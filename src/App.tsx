@@ -3,6 +3,11 @@ import { AppRoutes } from "./router";
 import { I18nextProvider } from "react-i18next";
 import i18n from "./i18n";
 import "./design-system/wakilisha.tokens.css";
+import "./design-system/wakilisha.elements.foundation.css";
+import "./design-system/wakilisha.elements.product.css";
+import "./design-system/wakilisha.elements.content.css";
+import "./design-system/wakilisha.elements.mobile.css";
+import "./design-system/wakilisha.elements.motion.css";
 import "./pages/admin/design-system/adminDesignSystemLayout.css";
 import { ThemeProvider } from "./components/design-system/theme/ThemeProvider";
 
