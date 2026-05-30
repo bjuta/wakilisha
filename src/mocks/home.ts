@@ -58,3 +58,18 @@ export const HOME_GENRE_VERTICALS = [
   { slug: "highlife", name: "Highlife", accentVar: "--wk-v-intel", artistCount: 64, trackCount: 310 },
   { slug: "bongo-flava", name: "Bongo Flava", accentVar: "--wk-v-places", artistCount: 47, trackCount: 240 },
 ];
+
+export const HOME_TRENDING_TRACKS = [
+  { slug: "calm-down", title: "Calm Down", artist: "Rema ft. Selena Gomez", streamCount: "2.1M", chartPosition: 3 },
+  { slug: "unavailable", title: "Unavailable", artist: "Davido ft. Musa Keys", streamCount: "1.8M", chartPosition: 5 },
+  { slug: "rush", title: "Rush", artist: "Ayra Starr", streamCount: "1.5M", chartPosition: 7 },
+  { slug: "terminator", title: "Terminator", artist: "Asake", streamCount: "1.4M", chartPosition: 8 },
+];
+
+export const HOME_RECENT_RELEASES = [
+  { slug: "timeless", title: "Timeless", artist: "Davido", releaseType: "Album", year: 2023, artworkUrl: "https://readdy.ai/api/search-image?query=music%20album%20cover%20art%2C%20African%20artist%2C%20modern%20design%2C%20warm%20tones%2C%20professional%20square%20artwork&width=400&height=400&seq=home-rel-1&orientation=squarish" },
+  { slug: "work-of-art", title: "Work of Art", artist: "Asake", releaseType: "Album", year: 2023, artworkUrl: "https://readdy.ai/api/search-image?query=contemporary%20African%20music%20album%20cover%2C%20artistic%20abstract%20design%2C%20warm%20colors%2C%20square%20format&width=400&height=400&seq=home-rel-2&orientation=squarish" },
+  { slug: "sability", title: "Sability", artist: "Ayra Starr", releaseType: "Single", year: 2023, artworkUrl: "https://readdy.ai/api/search-image?query=African%20female%20artist%20single%20artwork%2C%20vibrant%20colorful%20portrait%2C%20square%20format%2C%20modern%20pop%20art%20style&width=400&height=400&seq=home-rel-3&orientation=squarish" },
+  { slug: "boy-alone", title: "Boy Alone", artist: "Omah Lay", releaseType: "Album", year: 2022, artworkUrl: "https://readdy.ai/api/search-image?query=music%20album%20cover%2C%20moody%20atmospheric%20portrait%2C%20dark%20warm%20tones%2C%20square%20format%20artwork&width=400&height=400&seq=home-rel-4&orientation=squarish" },
+  { slug: "rave-and-roses", title: "Rave & Roses", artist: "Rema", releaseType: "Album", year: 2022, artworkUrl: "https://readdy.ai/api/search-image?query=vibrant%20African%20music%20album%20cover%2C%20colorful%20artistic%20design%2C%20square%20format%2C%20modern%20afrobeats%20style&width=400&height=400&seq=home-rel-5&orientation=squarish" },
+];

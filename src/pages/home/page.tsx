@@ -7,7 +7,7 @@ import { ChartRow } from "@/components/design-system/music/ChartRow";
 import { ArtistCard } from "@/components/design-system/registry/ArtistCard";
 import { StoryCard } from "@/components/design-system/editorial/StoryCard";
 import { SkeletonChartRow, SkeletonCard, SkeletonStoryCard } from "@/components/skeletons/Skeletons";
-import { HOME_CHART_ENTRIES, HOME_FEATURED_ARTISTS, HOME_EDITORIAL_STORIES, HOME_GENRE_VERTICALS } from "@/mocks/home";
+import { HOME_CHART_ENTRIES, HOME_FEATURED_ARTISTS, HOME_EDITORIAL_STORIES, HOME_GENRE_VERTICALS, HOME_RECENT_RELEASES, HOME_TRENDING_TRACKS } from "@/mocks/home";
 
 export default function Home() {
   const [loading, setLoading] = useState(true);
@@ -91,8 +91,56 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Artists section */}
+      {/* Trending tracks mini-section */}
       <section className="py-16 bg-[var(--wk-bg-subtle)]">
+        <div className="wk-container px-6">
+          <div className="mb-6 flex items-center justify-between">
+            <div>
+              <div className="wk-eyebrow mb-2">Discovery</div>
+              <h2 className="wk-h-section">Trending tracks</h2>
+            </div>
+            <Link to="/charts">
+              <WkButton variant="ghost">View charts</WkButton>
+            </Link>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {loading
+              ? Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="animate-pulse rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4">
+                    <div className="h-3 w-20 rounded bg-[var(--wk-surface-raised)] mb-2" />
+                    <div className="h-4 w-3/4 rounded bg-[var(--wk-surface-raised)] mb-1" />
+                    <div className="h-3 w-1/2 rounded bg-[var(--wk-surface-raised)]" />
+                  </div>
+                ))
+              : HOME_TRENDING_TRACKS.map((track) => (
+                  <Link
+                    key={track.slug}
+                    to={`/tracks/${track.slug}`}
+                    className="group rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4 transition-all hover:border-[var(--wk-border-2)]"
+                  >
+                    <div className="mb-2 flex items-center gap-2">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]">
+                        <i className="ri-fire-line text-xs" />
+                      </div>
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--wk-brand)]">
+                        Trending
+                      </span>
+                    </div>
+                    <h3 className="text-[14px] font-bold text-[var(--wk-text)]">{track.title}</h3>
+                    <div className="text-[12px] text-[var(--wk-text-muted)]">{track.artist}</div>
+                    <div className="mt-2 flex items-center gap-2 text-[11px] text-[var(--wk-text-faint)]">
+                      <span>{track.streamCount} streams</span>
+                      <span>·</span>
+                      <span>{track.chartPosition} on charts</span>
+                    </div>
+                  </Link>
+                ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Artists section */}
+      <section className="py-16">
         <div className="wk-container px-6">
           <div className="mb-6 flex items-center justify-between">
             <div>
@@ -107,6 +155,60 @@ export default function Home() {
             {loading
               ? Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)
               : HOME_FEATURED_ARTISTS.map((artist) => <ArtistCard key={artist.slug} {...artist} />)}
+          </div>
+        </div>
+      </section>
+
+      {/* Recent releases section */}
+      <section className="py-16 bg-[var(--wk-bg-subtle)]">
+        <div className="wk-container px-6">
+          <div className="mb-6 flex items-center justify-between">
+            <div>
+              <div className="wk-eyebrow mb-2">Fresh from the graph</div>
+              <h2 className="wk-h-section">Recent releases</h2>
+            </div>
+            <Link to="/releases">
+              <WkButton variant="ghost">All releases</WkButton>
+            </Link>
+          </div>
+          <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
+            {loading
+              ? Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="animate-pulse rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4">
+                    <div className="aspect-square rounded-lg bg-[var(--wk-surface-raised)] mb-3" />
+                    <div className="h-4 w-3/4 rounded bg-[var(--wk-surface-raised)] mb-1" />
+                    <div className="h-3 w-1/2 rounded bg-[var(--wk-surface-raised)]" />
+                  </div>
+                ))
+              : HOME_RECENT_RELEASES.map((release) => (
+                  <Link
+                    key={release.slug}
+                    to={`/releases/${release.slug}`}
+                    className="group block rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] overflow-hidden transition-all hover:border-[var(--wk-border-2)]"
+                  >
+                    <div className="relative aspect-square bg-[var(--wk-surface-raised)]">
+                      {release.artworkUrl ? (
+                        <img
+                          src={release.artworkUrl}
+                          alt={release.title}
+                          className="h-full w-full object-cover object-top transition-transform duration-[var(--wk-d-standard)] group-hover:scale-105"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center">
+                          <i className="ri-album-line text-4xl text-[var(--wk-text-faint)]" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-3">
+                      <h3 className="truncate text-[13px] font-bold text-[var(--wk-text)]">{release.title}</h3>
+                      <div className="truncate text-[12px] text-[var(--wk-text-muted)]">{release.artist}</div>
+                      <div className="mt-2 flex items-center gap-2">
+                        <WkTag>{release.releaseType}</WkTag>
+                        <span className="text-[11px] text-[var(--wk-text-faint)]">{release.year}</span>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
           </div>
         </div>
       </section>

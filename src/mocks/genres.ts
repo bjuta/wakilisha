@@ -12,3 +12,10 @@ export const GENRES = [
   { slug: "kwaito", name: "Kwaito", artistCount: 33, trackCount: 165, accentVar: "--wk-v-dance", representativeArtists: ["Brenda Fassie", "Arthur Mafokate", "Chomee"] },
   { slug: "afrobeats-gospel", name: "Gospel Afrobeats", artistCount: 26, trackCount: 140, accentVar: "--wk-v-intel", representativeArtists: ["Tim Godfrey", "Joe Mettle", "Nathaniel Bassey"] },
 ];
+
+export const TRENDING_GENRES = [
+  { slug: "amapiano", name: "Amapiano", artistCount: 112, trackCount: 680, accentVar: "--wk-v-dance", growth: 18 },
+  { slug: "afrorave", name: "Afrorave", artistCount: 29, trackCount: 120, accentVar: "--wk-v-dance", growth: 14 },
+  { slug: "afrobeats", name: "Afrobeats", artistCount: 284, trackCount: 1820, accentVar: "--wk-v-music", growth: 9 },
+  { slug: "trap", name: "Afro-Trap", artistCount: 52, trackCount: 290, accentVar: "--wk-v-film", growth: 7 },
+];

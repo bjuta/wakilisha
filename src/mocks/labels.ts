@@ -12,3 +12,9 @@ export const LABELS = [
   { slug: "platoon", name: "Platoon", country: "UK / Pan-African", artistCount: 18, releaseCount: 64 },
   { slug: "def-jam-africa", name: "Def Jam Africa", country: "South Africa", artistCount: 14, releaseCount: 55, isFeatured: true },
 ];
+
+export const FEATURED_LABELS = [
+  { slug: "mavin-records", name: "Mavin Records", country: "Nigeria", artistCount: 12, releaseCount: 48, featuredArtists: ["Ayra Starr", "Rema", "Ladipoe", "Magixx"] },
+  { slug: "empire-distribution", name: "EMPIRE Distribution", country: "USA / Pan-African", artistCount: 24, releaseCount: 112, featuredArtists: ["Fireboy DML", "Olamide", "Asake"] },
+  { slug: "atlantic-records", name: "Atlantic Records", country: "USA", artistCount: 5, releaseCount: 18, featuredArtists: ["Burna Boy", "Tems"] },
+];

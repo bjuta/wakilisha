@@ -1,37 +1,108 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { PageHero } from "@/components/design-system/primitives/PageHero";
-import { WkTag } from "@/components/design-system/primitives/Tag";
 import { ArtistCard } from "@/components/design-system/registry/ArtistCard";
 import { SkeletonCard } from "@/components/skeletons/Skeletons";
-import { ARTISTS, ARTIST_FILTERS } from "@/mocks/artists";
+import { ArtistSpotlight } from "./components/ArtistSpotlight";
+import { ArtistStats } from "./components/ArtistStats";
+import { ChartLegends } from "./components/ChartLegends";
+import { RisingArtists } from "./components/RisingArtists";
+import { GenreClusters } from "./components/GenreClusters";
+import { ARTISTS, ARTIST_FILTERS, ALPHABET, ARTIST_STATS, GENRE_CLUSTERS } from "@/mocks/artists";
 
 export default function Artists() {
   const [filter, setFilter] = useState("All");
+  const [alphaFilter, setAlphaFilter] = useState("All");
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
+  const [showDirectory, setShowDirectory] = useState(false);
 
   useEffect(() => {
-    const t = setTimeout(() => setLoading(false), 500);
+    const t = setTimeout(() => setLoading(false), 600);
     return () => clearTimeout(t);
   }, []);
 
   const filtered = ARTISTS.filter((a) => {
     const matchesFilter = filter === "All" || a.genres.some((g) => g === filter);
     const matchesQuery = !query.trim() || a.name.toLowerCase().includes(query.toLowerCase());
-    return matchesFilter && matchesQuery;
+    const matchesAlpha = alphaFilter === "All" || a.name.toUpperCase().startsWith(alphaFilter);
+    return matchesFilter && matchesQuery && matchesAlpha;
   });
+
+  const spotlightArtist = useMemo(() => {
+    // Pick a featured artist with high streams and chart presence
+    const chartLeaders = ARTISTS.filter((a) => a.isChartArtist && a.monthlyStreams > 10);
+    return chartLeaders[Math.floor(Math.random() * chartLeaders.length)] || ARTISTS[0];
+  }, []);
+
+  const chartLegends = ARTISTS.filter((a) => a.isChartArtist).sort(
+    (a, b) => a.topChartPosition - b.topChartPosition
+  );
+
+  const risingArtists = ARTISTS.filter((a) => a.isRising);
+
+  const stats = [
+    { label: "Artists", value: ARTIST_STATS.totalArtists },
+    { label: "Chart artists", value: ARTIST_STATS.chartArtists },
+    { label: "Tracks catalogued", value: ARTIST_STATS.totalTracks },
+    { label: "Releases", value: ARTIST_STATS.totalReleases },
+    { label: "Genres", value: ARTIST_STATS.totalGenres },
+    { label: "Monthly streams", value: ARTIST_STATS.monthlyStreams, suffix: "M", decimals: 1 },
+  ];
 
   return (
     <>
+      {/* Celebratory Hero — not a directory header */}
       <PageHero
-        eyebrow="Registry"
-        title="Artist directory"
-        subtitle={`${ARTISTS.length} artists indexed. Browse by name, genre, or chart activity.`}
+        eyebrow="The voices"
+        title="Artists"
+        subtitle={`${ARTIST_STATS.totalArtists} artists shaping the sound of now. From chart legends to rising voices, every story is here.`}
+        variant="standard"
+        actions={
+          <button
+            onClick={() => setShowDirectory(!showDirectory)}
+            className="wk-button wk-button-primary"
+          >
+            {showDirectory ? (
+              <>
+                Hide directory
+                <i className="ri-arrow-up-line" />
+              </>
+            ) : (
+              <>
+                Browse all artists
+                <i className="ri-arrow-down-line" />
+              </>
+            )}
+          </button>
+        }
       />
 
-      <div className="wk-container px-6 py-10">
-        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center">
-          <div className="relative flex-1">
+      {/* By The Numbers — aggregate stats strip */}
+      <ArtistStats stats={stats} />
+
+      {/* Artist Spotlight — one artist, full presence */}
+      <ArtistSpotlight {...spotlightArtist} />
+
+      {/* Chart Legends — the artists who run the charts */}
+      {!loading && <ChartLegends artists={chartLegends} />}
+
+      {/* Rising — emerging voices */}
+      {!loading && <RisingArtists artists={risingArtists} />}
+
+      {/* Genre Discovery — explore by sound */}
+      {!loading && <GenreClusters clusters={GENRE_CLUSTERS} />}
+
+      {/* Directory — search, filters, alphabet, grid — secondary, collapsible */}
+      <div className="wk-container px-6 py-14 md:py-20">
+        <div className="mb-6 flex items-center gap-3">
+          <div className="wk-eyebrow">Full directory</div>
+          <span className="text-[12px]" style={{ color: "var(--wk-text-muted)" }}>
+            {ARTISTS.length} artists
+          </span>
+        </div>
+
+        <div className="mb-6 flex flex-col gap-4">
+          <div className="relative max-w-md">
             <i className="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-[var(--wk-text-muted)]" />
             <input
               type="text"
@@ -41,26 +112,56 @@ export default function Artists() {
               className="w-full rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] py-2 pl-10 pr-4 text-[13px] text-[var(--wk-text)] placeholder:text-[var(--wk-text-faint)] outline-none focus:border-[var(--wk-brand)]"
             />
           </div>
-          <div className="flex flex-wrap gap-2">
-            {ARTIST_FILTERS.map((f) => (
+          <div className="flex flex-col gap-3">
+            {/* Alphabet filter */}
+            <div className="flex flex-wrap gap-1">
               <button
-                key={f}
-                onClick={() => setFilter(f)}
-                className={`rounded-full px-3 py-1.5 text-[13px] font-semibold transition-all whitespace-nowrap ${
-                  filter === f
+                onClick={() => setAlphaFilter("All")}
+                className={`h-7 min-w-[28px] rounded-md px-2 text-[11px] font-bold transition-all ${
+                  alphaFilter === "All"
                     ? "bg-[var(--wk-brand)] text-[var(--wk-brand-on)]"
-                    : "border border-[var(--wk-border)] text-[var(--wk-text-soft)] hover:bg-[var(--wk-surface-raised)]"
+                    : "border border-[var(--wk-border)] text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)]"
                 }`}
               >
-                {f}
+                All
               </button>
-            ))}
+              {ALPHABET.map((letter) => (
+                <button
+                  key={letter}
+                  onClick={() => setAlphaFilter(letter)}
+                  className={`h-7 min-w-[28px] rounded-md px-1.5 text-[11px] font-bold transition-all ${
+                    alphaFilter === letter
+                      ? "bg-[var(--wk-brand)] text-[var(--wk-brand-on)]"
+                      : "border border-[var(--wk-border)] text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)]"
+                  }`}
+                >
+                  {letter}
+                </button>
+              ))}
+            </div>
+            {/* Genre filter */}
+            <div className="flex flex-wrap gap-2">
+              {ARTIST_FILTERS.map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setFilter(f)}
+                  className={`rounded-full px-3 py-1.5 text-[13px] font-semibold transition-all whitespace-nowrap ${
+                    filter === f
+                      ? "bg-[var(--wk-brand)] text-[var(--wk-brand-on)]"
+                      : "border border-[var(--wk-border)] text-[var(--wk-text-soft)] hover:bg-[var(--wk-surface-raised)]"
+                  }`}
+                >
+                  {f}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
         <div className="mb-4 text-[13px] text-[var(--wk-text-muted)]">
           {filtered.length} artist{filtered.length !== 1 ? "s" : ""}
           {filter !== "All" && ` in ${filter}`}
+          {alphaFilter !== "All" && ` starting with ${alphaFilter}`}
         </div>
 
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">

@@ -10,3 +10,12 @@ export const RELEASES = [
 ];
 
 export const RELEASE_FILTERS = ["All", "Album", "EP", "Single"];
+
+export const RELEASE_GENRE_BREAKDOWN = [
+  { genre: "Afrobeats", count: 320, percentage: 42, accentVar: "--wk-v-music" },
+  { genre: "Afropop", count: 180, percentage: 24, accentVar: "--wk-v-music" },
+  { genre: "Amapiano", count: 120, percentage: 16, accentVar: "--wk-v-dance" },
+  { genre: "Highlife", count: 65, percentage: 8, accentVar: "--wk-v-intel" },
+  { genre: "R&B", count: 45, percentage: 6, accentVar: "--wk-v-film" },
+  { genre: "Rap", count: 32, percentage: 4, accentVar: "--wk-v-film" },
+];

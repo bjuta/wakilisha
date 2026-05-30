@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { PageHero } from "@/components/design-system/primitives/PageHero";
 import { LabelCard } from "@/components/design-system/registry/LabelCard";
-import { LABELS } from "@/mocks/labels";
+import { WkTag } from "@/components/design-system/primitives/Tag";
+import { LABELS, FEATURED_LABELS } from "@/mocks/labels";
 
 export default function Labels() {
   const [query, setQuery] = useState("");
@@ -28,6 +29,42 @@ export default function Labels() {
       />
 
       <div className="wk-container px-6 py-10">
+        {/* Featured labels */}
+        {!loading && (
+          <div className="mb-10">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="wk-eyebrow">Featured labels</div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {FEATURED_LABELS.map((label) => (
+                <div
+                  key={label.slug}
+                  className="relative overflow-hidden rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-5"
+                >
+                  <div className="absolute right-0 top-0 h-20 w-20 rounded-bl-full bg-[var(--wk-brand-soft)] opacity-40" />
+                  <div className="mb-2 flex items-center gap-2">
+                    <WkTag variant="brand">Featured</WkTag>
+                    {label.country && (
+                      <span className="text-[11px] text-[var(--wk-text-muted)]">{label.country}</span>
+                    )}
+                  </div>
+                  <h3 className="text-[16px] font-black text-[var(--wk-text)]">{label.name}</h3>
+                  <div className="mt-2 flex items-center gap-3 text-[12px] text-[var(--wk-text-muted)]">
+                    <span>{label.artistCount} artists</span>
+                    <span>{label.releaseCount} releases</span>
+                  </div>
+                  {label.featuredArtists && label.featuredArtists.length > 0 && (
+                    <div className="mt-3 text-[11px] text-[var(--wk-text-faint)]">
+                      {label.featuredArtists.join(", ")}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Search */}
         <div className="mb-6">
           <div className="relative max-w-sm">
             <i className="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-[var(--wk-text-muted)]" />
