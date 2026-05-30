@@ -1,3 +1,5 @@
+@import "./wakilisha.elements.charts-directory.css";
+
 /* WAKILISHA motion, delight and utility element styles. */
 @keyframes wk-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
 @keyframes wk-pulse-brand{0%,100%{opacity:1}50%{opacity:.6}}
