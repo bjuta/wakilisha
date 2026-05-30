@@ -28,6 +28,7 @@
     "extract:zip": "tsx packages/migration/src/extractZip.ts",
     "migration:audit": "tsx packages/migration/src/index.ts audit",
     "migration:chunked-seed": "tsx packages/migration/src/chunkedSeed.ts",
+    "migration:generate-registry": "tsx packages/migration/src/generateRegistry.ts",
     "migration:graph": "tsx packages/migration/src/index.ts graph",
     "migration:repair": "tsx packages/migration/src/index.ts repair",
     "migration:routes": "tsx packages/migration/src/index.ts routes",
