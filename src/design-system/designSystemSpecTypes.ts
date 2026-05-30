@@ -4,7 +4,9 @@ export type WkChapterGroup =
   | 'Media & Editorial'
   | 'Reach'
   | 'Implementation'
-  | 'React App UI';
+  | 'React App UI'
+  | 'Mobile-First Experience'
+  | 'Mobile High-Fidelity Screens';
 
 export interface WkQaCheck {
   id: string;
@@ -105,4 +107,6 @@ export const GROUPS = [
   'Reach',
   'Implementation',
   'React App UI',
+  'Mobile-First Experience',
+  'Mobile High-Fidelity Screens',
 ] as const;
