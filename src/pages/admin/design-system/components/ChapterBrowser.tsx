@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import type { WkDesignChapterSpec, WkParityPage } from "../../../../design-system/designSystemSpec";
 import { WkTag } from "../../../../components/design-system/primitives/Tag";
 import { WkSurface } from "../../../../components/design-system/primitives/Surface";
+import { CanonicalChapterDetail } from "./CanonicalChapterDetail";
 
 interface ChapterBrowserProps {
   chapters: WkDesignChapterSpec[];
@@ -60,6 +61,18 @@ export function ChapterBrowser({
                 <p className="line-clamp-2 text-[13px] leading-relaxed text-[var(--wk-text-muted)]">
                   {chapter.summary}
                 </p>
+                {chapter.canonical && (
+                  <div className="mt-3 rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg-subtle)] p-3">
+                    <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--wk-brand)]">
+                      Canonical depth
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <MiniMetric value={chapter.canonical.canonicalSubsections.length} label="Sections" />
+                      <MiniMetric value={chapter.canonical.richMedia.length} label="Visuals" />
+                      <MiniMetric value={chapter.canonical.canonicalMetrics.tables} label="Tables" />
+                    </div>
+                  </div>
+                )}
                 <div className="mt-3 grid grid-cols-2 gap-1">
                   <div className="flex items-center gap-1">
                     <i className="ri-file-list-line text-[11px] text-[var(--wk-text-faint)]" />
@@ -102,6 +115,17 @@ export function ChapterBrowser({
   );
 }
 
+function MiniMetric({ value, label }: { value: number | string; label: string }) {
+  return (
+    <div>
+      <div className="text-[15px] font-black leading-none text-[var(--wk-text)]">{value}</div>
+      <div className="mt-1 text-[9px] font-semibold uppercase tracking-[0.1em] text-[var(--wk-text-faint)]">
+        {label}
+      </div>
+    </div>
+  );
+}
+
 interface ChapterDetailProps {
   chapter: WkDesignChapterSpec;
   parityMap: WkParityPage[];
@@ -117,6 +141,7 @@ function ChapterDetail({ chapter, parityMap, onBack }: ChapterDetailProps) {
       <div className="flex flex-wrap items-start gap-3">
         <WkTag variant="brand">{chapter.number}</WkTag>
         <WkTag>{chapter.group}</WkTag>
+        {chapter.canonical && <WkTag>Canonical source: {chapter.canonical.canonicalAnchor}</WkTag>}
         <button
           onClick={onBack}
           className="ml-auto rounded-full px-3 py-1.5 text-[13px] font-semibold text-[var(--wk-text-muted)] transition-all hover:bg-[var(--wk-surface-raised)]"
@@ -128,6 +153,8 @@ function ChapterDetail({ chapter, parityMap, onBack }: ChapterDetailProps) {
       <h2 className="text-2xl font-black tracking-tight text-[var(--wk-text)]">
         {chapter.title}
       </h2>
+
+      <CanonicalChapterDetail chapter={chapter} />
 
       {/* Summary */}
       <WkSurface className="p-5">
