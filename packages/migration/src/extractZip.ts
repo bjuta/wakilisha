@@ -4,7 +4,7 @@ import { pipeline } from 'node:stream/promises';
 import unzipper from 'unzipper';
 
 const DEFAULT_DRIVE_URL =
-  'https://drive.google.com/file/d/13JlPAmlYUm-yl9kYtYqIYuykprX267YR/view?usp=drive_link';
+  'https://www.dropbox.com/scl/fi/zfhyr3spm1ga579oe08u1/wakilisha_supabase_import_2026-05-30.zip?rlkey=y66f7vvrobxcxkberuwx8dkfn&st=v3t4443o&dl=1';
 
 const DEFAULT_TARGET_DIR = path.join(
   process.cwd(),
