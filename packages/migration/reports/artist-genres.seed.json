@@ -1,0 +1,919 @@
+[
+  {
+    "artist_id": "358",
+    "genre_id": "16",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "235",
+    "genre_id": "5",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "530",
+    "genre_id": "7",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "492",
+    "genre_id": "14",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "313",
+    "genre_id": "14",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "323",
+    "genre_id": "19",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "224",
+    "genre_id": "14",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "390",
+    "genre_id": "14",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "47",
+    "genre_id": "14",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "482",
+    "genre_id": "20",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "61",
+    "genre_id": "18",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "222",
+    "genre_id": "21",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "263",
+    "genre_id": "21",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "302",
+    "genre_id": "21",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "28",
+    "genre_id": "2",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "449",
+    "genre_id": "21",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "337",
+    "genre_id": "20",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "238",
+    "genre_id": "1",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "435",
+    "genre_id": "7",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "542",
+    "genre_id": "3",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "378",
+    "genre_id": "19",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "77",
+    "genre_id": "5",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "215",
+    "genre_id": "20",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "231",
+    "genre_id": "21",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "236",
+    "genre_id": "17",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "523",
+    "genre_id": "5",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "464",
+    "genre_id": "25",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "529",
+    "genre_id": "5",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "140",
+    "genre_id": "5",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "534",
+    "genre_id": "5",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "267",
+    "genre_id": "8",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "229",
+    "genre_id": "8",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "511",
+    "genre_id": "15",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "308",
+    "genre_id": "21",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "159",
+    "genre_id": "2",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "237",
+    "genre_id": "21",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "163",
+    "genre_id": "21",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "513",
+    "genre_id": "5",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "175",
+    "genre_id": "21",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "333",
+    "genre_id": "5",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "220",
+    "genre_id": "19",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "434",
+    "genre_id": "21",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "55",
+    "genre_id": "21",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "226",
+    "genre_id": "21",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "261",
+    "genre_id": "21",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "307",
+    "genre_id": "25",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "120",
+    "genre_id": "3",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "152",
+    "genre_id": "20",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "541",
+    "genre_id": "2",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "274",
+    "genre_id": "15",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "157",
+    "genre_id": "20",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "130",
+    "genre_id": "15",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "145",
+    "genre_id": "21",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "475",
+    "genre_id": "20",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "150",
+    "genre_id": "2",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "250",
+    "genre_id": "5",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "497",
+    "genre_id": "21",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "27",
+    "genre_id": "2",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "228",
+    "genre_id": "5",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "310",
+    "genre_id": "5",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "382",
+    "genre_id": "21",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "381",
+    "genre_id": "20",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "508",
+    "genre_id": "20",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "415",
+    "genre_id": "21",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "54",
+    "genre_id": "5",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "160",
+    "genre_id": "20",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "354",
+    "genre_id": "5",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "199",
+    "genre_id": "5",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "813",
+    "genre_id": "20",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "193",
+    "genre_id": "2",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "454",
+    "genre_id": "3",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "440",
+    "genre_id": "20",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "408",
+    "genre_id": "20",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "361",
+    "genre_id": "21",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "400",
+    "genre_id": "5",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "500",
+    "genre_id": "20",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "493",
+    "genre_id": "15",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "462",
+    "genre_id": "20",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "557",
+    "genre_id": "20",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "550",
+    "genre_id": "2",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "322",
+    "genre_id": "20",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "379",
+    "genre_id": "21",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "253",
+    "genre_id": "21",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "520",
+    "genre_id": "21",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "286",
+    "genre_id": "25",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "317",
+    "genre_id": "25",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "540",
+    "genre_id": "25",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "348",
+    "genre_id": "25",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "506",
+    "genre_id": "25",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "370",
+    "genre_id": "5",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "264",
+    "genre_id": "2",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "40",
+    "genre_id": "3",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "82",
+    "genre_id": "7",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "63",
+    "genre_id": "7",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "528",
+    "genre_id": "7",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "309",
+    "genre_id": "21",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "3",
+    "genre_id": "21",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "257",
+    "genre_id": "21",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "52",
+    "genre_id": "21",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "558",
+    "genre_id": "5",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "535",
+    "genre_id": "5",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "515",
+    "genre_id": "5",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "426",
+    "genre_id": "5",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "311",
+    "genre_id": "5",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "425",
+    "genre_id": "5",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "31",
+    "genre_id": "5",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "525",
+    "genre_id": "5",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "559",
+    "genre_id": "5",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "371",
+    "genre_id": "5",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "318",
+    "genre_id": "5",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "181",
+    "genre_id": "5",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "166",
+    "genre_id": "5",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "69",
+    "genre_id": "5",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "35",
+    "genre_id": "5",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "424",
+    "genre_id": "5",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "289",
+    "genre_id": "5",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "90",
+    "genre_id": "5",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "350",
+    "genre_id": "5",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "524",
+    "genre_id": "5",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "427",
+    "genre_id": "5",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "536",
+    "genre_id": "5",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "39",
+    "genre_id": "5",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "555",
+    "genre_id": "25",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "56",
+    "genre_id": "25",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "433",
+    "genre_id": "7",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "433",
+    "genre_id": "21",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "1643",
+    "genre_id": "17",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "555",
+    "genre_id": "12",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "56",
+    "genre_id": "12",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "370",
+    "genre_id": "23",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  },
+  {
+    "artist_id": "385",
+    "genre_id": "5",
+    "source": "wp_wkcharts_artist_genres",
+    "confidence": 0.85,
+    "needs_review": false
+  }
+]

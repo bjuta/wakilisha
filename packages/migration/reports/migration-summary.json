@@ -1,0 +1,86 @@
+{
+  "generatedAt": "2026-05-30T17:45:58.900Z",
+  "graph": {
+    "totalTracks": 5549,
+    "tracksWithArtists": 5549,
+    "tracksWithoutArtists": 0,
+    "releasesWithTracklists": 559,
+    "releasesWithoutTracklists": -390,
+    "artistsWithGenres": 131,
+    "chartEntriesLinked": 6332,
+    "mediaAssetsLinked": 1929,
+    "oldRoutesResolved": 0,
+    "oldRoutesUnresolved": 0
+  },
+  "routes": {
+    "totalOldSlugs": 0,
+    "activeRoutes": 0,
+    "redirects": 0,
+    "retired": 0,
+    "duplicates": 0,
+    "flagged": 0,
+    "unresolved": 0,
+    "byEntityType": {}
+  },
+  "playback": {
+    "totalTracks": 5549,
+    "tracksWithPreview": 1069,
+    "tracksWithAppleId": 7031,
+    "tracksWithIsrc": 5549,
+    "tracksWithArtwork": 5549,
+    "tracksWithoutPlayable": 4480,
+    "byProvider": {
+      "apple_music": 7327,
+      "spotify": 486,
+      "multiple": 177,
+      "media_asset": 1483
+    }
+  },
+  "content": {
+    "total": 1960,
+    "articles": 75,
+    "guides": 0,
+    "surfacePages": 0,
+    "appMounts": 0,
+    "taxonomyShells": 0,
+    "utilityPages": 0,
+    "commercePages": 0,
+    "retire": 0,
+    "review": 1920
+  },
+  "counts": {
+    "totalRelationships": 20559,
+    "totalReviewItems": 7446,
+    "trackArtists": 7295,
+    "releaseTracks": 4293,
+    "artistGenres": 131,
+    "playbackSources": 9473,
+    "entitySlugs": 0,
+    "chartEntryTracks": 6332
+  },
+  "issueTypes": {
+    "track_artist_name_looks_combined": 1258,
+    "possible_combined_artist_string": 641,
+    "track_without_playable_metadata": 5547
+  },
+  "relationshipTypes": {
+    "track_artist": 7295,
+    "release_track": 4293,
+    "artist_genre": 131,
+    "entity_media": 1094,
+    "release_source": 1414,
+    "chart_entry_track": 6332
+  },
+  "acceptanceGate": {
+    "allCsvsLoad": true,
+    "allEntitiesCanonical": true,
+    "entityRelationshipsNotEmpty": true,
+    "allTracksHaveArtistOrReview": true,
+    "allReleasesHaveTracklistOrReview": false,
+    "artistGenresRestoredOrFlagged": true,
+    "chartEntriesLinkedOrFlagged": true,
+    "mediaAssetsLinkedOrFlagged": true,
+    "oldRoutesResolvedOrFlagged": true,
+    "reactPayloadsPossible": true
+  }
+}

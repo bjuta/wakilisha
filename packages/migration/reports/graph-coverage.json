@@ -1,0 +1,76 @@
+{
+  "generatedAt": "2026-05-30T17:35:15.381Z",
+  "sourceTablesPresent": {
+    "wk_tracks": true,
+    "wk_releases": true,
+    "wk_labels": true,
+    "wk_genres": true,
+    "wk_chart_series": true,
+    "wk_chart_editions": true,
+    "wk_chart_entries": true,
+    "wk_registry_entities": true,
+    "wk_media_assets": true,
+    "wk_articles": true,
+    "wk_guides": false,
+    "wk_page_surfaces": false,
+    "wk_old_primary_slugs": false,
+    "wk_old_registry_rows": true,
+    "wk_wordpress_items": false
+  },
+  "oldRegistrySourceCounts": {
+    "wp_wkcharts_tracks": 5549,
+    "wp_wkcharts_track_artists": 7295,
+    "wp_wkcharts_release_shells": 169,
+    "wp_wkcharts_track_sources": 2006,
+    "wp_wkcharts_release_tracks": 4293,
+    "wp_wkcharts_track_stats": 710,
+    "wp_wkcharts_labels": 232,
+    "wp_wkcharts_artists": 1712,
+    "wp_wkcharts_artist_genres": 131,
+    "wp_wkcharts_entity_slugs": 8204,
+    "wp_wkcharts_release_sources": 1487,
+    "wp_wkcharts_release_shell_artists": 648,
+    "wp_wkcharts_release_shell_tracks": 1026,
+    "wp_wkcharts_release_admin_history": 249,
+    "wp_wkcharts_editions": 77,
+    "wp_wkcharts_edition_items": 6332,
+    "wp_wkcharts_edition_snapshots": 77,
+    "wp_wkcharts_edition_snapshot_items": 700,
+    "wp_wkcharts_ingest_runs": 201,
+    "wp_waki_artists": 189,
+    "wp_waki_music_artist_profiles": 417,
+    "wp_waki_music_artists": 458
+  },
+  "counts": {
+    "tracks": 5549,
+    "releases": 169,
+    "chartEntries": 6332,
+    "mediaAssets": 1929,
+    "relationships": 20123,
+    "reviewItems": 813
+  },
+  "relationshipTypes": {
+    "track_artist": 7296,
+    "release_label": 150,
+    "chart_entry_track": 6332,
+    "entity_media": 1929,
+    "release_track": 4288,
+    "artist_genre": 128
+  },
+  "relationshipSources": {
+    "wk_tracks.artist_slug": 5502,
+    "wk_releases.label_slug": 150,
+    "wk_chart_entries.track_slug": 6332,
+    "wk_media_assets": 1929,
+    "old_registry.wp_wkcharts_track_artists": 1794,
+    "old_registry.wp_wkcharts_release_tracks": 4288,
+    "old_registry.wp_wkcharts_artist_genres": 128
+  },
+  "reviewIssueTypes": {
+    "missing_artist_relationship": 47,
+    "possible_combined_artist_string": 641,
+    "old_track_artist_unresolved_slug": 117,
+    "old_release_track_unresolved_slug": 5,
+    "old_artist_genre_unresolved_slug": 3
+  }
+}

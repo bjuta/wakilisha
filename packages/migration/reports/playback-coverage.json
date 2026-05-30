@@ -1,0 +1,14 @@
+{
+  "totalTracks": 5549,
+  "tracksWithPreview": 1069,
+  "tracksWithAppleId": 7031,
+  "tracksWithIsrc": 5549,
+  "tracksWithArtwork": 5549,
+  "tracksWithoutPlayable": 4480,
+  "byProvider": {
+    "apple_music": 7327,
+    "spotify": 486,
+    "multiple": 177,
+    "media_asset": 1483
+  }
+}

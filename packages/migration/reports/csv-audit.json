@@ -1,0 +1,350 @@
+{
+  "importDir": "/workspaces/wakilisha/data/supabase-imports/2026-05-30/raw",
+  "detectedAt": "2026-05-30T17:54:47.035Z",
+  "expectedTables": [
+    "wk_tracks",
+    "wk_releases",
+    "wk_labels",
+    "wk_genres",
+    "wk_chart_series",
+    "wk_chart_editions",
+    "wk_chart_entries",
+    "wk_registry_entities",
+    "wk_media_assets",
+    "wk_articles",
+    "wk_guides",
+    "wk_page_surfaces",
+    "wk_old_primary_slugs",
+    "wk_old_registry_rows",
+    "wk_wordpress_items"
+  ],
+  "foundTables": [
+    "wk_articles",
+    "wk_chart_editions",
+    "wk_chart_entries",
+    "wk_chart_series",
+    "wk_genres",
+    "wk_labels",
+    "wk_media_assets",
+    "wk_old_registry_rows",
+    "wk_registry_entities",
+    "wk_releases",
+    "wk_tracks"
+  ],
+  "missingTables": [
+    "wk_guides",
+    "wk_page_surfaces",
+    "wk_old_primary_slugs",
+    "wk_wordpress_items"
+  ],
+  "unknownFiles": [
+    "wk_old_primary_slugs.csv",
+    "wk_wordpress_items.csv"
+  ],
+  "files": [
+    {
+      "table": "wk_articles",
+      "fileName": "wk_articles.csv",
+      "rowCount": 217,
+      "headers": [
+        "id",
+        "source_wp_post_id",
+        "slug",
+        "title",
+        "excerpt",
+        "content_html",
+        "author",
+        "published_at",
+        "modified_at",
+        "categories",
+        "tags",
+        "seo",
+        "raw_meta",
+        "wp_status",
+        "created_at",
+        "updated_at"
+      ]
+    },
+    {
+      "table": "wk_chart_editions",
+      "fileName": "wk_chart_editions.csv",
+      "rowCount": 87,
+      "headers": [
+        "id",
+        "source_wp_post_id",
+        "series_wp_post_id",
+        "edition_id",
+        "slug",
+        "chart_slug",
+        "title",
+        "chart_date",
+        "cover_items",
+        "raw_meta",
+        "wp_status",
+        "created_at",
+        "updated_at"
+      ]
+    },
+    {
+      "table": "wk_chart_entries",
+      "fileName": "wk_chart_entries.csv",
+      "rowCount": 6332,
+      "headers": [
+        "id",
+        "chart_payload_id",
+        "chart_document_id",
+        "chart_source_wp_post_id",
+        "chart_slug",
+        "edition_id",
+        "chart_date",
+        "position",
+        "previous_position",
+        "title",
+        "artist_name",
+        "artist_slug",
+        "track_slug",
+        "release_slug",
+        "label_name",
+        "isrc",
+        "duration",
+        "release_date",
+        "artwork_url",
+        "preview_url",
+        "source_payload",
+        "is_resolved"
+      ]
+    },
+    {
+      "table": "wk_chart_series",
+      "fileName": "wk_chart_series.csv",
+      "rowCount": 5,
+      "headers": [
+        "id",
+        "source_wp_post_id",
+        "slug",
+        "title",
+        "raw_meta",
+        "wp_status",
+        "created_at",
+        "updated_at"
+      ]
+    },
+    {
+      "table": "wk_genres",
+      "fileName": "wk_genres.csv",
+      "rowCount": 17,
+      "headers": [
+        "id",
+        "source_wp_post_id",
+        "slug",
+        "name",
+        "description",
+        "raw_meta",
+        "wp_status",
+        "created_at",
+        "updated_at"
+      ]
+    },
+    {
+      "table": "wk_articles",
+      "fileName": "wk_guides.csv",
+      "rowCount": 3,
+      "headers": [
+        "id",
+        "source_wp_post_id",
+        "slug",
+        "title",
+        "content_html",
+        "raw_meta",
+        "wp_status",
+        "created_at",
+        "updated_at"
+      ]
+    },
+    {
+      "table": "wk_labels",
+      "fileName": "wk_labels.csv",
+      "rowCount": 232,
+      "headers": [
+        "id",
+        "source_wp_post_id",
+        "slug",
+        "name",
+        "country",
+        "city",
+        "logo_url",
+        "website",
+        "content_html",
+        "excerpt_html",
+        "wp_status",
+        "editable_payload",
+        "immutable_payload",
+        "seo_payload",
+        "updated_at"
+      ]
+    },
+    {
+      "table": "wk_media_assets",
+      "fileName": "wk_media_assets.csv",
+      "rowCount": 1929,
+      "headers": [
+        "id",
+        "entity_type",
+        "entity_slug",
+        "role",
+        "url",
+        "alt_text",
+        "raw_meta",
+        "source"
+      ]
+    },
+    {
+      "table": null,
+      "fileName": "wk_old_primary_slugs.csv",
+      "rowCount": 8204,
+      "headers": [
+        "entity_type",
+        "entity_id",
+        "entity_slug",
+        "full_slug"
+      ]
+    },
+    {
+      "table": "wk_old_registry_rows",
+      "fileName": "wk_old_registry_rows.csv",
+      "rowCount": 42162,
+      "headers": [
+        "id",
+        "import_run_id",
+        "source_table",
+        "source_pk",
+        "source_row_index",
+        "row_hash",
+        "row_data",
+        "created_at"
+      ]
+    },
+    {
+      "table": "wk_articles",
+      "fileName": "wk_page_surfaces.csv",
+      "rowCount": 79,
+      "headers": [
+        "id",
+        "source_wp_post_id",
+        "document_type",
+        "slug",
+        "title",
+        "wp_status",
+        "content_html",
+        "excerpt_html",
+        "editable_payload",
+        "immutable_payload",
+        "seo_payload",
+        "is_surface"
+      ]
+    },
+    {
+      "table": "wk_registry_entities",
+      "fileName": "wk_registry_entities.csv",
+      "rowCount": 7662,
+      "headers": [
+        "entity_type",
+        "id",
+        "source_wp_post_id",
+        "slug",
+        "title",
+        "country",
+        "city",
+        "image_url",
+        "hero_image_url",
+        "raw_meta",
+        "wp_status",
+        "href"
+      ]
+    },
+    {
+      "table": "wk_releases",
+      "fileName": "wk_releases.csv",
+      "rowCount": 169,
+      "headers": [
+        "id",
+        "source_wp_post_id",
+        "slug",
+        "title",
+        "artist_display",
+        "artist_slug",
+        "release_type",
+        "release_date",
+        "label_name",
+        "label_slug",
+        "artwork_url",
+        "tracklist",
+        "platform_links",
+        "content_html",
+        "excerpt_html",
+        "wp_status",
+        "editable_payload",
+        "immutable_payload",
+        "seo_payload",
+        "updated_at"
+      ]
+    },
+    {
+      "table": "wk_tracks",
+      "fileName": "wk_tracks.csv",
+      "rowCount": 5549,
+      "headers": [
+        "id",
+        "source_wp_post_id",
+        "slug",
+        "title",
+        "artist_name",
+        "artist_slug",
+        "isrc",
+        "duration",
+        "label_name",
+        "label_slug",
+        "release_title",
+        "release_slug",
+        "release_date",
+        "artwork_url",
+        "preview_url",
+        "platform_links",
+        "content_html",
+        "excerpt_html",
+        "wp_status",
+        "editable_payload",
+        "immutable_payload",
+        "seo_payload",
+        "updated_at"
+      ]
+    },
+    {
+      "table": null,
+      "fileName": "wk_wordpress_items.csv",
+      "rowCount": 1867,
+      "headers": [
+        "id",
+        "import_source_id",
+        "source_file",
+        "wp_post_id",
+        "wp_post_type",
+        "wp_status",
+        "wp_parent_id",
+        "wp_guid",
+        "original_slug",
+        "original_title",
+        "original_author",
+        "original_permalink",
+        "original_published_at",
+        "original_modified_at",
+        "content_hash",
+        "meta_hash",
+        "terms_hash",
+        "raw_item",
+        "imported_at",
+        "immutable_locked"
+      ]
+    }
+  ]
+}

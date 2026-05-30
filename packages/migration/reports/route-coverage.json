@@ -1,0 +1,22 @@
+{
+  "generatedAt": "2026-05-30T17:55:07.024Z",
+  "counts": {
+    "entitySlugs": 7679,
+    "reviewItems": 0,
+    "active": 7679,
+    "review": 17,
+    "routeConflicts": 0
+  },
+  "entityTypes": {
+    "artist": 1712,
+    "track": 5549,
+    "release": 169,
+    "label": 232,
+    "genre": 17
+  },
+  "sources": {
+    "wk_registry_entities.href": 7662,
+    "wk_genres": 17
+  },
+  "reviewIssueTypes": {}
+}
