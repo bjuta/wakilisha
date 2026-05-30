@@ -1,0 +1,62 @@
+export const SECTIONS = ["All", "Analysis", "Focus", "Industry", "Culture", "Interview"];
+
+export const STORIES = [
+  {
+    slug: "state-of-afrobeats-2024",
+    title: "The state of Afrobeats in 2024: global reach, local soul",
+    section: "Analysis",
+    date: "May 27, 2024",
+    readingTime: 8,
+    heroUrl: "https://readdy.ai/api/search-image?query=African%20music%20concert%20stage%20performance%2C%20crowd%2C%20dramatic%20lighting%2C%20cultural%20celebration%2C%20editorial%20photography%20style%2C%20wide%20angle&width=900&height=480&seq=mag1&orientation=landscape",
+    dek: "How the genre's breakout year reshaped industry expectations and who is driving the next wave.",
+    isFeatured: true,
+  },
+  {
+    slug: "east-africa-music-scene",
+    title: "East Africa's quiet surge: Tanzania and Kenya rewrite the map",
+    section: "Focus",
+    date: "May 20, 2024",
+    readingTime: 6,
+    heroUrl: "https://readdy.ai/api/search-image?query=East%20African%20city%20music%20culture%20documentary%20photography%2C%20Nairobi%20urban%20landscape%2C%20warm%20sunlight&width=400&height=240&seq=mag2&orientation=landscape",
+  },
+  {
+    slug: "streaming-economics",
+    title: "Streaming economics and the African artist",
+    section: "Industry",
+    date: "May 13, 2024",
+    readingTime: 5,
+    heroUrl: "https://readdy.ai/api/search-image?query=music%20streaming%20technology%20headphones%20digital%20music%20interface%20studio%20recording%20equipment%20warm%20light&width=400&height=240&seq=mag3&orientation=landscape",
+  },
+  {
+    slug: "genre-crossover",
+    title: "When genres cross: Afrobeats meets hip-hop in real time",
+    section: "Culture",
+    date: "May 6, 2024",
+    readingTime: 4,
+    heroUrl: "https://readdy.ai/api/search-image?query=music%20studio%20recording%20session%20African%20musicians%20collaboration%20creative%20process%20documentary%20photography&width=400&height=240&seq=mag4&orientation=landscape",
+  },
+  {
+    slug: "tems-interview",
+    title: "Tems: 'I don't chase the mainstream. I build the sound.'",
+    section: "Interview",
+    date: "Apr 29, 2024",
+    readingTime: 7,
+    heroUrl: "https://readdy.ai/api/search-image?query=African%20female%20singer%20interview%20portrait%2C%20editorial%20photography%2C%20warm%20lighting%2C%20contemplative%20expression&width=400&height=240&seq=mag5&orientation=landscape",
+  },
+  {
+    slug: "chart-methodology",
+    title: "How WAKILISHA charts work: sources, signals, and trust",
+    section: "Industry",
+    date: "Apr 22, 2024",
+    readingTime: 6,
+    heroUrl: "https://readdy.ai/api/search-image?query=data%20analytics%20music%20chart%20visualization%2C%20editorial%20photography%2C%20screens%2C%20abstract%20data&width=400&height=240&seq=mag6&orientation=landscape",
+  },
+  {
+    slug: "burna-boy-love-damini-retrospective",
+    title: "Two years on: Love, Damini rewired the global conversation",
+    section: "Analysis",
+    date: "Apr 15, 2024",
+    readingTime: 9,
+    heroUrl: "https://readdy.ai/api/search-image?query=African%20musician%20on%20stage%20concert%2C%20dramatic%20spotlight%2C%20powerful%20performance%20photography&width=400&height=240&seq=mag7&orientation=landscape",
+  },
+];

@@ -10,5 +10,5 @@
     "resolveJsonModule": true,
     "outDir": "dist"
   },
-  "include": ["packages/**/*.ts"]
+  "include": ["src/**/*", "packages/**/*.ts"]
 }
