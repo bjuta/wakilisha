@@ -4,8 +4,36 @@ import { productChapters } from './chapters/product';
 import { mediaChapters } from './chapters/media';
 import { reachChapters, implementationChapters } from './chapters/reachAndImplementation';
 import { reactAppUIChapters } from './chapters/reactAppUI';
+import { canonicalChapterEnhancementByNumber, canonicalChapterEnhancements } from './canonicalChapterEnhancements';
 
 export * from './designSystemSpecTypes';
+export * from './canonicalChapterEnhancements';
+
+const baseChapters = [
+  ...foundationsChapters,
+  ...productChapters,
+  ...mediaChapters,
+  ...reachChapters,
+  ...implementationChapters,
+  ...reactAppUIChapters,
+];
+
+const chapters = baseChapters.map((chapter) => ({
+  ...chapter,
+  canonical: canonicalChapterEnhancementByNumber[chapter.number],
+}));
+
+const canonicalTotals = canonicalChapterEnhancements.reduce(
+  (acc, chapter) => {
+    acc.richMediaSpecimens += chapter.canonicalMetrics.visualSpecimens;
+    acc.sourceTables += chapter.canonicalMetrics.tables;
+    acc.sourceCodeBlocks += chapter.canonicalMetrics.codeBlocks;
+    acc.sourceCallouts += chapter.canonicalMetrics.callouts;
+    acc.sourceDoDontCards += chapter.canonicalMetrics.doDontCards;
+    return acc;
+  },
+  { richMediaSpecimens: 0, sourceTables: 0, sourceCodeBlocks: 0, sourceCallouts: 0, sourceDoDontCards: 0 }
+);
 
 export const wakilishaDesignSystemSpec: WkDesignSystemSpec = {
   meta: {
@@ -23,14 +51,18 @@ export const wakilishaDesignSystemSpec: WkDesignSystemSpec = {
     rule: 'The interface stays small until the content earns space.'
   },
 
-  chapters: [
-    ...foundationsChapters,
-    ...productChapters,
-    ...mediaChapters,
-    ...reachChapters,
-    ...implementationChapters,
-    ...reactAppUIChapters,
-  ],
+  chapters,
+
+  canonicalParity: {
+    canonicalChapterCount: canonicalChapterEnhancements.length,
+    implementedChapterCount: chapters.filter((chapter) => chapter.canonical).length,
+    richMediaSpecimens: canonicalTotals.richMediaSpecimens,
+    sourceTables: canonicalTotals.sourceTables,
+    sourceCodeBlocks: canonicalTotals.sourceCodeBlocks,
+    sourceCallouts: canonicalTotals.sourceCallouts,
+    sourceDoDontCards: canonicalTotals.sourceDoDontCards,
+    parityPercent: Math.round((chapters.filter((chapter) => chapter.canonical).length / canonicalChapterEnhancements.length) * 100),
+  },
 
   parityPageMap: [
     { route: '/', archetype: 'Home / cultural graph overview', chapters: ['01','04','05','06','13','16','19','21','22','35','38'], qaChecks: ['01-earn-space','01-culture-forward','01-no-templates','04-token-only','05-fonts','06-token-spacing','13-metadata','16-dock-height','19-scrim-legible','35-scale-appropriate','38-editorial'] },
