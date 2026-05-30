@@ -1,4 +1,6 @@
-export const LABELS = [
+import { getLabels, hasImportedRegistryData, toLabelCard } from '@/data/registry/registry';
+
+const FALLBACK_LABELS = [
   { slug: "mavin-records", name: "Mavin Records", country: "Nigeria", artistCount: 12, releaseCount: 48, isFeatured: true },
   { slug: "ybnl-nation", name: "YBNL Nation", country: "Nigeria", artistCount: 8, releaseCount: 35 },
   { slug: "empire-distribution", name: "EMPIRE Distribution", country: "USA / Pan-African", artistCount: 24, releaseCount: 112, isFeatured: true },
@@ -13,8 +15,12 @@ export const LABELS = [
   { slug: "def-jam-africa", name: "Def Jam Africa", country: "South Africa", artistCount: 14, releaseCount: 55, isFeatured: true },
 ];
 
-export const FEATURED_LABELS = [
-  { slug: "mavin-records", name: "Mavin Records", country: "Nigeria", artistCount: 12, releaseCount: 48, featuredArtists: ["Ayra Starr", "Rema", "Ladipoe", "Magixx"] },
-  { slug: "empire-distribution", name: "EMPIRE Distribution", country: "USA / Pan-African", artistCount: 24, releaseCount: 112, featuredArtists: ["Fireboy DML", "Olamide", "Asake"] },
-  { slug: "atlantic-records", name: "Atlantic Records", country: "USA", artistCount: 5, releaseCount: 18, featuredArtists: ["Burna Boy", "Tems"] },
-];
+export const LABELS = hasImportedRegistryData() ? getLabels().map(toLabelCard) : FALLBACK_LABELS;
+
+export const FEATURED_LABELS = LABELS
+  .filter((label) => label.isFeatured)
+  .slice(0, 6)
+  .map((label) => ({
+    ...label,
+    featuredArtists: 'featuredArtists' in label && Array.isArray(label.featuredArtists) ? label.featuredArtists : [],
+  }));
