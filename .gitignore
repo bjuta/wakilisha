@@ -1,0 +1,27 @@
+# Dependencies
+node_modules
+
+# Raw data imports
+data/supabase-imports/**/raw/*.csv
+
+# Build outputs
+dist
+build
+
+# Migration reports (keep in repo for now, but may be ignored later)
+# packages/migration/reports/*.json
+# packages/migration/reports/*.md
+
+# Environment
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
