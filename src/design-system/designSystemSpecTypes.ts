@@ -12,6 +12,46 @@ export interface WkQaCheck {
   description: string;
 }
 
+export type WkRichMediaKind =
+  | 'brand'
+  | 'token'
+  | 'component'
+  | 'pattern'
+  | 'page'
+  | 'mobile'
+  | 'animation'
+  | 'data-viz';
+
+export interface WkRichMediaSpecimen {
+  id: string;
+  label: string;
+  kind: WkRichMediaKind;
+  canonicalClass: string | null;
+  count: number;
+  implementation: string;
+}
+
+export interface WkCanonicalMetrics {
+  subsections: number;
+  tables: number;
+  codeBlocks: number;
+  callouts: number;
+  doDontCards: number;
+  visualSpecimens: number;
+}
+
+export interface WkCanonicalChapterEnhancement {
+  number: string;
+  canonicalAnchor: string;
+  group: WkChapterGroup;
+  title: string;
+  canonicalDescription: string;
+  canonicalSubsections: string[];
+  richMedia: WkRichMediaSpecimen[];
+  canonicalMetrics: WkCanonicalMetrics;
+  parityInstruction: string;
+}
+
 export interface WkDesignChapterSpec {
   id: string;
   number: string;
@@ -24,6 +64,7 @@ export interface WkDesignChapterSpec {
   tables: string[];
   parityTargets: string[];
   qaChecks: WkQaCheck[];
+  canonical?: WkCanonicalChapterEnhancement;
 }
 
 export interface WkParityPage {
@@ -45,6 +86,16 @@ export interface WkDesignSystemSpec {
   chapters: WkDesignChapterSpec[];
   parityPageMap: WkParityPage[];
   globalQaGates: WkQaCheck[];
+  canonicalParity?: {
+    canonicalChapterCount: number;
+    implementedChapterCount: number;
+    richMediaSpecimens: number;
+    sourceTables: number;
+    sourceCodeBlocks: number;
+    sourceCallouts: number;
+    sourceDoDontCards: number;
+    parityPercent: number;
+  };
 }
 
 export const GROUPS = [
