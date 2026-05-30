@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { EXPECTED_TABLES, type ExpectedTable } from './config.js';
 import { listCsvFiles, readCsvRows, readCsvSummary, writeJson, writeText } from './csv.js';
+import { buildOldRegistryRepair } from './oldRegistry.js';
 import { detectTable } from './tableSignatures.js';
 
 type Row = Record<string, string>;
@@ -88,6 +89,16 @@ function addRelationship(list: Relationship[], rel: Relationship) {
   if (!duplicate) list.push(rel);
 }
 
+function addReviewItem(list: ReviewItem[], item: ReviewItem) {
+  const duplicate = list.some((existing) =>
+    existing.entityType === item.entityType &&
+    existing.entityId === item.entityId &&
+    existing.issue === item.issue &&
+    existing.source === item.source
+  );
+  if (!duplicate) list.push(item);
+}
+
 function parseJsonMaybe(value: string | undefined): unknown | null {
   if (!value) return null;
   try {
@@ -125,7 +136,7 @@ export function buildGraphReports(importDir: string, reportDir: string) {
         reviewReason: hasCombinedArtistSignal(artistName) ? 'artist_name_looks_combined' : null
       });
     } else {
-      reviewQueue.push({
+      addReviewItem(reviewQueue, {
         entityType: 'track',
         entityId: trackSlug,
         label: track.title ?? trackSlug,
@@ -156,7 +167,7 @@ export function buildGraphReports(importDir: string, reportDir: string) {
 
     const tracklist = parseJsonMaybe(release.tracklist);
     if (!Array.isArray(tracklist) || tracklist.length === 0) {
-      reviewQueue.push({
+      addReviewItem(reviewQueue, {
         entityType: 'release',
         entityId: releaseSlug,
         label: release.title ?? releaseSlug,
@@ -183,7 +194,7 @@ export function buildGraphReports(importDir: string, reportDir: string) {
         needsReview: entry.is_resolved !== 'true'
       });
     } else {
-      reviewQueue.push({
+      addReviewItem(reviewQueue, {
         entityType: 'chart_entry',
         entityId: entryId,
         label: `${entry.title ?? 'Untitled'} - ${entry.artist_name ?? 'Unknown artist'}`,
@@ -210,7 +221,7 @@ export function buildGraphReports(importDir: string, reportDir: string) {
         needsReview: false
       });
     } else {
-      reviewQueue.push({
+      addReviewItem(reviewQueue, {
         entityType: type || 'unknown',
         entityId: slug || media.id || 'unknown',
         label: media.alt_text || media.url || 'Unlabeled media',
@@ -223,7 +234,7 @@ export function buildGraphReports(importDir: string, reportDir: string) {
 
   for (const artist of tables.wk_registry_entities?.filter((row) => row.entity_type === 'artist') ?? []) {
     if (hasCombinedArtistSignal(artist.title)) {
-      reviewQueue.push({
+      addReviewItem(reviewQueue, {
         entityType: 'artist',
         entityId: artist.slug || artist.id,
         label: artist.title ?? artist.slug,
@@ -234,9 +245,14 @@ export function buildGraphReports(importDir: string, reportDir: string) {
     }
   }
 
+  const oldRegistry = buildOldRegistryRepair(tables);
+  for (const rel of oldRegistry.relationships) addRelationship(relationships, rel);
+  for (const item of oldRegistry.reviewItems) addReviewItem(reviewQueue, item);
+
   const coverage = {
     generatedAt: new Date().toISOString(),
     sourceTablesPresent: Object.fromEntries(EXPECTED_TABLES.map((table) => [table, Boolean(tables[table])])),
+    oldRegistrySourceCounts: oldRegistry.stats,
     counts: {
       tracks: tables.wk_tracks?.length ?? 0,
       releases: tables.wk_releases?.length ?? 0,
@@ -247,6 +263,10 @@ export function buildGraphReports(importDir: string, reportDir: string) {
     },
     relationshipTypes: relationships.reduce<Record<string, number>>((acc, rel) => {
       acc[rel.relationshipType] = (acc[rel.relationshipType] ?? 0) + 1;
+      return acc;
+    }, {}),
+    relationshipSources: relationships.reduce<Record<string, number>>((acc, rel) => {
+      acc[rel.source] = (acc[rel.source] ?? 0) + 1;
       return acc;
     }, {}),
     reviewIssueTypes: reviewQueue.reduce<Record<string, number>>((acc, item) => {
@@ -278,6 +298,10 @@ export function buildGraphReports(importDir: string, reportDir: string) {
       '## Relationship types',
       '',
       ...Object.entries(coverage.relationshipTypes).map(([type, count]) => `- ${type}: ${count}`),
+      '',
+      '## Relationship sources',
+      '',
+      ...Object.entries(coverage.relationshipSources).map(([type, count]) => `- ${type}: ${count}`),
       '',
       '## Review issue types',
       '',
