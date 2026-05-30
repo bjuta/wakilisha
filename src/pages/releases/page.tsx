@@ -18,39 +18,58 @@ export default function Releases() {
   const filtered = filter === "All" ? RELEASES : RELEASES.filter((r) => r.releaseType === filter);
 
   return (
-    <>
-      <PageHero
-        eyebrow="Registry"
-        title="Release catalog"
-        subtitle={`${RELEASES.length} releases catalogued. Albums, EPs, and singles from the repaired graph.`}
-      />
+    <div className="min-h-screen">
+      {/* Cinematic Hero — release catalog */}
+      <section className="relative min-h-[400px] md:min-h-[520px] flex items-end overflow-hidden">
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage: "url(https://readdy.ai/api/search-image?query=Abstract%20music%20album%20covers%20and%20vinyl%20records%20floating%20in%20dark%20space%2C%20colorful%20square%20artworks%2C%20warm%20studio%20lighting%2C%20artistic%20collection%20display%2C%20no%20text%2C%20cinematic%2C%20high%20contrast%2C%20editorial%20photography%20style&width=1400&height=600&seq=release-hero-v2&orientation=landscape)",
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+          }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/20" />
+        <div className="relative wk-container-wide w-full px-6 pb-12 pt-20 md:pb-16">
+          <div className="wk-eyebrow mb-4" style={{ color: "var(--wk-brand)" }}>
+            Registry
+          </div>
+          <h1 className="font-black leading-[0.92] tracking-[-0.055em] text-[#F0EFE8]" style={{ fontSize: "clamp(40px, 6vw, 80px)" }}>
+            Release catalog
+          </h1>
+          <p className="mt-4 max-w-xl text-[16px] leading-relaxed text-white/70">
+            {RELEASES.length} releases catalogued. Albums, EPs, and singles from the repaired graph.
+          </p>
+        </div>
+      </section>
 
-      <div className="wk-container px-6 py-10">
-        {/* Genre breakdown */}
+      <div className="wk-container-wide px-6 py-10">
+        {/* Genre breakdown — visual bars */}
         {!loading && (
-          <div className="mb-8">
-            <div className="mb-3 flex items-center gap-3">
+          <div className="mb-10">
+            <div className="mb-4 flex items-center gap-3">
               <div className="wk-eyebrow">By genre</div>
             </div>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {RELEASE_GENRE_BREAKDOWN.map((g) => (
                 <div
                   key={g.genre}
-                  className="flex items-center justify-between rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-4 py-3"
+                  className="group relative overflow-hidden rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-4 py-4 transition-all hover:border-[var(--wk-border-2)]"
                 >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="h-8 w-1 rounded-full"
-                      style={{ background: `var(${g.accentVar})` }}
-                    />
-                    <div>
-                      <div className="text-[13px] font-bold text-[var(--wk-text)]">{g.genre}</div>
-                      <div className="text-[11px] text-[var(--wk-text-muted)]">
-                        {g.count} releases
+                  <div className="absolute bottom-0 left-0 h-1 rounded-full transition-all" style={{ width: `${g.percentage}%`, background: `var(${g.accentVar})` }} />
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="h-8 w-1 rounded-full"
+                        style={{ background: `var(${g.accentVar})` }}
+                      />
+                      <div>
+                        <div className="text-[14px] font-bold text-[var(--wk-text)]">{g.genre}</div>
+                        <div className="text-[12px] text-[var(--wk-text-muted)]">{g.count} releases</div>
                       </div>
                     </div>
+                    <div className="text-[14px] font-black text-[var(--wk-brand)]">{g.percentage}%</div>
                   </div>
-                  <div className="text-[12px] font-bold text-[var(--wk-brand)]">{g.percentage}%</div>
                 </div>
               ))}
             </div>
@@ -161,6 +180,6 @@ export default function Releases() {
           </div>
         )}
       </div>
-    </>
+    </div>
   );
 }

@@ -29,7 +29,6 @@ export default function Artists() {
   });
 
   const spotlightArtist = useMemo(() => {
-    // Pick a featured artist with high streams and chart presence
     const chartLeaders = ARTISTS.filter((a) => a.isChartArtist && a.monthlyStreams > 10);
     return chartLeaders[Math.floor(Math.random() * chartLeaders.length)] || ARTISTS[0];
   }, []);
@@ -50,13 +49,14 @@ export default function Artists() {
   ];
 
   return (
-    <>
+    <div className="min-h-screen">
       {/* Celebratory Hero — not a directory header */}
       <PageHero
         eyebrow="The voices"
         title="Artists"
         subtitle={`${ARTIST_STATS.totalArtists} artists shaping the sound of now. From chart legends to rising voices, every story is here.`}
         variant="standard"
+        imageUrl="https://readdy.ai/api/search-image?query=Abstract%20African%20music%20culture%20mosaic%2C%20silhouettes%20of%20artists%20and%20performers%2C%20dramatic%20warm%20lighting%2C%20dark%20background%20with%20gold%20and%20green%20accents%2C%20artistic%20representation%20of%20musical%20talent%2C%20cinematic%2C%20no%20text%2C%20editorial%20style&width=1400&height=600&seq=artist-hero-v2&orientation=landscape"
         actions={
           <button
             onClick={() => setShowDirectory(!showDirectory)}
@@ -93,10 +93,10 @@ export default function Artists() {
       {!loading && <GenreClusters clusters={GENRE_CLUSTERS} />}
 
       {/* Directory — search, filters, alphabet, grid — secondary, collapsible */}
-      <div className="wk-container px-6 py-14 md:py-20">
+      <div className="wk-container-wide px-6 py-14 md:py-20">
         <div className="mb-6 flex items-center gap-3">
           <div className="wk-eyebrow">Full directory</div>
-          <span className="text-[12px]" style={{ color: "var(--wk-text-muted)" }}>
+          <span className="text-[12px] text-[var(--wk-text-muted)]">
             {ARTISTS.length} artists
           </span>
         </div>
@@ -109,7 +109,7 @@ export default function Artists() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search artists..."
-              className="w-full rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] py-2 pl-10 pr-4 text-[13px] text-[var(--wk-text)] placeholder:text-[var(--wk-text-faint)] outline-none focus:border-[var(--wk-brand)]"
+              className="w-full rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] py-2.5 pl-10 pr-4 text-[13px] text-[var(--wk-text)] placeholder:text-[var(--wk-text-faint)] outline-none focus:border-[var(--wk-brand)]"
             />
           </div>
           <div className="flex flex-col gap-3">
@@ -177,6 +177,6 @@ export default function Artists() {
           </div>
         )}
       </div>
-    </>
+    </div>
   );
 }
