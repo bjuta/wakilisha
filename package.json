@@ -22,6 +22,7 @@
   "private": true,
   "scripts": {
     "extract:zip": "tsx packages/migration/src/extractZip.ts",
+    "extract:local": "WAKILISHA_SKIP_DOWNLOAD=1 WAKILISHA_IMPORT_ZIP_PATH=./wakilisha_supabase_import_2026-05-30.zip tsx packages/migration/src/extractZip.ts",
     "migration:audit": "tsx packages/migration/src/index.ts audit",
     "migration:graph": "tsx packages/migration/src/index.ts graph"
   },
