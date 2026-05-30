@@ -1,0 +1,246 @@
+import type { WkDesignChapterSpec } from './designSystemSpecTypes';
+
+export const foundationsChapters: WkDesignChapterSpec[] = [
+  {
+    id: 'north-star',
+    number: '01',
+    group: 'Foundations',
+    title: 'North Star',
+    summary:
+      'The foundational decision filter for every surface. Every UI choice must earn its space, carry the cultural work, and belong to WAKILISHA. Interfaces stay compact by default and expand only when content earns it. No Western SaaS templates with African content pasted in.',
+    adminSections: ['Design System Bible header', 'QA gate: north-star compliance', 'Review queue criteria'],
+    implementationRules: [
+      'Every UI decision must answer whether it earns the space, carries the work, and belongs to WAKILISHA.',
+      'Interfaces stay compact by default and expand only when content earns it.',
+      'Do not build Western SaaS templates with African content pasted in.',
+      'Every surface is either culture-forward or data-forward; decorative chrome is never the default.',
+      'A hero must earn its size. A directory earns its density. A card earns its metadata.',
+    ],
+    componentsRequired: ['PageShell', 'PageHero', 'ThemeProvider'],
+    tables: ['content_route_classification'],
+    parityTargets: [
+      'All page reviews must include a north-star compliance check.',
+      'Every page archetype must justify its layout against the north-star rule.',
+    ],
+    qaChecks: [
+      { id: '01-earn-space', label: 'Earns space', description: 'Every element justifies its visual and interactive footprint.' },
+      { id: '01-culture-forward', label: 'Culture-forward', description: 'Content is the primary signal, not the UI chrome.' },
+      { id: '01-no-templates', label: 'No template drift', description: 'Does not look like a generic SaaS template with localized content.' },
+    ],
+  },
+  {
+    id: 'brand-architecture',
+    number: '02',
+    group: 'Foundations',
+    title: 'Brand Architecture',
+    summary:
+      'WAKILISHA is the mother brand. Every vertical shares the same chassis while flexing through one accent color, one metadata vocabulary, and one image treatment. The system must not fork.',
+    adminSections: ['Vertical token picker', 'Brand compliance checker', 'Design system preview panel'],
+    implementationRules: [
+      'Universal: wordmark, bolt, typography, spacing, radius, motion, navigation grammar, and editorial conventions.',
+      'Flexible: one vertical accent, image treatment, metadata vocabulary, card density, and player chrome.',
+      'Music keeps brand green as the founding vertical.',
+      'Vertical tokens must be exposed as --wk-v-* CSS variables, not inline styles.',
+      'Do not create separate component folders per vertical; use props and tokens.',
+    ],
+    componentsRequired: ['Logo', 'BoltMark', 'ThemeProvider', 'VerticalBadge'],
+    tables: ['entity_slugs'],
+    parityTargets: [
+      'Create vertical-aware components without forking the design system.',
+      'All vertical surfaces must consume the same component set with token overrides.',
+    ],
+    qaChecks: [
+      { id: '02-one-accent', label: 'One accent per vertical', description: 'Each vertical has exactly one accent color token.' },
+      { id: '02-no-fork', label: 'No component fork', description: 'Verticals use prop-driven styling, not separate component files.' },
+      { id: '02-token-driven', label: 'Token-driven', description: 'All vertical-specific color is via CSS variables.' },
+    ],
+  },
+  {
+    id: 'logo',
+    number: '03',
+    group: 'Foundations',
+    title: 'Logo',
+    summary:
+      'The custom WAKILISHA SVG masthead must be used correctly across dark, light, photo, and brand surfaces. Theme-aware SVG variants are required. Clear-space rules apply. The bolt mark is the fallback below 10px.',
+    adminSections: ['Design system preview', 'Brand asset panel'],
+    implementationRules: [
+      'Never recreate WAKILISHA in a system font except as a temporary bug fallback.',
+      'Dark mode uses white letters and green bolt. Light mode uses black letters and green bolt.',
+      'Clear space equals the height of the bolt glyph; 1.5x for print and event posters.',
+      'Below 10px logo height, switch to bolt-only mark.',
+      'Logo must be SVG, not raster, and must be responsive to data-wk-theme.',
+    ],
+    componentsRequired: ['Logo', 'BoltMark', 'AdminBar'],
+    tables: [],
+    parityTargets: [
+      'Ship theme-aware Logo and BoltMark React components.',
+      'Logo must pass dark/light/photo contrast tests.',
+    ],
+    qaChecks: [
+      { id: '03-svg', label: 'SVG only', description: 'Logo is rendered as SVG, not PNG or font.' },
+      { id: '03-theme-aware', label: 'Theme-aware', description: 'Logo switches white/black letters based on theme.' },
+      { id: '03-clear-space', label: 'Clear space', description: 'Clear space around the logo is at least bolt-height.' },
+    ],
+  },
+  {
+    id: 'color',
+    number: '04',
+    group: 'Foundations',
+    title: 'Color',
+    summary:
+      'A restrained warm-neutral spine with one brand green, semantic status colors, and light vertical accents. No generic SaaS blue, no neon gradients, no random purple. Green is for one meaningful moment per surface.',
+    adminSections: ['Token inspector', 'Theme toggle', 'Color palette preview', 'QA: token compliance'],
+    implementationRules: [
+      'Primary green is #84C241 in dark mode. Light mode brand text shifts to #5C8E25 for contrast.',
+      'Use green for one meaningful moment per surface, not as decoration everywhere.',
+      'No generic SaaS blue as primary, no neon gradients, no random purple as brand color.',
+      'Use vertical accents lightly and never as primary CTAs.',
+      'All color must be via --wk-* tokens. Hard-coded hex is only permitted for media overlays and documented exceptions.',
+    ],
+    componentsRequired: ['TokenInspector', 'ThemeProvider', 'Surface', 'Tag', 'AdminKpi'],
+    tables: [],
+    parityTargets: [
+      'All CSS must consume --wk-* tokens, not hard-coded Readdy classes.',
+      'No stray colors in production. Every surface color is traceable to a token.',
+    ],
+    qaChecks: [
+      { id: '04-token-only', label: 'Token-only', description: 'No hard-coded colors in production styles.' },
+      { id: '04-no-blue', label: 'No generic blue', description: 'Blue is not the primary brand color.' },
+      { id: '04-green-restraint', label: 'Green restraint', description: 'Green is used sparingly, not everywhere.' },
+    ],
+  },
+  {
+    id: 'typography',
+    number: '05',
+    group: 'Foundations',
+    title: 'Typography',
+    summary:
+      'Inter for display and UI, DM Sans for body and editorial warmth, DM Mono for tokens and code. Nothing else ships. Headlines use sentence case. Eyebrows and status use uppercase with tracking. Source casing is preserved for artist names, tracks, and places.',
+    adminSections: ['Typography scale preview', 'Token inspector', 'Specimen wall'],
+    implementationRules: [
+      'Nothing else ships beyond Inter, DM Sans, and DM Mono.',
+      'Headlines and buttons use sentence case. Eyebrows/status can use uppercase with tracking.',
+      'Artist, track, place, and title casing must preserve source casing.',
+      'Use clamp display scale for heroes, page titles, section titles, and article heads.',
+      'Body text uses DM Sans at 14–16px. UI text uses Inter at 12–14px.',
+    ],
+    componentsRequired: ['PageShell', 'PageHero', 'StoryCard', 'ArticleBody', 'TokenInspector'],
+    tables: [],
+    parityTargets: [
+      'Create type utility classes and replace generic heading styles.',
+      'All headings use semantic h1–h6, not divs with font-size classes.',
+    ],
+    qaChecks: [
+      { id: '05-fonts', label: 'Font stack', description: 'Only Inter, DM Sans, and DM Mono are used.' },
+      { id: '05-casing', label: 'Casing rules', description: 'Headlines are sentence case. Eyebrows are uppercase with tracking.' },
+      { id: '05-source-casing', label: 'Source casing preserved', description: 'Artist, track, and place names preserve original casing.' },
+    ],
+  },
+  {
+    id: 'spacing-layout',
+    number: '06',
+    group: 'Foundations',
+    title: 'Spacing & Layout',
+    summary:
+      'A 4-based spacing scale with tuned content widths: narrow for dialogs, text for reading, content for standard pages, wide for dense data, and max for magazine surfaces. Radius follows a 1–7 scale. Major section rhythm uses s-10, s-12, or s-16.',
+    adminSections: ['Token inspector', 'Layout preview panel', 'Spacing ruler'],
+    implementationRules: [
+      'Major section rhythm must use --wk-s-10, --wk-s-12, or --wk-s-16.',
+      'Use --wk-w-text for article bodies, --wk-w-content for standard pages, --wk-w-wide for dense data, and --wk-w-max for magazine surfaces.',
+      'Do not invent in-between spacing values without adding a system token.',
+      'Radius tokens must be used consistently: 1 for subtle, 2 for cards, 3 for pills, 4–7 for panels.',
+    ],
+    componentsRequired: ['PageShell', 'PageHero', 'Surface', 'Sheet', 'Modal'],
+    tables: [],
+    parityTargets: [
+      'Build page shells around container tokens before adding page content.',
+      'All layouts use wk-container, wk-w-*, and wk-s-* tokens.',
+    ],
+    qaChecks: [
+      { id: '06-token-spacing', label: 'Token spacing', description: 'All spacing uses --wk-s-* tokens.' },
+      { id: '06-token-width', label: 'Token widths', description: 'All max-widths use --wk-w-* tokens.' },
+      { id: '06-token-radius', label: 'Token radius', description: 'All border-radius uses --wk-r-* tokens.' },
+    ],
+  },
+  {
+    id: 'motion',
+    number: '07',
+    group: 'Foundations',
+    title: 'Motion',
+    summary:
+      'Motion is orientation, not decoration. No idle looping except live status dots, overflow marquees, and audio waveforms during playback. Elements enter from their origin and exit toward their destination. Reduced motion is respected globally.',
+    adminSections: ['Motion preview panel', 'Reduced-motion toggle', 'Animation spec'],
+    implementationRules: [
+      'No idle looping motion except live status dots, overflow marquees, and audio waveforms during playback.',
+      'Things appear from where they came and leave toward where they went.',
+      'Respect prefers-reduced-motion globally.',
+      'Avoid bouncy hover, parallax, card tilt, animated counters, and AI-template carousel motion.',
+      'Use --wk-d-* tokens for durations and --wk-ease-* for easing.',
+    ],
+    componentsRequired: ['Sheet', 'Modal', 'PlayerDock', 'PlayerSheet', 'Skeletons'],
+    tables: [],
+    parityTargets: [
+      'Create motion primitives for sheets, modals, player, route transitions, and reduced-motion.',
+      'All animations use design tokens for duration and easing.',
+    ],
+    qaChecks: [
+      { id: '07-no-idle', label: 'No idle motion', description: 'No looping animations on idle surfaces.' },
+      { id: '07-reduced-motion', label: 'Reduced motion', description: 'prefers-reduced-motion disables all non-essential motion.' },
+      { id: '07-token-motion', label: 'Token motion', description: 'All durations and easing use --wk-d-* and --wk-ease-* tokens.' },
+    ],
+  },
+  {
+    id: 'voice',
+    number: '08',
+    group: 'Foundations',
+    title: 'Voice',
+    summary:
+      'UI copy is editorial, factual, specific, restrained, and non-sycophantic. No emojis. No Awesome! No Oops! No celebration for ordinary states. Empty states state what is true. CTAs are verb + noun. No generic filler like Learn more or Click here.',
+    adminSections: ['Copy review panel', 'QA gate: voice compliance', 'String audit table'],
+    implementationRules: [
+      'No emojis, no Awesome!, no Oops!, no celebration copy for ordinary states.',
+      'Use one short sentence for empty/error states.',
+      'Use verb + noun CTAs: Open profile, Read the story, Save to collection.',
+      'Avoid Learn more, Click here, See all where a specific action exists.',
+      'Admin copy must be factual and specific: Review 3 pending releases, not Pending items.',
+    ],
+    componentsRequired: ['StateBlock', 'EmptyState', 'ErrorBlock', 'Toast'],
+    tables: [],
+    parityTargets: [
+      'Add copy lint rules to review page strings and CTAs.',
+      'Every empty state has a specific factual message.',
+    ],
+    qaChecks: [
+      { id: '08-no-emoji', label: 'No emojis', description: 'No emoji in UI copy or empty states.' },
+      { id: '08-cta-specific', label: 'Specific CTAs', description: 'All CTAs are verb + noun, not generic.' },
+      { id: '08-factual-empty', label: 'Factual empties', description: 'Empty states describe the current state factually.' },
+    ],
+  },
+  {
+    id: 'accessibility',
+    number: '09',
+    group: 'Foundations',
+    title: 'Accessibility',
+    summary:
+      'WCAG 2.2 AA is the floor; AAA where feasible. 44x44px touch targets for player and mobile controls. All icon-only controls need aria-labels. All page headings must be semantic. Mixed-language content supports lang attributes.',
+    adminSections: ['Accessibility audit panel', 'Screen reader preview', 'QA gate: a11y'],
+    implementationRules: [
+      'WCAG 2.2 AA is the floor; AAA where feasible.',
+      '44x44px touch targets for player and mobile controls.',
+      'All icon-only controls require aria-labels. All page headings must be semantic.',
+      'Mixed-language content must support lang attributes.',
+      'Focus indicators must be visible and use brand color.',
+    ],
+    componentsRequired: ['Button', 'IconButton', 'Modal', 'Sheet', 'PlayerDock', 'AdminBar'],
+    tables: [],
+    parityTargets: [
+      'Add page-level accessibility review before shipping any public route.',
+      'Every interactive element has a focus state and a label.',
+    ],
+    qaChecks: [
+      { id: '09-wcag-aa', label: 'WCAG AA', description: 'All pages pass WCAG 2.2 AA at minimum.' },
+      { id: '09-touch-target', label: 'Touch targets', description: 'All mobile controls are at least 44x44px.' },
+      { id: '09-aria', label: 'ARIA labels', description: 'All icon-only controls have aria-labels.' },
+    ],
+  },
+];

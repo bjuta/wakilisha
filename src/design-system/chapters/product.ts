@@ -1,0 +1,247 @@
+import type { WkDesignChapterSpec } from '../designSystemSpecTypes';
+
+export const productChapters: WkDesignChapterSpec[] = [
+  {
+    id: 'navigation',
+    number: '10',
+    group: 'Product',
+    title: 'Navigation',
+    summary:
+      'A consistent navigation grammar across public, admin, search, player, and profile surfaces. Navigation is small, stable, and theme-aware. Player and search coexist without crowding the masthead. Page-specific labels replace oversized nav decoration.',
+    adminSections: ['Admin nav bar', 'Breadcrumb builder', 'Nav preview panel', 'Route map'],
+    implementationRules: [
+      'Navigation must be small, stable, and theme-aware.',
+      'Player and search must coexist without crowding the masthead.',
+      'Use page-specific surface labels rather than oversized nav decoration.',
+      'Public nav: masthead + search + player capsule + user menu.',
+      'Admin nav: breadcrumb bar + KPI row + tab nav + action bar.',
+    ],
+    componentsRequired: ['HomeNav', 'AdminBar', 'PlayerDock', 'SearchBox', 'NavCapsule'],
+    tables: ['content_route_classification'],
+    parityTargets: [
+      'Implement public nav, admin nav, mobile nav, and player-aware nav capsule.',
+      'Navigation is shared across all pages via AppLayout.',
+    ],
+    qaChecks: [
+      { id: '10-stable', label: 'Stable across pages', description: 'Nav does not re-render on page transitions.' },
+      { id: '10-theme-aware', label: 'Theme-aware', description: 'Nav adapts to dark/light without page reload.' },
+      { id: '10-player-coexist', label: 'Player coexistence', description: 'Player and nav share space without overlap.' },
+    ],
+  },
+  {
+    id: 'buttons-actions',
+    number: '11',
+    group: 'Product',
+    title: 'Buttons & Actions',
+    summary:
+      'Actions are specific, accessible, and visually restrained. Primary is brand green. Ghost and soft carry secondary actions. No multiple primary CTAs in one decision area. Labels are sentence case and specific.',
+    adminSections: ['Specimen wall', 'Button audit table', 'QA gate: action compliance'],
+    implementationRules: [
+      'Primary button is brand green; do not use multiple primary CTAs in one decision area.',
+      'Ghost and soft buttons carry secondary actions.',
+      'Button labels are sentence case and specific to the action.',
+      'Icon buttons have aria-labels and 44px hit areas.',
+      'Disabled state must not be invisible; use reduced opacity plus cursor-not-allowed.',
+    ],
+    componentsRequired: ['WkButton', 'WkIconButton', 'WkActionBar', 'WkCTA'],
+    tables: [],
+    parityTargets: [
+      'Centralize Button, IconButton, ActionBar, and CTA patterns.',
+      'All buttons use the design system primitives.',
+    ],
+    qaChecks: [
+      { id: '11-primary-single', label: 'One primary per area', description: 'No multiple primary CTAs in one decision area.' },
+      { id: '11-aria-labels', label: 'Icon button labels', description: 'All icon-only buttons have aria-labels.' },
+      { id: '11-sentence-case', label: 'Sentence case', description: 'Button labels are sentence case, not title case.' },
+    ],
+  },
+  {
+    id: 'forms',
+    number: '12',
+    group: 'Product',
+    title: 'Forms',
+    summary:
+      'Readable admin and public forms with visible labels, validation, and accessible errors. Placeholder is never the label. Errors use color, text, and icons — never color-only. Search inputs show data scope and result count.',
+    adminSections: ['Admin edit forms', 'Review queue forms', 'Search input', 'Filter builder'],
+    implementationRules: [
+      'Placeholder is never the label.',
+      'Errors use color, text, and icons; never color-only.',
+      'Search inputs must show data scope and result count where possible.',
+      'Form validation must be live, not just on submit.',
+      'Admin forms must expose relationship status: which entities are linked and reviewable.',
+    ],
+    componentsRequired: ['WkInput', 'WkSearchBox', 'WkSelect', 'WkFilterBar', 'WkFormField'],
+    tables: ['entity_slugs', 'content_route_classification'],
+    parityTargets: [
+      'Build search, filters, admin edit forms, review queue forms.',
+      'All forms are accessible and validated.',
+    ],
+    qaChecks: [
+      { id: '12-visible-labels', label: 'Visible labels', description: 'Every input has a visible label, not just placeholder.' },
+      { id: '12-error-icons', label: 'Error icons', description: 'Errors use color + text + icon, not color alone.' },
+      { id: '12-live-validation', label: 'Live validation', description: 'Validation runs on input, not just on submit.' },
+    ],
+  },
+  {
+    id: 'cards-surfaces',
+    number: '13',
+    group: 'Product',
+    title: 'Cards & Surfaces',
+    summary:
+      'Restrained cards, raised panels, hover states, and media surfaces. Cards carry useful metadata, not just image + title. Surfaces clarify hierarchy, not as heavy boxes around everything. Image-led cards for discovery; row patterns for dense charts.',
+    adminSections: ['Entity cards', 'Story cards', 'Admin cards', 'Review queue cards', 'Specimen wall'],
+    implementationRules: [
+      'Cards must carry useful metadata, not just image + title.',
+      'Use surfaces to clarify content hierarchy, not as heavy boxes around everything.',
+      'Prefer image-led cards for editorial/music discovery and row patterns for dense charts.',
+      'Hover states must be subtle: border color shift, not shadow explosion.',
+      'Admin cards must show status, relationship counts, and action affordances.',
+    ],
+    componentsRequired: ['WkSurface', 'WkCard', 'WkEntityCard', 'WkStoryCard', 'WkAdminCard'],
+    tables: ['entity_slugs', 'review_queue'],
+    parityTargets: [
+      'Build entity cards, story cards, release cards, label cards, genre cards, and admin cards.',
+      'All cards use the same Surface primitive.',
+    ],
+    qaChecks: [
+      { id: '13-metadata', label: 'Metadata present', description: 'Cards carry at least one metadata item beyond title.' },
+      { id: '13-hover-restraint', label: 'Hover restraint', description: 'Hover is subtle: border or background shift, not heavy shadow.' },
+      { id: '13-no-boxes', label: 'No box disease', description: 'Surfaces clarify hierarchy; not every element is boxed.' },
+    ],
+  },
+  {
+    id: 'tags-badges',
+    number: '14',
+    group: 'Product',
+    title: 'Tags & Badges',
+    summary:
+      'Tags and badges communicate status, metadata, and editorial categories. Tags use sentence case. Status badges may use uppercase. Brand-soft backgrounds communicate active/featured. Do not over-tag cards.',
+    adminSections: ['Status tags', 'Editorial categories', 'Filter pills', 'Review status badges'],
+    implementationRules: [
+      'Tags use sentence case. Status badges may use uppercase.',
+      'Brand-soft backgrounds communicate active/featured states.',
+      'Do not over-tag cards until they become noisy.',
+      'Genre tags are brand-soft. Status tags are semantic-colored. Editorial tags are neutral.',
+      'Admin review queue uses status badges with uppercase and semantic color.',
+    ],
+    componentsRequired: ['WkTag', 'WkBadge', 'WkStatusBadge', 'WkGenreTag'],
+    tables: ['review_queue'],
+    parityTargets: [
+      'Centralize genre tags, status tags, chart movement tags, editorial categories.',
+      'All tags use the Tag primitive.',
+    ],
+    qaChecks: [
+      { id: '14-case', label: 'Case rules', description: 'Tags are sentence case. Status badges are uppercase.' },
+      { id: '14-not-noisy', label: 'Not noisy', description: 'Cards do not have more than 3 tags.' },
+      { id: '14-semantic', label: 'Semantic color', description: 'Status badges use semantic colors: success, warning, danger, info.' },
+    ],
+  },
+  {
+    id: 'track-entity-rows',
+    number: '15',
+    group: 'Product',
+    title: 'Track & Entity Rows',
+    summary:
+      'Dense music rows across charts, albums, search, queues, and related lists. Rows expose rank/position, artwork, title, artist, movement, and metadata. Compact and expanded modes. Playable rows reveal player affordances without breaking density.',
+    adminSections: ['Track rows in review queue', 'Chart rows in admin', 'Search result rows'],
+    implementationRules: [
+      'Rows should expose rank/position, artwork, title, artist, movement, and metadata where context requires.',
+      'Rows must support compact and expanded modes.',
+      'Playable rows must reveal player affordances without breaking density.',
+      'Chart rows must include rank, artwork, track, artist, movement, weeks, peak, and label.',
+      'Album track rows must include track number, title, duration, and explicit badge if applicable.',
+    ],
+    componentsRequired: ['WkTrackRow', 'WkChartRow', 'WkAlbumTrackRow', 'WkEntityRow'],
+    tables: ['track_playback_sources', 'entity_relationships'],
+    parityTargets: [
+      'Build TrackRow, ChartRow, AlbumTrackRow, EntityRow.',
+      'All rows use the same row primitive.',
+    ],
+    qaChecks: [
+      { id: '15-density', label: 'Dense', description: 'Rows are compact and information-dense.' },
+      { id: '15-playable', label: 'Playable affordance', description: 'Playable rows show a play button without bloating the row.' },
+      { id: '15-movement', label: 'Movement visible', description: 'Chart rows show movement arrows and delta.' },
+    ],
+  },
+  {
+    id: 'player-system',
+    number: '16',
+    group: 'Product',
+    title: 'Player System',
+    summary:
+      'Playback is a system: dock, nav capsule, sheet, theater, queue, and source attribution. Dock is 64px desktop, 56px mobile. Sheet expands from dock. Theater is reserved for immersive mode. Source/provider attribution is visible. No fake controls.',
+    adminSections: ['Player preview', 'Playback source audit', 'Player state inspector'],
+    implementationRules: [
+      'Player dock height is 64px desktop and 56px mobile.',
+      'Sheet expands from dock cover; theater is reserved for immersive mode.',
+      'Source/provider attribution must be visible; playback metadata must come from track_playback_sources.',
+      'No fake player controls detached from real playback availability.',
+      'Player state must be global: not per-page, not per-component.',
+    ],
+    componentsRequired: ['WkPlayerDock', 'WkPlayerSheet', 'WkPlayerNavCapsule', 'WkPlayerTheater'],
+    tables: ['track_playback_sources'],
+    parityTargets: [
+      'Build persistent player store, dock UI, expanded sheet, preview availability states.',
+      'Player works across all pages without re-mounting.',
+    ],
+    qaChecks: [
+      { id: '16-dock-height', label: 'Dock height', description: 'Dock is 64px desktop, 56px mobile.' },
+      { id: '16-source-visible', label: 'Source visible', description: 'Playback source attribution is always visible.' },
+      { id: '16-no-fake', label: 'No fake controls', description: 'Play button is disabled when no playback is available.' },
+    ],
+  },
+  {
+    id: 'search-discovery',
+    number: '17',
+    group: 'Product',
+    title: 'Search & Discovery',
+    summary:
+      'Discovery is graph-aware: search across artists, tracks, releases, labels, genres, charts, and editorial. Results identify entity type, relationship context, and route. Discovery pages use filters and editorial grouping, not generic grids only. No mock data in search results.',
+    adminSections: ['Global search', 'Entity filter panel', 'Review queue search', 'Directory search'],
+    implementationRules: [
+      'Search results must identify entity type, relationship context, and route.',
+      'Discovery pages should use filters and editorial grouping, not generic grids only.',
+      'No mock data in search results.',
+      'Search must be debounced and scoped: global, directory, or entity-specific.',
+      'Admin search must surface review queue items and relationship gaps.',
+    ],
+    componentsRequired: ['WkSearchBox', 'WkSearchResults', 'WkDirectoryFilters', 'WkEntityFilter'],
+    tables: ['entity_slugs', 'entity_relationships', 'review_queue'],
+    parityTargets: [
+      'Build global search payload and directory filters.',
+      'Search results are graph-backed and real.',
+    ],
+    qaChecks: [
+      { id: '17-entity-type', label: 'Entity type shown', description: 'Every search result shows its entity type.' },
+      { id: '17-real-data', label: 'Real data', description: 'No mock data in search results.' },
+      { id: '17-debounced', label: 'Debounced', description: 'Search is debounced and does not fire on every keystroke.' },
+    ],
+  },
+  {
+    id: 'states',
+    number: '18',
+    group: 'Product',
+    title: 'States',
+    summary:
+      'Loading, empty, error, review, partial-data, and no-playback states. Empty states state what is true, not cheerful filler. Partial graph states expose review reasons. Skeletons and factual labels, not spinner-heavy pages.',
+    adminSections: ['State preview panel', 'Skeleton gallery', 'Error state review', 'Empty state audit'],
+    implementationRules: [
+      'Empty states state what is true now, not cheerful filler.',
+      'Partial graph states must expose review reasons when useful.',
+      'Use skeletons and factual labels, not spinner-heavy pages.',
+      'Loading skeletons must match the final layout dimensions to avoid layout shift.',
+      'Error states must include retry action and contact/help link.',
+    ],
+    componentsRequired: ['WkStateBlock', 'WkSkeleton', 'WkErrorBlock', 'WkPartialDataNotice', 'WkEmptyState'],
+    tables: [],
+    parityTargets: [
+      'Create StateBlock, Skeleton, ErrorBlock, PartialDataNotice.',
+      'Every page handles all six states.',
+    ],
+    qaChecks: [
+      { id: '18-empty-factual', label: 'Factual empty states', description: 'Empty states state what is true, not filler.' },
+      { id: '18-skeleton-match', label: 'Skeleton match', description: 'Skeletons match final layout dimensions.' },
+      { id: '18-error-action', label: 'Error action', description: 'Error states include retry and help affordances.' },
+    ],
+  },
+];

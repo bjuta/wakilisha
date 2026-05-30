@@ -1,0 +1,139 @@
+import type { WkDesignChapterSpec } from '../designSystemSpecTypes';
+
+export const mediaChapters: WkDesignChapterSpec[] = [
+  {
+    id: 'image-system',
+    number: '19',
+    group: 'Media & Editorial',
+    title: 'Image System',
+    summary:
+      'Artist portraits, album art, editorial photos, hero scrims, and fallback artwork. Photography carries warmth; UI stays restrained. Hero photography needs legible scrims and safe logo placement. Fallback media is deterministic and entity-aware, not random.',
+    adminSections: ['Media audit panel', 'Fallback art preview', 'Image upload queue', 'Hero scrim tester'],
+    implementationRules: [
+      'Photography carries warmth; UI stays restrained.',
+      'Hero photography needs legible scrims and safe logo placement.',
+      'Fallback media must be deterministic and entity-aware, not random unrelated images.',
+      'Album art fallback is a gradient + icon, not stock photo.',
+      'Artist portrait fallback is a tonal gradient + monogram, not placeholder silhouette.',
+    ],
+    componentsRequired: ['WkImage', 'WkHeroImage', 'WkFallbackArt', 'WkMediaResolver'],
+    tables: ['wk_media_assets'],
+    parityTargets: [
+      'Build media resolver from wk_media_assets and fallback art system.',
+      'All images are served via the media resolver.',
+    ],
+    qaChecks: [
+      { id: '19-scrim-legible', label: 'Scrim legible', description: 'Hero scrims preserve text contrast in both themes.' },
+      { id: '19-fallback-deterministic', label: 'Deterministic fallback', description: 'Fallback art is entity-aware, not random.' },
+      { id: '19-no-stock', label: 'No stock photos', description: 'Album and artist fallbacks do not use unrelated stock photos.' },
+    ],
+  },
+  {
+    id: 'editorial-articles',
+    number: '20',
+    group: 'Media & Editorial',
+    title: 'Editorial Articles',
+    summary:
+      'Magazine surfaces feel authored, credible, and culturally specific. Articles need headline, dek, byline, section, date, hero, body, related entities, and attribution. Use --wk-w-text for reading body. Separate true editorial from WordPress shells using content classification.',
+    adminSections: ['Article editor', 'Content classification panel', 'Story preview', 'Byline builder'],
+    implementationRules: [
+      'Articles need headline, dek, byline, section, date, hero, body, related entities, and attribution.',
+      'Use --wk-w-text for reading body.',
+      'Separate true editorial from WordPress shells using content classification.',
+      'Article cards need section/category, date, reading time, and real routes.',
+      'Related entities in articles must link to canonical routes.',
+    ],
+    componentsRequired: ['WkStoryCard', 'WkArticleBody', 'WkArticleHero', 'WkArticleByline', 'WkArticleMeta'],
+    tables: ['content_route_classification'],
+    parityTargets: [
+      'Build MagazineIndex, ArticlePage, story cards, related graph embeds.',
+      'All magazine content is classified and route-linked.',
+    ],
+    qaChecks: [
+      { id: '20-reading-width', label: 'Reading width', description: 'Article body uses --wk-w-text max-width.' },
+      { id: '20-related-routes', label: 'Related routes', description: 'Related entities in articles link to real routes.' },
+      { id: '20-classified', label: 'Classified', description: 'Editorial content is separated from utility pages via classification.' },
+    ],
+  },
+  {
+    id: 'charts-rankings',
+    number: '21',
+    group: 'Media & Editorial',
+    title: 'Charts & Rankings',
+    summary:
+      'WAKILISHA charts are distinctive, dense, playable, and graph-aware. Chart rows show rank, artwork, track, artist, movement, weeks, peak, and label. Top positions get stronger visual treatment without destroying list density. Charts link to canonical tracks and artists.',
+    adminSections: ['Chart preview', 'Chart row builder', 'Movement audit', 'Series manager'],
+    implementationRules: [
+      'Chart rows show rank, artwork, track, artist, movement, weeks, peak, and label/metadata when available.',
+      'Top positions deserve stronger visual treatment without destroying list density.',
+      'Charts must link to canonical tracks and artists.',
+      'Chart editions must show series metadata, methodology, and status.',
+      'Movement and history UI must not be fabricated if data is unavailable.',
+    ],
+    componentsRequired: ['WkChartRow', 'WkChartHeader', 'WkChartEdition', 'WkChartMovement', 'WkChartHistory'],
+    tables: ['chart_entries', 'entity_relationships'],
+    parityTargets: [
+      'Build chart series, edition, row, movement, and history components.',
+      'Chart data is graph-backed and real.',
+    ],
+    qaChecks: [
+      { id: '21-dense', label: 'Dense rows', description: 'Chart rows are dense and information-rich.' },
+      { id: '21-canonical-links', label: 'Canonical links', description: 'Charts link to canonical tracks and artists.' },
+      { id: '21-no-fabricated', label: 'No fabricated data', description: 'Movement and history are not fabricated when data is unavailable.' },
+    ],
+  },
+  {
+    id: 'registry',
+    number: '22',
+    group: 'Media & Editorial',
+    title: 'Registry',
+    summary:
+      'Tracks, artists, releases, labels, and genres feel like a cultural graph, not flat tables. Entity pages expose relationships. Relationship counts are visible. Review data is flagged internally.',
+    adminSections: ['Entity graph viewer', 'Relationship audit table', 'Review queue', 'Slug registry'],
+    implementationRules: [
+      'Entity pages must expose relationships: artist→tracks, track→release/chart/playback, release→tracklist/label, genre→artists/tracks.',
+      'Do not hide relationship counts; make the graph visible and pleasurable.',
+      'Review/uncertain data must be flagged internally, not guessed publicly.',
+      'Entity metadata must come from repaired graph, not hard-coded.',
+      'Registry pages must use entity_slugs for canonical routing.',
+    ],
+    componentsRequired: ['WkEntityGraph', 'WkRelationshipModule', 'WkEntityMeta', 'WkRegistryTable'],
+    tables: ['entity_slugs', 'entity_relationships', 'track_artists', 'release_tracks', 'artist_genres'],
+    parityTargets: [
+      'Build registry payloads and graph relationship modules for every entity page.',
+      'Every entity page is graph-powered and relationship-aware.',
+    ],
+    qaChecks: [
+      { id: '22-relationships-visible', label: 'Relationships visible', description: 'Entity pages show relationship counts and links.' },
+      { id: '22-graph-backed', label: 'Graph-backed', description: 'All entity data comes from the repaired graph.' },
+      { id: '22-slug-routes', label: 'Slug routes', description: 'Entity pages use canonical slugs from entity_slugs.' },
+    ],
+  },
+  {
+    id: 'page-archetypes',
+    number: '23',
+    group: 'Media & Editorial',
+    title: 'Page Archetypes',
+    summary:
+      'Repeatable public page structures that replace disjointed WordPress templates. Every archetype starts with data contract, then layout, then components. Pattern: page shell + hero + relationship modules + related content. No one-off pages where a reusable archetype exists.',
+    adminSections: ['Archetype mapper', 'Route-to-archetype table', 'QA gate: archetype compliance', 'Parity checklist'],
+    implementationRules: [
+      'Every archetype starts with data contract, then layout, then components.',
+      'Use page shell + hero + relationship modules + related content pattern.',
+      'Do not build one-off pages where a reusable archetype exists.',
+      'Archetypes must be documented in the design system bible with route mappings.',
+      'New pages must match an existing archetype or require a new archetype proposal.',
+    ],
+    componentsRequired: ['PageShell', 'PageHero', 'WkRelationshipModule', 'WkRelatedContent'],
+    tables: ['content_route_classification'],
+    parityTargets: [
+      'Map every route to a system archetype before UI implementation.',
+      'All public pages follow a documented archetype.',
+    ],
+    qaChecks: [
+      { id: '23-archetype-mapped', label: 'Archetype mapped', description: 'Every route is mapped to a documented archetype.' },
+      { id: '23-pattern-match', label: 'Pattern match', description: 'Page follows shell + hero + modules + related content.' },
+      { id: '23-no-one-off', label: 'No one-offs', description: 'No standalone pages that do not match an archetype.' },
+    ],
+  },
+];
