@@ -1,6 +1,7 @@
 import type { WkDesignChapterSpec } from '../../../../design-system/designSystemSpec';
 import { WkTag } from '../../../../components/design-system/primitives/Tag';
 import { WkSurface } from '../../../../components/design-system/primitives/Surface';
+import { RichSpecimenCard } from './RichSpecimenCard';
 
 export function CanonicalChapterDetail({ chapter }: { chapter: WkDesignChapterSpec }) {
   const canonical = chapter.canonical;
@@ -50,32 +51,14 @@ export function CanonicalChapterDetail({ chapter }: { chapter: WkDesignChapterSp
           <div>
             <h3 className="text-[11px] font-bold uppercase tracking-wider text-[var(--wk-text-muted)]">Rich media and graphical specimens</h3>
             <p className="mt-1 text-[13px] text-[var(--wk-text-muted)]">
-              Visual depictions required by the canonical bible: token boards, hover lift, motion wireframes, player states, rows, modals, mobile frames and component previews.
+              Live depictions required by the canonical bible: token boards, hover lift, motion wireframes, player states, rows, modals, mobile frames and component previews.
             </p>
           </div>
           <WkTag variant="brand">{canonical.richMedia.length} groups</WkTag>
         </div>
         <div className="grid gap-4 lg:grid-cols-2">
           {canonical.richMedia.map((item) => (
-            <div key={item.id} className="overflow-hidden rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-bg-subtle)]">
-              <div className="grid h-36 grid-cols-4 gap-2 p-4">
-                <div className="rounded-xl bg-[var(--wk-brand)]" />
-                <div className="rounded-xl bg-[var(--wk-surface-raised)]" />
-                <div className="rounded-xl bg-[var(--wk-text-muted)]" />
-                <div className="rounded-xl bg-[var(--wk-surface)]" />
-                <div className="col-span-2 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)]" />
-                <div className="col-span-2 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-brand-soft)]" />
-              </div>
-              <div className="border-t border-[var(--wk-border)] p-4">
-                <div className="mb-2 flex flex-wrap items-center gap-2">
-                  <WkTag variant="brand">{item.kind}</WkTag>
-                  {item.count > 1 && <WkTag>{item.count} pieces</WkTag>}
-                  {item.canonicalClass && <WkTag>{item.canonicalClass}</WkTag>}
-                </div>
-                <h4 className="text-[15px] font-black tracking-tight text-[var(--wk-text)]">{item.label}</h4>
-                <p className="mt-2 text-[12px] leading-relaxed text-[var(--wk-text-muted)]">{item.implementation}</p>
-              </div>
-            </div>
+            <RichSpecimenCard key={item.id} item={item} />
           ))}
         </div>
       </WkSurface>
