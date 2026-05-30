@@ -21,6 +21,7 @@
   "name": "wakilisha-react-rebuild",
   "private": true,
   "scripts": {
+    "extract:zip": "tsx packages/migration/src/extractZip.ts",
     "migration:audit": "tsx packages/migration/src/index.ts audit",
     "migration:graph": "tsx packages/migration/src/index.ts graph"
   },
