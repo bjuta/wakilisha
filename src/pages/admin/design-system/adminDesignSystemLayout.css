@@ -1,0 +1,111 @@
+/* Admin design-system workbench layout.
+   The preview column is the product. Side panels are rails until needed. */
+
+@media (min-width: 1024px){
+  .wk-container-max > div[class*="lg:grid-cols-[290px_minmax"]{
+    grid-template-columns: 76px minmax(0, 1fr) 76px !important;
+    align-items: start;
+    transition: grid-template-columns var(--wk-d-standard) var(--wk-ease-standard);
+  }
+
+  .wk-container-max > div[class*="lg:grid-cols-[290px_minmax"]:has(> aside:first-child:hover),
+  .wk-container-max > div[class*="lg:grid-cols-[290px_minmax"]:has(> aside:first-child:focus-within){
+    grid-template-columns: 320px minmax(0, 1fr) 76px !important;
+  }
+
+  .wk-container-max > div[class*="lg:grid-cols-[290px_minmax"]:has(> aside:last-child:hover),
+  .wk-container-max > div[class*="lg:grid-cols-[290px_minmax"]:has(> aside:last-child:focus-within){
+    grid-template-columns: 76px minmax(0, 1fr) 340px !important;
+  }
+
+  .wk-container-max > div[class*="lg:grid-cols-[290px_minmax"]:has(> aside:first-child:hover):has(> aside:last-child:hover),
+  .wk-container-max > div[class*="lg:grid-cols-[290px_minmax"]:has(> aside:first-child:focus-within):has(> aside:last-child:focus-within){
+    grid-template-columns: 300px minmax(0, 1fr) 320px !important;
+  }
+
+  .wk-container-max > div[class*="lg:grid-cols-[290px_minmax"] > aside{
+    min-width: 0;
+    transition: opacity var(--wk-d-fast) var(--wk-ease-standard);
+  }
+
+  .wk-container-max > div[class*="lg:grid-cols-[290px_minmax"] > aside .wk-panel{
+    min-width: 0;
+    overflow: hidden;
+    transition:
+      min-height var(--wk-d-standard) var(--wk-ease-standard),
+      padding var(--wk-d-standard) var(--wk-ease-standard),
+      border-color var(--wk-d-fast) var(--wk-ease-standard),
+      background var(--wk-d-fast) var(--wk-ease-standard),
+      box-shadow var(--wk-d-fast) var(--wk-ease-standard);
+  }
+
+  .wk-container-max > div[class*="lg:grid-cols-[290px_minmax"] > aside:first-child:not(:hover):not(:focus-within) .wk-panel,
+  .wk-container-max > div[class*="lg:grid-cols-[290px_minmax"] > aside:last-child:not(:hover):not(:focus-within) .wk-panel{
+    min-height: 64px;
+    padding: 0 !important;
+    display: grid;
+    place-items: center;
+    border-color: rgba(var(--wk-brand-rgb), .24);
+    background: var(--wk-surface);
+    box-shadow: var(--wk-shadow-sm);
+  }
+
+  .wk-container-max > div[class*="lg:grid-cols-[290px_minmax"] > aside:first-child:not(:hover):not(:focus-within) .wk-panel > *,
+  .wk-container-max > div[class*="lg:grid-cols-[290px_minmax"] > aside:last-child:not(:hover):not(:focus-within) .wk-panel > *{
+    display: none !important;
+  }
+
+  .wk-container-max > div[class*="lg:grid-cols-[290px_minmax"] > aside:first-child:not(:hover):not(:focus-within) .wk-panel::before,
+  .wk-container-max > div[class*="lg:grid-cols-[290px_minmax"] > aside:last-child:not(:hover):not(:focus-within) .wk-panel::before{
+    display: grid;
+    width: 42px;
+    height: 42px;
+    place-items: center;
+    border-radius: var(--wk-r-pill);
+    background: var(--wk-brand-soft);
+    color: var(--wk-brand);
+    font-family: remixicon;
+    font-size: 20px;
+    line-height: 1;
+  }
+
+  .wk-container-max > div[class*="lg:grid-cols-[290px_minmax"] > aside:first-child:not(:hover):not(:focus-within) .wk-panel:nth-child(1)::before{content: "\f0d1";}
+  .wk-container-max > div[class*="lg:grid-cols-[290px_minmax"] > aside:first-child:not(:hover):not(:focus-within) .wk-panel:nth-child(2)::before{content: "\ef3e";}
+  .wk-container-max > div[class*="lg:grid-cols-[290px_minmax"] > aside:last-child:not(:hover):not(:focus-within) .wk-panel:nth-child(1)::before{content: "\eb7b";}
+  .wk-container-max > div[class*="lg:grid-cols-[290px_minmax"] > aside:last-child:not(:hover):not(:focus-within) .wk-panel:nth-child(2)::before{content: "\edca";}
+
+  .wk-container-max > div[class*="lg:grid-cols-[290px_minmax"] > aside:first-child:not(:hover):not(:focus-within)::after,
+  .wk-container-max > div[class*="lg:grid-cols-[290px_minmax"] > aside:last-child:not(:hover):not(:focus-within)::after{
+    display: block;
+    margin-top: 8px;
+    color: var(--wk-text-faint);
+    font: 800 9px/1 var(--wk-font-ui);
+    letter-spacing: .16em;
+    text-align: center;
+    text-transform: uppercase;
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    margin-inline: auto;
+  }
+
+  .wk-container-max > div[class*="lg:grid-cols-[290px_minmax"] > aside:first-child:not(:hover):not(:focus-within)::after{content: "Specimens";}
+  .wk-container-max > div[class*="lg:grid-cols-[290px_minmax"] > aside:last-child:not(:hover):not(:focus-within)::after{content: "QA / Routes";}
+
+  .wk-container-max > div[class*="lg:grid-cols-[290px_minmax"] > main{
+    min-width: 0;
+  }
+
+  .wk-container-max > div[class*="lg:grid-cols-[290px_minmax"] > main .lg\:grid-cols-2{
+    grid-template-columns: repeat(2, minmax(420px, 1fr));
+  }
+}
+
+@media (min-width: 1440px){
+  .wk-container-max > div[class*="lg:grid-cols-[290px_minmax"]{
+    grid-template-columns: 72px minmax(0, 1fr) 72px !important;
+  }
+
+  .wk-container-max > div[class*="lg:grid-cols-[290px_minmax"] > main .lg\:grid-cols-2{
+    grid-template-columns: repeat(2, minmax(520px, 1fr));
+  }
+}
