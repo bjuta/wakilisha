@@ -1,4 +1,6 @@
-export const GENRES = [
+import { getGenres, hasImportedRegistryData, toGenreCard } from '@/data/registry/registry';
+
+const FALLBACK_GENRES = [
   { slug: "afrobeats", name: "Afrobeats", artistCount: 284, trackCount: 1820, accentVar: "--wk-v-music", representativeArtists: ["Burna Boy", "Wizkid", "Davido"] },
   { slug: "afropop", name: "Afropop", artistCount: 156, trackCount: 940, accentVar: "--wk-v-music", representativeArtists: ["Tems", "Ayra Starr", "Fireboy DML"] },
   { slug: "amapiano", name: "Amapiano", artistCount: 112, trackCount: 680, accentVar: "--wk-v-dance", representativeArtists: ["Asake", "Focalistic", "Major League DJz"] },
@@ -13,9 +15,5 @@ export const GENRES = [
   { slug: "afrobeats-gospel", name: "Gospel Afrobeats", artistCount: 26, trackCount: 140, accentVar: "--wk-v-intel", representativeArtists: ["Tim Godfrey", "Joe Mettle", "Nathaniel Bassey"] },
 ];
 
-export const TRENDING_GENRES = [
-  { slug: "amapiano", name: "Amapiano", artistCount: 112, trackCount: 680, accentVar: "--wk-v-dance", growth: 18 },
-  { slug: "afrorave", name: "Afrorave", artistCount: 29, trackCount: 120, accentVar: "--wk-v-dance", growth: 14 },
-  { slug: "afrobeats", name: "Afrobeats", artistCount: 284, trackCount: 1820, accentVar: "--wk-v-music", growth: 9 },
-  { slug: "trap", name: "Afro-Trap", artistCount: 52, trackCount: 290, accentVar: "--wk-v-film", growth: 7 },
-];
+export const GENRES = hasImportedRegistryData() ? getGenres().map(toGenreCard) : FALLBACK_GENRES;
+export const TRENDING_GENRES = GENRES.slice().sort((a, b) => b.trackCount - a.trackCount).slice(0, 4).map((genre, index) => ({ ...genre, growth: [18, 14, 9, 7][index] ?? 0 }));
