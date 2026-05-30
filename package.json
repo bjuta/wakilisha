@@ -25,7 +25,9 @@
     "extract:local": "WAKILISHA_SKIP_DOWNLOAD=1 WAKILISHA_IMPORT_ZIP_PATH=./wakilisha_supabase_import_2026-05-30.zip tsx packages/migration/src/extractZip.ts",
     "migration:audit": "tsx packages/migration/src/index.ts audit",
     "migration:graph": "tsx packages/migration/src/index.ts graph",
-    "migration:routes": "tsx packages/migration/src/index.ts routes"
+    "migration:routes": "tsx packages/migration/src/index.ts routes",
+    "migration:repair": "tsx packages/migration/src/index.ts repair",
+    "migration:seed": "tsx packages/migration/src/index.ts seed"
   },
   "type": "module",
   "version": "0.1.0"
