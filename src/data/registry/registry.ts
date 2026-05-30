@@ -1,5 +1,5 @@
 import { importedRegistry } from './generated';
-import type { ImportedArtist, ImportedChartEntry, ImportedGenre, ImportedLabel, ImportedRelease, ImportedTrack } from './types';
+import type { ImportedArtist, ImportedChartEntry, ImportedGenre, ImportedLabel, ImportedTrack } from './types';
 
 const slugify = (value: string) =>
   value
@@ -19,7 +19,6 @@ const tracksById = by(importedRegistry.tracks, 'id');
 const tracksBySlug = by(importedRegistry.tracks, 'slug');
 const labelsById = by(importedRegistry.labels, 'id');
 const labelsBySlug = by(importedRegistry.labels, 'slug');
-const releasesById = by(importedRegistry.releases, 'id');
 const releasesBySlug = by(importedRegistry.releases, 'slug');
 const genresBySlug = by(importedRegistry.genres, 'slug');
 const chartEntriesByEdition = importedRegistry.chartEntries.reduce((acc, entry) => {
@@ -36,49 +35,20 @@ export function hasImportedRegistryData() {
   return importedRegistry.artists.length + importedRegistry.tracks.length + importedRegistry.labels.length + importedRegistry.chartEntries.length > 0;
 }
 
-export function getArtists() {
-  return importedRegistry.artists;
-}
-
-export function getArtistBySlug(slug: string) {
-  return artistsBySlug.get(slug) ?? null;
-}
-
-export function getTracks() {
-  return importedRegistry.tracks;
-}
-
-export function getTrackBySlug(slug: string) {
-  return tracksBySlug.get(slug) ?? null;
-}
-
-export function getLabels() {
-  return importedRegistry.labels;
-}
-
-export function getLabelBySlug(slug: string) {
-  return labelsBySlug.get(slug) ?? null;
-}
-
-export function getReleases() {
-  return importedRegistry.releases;
-}
-
-export function getReleaseBySlug(slug: string) {
-  return releasesBySlug.get(slug) ?? null;
-}
-
-export function getGenres() {
-  return importedRegistry.genres;
-}
-
-export function getGenreBySlug(slug: string) {
-  return genresBySlug.get(slug) ?? null;
-}
-
-export function getChartSeries() {
-  return importedRegistry.chartSeries;
-}
+export const getArtists = () => importedRegistry.artists;
+export const getTracks = () => importedRegistry.tracks;
+export const getLabels = () => importedRegistry.labels;
+export const getReleases = () => importedRegistry.releases;
+export const getGenres = () => importedRegistry.genres;
+export const getChartSeries = () => importedRegistry.chartSeries;
+export const getArtistBySlug = (slug: string) => artistsBySlug.get(slug) ?? null;
+export const getTrackBySlug = (slug: string) => tracksBySlug.get(slug) ?? null;
+export const getLabelBySlug = (slug: string) => labelsBySlug.get(slug) ?? null;
+export const getReleaseBySlug = (slug: string) => releasesBySlug.get(slug) ?? null;
+export const getGenreBySlug = (slug: string) => genresBySlug.get(slug) ?? null;
+export const resolveTrack = (trackId: string | null | undefined) => trackId ? tracksById.get(trackId) ?? null : null;
+export const resolveArtist = (artistId: string | null | undefined) => artistId ? artistsById.get(artistId) ?? null : null;
+export const resolveLabel = (labelId: string | null | undefined) => labelId ? labelsById.get(labelId) ?? null : null;
 
 export function getLatestChartEdition(seriesSlug?: string) {
   const series = seriesSlug ? importedRegistry.chartSeries.find((item) => item.slug === seriesSlug) : importedRegistry.chartSeries[0];
@@ -96,16 +66,11 @@ export function getChartEntriesForEdition(editionId: string) {
   return (chartEntriesByEdition.get(editionId) ?? []).slice().sort((a, b) => a.rank - b.rank);
 }
 
-export function resolveTrack(trackId: string | null | undefined) {
-  return trackId ? tracksById.get(trackId) ?? null : null;
-}
-
-export function resolveArtist(artistId: string | null | undefined) {
-  return artistId ? artistsById.get(artistId) ?? null : null;
-}
-
-export function resolveLabel(labelId: string | null | undefined) {
-  return labelId ? labelsById.get(labelId) ?? null : null;
+export function getArtistTopChartPosition(artist: ImportedArtist) {
+  const ranks = artist.chartEntryIds
+    .map((id) => importedRegistry.chartEntries.find((entry) => entry.id === id)?.rank)
+    .filter((rank): rank is number => typeof rank === 'number');
+  return ranks.length ? Math.min(...ranks) : 0;
 }
 
 export function toArtistCard(artist: ImportedArtist) {
@@ -117,9 +82,10 @@ export function toArtistCard(artist: ImportedArtist) {
     trackCount: artist.trackIds.length,
     releaseCount: artist.releaseIds.length,
     isChartArtist: artist.chartEntryIds.length > 0,
+    isRising: false,
     country: artist.country ?? 'Unknown',
-    debutYear: null,
-    monthlyStreams: null,
+    debutYear: new Date().getFullYear(),
+    monthlyStreams: 0,
     topChartPosition: getArtistTopChartPosition(artist),
     spotlightBio: artist.bio ?? `${artist.name} is part of the WAKILISHA registry, connected through the imported old-site data.`,
   };
@@ -175,13 +141,6 @@ export function toChartRow(entry: ImportedChartEntry) {
 export function getLatestChartRows() {
   const edition = getLatestChartEdition();
   return edition ? getChartEntriesForEdition(edition.id).map(toChartRow) : [];
-}
-
-export function getArtistTopChartPosition(artist: ImportedArtist) {
-  const ranks = artist.chartEntryIds
-    .map((id) => importedRegistry.chartEntries.find((entry) => entry.id === id)?.rank)
-    .filter((rank): rank is number => typeof rank === 'number');
-  return ranks.length ? Math.min(...ranks) : 0;
 }
 
 export function getSearchResults(query: string) {
