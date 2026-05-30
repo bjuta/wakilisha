@@ -1,9 +1,9 @@
-import React from 'react';
-import type { WkRichMediaSpecimen } from '../../../../design-system/designSystemSpec';
-import { WkTag } from '../../../../components/design-system/primitives/Tag';
+import { createElement } from 'react';
+import type { WkRichMediaSpecimen } from '@/design-system/designSystemSpec';
+import { WkTag } from '@/components/design-system/primitives/Tag';
 import { SpecimenCanvas } from './RichSpecimenBoards';
 
-const h = React.createElement;
+const h = createElement;
 
 export function RichSpecimenCard({ item }: { item: WkRichMediaSpecimen }) {
   return h('div', { className: 'overflow-hidden rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-bg-subtle)]' },

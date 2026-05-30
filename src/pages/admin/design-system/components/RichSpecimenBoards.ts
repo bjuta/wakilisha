@@ -1,22 +1,49 @@
-import React from 'react';
-import type { WkRichMediaSpecimen } from '../../../../design-system/designSystemSpec';
+import { createElement } from 'react';
+import type { WkRichMediaSpecimen } from '@/design-system/designSystemSpec';
 
-const h = React.createElement;
+const h = createElement;
 const photo = (seed: string) => `https://picsum.photos/seed/${seed}/900/650`;
 const c = (...parts: Array<string | false | undefined>) => parts.filter(Boolean).join(' ');
 
 function Img({ seed, className = '' }: { seed: string; className?: string }) {
-  return h('img', { src: photo(seed), alt: '', loading: 'lazy', className: c('h-full w-full object-cover', className) });
+  return h('img', {
+    src: photo(seed),
+    alt: '',
+    loading: 'lazy',
+    className: c('h-full w-full object-cover', className),
+  });
 }
 
 function Pill({ text, brand = false }: { text: string; brand?: boolean }) {
-  return h('span', { className: c('inline-flex rounded-full border px-2 py-1 text-[10px] font-bold leading-none', brand ? 'border-[rgba(var(--wk-brand-rgb),.35)] bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]' : 'border-[var(--wk-border)] bg-[var(--wk-surface)] text-[var(--wk-text-soft)]') }, text);
+  return h(
+    'span',
+    {
+      className: c(
+        'inline-flex rounded-full border px-2 py-1 text-[10px] font-bold leading-none',
+        brand
+          ? 'border-[rgba(var(--wk-brand-rgb),.35)] bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]'
+          : 'border-[var(--wk-border)] bg-[var(--wk-surface)] text-[var(--wk-text-soft)]'
+      ),
+    },
+    text
+  );
 }
 
 function Logo({ light = false }: { light?: boolean }) {
   const fill = light ? '#0C0D0A' : '#fff';
-  const paths = ['M25.79,25.46h.08L32.27,0h2.86l-7.71,29.38h-3.06L17.54,3.43h-.08l-6.81,25.95h-3.06L0,0h2.77l6.32,25.46h.08L15.99,0h3.1l6.69,25.46Z','M32.21,29.38L43.75,0h3.14l11.26,29.38h-2.86l-3.39-9.22h-13.38l-3.47,9.22h-2.86ZM39.47,17.79h11.51l-5.75-15.42-5.75,15.42Z','M60.23,29.38V0h2.77v15.22L78.06,0h3.14l-11.59,11.71,13.63,17.67h-3.39l-12.24-15.95-4.61,4.61v11.34h-2.77Z','M86.2,29.38V0h2.77v29.38h-2.77Z','M93.49,29.38V0h2.77v27.01h15.75v2.37h-18.52Z','M115.1,29.38V0h2.77v29.38h-2.77Z','M146.3,29.38V0h2.77v12.61h17.38V0h2.77v29.38h-2.77v-14.4h-17.38v14.4h-2.77Z','M173.11,29.38L184.65,0h3.14l11.26,29.38h-2.86l-3.39-9.22h-13.38l-3.47,9.22h-2.86ZM180.37,17.79h11.51l-5.75-15.42-5.75,15.42Z'];
-  return h('svg', { viewBox: '0 0 199.05 29.87', 'aria-label': 'WAKILISHA', className: 'h-auto w-full max-w-[220px]' },
+  const paths = [
+    'M25.79,25.46h.08L32.27,0h2.86l-7.71,29.38h-3.06L17.54,3.43h-.08l-6.81,25.95h-3.06L0,0h2.77l6.32,25.46h.08L15.99,0h3.1l6.69,25.46Z',
+    'M32.21,29.38L43.75,0h3.14l11.26,29.38h-2.86l-3.39-9.22h-13.38l-3.47,9.22h-2.86ZM39.47,17.79h11.51l-5.75-15.42-5.75,15.42Z',
+    'M60.23,29.38V0h2.77v15.22L78.06,0h3.14l-11.59,11.71,13.63,17.67h-3.39l-12.24-15.95-4.61,4.61v11.34h-2.77Z',
+    'M86.2,29.38V0h2.77v29.38h-2.77Z',
+    'M93.49,29.38V0h2.77v27.01h15.75v2.37h-18.52Z',
+    'M115.1,29.38V0h2.77v29.38h-2.77Z',
+    'M146.3,29.38V0h2.77v12.61h17.38V0h2.77v29.38h-2.77v-14.4h-17.38v14.4h-2.77Z',
+    'M173.11,29.38L184.65,0h3.14l11.26,29.38h-2.86l-3.39-9.22h-13.38l-3.47,9.22h-2.86ZM180.37,17.79h11.51l-5.75-15.42-5.75,15.42Z',
+  ];
+  return h(
+    'svg',
+    { viewBox: '0 0 199.05 29.87', 'aria-label': 'WAKILISHA', className: 'h-auto w-full max-w-[220px]' },
     ...paths.map((d) => h('path', { key: d, fill, d })),
     h('path', { fill: '#84C241', d: 'M132.91,11.14l-7.87,18.73,15.96-17.97c.26-.29.05-.76-.34-.76h-7.75Z' }),
     h('path', { fill: '#84C241', d: 'M130.72.18h6.59c.15.01.26.17.2.31-2.24,5.23-4.48,10.46-6.73,15.69l-6.74-.02c-.19,0-.32-.19-.24-.37l6.54-15.37c.06-.15.21-.25.37-.25Z' })
@@ -47,33 +74,516 @@ export function SpecimenCanvas({ item }: { item: WkRichMediaSpecimen }) {
 }
 
 function LogoBoard() {
-  return h('div', { className: 'grid gap-3 p-4' },
-    h('div', { className: 'grid gap-3 sm:grid-cols-2' },
-      h('div', { className: 'rounded-2xl bg-[#080908] p-6' }, h(Logo), h('p', { className: 'mt-3 font-mono text-[10px] text-white/45' }, 'Dark SVG · white letters, green bolt')),
-      h('div', { className: 'rounded-2xl bg-[#F7F8F3] p-6' }, h(Logo, { light: true }), h('p', { className: 'mt-3 font-mono text-[10px] text-black/45' }, 'Light SVG · black letters, green bolt'))
+  return h(
+    'div',
+    { className: 'grid gap-3 p-4' },
+    h(
+      'div',
+      { className: 'grid gap-3 sm:grid-cols-2' },
+      h(
+        'div',
+        { className: 'rounded-2xl bg-[#080908] p-6' },
+        h(Logo),
+        h('p', { className: 'mt-3 font-mono text-[10px] text-white/45' }, 'Dark SVG · white letters, green bolt')
+      ),
+      h(
+        'div',
+        { className: 'rounded-2xl bg-[#F7F8F3] p-6' },
+        h(Logo, { light: true }),
+        h('p', { className: 'mt-3 font-mono text-[10px] text-black/45' }, 'Light SVG · black letters, green bolt')
+      )
     ),
-    h('div', { className: 'rounded-2xl border border-dashed border-[var(--wk-brand)] bg-[var(--wk-bg-subtle)] p-8' }, h('div', { className: 'mx-auto max-w-[260px] rounded-xl bg-[#080908] p-5' }, h(Logo)), h('p', { className: 'mt-3 text-center font-mono text-[10px] text-[var(--wk-text-muted)]' }, 'Safe zone = 1× bolt height around the real mark'))
+    h(
+      'div',
+      { className: 'rounded-2xl border border-dashed border-[var(--wk-brand)] bg-[var(--wk-bg-subtle)] p-8' },
+      h('div', { className: 'mx-auto max-w-[260px] rounded-xl bg-[#080908] p-5' }, h(Logo)),
+      h('p', { className: 'mt-3 text-center font-mono text-[10px] text-[var(--wk-text-muted)]' }, 'Safe zone = 1× bolt height around the real mark')
+    )
   );
 }
 
 function TokenBoard() {
-  return h('div', { className: 'grid gap-3 p-4 sm:grid-cols-2' }, ...[['--wk-bg','#080908'],['--wk-surface','#141712'],['--wk-brand','#84C241'],['--wk-success','#4FD98E'],['--wk-warning','#F5B84B'],['--wk-danger','#FF6B6B']].map(([token, hex]) => h('div', { key: token, className: 'flex items-center gap-3 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-3' }, h('div', { className: 'h-11 w-11 rounded-lg border border-[var(--wk-border-2)]', style: { background: hex } }), h('div', null, h('div', { className: 'font-mono text-[11px] font-bold text-[var(--wk-text)]' }, token), h('div', { className: 'font-mono text-[10px] text-[var(--wk-text-muted)]' }, hex)))));
+  const tokens: [string, string][] = [
+    ['--wk-bg', '#080908'],
+    ['--wk-surface', '#141712'],
+    ['--wk-brand', '#84C241'],
+    ['--wk-success', '#4FD98E'],
+    ['--wk-warning', '#F5B84B'],
+    ['--wk-danger', '#FF6B6B'],
+  ];
+  return h(
+    'div',
+    { className: 'grid gap-3 p-4 sm:grid-cols-2' },
+    ...tokens.map(([token, hex]) =>
+      h(
+        'div',
+        { key: token, className: 'flex items-center gap-3 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-3' },
+        h('div', { className: 'h-11 w-11 rounded-lg border border-[var(--wk-border-2)]', style: { background: hex } }),
+        h(
+          'div',
+          null,
+          h('div', { className: 'font-mono text-[11px] font-bold text-[var(--wk-text)]' }, token),
+          h('div', { className: 'font-mono text-[10px] text-[var(--wk-text-muted)]' }, hex)
+        )
+      )
+    )
+  );
 }
 
-function TypeBoard() { return h('div', { className: 'space-y-3 p-4' }, h('div', { className: 'rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4' }, h('div', { className: 'text-[clamp(38px,7vw,72px)] font-black leading-[.88] tracking-[-0.06em] text-[var(--wk-text)]' }, 'Every voice on WAKILISHA.'), h('p', { className: 'mt-3 font-mono text-[10px] text-[var(--wk-text-muted)]' }, 'Hero display · Inter 900 · clamp scale')), h('div', { className: 'rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-3' }, h('p', { className: 'text-[16px] leading-relaxed text-[var(--wk-text-soft)]' }, 'DM Sans body copy carries editorial warmth while Inter carries structure, metadata, numbers and headings.'))); }
-function SpacingBoard() { return h('div', { className: 'p-4' }, h('div', { className: 'rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4' }, ...[4,8,12,16,24,32,48,64].map((w) => h('div', { key: w, className: 'mb-2 flex items-center gap-3 last:mb-0' }, h('div', { className: 'w-12 font-mono text-[10px] text-[var(--wk-text-muted)]' }, `${w}px`), h('div', { className: 'h-3 rounded-full bg-[var(--wk-brand)]', style: { width: `${Math.max(w * 2, 16)}px` } })))); }
-function PlayerBoard() { return h('div', { className: 'space-y-4 p-4' }, h('div', { className: 'relative overflow-hidden rounded-2xl border border-[var(--wk-border-2)] bg-[#0a0a08]' }, h(Img, { seed: 'wktheaterhero', className: 'absolute inset-0 opacity-70' }), h('div', { className: 'absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_25%,rgba(0,0,0,.74)_100%)]' }), h('div', { className: 'relative flex min-h-[220px] flex-col justify-end p-5 text-white' }, h('div', { className: 'mb-3 w-fit rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] backdrop-blur' }, 'Now playing'), h('div', { className: 'text-[clamp(28px,5vw,46px)] font-black leading-[.9] tracking-[-0.05em]' }, 'Midnight in Nairobi'), h('div', { className: 'mt-2 text-[13px] text-white/70' }, 'Sauti Sol · WAKILISHA Charts'), h('div', { className: 'mt-4 flex items-center gap-3' }, h('div', { className: 'grid h-11 w-11 place-items-center rounded-full bg-white text-black' }, h('i', { className: 'ri-play-fill' })), h('div', { className: 'font-mono text-[11px]' }, '1:24'), h('div', { className: 'h-1 flex-1 rounded-full bg-white/20' }, h('div', { className: 'h-full w-1/3 rounded-full bg-white' })), h('div', { className: 'font-mono text-[11px]' }, '3:48')))), h('div', { className: 'flex h-16 items-center gap-3 rounded-xl border border-[var(--wk-border-2)] bg-[var(--wk-surface)] p-2 shadow-[var(--wk-shadow)]' }, h('div', { className: 'h-11 w-11 overflow-hidden rounded-lg' }, h(Img, { seed: 'wk-player-art' })), h('div', { className: 'min-w-0 flex-1' }, h('div', { className: 'truncate text-[13px] font-bold text-[var(--wk-text)]' }, 'Disconnect'), h('div', { className: 'truncate text-[11px] text-[var(--wk-text-muted)]' }, 'Muthoni Drummer Queen')), h('span', { className: 'grid h-9 w-9 place-items-center rounded-full bg-[var(--wk-text)] text-[var(--wk-bg)]' }, h('i', { className: 'ri-play-fill' })))); }
-function GenreBoard() { return h('div', { className: 'grid grid-cols-2 gap-3 p-4 md:grid-cols-4' }, ...[['Afrobeats','1,248 tracks','genre-afrobeats'],['Gospel','812 tracks','genre-gospel'],['Hip hop','574 tracks','genre-hiphop'],['Jazz','221 tracks','genre-jazz']].map(([name,count,seed]) => h('div', { key: name, className: 'relative aspect-[3/4] overflow-hidden rounded-2xl' }, h(Img, { seed }), h('div', { className: 'absolute inset-0 bg-[linear-gradient(180deg,transparent_25%,rgba(0,0,0,.88)_100%)]' }), h('div', { className: 'absolute inset-x-0 bottom-0 p-4 text-white' }, h('div', { className: 'text-[15px] font-black tracking-[-0.02em]' }, name), h('div', { className: 'text-[11px] text-white/65' }, count))))); }
-function ArtistBoard() { return h('div', { className: 'grid gap-3 p-4 sm:grid-cols-3' }, ...[['Muthoni Drummer Queen','Nairobi · 42 tracks','artist-mdq'],['Blinky Bill','Kenya · 28 releases','artist-blinky'],['Karun','Alt R&B · 19 tracks','artist-karun']].map(([name,meta,seed], i) => h('div', { key: name, className: 'overflow-hidden rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)]' }, h('div', { className: 'relative aspect-square' }, h(Img, { seed }), i === 0 && h('span', { className: 'absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-full bg-[var(--wk-brand)] text-white' }, h('i', { className: 'ri-check-line text-xs' }))), h('div', { className: 'p-3' }, h('div', { className: 'truncate text-[14px] font-black text-[var(--wk-text)]' }, name), h('div', { className: 'text-[11px] text-[var(--wk-text-muted)]' }, meta), h('div', { className: 'mt-2 flex gap-1' }, h(Pill, { text: 'Artist', brand: true }), h(Pill, { text: 'Registry' })))))); }
-function MagazineBoard() { return h('div', { className: 'space-y-4 p-4' }, h('div', { className: 'relative aspect-[21/9] overflow-hidden rounded-2xl bg-[#120908]' }, h(Img, { seed: 'magazine-hero', className: 'opacity-55' }), h('div', { className: 'absolute inset-0 bg-[linear-gradient(160deg,rgba(26,10,10,.2),rgba(45,26,5,.42),rgba(10,13,26,.85))]' }), h('div', { className: 'absolute inset-0 flex flex-col justify-end p-5 text-white' }, h('span', { className: 'mb-2 w-fit rounded-full bg-[var(--wk-brand)] px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em]' }, 'Field notes'), h('div', { className: 'max-w-[14ch] text-[clamp(28px,6vw,54px)] font-black leading-[.9] tracking-[-0.055em]' }, 'How Nairobi made the sound.')))); }
-function ChartBoard() { return h('div', { className: 'p-4' }, h('div', { className: 'overflow-hidden rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)]' }, h('div', { className: 'h-1.5 bg-[linear-gradient(90deg,var(--wk-brand),#5dde6a,#84c241)]' }), h('div', { className: 'p-5' }, h('div', { className: 'mb-3 w-fit rounded-full bg-[var(--wk-brand)] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-[var(--wk-brand-on)]' }, 'Edition 04'), h('div', { className: 'text-[clamp(28px,5vw,50px)] font-black leading-[.9] tracking-[-0.055em] text-[var(--wk-text)]' }, 'WAKILISHA Top 40')), ...[['1','Sawa','Wanavokali','+2'],['2','Rhumba Japani','Sauti Sol','–'],['3','Kesho Kutwa','Khaligraph Jones','-1']].map(([rank,title,artist,delta], i) => h('div', { key: title, className: 'grid grid-cols-[34px_44px_1fr_42px_28px] items-center gap-3 border-t border-[var(--wk-divider)] px-4 py-2' }, h('div', { className: c('text-right font-black', i < 3 ? 'text-[18px] text-[var(--wk-brand)]' : 'text-[var(--wk-text-muted)]') }, rank), h('div', { className: 'h-11 w-11 overflow-hidden rounded-lg' }, h(Img, { seed: `chart-art-${rank}` })), h('div', { className: 'min-w-0' }, h('div', { className: 'truncate text-[13px] font-bold text-[var(--wk-text)]' }, title), h('div', { className: 'truncate text-[11px] text-[var(--wk-text-muted)]' }, artist)), h('div', { className: 'text-right text-[11px] font-black text-[var(--wk-success)]' }, delta), h('div', { className: 'grid h-7 w-7 place-items-center rounded-full bg-[var(--wk-surface-raised)] text-[var(--wk-text-soft)]' }, h('i', { className: 'ri-play-fill text-xs' })))))); }
-function TrackBoard() { return h('div', { className: 'p-4' }, h('div', { className: 'grid gap-5 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-5 md:grid-cols-[200px_1fr]' }, h('div', { className: 'aspect-square overflow-hidden rounded-2xl' }, h(Img, { seed: 'single-track-art' })), h('div', null, h('div', { className: 'mb-2 text-[10px] font-black uppercase tracking-[0.22em] text-[var(--wk-brand)]' }, 'Single track'), h('div', { className: 'text-[clamp(28px,5vw,52px)] font-black leading-[.92] tracking-[-0.055em] text-[var(--wk-text)]' }, 'In the City'), h('div', { className: 'mt-2 text-[15px] text-[var(--wk-text-soft)]' }, 'Karun · featuring Ukweli')))); }
-function AlbumBoard() { return h('div', { className: 'p-4' }, h('div', { className: 'grid gap-5 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-5 md:grid-cols-[170px_1fr]' }, h('div', { className: 'aspect-square overflow-hidden rounded-2xl' }, h(Img, { seed: 'album-cover' })), h('div', null, h('div', { className: 'mb-2 text-[10px] font-black uppercase tracking-[0.22em] text-[var(--wk-brand)]' }, 'Album'), h('div', { className: 'text-[clamp(26px,4.5vw,46px)] font-black leading-[.95] tracking-[-0.05em] text-[var(--wk-text)]' }, 'Atlas of Small Fires'), h('div', { className: 'mt-2 text-[14px] text-[var(--wk-text-soft)]' }, 'Blinky Bill'), h(Pill, { text: 'Play all', brand: true })))); }
-function ModalBoard() { return h('div', { className: 'p-4' }, h('div', { className: 'rounded-3xl border border-white/10 bg-[rgba(8,9,8,.72)] p-5 shadow-[var(--wk-shadow-lg)] backdrop-blur-xl' }, h('div', { className: 'grid gap-4 sm:grid-cols-[150px_1fr]' }, h('div', { className: 'aspect-square overflow-hidden rounded-2xl' }, h(Img, { seed: 'modal-album-cover' })), h('div', { className: 'text-white' }, h('div', { className: 'text-[24px] font-black leading-none tracking-[-0.04em]' }, 'Where We Landed'), h('div', { className: 'mt-1 text-[13px] text-white/60' }, 'Nyokabi Kariũki · 2026'), h('button', { className: 'mt-4 rounded-full bg-[var(--wk-brand)] px-4 py-2 text-[12px] font-bold text-[var(--wk-brand-on)]' }, 'Play album'))))); }
-function LabelBoard() { return h('div', { className: 'grid gap-3 p-4 sm:grid-cols-3' }, ...[['Sol Generation','SG'],['Pine Creek','PC'],['Kaka Empire','KE']].map(([name,initials]) => h('div', { key: name, className: 'rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4' }, h('div', { className: 'mb-3 grid h-16 w-16 place-items-center rounded-xl bg-[var(--wk-bg-subtle)] text-[22px] font-black text-[var(--wk-text-faint)]' }, initials), h('div', { className: 'text-[15px] font-black text-[var(--wk-text)]' }, name)))); }
-function ArticleBoard() { return h('div', { className: 'p-4' }, h('div', { className: 'relative mb-5 aspect-video overflow-hidden rounded-2xl' }, h(Img, { seed: 'article-hero', className: 'opacity-70' }), h('div', { className: 'absolute inset-0 bg-[linear-gradient(180deg,transparent_15%,rgba(8,9,8,.92)_100%)]' }), h('div', { className: 'absolute inset-x-0 bottom-0 p-5' }, h('span', { className: 'rounded-full bg-[var(--wk-brand)] px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-[var(--wk-brand-on)]' }, 'Essay'), h('div', { className: 'mt-2 max-w-[14ch] text-[clamp(26px,5vw,48px)] font-black leading-[.92] tracking-[-0.055em] text-white' }, 'How a scene becomes memory.')))); }
-function ShareBoard() { return h('div', { className: 'p-4' }, h('div', { className: 'mx-auto max-w-md rounded-t-3xl border border-[var(--wk-border-2)] bg-[var(--wk-surface)] p-5 shadow-[var(--wk-shadow-lg)]' }, h('div', { className: 'mx-auto mb-4 h-1 w-9 rounded-full bg-[var(--wk-border-strong)]' }), h('div', { className: 'text-[16px] font-black text-[var(--wk-text)]' }, 'Share this track'), h('div', { className: 'mb-4 mt-3 grid grid-cols-[52px_1fr] gap-3 rounded-xl bg-[var(--wk-bg-subtle)] p-3' }, h('div', { className: 'h-13 w-13 overflow-hidden rounded-lg' }, h(Img, { seed: 'share-preview' })), h('div', null, h('div', { className: 'text-[13px] font-bold text-[var(--wk-text)]' }, 'In the City'), h('div', { className: 'text-[11px] text-[var(--wk-text-muted)]' }, 'Karun · WAKILISHA'))))); }
-function MobileBoard() { return h('div', { className: 'flex justify-center p-4' }, h('div', { className: 'relative min-h-[520px] w-[300px] overflow-hidden rounded-[34px] border border-[var(--wk-border-2)] bg-[var(--wk-bg)]' }, h('div', { className: 'px-4 pb-20 pt-8' }, h('div', { className: 'mb-4 text-[26px] font-black tracking-[-0.05em] text-[var(--wk-text)]' }, 'Discover'), h('div', { className: 'relative aspect-[4/5] overflow-hidden rounded-2xl' }, h(Img, { seed: 'mobile-hero' }), h('div', { className: 'absolute inset-0 bg-[linear-gradient(180deg,transparent_40%,rgba(0,0,0,.85)_100%)]' }), h('div', { className: 'absolute bottom-0 p-4 text-white' }, h('div', { className: 'text-[24px] font-black leading-none tracking-[-0.05em]' }, 'The sound of Friday')))))); }
-function MotionBoard() { return h('div', { className: 'p-4' }, h('div', { className: 'grid grid-cols-5 gap-2' }, ...['60','120','220','420','640'].map((d,i) => h('div', { key: d, className: 'rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-2 text-center' }, h('div', { className: 'mx-auto mb-2 h-12 w-2 rounded-full bg-[var(--wk-brand)]', style: { opacity: .35 + i * .12 } }), h('div', { className: 'font-mono text-[10px] text-[var(--wk-text-muted)]' }, `${d}ms`))))); }
-function AdminBoard() { return h('div', { className: 'grid grid-cols-2 gap-3 p-4 sm:grid-cols-4' }, ...[['7,662','Registry'],['6,332','Chart entries'],['232','Labels'],['1,929','Media']].map(([v,l]) => h('div', { key: l, className: 'rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-3' }, h('div', { className: 'text-[24px] font-black tracking-[-0.05em] text-[var(--wk-text)]' }, v), h('div', { className: 'text-[10px] font-bold uppercase tracking-wider text-[var(--wk-text-muted)]' }, l)))); }
-function CardBoard() { return h('div', { className: 'grid grid-cols-2 gap-3 p-4' }, ...[['Registry card','card-rich-1'],['Editorial card','card-rich-2']].map(([title,seed]) => h('div', { key: title, className: 'overflow-hidden rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)]' }, h('div', { className: 'aspect-square' }, h(Img, { seed })), h('div', { className: 'p-3' }, h('div', { className: 'text-[13px] font-black text-[var(--wk-text)]' }, title), h('div', { className: 'mt-1 text-[11px] text-[var(--wk-text-muted)]' }, 'Image, metadata, action states.'))))); }
+function TypeBoard() {
+  return h(
+    'div',
+    { className: 'space-y-3 p-4' },
+    h(
+      'div',
+      { className: 'rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4' },
+      h(
+        'div',
+        { className: 'text-[clamp(38px,7vw,72px)] font-black leading-[.88] tracking-[-0.06em] text-[var(--wk-text)]' },
+        'Every voice on WAKILISHA.'
+      ),
+      h('p', { className: 'mt-3 font-mono text-[10px] text-[var(--wk-text-muted)]' }, 'Hero display · Inter 900 · clamp scale')
+    ),
+    h(
+      'div',
+      { className: 'rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-3' },
+      h(
+        'p',
+        { className: 'text-[16px] leading-relaxed text-[var(--wk-text-soft)]' },
+        'DM Sans body copy carries editorial warmth while Inter carries structure, metadata, numbers and headings.'
+      )
+    )
+  );
+}
+
+function SpacingBoard() {
+  const widths = [4, 8, 12, 16, 24, 32, 48, 64];
+  return h(
+    'div',
+    { className: 'p-4' },
+    h(
+      'div',
+      { className: 'rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4' },
+      ...widths.map((w) =>
+        h(
+          'div',
+          { key: w, className: 'mb-2 flex items-center gap-3 last:mb-0' },
+          h('div', { className: 'w-12 font-mono text-[10px] text-[var(--wk-text-muted)]' }, `${w}px`),
+          h('div', {
+            className: 'h-3 rounded-full bg-[var(--wk-brand)]',
+            style: { width: `${Math.max(w * 2, 16)}px` },
+          })
+        )
+      )
+    )
+  );
+}
+
+function PlayerBoard() {
+  return h(
+    'div',
+    { className: 'space-y-4 p-4' },
+    h(
+      'div',
+      { className: 'relative overflow-hidden rounded-2xl border border-[var(--wk-border-2)] bg-[#0a0a08]' },
+      h(Img, { seed: 'wktheaterhero', className: 'absolute inset-0 opacity-70' }),
+      h('div', { className: 'absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_25%,rgba(0,0,0,.74)_100%)]' }),
+      h(
+        'div',
+        { className: 'relative flex min-h-[220px] flex-col justify-end p-5 text-white' },
+        h(
+          'div',
+          { className: 'mb-3 w-fit rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] backdrop-blur' },
+          'Now playing'
+        ),
+        h(
+          'div',
+          { className: 'text-[clamp(28px,5vw,46px)] font-black leading-[.9] tracking-[-0.05em]' },
+          'Midnight in Nairobi'
+        ),
+        h('div', { className: 'mt-2 text-[13px] text-white/70' }, 'Sauti Sol · WAKILISHA Charts'),
+        h(
+          'div',
+          { className: 'mt-4 flex items-center gap-3' },
+          h(
+            'div',
+            { className: 'grid h-11 w-11 place-items-center rounded-full bg-white text-black' },
+            h('i', { className: 'ri-play-fill' })
+          ),
+          h('div', { className: 'font-mono text-[11px]' }, '1:24'),
+          h('div', { className: 'h-1 flex-1 rounded-full bg-white/20' }, h('div', { className: 'h-full w-1/3 rounded-full bg-white' })),
+          h('div', { className: 'font-mono text-[11px]' }, '3:48')
+        )
+      )
+    ),
+    h(
+      'div',
+      { className: 'flex h-16 items-center gap-3 rounded-xl border border-[var(--wk-border-2)] bg-[var(--wk-surface)] p-2 shadow-[var(--wk-shadow)]' },
+      h('div', { className: 'h-11 w-11 overflow-hidden rounded-lg' }, h(Img, { seed: 'wk-player-art' })),
+      h(
+        'div',
+        { className: 'min-w-0 flex-1' },
+        h('div', { className: 'truncate text-[13px] font-bold text-[var(--wk-text)]' }, 'Disconnect'),
+        h('div', { className: 'truncate text-[11px] text-[var(--wk-text-muted)]' }, 'Muthoni Drummer Queen')
+      ),
+      h(
+        'span',
+        { className: 'grid h-9 w-9 place-items-center rounded-full bg-[var(--wk-text)] text-[var(--wk-bg)]' },
+        h('i', { className: 'ri-play-fill' })
+      )
+    )
+  );
+}
+
+function GenreBoard() {
+  const genres: [string, string, string][] = [
+    ['Afrobeats', '1,248 tracks', 'genre-afrobeats'],
+    ['Gospel', '812 tracks', 'genre-gospel'],
+    ['Hip hop', '574 tracks', 'genre-hiphop'],
+    ['Jazz', '221 tracks', 'genre-jazz'],
+  ];
+  return h(
+    'div',
+    { className: 'grid grid-cols-2 gap-3 p-4 md:grid-cols-4' },
+    ...genres.map(([name, count, seed]) =>
+      h(
+        'div',
+        { key: name, className: 'relative aspect-[3/4] overflow-hidden rounded-2xl' },
+        h(Img, { seed }),
+        h('div', { className: 'absolute inset-0 bg-[linear-gradient(180deg,transparent_25%,rgba(0,0,0,.88)_100%)]' }),
+        h(
+          'div',
+          { className: 'absolute inset-x-0 bottom-0 p-4 text-white' },
+          h('div', { className: 'text-[15px] font-black tracking-[-0.02em]' }, name),
+          h('div', { className: 'text-[11px] text-white/65' }, count)
+        )
+      )
+    )
+  );
+}
+
+function ArtistBoard() {
+  const artists: [string, string, string][] = [
+    ['Muthoni Drummer Queen', 'Nairobi · 42 tracks', 'artist-mdq'],
+    ['Blinky Bill', 'Kenya · 28 releases', 'artist-blinky'],
+    ['Karun', 'Alt R&B · 19 tracks', 'artist-karun'],
+  ];
+  return h(
+    'div',
+    { className: 'grid gap-3 p-4 sm:grid-cols-3' },
+    ...artists.map(([name, meta, seed], i) =>
+      h(
+        'div',
+        { key: name, className: 'overflow-hidden rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)]' },
+        h(
+          'div',
+          { className: 'relative aspect-square' },
+          h(Img, { seed }),
+          i === 0 && h('span', { className: 'absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-full bg-[var(--wk-brand)] text-white' }, h('i', { className: 'ri-check-line text-xs' }))
+        ),
+        h(
+          'div',
+          { className: 'p-3' },
+          h('div', { className: 'truncate text-[14px] font-black text-[var(--wk-text)]' }, name),
+          h('div', { className: 'text-[11px] text-[var(--wk-text-muted)]' }, meta),
+          h('div', { className: 'mt-2 flex gap-1' }, h(Pill, { text: 'Artist', brand: true }), h(Pill, { text: 'Registry' }))
+        )
+      )
+    )
+  );
+}
+
+function MagazineBoard() {
+  return h(
+    'div',
+    { className: 'space-y-4 p-4' },
+    h(
+      'div',
+      { className: 'relative aspect-[21/9] overflow-hidden rounded-2xl bg-[#120908]' },
+      h(Img, { seed: 'magazine-hero', className: 'opacity-55' }),
+      h('div', { className: 'absolute inset-0 bg-[linear-gradient(160deg,rgba(26,10,10,.2),rgba(45,26,5,.42),rgba(10,13,26,.85))]' }),
+      h(
+        'div',
+        { className: 'absolute inset-0 flex flex-col justify-end p-5 text-white' },
+        h('span', { className: 'mb-2 w-fit rounded-full bg-[var(--wk-brand)] px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em]' }, 'Field notes'),
+        h(
+          'div',
+          { className: 'max-w-[14ch] text-[clamp(28px,6vw,54px)] font-black leading-[.9] tracking-[-0.055em]' },
+          'How Nairobi made the sound.'
+        )
+      )
+    )
+  );
+}
+
+function ChartBoard() {
+  const tracks: [string, string, string, string][] = [
+    ['1', 'Sawa', 'Wanavokali', '+2'],
+    ['2', 'Rhumba Japani', 'Sauti Sol', '\u2013'],
+    ['3', 'Kesho Kutwa', 'Khaligraph Jones', '-1'],
+  ];
+  return h(
+    'div',
+    { className: 'p-4' },
+    h(
+      'div',
+      { className: 'overflow-hidden rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)]' },
+      h('div', { className: 'h-1.5 bg-[linear-gradient(90deg,var(--wk-brand),#5dde6a,#84c241)]' }),
+      h(
+        'div',
+        { className: 'p-5' },
+        h('div', { className: 'mb-3 w-fit rounded-full bg-[var(--wk-brand)] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-[var(--wk-brand-on)]' }, 'Edition 04'),
+        h('div', { className: 'text-[clamp(28px,5vw,50px)] font-black leading-[.9] tracking-[-0.055em] text-[var(--wk-text)]' }, 'WAKILISHA Top 40')
+      ),
+      ...tracks.map(([rank, title, artist, delta], i) =>
+        h(
+          'div',
+          { key: title, className: 'grid grid-cols-[34px_44px_1fr_42px_28px] items-center gap-3 border-t border-[var(--wk-divider)] px-4 py-2' },
+          h(
+            'div',
+            { className: c('text-right font-black', i < 3 ? 'text-[18px] text-[var(--wk-brand)]' : 'text-[var(--wk-text-muted)]') },
+            rank
+          ),
+          h('div', { className: 'h-11 w-11 overflow-hidden rounded-lg' }, h(Img, { seed: `chart-art-${rank}` })),
+          h(
+            'div',
+            { className: 'min-w-0' },
+            h('div', { className: 'truncate text-[13px] font-bold text-[var(--wk-text)]' }, title),
+            h('div', { className: 'truncate text-[11px] text-[var(--wk-text-muted)]' }, artist)
+          ),
+          h('div', { className: 'text-right text-[11px] font-black text-[var(--wk-success)]' }, delta),
+          h('div', { className: 'grid h-7 w-7 place-items-center rounded-full bg-[var(--wk-surface-raised)] text-[var(--wk-text-soft)]' }, h('i', { className: 'ri-play-fill text-xs' }))
+        )
+      )
+    )
+  );
+}
+
+function TrackBoard() {
+  return h(
+    'div',
+    { className: 'p-4' },
+    h(
+      'div',
+      { className: 'grid gap-5 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-5 md:grid-cols-[200px_1fr]' },
+      h('div', { className: 'aspect-square overflow-hidden rounded-2xl' }, h(Img, { seed: 'single-track-art' })),
+      h(
+        'div',
+        null,
+        h('div', { className: 'mb-2 text-[10px] font-black uppercase tracking-[0.22em] text-[var(--wk-brand)]' }, 'Single track'),
+        h(
+          'div',
+          { className: 'text-[clamp(28px,5vw,52px)] font-black leading-[.92] tracking-[-0.055em] text-[var(--wk-text)]' },
+          'In the City'
+        ),
+        h('div', { className: 'mt-2 text-[15px] text-[var(--wk-text-soft)]' }, 'Karun · featuring Ukweli')
+      )
+    )
+  );
+}
+
+function AlbumBoard() {
+  return h(
+    'div',
+    { className: 'p-4' },
+    h(
+      'div',
+      { className: 'grid gap-5 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-5 md:grid-cols-[170px_1fr]' },
+      h('div', { className: 'aspect-square overflow-hidden rounded-2xl' }, h(Img, { seed: 'album-cover' })),
+      h(
+        'div',
+        null,
+        h('div', { className: 'mb-2 text-[10px] font-black uppercase tracking-[0.22em] text-[var(--wk-brand)]' }, 'Album'),
+        h(
+          'div',
+          { className: 'text-[clamp(26px,4.5vw,46px)] font-black leading-[.95] tracking-[-0.05em] text-[var(--wk-text)]' },
+          'Atlas of Small Fires'
+        ),
+        h('div', { className: 'mt-2 text-[14px] text-[var(--wk-text-soft)]' }, 'Blinky Bill'),
+        h(Pill, { text: 'Play all', brand: true })
+      )
+    )
+  );
+}
+
+function ModalBoard() {
+  return h(
+    'div',
+    { className: 'p-4' },
+    h(
+      'div',
+      { className: 'rounded-3xl border border-white/10 bg-[rgba(8,9,8,.72)] p-5 shadow-[var(--wk-shadow-lg)] backdrop-blur-xl' },
+      h(
+        'div',
+        { className: 'grid gap-4 sm:grid-cols-[150px_1fr]' },
+        h('div', { className: 'aspect-square overflow-hidden rounded-2xl' }, h(Img, { seed: 'modal-album-cover' })),
+        h(
+          'div',
+          { className: 'text-white' },
+          h('div', { className: 'text-[24px] font-black leading-none tracking-[-0.04em]' }, 'Where We Landed'),
+          h('div', { className: 'mt-1 text-[13px] text-white/60' }, 'Nyokabi Kari\u0169ki · 2026'),
+          h('button', { className: 'mt-4 rounded-full bg-[var(--wk-brand)] px-4 py-2 text-[12px] font-bold text-[var(--wk-brand-on)]' }, 'Play album')
+        )
+      )
+    )
+  );
+}
+
+function LabelBoard() {
+  const labels: [string, string][] = [
+    ['Sol Generation', 'SG'],
+    ['Pine Creek', 'PC'],
+    ['Kaka Empire', 'KE'],
+  ];
+  return h(
+    'div',
+    { className: 'grid gap-3 p-4 sm:grid-cols-3' },
+    ...labels.map(([name, initials]) =>
+      h(
+        'div',
+        { key: name, className: 'rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4' },
+        h('div', { className: 'mb-3 grid h-16 w-16 place-items-center rounded-xl bg-[var(--wk-bg-subtle)] text-[22px] font-black text-[var(--wk-text-faint)]' }, initials),
+        h('div', { className: 'text-[15px] font-black text-[var(--wk-text)]' }, name)
+      )
+    )
+  );
+}
+
+function ArticleBoard() {
+  return h(
+    'div',
+    { className: 'p-4' },
+    h(
+      'div',
+      { className: 'relative mb-5 aspect-video overflow-hidden rounded-2xl' },
+      h(Img, { seed: 'article-hero', className: 'opacity-70' }),
+      h('div', { className: 'absolute inset-0 bg-[linear-gradient(180deg,transparent_15%,rgba(8,9,8,.92)_100%)]' }),
+      h(
+        'div',
+        { className: 'absolute inset-x-0 bottom-0 p-5' },
+        h('span', { className: 'rounded-full bg-[var(--wk-brand)] px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-[var(--wk-brand-on)]' }, 'Essay'),
+        h(
+          'div',
+          { className: 'mt-2 max-w-[14ch] text-[clamp(26px,5vw,48px)] font-black leading-[.92] tracking-[-0.055em] text-white' },
+          'How a scene becomes memory.'
+        )
+      )
+    )
+  );
+}
+
+function ShareBoard() {
+  return h(
+    'div',
+    { className: 'p-4' },
+    h(
+      'div',
+      { className: 'mx-auto max-w-md rounded-t-3xl border border-[var(--wk-border-2)] bg-[var(--wk-surface)] p-5 shadow-[var(--wk-shadow-lg)]' },
+      h('div', { className: 'mx-auto mb-4 h-1 w-9 rounded-full bg-[var(--wk-border-strong)]' }),
+      h('div', { className: 'text-[16px] font-black text-[var(--wk-text)]' }, 'Share this track'),
+      h(
+        'div',
+        { className: 'mb-4 mt-3 grid grid-cols-[52px_1fr] gap-3 rounded-xl bg-[var(--wk-bg-subtle)] p-3' },
+        h('div', { className: 'h-13 w-13 overflow-hidden rounded-lg' }, h(Img, { seed: 'share-preview' })),
+        h(
+          'div',
+          null,
+          h('div', { className: 'text-[13px] font-bold text-[var(--wk-text)]' }, 'In the City'),
+          h('div', { className: 'text-[11px] text-[var(--wk-text-muted)]' }, 'Karun · WAKILISHA')
+        )
+      )
+    )
+  );
+}
+
+function MobileBoard() {
+  return h(
+    'div',
+    { className: 'flex justify-center p-4' },
+    h(
+      'div',
+      { className: 'relative min-h-[520px] w-[300px] overflow-hidden rounded-[34px] border border-[var(--wk-border-2)] bg-[var(--wk-bg)]' },
+      h(
+        'div',
+        { className: 'px-4 pb-20 pt-8' },
+        h('div', { className: 'mb-4 text-[26px] font-black tracking-[-0.05em] text-[var(--wk-text)]' }, 'Discover'),
+        h(
+          'div',
+          { className: 'relative aspect-[4/5] overflow-hidden rounded-2xl' },
+          h(Img, { seed: 'mobile-hero' }),
+          h('div', { className: 'absolute inset-0 bg-[linear-gradient(180deg,transparent_40%,rgba(0,0,0,.85)_100%)]' }),
+          h(
+            'div',
+            { className: 'absolute bottom-0 p-4 text-white' },
+            h('div', { className: 'text-[24px] font-black leading-none tracking-[-0.05em]' }, 'The sound of Friday')
+          )
+        )
+      )
+    )
+  );
+}
+
+function MotionBoard() {
+  const durations = ['60', '120', '220', '420', '640'];
+  return h(
+    'div',
+    { className: 'p-4' },
+    h(
+      'div',
+      { className: 'grid grid-cols-5 gap-2' },
+      ...durations.map((d, i) =>
+        h(
+          'div',
+          { key: d, className: 'rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-2 text-center' },
+          h('div', { className: 'mx-auto mb-2 h-12 w-2 rounded-full bg-[var(--wk-brand)]', style: { opacity: 0.35 + i * 0.12 } }),
+          h('div', { className: 'font-mono text-[10px] text-[var(--wk-text-muted)]' }, `${d}ms`)
+        )
+      )
+    )
+  );
+}
+
+function AdminBoard() {
+  const kpis: [string, string][] = [
+    ['7,662', 'Registry'],
+    ['6,332', 'Chart entries'],
+    ['232', 'Labels'],
+    ['1,929', 'Media'],
+  ];
+  return h(
+    'div',
+    { className: 'grid grid-cols-2 gap-3 p-4 sm:grid-cols-4' },
+    ...kpis.map(([v, l]) =>
+      h(
+        'div',
+        { key: l, className: 'rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-3' },
+        h('div', { className: 'text-[24px] font-black tracking-[-0.05em] text-[var(--wk-text)]' }, v),
+        h('div', { className: 'text-[10px] font-bold uppercase tracking-wider text-[var(--wk-text-muted)]' }, l)
+      )
+    )
+  );
+}
+
+function CardBoard() {
+  const cards: [string, string][] = [
+    ['Registry card', 'card-rich-1'],
+    ['Editorial card', 'card-rich-2'],
+  ];
+  return h(
+    'div',
+    { className: 'grid grid-cols-2 gap-3 p-4' },
+    ...cards.map(([title, seed]) =>
+      h(
+        'div',
+        { key: title, className: 'overflow-hidden rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)]' },
+        h('div', { className: 'aspect-square' }, h(Img, { seed })),
+        h(
+          'div',
+          { className: 'p-3' },
+          h('div', { className: 'text-[13px] font-black text-[var(--wk-text)]' }, title),
+          h('div', { className: 'mt-1 text-[11px] text-[var(--wk-text-muted)]' }, 'Image, metadata, action states.')
+        )
+      )
+    )
+  );
+}
