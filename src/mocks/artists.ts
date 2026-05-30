@@ -1,4 +1,6 @@
-export const ARTISTS = [
+import { getArtists, hasImportedRegistryData, toArtistCard } from '@/data/registry/registry';
+
+const FALLBACK_ARTISTS = [
   { slug: "burna-boy", name: "Burna Boy", genres: ["Afrobeats", "Afrofusion"], trackCount: 142, releaseCount: 8, isChartArtist: true, isRising: false, country: "Nigeria", debutYear: 2012, monthlyStreams: 18.4, topChartPosition: 1, spotlightBio: "Grammy-winning artist whose fusion of Afrobeats, dancehall, and reggae has redefined the sound of modern African music.", imageUrl: "https://readdy.ai/api/search-image?query=African%20afrobeats%20male%20music%20artist%20portrait%2C%20studio%20photography%2C%20dark%20background%2C%20warm%20lighting%2C%20professional&width=400&height=300&seq=a1&orientation=landscape" },
   { slug: "tems", name: "Tems", genres: ["Afropop", "R&B"], trackCount: 38, releaseCount: 3, isChartArtist: true, isRising: false, country: "Nigeria", debutYear: 2018, monthlyStreams: 9.2, topChartPosition: 1, spotlightBio: "Vocalist and producer whose ethereal sound bridges Afropop and R&B, earning global recognition and Grammy nominations.", imageUrl: "https://readdy.ai/api/search-image?query=African%20female%20singer%20artist%20portrait%2C%20studio%20photography%2C%20warm%20golden%20lighting%2C%20contemporary%20music%20artist&width=400&height=300&seq=a2&orientation=landscape" },
   { slug: "wizkid", name: "Wizkid", genres: ["Afrobeats", "Dancehall"], trackCount: 198, releaseCount: 6, isChartArtist: true, isRising: false, country: "Nigeria", debutYear: 2010, monthlyStreams: 22.1, topChartPosition: 1, spotlightBio: "One of Africa's most commercially successful artists, pioneering the global spread of Afrobeats for over a decade.", imageUrl: "https://readdy.ai/api/search-image?query=Nigerian%20male%20afrobeats%20music%20artist%20portrait%2C%20dark%20studio%20backdrop%2C%20professional%20lighting%2C%20musician&width=400&height=300&seq=a3&orientation=landscape" },
@@ -17,25 +19,22 @@ export const ARTISTS = [
   { slug: "omah-lay", name: "Omah Lay", genres: ["Afropop", "Afro-fusion"], trackCount: 35, releaseCount: 2, isChartArtist: true, isRising: true, country: "Nigeria", debutYear: 2019, monthlyStreams: 5.1, topChartPosition: 3, spotlightBio: "Afropop sensation whose deeply personal songwriting and unique production style have captivated listeners worldwide.", imageUrl: "https://readdy.ai/api/search-image?query=Nigerian%20male%20afropop%20artist%20portrait%2C%20contemplative%20studio%20photography%2C%20warm%20lighting&width=400&height=300&seq=a16&orientation=landscape" },
 ];
 
-export const ARTIST_FILTERS = ["All", "Afrobeats", "Afropop", "Amapiano", "R&B", "Highlife", "Rap", "Alt-Afrobeats", "Dancehall", "Afro-fusion"];
+export const ARTISTS = hasImportedRegistryData() ? getArtists().map(toArtistCard) : FALLBACK_ARTISTS;
 
+export const ARTIST_FILTERS = ["All", ...Array.from(new Set(ARTISTS.flatMap((artist) => artist.genres))).sort()];
 export const ALPHABET = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"];
 
 export const ARTIST_STATS = {
-  totalArtists: 16,
-  chartArtists: 9,
-  totalTracks: 1074,
-  totalReleases: 57,
-  totalGenres: 10,
-  countries: 2,
-  monthlyStreams: 130.1,
+  totalArtists: ARTISTS.length,
+  chartArtists: ARTISTS.filter((artist) => artist.isChartArtist).length,
+  totalTracks: ARTISTS.reduce((sum, artist) => sum + artist.trackCount, 0),
+  totalReleases: ARTISTS.reduce((sum, artist) => sum + artist.releaseCount, 0),
+  totalGenres: ARTIST_FILTERS.length - 1,
+  countries: new Set(ARTISTS.map((artist) => artist.country).filter(Boolean)).size,
+  monthlyStreams: ARTISTS.reduce((sum, artist) => sum + artist.monthlyStreams, 0),
 };
 
-export const GENRE_CLUSTERS = [
-  { genre: "Afrobeats", count: 8, description: "The heartbeat of modern African pop", artists: ["Burna Boy", "Wizkid", "Davido", "Rema", "Asake", "Fireboy DML", "Kizz Daniel", "Omah Lay"] },
-  { genre: "Afropop", count: 7, description: "Melodic hooks and crossover appeal", artists: ["Tems", "Ayra Starr", "Fireboy DML", "Oxlade", "BNXN", "Cruel Santino", "Amaarae"] },
-  { genre: "Amapiano", count: 1, description: "South African piano wave meets Nigerian street", artists: ["Asake"] },
-  { genre: "R&B", count: 4, description: "Soulful vocals and slow-burn emotion", artists: ["Tems", "Fireboy DML", "Oxlade", "BNXN"] },
-  { genre: "Alt-Afrobeats", count: 2, description: "Boundary-pushing experimental sounds", artists: ["Cruel Santino", "Amaarae"] },
-  { genre: "Dancehall", count: 2, description: "Reggae-influenced rhythm and energy", artists: ["Wizkid", "Stonebwoy"] },
-];
+export const GENRE_CLUSTERS = ARTIST_FILTERS.filter((genre) => genre !== "All").slice(0, 8).map((genre) => {
+  const artists = ARTISTS.filter((artist) => artist.genres.includes(genre));
+  return { genre, count: artists.length, description: `Artists connected to ${genre} in the WAKILISHA registry`, artists: artists.map((artist) => artist.name).slice(0, 8) };
+});
