@@ -1,4 +1,6 @@
+import { Link } from "react-router-dom";
 import { WkTag } from "@/components/design-system/primitives/Tag";
+import { usePlayer } from "@/context/PlayerContext";
 
 export interface ChartRowProps {
   rank: number;
@@ -10,6 +12,7 @@ export interface ChartRowProps {
   weeksOnChart?: number;
   peakPosition?: number;
   isPlayable?: boolean;
+  source?: string;
   onPlay?: () => void;
   isPlaying?: boolean;
   genre?: string;
@@ -42,14 +45,36 @@ export function ChartRow({
   weeksOnChart,
   peakPosition,
   isPlayable,
+  source,
   onPlay,
-  isPlaying,
   genre,
   label,
   previousWeek,
+  slug,
 }: ChartRowProps) {
+  const { currentTrack, isPlaying, playTrack } = usePlayer();
+  const trackId = slug || `${title}-${artist}`.toLowerCase().replace(/\s+/g, "-");
+  const isCurrentTrack = currentTrack?.id === trackId;
   const mvt = movement ? MOVEMENT_CONFIG[movement] : null;
   const isTop3 = rank <= 3;
+  const playable = isPlayable !== false;
+
+  const handlePlay = () => {
+    if (!playable) return;
+    if (onPlay) {
+      onPlay();
+      return;
+    }
+    const track = {
+      id: trackId,
+      title,
+      artist,
+      artworkUrl,
+      isPlayable: playable,
+      source,
+    };
+    playTrack(track, [track]);
+  };
 
   return (
     <div className={`group flex items-center gap-3 rounded-lg px-3 py-3 transition-colors hover:bg-[var(--wk-surface-raised)] ${isTop3 ? "bg-[var(--wk-brand-soft)]/30" : ""}`}>
@@ -79,23 +104,33 @@ export function ChartRow({
             <i className="ri-music-2-line text-lg" />
           </div>
         )}
-        {isPlayable && (
-          <button
-            onClick={onPlay}
-            aria-label={isPlaying ? "Pause" : "Play"}
-            className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100"
-          >
-            <i className={`text-white ${isPlaying ? "ri-pause-fill" : "ri-play-fill"}`} />
-          </button>
-        )}
+        <button
+          onClick={handlePlay}
+          disabled={!playable}
+          aria-label={isCurrentTrack && isPlaying ? "Pause" : "Play"}
+          className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100 disabled:opacity-0"
+        >
+          <i className={`text-white ${isCurrentTrack && isPlaying ? "ri-pause-fill" : "ri-play-fill"}`} />
+        </button>
       </div>
 
       <div className="min-w-0 flex-1">
         <div className="mb-0.5 flex items-center gap-2">
-          <span className="truncate text-[13px] font-bold text-[var(--wk-text)]">{title}</span>
+          {slug ? (
+            <Link to={`/tracks/${slug}`} className="truncate text-[13px] font-bold text-[var(--wk-text)] hover:underline">
+              {title}
+            </Link>
+          ) : (
+            <span className="truncate text-[13px] font-bold text-[var(--wk-text)]">{title}</span>
+          )}
           {peakPosition !== undefined && peakPosition === rank && (
             <span className="shrink-0 rounded-full bg-[var(--wk-brand-soft)] px-2 py-0.5 text-[10px] font-bold text-[var(--wk-brand)]">
               PEAK
+            </span>
+          )}
+          {!playable && (
+            <span className="shrink-0 rounded-full bg-[var(--wk-surface-raised)] px-2 py-0.5 text-[10px] font-bold text-[var(--wk-text-faint)]">
+              Preview
             </span>
           )}
         </div>
@@ -126,15 +161,14 @@ export function ChartRow({
         )}
       </div>
 
-      {isPlayable && (
-        <button
-          onClick={onPlay}
-          aria-label={isPlaying ? "Pause" : "Play"}
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] opacity-0 transition-all group-hover:opacity-100"
-        >
-          <i className={`text-sm ${isPlaying ? "ri-pause-fill" : "ri-play-mini-fill"}`} />
-        </button>
-      )}
+      <button
+        onClick={handlePlay}
+        disabled={!playable}
+        aria-label={isCurrentTrack && isPlaying ? "Pause" : "Play"}
+        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] transition-all disabled:opacity-40 disabled:cursor-not-allowed ${isCurrentTrack ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
+      >
+        <i className={`text-sm ${isCurrentTrack && isPlaying ? "ri-pause-fill" : "ri-play-mini-fill"}`} />
+      </button>
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { WkTag } from "@/components/design-system/primitives/Tag";
 import { WkButton } from "@/components/design-system/primitives/Button";
+import { usePlayer } from "@/context/PlayerContext";
 import { ChartRow } from "@/components/design-system/music/ChartRow";
 import { ArtistCard } from "@/components/design-system/registry/ArtistCard";
 import { StoryCard } from "@/components/design-system/editorial/StoryCard";
@@ -23,6 +24,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [scrollY, setScrollY] = useState(0);
   const heroRef = useRef<HTMLDivElement>(null);
+  const { playTrack } = usePlayer();
 
   useEffect(() => {
     const t = setTimeout(() => setLoading(false), 600);
@@ -37,6 +39,18 @@ export default function Home() {
 
   const top3 = HOME_CHART_ENTRIES.slice(0, 3);
   const restChart = HOME_CHART_ENTRIES.slice(3);
+
+  const chartTracks = HOME_CHART_ENTRIES.map((entry) => ({
+    id: entry.slug || `${entry.title}-${entry.artist}`.toLowerCase().replace(/\s+/g, "-"),
+    title: entry.title,
+    artist: entry.artist,
+    artworkUrl: entry.artworkUrl,
+    isPlayable: entry.isPlayable,
+  }));
+
+  const handlePlayChart = (idx: number) => {
+    playTrack(chartTracks[idx], chartTracks);
+  };
 
   return (
     <div className="min-h-screen">
@@ -155,7 +169,7 @@ export default function Home() {
                 : top3.map((entry, idx) => (
                     <Link
                       key={entry.rank}
-                      to={`/charts`}
+                      to={`/tracks/${entry.slug}`}
                       className="group relative flex items-center gap-4 overflow-hidden rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4 transition-all hover:border-[var(--wk-brand)]/40"
                     >
                       <div className="absolute inset-0 bg-gradient-to-r from-[var(--wk-brand)]/5 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
@@ -175,6 +189,17 @@ export default function Home() {
                           {entry.peakPosition === entry.rank && <span className="text-[var(--wk-brand)]">· Peak position</span>}
                         </div>
                       </div>
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handlePlayChart(idx);
+                        }}
+                        className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] opacity-0 transition-all group-hover:opacity-100"
+                        aria-label="Play"
+                      >
+                        <i className="ri-play-fill" />
+                      </button>
                       <div className="relative flex items-center gap-1 text-[13px] font-bold">
                         {entry.movement === "up" && <i className="ri-arrow-up-line text-[var(--wk-success)]" />}
                         {entry.movement === "down" && <i className="ri-arrow-down-line text-[var(--wk-danger)]" />}
@@ -202,7 +227,7 @@ export default function Home() {
               <div className="divide-y divide-[var(--wk-divider)]">
                 {loading
                   ? Array.from({ length: 5 }).map((_, i) => <SkeletonChartRow key={i} />)
-                  : restChart.map((entry) => <ChartRow key={entry.rank} {...entry} />)}
+                  : restChart.map((entry, idx) => <ChartRow key={entry.rank} {...entry} onPlay={() => handlePlayChart(idx + 3)} />)}
               </div>
             </div>
           </div>

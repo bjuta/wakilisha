@@ -1,9 +1,9 @@
 export const HOME_CHART_ENTRIES = [
-  { rank: 1, title: "Alone", artist: "Oxlade", movement: "up" as const, movementAmount: 2, weeksOnChart: 8, peakPosition: 1, isPlayable: false },
-  { rank: 2, title: "Monalisa", artist: "Lojay ft. Sarz", movement: "same" as const, weeksOnChart: 12, peakPosition: 1, isPlayable: false },
-  { rank: 3, title: "Essence", artist: "Wizkid ft. Tems", movement: "down" as const, movementAmount: 1, weeksOnChart: 24, peakPosition: 1, isPlayable: false },
-  { rank: 4, title: "Running", artist: "Burna Boy", movement: "up" as const, movementAmount: 3, weeksOnChart: 5, peakPosition: 4, isPlayable: false },
-  { rank: 5, title: "Last Last", artist: "Burna Boy", movement: "same" as const, weeksOnChart: 18, peakPosition: 2, isPlayable: false },
+  { rank: 1, title: "Alone", slug: "alone-oxlade", artist: "Oxlade", movement: "up" as const, movementAmount: 2, weeksOnChart: 8, peakPosition: 1, isPlayable: true, source: "Spotify" },
+  { rank: 2, title: "Monalisa", slug: "monalisa-lojay-sarz", artist: "Lojay ft. Sarz", movement: "same" as const, weeksOnChart: 12, peakPosition: 1, isPlayable: true, source: "Spotify" },
+  { rank: 3, title: "Essence", slug: "essence-wizkid-tems", artist: "Wizkid ft. Tems", movement: "down" as const, movementAmount: 1, weeksOnChart: 24, peakPosition: 1, isPlayable: true, source: "YouTube" },
+  { rank: 4, title: "Running", slug: "running-burna-boy", artist: "Burna Boy", movement: "up" as const, movementAmount: 3, weeksOnChart: 5, peakPosition: 4, isPlayable: true, source: "Spotify" },
+  { rank: 5, title: "Last Last", slug: "last-last-burna-boy", artist: "Burna Boy", movement: "same" as const, weeksOnChart: 18, peakPosition: 2, isPlayable: true, source: "YouTube" },
 ];
 
 export const HOME_FEATURED_ARTISTS = [
@@ -60,10 +60,10 @@ export const HOME_GENRE_VERTICALS = [
 ];
 
 export const HOME_TRENDING_TRACKS = [
-  { slug: "calm-down", title: "Calm Down", artist: "Rema ft. Selena Gomez", streamCount: "2.1M", chartPosition: 3 },
-  { slug: "unavailable", title: "Unavailable", artist: "Davido ft. Musa Keys", streamCount: "1.8M", chartPosition: 5 },
-  { slug: "rush", title: "Rush", artist: "Ayra Starr", streamCount: "1.5M", chartPosition: 7 },
-  { slug: "terminator", title: "Terminator", artist: "Asake", streamCount: "1.4M", chartPosition: 8 },
+  { slug: "calm-down", title: "Calm Down", artist: "Rema ft. Selena Gomez", streamCount: "2.1M", chartPosition: 3, isPlayable: true, source: "Spotify" },
+  { slug: "unavailable", title: "Unavailable", artist: "Davido ft. Musa Keys", streamCount: "1.8M", chartPosition: 5, isPlayable: true, source: "Spotify" },
+  { slug: "rush", title: "Rush", artist: "Ayra Starr", streamCount: "1.5M", chartPosition: 7, isPlayable: true, source: "Spotify" },
+  { slug: "terminator", title: "Terminator", artist: "Asake", streamCount: "1.4M", chartPosition: 8, isPlayable: true, source: "Spotify" },
 ];
 
 export const HOME_RECENT_RELEASES = [

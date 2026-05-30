@@ -1,49 +1,52 @@
 import { useState } from "react";
-import { Sheet } from "@/components/design-system/primitives/Sheet";
-import { WkTag } from "@/components/design-system/primitives/Tag";
-import { WkButton } from "@/components/design-system/primitives/Button";
+import { Link } from "react-router-dom";
+import { usePlayer } from "@/context/PlayerContext";
 
-export interface PlayerTrack {
-  id: string;
-  title: string;
-  artist: string;
-  artworkUrl?: string;
-  previewUrl?: string;
-  provider?: string;
-  isPlayable: boolean;
-}
+export function PlayerDock() {
+  const {
+    currentTrack,
+    isPlaying,
+    togglePlay,
+    openFullPlayer,
+    next,
+    prev,
+    progress,
+    canGoNext,
+    canGoPrev,
+  } = usePlayer();
 
-interface PlayerDockProps {
-  track: PlayerTrack | null;
-  isPlaying: boolean;
-  onTogglePlay: () => void;
-  onOpenSheet?: () => void;
-}
+  if (!currentTrack) return null;
 
-interface PlayerSheetProps {
-  open: boolean;
-  onClose: () => void;
-  track: PlayerTrack | null;
-  isPlaying: boolean;
-  onTogglePlay: () => void;
-}
-
-export function PlayerDock({ track, isPlaying, onTogglePlay, onOpenSheet }: PlayerDockProps) {
-  if (!track) return null;
+  const isPlayable = currentTrack.isPlayable !== false;
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  };
 
   return (
-    <div
-      className="fixed bottom-0 left-0 right-0 z-[80] border-t border-[var(--wk-border)] bg-[var(--wk-surface)]"
-      style={{ height: "var(--wk-player-dock-h)" }}
-    >
-      <div className="flex h-full items-center gap-3 px-4">
+    <div className="sticky bottom-0 z-[80] border-t border-[var(--wk-border)] bg-[var(--wk-surface)]">
+      {/* Progress bar */}
+      <div className="h-1 w-full bg-[var(--wk-surface-raised)]">
+        <div
+          className="h-full bg-[var(--wk-brand)] transition-all duration-1000 ease-linear"
+          style={{ width: `${progress * 100}%` }}
+        />
+      </div>
+
+      <div className="flex h-[var(--wk-player-dock-h)] items-center gap-3 px-4">
+        {/* Track info — clickable */}
         <button
-          onClick={onOpenSheet}
+          onClick={() => openFullPlayer()}
           className="flex min-w-0 flex-1 items-center gap-3 text-left"
         >
           <div className="h-10 w-10 shrink-0 overflow-hidden rounded-md bg-[var(--wk-surface-raised)]">
-            {track.artworkUrl ? (
-              <img src={track.artworkUrl} alt="" className="h-full w-full object-cover object-top" />
+            {currentTrack.artworkUrl ? (
+              <img
+                src={currentTrack.artworkUrl}
+                alt=""
+                className="h-full w-full object-cover object-top"
+              />
             ) : (
               <div className="flex h-full w-full items-center justify-center">
                 <i className="ri-music-2-line text-[var(--wk-text-faint)]" />
@@ -51,73 +54,62 @@ export function PlayerDock({ track, isPlaying, onTogglePlay, onOpenSheet }: Play
             )}
           </div>
           <div className="min-w-0">
-            <div className="truncate text-[13px] font-bold text-[var(--wk-text)]">{track.title}</div>
-            <div className="truncate text-[11px] text-[var(--wk-text-muted)]">{track.artist}</div>
+            <div className="truncate text-[13px] font-bold text-[var(--wk-text)]">
+              {currentTrack.title}
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="truncate text-[11px] text-[var(--wk-text-muted)]">
+                {currentTrack.artist}
+              </div>
+              {currentTrack.source && (
+                <span className="shrink-0 rounded-full bg-[var(--wk-brand-soft)] px-2 py-0.5 text-[10px] font-bold text-[var(--wk-brand)]">
+                  {currentTrack.source}
+                </span>
+              )}
+            </div>
           </div>
         </button>
 
-        <div className="flex shrink-0 items-center gap-2">
-          {track.provider && (
-            <WkTag>{track.provider}</WkTag>
-          )}
+        {/* Controls */}
+        <div className="flex shrink-0 items-center gap-1">
           <button
-            onClick={onTogglePlay}
-            disabled={!track.isPlayable}
+            onClick={prev}
+            disabled={!canGoPrev}
+            aria-label="Previous"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--wk-text-muted)] transition-all hover:bg-[var(--wk-surface-raised)] disabled:opacity-30"
+          >
+            <i className="ri-skip-back-mini-fill" />
+          </button>
+
+          <button
+            onClick={togglePlay}
+            disabled={!isPlayable}
             aria-label={isPlaying ? "Pause" : "Play"}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] disabled:opacity-40"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <i className={isPlaying ? "ri-pause-fill" : "ri-play-fill"} />
           </button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
-export function PlayerSheet({ open, onClose, track, isPlaying, onTogglePlay }: PlayerSheetProps) {
-  if (!track) return null;
-
-  return (
-    <Sheet open={open} onClose={onClose} title="Now playing">
-      <div className="space-y-6">
-        <div className="aspect-square w-full overflow-hidden rounded-xl bg-[var(--wk-surface-raised)]">
-          {track.artworkUrl ? (
-            <img src={track.artworkUrl} alt="" className="h-full w-full object-cover object-top" />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center">
-              <i className="ri-music-2-line text-5xl text-[var(--wk-text-faint)]" />
-            </div>
-          )}
-        </div>
-        <div>
-          <h2 className="text-xl font-black tracking-tight text-[var(--wk-text)]">{track.title}</h2>
-          <div className="text-[15px] text-[var(--wk-text-muted)]">{track.artist}</div>
-        </div>
-
-        <div className="flex items-center justify-center gap-4">
           <button
-            onClick={onTogglePlay}
-            disabled={!track.isPlayable}
-            aria-label={isPlaying ? "Pause" : "Play"}
-            className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] disabled:opacity-40"
+            onClick={next}
+            disabled={!canGoNext}
+            aria-label="Next"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--wk-text-muted)] transition-all hover:bg-[var(--wk-surface-raised)] disabled:opacity-30"
           >
-            <i className={`text-2xl ${isPlaying ? "ri-pause-fill" : "ri-play-fill"}`} />
+            <i className="ri-skip-forward-mini-fill" />
           </button>
         </div>
 
-        {track.provider && (
-          <div className="flex items-center justify-center gap-2 text-[12px] text-[var(--wk-text-faint)]">
-            <span>Playback via</span>
-            <WkTag>{track.provider}</WkTag>
-          </div>
-        )}
-
-        {!track.isPlayable && (
-          <div className="rounded-lg border border-[var(--wk-border)] p-3 text-center text-[13px] text-[var(--wk-text-muted)]">
-            No preview available for this track.
-          </div>
-        )}
+        {/* Expand button */}
+        <Link
+          to="/player"
+          onClick={() => openFullPlayer()}
+          aria-label="Open full player"
+          className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--wk-text-muted)] transition-all hover:bg-[var(--wk-surface-raised)]"
+        >
+          <i className="ri-arrow-up-s-line" />
+        </Link>
       </div>
-    </Sheet>
+    </div>
   );
 }

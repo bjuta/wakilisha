@@ -10,13 +10,16 @@ import "./design-system/wakilisha.elements.mobile.css";
 import "./design-system/wakilisha.elements.motion.css";
 import "./pages/admin/design-system/adminDesignSystemLayout.css";
 import { ThemeProvider } from "./components/design-system/theme/ThemeProvider";
+import { PlayerProvider } from "./context/PlayerContext";
 
 function App() {
   return (
     <I18nextProvider i18n={i18n}>
       <BrowserRouter basename={__BASE_PATH__}>
         <ThemeProvider>
-          <AppRoutes />
+          <PlayerProvider>
+            <AppRoutes />
+          </PlayerProvider>
         </ThemeProvider>
       </BrowserRouter>
     </I18nextProvider>

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, Outlet } from "react-router-dom";
 import { WkButton } from "@/components/design-system/primitives/Button";
 import { useTheme } from "@/components/design-system/theme/ThemeProvider";
+import { PlayerDock } from "@/components/design-system/music/PlayerDock";
 
 const NAV_LINKS = [
   { label: "Charts", to: "/charts" },
@@ -93,6 +94,9 @@ export function AppLayout() {
       <main className="flex-1">
         <Outlet />
       </main>
+
+      {/* Player Dock */}
+      <PlayerDock />
 
       {/* Footer */}
       <footer className="border-t border-[var(--wk-border)] bg-[var(--wk-surface-raised)]">

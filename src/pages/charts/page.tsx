@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
+import { usePlayer } from "@/context/PlayerContext";
 import { PageHero } from "@/components/design-system/primitives/PageHero";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { ChartRow } from "@/components/design-system/music/ChartRow";
@@ -14,6 +15,7 @@ import { CHART_DATA, CHART_SERIES, CHART_EDITION, NEW_ENTRIES, BIGGEST_MOVERS } 
 export default function Charts() {
   const [activeSeries, setActiveSeries] = useState("weekly-top-40");
   const [loading, setLoading] = useState(true);
+  const { playTrack } = usePlayer();
 
   useEffect(() => {
     const t = setTimeout(() => setLoading(false), 700);
@@ -22,6 +24,21 @@ export default function Charts() {
 
   const top3 = useMemo(() => CHART_DATA.slice(0, 3), []);
   const restOfChart = useMemo(() => CHART_DATA.slice(3), []);
+
+  const chartTracks = useMemo(() =>
+    CHART_DATA.map((entry) => ({
+      id: entry.slug || `${entry.title}-${entry.artist}`.toLowerCase().replace(/\s+/g, "-"),
+      title: entry.title,
+      artist: entry.artist,
+      artworkUrl: entry.artworkUrl,
+      isPlayable: entry.isPlayable,
+    })),
+    []
+  );
+
+  const handlePlayChart = (idx: number) => {
+    playTrack(chartTracks[idx], chartTracks);
+  };
 
   const series = CHART_SERIES.find((s) => s.id === activeSeries) || CHART_SERIES[0];
 
@@ -161,7 +178,7 @@ export default function Charts() {
             {loading
               ? Array.from({ length: 10 }).map((_, i) => <SkeletonChartRow key={i} />)
               : restOfChart.map((entry) => (
-                  <ChartRow key={entry.rank} {...entry} />
+                  <ChartRow key={entry.rank} {...entry} onPlay={() => handlePlayChart((entry.rank ?? 0) - 1)} />
                 ))}
           </div>
         </WkSurface>
