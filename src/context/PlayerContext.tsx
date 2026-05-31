@@ -29,6 +29,7 @@ interface PlayerContextValue {
   pause: () => void;
   next: () => void;
   prev: () => void;
+  playFromQueue: (index: number) => void;
   seek: (time: number) => void;
   setVolume: (vol: number) => void;
   toggleRepeat: () => void;
@@ -175,6 +176,17 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     if (currentTrack.isPlayable === false) return;
     setIsPlaying((prev) => !prev);
   }, [currentTrack]);
+
+  const playFromQueue = useCallback((index: number) => {
+    if (index < 0 || index >= queue.length) return;
+    const track = queue[index];
+    if (!track) return;
+    setQueueIndex(index);
+    setCurrentTrack(track);
+    setCurrentTime(0);
+    setDuration(deriveDuration(track));
+    setIsPlaying(true);
+  }, [queue]);
 
   const pause = useCallback(() => {
     setIsPlaying(false);
@@ -329,6 +341,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     pause,
     next,
     prev,
+    playFromQueue,
     seek,
     setVolume: handleSetVolume,
     toggleRepeat,

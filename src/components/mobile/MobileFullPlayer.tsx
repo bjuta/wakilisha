@@ -1,14 +1,73 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { usePlayer } from "@/context/PlayerContext";
 import { WkIcon } from "@/components/design-system/Icon";
+import { ShareSheet } from "@/components/design-system/share/ShareSheet";
+import { useScrollLock } from "@/hooks/useScrollLock";
 
 const LYRICS = [
   "The culture lives in the numbers",
   "From the coast to the valley",
   "We index the rhythm of the continent",
   "Charts in motion, every week",
+  "One by one, we count the rise",
+  "From Lagos to Nairobi, we're alive",
+  "Every beat, every rhyme, every soul",
+  "This is where the story gets told",
+  "The numbers don't lie, they don't pretend",
+  "We chart the truth from start to end",
+  "Afrobeats to the world, it's our time",
+  "WAKILISHA, the sound that climbs",
 ];
+
+function ActionMenu({
+  open,
+  onClose,
+  track,
+}: {
+  open: boolean;
+  onClose: () => void;
+  track: { title: string; artist: string; artworkUrl?: string };
+}) {
+  useScrollLock(open);
+  const [shareOpen, setShareOpen] = useState(false);
+
+  if (!open) return null;
+
+  const actions = [
+    { label: "Share", icon: "Share2" as const, onClick: () => setShareOpen(true) },
+    { label: "View artist", icon: "User" as const, onClick: () => onClose() },
+    { label: "Add to favorites", icon: "Heart" as const, onClick: () => onClose() },
+    { label: "Go to album", icon: "Album" as const, onClick: () => onClose() },
+  ];
+
+  return (
+    <>
+      <div className="fp-action-backdrop" onClick={onClose} />
+      <div data-scroll-lock="container" className="fp-action-sheet">
+        <div className="fp-action-handle" />
+        {actions.map((action) => (
+          <button key={action.label} className="fp-action-row" onClick={action.onClick}>
+            <WkIcon name={action.icon} size={18} />
+            <span>{action.label}</span>
+          </button>
+        ))}
+        <button className="fp-action-cancel" onClick={onClose}>Cancel</button>
+      </div>
+      <ShareSheet
+        item={{
+          title: track.title,
+          subtitle: track.artist,
+          description: `${track.title} by ${track.artist}`,
+          imageUrl: track.artworkUrl || null,
+          type: "track",
+        }}
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+      />
+    </>
+  );
+}
 
 export function MobileFullPlayer() {
   const nav = useNavigate();
@@ -31,8 +90,10 @@ export function MobileFullPlayer() {
     toggleShuffle,
     toggleRepeat,
     closeFullPlayer,
+    playFromQueue,
   } = usePlayer();
   const [liked, setLiked] = useState(false);
+  const [actionMenuOpen, setActionMenuOpen] = useState(false);
 
   if (!currentTrack) {
     return (
@@ -55,7 +116,10 @@ export function MobileFullPlayer() {
     `${Math.floor(seconds / 60)}:${Math.floor(seconds % 60).toString().padStart(2, "0")}`;
   const pct = Math.max(0, Math.min(1, progress || 0));
   const activeLyric = Math.floor((currentTime / (duration || 1)) * LYRICS.length) % LYRICS.length;
-  const upcoming = queue.slice(queueIndex + 1, queueIndex + 4);
+
+  const remainingCount = queue.length - queueIndex - 1;
+  const upcoming = queue.slice(queueIndex + 1);
+  const hasQueue = queue.length > 1;
 
   return (
     <div className="full-player mobile-full-player">
@@ -78,6 +142,7 @@ export function MobileFullPlayer() {
         <div className="fp-topbar-title">Now Playing</div>
         <button
           className="fp-topbar-btn mobile-pressable"
+          onClick={() => setActionMenuOpen(true)}
           aria-label="More player actions"
         >
           <WkIcon name="MoreHorizontal" size={20} />
@@ -104,7 +169,7 @@ export function MobileFullPlayer() {
           <button
             onClick={() => setLiked((v) => !v)}
             className={`fp-like mobile-pressable ${liked ? "text-[var(--wk-brand)]" : ""}`}
-            aria-label="Save track"
+            aria-label={liked ? "Remove from favorites" : "Save track"}
           >
             <WkIcon name="Heart" size={23} fill={liked ? "currentColor" : "none"} />
           </button>
@@ -120,7 +185,7 @@ export function MobileFullPlayer() {
             <WkIcon name="Clock3" size={12} /> {formatTime(duration || currentTrack.duration || 0)}
           </span>
           <span className="fp-meta-pill">
-            <WkIcon name="ListMusic" size={12} /> {queue.length || 1} in queue
+            <WkIcon name="ListMusic" size={12} /> {queue.length} in queue
           </span>
         </div>
 
@@ -187,33 +252,68 @@ export function MobileFullPlayer() {
           <p className="fp-lyric">{LYRICS[(activeLyric + 1) % LYRICS.length]}</p>
         </div>
 
-        {upcoming.length > 0 && (
+        {hasQueue && (
           <div className="fp-queue-strip">
             <div className="fp-queue-head">
               <span>Up next</span>
-              <span>
-                {queueIndex + 1} / {queue.length}
-              </span>
+              <span>{remainingCount} remaining</span>
             </div>
-            {upcoming.map((track) => (
-              <div key={track.id} className="fp-queue-row">
+            <div className="fp-queue-list">
+              {/* Current track indicator */}
+              <div className="fp-queue-row fp-queue-row--current">
                 <div className="fp-queue-art">
-                  {track.artworkUrl ? (
-                    <img src={track.artworkUrl} alt="" />
+                  {currentTrack.artworkUrl ? (
+                    <img src={currentTrack.artworkUrl} alt="" />
                   ) : (
                     <WkIcon name="Music2" size={14} />
                   )}
                 </div>
                 <div className="min-w-0">
-                  <div className="fp-queue-title">{track.title}</div>
-                  <div className="fp-queue-sub">{track.artist}</div>
+                  <div className="fp-queue-title">{currentTrack.title}</div>
+                  <div className="fp-queue-sub">{currentTrack.artist}</div>
                 </div>
-                <WkIcon name="ChevronRight" size={14} className="text-[var(--wk-text-faint)]" />
+                <div className="fp-queue-playing">
+                  <span className="fp-queue-playing-dot" />
+                  <span className="fp-queue-playing-label">Now</span>
+                </div>
               </div>
-            ))}
+
+              {/* Upcoming tracks */}
+              {upcoming.map((track, idx) => (
+                <button
+                  key={track.id}
+                  className="fp-queue-row"
+                  onClick={() => playFromQueue(queueIndex + 1 + idx)}
+                  aria-label={`Play ${track.title} by ${track.artist}`}
+                >
+                  <div className="fp-queue-art">
+                    {track.artworkUrl ? (
+                      <img src={track.artworkUrl} alt="" />
+                    ) : (
+                      <WkIcon name="Music2" size={14} />
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="fp-queue-title">{track.title}</div>
+                    <div className="fp-queue-sub">{track.artist}</div>
+                  </div>
+                  <WkIcon name="Play" size={14} className="text-[var(--wk-text-faint)]" />
+                </button>
+              ))}
+            </div>
           </div>
         )}
       </div>
+
+      <ActionMenu
+        open={actionMenuOpen}
+        onClose={() => setActionMenuOpen(false)}
+        track={{
+          title: currentTrack.title,
+          artist: currentTrack.artist,
+          artworkUrl: currentTrack.artworkUrl,
+        }}
+      />
     </div>
   );
 }
