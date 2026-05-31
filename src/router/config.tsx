@@ -39,6 +39,8 @@ import MobileSearch from "../pages/mobile/search/page";
 import MobileFullPlayer from "../pages/mobile/player/page";
 import MobileNotFound from "../pages/mobile/NotFound";
 import MobileTrackDetail from "../pages/mobile/tracks/detail/page";
+import MobileAuth from "../pages/mobile/auth/page";
+import MobileProfile from "../pages/mobile/profile/page";
 
 const routes: RouteObject[] = [
   {
@@ -74,8 +76,10 @@ const routes: RouteObject[] = [
       // Search
       { path: "/search", element: <ResponsivePage mobile={<MobileSearch />} desktop={<Search />} /> },
 
-      // Player
+      // Player / account
       { path: "/player", element: <ResponsivePage mobile={<MobileFullPlayer />} desktop={<MobileFullPlayer />} /> },
+      { path: "/auth", element: <ResponsivePage mobile={<MobileAuth />} desktop={<MobileAuth />} /> },
+      { path: "/profile", element: <ResponsivePage mobile={<MobileProfile />} desktop={<MobileProfile />} /> },
     ],
   },
   {
