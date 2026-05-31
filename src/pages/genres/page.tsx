@@ -1,104 +1,159 @@
-import { useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { GenreCard } from "@/components/design-system/registry/GenreCard";
-import { WkTag } from "@/components/design-system/primitives/Tag";
+import { PageHero } from "@/components/design-system/PageHero";
+import { ShareButton } from "@/components/design-system/share/ShareSheet";
+import { WkIcon } from "@/components/design-system/Icon";
 import { GENRES, TRENDING_GENRES } from "@/mocks/genres";
 
-export default function Genres() {
-  const [loading, setLoading] = useState(true);
+const genreVisual = (slug: string) =>
+  `linear-gradient(135deg, rgba(132,194,65,.35), rgba(8,9,8,.92)), url(https://picsum.photos/seed/wk-genre-${slug}/800/1100)`;
 
-  useEffect(() => {
-    const t = setTimeout(() => setLoading(false), 400);
-    return () => clearTimeout(t);
-  }, []);
+const filters = ["All", "High activity", "Artist-rich", "Track-rich", "Recently updated"];
+
+export default function Genres() {
+  const [activeFilter, setActiveFilter] = useState("All");
+  const [query, setQuery] = useState("");
+  const totalArtists = GENRES.reduce((s, g) => s + g.artistCount, 0);
+  const totalTracks = GENRES.reduce((s, g) => s + g.trackCount, 0);
+  const featured = TRENDING_GENRES[0] ?? GENRES[0];
+  const sideGenres = TRENDING_GENRES.slice(1, 4);
+
+  const filteredGenres = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return GENRES.filter((genre) => {
+      const matchesQuery = !q || genre.name.toLowerCase().includes(q) || genre.representativeArtists?.some((artist) => artist.toLowerCase().includes(q));
+      const matchesFilter =
+        activeFilter === "All" ||
+        (activeFilter === "High activity" && genre.trackCount >= 100) ||
+        (activeFilter === "Artist-rich" && genre.artistCount >= 25) ||
+        (activeFilter === "Track-rich" && genre.trackCount >= 50) ||
+        activeFilter === "Recently updated";
+      return matchesQuery && matchesFilter;
+    });
+  }, [activeFilter, query]);
 
   return (
     <div className="min-h-screen">
-      {/* Cinematic Hero — cultural territories feel */}
-      <section className="relative min-h-[400px] md:min-h-[520px] flex items-end overflow-hidden">
-        <div
-          className="absolute inset-0"
-          style={{
-            backgroundImage: "url(https://readdy.ai/api/search-image?query=Abstract%20African%20cultural%20soundscape%20visualization%2C%20colorful%20geometric%20patterns%20representing%20music%20genres%2C%20warm%20and%20cool%20tones%20blending%2C%20dark%20background%2C%20artistic%20digital%20art%2C%20no%20text%2C%20cinematic%20lighting%2C%20high%20contrast&width=1400&height=600&seq=genre-hero-v2&orientation=landscape)",
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-          }}
+      <div className="wk-container-wide px-4 md:px-6">
+        <PageHero
+          variant="default"
+          eyebrow={<><WkIcon name="Compass" size={14} /> Cultural territories</>}
+          title="Genre directory"
+          subtitle="Browse WAKILISHA by genre as living cultural territory: artists, tracks, activity, representative voices, and routes into discovery."
+          stats={[
+            { value: GENRES.length, label: "Genres" },
+            { value: totalArtists.toLocaleString(), label: "Artists" },
+            { value: totalTracks.toLocaleString(), label: "Tracks" },
+          ]}
+          actions={<ShareButton item={{ title: "WAKILISHA Genre Directory", subtitle: `${GENRES.length} genres`, description: "Browse the WAKILISHA cultural map by genre.", type: "page" }} />}
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/20" />
-        <div className="relative wk-container-wide w-full px-6 pb-12 pt-20 md:pb-16">
-          <div className="wk-eyebrow mb-4" style={{ color: "var(--wk-brand)" }}>
-            Discovery
-          </div>
-          <h1 className="font-black leading-[0.92] tracking-[-0.055em] text-[#F0EFE8]" style={{ fontSize: "clamp(40px, 6vw, 80px)" }}>
-            Genre directory
-          </h1>
-          <p className="mt-4 max-w-xl text-[16px] leading-relaxed text-white/70">
-            Browse the WAKILISHA cultural map by genre. Each genre surfaces artists, tracks, and releases from the graph.
-          </p>
-        </div>
-      </section>
 
-      <div className="wk-container-wide px-6 py-10">
-        {/* Trending genres — horizontal shelf, more visual */}
-        {!loading && (
-          <div className="mb-12">
-            <div className="mb-5 flex items-center gap-3">
-              <div className="wk-eyebrow">Trending now</div>
-            </div>
-            <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide">
-              {TRENDING_GENRES.map((g) => (
-                <Link
-                  key={g.slug}
-                  to={`/genres/${g.slug}`}
-                  className="group relative flex-none w-[280px] overflow-hidden rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-5 transition-all hover:border-[var(--wk-border-2)]"
-                >
-                  <div
-                    className="absolute right-0 top-0 h-32 w-32 rounded-bl-full opacity-[0.08] transition-opacity group-hover:opacity-[0.14]"
-                    style={{ background: `var(${g.accentVar})` }}
-                  />
-                  <div className="mb-3 flex items-center gap-2">
-                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]">
-                      <i className="ri-fire-line text-xs" />
+        <div className="directory-toolbar">
+          <div className="directory-filters">
+            {filters.map((filter) => (
+              <button key={filter} onClick={() => setActiveFilter(filter)} className={`directory-filter ${activeFilter === filter ? "on" : ""}`}>
+                {filter}
+              </button>
+            ))}
+          </div>
+          <input className="directory-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search genre or representative artist" />
+        </div>
+
+        {featured && (
+          <section className="genre-featured">
+            <Link to={`/genres/${featured.slug}`} className="genre-feature-card">
+              <div className="genre-feature-art" style={{ backgroundImage: genreVisual(featured.slug) }} />
+              <div className="genre-feature-shade" />
+              <div className="genre-feature-body">
+                <div className="genre-feature-kicker">Genre of the week</div>
+                <h2 className="genre-feature-title">{featured.name}</h2>
+                <p className="genre-feature-copy">
+                  {featured.artistCount} artists and {featured.trackCount} tracks currently mapped in this territory. Representative voices: {featured.representativeArtists?.slice(0, 3).join(", ") || "registry pending"}.
+                </p>
+              </div>
+            </Link>
+            <div className="genre-side-stack">
+              {sideGenres.map((genre) => (
+                <Link key={genre.slug} to={`/genres/${genre.slug}`} className="genre-side-card">
+                  <div className="genre-side-icon"><WkIcon name="AudioWaveform" size={28} /></div>
+                  <div className="min-w-0">
+                    <div className="artist-list-name">{genre.name}</div>
+                    <div className="artist-list-sub">{genre.artistCount} artists · {genre.trackCount} tracks</div>
+                    <div className="artist-card-tags">
+                      {genre.representativeArtists?.slice(0, 2).map((artist) => <span key={artist} className="tag tag-sm">{artist}</span>)}
                     </div>
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--wk-brand)]">Trending</span>
-                    {g.growth > 0 && (
-                      <span className="text-[11px] font-bold text-[var(--wk-success)]">+{g.growth}%</span>
-                    )}
-                  </div>
-                  <h3 className="text-[18px] font-black tracking-tight text-[var(--wk-text)]">{g.name}</h3>
-                  <div className="mt-3 flex items-center gap-3 text-[13px] text-[var(--wk-text-muted)]">
-                    <span className="inline-flex items-center gap-1"><i className="ri-user-line" /> {g.artistCount} artists</span>
-                    <span className="inline-flex items-center gap-1"><i className="ri-music-2-line" /> {g.trackCount} tracks</span>
                   </div>
                 </Link>
               ))}
             </div>
-          </div>
+          </section>
         )}
 
-        {/* All genres — grid with visual weight */}
-        <div className="mb-5 flex items-center justify-between">
-          <div className="text-[13px] text-[var(--wk-text-muted)]">
-            {GENRES.length} genres · {GENRES.reduce((s, g) => s + g.artistCount, 0).toLocaleString()} artists total
+        <section>
+          <div className="section-head">
+            <div>
+              <div className="section-kicker">Featured genres</div>
+              <h2 className="section-title">Cultural entry points</h2>
+            </div>
+            <p className="section-copy">Genre cards use color, texture, iconography, and activity signals instead of fake human faces.</p>
           </div>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {loading
-            ? Array.from({ length: 9 }).map((_, i) => (
-                <div key={i} className="animate-pulse rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-5">
-                  <div className="h-3 w-12 rounded bg-[var(--wk-surface-raised)] mb-1" />
-                  <div className="h-5 w-32 rounded bg-[var(--wk-surface-raised)] mb-2" />
-                  <div className="h-3 w-48 rounded bg-[var(--wk-surface-raised)] mb-2" />
-                  <div className="flex gap-2">
-                    <div className="h-5 w-16 rounded-full bg-[var(--wk-surface-raised)]" />
-                    <div className="h-5 w-16 rounded-full bg-[var(--wk-surface-raised)]" />
-                    <div className="h-5 w-16 rounded-full bg-[var(--wk-surface-raised)]" />
+          <div className="genre-grid">
+            {TRENDING_GENRES.map((genre) => (
+              <GenreTile key={genre.slug} genre={genre} featured />
+            ))}
+          </div>
+        </section>
+
+        <section>
+          <div className="section-head">
+            <div>
+              <div className="section-kicker">Full genre grid</div>
+              <h2 className="section-title">All mapped territories</h2>
+            </div>
+            <p className="section-copy">Showing {filteredGenres.length} of {GENRES.length} imported genres.</p>
+          </div>
+          <div className="genre-grid">
+            {filteredGenres.map((genre) => <GenreTile key={genre.slug} genre={genre} />)}
+          </div>
+        </section>
+
+        <section className="pg-layout cols-2 pb-10">
+          <div className="pg-block">
+            <div className="pg-block-label">Recently updated</div>
+            <div className="space-y-3">
+              {GENRES.slice(0, 5).map((genre) => (
+                <Link key={genre.slug} to={`/genres/${genre.slug}`} className="artist-list-item px-0">
+                  <div className="artist-list-ava flex items-center justify-center"><WkIcon name="Radio" size={20} /></div>
+                  <div>
+                    <div className="artist-list-name">{genre.name}</div>
+                    <div className="artist-list-sub">{genre.representativeArtists?.slice(0, 2).join(", ") || "Representative artists pending"}</div>
                   </div>
-                </div>
-              ))
-            : GENRES.map((g) => <GenreCard key={g.slug} {...g} />)}
-        </div>
+                  <div className="artist-list-stat">{genre.trackCount}</div>
+                </Link>
+              ))}
+            </div>
+          </div>
+          <div className="pg-block">
+            <div className="pg-block-label">Directory rule</div>
+            <h3 className="pg-block-title">Genres are portals, not people.</h3>
+            <p className="pg-block-body">This chapter uses abstract visual treatment, metadata density, iconography, and cultural routing. Human photography belongs to artist pages, not genre cards.</p>
+          </div>
+        </section>
       </div>
     </div>
+  );
+}
+
+function GenreTile({ genre, featured = false }: { genre: typeof GENRES[number]; featured?: boolean }) {
+  return (
+    <Link to={`/genres/${genre.slug}`} className="genre-card">
+      <div className="genre-card-bg" style={{ backgroundImage: genreVisual(genre.slug) }} />
+      <div className="genre-card-overlay" />
+      <div className="genre-card-icon"><WkIcon name={featured ? "Flame" : "Music2"} size={15} /></div>
+      <div className="genre-card-body">
+        <div className="genre-card-name">{genre.name}</div>
+        <div className="genre-card-count">{genre.artistCount} artists · {genre.trackCount} tracks</div>
+      </div>
+    </Link>
   );
 }
