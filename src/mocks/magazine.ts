@@ -1,352 +1,85 @@
+import { getArticles } from '@/data/registry/registry';
+
+const sectionPalette = [
+  { name: 'All', color: '#1a1a1a', accentBg: '#F8F7F4', accentText: '#1a1a1a' },
+  { name: 'Analysis', color: '#C44A3B', accentBg: '#FDF5F3', accentText: '#C44A3B', tone: 'authoritative', layout: 'editorial' },
+  { name: 'Focus', color: '#D97706', accentBg: '#FEF7ED', accentText: '#D97706', tone: 'regional', layout: 'immersive' },
+  { name: 'Industry', color: '#78716C', accentBg: '#F8F7F4', accentText: '#78716C', tone: 'structured', layout: 'report' },
+  { name: 'Culture', color: '#BE185D', accentBg: '#FDF2F7', accentText: '#BE185D', tone: 'expressive', layout: 'visual' },
+  { name: 'Interview', color: '#256B5A', accentBg: '#F0F7F4', accentText: '#256B5A', tone: 'intimate', layout: 'portrait' },
+  { name: 'Article', color: '#334155', accentBg: '#F1F5F9', accentText: '#334155', tone: 'editorial', layout: 'article' },
+  { name: 'Guide', color: '#4F46E5', accentBg: '#EEF2FF', accentText: '#4F46E5', tone: 'practical', layout: 'guide' },
+];
+
+const neutralHero = (seed: string) =>
+  `data:image/svg+xml;utf8,${encodeURIComponent(`
+    <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720">
+      <rect width="1200" height="720" fill="#111111"/>
+      <circle cx="180" cy="140" r="220" fill="#85C441" opacity="0.35"/>
+      <circle cx="980" cy="620" r="260" fill="#E37400" opacity="0.25"/>
+      <text x="72" y="600" fill="#F4F1E8" font-family="Arial, sans-serif" font-size="52" font-weight="800" letter-spacing="-2">${seed.replace(/&/g, '&amp;').slice(0, 42)}</text>
+      <text x="72" y="650" fill="#85C441" font-family="Arial, sans-serif" font-size="18" font-weight="700" letter-spacing="4">WAKILISHA</text>
+    </svg>
+  `)}`;
+
+const normalizeDate = (value?: string | null) => {
+  if (!value) return '';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleDateString('en', { month: 'short', day: 'numeric', year: 'numeric' });
+};
+
+const importedStories = getArticles().map((article, index) => ({
+  slug: article.slug,
+  title: article.title,
+  section: article.section || 'Article',
+  date: normalizeDate(article.date),
+  readingTime: article.readingTime || 1,
+  heroUrl: article.heroUrl ?? neutralHero(article.title),
+  dek: article.excerpt ?? article.body[0] ?? '',
+  isFeatured: article.isFeatured || index === 0,
+  author: article.author || 'WAKILISHA Editorial',
+  authorPhoto: undefined,
+  readCount: article.readCount || 0,
+  body: article.body.length ? article.body : article.excerpt ? [article.excerpt] : [],
+  contentHtml: article.contentHtml,
+  relatedEntities: article.relatedEntities ?? [],
+  tags: article.tags ?? [],
+}));
+
+const storySections = Array.from(new Set(importedStories.map((story) => story.section).filter(Boolean)));
+const paletteByName = new Map(sectionPalette.map((section) => [section.name.toLowerCase(), section]));
+
 export const SECTIONS = [
-  { name: "All", color: "#1a1a1a", accentBg: "#F8F7F4", accentText: "#1a1a1a" },
-  { name: "Analysis", color: "#C44A3B", accentBg: "#FDF5F3", accentText: "#C44A3B", tone: "authoritative", layout: "editorial" },
-  { name: "Focus", color: "#D97706", accentBg: "#FEF7ED", accentText: "#D97706", tone: "regional", layout: "immersive" },
-  { name: "Industry", color: "#78716C", accentBg: "#F8F7F4", accentText: "#78716C", tone: "structured", layout: "report" },
-  { name: "Culture", color: "#BE185D", accentBg: "#FDF2F7", accentText: "#BE185D", tone: "expressive", layout: "visual" },
-  { name: "Interview", color: "#256B5A", accentBg: "#F0F7F4", accentText: "#256B5A", tone: "intimate", layout: "portrait" },
+  sectionPalette[0],
+  ...storySections.map((name, index) => {
+    const match = paletteByName.get(name.toLowerCase());
+    if (match) return match;
+    const fallback = sectionPalette[(index % (sectionPalette.length - 1)) + 1];
+    return { ...fallback, name };
+  }),
 ];
 
-export const STORIES = [
-  {
-    slug: "state-of-afrobeats-2024",
-    title: "The state of Afrobeats in 2024: global reach, local soul",
-    section: "Analysis",
-    date: "May 27, 2024",
-    readingTime: 8,
-    heroUrl: "https://readdy.ai/api/search-image?query=African%20music%20concert%20stage%20performance%2C%20crowd%2C%20dramatic%20lighting%2C%20cultural%20celebration%2C%20editorial%20photography%20style%2C%20wide%20angle&width=900&height=480&seq=mag1&orientation=landscape",
-    dek: "How the genre's breakout year reshaped industry expectations and who is driving the next wave.",
-    isFeatured: true,
-    author: "WAKILISHA Editorial",
-    authorPhoto: "https://readdy.ai/api/search-image?query=Professional%20editorial%20team%20portrait%2C%20diverse%20creative%20directors%20in%20a%20modern%20studio%2C%20warm%20natural%20lighting%2C%20editorial%20photography%20style%2C%20neutral%20background&width=100&height=100&seq=auth1&orientation=squarish",
-    readCount: 12400,
-    body: [
-      "Afrobeats in 2024 is not merely a genre. It is a cultural export machine, a chart infrastructure, and a conversation about who controls the narrative of African music on the world stage.",
-      "This year, the numbers have shifted in ways that were predictable only in hindsight. Streaming platforms now report that Afrobeats accounts for more than 12% of all global music consumption growth, with the largest spikes coming not from Lagos or Accra, but from London, New York, and Toronto.",
-      "What is less visible is the backend. The contracts, the distribution deals, the metadata wars. WAKILISHA has been tracking the repaired graph of releases, artists, and labels, and the data tells a story that the charts alone cannot.",
-      "The top-performing Afrobeats tracks this year are not necessarily the most streamed. They are the most correctly attributed. The difference matters. When a track carries the right ISRC, the right label link, and the right artist relationship, it earns more per stream, it charts more accurately, and it survives longer in playlist rotation.",
-      "Who is driving the next wave? The answer is distributed. There is no single breakout artist this year. Instead, there is a cluster: artists from East Africa crossing over, South African amapiano producers borrowing Afrobeats cadence, and diaspora artists who never lived on the continent but carry its sonic DNA.",
-      "The infrastructure is catching up. Labels are investing in metadata. Distribution partners are hiring local A\u0026R. And platforms are finally treating African music as a primary category, not a regional one.",
-    ],
-    relatedEntities: [
-      { type: "artist", name: "Burna Boy", slug: "burna-boy" },
-      { type: "artist", name: "Wizkid", slug: "wizkid" },
-      { type: "release", name: "Love, Damini", slug: "love-damini" },
-    ],
-    tags: ["Afrobeats", "Global markets", "Streaming", "Industry analysis"],
-  },
-  {
-    slug: "east-africa-music-scene",
-    title: "East Africa's quiet surge: Tanzania and Kenya rewrite the map",
-    section: "Focus",
-    date: "May 20, 2024",
-    readingTime: 6,
-    heroUrl: "https://readdy.ai/api/search-image?query=East%20African%20city%20music%20culture%20documentary%20photography%2C%20Nairobi%20urban%20landscape%2C%20warm%20sunlight&width=400&height=240&seq=mag2&orientation=landscape",
-    author: "Amara Ochieng",
-    authorPhoto: "https://readdy.ai/api/search-image?query=Professional%20portrait%20of%20a%20young%20African%20woman%20journalist%2C%20warm%20smile%2C%20confident%20expression%2C%20natural%20lighting%2C%20editorial%20photography%2C%20neutral%20background&width=100&height=100&seq=auth2&orientation=squarish",
-    readCount: 8300,
-    body: [
-      "The East African music market has always been active. What changed in 2024 is visibility. For the first time, Tanzanian Bongo Flava and Kenyan Gengetone are entering global playlists at the same rate as West African Afrobeats.",
-      "The drivers are structural. Swahili-language music has a natural audience across 200 million speakers. Streaming platforms have finally added Swahili to their metadata languages, which means search and recommendation algorithms can now surface East African content accurately.",
-      "In Nairobi, the studio ecosystem is maturing. Producers who once worked in isolation are now collaborating across borders, and the repaired release graph shows a 40% increase in cross-border East African collaborations this year.",
-      "The question is sustainability. Can East African artists build the same global touring infrastructure as their West African counterparts? The data suggests they are trying. There are more East African artists on the WAKILISHA charts this quarter than ever before.",
-    ],
-    relatedEntities: [
-      { type: "artist", name: "Diamond Platnumz", slug: "diamond-platnumz" },
-      { type: "genre", name: "Bongo Flava", slug: "bongo-flava" },
-    ],
-    tags: ["East Africa", "Bongo Flava", "Gengetone", "Regional focus"],
-  },
-  {
-    slug: "streaming-economics",
-    title: "Streaming economics and the African artist",
-    section: "Industry",
-    date: "May 13, 2024",
-    readingTime: 5,
-    heroUrl: "https://readdy.ai/api/search-image?query=music%20streaming%20technology%20headphones%20digital%20music%20interface%20studio%20recording%20equipment%20warm%20light&width=400&height=240&seq=mag3&orientation=landscape",
-    author: "WAKILISHA Editorial",
-    authorPhoto: "https://readdy.ai/api/search-image?query=Professional%20editorial%20team%20portrait%2C%20diverse%20creative%20directors%20in%20a%20modern%20studio%2C%20warm%20natural%20lighting%2C%20editorial%20photography%20style%2C%20neutral%20background&width=100&height=100&seq=auth1&orientation=squarish",
-    readCount: 15200,
-    body: [
-      "The average African artist earns less per stream than artists in North America or Europe. This is not new. What is new is that the gap is closing, and the mechanism is not charity — it is data accuracy.",
-      "When a track's metadata is complete, it earns more. This sounds simple, but in practice it requires a label infrastructure that many African artists do not have. The WAKILISHA registry shows that 34% of African releases in our database have incomplete metadata, which directly impacts revenue.",
-      "The solution is not more platforms. It is better graph relationships. When an artist is linked to their correct label, their correct tracks, and their correct chart entries, the royalty flow improves. The repaired graph is not just a cultural project. It is an economic one.",
-    ],
-    relatedEntities: [
-      { type: "label", name: "Mavin Records", slug: "mavin-records" },
-      { type: "label", name: "EMPIRE Distribution", slug: "empire-distribution" },
-    ],
-    tags: ["Streaming", "Economics", "Royalties", "Metadata"],
-  },
-  {
-    slug: "genre-crossover",
-    title: "When genres cross: Afrobeats meets hip-hop in real time",
-    section: "Culture",
-    date: "May 6, 2024",
-    readingTime: 4,
-    heroUrl: "https://readdy.ai/api/search-image?query=music%20studio%20recording%20session%20African%20musicians%20collaboration%20creative%20process%20documentary%20photography&width=400&height=240&seq=mag4&orientation=landscape",
-    author: "Kofi Mensah",
-    authorPhoto: "https://readdy.ai/api/search-image?query=Professional%20portrait%20of%20a%20young%20African%20man%20writer%2C%20thoughtful%20expression%2C%20stylish%20glasses%2C%20natural%20lighting%2C%20editorial%20photography%2C%20neutral%20background&width=100&height=100&seq=auth3&orientation=squarish",
-    readCount: 6700,
-    body: [
-      "Genre boundaries are dissolving in real time. The most interesting music coming out of Africa right now is not pure Afrobeats, pure amapiano, or pure hip-hop. It is the intersection.",
-      "The collaboration graph tells the story. In 2023, cross-genre collaborations accounted for 18% of all chart entries. In 2024, that number is 31%. The jump is not gradual. It is a structural shift.",
-      "What is driving this? Partly it is audience demand. Listeners do not think in genres. They think in moods, in moments, in sonic textures. And partly it is artist mobility. Producers who trained in one genre now have the tools and the networks to work in three.",
-      "The challenge for the registry is keeping up. When a track blends Afrobeats, hip-hop, and amapiano, which genre does it belong to? The answer is all of them. The graph must support multiple genre relationships per track, and the WAKILISHA system is designed to do exactly that.",
-    ],
-    relatedEntities: [
-      { type: "genre", name: "Afrobeats", slug: "afrobeats" },
-      { type: "genre", name: "Amapiano", slug: "amapiano" },
-    ],
-    tags: ["Genres", "Crossover", "Hip-hop", "Amapiano"],
-  },
-  {
-    slug: "tems-interview",
-    title: "Tems: 'I don't chase the mainstream. I build the sound.'",
-    section: "Interview",
-    date: "Apr 29, 2024",
-    readingTime: 7,
-    heroUrl: "https://readdy.ai/api/search-image?query=African%20female%20singer%20interview%20portrait%2C%20editorial%20photography%2C%20warm%20lighting%2C%20contemplative%20expression&width=400&height=240&seq=mag5&orientation=landscape",
-    author: "WAKILISHA Editorial",
-    authorPhoto: "https://readdy.ai/api/search-image?query=Professional%20editorial%20team%20portrait%2C%20diverse%20creative%20directors%20in%20a%20modern%20studio%2C%20warm%20natural%20lighting%2C%20editorial%20photography%20style%2C%20neutral%20background&width=100&height=100&seq=auth1&orientation=squarish",
-    readCount: 28100,
-    body: [
-      "Tems sits in a studio in Lagos, calm, precise, and unhurried. She has just returned from a tour that took her through six countries in three weeks, and she is already back in the studio. 'The road is the work,' she says. 'The studio is the life.'",
-      "Her approach to sound is architectural. She does not write songs. She builds sonic environments. Every track starts with a mood, a color, a temperature. Only then does melody arrive.",
-      "The mainstream found her, not the other way around. When Wizkid's 'Essence' became a global phenomenon, it was because the sound was already complete. The feature was an invitation, not a compromise.",
-      "What is next? She is cautious about specifics. 'I don't chase the mainstream. I build the sound. If the sound is true, the audience comes.' It is a philosophy that the WAKILISHA registry respects: data should follow the art, not the other way around.",
-    ],
-    relatedEntities: [
-      { type: "artist", name: "Tems", slug: "tems" },
-      { type: "track", name: "Essence", slug: "essence" },
-    ],
-    tags: ["Interview", "Tems", "Afropop", "R\u0026B"],
-  },
-  {
-    slug: "chart-methodology",
-    title: "How WAKILISHA charts work: sources, signals, and trust",
-    section: "Industry",
-    date: "Apr 22, 2024",
-    readingTime: 6,
-    heroUrl: "https://readdy.ai/api/search-image?query=data%20analytics%20music%20chart%20visualization%2C%20editorial%20photography%2C%20screens%2C%20abstract%20data&width=400&height=240&seq=mag6&orientation=landscape",
-    author: "Data Team",
-    authorPhoto: "https://readdy.ai/api/search-image?query=Professional%20portrait%20of%20a%20data%20analyst%2C%20modern%20office%20setting%2C%20confident%20pose%2C%20neutral%20background%2C%20editorial%20photography%2C%20clean%20minimal%20style&width=100&height=100&seq=auth4&orientation=squarish",
-    readCount: 5400,
-    body: [
-      "Every chart is a claim. It claims that this track, at this moment, is more popular than that one. The claim is only as strong as the data behind it.",
-      "WAKILISHA charts are built from three signal sources: streaming volume, radio airplay, and digital activity. Streaming volume comes from platform APIs and direct label partnerships. Radio airplay is monitored through broadcast logs. Digital activity includes social engagement, playlist additions, and search volume.",
-      "The weighting changes by region. In West Africa, streaming dominates. In East Africa, radio still carries significant weight. In the diaspora, digital activity is the strongest signal.",
-      "The key is the graph. When a track is correctly linked to its artist, its release, and its label, the signals aggregate accurately. When the graph is broken, the chart is wrong. This is why the repaired graph is not a backend luxury. It is the foundation of the chart's credibility.",
-    ],
-    relatedEntities: [
-      { type: "chart", name: "Weekly Top 40", slug: "weekly-top-40" },
-    ],
-    tags: ["Charts", "Methodology", "Data", "Trust"],
-  },
-  {
-    slug: "burna-boy-love-damini-retrospective",
-    title: "Two years on: Love, Damini rewired the global conversation",
-    section: "Analysis",
-    date: "Apr 15, 2024",
-    readingTime: 9,
-    heroUrl: "https://readdy.ai/api/search-image?query=African%20musician%20on%20stage%20concert%2C%20dramatic%20spotlight%2C%20powerful%20performance%20photography&width=400&height=240&seq=mag7&orientation=landscape",
-    author: "WAKILISHA Editorial",
-    authorPhoto: "https://readdy.ai/api/search-image?query=Professional%20editorial%20team%20portrait%2C%20diverse%20creative%20directors%20in%20a%20modern%20studio%2C%20warm%20natural%20lighting%2C%20editorial%20photography%20style%2C%20neutral%20background&width=100&height=100&seq=auth1&orientation=squarish",
-    readCount: 18900,
-    body: [
-      "Love, Damini was not just an album. It was a repositioning. When Burna Boy released it in 2022, he was already a global star. But this album made him a global reference point.",
-      "The data is striking. In the two years since release, the album has generated 4.2 billion streams. It has charted in 38 countries. It has been sampled, referenced, and studied in ways that no previous Afrobeats album had been.",
-      "What the numbers miss is the cultural shift. Before Love, Damini, Afrobeats was a genre. After it, Afrobeats became a category. It was no longer 'African music.' It was music, full stop.",
-      "The registry reflects this. The relationship graph around Burna Boy expanded dramatically after 2022. More collaborations, more label partnerships, more cross-genre features. The graph is not just a record of what happened. It is a map of what became possible.",
-    ],
-    relatedEntities: [
-      { type: "artist", name: "Burna Boy", slug: "burna-boy" },
-      { type: "release", name: "Love, Damini", slug: "love-damini" },
-    ],
-    tags: ["Burna Boy", "Retrospective", "Afrobeats", "Global"],
-  },
-  {
-    slug: "south-africa-amapiano-global",
-    title: "Amapiano's global takeover: from Pretoria to the world",
-    section: "Focus",
-    date: "Apr 8, 2024",
-    readingTime: 7,
-    heroUrl: "https://readdy.ai/api/search-image?query=South%20African%20amapiano%20dance%20party%2C%20vibrant%20club%20lighting%2C%20energetic%20crowd%2C%20documentary%20photography%2C%20warm%20color%20palette&width=400&height=240&seq=mag8&orientation=landscape",
-    author: "Thandiwe Mokoena",
-    authorPhoto: "https://readdy.ai/api/search-image?query=Professional%20portrait%20of%20a%20South%20African%20woman%20journalist%2C%20confident%20expression%2C%20natural%20lighting%2C%20editorial%20photography%2C%20warm%20neutral%20background&width=100&height=100&seq=auth5&orientation=squarish",
-    readCount: 11200,
-    body: [
-      "Amapiano started in Pretoria. It was local, specific, and unapologetically South African. Now it is in Lagos, London, and Los Angeles. The speed of this transition is unprecedented in African music.",
-      "The genre's architecture is part of its portability. The log drum, the shakers, the slow tempo, and the open structure make it easy to blend with other genres. Afrobeats artists are adding amapiano sections to their tracks. UK producers are sampling amapiano drums. Brazilian DJs are playing amapiano sets.",
-      "The registry shows the growth. Amapiano tracks in the WAKILISHA database have increased by 67% in the past year. Cross-genre collaborations involving amapiano have increased by 120%. The genre is not just growing. It is connecting.",
-      "The question is authorship. As amapiano goes global, who gets credited? The WAKILISHA graph is designed to trace the origin of every sound, every sample, every collaboration. The genre's future depends on getting this right.",
-    ],
-    relatedEntities: [
-      { type: "genre", name: "Amapiano", slug: "amapiano" },
-      { type: "artist", name: "Asake", slug: "asake" },
-    ],
-    tags: ["Amapiano", "South Africa", "Global", "Focus"],
-  },
-  {
-    slug: "women-in-african-music-2024",
-    title: "The women reshaping African music in 2024",
-    section: "Culture",
-    date: "Mar 28, 2024",
-    readingTime: 6,
-    heroUrl: "https://readdy.ai/api/search-image?query=African%20female%20musicians%20group%20portrait%2C%20powerful%20confident%20poses%2C%20editorial%20photography%2C%20dramatic%20studio%20lighting%2C%20warm%20tones&width=400&height=240&seq=mag9&orientation=landscape",
-    author: "WAKILISHA Editorial",
-    authorPhoto: "https://readdy.ai/api/search-image?query=Professional%20editorial%20team%20portrait%2C%20diverse%20creative%20directors%20in%20a%20modern%20studio%2C%20warm%20natural%20lighting%2C%20editorial%20photography%20style%2C%20neutral%20background&width=100&height=100&seq=auth1&orientation=squarish",
-    readCount: 22400,
-    body: [
-      "The narrative around women in African music has often been about struggle. This year, it is about dominance. Women are not just participating. They are defining the sound, the business, and the culture.",
-      "Tems, Ayra Starr, and Simi are household names. But behind them is a generation of producers, songwriters, and executives who are not visible on stage. The WAKILISHA registry tracks this. The graph shows that women are now credited as primary writers on 42% of charting tracks, up from 28% three years ago.",
-      "The shift is structural. Labels are signing more female artists. Studios are hiring more female engineers. And audiences are responding. The data shows that tracks with female lead artists are streamed more, shared more, and chart longer.",
-      "This is not a trend. It is a permanent change in the architecture of African music. The graph will reflect it for decades.",
-    ],
-    relatedEntities: [
-      { type: "artist", name: "Tems", slug: "tems" },
-      { type: "artist", name: "Ayra Starr", slug: "ayra-starr" },
-      { type: "artist", name: "Simi", slug: "simi" },
-    ],
-    tags: ["Women", "Culture", "Industry", "Representation"],
-  },
-  {
-    slug: "davido-timeless-tour",
-    title: "Inside Davido's Timeless Tour: logistics of a global African arena run",
-    section: "Industry",
-    date: "Mar 18, 2024",
-    readingTime: 8,
-    heroUrl: "https://readdy.ai/api/search-image?query=African%20music%20arena%20tour%20concert%2C%20massive%20crowd%2C%20stage%20lights%2C%20professional%20photography%2C%20stadium%20atmosphere&width=400&height=240&seq=mag10&orientation=landscape",
-    author: "Tour Desk",
-    authorPhoto: "https://readdy.ai/api/search-image?query=Professional%20portrait%20of%20a%20music%20industry%20professional%2C%20concert%20backstage%20setting%2C%20confident%20pose%2C%20warm%20lighting%2C%20editorial%20photography&width=100&height=100&seq=auth6&orientation=squarish",
-    readCount: 9500,
-    body: [
-      "Davido's Timeless Tour was the largest African arena tour in history. It visited 28 cities, sold out 19 of them, and grossed more than any previous African tour. The numbers are impressive. The logistics are staggering.",
-      "Moving an African arena show across continents is not like moving a Western pop show. The visa infrastructure for African artists is fragmented. The insurance markets are underdeveloped. And the supply chains for stage equipment often require importing from Europe or Asia.",
-      "What made the tour work was data. Davido's team used the WAKILISHA registry to track which markets had the strongest fan graphs, which cities had the most reliable venue partnerships, and which promoters had the best track records.",
-      "The result was a tour that was not just big. It was efficient. And it proved that African arena tours can be scaled, replicated, and improved. The next one will be bigger.",
-    ],
-    relatedEntities: [
-      { type: "artist", name: "Davido", slug: "davido" },
-      { type: "release", name: "Timeless", slug: "timeless" },
-    ],
-    tags: ["Tour", "Davido", "Arena", "Industry"],
-  },
-  {
-    slug: "highlife-revival",
-    title: "Highlife never died: the Ghanaian revival you are not hearing about",
-    section: "Analysis",
-    date: "Mar 10, 2024",
-    readingTime: 5,
-    heroUrl: "https://readdy.ai/api/search-image?query=Ghanaian%20highlife%20music%20band%20performance%2C%20brass%20instruments%2C%20traditional%20and%20modern%20fusion%2C%20warm%20documentary%20photography&width=400&height=240&seq=mag11&orientation=landscape",
-    author: "Kwame Asante",
-    authorPhoto: "https://readdy.ai/api/search-image?query=Professional%20portrait%20of%20a%20Ghanaian%20man%20writer%2C%20glasses%2C%20intellectual%20expression%2C%20natural%20lighting%2C%20editorial%20photography%2C%20neutral%20background&width=100&height=100&seq=auth7&orientation=squarish",
-    readCount: 7800,
-    body: [
-      "Highlife is the oldest continuously recorded African popular music genre. It predates Afrobeats by decades. And it is having a quiet revival that most listeners are not noticing.",
-      "The revival is not a nostalgic movement. It is a structural one. Young Ghanaian producers are sampling highlife guitar lines, reusing brass arrangements, and building modern tracks on 1970s foundations. The result is music that feels both timeless and current.",
-      "The WAKILISHA registry tracks this through the sample graph. When a modern track samples a highlife recording, the relationship is recorded. The graph now shows more than 800 highlife samples in contemporary tracks, a 35% increase from last year.",
-      "The genre's survival is not accidental. It is architectural. Highlife was built on live instruments, detailed arrangements, and strong melodies. Those qualities travel well across decades.",
-    ],
-    relatedEntities: [
-      { type: "genre", name: "Highlife", slug: "highlife" },
-    ],
-    tags: ["Highlife", "Ghana", "Revival", "Samples"],
-  },
-  {
-    slug: "rema-interview",
-    title: "Rema: 'I see sound as color. Afrorave is my palette.'",
-    section: "Interview",
-    date: "Mar 1, 2024",
-    readingTime: 6,
-    heroUrl: "https://readdy.ai/api/search-image?query=young%20African%20male%20artist%20portrait%2C%20creative%20colorful%20lighting%2C%20editorial%20music%20photography%2C%20confident%20expression&width=400&height=240&seq=mag12&orientation=landscape",
-    author: "WAKILISHA Editorial",
-    authorPhoto: "https://readdy.ai/api/search-image?query=Professional%20editorial%20team%20portrait%2C%20diverse%20creative%20directors%20in%20a%20modern%20studio%2C%20warm%20natural%20lighting%2C%20editorial%20photography%20style%2C%20neutral%20background&width=100&height=100&seq=auth1&orientation=squarish",
-    readCount: 20100,
-    body: [
-      "Rema does not describe music in conventional terms. He describes it in colors. 'Afrorave is my palette,' he says. 'Each track is a different painting. The same colors, but different composition.'",
-      "His process is visual before it is sonic. He starts with a mood board, a collection of images, textures, and atmospheres. Only then does he touch the keyboard.",
-      "The result is a sound that is instantly recognizable. The high-pitched vocals, the trap drums, the Afrobeats percussion, and the ambient synths create a signature that is not borrowed from any single genre. It is Rema's own.",
-      "The registry reflects this. Rema's tracks are tagged with more genres than any other artist in the database. Not because the tags are uncertain, but because the sound genuinely exists in multiple spaces at once.",
-    ],
-    relatedEntities: [
-      { type: "artist", name: "Rema", slug: "rema" },
-      { type: "genre", name: "Afrorave", slug: "afrorave" },
-    ],
-    tags: ["Interview", "Rema", "Afrorave", "Creative process"],
-  },
-];
+export const STORIES = importedStories;
 
-export const EDITOR_PICKS = [
-  {
-    slug: "tems-interview",
-    title: "Tems: 'I don't chase the mainstream. I build the sound.'",
-    section: "Interview",
-    date: "Apr 29, 2024",
-    readingTime: 7,
-    heroUrl: "https://readdy.ai/api/search-image?query=African%20female%20singer%20interview%20portrait%2C%20editorial%20photography%2C%20warm%20lighting%2C%20contemplative%20expression&width=400&height=240&seq=mag5&orientation=landscape",
-    author: "WAKILISHA Editorial",
-    authorPhoto: "https://readdy.ai/api/search-image?query=Professional%20editorial%20team%20portrait%2C%20diverse%20creative%20directors%20in%20a%20modern%20studio%2C%20warm%20natural%20lighting%2C%20editorial%20photography%20style%2C%20neutral%20background&width=100&height=100&seq=auth1&orientation=squarish",
-    readCount: 28100,
-    pickReason: "Cover story",
-  },
-  {
-    slug: "women-in-african-music-2024",
-    title: "The women reshaping African music in 2024",
-    section: "Culture",
-    date: "Mar 28, 2024",
-    readingTime: 6,
-    heroUrl: "https://readdy.ai/api/search-image?query=African%20female%20musicians%20group%20portrait%2C%20powerful%20confident%20poses%2C%20editorial%20photography%2C%20dramatic%20studio%20lighting%2C%20warm%20tones&width=400&height=240&seq=mag9&orientation=landscape",
-    author: "WAKILISHA Editorial",
-    authorPhoto: "https://readdy.ai/api/search-image?query=Professional%20editorial%20team%20portrait%2C%20diverse%20creative%20directors%20in%20a%20modern%20studio%2C%20warm%20natural%20lighting%2C%20editorial%20photography%20style%2C%20neutral%20background&width=100&height=100&seq=auth1&orientation=squarish",
-    readCount: 22400,
-    pickReason: "Editor's choice",
-  },
-  {
-    slug: "rema-interview",
-    title: "Rema: 'I see sound as color. Afrorave is my palette.'",
-    section: "Interview",
-    date: "Mar 1, 2024",
-    readingTime: 6,
-    heroUrl: "https://readdy.ai/api/search-image?query=young%20African%20male%20artist%20portrait%2C%20creative%20colorful%20lighting%2C%20editorial%20music%20photography%2C%20confident%20expression&width=400&height=240&seq=mag12&orientation=landscape",
-    author: "WAKILISHA Editorial",
-    authorPhoto: "https://readdy.ai/api/search-image?query=Professional%20editorial%20team%20portrait%2C%20diverse%20creative%20directors%20in%20a%20modern%20studio%2C%20warm%20natural%20lighting%2C%20editorial%20photography%20style%2C%20neutral%20background&width=100&height=100&seq=auth1&orientation=squarish",
-    readCount: 20100,
-    pickReason: "Must read",
-  },
-];
+export const EDITOR_PICKS = STORIES.filter((story) => story.isFeatured).length
+  ? STORIES.filter((story) => story.isFeatured).slice(0, 5)
+  : STORIES.slice(0, 5);
 
-export const TRENDING_STORIES = [
-  { slug: "tems-interview", title: "Tems: 'I don't chase the mainstream...", section: "Interview", readCount: 28100, heroUrl: "https://readdy.ai/api/search-image?query=African%20female%20singer%20interview%20portrait%2C%20editorial%20photography%2C%20warm%20lighting%2C%20contemplative%20expression&width=400&height=240&seq=mag5&orientation=landscape" },
-  { slug: "rema-interview", title: "Rema: 'I see sound as color...'", section: "Interview", readCount: 20100, heroUrl: "https://readdy.ai/api/search-image?query=young%20African%20male%20artist%20portrait%2C%20creative%20colorful%20lighting%2C%20editorial%20music%20photography%2C%20confident%20expression&width=400&height=240&seq=mag12&orientation=landscape" },
-  { slug: "burna-boy-love-damini-retrospective", title: "Two years on: Love, Damini...", section: "Analysis", readCount: 18900, heroUrl: "https://readdy.ai/api/search-image?query=African%20musician%20on%20stage%20concert%2C%20dramatic%20spotlight%2C%20powerful%20performance%20photography&width=400&height=240&seq=mag7&orientation=landscape" },
-  { slug: "women-in-african-music-2024", title: "The women reshaping African music...", section: "Culture", readCount: 22400, heroUrl: "https://readdy.ai/api/search-image?query=African%20female%20musicians%20group%20portrait%2C%20powerful%20confident%20poses%2C%20editorial%20photography%2C%20dramatic%20studio%20lighting%2C%20warm%20tones&width=400&height=240&seq=mag9&orientation=landscape" },
-  { slug: "streaming-economics", title: "Streaming economics and the African artist", section: "Industry", readCount: 15200, heroUrl: "https://readdy.ai/api/search-image?query=music%20streaming%20technology%20headphones%20digital%20music%20interface%20studio%20recording%20equipment%20warm%20light&width=400&height=240&seq=mag3&orientation=landscape" },
-];
+export const TRENDING_STORIES = STORIES.slice()
+  .sort((a, b) => (b.readCount ?? 0) - (a.readCount ?? 0) || a.title.localeCompare(b.title))
+  .slice(0, 5);
 
-export const CONTRIBUTORS = [
-  {
-    name: "Amara Ochieng",
-    role: "East Africa Correspondent",
-    photo: "https://readdy.ai/api/search-image?query=Professional%20portrait%20of%20a%20young%20African%20woman%20journalist%2C%20warm%20smile%2C%20confident%20expression%2C%20natural%20lighting%2C%20editorial%20photography%2C%20neutral%20background&width=100&height=100&seq=auth2&orientation=squarish",
-    bio: "Covering the music scenes of Nairobi, Dar es Salaam, and Kampala since 2019.",
-  },
-  {
-    name: "Kofi Mensah",
-    role: "Culture Editor",
-    photo: "https://readdy.ai/api/search-image?query=Professional%20portrait%20of%20a%20young%20African%20man%20writer%2C%20thoughtful%20expression%2C%20stylish%20glasses%2C%20natural%20lighting%2C%20editorial%20photography%2C%20neutral%20background&width=100&height=100&seq=auth3&orientation=squarish",
-    bio: "Writes about genre, identity, and the spaces where music and culture collide.",
-  },
-  {
-    name: "Thandiwe Mokoena",
-    role: "South Africa Editor",
-    photo: "https://readdy.ai/api/search-image?query=Professional%20portrait%20of%20a%20South%20African%20woman%20journalist%2C%20confident%20expression%2C%20natural%20lighting%2C%20editorial%20photography%2C%20warm%20neutral%20background&width=100&height=100&seq=auth5&orientation=squarish",
-    bio: "Based in Johannesburg. Focused on amapiano, house, and the Southern African sound.",
-  },
-  {
-    name: "Kwame Asante",
-    role: "Heritage & History",
-    photo: "https://readdy.ai/api/search-image?query=Professional%20portrait%20of%20a%20Ghanaian%20man%20writer%2C%20glasses%2C%20intellectual%20expression%2C%20natural%20lighting%2C%20editorial%20photography%2C%20neutral%20background&width=100&height=100&seq=auth7&orientation=squarish",
-    bio: "Archives the past to explain the present. Highlife, highlife, and more highlife.",
-  },
-];
+const contributors = new Map<string, { name: string; role: string; photo?: string; bio: string }>();
+for (const story of STORIES) {
+  if (!contributors.has(story.author)) {
+    contributors.set(story.author, {
+      name: story.author,
+      role: story.section === 'Guide' ? 'Guide Author' : 'Contributor',
+      photo: story.authorPhoto,
+      bio: `Published ${STORIES.filter((item) => item.author === story.author).length} WAKILISHA piece${STORIES.filter((item) => item.author === story.author).length === 1 ? '' : 's'}.`,
+    });
+  }
+}
+
+export const CONTRIBUTORS = Array.from(contributors.values()).slice(0, 8);
