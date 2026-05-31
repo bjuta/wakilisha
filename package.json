@@ -28,6 +28,7 @@
   "private": true,
   "scripts": {
     "build": "vite build",
+    "charts:verify-partitioning": "tsx scripts/charts/verify-partitioning.ts",
     "dev": "vite --host 0.0.0.0",
     "extract:local": "WAKILISHA_SKIP_DOWNLOAD=1 WAKILISHA_IMPORT_ZIP_PATH=./wakilisha_supabase_import_2026-05-30.zip tsx packages/migration/src/extractZip.ts",
     "extract:zip": "tsx packages/migration/src/extractZip.ts",
