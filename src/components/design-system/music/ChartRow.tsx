@@ -24,16 +24,16 @@ export interface ChartRowProps {
 }
 
 const MOVEMENT_CONFIG = {
-  up: { icon: "ri-arrow-up-line", color: "var(--wk-success)", label: "Up" },
-  down: { icon: "ri-arrow-down-line", color: "var(--wk-danger)", label: "Down" },
-  new: { icon: "ri-star-smile-line", color: "var(--wk-brand)", label: "New" },
-  same: { icon: "ri-subtract-line", color: "var(--wk-text-faint)", label: "Same" },
+  up: { icon: "ri-arrow-up-line", color: "var(--wk-success)", bg: "var(--wk-success-soft)", label: "Up" },
+  down: { icon: "ri-arrow-down-line", color: "var(--wk-danger)", bg: "var(--wk-danger-soft)", label: "Down" },
+  new: { icon: "ri-star-smile-line", color: "var(--wk-brand)", bg: "var(--wk-brand-soft)", label: "New" },
+  same: { icon: "ri-subtract-line", color: "var(--wk-text-faint)", bg: "transparent", label: "Same" },
 };
 
 const RANK_COLORS: Record<number, string> = {
-  1: "var(--wk-brand)",
-  2: "var(--wk-brand)",
-  3: "var(--wk-brand)",
+  1: "#C9A96E",
+  2: "#A8A8A8",
+  3: "#B87333",
 };
 
 export function ChartRow({
@@ -110,8 +110,8 @@ export function ChartRow({
   }
 
   return (
-    <div className={`group flex items-center gap-3 rounded-lg px-3 py-3 transition-colors hover:bg-[var(--wk-surface-raised)] ${isTop3 ? "bg-[var(--wk-brand-soft)]/20" : ""}`}>
-      {/* Rank + Movement */}
+    <div className={`group flex items-center gap-3 rounded-xl px-3 py-3 transition-all duration-[var(--wk-d-fast)] hover:bg-[var(--wk-surface-raised)] ${isTop3 ? "bg-[var(--wk-surface-raised)]/50" : ""}`}>
+      {/* Rank */}
       <div className="flex w-12 shrink-0 flex-col items-center">
         <span
           className="text-[22px] font-black leading-none"
@@ -143,7 +143,7 @@ export function ChartRow({
           onClick={handlePlay}
           disabled={!playable}
           aria-label={isCurrentTrack && isPlaying ? "Pause" : "Play"}
-          className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100 disabled:opacity-0"
+          className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity duration-[var(--wk-d-fast)] group-hover:opacity-100 disabled:opacity-0"
         >
           <i className={`text-white ${isCurrentTrack && isPlaying ? "ri-pause-fill" : "ri-play-fill"}`} />
         </button>
@@ -160,12 +160,12 @@ export function ChartRow({
             <span className="truncate text-[14px] font-bold text-[var(--wk-text)]">{title}</span>
           )}
           {peakPosition !== undefined && peakPosition === rank && (
-            <span className="shrink-0 rounded-full bg-[var(--wk-brand-soft)] px-2 py-0.5 text-[10px] font-bold text-[var(--wk-brand)]">
+            <span className="shrink-0 rounded-full bg-[var(--wk-brand-soft)] border border-[var(--wk-brand)]/30 px-2 py-0.5 text-[10px] font-bold text-[var(--wk-brand)]">
               PEAK
             </span>
           )}
           {!playable && (
-            <span className="shrink-0 rounded-full bg-[var(--wk-surface-raised)] px-2 py-0.5 text-[10px] font-bold text-[var(--wk-text-faint)]">
+            <span className="shrink-0 rounded-full bg-[var(--wk-surface-raised)] border border-[var(--wk-border)] px-2 py-0.5 text-[10px] font-bold text-[var(--wk-text-faint)]">
               Preview
             </span>
           )}
@@ -203,7 +203,7 @@ export function ChartRow({
         onClick={handlePlay}
         disabled={!playable}
         aria-label={isCurrentTrack && isPlaying ? "Pause" : "Play"}
-        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] transition-all disabled:opacity-40 disabled:cursor-not-allowed ${isCurrentTrack ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
+        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] transition-all duration-[var(--wk-d-fast)] disabled:opacity-40 disabled:cursor-not-allowed ${isCurrentTrack ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
       >
         <i className={`text-sm ${isCurrentTrack && isPlaying ? "ri-pause-fill" : "ri-play-mini-fill"}`} />
       </button>
