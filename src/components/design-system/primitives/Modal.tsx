@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactNode } from "react";
+import { useScrollLock } from "@/hooks/useScrollLock";
 
 interface ModalProps {
   open: boolean;
@@ -18,6 +19,8 @@ const maxWidths = {
 export function Modal({ open, onClose, title, children, maxWidth = "md" }: ModalProps) {
   const panelRef = useRef<HTMLDivElement>(null);
 
+  useScrollLock(open);
+
   useEffect(() => {
     if (!open) return;
     const handleKey = (e: KeyboardEvent) => {
@@ -30,13 +33,7 @@ export function Modal({ open, onClose, title, children, maxWidth = "md" }: Modal
   useEffect(() => {
     if (open) {
       panelRef.current?.focus();
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
     }
-    return () => {
-      document.body.style.overflow = "";
-    };
   }, [open]);
 
   if (!open) return null;

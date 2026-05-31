@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useScrollLock } from "@/hooks/useScrollLock";
 import { WkButton } from "@/components/design-system/primitives/Button";
 
 interface LyricsContributor {
@@ -30,6 +31,8 @@ export default function LyricsModal({
   const [source, setSource] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
+
+  useScrollLock(isOpen);
 
   if (!isOpen) return null;
 
@@ -84,7 +87,7 @@ export default function LyricsModal({
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="relative w-full max-w-[600px] max-h-[90vh] overflow-y-auto rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] shadow-2xl">
+      <div data-scroll-lock="container" className="relative w-full max-w-[600px] max-h-[90vh] overflow-y-auto rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] shadow-2xl">
         {/* Header */}
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[var(--wk-divider)] bg-[var(--wk-surface)] px-6 py-4">
           <div>

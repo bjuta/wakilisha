@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { useScrollLock } from "@/hooks/useScrollLock";
 import { ShareButton } from "@/components/design-system/share/ShareSheet";
 import { WkIcon } from "@/components/design-system/Icon";
 import type { RELEASES } from "@/mocks/releases";
@@ -19,12 +20,14 @@ const fakeTracks = (release: Release) =>
   }));
 
 export function AlbumModal({ release, open, onClose }: AlbumModalProps) {
+  useScrollLock(open);
+
   if (!open || !release) return null;
   const tracks = fakeTracks(release);
 
   return (
     <div className="album-modal-backdrop" onClick={onClose} role="dialog" aria-modal="true">
-      <div className="album-modal" onClick={(event) => event.stopPropagation()}>
+      <div data-scroll-lock="container" className="album-modal" onClick={(event) => event.stopPropagation()}>
         <div className="album-modal-head">
           <div className="album-modal-cover"><img src={release.artworkUrl} alt={release.title} /></div>
           <div>

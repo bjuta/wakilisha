@@ -2,7 +2,9 @@ import { useState, useRef, useEffect } from "react";
 import { Link, useLocation, Outlet } from "react-router-dom";
 import { usePlayer } from "@/context/PlayerContext";
 import { useTheme } from "@/components/design-system/theme/ThemeProvider";
+import { useScrollLock } from "@/hooks/useScrollLock";
 import { WkIcon } from "@/components/design-system/Icon";
+import { MobileFullPlayer } from "./MobileFullPlayer";
 
 const PRIMARY_NAV = [
   { label: "Home", to: "/", icon: "Home" },
@@ -16,16 +18,16 @@ function MobileMiniPlayer() {
   const location = useLocation();
 
   if (!currentTrack) return null;
-  if (location.pathname === "/player" || location.pathname === "/auth") return null;
+  if (location.pathname === "/auth") return null;
   const isPlayable = currentTrack.isPlayable !== false;
 
   return (
     <div className="phn-miniplayer" onTouchStart={() => openFullPlayer()}>
       <div className="phn-mp-progress"><span style={{ transform: `scaleX(${progress})` }} /></div>
-      <Link to="/player" onClick={() => openFullPlayer()} className="phn-mp-art">
+      <button onClick={() => openFullPlayer()} className="phn-mp-art">
         {currentTrack.artworkUrl ? <img src={currentTrack.artworkUrl} alt={currentTrack.title} /> : <WkIcon name="Music2" size={18} />}
-      </Link>
-      <div className="phn-mp-info">
+      </button>
+      <div className="phn-mp-info" onClick={() => openFullPlayer()}>
         <div className="phn-mp-title">{currentTrack.title}</div>
         <div className="phn-mp-sub">{currentTrack.artist}{currentTrack.source ? ` · ${currentTrack.source}` : ""}</div>
       </div>
@@ -46,6 +48,8 @@ function MoreMenu() {
   const dragYRef = useRef(0);
   const { theme, toggle } = useTheme();
   const location = useLocation();
+
+  useScrollLock(isOpen);
 
   const open = () => { setExiting(false); setDragY(0); dragYRef.current = 0; setIsOpen(true); };
   const close = () => {
@@ -79,7 +83,7 @@ function MoreMenu() {
     };
   }, [isDragging]);
 
-  if (location.pathname === "/player" || location.pathname === "/auth") return null;
+  if (location.pathname === "/auth") return null;
 
   const backdropOpacity = isDragging ? Math.max(0, 0.5 - dragY / 400) : exiting ? 0 : 0.5;
   const sheetTransform = isDragging ? `translateY(${dragY}px)` : exiting ? "translateY(100%)" : "translateY(0)";
@@ -94,7 +98,7 @@ function MoreMenu() {
       {isOpen && (
         <>
           <div className={`phn-more-backdrop ${exiting ? "exiting" : ""}`} style={{ opacity: backdropOpacity }} onClick={close} />
-          <div className={`phn-more-sheet ${isDragging ? "dragging" : ""} ${exiting ? "exiting" : ""}`} style={{ transform: sheetTransform }}>
+          <div data-scroll-lock="container" className={`phn-more-sheet ${isDragging ? "dragging" : ""} ${exiting ? "exiting" : ""}`} style={{ transform: sheetTransform }}>
             <div className="phn-more-drag-zone" onTouchStart={(e) => onDragStart(e.touches[0].clientY)} onMouseDown={(e) => onDragStart(e.clientY)}>
               <div className="phn-more-handle" />
               <div className="phn-more-title">More</div>
@@ -141,7 +145,7 @@ function MoreMenu() {
 function MobileBottomNav() {
   const location = useLocation();
   const isActive = (path: string) => path === "/" ? location.pathname === "/" : location.pathname.startsWith(path);
-  if (location.pathname === "/player" || location.pathname === "/auth") return null;
+  if (location.pathname === "/auth") return null;
 
   return (
     <nav className="phn-nav" aria-label="Primary mobile navigation">
@@ -161,9 +165,11 @@ function MobileBottomNav() {
 
 export function MobileAppLayout() {
   const location = useLocation();
-  const { currentTrack } = usePlayer();
-  const showMiniPlayer = !!currentTrack && location.pathname !== "/player" && location.pathname !== "/auth";
+  const { currentTrack, isFullPlayerOpen } = usePlayer();
+  const showMiniPlayer = !!currentTrack && location.pathname !== "/auth";
   const bottomPadding = showMiniPlayer ? 148 : 88;
+
+  useScrollLock(isFullPlayerOpen);
 
   return (
     <div className="wk-app-shell min-h-screen flex flex-col">
@@ -172,6 +178,15 @@ export function MobileAppLayout() {
       </main>
       <MobileMiniPlayer />
       <MobileBottomNav />
+      {isFullPlayerOpen && (
+        <div
+          data-scroll-lock="container"
+          className="fixed inset-0 z-[90] overflow-y-auto bg-[var(--wk-bg)]"
+          style={{ animation: "slideUp 0.35s cubic-bezier(.16,1,.3,1)" }}
+        >
+          <MobileFullPlayer />
+        </div>
+      )}
     </div>
   );
 }

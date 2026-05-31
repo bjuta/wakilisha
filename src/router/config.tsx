@@ -1,6 +1,7 @@
 import type { RouteObject } from "react-router-dom";
 import { ResponsiveAppLayout } from "@/components/mobile/ResponsiveAppLayout";
 import { ResponsivePage } from "@/components/mobile/ResponsivePage";
+import { MobileFullPlayer } from "@/components/mobile/MobileFullPlayer";
 import NotFound from "../pages/NotFound";
 import Home from "../pages/home/page";
 import AdminDesignSystem from "../pages/admin/design-system/page";
@@ -39,7 +40,6 @@ import MobileLabels from "../pages/mobile/labels/page";
 import MobileMagazine from "../pages/mobile/magazine/page";
 import MobileArticlePage from "../pages/mobile/magazine/article/page";
 import MobileSearch from "../pages/mobile/search/page";
-import MobileFullPlayer from "../pages/mobile/player/page";
 import MobileNotFound from "../pages/mobile/NotFound";
 import MobileTrackDetail from "../pages/mobile/tracks/detail/page";
 import MobileAuth from "../pages/mobile/auth/page";
@@ -80,8 +80,8 @@ const routes: RouteObject[] = [
       // Search
       { path: "/search", element: <ResponsivePage mobile={<MobileSearch />} desktop={<Search />} /> },
 
-      // Player / account
-      { path: "/player", element: <ResponsivePage mobile={<MobileFullPlayer />} desktop={<MobileFullPlayer />} /> },
+      // Player — desktop only page, mobile uses overlay state
+      { path: "/player", element: <ResponsivePage mobile={<MobileHome />} desktop={<MobileFullPlayer />} /> },
       { path: "/auth", element: <ResponsivePage mobile={<MobileAuth />} desktop={<MobileAuth />} /> },
       { path: "/profile", element: <ResponsivePage mobile={<MobileProfile />} desktop={<ProfilePage />} /> },
       { path: "/settings", element: <ResponsivePage mobile={<SettingsPage />} desktop={<SettingsPage />} /> },

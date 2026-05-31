@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useScrollLock } from '@/hooks/useScrollLock';
 import { WkIcon } from '@/components/design-system/Icon';
 
 type ShareObject = {
@@ -67,6 +68,8 @@ export function ShareSheet({ item, open, onClose, timestamp }: ShareSheetProps) 
   const finalUrl = useMemo(() => getFinalUrl(baseUrl, timestamp), [baseUrl, timestamp]);
   const shareText = item.description || item.subtitle || item.title;
 
+  useScrollLock(open);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (event: KeyboardEvent) => {
@@ -105,7 +108,7 @@ export function ShareSheet({ item, open, onClose, timestamp }: ShareSheetProps) 
 
   return (
     <div className="share-sheet-backdrop" role="dialog" aria-modal="true" onClick={onClose}>
-      <div className="share-sheet w-full" onClick={(event) => event.stopPropagation()}>
+      <div data-scroll-lock="container" className="share-sheet w-full" onClick={(event) => event.stopPropagation()}>
         <div className="share-handle" />
         <div className="mb-3 flex items-start justify-between gap-4">
           <div>

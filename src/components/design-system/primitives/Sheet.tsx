@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from "react";
+import { useScrollLock } from "@/hooks/useScrollLock";
 
 interface SheetProps {
   open: boolean;
@@ -9,6 +10,8 @@ interface SheetProps {
 }
 
 export function Sheet({ open, onClose, title, children, side = "bottom" }: SheetProps) {
+  useScrollLock(open);
+
   useEffect(() => {
     if (!open) return;
     const handleKey = (e: KeyboardEvent) => {
@@ -17,11 +20,6 @@ export function Sheet({ open, onClose, title, children, side = "bottom" }: Sheet
     document.addEventListener("keydown", handleKey);
     return () => document.removeEventListener("keydown", handleKey);
   }, [open, onClose]);
-
-  useEffect(() => {
-    document.body.style.overflow = open ? "hidden" : "";
-    return () => { document.body.style.overflow = ""; };
-  }, [open]);
 
   if (!open) return null;
 
@@ -38,7 +36,7 @@ export function Sheet({ open, onClose, title, children, side = "bottom" }: Sheet
       aria-modal="true"
     >
       <div className="absolute inset-0 bg-[var(--wk-overlay)]" onClick={onClose} />
-      <div className={`wk-panel relative ${panelClasses}`}>
+      <div data-scroll-lock="container" className={`wk-panel relative ${panelClasses}`}>
         {title && (
           <div className="flex items-center justify-between border-b border-[var(--wk-border)] px-5 py-4">
             <h2 className="text-[15px] font-bold text-[var(--wk-text)]">{title}</h2>
