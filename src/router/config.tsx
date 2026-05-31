@@ -39,6 +39,9 @@ import SettingsPage from "../pages/settings/page";
 // Search
 import Search from "../pages/search/page";
 
+// Desktop player
+import DesktopPlayerPage from "../pages/player/page";
+
 // Mobile pages
 import MobileHome from "../pages/mobile/home/page";
 import MobileChartsDirectory from "../pages/mobile/charts/directory/page";
@@ -91,8 +94,8 @@ const routes: RouteObject[] = [
       // Search
       { path: "/search", element: <ResponsivePage mobile={<MobileSearch />} desktop={<Search />} /> },
 
-      // Player — desktop only page, mobile uses overlay state
-      { path: "/player", element: <ResponsivePage mobile={<MobileHome />} desktop={<MobileFullPlayer />} /> },
+      // Player — desktop player page, mobile uses overlay state
+      { path: "/player", element: <ResponsivePage mobile={<MobileHome />} desktop={<DesktopPlayerPage />} /> },
       { path: "/auth", element: <ResponsivePage mobile={<MobileAuth />} desktop={<MobileAuth />} /> },
       { path: "/profile", element: <ResponsivePage mobile={<MobileProfile />} desktop={<ProfilePage />} /> },
       { path: "/settings", element: <ResponsivePage mobile={<SettingsPage />} desktop={<SettingsPage />} /> },
