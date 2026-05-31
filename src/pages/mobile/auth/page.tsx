@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { WkIcon } from "@/components/design-system/Icon";
 
 export default function MobileAuth() {
   return (
@@ -13,9 +14,15 @@ export default function MobileAuth() {
         </div>
       </section>
 
+      <section className="auth-choice-grid">
+        <button className="auth-choice on">Charts</button>
+        <button className="auth-choice">Artists</button>
+        <button className="auth-choice">Magazine</button>
+      </section>
+
       <section className="auth-buttons">
-        <button className="auth-btn auth-btn-primary"><i className="ri-mail-line" /> Continue with email</button>
-        <button className="auth-btn auth-btn-secondary"><i className="ri-google-fill" /> Continue with Google</button>
+        <button className="auth-btn auth-btn-primary"><WkIcon name="Mail" size={17} /> Continue with email</button>
+        <button className="auth-btn auth-btn-secondary"><WkIcon name="Chrome" size={17} /> Continue with Google</button>
         <div className="auth-divider"><span className="auth-divider-line" /><span className="auth-divider-text">or</span><span className="auth-divider-line" /></div>
         <Link to="/" className="auth-btn auth-btn-ghost">Explore without signing in</Link>
       </section>
