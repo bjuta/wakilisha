@@ -1,6 +1,7 @@
 @import "./styles/wakilisha-mobile-v5.css";
 @import "./styles/wakilisha-pages-35-46.css";
 @import "./styles/wakilisha-magazine-38-44.css";
+@import "./styles/wakilisha-charts-39.css";
 
 /* Hero entrance animations */
 @keyframes heroFadeIn {
