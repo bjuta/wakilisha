@@ -22,6 +22,7 @@ import Magazine from "../pages/magazine/page";
 import ArticlePage from "../pages/magazine/article/page";
 import TrackDetail from "../pages/tracks/detail/page";
 import ProfilePage from "../pages/profile/page";
+import SettingsPage from "../pages/settings/page";
 
 // Search
 import Search from "../pages/search/page";
@@ -83,6 +84,7 @@ const routes: RouteObject[] = [
       { path: "/player", element: <ResponsivePage mobile={<MobileFullPlayer />} desktop={<MobileFullPlayer />} /> },
       { path: "/auth", element: <ResponsivePage mobile={<MobileAuth />} desktop={<MobileAuth />} /> },
       { path: "/profile", element: <ResponsivePage mobile={<MobileProfile />} desktop={<ProfilePage />} /> },
+      { path: "/settings", element: <ResponsivePage mobile={<SettingsPage />} desktop={<SettingsPage />} /> },
     ],
   },
   {
