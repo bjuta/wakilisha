@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { WkIcon } from '@/components/design-system/Icon';
 
 type ShareObject = {
@@ -18,12 +18,32 @@ type ShareSheetProps = {
 };
 
 const destinations = [
-  { label: 'Copy', icon: 'Link' },
-  { label: 'X', icon: 'Twitter' },
-  { label: 'WhatsApp', icon: 'MessageCircle' },
-  { label: 'Facebook', icon: 'Facebook' },
-  { label: 'Native', icon: 'Share2' },
+  { label: 'Copy', icon: 'Link', kind: 'copy' },
+  { label: 'X', icon: 'Twitter', kind: 'x' },
+  { label: 'WhatsApp', icon: 'MessageCircle', kind: 'whatsapp' },
+  { label: 'Facebook', icon: 'Facebook', kind: 'facebook' },
+  { label: 'Email', icon: 'Mail', kind: 'email' },
+  { label: 'Native', icon: 'Share2', kind: 'native' },
 ] as const;
+
+const objectTypeLabel: Record<NonNullable<ShareObject['type']>, string> = {
+  track: 'track',
+  album: 'album',
+  article: 'article',
+  chart: 'chart edition',
+  artist: 'artist page',
+  playlist: 'playlist',
+  page: 'page',
+};
+
+function getFinalUrl(baseUrl: string, timestamp?: string) {
+  if (!timestamp) return baseUrl;
+  return `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}t=${encodeURIComponent(timestamp)}`;
+}
+
+function openPopup(url: string) {
+  window.open(url, '_blank', 'noopener,noreferrer,width=720,height=640');
+}
 
 export function OGPreviewCard({ item }: { item: ShareObject }) {
   const url = item.url || (typeof window !== 'undefined' ? window.location.href : 'wakilisha.africa');
@@ -43,11 +63,22 @@ export function OGPreviewCard({ item }: { item: ShareObject }) {
 
 export function ShareSheet({ item, open, onClose, timestamp }: ShareSheetProps) {
   const [copied, setCopied] = useState(false);
-  const url = useMemo(() => item.url || (typeof window !== 'undefined' ? window.location.href : ''), [item.url]);
+  const baseUrl = useMemo(() => item.url || (typeof window !== 'undefined' ? window.location.href : ''), [item.url]);
+  const finalUrl = useMemo(() => getFinalUrl(baseUrl, timestamp), [baseUrl, timestamp]);
+  const shareText = item.description || item.subtitle || item.title;
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
+
   if (!open) return null;
 
   const copy = async () => {
-    const finalUrl = timestamp ? `${url}${url.includes('?') ? '&' : '?'}t=${encodeURIComponent(timestamp)}` : url;
     try { await navigator.clipboard.writeText(finalUrl); } catch { /* no-op */ }
     setCopied(true);
     setTimeout(() => setCopied(false), 1400);
@@ -55,20 +86,31 @@ export function ShareSheet({ item, open, onClose, timestamp }: ShareSheetProps) 
 
   const nativeShare = async () => {
     if ('share' in navigator) {
-      try { await navigator.share({ title: item.title, text: item.description || item.subtitle, url }); } catch { /* user cancelled */ }
+      try { await navigator.share({ title: item.title, text: shareText, url: finalUrl }); } catch { /* user cancelled */ }
     } else {
       await copy();
     }
   };
 
+  const handleDestination = async (kind: typeof destinations[number]['kind']) => {
+    const encodedUrl = encodeURIComponent(finalUrl);
+    const encodedText = encodeURIComponent(`${item.title}${item.subtitle ? ` — ${item.subtitle}` : ''}`);
+    if (kind === 'copy') return copy();
+    if (kind === 'native') return nativeShare();
+    if (kind === 'x') return openPopup(`https://twitter.com/intent/tweet?text=${encodedText}&url=${encodedUrl}`);
+    if (kind === 'whatsapp') return openPopup(`https://wa.me/?text=${encodedText}%20${encodedUrl}`);
+    if (kind === 'facebook') return openPopup(`https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`);
+    if (kind === 'email') return window.location.href = `mailto:?subject=${encodedText}&body=${encodeURIComponent(`${shareText}\n\n${finalUrl}`)}`;
+  };
+
   return (
-    <div className="fixed inset-0 z-[220] flex items-end justify-center bg-black/50 backdrop-blur-sm" role="dialog" aria-modal="true">
-      <div className="share-sheet w-full">
+    <div className="share-sheet-backdrop" role="dialog" aria-modal="true" onClick={onClose}>
+      <div className="share-sheet w-full" onClick={(event) => event.stopPropagation()}>
         <div className="share-handle" />
         <div className="mb-3 flex items-start justify-between gap-4">
           <div>
-            <div className="share-title">Share this {item.type ?? 'page'}</div>
-            <div className="share-sub">Create a link, social share, or OG preview from the exact WAKILISHA object.</div>
+            <div className="share-title">Share this {objectTypeLabel[item.type ?? 'page']}</div>
+            <div className="share-sub">Send the live link, copy a timestamped URL, or preview how the WAKILISHA card will travel.</div>
           </div>
           <button className="chart-btn" onClick={onClose} aria-label="Close share sheet"><WkIcon name="X" size={16} /></button>
         </div>
@@ -87,27 +129,28 @@ export function ShareSheet({ item, open, onClose, timestamp }: ShareSheetProps) 
         )}
         <div className="share-destinations">
           {destinations.map((dest) => (
-            <button key={dest.label} className="share-dest" onClick={dest.label === 'Copy' ? copy : dest.label === 'Native' ? nativeShare : copy}>
+            <button key={dest.label} className="share-dest" onClick={() => handleDestination(dest.kind)}>
               <span className="share-dest-icon"><WkIcon name={dest.icon as any} size={18} /></span>
               <span className="share-dest-label">{dest.label}</span>
             </button>
           ))}
         </div>
         <div className="share-link-row">
-          <input className="share-link-input" readOnly value={url} />
+          <input className="share-link-input" readOnly value={finalUrl} />
           <button className="btn btn-sm btn-primary" onClick={copy}>{copied ? 'Copied' : 'Copy'}</button>
         </div>
-        <OGPreviewCard item={{ ...item, url }} />
+        <OGPreviewCard item={{ ...item, url: finalUrl }} />
+        <div className="wk-lucide-note mt-4"><WkIcon name="PenTool" size={13} /> Lucide outline icons · 2px stroke · filled states only when active</div>
       </div>
     </div>
   );
 }
 
-export function ShareButton({ item, timestamp }: { item: ShareObject; timestamp?: string }) {
+export function ShareButton({ item, timestamp, label = 'Share' }: { item: ShareObject; timestamp?: string; label?: string }) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button className="btn btn-md btn-ghost" onClick={() => setOpen(true)}><WkIcon name="Share2" size={16} /> Share</button>
+      <button className="btn btn-md btn-ghost" onClick={() => setOpen(true)}><WkIcon name="Share2" size={16} /> {label}</button>
       <ShareSheet item={item} timestamp={timestamp} open={open} onClose={() => setOpen(false)} />
     </>
   );
