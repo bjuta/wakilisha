@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { usePlayer } from "@/context/PlayerContext";
+import { WkIcon } from "@/components/design-system/Icon";
 import {
   HOME_CHART_ENTRIES,
   HOME_FEATURED_ARTISTS,
@@ -25,6 +26,14 @@ const trackPayload = (track: {
   source: track.source,
 });
 
+const MovementIcon = ({ movement }: { movement?: string }) => {
+  if (movement === "up") return <WkIcon name="ArrowUp" size={13} className="text-[var(--wk-success)]" />;
+  if (movement === "down") return <WkIcon name="ArrowDown" size={13} className="text-[var(--wk-danger)]" />;
+  if (movement === "same") return <WkIcon name="Minus" size={13} className="text-[var(--wk-text-faint)]" />;
+  if (movement === "new") return <WkIcon name="Star" size={13} className="text-[var(--wk-brand)]" />;
+  return null;
+};
+
 export default function MobileHome() {
   const { playTrack } = usePlayer();
   const [email, setEmail] = useState("");
@@ -41,9 +50,7 @@ export default function MobileHome() {
 
   return (
     <div className="wk-mobile-v5">
-      {/* Hero — full-bleed, cinematic, minimal copy */}
       <section ref={heroRef} className="relative h-[100dvh] flex items-end overflow-hidden">
-        {/* Background image — full bleed with parallax + zoom */}
         <div
           className="absolute inset-0 animate-hero-img"
           style={{
@@ -56,13 +63,10 @@ export default function MobileHome() {
             className="h-full w-full object-cover"
           />
         </div>
-
-        {/* Dark gradient overlay for text readability */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-black/10" />
 
-        {/* Content — minimal, staggered entrance */}
         <div className="relative z-10 w-full px-6 pb-20">
-          <div className="mb-4 flex items-center gap-3 animate-hero-fade" style={{ animationDelay: '0.3s' }}>
+          <div className="mb-4 flex items-center gap-3 animate-hero-fade" style={{ animationDelay: "0.3s" }}>
             <div className="h-1.5 w-1.5 rounded-full bg-[var(--wk-brand)] animate-pulse" />
             <span className="text-[11px] font-bold text-[var(--wk-brand)] uppercase tracking-wider">
               Week 132 — May 2026
@@ -76,19 +80,18 @@ export default function MobileHome() {
             The definitive voice in African music.
           </h1>
 
-          <div className="mt-6 animate-hero-fade" style={{ animationDelay: '0.5s' }}>
+          <div className="mt-6 animate-hero-fade" style={{ animationDelay: "0.5s" }}>
             <Link
               to="/charts"
-              className="inline-flex items-center gap-2 rounded-full bg-[var(--wk-brand)] px-5 py-3 text-[13px] font-bold text-[var(--wk-brand-on)] active:scale-[0.97] transition-transform"
+              className="inline-flex min-h-[44px] items-center gap-2 rounded-full bg-[var(--wk-brand)] px-5 py-3 text-[13px] font-bold text-[var(--wk-brand-on)] active:scale-[0.97] transition-transform mobile-pressable"
             >
-              <i className="ri-bar-chart-line" />
+              <WkIcon name="BarChart3" size={16} />
               View the chart
             </Link>
           </div>
         </div>
       </section>
 
-      {/* Current #1 */}
       <section className="home-section">
         <div className="home-section-header">
           <div className="home-section-title">Current #1</div>
@@ -97,7 +100,7 @@ export default function MobileHome() {
         {HOME_CHART_ENTRIES[0] && (
           <Link
             to={`/tracks/${HOME_CHART_ENTRIES[0].slug}`}
-            className="mx-5 mb-5 block overflow-hidden rounded-[16px] border border-[var(--wk-border)] bg-[var(--wk-surface)]"
+            className="mx-5 mb-5 block overflow-hidden rounded-[16px] border border-[var(--wk-border)] bg-[var(--wk-surface)] mobile-pressable"
           >
             <div className="chart-hero-card h-[132px]">
               <img src={HOME_CHART_ENTRIES[0].artworkUrl} alt="" />
@@ -113,8 +116,9 @@ export default function MobileHome() {
                     playTrack(chartTracks[0], chartTracks);
                   }}
                   className="phn-mp-btn phn-mp-play"
+                  aria-label="Play current number one"
                 >
-                  <i className="ri-play-fill" />
+                  <WkIcon name="Play" size={15} />
                 </button>
               </div>
             </div>
@@ -122,7 +126,6 @@ export default function MobileHome() {
         )}
       </section>
 
-      {/* All chart entries — same 10 as desktop */}
       <section className="home-section">
         <div className="home-section-header">
           <div className="home-section-title">Top 10 chart</div>
@@ -133,27 +136,18 @@ export default function MobileHome() {
             <Link
               key={`${entry.rank}-${entry.slug}`}
               to={`/tracks/${entry.slug}`}
-              className="chart-row"
+              className="chart-row mobile-pressable"
             >
               <div className="chart-row-num">{entry.rank}</div>
-              <div className="chart-row-art">
-                <img src={entry.artworkUrl} alt="" />
-              </div>
+              <div className="chart-row-art"><img src={entry.artworkUrl} alt="" /></div>
               <div className="min-w-0 flex-1">
                 <div className="chart-row-title">{entry.title}</div>
                 <div className="chart-row-sub">{entry.artist}</div>
               </div>
               <div className="flex items-center gap-1 text-[12px] font-bold shrink-0">
-                {entry.movement === "up" && <i className="ri-arrow-up-line text-[var(--wk-success)]" />}
-                {entry.movement === "down" && <i className="ri-arrow-down-line text-[var(--wk-danger)]" />}
-                {entry.movement === "same" && <i className="ri-subtract-line text-[var(--wk-text-faint)]" />}
-                {entry.movement === "new" && <i className="ri-star-line text-[var(--wk-brand)]" />}
+                <MovementIcon movement={entry.movement} />
                 {entry.movementAmount && entry.movementAmount > 0 && entry.movement !== "new" && (
-                  <span
-                    style={{
-                      color: entry.movement === "up" ? "var(--wk-success)" : "var(--wk-danger)",
-                    }}
-                  >
+                  <span style={{ color: entry.movement === "up" ? "var(--wk-success)" : "var(--wk-danger)" }}>
                     {entry.movementAmount}
                   </span>
                 )}
@@ -164,15 +158,15 @@ export default function MobileHome() {
                   playTrack(chartTracks[idx], chartTracks);
                 }}
                 className="chart-delta delta-new"
+                aria-label={`Play ${entry.title}`}
               >
-                <i className="ri-play-fill" />
+                <WkIcon name="Play" size={14} />
               </button>
             </Link>
           ))}
         </div>
       </section>
 
-      {/* Trending tracks */}
       <section className="home-section">
         <div className="home-section-header">
           <div className="home-section-title">Trending tracks</div>
@@ -183,33 +177,22 @@ export default function MobileHome() {
             <button
               key={track.slug}
               onClick={() => playTrack(trackPayload(track), [trackPayload(track)])}
-              className="hcard"
+              className="hcard mobile-pressable"
             >
               <div className="hcard-art">
-                {track.artworkUrl ? (
-                  <img src={track.artworkUrl} alt="" />
-                ) : (
-                  <div className="flex h-full items-center justify-center">
-                    <i className="ri-music-2-line text-2xl text-[var(--wk-text-faint)]" />
-                  </div>
-                )}
+                {track.artworkUrl ? <img src={track.artworkUrl} alt="" /> : <div className="flex h-full items-center justify-center"><WkIcon name="Music2" size={24} className="text-[var(--wk-text-faint)]" /></div>}
               </div>
               <div className="hcard-title">{track.title}</div>
               <div className="hcard-sub">{track.artist}</div>
               <div className="mt-1 flex items-center gap-2 text-[9px] text-[var(--wk-text-faint)] px-2">
-                <span className="inline-flex items-center gap-1">
-                  <i className="ri-headphone-line" /> {track.streamCount}
-                </span>
-                <span className="inline-flex items-center gap-1">
-                  <i className="ri-bar-chart-line" /> #{track.chartPosition}
-                </span>
+                <span className="inline-flex items-center gap-1"><WkIcon name="Headphones" size={11} /> {track.streamCount}</span>
+                <span className="inline-flex items-center gap-1"><WkIcon name="BarChart3" size={11} /> #{track.chartPosition}</span>
               </div>
             </button>
           ))}
         </div>
       </section>
 
-      {/* New releases */}
       <section className="home-section">
         <div className="home-section-header">
           <div className="home-section-title">Recent releases</div>
@@ -217,16 +200,12 @@ export default function MobileHome() {
         </div>
         <div className="home-shelf">
           {HOME_RECENT_RELEASES.map((release) => (
-            <Link key={release.slug} to={`/releases/${release.slug}`} className="hcard">
-              <div className="hcard-art">
-                <img src={release.artworkUrl} alt="" />
-              </div>
+            <Link key={release.slug} to={`/releases/${release.slug}`} className="hcard mobile-pressable">
+              <div className="hcard-art"><img src={release.artworkUrl} alt="" /></div>
               <div className="hcard-title">{release.title}</div>
               <div className="hcard-sub">{release.artist}</div>
               <div className="mt-1 flex items-center gap-1.5 px-2">
-                <span className="rounded-full bg-[var(--wk-brand-soft)] px-1.5 py-0.5 text-[9px] font-bold text-[var(--wk-brand)] uppercase">
-                  {release.releaseType}
-                </span>
+                <span className="rounded-full bg-[var(--wk-brand-soft)] px-1.5 py-0.5 text-[9px] font-bold text-[var(--wk-brand)] uppercase">{release.releaseType}</span>
                 <span className="text-[9px] text-[var(--wk-text-faint)]">{release.year}</span>
               </div>
             </Link>
@@ -234,7 +213,6 @@ export default function MobileHome() {
         </div>
       </section>
 
-      {/* All 6 featured artists — same as desktop */}
       <section className="home-section">
         <div className="home-section-header">
           <div className="home-section-title">Featured artists</div>
@@ -242,21 +220,17 @@ export default function MobileHome() {
         </div>
         <div className="artist-grid-2col pt-0">
           {HOME_FEATURED_ARTISTS.map((artist) => (
-            <Link key={artist.slug} to={`/artists/${artist.slug}`} className="acard">
+            <Link key={artist.slug} to={`/artists/${artist.slug}`} className="acard mobile-pressable">
               <img src={artist.imageUrl} alt="" />
               <div className="acard-overlay">
                 <div className="acard-name">{artist.name}</div>
-                <div className="acard-meta">
-                  {artist.genres?.[0]} ·{" "}
-                  {artist.isChartArtist ? "Chart artist" : "Registry"}
-                </div>
+                <div className="acard-meta">{artist.genres?.[0]} · {artist.isChartArtist ? "Chart artist" : "Registry"}</div>
               </div>
             </Link>
           ))}
         </div>
       </section>
 
-      {/* All 5 editorial stories — same as desktop */}
       <section className="home-section">
         <div className="home-section-header">
           <div className="home-section-title">WAKILISHA magazine</div>
@@ -264,39 +238,28 @@ export default function MobileHome() {
         </div>
         <div className="mag-cards pt-0">
           {HOME_EDITORIAL_STORIES.map((story) => (
-            <Link key={story.slug} to={`/magazine/${story.slug}`} className="mag-card">
-              <div className="mag-card-art">
-                <img src={story.heroUrl} alt="" />
-              </div>
+            <Link key={story.slug} to={`/magazine/${story.slug}`} className="mag-card mobile-pressable">
+              <div className="mag-card-art"><img src={story.heroUrl} alt="" /></div>
               <div>
                 <div className="mag-card-tag">{story.section}</div>
                 <div className="mag-card-title">{story.title}</div>
-                <div className="mag-card-meta">
-                  {story.readingTime} min read · {story.date}
-                </div>
+                <div className="mag-card-meta">{story.readingTime} min read · {story.date}</div>
               </div>
             </Link>
           ))}
         </div>
       </section>
 
-      {/* Newsletter — same as desktop */}
       <section className="home-section pb-8">
         <div className="mx-5 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-5">
           <div className="text-[9px] font-extrabold uppercase tracking-[0.22em] text-[var(--wk-brand)] mb-2 flex items-center gap-2">
             <span className="w-4 h-px bg-[var(--wk-brand)]" />
             WAKILISHA Weekly
           </div>
-          <h2 className="text-[18px] font-black tracking-[-0.04em] text-[var(--wk-text)] mb-1">
-            The chart, in your inbox.
-          </h2>
-          <p className="text-[12px] leading-relaxed text-[var(--wk-text-soft)] mb-4">
-            Weekly chart updates, artist spotlights, and breaking stories from the African music ecosystem.
-          </p>
+          <h2 className="text-[18px] font-black tracking-[-0.04em] text-[var(--wk-text)] mb-1">The chart, in your inbox.</h2>
+          <p className="text-[12px] leading-relaxed text-[var(--wk-text-soft)] mb-4">Weekly chart updates, artist spotlights, and breaking stories from the African music ecosystem.</p>
           {subscribed ? (
-            <div className="flex items-center gap-2 text-[13px] font-bold text-[var(--wk-brand)]">
-              <i className="ri-check-line" /> Subscribed! Check your inbox.
-            </div>
+            <div className="flex items-center gap-2 text-[13px] font-bold text-[var(--wk-brand)]"><WkIcon name="Check" size={16} /> Subscribed! Check your inbox.</div>
           ) : (
             <div className="flex flex-col gap-2">
               <input
@@ -307,21 +270,15 @@ export default function MobileHome() {
                 className="w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-4 py-3 text-[13px] text-[var(--wk-text)] placeholder:text-[var(--wk-text-faint)] focus:outline-none focus:border-[var(--wk-brand)]"
               />
               <button
-                onClick={() => {
-                  if (email.trim()) setSubscribed(true);
-                }}
-                className="w-full rounded-xl bg-[var(--wk-brand)] py-3 text-[13px] font-bold text-[var(--wk-brand-on)] active:scale-[0.97] transition-transform"
+                onClick={() => { if (email.trim()) setSubscribed(true); }}
+                className="w-full rounded-xl bg-[var(--wk-brand)] py-3 text-[13px] font-bold text-[var(--wk-brand-on)] active:scale-[0.97] transition-transform mobile-pressable"
               >
-                <i className="ri-mail-send-line mr-1" />
+                <WkIcon name="Send" size={15} className="mr-1 inline" />
                 Subscribe
               </button>
               <div className="flex items-center gap-4 text-[10px] text-[var(--wk-text-faint)]">
-                <span className="inline-flex items-center gap-1">
-                  <i className="ri-shield-check-line" /> No spam
-                </span>
-                <span className="inline-flex items-center gap-1">
-                  <i className="ri-close-circle-line" /> Unsubscribe anytime
-                </span>
+                <span className="inline-flex items-center gap-1"><WkIcon name="ShieldCheck" size={12} /> No spam</span>
+                <span className="inline-flex items-center gap-1"><WkIcon name="CircleX" size={12} /> Unsubscribe anytime</span>
               </div>
             </div>
           )}
