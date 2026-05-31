@@ -19,6 +19,7 @@ export type ImportedTrack = {
   slug: string;
   title: string;
   artistNames: string[];
+  artistSlugs: string[];
   artistIds: string[];
   releaseId: Nullable<string>;
   labelIds: string[];
@@ -34,6 +35,7 @@ export type ImportedRelease = {
   slug: string;
   title: string;
   artistNames: string[];
+  artistSlugs: string[];
   artistIds: string[];
   labelIds: string[];
   trackIds: string[];
