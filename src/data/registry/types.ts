@@ -101,6 +101,24 @@ export type ImportedMediaAsset = {
   kind: Nullable<string>;
 };
 
+export type ImportedArticle = {
+  id: string;
+  slug: string;
+  title: string;
+  section: string;
+  date: Nullable<string>;
+  author: string;
+  excerpt: Nullable<string>;
+  contentHtml: Nullable<string>;
+  body: string[];
+  heroUrl: Nullable<string>;
+  readingTime: number;
+  tags: string[];
+  relatedEntities: { type: string; name: string; slug: string }[];
+  isFeatured: boolean;
+  readCount: number;
+};
+
 export type ImportedRegistry = {
   artists: ImportedArtist[];
   tracks: ImportedTrack[];
@@ -111,5 +129,6 @@ export type ImportedRegistry = {
   chartEditions: ImportedChartEdition[];
   chartEntries: ImportedChartEntry[];
   mediaAssets: ImportedMediaAsset[];
+  articles?: ImportedArticle[];
   generatedAt: string;
 };
