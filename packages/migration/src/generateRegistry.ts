@@ -18,6 +18,59 @@ function splitSlugs(value: string | null) {
   return list(value).map((item) => slugify(item));
 }
 
+function stripHtml(value: string | null) {
+  return String(value ?? '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function paragraphsFromHtml(value: string | null) {
+  if (!value) return [];
+  const matches = Array.from(value.matchAll(/<p[^>]*>(.*?)<\/p>/gis)).map((match) => stripHtml(match[1]));
+  const paras = matches.length ? matches : stripHtml(value).split(/\n{2,}/).map((item) => item.trim());
+  return paras.filter(Boolean).slice(0, 24);
+}
+
+function readMinutes(text: string) {
+  const words = stripHtml(text).split(/\s+/).filter(Boolean).length;
+  return Math.max(1, Math.ceil(words / 220));
+}
+
+function normalizeSection(row: AnyEntity, fallback: string) {
+  const raw = first(row, ['section', 'category', 'category_name', 'post_type', 'type']) ?? fallback;
+  const value = raw.replace(/^wk_/, '').replace(/_/g, ' ');
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function ingestArticles(tables: Tables) {
+  const rows = [...(tables.wk_articles ?? []), ...(tables.wk_guides ?? [])];
+  return rows.map((row, index) => {
+    const title = rowName(row) ?? `Article ${index + 1}`;
+    const id = rowId(row, 'article', index);
+    const contentHtml = first(row, ['content_html', 'post_content', 'body', 'content']);
+    const excerpt = first(row, ['excerpt_html', 'excerpt', 'post_excerpt', 'dek', 'summary']);
+    const body = paragraphsFromHtml(contentHtml ?? excerpt);
+    const date = first(row, ['published_at', 'post_date', 'date', 'modified_at']);
+    const slug = rowSlug(row, title, 'article');
+    const section = normalizeSection(row, tables.wk_guides?.includes(row) ? 'Guide' : 'Article');
+    return {
+      id,
+      slug,
+      title,
+      section,
+      date,
+      author: first(row, ['author', 'author_name', 'post_author']) ?? 'WAKILISHA Editorial',
+      excerpt: stripHtml(excerpt) || body[0] || null,
+      contentHtml,
+      body,
+      heroUrl: rowImage(row),
+      readingTime: readMinutes(contentHtml ?? excerpt ?? title),
+      tags: list(first(row, ['tags', 'tag_names', 'keywords'])),
+      relatedEntities: [],
+      isFeatured: index === 0,
+      readCount: 0,
+    };
+  }).filter((article) => article.title && article.slug);
+}
+
 function ensureArtistFromTrack(artists: Map<string, AnyEntity>, artistName: string | null, artistSlug: string | null) {
   const slug = artistSlug ? slugify(artistSlug) : artistName ? slugify(artistName) : null;
   if (!slug) return null;
@@ -150,11 +203,12 @@ function build() {
   ingestCoreTables(tables, tracks, releases, labels, genres);
   const chartEntries = ingestCharts(tables, chartSeries, chartEditions, tracks);
   linkRelationships(artists, tracks, releases, labels, genres, chartEntries);
-  return { artists: Array.from(artists.values()), tracks: Array.from(tracks.values()), releases: Array.from(releases.values()), labels: Array.from(labels.values()), genres: Array.from(genres.values()), chartSeries: Array.from(chartSeries.values()), chartEditions: Array.from(chartEditions.values()), chartEntries, mediaAssets: [], generatedAt: new Date().toISOString() };
+  const articles = ingestArticles(tables);
+  return { artists: Array.from(artists.values()), tracks: Array.from(tracks.values()), releases: Array.from(releases.values()), labels: Array.from(labels.values()), genres: Array.from(genres.values()), chartSeries: Array.from(chartSeries.values()), chartEditions: Array.from(chartEditions.values()), chartEntries, mediaAssets: [], articles, generatedAt: new Date().toISOString() };
 }
 
 const registry = build();
 fs.mkdirSync(path.dirname(outputPath), { recursive: true });
 fs.writeFileSync(outputPath, `import type { ImportedRegistry } from './types';\n\nexport const importedRegistry: ImportedRegistry = ${JSON.stringify(registry, null, 2)};\n`, 'utf8');
 console.log(`Generated registry: ${outputPath}`);
-console.log(JSON.stringify({ artists: registry.artists.length, tracks: registry.tracks.length, labels: registry.labels.length, genres: registry.genres.length, releases: registry.releases.length, chartEntries: registry.chartEntries.length, orphanTracks: registry.tracks.filter((track: AnyEntity) => track.artistIds.length === 0).length }, null, 2));
+console.log(JSON.stringify({ artists: registry.artists.length, tracks: registry.tracks.length, labels: registry.labels.length, genres: registry.genres.length, releases: registry.releases.length, chartEntries: registry.chartEntries.length, articles: registry.articles.length, orphanTracks: registry.tracks.filter((track: AnyEntity) => track.artistIds.length === 0).length }, null, 2));
