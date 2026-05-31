@@ -1,30 +1,11 @@
-import { useState, useMemo, useEffect } from "react";
+import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { usePlayer } from "@/context/PlayerContext";
 import { ChartRow } from "@/components/design-system/music/ChartRow";
-import { ChartTop3 } from "../components/ChartTop3";
 import { CHART_DATA, CHART_SERIES, CHART_EDITION } from "@/mocks/charts";
 
 export default function ChartsDirectory() {
   const { playTrack } = usePlayer();
-  const [activeSeries, setActiveSeries] = useState("weekly-top-40");
-
-  useEffect(() => {
-    const obs = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) entry.target.classList.add("in-view");
-        });
-      },
-      { threshold: 0.1, rootMargin: "0px 0px -40px 0px" }
-    );
-    document.querySelectorAll(".reveal").forEach((el) => obs.observe(el));
-    return () => obs.disconnect();
-  }, []);
-
-  const top3 = useMemo(() => CHART_DATA.slice(0, 3), []);
-  const chartList = useMemo(() => CHART_DATA, []);
-  const playableTracks = useMemo(() => CHART_DATA.filter((e) => e.isPlayable), []);
 
   const chartTracks = useMemo(
     () =>
@@ -34,454 +15,237 @@ export default function ChartsDirectory() {
         artist: entry.artist,
         artworkUrl: entry.artworkUrl,
         isPlayable: entry.isPlayable,
+        source: entry.source,
       })),
     []
   );
 
-  const handlePlayChart = (idx: number) => {
+  const playableTracks = useMemo(() => CHART_DATA.filter((entry) => entry.isPlayable), []);
+  const climbers = useMemo(
+    () => CHART_DATA.filter((entry) => entry.movement === "up").sort((a, b) => (b.movementAmount ?? 0) - (a.movementAmount ?? 0)).slice(0, 6),
+    []
+  );
+  const newEntries = useMemo(() => CHART_DATA.filter((entry) => entry.movement === "new").slice(0, 6), []);
+
+  const handlePlayChart = (idx = 0) => {
+    if (!chartTracks[idx]) return;
     playTrack(chartTracks[idx], chartTracks);
   };
 
-  const handlePlayTrack = (entry: typeof CHART_DATA[0]) => {
-    const track = {
-      id: entry.slug || `${entry.title}-${entry.artist}`.toLowerCase().replace(/\s+/g, "-"),
-      title: entry.title,
-      artist: entry.artist,
-      artworkUrl: entry.artworkUrl,
-      isPlayable: entry.isPlayable,
-      source: entry.source,
-    };
-    playTrack(track, chartTracks);
-  };
+  const hasChartData = CHART_DATA.length > 0;
+  const topTrack = CHART_DATA[0] ?? null;
 
-  const climbers = useMemo(
-    () => CHART_DATA.filter((e) => e.movement === "up").sort((a, b) => (b.movementAmount ?? 0) - (a.movementAmount ?? 0)).slice(0, 5),
-    []
-  );
-  const newEntries = useMemo(() => CHART_DATA.filter((e) => e.movement === "new").slice(0, 5), []);
+  if (!hasChartData) {
+    return (
+      <div className="min-h-screen">
+        <section className="wk-container px-4 py-16 md:px-6 md:py-24">
+          <div className="max-w-2xl rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-8">
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]">
+              <i className="ri-bar-chart-box-line text-2xl" />
+            </div>
+            <div className="wk-eyebrow mb-3">WAKILISHA charts</div>
+            <h1 className="text-[clamp(32px,5vw,64px)] font-black leading-[0.95] tracking-[-0.05em] text-[var(--wk-text)]">
+              Chart data has not been seeded yet.
+            </h1>
+            <p className="mt-4 text-[15px] leading-relaxed text-[var(--wk-text-muted)]">
+              The charts page now renders only imported registry data. Run the CSV registry generation and seed the app before showing chart entries, editions, archive rows, and #1 artwork.
+            </p>
+            <div className="mt-6 rounded-xl bg-[var(--wk-bg)] p-4 font-mono text-[12px] text-[var(--wk-text-soft)]">
+              WAKILISHA_IMPORT_DIR="$RAW_DIR" npm run migration:generate-registry
+            </div>
+          </div>
+        </section>
+      </div>
+    );
+  }
 
-  const series = CHART_SERIES.find((s) => s.id === activeSeries) || CHART_SERIES[0];
+  const genreBreakdown = Object.entries(
+    CHART_DATA.reduce<Record<string, number>>((acc, entry) => {
+      const genre = entry.genre ?? "Unknown";
+      acc[genre] = (acc[genre] ?? 0) + 1;
+      return acc;
+    }, {})
+  )
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+    .map(([genre, count]) => ({ genre, count }));
 
-  const genreBreakdown = [
-    { genre: "Afrobeats", count: 18 },
-    { genre: "Afropop", count: 10 },
-    { genre: "Amapiano", count: 6 },
-    { genre: "Afrofusion", count: 4 },
-    { genre: "R&B", count: 2 },
-  ];
-
-  const archiveRows = [
-    { series: "Weekly Top 40", edition: "Week 132", date: "2024-05-24", no1: CHART_DATA[0], entries: 40, sources: 3 },
-    { series: "Weekly Top 40", edition: "Week 131", date: "2024-05-17", no1: CHART_DATA[1], entries: 40, sources: 3 },
-    { series: "Weekly Top 40", edition: "Week 130", date: "2024-05-10", no1: CHART_DATA[2], entries: 40, sources: 3 },
-    { series: "Rising Voices", edition: "May 2024", date: "2024-05-01", no1: CHART_DATA[3], entries: 20, sources: 2 },
-    { series: "Genre Pulse", edition: "Q2 2024", date: "2024-04-15", no1: CHART_DATA[4], entries: 25, sources: 2 },
-  ];
+  const archiveRows = CHART_SERIES.map((series) => ({
+    series: series.label,
+    edition: series.latestEdition?.label ?? "Latest edition",
+    date: series.latestEdition?.date ?? CHART_EDITION.date,
+    no1: topTrack,
+    entries: series.count,
+    sources: 1,
+    href: series.latestEdition ? `/charts/${series.id}/${series.latestEdition.slug}` : `/charts/${series.id}`,
+  })).filter((row) => row.no1);
 
   return (
     <div className="min-h-screen">
-      {/* ===== COMPACT HEADER BAR ===== */}
-      <div className="border-b border-[var(--wk-border)]" style={{ background: "var(--wk-surface)" }}>
-        <div className="wk-container flex flex-col gap-3 px-4 py-4 md:flex-row md:items-center md:justify-between md:px-6">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--wk-brand)] text-[var(--wk-brand-on)]">
-              <i className="ri-bar-chart-box-line text-[16px]" />
-            </div>
+      <section className="relative overflow-hidden border-b border-[var(--wk-border)] bg-[var(--wk-surface)]">
+        <div
+          className="absolute inset-0 opacity-25 blur-3xl"
+          style={{ backgroundImage: `url(${topTrack?.artworkUrl})`, backgroundSize: "cover", backgroundPosition: "center" }}
+        />
+        <div className="relative wk-container px-4 py-10 md:px-6 md:py-14">
+          <div className="grid gap-8 lg:grid-cols-[1fr_360px] lg:items-end">
             <div>
-              <div className="flex items-center gap-2">
-                <span className="text-[12px] font-bold uppercase tracking-[0.12em] text-[var(--wk-brand)]">Week {CHART_EDITION.weekNumber}</span>
-                <span className="text-[12px] text-[var(--wk-text-faint)]">·</span>
-                <span className="text-[12px] text-[var(--wk-text-soft)]">{CHART_EDITION.date}</span>
-              </div>
-              <div className="text-[11px] text-[var(--wk-text-muted)] mt-0.5">
-                {CHART_EDITION.totalEntries} entries · {CHART_EDITION.totalArtists} artists · {CHART_EDITION.newEntries} new · {CHART_EDITION.methodology}
+              <div className="wk-eyebrow mb-3">WAKILISHA charts</div>
+              <h1 className="text-[clamp(40px,6vw,84px)] font-black leading-[0.92] tracking-[-0.055em] text-[var(--wk-text)]">
+                Chart universe
+              </h1>
+              <p className="mt-4 max-w-xl text-[16px] leading-relaxed text-[var(--wk-text-soft)]">
+                {CHART_EDITION.totalEntries} imported chart positions across {CHART_SERIES.length} series, powered by the current WAKILISHA registry.
+              </p>
+              <div className="mt-6 flex flex-wrap gap-3">
+                <button onClick={() => handlePlayChart(0)} disabled={!chartTracks.length} className="wk-button wk-button-primary disabled:opacity-40">
+                  <i className="ri-play-fill" /> Play top 10
+                </button>
+                {CHART_SERIES[0]?.latestEdition && (
+                  <Link to={`/charts/${CHART_SERIES[0].id}/${CHART_SERIES[0].latestEdition.slug}`} className="wk-button wk-button-ghost">
+                    Current edition <i className="ri-arrow-right-line" />
+                  </Link>
+                )}
               </div>
             </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <button onClick={() => handlePlayChart(0)} className="wk-button wk-button-primary">
-              <i className="ri-play-fill" />
-              Play top 10
-            </button>
-            <button className="wk-button wk-button-ghost">
-              <i className="ri-share-line" />
-              Share
-            </button>
+            {topTrack && (
+              <div className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)]/90 p-5 backdrop-blur">
+                <div className="mb-3 text-[11px] font-bold uppercase tracking-wider text-[var(--wk-brand)]">Current #1</div>
+                <div className="flex items-center gap-4">
+                  <img src={topTrack.artworkUrl} alt="" className="h-24 w-24 rounded-xl object-cover" />
+                  <div className="min-w-0">
+                    <div className="truncate text-[22px] font-black text-[var(--wk-text)]">{topTrack.title}</div>
+                    <div className="truncate text-[14px] text-[var(--wk-text-muted)]">{topTrack.artist}</div>
+                    <div className="mt-2 text-[12px] text-[var(--wk-text-faint)]">{topTrack.weeksOnChart} weeks · Peak #{topTrack.peakPosition}</div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* ===== TOP 3 SPOTLIGHT ===== */}
-      <ChartTop3 entries={top3} />
-
-      {/* ===== MAIN CHART BODY ===== */}
-      <div className="wk-container px-4 py-6 md:px-6 md:py-10">
+      <div className="wk-container px-4 py-8 md:px-6 md:py-12">
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_340px]">
-          {/* Left: Chart List */}
-          <div>
+          <main>
             <div className="mb-4 flex items-center justify-between">
               <div className="wk-eyebrow">Full chart · {CHART_DATA.length} positions</div>
-              <div className="flex items-center gap-2 text-[11px] text-[var(--wk-text-faint)]">
-                <span className="inline-flex items-center gap-1"><i className="ri-arrow-up-line text-[var(--wk-success)]" /> Up</span>
-                <span className="inline-flex items-center gap-1"><i className="ri-arrow-down-line text-[var(--wk-danger)]" /> Down</span>
-                <span className="inline-flex items-center gap-1"><i className="ri-subtract-line text-[var(--wk-text-faint)]" /> Same</span>
-                <span className="inline-flex items-center gap-1"><i className="ri-star-smile-line text-[var(--wk-brand)]" /> New</span>
-              </div>
+              <div className="text-[11px] text-[var(--wk-text-faint)]">Real imported chart entries only</div>
             </div>
-            <div className="rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] overflow-hidden">
+            <div className="overflow-hidden rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)]">
               <div className="divide-y divide-[var(--wk-divider)]">
-                {chartList.map((entry) => (
-                  <ChartRow
-                    key={entry.rank}
-                    rank={entry.rank}
-                    artworkUrl={entry.artworkUrl}
-                    title={entry.title}
-                    artist={entry.artist}
-                    movement={entry.movement}
-                    movementAmount={entry.movementAmount}
-                    weeksOnChart={entry.weeksOnChart}
-                    peakPosition={entry.peakPosition}
-                    isPlayable={entry.isPlayable}
-                    source={entry.source}
-                    genre={entry.genre}
-                    label={entry.label}
-                    previousWeek={entry.previousWeek}
-                    slug={entry.slug}
-                    onPlay={() => handlePlayChart((entry.rank ?? 0) - 1)}
-                  />
+                {CHART_DATA.map((entry) => (
+                  <ChartRow key={`${entry.editionId}-${entry.rank}-${entry.slug}`} {...entry} onPlay={() => handlePlayChart((entry.rank ?? 1) - 1)} />
                 ))}
               </div>
             </div>
-          </div>
+          </main>
 
-          {/* Right: Sidebar */}
-          <div className="space-y-5">
-            {/* Stats */}
+          <aside className="space-y-5">
             <div className="rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4">
               <div className="mb-3 text-[11px] font-bold uppercase tracking-wider text-[var(--wk-text-faint)]">This edition</div>
               <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-lg bg-[var(--wk-bg)] p-3">
-                  <div className="text-[20px] font-black leading-none text-[var(--wk-brand)]">{CHART_EDITION.totalEntries}</div>
-                  <div className="mt-1 text-[11px] text-[var(--wk-text-muted)]">Entries</div>
-                </div>
-                <div className="rounded-lg bg-[var(--wk-bg)] p-3">
-                  <div className="text-[20px] font-black leading-none text-[var(--wk-brand)]">{CHART_EDITION.totalArtists}</div>
-                  <div className="mt-1 text-[11px] text-[var(--wk-text-muted)]">Artists</div>
-                </div>
-                <div className="rounded-lg bg-[var(--wk-bg)] p-3">
-                  <div className="text-[20px] font-black leading-none text-[var(--wk-success)]">{CHART_EDITION.newEntries}</div>
-                  <div className="mt-1 text-[11px] text-[var(--wk-text-muted)]">New</div>
-                </div>
-                <div className="rounded-lg bg-[var(--wk-bg)] p-3">
-                  <div className="text-[20px] font-black leading-none text-[var(--wk-info)]">{CHART_EDITION.longestRunning.weeks}</div>
-                  <div className="mt-1 text-[11px] text-[var(--wk-text-muted)]">Longest run</div>
-                </div>
+                <Stat value={CHART_EDITION.totalEntries} label="Entries" />
+                <Stat value={CHART_EDITION.totalArtists} label="Artists" />
+                <Stat value={CHART_EDITION.newEntries} label="New" />
+                <Stat value={CHART_EDITION.longestRunning.weeks} label="Longest run" />
               </div>
             </div>
 
-            {/* Genre breakdown */}
+            <Signal title="New entries" entries={newEntries} empty="No new entries in this edition." />
+            <Signal title="Biggest climbers" entries={climbers} empty="No climbers in this edition." />
+
             <div className="rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4">
               <div className="mb-3 text-[11px] font-bold uppercase tracking-wider text-[var(--wk-text-faint)]">Genre breakdown</div>
               <div className="space-y-2">
                 {genreBreakdown.map((g) => (
                   <div key={g.genre} className="flex items-center gap-2">
-                    <div className="text-[13px] font-semibold text-[var(--wk-text)] w-24">{g.genre}</div>
-                    <div className="flex-1 h-2 rounded-full bg-[var(--wk-bg)] overflow-hidden">
-                      <div className="h-full rounded-full bg-[var(--wk-brand)]" style={{ width: `${(g.count / CHART_EDITION.totalEntries) * 100}%` }} />
+                    <div className="w-24 text-[13px] font-semibold text-[var(--wk-text)]">{g.genre}</div>
+                    <div className="h-2 flex-1 overflow-hidden rounded-full bg-[var(--wk-bg)]">
+                      <div className="h-full rounded-full bg-[var(--wk-brand)]" style={{ width: `${CHART_DATA.length ? (g.count / CHART_DATA.length) * 100 : 0}%` }} />
                     </div>
-                    <div className="text-[12px] font-bold text-[var(--wk-text-muted)] w-8 text-right">{g.count}</div>
+                    <div className="w-8 text-right text-[12px] font-bold text-[var(--wk-text-muted)]">{g.count}</div>
                   </div>
                 ))}
               </div>
             </div>
-
-            {/* New Entries */}
-            <div className="rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4">
-              <div className="mb-3 flex items-center justify-between">
-                <div className="text-[11px] font-bold uppercase tracking-wider text-[var(--wk-text-faint)]">New entries</div>
-                <span className="text-[11px] text-[var(--wk-brand)] font-bold">{newEntries.length}</span>
-              </div>
-              <div className="space-y-1">
-                {newEntries.map((entry) => (
-                  <div key={entry.rank} className="flex items-center gap-2 rounded-lg p-2 hover:bg-[var(--wk-bg)] transition-colors">
-                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--wk-brand)] text-[10px] font-black text-[var(--wk-brand-on)]">{entry.rank}</div>
-                    <div className="h-8 w-8 shrink-0 overflow-hidden rounded-md bg-[var(--wk-surface-raised)]">
-                      <img src={entry.artworkUrl} alt="" className="h-full w-full object-cover" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-[12px] font-bold text-[var(--wk-text)]">{entry.title}</div>
-                      <div className="truncate text-[11px] text-[var(--wk-text-muted)]">{entry.artist}</div>
-                    </div>
-                    <span className="text-[10px] font-bold text-[var(--wk-brand)]">New</span>
-                  </div>
-                ))}
-                {newEntries.length === 0 && (
-                  <div className="text-[12px] text-[var(--wk-text-faint)] py-2">No new entries this week.</div>
-                )}
-              </div>
-            </div>
-
-            {/* Movers */}
-            <div className="rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4">
-              <div className="mb-3 text-[11px] font-bold uppercase tracking-wider text-[var(--wk-text-faint)]">Biggest climbers</div>
-              <div className="space-y-1">
-                {climbers.map((entry) => (
-                  <div key={entry.rank} className="flex items-center gap-2 rounded-lg p-2 hover:bg-[var(--wk-bg)] transition-colors">
-                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--wk-success)] text-[10px] font-black text-white">+{entry.movementAmount}</div>
-                    <div className="h-8 w-8 shrink-0 overflow-hidden rounded-md bg-[var(--wk-surface-raised)]">
-                      <img src={entry.artworkUrl} alt="" className="h-full w-full object-cover" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-[12px] font-bold text-[var(--wk-text)]">{entry.title}</div>
-                      <div className="truncate text-[11px] text-[var(--wk-text-muted)]">{entry.artist}</div>
-                    </div>
-                    <span className="text-[12px] font-bold text-[var(--wk-text-muted)]">#{entry.rank}</span>
-                  </div>
-                ))}
-                {climbers.length === 0 && (
-                  <div className="text-[12px] text-[var(--wk-text-faint)] py-2">No climbers this week.</div>
-                )}
-              </div>
-            </div>
-
-            {/* Editor's Note */}
-            <div className="rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <i className="ri-quill-pen-line text-[var(--wk-brand)]" />
-                <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--wk-text-faint)]">Editor's Note</span>
-              </div>
-              <p className="text-[13px] leading-[1.6] text-[var(--wk-text-soft)]">
-                <strong className="text-[var(--wk-text)]">Oxlade's "Alone"</strong> reaches #1 after 8 weeks of steady growth. <strong className="text-[var(--wk-text)]">Asake's "Sungba"</strong> enters as the only Amapiano new entry. Amapiano now makes up 15% of the Top 40.
-              </p>
-              <Link to="/magazine" className="mt-2 inline-flex text-[11px] font-semibold text-[var(--wk-brand)] items-center gap-1">
-                Full analysis <i className="ri-arrow-right-line" />
-              </Link>
-            </div>
-          </div>
+          </aside>
         </div>
       </div>
 
-      {/* ===== PLAYABLE RAIL ===== */}
-      <div className="border-t border-[var(--wk-border)]" style={{ background: "var(--wk-surface)" }}>
-        <div className="wk-container px-4 py-6 md:px-6 md:py-8">
-          <div className="mb-4 flex items-center justify-between">
-            <div className="wk-eyebrow">Playable preview · {playableTracks.length} tracks</div>
-            <button onClick={() => handlePlayChart(0)} className="text-[12px] font-semibold text-[var(--wk-brand)] flex items-center gap-1">
-              <i className="ri-play-fill" /> Play all
-            </button>
-          </div>
-          <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-            {playableTracks.map((entry, idx) => {
-              const trackIdx = CHART_DATA.findIndex((t) => t.rank === entry.rank);
-              return (
-                <button
-                  key={entry.rank}
-                  onClick={() => handlePlayTrack(entry)}
-                  className="group flex-none w-[160px] text-left"
-                >
-                  <div className="relative aspect-square rounded-xl overflow-hidden bg-[var(--wk-surface-raised)] mb-2">
-                    <img src={entry.artworkUrl} alt="" className="h-full w-full object-cover object-top" />
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <div className="h-10 w-10 flex items-center justify-center rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)]">
-                        <i className="ri-play-fill text-lg" />
-                      </div>
-                    </div>
-                    <div className="absolute top-2 left-2 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-[10px] font-black text-white">
-                      {entry.rank}
-                    </div>
-                  </div>
-                  <div className="truncate text-[13px] font-bold text-[var(--wk-text)]">{entry.title}</div>
-                  <div className="truncate text-[11px] text-[var(--wk-text-muted)]">{entry.artist}</div>
-                  <div className="mt-1 text-[10px] text-[var(--wk-text-faint)]">{entry.source}</div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      {/* ===== CROSS-SELL GRID ===== */}
-      <div className="wk-container px-4 py-6 md:px-6 md:py-10">
-        <div className="mb-4 wk-eyebrow">Discover more</div>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          {/* Artist Spotlight */}
-          <div className="rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] overflow-hidden">
-            <div className="relative h-32 bg-[var(--wk-surface-raised)]">
-              <img src="https://picsum.photos/seed/wk-artist-oxlade/400/200" alt="" className="h-full w-full object-cover" />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-              <div className="absolute bottom-3 left-3 right-3">
-                <div className="text-[11px] font-bold uppercase tracking-wider text-white/70">Artist spotlight</div>
-                <div className="text-[18px] font-black text-white">Oxlade</div>
-                <div className="text-[12px] text-white/80">#1 this week · Afropop</div>
-              </div>
-            </div>
-            <div className="p-4">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="h-10 w-10 rounded-full bg-[var(--wk-brand-soft)] flex items-center justify-center shrink-0">
-                  <i className="ri-music-2-line text-[var(--wk-brand)]" />
-                </div>
-                <div className="min-w-0">
-                  <div className="text-[13px] font-bold text-[var(--wk-text)]">12 tracks on WAKILISHA</div>
-                  <div className="text-[11px] text-[var(--wk-text-muted)]">3 chart appearances · 2 releases</div>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Link to="/artists/oxlade" className="wk-button wk-button-primary flex-1 justify-center text-[12px]">
-                  <i className="ri-user-line" /> Profile
-                </Link>
-                <Link to="/artists/oxlade" className="wk-button wk-button-ghost flex-1 justify-center text-[12px]">
-                  <i className="ri-album-line" /> Releases
-                </Link>
-              </div>
-            </div>
-          </div>
-
-          {/* Magazine Story */}
-          <div className="rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] overflow-hidden">
-            <div className="relative h-32 bg-[var(--wk-surface-raised)]">
-              <img src="https://picsum.photos/seed/wk-magazine-amapiano/400/200" alt="" className="h-full w-full object-cover" />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-              <div className="absolute bottom-3 left-3 right-3">
-                <div className="text-[11px] font-bold uppercase tracking-wider text-white/70">Magazine</div>
-                <div className="text-[18px] font-black text-white">The Amapiano wave</div>
-                <div className="text-[12px] text-white/80">6 min read · Culture</div>
-              </div>
-            </div>
-            <div className="p-4">
-              <p className="text-[13px] leading-[1.6] text-[var(--wk-text-soft)] mb-3">
-                How South African house music became the dominant sound on African charts. Amapiano entries are up 87% year-over-year.
-              </p>
-              <Link to="/magazine/amapiano-wave" className="inline-flex text-[12px] font-semibold text-[var(--wk-brand)] items-center gap-1">
-                Read story <i className="ri-arrow-right-line" />
-              </Link>
-            </div>
-          </div>
-
-          {/* Methodology / Trust */}
-          <div className="rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="h-8 w-8 rounded-lg bg-[var(--wk-brand-soft)] flex items-center justify-center shrink-0">
-                <i className="ri-shield-check-line text-[var(--wk-brand)]" />
-              </div>
-              <div>
-                <div className="text-[13px] font-bold text-[var(--wk-text)]">How we compile the charts</div>
-                <div className="text-[11px] text-[var(--wk-text-muted)]">Verified data methodology</div>
-              </div>
-            </div>
-            <div className="space-y-2 mb-3">
-              <div className="flex items-center gap-2 text-[12px] text-[var(--wk-text-soft)]">
-                <i className="ri-checkbox-circle-line text-[var(--wk-success)]" />
-                Streaming data from 3 verified sources
-              </div>
-              <div className="flex items-center gap-2 text-[12px] text-[var(--wk-text-soft)]">
-                <i className="ri-checkbox-circle-line text-[var(--wk-success)]" />
-                Radio playlist monitoring across 12 cities
-              </div>
-              <div className="flex items-center gap-2 text-[12px] text-[var(--wk-text-soft)]">
-                <i className="ri-checkbox-circle-line text-[var(--wk-success)]" />
-                Weekly refresh every Friday at 00:00 UTC
-              </div>
-              <div className="flex items-center gap-2 text-[12px] text-[var(--wk-text-soft)]">
-                <i className="ri-checkbox-circle-line text-[var(--wk-success)]" />
-                Repaired cultural registry backing
-              </div>
-            </div>
-            <div className="pt-3 border-t border-[var(--wk-divider)]">
-              <div className="text-[11px] text-[var(--wk-text-muted)]">
-                <span className="font-bold text-[var(--wk-text)]">132 editions</span> published · <span className="font-bold text-[var(--wk-text)]">4,800+</span> chart entries tracked
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ===== ARCHIVE ===== */}
-      <div className="border-t border-[var(--wk-border)]" style={{ background: "var(--wk-surface)" }}>
-        <div className="wk-container px-4 py-6 md:px-6 md:py-8">
-          <div className="mb-4 flex items-center justify-between">
-            <div className="wk-eyebrow">Chart archive</div>
-            <div className="flex items-center gap-2">
-              <button className="rounded-full px-3 py-1 text-[11px] font-bold bg-[var(--wk-brand)] text-[var(--wk-brand-on)]">All</button>
-              <button className="rounded-full px-3 py-1 text-[11px] font-bold text-[var(--wk-text-muted)] border border-[var(--wk-border)] hover:bg-[var(--wk-bg)]">2024</button>
-              <button className="rounded-full px-3 py-1 text-[11px] font-bold text-[var(--wk-text-muted)] border border-[var(--wk-border)] hover:bg-[var(--wk-bg)]">2023</button>
-            </div>
-          </div>
-          <div className="rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] overflow-hidden">
-            <div className="grid grid-cols-[1.5fr_1.5fr_1fr_1fr_1fr] gap-3 px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-[var(--wk-text-faint)] border-b border-[var(--wk-divider)]">
-              <div>Series</div>
-              <div>#1 Track</div>
-              <div>Entries</div>
-              <div>Sources</div>
-              <div className="text-right">Date</div>
-            </div>
+      <section className="border-t border-[var(--wk-border)] bg-[var(--wk-surface)]">
+        <div className="wk-container px-4 py-8 md:px-6">
+          <div className="mb-4 wk-eyebrow">Chart archive</div>
+          <div className="overflow-hidden rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)]">
             <div className="divide-y divide-[var(--wk-divider)]">
               {archiveRows.map((row) => (
-                <Link key={`${row.series}-${row.edition}`} to={`/charts/weekly-top-40/week-132`} className="grid grid-cols-[1.5fr_1.5fr_1fr_1fr_1fr] gap-3 px-4 py-3 items-center hover:bg-[var(--wk-bg)] transition-colors">
+                <Link key={`${row.series}-${row.edition}`} to={row.href} className="grid gap-3 px-4 py-3 hover:bg-[var(--wk-bg)] md:grid-cols-[1.5fr_1.5fr_1fr_1fr] md:items-center">
                   <div>
                     <div className="text-[13px] font-bold text-[var(--wk-text)]">{row.series}</div>
                     <div className="text-[11px] text-[var(--wk-text-muted)]">{row.edition}</div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="h-8 w-8 shrink-0 overflow-hidden rounded-md bg-[var(--wk-surface-raised)]">
-                      <img src={row.no1.artworkUrl} alt="" className="h-full w-full object-cover" />
-                    </div>
+                    <img src={row.no1?.artworkUrl} alt="" className="h-8 w-8 rounded-md object-cover" />
                     <div className="min-w-0">
-                      <div className="truncate text-[12px] font-bold text-[var(--wk-text)]">{row.no1.title}</div>
-                      <div className="truncate text-[11px] text-[var(--wk-text-muted)]">{row.no1.artist}</div>
+                      <div className="truncate text-[12px] font-bold text-[var(--wk-text)]">{row.no1?.title}</div>
+                      <div className="truncate text-[11px] text-[var(--wk-text-muted)]">{row.no1?.artist}</div>
                     </div>
                   </div>
-                  <div className="text-[12px] font-bold text-[var(--wk-text-muted)]">{row.entries}</div>
-                  <div className="text-[12px] font-bold text-[var(--wk-text-muted)]">{row.sources}</div>
-                  <div className="text-right text-[12px] text-[var(--wk-text-muted)]">{row.date}</div>
+                  <div className="text-[12px] font-bold text-[var(--wk-text-muted)]">{row.entries} entries</div>
+                  <div className="text-[12px] text-[var(--wk-text-muted)] md:text-right">{row.date}</div>
                 </Link>
               ))}
+              {archiveRows.length === 0 && <div className="px-4 py-6 text-[13px] text-[var(--wk-text-muted)]">No chart archive rows available yet.</div>}
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* ===== SERIES SELECTOR ===== */}
-      <div className="border-t border-[var(--wk-border)]" style={{ background: "var(--wk-surface)" }}>
-        <div className="wk-container px-4 py-6 md:px-6 md:py-10">
-          <div className="mb-4 wk-eyebrow">Chart series</div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {CHART_SERIES.map((s) => (
-              <button
-                key={s.id}
-                onClick={() => setActiveSeries(s.id)}
-                className={`group flex items-center gap-4 rounded-xl border px-4 py-3 text-left transition-all ${
-                  activeSeries === s.id
-                    ? "border-[var(--wk-brand)]/40 bg-[var(--wk-brand)]/10"
-                    : "border-[var(--wk-border)] bg-[var(--wk-bg)] hover:border-[var(--wk-border-2)]"
-                }`}
-              >
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--wk-surface-raised)] shrink-0">
-                  <i className={`text-[var(--wk-brand)] ${activeSeries === s.id ? "ri-bar-chart-fill" : "ri-bar-chart-line"}`} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className={`text-[13px] font-bold ${activeSeries === s.id ? "text-[var(--wk-brand)]" : "text-[var(--wk-text)]"}`}>
-                    {s.label}
-                  </div>
-                  <div className="text-[11px] text-[var(--wk-text-muted)]">{s.count} entries · {s.description}</div>
-                </div>
-                <i className="ri-arrow-right-line text-[var(--wk-text-faint)]" />
+      <section className="border-t border-[var(--wk-border)] bg-[var(--wk-surface)]">
+        <div className="wk-container px-4 py-8 md:px-6">
+          <div className="mb-4 wk-eyebrow">Playable preview · {playableTracks.length} tracks</div>
+          <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+            {playableTracks.map((entry) => (
+              <button key={`${entry.editionId}-${entry.rank}`} onClick={() => handlePlayChart(Math.max(0, entry.rank - 1))} className="group w-[160px] flex-none text-left">
+                <img src={entry.artworkUrl} alt="" className="mb-2 aspect-square w-full rounded-xl object-cover" />
+                <div className="truncate text-[13px] font-bold text-[var(--wk-text)]">{entry.title}</div>
+                <div className="truncate text-[11px] text-[var(--wk-text-muted)]">{entry.artist}</div>
               </button>
             ))}
+            {playableTracks.length === 0 && <div className="text-[13px] text-[var(--wk-text-muted)]">No playable chart tracks available.</div>}
           </div>
         </div>
-      </div>
+      </section>
+    </div>
+  );
+}
 
-      <style>{`
-        .reveal {
-          opacity: 0;
-          transform: translateY(20px);
-          transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-        .reveal.in-view {
-          opacity: 1;
-          transform: translateY(0);
-        }
-      `}</style>
+function Stat({ value, label }: { value: string | number; label: string }) {
+  return (
+    <div className="rounded-lg bg-[var(--wk-bg)] p-3">
+      <div className="text-[20px] font-black leading-none text-[var(--wk-brand)]">{value}</div>
+      <div className="mt-1 text-[11px] text-[var(--wk-text-muted)]">{label}</div>
+    </div>
+  );
+}
+
+function Signal({ title, entries, empty }: { title: string; entries: typeof CHART_DATA; empty: string }) {
+  return (
+    <div className="rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4">
+      <div className="mb-3 text-[11px] font-bold uppercase tracking-wider text-[var(--wk-text-faint)]">{title}</div>
+      <div className="space-y-1">
+        {entries.map((entry) => (
+          <div key={`${entry.editionId}-${entry.rank}`} className="flex items-center gap-2 rounded-lg p-2 hover:bg-[var(--wk-bg)]">
+            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--wk-brand)] text-[10px] font-black text-[var(--wk-brand-on)]">{entry.rank}</div>
+            <img src={entry.artworkUrl} alt="" className="h-8 w-8 rounded-md object-cover" />
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-[12px] font-bold text-[var(--wk-text)]">{entry.title}</div>
+              <div className="truncate text-[11px] text-[var(--wk-text-muted)]">{entry.artist}</div>
+            </div>
+          </div>
+        ))}
+        {entries.length === 0 && <div className="py-2 text-[12px] text-[var(--wk-text-faint)]">{empty}</div>}
+      </div>
     </div>
   );
 }
