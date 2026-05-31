@@ -6,6 +6,7 @@ import {
   testWordPressConnection,
   CHARTS_INGESTION_MODE,
 } from "@/services/chartsIngestion/client";
+import { PUBLIC_MODE } from "@/services/chartsPublic/client";
 import type { EndpointDefinition } from "@/services/chartsIngestion/client";
 
 const STATUS_STYLES: Record<string, string> = {
@@ -16,6 +17,7 @@ const STATUS_STYLES: Record<string, string> = {
   deprecated: "bg-[var(--wk-danger-soft)] text-[var(--wk-danger)] border-[var(--wk-danger)]/20",
 };
 
+// ... existing code ...
 function DiagnosticsPanel() {
   const mode = getIngestionMode();
   const wpApiBase = import.meta.env.VITE_WAKILISHA_WP_API_BASE || "/wp-json/wakilisha/v1";
@@ -131,6 +133,203 @@ function DiagnosticsPanel() {
   );
 }
 
+// ... existing code ...
+function PublicChartsDiagnostics() {
+  const publicMode = PUBLIC_MODE;
+  const wpApiBase = import.meta.env.VITE_WAKILISHA_WP_API_BASE || "/wp-json/wakilisha/v1";
+
+  const endpoints = [
+    { label: "Families", method: "GET", path: `${wpApiBase}/charts`, status: publicMode === "mock" ? "mocked" : "ready" },
+    { label: "Family detail", method: "GET", path: `${wpApiBase}/charts/:family`, status: publicMode === "mock" ? "mocked" : "ready" },
+    { label: "Latest edition", method: "GET", path: `${wpApiBase}/charts/:family/latest`, status: publicMode === "mock" ? "mocked" : "ready" },
+    { label: "Edition detail", method: "GET", path: `${wpApiBase}/charts/:family/:edition`, status: publicMode === "mock" ? "mocked" : "ready" },
+    { label: "Edition entries", method: "GET", path: `${wpApiBase}/charts/:family/:edition/entries`, status: publicMode === "mock" ? "mocked" : "ready" },
+    { label: "Track chart history", method: "GET", path: `${wpApiBase}/tracks/:slug/chart-history`, status: publicMode === "mock" ? "mocked" : "ready" },
+  ];
+
+  return (
+    <div className="rounded-lg border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4 space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-[14px] font-bold text-[var(--wk-text)]">
+          <i className="ri-bar-chart-box-line mr-1.5 text-[var(--wk-brand)]" />
+          Public Charts API Diagnostics
+        </h2>
+        <span
+          className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider border ${
+            publicMode === "mock"
+              ? "bg-[var(--wk-warning-soft)] text-[var(--wk-warning)] border-[var(--wk-warning)]/20"
+              : "bg-[var(--wk-success-soft)] text-[var(--wk-success)] border-[var(--wk-success)]/20"
+          }`}
+        >
+          {publicMode}
+        </span>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="rounded-md bg-[var(--wk-bg-subtle)] p-3">
+          <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--wk-text-muted)] mb-1">Public Mode</div>
+          <div className="text-[13px] font-semibold text-[var(--wk-text)]">{publicMode}</div>
+        </div>
+        <div className="rounded-md bg-[var(--wk-bg-subtle)] p-3">
+          <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--wk-text-muted)] mb-1">WP API Base</div>
+          <div className="text-[12px] font-mono text-[var(--wk-text)] truncate" title={wpApiBase}>{wpApiBase}</div>
+        </div>
+        <div className="rounded-md bg-[var(--wk-bg-subtle)] p-3">
+          <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--wk-text-muted)] mb-1">Endpoints</div>
+          <div className="text-[13px] font-semibold text-[var(--wk-text)]">{endpoints.length}</div>
+        </div>
+        <div className="rounded-md bg-[var(--wk-bg-subtle)] p-3">
+          <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--wk-text-muted)] mb-1">Status</div>
+          <div className={`text-[13px] font-semibold ${publicMode === "mock" ? "text-[var(--wk-warning)]" : "text-[var(--wk-success)]"}`}>
+            {publicMode === "mock" ? "Mock data" : "Live API"}
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        {endpoints.map((ep) => (
+          <div key={ep.label} className="flex items-center gap-3 rounded-md bg-[var(--wk-bg-subtle)] px-3 py-2">
+            <span className={`shrink-0 rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider border ${STATUS_STYLES[ep.status]}`}>
+              {ep.status}
+            </span>
+            <span className="text-[12px] font-mono text-[var(--wk-brand)] font-semibold whitespace-nowrap">{ep.method}</span>
+            <span className="text-[12px] font-mono text-[var(--wk-text)] truncate">{ep.path}</span>
+            <span className="ml-auto text-[11px] text-[var(--wk-text-muted)] whitespace-nowrap">{ep.label}</span>
+          </div>
+        ))}
+      </div>
+
+      {publicMode === "mock" && (
+        <div className="rounded-md bg-[var(--wk-info-soft)]/30 border border-[var(--wk-info)]/20 p-3 flex items-start gap-2">
+          <i className="ri-information-line text-[var(--wk-info)] mt-0.5" />
+          <div className="text-[12px] text-[var(--wk-info)]">
+            Public charts are running in <strong>mock mode</strong>. All chart data is served from local mock data.
+            Switch <code className="font-mono text-[11px] bg-[var(--wk-info)]/10 px-1 rounded">VITE_CHARTS_PUBLIC_MODE</code> to <strong>wordpress</strong> to consume live published chart editions.
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ... existing code ...
+export default function AdminChartsIntegrationMap() {
+  const [copied, setCopied] = useState(false);
+  const [filter, setFilter] = useState("");
+  const groups = getEndpointGroups();
+
+  const handleCopy = (text: string) => {
+    navigator.clipboard.writeText(text).catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const allEndpoints = Object.values(groups).flat();
+  const filtered = filter
+    ? allEndpoints.filter(
+        (e) =>
+          e.key.toLowerCase().includes(filter.toLowerCase()) ||
+          e.path.toLowerCase().includes(filter.toLowerCase()) ||
+          e.description.toLowerCase().includes(filter.toLowerCase())
+      )
+    : allEndpoints;
+
+  const statusCounts = {
+    not_configured: allEndpoints.filter((e) => e.status === "not_configured").length,
+    planned: allEndpoints.filter((e) => e.status === "planned").length,
+    mocked: allEndpoints.filter((e) => e.status === "mocked").length,
+    ready: allEndpoints.filter((e) => e.status === "ready").length,
+    deprecated: allEndpoints.filter((e) => e.status === "deprecated").length,
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-[18px] font-bold text-[var(--wk-text)]">Backend Integration Map</h1>
+          <p className="mt-1 text-[12px] text-[var(--wk-text-muted)]">
+            Every frontend action mapped to its future WordPress endpoint, method, payload, and response.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {copied && (
+            <span className="text-[12px] text-[var(--wk-success)] font-semibold">
+              <i className="ri-check-line mr-1" />Copied to clipboard
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Admin Ingestion Diagnostics */}
+      <DiagnosticsPanel />
+
+      {/* Public Charts Diagnostics */}
+      <PublicChartsDiagnostics />
+
+      {/* Status Summary */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        {Object.entries(statusCounts).map(([status, count]) => (
+          <div key={status} className={`rounded-lg border p-3 ${STATUS_STYLES[status]}`}>
+            <div className="text-[10px] font-bold uppercase tracking-wider">{status.replace(/_/g, " ")}</div>
+            <div className="text-[20px] font-bold mt-1">{count}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Filter */}
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1">
+          <i className="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-[var(--wk-text-muted)] text-sm" />
+          <input
+            type="text"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            placeholder="Search endpoints, paths, or descriptions..."
+            className="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-surface)] pl-9 pr-3 py-2 text-[13px] text-[var(--wk-text)] placeholder:text-[var(--wk-text-faint)] focus:outline-none focus:ring-2 focus:ring-[var(--wk-brand)]"
+          />
+        </div>
+        <button
+          onClick={() => setFilter("")}
+          className="wk-button wk-button-sm wk-button-ghost whitespace-nowrap"
+        >
+          Clear
+        </button>
+      </div>
+
+      {/* Endpoints by Group */}
+      {filter ? (
+        <div className="space-y-3">
+          <div className="text-[13px] font-bold text-[var(--wk-text)]">
+            Search Results ({filtered.length} endpoint{filtered.length !== 1 ? "s" : ""})
+          </div>
+          {filtered.map((endpoint) => (
+            <EndpointCard key={endpoint.key} endpoint={endpoint} onCopy={handleCopy} />
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {Object.entries(groups).map(([groupName, endpoints]) => (
+            <div key={groupName} className="space-y-3">
+              <div className="flex items-center gap-2">
+                <h2 className="text-[14px] font-bold text-[var(--wk-text)]">{groupName}</h2>
+                <span className="text-[10px] font-mono text-[var(--wk-text-muted)] bg-[var(--wk-bg-subtle)] rounded-full px-2 py-0.5">
+                  {endpoints.length}
+                </span>
+              </div>
+              <div className="space-y-2">
+                {endpoints.map((endpoint) => (
+                  <EndpointCard key={endpoint.key} endpoint={endpoint} onCopy={handleCopy} />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function EndpointCard({ endpoint, onCopy }: { endpoint: EndpointDefinition; onCopy: (text: string) => void }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -221,120 +420,6 @@ function EndpointCard({ endpoint, onCopy }: { endpoint: EndpointDefinition; onCo
               </pre>
             </div>
           </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-export default function AdminChartsIntegrationMap() {
-  const [copied, setCopied] = useState(false);
-  const [filter, setFilter] = useState("");
-  const groups = getEndpointGroups();
-
-  const handleCopy = (text: string) => {
-    navigator.clipboard.writeText(text).catch(() => {});
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const allEndpoints = Object.values(groups).flat();
-  const filtered = filter
-    ? allEndpoints.filter(
-        (e) =>
-          e.key.toLowerCase().includes(filter.toLowerCase()) ||
-          e.path.toLowerCase().includes(filter.toLowerCase()) ||
-          e.description.toLowerCase().includes(filter.toLowerCase())
-      )
-    : allEndpoints;
-
-  const statusCounts = {
-    not_configured: allEndpoints.filter((e) => e.status === "not_configured").length,
-    planned: allEndpoints.filter((e) => e.status === "planned").length,
-    mocked: allEndpoints.filter((e) => e.status === "mocked").length,
-    ready: allEndpoints.filter((e) => e.status === "ready").length,
-    deprecated: allEndpoints.filter((e) => e.status === "deprecated").length,
-  };
-
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-[18px] font-bold text-[var(--wk-text)]">Backend Integration Map</h1>
-          <p className="mt-1 text-[12px] text-[var(--wk-text-muted)]">
-            Every frontend action mapped to its future WordPress endpoint, method, payload, and response.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {copied && (
-            <span className="text-[12px] text-[var(--wk-success)] font-semibold">
-              <i className="ri-check-line mr-1" />Copied to clipboard
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* Diagnostics Panel */}
-      <DiagnosticsPanel />
-
-      {/* Status Summary */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        {Object.entries(statusCounts).map(([status, count]) => (
-          <div key={status} className={`rounded-lg border p-3 ${STATUS_STYLES[status]}`}>
-            <div className="text-[10px] font-bold uppercase tracking-wider">{status.replace(/_/g, " ")}</div>
-            <div className="text-[20px] font-bold mt-1">{count}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Filter */}
-      <div className="flex items-center gap-2">
-        <div className="relative flex-1">
-          <i className="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-[var(--wk-text-muted)] text-sm" />
-          <input
-            type="text"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            placeholder="Search endpoints, paths, or descriptions..."
-            className="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-surface)] pl-9 pr-3 py-2 text-[13px] text-[var(--wk-text)] placeholder:text-[var(--wk-text-faint)] focus:outline-none focus:ring-2 focus:ring-[var(--wk-brand)]"
-          />
-        </div>
-        <button
-          onClick={() => setFilter("")}
-          className="wk-button wk-button-sm wk-button-ghost whitespace-nowrap"
-        >
-          Clear
-        </button>
-      </div>
-
-      {/* Endpoints by Group */}
-      {filter ? (
-        <div className="space-y-3">
-          <div className="text-[13px] font-bold text-[var(--wk-text)]">
-            Search Results ({filtered.length} endpoint{filtered.length !== 1 ? "s" : ""})
-          </div>
-          {filtered.map((endpoint) => (
-            <EndpointCard key={endpoint.key} endpoint={endpoint} onCopy={handleCopy} />
-          ))}
-        </div>
-      ) : (
-        <div className="space-y-6">
-          {Object.entries(groups).map(([groupName, endpoints]) => (
-            <div key={groupName} className="space-y-3">
-              <div className="flex items-center gap-2">
-                <h2 className="text-[14px] font-bold text-[var(--wk-text)]">{groupName}</h2>
-                <span className="text-[10px] font-mono text-[var(--wk-text-muted)] bg-[var(--wk-bg-subtle)] rounded-full px-2 py-0.5">
-                  {endpoints.length}
-                </span>
-              </div>
-              <div className="space-y-2">
-                {endpoints.map((endpoint) => (
-                  <EndpointCard key={endpoint.key} endpoint={endpoint} onCopy={handleCopy} />
-                ))}
-              </div>
-            </div>
-          ))}
         </div>
       )}
     </div>

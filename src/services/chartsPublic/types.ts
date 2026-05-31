@@ -51,6 +51,12 @@ export interface ChartEditionEntry {
   artworkUrl: string | null;
   score: number;
   entryPayload: Record<string, unknown>;
+  // Optional fields for richer mock data and view models
+  genre?: string;
+  source?: string;
+  isPlayable?: boolean;
+  duration?: number;
+  movementAmount?: number;
 }
 
 export interface ChartEntry {
