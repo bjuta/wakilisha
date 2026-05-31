@@ -1,303 +1,182 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { PageHero } from "@/components/design-system/primitives/PageHero";
-import { ArtistCard } from "@/components/design-system/registry/ArtistCard";
-import { SkeletonSquare } from "@/components/skeletons/Skeletons";
-import { ArtistStats } from "./components/ArtistStats";
-import { CoverStories } from "./components/CoverStories";
-import { ChartList } from "./components/ChartList";
-import { GenreRows } from "./components/GenreRows";
-import { RisingStars } from "./components/RisingStars";
-import { OriginBento } from "./components/OriginBento";
+import { PageHero } from "@/components/design-system/PageHero";
+import { ShareButton } from "@/components/design-system/share/ShareSheet";
+import { WkIcon } from "@/components/design-system/Icon";
 import { ARTISTS, ARTIST_FILTERS, ALPHABET, ARTIST_STATS } from "@/mocks/artists";
 
-const PAGE_SIZE = 16;
+type ViewMode = "grid" | "list";
+const PAGE_SIZE = 24;
 
-function getFlag(country: string): string {
-  const flags: Record<string, string> = {
-    Nigeria: "🇳🇬", Ghana: "🇬🇭", "South Africa": "🇿🇦", Kenya: "🇰🇪", Uganda: "🇺🇬",
-    Tanzania: "🇹🇿", Cameroon: "🇨🇲", Ethiopia: "🇪🇹", Rwanda: "🇷🇼", Zambia: "🇿🇲",
-    Zimbabwe: "🇿🇼", Senegal: "🇸🇳", Mali: "🇲🇱", Congo: "🇨🇩", Angola: "🇦🇴",
-    Botswana: "🇧🇼", Namibia: "🇳🇦", Morocco: "🇲🇦", Algeria: "🇩🇿", Tunisia: "🇹🇳",
-    Egypt: "🇪🇬", Sudan: "🇸🇩", "Sierra Leone": "🇸🇱", Liberia: "🇱🇷", "Burkina Faso": "🇧🇫",
-    Niger: "🇳🇪", Chad: "🇹🇩", Gabon: "🇬🇦", Guinea: "🇬🇳", "Guinea-Bissau": "🇬🇼",
-    The_Gambia: "🇬🇲", Togo: "🇹🇬", Benin: "🇧🇯", Mozambique: "🇲🇿", Malawi: "🇲🇼",
-    Madagascar: "🇲🇬", Mauritius: "🇲🇺", Seychelles: "🇸🇨", Djibouti: "🇩🇯", Somalia: "🇸🇴",
-    Eritrea: "🇪🇷", "South Sudan": "🇸🇸", Eswatini: "🇸🇿", Lesotho: "🇱🇸",
-  };
-  return flags[country] || "🌍";
-}
+const countryLabel = (country?: string) => country || "Unknown origin";
 
 export default function Artists() {
   const [filter, setFilter] = useState("All");
   const [alphaFilter, setAlphaFilter] = useState("All");
   const [query, setQuery] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [view, setView] = useState<ViewMode>("grid");
   const [page, setPage] = useState(1);
-  const gridRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const t = setTimeout(() => setLoading(false), 600);
-    return () => clearTimeout(t);
-  }, []);
+  const coverArtists = useMemo(() => ARTISTS.filter((a) => a.isChartArtist).sort((a, b) => (a.topChartPosition || 999) - (b.topChartPosition || 999)).slice(0, 4), []);
+  const featured = coverArtists[0] ?? ARTISTS[0];
+  const sideArtists = coverArtists.slice(1, 4);
+  const recentlyAdded = ARTISTS.slice(-6).reverse();
 
-  useEffect(() => {
-    setPage(1);
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return ARTISTS.filter((artist) => {
+      const matchesFilter = filter === "All" || artist.genres.some((g) => g === filter);
+      const matchesQuery = !q || artist.name.toLowerCase().includes(q) || artist.genres.some((g) => g.toLowerCase().includes(q)) || countryLabel(artist.country).toLowerCase().includes(q);
+      const matchesAlpha = alphaFilter === "All" || artist.name.toUpperCase().startsWith(alphaFilter);
+      return matchesFilter && matchesQuery && matchesAlpha;
+    });
   }, [filter, alphaFilter, query]);
 
-  const filtered = ARTISTS.filter((a) => {
-    const matchesFilter = filter === "All" || a.genres.some((g) => g === filter);
-    const matchesQuery = !query.trim() || a.name.toLowerCase().includes(query.toLowerCase());
-    const matchesAlpha = alphaFilter === "All" || a.name.toUpperCase().startsWith(alphaFilter);
-    return matchesFilter && matchesQuery && matchesAlpha;
-  });
-
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  // Cover stories: top 4 chart artists
-  const coverArtists = useMemo(() => {
-    return ARTISTS.filter((a) => a.isChartArtist)
-      .sort((a, b) => a.topChartPosition - b.topChartPosition)
-      .slice(0, 4);
-  }, []);
-
-  // Chart list: top 8 chart artists
-  const chartListArtists = useMemo(() => {
-    return ARTISTS.filter((a) => a.isChartArtist)
-      .sort((a, b) => a.topChartPosition - b.topChartPosition);
-  }, []);
-
-  // Rising: non-chart rising artists
-  const risingArtists = useMemo(() => {
-    return ARTISTS.filter((a) => a.isRising && !a.isChartArtist);
-  }, []);
-
-  // Genre shelves: top 5 genres with 2+ artists
-  const genreShelves = useMemo(() => {
-    const allGenres = Array.from(new Set(ARTISTS.flatMap((a) => a.genres)));
-    const shelves = allGenres
-      .map((genre) => ({
-        genre,
-        artists: ARTISTS.filter((a) => a.genres.includes(genre)).map((a) => ({
-          slug: a.slug,
-          name: a.name,
-          imageUrl: a.imageUrl,
-          trackCount: a.trackCount,
-          releaseCount: a.releaseCount,
-        })),
-      }))
-      .filter((s) => s.artists.length >= 2)
-      .sort((a, b) => b.artists.length - a.artists.length)
-      .slice(0, 5);
-    return shelves;
-  }, []);
-
-  // Origin groups
-  const originGroups = useMemo(() => {
-    const groups: Record<string, { country: string; artists: typeof ARTISTS }> = {};
-    ARTISTS.forEach((a) => {
-      if (!groups[a.country]) groups[a.country] = { country: a.country, artists: [] };
-      groups[a.country].artists.push(a);
-    });
-    return Object.values(groups)
-      .sort((a, b) => b.artists.length - a.artists.length)
-      .map((g) => ({
-        country: g.country,
-        flag: getFlag(g.country),
-        artistCount: g.artists.length,
-        chartCount: g.artists.filter((a) => a.isChartArtist).length,
-        risingCount: g.artists.filter((a) => a.isRising && !a.isChartArtist).length,
-        artists: g.artists.map((a) => ({ slug: a.slug, name: a.name, imageUrl: a.imageUrl })),
-      }));
-  }, []);
-
   const stats = [
-    { label: "Artists", value: ARTIST_STATS.totalArtists },
-    { label: "Chart artists", value: ARTIST_STATS.chartArtists },
-    { label: "Tracks", value: ARTIST_STATS.totalTracks },
-    { label: "Monthly streams", value: ARTIST_STATS.monthlyStreams, suffix: "M", decimals: 1 },
+    { value: ARTIST_STATS.totalArtists.toLocaleString(), label: "Artists" },
+    { value: ARTIST_STATS.chartArtists.toLocaleString(), label: "Chart artists" },
+    { value: ARTIST_STATS.totalTracks.toLocaleString(), label: "Tracks" },
   ];
 
-  const goToPage = (p: number) => {
-    setPage(p);
-    gridRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
+  const updateFilter = (next: string) => { setFilter(next); setPage(1); };
+  const updateAlpha = (next: string) => { setAlphaFilter(next); setPage(1); };
 
   return (
     <div className="min-h-screen">
-      {/* Cinematic Hero */}
-      <PageHero
-        eyebrow="The voices"
-        title="Artists"
-        subtitle={`${ARTIST_STATS.totalArtists} artists shaping the sound of now. From chart legends to rising voices, every story is here.`}
-        variant="full"
-        imageUrl="https://readdy.ai/api/search-image?query=Cinematic%20portrait%20of%20African%20music%20performers%20on%20stage%2C%20dramatic%20concert%20lighting%20with%20warm%20amber%20and%20deep%20shadows%2C%20artistic%20silhouettes%2C%20gold%20and%20bronze%20tones%2C%20editorial%20music%20photography%2C%20high%20contrast%2C%20moody%20atmosphere%2C%20no%20text%20visible%2C%20professional%20concert%20photography%20style&width=1400&height=800&seq=artist-hero-v3&orientation=landscape"
-      />
+      <div className="wk-container-wide px-4 md:px-6">
+        <PageHero
+          variant="artist"
+          eyebrow={<><WkIcon name="Mic2" size={14} /> The voices</>}
+          title="Artists"
+          subtitle="A human, photographic directory of WAKILISHA artists: chart voices, rising names, country scenes, genre lanes, and registry relationships."
+          backgroundImage={featured?.imageUrl}
+          stats={stats}
+          actions={<ShareButton item={{ title: "WAKILISHA Artists", subtitle: `${ARTISTS.length} artists`, description: "Browse WAKILISHA artists by genre, chart presence, origin, and alphabetical index.", imageUrl: featured?.imageUrl, type: "artist" }} />}
+        />
 
-      {/* Slim stats strip */}
-      <ArtistStats stats={stats} />
-
-      {/* Cover Stories — 2x2 editorial grid */}
-      {!loading && <CoverStories artists={coverArtists} />}
-
-      {/* Chart List — vertical ranking */}
-      {!loading && <ChartList artists={chartListArtists} />}
-
-      {/* Genre Shelves — horizontal scroll rows */}
-      {!loading && <GenreRows shelves={genreShelves} />}
-
-      {/* Rising Stars — 2x2 grid */}
-      {!loading && <RisingStars artists={risingArtists} />}
-
-      {/* Origin Bento — country grid */}
-      {!loading && <OriginBento groups={originGroups} />}
-
-      {/* Directory */}
-      <div ref={gridRef} className="wk-container-wide px-6 py-14 md:py-20">
-        <div className="mb-6 flex items-center gap-3">
-          <div className="wk-eyebrow">Full directory</div>
-          <span className="text-[12px] text-[var(--wk-text-muted)]">{ARTISTS.length} artists</span>
-        </div>
-
-        <div className="mb-6 flex flex-col gap-4">
-          <div className="relative max-w-md">
-            <i className="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-[var(--wk-text-muted)]" />
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search artists..."
-              className="w-full rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] py-2.5 pl-10 pr-4 text-[13px] text-[var(--wk-text)] placeholder:text-[var(--wk-text-faint)] outline-none focus:border-[var(--wk-brand)]"
-            />
-          </div>
-          <div className="flex flex-col gap-3">
-            {/* Alphabet filter */}
-            <div className="flex flex-wrap gap-1">
-              <button
-                onClick={() => setAlphaFilter("All")}
-                className={`h-7 min-w-[28px] rounded-md px-2 text-[11px] font-bold transition-all ${
-                  alphaFilter === "All"
-                    ? "bg-[var(--wk-brand)] text-[var(--wk-brand-on)]"
-                    : "border border-[var(--wk-border)] text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)]"
-                }`}
-              >
-                All
-              </button>
-              {ALPHABET.map((letter) => (
-                <button
-                  key={letter}
-                  onClick={() => setAlphaFilter(letter)}
-                  className={`h-7 min-w-[28px] rounded-md px-1.5 text-[11px] font-bold transition-all ${
-                    alphaFilter === letter
-                      ? "bg-[var(--wk-brand)] text-[var(--wk-brand-on)]"
-                      : "border border-[var(--wk-border)] text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)]"
-                  }`}
-                >
-                  {letter}
-                </button>
+        {featured && (
+          <section className="artist-featured">
+            <Link to={`/artists/${featured.slug}`} className="artist-feature-card">
+              {featured.imageUrl && <img src={featured.imageUrl} alt="" />}
+              <div className="artist-feature-body">
+                <div className="artist-feature-kicker">Featured artist</div>
+                <h2 className="artist-feature-name">{featured.name}</h2>
+                <div className="artist-feature-meta">{countryLabel(featured.country)} · {featured.genres.slice(0, 3).join(", ")} · {featured.trackCount} tracks</div>
+                <div className="artist-feature-actions">
+                  {featured.isChartArtist && <span className="artist-status"><WkIcon name="BadgeCheck" size={12} /> Chart artist</span>}
+                  {featured.isRising && <span className="artist-status"><WkIcon name="TrendingUp" size={12} /> Rising</span>}
+                </div>
+              </div>
+            </Link>
+            <div className="artist-side-list">
+              {sideArtists.map((artist) => (
+                <Link key={artist.slug} to={`/artists/${artist.slug}`} className="artist-side-card">
+                  <div className="artist-side-img">{artist.imageUrl && <img src={artist.imageUrl} alt="" />}</div>
+                  <div className="min-w-0">
+                    <div className="artist-list-name">{artist.name}</div>
+                    <div className="artist-list-sub">#{artist.topChartPosition || "—"} · {artist.genres[0]} · {countryLabel(artist.country)}</div>
+                  </div>
+                  <WkIcon name="ArrowRight" size={16} />
+                </Link>
               ))}
             </div>
-            {/* Genre filter */}
-            <div className="flex flex-wrap gap-2">
-              {ARTIST_FILTERS.map((f) => (
-                <button
-                  key={f}
-                  onClick={() => setFilter(f)}
-                  className={`rounded-full px-3 py-1.5 text-[13px] font-semibold transition-all whitespace-nowrap ${
-                    filter === f
-                      ? "bg-[var(--wk-brand)] text-[var(--wk-brand-on)]"
-                      : "border border-[var(--wk-border)] text-[var(--wk-text-soft)] hover:bg-[var(--wk-surface-raised)]"
-                  }`}
-                >
-                  {f}
-                </button>
-              ))}
+          </section>
+        )}
+
+        <div className="directory-toolbar">
+          <div className="directory-filters">
+            {ARTIST_FILTERS.slice(0, 12).map((f) => (
+              <button key={f} onClick={() => updateFilter(f)} className={`directory-filter ${filter === f ? "on" : ""}`}>{f}</button>
+            ))}
+          </div>
+          <div className="directory-tools">
+            <input className="directory-search" value={query} onChange={(e) => { setQuery(e.target.value); setPage(1); }} placeholder="Search artist, genre, or country" />
+            <div className="view-toggle" aria-label="View mode">
+              <button className={view === "grid" ? "on" : ""} onClick={() => setView("grid")}><WkIcon name="Grid2X2" size={15} /></button>
+              <button className={view === "list" ? "on" : ""} onClick={() => setView("list")}><WkIcon name="List" size={15} /></button>
             </div>
           </div>
         </div>
 
-        <div className="mb-4 flex items-center justify-between text-[13px]">
-          <span className="text-[var(--wk-text-muted)]">
-            {filtered.length} artist{filtered.length !== 1 ? "s" : ""}
-            {filter !== "All" && ` in ${filter}`}
-            {alphaFilter !== "All" && ` starting with ${alphaFilter}`}
-          </span>
-          {totalPages > 1 && (
-            <span className="text-[var(--wk-text-faint)]">
-              Page {page} of {totalPages}
-            </span>
+        <div className="az-strip">
+          <button onClick={() => updateAlpha("All")} className={`az-btn ${alphaFilter === "All" ? "on" : ""}`}>All</button>
+          {ALPHABET.map((letter) => <button key={letter} onClick={() => updateAlpha(letter)} className={`az-btn ${alphaFilter === letter ? "on" : ""}`}>{letter}</button>)}
+        </div>
+
+        <section>
+          <div className="section-head">
+            <div>
+              <div className="section-kicker">Full artist directory</div>
+              <h2 className="section-title">{filtered.length} artists found</h2>
+            </div>
+            <p className="section-copy">Grid mode prioritizes photographic browsing. List mode prioritizes dense comparison across origin, genre, tracks, releases, and chart presence.</p>
+          </div>
+
+          {view === "grid" ? (
+            <div className="artist-directory-grid">
+              {paginated.map((artist) => <ArtistTile key={artist.slug} artist={artist} />)}
+            </div>
+          ) : (
+            <div className="artist-directory-list">
+              {paginated.map((artist) => <ArtistListRow key={artist.slug} artist={artist} />)}
+            </div>
           )}
-        </div>
 
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-          {loading
-            ? Array.from({ length: 8 }).map((_, i) => <SkeletonSquare key={i} />)
-            : paginated.map((artist) => (
-                <ArtistCard
-                  key={artist.slug}
-                  slug={artist.slug}
-                  name={artist.name}
-                  imageUrl={artist.imageUrl}
-                  genres={artist.genres}
-                  trackCount={artist.trackCount}
-                  releaseCount={artist.releaseCount}
-                  isChartArtist={artist.isChartArtist}
-                  country={artist.country}
-                />
-              ))}
-        </div>
+          {filtered.length === 0 && <div className="artist-empty"><WkIcon name="UserSearch" size={32} /><div className="mt-3">No artists match this search.</div></div>}
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="mt-8 flex items-center justify-center gap-2">
-            <button
-              onClick={() => goToPage(Math.max(1, page - 1))}
-              disabled={page === 1}
-              className="flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--wk-border)] text-[var(--wk-text-muted)] transition-all disabled:opacity-40 hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]"
-            >
-              <i className="ri-arrow-left-line text-sm" />
-            </button>
+          {totalPages > 1 && (
+            <div className="mt-8 flex items-center justify-center gap-2">
+              <button className="directory-filter" disabled={page === 1} onClick={() => setPage(Math.max(1, page - 1))}><WkIcon name="ArrowLeft" size={14} /></button>
+              <span className="text-[12px] font-bold text-[var(--wk-text-muted)]">Page {page} of {totalPages}</span>
+              <button className="directory-filter" disabled={page === totalPages} onClick={() => setPage(Math.min(totalPages, page + 1))}><WkIcon name="ArrowRight" size={14} /></button>
+            </div>
+          )}
+        </section>
 
-            {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
-              let p = i + 1;
-              if (totalPages > 5) {
-                if (page <= 3) p = i + 1;
-                else if (page >= totalPages - 2) p = totalPages - 4 + i;
-                else p = page - 2 + i;
-              }
-              return (
-                <button
-                  key={p}
-                  onClick={() => goToPage(p)}
-                  className={`h-9 min-w-[36px] rounded-lg px-2 text-[13px] font-bold transition-all ${
-                    page === p
-                      ? "bg-[var(--wk-brand)] text-[var(--wk-brand-on)]"
-                      : "border border-[var(--wk-border)] text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]"
-                  }`}
-                >
-                  {p}
-                </button>
-              );
-            })}
-
-            <button
-              onClick={() => goToPage(Math.min(totalPages, page + 1))}
-              disabled={page === totalPages}
-              className="flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--wk-border)] text-[var(--wk-text-muted)] transition-all disabled:opacity-40 hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]"
-            >
-              <i className="ri-arrow-right-line text-sm" />
-            </button>
+        <section className="pg-layout cols-2 pb-10">
+          <div className="pg-block">
+            <div className="pg-block-label">Recently added</div>
+            <div className="space-y-2">
+              {recentlyAdded.map((artist) => <ArtistListRow key={artist.slug} artist={artist} compact />)}
+            </div>
           </div>
-        )}
-
-        {filtered.length === 0 && !loading && (
-          <div className="py-16 text-center text-[var(--wk-text-muted)]">
-            <i className="ri-user-search-line mb-3 block text-4xl" />
-            No artists match this search.
+          <div className="pg-block">
+            <div className="pg-block-label">Directory rule</div>
+            <h3 className="pg-block-title">Artists are human and photographic.</h3>
+            <p className="pg-block-body">Unlike genres, artist cards should preserve portrait/image presence, identity, status, country, genre metadata, and chart relevance. The directory must work both as a beautiful browse page and a dense registry.</p>
           </div>
-        )}
+        </section>
       </div>
     </div>
+  );
+}
+
+function ArtistTile({ artist }: { artist: typeof ARTISTS[number] }) {
+  return (
+    <Link to={`/artists/${artist.slug}`} className="artist-card">
+      <div className="artist-card-img">{artist.imageUrl && <img src={artist.imageUrl} alt="" />}</div>
+      {artist.isChartArtist && <div className="artist-card-verify"><WkIcon name="BadgeCheck" size={12} /></div>}
+      <div className="artist-card-body">
+        <div className="artist-card-name">{artist.name}</div>
+        <div className="artist-card-meta">{countryLabel(artist.country)} · {artist.trackCount} tracks · {artist.releaseCount} releases</div>
+        <div className="artist-card-tags">{artist.genres.slice(0, 2).map((genre) => <span key={genre} className="tag tag-sm">{genre}</span>)}</div>
+      </div>
+    </Link>
+  );
+}
+
+function ArtistListRow({ artist, compact = false }: { artist: typeof ARTISTS[number]; compact?: boolean }) {
+  return (
+    <Link to={`/artists/${artist.slug}`} className="artist-list-item">
+      <div className="artist-list-ava artist-list-avatar">{artist.imageUrl && <img src={artist.imageUrl} alt="" />}</div>
+      <div className="min-w-0">
+        <div className="artist-list-name">{artist.name} {artist.isChartArtist && <span className="text-[var(--wk-brand)]">✓</span>}</div>
+        <div className="artist-list-sub">{countryLabel(artist.country)} · {artist.genres.slice(0, compact ? 1 : 3).join(", ")}</div>
+      </div>
+      <div className="artist-list-stat">{artist.isChartArtist ? `#${artist.topChartPosition}` : artist.trackCount}</div>
+    </Link>
   );
 }
