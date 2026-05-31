@@ -482,7 +482,8 @@ export function getMockEntriesForEdition(
     (e) => e.familyId === familySlug && e.slug === editionSlug
   );
   if (!edition) return [];
-  return MOCK_ENTRIES.map((e) => ({ ...e, editionId: edition.id }));
+  const limit = edition.entryCount ?? 40;
+  return MOCK_ENTRIES.slice(0, limit).map((e) => ({ ...e, editionId: edition.id }));
 }
 
 export function getMockEditionsForFamily(familySlug: string): ChartEdition[] {

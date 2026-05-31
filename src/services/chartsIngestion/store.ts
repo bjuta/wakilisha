@@ -28,8 +28,10 @@ import {
   getLogsForJob,
 } from "./mockData";
 import type {
+  ChartFamily,
   IngestJob,
   IngestSource,
+  RawSourceItem,
   IngestCandidate,
   IngestMatch,
   ReviewIssue,
@@ -40,6 +42,7 @@ import type {
   DashboardKpis,
   IngestJobStatus,
   IssueStatus,
+  CsvImportSession,
 } from "./types";
 
 const STORE_KEY = "wkcharts_ingest_store_v1";
@@ -55,6 +58,7 @@ export interface StoreState {
   logs: IngestJobLog[];
   snapshots: Snapshot[];
   dashboardKpis: DashboardKpis;
+  csvImportSessions: CsvImportSession[];
 }
 
 function getInitialState(): StoreState {
@@ -69,6 +73,7 @@ function getInitialState(): StoreState {
     logs: [...mockLogs],
     snapshots: [...mockSnapshots],
     dashboardKpis: { ...mockDashboardKpis },
+    csvImportSessions: [],
   };
 }
 
@@ -79,6 +84,10 @@ export function loadStore(): StoreState {
       const parsed = JSON.parse(raw) as StoreState;
       // Validate it has all required keys
       if (parsed.jobs && parsed.sources && parsed.candidates) {
+        // Ensure csvImportSessions exists for backward compatibility
+        if (!parsed.csvImportSessions) {
+          parsed.csvImportSessions = [];
+        }
         return parsed;
       }
     }
@@ -151,6 +160,7 @@ export function resetDemoJob(): StoreState {
     issues: issuesWithDemo,
     draftEntries: draftEntriesWithDemo,
     logs: logsWithDemo,
+    csvImportSessions: [],
   };
   saveStore(newState);
   return newState;
@@ -381,6 +391,23 @@ export function addEdition(edition: ChartEdition): void {
 // ─── Dashboard KPIs ───
 export function getDashboardKpis(): DashboardKpis {
   return mutableStore.dashboardKpis;
+}
+
+// ─── CSV Import Session helpers ───
+export function getJobCsvImportSessions(jobId: string): CsvImportSession[] {
+  return mutableStore.csvImportSessions.filter((s) => s.jobId === jobId);
+}
+
+export function addCsvImportSession(session: CsvImportSession): void {
+  const state = mutableStore;
+  state.csvImportSessions = [session, ...state.csvImportSessions];
+  commit(state);
+}
+
+export function clearCsvImportSessions(jobId: string): void {
+  const state = mutableStore;
+  state.csvImportSessions = state.csvImportSessions.filter((s) => s.jobId !== jobId);
+  commit(state);
 }
 
 // ─── Summary counts ───

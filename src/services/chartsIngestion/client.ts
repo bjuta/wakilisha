@@ -780,3 +780,22 @@ export { WpApiError, testWordPressConnection, retryWithBackoff } from "./wpAdapt
 // These are exported for backward compatibility with components that need direct store access.
 // In WordPress mode, they return empty values or no-op.
 export { getStore, appendJobLog, getJobSummary } from "./store";
+
+// ─── CSV Discovery ───
+export const getDiscoveredCsvSources = adapter.getDiscoveredCsvSources;
+export const getDiscoveredCsvSourceById = adapter.getDiscoveredCsvSourceById;
+export const attachCsvAsSource = adapter.attachCsvAsSource;
+export const normalizeCsvCandidates = adapter.normalizeCsvCandidates;
+export const useCsvAsSource = adapter.attachCsvAsSource;
+
+// ─── CSV Import Sessions ───
+export const getCsvImportSessions = adapter.getCsvImportSessions;
+export const createCsvImportSession = adapter.createCsvImportSession;
+export const clearCsvImportSessions = adapter.clearCsvImportSessions;
+
+// ─── CSV Draft Integrity ───
+export const validateCsvDraftIntegrity = adapter.validateCsvDraftIntegrity;
+
+// ─── CSV Draft Creation ───
+export const createDraftFromCsvCandidates = adapter.createDraftFromCsvCandidates;
+export const exportDraftJson = adapter.exportDraftJson;

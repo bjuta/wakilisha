@@ -118,8 +118,7 @@ export function getChartEdition(seriesSlug: string, editionSlug: string) {
 
 export function getChartEntriesForEdition(editionId: string) {
   const exact = chartEntriesByEdition.get(editionId) ?? [];
-  const rows = exact.length ? exact : importedRegistry.chartEntries;
-  return rows.slice().sort((a, b) => a.rank - b.rank);
+  return exact.slice().sort((a, b) => a.rank - b.rank);
 }
 
 export function getArtistTopChartPosition(artist: ImportedArtist) {
@@ -200,19 +199,21 @@ export function toChartRow(entry: ImportedChartEntry) {
 
 export function getLatestChartRows(seriesSlug?: string) {
   const edition = getLatestChartEdition(seriesSlug);
-  return edition ? getChartEntriesForEdition(edition.id).map(toChartRow) : importedRegistry.chartEntries.slice().sort((a, b) => a.rank - b.rank).map(toChartRow);
+  if (!edition) return [];
+  return getChartEntriesForEdition(edition.id).map(toChartRow);
 }
 
 export function getChartRowsForEdition(seriesSlug: string, editionSlug: string) {
   const edition = getChartEdition(seriesSlug, editionSlug);
-  return edition ? getChartEntriesForEdition(edition.id).map(toChartRow) : importedRegistry.chartEntries.slice().sort((a, b) => a.rank - b.rank).map(toChartRow);
+  if (!edition) return [];
+  return getChartEntriesForEdition(edition.id).map(toChartRow);
 }
 
 export function getChartSeriesSummaries() {
   return effectiveChartSeries.map((series) => {
     const editions = getChartEditionsForSeries(series.slug);
     const latestEdition = editions[0] ?? null;
-    const rows = latestEdition ? getChartEntriesForEdition(latestEdition.id) : importedRegistry.chartEntries;
+    const rows = latestEdition ? getChartEntriesForEdition(latestEdition.id) : [];
     const entryCount = extractEntryCount(series.label, series.entryCount);
     return {
       id: series.slug,

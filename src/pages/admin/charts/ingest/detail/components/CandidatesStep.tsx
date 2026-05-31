@@ -196,8 +196,9 @@ export function CandidatesStep({ jobId, candidates, matches, issues, onUpdate, r
               {filtered.map((c) => {
                 const match = matches.find((m) => m.candidateId === c.id);
                 const candidateIssues = issues.filter((i) => i.candidateId === c.id);
+                const isCsv = Object.keys(c.sourcePositions).includes("csv");
                 return (
-                  <tr key={c.id}>
+                  <tr key={c.id} className={isCsv ? "bg-[var(--wk-brand-soft)]/20" : ""}>
                     <td className="tabular-nums text-[var(--wk-text)]">
                       {c.finalRank ?? c.calculatedRank}
                     </td>
@@ -207,6 +208,11 @@ export function CandidatesStep({ jobId, candidates, matches, issues, onUpdate, r
                           <img src={c.artworkUrl} alt="" className="h-8 w-8 rounded-md object-cover" />
                         )}
                         <span className="truncate max-w-[160px]">{c.normalizedTitle}</span>
+                        {isCsv && (
+                          <span className="rounded-full bg-[var(--wk-brand-soft)] px-1.5 py-0.5 text-[9px] font-semibold text-[var(--wk-brand)]">
+                            CSV
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td className="text-[12px] text-[var(--wk-text-soft)]">{c.normalizedArtistLine}</td>
@@ -311,6 +317,8 @@ function CandidateDetailDrawer({ candidate, match, candidateIssues, rawItems, on
   onClose: () => void;
 }) {
   const candidateRawItems = rawItems.filter((r) => candidate.rawItemIds.includes(r.id));
+  const isCsv = Object.keys(candidate.sourcePositions).includes("csv");
+  const csvPosition = candidate.sourcePositions.csv;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -349,6 +357,19 @@ function CandidateDetailDrawer({ candidate, match, candidateIssues, rawItems, on
             <div className="mt-1 text-[13px] font-semibold text-[var(--wk-text)]">{match?.matchMethod ?? "—"}</div>
           </div>
         </div>
+
+        {/* CSV Provenance Badge */}
+        {isCsv && (
+          <div className="mt-4 rounded-lg border border-[var(--wk-brand)] bg-[var(--wk-brand-soft)] p-3">
+            <div className="flex items-center gap-2">
+              <i className="ri-file-list-line text-[var(--wk-brand)]" />
+              <span className="text-[12px] font-semibold text-[var(--wk-brand)]">CSV Source</span>
+            </div>
+            <div className="mt-1 text-[11px] text-[var(--wk-text-soft)]">
+              Position {csvPosition} from CSV file
+            </div>
+          </div>
+        )}
 
         {/* Source Provenance */}
         <div className="mt-4">

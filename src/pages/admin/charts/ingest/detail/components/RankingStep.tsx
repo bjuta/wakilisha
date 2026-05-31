@@ -85,13 +85,22 @@ export function RankingStep({ jobId, candidates, onUpdate, role = "admin" }: Ran
               {sorted.slice(0, 40).map((c) => {
                 const hasOverride = c.manualRankOverride !== null;
                 const isLocked = lockedRows.has(c.id);
+                const csvPosition = c.sourcePositions.csv;
+                const hasCsvSource = csvPosition !== undefined;
                 return (
-                  <tr key={c.id} className={hasOverride ? "bg-[var(--wk-warning-soft)]/30" : ""}>
+                  <tr key={c.id} className={hasOverride ? "bg-[var(--wk-warning-soft)]/30" : hasCsvSource ? "bg-[var(--wk-brand-soft)]/10" : ""}>
                     <td className="tabular-nums text-[12px] text-[var(--wk-text-muted)]">{c.calculatedRank}</td>
                     <td className={`tabular-nums font-bold ${hasOverride ? "text-[var(--wk-warning)]" : "text-[var(--wk-text)]"}`}>
                       {c.finalRank ?? c.calculatedRank}
                     </td>
-                    <td className="font-semibold text-[var(--wk-text)]">{c.normalizedTitle}</td>
+                    <td className="font-semibold text-[var(--wk-text)]">
+                      <span>{c.normalizedTitle}</span>
+                      {hasCsvSource && (
+                        <span className="ml-1.5 rounded-full bg-[var(--wk-brand-soft)] px-1.5 py-0.5 text-[9px] font-semibold text-[var(--wk-brand)]">
+                          CSV#{csvPosition}
+                        </span>
+                      )}
+                    </td>
                     <td className="text-[12px] text-[var(--wk-text-soft)]">{c.normalizedArtistLine}</td>
                     <td className="tabular-nums text-[12px] text-[var(--wk-text-soft)]">{(c.sourceMetrics.spotify ?? 0).toLocaleString()}</td>
                     <td className="tabular-nums text-[12px] text-[var(--wk-text-soft)]">{(c.sourceMetrics.apple ?? 0).toLocaleString()}</td>

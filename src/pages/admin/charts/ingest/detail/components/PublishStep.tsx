@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import type { IngestJob } from "@/services/chartsIngestion/types";
-import { getStore, appendJobLog, publishEdition, hasCapability } from "@/services/chartsIngestion/client";
+import { getStore, appendJobLog, publishEdition, hasCapability, getCsvImportSessions } from "@/services/chartsIngestion/client";
 import type { UserRole } from "@/services/chartsIngestion/client";
 import { PreflightValidator } from "./PreflightValidator";
 import type { PreflightItem } from "./PreflightValidator";
+import type { CsvImportSession } from "@/services/chartsIngestion/types";
 
 interface PublishStepProps {
   jobId: string;
@@ -17,7 +18,10 @@ interface PublishStepProps {
     hasBlockingIssues: boolean;
     hasDraft: boolean;
     highIssues: number;
+    mediumIssues: number;
+    lowIssues: number;
     finalChartSize: number;
+    draftEntries: { sourceType?: string }[];
   };
   onUpdate: () => void;
   role?: UserRole;
@@ -28,8 +32,15 @@ export function PublishStep({ jobId, job, summary, onUpdate, role = "admin" }: P
   const [published, setPublished] = useState(job.status === "published");
   const [preflightItems, setPreflightItems] = useState<PreflightItem[]>([]);
   const [preflightRunning, setPreflightRunning] = useState(false);
+  const [csvSessions, setCsvSessions] = useState<CsvImportSession[]>([]);
 
   const canPublish = hasCapability(role, "publish_edition");
+
+  useEffect(() => {
+    getCsvImportSessions(jobId).then(setCsvSessions);
+  }, [jobId]);
+
+  const csvEntryCount = summary.draftEntries?.filter((d) => d.sourceType === "csv").length ?? 0;
 
   const checklist = [
     { label: "Sources fetched", pass: summary.totalSources > 0 },
@@ -55,8 +66,6 @@ export function PublishStep({ jobId, job, summary, onUpdate, role = "admin" }: P
 
   const handleRunPreflight = () => {
     setPreflightRunning(true);
-
-    // Simulate preflight check with a delay
     setTimeout(() => {
       const items: PreflightItem[] = [
         { label: "All sources fetched", pass: summary.totalSources > 0, required: true, reason: summary.totalSources === 0 ? "No sources configured" : undefined },
@@ -70,11 +79,8 @@ export function PublishStep({ jobId, job, summary, onUpdate, role = "admin" }: P
         { label: "Snapshot payload is valid", pass: summary.hasDraft, required: true },
         { label: "Current role can publish", pass: canPublish, required: true, reason: !canPublish ? "You need publish_wakilisha_charts permission" : undefined },
       ];
-
       setPreflightItems(items);
       setPreflightRunning(false);
-
-      // Append log
       appendJobLog(jobId, "publish", "success", "Preflight check completed", {
         pass: items.filter((i) => i.pass).length,
         fail: items.filter((i) => !i.pass && i.required).length,
@@ -92,7 +98,6 @@ export function PublishStep({ jobId, job, summary, onUpdate, role = "admin" }: P
   if (published) {
     const { edition, snapshot } = getSnapshotPreview();
     const mockHash = "sha256:" + Math.random().toString(36).substring(2, 34);
-
     return (
       <div className="space-y-4">
         <WkSurface className="p-5">
@@ -115,8 +120,6 @@ export function PublishStep({ jobId, job, summary, onUpdate, role = "admin" }: P
             </div>
           </div>
         </WkSurface>
-
-        {/* Snapshot Details */}
         {snapshot && (
           <WkSurface className="p-5">
             <h3 className="text-[14px] font-bold text-[var(--wk-text)]">Immutable Snapshot</h3>
@@ -130,18 +133,8 @@ export function PublishStep({ jobId, job, summary, onUpdate, role = "admin" }: P
                 <span className="font-mono text-[var(--wk-text)]">{snapshot.editionId}</span>
               </div>
               <div className="flex items-center justify-between text-[12px]">
-                <span className="text-[var(--wk-text-muted)]">Created</span>
-                <span className="text-[var(--wk-text)]">{new Date(snapshot.publishedAt).toLocaleString()}</span>
-              </div>
-              <div className="flex items-center justify-between text-[12px]">
                 <span className="text-[var(--wk-text-muted)]">Checksum</span>
                 <span className="font-mono text-[var(--wk-text-faint)]">{mockHash}</span>
-              </div>
-            </div>
-            <div className="mt-4 rounded-lg bg-[var(--wk-bg-subtle)] p-3">
-              <div className="text-[11px] text-[var(--wk-text-muted)]">
-                <i className="ri-lock-line mr-1" />
-                Published snapshots are immutable. Corrections must create a new edition — history cannot be silently edited.
               </div>
             </div>
           </WkSurface>
@@ -156,12 +149,8 @@ export function PublishStep({ jobId, job, summary, onUpdate, role = "admin" }: P
     <div className="space-y-4">
       <WkSurface className="p-5">
         <h2 className="mb-4 text-[14px] font-bold text-[var(--wk-text)]">Publish Readiness</h2>
-
-        {/* Status Banner */}
         <div className={`rounded-xl border p-4 ${
-          allPassed
-            ? "border-[var(--wk-success)] bg-[var(--wk-success-soft)]"
-            : "border-[var(--wk-warning)] bg-[var(--wk-warning-soft)]"
+          allPassed ? "border-[var(--wk-success)] bg-[var(--wk-success-soft)]" : "border-[var(--wk-warning)] bg-[var(--wk-warning-soft)]"
         }`}>
           <div className="flex items-center gap-3">
             <div className={`flex h-10 w-10 items-center justify-center rounded-full ${
@@ -176,19 +165,16 @@ export function PublishStep({ jobId, job, summary, onUpdate, role = "admin" }: P
               <div className="text-[12px] text-[var(--wk-text-soft)]">
                 {allPassed
                   ? "All checks passed. The edition can be published."
-                  : `${checklist.filter((c) => !c.pass).length} checks are failing. Resolve them before publishing.`}
+                  : `${checklist.filter((c) => !c.pass).length} checks are failing.`}
               </div>
             </div>
           </div>
         </div>
 
-        {/* Checklist */}
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           {checklist.map((item) => (
             <div key={item.label} className={`flex items-center gap-3 rounded-lg border p-3 ${
-              item.pass
-                ? "border-[var(--wk-success)]/20 bg-[var(--wk-success-soft)]"
-                : "border-[var(--wk-danger)]/20 bg-[var(--wk-danger-soft)]"
+              item.pass ? "border-[var(--wk-success)]/20 bg-[var(--wk-success-soft)]" : "border-[var(--wk-danger)]/20 bg-[var(--wk-danger-soft)]"
             }`}>
               <div className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${
                 item.pass ? "bg-[var(--wk-success)] text-white" : "bg-[var(--wk-danger)] text-white"
@@ -197,43 +183,65 @@ export function PublishStep({ jobId, job, summary, onUpdate, role = "admin" }: P
               </div>
               <span className={`text-[12px] font-semibold ${
                 item.pass ? "text-[var(--wk-success)]" : "text-[var(--wk-danger)]"
-              }`}>
-                {item.label}
-              </span>
+              }`}>{item.label}</span>
             </div>
           ))}
         </div>
 
         {/* Info Grid */}
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-lg border border-[var(--wk-border)] p-3">
-            <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--wk-text-muted)]">Chart Family</div>
-            <div className="mt-1 text-[13px] font-semibold text-[var(--wk-text)]">{job.chartFamily?.label}</div>
-          </div>
-          <div className="rounded-lg border border-[var(--wk-border)] p-3">
-            <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--wk-text-muted)]">Edition Date</div>
-            <div className="mt-1 text-[13px] font-semibold text-[var(--wk-text)]">{job.editionDate}</div>
-          </div>
-          <div className="rounded-lg border border-[var(--wk-border)] p-3">
-            <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--wk-text-muted)]">Chart Size</div>
-            <div className="mt-1 text-[13px] font-semibold text-[var(--wk-text)]">{job.chartSize} entries</div>
-          </div>
-          <div className="rounded-lg border border-[var(--wk-border)] p-3">
-            <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--wk-text-muted)]">Draft Size</div>
-            <div className="mt-1 text-[13px] font-semibold text-[var(--wk-text)]">{summary.finalChartSize} entries</div>
-          </div>
+          {[
+            { label: "Chart Family", value: job.chartFamily?.label },
+            { label: "Edition Date", value: job.editionDate },
+            { label: "Chart Size", value: `${job.chartSize} entries` },
+            { label: "Draft Size", value: `${summary.finalChartSize} entries` },
+          ].map(({ label, value }) => (
+            <div key={label} className="rounded-lg border border-[var(--wk-border)] p-3">
+              <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--wk-text-muted)]">{label}</div>
+              <div className="mt-1 text-[13px] font-semibold text-[var(--wk-text)]">{value}</div>
+            </div>
+          ))}
         </div>
 
-        {/* Snapshot Preview (before publish) */}
-        {previewSnapshot && (
-          <div className="mt-4 rounded-lg border border-[var(--wk-brand)]/30 bg-[var(--wk-brand-soft)] p-4">
-            <div className="flex items-center gap-2">
+        {/* Snapshot Preview with CSV Provenance */}
+        {summary.hasDraft && (
+          <div className="mt-4 rounded-xl border border-[var(--wk-brand)]/30 bg-[var(--wk-brand-soft)] p-4">
+            <div className="flex items-center gap-2 mb-3">
               <i className="ri-file-list-3-line text-[var(--wk-brand)]" />
-              <span className="text-[12px] font-semibold text-[var(--wk-brand)]">Snapshot Preview Available</span>
+              <span className="text-[12px] font-bold text-[var(--wk-brand)]">Snapshot Preview</span>
             </div>
-            <div className="mt-2 text-[11px] text-[var(--wk-text-soft)]">
-              A snapshot from a previous publish exists. New publish will create a fresh immutable snapshot.
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {[
+                { label: "Source Summary", value: `${summary.totalSources} sources, ${summary.totalCandidates} candidates` },
+                { label: "CSV Import Sessions", value: csvSessions.length > 0 ? `${csvSessions.length} sessions` : "None" },
+                { label: "CSV Entries", value: csvEntryCount > 0 ? `${csvEntryCount} of ${summary.finalChartSize}` : "None" },
+                { label: "Candidate Count", value: String(summary.totalCandidates) },
+                { label: "Draft Entry Count", value: String(summary.finalChartSize) },
+                { label: "Issue Summary", value: `${summary.highIssues} high, ${summary.mediumIssues} med, ${summary.lowIssues} low` },
+              ].map(({ label, value }) => (
+                <div key={label} className="rounded-lg bg-white/50 p-2">
+                  <div className="text-[10px] font-bold text-[var(--wk-brand)]">{label}</div>
+                  <div className="mt-0.5 text-[11px] font-semibold text-[var(--wk-text)]">{value}</div>
+                </div>
+              ))}
             </div>
+            {csvSessions.length > 0 && (
+              <div className="mt-3 space-y-1">
+                <div className="text-[10px] font-bold text-[var(--wk-brand)] mb-1">CSV Mapping Summary</div>
+                {csvSessions.map((s) => (
+                  <div key={s.id} className="flex items-center justify-between text-[10px] text-[var(--wk-text-soft)]">
+                    <span className="font-semibold">{s.filename}</span>
+                    <span>{s.candidateCount} cands / {Object.keys(s.mappingUsed).length} mapped fields</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {csvSessions.length > 0 && (
+              <div className="mt-2 text-[10px] text-[var(--wk-text-soft)]">
+                <i className="ri-shield-check-line mr-1 text-[var(--wk-brand)]" />
+                This snapshot includes full CSV provenance. Historical source can be verified.
+              </div>
+            )}
           </div>
         )}
 
@@ -244,7 +252,7 @@ export function PublishStep({ jobId, job, summary, onUpdate, role = "admin" }: P
             <div>
               <div className="text-[12px] font-semibold text-[var(--wk-text)]">Immutable Snapshot</div>
               <div className="mt-1 text-[11px] text-[var(--wk-text-muted)]">
-                Publishing creates an immutable snapshot that cannot be altered. Any corrections require a new edition with a correction event. This ensures chart history is auditable and trustworthy.
+                Publishing creates an immutable snapshot with full CSV provenance that cannot be altered. Any corrections require a new edition.
               </div>
             </div>
           </div>
@@ -268,27 +276,13 @@ export function PublishStep({ jobId, job, summary, onUpdate, role = "admin" }: P
             className={`wk-button whitespace-nowrap ${
               allPassed && canPublish ? "wk-button-primary" : "wk-button-danger cursor-not-allowed"
             }`}
-            title={!canPublish ? "You need publish_wakilisha_charts permission" : ""}
           >
             {publishing ? <i className="ri-loader-4-line animate-spin" /> : <i className="ri-check-double-line" />}
             {publishing ? "Publishing..." : "Publish Edition"}
           </button>
           <button className="wk-button wk-button-ghost whitespace-nowrap">
-            <i className="ri-save-line" />
-            Save Draft
+            <i className="ri-save-line" /> Save Draft
           </button>
-          {!canPublish && (
-            <span className="text-[12px] text-[var(--wk-warning)]">
-              <i className="ri-lock-line mr-1" />
-              You need publish_wakilisha_charts
-            </span>
-          )}
-          {!allPassed && canPublish && (
-            <span className="text-[12px] text-[var(--wk-danger)]">
-              {summary.highIssues > 0 && `${summary.highIssues} blocking issues`}
-              {summary.unresolvedMatches > 0 && `${summary.highIssues > 0 ? " + " : ""}${summary.unresolvedMatches} unresolved matches`}
-            </span>
-          )}
         </div>
       </WkSurface>
     </div>

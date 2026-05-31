@@ -1,3 +1,10 @@
+/**
+ * Chart Ingestion — rebuilt around the real WAKILISHA chart data structure.
+ * Phases:
+ *   0 Import Workspace  → 1 CSV Inspector → 2 Edition Assignment
+ *   3 Mapping Studio    → 4 Validation & Repair → 5 Normalized Candidates
+ *   6 Ranking Integrity → 7 Draft Builder → 8 Snapshot Preview
+ */
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
@@ -19,25 +26,25 @@ import {
   ALL_ROLES,
   hasCapability,
   getDisabledReason,
+  getDiscoveredCsvSources,
+  getCsvImportSessions,
 } from "@/services/chartsIngestion/client";
-import { getJobSummary } from "@/services/chartsIngestion/client";
-import type { IngestJob, IngestSource, IngestCandidate, IngestMatch, ReviewIssue, DraftEntry, IngestJobLog, Snapshot, ChartEdition } from "@/services/chartsIngestion/types";
+import type { IngestJob, IngestSource, IngestCandidate, IngestMatch, ReviewIssue, DraftEntry, IngestJobLog, Snapshot, ChartEdition, CsvImportSession, DiscoveredCsvSource } from "@/services/chartsIngestion/types";
+import type { UserRole } from "@/services/chartsIngestion/client";
 
-import { Stepper } from "./components/Stepper";
-import { JobSummaryRail } from "./components/JobSummaryRail";
-import { SetupStep } from "./components/SetupStep";
-import { SourcesStep } from "./components/SourcesStep";
-import { FetchStep } from "./components/FetchStep";
-import { CandidatesStep } from "./components/CandidatesStep";
-import { MatchingStep } from "./components/MatchingStep";
-import { IssuesStep } from "./components/IssuesStep";
-import { RankingStep } from "./components/RankingStep";
-import { DraftStep } from "./components/DraftStep";
-import { PublishStep } from "./components/PublishStep";
+import { PhaseNav } from "./components/PhaseNav";
+import { ImportWorkspace } from "./components/ImportWorkspace";
+import { CsvInspector } from "./components/CsvInspector";
+import { EditionAssignment } from "./components/EditionAssignment";
+import { MappingStudio } from "./components/MappingStudio";
+import { ValidationRepair } from "./components/ValidationRepair";
+import { NormalizedCandidates } from "./components/NormalizedCandidates";
+import { RankingIntegrity } from "./components/RankingIntegrity";
+import { DraftBuilder } from "./components/DraftBuilder";
+import { SnapshotPreview } from "./components/SnapshotPreview";
 import { Timeline } from "./components/Timeline";
 import { ApiContractDrawer } from "./components/ApiContractDrawer";
 import { SimulationPanel } from "./components/SimulationPanel";
-import type { UserRole } from "@/services/chartsIngestion/client";
 
 const STATUS_COLORS: Record<string, string> = {
   draft: "bg-[var(--wk-text-faint)]/10 text-[var(--wk-text-faint)]",
@@ -57,6 +64,18 @@ function formatStatus(status: string): string {
   return status.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
 }
 
+const PHASES = [
+  { id: "import", label: "Import Workspace", icon: "ri-folder-upload-line" },
+  { id: "inspect", label: "CSV Inspector", icon: "ri-file-search-line" },
+  { id: "edition", label: "Edition Assignment", icon: "ri-calendar-todo-line" },
+  { id: "mapping", label: "Mapping Studio", icon: "ri-git-merge-line" },
+  { id: "validation", label: "Validation & Repair", icon: "ri-shield-check-line" },
+  { id: "candidates", label: "Normalized Candidates", icon: "ri-list-check-2" },
+  { id: "ranking", label: "Ranking Integrity", icon: "ri-bar-chart-grouped-line" },
+  { id: "draft", label: "Draft Builder", icon: "ri-draft-line" },
+  { id: "snapshot", label: "Snapshot Preview", icon: "ri-lock-2-line" },
+];
+
 export default function AdminChartsIngestDetail() {
   const { jobId } = useParams<{ jobId: string }>();
   const navigate = useNavigate();
@@ -71,17 +90,21 @@ export default function AdminChartsIngestDetail() {
   const [logs, setLogs] = useState<IngestJobLog[]>([]);
   const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
   const [editions, setEditions] = useState<ChartEdition[]>([]);
-  const [summary, setSummary] = useState<ReturnType<typeof getJobSummary> | null>(null);
-  const [activeStep, setActiveStep] = useState(0);
+  const [summary, setSummary] = useState<ReturnType<typeof getJobSummaryApi> | null>(null);
+  const [activePhase, setActivePhase] = useState(0);
   const [loading, setLoading] = useState(true);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showContract, setShowContract] = useState(false);
   const [showTimeline, setShowTimeline] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "error" | "warning" | "success" } | null>(null);
+  const [discoveredCsvs, setDiscoveredCsvs] = useState<DiscoveredCsvSource[]>([]);
+  const [importSessions, setImportSessions] = useState<CsvImportSession[]>([]);
+  const [selectedCsv, setSelectedCsv] = useState<DiscoveredCsvSource | null>(null);
+  const [selectedEditionId, setSelectedEditionId] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     if (!jobId) return;
-    const [j, s, c, m, i, d, sum, l, sn, e] = await Promise.all([
+    const [j, s, c, m, i, d, sum, l, sn, e, csvs, sessions] = await Promise.all([
       getIngestJob(jobId),
       getSources(jobId),
       getCandidates(jobId),
@@ -92,6 +115,8 @@ export default function AdminChartsIngestDetail() {
       getJobLogs(jobId),
       getSnapshots(),
       getEditionsApi(),
+      getDiscoveredCsvSources(),
+      getCsvImportSessions(jobId),
     ]);
     setJob(j);
     setSources(s);
@@ -103,22 +128,8 @@ export default function AdminChartsIngestDetail() {
     setLogs(l);
     setSnapshots(sn);
     setEditions(e);
-    if (j) {
-      const statusStepMap: Record<string, number> = {
-        draft: 0,
-        fetching: 2,
-        normalizing: 3,
-        matching: 4,
-        scoring: 6,
-        review: 5,
-        ready_to_draft: 7,
-        drafted: 7,
-        published: 8,
-        failed: -1,
-        cancelled: -1,
-      };
-      setActiveStep(statusStepMap[j.status] ?? 0);
-    }
+    setDiscoveredCsvs(csvs);
+    setImportSessions(sessions);
     setLoading(false);
   }, [jobId]);
 
@@ -145,6 +156,15 @@ export default function AdminChartsIngestDetail() {
     setRole(newRole);
     setShowRoleMenu(false);
     showToast(`Switched to ${getRoleLabel(newRole)} role`, "success");
+  };
+
+  const handleSelectCsv = (csv: DiscoveredCsvSource) => {
+    setSelectedCsv(csv);
+    setActivePhase(1);
+  };
+
+  const handleGoToPhase = (phase: number) => {
+    setActivePhase(phase);
   };
 
   if (loading) {
@@ -177,8 +197,11 @@ export default function AdminChartsIngestDetail() {
   const jobEdition = editions.find((e) => e.ingestJobId === jobId) ?? null;
   const jobSnapshot = snapshots.find((s) => s.editionId === jobEdition?.id) ?? null;
 
+  const csvSources = sources.filter((s) => s.provider === "csv");
+  const hasCsvSources = csvSources.length > 0;
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Toast */}
       {toast && (
         <div className={`fixed bottom-6 right-6 z-50 rounded-xl px-4 py-3 shadow-lg ${
@@ -225,11 +248,16 @@ export default function AdminChartsIngestDetail() {
               <span>{job.rulesetKey}</span>
               <span>·</span>
               <span>by {job.createdBy}</span>
+              {importSessions.length > 0 && (
+                <>
+                  <span>·</span>
+                  <span className="text-[var(--wk-brand)]">{importSessions.length} CSV import(s)</span>
+                </>
+              )}
             </div>
           </div>
         </div>
         <div className="flex items-center gap-2 relative flex-wrap">
-          {/* Role Selector */}
           <div className="relative">
             <button
               onClick={() => setShowRoleMenu(!showRoleMenu)}
@@ -311,7 +339,7 @@ export default function AdminChartsIngestDetail() {
           )}
           {isPublishable && !hasBlockingIssues && (
             <button
-              onClick={() => setActiveStep(8)}
+              onClick={() => setActivePhase(8)}
               className="wk-button wk-button-primary whitespace-nowrap"
             >
               <i className="ri-check-double-line" />
@@ -327,13 +355,19 @@ export default function AdminChartsIngestDetail() {
         </div>
       </div>
 
-      {/* Stepper */}
+      {/* Phase Navigation */}
       <WkSurface className="p-4">
-        <Stepper
-          jobId={job.id}
-          jobStatus={job.status}
-          activeStep={activeStep}
-          onStepChange={setActiveStep}
+        <PhaseNav
+          phases={PHASES}
+          activePhase={activePhase}
+          onPhaseChange={setActivePhase}
+          job={job}
+          summary={summary}
+          candidates={candidates}
+          issues={issues}
+          draftEntries={draftEntries}
+          discoveredCsvs={discoveredCsvs}
+          importSessions={importSessions}
         />
       </WkSurface>
 
@@ -343,34 +377,107 @@ export default function AdminChartsIngestDetail() {
       )}
 
       {/* Timeline (collapsible) */}
-      {showTimeline && (
-        <Timeline logs={logs} jobId={job.id} />
-      )}
+      {showTimeline && <Timeline logs={logs} jobId={job.id} />}
 
-      {/* Main Content + Rail */}
-      <div className="grid gap-5 lg:grid-cols-[1fr_280px]">
-        {/* Step Content */}
-        <div>
-          {activeStep === 0 && <SetupStep job={job} />}
-          {activeStep === 1 && <SourcesStep jobId={job.id} sources={sources} onUpdate={handleUpdate} role={role} />}
-          {activeStep === 2 && <FetchStep sources={sources} />}
-          {activeStep === 3 && <CandidatesStep jobId={job.id} candidates={candidates} matches={matches} issues={issues} onUpdate={handleUpdate} role={role} />}
-          {activeStep === 4 && <MatchingStep jobId={job.id} candidates={candidates} matches={matches} onUpdate={handleUpdate} role={role} />}
-          {activeStep === 5 && <IssuesStep jobId={job.id} issues={issues} onUpdate={handleUpdate} role={role} />}
-          {activeStep === 6 && <RankingStep jobId={job.id} candidates={candidates} onUpdate={handleUpdate} role={role} />}
-          {activeStep === 7 && <DraftStep jobId={job.id} job={job} draftEntries={draftEntries} hasBlockingIssues={summary.hasBlockingIssues} hasUnresolvedMatches={summary.hasUnresolvedMatches} onUpdate={handleUpdate} role={role} />}
-          {activeStep === 8 && <PublishStep jobId={job.id} job={job} summary={summary} onUpdate={handleUpdate} role={role} />}
-        </div>
-
-        {/* Summary Rail */}
-        <div className="hidden lg:block">
-          <JobSummaryRail job={job} summary={summary} />
-        </div>
-      </div>
-
-      {/* Mobile Summary Rail */}
-      <div className="lg:hidden">
-        <JobSummaryRail job={job} summary={summary} collapsed />
+      {/* Main Content */}
+      <div>
+        {activePhase === 0 && (
+          <ImportWorkspace
+            jobId={job.id}
+            discoveredCsvs={discoveredCsvs}
+            importSessions={importSessions}
+            onSelectCsv={handleSelectCsv}
+            onUpdate={handleUpdate}
+            role={role}
+          />
+        )}
+        {activePhase === 1 && (
+          <CsvInspector
+            csv={selectedCsv}
+            discoveredCsvs={discoveredCsvs}
+            onSelectCsv={handleSelectCsv}
+            onGoToPhase={handleGoToPhase}
+            onUpdate={handleUpdate}
+            role={role}
+          />
+        )}
+        {activePhase === 2 && (
+          <EditionAssignment
+            job={job}
+            discoveredCsvs={discoveredCsvs}
+            selectedCsv={selectedCsv}
+            onSelectCsv={handleSelectCsv}
+            onUpdate={handleUpdate}
+            role={role}
+          />
+        )}
+        {activePhase === 3 && (
+          <MappingStudio
+            csv={selectedCsv}
+            discoveredCsvs={discoveredCsvs}
+            onSelectCsv={handleSelectCsv}
+            onUpdate={handleUpdate}
+            role={role}
+          />
+        )}
+        {activePhase === 4 && (
+          <ValidationRepair
+            jobId={job.id}
+            discoveredCsvs={discoveredCsvs}
+            candidates={candidates}
+            issues={issues}
+            importSessions={importSessions}
+            onUpdate={handleUpdate}
+            role={role}
+          />
+        )}
+        {activePhase === 5 && (
+          <NormalizedCandidates
+            jobId={job.id}
+            candidates={candidates}
+            matches={matches}
+            issues={issues}
+            importSessions={importSessions}
+            onUpdate={handleUpdate}
+            role={role}
+          />
+        )}
+        {activePhase === 6 && (
+          <RankingIntegrity
+            jobId={job.id}
+            job={job}
+            candidates={candidates}
+            onUpdate={handleUpdate}
+            role={role}
+          />
+        )}
+        {activePhase === 7 && (
+          <DraftBuilder
+            jobId={job.id}
+            job={job}
+            draftEntries={draftEntries}
+            candidates={candidates}
+            importSessions={importSessions}
+            hasBlockingIssues={summary.hasBlockingIssues}
+            hasUnresolvedMatches={summary.hasUnresolvedMatches}
+            onUpdate={handleUpdate}
+            role={role}
+          />
+        )}
+        {activePhase === 8 && (
+          <SnapshotPreview
+            jobId={job.id}
+            job={job}
+            summary={summary}
+            draftEntries={draftEntries}
+            importSessions={importSessions}
+            candidates={candidates}
+            issues={issues}
+            sources={sources}
+            onUpdate={handleUpdate}
+            role={role}
+          />
+        )}
       </div>
 
       {/* API Contract Drawer */}

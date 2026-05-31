@@ -166,6 +166,35 @@ export function IssuesStep({ jobId, issues, onUpdate, role = "admin" }: IssuesSt
           </div>
         </div>
       )}
+
+      {/* CSV Validation Issues Banner */}
+      {(() => {
+        const csvIssues = issues.filter(
+          (i) => i.message.startsWith("CSV") && i.status === "open"
+        );
+        return csvIssues.length > 0 ? (
+          <div className="rounded-xl border border-[var(--wk-brand)] bg-[var(--wk-brand-soft)] p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <i className="ri-file-list-line text-[var(--wk-brand)]" />
+              <span className="text-[12px] font-bold text-[var(--wk-brand)]">
+                {csvIssues.length} CSV Validation {csvIssues.length === 1 ? "Issue" : "Issues"}
+              </span>
+            </div>
+            <div className="space-y-1">
+              {csvIssues.map((issue) => (
+                <div key={issue.id} className="text-[11px] text-[var(--wk-text-soft)]">
+                  <i className={`mr-1 ${
+                    issue.severity === "high" ? "ri-error-warning-line text-[var(--wk-danger)]" :
+                    issue.severity === "medium" ? "ri-alert-line text-[var(--wk-warning)]" :
+                    "ri-information-line text-[var(--wk-info)]"
+                  }`} />
+                  {issue.message}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null;
+      })()}
     </div>
   );
 }

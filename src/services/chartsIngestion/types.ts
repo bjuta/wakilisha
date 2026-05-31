@@ -28,6 +28,8 @@ export type SourceType =
   | "legacy_wakilisha"
   | "previous_edition";
 
+export type CandidateSourceType = "mock" | "csv" | "manual" | "streaming" | "airplay" | "legacy";
+
 export type SourceStatus = "pending" | "fetching" | "completed" | "failed";
 
 export type Provider =
@@ -183,6 +185,7 @@ export interface IngestCandidate {
   manualRankOverride: number | null;
   finalRank: number | null;
   status: CandidateStatus;
+  sourceType?: CandidateSourceType;
   createdAt: string;
   updatedAt: string;
 }
@@ -229,6 +232,34 @@ export interface DraftEntry {
   score: number;
   entryPayload: Record<string, unknown>;
   locked: boolean;
+  sourceType?: CandidateSourceType;
+  csvProvenance?: {
+    sourceFilename: string;
+    sourceRowNumber: number;
+    rawRowHash: string;
+    mappedRankField: string;
+    mappedTitleField: string;
+    mappedArtistField: string;
+  };
+}
+
+export interface CsvImportSession {
+  id: string;
+  jobId: string;
+  filename: string;
+  sourceId: string;
+  rowCount: number;
+  validRows: number;
+  candidateCount: number;
+  issueCount: number;
+  normalizedAt: string;
+  normalizedBy: string;
+  mappingUsed: Record<string, string>;
+  validationSummary: {
+    errors: string[];
+    warnings: string[];
+    skippedRows: number;
+  };
 }
 
 export interface ScoreBreakdown {
@@ -271,6 +302,43 @@ export interface CsvMappingPreview {
   duplicateRows: number;
   columns: CsvColumnMapping[];
   readyToNormalize: boolean;
+}
+
+export interface DiscoveredCsvSource {
+  id: string;
+  filename: string;
+  filepath: string;
+  chartType: string;
+  confidence: "high" | "medium" | "low";
+  rowCount: number;
+  detectedDate: string | null;
+  detectedWeek: string | null;
+  mappingStatus: "mapped" | "partial" | "unmapped";
+  validationStatus: "valid" | "warnings" | "errors";
+  validationIssues: string[];
+  mappedFields: Record<string, string>;
+  headers: string[];
+  sampleRows: Record<string, string>[];
+  usedAsSource: boolean;
+  addedAt: string | null;
+  provenance: CsvRowProvenance[];
+}
+
+export interface CsvRowProvenance {
+  sourceFilename: string;
+  sourceRowNumber: number;
+  rawRowHash: string;
+  rawPayload: Record<string, string>;
+  mappedFields: Record<string, string>;
+  sourcePosition: number | null;
+}
+
+export interface CsvNormalizationResult {
+  candidateCount: number;
+  errors: string[];
+  warnings: string[];
+  skippedRows: number;
+  provenance: CsvRowProvenance[];
 }
 
 export interface ChartEdition {
