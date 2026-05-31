@@ -49,12 +49,23 @@ function sortEditions<T extends { date: string | null; label: string }>(editions
   return editions.slice().sort((a, b) => dateScore(b.date) - dateScore(a.date) || b.label.localeCompare(a.label));
 }
 
+const fallbackChartSeries = importedRegistry.chartEntries.length
+  ? [{ id: 'imported-chart', slug: 'imported-chart', label: 'Imported WAKILISHA Chart', description: 'Imported chart entries from the WAKILISHA registry', status: 'active' }]
+  : [];
+
+const fallbackChartEditions = importedRegistry.chartEntries.length
+  ? [{ id: importedRegistry.chartEntries[0].editionId || 'imported-edition', slug: importedRegistry.chartEntries[0].editionId || 'imported-edition', seriesId: importedRegistry.chartEntries[0].seriesId || 'imported-chart', label: 'Imported Edition', date: null, period: null, methodology: 'Compiled from imported WAKILISHA chart entries.' }]
+  : [];
+
+const effectiveChartSeries = importedRegistry.chartSeries.length ? importedRegistry.chartSeries : fallbackChartSeries;
+const effectiveChartEditions = importedRegistry.chartEditions.length ? importedRegistry.chartEditions : fallbackChartEditions;
+
 export function hasImportedRegistryData() {
   return importedRegistry.artists.length + importedRegistry.tracks.length + importedRegistry.labels.length + importedRegistry.chartEntries.length > 0;
 }
 
 export function hasImportedChartData() {
-  return importedRegistry.chartSeries.length > 0 && importedRegistry.chartEditions.length > 0 && importedRegistry.chartEntries.length > 0;
+  return importedRegistry.chartEntries.length > 0;
 }
 
 export const getArtists = () => importedRegistry.artists;
@@ -62,8 +73,8 @@ export const getTracks = () => importedRegistry.tracks;
 export const getLabels = () => importedRegistry.labels;
 export const getReleases = () => importedRegistry.releases;
 export const getGenres = () => importedRegistry.genres;
-export const getChartSeries = () => importedRegistry.chartSeries;
-export const getChartEditions = () => importedRegistry.chartEditions;
+export const getChartSeries = () => effectiveChartSeries;
+export const getChartEditions = () => effectiveChartEditions;
 export const getArtistBySlug = (slug: string) => artistsBySlug.get(slug) ?? null;
 export const getTrackBySlug = (slug: string) => tracksBySlug.get(slug) ?? null;
 export const getLabelBySlug = (slug: string) => labelsBySlug.get(slug) ?? null;
@@ -74,27 +85,30 @@ export const resolveArtist = (artistId: string | null | undefined) => artistId ?
 export const resolveLabel = (labelId: string | null | undefined) => labelId ? labelsById.get(labelId) ?? null : null;
 
 export function getChartEditionsForSeries(seriesSlug: string) {
-  const series = importedRegistry.chartSeries.find((item) => item.slug === seriesSlug || item.id === seriesSlug);
+  const series = effectiveChartSeries.find((item) => item.slug === seriesSlug || item.id === seriesSlug) ?? effectiveChartSeries[0];
   if (!series) return [];
-  return sortEditions(chartEditionsBySeries.get(series.id) ?? []);
+  const editions = chartEditionsBySeries.get(series.id) ?? effectiveChartEditions.filter((edition) => edition.seriesId === series.id);
+  return sortEditions(editions.length ? editions : effectiveChartEditions);
 }
 
 export function getLatestChartEdition(seriesSlug?: string) {
   const series = seriesSlug
-    ? importedRegistry.chartSeries.find((item) => item.slug === seriesSlug || item.id === seriesSlug)
-    : importedRegistry.chartSeries[0];
+    ? effectiveChartSeries.find((item) => item.slug === seriesSlug || item.id === seriesSlug)
+    : effectiveChartSeries[0];
   if (!series) return null;
   return getChartEditionsForSeries(series.slug)[0] ?? null;
 }
 
 export function getChartEdition(seriesSlug: string, editionSlug: string) {
-  const series = importedRegistry.chartSeries.find((item) => item.slug === seriesSlug || item.id === seriesSlug);
+  const series = effectiveChartSeries.find((item) => item.slug === seriesSlug || item.id === seriesSlug);
   if (!series) return null;
-  return importedRegistry.chartEditions.find((edition) => edition.seriesId === series.id && (edition.slug === editionSlug || edition.id === editionSlug)) ?? null;
+  return effectiveChartEditions.find((edition) => edition.seriesId === series.id && (edition.slug === editionSlug || edition.id === editionSlug)) ?? getLatestChartEdition(seriesSlug);
 }
 
 export function getChartEntriesForEdition(editionId: string) {
-  return (chartEntriesByEdition.get(editionId) ?? []).slice().sort((a, b) => a.rank - b.rank);
+  const exact = chartEntriesByEdition.get(editionId) ?? [];
+  const rows = exact.length ? exact : importedRegistry.chartEntries;
+  return rows.slice().sort((a, b) => a.rank - b.rank);
 }
 
 export function getArtistTopChartPosition(artist: ImportedArtist) {
@@ -175,24 +189,24 @@ export function toChartRow(entry: ImportedChartEntry) {
 
 export function getLatestChartRows(seriesSlug?: string) {
   const edition = getLatestChartEdition(seriesSlug);
-  return edition ? getChartEntriesForEdition(edition.id).map(toChartRow) : [];
+  return edition ? getChartEntriesForEdition(edition.id).map(toChartRow) : importedRegistry.chartEntries.slice().sort((a, b) => a.rank - b.rank).map(toChartRow);
 }
 
 export function getChartRowsForEdition(seriesSlug: string, editionSlug: string) {
   const edition = getChartEdition(seriesSlug, editionSlug);
-  return edition ? getChartEntriesForEdition(edition.id).map(toChartRow) : [];
+  return edition ? getChartEntriesForEdition(edition.id).map(toChartRow) : importedRegistry.chartEntries.slice().sort((a, b) => a.rank - b.rank).map(toChartRow);
 }
 
 export function getChartSeriesSummaries() {
-  return importedRegistry.chartSeries.map((series) => {
+  return effectiveChartSeries.map((series) => {
     const editions = getChartEditionsForSeries(series.slug);
     const latestEdition = editions[0] ?? null;
-    const entryCount = latestEdition ? getChartEntriesForEdition(latestEdition.id).length : 0;
+    const rows = latestEdition ? getChartEntriesForEdition(latestEdition.id) : importedRegistry.chartEntries;
     return {
       id: series.slug,
       label: series.label,
       description: series.description ?? 'Imported WAKILISHA chart series',
-      count: entryCount,
+      count: rows.length,
       editionCount: editions.length,
       latestEdition,
       status: series.status ?? 'active',
