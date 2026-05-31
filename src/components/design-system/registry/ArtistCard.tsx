@@ -1,5 +1,4 @@
 import { Link } from "react-router-dom";
-import { WkTag } from "@/components/design-system/primitives/Tag";
 
 export interface ArtistCardProps {
   slug: string;
@@ -9,6 +8,7 @@ export interface ArtistCardProps {
   trackCount?: number;
   releaseCount?: number;
   isChartArtist?: boolean;
+  country?: string;
 }
 
 export function ArtistCard({
@@ -19,13 +19,16 @@ export function ArtistCard({
   trackCount,
   releaseCount,
   isChartArtist,
+  country,
 }: ArtistCardProps) {
   return (
     <Link
       to={`/artists/${slug}`}
-      className="group block rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] overflow-hidden transition-all hover:border-[var(--wk-border-2)]"
+      className="group relative block overflow-hidden rounded-xl border border-[var(--wk-border)] transition-all hover:border-[var(--wk-border-2)]"
+      style={{ aspectRatio: "3/4" }}
     >
-      <div className="relative aspect-[4/3] bg-[var(--wk-surface-raised)]">
+      {/* Image fills entire card */}
+      <div className="absolute inset-0 bg-[var(--wk-surface-raised)]">
         {imageUrl ? (
           <img
             src={imageUrl}
@@ -37,32 +40,50 @@ export function ArtistCard({
             <i className="ri-user-3-line text-4xl text-[var(--wk-text-faint)]" />
           </div>
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
-        {isChartArtist && (
-          <div className="absolute right-2 top-2">
-            <WkTag variant="brand">
-              <i className="ri-bar-chart-line" />
-              Charts
-            </WkTag>
-          </div>
-        )}
       </div>
-      <div className="p-3">
-        <h3 className="truncate text-[14px] font-bold text-[var(--wk-text)]">{name}</h3>
-        <div className="mt-1 flex items-center gap-2 text-[11px] text-[var(--wk-text-muted)]">
+
+      {/* Dark gradient overlay for text */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
+
+      {/* Chart badge */}
+      {isChartArtist && (
+        <div className="absolute right-3 top-3">
+          <span className="inline-flex items-center gap-1 rounded-full bg-[var(--wk-brand)] px-2.5 py-1 text-[10px] font-bold text-[var(--wk-brand-on)] uppercase tracking-wider">
+            <i className="ri-bar-chart-line text-[9px]" />
+            Charts
+          </span>
+        </div>
+      )}
+
+      {/* Text overlay at bottom */}
+      <div className="absolute bottom-0 left-0 right-0 p-4">
+        <h3 className="text-[16px] font-bold leading-tight text-white">{name}</h3>
+        <div className="mt-1 flex items-center gap-1.5 text-[11px] text-white/60">
+          {country && <span>{country}</span>}
+          {country && (trackCount !== undefined || releaseCount !== undefined) && <span>·</span>}
           {trackCount !== undefined && <span>{trackCount} tracks</span>}
-          {trackCount !== undefined && releaseCount !== undefined && (
-            <span className="text-[var(--wk-text-faint)]">·</span>
-          )}
+          {trackCount !== undefined && releaseCount !== undefined && <span>·</span>}
           {releaseCount !== undefined && <span>{releaseCount} releases</span>}
         </div>
         {genres.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1">
             {genres.slice(0, 2).map((g) => (
-              <WkTag key={g}>{g}</WkTag>
+              <span
+                key={g}
+                className="rounded-full border border-white/20 bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-white/80 backdrop-blur-sm"
+              >
+                {g}
+              </span>
             ))}
           </div>
         )}
+      </div>
+
+      {/* Hover overlay */}
+      <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition-all group-hover:bg-black/30">
+        <div className="flex h-11 w-11 translate-y-4 items-center justify-center rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] opacity-0 transition-all group-hover:translate-y-0 group-hover:opacity-100">
+          <i className="ri-arrow-right-line text-lg" />
+        </div>
       </div>
     </Link>
   );

@@ -1,16 +1,19 @@
 import { useParams, Link } from "react-router-dom";
-import { WkTag } from "@/components/design-system/primitives/Tag";
-import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { WkButton } from "@/components/design-system/primitives/Button";
-import { ChartRow } from "@/components/design-system/music/ChartRow";
-import { ReleaseCard } from "@/components/design-system/registry/ReleaseCard";
-import { ARTIST_DETAILS } from "@/mocks/artistDetails";
+import { ARTIST_DETAILS, getArtistDetail, generateArtistDetailFromBase } from "@/mocks/artistDetails";
+import { ARTISTS } from "@/mocks/artists";
+import { ArtistDetailHero } from "./components/ArtistDetailHero";
+import { ArtistStatsBar } from "./components/ArtistStatsBar";
+import { ArtistChartSection } from "./components/ArtistChartSection";
+import { ArtistDiscography } from "./components/ArtistDiscography";
+import { RelatedArtistsShelf } from "./components/RelatedArtistsShelf";
 
 export default function ArtistDetail() {
   const { slug } = useParams<{ slug: string }>();
-  const artist = ARTIST_DETAILS.find((a) => a.slug === slug);
+  const base = ARTISTS.find((a) => a.slug === slug);
+  const detail = getArtistDetail(slug) || (base ? generateArtistDetailFromBase(base) : undefined);
 
-  if (!artist) {
+  if (!base || !detail) {
     return (
       <div className="wk-container px-6 py-20 text-center">
         <i className="ri-user-line mb-4 block text-5xl text-[var(--wk-text-faint)]" />
@@ -23,147 +26,104 @@ export default function ArtistDetail() {
     );
   }
 
+  // Merge base + detail
+  const artist = {
+    name: base.name,
+    imageUrl: detail?.imageUrl || base.imageUrl,
+    genres: base.genres,
+    country: base.country || "Nigeria",
+    debutYear: base.debutYear || 2010,
+    monthlyStreams: base.monthlyStreams || 0,
+    trackCount: base.trackCount,
+    releaseCount: base.releaseCount,
+    isChartArtist: base.isChartArtist,
+    topChartPosition: base.topChartPosition,
+    bio: detail?.bio || base.spotlightBio || `${base.name} is an artist in the WAKILISHA registry.`,
+    isRising: base.isRising,
+    chartEntries: detail?.chartEntries,
+    releases: detail?.releases,
+    relatedArtists: detail?.relatedArtists,
+  };
+
+  const stats = [
+    { label: "Tracks", value: artist.trackCount, icon: "ri-music-2-line" },
+    { label: "Releases", value: artist.releaseCount, icon: "ri-album-line" },
+    { label: "Monthly streams", value: artist.monthlyStreams, suffix: "M", icon: "ri-headphone-line" },
+    { label: "Peak chart", value: artist.isChartArtist ? `#${artist.topChartPosition}` : "—", icon: "ri-bar-chart-line" },
+  ];
+
+  // Enrich related artists with images
+  const relatedArtists = artist.relatedArtists?.map((ra) => {
+    const found = ARTISTS.find((a) => a.slug === ra.slug);
+    return { ...ra, imageUrl: found?.imageUrl };
+  });
+
   return (
-    <>
-      {/* Artist Hero */}
-      <section className="relative min-h-[360px] md:min-h-[440px] flex items-end overflow-hidden">
-        {artist.imageUrl && (
-          <>
-            <div
-              className="absolute inset-0"
-              style={{
-                backgroundImage: `url(${artist.imageUrl})`,
-                backgroundSize: "cover",
-                backgroundPosition: "center",
-              }}
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/20" />
-          </>
-        )}
-        <div className="relative wk-container px-6 pb-10 pt-16 w-full">
-          <div className="mb-3 flex items-center gap-2">
-            <div className="wk-eyebrow" style={{ color: "var(--wk-brand)" }}>Registry</div>
-            {artist.isChartArtist && <WkTag variant="brand">Charts</WkTag>}
-          </div>
-          <h1 className="wk-h-page mb-3" style={{ color: "#F0EFE8" }}>
-            {artist.name}
-          </h1>
-          <div className="flex flex-wrap items-center gap-3 text-[14px]" style={{ color: "rgba(240,239,232,.7)" }}>
-            {artist.genres.map((g) => (
-              <span key={g} className="rounded-full border border-white/20 px-3 py-1 text-[12px] font-semibold">
-                {g}
-              </span>
-            ))}
-            <span>·</span>
-            <span>{artist.trackCount} tracks</span>
-            <span>·</span>
-            <span>{artist.releaseCount} releases</span>
-          </div>
+    <div className="wk-app-shell">
+      {/* Hero */}
+      <ArtistDetailHero {...artist} />
+
+      {/* Stats bar */}
+      <ArtistStatsBar stats={stats} />
+
+      {/* Bio — full editorial width */}
+      <section className="wk-container px-6 py-10 md:py-16">
+        <div className="mx-auto max-w-3xl">
+          <div className="wk-eyebrow mb-3">About the artist</div>
+          <p className="text-[16px] leading-[1.65] text-[var(--wk-text-soft)] md:text-[18px]">
+            {artist.bio}
+          </p>
         </div>
       </section>
 
-      <div className="wk-container px-6 py-10">
-        <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
-          <div className="space-y-10">
-            {/* Bio */}
-            {artist.bio && (
-              <div>
-                <h2 className="mb-4 text-[12px] font-black uppercase tracking-wider text-[var(--wk-text-muted)]">
-                  About
-                </h2>
-                <p className="text-[15px] leading-relaxed text-[var(--wk-text-soft)]">
-                  {artist.bio}
-                </p>
-              </div>
-            )}
-
-            {/* Chart Appearances */}
-            {artist.chartEntries && artist.chartEntries.length > 0 && (
-              <div>
-                <h2 className="mb-4 text-[12px] font-black uppercase tracking-wider text-[var(--wk-text-muted)]">
-                  Chart appearances
-                </h2>
-                <WkSurface className="overflow-hidden">
-                  <div className="divide-y divide-[var(--wk-divider)]">
-                    {artist.chartEntries.map((entry) => (
-                      <ChartRow key={entry.rank} {...entry} />
-                    ))}
-                  </div>
-                </WkSurface>
-              </div>
-            )}
-
-            {/* Releases */}
-            {artist.releases && artist.releases.length > 0 && (
-              <div>
-                <h2 className="mb-4 text-[12px] font-black uppercase tracking-wider text-[var(--wk-text-muted)]">
-                  Releases
-                </h2>
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-                  {artist.releases.map((release) => (
-                    <ReleaseCard key={release.slug} {...release} />
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Sidebar */}
-          <aside className="space-y-6">
-            {/* Stats */}
-            <div className="rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-5">
-              <h3 className="mb-3 text-[12px] font-black uppercase tracking-wider text-[var(--wk-text-muted)]">
-                Stats
+      {/* Chart entries */}
+      {artist.chartEntries && artist.chartEntries.length > 0 && (
+        <ArtistChartSection entries={artist.chartEntries} />
+      )}
+      {(!artist.chartEntries || artist.chartEntries.length === 0) && (
+        <section className="py-10 md:py-14">
+          <div className="wk-container px-6">
+            <div className="mb-6">
+              <div className="wk-eyebrow mb-2">Chart performance</div>
+              <h3 className="text-[clamp(24px,3vw,40px)] font-black leading-[0.92] tracking-[-0.04em] text-[var(--wk-text)]">
+                Chart entries
               </h3>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-[13px] text-[var(--wk-text-soft)]">Tracks</span>
-                  <span className="text-[14px] font-bold text-[var(--wk-text)]">{artist.trackCount}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[13px] text-[var(--wk-text-soft)]">Releases</span>
-                  <span className="text-[14px] font-bold text-[var(--wk-text)]">{artist.releaseCount}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[13px] text-[var(--wk-text-soft)]">Charts</span>
-                  <span className="text-[14px] font-bold text-[var(--wk-text)]">
-                    {artist.chartEntries?.length ?? 0}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[13px] text-[var(--wk-text-soft)]">Peak position</span>
-                  <span className="text-[14px] font-bold text-[var(--wk-brand)]">
-                    #{Math.min(...(artist.chartEntries?.map((e) => e.peakPosition ?? 999) ?? [999]))}
-                  </span>
-                </div>
-              </div>
             </div>
+            <div className="rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-10 text-center">
+              <i className="ri-bar-chart-line mb-3 block text-4xl text-[var(--wk-text-faint)]" />
+              <p className="text-[15px] font-semibold text-[var(--wk-text-muted)]">No chart entries yet</p>
+              <p className="mt-1 text-[13px] text-[var(--wk-text-faint)]">This artist hasn't appeared on the WAKILISHA charts yet.</p>
+            </div>
+          </div>
+        </section>
+      )}
 
-            {/* Related Artists */}
-            {artist.relatedArtists && artist.relatedArtists.length > 0 && (
-              <div className="rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-5">
-                <h3 className="mb-3 text-[12px] font-black uppercase tracking-wider text-[var(--wk-text-muted)]">
-                  Related artists
-                </h3>
-                <div className="space-y-2">
-                  {artist.relatedArtists.map((a) => (
-                    <Link
-                      key={a.slug}
-                      to={`/artists/${a.slug}`}
-                      className="flex items-center gap-3 rounded-lg p-2 transition-colors hover:bg-[var(--wk-surface-raised)]"
-                    >
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--wk-surface-raised)]">
-                        <i className="ri-user-line text-[var(--wk-text-muted)]" />
-                      </div>
-                      <span className="text-[13px] font-semibold text-[var(--wk-text)]">{a.name}</span>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            )}
-          </aside>
-        </div>
-      </div>
-    </>
+      {/* Discography */}
+      {artist.releases && artist.releases.length > 0 && (
+        <ArtistDiscography releases={artist.releases} />
+      )}
+      {(!artist.releases || artist.releases.length === 0) && (
+        <section className="py-10 md:py-14">
+          <div className="wk-container px-6">
+            <div className="mb-6">
+              <div className="wk-eyebrow mb-2">Discography</div>
+              <h3 className="text-[clamp(24px,3vw,40px)] font-black leading-[0.92] tracking-[-0.04em] text-[var(--wk-text)]">
+                Releases
+              </h3>
+            </div>
+            <div className="rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-10 text-center">
+              <i className="ri-album-line mb-3 block text-4xl text-[var(--wk-text-faint)]" />
+              <p className="text-[15px] font-semibold text-[var(--wk-text-muted)]">No releases yet</p>
+              <p className="mt-1 text-[13px] text-[var(--wk-text-faint)]">This artist's discography hasn't been added to the registry yet.</p>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Related artists */}
+      {relatedArtists && relatedArtists.length > 0 && (
+        <RelatedArtistsShelf artists={relatedArtists} />
+      )}
+    </div>
   );
 }

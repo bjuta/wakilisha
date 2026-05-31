@@ -1,10 +1,10 @@
 export const SECTIONS = [
-  { name: "All", color: "#1a1a1a" },
-  { name: "Analysis", color: "#C44A3B" },
-  { name: "Focus", color: "#D97706" },
-  { name: "Industry", color: "#78716C" },
-  { name: "Culture", color: "#BE185D" },
-  { name: "Interview", color: "#256B5A" },
+  { name: "All", color: "#1a1a1a", accentBg: "#F8F7F4", accentText: "#1a1a1a" },
+  { name: "Analysis", color: "#C44A3B", accentBg: "#FDF5F3", accentText: "#C44A3B", tone: "authoritative", layout: "editorial" },
+  { name: "Focus", color: "#D97706", accentBg: "#FEF7ED", accentText: "#D97706", tone: "regional", layout: "immersive" },
+  { name: "Industry", color: "#78716C", accentBg: "#F8F7F4", accentText: "#78716C", tone: "structured", layout: "report" },
+  { name: "Culture", color: "#BE185D", accentBg: "#FDF2F7", accentText: "#BE185D", tone: "expressive", layout: "visual" },
+  { name: "Interview", color: "#256B5A", accentBg: "#F0F7F4", accentText: "#256B5A", tone: "intimate", layout: "portrait" },
 ];
 
 export const STORIES = [

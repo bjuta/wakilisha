@@ -4,9 +4,11 @@ interface StatItem {
   label: string;
   value: number;
   suffix?: string;
+  prefix?: string;
+  decimals?: number;
 }
 
-function AnimatedStat({ value, suffix }: { value: number; suffix?: string }) {
+function AnimatedNumber({ value, suffix, prefix, decimals }: { value: number; suffix?: string; prefix?: string; decimals?: number }) {
   const [display, setDisplay] = useState(0);
   const ref = useRef<HTMLSpanElement>(null);
   const hasAnimated = useRef(false);
@@ -14,19 +16,18 @@ function AnimatedStat({ value, suffix }: { value: number; suffix?: string }) {
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting && !hasAnimated.current) {
             hasAnimated.current = true;
-            const duration = 1000;
+            const duration = 1200;
             const start = performance.now();
-
+            const startVal = 0;
             const tick = (now: number) => {
               const progress = Math.min((now - start) / duration, 1);
               const eased = 1 - Math.pow(1 - progress, 3);
-              setDisplay(Math.round(value * eased));
+              setDisplay(startVal + (value - startVal) * eased);
               if (progress < 1) requestAnimationFrame(tick);
             };
             requestAnimationFrame(tick);
@@ -35,39 +36,32 @@ function AnimatedStat({ value, suffix }: { value: number; suffix?: string }) {
       },
       { threshold: 0.3 }
     );
-
     observer.observe(el);
     return () => observer.disconnect();
   }, [value]);
 
+  const formatted = decimals ? display.toFixed(decimals) : Math.round(display).toLocaleString();
   return (
     <span ref={ref}>
-      {display.toLocaleString()}{suffix}
+      {prefix}{formatted}{suffix}
     </span>
   );
 }
 
-interface ChartStatsStripProps {
+interface LabelsStatsProps {
   stats: StatItem[];
 }
 
-export function ChartStatsStrip({ stats }: ChartStatsStripProps) {
+export function LabelsStats({ stats }: LabelsStatsProps) {
   return (
-    <div className="border-b border-[var(--wk-border)] bg-[var(--wk-surface)]"
-    >
-      <div className="wk-container grid grid-cols-2 gap-px md:grid-cols-4 lg:grid-cols-6"
-      >
+    <div className="bg-[var(--wk-surface)]">
+      <div className="wk-container grid grid-cols-2 gap-px border-x border-[var(--wk-border)] md:grid-cols-3 lg:grid-cols-6" style={{ background: "var(--wk-border)" }}>
         {stats.map((stat, i) => (
-          <div
-            key={i}
-            className="flex flex-col items-center justify-center px-4 py-6 md:py-8"
-          >
-            <div className="mb-1 text-[clamp(24px,2.5vw,36px)] font-black leading-[1] tracking-[-0.04em]" style={{ color: "var(--wk-brand)" }}
-            >
-              <AnimatedStat value={stat.value} suffix={stat.suffix} />
+          <div key={i} className="flex flex-col items-center justify-center bg-[var(--wk-surface)] px-4 py-8 md:py-10">
+            <div className="mb-1 text-[clamp(28px,3vw,40px)] font-black leading-[1] tracking-[-0.04em]" style={{ color: "var(--wk-brand)" }}>
+              <AnimatedNumber value={stat.value} suffix={stat.suffix} prefix={stat.prefix} decimals={stat.decimals} />
             </div>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--wk-text-muted)" }}
-            >
+            <div className="text-[12px] font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--wk-text-muted)" }}>
               {stat.label}
             </div>
           </div>

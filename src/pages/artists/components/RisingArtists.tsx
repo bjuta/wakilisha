@@ -1,5 +1,5 @@
+import { useRef } from "react";
 import { Link } from "react-router-dom";
-import { WkTag } from "@/components/design-system/primitives/Tag";
 
 export interface RisingArtist {
   slug: string;
@@ -19,26 +19,55 @@ interface RisingArtistsProps {
 }
 
 export function RisingArtists({ artists }: RisingArtistsProps) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const scroll = (dir: "left" | "right") => {
+    if (!scrollRef.current) return;
+    const amount = dir === "left" ? -360 : 360;
+    scrollRef.current.scrollBy({ left: amount, behavior: "smooth" });
+  };
+
   return (
-    <section className="wk-container px-6 py-14 md:py-20">
-      <div className="mb-8 flex items-end justify-between">
-        <div>
-          <div className="wk-eyebrow mb-3">On the rise</div>
-          <h3 className="wk-h-section">Emerging voices</h3>
-        </div>
-        <div className="hidden text-[13px] md:block" style={{ color: "var(--wk-text-muted)" }}>
-          {artists.length} artists gaining momentum
+    <section className="py-14 md:py-20">
+      <div className="wk-container px-6">
+        <div className="mb-8 flex items-end justify-between">
+          <div>
+            <div className="wk-eyebrow mb-3">On the rise</div>
+            <h3 className="text-[clamp(28px,3.5vw,48px)] font-black leading-[0.92] tracking-[-0.04em] text-[var(--wk-text)]">
+              Emerging voices
+            </h3>
+          </div>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => scroll("left")}
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-[var(--wk-border)] text-[var(--wk-text-muted)] transition-all hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]"
+            >
+              <i className="ri-arrow-left-line text-sm" />
+            </button>
+            <button
+              onClick={() => scroll("right")}
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-[var(--wk-border)] text-[var(--wk-text-muted)] transition-all hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]"
+            >
+              <i className="ri-arrow-right-line text-sm" />
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      <div
+        ref={scrollRef}
+        className="flex gap-4 overflow-x-auto px-6 pb-2 scrollbar-hide"
+        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+      >
         {artists.map((artist) => (
           <Link
             key={artist.slug}
             to={`/artists/${artist.slug}`}
-            className="group flex gap-4 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4 transition-all hover:border-[var(--wk-border-2)]"
+            className="group flex shrink-0 gap-4 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4 transition-all hover:border-[var(--wk-border-2)]"
+            style={{ width: "360px" }}
           >
-            <div className="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-lg bg-[var(--wk-surface-raised)]">
+            {/* Portrait image */}
+            <div className="relative h-32 w-24 shrink-0 overflow-hidden rounded-lg bg-[var(--wk-surface-raised)]">
               {artist.imageUrl ? (
                 <img
                   src={artist.imageUrl}
@@ -51,18 +80,27 @@ export function RisingArtists({ artists }: RisingArtistsProps) {
                 </div>
               )}
             </div>
+
             <div className="flex min-w-0 flex-col justify-center">
-              <h4 className="mb-0.5 truncate text-[14px] font-bold text-[var(--wk-text)]">{artist.name}</h4>
-              <p className="mb-2 line-clamp-2 text-[12px] leading-[1.5]" style={{ color: "var(--wk-text-muted)" }}>
+              <h4 className="mb-1 text-[15px] font-bold text-[var(--wk-text)]">{artist.name}</h4>
+              <p className="mb-2 line-clamp-2 text-[12px] leading-[1.5] text-[var(--wk-text-muted)]">
                 {artist.spotlightBio}
               </p>
               <div className="flex flex-wrap items-center gap-2">
                 {artist.genres.slice(0, 2).map((g) => (
-                  <WkTag key={g}>{g}</WkTag>
+                  <span
+                    key={g}
+                    className="rounded-full bg-[var(--wk-brand-soft)] px-2 py-0.5 text-[10px] font-bold text-[var(--wk-brand)] uppercase tracking-wider"
+                  >
+                    {g}
+                  </span>
                 ))}
-                <span className="text-[11px]" style={{ color: "var(--wk-text-faint)" }}>
+                <span className="text-[11px] text-[var(--wk-text-faint)]">
                   {artist.monthlyStreams}M streams
                 </span>
+              </div>
+              <div className="mt-2 text-[11px] text-[var(--wk-text-faint)]">
+                {artist.country} · Since {artist.debutYear}
               </div>
             </div>
           </Link>

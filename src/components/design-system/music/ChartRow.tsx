@@ -20,6 +20,7 @@ export interface ChartRowProps {
   previousWeek?: number;
   slug?: string;
   artistSlug?: string;
+  compact?: boolean;
 }
 
 const MOVEMENT_CONFIG = {
@@ -51,6 +52,7 @@ export function ChartRow({
   label,
   previousWeek,
   slug,
+  compact,
 }: ChartRowProps) {
   const { currentTrack, isPlaying, playTrack } = usePlayer();
   const trackId = slug || `${title}-${artist}`.toLowerCase().replace(/\s+/g, "-");
@@ -76,32 +78,65 @@ export function ChartRow({
     playTrack(track, [track]);
   };
 
+  if (compact) {
+    return (
+      <div className="group flex items-center gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-[var(--wk-surface-raised)]">
+        <div className="flex w-6 shrink-0 flex-col items-center">
+          <span className="text-sm font-black leading-none" style={{ color: RANK_COLORS[rank] || "var(--wk-text-muted)" }}>
+            {rank}
+          </span>
+        </div>
+        <div className="h-8 w-8 shrink-0 overflow-hidden rounded-md bg-[var(--wk-surface-raised)]">
+          {artworkUrl ? (
+            <img src={artworkUrl} alt="" className="h-full w-full object-cover object-top" />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-[var(--wk-text-faint)]">
+              <i className="ri-music-2-line text-sm" />
+            </div>
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-[12px] font-bold text-[var(--wk-text)]">{title}</div>
+          <div className="truncate text-[11px] text-[var(--wk-text-muted)]">{artist}</div>
+        </div>
+        {mvt && (
+          <span className="flex items-center text-[10px] font-bold" style={{ color: mvt.color }}>
+            <i className={`${mvt.icon} text-[10px]`} />
+            {movementAmount && movementAmount > 0 ? movementAmount : ""}
+          </span>
+        )}
+      </div>
+    );
+  }
+
   return (
-    <div className={`group flex items-center gap-3 rounded-lg px-3 py-3 transition-colors hover:bg-[var(--wk-surface-raised)] ${isTop3 ? "bg-[var(--wk-brand-soft)]/30" : ""}`}>
-      <div className="flex w-8 shrink-0 flex-col items-center">
+    <div className={`group flex items-center gap-3 rounded-lg px-3 py-3 transition-colors hover:bg-[var(--wk-surface-raised)] ${isTop3 ? "bg-[var(--wk-brand-soft)]/20" : ""}`}>
+      {/* Rank + Movement */}
+      <div className="flex w-12 shrink-0 flex-col items-center">
         <span
-          className="text-lg font-black leading-none"
+          className="text-[22px] font-black leading-none"
           style={{ color: RANK_COLORS[rank] || "var(--wk-text-muted)" }}
         >
           {rank}
         </span>
         {mvt && (
           <span
-            className="mt-0.5 flex items-center text-[10px] font-bold"
+            className="mt-0.5 flex items-center gap-0.5 text-[11px] font-bold"
             style={{ color: mvt.color }}
           >
-            <i className={`${mvt.icon} text-[10px]`} />
+            <i className={`${mvt.icon} text-[11px]`} />
             {movementAmount && movementAmount > 0 ? movementAmount : ""}
           </span>
         )}
       </div>
 
-      <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-md bg-[var(--wk-surface-raised)]">
+      {/* Artwork */}
+      <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-[var(--wk-surface-raised)]">
         {artworkUrl ? (
           <img src={artworkUrl} alt="" className="h-full w-full object-cover object-top" />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-[var(--wk-text-faint)]">
-            <i className="ri-music-2-line text-lg" />
+            <i className="ri-music-2-line text-xl" />
           </div>
         )}
         <button
@@ -114,14 +149,15 @@ export function ChartRow({
         </button>
       </div>
 
+      {/* Info */}
       <div className="min-w-0 flex-1">
         <div className="mb-0.5 flex items-center gap-2">
           {slug ? (
-            <Link to={`/tracks/${slug}`} className="truncate text-[13px] font-bold text-[var(--wk-text)] hover:underline">
+            <Link to={`/tracks/${slug}`} className="truncate text-[14px] font-bold text-[var(--wk-text)] hover:underline">
               {title}
             </Link>
           ) : (
-            <span className="truncate text-[13px] font-bold text-[var(--wk-text)]">{title}</span>
+            <span className="truncate text-[14px] font-bold text-[var(--wk-text)]">{title}</span>
           )}
           {peakPosition !== undefined && peakPosition === rank && (
             <span className="shrink-0 rounded-full bg-[var(--wk-brand-soft)] px-2 py-0.5 text-[10px] font-bold text-[var(--wk-brand)]">
@@ -134,7 +170,7 @@ export function ChartRow({
             </span>
           )}
         </div>
-        <div className="truncate text-[11px] text-[var(--wk-text-muted)]">{artist}</div>
+        <div className="truncate text-[12px] text-[var(--wk-text-muted)]">{artist}</div>
         {(genre || label || previousWeek !== undefined) && (
           <div className="mt-1 hidden items-center gap-2 text-[11px] md:flex" style={{ color: "var(--wk-text-faint)" }}>
             {genre && <span>{genre}</span>}
@@ -150,6 +186,7 @@ export function ChartRow({
         )}
       </div>
 
+      {/* Meta */}
       <div className="hidden shrink-0 flex-col items-end gap-1 md:flex">
         {weeksOnChart !== undefined && (
           <WkTag>{weeksOnChart} wk{weeksOnChart !== 1 ? "s" : ""}</WkTag>
@@ -161,11 +198,12 @@ export function ChartRow({
         )}
       </div>
 
+      {/* Play button */}
       <button
         onClick={handlePlay}
         disabled={!playable}
         aria-label={isCurrentTrack && isPlaying ? "Pause" : "Play"}
-        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] transition-all disabled:opacity-40 disabled:cursor-not-allowed ${isCurrentTrack ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
+        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] transition-all disabled:opacity-40 disabled:cursor-not-allowed ${isCurrentTrack ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
       >
         <i className={`text-sm ${isCurrentTrack && isPlaying ? "ri-pause-fill" : "ri-play-mini-fill"}`} />
       </button>
