@@ -21,6 +21,8 @@ const labelsById = by(importedRegistry.labels, 'id');
 const labelsBySlug = by(importedRegistry.labels, 'slug');
 const releasesBySlug = by(importedRegistry.releases, 'slug');
 const genresBySlug = by(importedRegistry.genres, 'slug');
+const articles = importedRegistry.articles ?? [];
+const articlesBySlug = by(articles, 'slug');
 
 const chartEntriesByEdition = importedRegistry.chartEntries.reduce((acc, entry) => {
   const list = acc.get(entry.editionId) ?? [];
@@ -79,6 +81,9 @@ export const getTracks = () => importedRegistry.tracks;
 export const getLabels = () => importedRegistry.labels;
 export const getReleases = () => importedRegistry.releases;
 export const getGenres = () => importedRegistry.genres;
+export const getArticles = () => articles;
+export const getArticleBySlug = (slug: string) => articlesBySlug.get(slug) ?? null;
+export const hasImportedArticles = () => articles.length > 0;
 export const getChartSeries = () => effectiveChartSeries;
 export const getChartEditions = () => effectiveChartEditions;
 export const getArtistBySlug = (slug: string) => artistsBySlug.get(slug) ?? null;
@@ -249,7 +254,7 @@ export function buildChartEditionSummary(rows: ReturnType<typeof toChartRow>[], 
 
 export function getSearchResults(query: string) {
   const q = query.trim().toLowerCase();
-  if (!q) return { artists: [], tracks: [], labels: [], releases: [], genres: [] };
+  if (!q) return { artists: [], tracks: [], labels: [], releases: [], genres: [], articles: [] };
   const match = (value: string | null | undefined) => Boolean(value && value.toLowerCase().includes(q));
   return {
     artists: importedRegistry.artists.filter((item) => match(item.name) || item.genres.some(match)).slice(0, 12),
@@ -257,6 +262,7 @@ export function getSearchResults(query: string) {
     labels: importedRegistry.labels.filter((item) => match(item.name) || match(item.country)).slice(0, 12),
     releases: importedRegistry.releases.filter((item) => match(item.title) || item.artistNames.some(match)).slice(0, 12),
     genres: importedRegistry.genres.filter((item) => match(item.name)).slice(0, 12),
+    articles: articles.filter((item) => match(item.title) || match(item.excerpt) || item.tags.some(match)).slice(0, 12),
   };
 }
 
