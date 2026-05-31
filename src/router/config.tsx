@@ -15,6 +15,7 @@ import ArtistDetail from "../pages/artists/detail/page";
 
 // Other entity pages
 import Releases from "../pages/releases/page";
+import ReleaseDetail from "../pages/releases/detail/page";
 import Genres from "../pages/genres/page";
 import Labels from "../pages/labels/page";
 import Magazine from "../pages/magazine/page";
@@ -62,6 +63,7 @@ const routes: RouteObject[] = [
 
       // Releases
       { path: "/releases", element: <ResponsivePage mobile={<MobileReleases />} desktop={<Releases />} /> },
+      { path: "/releases/:slug", element: <ResponsivePage mobile={<MobileReleases />} desktop={<ReleaseDetail />} /> },
 
       // Genres
       { path: "/genres", element: <ResponsivePage mobile={<MobileGenres />} desktop={<Genres />} /> },
