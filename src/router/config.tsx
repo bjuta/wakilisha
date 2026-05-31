@@ -6,6 +6,16 @@ import NotFound from "../pages/NotFound";
 import Home from "../pages/home/page";
 import AdminDesignSystem from "../pages/admin/design-system/page";
 
+// Admin Charts Ingestion Studio
+import { AdminChartsLayout } from "../pages/admin/charts/AdminChartsLayout";
+import AdminChartsDashboard from "../pages/admin/charts/dashboard/page";
+import AdminChartsFamilies from "../pages/admin/charts/families/page";
+import AdminChartsIngest from "../pages/admin/charts/ingest/page";
+import AdminChartsIngestDetail from "../pages/admin/charts/ingest/detail/page";
+import AdminChartsEditions from "../pages/admin/charts/editions/page";
+import AdminChartsSnapshots from "../pages/admin/charts/snapshots/page";
+import AdminChartsIntegrationMap from "../pages/admin/charts/integration-map/page";
+
 // Charts
 import ChartsDirectory from "../pages/charts/directory/page";
 import ChartEdition from "../pages/charts/edition/page";
@@ -90,6 +100,20 @@ const routes: RouteObject[] = [
   {
     path: "/admin/design-system",
     element: <AdminDesignSystem />,
+  },
+  // Admin Charts Ingestion Studio
+  {
+    path: "/admin/charts",
+    element: <AdminChartsLayout />,
+    children: [
+      { path: "dashboard", element: <AdminChartsDashboard /> },
+      { path: "families", element: <AdminChartsFamilies /> },
+      { path: "ingest", element: <AdminChartsIngest /> },
+      { path: "ingest/:jobId", element: <AdminChartsIngestDetail /> },
+      { path: "editions", element: <AdminChartsEditions /> },
+      { path: "snapshots", element: <AdminChartsSnapshots /> },
+      { path: "integration-map", element: <AdminChartsIntegrationMap /> },
+    ],
   },
   {
     path: "*",
