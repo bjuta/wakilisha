@@ -18,12 +18,16 @@
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
+    "@vitejs/plugin-react": "latest",
     "tsx": "^4.19.2",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "vite": "latest"
   },
   "name": "wakilisha-react-rebuild",
   "private": true,
   "scripts": {
+    "build": "vite build",
+    "dev": "vite --host 0.0.0.0",
     "extract:local": "WAKILISHA_SKIP_DOWNLOAD=1 WAKILISHA_IMPORT_ZIP_PATH=./wakilisha_supabase_import_2026-05-30.zip tsx packages/migration/src/extractZip.ts",
     "extract:zip": "tsx packages/migration/src/extractZip.ts",
     "migration:audit": "tsx packages/migration/src/index.ts audit",
@@ -32,7 +36,8 @@
     "migration:graph": "tsx packages/migration/src/index.ts graph",
     "migration:repair": "tsx packages/migration/src/index.ts repair",
     "migration:routes": "tsx packages/migration/src/index.ts routes",
-    "migration:seed": "tsx packages/migration/src/index.ts seed"
+    "migration:seed": "tsx packages/migration/src/index.ts seed",
+    "preview": "vite preview --host 0.0.0.0"
   },
   "type": "module",
   "version": "0.1.0"
