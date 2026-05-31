@@ -70,14 +70,14 @@ export default function MobileReleases() {
           <div className="mt-4 flex items-center gap-2">
             <Link
               to={`/releases/${FEATURED_RELEASE.release.slug}`}
-              className="inline-flex items-center gap-2 rounded-full bg-[var(--wk-brand)] px-5 py-2.5 text-[12px] font-bold text-[var(--wk-brand-on)]"
+              className="inline-flex items-center gap-2 rounded-full bg-[var(--wk-brand)] px-5 py-2.5 text-[12px] font-bold text-[var(--wk-brand-on)] active:scale-[0.97] transition-transform"
             >
               <i className="ri-play-fill text-base" />
               Listen now
             </Link>
             <Link
               to={`/releases/${FEATURED_RELEASE.release.slug}`}
-              className="inline-flex items-center gap-2 rounded-full border border-[var(--wk-border)] px-5 py-2.5 text-[12px] font-semibold text-[var(--wk-text)]"
+              className="inline-flex items-center gap-2 rounded-full border border-[var(--wk-border)] px-5 py-2.5 text-[12px] font-semibold text-[var(--wk-text)] active:scale-[0.97] transition-transform"
             >
               Read review
             </Link>
@@ -118,13 +118,13 @@ export default function MobileReleases() {
           </div>
           <span className="text-[10px] text-[var(--wk-text-muted)]">{NEW_THIS_WEEK.length} new</span>
         </div>
-        <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth: "none" }}>
+        <div className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory" style={{ scrollbarWidth: 'none' }}>
           {NEW_THIS_WEEK.map((item) => (
             <Link
               key={item.release.slug}
               to={`/releases/${item.release.slug}`}
-              className="group shrink-0"
-              style={{ width: "160px" }}
+              className="group shrink-0 snap-start active:scale-[0.98] active:opacity-80 transition-all"
+              style={{ width: '160px' }}
             >
               <div className="relative overflow-hidden rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)]">
                 <div className="relative aspect-square bg-[var(--wk-surface-raised)]">
@@ -139,7 +139,7 @@ export default function MobileReleases() {
                         className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${
                           item.tagColor === "brand"
                             ? "bg-[var(--wk-brand)] text-[var(--wk-brand-on)]"
-                            : "bg-black/60 text-white"
+                            : "bg-black/60 text-[var(--wk-text)]"
                         }`}
                       >
                         {item.tag}
@@ -170,7 +170,7 @@ export default function MobileReleases() {
             <span className="w-5 h-px bg-[var(--wk-brand)]" />
             On the charts
           </div>
-          <Link to="/charts" className="text-[11px] font-semibold text-[var(--wk-brand)]">
+          <Link to="/charts" className="text-[11px] font-semibold text-[var(--wk-brand)] active:scale-[0.97] transition-transform">
             View charts →
           </Link>
         </div>
@@ -179,7 +179,7 @@ export default function MobileReleases() {
             <Link
               key={item.release.slug}
               to={`/releases/${item.release.slug}`}
-              className="group flex items-center gap-3 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-3"
+              className="group flex items-center gap-3 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-3 active:scale-[0.98] active:opacity-80 transition-all"
             >
               <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-[var(--wk-surface-raised)]">
                 <img
@@ -219,7 +219,7 @@ export default function MobileReleases() {
             <Link
               key={pick.release.slug}
               to={`/releases/${pick.release.slug}`}
-              className="group flex gap-3 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-3 overflow-hidden"
+              className="group flex gap-3 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-3 overflow-hidden active:scale-[0.98] active:opacity-80 transition-all"
             >
               <div className="h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-[var(--wk-surface-raised)]">
                 <img
@@ -283,7 +283,7 @@ export default function MobileReleases() {
               </div>
               <Link
                 to={`/labels/${spot.slug}`}
-                className="mt-2 inline-block text-[12px] font-semibold text-[var(--wk-brand)]"
+                className="mt-2 inline-block text-[12px] font-semibold text-[var(--wk-brand)] active:scale-[0.97] transition-transform"
               >
                 Explore label →
               </Link>
@@ -303,7 +303,7 @@ export default function MobileReleases() {
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={`rounded-full px-4 py-2 text-[12px] font-semibold transition-all whitespace-nowrap ${
+              className={`rounded-full px-4 py-2 text-[12px] font-semibold transition-all whitespace-nowrap active:scale-[0.96] ${
                 filter === f
                   ? "bg-[var(--wk-brand)] text-[var(--wk-brand-on)]"
                   : "border border-[var(--wk-border)] text-[var(--wk-text-soft)] hover:bg-[var(--wk-surface-raised)]"
@@ -331,7 +331,7 @@ export default function MobileReleases() {
                 <Link
                   key={release.slug}
                   to={`/releases/${release.slug}`}
-                  className="group rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] overflow-hidden"
+                  className="group rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] overflow-hidden active:scale-[0.98] active:opacity-80 transition-all"
                 >
                   <div className="relative aspect-square bg-[var(--wk-surface-raised)]">
                     <img

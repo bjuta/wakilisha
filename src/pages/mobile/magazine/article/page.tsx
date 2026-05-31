@@ -63,7 +63,7 @@ export default function MobileArticle() {
           <div className="flex items-center justify-between">
             <Link
               to="/magazine"
-              className="flex items-center gap-2 text-[12px] font-semibold uppercase tracking-wider text-white/60 transition-colors hover:text-white"
+              className="flex items-center gap-2 text-[12px] font-semibold uppercase tracking-wider text-[var(--wk-text-muted)] transition-colors hover:text-[var(--wk-text)] active:opacity-80"
             >
               <i className="ri-arrow-left-line" />
               Magazine
@@ -71,7 +71,7 @@ export default function MobileArticle() {
             <div className="flex items-center gap-2">
               <button
                 onClick={handleShare}
-                className="flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[12px] font-semibold text-white/80 backdrop-blur-sm transition-colors hover:bg-white/20 whitespace-nowrap"
+                className="flex items-center gap-2 rounded-full border border-[var(--wk-border-2)] bg-[var(--wk-surface-raised)] px-3 py-1.5 text-[12px] font-semibold text-[var(--wk-text-soft)] backdrop-blur-sm transition-colors hover:bg-[var(--wk-surface)] active:scale-[0.97] whitespace-nowrap"
               >
                 <i className="ri-share-line" />
                 Share
@@ -91,24 +91,24 @@ export default function MobileArticle() {
               {article.section}
             </span>
             {article.readingTime && (
-              <span className="text-[12px] font-medium text-white/60">
+              <span className="text-[12px] font-medium text-[var(--wk-text-muted)]">
                 {article.readingTime} min read
               </span>
             )}
           </div>
           <h1
             className="mb-4 max-w-lg font-black leading-[0.92] tracking-[-0.04em]"
-            style={{ color: "#F0EFE8", fontSize: "clamp(28px, 8vw, 44px)" }}
+            style={{ color: "var(--wk-text)", fontSize: "clamp(28px, 8vw, 44px)" }}
           >
             {article.title}
           </h1>
           {article.dek && (
-            <p className="max-w-md text-[15px] leading-relaxed" style={{ color: "rgba(240,239,232,.75)" }}>
+            <p className="max-w-md text-[15px] leading-relaxed" style={{ color: "var(--wk-text-soft)" }}>
               {article.dek}
             </p>
           )}
-          <div className="mt-6 flex items-center gap-3 text-[12px]" style={{ color: "rgba(240,239,232,.55)" }}>
-            <span className="font-semibold" style={{ color: "rgba(240,239,232,.85)" }}>
+          <div className="mt-6 flex items-center gap-3 text-[12px]" style={{ color: "var(--wk-text-muted)" }}>
+            <span className="font-semibold" style={{ color: "var(--wk-text)" }}>
               {article.author}
             </span>
             <span>·</span>
@@ -197,7 +197,7 @@ export default function MobileArticle() {
                       ? "genres"
                       : "artists"
                   }/${entity.slug}`}
-                  className="flex items-center gap-1.5 rounded-full border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-1.5 text-[12px] font-semibold text-[var(--wk-text)]"
+                  className="flex items-center gap-1.5 rounded-full border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-1.5 text-[12px] font-semibold text-[var(--wk-text)] active:scale-[0.97] transition-transform"
                 >
                   <i
                     className={
@@ -230,14 +230,14 @@ export default function MobileArticle() {
           <div className="flex items-center gap-3">
             <button
               onClick={handleShare}
-              className="inline-flex items-center gap-2 rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] px-4 py-2.5 text-[13px] font-semibold text-[var(--wk-text)] whitespace-nowrap"
+              className="inline-flex items-center gap-2 rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] px-4 py-2.5 text-[13px] font-semibold text-[var(--wk-text)] whitespace-nowrap active:scale-[0.97] transition-transform"
             >
               <i className="ri-share-line" />
               Copy link
             </button>
             <Link
               to="/magazine"
-              className="inline-flex items-center gap-2 rounded-full bg-[var(--wk-brand)] px-4 py-2.5 text-[13px] font-bold text-[var(--wk-brand-on)] whitespace-nowrap"
+              className="inline-flex items-center gap-2 rounded-full bg-[var(--wk-brand)] px-4 py-2.5 text-[13px] font-bold text-[var(--wk-brand-on)] whitespace-nowrap active:scale-[0.97] transition-transform"
             >
               More stories
               <i className="ri-arrow-right-line" />
@@ -262,7 +262,7 @@ export default function MobileArticle() {
                 <Link
                   key={story.slug}
                   to={`/magazine/${story.slug}`}
-                  className="group flex gap-3"
+                  className="group flex gap-3 active:scale-[0.98] active:opacity-80 transition-all"
                 >
                   <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-[var(--wk-surface-raised)]">
                     <img src={story.heroUrl} alt={story.title} className="h-full w-full object-cover" />

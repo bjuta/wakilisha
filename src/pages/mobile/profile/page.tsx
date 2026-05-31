@@ -1,11 +1,15 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
+import { useTheme } from "@/components/design-system/theme/ThemeProvider";
 import { HOME_FEATURED_ARTISTS, HOME_TRENDING_TRACKS } from "@/mocks/home";
 import { STORIES } from "@/mocks/magazine";
 
 export default function MobileProfile() {
+  const { theme, toggle } = useTheme();
   const savedTracks = HOME_TRENDING_TRACKS.slice(0, 3);
   const followedArtists = HOME_FEATURED_ARTISTS.slice(0, 4);
   const savedStories = STORIES.slice(0, 3);
+  const [showThemeSheet, setShowThemeSheet] = useState(false);
 
   return (
     <main className="wk-mobile-v5">
@@ -28,6 +32,45 @@ export default function MobileProfile() {
         <Link to="/auth" className="phn-btn-primary"><i className="ri-login-circle-line" /> Sign in</Link>
         <Link to="/search" className="phn-btn-secondary"><i className="ri-search-line" /> Discover</Link>
       </section>
+
+      {/* Settings — theme toggle */}
+      <div className="spec-section-hd">Settings</div>
+      <button
+        onClick={() => setShowThemeSheet(true)}
+        className="profile-settings-row"
+      >
+        <i className={theme === "dark" ? "ri-moon-line" : "ri-sun-line"} />
+        <div className="profile-settings-label">Dark mode</div>
+        <div className="profile-settings-value">{theme === "dark" ? "On" : "Off"}</div>
+        <i className="ri-arrow-right-s-line" />
+      </button>
+
+      {/* Theme selector sheet */}
+      {showThemeSheet && (
+        <>
+          <div className="phn-more-backdrop" onClick={() => setShowThemeSheet(false)} />
+          <div className="phn-more-sheet">
+            <div className="phn-more-handle" />
+            <div className="phn-more-title">Appearance</div>
+            <button
+              onClick={() => { toggle(); setShowThemeSheet(false); }}
+              className={`profile-theme-option ${theme === "light" ? "profile-theme-option-active" : ""}`}
+            >
+              <i className="ri-sun-line" />
+              <div className="profile-theme-option-label">Light</div>
+              {theme === "light" && <i className="ri-check-line" />}
+            </button>
+            <button
+              onClick={() => { toggle(); setShowThemeSheet(false); }}
+              className={`profile-theme-option ${theme === "dark" ? "profile-theme-option-active" : ""}`}
+            >
+              <i className="ri-moon-line" />
+              <div className="profile-theme-option-label">Dark</div>
+              {theme === "dark" && <i className="ri-check-line" />}
+            </button>
+          </div>
+        </>
+      )}
 
       <div className="spec-section-hd">Followed artists</div>
       <div className="phn-scroll-row">

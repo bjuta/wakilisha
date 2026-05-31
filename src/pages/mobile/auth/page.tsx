@@ -4,11 +4,11 @@ export default function MobileAuth() {
   return (
     <main className="wk-mobile-v5 auth-screen">
       <section className="auth-logo-zone">
-        <div className="flex h-24 w-24 items-center justify-center rounded-[28px] bg-[#84c241] text-[32px] font-black text-[#081006] shadow-[0_18px_60px_rgba(132,194,65,.22)]">
+        <div className="flex h-24 w-24 items-center justify-center rounded-[28px] bg-[var(--wk-brand)] text-[32px] font-black text-[var(--wk-brand-on)] auth-logo-shadow">
           W
         </div>
         <div className="text-center">
-          <div className="text-[28px] font-black tracking-[-.05em] text-white">WAKILISHA</div>
+          <div className="text-[28px] font-black tracking-[-.05em] text-[var(--wk-text)]">WAKILISHA</div>
           <p className="auth-tagline">Your people are here. Sign in to follow artists, save charts, and keep your cultural graph close.</p>
         </div>
       </section>

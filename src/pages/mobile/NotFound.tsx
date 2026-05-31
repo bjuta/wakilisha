@@ -10,7 +10,7 @@ export default function MobileNotFound() {
       </p>
       <Link
         to="/"
-        className="mt-6 flex items-center gap-2 rounded-full bg-[var(--wk-brand)] px-5 py-3 text-[13px] font-bold text-[var(--wk-brand-on)]"
+        className="mt-6 flex items-center gap-2 rounded-full bg-[var(--wk-brand)] px-5 py-3 text-[13px] font-bold text-[var(--wk-brand-on)] active:scale-[0.97] transition-transform"
       >
         <i className="ri-home-5-line" />
         Back to home

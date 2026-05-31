@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { GENRES, TRENDING_GENRES } from "@/mocks/genres";
 
 const bg = (slug: string, accentVar?: string) => ({
-  background: `linear-gradient(135deg, var(${accentVar ?? "--wk-brand"}), #0d1208), url(https://picsum.photos/seed/genre-${slug}/400/540) center/cover`,
+  background: `linear-gradient(135deg, var(${accentVar ?? "--wk-brand"}), var(--wk-bg)), url(https://picsum.photos/seed/genre-${slug}/400/540) center/cover`,
   backgroundBlendMode: "multiply",
 });
 

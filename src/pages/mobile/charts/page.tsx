@@ -79,12 +79,12 @@ export default function MobileCharts() {
           <div className="mt-5 flex flex-wrap gap-3">
             <button
               onClick={handlePlayTop10}
-              className="inline-flex items-center gap-2 rounded-full bg-[var(--wk-brand)] px-5 py-3 text-[13px] font-bold text-[var(--wk-brand-on)] whitespace-nowrap"
+              className="inline-flex items-center gap-2 rounded-full bg-[var(--wk-brand)] px-5 py-3 text-[13px] font-bold text-[var(--wk-brand-on)] whitespace-nowrap active:scale-[0.97] transition-transform"
             >
               <i className="ri-play-fill" />
               Listen to top 10
             </button>
-            <button className="inline-flex items-center gap-2 rounded-full border border-[var(--wk-border-2)] bg-transparent px-5 py-3 text-[13px] font-bold text-[var(--wk-text)] whitespace-nowrap">
+            <button className="inline-flex items-center gap-2 rounded-full border border-[var(--wk-border-2)] bg-transparent px-5 py-3 text-[13px] font-bold text-[var(--wk-text)] whitespace-nowrap active:scale-[0.97] transition-transform">
               <i className="ri-share-line" />
               Share
             </button>
@@ -134,7 +134,7 @@ export default function MobileCharts() {
       </div>
 
       {/* Series selector */}
-      <div className="border-b border-[var(--wk-border)] px-5 py-3 flex gap-2 overflow-x-auto">
+      <div className="border-b border-[var(--wk-border)] px-5 py-3 flex gap-2 overflow-x-auto snap-x snap-mandatory scrollbar-none" style={{ scrollbarWidth: 'none' }}>
         {CHART_SERIES.map((s) => (
           <button
             key={s.id}
@@ -162,7 +162,7 @@ export default function MobileCharts() {
               <Link
                 key={entry.rank}
                 to={`/tracks/${entry.slug}`}
-                className="group flex items-center gap-4 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4 transition-all hover:border-[var(--wk-brand)]/40"
+                className="group flex items-center gap-4 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4 transition-all hover:border-[var(--wk-brand)]/40 active:scale-[0.98] active:opacity-80"
               >
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[var(--wk-surface-raised)]">
                   <span className="font-black text-[22px] text-[var(--wk-brand)]">{i + 1}</span>

@@ -7,7 +7,7 @@ export default function MobileArtistDetail() {
   const base = ARTISTS.find((artist) => artist.slug === slug);
   const detail = ARTIST_DETAILS.find((artist) => artist.slug === slug);
 
-  if (!base) return <div className="wk-mobile-v5 px-5 py-16 text-white/50">Artist not found.</div>;
+  if (!base) return <div className="wk-mobile-v5 px-5 py-16 text-[var(--wk-text-muted)]">Artist not found.</div>;
 
   const artist = {
     ...base,
@@ -47,7 +47,7 @@ export default function MobileArtistDetail() {
 
       <section className="px-5 py-5">
         <div className="mag-card-tag">About</div>
-        <p className="text-[13px] leading-[1.65] text-white/55">{artist.bio}</p>
+        <p className="text-[13px] leading-[1.65] text-[var(--wk-text-soft)]">{artist.bio}</p>
       </section>
 
       {artist.chartEntries.length > 0 && (

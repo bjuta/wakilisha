@@ -81,62 +81,50 @@ export default function Home() {
 
   return (
     <div className="min-h-screen">
-      {/* Hero — clean, editorial, confident */}
-      <section ref={heroRef} className="relative min-h-[85dvh] flex flex-col justify-end overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-[#080a06] via-[#0f140a] to-[#0a0d06]" />
+      {/* Hero — full-bleed, cinematic, minimal copy */}
+      <section ref={heroRef} className="relative h-[100dvh] flex items-end overflow-hidden">
+        {/* Background image — full bleed with parallax + zoom */}
         <div
-          className="absolute inset-0 opacity-30"
+          className="absolute inset-0 animate-hero-img"
           style={{
-            backgroundImage:
-              "radial-gradient(ellipse at 30% 70%, rgba(132,194,65,.12) 0%, transparent 50%), radial-gradient(ellipse at 70% 30%, rgba(132,194,65,.06) 0%, transparent 50%)",
+            transform: `translateY(${scrollY * 0.12}px) scale(${1 + scrollY * 0.0002})`,
           }}
-        />
-        <div
-          className="absolute inset-0"
-          style={{
-            transform: `translateY(${scrollY * 0.2}px)`,
-            backgroundImage:
-              "url(https://readdy.ai/api/search-image?query=Abstract%20African%20music%20culture%20visual%20art%2C%20dark%20cinematic%20background%20with%20subtle%20golden%20green%20light%20particles%2C%20geometric%20vinyl%20record%20patterns%2C%20sound%20wave%20art%2C%20editorial%20magazine%20quality%2C%20dramatic%20contrast%2C%20no%20text%2C%20high%20end%20digital%20art%2C%20premium%20feel%2C%20minimal%20composition&width=1440&height=900&seq=hero-home-v4&orientation=landscape)",
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-            opacity: 0.35,
-          }}
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-[var(--wk-bg)] via-[var(--wk-bg)]/60 to-transparent" />
+        >
+          <img
+            src="https://readdy.ai/api/search-image?query=Dynamic%20cinematic%20close-up%20of%20a%20vinyl%20record%20spinning%20on%20a%20turntable%20with%20dramatic%20warm%20golden%20and%20green%20neon%20lighting%20streaks%2C%20dark%20moody%20African%20music%20studio%20atmosphere%2C%20professional%20editorial%20photography%2C%20abstract%20bokeh%20light%20particles%2C%20high%20contrast%20between%20vibrant%20colors%20and%20deep%20black%20background%2C%20premium%20music%20culture%20aesthetic%2C%20no%20text%2C%20sharp%20focus%2C%20ultra%20detailed&width=1600&height=900&seq=hero-home-cinematic-v2&orientation=landscape"
+            alt="African music culture"
+            className="h-full w-full object-cover"
+          />
+        </div>
 
-        <div className="relative z-10 wk-container-wide px-6 pb-20 pt-32">
-          <div className="mb-5 flex items-center gap-3">
-            <div className="h-1.5 w-1.5 rounded-full bg-[var(--wk-brand)] animate-pulse" />
-            <span className="text-[11px] font-bold text-[var(--wk-brand)] uppercase tracking-wider">
-              Week 132 — May 2026
-            </span>
-          </div>
+        {/* Dark gradient overlay for text readability */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-black/10" />
 
-          <h1
-            className="max-w-[800px] font-black leading-[0.92] tracking-[-0.05em] text-[var(--wk-text)]"
-            style={{ fontSize: "clamp(42px, 6vw, 96px)" }}
-          >
-            The definitive voice in African music.
-          </h1>
+        {/* Content — minimal, staggered entrance */}
+        <div className="relative z-10 w-full px-6 pb-20 md:pb-28">
+          <div className="wk-container-wide">
+            <div className="mb-4 flex items-center gap-3 animate-hero-fade" style={{ animationDelay: '0.3s' }}>
+              <div className="h-1.5 w-1.5 rounded-full bg-[var(--wk-brand)] animate-pulse" />
+              <span className="text-[11px] font-bold text-[var(--wk-brand)] uppercase tracking-wider">
+                Week 132 — May 2026
+              </span>
+            </div>
 
-          <p className="mt-5 max-w-[480px] text-[16px] leading-relaxed text-[var(--wk-text-soft)]">
-            Official charts, verified artist data, and editorial intelligence
-            for the African music ecosystem.
-          </p>
+            <h1
+              className="max-w-[720px] font-black leading-[0.92] tracking-[-0.05em] text-white animate-hero-fade"
+              style={{ fontSize: "clamp(40px, 5.5vw, 88px)", animationDelay: '0.5s' }}
+            >
+              The definitive voice in African music.
+            </h1>
 
-          <div className="mt-8 flex flex-wrap gap-3">
-            <Link to="/charts">
-              <WkButton variant="primary">
-                <i className="ri-bar-chart-line" />
-                View chart
-              </WkButton>
-            </Link>
-            <Link to="/magazine">
-              <WkButton variant="ghost">
-                <i className="ri-article-line" />
-                Read magazine
-              </WkButton>
-            </Link>
+            <div className="mt-8 animate-hero-fade" style={{ animationDelay: '0.7s' }}>
+              <Link to="/charts">
+                <WkButton variant="primary">
+                  <i className="ri-bar-chart-line" />
+                  View the chart
+                </WkButton>
+              </Link>
+            </div>
           </div>
         </div>
       </section>

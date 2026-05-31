@@ -15,9 +15,9 @@ export default function MobilePlayer() {
   if (!currentTrack) {
     return (
       <div className="wk-mobile-v5 flex min-h-screen flex-col items-center justify-center px-6 text-center">
-        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-white/5"><i className="ri-music-2-line text-2xl text-white/25" /></div>
+        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[var(--wk-surface-raised)]"><i className="ri-music-2-line text-2xl text-[var(--wk-text-faint)]" /></div>
         <h2 className="fp-track-name">No track playing</h2>
-        <p className="mt-2 text-[13px] text-white/45">Tap play on any track to start listening.</p>
+        <p className="mt-2 text-[13px] text-[var(--wk-text-muted)]">Tap play on any track to start listening.</p>
         <button onClick={() => nav(-1)} className="mt-6 auth-btn auth-btn-primary">Go back</button>
       </div>
     );
@@ -29,7 +29,7 @@ export default function MobilePlayer() {
 
   return (
     <div className="wk-mobile-v5 full-player">
-      <div className="fp-ambient" style={{ background: `radial-gradient(circle at 50% 20%, rgba(132,194,65,.18), transparent 55%)` }} />
+      <div className="fp-ambient" style={{ background: `radial-gradient(circle at 50% 20%, rgba(var(--wk-brand-rgb),.18), transparent 55%)` }} />
       <div className="fp-topbar">
         <button className="fp-topbar-btn" onClick={() => nav(-1)}><i className="ri-arrow-down-s-line text-xl" /></button>
         <div className="fp-topbar-title">Now Playing</div>
@@ -37,7 +37,7 @@ export default function MobilePlayer() {
       </div>
 
       <div className="fp-art-zone">
-        {currentTrack.artworkUrl ? <img src={currentTrack.artworkUrl} alt={currentTrack.title} /> : <div className="aspect-square bg-[#1a2a10]" />}
+        {currentTrack.artworkUrl ? <img src={currentTrack.artworkUrl} alt={currentTrack.title} /> : <div className="aspect-square bg-[var(--wk-surface-raised)]" />}
       </div>
 
       <div className="fp-controls">
@@ -70,7 +70,7 @@ export default function MobilePlayer() {
           <p className="fp-lyric">{LYRICS[(activeLyric + 1) % LYRICS.length]}</p>
         </div>
 
-        {queue.length > 1 && <div className="mt-4 text-center text-[11px] text-white/35">{queueIndex + 1} / {queue.length} in queue</div>}
+        {queue.length > 1 && <div className="mt-4 text-center text-[11px] text-[var(--wk-text-faint)]">{queueIndex + 1} / {queue.length} in queue</div>}
       </div>
     </div>
   );

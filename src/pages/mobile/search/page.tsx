@@ -5,6 +5,7 @@ import { TRACK_DETAILS } from "@/mocks/trackDetails";
 import { RELEASES } from "@/mocks/releases";
 import { GENRES } from "@/mocks/genres";
 import { LABELS } from "@/mocks/labels";
+import { CHART_DATA } from "@/mocks/charts";
 
 const hot = ["Burna Boy", "Afrobeats", "Amapiano", "Tems", "Wizkid", "Asake", "Davido", "Rema"];
 
@@ -19,6 +20,7 @@ export default function MobileSearch() {
       releases: RELEASES.filter((r) => r.title.toLowerCase().includes(q) || r.artist.toLowerCase().includes(q)).slice(0, 6),
       genres: GENRES.filter((g) => g.name.toLowerCase().includes(q)).slice(0, 8),
       labels: LABELS.filter((l) => l.name.toLowerCase().includes(q) || (l.country || "").toLowerCase().includes(q)).slice(0, 8),
+      charts: CHART_DATA.filter((c) => c.title.toLowerCase().includes(q) || c.artist.toLowerCase().includes(q) || (c.genre || "").toLowerCase().includes(q)).slice(0, 8),
     };
   }, [q]);
 
@@ -41,9 +43,9 @@ export default function MobileSearch() {
           <div className="search-section-label">Browse</div>
           <div className="grid grid-cols-2 gap-2">
             {[{ icon: "ri-bar-chart-line", label: "Charts", to: "/charts" }, { icon: "ri-user-line", label: "Artists", to: "/artists" }, { icon: "ri-album-line", label: "Releases", to: "/releases" }, { icon: "ri-folder-music-line", label: "Genres", to: "/genres" }, { icon: "ri-building-2-line", label: "Labels", to: "/labels" }, { icon: "ri-article-line", label: "Magazine", to: "/magazine" }].map((item) => (
-              <Link key={item.to} to={item.to} className="rounded-[14px] border border-white/10 bg-white/[.04] p-4">
-                <i className={`${item.icon} mb-2 block text-[20px] text-[#84c241]`} />
-                <span className="text-[13px] font-bold text-white">{item.label}</span>
+              <Link key={item.to} to={item.to} className="rounded-[14px] border border-[var(--wk-border)] bg-[var(--wk-surface-raised)] p-4">
+                <i className={`${item.icon} mb-2 block text-[20px] text-[var(--wk-brand)]`} />
+                <span className="text-[13px] font-bold text-[var(--wk-text)]">{item.label}</span>
               </Link>
             ))}
           </div>
@@ -54,6 +56,7 @@ export default function MobileSearch() {
         <div className="search-sections">
           {results.artists.length > 0 && <ResultSection title={`Artists · ${results.artists.length}`}>{results.artists.map((a) => <ArtistHit key={a.slug} artist={a} />)}</ResultSection>}
           {results.tracks.length > 0 && <ResultSection title={`Tracks · ${results.tracks.length}`}>{results.tracks.map((t) => <TrackHit key={t.slug} track={t} />)}</ResultSection>}
+          {results.charts.length > 0 && <ResultSection title={`Chart entries · ${results.charts.length}`}>{results.charts.map((c) => <ChartHit key={c.rank} entry={c} />)}</ResultSection>}
           {results.releases.length > 0 && <ResultSection title={`Releases · ${results.releases.length}`}>{results.releases.map((r) => <ReleaseHit key={r.slug} release={r} />)}</ResultSection>}
           {results.genres.length > 0 && <ResultSection title={`Genres · ${results.genres.length}`}>{results.genres.map((g) => <Link key={g.slug} to={`/genres/${g.slug}`} className="search-chip">{g.name}</Link>)}</ResultSection>}
           {results.labels.length > 0 && <ResultSection title={`Labels · ${results.labels.length}`}>{results.labels.map((l) => <Link key={l.slug} to={`/labels/${l.slug}`} className="lbl-row"><div className="lbl-avatar">{l.name[0]}</div><div><div className="lbl-name">{l.name}</div><div className="lbl-meta">{l.artistCount} artists · {l.releaseCount} releases</div></div><i className="ri-arrow-right-s-line lbl-chevron" /></Link>)}</ResultSection>}
@@ -75,4 +78,21 @@ function TrackHit({ track }: { track: typeof TRACK_DETAILS[number] }) {
 }
 function ReleaseHit({ release }: { release: typeof RELEASES[number] }) {
   return <Link to={`/releases/${release.slug}`} className="lbl-row"><div className="lbl-avatar">{release.artworkUrl ? <img src={release.artworkUrl} alt="" /> : <i className="ri-album-line" />}</div><div><div className="lbl-name">{release.title}</div><div className="lbl-meta">{release.artist}</div></div><i className="ri-arrow-right-s-line lbl-chevron" /></Link>;
+}
+function ChartHit({ entry }: { entry: typeof CHART_DATA[number] }) {
+  return (
+    <Link to={`/tracks/${entry.slug}`} className="lbl-row">
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] text-[11px] font-black">
+        {entry.rank}
+      </div>
+      <div className="lbl-avatar overflow-hidden">
+        {entry.artworkUrl ? <img src={entry.artworkUrl} alt="" className="h-full w-full object-cover" /> : <i className="ri-music-2-line" />}
+      </div>
+      <div>
+        <div className="lbl-name">{entry.title}</div>
+        <div className="lbl-meta">{entry.artist} · {entry.genre}</div>
+      </div>
+      <i className="ri-arrow-right-s-line lbl-chevron" />
+    </Link>
+  );
 }
