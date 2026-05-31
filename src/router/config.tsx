@@ -4,9 +4,16 @@ import { ResponsivePage } from "@/components/mobile/ResponsivePage";
 import NotFound from "../pages/NotFound";
 import Home from "../pages/home/page";
 import AdminDesignSystem from "../pages/admin/design-system/page";
-import Charts from "../pages/charts/page";
+
+// Charts
+import ChartsDirectory from "../pages/charts/directory/page";
+import ChartEdition from "../pages/charts/edition/page";
+
+// Artists
 import Artists from "../pages/artists/page";
 import ArtistDetail from "../pages/artists/detail/page";
+
+// Other entity pages
 import Releases from "../pages/releases/page";
 import Genres from "../pages/genres/page";
 import Labels from "../pages/labels/page";
@@ -14,9 +21,13 @@ import Magazine from "../pages/magazine/page";
 import ArticlePage from "../pages/magazine/article/page";
 import TrackDetail from "../pages/tracks/detail/page";
 
+// Search
+import Search from "../pages/search/page";
+
 // Mobile pages
 import MobileHome from "../pages/mobile/home/page";
-import MobileCharts from "../pages/mobile/charts/page";
+import MobileChartsDirectory from "../pages/mobile/charts/directory/page";
+import MobileChartEdition from "../pages/mobile/charts/edition/page";
 import MobileArtists from "../pages/mobile/artists/page";
 import MobileArtistDetail from "../pages/mobile/artists/detail/page";
 import MobileReleases from "../pages/mobile/releases/page";
@@ -34,16 +45,36 @@ const routes: RouteObject[] = [
     element: <ResponsiveAppLayout />,
     children: [
       { path: "/", element: <ResponsivePage mobile={<MobileHome />} desktop={<Home />} /> },
-      { path: "/charts", element: <ResponsivePage mobile={<MobileCharts />} desktop={<Charts />} /> },
+
+      // Charts: directory at /charts, edition at /charts/:series/:edition
+      { path: "/charts", element: <ResponsivePage mobile={<MobileChartsDirectory />} desktop={<ChartsDirectory />} /> },
+      { path: "/charts/:series", element: <ResponsivePage mobile={<MobileChartEdition />} desktop={<ChartEdition />} /> },
+      { path: "/charts/:series/:edition", element: <ResponsivePage mobile={<MobileChartEdition />} desktop={<ChartEdition />} /> },
+
+      // Artists
       { path: "/artists", element: <ResponsivePage mobile={<MobileArtists />} desktop={<Artists />} /> },
       { path: "/artists/:slug", element: <ResponsivePage mobile={<MobileArtistDetail />} desktop={<ArtistDetail />} /> },
+
+      // Tracks
       { path: "/tracks/:slug", element: <ResponsivePage mobile={<MobileTrackDetail />} desktop={<TrackDetail />} /> },
+
+      // Releases
       { path: "/releases", element: <ResponsivePage mobile={<MobileReleases />} desktop={<Releases />} /> },
+
+      // Genres
       { path: "/genres", element: <ResponsivePage mobile={<MobileGenres />} desktop={<Genres />} /> },
+
+      // Labels
       { path: "/labels", element: <ResponsivePage mobile={<MobileLabels />} desktop={<Labels />} /> },
+
+      // Magazine
       { path: "/magazine", element: <ResponsivePage mobile={<MobileMagazine />} desktop={<Magazine />} /> },
       { path: "/magazine/:slug", element: <ResponsivePage mobile={<MobileArticlePage />} desktop={<ArticlePage />} /> },
-      { path: "/search", element: <MobileSearch /> },
+
+      // Search
+      { path: "/search", element: <ResponsivePage mobile={<MobileSearch />} desktop={<Search />} /> },
+
+      // Player
       { path: "/player", element: <ResponsivePage mobile={<MobileFullPlayer />} desktop={<MobileFullPlayer />} /> },
     ],
   },

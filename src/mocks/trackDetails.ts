@@ -19,8 +19,12 @@ export interface TrackDetail {
   movementAmount?: number;
   previousWeek?: number;
   lyrics?: string;
+  lyricsContributor?: { name: string; submittedAt: string; source?: string };
   albumSlug?: string;
   albumTitle?: string;
+  chartHistory?: number[];
+  credits?: { role: string; name: string }[];
+  streamingLinks?: { platform: string; url: string }[];
 }
 
 export const TRACK_DETAILS: TrackDetail[] = [
@@ -45,6 +49,25 @@ export const TRACK_DETAILS: TrackDetail[] = [
     movementAmount: 2,
     previousWeek: 3,
     albumTitle: "Oxygene",
+    chartHistory: [12, 9, 7, 5, 4, 3, 3, 1],
+    lyrics: "Verse 1\nI do not want to be alone tonight\nI need you right here by my side\nThe way you make me feel inside\nI cannot hide it\n\nChorus\nI am alone, alone, alone\nWithout you I am alone\nCome back to me, come back to me\nI do not want to be alone",
+    lyricsContributor: {
+      name: "Olamide Adeyemi",
+      submittedAt: "2026-05-12",
+      source: "Verified from official artist website",
+    },
+    credits: [
+      { role: "Artist", name: "Oxlade" },
+      { role: "Producer", name: "Spax" },
+      { role: "Songwriter", name: "Oxlade" },
+      { role: "Label", name: "Epic Records" },
+    ],
+    streamingLinks: [
+      { platform: "Spotify", url: "#" },
+      { platform: "Apple Music", url: "#" },
+      { platform: "YouTube", url: "#" },
+      { platform: "Audiomack", url: "#" },
+    ],
   },
   {
     slug: "monalisa-lojay-sarz",
@@ -64,6 +87,23 @@ export const TRACK_DETAILS: TrackDetail[] = [
     peakPosition: 1,
     movement: "same",
     albumTitle: "LV N ATTN",
+    chartHistory: [18, 15, 12, 10, 8, 6, 4, 3, 2, 2, 1, 2],
+    lyrics: "Verse 1\nMonalisa, I go sweep you off your feet\nGirl you got me on my knees\nBegging you please\n\nChorus\nMonalisa, Monalisa\nYou are a work of art\nYou dey burst my brain\nGirl you dey drive me insane",
+    lyricsContributor: {
+      name: "Chijioke Nnanna",
+      submittedAt: "2026-05-15",
+    },
+    credits: [
+      { role: "Artist", name: "Lojay" },
+      { role: "Featured", name: "Sarz" },
+      { role: "Producer", name: "Sarz" },
+      { role: "Label", name: "Warner Music" },
+    ],
+    streamingLinks: [
+      { platform: "Spotify", url: "#" },
+      { platform: "Apple Music", url: "#" },
+      { platform: "YouTube", url: "#" },
+    ],
   },
   {
     slug: "essence-wizkid-tems",
@@ -86,6 +126,22 @@ export const TRACK_DETAILS: TrackDetail[] = [
     movementAmount: 1,
     previousWeek: 1,
     albumTitle: "Made in Lagos",
+    chartHistory: [20, 18, 15, 12, 10, 8, 6, 5, 4, 3, 2, 1, 1, 1, 1, 2, 2, 3, 3, 2, 2, 3, 3, 3],
+    lyrics: "Verse 1 — Wizkid\nOh, I love the rhythm and the vibe\nGirl your body set, me I no go lie\nThe way you move, you dey scatter my mind\nI just wanna hold you tonight\n\nChorus\nI know that you wanna\nI know that you need it\nBaby I got it, I got it, I got it\nSay no go do me wrong\nSay no go do me wayo\n\nVerse 2 — Tems\nYou do not see me at the party\nI am the vibe and I am the party\nI am the one, I am the one\nYou are the one that I want",
+    credits: [
+      { role: "Artist", name: "Wizkid" },
+      { role: "Featured", name: "Tems" },
+      { role: "Producer", name: "P2J" },
+      { role: "Producer", name: "Legendury Beatz" },
+      { role: "Label", name: "RCA Records / Starboy" },
+    ],
+    streamingLinks: [
+      { platform: "Spotify", url: "#" },
+      { platform: "Apple Music", url: "#" },
+      { platform: "YouTube", url: "#" },
+      { platform: "Tidal", url: "#" },
+      { platform: "Deezer", url: "#" },
+    ],
   },
   {
     slug: "running-burna-boy",
@@ -108,6 +164,17 @@ export const TRACK_DETAILS: TrackDetail[] = [
     movementAmount: 3,
     previousWeek: 7,
     albumTitle: "Love, Damini",
+    chartHistory: [15, 12, 10, 7, 4],
+    credits: [
+      { role: "Artist", name: "Burna Boy" },
+      { role: "Producer", name: "Kel P" },
+      { role: "Label", name: "Atlantic Records" },
+    ],
+    streamingLinks: [
+      { platform: "Spotify", url: "#" },
+      { platform: "Apple Music", url: "#" },
+      { platform: "YouTube", url: "#" },
+    ],
   },
   {
     slug: "last-last-burna-boy",
@@ -128,6 +195,20 @@ export const TRACK_DETAILS: TrackDetail[] = [
     movement: "same",
     previousWeek: 5,
     albumTitle: "Love, Damini",
+    chartHistory: [20, 18, 15, 12, 10, 8, 6, 5, 4, 3, 2, 2, 2, 3, 3, 4, 4, 5],
+    lyrics: "Verse 1\nE don cast, last last\nNa everybody go chop breakfast\nShayo, I no go deny\nI dey shack garri and e dey make me high\n\nChorus\nLast last, na everybody go chop breakfast\nE don cast, e don cast oh\nNa everybody go chop breakfast\nShayo, I no go deny",
+    credits: [
+      { role: "Artist", name: "Burna Boy" },
+      { role: "Producer", name: "Chopstix" },
+      { role: "Sample", name: "Tony Montana" },
+      { role: "Label", name: "Atlantic Records" },
+    ],
+    streamingLinks: [
+      { platform: "Spotify", url: "#" },
+      { platform: "Apple Music", url: "#" },
+      { platform: "YouTube", url: "#" },
+      { platform: "Tidal", url: "#" },
+    ],
   },
   {
     slug: "peru-fireboy-ed",
@@ -149,6 +230,19 @@ export const TRACK_DETAILS: TrackDetail[] = [
     movementAmount: 2,
     previousWeek: 4,
     albumTitle: "Playboy",
+    chartHistory: [20, 18, 15, 12, 10, 8, 6, 5, 4, 3, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 6, 6],
+    lyrics: "Verse 1\nPeru, para, Peru, para\nI am loo, I am loo, I am loo, I am loo\nFor you, for you, for you, for you\nI am loo, I am loo, I am loo, I am loo\n\nChorus\nPeru, para, Peru, para\nI am loo, I am loo, I am loo, I am loo\nFor you, for you, for you, for you\nI am loo, I am loo, I am loo, I am loo",
+    credits: [
+      { role: "Artist", name: "Fireboy DML" },
+      { role: "Featured", name: "Ed Sheeran" },
+      { role: "Producer", name: "Shizzi" },
+      { role: "Label", name: "YBNL Nation" },
+    ],
+    streamingLinks: [
+      { platform: "Spotify", url: "#" },
+      { platform: "Apple Music", url: "#" },
+      { platform: "YouTube", url: "#" },
+    ],
   },
   {
     slug: "buga-kizz-tekno",
@@ -169,6 +263,19 @@ export const TRACK_DETAILS: TrackDetail[] = [
     movement: "up",
     movementAmount: 1,
     previousWeek: 8,
+    chartHistory: [12, 10, 9, 8, 7, 7],
+    credits: [
+      { role: "Artist", name: "Kizz Daniel" },
+      { role: "Featured", name: "Tekno" },
+      { role: "Producer", name: "Blaisebeatz" },
+      { role: "Label", name: "Flyboy Inc" },
+    ],
+    streamingLinks: [
+      { platform: "Spotify", url: "#" },
+      { platform: "Apple Music", url: "#" },
+      { platform: "YouTube", url: "#" },
+      { platform: "Boomplay", url: "#" },
+    ],
   },
   {
     slug: "calm-down-rema-selena",
@@ -189,6 +296,20 @@ export const TRACK_DETAILS: TrackDetail[] = [
     movement: "same",
     previousWeek: 8,
     albumTitle: "Rave & Roses",
+    chartHistory: [20, 18, 16, 14, 12, 10, 9, 8, 7, 6, 5, 4, 3, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 8, 8, 8, 8, 8, 8],
+    lyrics: "Verse 1\nBaby, calm down, calm down\nGirl, this your body e put my heart for lockdown\nFor lockdown, oh lockdown\nGirl, you sweet like Fanta, ooh Fanta, ooh\n\nChorus\nCalm down, calm down\nGirl, this your body e put my heart for lockdown\nFor lockdown, oh lockdown\nGirl, you sweet like Fanta, ooh Fanta, ooh",
+    credits: [
+      { role: "Artist", name: "Rema" },
+      { role: "Featured", name: "Selena Gomez" },
+      { role: "Producer", name: "Andre Vibez" },
+      { role: "Label", name: "Mavin Records" },
+    ],
+    streamingLinks: [
+      { platform: "Spotify", url: "#" },
+      { platform: "Apple Music", url: "#" },
+      { platform: "YouTube", url: "#" },
+      { platform: "Tidal", url: "#" },
+    ],
   },
   {
     slug: "sungba-asake-burna",
@@ -209,6 +330,19 @@ export const TRACK_DETAILS: TrackDetail[] = [
     movement: "new",
     previousWeek: 0,
     albumTitle: "Mr. Money with the Vibe",
+    chartHistory: [9],
+    lyrics: "Verse 1\nSungba, sungba, sungba, sungba\nI no dey wear agbada\nI no dey wear senator\nI dey wear Zaza, I dey wear Gucci\nSungba, sungba, sungba, sungba\n\nChorus\nSungba, sungba, sungba, sungba\nI no dey wear agbada\nI no dey wear senator\nI dey wear Zaza, I dey wear Gucci\nSungba, sungba, sungba, sungba",
+    credits: [
+      { role: "Artist", name: "Asake" },
+      { role: "Featured", name: "Burna Boy" },
+      { role: "Producer", name: "Magicsticks" },
+      { role: "Label", name: "YBNL Nation" },
+    ],
+    streamingLinks: [
+      { platform: "Spotify", url: "#" },
+      { platform: "Apple Music", url: "#" },
+      { platform: "YouTube", url: "#" },
+    ],
   },
   {
     slug: "terminator-asake",
@@ -230,6 +364,17 @@ export const TRACK_DETAILS: TrackDetail[] = [
     movementAmount: 4,
     previousWeek: 6,
     albumTitle: "Mr. Money with the Vibe",
+    chartHistory: [20, 18, 15, 12, 10, 8, 6, 5, 5, 5, 6, 7, 8, 10],
+    credits: [
+      { role: "Artist", name: "Asake" },
+      { role: "Producer", name: "Magicsticks" },
+      { role: "Label", name: "YBNL Nation" },
+    ],
+    streamingLinks: [
+      { platform: "Spotify", url: "#" },
+      { platform: "Apple Music", url: "#" },
+      { platform: "YouTube", url: "#" },
+    ],
   },
   {
     slug: "kwaku-traveller-black-sherif",
@@ -252,6 +397,17 @@ export const TRACK_DETAILS: TrackDetail[] = [
     movementAmount: 2,
     previousWeek: 13,
     albumTitle: "The Villain I Never Was",
+    chartHistory: [20, 18, 16, 14, 12, 10, 9, 8, 7],
+    credits: [
+      { role: "Artist", name: "Black Sherif" },
+      { role: "Producer", name: "Joker Nharnah" },
+      { role: "Label", name: "Blacko Management" },
+    ],
+    streamingLinks: [
+      { platform: "Spotify", url: "#" },
+      { platform: "Apple Music", url: "#" },
+      { platform: "YouTube", url: "#" },
+    ],
   },
   {
     slug: "rush-ayra-starr",
@@ -273,6 +429,17 @@ export const TRACK_DETAILS: TrackDetail[] = [
     movement: "same",
     previousWeek: 12,
     albumTitle: "19 & Dangerous",
+    chartHistory: [20, 18, 15, 12, 10, 9, 8],
+    credits: [
+      { role: "Artist", name: "Ayra Starr" },
+      { role: "Producer", name: "Andre Vibez" },
+      { role: "Label", name: "Mavin Records" },
+    ],
+    streamingLinks: [
+      { platform: "Spotify", url: "#" },
+      { platform: "Apple Music", url: "#" },
+      { platform: "YouTube", url: "#" },
+    ],
   },
   {
     slug: "overloading-bnxn-wizkid",
@@ -291,6 +458,18 @@ export const TRACK_DETAILS: TrackDetail[] = [
     peakPosition: 13,
     movement: "new",
     previousWeek: 0,
+    chartHistory: [13],
+    credits: [
+      { role: "Artist", name: "BNXN" },
+      { role: "Featured", name: "Wizkid" },
+      { role: "Producer", name: "Blanco" },
+      { role: "Label", name: "To Your Ears" },
+    ],
+    streamingLinks: [
+      { platform: "Spotify", url: "#" },
+      { platform: "Apple Music", url: "#" },
+      { platform: "YouTube", url: "#" },
+    ],
   },
   {
     slug: "organize-fireboy",
@@ -312,6 +491,17 @@ export const TRACK_DETAILS: TrackDetail[] = [
     movementAmount: 3,
     previousWeek: 11,
     albumTitle: "Playboy",
+    chartHistory: [20, 18, 16, 14, 12, 11, 10, 10, 11, 12, 14],
+    credits: [
+      { role: "Artist", name: "Fireboy DML" },
+      { role: "Producer", name: "Bizzouch" },
+      { role: "Label", name: "YBNL Nation" },
+    ],
+    streamingLinks: [
+      { platform: "Spotify", url: "#" },
+      { platform: "Apple Music", url: "#" },
+      { platform: "YouTube", url: "#" },
+    ],
   },
   {
     slug: "unavailable-davido-musa",
@@ -334,6 +524,20 @@ export const TRACK_DETAILS: TrackDetail[] = [
     movementAmount: 5,
     previousWeek: 20,
     albumTitle: "Timeless",
+    chartHistory: [20, 18, 15],
+    lyrics: "Verse 1\nI am unavailable, I am unavailable\nI am unavailable, I am unavailable\nI am unavailable, I am unavailable\nI am unavailable, I am unavailable\n\nChorus\nI am unavailable, I am unavailable\nI am unavailable, I am unavailable\nI am unavailable, I am unavailable\nI am unavailable, I am unavailable",
+    credits: [
+      { role: "Artist", name: "Davido" },
+      { role: "Featured", name: "Musa Keys" },
+      { role: "Producer", name: "Magicsticks" },
+      { role: "Label", name: "DMW" },
+    ],
+    streamingLinks: [
+      { platform: "Spotify", url: "#" },
+      { platform: "Apple Music", url: "#" },
+      { platform: "YouTube", url: "#" },
+      { platform: "Boomplay", url: "#" },
+    ],
   },
   {
     slug: "yawa-fireboy",
@@ -352,6 +556,17 @@ export const TRACK_DETAILS: TrackDetail[] = [
     peakPosition: 16,
     movement: "new",
     previousWeek: 0,
+    chartHistory: [16],
+    credits: [
+      { role: "Artist", name: "Fireboy DML" },
+      { role: "Producer", name: "Pheelz" },
+      { role: "Label", name: "YBNL Nation" },
+    ],
+    streamingLinks: [
+      { platform: "Spotify", url: "#" },
+      { platform: "Apple Music", url: "#" },
+      { platform: "YouTube", url: "#" },
+    ],
   },
   {
     slug: "sability-ayra-starr",
@@ -370,6 +585,17 @@ export const TRACK_DETAILS: TrackDetail[] = [
     peakPosition: 19,
     movement: "new",
     previousWeek: 0,
+    chartHistory: [17],
+    credits: [
+      { role: "Artist", name: "Ayra Starr" },
+      { role: "Producer", name: "Andre Vibez" },
+      { role: "Label", name: "Mavin Records" },
+    ],
+    streamingLinks: [
+      { platform: "Spotify", url: "#" },
+      { platform: "Apple Music", url: "#" },
+      { platform: "YouTube", url: "#" },
+    ],
   },
   {
     slug: "for-my-hand-burna-ed",
@@ -391,6 +617,25 @@ export const TRACK_DETAILS: TrackDetail[] = [
     movementAmount: 1,
     previousWeek: 17,
     albumTitle: "Love, Damini",
+    chartHistory: [20, 18, 15, 12, 10, 8, 6, 5, 4, 3, 3, 3, 4, 4, 5],
+    lyrics: "Verse 1 — Burna Boy\nFor my hand, for my hand\nI go fight for my hand\nI go die for my hand\nFor my hand, for my hand\n\nChorus\nFor my hand, for my hand\nI go fight for my hand\nI go die for my hand\nFor my hand, for my hand\n\nVerse 2 — Ed Sheeran\nI will stand by you, I will stand by you\nThrough the fire and the rain\nI will stand by you, I will stand by you\nThrough the joy and the pain",
+    lyricsContributor: {
+      name: "Fatima Abdi",
+      submittedAt: "2026-05-08",
+      source: "Official CD booklet",
+    },
+    credits: [
+      { role: "Artist", name: "Burna Boy" },
+      { role: "Featured", name: "Ed Sheeran" },
+      { role: "Producer", name: "Kel P" },
+      { role: "Label", name: "Atlantic Records" },
+    ],
+    streamingLinks: [
+      { platform: "Spotify", url: "#" },
+      { platform: "Apple Music", url: "#" },
+      { platform: "YouTube", url: "#" },
+      { platform: "Tidal", url: "#" },
+    ],
   },
   {
     slug: "bad-to-me-wizkid",
@@ -412,6 +657,18 @@ export const TRACK_DETAILS: TrackDetail[] = [
     movementAmount: 2,
     previousWeek: 17,
     albumTitle: "More Love, Less Ego",
+    chartHistory: [20, 18, 16, 14, 12, 10, 9, 8, 7, 6, 5, 5, 5, 6, 7, 8, 9, 10, 12, 15],
+    lyrics: "Verse 1\nYou bad to me, you bad to me\nYou bad to me, you bad to me\nYou bad to me, you bad to me\nYou bad to me, you bad to me\n\nChorus\nYou bad to me, you bad to me\nYou bad to me, you bad to me\nYou bad to me, you bad to me\nYou bad to me, you bad to me",
+    credits: [
+      { role: "Artist", name: "Wizkid" },
+      { role: "Producer", name: "P2J" },
+      { role: "Label", name: "RCA Records" },
+    ],
+    streamingLinks: [
+      { platform: "Spotify", url: "#" },
+      { platform: "Apple Music", url: "#" },
+      { platform: "YouTube", url: "#" },
+    ],
   },
   {
     slug: "feel-davido",
@@ -432,9 +689,25 @@ export const TRACK_DETAILS: TrackDetail[] = [
     movement: "same",
     previousWeek: 20,
     albumTitle: "Timeless",
+    chartHistory: [20, 18, 16, 14, 13, 12, 12, 12],
+    credits: [
+      { role: "Artist", name: "Davido" },
+      { role: "Producer", name: "Magicsticks" },
+      { role: "Label", name: "DMW" },
+    ],
+    streamingLinks: [
+      { platform: "Spotify", url: "#" },
+      { platform: "Apple Music", url: "#" },
+      { platform: "YouTube", url: "#" },
+      { platform: "Boomplay", url: "#" },
+    ],
   },
 ];
 
 export function getTrackBySlug(slug: string): TrackDetail | undefined {
   return TRACK_DETAILS.find((t) => t.slug === slug);
+}
+
+export function getRelatedTracks(artistSlug: string, currentSlug: string): TrackDetail[] {
+  return TRACK_DETAILS.filter((t) => t.artistSlug === artistSlug && t.slug !== currentSlug).slice(0, 4);
 }

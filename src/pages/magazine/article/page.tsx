@@ -1,7 +1,5 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
-import { WkTag } from "@/components/design-system/primitives/Tag";
-import { WkButton } from "@/components/design-system/primitives/Button";
 import { StoryCard } from "@/components/design-system/editorial/StoryCard";
 import { STORIES } from "@/mocks/magazine";
 
@@ -14,9 +12,11 @@ export default function ArticlePage() {
   const { slug } = useParams<{ slug: string }>();
   const article = STORIES.find((s) => s.slug === slug);
   const [copyToast, setCopyToast] = useState(false);
+  const [showFullLyrics, setShowFullLyrics] = useState(false);
 
   useEffect(() => {
     setCopyToast(false);
+    window.scrollTo(0, 0);
   }, [slug]);
 
   if (!article) {
@@ -26,7 +26,9 @@ export default function ArticlePage() {
         <h1 className="wk-h-section mb-2">Article not found</h1>
         <p className="text-[var(--wk-text-muted)]">This story does not exist in the registry.</p>
         <Link to="/magazine" className="mt-6 inline-block">
-          <WkButton variant="primary">Back to magazine</WkButton>
+          <span className="inline-flex items-center gap-2 rounded-full bg-[var(--wk-brand)] px-4 py-2.5 text-[13px] font-bold text-[var(--wk-brand-on)] transition-all hover:brightness-110 whitespace-nowrap">
+            Back to magazine
+          </span>
         </Link>
       </div>
     );
@@ -36,7 +38,6 @@ export default function ArticlePage() {
     (s) => s.slug !== article.slug && s.section === article.section
   ).slice(0, 3);
 
-  // Pull quotes — extract the first sentence from select paragraphs for pull quotes
   const pullQuotes = article.body
     ?.map((p, i) => (i === 1 || i === 3 || i === 5 ? p : null))
     .filter(Boolean) || [];
@@ -49,23 +50,10 @@ export default function ArticlePage() {
 
   return (
     <article>
-      {/* ===== ARTICLE HERO — full cinematic, the article IS the hero ===== */}
-      <section className="relative min-h-[70vh] md:min-h-[80vh] flex items-end overflow-hidden">
-        {article.heroUrl && (
-          <>
-            <div
-              className="absolute inset-0"
-              style={{
-                backgroundImage: `url(${article.heroUrl})`,
-                backgroundSize: "cover",
-                backgroundPosition: "center",
-              }}
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-black/15" />
-            <div className="absolute inset-0 bg-gradient-to-r from-black/40 via-transparent to-transparent" />
-          </>
-        )}
-
+      {/* ============================================================ */}
+      {/*  ARTICLE HERO — split layout, image as design element        */}
+      {/* ============================================================ */}
+      <section className="relative overflow-hidden">
         {/* Top bar */}
         <div className="absolute top-0 left-0 right-0 z-10">
           <div className="wk-container flex items-center justify-between px-6 py-5">
@@ -93,45 +81,66 @@ export default function ArticlePage() {
           </div>
         </div>
 
-        <div className="relative wk-container w-full px-6 pb-14 pt-20 md:pb-20">
-          <div className="mb-5 flex items-center gap-3">
-            <span className="rounded-full bg-[var(--wk-brand)] px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-[var(--wk-brand-on)]">
-              {article.section}
-            </span>
-            {article.readingTime && (
-              <span className="text-[12px] font-medium text-white/60">
-                {article.readingTime} min read
+        {/* Split hero */}
+        <div className="grid min-h-[80vh] lg:grid-cols-[1fr_1.2fr]">
+          {/* Left: text content */}
+          <div className="flex flex-col justify-end bg-[var(--wk-bg)] p-6 pb-12 pt-24 lg:pb-16 lg:pl-12 lg:pr-10">
+            <div className="mb-5 flex items-center gap-3">
+              <span className="rounded-full bg-[var(--wk-brand)] px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-[var(--wk-brand-on)]">
+                {article.section}
               </span>
+              {article.readingTime && (
+                <span className="text-[12px] font-medium text-[var(--wk-text-muted)]">
+                  {article.readingTime} min read
+                </span>
+              )}
+            </div>
+            <h1
+              className="mb-6 max-w-3xl font-black leading-[0.92] tracking-[-0.04em] text-[var(--wk-text)]"
+              style={{ fontSize: "clamp(32px, 5vw, 64px)" }}
+            >
+              {article.title}
+            </h1>
+            {article.dek && (
+              <p className="max-w-2xl text-[17px] leading-relaxed text-[var(--wk-text-muted)]">
+                {article.dek}
+              </p>
             )}
+            <div className="mt-8 flex items-center gap-4 text-[13px] text-[var(--wk-text-faint)]">
+              <div className="flex items-center gap-2">
+                {article.authorPhoto && (
+                  <img src={article.authorPhoto} alt={article.author} className="h-8 w-8 rounded-full object-cover" />
+                )}
+                <span className="font-semibold text-[var(--wk-text)]">{article.author}</span>
+              </div>
+              <span>·</span>
+              <span>{article.date}</span>
+              {article.readCount && (
+                <>
+                  <span>·</span>
+                  <span>{formatReadCount(article.readCount)} reads</span>
+                </>
+              )}
+            </div>
           </div>
-          <h1
-            className="mb-6 max-w-4xl font-black leading-[0.92] tracking-[-0.04em]"
-            style={{ color: "#F0EFE8", fontSize: "clamp(32px, 5vw, 64px)" }}
-          >
-            {article.title}
-          </h1>
-          {article.dek && (
-            <p className="max-w-2xl text-[18px] leading-relaxed" style={{ color: "rgba(240,239,232,.75)" }}>
-              {article.dek}
-            </p>
+
+          {/* Right: image */}
+          {article.heroUrl && (
+            <div className="relative min-h-[40vh] lg:min-h-full">
+              <img
+                src={article.heroUrl}
+                alt={article.title}
+                className="h-full w-full object-cover object-top"
+              />
+              <div className="absolute inset-0 bg-gradient-to-r from-[var(--wk-bg)] via-transparent to-transparent lg:hidden" />
+            </div>
           )}
-          <div className="mt-8 flex items-center gap-4 text-[13px]" style={{ color: "rgba(240,239,232,.55)" }}>
-            <span className="font-semibold" style={{ color: "rgba(240,239,232,.85)" }}>
-              {article.author}
-            </span>
-            <span>·</span>
-            <span>{article.date}</span>
-            {article.readCount && (
-              <>
-                <span>·</span>
-                <span>{formatReadCount(article.readCount)} reads</span>
-              </>
-            )}
-          </div>
         </div>
       </section>
 
-      {/* ===== ARTICLE BODY — editorial layout with drop cap, pull quotes, and graph sidebar ===== */}
+      {/* ============================================================ */}
+      {/*  ARTICLE BODY — editorial layout                             */}
+      {/* ============================================================ */}
       <div className="wk-container px-6 py-14 md:py-20">
         <div className="mx-auto max-w-[var(--wk-w-text)]">
           {/* Lead paragraph with drop cap */}
@@ -158,9 +167,9 @@ export default function ArticlePage() {
                   </p>
                   {/* Pull quote after every other paragraph, if we have one */}
                   {pq && index % 2 === 0 && (
-                    <blockquote className="my-8 border-l-4 border-[var(--wk-brand)] pl-6">
-                      <p className="text-[20px] font-bold leading-snug tracking-[-0.01em] text-[var(--wk-text)]">
-                        "{pq}"
+                    <blockquote className="my-10 border-l-4 border-[var(--wk-brand)] pl-6">
+                      <p className="text-[22px] font-bold leading-snug tracking-[-0.01em] text-[var(--wk-text)]">
+                        &ldquo;{pq}&rdquo;
                       </p>
                     </blockquote>
                   )}
@@ -266,10 +275,35 @@ export default function ArticlePage() {
               </Link>
             </div>
           </div>
+
+          {/* Author bio */}
+          {article.authorPhoto && (
+            <div className="mt-14 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-6 md:p-8">
+              <div className="flex items-center gap-4">
+                <img
+                  src={article.authorPhoto}
+                  alt={article.author}
+                  className="h-14 w-14 rounded-full object-cover"
+                />
+                <div>
+                  <h3 className="text-[15px] font-bold text-[var(--wk-text)]">{article.author}</h3>
+                  <p className="text-[13px] text-[var(--wk-text-muted)]">
+                    Contributor to WAKILISHA Editorial
+                  </p>
+                </div>
+              </div>
+              <p className="mt-4 text-[14px] leading-relaxed text-[var(--wk-text-muted)]">
+                This story is part of the WAKILISHA editorial graph. Every article is linked to the
+                registry — artists, releases, tracks, and charts — so you can follow the connections.
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* ===== READ NEXT — editorial section with visual weight ===== */}
+      {/* ============================================================ */}
+      {/*  READ NEXT — editorial section                                */}
+      {/* ============================================================ */}
       {relatedStories.length > 0 && (
         <section className="border-t border-[var(--wk-border)] bg-[var(--wk-bg-subtle)] py-16 md:py-24">
           <div className="wk-container px-6">

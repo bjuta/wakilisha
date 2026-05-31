@@ -1,4 +1,11 @@
-export const SECTIONS = ["All", "Analysis", "Focus", "Industry", "Culture", "Interview"];
+export const SECTIONS = [
+  { name: "All", color: "#1a1a1a" },
+  { name: "Analysis", color: "#C44A3B" },
+  { name: "Focus", color: "#D97706" },
+  { name: "Industry", color: "#78716C" },
+  { name: "Culture", color: "#BE185D" },
+  { name: "Interview", color: "#256B5A" },
+];
 
 export const STORIES = [
   {
@@ -11,6 +18,7 @@ export const STORIES = [
     dek: "How the genre's breakout year reshaped industry expectations and who is driving the next wave.",
     isFeatured: true,
     author: "WAKILISHA Editorial",
+    authorPhoto: "https://readdy.ai/api/search-image?query=Professional%20editorial%20team%20portrait%2C%20diverse%20creative%20directors%20in%20a%20modern%20studio%2C%20warm%20natural%20lighting%2C%20editorial%20photography%20style%2C%20neutral%20background&width=100&height=100&seq=auth1&orientation=squarish",
     readCount: 12400,
     body: [
       "Afrobeats in 2024 is not merely a genre. It is a cultural export machine, a chart infrastructure, and a conversation about who controls the narrative of African music on the world stage.",
@@ -35,6 +43,7 @@ export const STORIES = [
     readingTime: 6,
     heroUrl: "https://readdy.ai/api/search-image?query=East%20African%20city%20music%20culture%20documentary%20photography%2C%20Nairobi%20urban%20landscape%2C%20warm%20sunlight&width=400&height=240&seq=mag2&orientation=landscape",
     author: "Amara Ochieng",
+    authorPhoto: "https://readdy.ai/api/search-image?query=Professional%20portrait%20of%20a%20young%20African%20woman%20journalist%2C%20warm%20smile%2C%20confident%20expression%2C%20natural%20lighting%2C%20editorial%20photography%2C%20neutral%20background&width=100&height=100&seq=auth2&orientation=squarish",
     readCount: 8300,
     body: [
       "The East African music market has always been active. What changed in 2024 is visibility. For the first time, Tanzanian Bongo Flava and Kenyan Gengetone are entering global playlists at the same rate as West African Afrobeats.",
@@ -56,6 +65,7 @@ export const STORIES = [
     readingTime: 5,
     heroUrl: "https://readdy.ai/api/search-image?query=music%20streaming%20technology%20headphones%20digital%20music%20interface%20studio%20recording%20equipment%20warm%20light&width=400&height=240&seq=mag3&orientation=landscape",
     author: "WAKILISHA Editorial",
+    authorPhoto: "https://readdy.ai/api/search-image?query=Professional%20editorial%20team%20portrait%2C%20diverse%20creative%20directors%20in%20a%20modern%20studio%2C%20warm%20natural%20lighting%2C%20editorial%20photography%20style%2C%20neutral%20background&width=100&height=100&seq=auth1&orientation=squarish",
     readCount: 15200,
     body: [
       "The average African artist earns less per stream than artists in North America or Europe. This is not new. What is new is that the gap is closing, and the mechanism is not charity — it is data accuracy.",
@@ -76,6 +86,7 @@ export const STORIES = [
     readingTime: 4,
     heroUrl: "https://readdy.ai/api/search-image?query=music%20studio%20recording%20session%20African%20musicians%20collaboration%20creative%20process%20documentary%20photography&width=400&height=240&seq=mag4&orientation=landscape",
     author: "Kofi Mensah",
+    authorPhoto: "https://readdy.ai/api/search-image?query=Professional%20portrait%20of%20a%20young%20African%20man%20writer%2C%20thoughtful%20expression%2C%20stylish%20glasses%2C%20natural%20lighting%2C%20editorial%20photography%2C%20neutral%20background&width=100&height=100&seq=auth3&orientation=squarish",
     readCount: 6700,
     body: [
       "Genre boundaries are dissolving in real time. The most interesting music coming out of Africa right now is not pure Afrobeats, pure amapiano, or pure hip-hop. It is the intersection.",
@@ -97,6 +108,7 @@ export const STORIES = [
     readingTime: 7,
     heroUrl: "https://readdy.ai/api/search-image?query=African%20female%20singer%20interview%20portrait%2C%20editorial%20photography%2C%20warm%20lighting%2C%20contemplative%20expression&width=400&height=240&seq=mag5&orientation=landscape",
     author: "WAKILISHA Editorial",
+    authorPhoto: "https://readdy.ai/api/search-image?query=Professional%20editorial%20team%20portrait%2C%20diverse%20creative%20directors%20in%20a%20modern%20studio%2C%20warm%20natural%20lighting%2C%20editorial%20photography%20style%2C%20neutral%20background&width=100&height=100&seq=auth1&orientation=squarish",
     readCount: 28100,
     body: [
       "Tems sits in a studio in Lagos, calm, precise, and unhurried. She has just returned from a tour that took her through six countries in three weeks, and she is already back in the studio. 'The road is the work,' she says. 'The studio is the life.'",
@@ -118,6 +130,7 @@ export const STORIES = [
     readingTime: 6,
     heroUrl: "https://readdy.ai/api/search-image?query=data%20analytics%20music%20chart%20visualization%2C%20editorial%20photography%2C%20screens%2C%20abstract%20data&width=400&height=240&seq=mag6&orientation=landscape",
     author: "Data Team",
+    authorPhoto: "https://readdy.ai/api/search-image?query=Professional%20portrait%20of%20a%20data%20analyst%2C%20modern%20office%20setting%2C%20confident%20pose%2C%20neutral%20background%2C%20editorial%20photography%2C%20clean%20minimal%20style&width=100&height=100&seq=auth4&orientation=squarish",
     readCount: 5400,
     body: [
       "Every chart is a claim. It claims that this track, at this moment, is more popular than that one. The claim is only as strong as the data behind it.",
@@ -138,6 +151,7 @@ export const STORIES = [
     readingTime: 9,
     heroUrl: "https://readdy.ai/api/search-image?query=African%20musician%20on%20stage%20concert%2C%20dramatic%20spotlight%2C%20powerful%20performance%20photography&width=400&height=240&seq=mag7&orientation=landscape",
     author: "WAKILISHA Editorial",
+    authorPhoto: "https://readdy.ai/api/search-image?query=Professional%20editorial%20team%20portrait%2C%20diverse%20creative%20directors%20in%20a%20modern%20studio%2C%20warm%20natural%20lighting%2C%20editorial%20photography%20style%2C%20neutral%20background&width=100&height=100&seq=auth1&orientation=squarish",
     readCount: 18900,
     body: [
       "Love, Damini was not just an album. It was a repositioning. When Burna Boy released it in 2022, he was already a global star. But this album made him a global reference point.",
@@ -159,6 +173,7 @@ export const STORIES = [
     readingTime: 7,
     heroUrl: "https://readdy.ai/api/search-image?query=South%20African%20amapiano%20dance%20party%2C%20vibrant%20club%20lighting%2C%20energetic%20crowd%2C%20documentary%20photography%2C%20warm%20color%20palette&width=400&height=240&seq=mag8&orientation=landscape",
     author: "Thandiwe Mokoena",
+    authorPhoto: "https://readdy.ai/api/search-image?query=Professional%20portrait%20of%20a%20South%20African%20woman%20journalist%2C%20confident%20expression%2C%20natural%20lighting%2C%20editorial%20photography%2C%20warm%20neutral%20background&width=100&height=100&seq=auth5&orientation=squarish",
     readCount: 11200,
     body: [
       "Amapiano started in Pretoria. It was local, specific, and unapologetically South African. Now it is in Lagos, London, and Los Angeles. The speed of this transition is unprecedented in African music.",
@@ -180,6 +195,7 @@ export const STORIES = [
     readingTime: 6,
     heroUrl: "https://readdy.ai/api/search-image?query=African%20female%20musicians%20group%20portrait%2C%20powerful%20confident%20poses%2C%20editorial%20photography%2C%20dramatic%20studio%20lighting%2C%20warm%20tones&width=400&height=240&seq=mag9&orientation=landscape",
     author: "WAKILISHA Editorial",
+    authorPhoto: "https://readdy.ai/api/search-image?query=Professional%20editorial%20team%20portrait%2C%20diverse%20creative%20directors%20in%20a%20modern%20studio%2C%20warm%20natural%20lighting%2C%20editorial%20photography%20style%2C%20neutral%20background&width=100&height=100&seq=auth1&orientation=squarish",
     readCount: 22400,
     body: [
       "The narrative around women in African music has often been about struggle. This year, it is about dominance. Women are not just participating. They are defining the sound, the business, and the culture.",
@@ -202,6 +218,7 @@ export const STORIES = [
     readingTime: 8,
     heroUrl: "https://readdy.ai/api/search-image?query=African%20music%20arena%20tour%20concert%2C%20massive%20crowd%2C%20stage%20lights%2C%20professional%20photography%2C%20stadium%20atmosphere&width=400&height=240&seq=mag10&orientation=landscape",
     author: "Tour Desk",
+    authorPhoto: "https://readdy.ai/api/search-image?query=Professional%20portrait%20of%20a%20music%20industry%20professional%2C%20concert%20backstage%20setting%2C%20confident%20pose%2C%20warm%20lighting%2C%20editorial%20photography&width=100&height=100&seq=auth6&orientation=squarish",
     readCount: 9500,
     body: [
       "Davido's Timeless Tour was the largest African arena tour in history. It visited 28 cities, sold out 19 of them, and grossed more than any previous African tour. The numbers are impressive. The logistics are staggering.",
@@ -223,6 +240,7 @@ export const STORIES = [
     readingTime: 5,
     heroUrl: "https://readdy.ai/api/search-image?query=Ghanaian%20highlife%20music%20band%20performance%2C%20brass%20instruments%2C%20traditional%20and%20modern%20fusion%2C%20warm%20documentary%20photography&width=400&height=240&seq=mag11&orientation=landscape",
     author: "Kwame Asante",
+    authorPhoto: "https://readdy.ai/api/search-image?query=Professional%20portrait%20of%20a%20Ghanaian%20man%20writer%2C%20glasses%2C%20intellectual%20expression%2C%20natural%20lighting%2C%20editorial%20photography%2C%20neutral%20background&width=100&height=100&seq=auth7&orientation=squarish",
     readCount: 7800,
     body: [
       "Highlife is the oldest continuously recorded African popular music genre. It predates Afrobeats by decades. And it is having a quiet revival that most listeners are not noticing.",
@@ -243,6 +261,7 @@ export const STORIES = [
     readingTime: 6,
     heroUrl: "https://readdy.ai/api/search-image?query=young%20African%20male%20artist%20portrait%2C%20creative%20colorful%20lighting%2C%20editorial%20music%20photography%2C%20confident%20expression&width=400&height=240&seq=mag12&orientation=landscape",
     author: "WAKILISHA Editorial",
+    authorPhoto: "https://readdy.ai/api/search-image?query=Professional%20editorial%20team%20portrait%2C%20diverse%20creative%20directors%20in%20a%20modern%20studio%2C%20warm%20natural%20lighting%2C%20editorial%20photography%20style%2C%20neutral%20background&width=100&height=100&seq=auth1&orientation=squarish",
     readCount: 20100,
     body: [
       "Rema does not describe music in conventional terms. He describes it in colors. 'Afrorave is my palette,' he says. 'Each track is a different painting. The same colors, but different composition.'",
@@ -267,6 +286,7 @@ export const EDITOR_PICKS = [
     readingTime: 7,
     heroUrl: "https://readdy.ai/api/search-image?query=African%20female%20singer%20interview%20portrait%2C%20editorial%20photography%2C%20warm%20lighting%2C%20contemplative%20expression&width=400&height=240&seq=mag5&orientation=landscape",
     author: "WAKILISHA Editorial",
+    authorPhoto: "https://readdy.ai/api/search-image?query=Professional%20editorial%20team%20portrait%2C%20diverse%20creative%20directors%20in%20a%20modern%20studio%2C%20warm%20natural%20lighting%2C%20editorial%20photography%20style%2C%20neutral%20background&width=100&height=100&seq=auth1&orientation=squarish",
     readCount: 28100,
     pickReason: "Cover story",
   },
@@ -278,6 +298,7 @@ export const EDITOR_PICKS = [
     readingTime: 6,
     heroUrl: "https://readdy.ai/api/search-image?query=African%20female%20musicians%20group%20portrait%2C%20powerful%20confident%20poses%2C%20editorial%20photography%2C%20dramatic%20studio%20lighting%2C%20warm%20tones&width=400&height=240&seq=mag9&orientation=landscape",
     author: "WAKILISHA Editorial",
+    authorPhoto: "https://readdy.ai/api/search-image?query=Professional%20editorial%20team%20portrait%2C%20diverse%20creative%20directors%20in%20a%20modern%20studio%2C%20warm%20natural%20lighting%2C%20editorial%20photography%20style%2C%20neutral%20background&width=100&height=100&seq=auth1&orientation=squarish",
     readCount: 22400,
     pickReason: "Editor's choice",
   },
@@ -289,15 +310,43 @@ export const EDITOR_PICKS = [
     readingTime: 6,
     heroUrl: "https://readdy.ai/api/search-image?query=young%20African%20male%20artist%20portrait%2C%20creative%20colorful%20lighting%2C%20editorial%20music%20photography%2C%20confident%20expression&width=400&height=240&seq=mag12&orientation=landscape",
     author: "WAKILISHA Editorial",
+    authorPhoto: "https://readdy.ai/api/search-image?query=Professional%20editorial%20team%20portrait%2C%20diverse%20creative%20directors%20in%20a%20modern%20studio%2C%20warm%20natural%20lighting%2C%20editorial%20photography%20style%2C%20neutral%20background&width=100&height=100&seq=auth1&orientation=squarish",
     readCount: 20100,
     pickReason: "Must read",
   },
 ];
 
 export const TRENDING_STORIES = [
-  { slug: "tems-interview", title: "Tems: 'I don't chase the mainstream...", section: "Interview", readCount: 28100 },
-  { slug: "rema-interview", title: "Rema: 'I see sound as color...'", section: "Interview", readCount: 20100 },
-  { slug: "burna-boy-love-damini-retrospective", title: "Two years on: Love, Damini...", section: "Analysis", readCount: 18900 },
-  { slug: "women-in-african-music-2024", title: "The women reshaping African music...", section: "Culture", readCount: 22400 },
-  { slug: "streaming-economics", title: "Streaming economics and the African artist", section: "Industry", readCount: 15200 },
+  { slug: "tems-interview", title: "Tems: 'I don't chase the mainstream...", section: "Interview", readCount: 28100, heroUrl: "https://readdy.ai/api/search-image?query=African%20female%20singer%20interview%20portrait%2C%20editorial%20photography%2C%20warm%20lighting%2C%20contemplative%20expression&width=400&height=240&seq=mag5&orientation=landscape" },
+  { slug: "rema-interview", title: "Rema: 'I see sound as color...'", section: "Interview", readCount: 20100, heroUrl: "https://readdy.ai/api/search-image?query=young%20African%20male%20artist%20portrait%2C%20creative%20colorful%20lighting%2C%20editorial%20music%20photography%2C%20confident%20expression&width=400&height=240&seq=mag12&orientation=landscape" },
+  { slug: "burna-boy-love-damini-retrospective", title: "Two years on: Love, Damini...", section: "Analysis", readCount: 18900, heroUrl: "https://readdy.ai/api/search-image?query=African%20musician%20on%20stage%20concert%2C%20dramatic%20spotlight%2C%20powerful%20performance%20photography&width=400&height=240&seq=mag7&orientation=landscape" },
+  { slug: "women-in-african-music-2024", title: "The women reshaping African music...", section: "Culture", readCount: 22400, heroUrl: "https://readdy.ai/api/search-image?query=African%20female%20musicians%20group%20portrait%2C%20powerful%20confident%20poses%2C%20editorial%20photography%2C%20dramatic%20studio%20lighting%2C%20warm%20tones&width=400&height=240&seq=mag9&orientation=landscape" },
+  { slug: "streaming-economics", title: "Streaming economics and the African artist", section: "Industry", readCount: 15200, heroUrl: "https://readdy.ai/api/search-image?query=music%20streaming%20technology%20headphones%20digital%20music%20interface%20studio%20recording%20equipment%20warm%20light&width=400&height=240&seq=mag3&orientation=landscape" },
+];
+
+export const CONTRIBUTORS = [
+  {
+    name: "Amara Ochieng",
+    role: "East Africa Correspondent",
+    photo: "https://readdy.ai/api/search-image?query=Professional%20portrait%20of%20a%20young%20African%20woman%20journalist%2C%20warm%20smile%2C%20confident%20expression%2C%20natural%20lighting%2C%20editorial%20photography%2C%20neutral%20background&width=100&height=100&seq=auth2&orientation=squarish",
+    bio: "Covering the music scenes of Nairobi, Dar es Salaam, and Kampala since 2019.",
+  },
+  {
+    name: "Kofi Mensah",
+    role: "Culture Editor",
+    photo: "https://readdy.ai/api/search-image?query=Professional%20portrait%20of%20a%20young%20African%20man%20writer%2C%20thoughtful%20expression%2C%20stylish%20glasses%2C%20natural%20lighting%2C%20editorial%20photography%2C%20neutral%20background&width=100&height=100&seq=auth3&orientation=squarish",
+    bio: "Writes about genre, identity, and the spaces where music and culture collide.",
+  },
+  {
+    name: "Thandiwe Mokoena",
+    role: "South Africa Editor",
+    photo: "https://readdy.ai/api/search-image?query=Professional%20portrait%20of%20a%20South%20African%20woman%20journalist%2C%20confident%20expression%2C%20natural%20lighting%2C%20editorial%20photography%2C%20warm%20neutral%20background&width=100&height=100&seq=auth5&orientation=squarish",
+    bio: "Based in Johannesburg. Focused on amapiano, house, and the Southern African sound.",
+  },
+  {
+    name: "Kwame Asante",
+    role: "Heritage & History",
+    photo: "https://readdy.ai/api/search-image?query=Professional%20portrait%20of%20a%20Ghanaian%20man%20writer%2C%20glasses%2C%20intellectual%20expression%2C%20natural%20lighting%2C%20editorial%20photography%2C%20neutral%20background&width=100&height=100&seq=auth7&orientation=squarish",
+    bio: "Archives the past to explain the present. Highlife, highlife, and more highlife.",
+  },
 ];

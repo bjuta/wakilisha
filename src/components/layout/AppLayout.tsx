@@ -11,6 +11,7 @@ const NAV_LINKS = [
   { label: "Genres", to: "/genres" },
   { label: "Labels", to: "/labels" },
   { label: "Magazine", to: "/magazine" },
+  { label: "Search", to: "/search" },
 ];
 
 export function AppLayout() {
