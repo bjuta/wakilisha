@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { usePlayer } from "@/context/PlayerContext";
 import { TRACK_DETAILS, getTrackBySlug, getRelatedTracks } from "@/mocks/trackDetails";
+import { TrackChartHistorySection } from "@/components/charts/TrackChartHistory";
 import { WkIcon } from "@/components/design-system/Icon";
 
 const TABS = ["Overview", "Chart stats", "Lyrics", "Credits"] as const;
@@ -187,7 +188,19 @@ function MetaRows({ track }: { track: NonNullable<ReturnType<typeof getTrackBySl
 }
 
 function ChartStatsTab({ track }: { track: NonNullable<ReturnType<typeof getTrackBySlug>> }) {
-  return <div>{track.chartHistory && track.chartHistory.length > 1 && <div className="border-b border-[var(--wk-divider)] px-5 py-5"><div className="mb-2 text-[11px] font-black uppercase tracking-wider text-[var(--wk-text-muted)]">Chart journey · {track.chartHistory.length} weeks</div><div className="mb-3 flex items-end gap-4"><div><div className="text-[9px] uppercase tracking-wider text-[var(--wk-text-faint)]">Current</div><div className="text-[24px] font-black text-[var(--wk-brand)]">#{track.rank}</div></div><div className="h-8 w-px bg-[var(--wk-divider)]" /><div><div className="text-[9px] uppercase tracking-wider text-[var(--wk-text-faint)]">Peak</div><div className="text-[18px] font-black text-[var(--wk-text)]">#{track.peakPosition}</div></div><div className="h-8 w-px bg-[var(--wk-divider)]" /><div><div className="text-[9px] uppercase tracking-wider text-[var(--wk-text-faint)]">Weeks</div><div className="text-[18px] font-black text-[var(--wk-text)]">{track.weeksOnChart}</div></div></div><ChartSparklineMobile data={track.chartHistory} /></div>}<div className="divide-y divide-[var(--wk-divider)] border-b border-[var(--wk-divider)]">{[{ label: "Current position", value: `#${track.rank}` },{ label: "Peak position", value: `#${track.peakPosition}` },{ label: "Weeks on chart", value: track.weeksOnChart },track.previousWeek && track.previousWeek > 0 ? { label: "Previous week", value: `#${track.previousWeek}` } : null,track.duration ? { label: "Duration", value: formatDuration(track.duration) } : null,track.streamCount ? { label: "Verified streams", value: track.streamCount } : null].filter(Boolean).map((row: any) => <div key={row.label} className="flex items-center justify-between px-5 py-3"><span className="text-[13px] text-[var(--wk-text-soft)]">{row.label}</span><span className="text-[14px] font-bold text-[var(--wk-text)]">{row.value}</span></div>)}<div className="flex items-center justify-between px-5 py-3"><span className="text-[13px] text-[var(--wk-text-soft)]">Movement</span><MovementBadge movement={track.movement} amount={track.movementAmount} /></div></div></div>;
+  return <div>{track.chartHistory && track.chartHistory.length > 1 && <div className="border-b border-[var(--wk-divider)] px-5 py-5"><div className="mb-2 text-[11px] font-black uppercase tracking-wider text-[var(--wk-text-muted)]">Chart journey · {track.chartHistory.length} weeks</div><div className="mb-3 flex items-end gap-4"><div><div className="text-[9px] uppercase tracking-wider text-[var(--wk-text-faint)]">Current</div><div className="text-[24px] font-black text-[var(--wk-brand)]">#{track.rank}</div></div><div className="h-8 w-px bg-[var(--wk-divider)]" /><div><div className="text-[9px] uppercase tracking-wider text-[var(--wk-text-faint)]">Peak</div><div className="text-[18px] font-black text-[var(--wk-text)]">#{track.peakPosition}</div></div><div className="h-8 w-px bg-[var(--wk-divider)]" /><div><div className="text-[9px] uppercase tracking-wider text-[var(--wk-text-faint)]">Weeks</div><div className="text-[18px] font-black text-[var(--wk-text)]">{track.weeksOnChart}</div></div></div><ChartSparklineMobile data={track.chartHistory} /></div>}
+
+      {/* Public chart history from chartsPublic service */}
+      <TrackChartHistorySection
+        trackSlug={track.slug}
+        trackRank={track.rank ?? 0}
+        trackPeak={track.peakPosition ?? 0}
+        trackWeeks={track.weeksOnChart ?? 0}
+        trackHistory={track.chartHistory}
+        compact
+      />
+
+      <div className="divide-y divide-[var(--wk-divider)] border-b border-[var(--wk-divider)]">{[{ label: "Current position", value: `#${track.rank}` },{ label: "Peak position", value: `#${track.peakPosition}` },{ label: "Weeks on chart", value: track.weeksOnChart },track.previousWeek && track.previousWeek > 0 ? { label: "Previous week", value: `#${track.previousWeek}` } : null,track.duration ? { label: "Duration", value: formatDuration(track.duration) } : null,track.streamCount ? { label: "Verified streams", value: track.streamCount } : null].filter(Boolean).map((row: any) => <div key={row.label} className="flex items-center justify-between px-5 py-3"><span className="text-[13px] text-[var(--wk-text-soft)]">{row.label}</span><span className="text-[14px] font-bold text-[var(--wk-text)]">{row.value}</span></div>)}<div className="flex items-center justify-between px-5 py-3"><span className="text-[13px] text-[var(--wk-text-soft)]">Movement</span><MovementBadge movement={track.movement} amount={track.movementAmount} /></div></div></div>;
 }
 
 function LyricsTab({ track }: { track: NonNullable<ReturnType<typeof getTrackBySlug>> }) {

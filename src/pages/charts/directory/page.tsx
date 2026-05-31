@@ -12,6 +12,7 @@ import {
   type ChartDirectoryViewModel,
   type ChartEntryRowViewModel,
 } from "@/services/chartsPublic/viewModels";
+import { ChartRefreshButton } from "@/components/charts/ChartRefreshButton";
 
 const HERO_IMAGE = "https://readdy.ai/api/search-image?query=abstract%20dark%20minimalist%20music%20visualization%20with%20subtle%20green%20neon%20light%20streaks%20on%20deep%20black%20background%20geometric%20waveforms%20and%20floating%20particles%20premium%20cinematic%20atmosphere%20no%20text%20high%20contrast%20editorial%20photography%20style&width=1600&height=640&seq=charts-hero-01&orientation=landscape";
 
@@ -564,8 +565,9 @@ export default function ChartsDirectory() {
 
       {/* Subtle metadata footer */}
       <div className="border-t border-[var(--wk-border)] bg-[var(--wk-bg)]">
-        <div className="wk-container px-4 py-3 md:px-6">
+        <div className="wk-container px-4 py-3 md:px-6 flex items-center justify-between gap-3">
           <div className="text-[11px] text-[var(--wk-text-faint)]">{metaLine}</div>
+          <ChartRefreshButton onRefresh={load} size="sm" />
         </div>
       </div>
     </div>

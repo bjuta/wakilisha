@@ -15,6 +15,7 @@ import AdminChartsIngestDetail from "../pages/admin/charts/ingest/detail/page";
 import AdminChartsEditions from "../pages/admin/charts/editions/page";
 import AdminChartsSnapshots from "../pages/admin/charts/snapshots/page";
 import AdminChartsIntegrationMap from "../pages/admin/charts/integration-map/page";
+import AdminChartsPublicApiQa from "../pages/admin/charts/public-api-qa/page";
 
 // Charts
 import ChartsDirectory from "../pages/charts/directory/page";
@@ -113,6 +114,7 @@ const routes: RouteObject[] = [
       { path: "editions", element: <AdminChartsEditions /> },
       { path: "snapshots", element: <AdminChartsSnapshots /> },
       { path: "integration-map", element: <AdminChartsIntegrationMap /> },
+      { path: "public-api-qa", element: <AdminChartsPublicApiQa /> },
     ],
   },
   {

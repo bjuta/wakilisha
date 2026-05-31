@@ -14,6 +14,7 @@ const NAV_ITEMS = [
   { path: "/admin/charts/editions", label: "Editions", icon: "ri-stack-line" },
   { path: "/admin/charts/snapshots", label: "Snapshots", icon: "ri-camera-lens-line" },
   { path: "/admin/charts/integration-map", label: "Integration Map", icon: "ri-map-pin-line" },
+  { path: "/admin/charts/public-api-qa", label: "Public API QA", icon: "ri-test-tube-line" },
 ];
 
 export function AdminChartsLayout({ children }: AdminChartsLayoutProps) {

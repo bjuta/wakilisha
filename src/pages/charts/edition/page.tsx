@@ -18,6 +18,7 @@ import {
   type ChartArchiveViewModel,
 } from "@/services/chartsPublic/viewModels";
 import { ShareButton } from "@/components/design-system/share/ShareSheet";
+import { ChartRefreshButton } from "@/components/charts/ChartRefreshButton";
 import { WkIcon } from "@/components/design-system/Icon";
 
 const rankTone = (rank: number) =>
@@ -628,8 +629,9 @@ export default function ChartEdition() {
 
       {/* Subtle metadata */}
       <div className="border-t border-[var(--wk-border)] bg-[var(--wk-bg)]">
-        <div className="wk-container-wide px-4 py-3 md:px-6">
+        <div className="wk-container-wide px-4 py-3 md:px-6 flex items-center justify-between gap-3">
           <div className="text-[11px] text-[var(--wk-text-faint)]">{metaLine}</div>
+          <ChartRefreshButton onRefresh={load} size="sm" />
         </div>
       </div>
     </main>

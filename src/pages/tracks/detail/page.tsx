@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { usePlayer } from "@/context/PlayerContext";
 import { TRACK_DETAILS, getTrackBySlug, getRelatedTracks } from "@/mocks/trackDetails";
+import { TrackChartHistorySection } from "@/components/charts/TrackChartHistory";
 import { WkIcon } from "@/components/design-system/Icon";
 
 const TABS = ["Overview", "Chart stats", "Lyrics", "Credits"] as const;
@@ -282,6 +283,16 @@ function ChartStatsTab({ track }: { track: NonNullable<ReturnType<typeof getTrac
           <ChartSparkline data={track.chartHistory} />
         </div>
       )}
+
+      {/* Public chart history from chartsPublic service */}
+      <TrackChartHistorySection
+        trackSlug={track.slug}
+        trackRank={track.rank ?? 0}
+        trackPeak={track.peakPosition ?? 0}
+        trackWeeks={track.weeksOnChart ?? 0}
+        trackHistory={track.chartHistory}
+      />
+
       <div className="divide-y divide-[var(--wk-divider)] border-b border-[var(--wk-divider)]">
         {[
           { label: "Current position", value: `#${track.rank}` },

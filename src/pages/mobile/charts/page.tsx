@@ -14,6 +14,7 @@ import {
   type ChartDirectoryViewModel,
   type ChartEntryRowViewModel,
 } from "@/services/chartsPublic/viewModels";
+import { ChartRefreshButton } from "@/components/charts/ChartRefreshButton";
 
 export default function MobileCharts() {
   const [activeSeries, setActiveSeries] = useState("weekly-top-40");
@@ -353,7 +354,10 @@ export default function MobileCharts() {
       {/* Subtle metadata */}
       {metaLine && (
         <div className="border-t border-[var(--wk-border)] bg-[var(--wk-bg)] px-5 py-3">
-          <div className="text-[10px] text-[var(--wk-text-faint)]">{metaLine}</div>
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-[10px] text-[var(--wk-text-faint)]">{metaLine}</div>
+            <ChartRefreshButton onRefresh={load} size="sm" />
+          </div>
         </div>
       )}
     </div>
