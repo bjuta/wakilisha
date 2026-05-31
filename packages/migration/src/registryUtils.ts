@@ -56,7 +56,7 @@ export function rowName(row: Row): string | null {
 }
 
 export function rowSlug(row: Row, fallback: string, prefix: string): string {
-  return first(row, ['slug', 'post_name', 'permalink_slug', 'old_slug', 'canonical_slug']) ?? slugify(fallback) || `${prefix}-${Date.now()}`;
+  return (first(row, ['slug', 'post_name', 'permalink_slug', 'old_slug', 'canonical_slug']) ?? slugify(fallback)) || `${prefix}-${Date.now()}`;
 }
 
 export function rowImage(row: Row): string | null {
