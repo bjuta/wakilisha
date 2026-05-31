@@ -39,6 +39,12 @@ const chartEditionsBySeries = importedRegistry.chartEditions.reduce((acc, editio
 const titleCase = (value: string) => value.replace(/\b\w/g, (char) => char.toUpperCase());
 const fallbackImage = (seed: string) => `https://picsum.photos/seed/${encodeURIComponent(seed)}/600/600`;
 
+function extractEntryCount(label: string, explicit?: number | null): number {
+  if (explicit != null && explicit > 0) return explicit;
+  const match = label.match(/\b(10|20|25|30|40|50|60|100)\b/);
+  return match ? Number(match[1]) : 40;
+}
+
 const dateScore = (value: string | null | undefined) => {
   if (!value) return 0;
   const parsed = Date.parse(value);
@@ -50,7 +56,7 @@ function sortEditions<T extends { date: string | null; label: string }>(editions
 }
 
 const fallbackChartSeries = importedRegistry.chartEntries.length
-  ? [{ id: 'imported-chart', slug: 'imported-chart', label: 'Imported WAKILISHA Chart', description: 'Imported chart entries from the WAKILISHA registry', status: 'active' }]
+  ? [{ id: 'imported-chart', slug: 'imported-chart', label: 'Imported WAKILISHA Chart', description: 'Imported chart entries from the WAKILISHA registry', status: 'active', entryCount: null }]
   : [];
 
 const fallbackChartEditions = importedRegistry.chartEntries.length
@@ -202,11 +208,13 @@ export function getChartSeriesSummaries() {
     const editions = getChartEditionsForSeries(series.slug);
     const latestEdition = editions[0] ?? null;
     const rows = latestEdition ? getChartEntriesForEdition(latestEdition.id) : importedRegistry.chartEntries;
+    const entryCount = extractEntryCount(series.label, series.entryCount);
     return {
       id: series.slug,
       label: series.label,
       description: series.description ?? 'Imported WAKILISHA chart series',
       count: rows.length,
+      entryCount,
       editionCount: editions.length,
       latestEdition,
       status: series.status ?? 'active',

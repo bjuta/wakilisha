@@ -69,6 +69,7 @@ export type ImportedChartSeries = {
   label: string;
   description: Nullable<string>;
   status: Nullable<string>;
+  entryCount: Nullable<number>;
 };
 
 export type ImportedChartEdition = {
