@@ -1,190 +1,136 @@
 import type { ChartFamily, ChartEdition, ChartEditionEntry, TrackChartHistory } from "./types";
 import {
   hasImportedChartData,
-  getLatestChartRows,
   getChartSeriesSummaries,
-  getLatestChartEdition,
-} from "@/data/registry/registry";
+  getChartEditionsForSeries,
+  getChartRowsForEdition,
+} from "../../data/registry/registry";
 
-// ─── Try to use generated registry data if available ───
-let registryData: {
+// ─── Registry-backed mock data ────────────────────────────────────────────────
+// Public chart pages run through this mock client until the WordPress public API is live.
+// When imported registry data exists, preserve edition boundaries exactly instead of
+// flattening latest rows into one shared entry pool.
+
+type RegistryRow = ReturnType<typeof getChartRowsForEdition>[number];
+
+type RegistryData = {
   entries: ChartEditionEntry[];
   families: ChartFamily[];
   editions: ChartEdition[];
-} | null = null;
+};
 
-try {
-  if (hasImportedChartData()) {
-    const rows = getLatestChartRows();
+const toIsoDate = (value: string | null | undefined, fallback = "2026-05-31") => value || fallback;
+const stableImage = (seed: string) => `https://picsum.photos/seed/${encodeURIComponent(seed)}/600/600`;
+
+function toMovement(value: unknown): ChartEditionEntry["movement"] {
+  return value === "up" || value === "down" || value === "same" || value === "new" || value === "re_entry"
+    ? value
+    : "same";
+}
+
+function registryRowToEntry(row: RegistryRow, edition: { id: string }, index: number): ChartEditionEntry {
+  const rank = row.rank ?? index + 1;
+  const previousRank = row.previousRank ?? null;
+  const trackSlug = row.slug ?? `chart-entry-${edition.id}-${rank}`;
+  const movement = toMovement(row.movement);
+
+  return {
+    id: `${edition.id}::${String(rank).padStart(3, "0")}::${trackSlug}`,
+    editionId: edition.id,
+    rank,
+    previousRank,
+    movement,
+    peakPosition: row.peakPosition ?? rank,
+    weeksOnChart: row.weeksOnChart ?? row.weeks ?? 1,
+    trackSlug,
+    trackTitle: row.title,
+    artistSlugs: [],
+    artistNames: [row.artist],
+    artworkUrl: row.artworkUrl ?? stableImage(trackSlug),
+    score: Math.max(100, 1000 - index * 18),
+    entryPayload: {
+      registrySeriesId: row.seriesId,
+      registryEditionId: row.editionId,
+      previousWeek: row.previousWeek,
+      label: row.label,
+    },
+    genre: row.genre ?? "Unknown",
+    source: row.source ?? "WAKILISHA Registry",
+    isPlayable: row.isPlayable ?? false,
+    duration: undefined,
+    movementAmount: row.movementAmount ?? (previousRank ? Math.abs(previousRank - rank) : 0),
+  };
+}
+
+function buildRegistryData(): RegistryData | null {
+  try {
+    if (!hasImportedChartData()) return null;
+
     const seriesSummaries = getChartSeriesSummaries();
-    const latestEdition = getLatestChartEdition();
+    if (!seriesSummaries.length) return null;
 
-    if (rows.length > 0 && seriesSummaries.length > 0) {
-      const entries: ChartEditionEntry[] = rows.map((row, idx) => ({
-        id: `entry-${String(idx + 1).padStart(3, "0")}`,
-        editionId: latestEdition?.id ?? "ed-registry",
-        rank: row.rank ?? idx + 1,
-        previousRank: row.previousRank ?? null,
-        movement: (row.movement as ChartEditionEntry["movement"]) ?? "same",
-        peakPosition: row.peakPosition ?? row.rank ?? idx + 1,
-        weeksOnChart: row.weeksOnChart ?? 1,
-        trackSlug: row.slug ?? `track-${idx + 1}`,
-        trackTitle: row.title,
-        artistSlugs: [],
-        artistNames: [row.artist],
-        artworkUrl: row.artworkUrl ?? null,
-        score: Math.max(100, 1000 - idx * 18),
-        entryPayload: {},
-        genre: (row as unknown as Record<string, string>).genre ?? "Afrobeats",
-        source: (row as unknown as Record<string, string>).source ?? "Spotify",
-        isPlayable: (row as unknown as Record<string, boolean>).isPlayable ?? true,
-        duration: (row as unknown as Record<string, number>).duration,
-        movementAmount: row.previousRank
-          ? Math.abs(row.previousRank - (row.rank ?? idx + 1))
-          : 0,
-      }));
+    const families: ChartFamily[] = seriesSummaries.map((series) => ({
+      id: series.id,
+      familyKey: series.id,
+      label: series.label,
+      description: series.description ?? "Imported WAKILISHA chart series",
+      defaultChartSize: series.entryCount ?? 40,
+      defaultRegion: "global",
+      editionFrequency: "weekly",
+      defaultRuleset: "default",
+      defaultScoringModel: "weighted_streaming",
+      createdAt: "2024-01-01T00:00:00Z",
+      updatedAt: new Date().toISOString(),
+      slug: series.id,
+    }));
 
-      const families: ChartFamily[] = seriesSummaries.map((s) => ({
-        id: s.id,
-        familyKey: s.id,
-        label: s.label,
-        description: s.description ?? "Chart series",
-        defaultChartSize: s.entryCount ?? 40,
-        defaultRegion: "global",
-        editionFrequency: "weekly",
-        defaultRuleset: "default",
-        defaultScoringModel: "weighted_streaming",
-        createdAt: "2024-01-01T00:00:00Z",
-        updatedAt: "2024-06-01T00:00:00Z",
-        slug: s.id,
-      }));
+    const editions: ChartEdition[] = [];
+    const entries: ChartEditionEntry[] = [];
 
-      const editions: ChartEdition[] = seriesSummaries
-        .filter((s) => s.latestEdition)
-        .map((s) => ({
-          id: `ed-${s.id}-${s.latestEdition!.slug}`,
-          familyId: s.id,
-          slug: s.latestEdition!.slug,
-          label: s.latestEdition!.label,
-          date: s.latestEdition!.date ?? "2026-05-31",
-          periodStart: "2026-05-24",
-          periodEnd: "2026-05-30",
+    for (const series of seriesSummaries) {
+      const registryEditions = getChartEditionsForSeries(series.id);
+      for (const edition of registryEditions) {
+        const rows = getChartRowsForEdition(series.id, edition.slug);
+        const editionEntries = rows.map((row, index) => registryRowToEntry(row, edition, index));
+
+        entries.push(...editionEntries);
+        editions.push({
+          id: edition.id,
+          familyId: series.id,
+          slug: edition.slug,
+          label: edition.label,
+          date: toIsoDate(edition.date),
+          periodStart: edition.period ?? "",
+          periodEnd: edition.period ?? "",
           status: "published",
           ingestJobId: null,
-          publishedAt: "2026-05-31T00:00:00Z",
-          publishedBy: "WAKILISHA Charts",
-          entryCount: s.count,
-          newEntries: entries.filter((e) => e.movement === "new").length,
-          reEntries: entries.filter((e) => e.movement === "re_entry").length,
-        }));
-
-      registryData = { entries, families, editions };
+          publishedAt: edition.date ? `${edition.date}T00:00:00Z` : null,
+          publishedBy: "WAKILISHA Registry Import",
+          entryCount: editionEntries.length,
+          newEntries: editionEntries.filter((entry) => entry.movement === "new").length,
+          reEntries: editionEntries.filter((entry) => entry.movement === "re_entry").length,
+        });
+      }
     }
+
+    if (!entries.length || !editions.length) return null;
+    return { entries, families, editions };
+  } catch (error) {
+    if (import.meta.env.DEV) {
+      // eslint-disable-next-line no-console
+      console.warn("[chartsPublic/mockData] Failed to build registry-backed chart data", error);
+    }
+    return null;
   }
-} catch {
-  registryData = null;
 }
 
-// ─── Image helpers ───
-const img = (seq: number, prompt: string) =>
-  `https://readdy.ai/api/search-image?query=$%7BencodeURIComponent%28prompt%29%7D&width=300&height=300&seq=chart-entry-${seq}&orientation=squarish`;
+const registryData = buildRegistryData();
 
-const prompts = [
-  "abstract album cover artwork with deep midnight blue and silver starlight tones, dreamy atmospheric minimal design on a dark background, no text, cinematic lighting, premium editorial photography quality",
-  "abstract album cover artwork with warm golden sunset tones and amber gradients, soft atmospheric minimal design on a dark background, no text, cinematic lighting, premium editorial photography quality",
-  "abstract album cover artwork with electric purple and neon pink tones, energetic vibrant minimal design on a dark background, no text, cinematic lighting, premium editorial photography quality",
-  "abstract album cover artwork with savanna green and earth tones, natural organic minimal design on a dark background, no text, cinematic lighting, premium editorial photography quality",
-  "abstract album cover artwork with deep ocean blue and teal tones, flowing water minimal design on a dark background, no text, cinematic lighting, premium editorial photography quality",
-  "abstract album cover artwork with desert rose and coral tones, warm floral minimal design on a dark background, no text, cinematic lighting, premium editorial photography quality",
-  "abstract album cover artwork with neon green and black cyber tones, futuristic minimal design on a dark background, no text, cinematic lighting, premium editorial photography quality",
-  "abstract album cover artwork with river blue and misty white tones, serene flowing minimal design on a dark background, no text, cinematic lighting, premium editorial photography quality",
-  "abstract album cover artwork with deep crimson and gold tones, bold dramatic minimal design on a dark background, no text, cinematic lighting, premium editorial photography quality",
-  "abstract album cover artwork with sunrise orange and soft yellow tones, hopeful bright minimal design on a dark background, no text, cinematic lighting, premium editorial photography quality",
-  "abstract album cover artwork with deep forest green and moss tones, earthy organic minimal design on a dark background, no text, cinematic lighting, premium editorial photography quality",
-  "abstract album cover artwork with twilight purple and indigo tones, mysterious evening minimal design on a dark background, no text, cinematic lighting, premium editorial photography quality",
-  "abstract album cover artwork with fire red and orange ember tones, intense passionate minimal design on a dark background, no text, cinematic lighting, premium editorial photography quality",
-  "abstract album cover artwork with ice blue and silver frost tones, cool crystalline minimal design on a dark background, no text, cinematic lighting, premium editorial photography quality",
-  "abstract album cover artwork with warm sand and terracotta tones, earthy mediterranean minimal design on a dark background, no text, cinematic lighting, premium editorial photography quality",
-  "abstract album cover artwork with deep magenta and violet tones, rich luxurious minimal design on a dark background, no text, cinematic lighting, premium editorial photography quality",
-  "abstract album cover artwork with olive green and bronze tones, vintage sophisticated minimal design on a dark background, no text, cinematic lighting, premium editorial photography quality",
-  "abstract album cover artwork with sky blue and cloud white tones, airy light minimal design on a dark background, no text, cinematic lighting, premium editorial photography quality",
-  "abstract album cover artwork with burnt orange and charcoal tones, smoky dramatic minimal design on a dark background, no text, cinematic lighting, premium editorial photography quality",
-  "abstract album cover artwork with pearl white and soft rose tones, elegant delicate minimal design on a dark background, no text, cinematic lighting, premium editorial photography quality",
-];
+// ─── Hardcoded fallback data ──────────────────────────────────────────────────
+// Used only when no imported registry chart data exists. Unlike the old fallback,
+// entries are generated per edition so archive pages never relabel one shared pool.
 
-const entryData = [
-  { title: "Midnight Dreams", artist: "Luna Stark", movement: "up" as const, prev: 2, peak: 1, weeks: 8, genre: "Afrobeats", score: 985.4, source: "Spotify", playable: true },
-  { title: "Golden Hour", artist: "The Radiants", movement: "down" as const, prev: 1, peak: 1, weeks: 12, genre: "Afropop", score: 972.1, source: "Apple Music", playable: true },
-  { title: "Electric Soul", artist: "Kai Nova", movement: "up" as const, prev: 5, peak: 3, weeks: 4, genre: "Amapiano", score: 954.7, source: "Spotify", playable: true },
-  { title: "Savanna Wind", artist: "Amara & The Echoes", movement: "same" as const, prev: 4, peak: 2, weeks: 15, genre: "Afrobeats", score: 948.2, source: "YouTube", playable: true },
-  { title: "Lagos Lights", artist: "DJ Kole", movement: "up" as const, prev: 8, peak: 3, weeks: 6, genre: "Afrobeats", score: 932.8, source: "Spotify", playable: true },
-  { title: "Desert Rose", artist: "Zara Nia", movement: "down" as const, prev: 3, peak: 1, weeks: 20, genre: "Afrofusion", score: 921.5, source: "Apple Music", playable: true },
-  { title: "Neon Nights", artist: "Pulse City", movement: "new" as const, prev: null, peak: 7, weeks: 1, genre: "Afrobeats", score: 915.3, source: "Spotify", playable: true },
-  { title: "River Flow", artist: "Kofi Soul", movement: "up" as const, prev: 11, peak: 5, weeks: 9, genre: "Afropop", score: 908.7, source: "Boomplay", playable: true },
-  { title: "City Drums", artist: "The Beats Collective", movement: "down" as const, prev: 6, peak: 4, weeks: 7, genre: "Amapiano", score: 901.2, source: "Spotify", playable: true },
-  { title: "Sunrise", artist: "Eva M", movement: "up" as const, prev: 14, peak: 10, weeks: 3, genre: "R&B", score: 894.6, source: "Apple Music", playable: true },
-  { title: "Jungle Beat", artist: "Tribe X", movement: "same" as const, prev: 11, peak: 8, weeks: 11, genre: "Afrobeats", score: 887.3, source: "Spotify", playable: true },
-  { title: "Ocean Drive", artist: "Sandy Vibes", movement: "down" as const, prev: 9, peak: 5, weeks: 18, genre: "Afropop", score: 880.1, source: "YouTube", playable: false },
-  { title: "Fire Dance", artist: "Blaze Crew", movement: "up" as const, prev: 17, peak: 11, weeks: 2, genre: "Amapiano", score: 873.5, source: "Spotify", playable: true },
-  { title: "Ice Queen", artist: "Crystal T", movement: "new" as const, prev: null, peak: 14, weeks: 1, genre: "Afrobeats", score: 868.9, source: "Apple Music", playable: true },
-  { title: "Terra Firma", artist: "Earth Tone", movement: "same" as const, prev: 15, peak: 12, weeks: 5, genre: "Afrofusion", score: 862.4, source: "Boomplay", playable: true },
-  { title: "Violet Haze", artist: "Magenta Sky", movement: "down" as const, prev: 10, peak: 6, weeks: 14, genre: "R&B", score: 856.7, source: "Spotify", playable: true },
-  { title: "Bronze Age", artist: "Vintage Soul", movement: "up" as const, prev: 21, peak: 15, weeks: 4, genre: "Afrobeats", score: 849.2, source: "YouTube", playable: true },
-  { title: "Cloud Nine", artist: "Sky Walker", movement: "same" as const, prev: 18, peak: 16, weeks: 8, genre: "Afropop", score: 843.1, source: "Spotify", playable: true },
-  { title: "Ember Glow", artist: "Ash & Fire", movement: "down" as const, prev: 13, peak: 9, weeks: 22, genre: "Amapiano", score: 838.5, source: "Apple Music", playable: true },
-  { title: "Pearl", artist: "Lumina", movement: "new" as const, prev: null, peak: 20, weeks: 1, genre: "Afrobeats", score: 831.6, source: "Spotify", playable: true },
-  { title: "Nightfall", artist: "Dark Matter", movement: "up" as const, prev: 25, peak: 18, weeks: 3, genre: "Afrofusion", score: 825.3, source: "Boomplay", playable: false },
-  { title: "Solar Flare", artist: "Sun Child", movement: "same" as const, prev: 22, peak: 19, weeks: 6, genre: "Afrobeats", score: 819.8, source: "Spotify", playable: true },
-  { title: "Red Dust", artist: "Desert Storm", movement: "down" as const, prev: 19, peak: 14, weeks: 10, genre: "Afropop", score: 813.4, source: "YouTube", playable: true },
-  { title: "Blue Velvet", artist: "Silk Route", movement: "up" as const, prev: 28, peak: 22, weeks: 2, genre: "R&B", score: 807.2, source: "Apple Music", playable: true },
-  { title: "Green Light", artist: "Go Signal", movement: "same" as const, prev: 24, peak: 23, weeks: 7, genre: "Afrobeats", score: 801.5, source: "Spotify", playable: true },
-  { title: "Shadow Box", artist: "Mystery Man", movement: "new" as const, prev: null, peak: 26, weeks: 1, genre: "Amapiano", score: 795.8, source: "Boomplay", playable: true },
-  { title: "Crystal Clear", artist: "Pure Water", movement: "down" as const, prev: 23, peak: 17, weeks: 13, genre: "Afropop", score: 789.3, source: "Spotify", playable: true },
-  { title: "Wild Heart", artist: "Nature Boy", movement: "up" as const, prev: 31, peak: 27, weeks: 4, genre: "Afrofusion", score: 783.6, source: "YouTube", playable: true },
-  { title: "Steel Drum", artist: "Island Sound", movement: "same" as const, prev: 29, peak: 28, weeks: 9, genre: "Afrobeats", score: 777.1, source: "Apple Music", playable: true },
-  { title: "Paper Crown", artist: "Young King", movement: "down" as const, prev: 26, peak: 20, weeks: 16, genre: "Afrobeats", score: 771.4, source: "Spotify", playable: true },
-  { title: "Rain Dance", artist: "Storm Chaser", movement: "new" as const, prev: null, peak: 31, weeks: 1, genre: "Afropop", score: 765.9, source: "Boomplay", playable: false },
-  { title: "Stone Cold", artist: "Rock Steady", movement: "up" as const, prev: 35, peak: 30, weeks: 3, genre: "Amapiano", score: 759.2, source: "YouTube", playable: true },
-  { title: "Soft Landing", artist: "Feather Weight", movement: "same" as const, prev: 33, peak: 32, weeks: 5, genre: "R&B", score: 753.7, source: "Spotify", playable: true },
-  { title: "Hard Knock", artist: "Tough Love", movement: "down" as const, prev: 30, peak: 25, weeks: 11, genre: "Afrobeats", score: 747.8, source: "Apple Music", playable: true },
-  { title: "Fast Lane", artist: "Speed Demon", movement: "up" as const, prev: 38, peak: 34, weeks: 2, genre: "Afrofusion", score: 741.5, source: "Spotify", playable: true },
-  { title: "Slow Burn", artist: "Ember Ash", movement: "same" as const, prev: 36, peak: 35, weeks: 6, genre: "Afropop", score: 735.2, source: "Boomplay", playable: true },
-  { title: "High Tide", artist: "Wave Rider", movement: "new" as const, prev: null, peak: 37, weeks: 1, genre: "Afrobeats", score: 729.6, source: "YouTube", playable: true },
-  { title: "Low Key", artist: "Quiet Storm", movement: "down" as const, prev: 34, peak: 29, weeks: 19, genre: "Amapiano", score: 723.1, source: "Spotify", playable: true },
-  { title: "Full Moon", artist: "Lunar Tide", movement: "up" as const, prev: 40, peak: 39, weeks: 2, genre: "Afrobeats", score: 717.8, source: "Apple Music", playable: true },
-  { title: "Empty Space", artist: "Void Walker", movement: "same" as const, prev: 39, peak: 38, weeks: 8, genre: "Afropop", score: 712.3, source: "Spotify", playable: true },
-];
-
-function buildHardcodedEntries(): ChartEditionEntry[] {
-  return entryData.map((d, idx) => {
-    const rank = idx + 1;
-    const movementAmount = d.prev !== null ? Math.abs(d.prev - rank) : 0;
-    const slug = d.title.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-    return {
-      id: `entry-${String(rank).padStart(3, "0")}`,
-      editionId: "ed-2026-w22",
-      rank,
-      previousRank: d.prev,
-      movement: d.movement,
-      peakPosition: d.peak,
-      weeksOnChart: d.weeks,
-      trackSlug: slug,
-      trackTitle: d.title,
-      artistSlugs: [slug],
-      artistNames: [d.artist],
-      artworkUrl: img(rank, prompts[idx % prompts.length]),
-      score: d.score,
-      entryPayload: {},
-      genre: d.genre,
-      source: d.source,
-      isPlayable: d.playable,
-      duration: 180 + ((d.title.length * 7) % 120),
-      movementAmount,
-    };
-  });
-}
-
-const HARDCODED_FAMILIES: ChartFamily[] = [
+const fallbackFamilies: ChartFamily[] = [
   {
     id: "weekly-top-40",
     familyKey: "weekly-top-40",
@@ -196,7 +142,7 @@ const HARDCODED_FAMILIES: ChartFamily[] = [
     defaultRuleset: "default",
     defaultScoringModel: "weighted_streaming",
     createdAt: "2024-01-01T00:00:00Z",
-    updatedAt: "2024-06-01T00:00:00Z",
+    updatedAt: "2026-05-31T00:00:00Z",
     slug: "weekly-top-40",
   },
   {
@@ -210,7 +156,7 @@ const HARDCODED_FAMILIES: ChartFamily[] = [
     defaultRuleset: "breakout",
     defaultScoringModel: "velocity_weighted",
     createdAt: "2024-01-01T00:00:00Z",
-    updatedAt: "2024-06-01T00:00:00Z",
+    updatedAt: "2026-05-31T00:00:00Z",
     slug: "rising-voices",
   },
   {
@@ -224,7 +170,7 @@ const HARDCODED_FAMILIES: ChartFamily[] = [
     defaultRuleset: "genre_focused",
     defaultScoringModel: "weighted_streaming",
     createdAt: "2024-01-01T00:00:00Z",
-    updatedAt: "2024-06-01T00:00:00Z",
+    updatedAt: "2026-05-31T00:00:00Z",
     slug: "genre-pulse",
   },
   {
@@ -238,7 +184,7 @@ const HARDCODED_FAMILIES: ChartFamily[] = [
     defaultRuleset: "legacy",
     defaultScoringModel: "engagement_weighted",
     createdAt: "2024-01-01T00:00:00Z",
-    updatedAt: "2024-06-01T00:00:00Z",
+    updatedAt: "2026-05-31T00:00:00Z",
     slug: "classics",
   },
   {
@@ -252,244 +198,175 @@ const HARDCODED_FAMILIES: ChartFamily[] = [
     defaultRuleset: "velocity",
     defaultScoringModel: "velocity_weighted",
     createdAt: "2024-01-01T00:00:00Z",
-    updatedAt: "2024-06-01T00:00:00Z",
+    updatedAt: "2026-05-31T00:00:00Z",
     slug: "breakout",
   },
 ];
 
-const HARDCODED_EDITIONS: ChartEdition[] = [
-  {
-    id: "ed-2026-w22",
-    familyId: "weekly-top-40",
-    slug: "week-22-2026",
-    label: "Week 22, 2026",
-    date: "2026-05-31",
-    periodStart: "2026-05-24",
-    periodEnd: "2026-05-30",
-    status: "published",
-    ingestJobId: "job-2026-w22",
-    publishedAt: "2026-05-31T00:00:00Z",
-    publishedBy: "WAKILISHA Charts",
-    entryCount: 40,
-    newEntries: 5,
-    reEntries: 1,
-  },
-  {
-    id: "ed-2026-w21",
-    familyId: "weekly-top-40",
-    slug: "week-21-2026",
-    label: "Week 21, 2026",
-    date: "2026-05-24",
-    periodStart: "2026-05-17",
-    periodEnd: "2026-05-23",
-    status: "published",
-    ingestJobId: "job-2026-w21",
-    publishedAt: "2026-05-24T00:00:00Z",
-    publishedBy: "WAKILISHA Charts",
-    entryCount: 40,
-    newEntries: 4,
-    reEntries: 2,
-  },
-  {
-    id: "ed-2026-w20",
-    familyId: "weekly-top-40",
-    slug: "week-20-2026",
-    label: "Week 20, 2026",
-    date: "2026-05-17",
-    periodStart: "2026-05-10",
-    periodEnd: "2026-05-16",
-    status: "published",
-    ingestJobId: "job-2026-w20",
-    publishedAt: "2026-05-17T00:00:00Z",
-    publishedBy: "WAKILISHA Charts",
-    entryCount: 40,
-    newEntries: 6,
-    reEntries: 0,
-  },
-  {
-    id: "ed-2026-w19",
-    familyId: "weekly-top-40",
-    slug: "week-19-2026",
-    label: "Week 19, 2026",
-    date: "2026-05-10",
-    periodStart: "2026-05-03",
-    periodEnd: "2026-05-09",
-    status: "published",
-    ingestJobId: "job-2026-w19",
-    publishedAt: "2026-05-10T00:00:00Z",
-    publishedBy: "WAKILISHA Charts",
-    entryCount: 40,
-    newEntries: 3,
-    reEntries: 1,
-  },
-  {
-    id: "ed-2026-w22-rising",
-    familyId: "rising-voices",
-    slug: "week-22-2026",
-    label: "Week 22, 2026",
-    date: "2026-05-31",
-    periodStart: "2026-05-24",
-    periodEnd: "2026-05-30",
-    status: "published",
-    ingestJobId: "job-2026-w22-rising",
-    publishedAt: "2026-05-31T00:00:00Z",
-    publishedBy: "WAKILISHA Charts",
-    entryCount: 20,
-    newEntries: 8,
-    reEntries: 0,
-  },
-  {
-    id: "ed-2026-w21-rising",
-    familyId: "rising-voices",
-    slug: "week-21-2026",
-    label: "Week 21, 2026",
-    date: "2026-05-24",
-    periodStart: "2026-05-17",
-    periodEnd: "2026-05-23",
-    status: "published",
-    ingestJobId: "job-2026-w21-rising",
-    publishedAt: "2026-05-24T00:00:00Z",
-    publishedBy: "WAKILISHA Charts",
-    entryCount: 20,
-    newEntries: 7,
-    reEntries: 1,
-  },
-  {
-    id: "ed-2026-m05-genre",
-    familyId: "genre-pulse",
-    slug: "may-2026",
-    label: "May 2026",
-    date: "2026-05-31",
-    periodStart: "2026-05-01",
-    periodEnd: "2026-05-31",
-    status: "published",
-    ingestJobId: "job-2026-m05-genre",
-    publishedAt: "2026-05-31T00:00:00Z",
-    publishedBy: "WAKILISHA Charts",
-    entryCount: 30,
-    newEntries: 4,
-    reEntries: 2,
-  },
-  {
-    id: "ed-2026-m04-genre",
-    familyId: "genre-pulse",
-    slug: "april-2026",
-    label: "April 2026",
-    date: "2026-04-30",
-    periodStart: "2026-04-01",
-    periodEnd: "2026-04-30",
-    status: "published",
-    ingestJobId: "job-2026-m04-genre",
-    publishedAt: "2026-04-30T00:00:00Z",
-    publishedBy: "WAKILISHA Charts",
-    entryCount: 30,
-    newEntries: 5,
-    reEntries: 1,
-  },
-  {
-    id: "ed-2026-m05-classics",
-    familyId: "classics",
-    slug: "may-2026",
-    label: "May 2026",
-    date: "2026-05-31",
-    periodStart: "2026-05-01",
-    periodEnd: "2026-05-31",
-    status: "published",
-    ingestJobId: "job-2026-m05-classics",
-    publishedAt: "2026-05-31T00:00:00Z",
-    publishedBy: "WAKILISHA Charts",
-    entryCount: 25,
-    newEntries: 0,
-    reEntries: 1,
-  },
-  {
-    id: "ed-2026-m04-classics",
-    familyId: "classics",
-    slug: "april-2026",
-    label: "April 2026",
-    date: "2026-04-30",
-    periodStart: "2026-04-01",
-    periodEnd: "2026-04-30",
-    status: "published",
-    ingestJobId: "job-2026-m04-classics",
-    publishedAt: "2026-04-30T00:00:00Z",
-    publishedBy: "WAKILISHA Charts",
-    entryCount: 25,
-    newEntries: 0,
-    reEntries: 2,
-  },
-  {
-    id: "ed-2026-w22-breakout",
-    familyId: "breakout",
-    slug: "week-22-2026",
-    label: "Week 22, 2026",
-    date: "2026-05-31",
-    periodStart: "2026-05-24",
-    periodEnd: "2026-05-30",
-    status: "published",
-    ingestJobId: "job-2026-w22-breakout",
-    publishedAt: "2026-05-31T00:00:00Z",
-    publishedBy: "WAKILISHA Charts",
-    entryCount: 15,
-    newEntries: 6,
-    reEntries: 0,
-  },
-  {
-    id: "ed-2026-w21-breakout",
-    familyId: "breakout",
-    slug: "week-21-2026",
-    label: "Week 21, 2026",
-    date: "2026-05-24",
-    periodStart: "2026-05-17",
-    periodEnd: "2026-05-23",
-    status: "published",
-    ingestJobId: "job-2026-w21-breakout",
-    publishedAt: "2026-05-24T00:00:00Z",
-    publishedBy: "WAKILISHA Charts",
-    entryCount: 15,
-    newEntries: 5,
-    reEntries: 1,
-  },
+const fallbackEditions: ChartEdition[] = [
+  ["weekly-top-40", "week-22-2026", "Week 22, 2026", "2026-05-31", 40],
+  ["weekly-top-40", "week-21-2026", "Week 21, 2026", "2026-05-24", 40],
+  ["weekly-top-40", "week-20-2026", "Week 20, 2026", "2026-05-17", 40],
+  ["weekly-top-40", "week-19-2026", "Week 19, 2026", "2026-05-10", 40],
+  ["rising-voices", "week-22-2026", "Week 22, 2026", "2026-05-31", 20],
+  ["rising-voices", "week-21-2026", "Week 21, 2026", "2026-05-24", 20],
+  ["genre-pulse", "may-2026", "May 2026", "2026-05-31", 30],
+  ["genre-pulse", "april-2026", "April 2026", "2026-04-30", 30],
+  ["classics", "may-2026", "May 2026", "2026-05-31", 25],
+  ["classics", "april-2026", "April 2026", "2026-04-30", 25],
+  ["breakout", "week-22-2026", "Week 22, 2026", "2026-05-31", 15],
+  ["breakout", "week-21-2026", "Week 21, 2026", "2026-05-24", 15],
+].map(([familyId, slug, label, date, entryCount]) => ({
+  id: `ed-${familyId}-${slug}`,
+  familyId: String(familyId),
+  slug: String(slug),
+  label: String(label),
+  date: String(date),
+  periodStart: String(date),
+  periodEnd: String(date),
+  status: "published" as const,
+  ingestJobId: `job-${familyId}-${slug}`,
+  publishedAt: `${date}T00:00:00Z`,
+  publishedBy: "WAKILISHA Charts",
+  entryCount: Number(entryCount),
+  newEntries: Math.max(1, Math.floor(Number(entryCount) / 8)),
+  reEntries: Math.max(0, Math.floor(Number(entryCount) / 20)),
+}));
+
+const fallbackTitles = [
+  ["Midnight Dreams", "Luna Stark", "Afrobeats"],
+  ["Golden Hour", "The Radiants", "Afropop"],
+  ["Electric Soul", "Kai Nova", "Amapiano"],
+  ["Savanna Wind", "Amara & The Echoes", "Afrobeats"],
+  ["Lagos Lights", "DJ Kole", "Afrobeats"],
+  ["Desert Rose", "Zara Nia", "Afrofusion"],
+  ["Neon Nights", "Pulse City", "Afrobeats"],
+  ["River Flow", "Kofi Soul", "Afropop"],
+  ["City Drums", "The Beats Collective", "Amapiano"],
+  ["Sunrise", "Eva M", "R&B"],
+  ["Jungle Beat", "Tribe X", "Afrobeats"],
+  ["Ocean Drive", "Sandy Vibes", "Afropop"],
+  ["Fire Dance", "Blaze Crew", "Amapiano"],
+  ["Ice Queen", "Crystal T", "Afrobeats"],
+  ["Terra Firma", "Earth Tone", "Afrofusion"],
+  ["Violet Haze", "Magenta Sky", "R&B"],
+  ["Bronze Age", "Vintage Soul", "Afrobeats"],
+  ["Cloud Nine", "Sky Walker", "Afropop"],
+  ["Ember Glow", "Ash & Fire", "Amapiano"],
+  ["Pearl", "Lumina", "Afrobeats"],
+  ["Nightfall", "Dark Matter", "Afrofusion"],
+  ["Solar Flare", "Sun Child", "Afrobeats"],
+  ["Red Dust", "Desert Storm", "Afropop"],
+  ["Blue Velvet", "Silk Route", "R&B"],
+  ["Green Light", "Go Signal", "Afrobeats"],
+  ["Shadow Box", "Mystery Man", "Amapiano"],
+  ["Crystal Clear", "Pure Water", "Afropop"],
+  ["Wild Heart", "Nature Boy", "Afrofusion"],
+  ["Steel Drum", "Island Sound", "Afrobeats"],
+  ["Paper Crown", "Young King", "Afrobeats"],
+  ["Rain Dance", "Storm Chaser", "Afropop"],
+  ["Stone Cold", "Rock Steady", "Amapiano"],
+  ["Soft Landing", "Feather Weight", "R&B"],
+  ["Hard Knock", "Tough Love", "Afrobeats"],
+  ["Fast Lane", "Speed Demon", "Afrofusion"],
+  ["Slow Burn", "Ember Ash", "Afropop"],
+  ["High Tide", "Wave Rider", "Afrobeats"],
+  ["Low Key", "Quiet Storm", "Amapiano"],
+  ["Full Moon", "Lunar Tide", "Afrobeats"],
+  ["Empty Space", "Void Walker", "Afropop"],
 ];
 
-const HARDCODED_ENTRIES = buildHardcodedEntries();
+function slugify(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+}
+
+function buildFallbackEntriesForEdition(edition: ChartEdition, editionIndex: number): ChartEditionEntry[] {
+  const limit = edition.entryCount || 40;
+  return Array.from({ length: limit }, (_, index) => {
+    const rotated = fallbackTitles[(index + editionIndex * 3) % fallbackTitles.length];
+    const [title, artist, genre] = rotated;
+    const rank = index + 1;
+    const previousRank = rank === 1 && editionIndex % 2 === 0 ? 2 : rank + ((editionIndex + index) % 5 === 0 ? 2 : 0);
+    const movement: ChartEditionEntry["movement"] = editionIndex === 0 && index % 9 === 0 ? "new" : previousRank > rank ? "up" : previousRank < rank ? "down" : "same";
+    const trackSlug = slugify(`${title}-${artist}`);
+
+    return {
+      id: `${edition.id}::${String(rank).padStart(3, "0")}::${trackSlug}`,
+      editionId: edition.id,
+      rank,
+      previousRank: movement === "new" ? null : previousRank,
+      movement,
+      peakPosition: Math.max(1, Math.min(rank, previousRank)),
+      weeksOnChart: 1 + ((index + editionIndex) % 24),
+      trackSlug,
+      trackTitle: title,
+      artistSlugs: [slugify(artist)],
+      artistNames: [artist],
+      artworkUrl: stableImage(`${edition.id}-${trackSlug}`),
+      score: Math.max(100, 1000 - index * 14 - editionIndex * 3),
+      entryPayload: { fallbackEditionId: edition.id, generatedForEdition: true },
+      genre,
+      source: ["Spotify", "Apple Music", "YouTube", "Boomplay"][index % 4],
+      isPlayable: index % 7 !== 0,
+      duration: 180 + ((title.length * 7) % 120),
+      movementAmount: movement === "new" ? 0 : Math.abs(previousRank - rank),
+    };
+  });
+}
+
+const fallbackEntries = fallbackEditions.flatMap((edition, index) => buildFallbackEntriesForEdition(edition, index));
+
+export const MOCK_FAMILIES = registryData?.families ?? fallbackFamilies;
+export const MOCK_EDITIONS = registryData?.editions ?? fallbackEditions;
+export const MOCK_ENTRIES = registryData?.entries ?? fallbackEntries;
+
+const historyEntries = MOCK_ENTRIES.filter((entry) => entry.trackSlug === "midnight-dreams").slice(0, 8);
 
 export const MOCK_TRACK_HISTORY: TrackChartHistory = {
   trackSlug: "midnight-dreams",
   trackTitle: "Midnight Dreams",
   artistNames: ["Luna Stark"],
-  appearances: [
-    { editionSlug: "week-22-2026", editionLabel: "Week 22, 2026", rank: 1, weeksOnChart: 8, movement: "up" as const },
-    { editionSlug: "week-21-2026", editionLabel: "Week 21, 2026", rank: 2, weeksOnChart: 7, movement: "same" as const },
-    { editionSlug: "week-20-2026", editionLabel: "Week 20, 2026", rank: 3, weeksOnChart: 6, movement: "up" as const },
-  ],
-  peakPosition: 1,
-  totalWeeksOnChart: 8,
-  firstAppearance: "2026-04-05",
-  latestAppearance: "2026-05-31",
+  appearances: historyEntries.map((entry) => {
+    const edition = MOCK_EDITIONS.find((item) => item.id === entry.editionId);
+    return {
+      editionSlug: edition?.slug ?? entry.editionId,
+      editionLabel: edition?.label ?? entry.editionId,
+      rank: entry.rank,
+      weeksOnChart: entry.weeksOnChart ?? 0,
+      movement: entry.movement,
+    };
+  }),
+  peakPosition: historyEntries.length ? Math.min(...historyEntries.map((entry) => entry.rank)) : 0,
+  totalWeeksOnChart: historyEntries.length ? Math.max(...historyEntries.map((entry) => entry.weeksOnChart ?? 0)) : 0,
+  firstAppearance: null,
+  latestAppearance: null,
 };
-export const MOCK_FAMILIES = registryData?.families ?? HARDCODED_FAMILIES;
-export const MOCK_EDITIONS = registryData?.editions ?? HARDCODED_EDITIONS;
-export const MOCK_ENTRIES = registryData?.entries ?? HARDCODED_ENTRIES;
 
-// ─── Edition helpers ───
+// ─── Edition helpers ─────────────────────────────────────────────────────────
 
-export function getMockEntriesForEdition(
-  familySlug: string,
-  editionSlug: string
-): ChartEditionEntry[] {
+export function getMockEntriesForEdition(familySlug: string, editionSlug: string): ChartEditionEntry[] {
+  const family = getMockFamily(familySlug);
+  if (!family) return [];
+
   const edition = MOCK_EDITIONS.find(
-    (e) => e.familyId === familySlug && e.slug === editionSlug
+    (item) => item.familyId === family.id && (item.slug === editionSlug || item.id === editionSlug)
   );
   if (!edition) return [];
-  const limit = edition.entryCount ?? 40;
-  return MOCK_ENTRIES.slice(0, limit).map((e) => ({ ...e, editionId: edition.id }));
+
+  return MOCK_ENTRIES
+    .filter((entry) => entry.editionId === edition.id)
+    .slice()
+    .sort((a, b) => a.rank - b.rank);
 }
 
 export function getMockEditionsForFamily(familySlug: string): ChartEdition[] {
+  const family = getMockFamily(familySlug);
+  if (!family) return [];
+
   return MOCK_EDITIONS
-    .filter((e) => e.familyId === familySlug)
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    .filter((edition) => edition.familyId === family.id)
+    .slice()
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime() || b.label.localeCompare(a.label));
 }
 
 export function getMockLatestEdition(familySlug: string): ChartEdition | null {
@@ -498,47 +375,48 @@ export function getMockLatestEdition(familySlug: string): ChartEdition | null {
 }
 
 export function getMockEdition(familySlug: string, editionSlug: string): ChartEdition | null {
-  return (
-    MOCK_EDITIONS.find((e) => e.familyId === familySlug && e.slug === editionSlug) ?? null
-  );
+  const family = getMockFamily(familySlug);
+  if (!family) return null;
+  return MOCK_EDITIONS.find((edition) => edition.familyId === family.id && (edition.slug === editionSlug || edition.id === editionSlug)) ?? null;
 }
 
 export function getMockFamily(familySlug: string): ChartFamily | null {
-  return (
-    MOCK_FAMILIES.find((f) => f.slug === familySlug || f.familyKey === familySlug) ?? null
-  );
+  return MOCK_FAMILIES.find((family) => family.slug === familySlug || family.familyKey === familySlug || family.id === familySlug) ?? null;
 }
 
-// Edition metadata for view model
 export function computeEditionMeta(entries: ChartEditionEntry[]) {
   const totalEntries = entries.length;
-  const artists = new Set(entries.flatMap((e) => e.artistNames));
-  const newEntries = entries.filter((e) => e.movement === "new").length;
-  const reEntries = entries.filter((e) => e.movement === "re_entry").length;
+  const artists = new Set(entries.flatMap((entry) => entry.artistNames));
+  const newEntries = entries.filter((entry) => entry.movement === "new").length;
+  const reEntries = entries.filter((entry) => entry.movement === "re_entry").length;
 
   const longest = entries.reduce(
-    (longest, e) => {
-      const w = e.weeksOnChart ?? 0;
-      return w > (longest?.weeks ?? 0) ? { title: e.trackTitle, artist: e.artistNames.join(", "), weeks: w } : longest;
+    (current, entry) => {
+      const weeks = entry.weeksOnChart ?? 0;
+      return weeks > (current?.weeks ?? 0)
+        ? { title: entry.trackTitle, artist: entry.artistNames.join(", "), weeks }
+        : current;
     },
     null as { title: string; artist: string; weeks: number } | null
   );
 
   const biggestMover = entries
-    .filter((e) => e.movement === "up")
+    .filter((entry) => entry.movement === "up")
     .reduce(
-      (biggest, e) => {
-        const amt = e.movementAmount ?? 0;
-        return amt > (biggest?.amount ?? 0) ? { title: e.trackTitle, artist: e.artistNames.join(", "), amount: amt } : biggest;
+      (current, entry) => {
+        const amount = entry.movementAmount ?? 0;
+        return amount > (current?.amount ?? 0)
+          ? { title: entry.trackTitle, artist: entry.artistNames.join(", "), amount }
+          : current;
       },
       null as { title: string; artist: string; amount: number } | null
     );
 
-  const genreCounts: Record<string, number> = {};
-  entries.forEach((e) => {
-    const g = (e as ChartEditionEntry & { genre?: string }).genre ?? "Unknown";
-    genreCounts[g] = (genreCounts[g] || 0) + 1;
-  });
+  const genreCounts = entries.reduce<Record<string, number>>((acc, entry) => {
+    const genre = entry.genre ?? "Unknown";
+    acc[genre] = (acc[genre] ?? 0) + 1;
+    return acc;
+  }, {});
   const topGenreEntry = Object.entries(genreCounts).sort((a, b) => b[1] - a[1])[0];
 
   return {
@@ -548,7 +426,7 @@ export function computeEditionMeta(entries: ChartEditionEntry[]) {
     reEntries,
     longestRunning: longest,
     biggestMover,
-    topGenre: topGenreEntry?.[0] ?? "Afrobeats",
+    topGenre: topGenreEntry?.[0] ?? "Unknown",
     topGenreCount: topGenreEntry?.[1] ?? 0,
   };
 }
