@@ -21,6 +21,7 @@ const labelsById = by(importedRegistry.labels, 'id');
 const labelsBySlug = by(importedRegistry.labels, 'slug');
 const releasesBySlug = by(importedRegistry.releases, 'slug');
 const genresBySlug = by(importedRegistry.genres, 'slug');
+
 const chartEntriesByEdition = importedRegistry.chartEntries.reduce((acc, entry) => {
   const list = acc.get(entry.editionId) ?? [];
   list.push(entry);
@@ -28,11 +29,32 @@ const chartEntriesByEdition = importedRegistry.chartEntries.reduce((acc, entry) 
   return acc;
 }, new Map<string, ImportedChartEntry[]>());
 
+const chartEditionsBySeries = importedRegistry.chartEditions.reduce((acc, edition) => {
+  const list = acc.get(edition.seriesId) ?? [];
+  list.push(edition);
+  acc.set(edition.seriesId, list);
+  return acc;
+}, new Map<string, typeof importedRegistry.chartEditions>());
+
 const titleCase = (value: string) => value.replace(/\b\w/g, (char) => char.toUpperCase());
 const fallbackImage = (seed: string) => `https://picsum.photos/seed/${encodeURIComponent(seed)}/600/600`;
 
+const dateScore = (value: string | null | undefined) => {
+  if (!value) return 0;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+function sortEditions<T extends { date: string | null; label: string }>(editions: T[]) {
+  return editions.slice().sort((a, b) => dateScore(b.date) - dateScore(a.date) || b.label.localeCompare(a.label));
+}
+
 export function hasImportedRegistryData() {
   return importedRegistry.artists.length + importedRegistry.tracks.length + importedRegistry.labels.length + importedRegistry.chartEntries.length > 0;
+}
+
+export function hasImportedChartData() {
+  return importedRegistry.chartSeries.length > 0 && importedRegistry.chartEditions.length > 0 && importedRegistry.chartEntries.length > 0;
 }
 
 export const getArtists = () => importedRegistry.artists;
@@ -41,6 +63,7 @@ export const getLabels = () => importedRegistry.labels;
 export const getReleases = () => importedRegistry.releases;
 export const getGenres = () => importedRegistry.genres;
 export const getChartSeries = () => importedRegistry.chartSeries;
+export const getChartEditions = () => importedRegistry.chartEditions;
 export const getArtistBySlug = (slug: string) => artistsBySlug.get(slug) ?? null;
 export const getTrackBySlug = (slug: string) => tracksBySlug.get(slug) ?? null;
 export const getLabelBySlug = (slug: string) => labelsBySlug.get(slug) ?? null;
@@ -50,16 +73,24 @@ export const resolveTrack = (trackId: string | null | undefined) => trackId ? tr
 export const resolveArtist = (artistId: string | null | undefined) => artistId ? artistsById.get(artistId) ?? null : null;
 export const resolveLabel = (labelId: string | null | undefined) => labelId ? labelsById.get(labelId) ?? null : null;
 
+export function getChartEditionsForSeries(seriesSlug: string) {
+  const series = importedRegistry.chartSeries.find((item) => item.slug === seriesSlug || item.id === seriesSlug);
+  if (!series) return [];
+  return sortEditions(chartEditionsBySeries.get(series.id) ?? []);
+}
+
 export function getLatestChartEdition(seriesSlug?: string) {
-  const series = seriesSlug ? importedRegistry.chartSeries.find((item) => item.slug === seriesSlug) : importedRegistry.chartSeries[0];
+  const series = seriesSlug
+    ? importedRegistry.chartSeries.find((item) => item.slug === seriesSlug || item.id === seriesSlug)
+    : importedRegistry.chartSeries[0];
   if (!series) return null;
-  return importedRegistry.chartEditions.find((edition) => edition.seriesId === series.id) ?? null;
+  return getChartEditionsForSeries(series.slug)[0] ?? null;
 }
 
 export function getChartEdition(seriesSlug: string, editionSlug: string) {
-  const series = importedRegistry.chartSeries.find((item) => item.slug === seriesSlug);
+  const series = importedRegistry.chartSeries.find((item) => item.slug === seriesSlug || item.id === seriesSlug);
   if (!series) return null;
-  return importedRegistry.chartEditions.find((edition) => edition.seriesId === series.id && edition.slug === editionSlug) ?? null;
+  return importedRegistry.chartEditions.find((edition) => edition.seriesId === series.id && (edition.slug === editionSlug || edition.id === editionSlug)) ?? null;
 }
 
 export function getChartEntriesForEdition(editionId: string) {
@@ -119,6 +150,7 @@ export function toChartRow(entry: ImportedChartEntry) {
   const track = resolveTrack(entry.trackId);
   const previous = entry.previousRank;
   const movement = previous == null || previous === 0 ? 'new' : previous > entry.rank ? 'up' : previous < entry.rank ? 'down' : 'same';
+  const weeksOnChart = entry.weeksOnChart ?? 0;
   return {
     rank: entry.rank,
     title: track?.title ?? 'Unknown track',
@@ -126,7 +158,8 @@ export function toChartRow(entry: ImportedChartEntry) {
     artist: track?.artistNames.join(', ') || 'Unknown artist',
     movement,
     movementAmount: previous ? Math.abs(previous - entry.rank) : undefined,
-    weeksOnChart: entry.weeksOnChart ?? 0,
+    weeksOnChart,
+    weeks: weeksOnChart,
     peakPosition: entry.peakPosition ?? entry.rank,
     isPlayable: Boolean(track?.sourceUrl),
     source: track?.source ?? undefined,
@@ -135,12 +168,61 @@ export function toChartRow(entry: ImportedChartEntry) {
     genre: track?.genres[0] ?? undefined,
     label: track?.labelIds.map((id) => labelsById.get(id)?.name).filter(Boolean).join(', ') || undefined,
     previousWeek: previous ?? 0,
+    seriesId: entry.seriesId,
+    editionId: entry.editionId,
   };
 }
 
-export function getLatestChartRows() {
-  const edition = getLatestChartEdition();
+export function getLatestChartRows(seriesSlug?: string) {
+  const edition = getLatestChartEdition(seriesSlug);
   return edition ? getChartEntriesForEdition(edition.id).map(toChartRow) : [];
+}
+
+export function getChartRowsForEdition(seriesSlug: string, editionSlug: string) {
+  const edition = getChartEdition(seriesSlug, editionSlug);
+  return edition ? getChartEntriesForEdition(edition.id).map(toChartRow) : [];
+}
+
+export function getChartSeriesSummaries() {
+  return importedRegistry.chartSeries.map((series) => {
+    const editions = getChartEditionsForSeries(series.slug);
+    const latestEdition = editions[0] ?? null;
+    const entryCount = latestEdition ? getChartEntriesForEdition(latestEdition.id).length : 0;
+    return {
+      id: series.slug,
+      label: series.label,
+      description: series.description ?? 'Imported WAKILISHA chart series',
+      count: entryCount,
+      editionCount: editions.length,
+      latestEdition,
+      status: series.status ?? 'active',
+    };
+  });
+}
+
+export function buildChartEditionSummary(rows: ReturnType<typeof toChartRow>[], edition = getLatestChartEdition()) {
+  const uniqueArtists = new Set(rows.map((entry) => entry.artist));
+  const newEntries = rows.filter((entry) => entry.movement === 'new');
+  const longestRunning = rows.slice().sort((a, b) => b.weeksOnChart - a.weeksOnChart)[0] ?? null;
+  const biggestMover = rows.filter((entry) => entry.movement === 'up').sort((a, b) => (b.movementAmount ?? 0) - (a.movementAmount ?? 0))[0] ?? null;
+  const genreCounts = rows.reduce<Record<string, number>>((acc, entry) => {
+    const genre = entry.genre ?? 'Unknown';
+    acc[genre] = (acc[genre] ?? 0) + 1;
+    return acc;
+  }, {});
+  const topGenre = Object.entries(genreCounts).sort((a, b) => b[1] - a[1])[0] ?? ['Unknown', 0];
+  return {
+    date: edition?.date ?? '',
+    weekNumber: Number(edition?.label?.match(/\d+/)?.[0] ?? edition?.slug?.match(/\d+/)?.[0] ?? 0),
+    methodology: edition?.methodology ?? 'Compiled from imported WAKILISHA chart entries.',
+    totalEntries: rows.length,
+    totalArtists: uniqueArtists.size,
+    newEntries: newEntries.length,
+    topGenre: topGenre[0],
+    topGenreCount: topGenre[1],
+    longestRunning: longestRunning ?? { title: 'No chart entries', artist: '', weeks: 0, weeksOnChart: 0 },
+    biggestMover: biggestMover ? { ...biggestMover, amount: biggestMover.movementAmount ?? 0 } : { title: 'No movement data', artist: '', amount: 0 },
+  };
 }
 
 export function getSearchResults(query: string) {
