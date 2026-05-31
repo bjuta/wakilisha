@@ -8,13 +8,16 @@ import {
   getLatestChartEdition,
   getChartEdition,
   getChartEditionEntries,
+  getChartEditionsForFamily,
 } from "@/services/chartsPublic/client";
 import {
   toChartEditionViewModel,
   toChartEntryRowViewModel,
   toChartTrackPlayerModel,
+  toChartArchiveViewModel,
   type ChartEditionViewModel,
   type ChartEntryRowViewModel,
+  type ChartArchiveViewModel,
 } from "@/services/chartsPublic/viewModels";
 
 export default function MobileChartEdition() {
@@ -24,51 +27,71 @@ export default function MobileChartEdition() {
   }>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [notFound, setNotFound] = useState(false);
+  const [errorDiagnostics, setErrorDiagnostics] = useState<string | null>(null);
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
+  const [notFound, setNotFound] = useState<"family" | "edition" | null>(null);
   const [edition, setEdition] = useState<ChartEditionViewModel | null>(null);
   const [entries, setEntries] = useState<ChartEntryRowViewModel[]>([]);
   const [familyLabel, setFamilyLabel] = useState("WAKILISHA Charts");
+  const [familySlug, setFamilySlug] = useState("");
+  const [latestEditionSlug, setLatestEditionSlug] = useState<string | undefined>(undefined);
+  const [archive, setArchive] = useState<ChartArchiveViewModel | null>(null);
+  const [meta, setMeta] = useState<{ dataSource: "mock" | "wordpress" | "cache"; fetchedAt: string; isStale: boolean } | null>(null);
   const { playTrack } = usePlayer();
 
   const load = useCallback(async () => {
     if (!series) {
-      setNotFound(true);
+      setNotFound("family");
       setLoading(false);
       return;
     }
     setLoading(true);
     setError(null);
-    setNotFound(false);
+    setErrorDiagnostics(null);
+    setNotFound(null);
     try {
-      const family = await getChartFamily(series);
+      const { data: family } = await getChartFamily(series);
       if (!family) {
-        setNotFound(true);
+        setNotFound("family");
         setLoading(false);
         return;
       }
       setFamilyLabel(family.label);
+      setFamilySlug(series);
 
-      let rawEdition: Awaited<ReturnType<typeof getChartEdition>>;
+      let editionResult: Awaited<ReturnType<typeof getChartEdition>>;
       if (editionSlug) {
-        rawEdition = await getChartEdition(series, editionSlug);
+        editionResult = await getChartEdition(series, editionSlug);
       } else {
-        rawEdition = await getLatestChartEdition(series);
+        editionResult = await getLatestChartEdition(series);
       }
 
-      if (!rawEdition) {
-        setNotFound(true);
+      if (!editionResult.data) {
+        const { data: latest } = await getLatestChartEdition(series);
+        setLatestEditionSlug(latest.data?.slug);
+        setNotFound("edition");
         setLoading(false);
         return;
       }
 
-      const rawEntries = await getChartEditionEntries(series, rawEdition.slug);
+      setMeta(editionResult.meta);
+
+      const { data: rawEntries } = await getChartEditionEntries(series, editionResult.data.slug);
       const mappedEntries = rawEntries.map(toChartEntryRowViewModel);
-      const editionVM = toChartEditionViewModel(rawEdition, family, rawEntries);
+      const editionVM = toChartEditionViewModel(editionResult.data, family, rawEntries);
+
+      const { data: allEditions } = await getChartEditionsForFamily(series);
+      const entriesMap: Record<string, import("@/services/chartsPublic/types").ChartEditionEntry[]> = {
+        [editionResult.data.slug]: rawEntries,
+      };
+      const archiveVM = toChartArchiveViewModel(allEditions, entriesMap);
 
       setEdition(editionVM);
       setEntries(mappedEntries);
+      setArchive(archiveVM);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
+      setErrorDiagnostics(err instanceof Error ? err.stack : null);
     } finally {
       setLoading(false);
     }
@@ -117,6 +140,14 @@ export default function MobileChartEdition() {
       .slice(0, 5)
       .map(([genre, count]) => ({ genre, count }));
   }, [entries]);
+
+  const metaLine = meta?.isStale
+    ? `Loaded from cache (stale) · ${new Date(meta.fetchedAt).toLocaleString()}`
+    : meta?.dataSource === "cache"
+    ? `Loaded from cache · ${new Date(meta.fetchedAt).toLocaleString()}`
+    : meta
+    ? `Loaded from ${meta.dataSource === "mock" ? "mock data" : "WordPress API"}`
+    : "";
 
   if (loading) {
     return (
@@ -167,27 +198,89 @@ export default function MobileChartEdition() {
             <i className="ri-arrow-left-line" /> Back
           </Link>
         </div>
+
+        {/* Diagnostics */}
+        <div className="mt-6">
+          <button
+            onClick={() => setShowDiagnostics(!showDiagnostics)}
+            className="text-[12px] text-[var(--wk-text-muted)] flex items-center gap-1 mx-auto"
+          >
+            <i className={`ri-${showDiagnostics ? "arrow-up" : "arrow-down"}-s-line`} />
+            {showDiagnostics ? "Hide" : "Show"} diagnostics
+          </button>
+          {showDiagnostics && (
+            <div className="mt-3 text-left rounded-lg bg-[var(--wk-bg)] p-3 space-y-1 font-mono text-[11px] text-[var(--wk-text-soft)]">
+              <div className="grid grid-cols-[100px_1fr] gap-1">
+                <span className="text-[var(--wk-text-faint)]">Mode</span>
+                <span>{import.meta.env.VITE_CHARTS_PUBLIC_MODE ?? "mock"}</span>
+                <span className="text-[var(--wk-text-faint)]">Family slug</span>
+                <span>{series ?? "—"}</span>
+                <span className="text-[var(--wk-text-faint)]">Edition slug</span>
+                <span>{editionSlug ?? "latest"}</span>
+                <span className="text-[var(--wk-text-faint)]">Endpoint</span>
+                <span>GET /charts/{series}{editionSlug ? `/${editionSlug}` : "/latest"}</span>
+                <span className="text-[var(--wk-text-faint)]">Error</span>
+                <span className="text-[var(--wk-danger)]">{error}</span>
+                <span className="text-[var(--wk-text-faint)]">Retryable</span>
+                <span>{error.includes("timeout") || error.includes("Network") ? "Yes" : "No"}</span>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     );
   }
 
-  if (notFound || !edition || entries.length === 0) {
+  if (notFound === "family") {
     return (
       <div className="min-h-screen pb-24 px-5 py-16 text-center">
         <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--wk-brand-soft)] text-[var(--wk-brand)] mx-auto">
           <i className="ri-bar-chart-box-line text-2xl" />
         </div>
-        <h1 className="text-[16px] font-bold text-[var(--wk-text)] mb-2">
-          {notFound ? "Chart not found" : "No published chart edition found"}
-        </h1>
+        <h1 className="text-[16px] font-bold text-[var(--wk-text)] mb-2">Chart not found</h1>
+        <p className="text-[13px] text-[var(--wk-text-muted)] mb-4">The chart series you are looking for does not exist.</p>
+        <Link to="/charts" className="wk-button wk-button-primary text-[13px]">
+          <i className="ri-arrow-left-line" /> Back to charts
+        </Link>
+      </div>
+    );
+  }
+
+  if (notFound === "edition") {
+    return (
+      <div className="min-h-screen pb-24 px-5 py-16 text-center">
+        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--wk-brand-soft)] text-[var(--wk-brand)] mx-auto">
+          <i className="ri-bar-chart-box-line text-2xl" />
+        </div>
+        <h1 className="text-[16px] font-bold text-[var(--wk-text)] mb-2">Edition not found</h1>
         <p className="text-[13px] text-[var(--wk-text-muted)] mb-4">
-          {notFound
-            ? "The chart series or edition you are looking for does not exist."
-            : "There are no entries for this chart edition yet."}
+          The edition <code className="font-mono text-[11px] bg-[var(--wk-bg)] px-1 rounded">{editionSlug}</code> does not exist.
         </p>
         <div className="flex gap-3 justify-center">
+          {latestEditionSlug && (
+            <Link to={`/charts/${series}/${latestEditionSlug}`} className="wk-button wk-button-primary text-[13px]">
+              <i className="ri-arrow-right-line" /> Latest edition
+            </Link>
+          )}
+          <Link to="/charts" className="wk-button wk-button-ghost text-[13px]">
+            <i className="ri-arrow-left-line" /> Back
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (!edition || entries.length === 0) {
+    return (
+      <div className="min-h-screen pb-24 px-5 py-16 text-center">
+        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--wk-brand-soft)] text-[var(--wk-brand)] mx-auto">
+          <i className="ri-bar-chart-box-line text-2xl" />
+        </div>
+        <h1 className="text-[16px] font-bold text-[var(--wk-text)] mb-2">No published chart edition found</h1>
+        <p className="text-[13px] text-[var(--wk-text-muted)] mb-4">There are no entries for this chart edition yet.</p>
+        <div className="flex gap-3 justify-center">
           <button onClick={load} className="wk-button wk-button-primary text-[13px]">
-            <i className="ri-refresh-line" /> {notFound ? "Retry" : "Refresh"}
+            <i className="ri-refresh-line" /> Refresh
           </button>
           <Link to="/charts" className="wk-button wk-button-ghost text-[13px]">
             <i className="ri-arrow-left-line" /> Back
@@ -284,6 +377,43 @@ export default function MobileChartEdition() {
           </div>
         ))}
       </div>
+
+      {/* Archive switcher */}
+      {archive && archive.previous.length > 0 && (
+        <div className="px-5 py-4 border-b border-[var(--wk-border)]">
+          <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-[var(--wk-text-muted)]">Edition history</div>
+          <div className="flex gap-2 overflow-x-auto snap-x snap-mandatory scrollbar-none" style={{ scrollbarWidth: "none" }}>
+            {archive.latest && (
+              <Link
+                to={`/charts/${familySlug}/${archive.latest.slug}`}
+                className={`flex-none snap-start rounded-xl border p-3 w-[140px] ${
+                  archive.latest.slug === edition.slug
+                    ? "border-[var(--wk-brand)] bg-[var(--wk-brand)]/5"
+                    : "border-[var(--wk-border)] bg-[var(--wk-surface)]"
+                }`}
+              >
+                <div className="text-[10px] font-bold text-[var(--wk-brand)] mb-0.5">Latest</div>
+                <div className="text-[12px] font-bold text-[var(--wk-text)] truncate">{archive.latest.label}</div>
+                <div className="text-[10px] text-[var(--wk-text-muted)]">{archive.latest.entryCount} entries</div>
+              </Link>
+            )}
+            {archive.previous.map((item) => (
+              <Link
+                key={item.slug}
+                to={`/charts/${familySlug}/${item.slug}`}
+                className={`flex-none snap-start rounded-xl border p-3 w-[140px] ${
+                  item.slug === edition.slug
+                    ? "border-[var(--wk-brand)] bg-[var(--wk-brand)]/5"
+                    : "border-[var(--wk-border)] bg-[var(--wk-surface)]"
+                }`}
+              >
+                <div className="text-[12px] font-bold text-[var(--wk-text)] truncate">{item.label}</div>
+                <div className="text-[10px] text-[var(--wk-text-muted)]">{item.entryCount} entries</div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Top 3 */}
       <div className="px-5 py-6">
@@ -532,6 +662,13 @@ export default function MobileChartEdition() {
               </button>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Subtle metadata */}
+      {metaLine && (
+        <div className="border-t border-[var(--wk-border)] bg-[var(--wk-bg)] px-5 py-3">
+          <div className="text-[10px] text-[var(--wk-text-faint)]">{metaLine}</div>
         </div>
       )}
     </div>

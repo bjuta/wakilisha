@@ -6,13 +6,16 @@ import {
   getLatestChartEdition,
   getChartEdition,
   getChartEditionEntries,
+  getChartEditionsForFamily,
 } from "@/services/chartsPublic/client";
 import {
   toChartEditionViewModel,
   toChartEntryRowViewModel,
   toChartTrackPlayerModel,
+  toChartArchiveViewModel,
   type ChartEditionViewModel,
   type ChartEntryRowViewModel,
+  type ChartArchiveViewModel,
 } from "@/services/chartsPublic/viewModels";
 import { ShareButton } from "@/components/design-system/share/ShareSheet";
 import { WkIcon } from "@/components/design-system/Icon";
@@ -36,62 +39,92 @@ export default function ChartEdition() {
 
   const [state, setState] = useState<
     | { status: "loading" }
-    | { status: "error"; error: string }
-    | { status: "not_found" }
+    | { status: "error"; error: string; diagnostics?: string; retryable?: boolean }
+    | { status: "family_not_found" }
+    | { status: "edition_not_found"; familySlug: string; familyLabel: string; latestEditionSlug?: string }
     | { status: "empty" }
     | {
         status: "loaded";
         edition: ChartEditionViewModel;
         entries: ChartEntryRowViewModel[];
         familyLabel: string;
+        familySlug: string;
+        archive: ChartArchiveViewModel;
+        meta: { dataSource: "mock" | "wordpress" | "cache"; fetchedAt: string; isStale: boolean };
       }
   >({ status: "loading" });
   const [showErrorDetails, setShowErrorDetails] = useState(false);
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
 
   const load = useCallback(async () => {
     if (!series) {
-      setState({ status: "not_found" });
+      setState({ status: "family_not_found" });
       return;
     }
     setState({ status: "loading" });
     try {
-      const family = await getChartFamily(series);
+      const { data: family } = await getChartFamily(series);
       if (!family) {
-        setState({ status: "not_found" });
+        setState({ status: "family_not_found" });
         return;
       }
 
-      let edition: Awaited<ReturnType<typeof getChartEdition>>;
+      let editionResult: Awaited<ReturnType<typeof getChartEdition>>;
+      let editionMeta: { source: "mock" | "wordpress" | "cache"; fetchedAt: string; isStale: boolean };
+
       if (editionSlug) {
-        edition = await getChartEdition(series, editionSlug);
+        const result = await getChartEdition(series, editionSlug);
+        editionResult = result;
+        editionMeta = result.meta;
       } else {
-        edition = await getLatestChartEdition(series);
+        const result = await getLatestChartEdition(series);
+        editionResult = result;
+        editionMeta = result.meta;
       }
 
-      if (!edition) {
-        setState({ status: "empty" });
+      if (!editionResult.data) {
+        const { data: latestEdition } = await getLatestChartEdition(series);
+        setState({
+          status: "edition_not_found",
+          familySlug: series,
+          familyLabel: family.label,
+          latestEditionSlug: latestEdition.data?.slug,
+        });
         return;
       }
 
-      const rawEntries = await getChartEditionEntries(series, edition.slug);
+      const { data: rawEntries } = await getChartEditionEntries(series, editionResult.data.slug);
       if (rawEntries.length === 0) {
         setState({ status: "empty" });
         return;
       }
 
       const entries = rawEntries.map(toChartEntryRowViewModel);
-      const editionVM = toChartEditionViewModel(edition, family, rawEntries);
+      const editionVM = toChartEditionViewModel(editionResult.data, family, rawEntries);
+
+      // Load archive
+      const { data: allEditions } = await getChartEditionsForFamily(series);
+      const entriesMap: Record<string, import("@/services/chartsPublic/types").ChartEditionEntry[]> = {
+        [editionResult.data.slug]: rawEntries,
+      };
+      const archive = toChartArchiveViewModel(allEditions, entriesMap);
 
       setState({
         status: "loaded",
         edition: editionVM,
         entries,
         familyLabel: family.label,
+        familySlug: series,
+        archive,
+        meta: editionMeta,
       });
     } catch (err) {
+      const isRetryable = err instanceof Error && err.message.includes("timeout") || err instanceof Error && err.message.includes("Network error");
       setState({
         status: "error",
         error: err instanceof Error ? err.message : "Unknown error",
+        diagnostics: err instanceof Error ? err.stack : undefined,
+        retryable: isRetryable,
       });
     }
   }, [series, editionSlug]);
@@ -101,6 +134,48 @@ export default function ChartEdition() {
   }, [load]);
 
   const handleRetry = () => load();
+
+  // Hoist all hooks before any early return
+  const loadedState = state.status === "loaded" ? state : null;
+
+  const chartTracks = useMemo(
+    () => loadedState?.entries.map(toChartTrackPlayerModel) ?? [],
+    [loadedState?.entries]
+  );
+
+  const newEntries = useMemo(
+    () => loadedState?.entries.filter((e) => e.movement === "new").slice(0, 5) ?? [],
+    [loadedState?.entries]
+  );
+  const climbers = useMemo(
+    () =>
+      (loadedState?.entries ?? [])
+        .filter((e) => e.movement === "up")
+        .sort((a, b) => (b.movementAmount ?? 0) - (a.movementAmount ?? 0))
+        .slice(0, 5),
+    [loadedState?.entries]
+  );
+
+  const genreBreakdown = useMemo(() => {
+    const counts = (loadedState?.entries ?? []).reduce<Record<string, number>>((acc, entry) => {
+      const genre = entry.genre || "Unknown";
+      acc[genre] = (acc[genre] || 0) + 1;
+      return acc;
+    }, {});
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6)
+      .map(([genre, count]) => ({ genre, count }));
+  }, [loadedState?.entries]);
+
+  const topTrackForTrajectory = loadedState?.entries[0] ?? null;
+  const trajectory = useMemo(() => {
+    const weeks = Math.max(6, Math.min(12, topTrackForTrajectory?.weeksOnChart || 8));
+    return Array.from(
+      { length: weeks },
+      (_, i) => Math.max(8, 90 - (i * 5 + (topTrackForTrajectory?.rank || 1) * 2))
+    );
+  }, [topTrackForTrajectory]);
 
   if (state.status === "loading") {
     return (
@@ -172,21 +247,76 @@ export default function ChartEdition() {
               {state.error}
             </div>
           )}
+
+          {/* Collapsible diagnostics */}
+          <div className="mt-6 border-t border-[var(--wk-border)] pt-4">
+            <button
+              onClick={() => setShowDiagnostics(!showDiagnostics)}
+              className="flex items-center gap-2 text-[12px] text-[var(--wk-text-muted)] mx-auto"
+            >
+              <i className={`ri-${showDiagnostics ? "arrow-up" : "arrow-down"}-s-line`} />
+              {showDiagnostics ? "Hide" : "Show"} diagnostics
+            </button>
+            {showDiagnostics && (
+              <div className="mt-3 text-left rounded-lg bg-[var(--wk-bg)] p-3 space-y-1 font-mono text-[11px] text-[var(--wk-text-soft)]">
+                <div className="grid grid-cols-[100px_1fr] gap-1">
+                  <span className="text-[var(--wk-text-faint)]">Mode</span>
+                  <span>{import.meta.env.VITE_CHARTS_PUBLIC_MODE ?? "mock"}</span>
+                  <span className="text-[var(--wk-text-faint)]">Family slug</span>
+                  <span>{series ?? "—"}</span>
+                  <span className="text-[var(--wk-text-faint)]">Edition slug</span>
+                  <span>{editionSlug ?? "latest"}</span>
+                  <span className="text-[var(--wk-text-faint)]">Endpoint</span>
+                  <span>GET /charts/{series}{editionSlug ? `/${editionSlug}` : "/latest"}</span>
+                  <span className="text-[var(--wk-text-faint)]">Error status</span>
+                  <span>{state.error.includes("HTTP") ? state.error.match(/HTTP\s+(\d+)/)?.[1] ?? "—" : "—"}</span>
+                  <span className="text-[var(--wk-text-faint)]">Message</span>
+                  <span className="text-[var(--wk-danger)]">{state.error}</span>
+                  <span className="text-[var(--wk-text-faint)]">Retryable</span>
+                  <span>{state.retryable ? "Yes" : "No"}</span>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </main>
     );
   }
 
-  if (state.status === "not_found") {
+  if (state.status === "family_not_found") {
     return (
       <main className="min-h-screen wk-container px-6 py-20">
         <div className="max-w-2xl mx-auto rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-8 text-center">
           <WkIcon name="BarChart3" size={42} className="mx-auto mb-4 text-[var(--wk-text-faint)]" />
           <h1 className="wk-h-section mb-2">Chart not found</h1>
-          <p className="text-[var(--wk-text-muted)] mb-6">The chart series or edition you are looking for does not exist.</p>
+          <p className="text-[var(--wk-text-muted)] mb-6">The chart series you are looking for does not exist.</p>
           <Link to="/charts" className="wk-button wk-button-primary">
             <i className="ri-arrow-left-line" /> Back to charts
           </Link>
+        </div>
+      </main>
+    );
+  }
+
+  if (state.status === "edition_not_found") {
+    return (
+      <main className="min-h-screen wk-container px-6 py-20">
+        <div className="max-w-2xl mx-auto rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-8 text-center">
+          <WkIcon name="BarChart3" size={42} className="mx-auto mb-4 text-[var(--wk-text-faint)]" />
+          <h1 className="wk-h-section mb-2">Edition not found</h1>
+          <p className="text-[var(--wk-text-muted)] mb-6">
+            The edition <code className="font-mono text-[12px] bg-[var(--wk-bg)] px-1 rounded">{editionSlug}</code> does not exist in the <strong>{state.familyLabel}</strong> series.
+          </p>
+          <div className="flex items-center justify-center gap-3">
+            {state.latestEditionSlug && (
+              <Link to={`/charts/${state.familySlug}/${state.latestEditionSlug}`} className="wk-button wk-button-primary">
+                <i className="ri-arrow-right-line" /> Latest edition
+              </Link>
+            )}
+            <Link to="/charts" className="wk-button wk-button-ghost">
+              <i className="ri-arrow-left-line" /> Back to charts
+            </Link>
+          </div>
         </div>
       </main>
     );
@@ -212,54 +342,23 @@ export default function ChartEdition() {
     );
   }
 
-  const { edition, entries, familyLabel } = state;
+  const { edition, entries, familyLabel, familySlug, archive, meta } = state;
   const topTrack = entries[0] ?? null;
   const top3 = entries.slice(0, 3);
   const rows = entries.slice(3);
-
-  const chartTracks = useMemo(
-    () => entries.map(toChartTrackPlayerModel),
-    [entries]
-  );
-
-  const newEntries = useMemo(
-    () => entries.filter((entry) => entry.movement === "new").slice(0, 5),
-    [entries]
-  );
-  const climbers = useMemo(
-    () =>
-      entries
-        .filter((entry) => entry.movement === "up")
-        .sort((a, b) => (b.movementAmount ?? 0) - (a.movementAmount ?? 0))
-        .slice(0, 5),
-    [entries]
-  );
-
-  const genreBreakdown = useMemo(() => {
-    const counts = entries.reduce<Record<string, number>>((acc, entry) => {
-      const genre = entry.genre || "Unknown";
-      acc[genre] = (acc[genre] || 0) + 1;
-      return acc;
-    }, {});
-    return Object.entries(counts)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 6)
-      .map(([genre, count]) => ({ genre, count }));
-  }, [entries]);
-
-  const trajectory = useMemo(() => {
-    const weeks = Math.max(6, Math.min(12, topTrack?.weeksOnChart || 8));
-    return Array.from(
-      { length: weeks },
-      (_, i) => Math.max(8, 90 - (i * 5 + (topTrack?.rank || 1) * 2))
-    );
-  }, [topTrack]);
 
   const playAt = (idx: number) => {
     const track = chartTracks[idx];
     if (!track) return;
     playTrack(track, chartTracks);
   };
+
+  // Subtle metadata
+  const metaLine = meta.isStale
+    ? `Loaded from cache (stale) · Last updated ${new Date(meta.fetchedAt).toLocaleString()}`
+    : meta.dataSource === "cache"
+    ? `Loaded from cache · Last updated ${new Date(meta.fetchedAt).toLocaleString()}`
+    : `Loaded from ${meta.dataSource === "mock" ? "mock data" : "WordPress API"} · ${new Date(meta.fetchedAt).toLocaleTimeString()}`;
 
   if (!entries.length || !topTrack) {
     return (
@@ -282,9 +381,9 @@ export default function ChartEdition() {
               <div className="chart-edition-kicker">
                 <WkIcon name="BarChart3" size={14} /> {familyLabel}
               </div>
-              <h1 className="chart-edition-title">Chart edition</h1>
+              <h1 className="chart-edition-title">{edition.label}</h1>
               <p className="chart-edition-sub">
-                {edition.totalEntries} ranked positions, {edition.totalArtists} artists, {edition.newEntries} new entries. Dense, playable, archive-ready chart infrastructure.
+                {edition.totalEntries} ranked positions, {edition.totalArtists} artists, {edition.newEntries} new entries. {edition.date} · {edition.weekNumber ? `Week ${edition.weekNumber}` : edition.label}.
               </p>
               <div className="chart-edition-actions">
                 <button className="wk-button wk-button-primary" onClick={() => playAt(0)}>
@@ -328,6 +427,72 @@ export default function ChartEdition() {
       </section>
 
       <div className="wk-container-wide px-4 py-10 md:px-6">
+        {/* Archive switcher */}
+        {archive.previous.length > 0 && (
+          <section className="mb-10">
+            <div className="mb-4 flex items-end justify-between gap-4">
+              <div>
+                <div className="section-kicker">Archive</div>
+                <h2 className="section-title">Edition history</h2>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {archive.latest && (
+                <Link
+                  to={`/charts/${familySlug}/${archive.latest.slug}`}
+                  className={`rounded-xl border p-4 transition-all hover:border-[var(--wk-brand)]/40 ${
+                    archive.latest.slug === edition.slug
+                      ? "border-[var(--wk-brand)] bg-[var(--wk-brand)]/5"
+                      : "border-[var(--wk-border)] bg-[var(--wk-surface)]"
+                  }`}
+                >
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--wk-brand)] mb-1">Latest</div>
+                  <div className="text-[14px] font-bold text-[var(--wk-text)]">{archive.latest.label}</div>
+                  <div className="text-[12px] text-[var(--wk-text-muted)]">{archive.latest.date} · {archive.latest.entryCount} entries</div>
+                  {archive.latest.no1Track && (
+                    <div className="mt-2 flex items-center gap-2">
+                      <div className="h-6 w-6 rounded overflow-hidden bg-[var(--wk-surface-raised)]">
+                        {archive.latest.no1Track.artworkUrl ? (
+                          <img src={archive.latest.no1Track.artworkUrl} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          <i className="ri-music-2-line text-[10px] flex items-center justify-center h-full" />
+                        )}
+                      </div>
+                      <div className="text-[11px] text-[var(--wk-text-muted)] truncate">{archive.latest.no1Track.title}</div>
+                    </div>
+                  )}
+                </Link>
+              )}
+              {archive.previous.slice(0, 3).map((item) => (
+                <Link
+                  key={item.slug}
+                  to={`/charts/${familySlug}/${item.slug}`}
+                  className={`rounded-xl border p-4 transition-all hover:border-[var(--wk-brand)]/40 ${
+                    item.slug === edition.slug
+                      ? "border-[var(--wk-brand)] bg-[var(--wk-brand)]/5"
+                      : "border-[var(--wk-border)] bg-[var(--wk-surface)]"
+                  }`}
+                >
+                  <div className="text-[14px] font-bold text-[var(--wk-text)]">{item.label}</div>
+                  <div className="text-[12px] text-[var(--wk-text-muted)]">{item.date} · {item.entryCount} entries</div>
+                  {item.no1Track && (
+                    <div className="mt-2 flex items-center gap-2">
+                      <div className="h-6 w-6 rounded overflow-hidden bg-[var(--wk-surface-raised)]">
+                        {item.no1Track.artworkUrl ? (
+                          <img src={item.no1Track.artworkUrl} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          <i className="ri-music-2-line text-[10px] flex items-center justify-center h-full" />
+                        )}
+                      </div>
+                      <div className="text-[11px] text-[var(--wk-text-muted)] truncate">{item.no1Track.title}</div>
+                    </div>
+                  )}
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
+
         <section className="chart-top3-grid">
           {top3.map((entry, idx) => (
             <Link
@@ -459,6 +624,13 @@ export default function ChartEdition() {
             </div>
           </aside>
         </section>
+      </div>
+
+      {/* Subtle metadata */}
+      <div className="border-t border-[var(--wk-border)] bg-[var(--wk-bg)]">
+        <div className="wk-container-wide px-4 py-3 md:px-6">
+          <div className="text-[11px] text-[var(--wk-text-faint)]">{metaLine}</div>
+        </div>
       </div>
     </main>
   );

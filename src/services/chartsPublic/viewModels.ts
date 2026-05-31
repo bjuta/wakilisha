@@ -4,6 +4,14 @@ import type {
   ChartEditionEntry,
 } from "./types";
 
+// ─── Metadata for page-level source awareness ───
+
+export interface ChartPageMeta {
+  dataSource: "mock" | "wordpress" | "cache";
+  fetchedAt: string;
+  isStale: boolean;
+}
+
 // ─── View model types for public chart pages ───
 
 export interface ChartFamilyViewModel {
@@ -70,6 +78,7 @@ export interface ChartDirectoryViewModel {
     editions: number;
     newThisWeek: number;
   };
+  meta: ChartPageMeta;
 }
 
 export interface ChartTrackPlayerModel {
@@ -80,6 +89,46 @@ export interface ChartTrackPlayerModel {
   isPlayable?: boolean;
   source?: string;
   duration?: number;
+}
+
+// ─── Archive view models ───
+
+export interface ChartEditionArchiveItem {
+  slug: string;
+  label: string;
+  date: string;
+  entryCount: number;
+  isLatest: boolean;
+  no1Track?: {
+    title: string;
+    artist: string;
+    artworkUrl: string | null;
+  };
+}
+
+export interface ChartArchiveViewModel {
+  latest: ChartEditionArchiveItem | null;
+  previous: ChartEditionArchiveItem[];
+}
+
+// ─── Track chart history view model ───
+
+export interface ChartTrackHistoryViewModel {
+  trackSlug: string;
+  trackTitle: string;
+  artistNames: string[];
+  appearances: {
+    editionSlug: string;
+    editionLabel: string;
+    rank: number;
+    weeksOnChart: number;
+    movement: "up" | "down" | "same" | "new" | "re_entry";
+    date: string;
+  }[];
+  peakPosition: number;
+  totalWeeksOnChart: number;
+  firstAppearance: string | null;
+  latestAppearance: string | null;
 }
 
 // ─── Accent colors and icons for families ───
@@ -237,7 +286,8 @@ export function toChartDirectoryViewModel(
   editions: ChartEdition[],
   featuredFamilySlug: string,
   featuredEdition: ChartEdition | null,
-  featuredEntries: ChartEditionEntry[]
+  featuredEntries: ChartEditionEntry[],
+  meta: ChartPageMeta
 ): ChartDirectoryViewModel {
   const familyVMs = families.map((f) => toChartFamilyViewModel(f, editions));
   const featuredFamily =
@@ -254,7 +304,8 @@ export function toChartDirectoryViewModel(
     featuredFamily && featuredEdition
       ? toChartEditionViewModel(
           featuredEdition,
-          families.find((f) => (f.slug ?? f.familyKey) === featuredFamilySlug) ?? families[0],
+          families.find((f) => (f.slug ?? f.familyKey) === featuredFamilySlug) ??
+            families[0],
           featuredEntries
         )
       : null;
@@ -270,6 +321,40 @@ export function toChartDirectoryViewModel(
       editions: totalEditions,
       newThisWeek,
     },
+    meta,
+  };
+}
+
+export function toChartArchiveViewModel(
+  editions: ChartEdition[],
+  entriesMap: Record<string, ChartEditionEntry[]>
+): ChartArchiveViewModel {
+  const sorted = [...editions].sort(
+    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+  );
+
+  const items: ChartEditionArchiveItem[] = sorted.map((edition, idx) => {
+    const entries = entriesMap[edition.slug] ?? [];
+    const no1 = entries[0];
+    return {
+      slug: edition.slug,
+      label: edition.label,
+      date: edition.date,
+      entryCount: entries.length,
+      isLatest: idx === 0,
+      no1Track: no1
+        ? {
+            title: no1.trackTitle,
+            artist: no1.artistNames.join(", "),
+            artworkUrl: no1.artworkUrl,
+          }
+        : undefined,
+    };
+  });
+
+  return {
+    latest: items[0] ?? null,
+    previous: items.slice(1),
   };
 }
 
@@ -291,6 +376,24 @@ export function toChartTrackPlayerModels(
   entries: ChartEntryRowViewModel[]
 ): ChartTrackPlayerModel[] {
   return entries.map(toChartTrackPlayerModel);
+}
+
+export function toChartTrackHistoryViewModel(
+  history: import("./types").TrackChartHistory
+): ChartTrackHistoryViewModel {
+  return {
+    trackSlug: history.trackSlug,
+    trackTitle: history.trackTitle,
+    artistNames: history.artistNames,
+    appearances: history.appearances.map((a) => ({
+      ...a,
+      date: a.editionLabel,
+    })),
+    peakPosition: history.peakPosition,
+    totalWeeksOnChart: history.totalWeeksOnChart,
+    firstAppearance: history.firstAppearance,
+    latestAppearance: history.latestAppearance,
+  };
 }
 
 // ─── Re-export types for convenience ───

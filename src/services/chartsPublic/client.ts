@@ -1,16 +1,20 @@
-// ... existing code ...
 import type {
   ChartFamily,
   ChartEdition,
   ChartEditionEntry,
-  ChartEntry,
   TrackChartHistory,
 } from "./types";
 
+import { fromWpChartFamily, fromWpChartEdition } from "../chartsIngestion/normalizers";
+
+import { publicWpGet, PublicWpApiError } from "./wpAdapter";
+
 import {
-  fromWpChartFamily,
-  fromWpChartEdition,
-} from "../chartsIngestion/normalizers";
+  getCachedChart,
+  setCachedChart,
+  clearChartCache,
+  DEFAULT_CACHE_TTL,
+} from "./cache";
 
 import {
   MOCK_FAMILIES,
@@ -21,18 +25,16 @@ import {
   getMockLatestEdition,
   getMockEdition,
   getMockFamily,
+  getMockEditionsForFamily,
 } from "./mockData";
 
-// ... existing code ...
+// ─── Environment ───
 const PUBLIC_API_BASE =
-  import.meta.env.VITE_WAKILISHA_WP_API_BASE ||
-  "/wp-json/wakilisha/v1";
+  import.meta.env.VITE_WAKILISHA_WP_API_BASE || "/wp-json/wakilisha/v1";
 
-const PUBLIC_MODE =
-  (import.meta.env.VITE_CHARTS_PUBLIC_MODE as "mock" | "wordpress") ||
-  "mock";
+export const PUBLIC_MODE =
+  (import.meta.env.VITE_CHARTS_PUBLIC_MODE as "mock" | "wordpress") || "mock";
 
-// ... existing code ...
 if (import.meta.env.DEV && !import.meta.env.VITE_WAKILISHA_WP_API_BASE) {
   // eslint-disable-next-line no-console
   console.warn(
@@ -40,154 +42,232 @@ if (import.meta.env.DEV && !import.meta.env.VITE_WAKILISHA_WP_API_BASE) {
   );
 }
 
-// ... existing code ...
-class PublicApiError extends Error {
-  status: number;
-  constructor(message: string, status: number) {
-    super(message);
-    this.name = "PublicApiError";
-    this.status = status;
-  }
+// ─── Error type ───
+export { PublicWpApiError };
+
+// ─── Metadata types ───
+export interface ChartFetchMeta {
+  source: "mock" | "wordpress" | "cache";
+  fetchedAt: string;
+  isStale: boolean;
 }
 
-async function publicRequest<T>(path: string): Promise<T> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 15000);
-
-  try {
-    const response = await fetch(`${PUBLIC_API_BASE}${path}`, {
-      method: "GET",
-      headers: {
-        Accept: "application/json",
-      },
-      signal: controller.signal,
-      credentials: "same-origin",
-    });
-
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      const text = await response.text();
-      throw new PublicApiError(
-        text || `Public API returned ${response.status}`,
-        response.status
-      );
-    }
-
-    return (await response.json()) as T;
-  } catch (err) {
-    clearTimeout(timeoutId);
-    if (err instanceof PublicApiError) throw err;
-    if (err instanceof Error && err.name === "AbortError") {
-      throw new PublicApiError("Request timed out", 504);
-    }
-    throw new PublicApiError(
-      err instanceof Error ? err.message : "Unknown error",
-      500
-    );
-  }
+export interface ChartResult<T> {
+  data: T;
+  meta: ChartFetchMeta;
 }
 
-// ... existing code ...
+// ─── Helpers ───
 function isMock(): boolean {
   return PUBLIC_MODE === "mock";
 }
 
-export function getChartFamilies(): Promise<ChartFamily[]> {
-  if (isMock()) {
-    return Promise.resolve([...MOCK_FAMILIES]);
-  }
-  return publicRequest<{ families: unknown[] }>("/charts")
-    .then((res) => (res.families || []).map(fromWpChartFamily))
-    .catch((err) => {
-      throw new Error(`getChartFamilies failed: ${err.message}`);
-    });
+function now(): string {
+  return new Date().toISOString();
 }
 
-export function getChartFamily(familySlug: string): Promise<ChartFamily | null> {
-  if (isMock()) {
-    const family = getMockFamily(familySlug);
-    return Promise.resolve(family ? { ...family } : null);
-  }
-  return publicRequest<{ family: unknown }>(`/charts/${familySlug}`)
-    .then((res) => (res.family ? fromWpChartFamily(res.family) : null))
-    .catch((err) => {
-      throw new Error(`getChartFamily failed: ${err.message}`);
-    });
+function mockMeta(): ChartFetchMeta {
+  return { source: "mock", fetchedAt: now(), isStale: false };
 }
 
-export function getLatestChartEdition(familySlug: string): Promise<ChartEdition | null> {
-  if (isMock()) {
-    const edition = getMockLatestEdition(familySlug);
-    return Promise.resolve(edition ? { ...edition } : null);
+function cacheMeta(entry: {
+  source: "mock" | "wordpress";
+  fetchedAt: number;
+  isStale: boolean;
+}): ChartFetchMeta {
+  return {
+    source: "cache",
+    fetchedAt: new Date(entry.fetchedAt).toISOString(),
+    isStale: entry.isStale,
+  };
+}
+
+function wpMeta(): ChartFetchMeta {
+  return { source: "wordpress", fetchedAt: now(), isStale: false };
+}
+
+/**
+ * Core cache wrapper. Checks cache first, returns fresh if hit.
+ * On fetch failure, falls back to stale cache if available.
+ */
+async function withCache<T>(
+  key: string,
+  fetchFn: () => Promise<{ data: T; source: "mock" | "wordpress" }>,
+  ttlMs = DEFAULT_CACHE_TTL
+): Promise<ChartResult<T>> {
+  const cached = getCachedChart<T>(key);
+  if (cached && !cached.isStale) {
+    return { data: cached.data, meta: cacheMeta(cached) };
   }
-  return publicRequest<{ edition: unknown }>(`/charts/${familySlug}/latest`)
-    .then((res) => (res.edition ? fromWpChartEdition(res.edition) : null))
-    .catch((err) => {
-      throw new Error(`getLatestChartEdition failed: ${err.message}`);
-    });
+
+  try {
+    const { data, source } = await fetchFn();
+    setCachedChart(key, data, source, ttlMs);
+    return { data, meta: source === "mock" ? mockMeta() : wpMeta() };
+  } catch (err) {
+    if (cached) {
+      return {
+        data: cached.data,
+        meta: { ...cacheMeta(cached), isStale: true },
+      };
+    }
+    throw err;
+  }
+}
+
+// ─── API Functions ───
+
+export function getChartFamilies(): Promise<ChartResult<ChartFamily[]>> {
+  return withCache("chart_families", async () => {
+    if (isMock()) {
+      return { data: [...MOCK_FAMILIES], source: "mock" };
+    }
+    const res = await publicWpGet<{ families: unknown[] }>("/charts");
+    return {
+      data: (res.families || []).map(fromWpChartFamily),
+      source: "wordpress",
+    };
+  });
+}
+
+export function getChartFamily(
+  familySlug: string
+): Promise<ChartResult<ChartFamily | null>> {
+  return withCache(`chart_family_${familySlug}`, async () => {
+    if (isMock()) {
+      const family = getMockFamily(familySlug);
+      return { data: family ? { ...family } : null, source: "mock" };
+    }
+    const res = await publicWpGet<{ family: unknown }>(`/charts/${familySlug}`);
+    return {
+      data: res.family ? fromWpChartFamily(res.family) : null,
+      source: "wordpress",
+    };
+  });
+}
+
+export function getChartEditionsForFamily(
+  familySlug: string
+): Promise<ChartResult<ChartEdition[]>> {
+  return withCache(`chart_family_editions_${familySlug}`, async () => {
+    if (isMock()) {
+      return { data: getMockEditionsForFamily(familySlug), source: "mock" };
+    }
+    const res = await publicWpGet<{ editions: unknown[] }>(
+      `/charts/${familySlug}/editions`
+    );
+    return {
+      data: (res.editions || []).map(fromWpChartEdition),
+      source: "wordpress",
+    };
+  });
+}
+
+export function getLatestChartEdition(
+  familySlug: string
+): Promise<ChartResult<ChartEdition | null>> {
+  return withCache(`chart_latest_${familySlug}`, async () => {
+    if (isMock()) {
+      const edition = getMockLatestEdition(familySlug);
+      return { data: edition ? { ...edition } : null, source: "mock" };
+    }
+    const res = await publicWpGet<{ edition: unknown }>(
+      `/charts/${familySlug}/latest`
+    );
+    return {
+      data: res.edition ? fromWpChartEdition(res.edition) : null,
+      source: "wordpress",
+    };
+  });
 }
 
 export function getChartEdition(
   familySlug: string,
   editionSlug: string
-): Promise<ChartEdition | null> {
-  if (isMock()) {
-    const edition = getMockEdition(familySlug, editionSlug);
-    return Promise.resolve(edition ? { ...edition } : null);
-  }
-  return publicRequest<{ edition: unknown }>(`/charts/${familySlug}/${editionSlug}`)
-    .then((res) => (res.edition ? fromWpChartEdition(res.edition) : null))
-    .catch((err) => {
-      throw new Error(`getChartEdition failed: ${err.message}`);
-    });
+): Promise<ChartResult<ChartEdition | null>> {
+  return withCache(
+    `chart_edition_${familySlug}_${editionSlug}`,
+    async () => {
+      if (isMock()) {
+        const edition = getMockEdition(familySlug, editionSlug);
+        return { data: edition ? { ...edition } : null, source: "mock" };
+      }
+      const res = await publicWpGet<{ edition: unknown }>(
+        `/charts/${familySlug}/${editionSlug}`
+      );
+      return {
+        data: res.edition ? fromWpChartEdition(res.edition) : null,
+        source: "wordpress",
+      };
+    }
+  );
 }
 
 export function getChartEditionEntries(
   familySlug: string,
   editionSlug: string
-): Promise<ChartEditionEntry[]> {
-  if (isMock()) {
-    return Promise.resolve(getMockEntriesForEdition(familySlug, editionSlug));
-  }
-  return publicRequest<{ entries: unknown[] }>(`/charts/${familySlug}/${editionSlug}/entries`)
-    .then((res) => (res.entries || []) as ChartEditionEntry[])
-    .catch((err) => {
-      throw new Error(`getChartEditionEntries failed: ${err.message}`);
-    });
+): Promise<ChartResult<ChartEditionEntry[]>> {
+  return withCache(
+    `chart_entries_${familySlug}_${editionSlug}`,
+    async () => {
+      if (isMock()) {
+        return {
+          data: getMockEntriesForEdition(familySlug, editionSlug),
+          source: "mock",
+        };
+      }
+      const res = await publicWpGet<{ entries: unknown[] }>(
+        `/charts/${familySlug}/${editionSlug}/entries`
+      );
+      return {
+        data: (res.entries || []) as ChartEditionEntry[],
+        source: "wordpress",
+      };
+    }
+  );
 }
 
-export function getTrackChartHistory(trackSlug: string): Promise<TrackChartHistory | null> {
-  if (isMock()) {
-    if (trackSlug === "midnight-dreams") {
-      return Promise.resolve({ ...MOCK_TRACK_HISTORY });
+export function getTrackChartHistory(
+  trackSlug: string
+): Promise<ChartResult<TrackChartHistory | null>> {
+  return withCache(`track_history_${trackSlug}`, async () => {
+    if (isMock()) {
+      if (trackSlug === "midnight-dreams") {
+        return { data: { ...MOCK_TRACK_HISTORY }, source: "mock" };
+      }
+      return {
+        data: {
+          trackSlug,
+          trackTitle: "Unknown Track",
+          artistNames: [],
+          appearances: [],
+          peakPosition: 0,
+          totalWeeksOnChart: 0,
+          firstAppearance: null,
+          latestAppearance: null,
+        },
+        source: "mock",
+      };
     }
-    return Promise.resolve({
-      trackSlug,
-      trackTitle: "Unknown Track",
-      artistNames: [],
-      appearances: [],
-      peakPosition: 0,
-      totalWeeksOnChart: 0,
-      firstAppearance: null,
-      latestAppearance: null,
-    });
-  }
-  return publicRequest<{ history: unknown }>(`/tracks/${trackSlug}/chart-history`)
-    .then((res) => (res.history ? res.history as TrackChartHistory : null))
-    .catch((err) => {
-      throw new Error(`getTrackChartHistory failed: ${err.message}`);
-    });
+    const res = await publicWpGet<{ history: unknown }>(
+      `/tracks/${trackSlug}/chart-history`
+    );
+    return {
+      data: res.history ? (res.history as TrackChartHistory) : null,
+      source: "wordpress",
+    };
+  });
 }
 
 // ─── Re-export types ───
-export type { ChartFamily, ChartEdition, ChartEditionEntry, ChartEntry, TrackChartHistory };
-export { PublicApiError, PUBLIC_MODE };
+export type { ChartFamily, ChartEdition, ChartEditionEntry, TrackChartHistory };
+export { clearChartCache };
 export {
   getMockEntriesForEdition,
   getMockLatestEdition,
   getMockEdition,
   getMockFamily,
+  getMockEditionsForFamily,
 } from "./mockData";
 export {
   toChartDirectoryViewModel,
@@ -196,6 +276,7 @@ export {
   toChartTrackPlayerModel,
   toChartTrackPlayerModels,
   toChartFamilyViewModel,
+  toChartArchiveViewModel,
 } from "./viewModels";
 export type {
   ChartDirectoryViewModel,
@@ -203,4 +284,10 @@ export type {
   ChartEntryRowViewModel,
   ChartFamilyViewModel,
   ChartTrackPlayerModel,
+  ChartPageMeta,
+  ChartArchiveViewModel,
+  ChartEditionArchiveItem,
+  ChartTrackHistoryViewModel,
 } from "./viewModels";
+export { publicWpGet, testPublicWpConnection } from "./wpAdapter";
+export { PUBLIC_API_BASE };

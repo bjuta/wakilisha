@@ -275,6 +275,54 @@ const HARDCODED_EDITIONS: ChartEdition[] = [
     reEntries: 1,
   },
   {
+    id: "ed-2026-w21",
+    familyId: "weekly-top-40",
+    slug: "week-21-2026",
+    label: "Week 21, 2026",
+    date: "2026-05-24",
+    periodStart: "2026-05-17",
+    periodEnd: "2026-05-23",
+    status: "published",
+    ingestJobId: "job-2026-w21",
+    publishedAt: "2026-05-24T00:00:00Z",
+    publishedBy: "WAKILISHA Charts",
+    entryCount: 40,
+    newEntries: 4,
+    reEntries: 2,
+  },
+  {
+    id: "ed-2026-w20",
+    familyId: "weekly-top-40",
+    slug: "week-20-2026",
+    label: "Week 20, 2026",
+    date: "2026-05-17",
+    periodStart: "2026-05-10",
+    periodEnd: "2026-05-16",
+    status: "published",
+    ingestJobId: "job-2026-w20",
+    publishedAt: "2026-05-17T00:00:00Z",
+    publishedBy: "WAKILISHA Charts",
+    entryCount: 40,
+    newEntries: 6,
+    reEntries: 0,
+  },
+  {
+    id: "ed-2026-w19",
+    familyId: "weekly-top-40",
+    slug: "week-19-2026",
+    label: "Week 19, 2026",
+    date: "2026-05-10",
+    periodStart: "2026-05-03",
+    periodEnd: "2026-05-09",
+    status: "published",
+    ingestJobId: "job-2026-w19",
+    publishedAt: "2026-05-10T00:00:00Z",
+    publishedBy: "WAKILISHA Charts",
+    entryCount: 40,
+    newEntries: 3,
+    reEntries: 1,
+  },
+  {
     id: "ed-2026-w22-rising",
     familyId: "rising-voices",
     slug: "week-22-2026",
@@ -289,6 +337,22 @@ const HARDCODED_EDITIONS: ChartEdition[] = [
     entryCount: 20,
     newEntries: 8,
     reEntries: 0,
+  },
+  {
+    id: "ed-2026-w21-rising",
+    familyId: "rising-voices",
+    slug: "week-21-2026",
+    label: "Week 21, 2026",
+    date: "2026-05-24",
+    periodStart: "2026-05-17",
+    periodEnd: "2026-05-23",
+    status: "published",
+    ingestJobId: "job-2026-w21-rising",
+    publishedAt: "2026-05-24T00:00:00Z",
+    publishedBy: "WAKILISHA Charts",
+    entryCount: 20,
+    newEntries: 7,
+    reEntries: 1,
   },
   {
     id: "ed-2026-m05-genre",
@@ -307,6 +371,22 @@ const HARDCODED_EDITIONS: ChartEdition[] = [
     reEntries: 2,
   },
   {
+    id: "ed-2026-m04-genre",
+    familyId: "genre-pulse",
+    slug: "april-2026",
+    label: "April 2026",
+    date: "2026-04-30",
+    periodStart: "2026-04-01",
+    periodEnd: "2026-04-30",
+    status: "published",
+    ingestJobId: "job-2026-m04-genre",
+    publishedAt: "2026-04-30T00:00:00Z",
+    publishedBy: "WAKILISHA Charts",
+    entryCount: 30,
+    newEntries: 5,
+    reEntries: 1,
+  },
+  {
     id: "ed-2026-m05-classics",
     familyId: "classics",
     slug: "may-2026",
@@ -323,6 +403,22 @@ const HARDCODED_EDITIONS: ChartEdition[] = [
     reEntries: 1,
   },
   {
+    id: "ed-2026-m04-classics",
+    familyId: "classics",
+    slug: "april-2026",
+    label: "April 2026",
+    date: "2026-04-30",
+    periodStart: "2026-04-01",
+    periodEnd: "2026-04-30",
+    status: "published",
+    ingestJobId: "job-2026-m04-classics",
+    publishedAt: "2026-04-30T00:00:00Z",
+    publishedBy: "WAKILISHA Charts",
+    entryCount: 25,
+    newEntries: 0,
+    reEntries: 2,
+  },
+  {
     id: "ed-2026-w22-breakout",
     familyId: "breakout",
     slug: "week-22-2026",
@@ -337,6 +433,22 @@ const HARDCODED_EDITIONS: ChartEdition[] = [
     entryCount: 15,
     newEntries: 6,
     reEntries: 0,
+  },
+  {
+    id: "ed-2026-w21-breakout",
+    familyId: "breakout",
+    slug: "week-21-2026",
+    label: "Week 21, 2026",
+    date: "2026-05-24",
+    periodStart: "2026-05-17",
+    periodEnd: "2026-05-23",
+    status: "published",
+    ingestJobId: "job-2026-w21-breakout",
+    publishedAt: "2026-05-24T00:00:00Z",
+    publishedBy: "WAKILISHA Charts",
+    entryCount: 15,
+    newEntries: 5,
+    reEntries: 1,
   },
 ];
 
@@ -360,6 +472,8 @@ export const MOCK_FAMILIES = registryData?.families ?? HARDCODED_FAMILIES;
 export const MOCK_EDITIONS = registryData?.editions ?? HARDCODED_EDITIONS;
 export const MOCK_ENTRIES = registryData?.entries ?? HARDCODED_ENTRIES;
 
+// ─── Edition helpers ───
+
 export function getMockEntriesForEdition(
   familySlug: string,
   editionSlug: string
@@ -371,8 +485,15 @@ export function getMockEntriesForEdition(
   return MOCK_ENTRIES.map((e) => ({ ...e, editionId: edition.id }));
 }
 
+export function getMockEditionsForFamily(familySlug: string): ChartEdition[] {
+  return MOCK_EDITIONS
+    .filter((e) => e.familyId === familySlug)
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+}
+
 export function getMockLatestEdition(familySlug: string): ChartEdition | null {
-  return MOCK_EDITIONS.find((e) => e.familyId === familySlug) ?? null;
+  const editions = getMockEditionsForFamily(familySlug);
+  return editions[0] ?? null;
 }
 
 export function getMockEdition(familySlug: string, editionSlug: string): ChartEdition | null {

@@ -28,7 +28,7 @@ export default function MobileCharts() {
     setError(null);
     setEmpty(false);
     try {
-      const families = await getChartFamilies();
+      const { data: families } = await getChartFamilies();
       if (families.length === 0) {
         setEmpty(true);
         setLoading(false);
@@ -36,14 +36,14 @@ export default function MobileCharts() {
       }
       const active = families.find((f) => (f.slug ?? f.familyKey) === activeSeries) ?? families[0];
       const activeSlug = active.slug ?? active.familyKey;
-      const edition = await getLatestChartEdition(activeSlug);
+      const { data: edition, meta } = await getLatestChartEdition(activeSlug);
       if (!edition) {
         setEmpty(true);
         setLoading(false);
         return;
       }
-      const entries = await getChartEditionEntries(activeSlug, edition.slug);
-      const vm = toChartDirectoryViewModel(families, [edition], activeSlug, edition, entries);
+      const { data: entries } = await getChartEditionEntries(activeSlug, edition.slug);
+      const vm = toChartDirectoryViewModel(families, [edition], activeSlug, edition, entries, meta);
       setData(vm);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
@@ -85,6 +85,14 @@ export default function MobileCharts() {
       { label: "New", value: data.featuredEdition.newEntries },
     ];
   }, [data]);
+
+  const metaLine = data?.meta.isStale
+    ? `Loaded from cache (stale) · ${new Date(data.meta.fetchedAt).toLocaleString()}`
+    : data?.meta.dataSource === "cache"
+    ? `Loaded from cache · ${new Date(data.meta.fetchedAt).toLocaleString()}`
+    : data?.meta
+    ? `Loaded from ${data.meta.dataSource === "mock" ? "mock data" : "WordPress API"}`
+    : "";
 
   if (loading) {
     return (
@@ -341,6 +349,13 @@ export default function MobileCharts() {
           </div>
         </div>
       </div>
+
+      {/* Subtle metadata */}
+      {metaLine && (
+        <div className="border-t border-[var(--wk-border)] bg-[var(--wk-bg)] px-5 py-3">
+          <div className="text-[10px] text-[var(--wk-text-faint)]">{metaLine}</div>
+        </div>
+      )}
     </div>
   );
 }

@@ -54,21 +54,21 @@ export default function MobileChartsDirectory() {
   const load = useCallback(async () => {
     setState({ status: "loading" });
     try {
-      const families = await getChartFamilies();
+      const { data: families } = await getChartFamilies();
       if (families.length === 0) {
         setState({ status: "empty" });
         return;
       }
       const featuredFamily = families[0];
       const featuredSlug = featuredFamily.slug ?? featuredFamily.familyKey;
-      const edition = await getLatestChartEdition(featuredSlug);
+      const { data: edition, meta } = await getLatestChartEdition(featuredSlug);
       if (!edition) {
         setState({ status: "empty" });
         return;
       }
-      const entries = await getChartEditionEntries(featuredSlug, edition.slug);
-      const data = toChartDirectoryViewModel(families, [edition], featuredSlug, edition, entries);
-      setState({ status: "loaded", data });
+      const { data: entries } = await getChartEditionEntries(featuredSlug, edition.slug);
+      const vm = toChartDirectoryViewModel(families, [edition], featuredSlug, edition, entries, meta);
+      setState({ status: "loaded", data: vm });
     } catch (err) {
       setState({ status: "error", error: err instanceof Error ? err.message : "Unknown error" });
     }
@@ -77,6 +77,12 @@ export default function MobileChartsDirectory() {
   useEffect(() => {
     load();
   }, [load]);
+
+  const loadedData = state.status === "loaded" ? state.data : null;
+  const chartTracks = useMemo(
+    () => (loadedData ? toChartTrackPlayerModels(loadedData.topEntries) : []),
+    [loadedData]
+  );
 
   if (state.status === "loading") {
     return (
@@ -135,10 +141,9 @@ export default function MobileChartsDirectory() {
   const featured = data.featuredFamily;
   const edition = data.featuredEdition;
   const topTrack = data.topEntries[0] ?? null;
-  const allEntries = data.topEntries; // top 5 in directory view
+  const allEntries = data.topEntries;
   const top3 = allEntries.slice(0, 3);
   const allRows = allEntries.slice(3);
-  const chartTracks = useMemo(() => toChartTrackPlayerModels(allEntries), [allEntries]);
   const top10 = chartTracks.slice(0, 10);
   const handlePlayTop10 = () => {
     if (top10.length > 0) playTrack(top10[0], top10);
@@ -160,6 +165,12 @@ export default function MobileChartsDirectory() {
       no1Title: topTrack?.title ?? "",
       entryCount: series.entryCount,
     }));
+
+  const metaLine = data.meta.isStale
+    ? `Loaded from cache (stale) · ${new Date(data.meta.fetchedAt).toLocaleString()}`
+    : data.meta.dataSource === "cache"
+    ? `Loaded from cache · ${new Date(data.meta.fetchedAt).toLocaleString()}`
+    : `Loaded from ${data.meta.dataSource === "mock" ? "mock data" : "WordPress API"}`;
 
   return (
     <div className="wk-mobile-v5">
@@ -357,6 +368,11 @@ export default function MobileChartsDirectory() {
             <div className="text-[10px] leading-relaxed text-[var(--wk-text-muted)]">{item.desc}</div>
           </div>
         ))}
+      </div>
+
+      {/* Subtle metadata */}
+      <div className="border-t border-[var(--wk-border)] bg-[var(--wk-bg)] px-5 py-3">
+        <div className="text-[10px] text-[var(--wk-text-faint)]">{metaLine}</div>
       </div>
     </div>
   );

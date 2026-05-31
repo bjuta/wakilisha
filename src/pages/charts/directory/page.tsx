@@ -19,7 +19,7 @@ export default function ChartsDirectory() {
   const { playTrack } = usePlayer();
   const [state, setState] = useState<
     | { status: "loading" }
-    | { status: "error"; error: string }
+    | { status: "error"; error: string; diagnostics?: string }
     | { status: "empty" }
     | { status: "loaded"; data: ChartDirectoryViewModel }
   >({ status: "loading" });
@@ -28,31 +28,33 @@ export default function ChartsDirectory() {
   const load = useCallback(async () => {
     setState({ status: "loading" });
     try {
-      const families = await getChartFamilies();
+      const { data: families, meta: familiesMeta } = await getChartFamilies();
       if (families.length === 0) {
         setState({ status: "empty" });
         return;
       }
       const featuredFamily = families[0];
       const featuredSlug = featuredFamily.slug ?? featuredFamily.familyKey;
-      const edition = await getLatestChartEdition(featuredSlug);
+      const { data: edition, meta: editionMeta } = await getLatestChartEdition(featuredSlug);
       if (!edition) {
         setState({ status: "empty" });
         return;
       }
-      const entries = await getChartEditionEntries(featuredSlug, edition.slug);
+      const { data: entries } = await getChartEditionEntries(featuredSlug, edition.slug);
       const data = toChartDirectoryViewModel(
         families,
-        [edition], // simplified: just pass the loaded edition
+        [edition],
         featuredSlug,
         edition,
-        entries
+        entries,
+        editionMeta.source === "cache" ? { ...editionMeta, isStale: editionMeta.isStale || familiesMeta.isStale } : editionMeta
       );
       setState({ status: "loaded", data });
     } catch (err) {
       setState({
         status: "error",
         error: err instanceof Error ? err.message : "Unknown error",
+        diagnostics: err instanceof Error ? err.stack : undefined,
       });
     }
   }, []);
@@ -62,6 +64,10 @@ export default function ChartsDirectory() {
   }, [load]);
 
   const handleRetry = () => load();
+
+  const loadedData = state.status === "loaded" ? state.data : null;
+  const chartTracks = useMemo(() => loadedData ? toChartTrackPlayerModels(loadedData.topEntries) : [], [loadedData]);
+  const top10 = useMemo(() => loadedData ? toChartTrackPlayerModels(loadedData.topEntries) : [], [loadedData]);
 
   if (state.status === "loading") {
     return (
@@ -138,7 +144,15 @@ export default function ChartsDirectory() {
             </div>
             {showErrorDetails && (
               <div className="mt-4 rounded-xl bg-[var(--wk-bg)] p-4 font-mono text-[12px] text-[var(--wk-text-soft)] overflow-auto">
-                {state.error}
+                <div className="mb-2 font-bold text-[var(--wk-text)]">Diagnostics</div>
+                <div className="space-y-1">
+                  <div>Mode: {import.meta.env.VITE_CHARTS_PUBLIC_MODE ?? "mock"}</div>
+                  <div>Endpoint: GET /charts</div>
+                  <div>Error: {state.error}</div>
+                </div>
+                {state.diagnostics && (
+                  <div className="mt-2 text-[var(--wk-text-faint)]">{state.diagnostics}</div>
+                )}
               </div>
             )}
           </div>
@@ -175,10 +189,8 @@ export default function ChartsDirectory() {
   const featured = data.featuredFamily;
   const edition = data.featuredEdition;
   const topTrack = data.topEntries[0] ?? null;
-  const chartTracks = useMemo(() => toChartTrackPlayerModels(data.topEntries), [data.topEntries]);
   const top5 = data.topEntries;
-  const top10 = useMemo(() => toChartTrackPlayerModels(data.topEntries), [data.topEntries]);
-  const allEntries = data.topEntries; // Note: topEntries only has top 5 in directory view
+  const allEntries = data.topEntries;
   const newEntries = allEntries.filter((e) => e.movement === "new");
   const climbers = allEntries
     .filter((e) => e.movement === "up")
@@ -202,6 +214,13 @@ export default function ChartsDirectory() {
       : `/charts/${featured?.slug ?? "weekly-top-40"}`;
 
   const totalEditions = data.families.reduce((sum, s) => sum + (s.editionCount ?? 0), 0);
+
+  // Subtle metadata
+  const metaLine = data.meta.isStale
+    ? `Loaded from cache (stale) · Last updated ${new Date(data.meta.fetchedAt).toLocaleString()}`
+    : data.meta.dataSource === "cache"
+    ? `Loaded from cache · Last updated ${new Date(data.meta.fetchedAt).toLocaleString()}`
+    : `Loaded from ${data.meta.dataSource === "mock" ? "mock data" : "WordPress API"} · ${new Date(data.meta.fetchedAt).toLocaleTimeString()}`;
 
   return (
     <div className="min-h-screen">
@@ -542,6 +561,13 @@ export default function ChartsDirectory() {
           </div>
         </div>
       </section>
+
+      {/* Subtle metadata footer */}
+      <div className="border-t border-[var(--wk-border)] bg-[var(--wk-bg)]">
+        <div className="wk-container px-4 py-3 md:px-6">
+          <div className="text-[11px] text-[var(--wk-text-faint)]">{metaLine}</div>
+        </div>
+      </div>
     </div>
   );
 }
