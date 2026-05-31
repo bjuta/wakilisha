@@ -140,7 +140,7 @@ export function ShareSheet({ item, open, onClose, timestamp }: ShareSheetProps) 
         </div>
         <div className="share-link-row">
           <input className="share-link-input" readOnly value={finalUrl} />
-          <button className="btn btn-sm btn-primary" onClick={copy}>{copied ? 'Copied' : 'Copy'}</button>
+          <button className="wk-button wk-button-sm wk-button-primary" onClick={copy}>{copied ? 'Copied' : 'Copy'}</button>
         </div>
         <OGPreviewCard item={{ ...item, url: finalUrl }} />
         <div className="wk-lucide-note mt-4"><WkIcon name="PenTool" size={13} /> Lucide outline icons · 2px stroke · filled states only when active</div>
@@ -153,7 +153,7 @@ export function ShareButton({ item, timestamp, label = 'Share' }: { item: ShareO
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button className="btn btn-md btn-ghost" onClick={() => setOpen(true)}><WkIcon name="Share2" size={16} /> {label}</button>
+      <button className="wk-button wk-button-ghost" onClick={() => setOpen(true)}><WkIcon name="Share2" size={16} /> {label}</button>
       <ShareSheet item={item} timestamp={timestamp} open={open} onClose={() => setOpen(false)} />
     </>
   );

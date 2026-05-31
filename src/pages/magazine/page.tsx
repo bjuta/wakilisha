@@ -32,7 +32,7 @@ export default function Magazine() {
             <span>By {featured.author}</span>
             <span>{featured.date || "Undated"}</span>
             <span>{featured.readingTime} min read</span>
-            <Link to={`/magazine/${featured.slug}`} className="btn btn-md btn-primary">Read cover story <WkIcon name="ArrowRight" size={15} /></Link>
+            <Link to={`/magazine/${featured.slug}`} className="wk-button wk-button-primary">Read cover story <WkIcon name="ArrowRight" size={15} /></Link>
             <ShareButton item={{ title: featured.title, subtitle: featured.author, description: featured.dek, imageUrl: featured.heroUrl, type: "article" }} />
           </div>
         </div>
@@ -115,7 +115,7 @@ export default function Magazine() {
             </div>
             <div className="mag-newsletter-form">
               <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email address" />
-              <button className="btn btn-md btn-primary" type="submit">Subscribe</button>
+              <button className="wk-button wk-button-primary" type="submit">Subscribe</button>
             </div>
           </form>
         </section>

@@ -50,6 +50,13 @@ export default function MobileChartsDirectory() {
 
   const totalEditions = CHART_SERIES.reduce((sum, s) => sum + (s.editionCount ?? 0), 0);
 
+  const topTrack = CHART_DATA[0] ?? null;
+  const series = CHART_SERIES[0];
+  const top10 = chartTracks.slice(0, 10);
+  const handlePlayTop10 = () => {
+    if (top10.length > 0) playTrack(top10[0], top10);
+  };
+
   const recentEditions = CHART_SERIES.filter((s) => s.latestEdition).map((series) => ({
     seriesLabel: series.label,
     seriesId: series.id,
@@ -67,26 +74,84 @@ export default function MobileChartsDirectory() {
 
   return (
     <div className="wk-mobile-v5">
-      <section className="charts-hdr">
-        <div className="charts-ed-badge">
-          <WkIcon name="BarChart3" size={14} /> {CHART_SERIES[0]?.label ?? "WAKILISHA Charts"}
+      {/* Fullwidth visual hero */}
+      <section className="charts-visual-hero">
+        {/* Blurred artwork background */}
+        {topTrack?.artworkUrl && (
+          <div
+            className="charts-visual-hero-bg"
+            style={{ backgroundImage: `url(${topTrack.artworkUrl})` }}
+          />
+        )}
+        {/* Fallback */}
+        {!topTrack?.artworkUrl && (
+          <div className="charts-visual-hero-bg" style={{ background: "linear-gradient(135deg,#1a3a0a,#2a5a1a)" }} />
+        )}
+        <div className="charts-visual-hero-overlay" />
+
+        <div className="charts-visual-hero-content">
+          <div className="charts-ed-badge">
+            <WkIcon name="BarChart3" size={14} /> {series?.label ?? "WAKILISHA Charts"}
+          </div>
+          <h1 className="charts-title">{series?.label ?? "Chart Universe"}</h1>
+          <p className="charts-meta">
+            {series?.description ?? "The definitive index of African music charts."}
+          </p>
         </div>
-        <h1 className="charts-title">Chart Universe</h1>
-        <p className="charts-meta">{CHART_DATA.length} entries · {CHART_SERIES.length} series · {CHART_EDITION.date || "Imported edition"}</p>
+
+        {/* Floating #1 card */}
+        {topTrack && (
+          <div className="charts-hero-no1-card">
+            <div className="charts-hero-no1-art">
+              <img src={topTrack.artworkUrl} alt={topTrack.title} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="charts-hero-no1-crown">
+                <WkIcon name="Crown" size={12} />
+                <span>Current #1</span>
+              </div>
+              <div className="charts-hero-no1-title">{topTrack.title}</div>
+              <div className="charts-hero-no1-artist">{topTrack.artist}</div>
+            </div>
+            <button
+              onClick={() => playTrack(chartTracks[0], chartTracks)}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)]"
+              aria-label={`Play ${topTrack.title}`}
+            >
+              <WkIcon name="Play" size={14} />
+            </button>
+          </div>
+        )}
       </section>
 
-      <div className="grid grid-cols-4 gap-px border-y border-[var(--wk-border)]" style={{ background: "var(--wk-border)" }}>
-        {[
-          { label: "Series", value: CHART_SERIES.length },
-          { label: "Editions", value: totalEditions },
-          { label: "Entries", value: CHART_DATA.length },
-          { label: "Updated", value: CHART_EDITION.date || "—" },
-        ].map((stat) => (
-          <div key={stat.label} className="bg-[var(--wk-surface)] px-2 py-3 text-center">
-            <div className="truncate px-1 text-[14px] font-black text-[var(--wk-brand)]">{stat.value}</div>
-            <div className="text-[9px] font-bold uppercase tracking-wider text-[var(--wk-text-muted)]">{stat.label}</div>
-          </div>
-        ))}
+      {/* Action buttons */}
+      <div className="charts-hero-actions">
+        <button onClick={handlePlayTop10} className="charts-hero-btn charts-hero-btn-primary">
+          <WkIcon name="Play" size={14} /> Listen to top 10
+        </button>
+        <button className="charts-hero-btn charts-hero-btn-secondary">
+          <WkIcon name="Share2" size={14} /> Share
+        </button>
+      </div>
+
+      {/* Stats row */}
+      <div className="charts-hero-stats-row">
+        <div>
+          <div className="stat-val">{CHART_DATA.length}</div>
+          <div className="stat-lbl">Entries</div>
+        </div>
+        <div>
+          <div className="stat-val">{CHART_SERIES.length}</div>
+          <div className="stat-lbl">Series</div>
+        </div>
+        <div>
+          <div className="stat-val">{totalEditions}</div>
+          <div className="stat-lbl">Editions</div>
+        </div>
+        <div>
+          <div className="stat-val">{CHART_EDITION.newEntries}</div>
+          <div className="stat-lbl">New</div>
+        </div>
       </div>
 
       <div className="charts-filter-row">

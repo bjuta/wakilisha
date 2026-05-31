@@ -23,10 +23,9 @@ const SERIES_ICON: Record<string, string> = {
 
 export default function ChartsDirectory() {
   const { playTrack } = usePlayer();
-
   const topTrack = CHART_DATA[0] ?? null;
+  const series = CHART_SERIES[0];
   const hasData = CHART_DATA.length > 0;
-
   const chartTracks = useMemo(
     () =>
       CHART_DATA.map((entry) => ({
@@ -39,25 +38,26 @@ export default function ChartsDirectory() {
       })),
     []
   );
-
   const handlePlay = (idx: number) => {
     if (!chartTracks[idx]) return;
     playTrack(chartTracks[idx], chartTracks);
   };
-
+  const top5 = chartTracks.slice(0, 5);
+  const top10 = chartTracks.slice(0, 10);
+  const handlePlayTop10 = () => {
+    if (top10.length > 0) playTrack(top10[0], top10);
+  };
   const handlePlayTop5 = () => {
-    const top5 = chartTracks.slice(0, 5);
     if (top5.length > 0) playTrack(top5[0], top5);
   };
-
   const latestEditionHref =
-    CHART_SERIES[0]?.latestEdition
-      ? `/charts/${CHART_SERIES[0].id}/${CHART_SERIES[0].latestEdition.slug}`
-      : `/charts/${CHART_SERIES[0]?.id ?? "weekly-top-40"}`;
-
+    series?.latestEdition
+      ? `/charts/${series.id}/${series.latestEdition.slug}`
+      : `/charts/${series?.id ?? "weekly-top-40"}`;
   const totalEditions = CHART_SERIES.reduce((sum, s) => sum + (s.editionCount ?? 0), 0);
-
-  // Get recent editions across all series (mocked from series data)
+  const newEntries = CHART_DATA.filter((e) => e.movement === "new").slice(0, 3);
+  const climbers = CHART_DATA.filter((e) => e.movement === "up").sort((a, b) => (b.movementAmount ?? 0) - (a.movementAmount ?? 0)).slice(0, 3);
+  // ... existing code ...
   const recentEditions = useMemo(() => {
     const rows: Array<{
       seriesLabel: string;
@@ -114,74 +114,186 @@ export default function ChartsDirectory() {
 
   return (
     <div className="min-h-screen">
-      {/* Hero */}
-      <section className="relative min-h-[520px] md:min-h-[600px] overflow-hidden flex items-end">
-        <div
-          className="absolute inset-0 bg-cover bg-center"
-          style={{ backgroundImage: `url(${HERO_IMAGE})` }}
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-[var(--wk-bg)] via-[var(--wk-bg)]/80 to-[var(--wk-bg)]/40" />
-        <div className="absolute inset-0 bg-gradient-to-r from-[var(--wk-bg)]/70 via-transparent to-[var(--wk-bg)]/70" />
+      {/* Cinematic Hero — blurred #1 artwork backdrop */}
+      <section className="relative min-h-[560px] md:min-h-[640px] overflow-hidden flex items-end">
+        {/* Blurred artwork background */}
+        {topTrack?.artworkUrl && (
+          <div
+            className="absolute inset-0 bg-cover bg-center"
+            style={{
+              backgroundImage: `url(${topTrack.artworkUrl})`,
+              filter: "blur(60px) saturate(1.3)",
+              transform: "scale(1.15)",
+            }}
+          />
+        )}
+        {/* Fallback if no artwork */}
+        {!topTrack?.artworkUrl && (
+          <div
+            className="absolute inset-0 bg-cover bg-center"
+            style={{ backgroundImage: `url(${HERO_IMAGE})` }}
+          />
+        )}
+        {/* Gradient overlays */}
+        <div className="absolute inset-0 bg-gradient-to-t from-[var(--wk-bg)] via-[var(--wk-bg)]/85 to-[var(--wk-bg)]/30" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[var(--wk-bg)]/80 via-transparent to-[var(--wk-bg)]/80" />
         <div className="absolute inset-0 bg-[var(--wk-brand)]/[0.03]" />
 
-        <div className="relative wk-container px-4 pb-10 pt-20 md:px-6 md:pb-14 md:pt-24">
-          <div className="max-w-3xl">
-            <div className="mb-4 flex items-center gap-3">
-              <div className="wk-eyebrow">WAKILISHA charts</div>
-              <span className="inline-block h-1 w-1 rounded-full bg-[var(--wk-brand)]" />
-              <span className="text-[11px] font-bold uppercase tracking-[0.15em] text-[var(--wk-brand)]">
-                Directory
-              </span>
+        <div className="relative wk-container px-4 pb-10 pt-20 md:px-6 md:pb-16 md:pt-28 w-full">
+          <div className="grid grid-cols-1 items-end gap-8 lg:grid-cols-[1fr_420px]">
+            {/* Left: title and actions */}
+            <div className="pb-2">
+              <div className="mb-4 flex items-center gap-3">
+                <div className="wk-eyebrow">WAKILISHA charts</div>
+                <span className="inline-block h-1 w-1 rounded-full bg-[var(--wk-brand)]" />
+                <span className="text-[11px] font-bold uppercase tracking-[0.15em] text-[var(--wk-brand)]">
+                  Directory
+                </span>
+              </div>
+
+              <h1 className="text-[clamp(44px,6vw,84px)] font-black leading-[0.9] tracking-[-0.055em] text-[var(--wk-text)]">
+                {series?.label ?? "Chart Universe"}
+              </h1>
+
+              <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-[var(--wk-text-soft)]">
+                {series?.description ?? "The definitive index of African music charts."}
+                {" "}Track what is rising, what has stayed, and what is breaking through.
+              </p>
+
+              <div className="mt-6 flex flex-wrap items-center gap-3">
+                <button
+                  onClick={handlePlayTop10}
+                  className="wk-button wk-button-primary"
+                >
+                  <i className="ri-play-fill" /> Listen to top 10
+                </button>
+                <button className="wk-button wk-button-ghost">
+                  <i className="ri-share-line" /> Share
+                </button>
+                <Link
+                  to={latestEditionHref}
+                  className="hidden md:inline-flex items-center gap-1 text-[13px] font-semibold text-[var(--wk-brand)] whitespace-nowrap"
+                >
+                  View edition <i className="ri-arrow-right-line" />
+                </Link>
+              </div>
+
+              {/* Stats row */}
+              <div className="mt-7 flex flex-wrap items-center gap-6">
+                <div className="flex items-center gap-2">
+                  <span className="text-[26px] font-black leading-none text-[var(--wk-brand)]">{CHART_DATA.length}</span>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--wk-text-muted)]">Chart entries</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[26px] font-black leading-none text-[var(--wk-brand)]">{CHART_SERIES.length}</span>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--wk-text-muted)]">Series</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[26px] font-black leading-none text-[var(--wk-brand)]">{totalEditions}</span>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--wk-text-muted)]">Editions</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[26px] font-black leading-none text-[var(--wk-brand)]">{CHART_EDITION.newEntries}</span>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--wk-text-muted)]">New this week</span>
+                </div>
+              </div>
             </div>
 
-            <h1 className="text-[clamp(44px,7vw,88px)] font-black leading-[0.9] tracking-[-0.055em] text-[var(--wk-text)]">
-              Chart Universe
-            </h1>
+            {/* Right: #1 card overlapping */}
+            {topTrack && (
+              <div className="relative lg:-mb-8">
+                <div className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)]/90 backdrop-blur-xl p-5">
+                  {/* Crown badge */}
+                  <div className="mb-3 flex items-center gap-2">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#C9A96E]/15 text-[#C9A96E]">
+                      <i className="ri-vip-crown-2-fill" />
+                    </div>
+                    <span className="text-[11px] font-bold uppercase tracking-[0.15em] text-[#C9A96E]">
+                      Current #1
+                    </span>
+                  </div>
 
-            <p className="mt-5 max-w-xl text-[15px] leading-relaxed text-[var(--wk-text-soft)]">
-              The definitive index of African music charts. Track what is rising, what has stayed, and what is breaking through across every series.
-            </p>
+                  <div className="flex items-center gap-4">
+                    <div className="relative h-28 w-28 shrink-0 overflow-hidden rounded-xl">
+                      <img
+                        src={topTrack.artworkUrl}
+                        alt={topTrack.title}
+                        className="h-full w-full object-cover object-top"
+                      />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="mb-1 truncate text-[20px] font-black text-[var(--wk-text)]">
+                        {topTrack.title}
+                      </div>
+                      <div className="truncate text-[14px] text-[var(--wk-text-muted)]">
+                        {topTrack.artist}
+                      </div>
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        {topTrack.genre && (
+                          <span className="rounded-full bg-[var(--wk-brand-soft)] border border-[var(--wk-brand)]/20 px-2.5 py-0.5 text-[11px] font-semibold text-[var(--wk-brand)]">
+                            {topTrack.genre}
+                          </span>
+                        )}
+                        {topTrack.weeksOnChart !== undefined && (
+                          <span className="text-[11px] text-[var(--wk-text-faint)]">
+                            {topTrack.weeksOnChart} wk{topTrack.weeksOnChart !== 1 ? "s" : ""} on chart
+                          </span>
+                        )}
+                        {topTrack.peakPosition === 1 && (
+                          <span className="rounded-full bg-[#C9A96E]/15 border border-[#C9A96E]/30 px-2 py-0.5 text-[10px] font-bold text-[#C9A96E]">
+                            PEAK
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
 
-            <div className="mt-7 flex flex-wrap items-center gap-3">
-              <Link
-                to={latestEditionHref}
-                className="wk-button wk-button-primary whitespace-nowrap"
-              >
-                <i className="ri-bar-chart-line" /> Latest edition
-              </Link>
-              <button
-                onClick={handlePlayTop5}
-                className="wk-button wk-button-ghost whitespace-nowrap"
-              >
-                <i className="ri-play-fill" /> Play top 5
-              </button>
-            </div>
+                  {/* Mini stats */}
+                  <div className="mt-4 grid grid-cols-3 gap-2 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] p-3">
+                    <div className="text-center">
+                      <div className="text-[18px] font-black text-[var(--wk-brand)]">{topTrack.weeksOnChart ?? 0}</div>
+                      <div className="mt-0.5 text-[10px] font-bold uppercase tracking-wider text-[var(--wk-text-faint)]">Weeks</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-[18px] font-black text-[var(--wk-brand)]">#{topTrack.peakPosition ?? 1}</div>
+                      <div className="mt-0.5 text-[10px] font-bold uppercase tracking-wider text-[var(--wk-text-faint)]">Peak</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-[18px] font-black text-[var(--wk-brand)]">{topTrack.genre ?? "—"}</div>
+                      <div className="mt-0.5 text-[10px] font-bold uppercase tracking-wider text-[var(--wk-text-faint)]">Genre</div>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="mt-4 flex gap-2">
+                    <button
+                      onClick={() => handlePlay(0)}
+                      className="wk-button wk-button-primary flex-1 justify-center text-[12px]"
+                    >
+                      <i className="ri-play-fill" /> Play
+                    </button>
+                    <Link
+                      to={`/tracks/${topTrack.slug}`}
+                      className="wk-button wk-button-ghost flex-1 justify-center text-[12px]"
+                    >
+                      <i className="ri-music-2-line" /> Track
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </section>
 
-      {/* Stats strip */}
-      <section className="border-b border-[var(--wk-border)] bg-[var(--wk-surface)]">
-        <div className="wk-container px-4 py-5 md:px-6">
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-            <Stat label="Active series" value={CHART_SERIES.length} />
-            <Stat label="Total editions" value={totalEditions} />
-            <Stat label="Chart entries" value={CHART_DATA.length} />
-            <Stat label="Latest update" value={CHART_EDITION.date || "—"} />
-          </div>
-        </div>
-      </section>
-
-      {/* Featured latest edition */}
-      <section className="wk-container px-4 py-10 md:px-6 md:py-14">
+      {/* Current edition section — starts below the overlapping #1 card */}
+      <section className="wk-container px-4 pt-14 md:px-6 md:pt-20">
         <div className="mb-6 flex items-end justify-between gap-4">
           <div>
-            <div className="wk-eyebrow mb-2">Current edition</div>
-            <h2 className="wk-h-section">
-              {CHART_SERIES[0]?.label ?? "Weekly Top 40"}
-            </h2>
+            <div className="wk-eyebrow mb-2">This week</div>
+            <h2 className="wk-h-section">Top positions</h2>
             <p className="mt-1 text-[14px] text-[var(--wk-text-muted)]">
-              Week {CHART_EDITION.weekNumber} · {CHART_EDITION.date} · Top {CHART_SERIES[0]?.entryCount ?? 40}
+              Week {CHART_EDITION.weekNumber} · {CHART_EDITION.date} · Top {series?.entryCount ?? 40}
             </p>
           </div>
           <Link
@@ -315,94 +427,22 @@ export default function ChartsDirectory() {
                 to={latestEditionHref}
                 className="inline-flex items-center gap-1 text-[13px] font-semibold text-[var(--wk-brand)]"
               >
-                View all {CHART_SERIES[0]?.entryCount ?? CHART_DATA.length} positions
+                View all {series?.entryCount ?? CHART_DATA.length} positions
                 <i className="ri-arrow-right-line" />
               </Link>
             </div>
           </div>
 
-          {/* #1 card */}
+          {/* Signal cards */}
           <div className="flex flex-col gap-5">
-            {topTrack && (
-              <div className="overflow-hidden rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)]">
-                <div className="relative h-44 bg-[var(--wk-surface-raised)]">
-                  <img
-                    src={topTrack.artworkUrl}
-                    alt={topTrack.title}
-                    className="h-full w-full object-cover object-top"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-[var(--wk-surface)] via-transparent to-transparent" />
-                  <div className="absolute bottom-3 left-4 right-4">
-                    <div className="mb-1 flex items-center gap-2">
-                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#C9A96E]/20 text-[#C9A96E]">
-                        <i className="ri-vip-crown-2-fill text-sm" />
-                      </div>
-                      <span className="text-[11px] font-bold uppercase tracking-[0.15em] text-[#C9A96E]">
-                        Current #1
-                      </span>
-                    </div>
-                    <div className="truncate text-[22px] font-black text-[var(--wk-text)]">
-                      {topTrack.title}
-                    </div>
-                    <div className="truncate text-[14px] text-[var(--wk-text-muted)]">
-                      {topTrack.artist}
-                    </div>
-                  </div>
-                </div>
-                <div className="p-4">
-                  <div className="grid grid-cols-3 gap-2">
-                    <div className="text-center">
-                      <div className="text-[20px] font-black text-[var(--wk-brand)]">
-                        {topTrack.weeksOnChart ?? 0}
-                      </div>
-                      <div className="mt-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--wk-text-faint)]">
-                        Weeks
-                      </div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-[20px] font-black text-[var(--wk-brand)]">
-                        #{topTrack.peakPosition ?? 1}
-                      </div>
-                      <div className="mt-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--wk-text-faint)]">
-                        Peak
-                      </div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-[20px] font-black text-[var(--wk-brand)]">
-                        {topTrack.genre ?? "—"}
-                      </div>
-                      <div className="mt-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--wk-text-faint)]">
-                        Genre
-                      </div>
-                    </div>
-                  </div>
-                  <div className="mt-4 flex gap-2">
-                    <button
-                      onClick={() => handlePlay(0)}
-                      className="wk-button wk-button-primary flex-1 justify-center text-[12px]"
-                    >
-                      <i className="ri-play-fill" /> Play
-                    </button>
-                    <Link
-                      to={`/tracks/${topTrack.slug}`}
-                      className="wk-button wk-button-ghost flex-1 justify-center text-[12px]"
-                    >
-                      <i className="ri-music-2-line" /> Track
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Quick signals */}
-            <SignalStrip title="New entries" entries={CHART_DATA.filter((e) => e.movement === "new").slice(0, 3)} badge="New" />
-            <SignalStrip title="Biggest climbers" entries={CHART_DATA.filter((e) => e.movement === "up").sort((a, b) => (b.movementAmount ?? 0) - (a.movementAmount ?? 0)).slice(0, 3)} badge="Climber" />
+            <SignalStrip title="New entries" entries={newEntries} badge="New" />
+            <SignalStrip title="Biggest climbers" entries={climbers} badge="Climber" />
           </div>
         </div>
       </section>
 
       {/* Chart series grid */}
-      <section className="border-t border-[var(--wk-border)] bg-[var(--wk-surface)]">
+      <section className="border-t border-[var(--wk-border)] bg-[var(--wk-surface)] mt-10">
         <div className="wk-container px-4 py-10 md:px-6 md:py-14">
           <div className="mb-8 flex items-end justify-between gap-4">
             <div>

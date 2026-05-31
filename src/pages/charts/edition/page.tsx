@@ -71,9 +71,9 @@ export default function ChartEdition() {
               <h1 className="chart-edition-title">Chart edition</h1>
               <p className="chart-edition-sub">{CHART_EDITION.totalEntries} ranked positions, {CHART_EDITION.totalArtists} artists, {CHART_EDITION.newEntries} new entries. Dense, playable, archive-ready chart infrastructure.</p>
               <div className="chart-edition-actions">
-                <button className="btn btn-md btn-primary" onClick={() => playAt(0)}><WkIcon name="Play" size={16} /> Play #1</button>
-                <button className="btn btn-md btn-ghost" onClick={() => playAt(0)}><WkIcon name="ListMusic" size={16} /> Play chart</button>
-                <Link to="/charts" className="btn btn-md btn-ghost"><WkIcon name="Archive" size={16} /> Archive</Link>
+                <button className="wk-button wk-button-primary" onClick={() => playAt(0)}><WkIcon name="Play" size={16} /> Play #1</button>
+                <button className="wk-button wk-button-ghost" onClick={() => playAt(0)}><WkIcon name="ListMusic" size={16} /> Play chart</button>
+                <Link to="/charts" className="wk-button wk-button-ghost"><WkIcon name="Archive" size={16} /> Archive</Link>
                 <ShareButton item={{ title: seriesData?.label ?? "WAKILISHA Chart Edition", subtitle: edition || CHART_EDITION.date || "Current edition", description: CHART_EDITION.methodology, imageUrl: topTrack.artworkUrl, type: "chart" }} />
               </div>
               <div className="chart-stats-strip">
@@ -101,7 +101,7 @@ export default function ChartEdition() {
               <div className="chart-podium-body">
                 <div className="chart-podium-title">{entry.title}</div>
                 <div className="chart-podium-artist">{entry.artist} · {movementLabel(entry)}</div>
-                <button onClick={(e) => { e.preventDefault(); playAt(idx); }} className="btn btn-sm btn-primary mt-3"><WkIcon name="Play" size={14} /> Play</button>
+                <button onClick={(e) => { e.preventDefault(); playAt(idx); }} className="wk-button wk-button-sm wk-button-primary mt-3"><WkIcon name="Play" size={14} /> Play</button>
               </div>
             </Link>
           ))}

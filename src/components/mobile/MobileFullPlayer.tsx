@@ -105,7 +105,7 @@ export function MobileFullPlayer() {
         <p className="mt-2 text-[13px] text-[var(--wk-text-muted)]">
           Tap play on any track to start listening.
         </p>
-        <button onClick={() => { closeFullPlayer(); nav(-1); }} className="mt-6 auth-btn auth-btn-primary">
+        <button onClick={() => { closeFullPlayer(); nav(-1); }} className="mt-6 auth-btn auth-btn-primary mobile-pressable">
           Go back
         </button>
       </div>

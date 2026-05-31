@@ -31,8 +31,8 @@ export default function Releases() {
               <span><WkIcon name="Building2" size={14} /> {CATALOG_STATS.labelsRepresented} labels</span>
             </div>
             <div className="album41-actions">
-              <button onClick={() => setModalRelease(featured)} className="btn btn-lg btn-primary"><WkIcon name="Play" size={18} /> Preview featured</button>
-              <Link to={`/releases/${featured.slug}`} className="btn btn-lg btn-ghost"><WkIcon name="ArrowUpRight" size={18} /> Full page</Link>
+              <button onClick={() => setModalRelease(featured)} className="wk-button wk-button-lg wk-button-primary"><WkIcon name="Play" size={18} /> Preview featured</button>
+              <Link to={`/releases/${featured.slug}`} className="wk-button wk-button-lg wk-button-ghost"><WkIcon name="ArrowUpRight" size={18} /> Full page</Link>
               <ShareButton item={{ title: "WAKILISHA Releases", subtitle: `${CATALOG_STATS.total} releases`, description: "Browse albums, EPs, singles and compilations in the WAKILISHA catalog.", imageUrl: featured.artworkUrl, type: "album" }} />
             </div>
           </div>
@@ -109,8 +109,8 @@ function ReleaseTile({ release, onPreview, wide = false }: { release: Release; o
         <div className="artist-card-meta">{release.artist} · {release.year} · {release.trackCount} tracks</div>
         <div className="artist-card-tags"><span className="tag tag-sm">{release.releaseType}</span><span className="tag tag-sm">{release.labelName}</span></div>
         <div className="mt-3 flex gap-2">
-          <button onClick={() => onPreview(release)} className="btn btn-sm btn-primary"><WkIcon name="Eye" size={13} /> Preview</button>
-          <Link to={`/releases/${release.slug}`} className="btn btn-sm btn-ghost"><WkIcon name="ArrowUpRight" size={13} /> Open</Link>
+          <button onClick={() => onPreview(release)} className="wk-button wk-button-sm wk-button-primary"><WkIcon name="Eye" size={13} /> Preview</button>
+          <Link to={`/releases/${release.slug}`} className="wk-button wk-button-sm wk-button-ghost"><WkIcon name="ArrowUpRight" size={13} /> Open</Link>
         </div>
       </div>
     </div>

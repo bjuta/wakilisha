@@ -32,7 +32,7 @@ export default function ReleaseDetail() {
         <WkIcon name="Album" size={42} className="mx-auto mb-4 text-[var(--wk-text-faint)]" />
         <h1 className="wk-h-section mb-2">Release not found</h1>
         <p className="text-[var(--wk-text-muted)]">This release does not exist in the WAKILISHA catalog.</p>
-        <Link to="/releases" className="btn btn-md btn-primary mt-6">Back to releases</Link>
+        <Link to="/releases" className="wk-button wk-button-primary mt-6">Back to releases</Link>
       </main>
     );
   }
@@ -66,9 +66,9 @@ export default function ReleaseDetail() {
               <span><WkIcon name="Disc3" size={14} /> {release.releaseType}</span>
             </div>
             <div className="album41-actions">
-              <button className="btn btn-lg btn-primary"><WkIcon name="Play" size={18} /> Play</button>
-              <button className="btn btn-lg btn-ghost"><WkIcon name="Shuffle" size={18} /> Shuffle</button>
-              <button className="btn btn-lg btn-ghost"><WkIcon name="Heart" size={18} /> Save</button>
+              <button className="wk-button wk-button-lg wk-button-primary"><WkIcon name="Play" size={18} /> Play</button>
+              <button className="wk-button wk-button-lg wk-button-ghost"><WkIcon name="Shuffle" size={18} /> Shuffle</button>
+              <button className="wk-button wk-button-lg wk-button-ghost"><WkIcon name="Heart" size={18} /> Save</button>
               <ShareButton item={{ title: release.title, subtitle: release.artist, description: `${release.releaseType} by ${release.artist} on WAKILISHA`, imageUrl: release.artworkUrl, type: "album" }} />
             </div>
           </div>
@@ -134,7 +134,7 @@ export default function ReleaseDetail() {
             <div className="album41-card-title"><WkIcon name="Building2" size={15} /> Label context</div>
             <div className="artist-list-name">{release.labelName}</div>
             <div className="artist-list-sub">Catalog relationship · {release.releaseType}</div>
-            <Link to={`/labels/${release.labelName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`} className="btn btn-sm btn-ghost mt-4">Open label</Link>
+            <Link to={`/labels/${release.labelName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`} className="wk-button wk-button-sm wk-button-ghost mt-4">Open label</Link>
           </section>
 
           {related.length > 0 && (

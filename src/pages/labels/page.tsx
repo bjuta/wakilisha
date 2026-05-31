@@ -57,7 +57,7 @@ export default function Labels() {
             <h1 className="label43-title">Labels</h1>
             <p className="label43-sub">Record labels, imprints, distributors, and music institutions mapped as ecosystems: rosters, releases, chart presence, country footprint, and catalog relationships.</p>
             <div className="label43-actions">
-              <a href="#label-directory" className="btn btn-lg btn-primary"><WkIcon name="Search" size={18} /> Browse directory</a>
+              <a href="#label-directory" className="wk-button wk-button-lg wk-button-primary"><WkIcon name="Search" size={18} /> Browse directory</a>
               <ShareButton item={{ title: "WAKILISHA Labels", subtitle: `${LABELS.length} labels`, description: "Browse WAKILISHA labels and music institutions by country, roster, catalog and chart presence.", type: "page" }} />
             </div>
           </div>

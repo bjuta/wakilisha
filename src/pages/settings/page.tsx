@@ -127,8 +127,8 @@ export default function SettingsPage() {
                 <WkIcon name={dirty ? "CircleAlert" : "CircleCheck"} size={14} /> {dirty ? "Unsaved changes" : "Saved"}
               </div>
               <div className="flex gap-2">
-                <button className="btn btn-sm btn-ghost" onClick={() => setSettings(savedSettings)} disabled={!dirty}>Discard</button>
-                <button className="btn btn-sm btn-primary" onClick={save} disabled={!dirty}>Save changes</button>
+                <button className="wk-button wk-button-sm wk-button-ghost" onClick={() => setSettings(savedSettings)} disabled={!dirty}>Discard</button>
+                <button className="wk-button wk-button-sm wk-button-primary" onClick={save} disabled={!dirty}>Save changes</button>
               </div>
             </div>
           </section>
@@ -171,7 +171,7 @@ function PlaybackPane({ settings, update }: { settings: SettingsState; update: <
 }
 
 function DangerPane({ reset }: { reset: () => void }) {
-  return <div className="settings49-danger"><div className="settings49-danger-title">Reset local settings</div><p className="settings49-danger-copy">This clears the settings stored in this browser and returns the endpoint to the default WAKILISHA state. It does not delete an account.</p><button className="btn btn-sm btn-danger" onClick={reset}><WkIcon name="RotateCcw" size={14} /> Reset local settings</button></div>;
+  return <div className="settings49-danger"><div className="settings49-danger-title">Reset local settings</div><p className="settings49-danger-copy">This clears the settings stored in this browser and returns the endpoint to the default WAKILISHA state. It does not delete an account.</p><button className="wk-button wk-button-sm wk-button-danger" onClick={reset}><WkIcon name="RotateCcw" size={14} /> Reset local settings</button></div>;
 }
 
 function Field({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {

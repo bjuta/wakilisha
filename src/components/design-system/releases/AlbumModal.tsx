@@ -35,10 +35,10 @@ export function AlbumModal({ release, open, onClose }: AlbumModalProps) {
             <h2 className="album-modal-title">{release.title}</h2>
             <div className="album-modal-sub">{release.artist} · {release.year} · {release.labelName}</div>
             <div className="album-modal-actions">
-              <button className="btn btn-md btn-primary"><WkIcon name="Play" size={16} /> Play</button>
-              <button className="btn btn-md btn-ghost"><WkIcon name="Shuffle" size={16} /> Shuffle</button>
+              <button className="wk-button wk-button-primary"><WkIcon name="Play" size={16} /> Play</button>
+              <button className="wk-button wk-button-ghost"><WkIcon name="Shuffle" size={16} /> Shuffle</button>
               <ShareButton item={{ title: release.title, subtitle: release.artist, description: `${release.releaseType} by ${release.artist}`, imageUrl: release.artworkUrl, type: "album" }} />
-              <Link to={`/releases/${release.slug}`} className="btn btn-md btn-ghost"><WkIcon name="ArrowUpRight" size={16} /> Full page</Link>
+              <Link to={`/releases/${release.slug}`} className="wk-button wk-button-ghost"><WkIcon name="ArrowUpRight" size={16} /> Full page</Link>
             </div>
           </div>
           <button className="chart-btn album-modal-close" onClick={onClose} aria-label="Close album modal"><WkIcon name="X" size={18} /></button>

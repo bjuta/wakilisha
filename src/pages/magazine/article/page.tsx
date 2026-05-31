@@ -79,7 +79,7 @@ export default function ArticlePage() {
             <div className="article-sidebox-title">Actions</div>
             <div className="grid gap-2">
               <ShareButton item={{ title: article.title, subtitle: article.author, description: article.dek, imageUrl: article.heroUrl, type: "article" }} />
-              <button className="btn btn-md btn-ghost"><WkIcon name="Bookmark" size={16} /> Save</button>
+              <button className="wk-button wk-button-ghost"><WkIcon name="Bookmark" size={16} /> Save</button>
             </div>
           </div>
           <div className="article-sidebox">
