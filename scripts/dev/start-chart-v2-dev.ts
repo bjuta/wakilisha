@@ -37,6 +37,17 @@ function loadDotEnvLocal(): void {
   }
 }
 
+function normalizeDatabaseUrlForPg(databaseUrl: string): string {
+  try {
+    const url = new URL(databaseUrl);
+    url.searchParams.delete("sslmode");
+    url.searchParams.delete("uselibpqcompat");
+    return url.toString();
+  } catch {
+    return databaseUrl;
+  }
+}
+
 function log(label: string, message: string): void {
   console.log(`${B}[${label}]${RESET} ${message}`);
 }
@@ -48,11 +59,13 @@ function fail(label: string, message: string): void {
 }
 
 async function checkDbConnection(): Promise<boolean> {
-  const { Pool } = await import("pg");
-  const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
+  const pg = await import("pg");
+  const pool = new pg.default.Pool({
+    connectionString: normalizeDatabaseUrlForPg(process.env.DATABASE_URL ?? ""),
     ssl: { rejectUnauthorized: false },
     connectionTimeoutMillis: 5000,
+    query_timeout: 5000,
+    statement_timeout: 5000,
   });
   try {
     const result = await pool.query("SELECT 1 AS ok");
