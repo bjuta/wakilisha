@@ -17,6 +17,19 @@ export interface ChartPageMeta {
 export interface ChartFamilyViewModel {
   id: string;
   slug: string;
+  sourceFamilySlug: string;
+  seriesSlug: string;
+  seriesLabel: string;
+  marketSlug: string;
+  marketLabel: string;
+  publicSlug: string;
+  publicLabel: string;
+  shortLabel: string;
+  chartMode: "data" | "editorial" | "hybrid";
+  periodType: "weekly" | "monthly" | "yearly" | "evergreen";
+  methodologyVersion: string;
+  eligibilityRulesVersion: string;
+  legacySlugs: string[];
   label: string;
   description: string;
   entryCount: number;
@@ -41,12 +54,23 @@ export interface ChartEditionViewModel {
   newEntries: number;
   reEntries: number;
   methodology: string;
+  methodologyVersion: string;
+  eligibilityRulesVersion: string;
+  chartMode: "data" | "editorial" | "hybrid";
+  periodType: "weekly" | "monthly" | "yearly" | "evergreen";
   biggestMover?: { title: string; artist: string; amount: number };
   topGenre?: string;
   topGenreCount?: number;
   longestRunning?: { title: string; artist: string; weeks: number };
   familySlug: string;
   familyLabel: string;
+  sourceFamilySlug: string;
+  seriesSlug: string;
+  seriesLabel: string;
+  marketSlug: string;
+  marketLabel: string;
+  publicSlug: string;
+  publicLabel: string;
 }
 
 export interface ChartEntryRowViewModel {
@@ -134,20 +158,40 @@ export interface ChartTrackHistoryViewModel {
 // ─── Accent colors and icons for families ───
 
 const FAMILY_ACCENT: Record<string, string> = {
+  "top-songs-kenya": "#84C241",
+  "rnb-kenya": "#D6766A",
+  "gengetone-kenya": "#E8A23A",
+  "2026-releases-kenya": "#4FD9C2",
+  kenya: "#84C241",
+  rnb: "#D6766A",
+  gengetone: "#E8A23A",
+  "2026": "#4FD9C2",
   "weekly-top-40": "#84C241",
   "rising-voices": "#E8A23A",
   "genre-pulse": "#D6766A",
-  "classics": "#C9A96E",
-  "breakout": "#4FD9C2",
+  classics: "#C9A96E",
+  breakout: "#4FD9C2",
 };
 
 const FAMILY_ICON: Record<string, string> = {
+  "top-songs-kenya": "ri-bar-chart-line",
+  "rnb-kenya": "ri-pulse-line",
+  "gengetone-kenya": "ri-fire-line",
+  "2026-releases-kenya": "ri-calendar-event-line",
+  kenya: "ri-bar-chart-line",
+  rnb: "ri-pulse-line",
+  gengetone: "ri-fire-line",
+  "2026": "ri-calendar-event-line",
   "weekly-top-40": "ri-bar-chart-line",
   "rising-voices": "ri-rocket-line",
   "genre-pulse": "ri-pulse-line",
-  "classics": "ri-vip-crown-line",
-  "breakout": "ri-fire-line",
+  classics: "ri-vip-crown-line",
+  breakout: "ri-fire-line",
 };
+
+function familyPublicSlug(family: ChartFamily): string {
+  return family.publicSlug ?? family.slug ?? family.familyKey;
+}
 
 // ─── Adapter functions ───
 
@@ -177,11 +221,11 @@ export function toChartEntryRowViewModel(
     artist: entry.artistNames.join(", "),
     artworkUrl: entry.artworkUrl,
     slug: entry.trackSlug,
-    genre: rich.genre ?? "Afrobeats",
+    genre: rich.genre ?? null,
     peakPosition: entry.peakPosition ?? entry.rank,
     weeksOnChart: entry.weeksOnChart ?? 1,
     isPlayable: rich.isPlayable ?? true,
-    source: rich.source ?? "Spotify",
+    source: rich.source ?? "WAKILISHA chart data",
     score: entry.score,
     duration: rich.duration ?? 180 + ((entry.trackTitle.length * 7) % 120),
   };
@@ -191,17 +235,32 @@ export function toChartFamilyViewModel(
   family: ChartFamily,
   editions: ChartEdition[]
 ): ChartFamilyViewModel {
-  const familyEditions = editions.filter((e) => e.familyId === family.id);
+  const sourceFamilySlug = family.sourceFamilySlug ?? family.familyKey ?? family.id;
+  const publicSlug = familyPublicSlug(family);
+  const familyEditions = editions.filter((e) => e.familyId === sourceFamilySlug || e.familyId === family.id);
   const latest = familyEditions[0];
   return {
     id: family.id,
-    slug: family.slug ?? family.familyKey,
-    label: family.label,
+    slug: publicSlug,
+    sourceFamilySlug,
+    seriesSlug: family.seriesSlug ?? publicSlug,
+    seriesLabel: family.seriesLabel ?? family.label,
+    marketSlug: family.marketSlug ?? "unspecified",
+    marketLabel: family.marketLabel ?? "Unspecified",
+    publicSlug,
+    publicLabel: family.publicLabel ?? family.label,
+    shortLabel: family.shortLabel ?? family.label,
+    chartMode: family.chartMode ?? "data",
+    periodType: family.periodType ?? "weekly",
+    methodologyVersion: family.methodologyVersion ?? family.defaultScoringModel,
+    eligibilityRulesVersion: family.eligibilityRulesVersion ?? family.defaultRuleset,
+    legacySlugs: family.legacySlugs ?? [family.slug, family.familyKey, family.id].filter(Boolean) as string[],
+    label: family.publicLabel ?? family.label,
     description: family.description,
     entryCount: family.defaultChartSize,
     editionCount: familyEditions.length,
-    accentColor: FAMILY_ACCENT[family.id] ?? "var(--wk-brand)",
-    icon: FAMILY_ICON[family.id] ?? "ri-bar-chart-line",
+    accentColor: FAMILY_ACCENT[publicSlug] ?? FAMILY_ACCENT[sourceFamilySlug] ?? "var(--wk-brand)",
+    icon: FAMILY_ICON[publicSlug] ?? FAMILY_ICON[sourceFamilySlug] ?? "ri-bar-chart-line",
     latestEditionSlug: latest?.slug,
     latestEditionLabel: latest?.label,
     latestEditionDate: latest?.date,
@@ -216,6 +275,8 @@ export function toChartEditionViewModel(
   const artists = new Set(entries.flatMap((e) => e.artistNames));
   const newEntries = entries.filter((e) => e.movement === "new").length;
   const reEntries = entries.filter((e) => e.movement === "re_entry").length;
+  const sourceFamilySlug = family.sourceFamilySlug ?? family.familyKey ?? family.id;
+  const publicSlug = familyPublicSlug(family);
 
   const longest = entries.reduce(
     (longest, e) => {
@@ -251,7 +312,7 @@ export function toChartEditionViewModel(
   const genreCounts: Record<string, number> = {};
   entries.forEach((e) => {
     const rich = e as ChartEditionEntry & { genre?: string };
-    const g = rich.genre ?? "Unknown";
+    const g = rich.genre ?? "Unclassified";
     genreCounts[g] = (genreCounts[g] || 0) + 1;
   });
   const topGenreEntry = Object.entries(genreCounts).sort((a, b) => b[1] - a[1])[0];
@@ -271,13 +332,24 @@ export function toChartEditionViewModel(
     newEntries,
     reEntries,
     methodology:
-      "Combined streaming data from Spotify, Apple Music, YouTube, and Boomplay. Radio airplay monitored across 12 African countries. Social engagement, playlist adds, and search volume weighted into final scores.",
+      `Methodology ${family.methodologyVersion ?? family.defaultScoringModel}: ranked from WAKILISHA chart source data with immutable edition partitioning and preserved source provenance.`,
+    methodologyVersion: family.methodologyVersion ?? family.defaultScoringModel,
+    eligibilityRulesVersion: family.eligibilityRulesVersion ?? family.defaultRuleset,
+    chartMode: family.chartMode ?? "data",
+    periodType: family.periodType ?? "weekly",
     biggestMover: biggestMover ?? undefined,
-    topGenre: topGenreEntry?.[0] ?? "Afrobeats",
+    topGenre: topGenreEntry?.[0] ?? undefined,
     topGenreCount: topGenreEntry?.[1] ?? 0,
     longestRunning: longest ?? undefined,
-    familySlug: family.slug ?? family.familyKey,
-    familyLabel: family.label,
+    familySlug: publicSlug,
+    familyLabel: family.publicLabel ?? family.label,
+    sourceFamilySlug,
+    seriesSlug: family.seriesSlug ?? publicSlug,
+    seriesLabel: family.seriesLabel ?? family.label,
+    marketSlug: family.marketSlug ?? "unspecified",
+    marketLabel: family.marketLabel ?? "Unspecified",
+    publicSlug,
+    publicLabel: family.publicLabel ?? family.label,
   };
 }
 
@@ -291,7 +363,7 @@ export function toChartDirectoryViewModel(
 ): ChartDirectoryViewModel {
   const familyVMs = families.map((f) => toChartFamilyViewModel(f, editions));
   const featuredFamily =
-    familyVMs.find((f) => f.slug === featuredFamilySlug) ?? familyVMs[0] ?? null;
+    familyVMs.find((f) => f.slug === featuredFamilySlug || f.sourceFamilySlug === featuredFamilySlug || f.legacySlugs.includes(featuredFamilySlug)) ?? familyVMs[0] ?? null;
 
   const topEntries = featuredEntries
     .slice(0, 5)
@@ -304,8 +376,10 @@ export function toChartDirectoryViewModel(
     featuredFamily && featuredEdition
       ? toChartEditionViewModel(
           featuredEdition,
-          families.find((f) => (f.slug ?? f.familyKey) === featuredFamilySlug) ??
-            families[0],
+          families.find((f) => {
+            const publicSlug = f.publicSlug ?? f.slug ?? f.familyKey;
+            return publicSlug === featuredFamily.slug || f.familyKey === featuredFamily.sourceFamilySlug || f.id === featuredFamily.sourceFamilySlug;
+          }) ?? families[0],
           featuredEntries
         )
       : null;
@@ -317,7 +391,7 @@ export function toChartDirectoryViewModel(
     topEntries,
     stats: {
       entries: featuredEntries.length,
-      series: families.length,
+      series: new Set(familyVMs.map((family) => family.seriesSlug)).size,
       editions: totalEditions,
       newThisWeek,
     },
@@ -358,9 +432,7 @@ export function toChartArchiveViewModel(
   };
 }
 
-export function toChartTrackPlayerModel(
-  entry: ChartEntryRowViewModel
-): ChartTrackPlayerModel {
+export function toChartTrackPlayerModel(entry: ChartEntryRowViewModel): ChartTrackPlayerModel {
   return {
     id: entry.slug,
     title: entry.title,
@@ -372,9 +444,7 @@ export function toChartTrackPlayerModel(
   };
 }
 
-export function toChartTrackPlayerModels(
-  entries: ChartEntryRowViewModel[]
-): ChartTrackPlayerModel[] {
+export function toChartTrackPlayerModels(entries: ChartEntryRowViewModel[]): ChartTrackPlayerModel[] {
   return entries.map(toChartTrackPlayerModel);
 }
 
@@ -385,9 +455,9 @@ export function toChartTrackHistoryViewModel(
     trackSlug: history.trackSlug,
     trackTitle: history.trackTitle,
     artistNames: history.artistNames,
-    appearances: history.appearances.map((a) => ({
-      ...a,
-      date: a.editionLabel,
+    appearances: history.appearances.map((appearance) => ({
+      ...appearance,
+      date: appearance.editionLabel,
     })),
     peakPosition: history.peakPosition,
     totalWeeksOnChart: history.totalWeeksOnChart,
@@ -395,10 +465,3 @@ export function toChartTrackHistoryViewModel(
     latestAppearance: history.latestAppearance,
   };
 }
-
-// ─── Re-export types for convenience ───
-export type {
-  ChartFamily,
-  ChartEdition,
-  ChartEditionEntry,
-} from "./types";
