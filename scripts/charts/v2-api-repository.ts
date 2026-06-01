@@ -2,11 +2,12 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 
-type Row = Record<string, unknown>;
+const root = process.cwd();
+const dataRoot = path.join(root, "public", "charts-data");
 
-type Entry = {
+export type Row = Record<string, unknown>;
+export type Entry = {
   id: string;
-  editionId: string;
   rank: number;
   previousRank: number | null;
   movement: string;
@@ -17,26 +18,7 @@ type Entry = {
   artworkUrl: string | null;
   score?: number;
 };
-
-type EntriesPayload = { entries: Entry[] };
-
-type InsertPlan = {
-  generatedAt: string;
-  migrationReadiness: "ready" | "ready_with_warnings" | "blocked";
-  counts: Record<string, number>;
-  inserts: {
-    series: Row[];
-    markets: Row[];
-    programs: Row[];
-    methodologies: Row[];
-    eligibilityRules: Row[];
-    editions: Row[];
-    sourceCoverage: Row[];
-    slugAliases: Row[];
-  };
-};
-
-type TracksIndex = Record<string, {
+export type TracksIndex = Record<string, {
   trackSlug: string;
   trackTitle: string;
   artistNames: string[];
@@ -59,7 +41,7 @@ export type V2ResolvedSlug = {
   canonicalized: boolean;
 };
 
-export type V2Repository = {
+export interface V2Repository {
   kind: "json-local" | "database";
   getCounts(): Record<string, number>;
   getMigrationReadiness(): string;
@@ -76,116 +58,141 @@ export type V2Repository = {
   getMethodology(methodologyVersion: string): Promise<Row | null>;
   getEligibilityRules(eligibilityVersion: string): Promise<Row | null>;
   getTrackHistory(trackSlug: string): Promise<TracksIndex[string] | null>;
-};
-
-const root = process.cwd();
-const reportsDir = path.join(root, "reports");
-const chartsDir = path.join(root, "public/charts-data");
-const defaultPlanPath = path.join(reportsDir, "chart-v2-insert-plan.json");
-const tracksPath = path.join(chartsDir, "tracks.json");
-
-function readJson<T>(filePath: string): T {
-  if (!fs.existsSync(filePath)) throw new Error(`Missing required file: ${filePath}`);
-  return JSON.parse(fs.readFileSync(filePath, "utf8")) as T;
 }
 
-function str(row: Row | undefined | null, key: string): string {
+function readJson<T>(filepath: string): T {
+  return JSON.parse(fs.readFileSync(filepath, "utf8")) as T;
+}
+
+export function str(row: Row | undefined | null, key: string): string {
   return String(row?.[key] ?? "");
 }
 
-function sqlLiteral(value: unknown): string {
-  if (value === null || value === undefined) return "NULL";
-  return `'${String(value).replace(/'/g, "''")}'`;
-}
-
 export function programId(program: Row): string {
-  return String(program.id);
+  return str(program, "id");
 }
 
-export function sourceFamilySlug(program: Row): string {
-  return String(program.source_family_slug ?? program.public_slug);
+function sqlLiteral(value: string): string {
+  return `'${value.replace(/'/g, "''")}'`;
 }
 
-export class JsonV2Repository implements V2Repository {
+class JsonV2Repository implements V2Repository {
   kind = "json-local" as const;
-  private plan: InsertPlan;
-  private tracksIndex: TracksIndex;
-  private seriesBySlug: Map<string, Row>;
-  private marketBySlug: Map<string, Row>;
-  private methodologiesByVersion: Map<string, Row>;
-  private eligibilityByVersion: Map<string, Row>;
-  private coverageByEdition: Map<string, Row[]>;
-  private aliasToCanonical: Map<string, string>;
+  private manifest = readJson<Record<string, unknown>>(path.join(dataRoot, "manifest.json"));
+  private families = readJson<Row[]>(path.join(dataRoot, "families.json"));
+  private editions = readJson<Row[]>(path.join(dataRoot, "editions.json"));
+  private tracksIndex = readJson<TracksIndex>(path.join(dataRoot, "tracks.json"));
+  private seriesBySlug = new Map<string, Row>();
+  private marketsBySlug = new Map<string, Row>();
+  private methodologiesByVersion = new Map<string, Row>();
+  private eligibilityByVersion = new Map<string, Row>();
 
-  constructor(planPath = defaultPlanPath) {
-    this.plan = readJson<InsertPlan>(planPath);
-    this.tracksIndex = fs.existsSync(tracksPath) ? readJson<TracksIndex>(tracksPath) : {};
-    this.seriesBySlug = new Map(this.plan.inserts.series.map((row) => [String(row.series_slug), row]));
-    this.marketBySlug = new Map(this.plan.inserts.markets.map((row) => [String(row.market_slug), row]));
-    this.methodologiesByVersion = new Map(this.plan.inserts.methodologies.map((row) => [String(row.methodology_version), row]));
-    this.eligibilityByVersion = new Map(this.plan.inserts.eligibilityRules.map((row) => [String(row.eligibility_version), row]));
-    this.coverageByEdition = new Map();
-    for (const row of this.plan.inserts.sourceCoverage) {
-      const editionId = String(row.edition_id);
-      const list = this.coverageByEdition.get(editionId) ?? [];
-      list.push(row);
-      this.coverageByEdition.set(editionId, list);
-    }
-    this.aliasToCanonical = new Map();
-    for (const alias of this.plan.inserts.slugAliases) {
-      if (alias.redirect_status === "active") {
-        this.aliasToCanonical.set(String(alias.legacy_slug), String(alias.canonical_slug));
-      }
+  constructor() {
+    for (const family of this.families) {
+      this.seriesBySlug.set(str(family, "seriesSlug"), {
+        id: str(family, "seriesSlug"),
+        series_slug: str(family, "seriesSlug"),
+        series_label: str(family, "seriesLabel"),
+      });
+      this.marketsBySlug.set(str(family, "marketSlug"), {
+        id: str(family, "marketSlug"),
+        market_slug: str(family, "marketSlug"),
+        market_label: str(family, "marketLabel"),
+      });
+      this.methodologiesByVersion.set(str(family, "methodologyVersion"), {
+        id: str(family, "methodologyVersion"),
+        methodology_version: str(family, "methodologyVersion"),
+      });
+      this.eligibilityByVersion.set(str(family, "eligibilityRulesVersion"), {
+        id: str(family, "eligibilityRulesVersion"),
+        eligibility_version: str(family, "eligibilityRulesVersion"),
+      });
     }
   }
 
-  getCounts() {
-    return this.plan.counts;
+  getCounts(): Record<string, number> {
+    return (this.manifest.totals as Record<string, number> | undefined) ?? {};
   }
 
-  getMigrationReadiness() {
-    return this.plan.migrationReadiness;
+  getMigrationReadiness(): string {
+    return "ready_with_warnings";
   }
 
   async resolveProgramSlug(slug: string): Promise<V2ResolvedSlug> {
-    const canonicalSlug = this.aliasToCanonical.get(slug) ?? slug;
+    const family = this.families.find((row) =>
+      str(row, "publicSlug") === slug ||
+      str(row, "sourceFamilySlug") === slug ||
+      (Array.isArray(row.legacySlugs) && (row.legacySlugs as string[]).includes(slug))
+    );
+    const canonicalSlug = family ? str(family, "publicSlug") : slug;
     return { requestedSlug: slug, canonicalSlug, canonicalized: canonicalSlug !== slug };
   }
 
   async listPrograms(): Promise<Row[]> {
-    return this.plan.inserts.programs;
+    return this.families.map((family) => ({
+      id: str(family, "publicSlug"),
+      series_slug: str(family, "seriesSlug"),
+      market_slug: str(family, "marketSlug"),
+      public_slug: str(family, "publicSlug"),
+      public_label: str(family, "publicLabel"),
+      short_label: str(family, "shortLabel"),
+      source_family_slug: str(family, "sourceFamilySlug"),
+      default_period_type: str(family, "periodType"),
+      default_methodology_version: str(family, "methodologyVersion"),
+      default_eligibility_rules_version: str(family, "eligibilityRulesVersion"),
+    }));
   }
 
   async getProgram(slug: string): Promise<Row | null> {
     const { canonicalSlug } = await this.resolveProgramSlug(slug);
-    return this.plan.inserts.programs.find((program) => program.public_slug === canonicalSlug) ?? null;
+    return (await this.listPrograms()).find((row) => str(row, "public_slug") === canonicalSlug) ?? null;
   }
 
   async listEditionsForProgram(program: Row): Promise<Row[]> {
-    return this.plan.inserts.editions
-      .filter((edition) => edition.program_id === programId(program))
-      .slice()
-      .sort((a, b) => Date.parse(str(b, "edition_date")) - Date.parse(str(a, "edition_date")));
+    const sourceSlug = str(program, "source_family_slug") || str(program, "public_slug");
+    return this.editions
+      .filter((edition) => str(edition, "familyId") === sourceSlug || str(edition, "familyId") === str(program, "public_slug"))
+      .map((edition) => ({
+        id: str(edition, "id"),
+        program_id: programId(program),
+        edition_slug: str(edition, "slug"),
+        edition_label: str(edition, "label"),
+        edition_date: str(edition, "date"),
+        period_start: str(edition, "periodStart"),
+        period_end: str(edition, "periodEnd"),
+        entry_count: Number(edition.entryCount ?? 0),
+      }))
+      .sort((a, b) => str(b, "edition_date").localeCompare(str(a, "edition_date")) || str(b, "edition_slug").localeCompare(str(a, "edition_slug")));
   }
 
   async getLatestNonEmptyEdition(program: Row): Promise<Row | null> {
-    const editions = await this.listEditionsForProgram(program);
-    return editions.find((edition) => Number(edition.entry_count ?? 0) > 0) ?? null;
+    return (await this.listEditionsForProgram(program)).find((edition) => Number(edition.entry_count ?? 0) > 0) ?? null;
   }
 
   async getEdition(program: Row, editionSlug: string): Promise<Row | null> {
-    const editions = await this.listEditionsForProgram(program);
-    return editions.find((edition) => edition.edition_slug === editionSlug) ?? null;
+    return (await this.listEditionsForProgram(program)).find((edition) => str(edition, "edition_slug") === editionSlug) ?? null;
   }
 
   async listEntries(program: Row, editionSlug: string): Promise<Entry[]> {
-    const filePath = path.join(chartsDir, "entries", sourceFamilySlug(program), `${editionSlug}.json`);
-    if (!fs.existsSync(filePath)) return [];
-    return (readJson<EntriesPayload>(filePath).entries ?? []).slice().sort((a, b) => a.rank - b.rank);
+    const entriesPath = path.join(dataRoot, "entries", str(program, "source_family_slug") || str(program, "public_slug"), `${editionSlug}.json`);
+    if (!fs.existsSync(entriesPath)) return [];
+    const entries = readJson<Row[]>(entriesPath);
+    return entries.map((entry) => ({
+      id: str(entry, "id"),
+      rank: Number(entry.rank ?? 0),
+      previousRank: entry.previousRank === null || entry.previousRank === undefined ? null : Number(entry.previousRank),
+      movement: str(entry, "movement"),
+      trackSlug: str(entry, "trackSlug") || null,
+      trackTitle: str(entry, "trackTitle"),
+      artistSlugs: Array.isArray(entry.artistSlugs) ? entry.artistSlugs as string[] : [],
+      artistNames: Array.isArray(entry.artistNames) ? entry.artistNames as string[] : [],
+      artworkUrl: str(entry, "artworkUrl") || null,
+      score: typeof entry.score === "number" ? entry.score : 0,
+    }));
   }
 
-  async listSourceCoverage(editionId: string): Promise<Row[]> {
-    return this.coverageByEdition.get(editionId) ?? [];
+  async listSourceCoverage(): Promise<Row[]> {
+    return [];
   }
 
   async getSeries(seriesSlug: string): Promise<Row | null> {
@@ -193,7 +200,7 @@ export class JsonV2Repository implements V2Repository {
   }
 
   async getMarket(marketSlug: string): Promise<Row | null> {
-    return this.marketBySlug.get(marketSlug) ?? null;
+    return this.marketsBySlug.get(marketSlug) ?? null;
   }
 
   async getMethodology(methodologyVersion: string): Promise<Row | null> {
@@ -270,12 +277,47 @@ export class DatabaseV2Repository implements V2Repository {
   }
 
   async listPrograms(): Promise<Row[]> {
-    return this.queryJson<Row[]>(`SELECT * FROM wk_chart_programs_v2 ORDER BY public_slug ASC`);
+    return this.queryJson<Row[]>(`
+      SELECT
+        p.*,
+        s.series_label,
+        m.market_label,
+        COALESCE((
+          SELECT json_agg(edition_row ORDER BY edition_row.edition_date DESC, edition_row.edition_slug DESC)
+          FROM (
+            SELECT
+              e.id,
+              e.edition_slug,
+              e.edition_label,
+              e.edition_date,
+              e.period_start,
+              e.period_end,
+              e.entry_count
+            FROM wk_chart_editions_v2 e
+            WHERE e.program_id = p.id
+              AND e.entry_count > 0
+          ) edition_row
+        ), '[]'::json) AS archive_json
+      FROM wk_chart_programs_v2 p
+      LEFT JOIN wk_chart_series_v2 s ON s.series_slug = p.series_slug
+      LEFT JOIN wk_chart_markets_v2 m ON m.market_slug = p.market_slug
+      ORDER BY p.public_slug ASC
+    `);
   }
 
   async getProgram(slug: string): Promise<Row | null> {
     const { canonicalSlug } = await this.resolveProgramSlug(slug);
-    return this.first(`SELECT * FROM wk_chart_programs_v2 WHERE public_slug = ${sqlLiteral(canonicalSlug)} LIMIT 1`);
+    return this.first(`
+      SELECT
+        p.*,
+        s.series_label,
+        m.market_label
+      FROM wk_chart_programs_v2 p
+      LEFT JOIN wk_chart_series_v2 s ON s.series_slug = p.series_slug
+      LEFT JOIN wk_chart_markets_v2 m ON m.market_slug = p.market_slug
+      WHERE p.public_slug = ${sqlLiteral(canonicalSlug)}
+      LIMIT 1
+    `);
   }
 
   async listEditionsForProgram(program: Row): Promise<Row[]> {
