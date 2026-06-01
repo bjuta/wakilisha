@@ -202,6 +202,18 @@ const server = http.createServer((req, res) => {
   void route(req, res);
 });
 
+server.on("error", (err: NodeJS.ErrnoException) => {
+  if (err.code === "EADDRINUSE") {
+    console.error(`WAKILISHA Chart V2 local API could not start: port ${port} is already in use.`);
+    console.error(`Stop the existing server with: fuser -k ${port}/tcp`);
+    console.error(`Or run on another port: WAKILISHA_V2_API_PORT=${port + 1} npm run charts:v2-local-api`);
+    process.exitCode = 1;
+    return;
+  }
+  console.error("WAKILISHA Chart V2 local API failed to start:", err);
+  process.exitCode = 1;
+});
+
 server.listen(port, () => {
   console.log(`WAKILISHA Chart V2 local read-only API listening on http://localhost:${port}/wp-json/wakilisha/v2`);
   console.log(`Repository mode: ${repo.kind}`);
