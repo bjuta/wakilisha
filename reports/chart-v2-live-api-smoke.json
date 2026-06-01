@@ -1,0 +1,21 @@
+{
+  "generatedAt": "2026-06-01T10:33:46.258Z",
+  "mode": "no-network-skipped",
+  "liveBase": null,
+  "timeoutMs": 30000,
+  "fixtureSource": "reports/chart-v2-api-fixtures.json",
+  "summary": {
+    "pass": 0,
+    "fail": 0,
+    "warning": 0,
+    "skipped": 1
+  },
+  "checks": [
+    {
+      "id": "LIVE-000",
+      "status": "skipped",
+      "title": "Live V2 API smoke test skipped",
+      "detail": "Set WAKILISHA_V2_LIVE_API_SMOKE=1 and WAKILISHA_V2_LIVE_API_BASE=https://example.com/wp-json/wakilisha/v2 to run live checks."
+    }
+  ]
+}
