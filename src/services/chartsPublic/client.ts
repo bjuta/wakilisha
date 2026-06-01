@@ -27,12 +27,12 @@ import {
 } from "./mockData";
 
 import {
-  CSV_PUBLIC_CHART_DATA,
   hasCsvPublicChartData,
   getCsvEntriesForEdition,
   getCsvLatestEdition,
   getCsvEdition,
   getCsvFamily,
+  getCsvFamilies,
   getCsvEditionsForFamily,
   getCsvTrackHistory,
 } from "./csvData";
@@ -95,8 +95,8 @@ function wpMeta(): ChartFetchMeta {
   return { source: "wordpress", fetchedAt: now(), isStale: false };
 }
 
-function useCsvPublicData() {
-  return isMock() && hasCsvPublicChartData();
+async function useCsvPublicData(): Promise<boolean> {
+  return isMock() && (await hasCsvPublicChartData());
 }
 
 /**
@@ -133,7 +133,11 @@ async function withCache<T>(
 export function getChartFamilies(): Promise<ChartResult<ChartFamily[]>> {
   return withCache("chart_families", async () => {
     if (isMock()) {
-      return { data: useCsvPublicData() ? [...CSV_PUBLIC_CHART_DATA.families] : [...MOCK_FAMILIES], source: "mock" };
+      const csvData = await useCsvPublicData();
+      return {
+        data: csvData ? await getCsvFamilies() : [...MOCK_FAMILIES],
+        source: "mock",
+      };
     }
     const res = await publicWpGet<{ families: unknown[] }>("/charts");
     return {
@@ -148,7 +152,8 @@ export function getChartFamily(
 ): Promise<ChartResult<ChartFamily | null>> {
   return withCache(`chart_family_${familySlug}`, async () => {
     if (isMock()) {
-      const family = useCsvPublicData() ? getCsvFamily(familySlug) : getMockFamily(familySlug);
+      const csvData = await useCsvPublicData();
+      const family = csvData ? await getCsvFamily(familySlug) : getMockFamily(familySlug);
       return { data: family ? { ...family } : null, source: "mock" };
     }
     const res = await publicWpGet<{ family: unknown }>(`/charts/${familySlug}`);
@@ -164,7 +169,11 @@ export function getChartEditionsForFamily(
 ): Promise<ChartResult<ChartEdition[]>> {
   return withCache(`chart_family_editions_${familySlug}`, async () => {
     if (isMock()) {
-      return { data: useCsvPublicData() ? getCsvEditionsForFamily(familySlug) : getMockEditionsForFamily(familySlug), source: "mock" };
+      const csvData = await useCsvPublicData();
+      return {
+        data: csvData ? await getCsvEditionsForFamily(familySlug) : getMockEditionsForFamily(familySlug),
+        source: "mock",
+      };
     }
     const res = await publicWpGet<{ editions: unknown[] }>(
       `/charts/${familySlug}/editions`
@@ -181,7 +190,8 @@ export function getLatestChartEdition(
 ): Promise<ChartResult<ChartEdition | null>> {
   return withCache(`chart_latest_${familySlug}`, async () => {
     if (isMock()) {
-      const edition = useCsvPublicData() ? getCsvLatestEdition(familySlug) : getMockLatestEdition(familySlug);
+      const csvData = await useCsvPublicData();
+      const edition = csvData ? await getCsvLatestEdition(familySlug) : getMockLatestEdition(familySlug);
       return { data: edition ? { ...edition } : null, source: "mock" };
     }
     const res = await publicWpGet<{ edition: unknown }>(
@@ -202,7 +212,8 @@ export function getChartEdition(
     `chart_edition_${familySlug}_${editionSlug}`,
     async () => {
       if (isMock()) {
-        const edition = useCsvPublicData() ? getCsvEdition(familySlug, editionSlug) : getMockEdition(familySlug, editionSlug);
+        const csvData = await useCsvPublicData();
+        const edition = csvData ? await getCsvEdition(familySlug, editionSlug) : getMockEdition(familySlug, editionSlug);
         return { data: edition ? { ...edition } : null, source: "mock" };
       }
       const res = await publicWpGet<{ edition: unknown }>(
@@ -224,8 +235,11 @@ export function getChartEditionEntries(
     `chart_entries_${familySlug}_${editionSlug}`,
     async () => {
       if (isMock()) {
+        const csvData = await useCsvPublicData();
         return {
-          data: useCsvPublicData() ? getCsvEntriesForEdition(familySlug, editionSlug) : getMockEntriesForEdition(familySlug, editionSlug),
+          data: csvData
+            ? await getCsvEntriesForEdition(familySlug, editionSlug)
+            : getMockEntriesForEdition(familySlug, editionSlug),
           source: "mock",
         };
       }
@@ -245,7 +259,8 @@ export function getTrackChartHistory(
 ): Promise<ChartResult<TrackChartHistory | null>> {
   return withCache(`track_history_${trackSlug}`, async () => {
     if (isMock()) {
-      const csvHistory = useCsvPublicData() ? getCsvTrackHistory(trackSlug) : null;
+      const csvData = await useCsvPublicData();
+      const csvHistory = csvData ? await getCsvTrackHistory(trackSlug) : null;
       if (csvHistory) return { data: csvHistory, source: "mock" };
       if (trackSlug === "midnight-dreams") {
         return { data: { ...MOCK_TRACK_HISTORY }, source: "mock" };
@@ -274,9 +289,8 @@ export function getTrackChartHistory(
   });
 }
 
-// ─── Re-export types ───
-export type { ChartFamily, ChartEdition, ChartEditionEntry, TrackChartHistory };
 export { clearChartCache };
+export type { ChartFamily, ChartEdition, ChartEditionEntry, TrackChartHistory };
 export {
   getMockEntriesForEdition,
   getMockLatestEdition,
@@ -290,6 +304,7 @@ export {
   getCsvLatestEdition,
   getCsvEdition,
   getCsvFamily,
+  getCsvFamilies,
   getCsvEditionsForFamily,
 } from "./csvData";
 export {

@@ -5,7 +5,7 @@ import type { ChartEdition, ChartEditionEntry, ChartFamily, TrackChartHistory } 
 
 const root = process.cwd();
 const rawDir = path.join(root, "data/supabase-imports/2026-05-30/raw");
-const outPath = path.join(root, "src/services/chartsPublic/csvData.ts");
+const outDir = path.join(root, "public/charts-data");
 
 function readCsv(filename: string): Record<string, string>[] {
   const filepath = path.join(rawDir, filename);
@@ -138,7 +138,7 @@ const editions: ChartEdition[] = editionPairs.map(({ edition, series }) => {
     id: editionId,
     familyId,
     slug: edition.slug || slugify(`${familyId}-${editionId}`),
-    label: edition.title || `${families.find((family) => family.id === familyId)?.label ?? familyId} · ${date || editionId}`,
+    label: edition.title || `${families.find((family) => family.id === familyId)?.label ?? familyId} \u00b7 ${date || editionId}`,
     date,
     periodStart: date,
     periodEnd: date,
@@ -172,9 +172,13 @@ for (const entry of entryRows) {
   weeksByTrack.set(trackKey, (weeksByTrack.get(trackKey) ?? 0) + 1);
 }
 
+// Build entries per edition
 const entries: ChartEditionEntry[] = [];
+const entriesPerEdition = new Map<string, ChartEditionEntry[]>();
+
 for (const edition of editions) {
   const rows = (entriesByEdition.get(edition.id) ?? []).slice().sort((a, b) => (numberOrNull(a.position) ?? 9999) - (numberOrNull(b.position) ?? 9999));
+  const editionEntries: ChartEditionEntry[] = [];
 
   rows.forEach((row, index) => {
     const rank = numberOrNull(row.position) ?? index + 1;
@@ -188,7 +192,7 @@ for (const edition of editions) {
     const sourcePayload = row.source_payload || track?.platform_links || "";
     const movement: ChartEditionEntry["movement"] = previousRank == null || previousRank <= 0 ? "new" : previousRank > rank ? "up" : previousRank < rank ? "down" : "same";
 
-    entries.push({
+    const entry: ChartEditionEntry = {
       id: row.id || `${edition.id}::${String(rank).padStart(3, "0")}::${trackSlug}`,
       editionId: edition.id,
       rank,
@@ -222,21 +226,176 @@ for (const edition of editions) {
       isPlayable: Boolean(previewUrl || sourcePayload),
       duration: numberOrNull(row.duration || track?.duration) ?? undefined,
       movementAmount: previousRank ? Math.abs(previousRank - rank) : 0,
-    });
+    };
+
+    editionEntries.push(entry);
+    entries.push(entry);
   });
+
+  entriesPerEdition.set(edition.id, editionEntries);
 }
 
-const payload = {
+// Build track history index
+const trackAppearances = new Map<string, ChartEditionEntry[]>();
+for (const entry of entries) {
+  const list = trackAppearances.get(entry.trackSlug) ?? [];
+  list.push(entry);
+  trackAppearances.set(entry.trackSlug, list);
+}
+
+const tracks: Record<string, TrackChartHistory> = {};
+for (const [trackSlug, appearances] of trackAppearances) {
+  const sorted = appearances.slice().sort((a, b) => {
+    const editionA = editions.find((edition) => edition.id === a.editionId);
+    const editionB = editions.find((edition) => edition.id === b.editionId);
+    return new Date(editionB?.date ?? 0).getTime() - new Date(editionA?.date ?? 0).getTime();
+  });
+
+  const first = sorted[sorted.length - 1];
+  const latest = sorted[0];
+  const firstEdition = editions.find((edition) => edition.id === first.editionId);
+  const latestEdition = editions.find((edition) => edition.id === latest.editionId);
+
+  tracks[trackSlug] = {
+    trackSlug,
+    trackTitle: latest.trackTitle,
+    artistNames: latest.artistNames,
+    appearances: sorted.map((entry) => {
+      const edition = editions.find((item) => item.id === entry.editionId);
+      return {
+        editionSlug: edition?.slug ?? entry.editionId,
+        editionLabel: edition?.label ?? entry.editionId,
+        rank: entry.rank,
+        weeksOnChart: entry.weeksOnChart ?? 0,
+        movement: entry.movement,
+      };
+    }),
+    peakPosition: Math.min(...sorted.map((entry) => entry.rank)),
+    totalWeeksOnChart: Math.max(...sorted.map((entry) => entry.weeksOnChart ?? 0)),
+    firstAppearance: firstEdition?.date ?? null,
+    latestAppearance: latestEdition?.date ?? null,
+  };
+}
+
+// Ensure output directory exists
+fs.mkdirSync(outDir, { recursive: true });
+
+// Write manifest
+const manifest = {
   generatedAt: new Date().toISOString(),
   sourceFiles: ["wk_chart_series.csv", "wk_chart_editions.csv", "wk_chart_entries.csv", "wk_tracks.csv"],
-  families,
-  editions,
-  entries,
+  totalFamilies: families.length,
+  totalEditions: editions.length,
+  totalEntries: entries.length,
 };
 
-const source = `import type { ChartEdition, ChartEditionEntry, ChartFamily, TrackChartHistory } from "./types";\n\nexport type CsvPublicChartData = {\n  generatedAt: string | null;\n  sourceFiles: string[];\n  families: ChartFamily[];\n  editions: ChartEdition[];\n  entries: ChartEditionEntry[];\n};\n\nexport const CSV_PUBLIC_CHART_DATA: CsvPublicChartData = ${JSON.stringify(payload, null, 2)};\n\nexport function hasCsvPublicChartData() {\n  return CSV_PUBLIC_CHART_DATA.families.length > 0 && CSV_PUBLIC_CHART_DATA.editions.length > 0 && CSV_PUBLIC_CHART_DATA.entries.length > 0;\n}\n\nexport function getCsvFamily(familySlug: string): ChartFamily | null {\n  return CSV_PUBLIC_CHART_DATA.families.find((family) => family.slug === familySlug || family.familyKey === familySlug || family.id === familySlug) ?? null;\n}\n\nexport function getCsvEditionsForFamily(familySlug: string): ChartEdition[] {\n  const family = getCsvFamily(familySlug);\n  if (!family) return [];\n  return CSV_PUBLIC_CHART_DATA.editions.filter((edition) => edition.familyId === family.id).slice().sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime() || b.label.localeCompare(a.label));\n}\n\nexport function getCsvLatestEdition(familySlug: string): ChartEdition | null {\n  return getCsvEditionsForFamily(familySlug)[0] ?? null;\n}\n\nexport function getCsvEdition(familySlug: string, editionSlug: string): ChartEdition | null {\n  const family = getCsvFamily(familySlug);\n  if (!family) return null;\n  return CSV_PUBLIC_CHART_DATA.editions.find((edition) => edition.familyId === family.id && (edition.slug === editionSlug || edition.id === editionSlug)) ?? null;\n}\n\nexport function getCsvEntriesForEdition(familySlug: string, editionSlug: string): ChartEditionEntry[] {\n  const edition = getCsvEdition(familySlug, editionSlug);\n  if (!edition) return [];\n  return CSV_PUBLIC_CHART_DATA.entries.filter((entry) => entry.editionId === edition.id).slice().sort((a, b) => a.rank - b.rank);\n}\n\nexport function getCsvTrackHistory(trackSlug: string): TrackChartHistory | null {\n  const appearances = CSV_PUBLIC_CHART_DATA.entries.filter((entry) => entry.trackSlug === trackSlug);\n  if (!appearances.length) return null;\n  const sorted = appearances.slice().sort((a, b) => {\n    const editionA = CSV_PUBLIC_CHART_DATA.editions.find((edition) => edition.id === a.editionId);\n    const editionB = CSV_PUBLIC_CHART_DATA.editions.find((edition) => edition.id === b.editionId);\n    return new Date(editionB?.date ?? 0).getTime() - new Date(editionA?.date ?? 0).getTime();\n  });\n  const first = sorted[sorted.length - 1];\n  const latest = sorted[0];\n  const firstEdition = CSV_PUBLIC_CHART_DATA.editions.find((edition) => edition.id === first.editionId);\n  const latestEdition = CSV_PUBLIC_CHART_DATA.editions.find((edition) => edition.id === latest.editionId);\n  return {\n    trackSlug,\n    trackTitle: latest.trackTitle,\n    artistNames: latest.artistNames,\n    appearances: sorted.map((entry) => {\n      const edition = CSV_PUBLIC_CHART_DATA.editions.find((item) => item.id === entry.editionId);\n      return { editionSlug: edition?.slug ?? entry.editionId, editionLabel: edition?.label ?? entry.editionId, rank: entry.rank, weeksOnChart: entry.weeksOnChart ?? 0, movement: entry.movement };\n    }),\n    peakPosition: Math.min(...sorted.map((entry) => entry.rank)),\n    totalWeeksOnChart: Math.max(...sorted.map((entry) => entry.weeksOnChart ?? 0)),\n    firstAppearance: firstEdition?.date ?? null,\n    latestAppearance: latestEdition?.date ?? null,\n  };\n}\n`;
+fs.writeFileSync(path.join(outDir, "manifest.json"), JSON.stringify(manifest, null, 2));
 
-fs.writeFileSync(outPath, source);
-console.log(`Generated ${outPath}`);
-console.log(`Families: ${families.length}, editions: ${editions.length}, entries: ${entries.length}`);
-console.log(`Source rows: series=${seriesRows.length}, editions=${editionRows.length}, dedupedEditions=${editions.length}, duplicateEditions=${duplicateEditionCount}, entries=${entryRows.length}, tracks=${trackRows.length}`);
+// Write families
+fs.writeFileSync(path.join(outDir, "families.json"), JSON.stringify({ families }, null, 2));
+
+// Write editions
+fs.writeFileSync(path.join(outDir, "editions.json"), JSON.stringify({ editions }, null, 2));
+
+// Write per-edition entries
+let entriesFileCount = 0;
+let totalEntriesWritten = 0;
+
+for (const edition of editions) {
+  const family = families.find((f) => f.id === edition.familyId);
+  if (!family) continue;
+
+  const familySlug = family.slug || family.id;
+  const editionSlug = edition.slug;
+  const editionEntries = entriesPerEdition.get(edition.id) ?? [];
+
+  const editionDir = path.join(outDir, "entries", familySlug);
+  fs.mkdirSync(editionDir, { recursive: true });
+
+  const filePath = path.join(editionDir, `${editionSlug}.json`);
+  fs.writeFileSync(filePath, JSON.stringify({ entries: editionEntries }, null, 2));
+  entriesFileCount += 1;
+  totalEntriesWritten += editionEntries.length;
+}
+
+// Write tracks index
+fs.writeFileSync(path.join(outDir, "tracks.json"), JSON.stringify(tracks, null, 2));
+
+// Print summary
+function formatBytes(bytes: number) {
+  if (bytes === 0) return "0 B";
+  const k = 1024;
+  const sizes = ["B", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${parseFloat((bytes / k ** i).toFixed(2))} ${sizes[i]}`;
+}
+
+function getFileSize(filepath: string) {
+  try {
+    return fs.statSync(filepath).size;
+  } catch {
+    return 0;
+  }
+}
+
+const files = fs.readdirSync(outDir, { recursive: true, withFileTypes: true });
+let maxFileSize = 0;
+let maxFileName = "";
+let totalSize = 0;
+
+for (const file of files) {
+  if (file.isFile()) {
+    const filePath = path.join(file.path || outDir, file.name);
+    const size = getFileSize(filePath);
+    totalSize += size;
+    if (size > maxFileSize) {
+      maxFileSize = size;
+      maxFileName = file.name;
+    }
+  }
+}
+
+console.log("\n=== WAKILISHA Charts JSON Generator ===");
+console.log(`Families: ${families.length}`);
+console.log(`Editions: ${editions.length} (deduped from ${rawEditionPairs.length}, duplicates removed: ${duplicateEditionCount})`);
+console.log(`Entries: ${entries.length} (written to ${entriesFileCount} edition files)`);
+console.log(`Unique tracks: ${Object.keys(tracks).length}`);
+console.log(`\nOutput directory: ${outDir}`);
+console.log(`Total size: ${formatBytes(totalSize)}`);
+console.log(`Largest file: ${maxFileName} (${formatBytes(maxFileSize)})`);
+console.log(`\nPASS: All files written successfully.`);
+
+// Validate no file exceeds 100MB
+const MAX_FILE_SIZE = 100 * 1024 * 1024;
+if (maxFileSize > MAX_FILE_SIZE) {
+  console.error(`\nERROR: File ${maxFileName} exceeds ${formatBytes(MAX_FILE_SIZE)} GitHub limit`);
+  process.exit(1);
+}
+
+// Validate total entries match
+if (totalEntriesWritten !== entries.length) {
+  console.error(`\nERROR: Entry count mismatch: generated ${entries.length}, written ${totalEntriesWritten}`);
+  process.exit(1);
+}
+
+// Validate entries per edition
+let failedEditions = 0;
+for (const edition of editions) {
+  const family = families.find((f) => f.id === edition.familyId);
+  if (!family) continue;
+
+  const filePath = path.join(outDir, "entries", family.slug || family.id, `${edition.slug}.json`);
+  const data = JSON.parse(fs.readFileSync(filePath, "utf8")) as { entries: ChartEditionEntry[] };
+  const wrongIds = data.entries.filter((e) => e.editionId !== edition.id);
+  if (wrongIds.length > 0) {
+    console.error(`Edition ${edition.slug}: ${wrongIds.length} entries have wrong editionId`);
+    failedEditions += 1;
+  }
+}
+
+if (failedEditions > 0) {
+  console.error(`\nERROR: ${failedEditions} editions failed validation`);
+  process.exit(1);
+}
+
+console.log("\nAll validations passed.");

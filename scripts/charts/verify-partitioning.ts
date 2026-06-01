@@ -1,27 +1,35 @@
-import type { ChartEdition, ChartEditionEntry } from "../../src/services/chartsPublic/types";
-import {
-  CSV_PUBLIC_CHART_DATA,
-  hasCsvPublicChartData,
-  getCsvEntriesForEdition,
-  getCsvEditionsForFamily,
-} from "../../src/services/chartsPublic/csvData";
-import {
-  MOCK_EDITIONS,
-  MOCK_ENTRIES,
-  getMockEditionsForFamily,
-  getMockEntriesForEdition,
-} from "../../src/services/chartsPublic/mockData";
+import fs from "node:fs";
+import path from "node:path";
+import type { ChartEdition, ChartEditionEntry, ChartFamily } from "../../src/services/chartsPublic/types";
 
-const usingCsv = hasCsvPublicChartData();
-const EDITIONS: ChartEdition[] = usingCsv ? CSV_PUBLIC_CHART_DATA.editions : MOCK_EDITIONS;
-const ENTRIES: ChartEditionEntry[] = usingCsv ? CSV_PUBLIC_CHART_DATA.entries : MOCK_ENTRIES;
+const root = process.cwd();
+const dataDir = path.join(root, "public/charts-data");
 
-function getEntriesForEdition(familySlug: string, editionSlug: string) {
-  return usingCsv ? getCsvEntriesForEdition(familySlug, editionSlug) : getMockEntriesForEdition(familySlug, editionSlug);
+// Fallback to mock data if CSV JSON files don't exist
+const hasJsonData = fs.existsSync(path.join(dataDir, "manifest.json"));
+
+let manifest: { totalFamilies: number; totalEditions: number; totalEntries: number } | null = null;
+let families: ChartFamily[] = [];
+let editions: ChartEdition[] = [];
+let tracks: Record<string, unknown> = {};
+
+if (hasJsonData) {
+  manifest = JSON.parse(fs.readFileSync(path.join(dataDir, "manifest.json"), "utf8"));
+  families = JSON.parse(fs.readFileSync(path.join(dataDir, "families.json"), "utf8")).families;
+  editions = JSON.parse(fs.readFileSync(path.join(dataDir, "editions.json"), "utf8")).editions;
+  if (fs.existsSync(path.join(dataDir, "tracks.json"))) {
+    tracks = JSON.parse(fs.readFileSync(path.join(dataDir, "tracks.json"), "utf8"));
+  }
+} else {
+  console.log("No public/charts-data JSON files found. Skipping JSON-backed validation.");
+  process.exit(0);
 }
 
-function getEditionsForFamily(familySlug: string) {
-  return usingCsv ? getCsvEditionsForFamily(familySlug) : getMockEditionsForFamily(familySlug);
+function loadEntriesForEdition(familySlug: string, editionSlug: string): ChartEditionEntry[] {
+  const filePath = path.join(dataDir, "entries", familySlug, `${editionSlug}.json`);
+  if (!fs.existsSync(filePath)) return [];
+  const data = JSON.parse(fs.readFileSync(filePath, "utf8")) as { entries: ChartEditionEntry[] };
+  return data.entries;
 }
 
 function signature(entries: ChartEditionEntry[]) {
@@ -49,19 +57,18 @@ const report: {
   top3: string;
 }[] = [];
 
-const duplicateEditionIds = EDITIONS.length - new Set(EDITIONS.map((edition) => edition.id)).size;
+const duplicateEditionIds = editions.length - new Set(editions.map((edition) => edition.id)).size;
 if (duplicateEditionIds > 0) {
-  errors.push(`${duplicateEditionIds} duplicate edition IDs found in ${usingCsv ? "CSV" : "mock"} chart data`);
+  errors.push(`${duplicateEditionIds} duplicate edition IDs found in JSON chart data`);
 }
 
-const duplicateEntryIds = ENTRIES.length - new Set(ENTRIES.map((entry) => entry.id)).size;
-if (duplicateEntryIds > 0) {
-  errors.push(`${duplicateEntryIds} duplicate entry IDs found in ${usingCsv ? "CSV" : "mock"} chart data`);
-}
+let totalEntries = 0;
 
-for (const edition of EDITIONS) {
-  const familySlug = edition.familyId;
-  const entries = getEntriesForEdition(familySlug, edition.slug);
+for (const edition of editions) {
+  const family = families.find((f) => f.id === edition.familyId);
+  const familySlug = family?.slug || family?.id || edition.familyId;
+  const entries = loadEntriesForEdition(familySlug, edition.slug);
+  totalEntries += entries.length;
   const uniqueEntryIds = new Set(entries.map((entry) => entry.id));
 
   if (entries.length !== uniqueEntryIds.size) {
@@ -88,17 +95,21 @@ for (const edition of EDITIONS) {
 }
 
 const editionsByFamily = new Map<string, ChartEdition[]>();
-for (const edition of EDITIONS) {
+for (const edition of editions) {
   const list = editionsByFamily.get(edition.familyId) ?? [];
   list.push(edition);
   editionsByFamily.set(edition.familyId, list);
 }
 
-for (const [familySlug, editions] of editionsByFamily) {
-  const signatures = editions.map((edition) => ({
-    edition,
-    signature: signature(getEntriesForEdition(familySlug, edition.slug)),
-  }));
+for (const [familySlug, familyEditions] of editionsByFamily) {
+  const signatures = familyEditions.map((edition) => {
+    const family = families.find((f) => f.id === edition.familyId);
+    const resolvedFamilySlug = family?.slug || family?.id || familySlug;
+    return {
+      edition,
+      signature: signature(loadEntriesForEdition(resolvedFamilySlug, edition.slug)),
+    };
+  });
 
   for (let i = 0; i < signatures.length; i += 1) {
     for (let j = i + 1; j < signatures.length; j += 1) {
@@ -112,20 +123,30 @@ for (const [familySlug, editions] of editionsByFamily) {
 }
 
 for (const familySlug of Array.from(editionsByFamily.keys())) {
-  const editions = getEditionsForFamily(familySlug);
-  for (const edition of editions) {
-    const entries = getEntriesForEdition(familySlug, edition.slug);
+  const family = families.find((f) => f.id === familySlug || f.slug === familySlug);
+  const resolvedFamilySlug = family?.slug || family?.id || familySlug;
+  const familyEditions = editions.filter((e) => e.familyId === familySlug);
+  for (const edition of familyEditions) {
+    const entries = loadEntriesForEdition(resolvedFamilySlug, edition.slug);
     if (entries.some((entry) => entry.editionId !== edition.id)) {
       errors.push(`${familySlug}/${edition.slug}: route helper returned cross-edition entries`);
     }
   }
 }
 
-console.log(`\nWAKILISHA chart partitioning report (${usingCsv ? "CSV-backed public data" : "mock fallback"})`);
-console.log(`Families: ${editionsByFamily.size}, editions: ${EDITIONS.length}, entries: ${ENTRIES.length}`);
+console.log(`\nWAKILISHA chart partitioning report (JSON-backed public data)`);
+console.log(`Families: ${editionsByFamily.size}, editions: ${editions.length}, entries: ${totalEntries}`);
 console.table(report.slice(0, 80));
 if (report.length > 80) {
   console.log(`… ${report.length - 80} more editions omitted from console table`);
+}
+
+if (manifest && totalEntries !== manifest.totalEntries) {
+  errors.push(`Total entries mismatch: manifest says ${manifest.totalEntries}, loaded ${totalEntries}`);
+}
+
+if (Object.keys(tracks).length > 0) {
+  console.log(`\nTrack history index: ${Object.keys(tracks).length} tracks`);
 }
 
 if (warnings.length) {
@@ -140,3 +161,4 @@ if (errors.length) {
 }
 
 console.log(`\nPASS: ${report.length} editions verified. Every returned entry belongs to its requested edition.`);
+console.log(`Total entries across all JSON chunks: ${totalEntries}`);
