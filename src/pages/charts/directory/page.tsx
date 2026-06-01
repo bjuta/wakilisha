@@ -35,7 +35,7 @@ export default function ChartsDirectory() {
         return;
       }
       const featuredFamily = families[0];
-      const featuredSlug = featuredFamily.slug ?? featuredFamily.familyKey;
+      const featuredSlug = featuredFamily.publicSlug ?? featuredFamily.slug ?? featuredFamily.familyKey;
       const { data: edition, meta: editionMeta } = await getLatestChartEdition(featuredSlug);
       if (!edition) {
         setState({ status: "empty" });
@@ -257,9 +257,20 @@ export default function ChartsDirectory() {
                 </span>
               </div>
 
+              {/* Taxonomy-aware hero title */}
               <h1 className="text-[clamp(44px,6vw,84px)] font-black leading-[0.9] tracking-[-0.055em] text-[var(--wk-text)]">
-                {featured?.label ?? "Chart Universe"}
+                {featured?.publicLabel ?? featured?.label ?? "Chart Universe"}
               </h1>
+
+              {/* Metadata chips */}
+              {featured && (
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                  <TaxonomyChip label="Series" value={featured.seriesLabel} />
+                  <TaxonomyChip label="Market" value={featured.marketLabel} />
+                  <TaxonomyChip label="Mode" value={featured.chartMode === "data" ? "Data chart" : featured.chartMode === "editorial" ? "Editorial" : "Hybrid"} />
+                  <TaxonomyChip label="Period" value={featured.periodType === "weekly" ? "Weekly" : featured.periodType === "monthly" ? "Monthly" : featured.periodType === "yearly" ? "Yearly" : "Evergreen"} />
+                </div>
+              )}
 
               <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-[var(--wk-text-soft)]">
                 {featured?.description ?? "The definitive index of African music charts."}
@@ -400,13 +411,13 @@ export default function ChartsDirectory() {
         </div>
       </section>
 
-      {/* Chart series grid */}
+      {/* Chart family grid */}
       <section className="border-t border-[var(--wk-border)] bg-[var(--wk-surface)] mt-10">
         <div className="wk-container px-4 py-10 md:px-6 md:py-14">
           <div className="mb-8 flex items-end justify-between gap-4">
             <div>
-              <div className="wk-eyebrow mb-2">Chart series</div>
-              <h2 className="wk-h-section">Browse by series</h2>
+              <div className="wk-eyebrow mb-2">Chart families</div>
+              <h2 className="wk-h-section">Browse by chart</h2>
             </div>
             <span className="text-[13px] text-[var(--wk-text-muted)]">{data.families.length} active</span>
           </div>
@@ -431,12 +442,31 @@ export default function ChartsDirectory() {
                         <i className={`${series.icon} text-xl`} style={{ color: series.accentColor }} />
                       </div>
                       <div className="min-w-0">
-                        <div className="text-[16px] font-bold text-[var(--wk-text)]">{series.label}</div>
-                        <div className="text-[12px] text-[var(--wk-text-muted)]">{series.description}</div>
+                        {/* publicLabel as main title */}
+                        <div className="text-[16px] font-bold text-[var(--wk-text)]">{series.publicLabel}</div>
+                        {/* shortLabel as small badge if useful */}
+                        {series.shortLabel && series.shortLabel !== series.publicLabel && (
+                          <div className="text-[11px] text-[var(--wk-text-faint)]">{series.shortLabel}</div>
+                        )}
                       </div>
                     </div>
                     <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[var(--wk-brand)] bg-[var(--wk-brand-soft)]">
                       Active
+                    </span>
+                  </div>
+
+                  {/* Taxonomy metadata row */}
+                  <div className="mb-3 flex flex-wrap items-center gap-2">
+                    <span className="text-[11px] text-[var(--wk-text-muted)]">
+                      <span className="font-semibold text-[var(--wk-text)]">Series:</span> {series.seriesLabel}
+                    </span>
+                    <span className="text-[var(--wk-text-faint)]">·</span>
+                    <span className="text-[11px] text-[var(--wk-text-muted)]">
+                      <span className="font-semibold text-[var(--wk-text)]">Market:</span> {series.marketLabel}
+                    </span>
+                    <span className="text-[var(--wk-text-faint)]">·</span>
+                    <span className="text-[11px] text-[var(--wk-text-muted)]">
+                      <span className="font-semibold text-[var(--wk-text)]">Mode:</span> {series.chartMode === "data" ? "Data" : series.chartMode === "editorial" ? "Editorial" : "Hybrid"}
                     </span>
                   </div>
 
@@ -461,6 +491,12 @@ export default function ChartsDirectory() {
                       <span className="font-bold text-[var(--wk-text)]">Top {series.entryCount}</span>
                       <span className="text-[var(--wk-text-faint)]">·</span>
                       <span><span className="font-bold text-[var(--wk-text)]">{series.editionCount}</span> editions</span>
+                      {series.latestEditionDate && (
+                        <>
+                          <span className="text-[var(--wk-text-faint)]">·</span>
+                          <span>{series.latestEditionDate}</span>
+                        </>
+                      )}
                     </div>
                     <i className="ri-arrow-right-line text-[var(--wk-text-faint)] transition-colors group-hover:text-[var(--wk-brand)]" />
                   </div>
@@ -481,7 +517,7 @@ export default function ChartsDirectory() {
         </div>
         <div className="overflow-hidden rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)]">
           <div className="hidden grid-cols-[1.5fr_1.5fr_1fr_1fr] gap-3 px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-[var(--wk-text-faint)] border-b border-[var(--wk-divider)] md:grid">
-            <div>Series</div>
+            <div>Chart</div>
             <div>Edition</div>
             <div className="text-right">Entries</div>
             <div className="text-right">Date</div>
@@ -506,7 +542,8 @@ export default function ChartsDirectory() {
                       )}
                     </div>
                     <div>
-                      <div className="text-[13px] font-bold text-[var(--wk-text)]">{row.label}</div>
+                      {/* Show publicLabel, not raw label */}
+                      <div className="text-[13px] font-bold text-[var(--wk-text)]">{row.publicLabel}</div>
                       <div className="text-[11px] text-[var(--wk-text-muted)] md:hidden">{row.latestEditionLabel}</div>
                     </div>
                   </div>
@@ -571,6 +608,14 @@ export default function ChartsDirectory() {
         </div>
       </div>
     </div>
+  );
+}
+
+function TaxonomyChip({ label, value }: { label: string; value: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-1 text-[11px] text-[var(--wk-text-muted)]">
+      <span className="font-bold text-[var(--wk-text)]">{label}:</span> {value}
+    </span>
   );
 }
 

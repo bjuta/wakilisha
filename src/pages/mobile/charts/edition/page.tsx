@@ -35,6 +35,7 @@ export default function MobileChartEdition() {
   const [entries, setEntries] = useState<ChartEntryRowViewModel[]>([]);
   const [familyLabel, setFamilyLabel] = useState("WAKILISHA Charts");
   const [familySlug, setFamilySlug] = useState("");
+  const [publicSlug, setPublicSlug] = useState("");
   const [latestEditionSlug, setLatestEditionSlug] = useState<string | undefined>(undefined);
   const [archive, setArchive] = useState<ChartArchiveViewModel | null>(null);
   const [meta, setMeta] = useState<{ dataSource: "mock" | "wordpress" | "cache"; fetchedAt: string; isStale: boolean } | null>(null);
@@ -59,6 +60,7 @@ export default function MobileChartEdition() {
       }
       setFamilyLabel(family.label);
       setFamilySlug(series);
+      setPublicSlug(family.publicSlug ?? family.slug ?? series);
 
       let editionResult: Awaited<ReturnType<typeof getChartEdition>>;
       if (editionSlug) {
@@ -315,15 +317,28 @@ export default function MobileChartEdition() {
             <span className="w-5 h-px bg-[var(--wk-brand)]" />
             WAKILISHA charts
           </div>
+          {/* Taxonomy-aware title */}
           <h1
             className="font-black leading-[0.92] tracking-[-0.055em] text-[var(--wk-text)]"
-            style={{ fontSize: "clamp(32px, 10vw, 48px)" }}
+            style={{ fontSize: "clamp(28px, 9vw, 42px)" }}
           >
-            {familyLabel}
+            {edition.publicLabel ?? `${edition.seriesLabel} · ${edition.marketLabel}`}
           </h1>
-          <p className="mt-3 max-w-sm text-[14px] leading-relaxed text-[var(--wk-text-soft)]">
-            {edition.label}. The definitive ranking of African music.
+          <p className="mt-2 max-w-sm text-[14px] leading-relaxed text-[var(--wk-text-soft)]">
+            {edition.label}
           </p>
+          {/* Taxonomy chips */}
+          <div className="mt-3 flex flex-wrap gap-2">
+            <span className="rounded-full border border-[var(--wk-brand)]/30 bg-[var(--wk-brand)]/10 px-2.5 py-0.5 text-[10px] font-semibold text-[var(--wk-brand)]">
+              {edition.seriesLabel}
+            </span>
+            <span className="rounded-full border border-white/20 bg-white/10 px-2.5 py-0.5 text-[10px] font-semibold text-white/80">
+              {edition.marketLabel}
+            </span>
+            <span className="rounded-full border border-white/20 bg-white/10 px-2.5 py-0.5 text-[10px] text-white/70">
+              {edition.methodologyVersion}
+            </span>
+          </div>
           <div className="mt-5 flex flex-wrap gap-3">
             <button
               onClick={handlePlayTop10}
@@ -386,7 +401,7 @@ export default function MobileChartEdition() {
           <div className="flex gap-2 overflow-x-auto snap-x snap-mandatory scrollbar-none" style={{ scrollbarWidth: "none" }}>
             {archive.latest && (
               <Link
-                to={`/charts/${familySlug}/${archive.latest.slug}`}
+                to={`/charts/${publicSlug || familySlug}/${archive.latest.slug}`}
                 className={`flex-none snap-start rounded-xl border p-3 w-[140px] ${
                   archive.latest.slug === edition.slug
                     ? "border-[var(--wk-brand)] bg-[var(--wk-brand)]/5"
@@ -401,7 +416,7 @@ export default function MobileChartEdition() {
             {archive.previous.map((item) => (
               <Link
                 key={item.slug}
-                to={`/charts/${familySlug}/${item.slug}`}
+                to={`/charts/${publicSlug || familySlug}/${item.slug}`}
                 className={`flex-none snap-start rounded-xl border p-3 w-[140px] ${
                   item.slug === edition.slug
                     ? "border-[var(--wk-brand)] bg-[var(--wk-brand)]/5"

@@ -50,6 +50,7 @@ export default function ChartEdition() {
         entries: ChartEntryRowViewModel[];
         familyLabel: string;
         familySlug: string;
+        publicSlug: string;
         archive: ChartArchiveViewModel;
         meta: { dataSource: "mock" | "wordpress" | "cache"; fetchedAt: string; isStale: boolean };
       }
@@ -69,6 +70,8 @@ export default function ChartEdition() {
         setState({ status: "family_not_found" });
         return;
       }
+
+      const publicSlug = family.publicSlug ?? family.slug ?? family.familyKey;
 
       let editionResult: Awaited<ReturnType<typeof getChartEdition>>;
       let editionMeta: { source: "mock" | "wordpress" | "cache"; fetchedAt: string; isStale: boolean };
@@ -116,6 +119,7 @@ export default function ChartEdition() {
         entries,
         familyLabel: family.label,
         familySlug: series,
+        publicSlug,
         archive,
         meta: editionMeta,
       });
@@ -343,7 +347,7 @@ export default function ChartEdition() {
     );
   }
 
-  const { edition, entries, familyLabel, familySlug, archive, meta } = state;
+  const { edition, entries, familyLabel, publicSlug, archive, meta } = state;
   const topTrack = entries[0] ?? null;
   const top3 = entries.slice(0, 3);
   const rows = entries.slice(3);
@@ -382,10 +386,26 @@ export default function ChartEdition() {
               <div className="chart-edition-kicker">
                 <WkIcon name="BarChart3" size={14} /> {familyLabel}
               </div>
-              <h1 className="chart-edition-title">{edition.label}</h1>
+              {/* Show publicLabel as the main title */}
+              <h1 className="chart-edition-title">{edition.publicLabel}</h1>
               <p className="chart-edition-sub">
-                {edition.totalEntries} ranked positions, {edition.totalArtists} artists, {edition.newEntries} new entries. {edition.date} · {edition.weekNumber ? `Week ${edition.weekNumber}` : edition.label}.
+                {edition.label} · {edition.date}. {edition.totalEntries} ranked positions, {edition.totalArtists} artists, {edition.newEntries} new entries.
               </p>
+              {/* Taxonomy chips */}
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--wk-brand)]/20 bg-[var(--wk-brand)]/10 px-3 py-1 text-[11px] text-[var(--wk-brand)]">
+                  <span className="font-bold">Series:</span> {edition.seriesLabel}
+                </span>
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-1 text-[11px] text-[var(--wk-text-muted)]">
+                  <span className="font-bold text-[var(--wk-text)]">Market:</span> {edition.marketLabel}
+                </span>
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-1 text-[11px] text-[var(--wk-text-muted)]">
+                  <span className="font-bold text-[var(--wk-text)]">Methodology:</span> {edition.methodologyVersion}
+                </span>
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-1 text-[11px] text-[var(--wk-text-muted)]">
+                  <span className="font-bold text-[var(--wk-text)]">Eligibility:</span> {edition.eligibilityRulesVersion}
+                </span>
+              </div>
               <div className="chart-edition-actions">
                 <button className="wk-button wk-button-primary" onClick={() => playAt(0)}>
                   <WkIcon name="Play" size={16} /> Play #1
@@ -398,7 +418,7 @@ export default function ChartEdition() {
                 </Link>
                 <ShareButton
                   item={{
-                    title: familyLabel,
+                    title: edition.publicLabel,
                     subtitle: edition.label || "Current edition",
                     description: edition.methodology,
                     imageUrl: topTrack.artworkUrl,
@@ -428,7 +448,7 @@ export default function ChartEdition() {
       </section>
 
       <div className="wk-container-wide px-4 py-10 md:px-6">
-        {/* Archive switcher */}
+        {/* Archive switcher — use publicSlug for links */}
         {archive.previous.length > 0 && (
           <section className="mb-10">
             <div className="mb-4 flex items-end justify-between gap-4">
@@ -440,7 +460,7 @@ export default function ChartEdition() {
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {archive.latest && (
                 <Link
-                  to={`/charts/${familySlug}/${archive.latest.slug}`}
+                  to={`/charts/${publicSlug}/${archive.latest.slug}`}
                   className={`rounded-xl border p-4 transition-all hover:border-[var(--wk-brand)]/40 ${
                     archive.latest.slug === edition.slug
                       ? "border-[var(--wk-brand)] bg-[var(--wk-brand)]/5"
@@ -467,7 +487,7 @@ export default function ChartEdition() {
               {archive.previous.slice(0, 3).map((item) => (
                 <Link
                   key={item.slug}
-                  to={`/charts/${familySlug}/${item.slug}`}
+                  to={`/charts/${publicSlug}/${item.slug}`}
                   className={`rounded-xl border p-4 transition-all hover:border-[var(--wk-brand)]/40 ${
                     item.slug === edition.slug
                       ? "border-[var(--wk-brand)] bg-[var(--wk-brand)]/5"

@@ -35,8 +35,8 @@ export default function MobileCharts() {
         setLoading(false);
         return;
       }
-      const active = families.find((f) => (f.slug ?? f.familyKey) === activeSeries) ?? families[0];
-      const activeSlug = active.slug ?? active.familyKey;
+      const active = families.find((f) => (f.publicSlug ?? f.slug ?? f.familyKey) === activeSeries || f.slug === activeSeries || f.familyKey === activeSeries) ?? families[0];
+      const activeSlug = active.publicSlug ?? active.slug ?? active.familyKey;
       const { data: edition, meta } = await getLatestChartEdition(activeSlug);
       if (!edition) {
         setEmpty(true);
@@ -255,15 +255,15 @@ export default function MobileCharts() {
         {data.families.map((s) => (
           <button
             key={s.id}
-            onClick={() => setActiveSeries(s.slug)}
+            onClick={() => setActiveSeries(s.publicSlug ?? s.slug)}
             className={`flex-none rounded-xl border px-3 py-2 text-left transition-all ${
-              activeSeries === s.slug
+              activeSeries === (s.publicSlug ?? s.slug)
                 ? "border-[var(--wk-brand)]/40 bg-[var(--wk-brand)]/10"
                 : "border-[var(--wk-border)] bg-[var(--wk-bg)] hover:border-[var(--wk-border-2)]"
             }`}
           >
-            <div className={`text-[12px] font-bold ${activeSeries === s.slug ? "text-[var(--wk-brand)]" : "text-[var(--wk-text)]"}`}>
-              {s.label}
+            <div className={`text-[12px] font-bold ${activeSeries === (s.publicSlug ?? s.slug) ? "text-[var(--wk-brand)]" : "text-[var(--wk-text)]"}`}>
+              {s.publicLabel ?? s.label}
             </div>
             <div className="text-[10px] text-[var(--wk-text-muted)]">{s.entryCount} entries</div>
           </button>

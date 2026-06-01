@@ -5,6 +5,7 @@ import {
   getChartEditionsForSeries,
   getChartRowsForEdition,
 } from "../../data/registry/registry";
+import { applyChartFamilyPresentation, resolveSourceFamilySlug } from "./chartPresentation";
 
 // ─── Registry-backed mock data ────────────────────────────────────────────────
 // Public chart pages run through this mock client until the WordPress public API is live.
@@ -69,20 +70,23 @@ function buildRegistryData(): RegistryData | null {
     const seriesSummaries = getChartSeriesSummaries();
     if (!seriesSummaries.length) return null;
 
-    const families: ChartFamily[] = seriesSummaries.map((series) => ({
-      id: series.id,
-      familyKey: series.id,
-      label: series.label,
-      description: series.description ?? "Imported WAKILISHA chart series",
-      defaultChartSize: series.entryCount ?? 40,
-      defaultRegion: "global",
-      editionFrequency: "weekly",
-      defaultRuleset: "default",
-      defaultScoringModel: "weighted_streaming",
-      createdAt: "2024-01-01T00:00:00Z",
-      updatedAt: new Date().toISOString(),
-      slug: series.id,
-    }));
+    const families: ChartFamily[] = seriesSummaries.map((series) => {
+      const base = {
+        id: series.id,
+        familyKey: series.id,
+        label: series.label,
+        description: series.description ?? "Imported WAKILISHA chart series",
+        defaultChartSize: series.entryCount ?? 40,
+        defaultRegion: "global",
+        editionFrequency: "weekly" as const,
+        defaultRuleset: "default",
+        defaultScoringModel: "weighted_streaming",
+        createdAt: "2024-01-01T00:00:00Z",
+        updatedAt: new Date().toISOString(),
+        slug: series.id,
+      };
+      return applyChartFamilyPresentation(base);
+    });
 
     const editions: ChartEdition[] = [];
     const entries: ChartEditionEntry[] = [];
@@ -144,6 +148,19 @@ const fallbackFamilies: ChartFamily[] = [
     createdAt: "2024-01-01T00:00:00Z",
     updatedAt: "2026-05-31T00:00:00Z",
     slug: "weekly-top-40",
+    sourceFamilySlug: "weekly-top-40",
+    seriesSlug: "weekly-top-40",
+    seriesLabel: "Weekly Top 40",
+    marketSlug: "global",
+    marketLabel: "Global",
+    publicSlug: "weekly-top-40",
+    publicLabel: "Weekly Top 40 · Global",
+    shortLabel: "Top 40",
+    chartMode: "data",
+    periodType: "weekly",
+    methodologyVersion: "weighted_streaming_v1",
+    eligibilityRulesVersion: "default_v1",
+    legacySlugs: ["weekly-top-40", "top-40", "weeklytop40"],
   },
   {
     id: "rising-voices",
@@ -158,6 +175,19 @@ const fallbackFamilies: ChartFamily[] = [
     createdAt: "2024-01-01T00:00:00Z",
     updatedAt: "2026-05-31T00:00:00Z",
     slug: "rising-voices",
+    sourceFamilySlug: "rising-voices",
+    seriesSlug: "rising-voices",
+    seriesLabel: "Rising Voices",
+    marketSlug: "global",
+    marketLabel: "Global",
+    publicSlug: "rising-voices",
+    publicLabel: "Rising Voices · Global",
+    shortLabel: "Rising",
+    chartMode: "data",
+    periodType: "weekly",
+    methodologyVersion: "velocity_weighted_v1",
+    eligibilityRulesVersion: "breakout_v1",
+    legacySlugs: ["rising-voices", "risingvoices", "breakout"],
   },
   {
     id: "genre-pulse",
@@ -172,6 +202,19 @@ const fallbackFamilies: ChartFamily[] = [
     createdAt: "2024-01-01T00:00:00Z",
     updatedAt: "2026-05-31T00:00:00Z",
     slug: "genre-pulse",
+    sourceFamilySlug: "genre-pulse",
+    seriesSlug: "genre-pulse",
+    seriesLabel: "Genre Pulse",
+    marketSlug: "global",
+    marketLabel: "Global",
+    publicSlug: "genre-pulse",
+    publicLabel: "Genre Pulse · Global",
+    shortLabel: "Genre",
+    chartMode: "hybrid",
+    periodType: "monthly",
+    methodologyVersion: "weighted_streaming_v1",
+    eligibilityRulesVersion: "genre_focused_v1",
+    legacySlugs: ["genre-pulse", "genrepulse", "genre"],
   },
   {
     id: "classics",
@@ -186,6 +229,19 @@ const fallbackFamilies: ChartFamily[] = [
     createdAt: "2024-01-01T00:00:00Z",
     updatedAt: "2026-05-31T00:00:00Z",
     slug: "classics",
+    sourceFamilySlug: "classics",
+    seriesSlug: "classics",
+    seriesLabel: "Classics",
+    marketSlug: "global",
+    marketLabel: "Global",
+    publicSlug: "classics",
+    publicLabel: "Classics · Global",
+    shortLabel: "Classics",
+    chartMode: "editorial",
+    periodType: "evergreen",
+    methodologyVersion: "engagement_weighted_v1",
+    eligibilityRulesVersion: "legacy_v1",
+    legacySlugs: ["classics", "classic", "timeless"],
   },
   {
     id: "breakout",
@@ -200,6 +256,19 @@ const fallbackFamilies: ChartFamily[] = [
     createdAt: "2024-01-01T00:00:00Z",
     updatedAt: "2026-05-31T00:00:00Z",
     slug: "breakout",
+    sourceFamilySlug: "breakout",
+    seriesSlug: "breakout",
+    seriesLabel: "Breakout",
+    marketSlug: "global",
+    marketLabel: "Global",
+    publicSlug: "breakout",
+    publicLabel: "Breakout · Global",
+    shortLabel: "Breakout",
+    chartMode: "data",
+    periodType: "weekly",
+    methodologyVersion: "velocity_weighted_v1",
+    eligibilityRulesVersion: "velocity_v1",
+    legacySlugs: ["breakout", "fastest-rising", "rising"],
   },
 ];
 
@@ -381,7 +450,20 @@ export function getMockEdition(familySlug: string, editionSlug: string): ChartEd
 }
 
 export function getMockFamily(familySlug: string): ChartFamily | null {
-  return MOCK_FAMILIES.find((family) => family.slug === familySlug || family.familyKey === familySlug || family.id === familySlug) ?? null;
+  const resolved = resolveSourceFamilySlug(familySlug);
+  return MOCK_FAMILIES.find((family) =>
+    family.publicSlug === familySlug ||
+    family.slug === familySlug ||
+    family.familyKey === familySlug ||
+    family.id === familySlug ||
+    family.sourceFamilySlug === familySlug ||
+    family.legacySlugs?.includes(familySlug) ||
+    family.publicSlug === resolved ||
+    family.slug === resolved ||
+    family.id === resolved ||
+    family.sourceFamilySlug === resolved ||
+    family.legacySlugs?.includes(resolved)
+  ) ?? null;
 }
 
 export function computeEditionMeta(entries: ChartEditionEntry[]) {

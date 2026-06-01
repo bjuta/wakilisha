@@ -35,6 +35,10 @@ const SERIES_ICON: Record<string, string> = {
   "genre-pulse": "Activity",
   "classics": "Crown",
   "breakout": "Flame",
+  "top-songs-kenya": "BarChart3",
+  "rnb-kenya": "Music",
+  "gengetone-kenya": "Flame",
+  "2026-releases-kenya": "Calendar",
 };
 
 const methodology = [
@@ -62,7 +66,7 @@ export default function MobileChartsDirectory() {
         return;
       }
       const featuredFamily = families[0];
-      const featuredSlug = featuredFamily.slug ?? featuredFamily.familyKey;
+      const featuredSlug = featuredFamily.publicSlug ?? featuredFamily.slug ?? featuredFamily.familyKey;
       const { data: edition, meta } = await getLatestChartEdition(featuredSlug);
       if (!edition) {
         setState({ status: "empty" });
@@ -158,7 +162,9 @@ export default function MobileChartsDirectory() {
   const recentEditions = data.families
     .filter((s) => s.latestEditionSlug)
     .map((series) => ({
-      seriesLabel: series.label,
+      seriesPublicLabel: series.publicLabel,
+      seriesLabel: series.seriesLabel,
+      marketLabel: series.marketLabel,
       seriesId: series.slug,
       editionLabel: series.latestEditionLabel!,
       editionSlug: series.latestEditionSlug!,
@@ -187,10 +193,30 @@ export default function MobileChartsDirectory() {
         <div className="charts-visual-hero-overlay" />
         <div className="charts-visual-hero-content">
           <div className="charts-ed-badge">
-            <WkIcon name="BarChart3" size={14} /> {featured?.label ?? "WAKILISHA Charts"}
+            <WkIcon name="BarChart3" size={14} /> WAKILISHA Charts
           </div>
-          <h1 className="charts-title">{featured?.label ?? "Chart Universe"}</h1>
+          {/* Taxonomy-aware title: [Series Label] · [Market Label] */}
+          <h1 className="charts-title">
+            {featured ? `${featured.seriesLabel} · ${featured.marketLabel}` : (featured?.publicLabel ?? "Chart Universe")}
+          </h1>
           <p className="charts-meta">{featured?.description ?? "The definitive index of African music charts."}</p>
+          {/* Taxonomy chips */}
+          {featured && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              <span className="rounded-full border border-[var(--wk-brand)]/30 bg-[var(--wk-brand)]/10 px-2.5 py-0.5 text-[10px] font-semibold text-[var(--wk-brand)]">
+                {featured.seriesLabel}
+              </span>
+              <span className="rounded-full border border-white/20 bg-white/10 px-2.5 py-0.5 text-[10px] font-semibold text-white/80">
+                {featured.marketLabel}
+              </span>
+              <span className="rounded-full border border-white/20 bg-white/10 px-2.5 py-0.5 text-[10px] text-white/70">
+                {featured.chartMode === "data" ? "Data chart" : featured.chartMode === "editorial" ? "Editorial" : "Hybrid"}
+              </span>
+              <span className="rounded-full border border-white/20 bg-white/10 px-2.5 py-0.5 text-[10px] text-white/70">
+                {featured.periodType === "weekly" ? "Weekly" : featured.periodType === "monthly" ? "Monthly" : featured.periodType}
+              </span>
+            </div>
+          )}
         </div>
         {topTrack && (
           <div className="charts-hero-no1-card">
@@ -255,7 +281,7 @@ export default function MobileChartsDirectory() {
             to={series.latestEditionSlug ? `/charts/${series.slug}/${series.latestEditionSlug}` : `/charts/${series.slug}`}
             className="charts-filter"
           >
-            {series.label}
+            {series.shortLabel ?? series.seriesLabel}
           </Link>
         ))}
       </div>
@@ -304,23 +330,39 @@ export default function MobileChartsDirectory() {
         ))}
       </div>
 
-      {/* Chart series */}
-      <div className="spec-section-hd">Chart series</div>
+      {/* Chart families */}
+      <div className="spec-section-hd">Chart families</div>
       <div className="px-5 pb-4 flex flex-col gap-3">
         {data.families.map((series) => {
-          const icon = SERIES_ICON[series.id] ?? "BarChart3";
+          const icon = SERIES_ICON[series.id] ?? SERIES_ICON[series.slug] ?? "BarChart3";
           const href = series.latestEditionSlug ? `/charts/${series.slug}/${series.latestEditionSlug}` : `/charts/${series.slug}`;
           return (
-            <Link key={series.id} to={href} className="mobile-pressable flex items-center gap-3 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4 transition-all">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--wk-brand-soft)]">
-                <WkIcon name={icon as any} size={18} className="text-[var(--wk-brand)]" />
+            <Link key={series.id} to={href} className="mobile-pressable flex flex-col rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4 gap-2 transition-all">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--wk-brand-soft)]">
+                  <WkIcon name={icon as any} size={18} className="text-[var(--wk-brand)]" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  {/* publicLabel as main title */}
+                  <div className="text-[14px] font-bold text-[var(--wk-text)]">{series.publicLabel}</div>
+                  <div className="text-[11px] text-[var(--wk-text-faint)]">{series.description}</div>
+                </div>
+                <WkIcon name="ChevronRight" size={16} className="text-[var(--wk-text-faint)]" />
               </div>
-              <div className="min-w-0 flex-1">
-                <div className="text-[14px] font-bold text-[var(--wk-text)]">{series.label}</div>
-                <div className="text-[11px] text-[var(--wk-text-muted)]">Top {series.entryCount} · {series.editionCount} editions</div>
-                <div className="text-[11px] text-[var(--wk-text-faint)]">{series.description}</div>
+              {/* Taxonomy metadata */}
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-[var(--wk-text-muted)] pl-[52px]">
+                <span><span className="font-bold text-[var(--wk-text)]">Series:</span> {series.seriesLabel}</span>
+                <span className="text-[var(--wk-text-faint)]">·</span>
+                <span><span className="font-bold text-[var(--wk-text)]">Market:</span> {series.marketLabel}</span>
+                <span className="text-[var(--wk-text-faint)]">·</span>
+                <span>Top {series.entryCount} · {series.editionCount} editions</span>
+                {series.latestEditionDate && (
+                  <>
+                    <span className="text-[var(--wk-text-faint)]">·</span>
+                    <span>{series.latestEditionDate}</span>
+                  </>
+                )}
               </div>
-              <WkIcon name="ChevronRight" size={16} className="text-[var(--wk-text-faint)]" />
             </Link>
           );
         })}
@@ -345,8 +387,11 @@ export default function MobileChartsDirectory() {
                       )}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="text-[13px] font-bold text-[var(--wk-text)]">{row.seriesLabel}</div>
-                      <div className="text-[11px] text-[var(--wk-text-muted)]">{row.editionLabel} · Top {row.entryCount}</div>
+                      {/* publicLabel */}
+                      <div className="text-[13px] font-bold text-[var(--wk-text)]">{row.seriesPublicLabel}</div>
+                      <div className="text-[11px] text-[var(--wk-text-muted)]">
+                        {row.seriesLabel} · {row.marketLabel} · Top {row.entryCount}
+                      </div>
                     </div>
                     <div className="shrink-0 text-[11px] text-[var(--wk-text-faint)]">{row.date}</div>
                     <WkIcon name="ChevronRight" size={16} className="text-[var(--wk-text-faint)]" />
