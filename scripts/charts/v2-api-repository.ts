@@ -1,9 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
-import { Pool } from "pg";
+import pg from "pg";
 
 const root = process.cwd();
 const dataRoot = path.join(root, "public", "charts-data");
+
+type PgPool = InstanceType<typeof pg.Pool>;
 
 export type Row = Record<string, unknown>;
 export type Entry = {
@@ -243,13 +245,13 @@ class JsonV2Repository implements V2Repository {
 
 export class DatabaseV2Repository implements V2Repository {
   kind = "database" as const;
-  private pool: Pool;
+  private pool: PgPool;
 
   constructor(private databaseUrl = process.env.DATABASE_URL ?? "") {
     if (!this.databaseUrl) {
       throw new Error("DatabaseV2Repository requires DATABASE_URL.");
     }
-    this.pool = new Pool({
+    this.pool = new pg.Pool({
       connectionString: normalizeDatabaseUrlForPg(this.databaseUrl),
       ssl: { rejectUnauthorized: false },
       connectionTimeoutMillis: 10000,
