@@ -21,6 +21,7 @@ type Entry = {
 };
 
 const port = Number(process.env.WAKILISHA_V2_API_PORT ?? 4175);
+const host = process.env.WAKILISHA_V2_API_HOST;
 const repo = createV2Repository();
 
 function str(row: Row | undefined | null, key: string): string {
@@ -37,6 +38,21 @@ function numberValue(row: Row | undefined | null, key: string): number {
   return Number.isFinite(value) ? value : 0;
 }
 
+function embeddedArchive(program: Row): Row[] | null {
+  const value = program.archive_json;
+  if (!value) return null;
+  if (Array.isArray(value)) return value as Row[];
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value) as unknown;
+      return Array.isArray(parsed) ? parsed as Row[] : null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
 async function toEditionSummary(edition: Row) {
   return {
     id: str(edition, "id"),
@@ -50,9 +66,9 @@ async function toEditionSummary(edition: Row) {
 }
 
 async function toProgram(repository: V2Repository, program: Row) {
-  const series = await repository.getSeries(str(program, "series_slug"));
-  const market = await repository.getMarket(str(program, "market_slug"));
-  const archive = (await repository.listEditionsForProgram(program)).filter((edition) => numberValue(edition, "entry_count") > 0);
+  const archive = embeddedArchive(program) ?? (await repository.listEditionsForProgram(program)).filter((edition) => numberValue(edition, "entry_count") > 0);
+  const series = str(program, "series_label") ? program : await repository.getSeries(str(program, "series_slug"));
+  const market = str(program, "market_label") ? program : await repository.getMarket(str(program, "market_slug"));
   return {
     id: str(program, "id"),
     seriesSlug: str(program, "series_slug"),
@@ -214,8 +230,8 @@ server.on("error", (err: NodeJS.ErrnoException) => {
   process.exitCode = 1;
 });
 
-server.listen(port, () => {
-  console.log(`WAKILISHA Chart V2 local read-only API listening on http://localhost:${port}/wp-json/wakilisha/v2`);
+server.listen(port, host, () => {
+  console.log(`WAKILISHA Chart V2 local read-only API listening on http://${host ?? "localhost"}:${port}/wp-json/wakilisha/v2`);
   console.log(`Repository mode: ${repo.kind}`);
   console.log("No database writes. No public JSON mutation.");
 });
