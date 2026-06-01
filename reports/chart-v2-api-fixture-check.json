@@ -1,0 +1,76 @@
+{
+  "generatedAt": "2026-06-01T09:56:12.384Z",
+  "mode": "fixture-contract-check-no-network",
+  "sourceFixtures": "reports/chart-v2-api-fixtures.json",
+  "pass": 11,
+  "warning": 0,
+  "fail": 0,
+  "checks": [
+    {
+      "id": "API-001",
+      "status": "pass",
+      "title": "Endpoint fixture exists: listPrograms",
+      "detail": "/wp-json/wakilisha/v2/charts"
+    },
+    {
+      "id": "API-002",
+      "status": "pass",
+      "title": "Endpoint fixture exists: getProgram",
+      "detail": "/wp-json/wakilisha/v2/charts/{programSlug}"
+    },
+    {
+      "id": "API-003",
+      "status": "pass",
+      "title": "Endpoint fixture exists: getLatestEdition",
+      "detail": "/wp-json/wakilisha/v2/charts/{programSlug}/latest"
+    },
+    {
+      "id": "API-004",
+      "status": "pass",
+      "title": "Endpoint fixture exists: getEdition",
+      "detail": "/wp-json/wakilisha/v2/charts/{programSlug}/{editionSlug}"
+    },
+    {
+      "id": "API-005",
+      "status": "pass",
+      "title": "Endpoint fixture exists: getEditionEntries",
+      "detail": "/wp-json/wakilisha/v2/charts/{programSlug}/{editionSlug}/entries"
+    },
+    {
+      "id": "API-006",
+      "status": "pass",
+      "title": "Endpoint fixture exists: resolveAlias",
+      "detail": "/wp-json/wakilisha/v2/charts/resolve/{slug}"
+    },
+    {
+      "id": "API-010",
+      "status": "pass",
+      "title": "Program list count matches fixture count",
+      "detail": "listPrograms=4; expected=4"
+    },
+    {
+      "id": "API-011",
+      "status": "pass",
+      "title": "Latest examples exist for every program",
+      "detail": "latestExamples=4; programs=4"
+    },
+    {
+      "id": "API-012",
+      "status": "pass",
+      "title": "Latest examples include sample entries",
+      "detail": "All latest examples include sample entries."
+    },
+    {
+      "id": "API-013",
+      "status": "pass",
+      "title": "Latest examples do not select empty editions",
+      "detail": "No latest example selected an empty edition."
+    },
+    {
+      "id": "API-014",
+      "status": "pass",
+      "title": "Alias examples are present",
+      "detail": "aliasExamples=10"
+    }
+  ]
+}
