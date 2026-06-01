@@ -24,9 +24,9 @@ function escapeSql(value: unknown): string {
   return `'${String(value).replace(/'/g, "''")}'`;
 }
 
-function jsonb(value: unknown): string {
-  if (value === null || value === undefined || value === '') return 'null';
-  return escapeSql(JSON.stringify(value));
+function jsonb(value: unknown): unknown {
+  if (value === null || value === undefined || value === '') return null;
+  return JSON.stringify(value);
 }
 
 function readRows(fileName: string): JsonRow[] {
@@ -121,6 +121,12 @@ const specs: SeedSpec[] = [
     table: 'review_queue',
     columns: ['entity_type', 'entity_id', 'label', 'issue', 'source', 'confidence', 'recommendation', 'status'],
     map: (row) => [row.entityType, row.entityId, row.label, row.issue, row.source, row.confidence, row.recommendation, 'open']
+  },
+  {
+    sourceFile: 'chart-entry-tracks.seed.json',
+    table: 'chart_entry_tracks',
+    columns: ['chart_entry_id', 'track_id', 'position', 'source', 'confidence', 'needs_review', 'review_reason'],
+    map: (row) => [row.chart_entry_id, row.track_id, row.position, row.source, row.confidence ?? 0.85, row.needs_review === true, row.review_reason ?? null]
   }
 ];
 

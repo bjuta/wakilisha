@@ -13,9 +13,15 @@ import { PublicWpApiError } from "./wpAdapter";
 const RAW_BASE =
   import.meta.env.VITE_WAKILISHA_WP_V2_API_BASE || "/wp-json/wakilisha/v2";
 
-// Handle __BASE_PATH__ safely: default to "/" in dev if undefined.
-const BASE_PATH =
-  typeof __BASE_PATH__ !== "undefined" ? __BASE_PATH__ : "/";
+// Handle __BASE_PATH__ safely: default to "/" in dev.
+// In dev mode, the Vite proxy is always at the root regardless of basePath.
+// In prod, we respect __BASE_PATH__ for sub-directory WordPress installs.
+const isDev = import.meta.env.DEV;
+const BASE_PATH = isDev
+  ? "/"
+  : typeof __BASE_PATH__ !== "undefined"
+    ? __BASE_PATH__
+    : "/";
 
 // Ensure the base path is prepended to the API base if needed.
 // RAW_BASE already starts with "/", so we strip any trailing slash from BASE_PATH

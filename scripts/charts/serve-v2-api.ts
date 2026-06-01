@@ -216,29 +216,49 @@ async function route(req: http.IncomingMessage, res: http.ServerResponse) {
   }
 }
 
-const server = http.createServer((req, res) => {
-  void route(req, res);
-});
+async function startServer(): Promise<void> {
+  // Warm up DB connection before starting the HTTP server.
+  // This prevents intermittent 502s where the proxy is ready but the DB pool is not.
+  if (repo.kind === "database") {
+    const dbOk = await repo.testConnection();
+    if (!dbOk) {
+      console.error("[WAKILISHA V2 API] Database connection failed. Cannot start.");
+      console.error(`[WAKILISHA V2 API] DATABASE_URL: ${process.env.DATABASE_URL ? "set" : "not set"}`);
+      console.error(`[WAKILISHA V2 API] Check your connection string and network access.`);
+      process.exit(1);
+    }
+    console.log("[WAKILISHA V2 API] Database connection verified.");
+  }
 
-server.on("error", (err: NodeJS.ErrnoException) => {
-  if (err.code === "EADDRINUSE") {
-    console.error(`[WAKILISHA V2 API] Port ${port} is already in use.`);
-    console.error(`  Stop the existing server or use a different port:`);
-    console.error(`  WAKILISHA_V2_API_PORT=${port + 1} npm run charts:v2-local-api`);
+  const server = http.createServer((req, res) => {
+    void route(req, res);
+  });
+
+  server.on("error", (err: NodeJS.ErrnoException) => {
+    if (err.code === "EADDRINUSE") {
+      console.error(`[WAKILISHA V2 API] Port ${port} is already in use.`);
+      console.error(`  Stop the existing server or use a different port:`);
+      console.error(`  WAKILISHA_V2_API_PORT=${port + 1} npm run charts:v2-local-api`);
+      process.exitCode = 1;
+      return;
+    }
+    console.error("[WAKILISHA V2 API] Server failed to start:", err.message);
+    if (err.stack) {
+      console.error(err.stack);
+    }
     process.exitCode = 1;
-    return;
-  }
-  console.error("[WAKILISHA V2 API] Server failed to start:", err.message);
-  if (err.stack) {
-    console.error(err.stack);
-  }
-  process.exitCode = 1;
-});
+  });
 
-server.listen(port, host, () => {
-  const addr = `http://${host ?? "localhost"}:${port}`;
-  console.log(`[WAKILISHA V2 API] Listening on ${addr}/wp-json/wakilisha/v2`);
-  console.log(`[WAKILISHA V2 API] Repository mode: ${repo.kind}`);
-  console.log(`[WAKILISHA V2 API] DATABASE_URL: ${process.env.DATABASE_URL ? "set" : "not set"}`);
-  console.log(`[WAKILISHA V2 API] No database writes. No public JSON mutation.`);
+  server.listen(port, host, () => {
+    const addr = `http://${host ?? "localhost"}:${port}`;
+    console.log(`[WAKILISHA V2 API] Listening on ${addr}/wp-json/wakilisha/v2`);
+    console.log(`[WAKILISHA V2 API] Repository mode: ${repo.kind}`);
+    console.log(`[WAKILISHA V2 API] DATABASE_URL: ${process.env.DATABASE_URL ? "set" : "not set"}`);
+    console.log(`[WAKILISHA V2 API] No database writes. No public JSON mutation.`);
+  });
+}
+
+startServer().catch((err) => {
+  console.error("[WAKILISHA V2 API] Unhandled startup error:", err instanceof Error ? err.message : err);
+  process.exit(1);
 });

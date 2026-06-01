@@ -169,6 +169,27 @@ create table if not exists wakilisha_repaired.content_route_classification (
   )
 );
 
+create table if not exists wakilisha_repaired.chart_entry_tracks (
+  id uuid primary key default gen_random_uuid(),
+  chart_entry_id text not null,
+  track_id text not null,
+  position integer,
+  source text,
+  confidence numeric not null default 0.5,
+  needs_review boolean not null default false,
+  review_reason text,
+  created_at timestamptz not null default now()
+);
+
+create unique index if not exists chart_entry_tracks_dedupe_idx
+  on wakilisha_repaired.chart_entry_tracks(chart_entry_id, track_id, coalesce(position, -1));
+
+create index if not exists chart_entry_tracks_entry_idx
+  on wakilisha_repaired.chart_entry_tracks(chart_entry_id);
+
+create index if not exists chart_entry_tracks_track_idx
+  on wakilisha_repaired.chart_entry_tracks(track_id);
+
 create table if not exists wakilisha_repaired.review_queue (
   id uuid primary key default gen_random_uuid(),
   entity_type text not null,
