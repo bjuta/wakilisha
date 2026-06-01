@@ -31,6 +31,7 @@
     "charts:generate-public-csv-data": "tsx scripts/charts/generate-public-csv-data.ts",
     "charts:v2-api-fixture-check": "tsx scripts/charts/compare-v2-api-fixtures.ts",
     "charts:v2-api-fixtures": "tsx scripts/charts/generate-v2-api-fixtures.ts",
+    "charts:v2-apply-plan": "tsx scripts/charts/apply-v2-insert-plan.ts",
     "charts:v2-db-readiness": "tsx scripts/charts/check-v2-db-readiness.ts",
     "charts:v2-execute-plan": "tsx scripts/charts/execute-v2-insert-plan.ts",
     "charts:v2-live-smoke": "tsx scripts/charts/smoke-v2-live-api.ts",
