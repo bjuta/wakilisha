@@ -12,10 +12,13 @@ import "./pages/admin/design-system/adminDesignSystemLayout.css";
 import { ThemeProvider } from "./components/design-system/theme/ThemeProvider";
 import { PlayerProvider } from "./context/PlayerContext";
 
+const baseUrl = import.meta.env.BASE_URL;
+const routerBasename = baseUrl && baseUrl !== "/" ? baseUrl.replace(/\/$/, "") : undefined;
+
 function App() {
   return (
     <I18nextProvider i18n={i18n}>
-      <BrowserRouter basename={__BASE_PATH__}>
+      <BrowserRouter basename={routerBasename}>
         <ThemeProvider>
           <PlayerProvider>
             <AppRoutes />
