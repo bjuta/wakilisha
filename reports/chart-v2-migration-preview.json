@@ -1,0 +1,272 @@
+{
+  "generatedAt": "2026-06-01T08:08:54.915Z",
+  "mode": "preview-only-no-db-writes",
+  "source": {
+    "manifest": {
+      "generatedAt": "2026-06-01T06:23:02.280Z",
+      "sourceFiles": [
+        "wk_chart_series.csv",
+        "wk_chart_editions.csv",
+        "wk_chart_entries.csv",
+        "wk_tracks.csv"
+      ],
+      "totalFamilies": 4,
+      "totalEditions": 78,
+      "totalEntries": 6332
+    },
+    "familyCount": 4,
+    "editionCount": 78,
+    "entryCount": 6332
+  },
+  "target": {
+    "seriesCount": 4,
+    "marketCount": 1,
+    "programCount": 4,
+    "editionCount": 78,
+    "entryCount": 6332,
+    "aliasCount": 10
+  },
+  "programs": [
+    {
+      "sourceFamilySlug": "2026",
+      "seriesSlug": "2026-releases",
+      "seriesLabel": "2026 Releases",
+      "marketSlug": "kenya",
+      "marketLabel": "Kenya",
+      "publicSlug": "2026-releases-kenya",
+      "publicLabel": "2026 Releases · Kenya",
+      "shortLabel": "2026 Releases",
+      "chartMode": "data",
+      "periodType": "weekly",
+      "methodologyVersion": "csv-registry-import-v1",
+      "eligibilityRulesVersion": "2026-releases-kenya-v1",
+      "legacySlugs": [
+        "2026",
+        "top-kenyan-songs-released-in-2026"
+      ]
+    },
+    {
+      "sourceFamilySlug": "gengetone",
+      "seriesSlug": "gengetone",
+      "seriesLabel": "Gengetone Songs",
+      "marketSlug": "kenya",
+      "marketLabel": "Kenya",
+      "publicSlug": "gengetone-kenya",
+      "publicLabel": "Gengetone Songs · Kenya",
+      "shortLabel": "Gengetone",
+      "chartMode": "data",
+      "periodType": "weekly",
+      "methodologyVersion": "csv-registry-import-v1",
+      "eligibilityRulesVersion": "gengetone-kenya-v1",
+      "legacySlugs": [
+        "gengetone",
+        "top-gengetone-songs"
+      ]
+    },
+    {
+      "sourceFamilySlug": "kenya",
+      "seriesSlug": "top-songs",
+      "seriesLabel": "Top Songs",
+      "marketSlug": "kenya",
+      "marketLabel": "Kenya",
+      "publicSlug": "top-songs-kenya",
+      "publicLabel": "Top 100 Songs · Kenya",
+      "shortLabel": "Kenya Top 100",
+      "chartMode": "data",
+      "periodType": "weekly",
+      "methodologyVersion": "csv-registry-import-v1",
+      "eligibilityRulesVersion": "top-songs-kenya-v1",
+      "legacySlugs": [
+        "kenya",
+        "top-100-kenya",
+        "kenya-top-100"
+      ]
+    },
+    {
+      "sourceFamilySlug": "rnb",
+      "seriesSlug": "rnb",
+      "seriesLabel": "R&B Songs",
+      "marketSlug": "kenya",
+      "marketLabel": "Kenya",
+      "publicSlug": "rnb-kenya",
+      "publicLabel": "R&B Songs · Kenya",
+      "shortLabel": "Kenyan R&B",
+      "chartMode": "data",
+      "periodType": "weekly",
+      "methodologyVersion": "csv-registry-import-v1",
+      "eligibilityRulesVersion": "rnb-kenya-v1",
+      "legacySlugs": [
+        "rnb",
+        "kenyan-rnb",
+        "top-kenyan-rnb-songs"
+      ]
+    }
+  ],
+  "aliases": [
+    {
+      "legacySlug": "2026",
+      "canonicalSlug": "2026-releases-kenya",
+      "entityType": "chart_program",
+      "redirectStatus": "active"
+    },
+    {
+      "legacySlug": "top-kenyan-songs-released-in-2026",
+      "canonicalSlug": "2026-releases-kenya",
+      "entityType": "chart_program",
+      "redirectStatus": "active"
+    },
+    {
+      "legacySlug": "gengetone",
+      "canonicalSlug": "gengetone-kenya",
+      "entityType": "chart_program",
+      "redirectStatus": "active"
+    },
+    {
+      "legacySlug": "top-gengetone-songs",
+      "canonicalSlug": "gengetone-kenya",
+      "entityType": "chart_program",
+      "redirectStatus": "active"
+    },
+    {
+      "legacySlug": "kenya",
+      "canonicalSlug": "top-songs-kenya",
+      "entityType": "chart_program",
+      "redirectStatus": "active"
+    },
+    {
+      "legacySlug": "top-100-kenya",
+      "canonicalSlug": "top-songs-kenya",
+      "entityType": "chart_program",
+      "redirectStatus": "active"
+    },
+    {
+      "legacySlug": "kenya-top-100",
+      "canonicalSlug": "top-songs-kenya",
+      "entityType": "chart_program",
+      "redirectStatus": "active"
+    },
+    {
+      "legacySlug": "rnb",
+      "canonicalSlug": "rnb-kenya",
+      "entityType": "chart_program",
+      "redirectStatus": "active"
+    },
+    {
+      "legacySlug": "kenyan-rnb",
+      "canonicalSlug": "rnb-kenya",
+      "entityType": "chart_program",
+      "redirectStatus": "active"
+    },
+    {
+      "legacySlug": "top-kenyan-rnb-songs",
+      "canonicalSlug": "rnb-kenya",
+      "entityType": "chart_program",
+      "redirectStatus": "active"
+    }
+  ],
+  "validation": {
+    "unmappedFamilies": [],
+    "emptyEditions": [
+      {
+        "family": "gengetone",
+        "edition": "gengetone-2026-03-28",
+        "editionId": "10"
+      }
+    ],
+    "duplicateRanksPerEdition": [],
+    "entriesWithoutArtwork": {
+      "count": 0,
+      "sample": []
+    },
+    "entriesWithoutTrackSlug": {
+      "count": 0,
+      "sample": []
+    },
+    "latestEditionTop3PerProgram": {
+      "2026-releases-kenya": {
+        "edition": "2026-2026-05-18",
+        "editionId": "93",
+        "top3": [
+          {
+            "rank": 1,
+            "title": "Not Letting Go",
+            "artist": "Bensoul"
+          },
+          {
+            "rank": 2,
+            "title": "Hallelujah (Washwash)",
+            "artist": "Khaligraph Jones, Bensoul"
+          },
+          {
+            "rank": 3,
+            "title": "Mafrrrmbanya",
+            "artist": "Watendawili"
+          }
+        ]
+      },
+      "gengetone-kenya": {
+        "edition": "gengetone-2026-05-18",
+        "editionId": "89",
+        "top3": [
+          {
+            "rank": 1,
+            "title": "Songa ka injili",
+            "artist": "Kushman, Shark Tank"
+          },
+          {
+            "rank": 2,
+            "title": "Wakiuliza",
+            "artist": "Collo Blue, Fathermoh"
+          },
+          {
+            "rank": 3,
+            "title": "PAPARAZZI",
+            "artist": "Uncojingjong"
+          }
+        ]
+      },
+      "top-songs-kenya": {
+        "edition": "kenya-2026-05-18",
+        "editionId": "87",
+        "top3": [
+          {
+            "rank": 1,
+            "title": "Hallelujah (Washwash)",
+            "artist": "Khaligraph Jones, Bensoul"
+          },
+          {
+            "rank": 2,
+            "title": "Chai ya saa kumi",
+            "artist": "Ywaya Tajiri"
+          },
+          {
+            "rank": 3,
+            "title": "We Don't Need Money to Be Rich",
+            "artist": "Mutoriah"
+          }
+        ]
+      },
+      "rnb-kenya": {
+        "edition": "rnb-2026-05-18",
+        "editionId": "91",
+        "top3": [
+          {
+            "rank": 1,
+            "title": "NERVOUS",
+            "artist": "Bee Thee Artiste, Ywaya Tajiri, AUGUST IV"
+          },
+          {
+            "rank": 2,
+            "title": "Wi Muthaka",
+            "artist": "Tuku Kantu, Muthaka"
+          },
+          {
+            "rank": 3,
+            "title": "Njia",
+            "artist": "Billy Black"
+          }
+        ]
+      }
+    }
+  }
+}
