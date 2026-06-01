@@ -17,6 +17,19 @@ export interface ChartFamily {
   createdAt: string;
   updatedAt: string;
   slug?: string;
+  sourceFamilySlug?: string;
+  seriesSlug?: string;
+  seriesLabel?: string;
+  marketSlug?: string;
+  marketLabel?: string;
+  publicSlug?: string;
+  publicLabel?: string;
+  shortLabel?: string;
+  chartMode?: "data" | "editorial" | "hybrid";
+  periodType?: "weekly" | "monthly" | "yearly" | "evergreen";
+  methodologyVersion?: string;
+  eligibilityRulesVersion?: string;
+  legacySlugs?: string[];
 }
 
 export interface ChartEdition {
@@ -99,3 +112,11 @@ export interface ChartEditionWithEntries extends ChartEdition {
   entries: ChartEditionEntry[];
   family: ChartFamily;
 }
+
+export type CsvPublicChartData = {
+  generatedAt: string | null;
+  sourceFiles: string[];
+  families: ChartFamily[];
+  editions: ChartEdition[];
+  entries: ChartEditionEntry[];
+};
