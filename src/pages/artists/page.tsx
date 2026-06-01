@@ -1,48 +1,74 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { PageHero } from "@/components/design-system/PageHero";
 import { ShareButton } from "@/components/design-system/share/ShareSheet";
 import { WkIcon } from "@/components/design-system/Icon";
-import { ARTISTS, ARTIST_FILTERS, ALPHABET, ARTIST_STATS } from "@/mocks/artists";
+import { listArtists, type RepairedArtist } from "@/services/repairedContent/client";
 
 type ViewMode = "grid" | "list";
 const PAGE_SIZE = 24;
+const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
-const countryLabel = (country?: string) => country || "Unknown origin";
+const countryLabel = (country?: string | null) => country || "Unknown origin";
 
 export default function Artists() {
+  const [artists, setArtists] = useState<RepairedArtist[]>([]);
+  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState("All");
   const [alphaFilter, setAlphaFilter] = useState("All");
   const [query, setQuery] = useState("");
   const [view, setView] = useState<ViewMode>("grid");
   const [page, setPage] = useState(1);
 
-  const coverArtists = useMemo(() => ARTISTS.filter((a) => a.isChartArtist).sort((a, b) => (a.topChartPosition || 999) - (b.topChartPosition || 999)).slice(0, 4), []);
-  const featured = coverArtists[0] ?? ARTISTS[0];
+  useEffect(() => {
+    let alive = true;
+    setStatus("loading");
+    listArtists()
+      .then((items) => {
+        if (!alive) return;
+        setArtists(items.filter((artist) => artist.name));
+        setStatus("ready");
+      })
+      .catch((err) => {
+        if (!alive) return;
+        setError(err instanceof Error ? err.message : "Could not load imported artists.");
+        setStatus("error");
+      });
+    return () => { alive = false; };
+  }, []);
+
+  const artistFilters = useMemo(() => ["All", ...Array.from(new Set(artists.flatMap((artist) => artist.genres))).filter(Boolean).slice(0, 20)], [artists]);
+  const coverArtists = useMemo(() => artists.filter((a) => a.isChartArtist).sort((a, b) => (a.topChartPosition || 999) - (b.topChartPosition || 999)).slice(0, 4), [artists]);
+  const featured = coverArtists[0] ?? artists[0];
   const sideArtists = coverArtists.slice(1, 4);
-  const recentlyAdded = ARTISTS.slice(-6).reverse();
+  const recentlyAdded = artists.slice(-6).reverse();
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return ARTISTS.filter((artist) => {
+    return artists.filter((artist) => {
       const matchesFilter = filter === "All" || artist.genres.some((g) => g === filter);
       const matchesQuery = !q || artist.name.toLowerCase().includes(q) || artist.genres.some((g) => g.toLowerCase().includes(q)) || countryLabel(artist.country).toLowerCase().includes(q);
       const matchesAlpha = alphaFilter === "All" || artist.name.toUpperCase().startsWith(alphaFilter);
       return matchesFilter && matchesQuery && matchesAlpha;
     });
-  }, [filter, alphaFilter, query]);
+  }, [artists, filter, alphaFilter, query]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const totalTracks = artists.reduce((sum, artist) => sum + artist.trackCount, 0);
 
   const stats = [
-    { value: ARTIST_STATS.totalArtists.toLocaleString(), label: "Artists" },
-    { value: ARTIST_STATS.chartArtists.toLocaleString(), label: "Chart artists" },
-    { value: ARTIST_STATS.totalTracks.toLocaleString(), label: "Tracks" },
+    { value: artists.length.toLocaleString(), label: "Artists" },
+    { value: artists.filter((artist) => artist.isChartArtist).length.toLocaleString(), label: "Chart artists" },
+    { value: totalTracks.toLocaleString(), label: "Tracks" },
   ];
 
   const updateFilter = (next: string) => { setFilter(next); setPage(1); };
   const updateAlpha = (next: string) => { setAlphaFilter(next); setPage(1); };
+
+  if (status === "loading") return <div className="wk-container px-6 py-20 text-[var(--wk-text-muted)]">Loading imported artists…</div>;
+  if (status === "error") return <div className="wk-container px-6 py-20 text-[var(--wk-text-muted)]">Artists could not be loaded: {error}</div>;
 
   return (
     <div className="min-h-screen">
@@ -51,10 +77,10 @@ export default function Artists() {
           variant="artist"
           eyebrow={<><WkIcon name="Mic2" size={14} /> The voices</>}
           title="Artists"
-          subtitle="A human, photographic directory of WAKILISHA artists: chart voices, rising names, country scenes, genre lanes, and registry relationships."
-          backgroundImage={featured?.imageUrl}
+          subtitle="A graph-backed directory of WAKILISHA artists: chart voices, rising names, genre lanes, and registry relationships."
+          backgroundImage={featured?.imageUrl || undefined}
           stats={stats}
-          actions={<ShareButton item={{ title: "WAKILISHA Artists", subtitle: `${ARTISTS.length} artists`, description: "Browse WAKILISHA artists by genre, chart presence, origin, and alphabetical index.", imageUrl: featured?.imageUrl, type: "artist" }} />}
+          actions={<ShareButton item={{ title: "WAKILISHA Artists", subtitle: `${artists.length} artists`, description: "Browse WAKILISHA artists by genre, chart presence, origin, and alphabetical index.", imageUrl: featured?.imageUrl || undefined, type: "artist" }} />}
         />
 
         {featured && (
@@ -64,7 +90,7 @@ export default function Artists() {
               <div className="artist-feature-body">
                 <div className="artist-feature-kicker">Featured artist</div>
                 <h2 className="artist-feature-name">{featured.name}</h2>
-                <div className="artist-feature-meta">{countryLabel(featured.country)} · {featured.genres.slice(0, 3).join(", ")} · {featured.trackCount} tracks</div>
+                <div className="artist-feature-meta">{countryLabel(featured.country)} · {featured.genres.slice(0, 3).join(", ") || "genres pending"} · {featured.trackCount} tracks</div>
                 <div className="artist-feature-actions">
                   {featured.isChartArtist && <span className="artist-status"><WkIcon name="BadgeCheck" size={12} /> Chart artist</span>}
                   {featured.isRising && <span className="artist-status"><WkIcon name="TrendingUp" size={12} /> Rising</span>}
@@ -77,7 +103,7 @@ export default function Artists() {
                   <div className="artist-side-img">{artist.imageUrl && <img src={artist.imageUrl} alt="" />}</div>
                   <div className="min-w-0">
                     <div className="artist-list-name">{artist.name}</div>
-                    <div className="artist-list-sub">#{artist.topChartPosition || "—"} · {artist.genres[0]} · {countryLabel(artist.country)}</div>
+                    <div className="artist-list-sub">#{artist.topChartPosition || "—"} · {artist.genres[0] || "genre pending"} · {countryLabel(artist.country)}</div>
                   </div>
                   <WkIcon name="ArrowRight" size={16} />
                 </Link>
@@ -88,12 +114,12 @@ export default function Artists() {
 
         <div className="directory-toolbar">
           <div className="directory-filters">
-            {ARTIST_FILTERS.slice(0, 12).map((f) => (
+            {artistFilters.slice(0, 12).map((f) => (
               <button key={f} onClick={() => updateFilter(f)} className={`directory-filter ${filter === f ? "on" : ""}`}>{f}</button>
             ))}
           </div>
           <div className="directory-tools">
-            <input className="directory-search" value={query} onChange={(e) => { setQuery(e.target.value); setPage(1); }} placeholder="Search artist, genre, or country" />
+            <input className="directory-search" value={query} onChange={(e) => { setQuery(e.target.value); setPage(1); }} placeholder="Search artist or genre" />
             <div className="view-toggle" aria-label="View mode">
               <button className={view === "grid" ? "on" : ""} onClick={() => setView("grid")}><WkIcon name="Grid2X2" size={15} /></button>
               <button className={view === "list" ? "on" : ""} onClick={() => setView("list")}><WkIcon name="List" size={15} /></button>
@@ -112,7 +138,7 @@ export default function Artists() {
               <div className="section-kicker">Full artist directory</div>
               <h2 className="section-title">{filtered.length} artists found</h2>
             </div>
-            <p className="section-copy">Grid mode prioritizes photographic browsing. List mode prioritizes dense comparison across origin, genre, tracks, releases, and chart presence.</p>
+            <p className="section-copy">This directory now loads from wakilisha_repaired.track_artists, release_tracks, chart_entry_tracks, and artist_genres.</p>
           </div>
 
           {view === "grid" ? (
@@ -144,9 +170,9 @@ export default function Artists() {
             </div>
           </div>
           <div className="pg-block">
-            <div className="pg-block-label">Directory rule</div>
-            <h3 className="pg-block-title">Artists are human and photographic.</h3>
-            <p className="pg-block-body">Unlike genres, artist cards should preserve portrait/image presence, identity, status, country, genre metadata, and chart relevance. The directory must work both as a beautiful browse page and a dense registry.</p>
+            <div className="pg-block-label">Data source</div>
+            <h3 className="pg-block-title">Artists are now graph-backed.</h3>
+            <p className="pg-block-body">This page no longer imports the old artist mock file. It hydrates from repaired relational tables through the V2 API.</p>
           </div>
         </section>
       </div>
@@ -154,7 +180,7 @@ export default function Artists() {
   );
 }
 
-function ArtistTile({ artist }: { artist: typeof ARTISTS[number] }) {
+function ArtistTile({ artist }: { artist: RepairedArtist }) {
   return (
     <Link to={`/artists/${artist.slug}`} className="artist-card">
       <div className="artist-card-img">{artist.imageUrl && <img src={artist.imageUrl} alt="" />}</div>
@@ -168,13 +194,13 @@ function ArtistTile({ artist }: { artist: typeof ARTISTS[number] }) {
   );
 }
 
-function ArtistListRow({ artist, compact = false }: { artist: typeof ARTISTS[number]; compact?: boolean }) {
+function ArtistListRow({ artist, compact = false }: { artist: RepairedArtist; compact?: boolean }) {
   return (
     <Link to={`/artists/${artist.slug}`} className="artist-list-item">
       <div className="artist-list-ava artist-list-avatar">{artist.imageUrl && <img src={artist.imageUrl} alt="" />}</div>
       <div className="min-w-0">
         <div className="artist-list-name">{artist.name} {artist.isChartArtist && <span className="text-[var(--wk-brand)]">✓</span>}</div>
-        <div className="artist-list-sub">{countryLabel(artist.country)} · {artist.genres.slice(0, compact ? 1 : 3).join(", ")}</div>
+        <div className="artist-list-sub">{countryLabel(artist.country)} · {artist.genres.slice(0, compact ? 1 : 3).join(", ") || "genres pending"}</div>
       </div>
       <div className="artist-list-stat">{artist.isChartArtist ? `#${artist.topChartPosition}` : artist.trackCount}</div>
     </Link>
