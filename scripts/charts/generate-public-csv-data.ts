@@ -49,6 +49,19 @@ function splitArtistNames(artistName: string) {
     .filter(Boolean);
 }
 
+function editionKey(edition: Record<string, string>) {
+  return edition.edition_id || edition.id || edition.slug;
+}
+
+function isBetterEditionCandidate(next: Record<string, string>, current: Record<string, string>) {
+  const nextSlug = next.slug || "";
+  const currentSlug = current.slug || "";
+  if (currentSlug.endsWith("-2") && !nextSlug.endsWith("-2")) return true;
+  if (!current.chart_date && next.chart_date) return true;
+  if (!current.title && next.title) return true;
+  return false;
+}
+
 const seriesRows = readCsv("wk_chart_series.csv");
 const editionRows = readCsv("wk_chart_editions.csv");
 const entryRows = readCsv("wk_chart_entries.csv");
@@ -75,16 +88,28 @@ function inferSeriesForEdition(edition: Record<string, string>) {
   return null;
 }
 
-const editionPairs = editionRows
+const rawEditionPairs = editionRows
   .map((edition) => ({ edition, series: inferSeriesForEdition(edition) }))
   .filter((pair): pair is { edition: Record<string, string>; series: Record<string, string> } => Boolean(pair.series));
+
+const editionPairsById = new Map<string, { edition: Record<string, string>; series: Record<string, string> }>();
+for (const pair of rawEditionPairs) {
+  const key = editionKey(pair.edition);
+  if (!key) continue;
+  const existing = editionPairsById.get(key);
+  if (!existing || isBetterEditionCandidate(pair.edition, existing.edition)) {
+    editionPairsById.set(key, pair);
+  }
+}
+const editionPairs = Array.from(editionPairsById.values());
+const duplicateEditionCount = rawEditionPairs.length - editionPairs.length;
 
 const familyIds = new Set(editionPairs.map(({ series }) => series.slug || series.id));
 
 const families: ChartFamily[] = Array.from(familyIds).map((familyId) => {
   const series = editionPairs.find((pair) => (pair.series.slug || pair.series.id) === familyId)?.series;
   const relatedEditions = editionPairs.filter((pair) => (pair.series.slug || pair.series.id) === familyId);
-  const relatedEntries = entryRows.filter((entry) => relatedEditions.some((pair) => pair.edition.edition_id === entry.edition_id || pair.edition.slug === entry.edition_id));
+  const relatedEntries = entryRows.filter((entry) => relatedEditions.some((pair) => editionKey(pair.edition) === entry.edition_id || pair.edition.slug === entry.edition_id));
   const maxRank = Math.max(...relatedEntries.map((entry) => numberOrNull(entry.position) ?? 0), 0);
 
   return {
@@ -105,7 +130,7 @@ const families: ChartFamily[] = Array.from(familyIds).map((familyId) => {
 
 const editions: ChartEdition[] = editionPairs.map(({ edition, series }) => {
   const familyId = series.slug || series.id;
-  const editionId = edition.edition_id || edition.id || edition.slug;
+  const editionId = editionKey(edition);
   const entriesForEdition = entryRows.filter((entry) => entry.edition_id === editionId || entry.edition_id === edition.slug);
   const date = safeDate(edition.chart_date || entriesForEdition[0]?.chart_date || edition.created_at);
 
@@ -214,4 +239,4 @@ const source = `import type { ChartEdition, ChartEditionEntry, ChartFamily, Trac
 fs.writeFileSync(outPath, source);
 console.log(`Generated ${outPath}`);
 console.log(`Families: ${families.length}, editions: ${editions.length}, entries: ${entries.length}`);
-console.log(`Source rows: series=${seriesRows.length}, editions=${editionRows.length}, entries=${entryRows.length}, tracks=${trackRows.length}`);
+console.log(`Source rows: series=${seriesRows.length}, editions=${editionRows.length}, dedupedEditions=${editions.length}, duplicateEditions=${duplicateEditionCount}, entries=${entryRows.length}, tracks=${trackRows.length}`);
