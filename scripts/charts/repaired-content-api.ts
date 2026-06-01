@@ -3,10 +3,52 @@ import pg from "pg";
 type Row = Record<string, unknown>;
 let pool: pg.Pool | null = null;
 
+function normalizeDatabaseUrl(databaseUrl: string): string {
+  try {
+    const url = new URL(databaseUrl);
+    url.searchParams.delete("sslmode");
+    url.searchParams.delete("uselibpqcompat");
+    return url.toString();
+  } catch {
+    return databaseUrl;
+  }
+}
+
 function db(): pg.Pool {
+  const explicitHost = process.env.PGHOST;
+  const explicitUser = process.env.PGUSER;
+  const explicitPassword = process.env.PGPASSWORD;
+  const explicitDatabase = process.env.PGDATABASE;
+  const explicitPort = Number(process.env.PGPORT || 5432);
   const url = process.env.DATABASE_URL;
-  if (!url) throw new Error("DATABASE_URL is required for repaired content endpoints.");
-  pool ??= new pg.Pool({ connectionString: url, ssl: { rejectUnauthorized: false }, max: 4 });
+
+  if (!pool) {
+    if (explicitHost && explicitUser && explicitPassword && explicitDatabase) {
+      pool = new pg.Pool({
+        host: explicitHost,
+        port: explicitPort,
+        user: explicitUser,
+        password: explicitPassword,
+        database: explicitDatabase,
+        ssl: { rejectUnauthorized: false },
+        max: 4,
+        connectionTimeoutMillis: 10000,
+        query_timeout: 10000,
+        statement_timeout: 10000,
+      });
+    } else {
+      if (!url) throw new Error("DATABASE_URL or explicit PG* env vars are required for repaired content endpoints.");
+      pool = new pg.Pool({
+        connectionString: normalizeDatabaseUrl(url),
+        ssl: { rejectUnauthorized: false },
+        max: 4,
+        connectionTimeoutMillis: 10000,
+        query_timeout: 10000,
+        statement_timeout: 10000,
+      });
+    }
+  }
+
   return pool;
 }
 
