@@ -1,4 +1,9 @@
 import type { ChartEdition, ChartEditionEntry, ChartFamily, TrackChartHistory } from "./types";
+import {
+  applyChartFamilyPresentation,
+  getSourceFamilySlugFromPresentedFamily,
+  resolveSourceFamilySlug,
+} from "./chartPresentation";
 
 // ─── JSON-backed async chart data loader ──────────────────────────────────────
 // Replaces the old inline CSV_PUBLIC_CHART_DATA blob with lazy-loaded JSON
@@ -58,6 +63,10 @@ async function fetchJson<T>(url: string): Promise<T | null> {
   }
 }
 
+function resolveFamilySlugForLookup(familySlug: string): string {
+  return resolveSourceFamilySlug(familySlug);
+}
+
 // ─── Internal loaders ─────────────────────────────────────────────────────────
 
 async function loadManifest(): Promise<ChartDataManifest | null> {
@@ -69,7 +78,7 @@ async function loadManifest(): Promise<ChartDataManifest | null> {
 async function loadFamilies(): Promise<ChartFamily[]> {
   if (families) return families;
   const data = await fetchJson<FamiliesPayload>(dataUrl("families.json"));
-  families = data?.families ?? [];
+  families = (data?.families ?? []).map(applyChartFamilyPresentation);
   return families;
 }
 
@@ -105,11 +114,17 @@ export async function hasCsvPublicChartData(): Promise<boolean> {
 }
 
 export async function getCsvFamily(familySlug: string): Promise<ChartFamily | null> {
+  const sourceSlug = resolveFamilySlugForLookup(familySlug);
   const all = await loadFamilies();
   return (
     all.find(
       (family) =>
-        family.slug === familySlug || family.familyKey === familySlug || family.id === familySlug
+        family.slug === familySlug ||
+        family.publicSlug === familySlug ||
+        family.familyKey === sourceSlug ||
+        family.id === sourceSlug ||
+        family.sourceFamilySlug === sourceSlug ||
+        family.legacySlugs?.includes(familySlug)
     ) ?? null
   );
 }
@@ -117,9 +132,10 @@ export async function getCsvFamily(familySlug: string): Promise<ChartFamily | nu
 export async function getCsvEditionsForFamily(familySlug: string): Promise<ChartEdition[]> {
   const family = await getCsvFamily(familySlug);
   if (!family) return [];
+  const sourceFamilySlug = getSourceFamilySlugFromPresentedFamily(family);
   const all = await loadEditions();
   return all
-    .filter((edition) => edition.familyId === family.id)
+    .filter((edition) => edition.familyId === sourceFamilySlug)
     .slice()
     .sort(
       (a, b) =>
@@ -135,11 +151,12 @@ export async function getCsvLatestEdition(familySlug: string): Promise<ChartEdit
 export async function getCsvEdition(familySlug: string, editionSlug: string): Promise<ChartEdition | null> {
   const family = await getCsvFamily(familySlug);
   if (!family) return null;
+  const sourceFamilySlug = getSourceFamilySlugFromPresentedFamily(family);
   const all = await loadEditions();
   return (
     all.find(
       (edition) =>
-        edition.familyId === family.id &&
+        edition.familyId === sourceFamilySlug &&
         (edition.slug === editionSlug || edition.id === editionSlug)
     ) ?? null
   );
@@ -153,8 +170,8 @@ export async function getCsvEntriesForEdition(
   if (!edition) return [];
 
   const family = await getCsvFamily(familySlug);
-  const resolvedFamilySlug = family?.slug || family?.id || familySlug;
-  const entries = await loadEntriesForEdition(resolvedFamilySlug, edition.slug);
+  const sourceFamilySlug = family ? getSourceFamilySlugFromPresentedFamily(family) : resolveFamilySlugForLookup(familySlug);
+  const entries = await loadEntriesForEdition(sourceFamilySlug, edition.slug);
 
   // Guard: filter out any entries that don't belong to this edition
   return entries
