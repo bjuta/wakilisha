@@ -1,9 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
-import { Pool } from "pg";
+import pg from "pg";
 
 const root = process.cwd();
 const dataRoot = path.join(root, "public", "charts-data");
+
+type PgPool = InstanceType<typeof pg.Pool>;
 
 export type Row = Record<string, unknown>;
 export type Entry = {
@@ -218,13 +220,13 @@ class JsonV2Repository implements V2Repository {
 
 export class DatabaseV2Repository implements V2Repository {
   kind = "database" as const;
-  private pool: Pool;
+  private pool: PgPool;
 
   constructor(private databaseUrl = process.env.DATABASE_URL ?? "") {
     if (!this.databaseUrl) {
       throw new Error("DatabaseV2Repository requires DATABASE_URL.");
     }
-    this.pool = new Pool({
+    this.pool = new pg.Pool({
       connectionString: this.databaseUrl,
       ssl: { rejectUnauthorized: false },
     });
@@ -234,10 +236,9 @@ export class DatabaseV2Repository implements V2Repository {
     const wrapped = `WITH q AS (${sql}) SELECT COALESCE(json_agg(q), '[]'::json) AS result FROM q;`;
     const result = await this.pool.query(wrapped);
     const jsonValue = result.rows[0]?.result;
-    if (jsonValue === null || jsonValue === undefined) {
-      return JSON.parse("[]") as T;
-    }
-    return JSON.parse(jsonValue as string) as T;
+    if (jsonValue === null || jsonValue === undefined) return [] as T;
+    if (typeof jsonValue === "string") return JSON.parse(jsonValue) as T;
+    return jsonValue as T;
   }
 
   private async first(sql: string): Promise<Row | null> {
