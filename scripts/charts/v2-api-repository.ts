@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { spawnSync } from "node:child_process";
+import { Pool } from "pg";
 
 const root = process.cwd();
 const dataRoot = path.join(root, "public", "charts-data");
@@ -43,8 +43,8 @@ export type V2ResolvedSlug = {
 
 export interface V2Repository {
   kind: "json-local" | "database";
-  getCounts(): Record<string, number>;
-  getMigrationReadiness(): string;
+  getCounts(): Promise<Record<string, number>>;
+  getMigrationReadiness(): Promise<string>;
   resolveProgramSlug(slug: string): Promise<V2ResolvedSlug>;
   listPrograms(): Promise<Row[]>;
   getProgram(slug: string): Promise<Row | null>;
@@ -110,11 +110,11 @@ class JsonV2Repository implements V2Repository {
     }
   }
 
-  getCounts(): Record<string, number> {
+  async getCounts(): Promise<Record<string, number>> {
     return (this.manifest.totals as Record<string, number> | undefined) ?? {};
   }
 
-  getMigrationReadiness(): string {
+  async getMigrationReadiness(): Promise<string> {
     return "ready_with_warnings";
   }
 
@@ -218,33 +218,35 @@ class JsonV2Repository implements V2Repository {
 
 export class DatabaseV2Repository implements V2Repository {
   kind = "database" as const;
+  private pool: Pool;
 
   constructor(private databaseUrl = process.env.DATABASE_URL ?? "") {
     if (!this.databaseUrl) {
       throw new Error("DatabaseV2Repository requires DATABASE_URL.");
     }
-  }
-
-  private queryJson<T>(sql: string): T {
-    const wrapped = `WITH q AS (${sql}) SELECT COALESCE(json_agg(q), '[]'::json) FROM q;`;
-    const result = spawnSync("psql", [this.databaseUrl, "-X", "-q", "-t", "-A", "-v", "ON_ERROR_STOP=1", "-c", wrapped], {
-      cwd: root,
-      encoding: "utf8",
-      maxBuffer: 1024 * 1024 * 20,
+    this.pool = new Pool({
+      connectionString: this.databaseUrl,
+      ssl: { rejectUnauthorized: false },
     });
-    if (result.status !== 0) {
-      throw new Error(`psql query failed: ${result.stderr || result.stdout}`);
+  }
+
+  private async queryJson<T>(sql: string): Promise<T> {
+    const wrapped = `WITH q AS (${sql}) SELECT COALESCE(json_agg(q), '[]'::json) AS result FROM q;`;
+    const result = await this.pool.query(wrapped);
+    const jsonValue = result.rows[0]?.result;
+    if (jsonValue === null || jsonValue === undefined) {
+      return JSON.parse("[]") as T;
     }
-    const output = result.stdout.trim() || "[]";
-    return JSON.parse(output) as T;
+    return JSON.parse(jsonValue as string) as T;
   }
 
-  private first(sql: string): Row | null {
-    return (this.queryJson<Row[]>(sql)[0] as Row | undefined) ?? null;
+  private async first(sql: string): Promise<Row | null> {
+    const rows = await this.queryJson<Row[]>(sql);
+    return rows[0] ?? null;
   }
 
-  getCounts(): Record<string, number> {
-    const row = this.first(`
+  async getCounts(): Promise<Record<string, number>> {
+    const row = await this.first(`
       SELECT
         (SELECT COUNT(*)::int FROM wk_chart_series_v2) AS series,
         (SELECT COUNT(*)::int FROM wk_chart_markets_v2) AS markets,
@@ -256,15 +258,15 @@ export class DatabaseV2Repository implements V2Repository {
         (SELECT COUNT(*)::int FROM wk_chart_source_coverage_v2) AS "sourceCoverage",
         (SELECT COUNT(*)::int FROM wk_chart_slug_aliases_v2) AS "slugAliases"
     `);
-    return row ?? {};
+    return (row as Record<string, number> | null) ?? {};
   }
 
-  getMigrationReadiness(): string {
+  async getMigrationReadiness(): Promise<string> {
     return "database_readonly";
   }
 
   async resolveProgramSlug(slug: string): Promise<V2ResolvedSlug> {
-    const alias = this.first(`
+    const alias = await this.first(`
       SELECT canonical_slug
       FROM wk_chart_slug_aliases_v2
       WHERE legacy_slug = ${sqlLiteral(slug)}
@@ -404,7 +406,7 @@ export class DatabaseV2Repository implements V2Repository {
   }
 
   async getTrackHistory(trackSlug: string): Promise<TracksIndex[string] | null> {
-    const rows = this.queryJson<Row[]>(`
+    const rows = await this.queryJson<Row[]>(`
       SELECT
         e.edition_slug AS "editionSlug",
         e.edition_label AS "editionLabel",

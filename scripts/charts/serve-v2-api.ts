@@ -145,8 +145,8 @@ async function route(req: http.IncomingMessage, res: http.ServerResponse) {
         charts_public: true,
         charts_v2: true,
         repository: repo.kind,
-        counts: repo.getCounts(),
-        migrationReadiness: repo.getMigrationReadiness(),
+        counts: await repo.getCounts(),
+        migrationReadiness: await repo.getMigrationReadiness(),
       }));
     }
 
