@@ -1,0 +1,73 @@
+{
+  "generatedAt": "2026-06-01T09:23:40.151Z",
+  "mode": "guarded-v2-insert-executor-scaffold",
+  "executionStatus": "not_attempted",
+  "executionDetail": "Default mode is readiness-only. No database command was executed.",
+  "environment": {
+    "allowDbWrites": false,
+    "executorMode": "readiness_only",
+    "confirmationProvided": false,
+    "databaseUrlProvided": false
+  },
+  "checks": [
+    {
+      "id": "EXEC-001",
+      "status": "pass",
+      "title": "Preview has zero blockers",
+      "detail": "Readiness=ready_with_warnings; blockerCount=0"
+    },
+    {
+      "id": "EXEC-002",
+      "status": "pass",
+      "title": "Insert plan is dry-run and unblocked",
+      "detail": "Plan mode=dry-run-no-db-writes; blocked=false"
+    },
+    {
+      "id": "EXEC-003",
+      "status": "pass",
+      "title": "Entry count matches preview",
+      "detail": "Plan entries=6332; preview entries=6332"
+    },
+    {
+      "id": "EXEC-004",
+      "status": "pass",
+      "title": "SQL artifact is rollback-only",
+      "detail": "SQL exists=true; has BEGIN=true; has ROLLBACK=true; has COMMIT=false"
+    },
+    {
+      "id": "EXEC-005",
+      "status": "pass",
+      "title": "Generated artifacts are GitHub-safe",
+      "detail": "JSON=0.1MB; SQL=3.66MB"
+    },
+    {
+      "id": "EXEC-006",
+      "status": "warning",
+      "title": "Content QA warnings remain",
+      "detail": "2 warning(s) remain. This does not block dry-run execution, but requires editorial sign-off before API cutover or real inserts."
+    }
+  ],
+  "counts": {
+    "series": 4,
+    "markets": 1,
+    "programs": 4,
+    "methodologies": 1,
+    "eligibilityRules": 4,
+    "editions": 78,
+    "entries": 6332,
+    "sourceCoverage": 78,
+    "slugAliases": 10
+  },
+  "artifacts": {
+    "preview": "reports/chart-v2-migration-preview.json",
+    "insertPlan": "reports/chart-v2-insert-plan.json",
+    "sql": "reports/chart-v2-inserts.sql",
+    "insertPlanSizeMb": 0.1,
+    "sqlSizeMb": 3.66
+  },
+  "psql": {
+    "exitCode": null,
+    "stdout": "",
+    "stderr": ""
+  }
+}
