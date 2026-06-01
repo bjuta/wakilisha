@@ -125,8 +125,61 @@ export async function repairedResponse(resource: string, limit = 120): Promise<R
   }
 
   if (resource === "artists") {
-    const rows = await q("select ta.artist_id as id, coalesce(nullif(max(ta.artist_name_snapshot),''),'Artist ' || ta.artist_id) as name, count(distinct ta.track_id)::int as track_count, count(distinct rt.release_id)::int as release_count, count(distinct cet.chart_entry_id)::int as chart_count, min(ce.rank)::int as top_chart_position, coalesce(array_remove(array_agg(distinct ag.genre_id), null), array[]::text[]) as genres from wakilisha_repaired.track_artists ta left join wakilisha_repaired.release_tracks rt on rt.track_id=ta.track_id left join wakilisha_repaired.chart_entry_tracks cet on cet.track_id=ta.track_id left join wk_chart_entries_v2 ce on ce.id::text=cet.chart_entry_id left join wakilisha_repaired.artist_genres ag on ag.artist_id=ta.artist_id group by ta.artist_id order by count(distinct cet.chart_entry_id) desc, count(distinct ta.track_id) desc limit $1", [limit]);
-    return { artists: rows.map((row) => { const name = s(row, "name"); return { id: s(row, "id"), slug: `${slugify(name)}-${s(row, "id")}`, name, country: null, imageUrl: null, genres: Array.isArray(row.genres) ? row.genres.map(String).slice(0, 4) : [], trackCount: n(row, "track_count"), releaseCount: n(row, "release_count"), isChartArtist: n(row, "chart_count") > 0, isRising: n(row, "chart_count") > 0 && n(row, "top_chart_position") <= 20, topChartPosition: row.top_chart_position === null ? null : n(row, "top_chart_position") }; }) };
+    const rows = await q(`
+      with canonical_artists as (
+        select
+          ta.artist_id as id,
+          max(nullif(trim(ta.artist_name_snapshot), '')) filter (
+            where trim(coalesce(ta.artist_name_snapshot, '')) <> ''
+              and lower(trim(ta.artist_name_snapshot)) !~ '^artist\\s+[0-9]+$'
+          ) as name,
+          count(distinct ta.track_id)::int as track_count,
+          count(distinct rt.release_id)::int as release_count,
+          count(distinct cet.chart_entry_id)::int as chart_count,
+          min(ce.rank)::int as top_chart_position,
+          coalesce(
+            array_remove(
+              array_agg(distinct case
+                when ag.genre_id ~ '[A-Za-z]' then ag.genre_id
+                else null
+              end),
+              null
+            ),
+            array[]::text[]
+          ) as genres
+        from wakilisha_repaired.track_artists ta
+        left join wakilisha_repaired.release_tracks rt on rt.track_id = ta.track_id
+        left join wakilisha_repaired.chart_entry_tracks cet on cet.track_id = ta.track_id
+        left join wk_chart_entries_v2 ce on ce.id::text = cet.chart_entry_id
+        left join wakilisha_repaired.artist_genres ag on ag.artist_id = ta.artist_id
+        group by ta.artist_id
+      )
+      select *
+      from canonical_artists
+      where name is not null
+      order by chart_count desc, track_count desc, release_count desc, name asc
+      limit $1
+    `, [limit]);
+    return {
+      artists: rows.map((row) => {
+        const name = s(row, "name");
+        const topChartPosition = row.top_chart_position === null ? null : n(row, "top_chart_position");
+        const chartCount = n(row, "chart_count");
+        return {
+          id: s(row, "id"),
+          slug: `${slugify(name)}-${s(row, "id")}`,
+          name,
+          country: null,
+          imageUrl: null,
+          genres: Array.isArray(row.genres) ? row.genres.map(String).slice(0, 4) : [],
+          trackCount: n(row, "track_count"),
+          releaseCount: n(row, "release_count"),
+          isChartArtist: chartCount > 0 && topChartPosition !== null,
+          isRising: chartCount > 0 && topChartPosition !== null && topChartPosition <= 20,
+          topChartPosition,
+        };
+      })
+    };
   }
 
   if (resource === "releases") {
