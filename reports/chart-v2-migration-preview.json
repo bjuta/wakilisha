@@ -1,6 +1,10 @@
 {
-  "generatedAt": "2026-06-01T08:08:54.915Z",
+  "generatedAt": "2026-06-01T10:00:00.000Z",
   "mode": "preview-only-no-db-writes",
+  "migrationReadiness": "ready_with_warnings",
+  "blockerCount": 0,
+  "warningCount": 3,
+  "infoCount": 9,
   "source": {
     "manifest": {
       "generatedAt": "2026-06-01T06:23:02.280Z",
@@ -40,10 +44,7 @@
       "periodType": "weekly",
       "methodologyVersion": "csv-registry-import-v1",
       "eligibilityRulesVersion": "2026-releases-kenya-v1",
-      "legacySlugs": [
-        "2026",
-        "top-kenyan-songs-released-in-2026"
-      ]
+      "legacySlugs": ["2026", "top-kenyan-songs-released-in-2026"]
     },
     {
       "sourceFamilySlug": "gengetone",
@@ -58,10 +59,7 @@
       "periodType": "weekly",
       "methodologyVersion": "csv-registry-import-v1",
       "eligibilityRulesVersion": "gengetone-kenya-v1",
-      "legacySlugs": [
-        "gengetone",
-        "top-gengetone-songs"
-      ]
+      "legacySlugs": ["gengetone", "top-gengetone-songs"]
     },
     {
       "sourceFamilySlug": "kenya",
@@ -76,11 +74,7 @@
       "periodType": "weekly",
       "methodologyVersion": "csv-registry-import-v1",
       "eligibilityRulesVersion": "top-songs-kenya-v1",
-      "legacySlugs": [
-        "kenya",
-        "top-100-kenya",
-        "kenya-top-100"
-      ]
+      "legacySlugs": ["kenya", "top-100-kenya", "kenya-top-100"]
     },
     {
       "sourceFamilySlug": "rnb",
@@ -95,11 +89,7 @@
       "periodType": "weekly",
       "methodologyVersion": "csv-registry-import-v1",
       "eligibilityRulesVersion": "rnb-kenya-v1",
-      "legacySlugs": [
-        "rnb",
-        "kenyan-rnb",
-        "top-kenyan-rnb-songs"
-      ]
+      "legacySlugs": ["rnb", "kenyan-rnb", "top-kenyan-rnb-songs"]
     }
   ],
   "aliases": [
@@ -164,109 +154,180 @@
       "redirectStatus": "active"
     }
   ],
-  "validation": {
-    "unmappedFamilies": [],
-    "emptyEditions": [
-      {
-        "family": "gengetone",
-        "edition": "gengetone-2026-03-28",
-        "editionId": "10"
-      }
-    ],
-    "duplicateRanksPerEdition": [],
-    "entriesWithoutArtwork": {
-      "count": 0,
-      "sample": []
+  "findings": [
+    {
+      "id": "WARN-001",
+      "severity": "warning",
+      "category": "content_qa",
+      "title": "Empty editions found",
+      "description": "1 edition(s) have zero entries. These will migrate as empty placeholder editions unless excluded.",
+      "affectedCount": 1,
+      "sample": [
+        {
+          "familySlug": "gengetone",
+          "editionSlug": "gengetone-2026-03-28",
+          "editionId": "10"
+        }
+      ],
+      "recommendedAction": "Confirm whether each empty edition is a valid draft/placeholder or should be excluded from public archive display. Known case: gengetone-2026-03-28."
     },
-    "entriesWithoutTrackSlug": {
-      "count": 0,
-      "sample": []
+    {
+      "id": "WARN-005",
+      "severity": "warning",
+      "category": "editorial_review",
+      "title": "Repeated top-10 signatures across editions",
+      "description": "Some chart families have editions where the top-10 ordering is identical to another edition. This may indicate duplicate or stale data, or normal consistency in a slow-moving chart.",
+      "affectedCount": 12,
+      "sample": [
+        {
+          "familySlug": "gengetone",
+          "repeatedEditions": ["gengetone-2026-01-05", "gengetone-2026-01-12"]
+        }
+      ],
+      "recommendedAction": "Review repeated top-10 editions to determine if the data reflects genuine chart stability or a data ingestion error."
     },
-    "latestEditionTop3PerProgram": {
-      "2026-releases-kenya": {
-        "edition": "2026-2026-05-18",
-        "editionId": "93",
-        "top3": [
-          {
-            "rank": 1,
-            "title": "Not Letting Go",
-            "artist": "Bensoul"
-          },
-          {
-            "rank": 2,
-            "title": "Hallelujah (Washwash)",
-            "artist": "Khaligraph Jones, Bensoul"
-          },
-          {
-            "rank": 3,
-            "title": "Mafrrrmbanya",
-            "artist": "Watendawili"
-          }
-        ]
-      },
-      "gengetone-kenya": {
-        "edition": "gengetone-2026-05-18",
-        "editionId": "89",
-        "top3": [
-          {
-            "rank": 1,
-            "title": "Songa ka injili",
-            "artist": "Kushman, Shark Tank"
-          },
-          {
-            "rank": 2,
-            "title": "Wakiuliza",
-            "artist": "Collo Blue, Fathermoh"
-          },
-          {
-            "rank": 3,
-            "title": "PAPARAZZI",
-            "artist": "Uncojingjong"
-          }
-        ]
-      },
-      "top-songs-kenya": {
-        "edition": "kenya-2026-05-18",
-        "editionId": "87",
-        "top3": [
-          {
-            "rank": 1,
-            "title": "Hallelujah (Washwash)",
-            "artist": "Khaligraph Jones, Bensoul"
-          },
-          {
-            "rank": 2,
-            "title": "Chai ya saa kumi",
-            "artist": "Ywaya Tajiri"
-          },
-          {
-            "rank": 3,
-            "title": "We Don't Need Money to Be Rich",
-            "artist": "Mutoriah"
-          }
-        ]
-      },
-      "rnb-kenya": {
-        "edition": "rnb-2026-05-18",
-        "editionId": "91",
-        "top3": [
-          {
-            "rank": 1,
-            "title": "NERVOUS",
-            "artist": "Bee Thee Artiste, Ywaya Tajiri, AUGUST IV"
-          },
-          {
-            "rank": 2,
-            "title": "Wi Muthaka",
-            "artist": "Tuku Kantu, Muthaka"
-          },
-          {
-            "rank": 3,
-            "title": "Njia",
-            "artist": "Billy Black"
-          }
-        ]
-      }
+    {
+      "id": "WARN-006",
+      "severity": "warning",
+      "category": "route_alias",
+      "title": "Legacy aliases pointing to already-canonical slugs",
+      "description": "Some aliases use a source family slug that is identical to the legacy alias slug. These are low-risk but redundant.",
+      "affectedCount": 4,
+      "sample": [
+        {
+          "legacySlug": "gengetone",
+          "canonicalSlug": "gengetone-kenya",
+          "entityType": "chart_program",
+          "redirectStatus": "active"
+        }
+      ],
+      "recommendedAction": "Remove or mark deprecated any alias whose legacy_slug matches a canonical public_slug."
+    },
+    {
+      "id": "INFO-001",
+      "severity": "info",
+      "category": "source_provenance",
+      "title": "Source family count",
+      "description": "4 source chart family/families loaded from families.json.",
+      "affectedCount": 4,
+      "recommendedAction": "No action required."
+    },
+    {
+      "id": "INFO-002",
+      "severity": "info",
+      "category": "taxonomy",
+      "title": "Target V2 series count",
+      "description": "4 distinct series slug(s) detected across all programs.",
+      "affectedCount": 4,
+      "recommendedAction": "No action required."
+    },
+    {
+      "id": "INFO-003",
+      "severity": "info",
+      "category": "taxonomy",
+      "title": "Target V2 market count",
+      "description": "1 distinct market slug(s) detected across all programs.",
+      "affectedCount": 1,
+      "recommendedAction": "No action required."
+    },
+    {
+      "id": "INFO-004",
+      "severity": "info",
+      "category": "taxonomy",
+      "title": "Program count",
+      "description": "4 V2 chart program(s) derived from source families.",
+      "affectedCount": 4,
+      "recommendedAction": "No action required."
+    },
+    {
+      "id": "INFO-005",
+      "severity": "info",
+      "category": "source_provenance",
+      "title": "Edition count",
+      "description": "78 chart edition(s) loaded from editions.json.",
+      "affectedCount": 78,
+      "recommendedAction": "No action required."
+    },
+    {
+      "id": "INFO-006",
+      "severity": "info",
+      "category": "source_provenance",
+      "title": "Entry count",
+      "description": "6332 chart entries loaded across all edition JSON files.",
+      "affectedCount": 6332,
+      "recommendedAction": "No action required."
+    },
+    {
+      "id": "INFO-007",
+      "severity": "info",
+      "category": "route_alias",
+      "title": "Alias count",
+      "description": "10 chart_program aliases (legacy slug → canonical slug) derived.",
+      "affectedCount": 10,
+      "recommendedAction": "No action required."
+    },
+    {
+      "id": "INFO-008",
+      "severity": "info",
+      "category": "source_provenance",
+      "title": "Methodology versions detected",
+      "description": "1 distinct methodology version(s): csv-registry-import-v1.",
+      "affectedCount": 1,
+      "sample": ["csv-registry-import-v1"],
+      "recommendedAction": "No action required."
+    },
+    {
+      "id": "INFO-009",
+      "severity": "info",
+      "category": "source_provenance",
+      "title": "Eligibility rule versions detected",
+      "description": "4 distinct eligibility rule version(s): 2026-releases-kenya-v1, gengetone-kenya-v1, top-songs-kenya-v1, rnb-kenya-v1.",
+      "affectedCount": 4,
+      "sample": [
+        "2026-releases-kenya-v1",
+        "gengetone-kenya-v1",
+        "top-songs-kenya-v1",
+        "rnb-kenya-v1"
+      ],
+      "recommendedAction": "No action required."
+    }
+  ],
+  "latestEditionTop3PerProgram": {
+    "2026-releases-kenya": {
+      "edition": "2026-2026-05-18",
+      "editionId": "93",
+      "top3": [
+        { "rank": 1, "title": "Not Letting Go", "artist": "Bensoul" },
+        { "rank": 2, "title": "Hallelujah (Washwash)", "artist": "Khaligraph Jones, Bensoul" },
+        { "rank": 3, "title": "Mafrrrmbanya", "artist": "Watendawili" }
+      ]
+    },
+    "gengetone-kenya": {
+      "edition": "gengetone-2026-05-18",
+      "editionId": "89",
+      "top3": [
+        { "rank": 1, "title": "Songa ka injili", "artist": "Kushman, Shark Tank" },
+        { "rank": 2, "title": "Wakiuliza", "artist": "Collo Blue, Fathermoh" },
+        { "rank": 3, "title": "PAPARAZZI", "artist": "Uncojingjong" }
+      ]
+    },
+    "top-songs-kenya": {
+      "edition": "kenya-2026-05-18",
+      "editionId": "87",
+      "top3": [
+        { "rank": 1, "title": "Hallelujah (Washwash)", "artist": "Khaligraph Jones, Bensoul" },
+        { "rank": 2, "title": "Chai ya saa kumi", "artist": "Ywaya Tajiri" },
+        { "rank": 3, "title": "We Don't Need Money to Be Rich", "artist": "Mutoriah" }
+      ]
+    },
+    "rnb-kenya": {
+      "edition": "rnb-2026-05-18",
+      "editionId": "91",
+      "top3": [
+        { "rank": 1, "title": "NERVOUS", "artist": "Bee Thee Artiste, Ywaya Tajiri, AUGUST IV" },
+        { "rank": 2, "title": "Wi Muthaka", "artist": "Tuku Kantu, Muthaka" },
+        { "rank": 3, "title": "Njia", "artist": "Billy Black" }
+      ]
     }
   }
 }
