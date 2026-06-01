@@ -78,35 +78,21 @@ export async function repairedResponse(resource: string, limit = 120): Promise<R
         legacy_wp_post_id as id,
         slug,
         title,
-        coalesce(nullif(source_payload->>'category',''),'Article') as section,
+        coalesce(nullif(source_payload->>'category',''), 'Article') as section,
         coalesce(nullif(source_payload->>'excerpt',''), nullif(source_payload->>'post_excerpt',''), '') as dek,
-        coalesce(nullif(source_payload->>'author',''),'WAKILISHA Editorial') as author,
+        coalesce(nullif(source_payload->>'author',''), 'WAKILISHA Editorial') as author,
         coalesce(nullif(source_payload->>'post_date',''), nullif(source_payload->>'date',''), 'Undated') as date,
         coalesce(nullif(source_payload->>'featured_image_url',''), nullif(source_payload->>'image',''), '') as hero_url
       from wakilisha_repaired.content_route_classification
       where classification = 'article'
         and migration_action = 'migrate_to_article'
-        and coalesce(needs_review,false) = false
+        and coalesce(needs_review, false) = false
         and slug is not null
         and title is not null
-        and lower(coalesce(source_payload->>'post_type', source_payload->>'type', 'post')) not in (
+        and lower(coalesce(legacy_post_type, source_payload->>'post_type', source_payload->>'type', 'post')) not in (
           'page', 'product', 'attachment', 'nav_menu_item', 'revision'
         )
-        and lower(coalesce(slug, '')) not in (
-          'about', 'account', 'account-settings', 'archive', 'cart', 'checkout', 'claim-your-name',
-          'contacts', 'corrections', 'faq', 'faqs', 'home', 'journal', 'labels', 'lifestyle',
-          'login', 'magazine', 'music', 'my-account', 'my-library', 'my-top-10', 'news-resources',
-          'opinion', 'order-tracking', 'plan', 'play', 'privacy', 'profile', 'profile1', 'settings',
-          'short-stories', 'sports', 'the-registry', 'venues'
-        )
-        and lower(coalesce(title, '')) not in (
-          'about', 'account', 'account settings', 'archive', 'artists', 'cart', 'chart methodology',
-          'checkout', 'claim your name', 'contacts', 'corrections', 'duka', 'events', 'faq', 'faqs', 'home',
-          'journal', 'labels', 'lifestyle', 'login', 'magazine', 'music', 'my account', 'my library',
-          'my top 10', 'news & resources', 'opinion', 'order tracking', 'plan', 'play', 'privacy',
-          'profile', 'science and technology', 'settings', 'short stories', 'sports', 'the registry©',
-          'venues'
-        )
+        and lower(coalesce(source_payload->>'post_status', source_payload->>'status', 'publish')) in ('publish', 'published')
         and lower(coalesce(slug, '')) not like '%account%'
         and lower(coalesce(slug, '')) not like '%checkout%'
         and lower(coalesce(slug, '')) not like '%order-tracking%'
@@ -114,50 +100,94 @@ export async function repairedResponse(resource: string, limit = 120): Promise<R
         and lower(coalesce(slug, '')) not like '%profile%'
         and lower(coalesce(slug, '')) not like '%settings%'
         and lower(coalesce(slug, '')) not like 'my-%'
+        and lower(coalesce(title, '')) not in (
+          'about', 'account', 'account settings', 'cart', 'checkout', 'contacts', 'faq', 'faqs',
+          'login', 'my account', 'my library', 'order tracking', 'privacy', 'profile', 'settings'
+        )
         and (
-          length(coalesce(nullif(source_payload->>'post_content',''), nullif(source_payload->>'content',''), '')) > 280
-          or length(coalesce(nullif(source_payload->>'excerpt',''), nullif(source_payload->>'post_excerpt',''), '')) > 80
+          length(coalesce(nullif(source_payload->>'post_content',''), nullif(source_payload->>'content',''), '')) > 80
+          or length(coalesce(nullif(source_payload->>'excerpt',''), nullif(source_payload->>'post_excerpt',''), '')) > 20
+          or coalesce(nullif(source_payload->>'featured_image_url',''), nullif(source_payload->>'image',''), '') <> ''
         )
       order by nullif(source_payload->>'post_date','') desc nulls last, title asc
       limit $1
     `, [limit]);
-    return { stories: rows.map((row, index) => ({ id: s(row, "id") || s(row, "slug"), slug: s(row, "slug"), title: s(row, "title"), section: s(row, "section") || "Article", dek: s(row, "dek"), author: s(row, "author"), date: s(row, "date"), readingTime: Math.max(1, Math.min(9, Math.round((s(row, "dek").length || 300) / 240))), heroUrl: s(row, "hero_url") || `https://picsum.photos/seed/wakilisha-story-${index}/1200/800` })) };
+    return {
+      stories: rows.map((row, index) => ({
+        id: s(row, "id") || s(row, "slug"),
+        slug: s(row, "slug"),
+        title: s(row, "title"),
+        section: s(row, "section") || "Article",
+        dek: s(row, "dek"),
+        author: s(row, "author"),
+        date: s(row, "date"),
+        readingTime: Math.max(1, Math.min(9, Math.round((s(row, "dek").length || 300) / 240))),
+        heroUrl: s(row, "hero_url") || `https://picsum.photos/seed/wakilisha-story-${index}/1200/800`,
+      }))
+    };
   }
 
   if (resource === "artists") {
     const rows = await q(`
       with canonical_artists as (
         select
-          ta.artist_id as id,
-          max(nullif(trim(ta.artist_name_snapshot), '')) filter (
-            where trim(coalesce(ta.artist_name_snapshot, '')) <> ''
-              and lower(trim(ta.artist_name_snapshot)) !~ '^artist\\s+[0-9]+$'
-          ) as name,
-          count(distinct ta.track_id)::int as track_count,
+          wa.id::text as id,
+          wa.source_wp_post_id::text as source_wp_post_id,
+          wa.slug,
+          trim(wa.display_name) as name,
+          nullif(trim(coalesce(wa.country, '')), '') as country,
+          coalesce(nullif(wa.portrait_image_url, ''), nullif(wa.hero_image_url, '')) as image_url,
+          regexp_replace(lower(trim(wa.display_name)), '[^a-z0-9]+', '', 'g') as name_key
+        from public.wk_artists wa
+        where trim(coalesce(wa.display_name, '')) <> ''
+          and coalesce(wa.wp_status, 'publish') = 'publish'
+      ),
+      artist_track_links as (
+        select distinct
+          ca.id as canonical_artist_id,
+          ta.track_id,
+          ta.artist_id as repaired_artist_id
+        from canonical_artists ca
+        join wakilisha_repaired.track_artists ta
+          on ta.artist_id = ca.id
+          or (ca.source_wp_post_id is not null and ta.artist_id = ca.source_wp_post_id)
+          or regexp_replace(lower(trim(coalesce(ta.artist_name_snapshot, ''))), '[^a-z0-9]+', '', 'g') = ca.name_key
+      ),
+      artist_metrics as (
+        select
+          atl.canonical_artist_id as id,
+          count(distinct atl.track_id)::int as track_count,
           count(distinct rt.release_id)::int as release_count,
           count(distinct cet.chart_entry_id)::int as chart_count,
           min(ce.rank)::int as top_chart_position,
           coalesce(
             array_remove(
-              array_agg(distinct case
-                when ag.genre_id ~ '[A-Za-z]' then ag.genre_id
-                else null
-              end),
+              array_agg(distinct case when ag.genre_id ~ '[A-Za-z]' then ag.genre_id else null end),
               null
             ),
             array[]::text[]
           ) as genres
-        from wakilisha_repaired.track_artists ta
-        left join wakilisha_repaired.release_tracks rt on rt.track_id = ta.track_id
-        left join wakilisha_repaired.chart_entry_tracks cet on cet.track_id = ta.track_id
+        from artist_track_links atl
+        left join wakilisha_repaired.release_tracks rt on rt.track_id = atl.track_id
+        left join wakilisha_repaired.chart_entry_tracks cet on cet.track_id = atl.track_id
         left join wk_chart_entries_v2 ce on ce.id::text = cet.chart_entry_id
-        left join wakilisha_repaired.artist_genres ag on ag.artist_id = ta.artist_id
-        group by ta.artist_id
+        left join wakilisha_repaired.artist_genres ag on ag.artist_id = atl.repaired_artist_id
+        group by atl.canonical_artist_id
       )
-      select *
-      from canonical_artists
-      where name is not null
-      order by chart_count desc, track_count desc, release_count desc, name asc
+      select
+        ca.id,
+        ca.slug,
+        ca.name,
+        ca.country,
+        ca.image_url,
+        coalesce(am.track_count, 0) as track_count,
+        coalesce(am.release_count, 0) as release_count,
+        coalesce(am.chart_count, 0) as chart_count,
+        am.top_chart_position,
+        coalesce(am.genres, array[]::text[]) as genres
+      from canonical_artists ca
+      left join artist_metrics am on am.id = ca.id
+      order by coalesce(am.chart_count, 0) desc, coalesce(am.track_count, 0) desc, coalesce(am.release_count, 0) desc, ca.name asc
       limit $1
     `, [limit]);
     return {
@@ -167,10 +197,10 @@ export async function repairedResponse(resource: string, limit = 120): Promise<R
         const chartCount = n(row, "chart_count");
         return {
           id: s(row, "id"),
-          slug: `${slugify(name)}-${s(row, "id")}`,
+          slug: s(row, "slug") || `${slugify(name)}-${s(row, "id")}`,
           name,
-          country: null,
-          imageUrl: null,
+          country: s(row, "country") || null,
+          imageUrl: s(row, "image_url") || null,
           genres: Array.isArray(row.genres) ? row.genres.map(String).slice(0, 4) : [],
           trackCount: n(row, "track_count"),
           releaseCount: n(row, "release_count"),
