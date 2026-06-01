@@ -78,6 +78,17 @@ function sqlLiteral(value: string): string {
   return `'${value.replace(/'/g, "''")}'`;
 }
 
+function normalizeDatabaseUrlForPg(databaseUrl: string): string {
+  try {
+    const url = new URL(databaseUrl);
+    url.searchParams.delete("sslmode");
+    url.searchParams.delete("uselibpqcompat");
+    return url.toString();
+  } catch {
+    return databaseUrl;
+  }
+}
+
 class JsonV2Repository implements V2Repository {
   kind = "json-local" as const;
   private manifest = readJson<Record<string, unknown>>(path.join(dataRoot, "manifest.json"));
@@ -227,8 +238,12 @@ export class DatabaseV2Repository implements V2Repository {
       throw new Error("DatabaseV2Repository requires DATABASE_URL.");
     }
     this.pool = new pg.Pool({
-      connectionString: this.databaseUrl,
+      connectionString: normalizeDatabaseUrlForPg(this.databaseUrl),
       ssl: { rejectUnauthorized: false },
+      connectionTimeoutMillis: 10000,
+      query_timeout: 10000,
+      statement_timeout: 10000,
+      max: 4,
     });
   }
 
