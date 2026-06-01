@@ -8,6 +8,15 @@ import type {
 import { fromWpChartFamily, fromWpChartEdition } from "../chartsIngestion/normalizers";
 
 import { publicWpGet, PublicWpApiError } from "./wpAdapter";
+import {
+  getV2ChartEdition,
+  getV2ChartEditionEntries,
+  getV2ChartEditionsForFamily,
+  getV2ChartFamilies,
+  getV2ChartFamily,
+  getV2LatestChartEdition,
+  getV2TrackChartHistory,
+} from "./v2Adapter";
 
 import {
   getCachedChart,
@@ -44,6 +53,9 @@ export const PUBLIC_API_BASE =
 export const PUBLIC_MODE =
   (import.meta.env.VITE_CHARTS_PUBLIC_MODE as "mock" | "wordpress") || "mock";
 
+export const PUBLIC_API_VERSION =
+  (import.meta.env.VITE_CHARTS_PUBLIC_API_VERSION as "v1" | "v2") || "v1";
+
 if (import.meta.env.DEV && !import.meta.env.VITE_WAKILISHA_WP_API_BASE) {
   // eslint-disable-next-line no-console
   console.warn(
@@ -69,6 +81,10 @@ export interface ChartResult<T> {
 // ─── Helpers ───
 function isMock(): boolean {
   return PUBLIC_MODE === "mock";
+}
+
+function isV2WordPress(): boolean {
+  return PUBLIC_MODE === "wordpress" && PUBLIC_API_VERSION === "v2";
 }
 
 function now(): string {
@@ -131,13 +147,16 @@ async function withCache<T>(
 // ─── API Functions ───
 
 export function getChartFamilies(): Promise<ChartResult<ChartFamily[]>> {
-  return withCache("chart_families", async () => {
+  return withCache(`chart_families_${PUBLIC_API_VERSION}`, async () => {
     if (isMock()) {
       const csvData = await useCsvPublicData();
       return {
         data: csvData ? await getCsvFamilies() : [...MOCK_FAMILIES],
         source: "mock",
       };
+    }
+    if (isV2WordPress()) {
+      return { data: await getV2ChartFamilies(), source: "wordpress" };
     }
     const res = await publicWpGet<{ families: unknown[] }>("/charts");
     return {
@@ -150,11 +169,14 @@ export function getChartFamilies(): Promise<ChartResult<ChartFamily[]>> {
 export function getChartFamily(
   familySlug: string
 ): Promise<ChartResult<ChartFamily | null>> {
-  return withCache(`chart_family_${familySlug}`, async () => {
+  return withCache(`chart_family_${PUBLIC_API_VERSION}_${familySlug}`, async () => {
     if (isMock()) {
       const csvData = await useCsvPublicData();
       const family = csvData ? await getCsvFamily(familySlug) : getMockFamily(familySlug);
       return { data: family ? { ...family } : null, source: "mock" };
+    }
+    if (isV2WordPress()) {
+      return { data: await getV2ChartFamily(familySlug), source: "wordpress" };
     }
     const res = await publicWpGet<{ family: unknown }>(`/charts/${familySlug}`);
     return {
@@ -167,13 +189,16 @@ export function getChartFamily(
 export function getChartEditionsForFamily(
   familySlug: string
 ): Promise<ChartResult<ChartEdition[]>> {
-  return withCache(`chart_family_editions_${familySlug}`, async () => {
+  return withCache(`chart_family_editions_${PUBLIC_API_VERSION}_${familySlug}`, async () => {
     if (isMock()) {
       const csvData = await useCsvPublicData();
       return {
         data: csvData ? await getCsvEditionsForFamily(familySlug) : getMockEditionsForFamily(familySlug),
         source: "mock",
       };
+    }
+    if (isV2WordPress()) {
+      return { data: await getV2ChartEditionsForFamily(familySlug), source: "wordpress" };
     }
     const res = await publicWpGet<{ editions: unknown[] }>(
       `/charts/${familySlug}/editions`
@@ -188,11 +213,14 @@ export function getChartEditionsForFamily(
 export function getLatestChartEdition(
   familySlug: string
 ): Promise<ChartResult<ChartEdition | null>> {
-  return withCache(`chart_latest_${familySlug}`, async () => {
+  return withCache(`chart_latest_${PUBLIC_API_VERSION}_${familySlug}`, async () => {
     if (isMock()) {
       const csvData = await useCsvPublicData();
       const edition = csvData ? await getCsvLatestEdition(familySlug) : getMockLatestEdition(familySlug);
       return { data: edition ? { ...edition } : null, source: "mock" };
+    }
+    if (isV2WordPress()) {
+      return { data: await getV2LatestChartEdition(familySlug), source: "wordpress" };
     }
     const res = await publicWpGet<{ edition: unknown }>(
       `/charts/${familySlug}/latest`
@@ -209,12 +237,15 @@ export function getChartEdition(
   editionSlug: string
 ): Promise<ChartResult<ChartEdition | null>> {
   return withCache(
-    `chart_edition_${familySlug}_${editionSlug}`,
+    `chart_edition_${PUBLIC_API_VERSION}_${familySlug}_${editionSlug}`,
     async () => {
       if (isMock()) {
         const csvData = await useCsvPublicData();
         const edition = csvData ? await getCsvEdition(familySlug, editionSlug) : getMockEdition(familySlug, editionSlug);
         return { data: edition ? { ...edition } : null, source: "mock" };
+      }
+      if (isV2WordPress()) {
+        return { data: await getV2ChartEdition(familySlug, editionSlug), source: "wordpress" };
       }
       const res = await publicWpGet<{ edition: unknown }>(
         `/charts/${familySlug}/${editionSlug}`
@@ -232,7 +263,7 @@ export function getChartEditionEntries(
   editionSlug: string
 ): Promise<ChartResult<ChartEditionEntry[]>> {
   return withCache(
-    `chart_entries_${familySlug}_${editionSlug}`,
+    `chart_entries_${PUBLIC_API_VERSION}_${familySlug}_${editionSlug}`,
     async () => {
       if (isMock()) {
         const csvData = await useCsvPublicData();
@@ -242,6 +273,9 @@ export function getChartEditionEntries(
             : getMockEntriesForEdition(familySlug, editionSlug),
           source: "mock",
         };
+      }
+      if (isV2WordPress()) {
+        return { data: await getV2ChartEditionEntries(familySlug, editionSlug), source: "wordpress" };
       }
       const res = await publicWpGet<{ entries: unknown[] }>(
         `/charts/${familySlug}/${editionSlug}/entries`
@@ -257,7 +291,7 @@ export function getChartEditionEntries(
 export function getTrackChartHistory(
   trackSlug: string
 ): Promise<ChartResult<TrackChartHistory | null>> {
-  return withCache(`track_history_${trackSlug}`, async () => {
+  return withCache(`track_history_${PUBLIC_API_VERSION}_${trackSlug}`, async () => {
     if (isMock()) {
       const csvData = await useCsvPublicData();
       const csvHistory = csvData ? await getCsvTrackHistory(trackSlug) : null;
@@ -278,6 +312,9 @@ export function getTrackChartHistory(
         },
         source: "mock",
       };
+    }
+    if (isV2WordPress()) {
+      return { data: await getV2TrackChartHistory(trackSlug), source: "wordpress" };
     }
     const res = await publicWpGet<{ history: unknown }>(
       `/tracks/${trackSlug}/chart-history`
