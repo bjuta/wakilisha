@@ -53,15 +53,35 @@ function fileSizeMb(filepath: string): number {
   return Number((fs.statSync(filepath).size / 1024 / 1024).toFixed(2));
 }
 
+function stripSqlComments(sql: string): string {
+  return sql
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n")
+    .map((line) => line.replace(/--.*$/g, ""))
+    .join("\n")
+    .trim();
+}
+
+function getFinalSqlStatement(sql: string): string {
+  const cleaned = stripSqlComments(sql);
+  const statements = cleaned
+    .split(";")
+    .map((statement) => statement.trim())
+    .filter(Boolean);
+  return statements[statements.length - 1]?.toUpperCase() ?? "";
+}
+
+function isRollbackOnlySql(sql: string): boolean {
+  const finalStatement = getFinalSqlStatement(sql);
+  return sql.includes("BEGIN;") && finalStatement === "ROLLBACK";
+}
+
 function normalizeSqlForCommit(sql: string): string {
-  const trimmed = sql.trim();
-  if (!/ROLLBACK;\s*$/i.test(trimmed)) {
-    throw new Error("Refusing commit-mode: SQL artifact does not end with ROLLBACK; exactly as expected.");
+  if (!isRollbackOnlySql(sql)) {
+    throw new Error(`Refusing commit-mode: final executable SQL statement is ${getFinalSqlStatement(sql) || "empty"}, expected ROLLBACK.`);
   }
-  if (/COMMIT;\s*$/i.test(trimmed)) {
-    throw new Error("Refusing commit-mode: SQL artifact already contains trailing COMMIT; expected rollback-only artifact.");
-  }
-  return `${trimmed.replace(/ROLLBACK;\s*$/i, "COMMIT;")}\n`;
+  const cleaned = stripSqlComments(sql);
+  return `${cleaned.replace(/ROLLBACK\s*;?\s*$/i, "COMMIT;")}\n`;
 }
 
 function runPsql(sqlFilePath: string): { exitCode: number | null; stdout: string; stderr: string } {
@@ -127,11 +147,13 @@ add(checks, {
   detail: `blocked=${plan.blocked}; mode=${plan.mode}`,
 });
 
+const finalSqlStatement = getFinalSqlStatement(sql);
+const rollbackOnlySql = fs.existsSync(sqlPath) && isRollbackOnlySql(sql);
 add(checks, {
   id: "APPLY-003",
-  status: fs.existsSync(sqlPath) && sql.includes("BEGIN;") && /ROLLBACK;\s*$/i.test(sql.trim()) && !/COMMIT;\s*$/i.test(sql.trim()) ? "pass" : "fail",
+  status: rollbackOnlySql ? "pass" : "fail",
   title: "Source SQL artifact is rollback-only",
-  detail: `exists=${fs.existsSync(sqlPath)}; size=${fileSizeMb(sqlPath)}MB; trailingRollback=${/ROLLBACK;\s*$/i.test(sql.trim())}`,
+  detail: `exists=${fs.existsSync(sqlPath)}; size=${fileSizeMb(sqlPath)}MB; finalStatement=${finalSqlStatement || "empty"}; rollbackOnly=${rollbackOnlySql}`,
 });
 
 add(checks, {
@@ -162,7 +184,7 @@ if (mode === "readiness_only") {
   } else {
     psqlResult = runPsql(sqlPath);
     executionStatus = "executed_rollback";
-    executionDetail = "Rollback SQL executed. Because the SQL artifact ends with ROLLBACK, no persisted writes should remain if execution completed successfully.";
+    executionDetail = "Rollback SQL executed. Because the SQL artifact's final executable statement is ROLLBACK, no persisted writes should remain if execution completed successfully.";
   }
 } else if (mode === "execute_commit_sql") {
   if (!allowCommit) {
