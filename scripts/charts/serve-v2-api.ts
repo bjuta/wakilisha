@@ -20,7 +20,7 @@ type Entry = {
   score?: number;
 };
 
-const port = Number(process.env.WAKILISHA_V2_API_PORT ?? 4175);
+const port = Number(process.env.WAKILISHA_V2_API_PORT ?? 4176);
 const host = process.env.WAKILISHA_V2_API_HOST;
 const repo = createV2Repository();
 
@@ -121,6 +121,8 @@ function json(res: http.ServerResponse, status: number, body: unknown) {
     "content-type": "application/json; charset=utf-8",
     "cache-control": "public, max-age=60, stale-while-revalidate=300",
     "access-control-allow-origin": "*",
+    "access-control-allow-methods": "GET, OPTIONS",
+    "access-control-allow-headers": "Content-Type, Accept",
   });
   res.end(JSON.stringify(body, null, 2));
 }
@@ -220,18 +222,23 @@ const server = http.createServer((req, res) => {
 
 server.on("error", (err: NodeJS.ErrnoException) => {
   if (err.code === "EADDRINUSE") {
-    console.error(`WAKILISHA Chart V2 local API could not start: port ${port} is already in use.`);
-    console.error(`Stop the existing server with: fuser -k ${port}/tcp`);
-    console.error(`Or run on another port: WAKILISHA_V2_API_PORT=${port + 1} npm run charts:v2-local-api`);
+    console.error(`[WAKILISHA V2 API] Port ${port} is already in use.`);
+    console.error(`  Stop the existing server or use a different port:`);
+    console.error(`  WAKILISHA_V2_API_PORT=${port + 1} npm run charts:v2-local-api`);
     process.exitCode = 1;
     return;
   }
-  console.error("WAKILISHA Chart V2 local API failed to start:", err);
+  console.error("[WAKILISHA V2 API] Server failed to start:", err.message);
+  if (err.stack) {
+    console.error(err.stack);
+  }
   process.exitCode = 1;
 });
 
 server.listen(port, host, () => {
-  console.log(`WAKILISHA Chart V2 local read-only API listening on http://${host ?? "localhost"}:${port}/wp-json/wakilisha/v2`);
-  console.log(`Repository mode: ${repo.kind}`);
-  console.log("No database writes. No public JSON mutation.");
+  const addr = `http://${host ?? "localhost"}:${port}`;
+  console.log(`[WAKILISHA V2 API] Listening on ${addr}/wp-json/wakilisha/v2`);
+  console.log(`[WAKILISHA V2 API] Repository mode: ${repo.kind}`);
+  console.log(`[WAKILISHA V2 API] DATABASE_URL: ${process.env.DATABASE_URL ? "set" : "not set"}`);
+  console.log(`[WAKILISHA V2 API] No database writes. No public JSON mutation.`);
 });

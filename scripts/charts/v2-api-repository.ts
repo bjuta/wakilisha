@@ -1,11 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
-import pg from "pg";
+import { Pool } from "pg";
 
 const root = process.cwd();
 const dataRoot = path.join(root, "public", "charts-data");
-
-type PgPool = InstanceType<typeof pg.Pool>;
 
 export type Row = Record<string, unknown>;
 export type Entry = {
@@ -45,6 +43,8 @@ export type V2ResolvedSlug = {
 
 export interface V2Repository {
   kind: "json-local" | "database";
+  testConnection(): Promise<boolean>;
+  end(): Promise<void>;
   getCounts(): Promise<Record<string, number>>;
   getMigrationReadiness(): Promise<string>;
   resolveProgramSlug(slug: string): Promise<V2ResolvedSlug>;
@@ -121,6 +121,18 @@ class JsonV2Repository implements V2Repository {
         eligibility_version: str(family, "eligibilityRulesVersion"),
       });
     }
+  }
+
+  async testConnection(): Promise<boolean> {
+    try {
+      return this.families.length > 0;
+    } catch {
+      return false;
+    }
+  }
+
+  async end(): Promise<void> {
+    // No-op for JSON repo
   }
 
   async getCounts(): Promise<Record<string, number>> {
@@ -231,13 +243,13 @@ class JsonV2Repository implements V2Repository {
 
 export class DatabaseV2Repository implements V2Repository {
   kind = "database" as const;
-  private pool: PgPool;
+  private pool: Pool;
 
   constructor(private databaseUrl = process.env.DATABASE_URL ?? "") {
     if (!this.databaseUrl) {
       throw new Error("DatabaseV2Repository requires DATABASE_URL.");
     }
-    this.pool = new pg.Pool({
+    this.pool = new Pool({
       connectionString: normalizeDatabaseUrlForPg(this.databaseUrl),
       ssl: { rejectUnauthorized: false },
       connectionTimeoutMillis: 10000,
@@ -245,6 +257,19 @@ export class DatabaseV2Repository implements V2Repository {
       statement_timeout: 10000,
       max: 4,
     });
+  }
+
+  async testConnection(): Promise<boolean> {
+    try {
+      const result = await this.pool.query("SELECT 1 AS ok");
+      return result.rows[0]?.ok === 1;
+    } catch {
+      return false;
+    }
+  }
+
+  async end(): Promise<void> {
+    await this.pool.end();
   }
 
   private async queryJson<T>(sql: string): Promise<T> {
@@ -463,6 +488,14 @@ export class DatabaseV2Repository implements V2Repository {
 
 export function createV2Repository(): V2Repository {
   const mode = process.env.WAKILISHA_V2_REPOSITORY_MODE ?? "json";
-  if (mode === "database") return new DatabaseV2Repository();
+  if (mode === "database") {
+    if (!process.env.DATABASE_URL) {
+      throw new Error(
+        "WAKILISHA_V2_REPOSITORY_MODE=database but DATABASE_URL is not set. " +
+        "Set DATABASE_URL or switch to WAKILISHA_V2_REPOSITORY_MODE=json."
+      );
+    }
+    return new DatabaseV2Repository();
+  }
   return new JsonV2Repository();
 }

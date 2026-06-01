@@ -47,7 +47,24 @@ function fail(label: string, message: string): void {
   console.log(`${R}[${label}]${RESET} ${message}`);
 }
 
-async function healthCheck(retries = 30, delayMs = 500): Promise<boolean> {
+async function checkDbConnection(): Promise<boolean> {
+  const { Pool } = await import("pg");
+  const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false },
+    connectionTimeoutMillis: 5000,
+  });
+  try {
+    const result = await pool.query("SELECT 1 AS ok");
+    return result.rows[0]?.ok === 1;
+  } catch {
+    return false;
+  } finally {
+    await pool.end();
+  }
+}
+
+async function healthCheck(retries = 40, delayMs = 500): Promise<boolean> {
   for (let i = 0; i < retries; i++) {
     try {
       const res = await fetch(`${API_BASE}/wp-json/wakilisha/v2/charts/health`, {
@@ -62,12 +79,38 @@ async function healthCheck(retries = 30, delayMs = 500): Promise<boolean> {
   return false;
 }
 
+async function healthCheckWithData(retries = 10, delayMs = 500): Promise<{ ok: boolean; data: { repository?: string; counts?: Record<string, number> } }> {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const res = await fetch(`${API_BASE}/wp-json/wakilisha/v2/charts/health`, {
+        signal: AbortSignal.timeout(5000),
+      });
+      if (res.ok) {
+        const body = (await res.json()) as { data?: { repository?: string; counts?: Record<string, number> } };
+        const data = body.data ?? {};
+        const counts = data.counts ?? {};
+        if (counts.programs !== undefined && counts.programs > 0) {
+          return { ok: true, data };
+        }
+        if (data.repository === "json-local") {
+          return { ok: true, data };
+        }
+      }
+    } catch {
+      // ignore
+    }
+    await setTimeout(delayMs);
+  }
+  return { ok: false, data: {} };
+}
+
 async function main(): Promise<void> {
   loadDotEnvLocal();
-  console.log("\n  WAKILISHA Chart V2 Dev\n");
+  console.log("\n  WAKILISHA Chart V2 Dev Environment\n");
+  console.log("  " + "=".repeat(50) + "\n");
 
-  // [1/4] Check DATABASE_URL
-  log("1/4", "Checking DATABASE_URL...");
+  // [1/5] Check DATABASE_URL
+  log("1/5", "Checking DATABASE_URL...");
   if (!process.env.DATABASE_URL) {
     fail("FAIL", "DATABASE_URL is not set.");
     console.log(`
@@ -75,13 +118,30 @@ async function main(): Promise<void> {
    DATABASE_URL=postgresql://...
    WAKILISHA_V2_REPOSITORY_MODE=database
    WAKILISHA_V2_API_PORT=4176
+
+   Or run without database:
+   WAKILISHA_V2_REPOSITORY_MODE=json npm run dev:v2
  `);
     process.exit(1);
   }
   ok("OK", "DATABASE_URL present");
 
-  // [2/4] Start API
-  log("2/4", `Starting V2 API on ${API_PORT}...`);
+  // [2/5] Check database connection
+  log("2/5", "Testing database connection...");
+  const dbConnected = await checkDbConnection();
+  if (!dbConnected) {
+    fail("FAIL", "Cannot connect to database.");
+    console.log(`
+   Check your DATABASE_URL and network access.
+   Supabase connection requires SSL (rejectUnauthorized: false).
+   If using a local Postgres, remove the ssl parameter from the connection.
+ `);
+    process.exit(1);
+  }
+  ok("OK", "Database connection established");
+
+  // [3/5] Start API
+  log("3/5", `Starting V2 API on port ${API_PORT}...`);
   const apiEnv = {
     ...process.env,
     WAKILISHA_V2_REPOSITORY_MODE: "database",
@@ -97,12 +157,20 @@ async function main(): Promise<void> {
 
   apiProc.stdout?.on("data", (data: Buffer) => {
     const text = data.toString().trim();
-    if (text.includes("listening")) {
+    if (text.includes("listening") || text.includes("Listening")) {
       ok("API", text);
+    } else {
+      console.log(`${Y}[API]${RESET} ${text}`);
     }
   });
   apiProc.stderr?.on("data", (data: Buffer) => {
-    console.error(`${R}[API stderr]${RESET} ${data.toString().trim()}`);
+    const text = data.toString().trim();
+    if (text.includes("SSL") || text.includes("certificate")) {
+      console.error(`${Y}[API SSL]${RESET} ${text}`);
+      console.error(`${Y}[NOTE]${RESET} This is a non-blocking warning for Supabase SSL. The API should still work.`);
+    } else {
+      console.error(`${R}[API stderr]${RESET} ${text}`);
+    }
   });
 
   apiProc.on("error", (err: Error) => {
@@ -111,44 +179,30 @@ async function main(): Promise<void> {
   });
 
   apiProc.on("exit", (code: number | null) => {
-    if (code !== null && code !== 0) {
+    if (code !== null && code !== 0 && code !== 143) {
       fail("API", `Exited with code ${code}`);
       process.exit(1);
     }
   });
 
-  // [3/4] Health check
-  log("3/4", "Waiting for API health check...");
-  const healthy = await healthCheck();
+  // [4/5] Health check with data validation
+  log("4/5", "Waiting for API health check...");
+  const { ok: healthy, data } = await healthCheckWithData();
   if (!healthy) {
-    fail("FAIL", "API health check failed after 15s. The API may have crashed.");
+    fail("FAIL", "API health check failed or returned empty data. The API may have crashed.");
     apiProc.kill();
     process.exit(1);
   }
 
-  try {
-    const res = await fetch(`${API_BASE}/wp-json/wakilisha/v2/charts/health`, {
-      signal: AbortSignal.timeout(5000),
-    });
-    const body = (await res.json()) as {
-      data?: {
-        repository?: string;
-        counts?: Record<string, number>;
-      };
-    };
-    ok("OK", "Health check passed");
-    const data = body.data ?? {};
-    const counts = data.counts ?? {};
-    console.log(`  repository: ${data.repository ?? "unknown"}`);
-    console.log(`  programs: ${counts.programs ?? "?"}`);
-    console.log(`  editions: ${counts.editions ?? "?"}`);
-    console.log(`  entries: ${counts.entries ?? "?"}`);
-  } catch {
-    ok("OK", "Health check passed (basic)");
-  }
+  ok("OK", "Health check passed with data");
+  const counts = data.counts ?? {};
+  console.log(`  repository: ${data.repository ?? "unknown"}`);
+  console.log(`  programs: ${counts.programs ?? "?"}`);
+  console.log(`  editions: ${counts.editions ?? "?"}`);
+  console.log(`  entries: ${counts.entries ?? "?"}`);
 
-  // [4/4] Start Vite
-  log("4/4", `Starting Vite on ${VITE_PORT}...`);
+  // [5/5] Start Vite
+  log("5/5", `Starting Vite dev server on port ${VITE_PORT}...`);
   const viteEnv = {
     ...process.env,
     VITE_CHARTS_PUBLIC_MODE: "wordpress",
@@ -171,24 +225,44 @@ async function main(): Promise<void> {
 
   console.log("\n");
   ok("READY", "Chart V2 dev mode is running");
-  console.log(`\n  Frontend:    http://localhost:${VITE_PORT}/charts`);
-  console.log(`  Proxy API:   http://localhost:${VITE_PORT}${PROXY_PATH}/charts/health`);
-  console.log(`  Direct API:  ${API_BASE}/wp-json/wakilisha/v2/charts/health`);
+  console.log(`\n  ${"=".repeat(50)}\n`);
+  console.log(`  Frontend:      http://localhost:${VITE_PORT}/`);
+  console.log(`  Charts:        http://localhost:${VITE_PORT}/charts`);
+  console.log(`  Proxy API:     http://localhost:${VITE_PORT}${PROXY_PATH}/charts/health`);
+  console.log(`  Direct API:    ${API_BASE}/wp-json/wakilisha/v2/charts/health`);
+  console.log(`\n  Quick test:    curl -i http://localhost:${VITE_PORT}${PROXY_PATH}/charts/health`);
   console.log(`\n  Press Ctrl+C to stop.\n`);
 
   // Graceful shutdown
   const shutdown = (signal: string): void => {
     console.log(`\n${Y}[${signal}]${RESET} Shutting down...`);
-    viteProc.kill();
-    apiProc.kill();
-    process.exit(0);
+    try {
+      viteProc.kill("SIGTERM");
+      apiProc.kill("SIGTERM");
+    } catch {
+      viteProc.kill();
+      apiProc.kill();
+    }
+    setTimeout(2000).then(() => {
+      try {
+        viteProc.kill("SIGKILL");
+        apiProc.kill("SIGKILL");
+      } catch {
+        // ignore
+      }
+      process.exit(0);
+    });
   };
 
   process.on("SIGINT", () => shutdown("SIGINT"));
   process.on("SIGTERM", () => shutdown("SIGTERM"));
   process.on("exit", () => {
-    viteProc.kill();
-    apiProc.kill();
+    try {
+      viteProc.kill();
+      apiProc.kill();
+    } catch {
+      // ignore
+    }
   });
 }
 

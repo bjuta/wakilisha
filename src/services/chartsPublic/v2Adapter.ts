@@ -6,13 +6,22 @@ import type {
 } from "./types";
 import { PublicWpApiError } from "./wpAdapter";
 
-const isDev = import.meta.env.DEV;
-const DEFAULT_V2_BASE = isDev
-  ? "/__wakilisha-v2-api/wp-json/wakilisha/v2"
-  : "/wp-json/wakilisha/v2";
+// Deterministic base path: never use dynamic host detection.
+// In dev, Vite proxy handles routing to the local API.
+// In prod, the WordPress plugin handles routing.
+// The env var is injected by the dev script or build config.
+const RAW_BASE =
+  import.meta.env.VITE_WAKILISHA_WP_V2_API_BASE || "/wp-json/wakilisha/v2";
 
-export const PUBLIC_V2_API_BASE =
-  import.meta.env.VITE_WAKILISHA_WP_V2_API_BASE || DEFAULT_V2_BASE;
+// Handle __BASE_PATH__ safely: default to "/" in dev if undefined.
+const BASE_PATH =
+  typeof __BASE_PATH__ !== "undefined" ? __BASE_PATH__ : "/";
+
+// Ensure the base path is prepended to the API base if needed.
+// RAW_BASE already starts with "/", so we strip any trailing slash from BASE_PATH
+// and prepend it to RAW_BASE.
+const normalizedBasePath = BASE_PATH.replace(/\/$/, "");
+export const PUBLIC_V2_API_BASE = normalizedBasePath + RAW_BASE;
 
 type ApiEnvelope<T> = {
   data: T;
