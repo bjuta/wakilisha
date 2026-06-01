@@ -1,3 +1,10 @@
+import type { ChartEdition, ChartEditionEntry } from "../../src/services/chartsPublic/types";
+import {
+  CSV_PUBLIC_CHART_DATA,
+  hasCsvPublicChartData,
+  getCsvEntriesForEdition,
+  getCsvEditionsForFamily,
+} from "../../src/services/chartsPublic/csvData";
 import {
   MOCK_EDITIONS,
   MOCK_ENTRIES,
@@ -5,14 +12,26 @@ import {
   getMockEntriesForEdition,
 } from "../../src/services/chartsPublic/mockData";
 
-function signature(entries: typeof MOCK_ENTRIES) {
+const usingCsv = hasCsvPublicChartData();
+const EDITIONS: ChartEdition[] = usingCsv ? CSV_PUBLIC_CHART_DATA.editions : MOCK_EDITIONS;
+const ENTRIES: ChartEditionEntry[] = usingCsv ? CSV_PUBLIC_CHART_DATA.entries : MOCK_ENTRIES;
+
+function getEntriesForEdition(familySlug: string, editionSlug: string) {
+  return usingCsv ? getCsvEntriesForEdition(familySlug, editionSlug) : getMockEntriesForEdition(familySlug, editionSlug);
+}
+
+function getEditionsForFamily(familySlug: string) {
+  return usingCsv ? getCsvEditionsForFamily(familySlug) : getMockEditionsForFamily(familySlug);
+}
+
+function signature(entries: ChartEditionEntry[]) {
   return entries
     .slice(0, 10)
     .map((entry) => `${entry.rank}:${entry.trackTitle}:${entry.artistNames.join("/")}`)
     .join("|");
 }
 
-function topThree(entries: typeof MOCK_ENTRIES) {
+function topThree(entries: ChartEditionEntry[]) {
   return entries
     .slice(0, 3)
     .map((entry) => `#${entry.rank} ${entry.trackTitle} — ${entry.artistNames.join(", ")}`)
@@ -30,9 +49,19 @@ const report: {
   top3: string;
 }[] = [];
 
-for (const edition of MOCK_EDITIONS) {
+const duplicateEditionIds = EDITIONS.length - new Set(EDITIONS.map((edition) => edition.id)).size;
+if (duplicateEditionIds > 0) {
+  errors.push(`${duplicateEditionIds} duplicate edition IDs found in ${usingCsv ? "CSV" : "mock"} chart data`);
+}
+
+const duplicateEntryIds = ENTRIES.length - new Set(ENTRIES.map((entry) => entry.id)).size;
+if (duplicateEntryIds > 0) {
+  errors.push(`${duplicateEntryIds} duplicate entry IDs found in ${usingCsv ? "CSV" : "mock"} chart data`);
+}
+
+for (const edition of EDITIONS) {
   const familySlug = edition.familyId;
-  const entries = getMockEntriesForEdition(familySlug, edition.slug);
+  const entries = getEntriesForEdition(familySlug, edition.slug);
   const uniqueEntryIds = new Set(entries.map((entry) => entry.id));
 
   if (entries.length !== uniqueEntryIds.size) {
@@ -58,8 +87,8 @@ for (const edition of MOCK_EDITIONS) {
   });
 }
 
-const editionsByFamily = new Map<string, typeof MOCK_EDITIONS>();
-for (const edition of MOCK_EDITIONS) {
+const editionsByFamily = new Map<string, ChartEdition[]>();
+for (const edition of EDITIONS) {
   const list = editionsByFamily.get(edition.familyId) ?? [];
   list.push(edition);
   editionsByFamily.set(edition.familyId, list);
@@ -68,7 +97,7 @@ for (const edition of MOCK_EDITIONS) {
 for (const [familySlug, editions] of editionsByFamily) {
   const signatures = editions.map((edition) => ({
     edition,
-    signature: signature(getMockEntriesForEdition(familySlug, edition.slug)),
+    signature: signature(getEntriesForEdition(familySlug, edition.slug)),
   }));
 
   for (let i = 0; i < signatures.length; i += 1) {
@@ -83,17 +112,21 @@ for (const [familySlug, editions] of editionsByFamily) {
 }
 
 for (const familySlug of Array.from(editionsByFamily.keys())) {
-  const editions = getMockEditionsForFamily(familySlug);
+  const editions = getEditionsForFamily(familySlug);
   for (const edition of editions) {
-    const entries = getMockEntriesForEdition(familySlug, edition.slug);
+    const entries = getEntriesForEdition(familySlug, edition.slug);
     if (entries.some((entry) => entry.editionId !== edition.id)) {
       errors.push(`${familySlug}/${edition.slug}: route helper returned cross-edition entries`);
     }
   }
 }
 
-console.log("\nWAKILISHA chart partitioning report");
-console.table(report);
+console.log(`\nWAKILISHA chart partitioning report (${usingCsv ? "CSV-backed public data" : "mock fallback"})`);
+console.log(`Families: ${editionsByFamily.size}, editions: ${EDITIONS.length}, entries: ${ENTRIES.length}`);
+console.table(report.slice(0, 80));
+if (report.length > 80) {
+  console.log(`… ${report.length - 80} more editions omitted from console table`);
+}
 
 if (warnings.length) {
   console.warn("\nWarnings:");
