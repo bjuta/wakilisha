@@ -5,6 +5,7 @@ import {
   programId,
   type V2Repository,
 } from "./v2-api-repository";
+import { repairedResponse } from "./repaired-content-api";
 
 type Row = Record<string, unknown>;
 type Entry = {
@@ -133,11 +134,18 @@ function error(res: http.ServerResponse, status: number, code: string, message: 
 
 async function route(req: http.IncomingMessage, res: http.ServerResponse) {
   try {
+    if (req.method === "OPTIONS") return json(res, 200, {});
     if (req.method !== "GET") return error(res, 405, "method_not_allowed", "Only GET is supported.");
     const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
     const prefix = "/wp-json/wakilisha/v2";
     if (!url.pathname.startsWith(prefix)) return error(res, 404, "not_found", "Route not found.");
     const parts = url.pathname.slice(prefix.length).split("/").filter(Boolean).map(decodeURIComponent);
+
+    if (parts.length >= 2 && parts[0] === "repaired") {
+      const limit = Math.min(Number(url.searchParams.get("limit") ?? 120) || 120, 500);
+      const data = await repairedResponse(parts[1], limit);
+      return json(res, 200, envelope(data, { namespace: "repaired", resource: parts[1] }));
+    }
 
     if (parts.join("/") === "charts/health") {
       return json(res, 200, envelope({
@@ -259,6 +267,6 @@ async function startServer(): Promise<void> {
 }
 
 startServer().catch((err) => {
-  console.error("[WAKILISHA V2 API] Unhandled startup error:", err instanceof Error ? err.message : err);
+  console.error("[WAKILISHA V2 API] Fatal startup error:", err instanceof Error ? err.message : err);
   process.exit(1);
 });
