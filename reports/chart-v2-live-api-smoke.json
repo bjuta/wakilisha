@@ -1,21 +1,103 @@
 {
-  "generatedAt": "2026-06-01T10:33:46.258Z",
-  "mode": "no-network-skipped",
-  "liveBase": null,
+  "generatedAt": "2026-06-01T10:44:36.460Z",
+  "mode": "live-api-smoke",
+  "liveBase": "http://localhost:4175/wp-json/wakilisha/v2",
   "timeoutMs": 30000,
   "fixtureSource": "reports/chart-v2-api-fixtures.json",
   "summary": {
-    "pass": 0,
+    "pass": 11,
     "fail": 0,
     "warning": 0,
-    "skipped": 1
+    "skipped": 0
   },
   "checks": [
     {
-      "id": "LIVE-000",
-      "status": "skipped",
-      "title": "Live V2 API smoke test skipped",
-      "detail": "Set WAKILISHA_V2_LIVE_API_SMOKE=1 and WAKILISHA_V2_LIVE_API_BASE=https://example.com/wp-json/wakilisha/v2 to run live checks."
+      "id": "LIVE-001",
+      "status": "pass",
+      "title": "Health endpoint responds",
+      "detail": "HTTP 200",
+      "endpoint": "/charts/health",
+      "durationMs": 125
+    },
+    {
+      "id": "LIVE-002",
+      "status": "pass",
+      "title": "Program list count matches fixture contract",
+      "detail": "live=4; fixture=4; HTTP 200",
+      "endpoint": "/charts",
+      "durationMs": 6
+    },
+    {
+      "id": "LIVE-003",
+      "status": "pass",
+      "title": "Latest edition matches fixture for 2026-releases-kenya",
+      "detail": "live=2026-2026-05-18; fixture=2026-2026-05-18; HTTP 200",
+      "endpoint": "/charts/2026-releases-kenya/latest",
+      "durationMs": 62
+    },
+    {
+      "id": "LIVE-004",
+      "status": "pass",
+      "title": "Edition entry count matches fixture for 2026-releases-kenya/2026-2026-05-18",
+      "detail": "live=100; fixture=100; HTTP 200",
+      "endpoint": "/charts/2026-releases-kenya/2026-2026-05-18/entries",
+      "durationMs": 52
+    },
+    {
+      "id": "LIVE-005",
+      "status": "pass",
+      "title": "Latest edition matches fixture for gengetone-kenya",
+      "detail": "live=gengetone-2026-05-18; fixture=gengetone-2026-05-18; HTTP 200",
+      "endpoint": "/charts/gengetone-kenya/latest",
+      "durationMs": 33
+    },
+    {
+      "id": "LIVE-006",
+      "status": "pass",
+      "title": "Edition entry count matches fixture for gengetone-kenya/gengetone-2026-05-18",
+      "detail": "live=50; fixture=50; HTTP 200",
+      "endpoint": "/charts/gengetone-kenya/gengetone-2026-05-18/entries",
+      "durationMs": 13
+    },
+    {
+      "id": "LIVE-007",
+      "status": "pass",
+      "title": "Latest edition matches fixture for top-songs-kenya",
+      "detail": "live=kenya-2026-05-18; fixture=kenya-2026-05-18; HTTP 200",
+      "endpoint": "/charts/top-songs-kenya/latest",
+      "durationMs": 27
+    },
+    {
+      "id": "LIVE-008",
+      "status": "pass",
+      "title": "Edition entry count matches fixture for top-songs-kenya/kenya-2026-05-18",
+      "detail": "live=100; fixture=100; HTTP 200",
+      "endpoint": "/charts/top-songs-kenya/kenya-2026-05-18/entries",
+      "durationMs": 24
+    },
+    {
+      "id": "LIVE-009",
+      "status": "pass",
+      "title": "Latest edition matches fixture for rnb-kenya",
+      "detail": "live=rnb-2026-05-18; fixture=rnb-2026-05-18; HTTP 200",
+      "endpoint": "/charts/rnb-kenya/latest",
+      "durationMs": 14
+    },
+    {
+      "id": "LIVE-010",
+      "status": "pass",
+      "title": "Edition entry count matches fixture for rnb-kenya/rnb-2026-05-18",
+      "detail": "live=100; fixture=100; HTTP 200",
+      "endpoint": "/charts/rnb-kenya/rnb-2026-05-18/entries",
+      "durationMs": 13
+    },
+    {
+      "id": "LIVE-011",
+      "status": "pass",
+      "title": "Legacy alias resolves to canonical slug",
+      "detail": "legacy=2026; expected=2026-releases-kenya; HTTP 200",
+      "endpoint": "/charts/resolve/2026",
+      "durationMs": 1
     }
   ]
 }
