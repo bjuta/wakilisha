@@ -6,8 +6,28 @@ import type {
 } from "./types";
 import { PublicWpApiError } from "./wpAdapter";
 
-export const PUBLIC_V2_API_BASE =
+const RAW_PUBLIC_V2_API_BASE =
   import.meta.env.VITE_WAKILISHA_WP_V2_API_BASE || "/wp-json/wakilisha/v2";
+
+function resolvePublicV2ApiBase(base: string): string {
+  if (typeof window === "undefined") return base;
+  if (!window.location.hostname.endsWith(".app.github.dev")) return base;
+
+  try {
+    const url = new URL(base);
+    if (url.hostname !== "localhost" && url.hostname !== "127.0.0.1") return base;
+
+    const forwardedHost = window.location.hostname.replace(/-(\d+)\.app\.github\.dev$/, `-${url.port}.app.github.dev`);
+    url.protocol = window.location.protocol;
+    url.hostname = forwardedHost;
+    url.port = "";
+    return url.toString().replace(/\/$/, "");
+  } catch {
+    return base;
+  }
+}
+
+export const PUBLIC_V2_API_BASE = resolvePublicV2ApiBase(RAW_PUBLIC_V2_API_BASE);
 
 type ApiEnvelope<T> = {
   data: T;
