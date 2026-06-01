@@ -1,6 +1,6 @@
 # Chart V2 API Fixture Contract Check
 
-Generated: 2026-06-01T09:56:12.384Z
+Generated: 2026-06-01T09:58:57.424Z
 
 Mode: **fixture-contract-check-no-network**
 
