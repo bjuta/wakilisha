@@ -193,6 +193,20 @@ function familyPublicSlug(family: ChartFamily): string {
   return family.publicSlug ?? family.slug ?? family.familyKey;
 }
 
+function editionBelongsToFamily(edition: ChartEdition, family: ChartFamily): boolean {
+  const publicSlug = familyPublicSlug(family);
+  const sourceFamilySlug = family.sourceFamilySlug ?? family.familyKey ?? family.id;
+  const candidates = new Set([
+    family.id,
+    family.slug,
+    family.familyKey,
+    family.publicSlug,
+    publicSlug,
+    sourceFamilySlug,
+  ].filter(Boolean));
+  return candidates.has(edition.familyId);
+}
+
 // ─── Adapter functions ───
 
 export function toChartEntryRowViewModel(
@@ -237,7 +251,7 @@ export function toChartFamilyViewModel(
 ): ChartFamilyViewModel {
   const sourceFamilySlug = family.sourceFamilySlug ?? family.familyKey ?? family.id;
   const publicSlug = familyPublicSlug(family);
-  const familyEditions = editions.filter((e) => e.familyId === sourceFamilySlug || e.familyId === family.id);
+  const familyEditions = editions.filter((e) => editionBelongsToFamily(e, family));
   const latest = familyEditions[0];
   return {
     id: family.id,
