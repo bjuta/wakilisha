@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import path from "node:path";
 import { spawn } from "node:child_process";
 import { setTimeout } from "node:timers/promises";
 
@@ -12,6 +14,28 @@ const R = "\x1b[31m";
 const Y = "\x1b[33m";
 const B = "\x1b[36m";
 const RESET = "\x1b[0m";
+
+function loadDotEnvLocal(): void {
+  const envPath = path.join(process.cwd(), ".env.local");
+  if (!fs.existsSync(envPath)) return;
+
+  const lines = fs.readFileSync(envPath, "utf8").split(/\r?\n/);
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+
+    const match = trimmed.match(/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/);
+    if (!match) continue;
+
+    const [, key, rawValue] = match;
+    if (process.env[key] !== undefined) continue;
+
+    const value = rawValue
+      .trim()
+      .replace(/^['"]|['"]$/g, "");
+    process.env[key] = value;
+  }
+}
 
 function log(label: string, message: string): void {
   console.log(`${B}[${label}]${RESET} ${message}`);
@@ -31,7 +55,7 @@ async function healthCheck(retries = 30, delayMs = 500): Promise<boolean> {
       });
       if (res.ok) return true;
     } catch {
-      // ignore
+      // ignore while the API boots
     }
     await setTimeout(delayMs);
   }
@@ -39,6 +63,7 @@ async function healthCheck(retries = 30, delayMs = 500): Promise<boolean> {
 }
 
 async function main(): Promise<void> {
+  loadDotEnvLocal();
   console.log("\n  WAKILISHA Chart V2 Dev\n");
 
   // [1/4] Check DATABASE_URL
@@ -46,11 +71,11 @@ async function main(): Promise<void> {
   if (!process.env.DATABASE_URL) {
     fail("FAIL", "DATABASE_URL is not set.");
     console.log(`
-  Create .env.local with:
-  DATABASE_URL=postgresql://...
-  WAKILISHA_V2_REPOSITORY_MODE=database
-  WAKILISHA_V2_API_PORT=4176
-`);
+   Create .env.local with:
+   DATABASE_URL=postgresql://...
+   WAKILISHA_V2_REPOSITORY_MODE=database
+   WAKILISHA_V2_API_PORT=4176
+ `);
     process.exit(1);
   }
   ok("OK", "DATABASE_URL present");
