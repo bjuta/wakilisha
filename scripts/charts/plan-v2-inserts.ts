@@ -18,8 +18,6 @@ type ProgramPreview = {
 };
 
 type PreviewReport = {
-  generatedAt: string;
-  mode: string;
   migrationReadiness: "ready" | "ready_with_warnings" | "blocked";
   blockerCount: number;
   warningCount: number;
@@ -56,32 +54,10 @@ type ChartEntry = {
   artistSlugs?: string[];
   artistNames: string[];
   artworkUrl: string | null;
-  entryPayload?: Record<string, unknown>;
 };
 
 type EditionsPayload = { editions: ChartEdition[] };
 type EntriesPayload = { entries: ChartEntry[] };
-
-type InsertPlan = {
-  generatedAt: string;
-  mode: "dry-run-no-db-writes";
-  sourcePreview: string;
-  migrationReadiness: PreviewReport["migrationReadiness"];
-  blocked: boolean;
-  counts: Record<string, number>;
-  inserts: {
-    series: unknown[];
-    markets: unknown[];
-    programs: unknown[];
-    methodologies: unknown[];
-    eligibilityRules: unknown[];
-    editions: unknown[];
-    entries: unknown[];
-    sourceCoverage: unknown[];
-    slugAliases: unknown[];
-  };
-  warnings: string[];
-};
 
 const root = process.cwd();
 const chartsDir = path.join(root, "public/charts-data");
@@ -130,6 +106,44 @@ function first<T>(items: T[]): T | undefined {
   return items[0];
 }
 
+function compactEntryPayload(entry: ChartEntry, edition: ChartEdition, program: ProgramPreview, entriesPath: string) {
+  return {
+    source: "public-charts-data-json",
+    sourceFile: entriesPath,
+    sourceEntryId: entry.id,
+    sourceEditionId: edition.id,
+    sourceEditionSlug: edition.slug,
+    sourceFamilySlug: edition.familyId,
+    publicProgramSlug: program.publicSlug,
+  };
+}
+
+function insertSql(table: string, rows: Record<string, unknown>[]): string {
+  if (!rows.length) return `-- No rows for ${table}\n`;
+  const columns = Object.keys(rows[0]);
+  const values = rows
+    .map((row) => {
+      const cells = columns.map((column) => {
+        const value = row[column];
+        if (
+          column.endsWith("payload") ||
+          column === "raw_payload" ||
+          column === "formula_payload" ||
+          column === "source_weights_payload" ||
+          column === "rules_payload" ||
+          column === "coverage_payload"
+        ) {
+          return sqlJson(value ?? null);
+        }
+        if (typeof value === "number") return sqlNumber(value);
+        return sqlString(value);
+      });
+      return `(${cells.join(", ")})`;
+    })
+    .join(",\n");
+  return `INSERT INTO ${table} (${columns.join(", ")})\nVALUES\n${values}\nON CONFLICT DO NOTHING;\n`;
+}
+
 fs.mkdirSync(reportsDir, { recursive: true });
 
 const preview = readJsonFile<PreviewReport>(previewPath);
@@ -137,8 +151,7 @@ if (preview.migrationReadiness === "blocked") {
   throw new Error("Chart V2 insert plan refused: migration preview is blocked. Resolve blockers before planning inserts.");
 }
 
-const editionsPayload = readChartJson<EditionsPayload>("editions.json");
-const editions = editionsPayload.editions ?? [];
+const editions = readChartJson<EditionsPayload>("editions.json").editions ?? [];
 const programsBySourceFamily = new Map(preview.programs.map((program) => [program.sourceFamilySlug, program]));
 const programIdBySourceFamily = new Map(preview.programs.map((program) => [program.sourceFamilySlug, safeId("program", program.publicSlug)]));
 
@@ -233,6 +246,7 @@ const eligibilityRules = Array.from(
 
 const editionInserts: Record<string, unknown>[] = [];
 const entryInserts: Record<string, unknown>[] = [];
+const entrySamples: Record<string, unknown>[] = [];
 const sourceCoverageInserts: Record<string, unknown>[] = [];
 const warnings: string[] = [];
 
@@ -246,8 +260,7 @@ for (const edition of editions) {
 
   const editionId = safeId("edition", `${program.publicSlug}_${edition.slug}`);
   const entriesPath = `entries/${edition.familyId}/${edition.slug}.json`;
-  const entriesPayload = readChartJson<EntriesPayload>(entriesPath);
-  const entries = entriesPayload.entries ?? [];
+  const entries = readChartJson<EntriesPayload>(entriesPath).entries ?? [];
 
   editionInserts.push({
     id: editionId,
@@ -278,7 +291,7 @@ for (const edition of editions) {
 
   for (const entry of entries) {
     const artistName = entry.artistNames?.join(", ") || "Unknown artist";
-    entryInserts.push({
+    const row = {
       id: safeId("entry", `${editionId}_${String(entry.rank).padStart(3, "0")}_${entry.id}`),
       edition_id: editionId,
       rank: entry.rank,
@@ -290,14 +303,10 @@ for (const edition of editions) {
       artist_slug: first(entry.artistSlugs ?? []) ?? null,
       artwork_url: entry.artworkUrl ?? null,
       source_entry_id: entry.id,
-      raw_payload: {
-        sourceEntry: entry,
-        sourceFamilySlug: edition.familyId,
-        sourceEditionSlug: edition.slug,
-        sourceEditionId: edition.id,
-        publicProgramSlug: program.publicSlug,
-      },
-    });
+      raw_payload: compactEntryPayload(entry, edition, program, entriesPath),
+    };
+    entryInserts.push(row);
+    if (entrySamples.length < 20) entrySamples.push(row);
   }
 }
 
@@ -309,22 +318,28 @@ const slugAliases = preview.aliases.map((alias) => ({
   redirect_status: alias.redirectStatus,
 }));
 
-const plan: InsertPlan = {
+const counts = {
+  series: series.length,
+  markets: markets.length,
+  programs: programs.length,
+  methodologies: methodologies.length,
+  eligibilityRules: eligibilityRules.length,
+  editions: editionInserts.length,
+  entries: entryInserts.length,
+  sourceCoverage: sourceCoverageInserts.length,
+  slugAliases: slugAliases.length,
+};
+
+const plan = {
   generatedAt: new Date().toISOString(),
   mode: "dry-run-no-db-writes",
   sourcePreview: path.relative(root, previewPath),
   migrationReadiness: preview.migrationReadiness,
   blocked: false,
-  counts: {
-    series: series.length,
-    markets: markets.length,
-    programs: programs.length,
-    methodologies: methodologies.length,
-    eligibilityRules: eligibilityRules.length,
-    editions: editionInserts.length,
-    entries: entryInserts.length,
-    sourceCoverage: sourceCoverageInserts.length,
-    slugAliases: slugAliases.length,
+  counts,
+  artifactStrategy: {
+    json: "Summary-only. Full 6,332 entry rows are intentionally excluded to keep the repository GitHub-safe.",
+    sql: "Full dry-run SQL is generated, but entry raw_payload contains compact source references rather than the full source entry object.",
   },
   inserts: {
     series,
@@ -333,34 +348,21 @@ const plan: InsertPlan = {
     methodologies,
     eligibilityRules,
     editions: editionInserts,
-    entries: entryInserts,
     sourceCoverage: sourceCoverageInserts,
     slugAliases,
+    entrySamples,
+  },
+  omittedFromJson: {
+    entries: entryInserts.length,
+    reason: "Full entry insert rows are represented in reports/chart-v2-inserts.sql and by entrySamples in this JSON plan.",
   },
   warnings,
 };
 
-function insertSql(table: string, rows: Record<string, unknown>[]): string {
-  if (!rows.length) return `-- No rows for ${table}\n`;
-  const columns = Object.keys(rows[0]);
-  const values = rows
-    .map((row) => {
-      const cells = columns.map((column) => {
-        const value = row[column];
-        if (column.endsWith("payload") || column === "raw_payload" || column === "formula_payload" || column === "source_weights_payload" || column === "rules_payload" || column === "coverage_payload") return sqlJson(value ?? null);
-        if (typeof value === "number") return sqlNumber(value);
-        return sqlString(value);
-      });
-      return `(${cells.join(", ")})`;
-    })
-    .join(",\n");
-  return `INSERT INTO ${table} (${columns.join(", ")})\nVALUES\n${values}\nON CONFLICT DO NOTHING;\n`;
-}
-
 const sql = [
   "-- WAKILISHA Chart V2 dry-run insert plan",
   "-- Generated for review only. Do not execute until content QA and DBA review are complete.",
-  "-- This file is produced from public/charts-data and reports/chart-v2-migration-preview.json.",
+  "-- Entry raw_payload values are compact provenance references, not full source entry objects.",
   "BEGIN;",
   insertSql("wk_chart_series_v2", series),
   insertSql("wk_chart_markets_v2", markets),
@@ -389,15 +391,21 @@ Migration readiness: **${plan.migrationReadiness}**
 
 | Table | Rows |
 | --- | ---: |
-| wk_chart_series_v2 | ${plan.counts.series} |
-| wk_chart_markets_v2 | ${plan.counts.markets} |
-| wk_chart_programs_v2 | ${plan.counts.programs} |
-| wk_chart_methodologies_v2 | ${plan.counts.methodologies} |
-| wk_chart_eligibility_rules_v2 | ${plan.counts.eligibilityRules} |
-| wk_chart_editions_v2 | ${plan.counts.editions} |
-| wk_chart_entries_v2 | ${plan.counts.entries} |
-| wk_chart_source_coverage_v2 | ${plan.counts.sourceCoverage} |
-| wk_chart_slug_aliases_v2 | ${plan.counts.slugAliases} |
+| wk_chart_series_v2 | ${counts.series} |
+| wk_chart_markets_v2 | ${counts.markets} |
+| wk_chart_programs_v2 | ${counts.programs} |
+| wk_chart_methodologies_v2 | ${counts.methodologies} |
+| wk_chart_eligibility_rules_v2 | ${counts.eligibilityRules} |
+| wk_chart_editions_v2 | ${counts.editions} |
+| wk_chart_entries_v2 | ${counts.entries} |
+| wk_chart_source_coverage_v2 | ${counts.sourceCoverage} |
+| wk_chart_slug_aliases_v2 | ${counts.slugAliases} |
+
+## GitHub-safe artifact strategy
+
+The JSON plan intentionally excludes the full 6,332 entry rows. It includes table counts, all low-volume rows, and 20 sample entry rows.
+
+The SQL plan includes all rows, but entry \`raw_payload\` values are compact provenance references instead of full source entry objects. This keeps the review artifact small enough for GitHub while preserving the path back to the source JSON files.
 
 ## Programs
 
@@ -437,6 +445,6 @@ console.log(`Readiness: ${plan.migrationReadiness}`);
 console.log(`JSON: ${path.relative(root, jsonPlanPath)}`);
 console.log(`Markdown: ${path.relative(root, mdPlanPath)}`);
 console.log(`SQL: ${path.relative(root, sqlPlanPath)}`);
-console.log(`Series: ${plan.counts.series}, markets: ${plan.counts.markets}, programs: ${plan.counts.programs}`);
-console.log(`Editions: ${plan.counts.editions}, entries: ${plan.counts.entries}, aliases: ${plan.counts.slugAliases}`);
+console.log(`Series: ${counts.series}, markets: ${counts.markets}, programs: ${counts.programs}`);
+console.log(`Editions: ${counts.editions}, entries: ${counts.entries}, aliases: ${counts.slugAliases}`);
 if (warnings.length) console.warn(`Planner warnings: ${warnings.length}`);
