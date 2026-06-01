@@ -248,24 +248,45 @@ export class DatabaseV2Repository implements V2Repository {
   private pool: PgPool;
 
   constructor(private databaseUrl = process.env.DATABASE_URL ?? "") {
-    if (!this.databaseUrl) {
-      throw new Error("DatabaseV2Repository requires DATABASE_URL.");
+    if (!this.databaseUrl && !process.env.PGHOST) {
+      throw new Error("DatabaseV2Repository requires DATABASE_URL or explicit PG* env vars.");
     }
-    this.pool = new pg.Pool({
-      connectionString: normalizeDatabaseUrlForPg(this.databaseUrl),
-      ssl: { rejectUnauthorized: false },
-      connectionTimeoutMillis: 10000,
-      query_timeout: 10000,
-      statement_timeout: 10000,
-      max: 4,
-    });
+
+    const explicitHost = process.env.PGHOST;
+    const explicitUser = process.env.PGUSER;
+    const explicitPassword = process.env.PGPASSWORD;
+    const explicitDatabase = process.env.PGDATABASE;
+    const explicitPort = Number(process.env.PGPORT || 5432);
+
+    this.pool = explicitHost && explicitUser && explicitPassword && explicitDatabase
+      ? new pg.Pool({
+          host: explicitHost,
+          port: explicitPort,
+          user: explicitUser,
+          password: explicitPassword,
+          database: explicitDatabase,
+          ssl: { rejectUnauthorized: false },
+          connectionTimeoutMillis: 10000,
+          query_timeout: 10000,
+          statement_timeout: 10000,
+          max: 4,
+        })
+      : new pg.Pool({
+          connectionString: normalizeDatabaseUrlForPg(this.databaseUrl),
+          ssl: { rejectUnauthorized: false },
+          connectionTimeoutMillis: 10000,
+          query_timeout: 10000,
+          statement_timeout: 10000,
+          max: 4,
+        });
   }
 
   async testConnection(): Promise<boolean> {
     try {
       const result = await this.pool.query("SELECT 1 AS ok");
       return result.rows[0]?.ok === 1;
-    } catch {
+    } catch (err) {
+      console.error("[DatabaseV2Repository.testConnection] pg error:", err);
       return false;
     }
   }
@@ -491,10 +512,10 @@ export class DatabaseV2Repository implements V2Repository {
 export function createV2Repository(): V2Repository {
   const mode = process.env.WAKILISHA_V2_REPOSITORY_MODE ?? "json";
   if (mode === "database") {
-    if (!process.env.DATABASE_URL) {
+    if (!process.env.DATABASE_URL && !process.env.PGHOST) {
       throw new Error(
-        "WAKILISHA_V2_REPOSITORY_MODE=database but DATABASE_URL is not set. " +
-        "Set DATABASE_URL or switch to WAKILISHA_V2_REPOSITORY_MODE=json."
+        "WAKILISHA_V2_REPOSITORY_MODE=database but neither DATABASE_URL nor PGHOST is set. " +
+        "Set DATABASE_URL, or provide explicit PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE, or switch to WAKILISHA_V2_REPOSITORY_MODE=json."
       );
     }
     return new DatabaseV2Repository();
