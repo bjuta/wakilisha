@@ -1,0 +1,2656 @@
+{
+  "generatedAt": "2026-06-01T09:05:18.878Z",
+  "mode": "dry-run-no-db-writes",
+  "sourcePreview": "reports/chart-v2-migration-preview.json",
+  "migrationReadiness": "ready_with_warnings",
+  "blocked": false,
+  "counts": {
+    "series": 4,
+    "markets": 1,
+    "programs": 4,
+    "methodologies": 1,
+    "eligibilityRules": 4,
+    "editions": 78,
+    "entries": 6332,
+    "sourceCoverage": 78,
+    "slugAliases": 10
+  },
+  "artifactStrategy": {
+    "json": "Summary-only. Full 6,332 entry rows are intentionally excluded to keep the repository GitHub-safe.",
+    "sql": "Full dry-run SQL is generated, but entry raw_payload contains compact source references rather than the full source entry object."
+  },
+  "inserts": {
+    "series": [
+      {
+        "id": "series_2026_releases",
+        "series_slug": "2026-releases",
+        "series_label": "2026 Releases",
+        "description": "Chart series for 2026 Releases.",
+        "chart_mode": "data"
+      },
+      {
+        "id": "series_gengetone",
+        "series_slug": "gengetone",
+        "series_label": "Gengetone Songs",
+        "description": "Chart series for Gengetone Songs.",
+        "chart_mode": "data"
+      },
+      {
+        "id": "series_top_songs",
+        "series_slug": "top-songs",
+        "series_label": "Top Songs",
+        "description": "Chart series for Top Songs.",
+        "chart_mode": "data"
+      },
+      {
+        "id": "series_rnb",
+        "series_slug": "rnb",
+        "series_label": "R&B Songs",
+        "description": "Chart series for R&B Songs.",
+        "chart_mode": "data"
+      }
+    ],
+    "markets": [
+      {
+        "id": "market_kenya",
+        "market_slug": "kenya",
+        "market_label": "Kenya",
+        "market_type": "country",
+        "country_code": "KE",
+        "parent_market_slug": null,
+        "timezone": "Africa/Nairobi",
+        "default_language": "en"
+      }
+    ],
+    "programs": [
+      {
+        "id": "program_2026_releases_kenya",
+        "series_slug": "2026-releases",
+        "market_slug": "kenya",
+        "public_slug": "2026-releases-kenya",
+        "public_label": "2026 Releases · Kenya",
+        "short_label": "2026 Releases",
+        "source_family_slug": "2026",
+        "default_period_type": "weekly",
+        "default_methodology_version": "csv-registry-import-v1",
+        "default_eligibility_rules_version": "2026-releases-kenya-v1"
+      },
+      {
+        "id": "program_gengetone_kenya",
+        "series_slug": "gengetone",
+        "market_slug": "kenya",
+        "public_slug": "gengetone-kenya",
+        "public_label": "Gengetone Songs · Kenya",
+        "short_label": "Gengetone",
+        "source_family_slug": "gengetone",
+        "default_period_type": "weekly",
+        "default_methodology_version": "csv-registry-import-v1",
+        "default_eligibility_rules_version": "gengetone-kenya-v1"
+      },
+      {
+        "id": "program_top_songs_kenya",
+        "series_slug": "top-songs",
+        "market_slug": "kenya",
+        "public_slug": "top-songs-kenya",
+        "public_label": "Top 100 Songs · Kenya",
+        "short_label": "Kenya Top 100",
+        "source_family_slug": "kenya",
+        "default_period_type": "weekly",
+        "default_methodology_version": "csv-registry-import-v1",
+        "default_eligibility_rules_version": "top-songs-kenya-v1"
+      },
+      {
+        "id": "program_rnb_kenya",
+        "series_slug": "rnb",
+        "market_slug": "kenya",
+        "public_slug": "rnb-kenya",
+        "public_label": "R&B Songs · Kenya",
+        "short_label": "Kenyan R&B",
+        "source_family_slug": "rnb",
+        "default_period_type": "weekly",
+        "default_methodology_version": "csv-registry-import-v1",
+        "default_eligibility_rules_version": "rnb-kenya-v1"
+      }
+    ],
+    "methodologies": [
+      {
+        "id": "methodology_csv_registry_import_v1",
+        "methodology_version": "csv-registry-import-v1",
+        "label": "csv-registry-import-v1",
+        "description": "Imported WAKILISHA CSV/registry chart methodology placeholder. Replace with full formula before API cutover.",
+        "formula_payload": {
+          "mode": "csv_registry_import",
+          "version": "csv-registry-import-v1",
+          "note": "Dry-run insert planner preserves source ranking order. It does not recalculate rankings."
+        },
+        "source_weights_payload": {
+          "source": "public/charts-data",
+          "weighting": "preserved_rank_order"
+        }
+      }
+    ],
+    "eligibilityRules": [
+      {
+        "id": "eligibility_2026_releases_kenya_v1",
+        "eligibility_version": "2026-releases-kenya-v1",
+        "label": "2026-releases-kenya-v1",
+        "description": "Eligibility rules placeholder for 2026 Releases · Kenya.",
+        "rules_payload": {
+          "sourceFamilySlug": "2026",
+          "seriesSlug": "2026-releases",
+          "marketSlug": "kenya",
+          "note": "Dry-run placeholder. Formal eligibility rules must be authored before automated ingestion uses this version."
+        }
+      },
+      {
+        "id": "eligibility_gengetone_kenya_v1",
+        "eligibility_version": "gengetone-kenya-v1",
+        "label": "gengetone-kenya-v1",
+        "description": "Eligibility rules placeholder for Gengetone Songs · Kenya.",
+        "rules_payload": {
+          "sourceFamilySlug": "gengetone",
+          "seriesSlug": "gengetone",
+          "marketSlug": "kenya",
+          "note": "Dry-run placeholder. Formal eligibility rules must be authored before automated ingestion uses this version."
+        }
+      },
+      {
+        "id": "eligibility_top_songs_kenya_v1",
+        "eligibility_version": "top-songs-kenya-v1",
+        "label": "top-songs-kenya-v1",
+        "description": "Eligibility rules placeholder for Top 100 Songs · Kenya.",
+        "rules_payload": {
+          "sourceFamilySlug": "kenya",
+          "seriesSlug": "top-songs",
+          "marketSlug": "kenya",
+          "note": "Dry-run placeholder. Formal eligibility rules must be authored before automated ingestion uses this version."
+        }
+      },
+      {
+        "id": "eligibility_rnb_kenya_v1",
+        "eligibility_version": "rnb-kenya-v1",
+        "label": "rnb-kenya-v1",
+        "description": "Eligibility rules placeholder for R&B Songs · Kenya.",
+        "rules_payload": {
+          "sourceFamilySlug": "rnb",
+          "seriesSlug": "rnb",
+          "marketSlug": "kenya",
+          "note": "Dry-run placeholder. Formal eligibility rules must be authored before automated ingestion uses this version."
+        }
+      }
+    ],
+    "editions": [
+      {
+        "id": "edition_2026_releases_kenya_2026_2026_02_02",
+        "program_id": "program_2026_releases_kenya",
+        "source_edition_id": "2",
+        "edition_slug": "2026-2026-02-02",
+        "edition_label": "Top Kenyan Songs Released in 2026",
+        "edition_date": "2026-02-02",
+        "period_start": "2026-02-02",
+        "period_end": "2026-02-02",
+        "status": "published",
+        "entry_count": 20,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_2026_releases_kenya_2026_2026_02_09",
+        "program_id": "program_2026_releases_kenya",
+        "source_edition_id": "3",
+        "edition_slug": "2026-2026-02-09",
+        "edition_label": "Top Kenyan Songs Released in 2026",
+        "edition_date": "2026-02-09",
+        "period_start": "2026-02-09",
+        "period_end": "2026-02-09",
+        "status": "published",
+        "entry_count": 30,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_2026_releases_kenya_2026_2026_02_16",
+        "program_id": "program_2026_releases_kenya",
+        "source_edition_id": "4",
+        "edition_slug": "2026-2026-02-16",
+        "edition_label": "Top Kenyan Songs Released in 2026",
+        "edition_date": "2026-02-16",
+        "period_start": "2026-02-16",
+        "period_end": "2026-02-16",
+        "status": "published",
+        "entry_count": 30,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_2026_releases_kenya_2026_2026_02_23",
+        "program_id": "program_2026_releases_kenya",
+        "source_edition_id": "5",
+        "edition_slug": "2026-2026-02-23",
+        "edition_label": "Top Kenyan Songs Released in 2026",
+        "edition_date": "2026-02-23",
+        "period_start": "2026-02-23",
+        "period_end": "2026-02-23",
+        "status": "published",
+        "entry_count": 50,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_2026_releases_kenya_2026_2026_03_02",
+        "program_id": "program_2026_releases_kenya",
+        "source_edition_id": "6",
+        "edition_slug": "2026-2026-03-02",
+        "edition_label": "Top Kenyan Songs Released in 2026",
+        "edition_date": "2026-03-02",
+        "period_start": "2026-03-02",
+        "period_end": "2026-03-02",
+        "status": "published",
+        "entry_count": 100,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_2026_releases_kenya_2026_2026_03_09",
+        "program_id": "program_2026_releases_kenya",
+        "source_edition_id": "7",
+        "edition_slug": "2026-2026-03-09",
+        "edition_label": "Top Kenyan Songs Released in 2026",
+        "edition_date": "2026-03-09",
+        "period_start": "2026-03-09",
+        "period_end": "2026-03-09",
+        "status": "published",
+        "entry_count": 100,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_2026_releases_kenya_2026_2026_03_16",
+        "program_id": "program_2026_releases_kenya",
+        "source_edition_id": "8",
+        "edition_slug": "2026-2026-03-16",
+        "edition_label": "Top Kenyan Songs Released in 2026",
+        "edition_date": "2026-03-16",
+        "period_start": "2026-03-16",
+        "period_end": "2026-03-16",
+        "status": "published",
+        "entry_count": 100,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_2026_releases_kenya_2026_2026_03_23",
+        "program_id": "program_2026_releases_kenya",
+        "source_edition_id": "9",
+        "edition_slug": "2026-2026-03-23",
+        "edition_label": "Top Kenyan Songs Released in 2026",
+        "edition_date": "2026-03-23",
+        "period_start": "2026-03-23",
+        "period_end": "2026-03-23",
+        "status": "published",
+        "entry_count": 100,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_gengetone_kenya_gengetone_2026_03_28",
+        "program_id": "program_gengetone_kenya",
+        "source_edition_id": "10",
+        "edition_slug": "gengetone-2026-03-28",
+        "edition_label": "Top Gengetone Songs",
+        "edition_date": "2026-03-28",
+        "period_start": "2026-03-28",
+        "period_end": "2026-03-28",
+        "status": "published",
+        "entry_count": 0,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_gengetone_kenya_gengetone_2026_01_05",
+        "program_id": "program_gengetone_kenya",
+        "source_edition_id": "12",
+        "edition_slug": "gengetone-2026-01-05",
+        "edition_label": "Top Gengetone Songs",
+        "edition_date": "2026-01-05",
+        "period_start": "2026-01-05",
+        "period_end": "2026-01-05",
+        "status": "published",
+        "entry_count": 48,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_gengetone_kenya_gengetone_2026_01_12",
+        "program_id": "program_gengetone_kenya",
+        "source_edition_id": "13",
+        "edition_slug": "gengetone-2026-01-12",
+        "edition_label": "Top Gengetone Songs",
+        "edition_date": "2026-01-12",
+        "period_start": "2026-01-12",
+        "period_end": "2026-01-12",
+        "status": "published",
+        "entry_count": 48,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_gengetone_kenya_gengetone_2026_01_19",
+        "program_id": "program_gengetone_kenya",
+        "source_edition_id": "14",
+        "edition_slug": "gengetone-2026-01-19",
+        "edition_label": "Top Gengetone Songs",
+        "edition_date": "2026-01-19",
+        "period_start": "2026-01-19",
+        "period_end": "2026-01-19",
+        "status": "published",
+        "entry_count": 49,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_gengetone_kenya_gengetone_2026_01_26",
+        "program_id": "program_gengetone_kenya",
+        "source_edition_id": "15",
+        "edition_slug": "gengetone-2026-01-26",
+        "edition_label": "Top Gengetone Songs",
+        "edition_date": "2026-01-26",
+        "period_start": "2026-01-26",
+        "period_end": "2026-01-26",
+        "status": "published",
+        "entry_count": 49,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_gengetone_kenya_gengetone_2026_02_02",
+        "program_id": "program_gengetone_kenya",
+        "source_edition_id": "16",
+        "edition_slug": "gengetone-2026-02-02",
+        "edition_label": "Top Gengetone Songs",
+        "edition_date": "2026-02-02",
+        "period_start": "2026-02-02",
+        "period_end": "2026-02-02",
+        "status": "published",
+        "entry_count": 49,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_gengetone_kenya_gengetone_2026_02_09",
+        "program_id": "program_gengetone_kenya",
+        "source_edition_id": "17",
+        "edition_slug": "gengetone-2026-02-09",
+        "edition_label": "Top Gengetone Songs",
+        "edition_date": "2026-02-09",
+        "period_start": "2026-02-09",
+        "period_end": "2026-02-09",
+        "status": "published",
+        "entry_count": 49,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_gengetone_kenya_gengetone_2026_02_16",
+        "program_id": "program_gengetone_kenya",
+        "source_edition_id": "18",
+        "edition_slug": "gengetone-2026-02-16",
+        "edition_label": "Top Gengetone Songs",
+        "edition_date": "2026-02-16",
+        "period_start": "2026-02-16",
+        "period_end": "2026-02-16",
+        "status": "published",
+        "entry_count": 50,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_gengetone_kenya_gengetone_2026_02_23",
+        "program_id": "program_gengetone_kenya",
+        "source_edition_id": "19",
+        "edition_slug": "gengetone-2026-02-23",
+        "edition_label": "Top Gengetone Songs",
+        "edition_date": "2026-02-23",
+        "period_start": "2026-02-23",
+        "period_end": "2026-02-23",
+        "status": "published",
+        "entry_count": 50,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_gengetone_kenya_gengetone_2026_03_02",
+        "program_id": "program_gengetone_kenya",
+        "source_edition_id": "20",
+        "edition_slug": "gengetone-2026-03-02",
+        "edition_label": "Top Gengetone Songs",
+        "edition_date": "2026-03-02",
+        "period_start": "2026-03-02",
+        "period_end": "2026-03-02",
+        "status": "published",
+        "entry_count": 50,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_gengetone_kenya_gengetone_2026_03_09",
+        "program_id": "program_gengetone_kenya",
+        "source_edition_id": "21",
+        "edition_slug": "gengetone-2026-03-09",
+        "edition_label": "Top Gengetone Songs",
+        "edition_date": "2026-03-09",
+        "period_start": "2026-03-09",
+        "period_end": "2026-03-09",
+        "status": "published",
+        "entry_count": 50,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_gengetone_kenya_gengetone_2026_03_16",
+        "program_id": "program_gengetone_kenya",
+        "source_edition_id": "22",
+        "edition_slug": "gengetone-2026-03-16",
+        "edition_label": "Top Gengetone Songs",
+        "edition_date": "2026-03-16",
+        "period_start": "2026-03-16",
+        "period_end": "2026-03-16",
+        "status": "published",
+        "entry_count": 50,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_gengetone_kenya_gengetone_2026_03_23",
+        "program_id": "program_gengetone_kenya",
+        "source_edition_id": "23",
+        "edition_slug": "gengetone-2026-03-23",
+        "edition_label": "Top Gengetone Songs",
+        "edition_date": "2026-03-23",
+        "period_start": "2026-03-23",
+        "period_end": "2026-03-23",
+        "status": "published",
+        "entry_count": 50,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_top_songs_kenya_kenya_2026_01_05",
+        "program_id": "program_top_songs_kenya",
+        "source_edition_id": "26",
+        "edition_slug": "kenya-2026-01-05",
+        "edition_label": "Top 100 Songs in Kenya",
+        "edition_date": "2026-01-05",
+        "period_start": "2026-01-05",
+        "period_end": "2026-01-05",
+        "status": "published",
+        "entry_count": 100,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_top_songs_kenya_kenya_2026_01_12",
+        "program_id": "program_top_songs_kenya",
+        "source_edition_id": "27",
+        "edition_slug": "kenya-2026-01-12",
+        "edition_label": "Top 100 Songs in Kenya",
+        "edition_date": "2026-01-12",
+        "period_start": "2026-01-12",
+        "period_end": "2026-01-12",
+        "status": "published",
+        "entry_count": 100,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_top_songs_kenya_kenya_2026_01_19",
+        "program_id": "program_top_songs_kenya",
+        "source_edition_id": "28",
+        "edition_slug": "kenya-2026-01-19",
+        "edition_label": "Top 100 Songs in Kenya",
+        "edition_date": "2026-01-19",
+        "period_start": "2026-01-19",
+        "period_end": "2026-01-19",
+        "status": "published",
+        "entry_count": 100,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_top_songs_kenya_kenya_2026_01_26",
+        "program_id": "program_top_songs_kenya",
+        "source_edition_id": "29",
+        "edition_slug": "kenya-2026-01-26",
+        "edition_label": "Top 100 Songs in Kenya",
+        "edition_date": "2026-01-26",
+        "period_start": "2026-01-26",
+        "period_end": "2026-01-26",
+        "status": "published",
+        "entry_count": 100,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_top_songs_kenya_kenya_2026_02_02",
+        "program_id": "program_top_songs_kenya",
+        "source_edition_id": "30",
+        "edition_slug": "kenya-2026-02-02",
+        "edition_label": "Top 100 Songs in Kenya",
+        "edition_date": "2026-02-02",
+        "period_start": "2026-02-02",
+        "period_end": "2026-02-02",
+        "status": "published",
+        "entry_count": 100,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_top_songs_kenya_kenya_2026_02_09",
+        "program_id": "program_top_songs_kenya",
+        "source_edition_id": "31",
+        "edition_slug": "kenya-2026-02-09",
+        "edition_label": "Top 100 Songs in Kenya",
+        "edition_date": "2026-02-09",
+        "period_start": "2026-02-09",
+        "period_end": "2026-02-09",
+        "status": "published",
+        "entry_count": 100,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_top_songs_kenya_kenya_2026_02_16",
+        "program_id": "program_top_songs_kenya",
+        "source_edition_id": "32",
+        "edition_slug": "kenya-2026-02-16",
+        "edition_label": "Top 100 Songs in Kenya",
+        "edition_date": "2026-02-16",
+        "period_start": "2026-02-16",
+        "period_end": "2026-02-16",
+        "status": "published",
+        "entry_count": 100,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_top_songs_kenya_kenya_2026_02_23",
+        "program_id": "program_top_songs_kenya",
+        "source_edition_id": "33",
+        "edition_slug": "kenya-2026-02-23",
+        "edition_label": "Top 100 Songs in Kenya",
+        "edition_date": "2026-02-23",
+        "period_start": "2026-02-23",
+        "period_end": "2026-02-23",
+        "status": "published",
+        "entry_count": 100,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_rnb_kenya_rnb_2026_01_05",
+        "program_id": "program_rnb_kenya",
+        "source_edition_id": "44",
+        "edition_slug": "rnb-2026-01-05",
+        "edition_label": "Top Kenyan R&#038;B Songs",
+        "edition_date": "2026-01-05",
+        "period_start": "2026-01-05",
+        "period_end": "2026-01-05",
+        "status": "published",
+        "entry_count": 100,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_rnb_kenya_rnb_2026_01_12",
+        "program_id": "program_rnb_kenya",
+        "source_edition_id": "45",
+        "edition_slug": "rnb-2026-01-12",
+        "edition_label": "Top Kenyan R&#038;B Songs",
+        "edition_date": "2026-01-12",
+        "period_start": "2026-01-12",
+        "period_end": "2026-01-12",
+        "status": "published",
+        "entry_count": 100,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_rnb_kenya_rnb_2026_01_19",
+        "program_id": "program_rnb_kenya",
+        "source_edition_id": "46",
+        "edition_slug": "rnb-2026-01-19",
+        "edition_label": "Top Kenyan R&#038;B Songs",
+        "edition_date": "2026-01-19",
+        "period_start": "2026-01-19",
+        "period_end": "2026-01-19",
+        "status": "published",
+        "entry_count": 100,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_rnb_kenya_rnb_2026_01_26",
+        "program_id": "program_rnb_kenya",
+        "source_edition_id": "47",
+        "edition_slug": "rnb-2026-01-26",
+        "edition_label": "Top Kenyan R&#038;B Songs",
+        "edition_date": "2026-01-26",
+        "period_start": "2026-01-26",
+        "period_end": "2026-01-26",
+        "status": "published",
+        "entry_count": 100,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_rnb_kenya_rnb_2026_02_02",
+        "program_id": "program_rnb_kenya",
+        "source_edition_id": "48",
+        "edition_slug": "rnb-2026-02-02",
+        "edition_label": "Top Kenyan R&#038;B Songs",
+        "edition_date": "2026-02-02",
+        "period_start": "2026-02-02",
+        "period_end": "2026-02-02",
+        "status": "published",
+        "entry_count": 100,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_rnb_kenya_rnb_2026_02_09",
+        "program_id": "program_rnb_kenya",
+        "source_edition_id": "49",
+        "edition_slug": "rnb-2026-02-09",
+        "edition_label": "Top Kenyan R&#038;B Songs",
+        "edition_date": "2026-02-09",
+        "period_start": "2026-02-09",
+        "period_end": "2026-02-09",
+        "status": "published",
+        "entry_count": 100,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_rnb_kenya_rnb_2026_02_16",
+        "program_id": "program_rnb_kenya",
+        "source_edition_id": "50",
+        "edition_slug": "rnb-2026-02-16",
+        "edition_label": "Top Kenyan R&#038;B Songs",
+        "edition_date": "2026-02-16",
+        "period_start": "2026-02-16",
+        "period_end": "2026-02-16",
+        "status": "published",
+        "entry_count": 100,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_rnb_kenya_rnb_2026_02_23",
+        "program_id": "program_rnb_kenya",
+        "source_edition_id": "51",
+        "edition_slug": "rnb-2026-02-23",
+        "edition_label": "Top Kenyan R&#038;B Songs",
+        "edition_date": "2026-02-23",
+        "period_start": "2026-02-23",
+        "period_end": "2026-02-23",
+        "status": "published",
+        "entry_count": 100,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_rnb_kenya_rnb_2026_03_02",
+        "program_id": "program_rnb_kenya",
+        "source_edition_id": "52",
+        "edition_slug": "rnb-2026-03-02",
+        "edition_label": "Top Kenyan R&#038;B Songs",
+        "edition_date": "2026-03-02",
+        "period_start": "2026-03-02",
+        "period_end": "2026-03-02",
+        "status": "published",
+        "entry_count": 100,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_rnb_kenya_rnb_2026_03_09",
+        "program_id": "program_rnb_kenya",
+        "source_edition_id": "53",
+        "edition_slug": "rnb-2026-03-09",
+        "edition_label": "Top Kenyan R&#038;B Songs",
+        "edition_date": "2026-03-09",
+        "period_start": "2026-03-09",
+        "period_end": "2026-03-09",
+        "status": "published",
+        "entry_count": 100,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_rnb_kenya_rnb_2026_03_16",
+        "program_id": "program_rnb_kenya",
+        "source_edition_id": "54",
+        "edition_slug": "rnb-2026-03-16",
+        "edition_label": "Top Kenyan R&#038;B Songs",
+        "edition_date": "2026-03-16",
+        "period_start": "2026-03-16",
+        "period_end": "2026-03-16",
+        "status": "published",
+        "entry_count": 100,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_rnb_kenya_rnb_2026_03_23",
+        "program_id": "program_rnb_kenya",
+        "source_edition_id": "55",
+        "edition_slug": "rnb-2026-03-23",
+        "edition_label": "Top Kenyan R&#038;B Songs",
+        "edition_date": "2026-03-23",
+        "period_start": "2026-03-23",
+        "period_end": "2026-03-23",
+        "status": "published",
+        "entry_count": 100,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_gengetone_kenya_gengetone_2026_03_30",
+        "program_id": "program_gengetone_kenya",
+        "source_edition_id": "56",
+        "edition_slug": "gengetone-2026-03-30",
+        "edition_label": "Top Gengetone Songs",
+        "edition_date": "2026-03-30",
+        "period_start": "2026-03-30",
+        "period_end": "2026-03-30",
+        "status": "published",
+        "entry_count": 50,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_rnb_kenya_rnb_2026_03_30",
+        "program_id": "program_rnb_kenya",
+        "source_edition_id": "57",
+        "edition_slug": "rnb-2026-03-30",
+        "edition_label": "Top Kenyan R&#038;B Songs",
+        "edition_date": "2026-03-30",
+        "period_start": "2026-03-30",
+        "period_end": "2026-03-30",
+        "status": "published",
+        "entry_count": 100,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_2026_releases_kenya_2026_2026_03_30",
+        "program_id": "program_2026_releases_kenya",
+        "source_edition_id": "58",
+        "edition_slug": "2026-2026-03-30",
+        "edition_label": "Top Kenyan Songs Released in 2026",
+        "edition_date": "2026-03-30",
+        "period_start": "2026-03-30",
+        "period_end": "2026-03-30",
+        "status": "published",
+        "entry_count": 100,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_top_songs_kenya_kenya_2026_03_02",
+        "program_id": "program_top_songs_kenya",
+        "source_edition_id": "59",
+        "edition_slug": "kenya-2026-03-02",
+        "edition_label": "Top 100 Songs in Kenya",
+        "edition_date": "2026-03-02",
+        "period_start": "2026-03-02",
+        "period_end": "2026-03-02",
+        "status": "published",
+        "entry_count": 100,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_top_songs_kenya_kenya_2026_03_09",
+        "program_id": "program_top_songs_kenya",
+        "source_edition_id": "60",
+        "edition_slug": "kenya-2026-03-09",
+        "edition_label": "Top 100 Songs in Kenya",
+        "edition_date": "2026-03-09",
+        "period_start": "2026-03-09",
+        "period_end": "2026-03-09",
+        "status": "published",
+        "entry_count": 100,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_gengetone_kenya_gengetone_2026_04_06",
+        "program_id": "program_gengetone_kenya",
+        "source_edition_id": "61",
+        "edition_slug": "gengetone-2026-04-06",
+        "edition_label": "Top Gengetone Songs",
+        "edition_date": "2026-04-06",
+        "period_start": "2026-04-06",
+        "period_end": "2026-04-06",
+        "status": "published",
+        "entry_count": 50,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_rnb_kenya_rnb_2026_04_06",
+        "program_id": "program_rnb_kenya",
+        "source_edition_id": "62",
+        "edition_slug": "rnb-2026-04-06",
+        "edition_label": "Top Kenyan R&#038;B Songs",
+        "edition_date": "2026-04-06",
+        "period_start": "2026-04-06",
+        "period_end": "2026-04-06",
+        "status": "published",
+        "entry_count": 100,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_2026_releases_kenya_2026_2026_04_06",
+        "program_id": "program_2026_releases_kenya",
+        "source_edition_id": "63",
+        "edition_slug": "2026-2026-04-06",
+        "edition_label": "Top Kenyan Songs Released in 2026",
+        "edition_date": "2026-04-06",
+        "period_start": "2026-04-06",
+        "period_end": "2026-04-06",
+        "status": "published",
+        "entry_count": 100,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_gengetone_kenya_gengetone_2026_04_13",
+        "program_id": "program_gengetone_kenya",
+        "source_edition_id": "64",
+        "edition_slug": "gengetone-2026-04-13",
+        "edition_label": "Top Gengetone Songs",
+        "edition_date": "2026-04-13",
+        "period_start": "2026-04-13",
+        "period_end": "2026-04-13",
+        "status": "published",
+        "entry_count": 50,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_top_songs_kenya_kenya_2026_03_16",
+        "program_id": "program_top_songs_kenya",
+        "source_edition_id": "67",
+        "edition_slug": "kenya-2026-03-16",
+        "edition_label": "Top 100 Songs in Kenya",
+        "edition_date": "2026-03-16",
+        "period_start": "2026-03-16",
+        "period_end": "2026-03-16",
+        "status": "published",
+        "entry_count": 100,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_rnb_kenya_rnb_2026_04_13",
+        "program_id": "program_rnb_kenya",
+        "source_edition_id": "65",
+        "edition_slug": "rnb-2026-04-13",
+        "edition_label": "Top Kenyan R&#038;B Songs",
+        "edition_date": "2026-04-13",
+        "period_start": "2026-04-13",
+        "period_end": "2026-04-13",
+        "status": "published",
+        "entry_count": 100,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_2026_releases_kenya_2026_2026_04_13",
+        "program_id": "program_2026_releases_kenya",
+        "source_edition_id": "66",
+        "edition_slug": "2026-2026-04-13",
+        "edition_label": "Top Kenyan Songs Released in 2026",
+        "edition_date": "2026-04-13",
+        "period_start": "2026-04-13",
+        "period_end": "2026-04-13",
+        "status": "published",
+        "entry_count": 100,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_top_songs_kenya_kenya_2026_03_23",
+        "program_id": "program_top_songs_kenya",
+        "source_edition_id": "68",
+        "edition_slug": "kenya-2026-03-23",
+        "edition_label": "Top 100 Songs in Kenya",
+        "edition_date": "2026-03-23",
+        "period_start": "2026-03-23",
+        "period_end": "2026-03-23",
+        "status": "published",
+        "entry_count": 100,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_top_songs_kenya_kenya_2026_03_30",
+        "program_id": "program_top_songs_kenya",
+        "source_edition_id": "71",
+        "edition_slug": "kenya-2026-03-30",
+        "edition_label": "Top 100 Songs in Kenya",
+        "edition_date": "2026-03-30",
+        "period_start": "2026-03-30",
+        "period_end": "2026-03-30",
+        "status": "published",
+        "entry_count": 100,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_top_songs_kenya_kenya_2026_04_06",
+        "program_id": "program_top_songs_kenya",
+        "source_edition_id": "72",
+        "edition_slug": "kenya-2026-04-06",
+        "edition_label": "Top 100 Songs in Kenya",
+        "edition_date": "2026-04-06",
+        "period_start": "2026-04-06",
+        "period_end": "2026-04-06",
+        "status": "published",
+        "entry_count": 100,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_top_songs_kenya_kenya_2026_04_13",
+        "program_id": "program_top_songs_kenya",
+        "source_edition_id": "73",
+        "edition_slug": "kenya-2026-04-13",
+        "edition_label": "Top 100 Songs in Kenya",
+        "edition_date": "2026-04-13",
+        "period_start": "2026-04-13",
+        "period_end": "2026-04-13",
+        "status": "published",
+        "entry_count": 100,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_top_songs_kenya_kenya_2026_04_20",
+        "program_id": "program_top_songs_kenya",
+        "source_edition_id": "74",
+        "edition_slug": "kenya-2026-04-20",
+        "edition_label": "Top 100 Songs in Kenya",
+        "edition_date": "2026-04-20",
+        "period_start": "2026-04-20",
+        "period_end": "2026-04-20",
+        "status": "published",
+        "entry_count": 100,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_gengetone_kenya_gengetone_2026_04_20",
+        "program_id": "program_gengetone_kenya",
+        "source_edition_id": "75",
+        "edition_slug": "gengetone-2026-04-20",
+        "edition_label": "Top Gengetone Songs",
+        "edition_date": "2026-04-20",
+        "period_start": "2026-04-20",
+        "period_end": "2026-04-20",
+        "status": "published",
+        "entry_count": 50,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_2026_releases_kenya_2026_2026_04_20",
+        "program_id": "program_2026_releases_kenya",
+        "source_edition_id": "76",
+        "edition_slug": "2026-2026-04-20",
+        "edition_label": "Top Kenyan Songs Released in 2026",
+        "edition_date": "2026-04-20",
+        "period_start": "2026-04-20",
+        "period_end": "2026-04-20",
+        "status": "published",
+        "entry_count": 100,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_rnb_kenya_rnb_2026_04_20",
+        "program_id": "program_rnb_kenya",
+        "source_edition_id": "77",
+        "edition_slug": "rnb-2026-04-20",
+        "edition_label": "Top Kenyan R&#038;B Songs",
+        "edition_date": "2026-04-20",
+        "period_start": "2026-04-20",
+        "period_end": "2026-04-20",
+        "status": "published",
+        "entry_count": 100,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_top_songs_kenya_kenya_2026_04_27",
+        "program_id": "program_top_songs_kenya",
+        "source_edition_id": "78",
+        "edition_slug": "kenya-2026-04-27",
+        "edition_label": "Top 100 Songs in Kenya",
+        "edition_date": "2026-04-27",
+        "period_start": "2026-04-27",
+        "period_end": "2026-04-27",
+        "status": "published",
+        "entry_count": 100,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_gengetone_kenya_gengetone_2026_04_27",
+        "program_id": "program_gengetone_kenya",
+        "source_edition_id": "79",
+        "edition_slug": "gengetone-2026-04-27",
+        "edition_label": "Top Gengetone Songs",
+        "edition_date": "2026-04-27",
+        "period_start": "2026-04-27",
+        "period_end": "2026-04-27",
+        "status": "published",
+        "entry_count": 50,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_rnb_kenya_rnb_2026_04_27",
+        "program_id": "program_rnb_kenya",
+        "source_edition_id": "80",
+        "edition_slug": "rnb-2026-04-27",
+        "edition_label": "Top Kenyan R&B Songs",
+        "edition_date": "2026-04-27",
+        "period_start": "2026-04-27",
+        "period_end": "2026-04-27",
+        "status": "published",
+        "entry_count": 100,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_2026_releases_kenya_2026_2026_04_27",
+        "program_id": "program_2026_releases_kenya",
+        "source_edition_id": "81",
+        "edition_slug": "2026-2026-04-27",
+        "edition_label": "Top Kenyan Songs Released in 2026",
+        "edition_date": "2026-04-27",
+        "period_start": "2026-04-27",
+        "period_end": "2026-04-27",
+        "status": "published",
+        "entry_count": 100,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_top_songs_kenya_kenya_2026_05_04",
+        "program_id": "program_top_songs_kenya",
+        "source_edition_id": "82",
+        "edition_slug": "kenya-2026-05-04",
+        "edition_label": "Top 100 Songs in Kenya",
+        "edition_date": "2026-05-04",
+        "period_start": "2026-05-04",
+        "period_end": "2026-05-04",
+        "status": "published",
+        "entry_count": 100,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_gengetone_kenya_gengetone_2026_05_04",
+        "program_id": "program_gengetone_kenya",
+        "source_edition_id": "83",
+        "edition_slug": "gengetone-2026-05-04",
+        "edition_label": "Top Gengetone Songs",
+        "edition_date": "2026-05-04",
+        "period_start": "2026-05-04",
+        "period_end": "2026-05-04",
+        "status": "published",
+        "entry_count": 50,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_rnb_kenya_rnb_2026_05_04",
+        "program_id": "program_rnb_kenya",
+        "source_edition_id": "84",
+        "edition_slug": "rnb-2026-05-04",
+        "edition_label": "Top Kenyan R&#038;B Songs",
+        "edition_date": "2026-05-04",
+        "period_start": "2026-05-04",
+        "period_end": "2026-05-04",
+        "status": "published",
+        "entry_count": 100,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_2026_releases_kenya_2026_2026_05_04",
+        "program_id": "program_2026_releases_kenya",
+        "source_edition_id": "85",
+        "edition_slug": "2026-2026-05-04",
+        "edition_label": "Top Kenyan Songs Released in 2026",
+        "edition_date": "2026-05-04",
+        "period_start": "2026-05-04",
+        "period_end": "2026-05-04",
+        "status": "published",
+        "entry_count": 100,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_top_songs_kenya_kenya_2026_05_11",
+        "program_id": "program_top_songs_kenya",
+        "source_edition_id": "86",
+        "edition_slug": "kenya-2026-05-11",
+        "edition_label": "Top 100 Songs in Kenya",
+        "edition_date": "2026-05-11",
+        "period_start": "2026-05-11",
+        "period_end": "2026-05-11",
+        "status": "published",
+        "entry_count": 100,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_top_songs_kenya_kenya_2026_05_18",
+        "program_id": "program_top_songs_kenya",
+        "source_edition_id": "87",
+        "edition_slug": "kenya-2026-05-18",
+        "edition_label": "Top 100 Songs in Kenya",
+        "edition_date": "2026-05-18",
+        "period_start": "2026-05-18",
+        "period_end": "2026-05-18",
+        "status": "published",
+        "entry_count": 100,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_gengetone_kenya_gengetone_2026_05_11",
+        "program_id": "program_gengetone_kenya",
+        "source_edition_id": "88",
+        "edition_slug": "gengetone-2026-05-11",
+        "edition_label": "Top Gengetone Songs",
+        "edition_date": "2026-05-11",
+        "period_start": "2026-05-11",
+        "period_end": "2026-05-11",
+        "status": "published",
+        "entry_count": 50,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_gengetone_kenya_gengetone_2026_05_18",
+        "program_id": "program_gengetone_kenya",
+        "source_edition_id": "89",
+        "edition_slug": "gengetone-2026-05-18",
+        "edition_label": "Top Gengetone Songs",
+        "edition_date": "2026-05-18",
+        "period_start": "2026-05-18",
+        "period_end": "2026-05-18",
+        "status": "published",
+        "entry_count": 50,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_2026_releases_kenya_2026_2026_01_26",
+        "program_id": "program_2026_releases_kenya",
+        "source_edition_id": "1",
+        "edition_slug": "2026-2026-01-26",
+        "edition_label": "Top Kenyan Songs Released in 2026",
+        "edition_date": "2026-01-26",
+        "period_start": "2026-01-26",
+        "period_end": "2026-01-26",
+        "status": "published",
+        "entry_count": 10,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_rnb_kenya_rnb_2026_05_11",
+        "program_id": "program_rnb_kenya",
+        "source_edition_id": "90",
+        "edition_slug": "rnb-2026-05-11",
+        "edition_label": "Top Kenyan R&B Songs",
+        "edition_date": "2026-05-11",
+        "period_start": "2026-05-11",
+        "period_end": "2026-05-11",
+        "status": "published",
+        "entry_count": 100,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_rnb_kenya_rnb_2026_05_18",
+        "program_id": "program_rnb_kenya",
+        "source_edition_id": "91",
+        "edition_slug": "rnb-2026-05-18",
+        "edition_label": "Top Kenyan R&B Songs",
+        "edition_date": "2026-05-18",
+        "period_start": "2026-05-18",
+        "period_end": "2026-05-18",
+        "status": "published",
+        "entry_count": 100,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_2026_releases_kenya_2026_2026_05_11",
+        "program_id": "program_2026_releases_kenya",
+        "source_edition_id": "92",
+        "edition_slug": "2026-2026-05-11",
+        "edition_label": "Top Kenyan Songs Released in 2026",
+        "edition_date": "2026-05-11",
+        "period_start": "2026-05-11",
+        "period_end": "2026-05-11",
+        "status": "published",
+        "entry_count": 100,
+        "snapshot_id": null
+      },
+      {
+        "id": "edition_2026_releases_kenya_2026_2026_05_18",
+        "program_id": "program_2026_releases_kenya",
+        "source_edition_id": "93",
+        "edition_slug": "2026-2026-05-18",
+        "edition_label": "Top Kenyan Songs Released in 2026",
+        "edition_date": "2026-05-18",
+        "period_start": "2026-05-18",
+        "period_end": "2026-05-18",
+        "status": "published",
+        "entry_count": 100,
+        "snapshot_id": null
+      }
+    ],
+    "sourceCoverage": [
+      {
+        "id": "coverage_edition_2026_releases_kenya_2026_2026_02_02_csv_registry_import",
+        "edition_id": "edition_2026_releases_kenya_2026_2026_02_02",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/2026/2026-2026-02-02.json",
+          "entryCount": 20,
+          "sourceFamilySlug": "2026",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_2026_releases_kenya_2026_2026_02_09_csv_registry_import",
+        "edition_id": "edition_2026_releases_kenya_2026_2026_02_09",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/2026/2026-2026-02-09.json",
+          "entryCount": 30,
+          "sourceFamilySlug": "2026",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_2026_releases_kenya_2026_2026_02_16_csv_registry_import",
+        "edition_id": "edition_2026_releases_kenya_2026_2026_02_16",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/2026/2026-2026-02-16.json",
+          "entryCount": 30,
+          "sourceFamilySlug": "2026",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_2026_releases_kenya_2026_2026_02_23_csv_registry_import",
+        "edition_id": "edition_2026_releases_kenya_2026_2026_02_23",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/2026/2026-2026-02-23.json",
+          "entryCount": 50,
+          "sourceFamilySlug": "2026",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_2026_releases_kenya_2026_2026_03_02_csv_registry_import",
+        "edition_id": "edition_2026_releases_kenya_2026_2026_03_02",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/2026/2026-2026-03-02.json",
+          "entryCount": 100,
+          "sourceFamilySlug": "2026",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_2026_releases_kenya_2026_2026_03_09_csv_registry_import",
+        "edition_id": "edition_2026_releases_kenya_2026_2026_03_09",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/2026/2026-2026-03-09.json",
+          "entryCount": 100,
+          "sourceFamilySlug": "2026",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_2026_releases_kenya_2026_2026_03_16_csv_registry_import",
+        "edition_id": "edition_2026_releases_kenya_2026_2026_03_16",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/2026/2026-2026-03-16.json",
+          "entryCount": 100,
+          "sourceFamilySlug": "2026",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_2026_releases_kenya_2026_2026_03_23_csv_registry_import",
+        "edition_id": "edition_2026_releases_kenya_2026_2026_03_23",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/2026/2026-2026-03-23.json",
+          "entryCount": 100,
+          "sourceFamilySlug": "2026",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_gengetone_kenya_gengetone_2026_03_28_csv_registry_import",
+        "edition_id": "edition_gengetone_kenya_gengetone_2026_03_28",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "unavailable",
+        "coverage_payload": {
+          "sourceFile": "entries/gengetone/gengetone-2026-03-28.json",
+          "entryCount": 0,
+          "sourceFamilySlug": "gengetone",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_gengetone_kenya_gengetone_2026_01_05_csv_registry_import",
+        "edition_id": "edition_gengetone_kenya_gengetone_2026_01_05",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/gengetone/gengetone-2026-01-05.json",
+          "entryCount": 48,
+          "sourceFamilySlug": "gengetone",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_gengetone_kenya_gengetone_2026_01_12_csv_registry_import",
+        "edition_id": "edition_gengetone_kenya_gengetone_2026_01_12",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/gengetone/gengetone-2026-01-12.json",
+          "entryCount": 48,
+          "sourceFamilySlug": "gengetone",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_gengetone_kenya_gengetone_2026_01_19_csv_registry_import",
+        "edition_id": "edition_gengetone_kenya_gengetone_2026_01_19",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/gengetone/gengetone-2026-01-19.json",
+          "entryCount": 49,
+          "sourceFamilySlug": "gengetone",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_gengetone_kenya_gengetone_2026_01_26_csv_registry_import",
+        "edition_id": "edition_gengetone_kenya_gengetone_2026_01_26",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/gengetone/gengetone-2026-01-26.json",
+          "entryCount": 49,
+          "sourceFamilySlug": "gengetone",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_gengetone_kenya_gengetone_2026_02_02_csv_registry_import",
+        "edition_id": "edition_gengetone_kenya_gengetone_2026_02_02",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/gengetone/gengetone-2026-02-02.json",
+          "entryCount": 49,
+          "sourceFamilySlug": "gengetone",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_gengetone_kenya_gengetone_2026_02_09_csv_registry_import",
+        "edition_id": "edition_gengetone_kenya_gengetone_2026_02_09",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/gengetone/gengetone-2026-02-09.json",
+          "entryCount": 49,
+          "sourceFamilySlug": "gengetone",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_gengetone_kenya_gengetone_2026_02_16_csv_registry_import",
+        "edition_id": "edition_gengetone_kenya_gengetone_2026_02_16",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/gengetone/gengetone-2026-02-16.json",
+          "entryCount": 50,
+          "sourceFamilySlug": "gengetone",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_gengetone_kenya_gengetone_2026_02_23_csv_registry_import",
+        "edition_id": "edition_gengetone_kenya_gengetone_2026_02_23",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/gengetone/gengetone-2026-02-23.json",
+          "entryCount": 50,
+          "sourceFamilySlug": "gengetone",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_gengetone_kenya_gengetone_2026_03_02_csv_registry_import",
+        "edition_id": "edition_gengetone_kenya_gengetone_2026_03_02",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/gengetone/gengetone-2026-03-02.json",
+          "entryCount": 50,
+          "sourceFamilySlug": "gengetone",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_gengetone_kenya_gengetone_2026_03_09_csv_registry_import",
+        "edition_id": "edition_gengetone_kenya_gengetone_2026_03_09",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/gengetone/gengetone-2026-03-09.json",
+          "entryCount": 50,
+          "sourceFamilySlug": "gengetone",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_gengetone_kenya_gengetone_2026_03_16_csv_registry_import",
+        "edition_id": "edition_gengetone_kenya_gengetone_2026_03_16",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/gengetone/gengetone-2026-03-16.json",
+          "entryCount": 50,
+          "sourceFamilySlug": "gengetone",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_gengetone_kenya_gengetone_2026_03_23_csv_registry_import",
+        "edition_id": "edition_gengetone_kenya_gengetone_2026_03_23",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/gengetone/gengetone-2026-03-23.json",
+          "entryCount": 50,
+          "sourceFamilySlug": "gengetone",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_top_songs_kenya_kenya_2026_01_05_csv_registry_import",
+        "edition_id": "edition_top_songs_kenya_kenya_2026_01_05",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/kenya/kenya-2026-01-05.json",
+          "entryCount": 100,
+          "sourceFamilySlug": "kenya",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_top_songs_kenya_kenya_2026_01_12_csv_registry_import",
+        "edition_id": "edition_top_songs_kenya_kenya_2026_01_12",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/kenya/kenya-2026-01-12.json",
+          "entryCount": 100,
+          "sourceFamilySlug": "kenya",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_top_songs_kenya_kenya_2026_01_19_csv_registry_import",
+        "edition_id": "edition_top_songs_kenya_kenya_2026_01_19",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/kenya/kenya-2026-01-19.json",
+          "entryCount": 100,
+          "sourceFamilySlug": "kenya",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_top_songs_kenya_kenya_2026_01_26_csv_registry_import",
+        "edition_id": "edition_top_songs_kenya_kenya_2026_01_26",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/kenya/kenya-2026-01-26.json",
+          "entryCount": 100,
+          "sourceFamilySlug": "kenya",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_top_songs_kenya_kenya_2026_02_02_csv_registry_import",
+        "edition_id": "edition_top_songs_kenya_kenya_2026_02_02",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/kenya/kenya-2026-02-02.json",
+          "entryCount": 100,
+          "sourceFamilySlug": "kenya",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_top_songs_kenya_kenya_2026_02_09_csv_registry_import",
+        "edition_id": "edition_top_songs_kenya_kenya_2026_02_09",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/kenya/kenya-2026-02-09.json",
+          "entryCount": 100,
+          "sourceFamilySlug": "kenya",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_top_songs_kenya_kenya_2026_02_16_csv_registry_import",
+        "edition_id": "edition_top_songs_kenya_kenya_2026_02_16",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/kenya/kenya-2026-02-16.json",
+          "entryCount": 100,
+          "sourceFamilySlug": "kenya",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_top_songs_kenya_kenya_2026_02_23_csv_registry_import",
+        "edition_id": "edition_top_songs_kenya_kenya_2026_02_23",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/kenya/kenya-2026-02-23.json",
+          "entryCount": 100,
+          "sourceFamilySlug": "kenya",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_rnb_kenya_rnb_2026_01_05_csv_registry_import",
+        "edition_id": "edition_rnb_kenya_rnb_2026_01_05",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/rnb/rnb-2026-01-05.json",
+          "entryCount": 100,
+          "sourceFamilySlug": "rnb",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_rnb_kenya_rnb_2026_01_12_csv_registry_import",
+        "edition_id": "edition_rnb_kenya_rnb_2026_01_12",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/rnb/rnb-2026-01-12.json",
+          "entryCount": 100,
+          "sourceFamilySlug": "rnb",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_rnb_kenya_rnb_2026_01_19_csv_registry_import",
+        "edition_id": "edition_rnb_kenya_rnb_2026_01_19",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/rnb/rnb-2026-01-19.json",
+          "entryCount": 100,
+          "sourceFamilySlug": "rnb",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_rnb_kenya_rnb_2026_01_26_csv_registry_import",
+        "edition_id": "edition_rnb_kenya_rnb_2026_01_26",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/rnb/rnb-2026-01-26.json",
+          "entryCount": 100,
+          "sourceFamilySlug": "rnb",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_rnb_kenya_rnb_2026_02_02_csv_registry_import",
+        "edition_id": "edition_rnb_kenya_rnb_2026_02_02",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/rnb/rnb-2026-02-02.json",
+          "entryCount": 100,
+          "sourceFamilySlug": "rnb",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_rnb_kenya_rnb_2026_02_09_csv_registry_import",
+        "edition_id": "edition_rnb_kenya_rnb_2026_02_09",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/rnb/rnb-2026-02-09.json",
+          "entryCount": 100,
+          "sourceFamilySlug": "rnb",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_rnb_kenya_rnb_2026_02_16_csv_registry_import",
+        "edition_id": "edition_rnb_kenya_rnb_2026_02_16",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/rnb/rnb-2026-02-16.json",
+          "entryCount": 100,
+          "sourceFamilySlug": "rnb",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_rnb_kenya_rnb_2026_02_23_csv_registry_import",
+        "edition_id": "edition_rnb_kenya_rnb_2026_02_23",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/rnb/rnb-2026-02-23.json",
+          "entryCount": 100,
+          "sourceFamilySlug": "rnb",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_rnb_kenya_rnb_2026_03_02_csv_registry_import",
+        "edition_id": "edition_rnb_kenya_rnb_2026_03_02",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/rnb/rnb-2026-03-02.json",
+          "entryCount": 100,
+          "sourceFamilySlug": "rnb",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_rnb_kenya_rnb_2026_03_09_csv_registry_import",
+        "edition_id": "edition_rnb_kenya_rnb_2026_03_09",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/rnb/rnb-2026-03-09.json",
+          "entryCount": 100,
+          "sourceFamilySlug": "rnb",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_rnb_kenya_rnb_2026_03_16_csv_registry_import",
+        "edition_id": "edition_rnb_kenya_rnb_2026_03_16",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/rnb/rnb-2026-03-16.json",
+          "entryCount": 100,
+          "sourceFamilySlug": "rnb",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_rnb_kenya_rnb_2026_03_23_csv_registry_import",
+        "edition_id": "edition_rnb_kenya_rnb_2026_03_23",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/rnb/rnb-2026-03-23.json",
+          "entryCount": 100,
+          "sourceFamilySlug": "rnb",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_gengetone_kenya_gengetone_2026_03_30_csv_registry_import",
+        "edition_id": "edition_gengetone_kenya_gengetone_2026_03_30",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/gengetone/gengetone-2026-03-30.json",
+          "entryCount": 50,
+          "sourceFamilySlug": "gengetone",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_rnb_kenya_rnb_2026_03_30_csv_registry_import",
+        "edition_id": "edition_rnb_kenya_rnb_2026_03_30",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/rnb/rnb-2026-03-30.json",
+          "entryCount": 100,
+          "sourceFamilySlug": "rnb",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_2026_releases_kenya_2026_2026_03_30_csv_registry_import",
+        "edition_id": "edition_2026_releases_kenya_2026_2026_03_30",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/2026/2026-2026-03-30.json",
+          "entryCount": 100,
+          "sourceFamilySlug": "2026",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_top_songs_kenya_kenya_2026_03_02_csv_registry_import",
+        "edition_id": "edition_top_songs_kenya_kenya_2026_03_02",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/kenya/kenya-2026-03-02.json",
+          "entryCount": 100,
+          "sourceFamilySlug": "kenya",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_top_songs_kenya_kenya_2026_03_09_csv_registry_import",
+        "edition_id": "edition_top_songs_kenya_kenya_2026_03_09",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/kenya/kenya-2026-03-09.json",
+          "entryCount": 100,
+          "sourceFamilySlug": "kenya",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_gengetone_kenya_gengetone_2026_04_06_csv_registry_import",
+        "edition_id": "edition_gengetone_kenya_gengetone_2026_04_06",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/gengetone/gengetone-2026-04-06.json",
+          "entryCount": 50,
+          "sourceFamilySlug": "gengetone",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_rnb_kenya_rnb_2026_04_06_csv_registry_import",
+        "edition_id": "edition_rnb_kenya_rnb_2026_04_06",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/rnb/rnb-2026-04-06.json",
+          "entryCount": 100,
+          "sourceFamilySlug": "rnb",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_2026_releases_kenya_2026_2026_04_06_csv_registry_import",
+        "edition_id": "edition_2026_releases_kenya_2026_2026_04_06",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/2026/2026-2026-04-06.json",
+          "entryCount": 100,
+          "sourceFamilySlug": "2026",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_gengetone_kenya_gengetone_2026_04_13_csv_registry_import",
+        "edition_id": "edition_gengetone_kenya_gengetone_2026_04_13",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/gengetone/gengetone-2026-04-13.json",
+          "entryCount": 50,
+          "sourceFamilySlug": "gengetone",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_top_songs_kenya_kenya_2026_03_16_csv_registry_import",
+        "edition_id": "edition_top_songs_kenya_kenya_2026_03_16",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/kenya/kenya-2026-03-16.json",
+          "entryCount": 100,
+          "sourceFamilySlug": "kenya",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_rnb_kenya_rnb_2026_04_13_csv_registry_import",
+        "edition_id": "edition_rnb_kenya_rnb_2026_04_13",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/rnb/rnb-2026-04-13.json",
+          "entryCount": 100,
+          "sourceFamilySlug": "rnb",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_2026_releases_kenya_2026_2026_04_13_csv_registry_import",
+        "edition_id": "edition_2026_releases_kenya_2026_2026_04_13",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/2026/2026-2026-04-13.json",
+          "entryCount": 100,
+          "sourceFamilySlug": "2026",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_top_songs_kenya_kenya_2026_03_23_csv_registry_import",
+        "edition_id": "edition_top_songs_kenya_kenya_2026_03_23",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/kenya/kenya-2026-03-23.json",
+          "entryCount": 100,
+          "sourceFamilySlug": "kenya",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_top_songs_kenya_kenya_2026_03_30_csv_registry_import",
+        "edition_id": "edition_top_songs_kenya_kenya_2026_03_30",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/kenya/kenya-2026-03-30.json",
+          "entryCount": 100,
+          "sourceFamilySlug": "kenya",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_top_songs_kenya_kenya_2026_04_06_csv_registry_import",
+        "edition_id": "edition_top_songs_kenya_kenya_2026_04_06",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/kenya/kenya-2026-04-06.json",
+          "entryCount": 100,
+          "sourceFamilySlug": "kenya",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_top_songs_kenya_kenya_2026_04_13_csv_registry_import",
+        "edition_id": "edition_top_songs_kenya_kenya_2026_04_13",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/kenya/kenya-2026-04-13.json",
+          "entryCount": 100,
+          "sourceFamilySlug": "kenya",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_top_songs_kenya_kenya_2026_04_20_csv_registry_import",
+        "edition_id": "edition_top_songs_kenya_kenya_2026_04_20",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/kenya/kenya-2026-04-20.json",
+          "entryCount": 100,
+          "sourceFamilySlug": "kenya",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_gengetone_kenya_gengetone_2026_04_20_csv_registry_import",
+        "edition_id": "edition_gengetone_kenya_gengetone_2026_04_20",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/gengetone/gengetone-2026-04-20.json",
+          "entryCount": 50,
+          "sourceFamilySlug": "gengetone",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_2026_releases_kenya_2026_2026_04_20_csv_registry_import",
+        "edition_id": "edition_2026_releases_kenya_2026_2026_04_20",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/2026/2026-2026-04-20.json",
+          "entryCount": 100,
+          "sourceFamilySlug": "2026",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_rnb_kenya_rnb_2026_04_20_csv_registry_import",
+        "edition_id": "edition_rnb_kenya_rnb_2026_04_20",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/rnb/rnb-2026-04-20.json",
+          "entryCount": 100,
+          "sourceFamilySlug": "rnb",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_top_songs_kenya_kenya_2026_04_27_csv_registry_import",
+        "edition_id": "edition_top_songs_kenya_kenya_2026_04_27",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/kenya/kenya-2026-04-27.json",
+          "entryCount": 100,
+          "sourceFamilySlug": "kenya",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_gengetone_kenya_gengetone_2026_04_27_csv_registry_import",
+        "edition_id": "edition_gengetone_kenya_gengetone_2026_04_27",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/gengetone/gengetone-2026-04-27.json",
+          "entryCount": 50,
+          "sourceFamilySlug": "gengetone",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_rnb_kenya_rnb_2026_04_27_csv_registry_import",
+        "edition_id": "edition_rnb_kenya_rnb_2026_04_27",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/rnb/rnb-2026-04-27.json",
+          "entryCount": 100,
+          "sourceFamilySlug": "rnb",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_2026_releases_kenya_2026_2026_04_27_csv_registry_import",
+        "edition_id": "edition_2026_releases_kenya_2026_2026_04_27",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/2026/2026-2026-04-27.json",
+          "entryCount": 100,
+          "sourceFamilySlug": "2026",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_top_songs_kenya_kenya_2026_05_04_csv_registry_import",
+        "edition_id": "edition_top_songs_kenya_kenya_2026_05_04",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/kenya/kenya-2026-05-04.json",
+          "entryCount": 100,
+          "sourceFamilySlug": "kenya",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_gengetone_kenya_gengetone_2026_05_04_csv_registry_import",
+        "edition_id": "edition_gengetone_kenya_gengetone_2026_05_04",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/gengetone/gengetone-2026-05-04.json",
+          "entryCount": 50,
+          "sourceFamilySlug": "gengetone",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_rnb_kenya_rnb_2026_05_04_csv_registry_import",
+        "edition_id": "edition_rnb_kenya_rnb_2026_05_04",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/rnb/rnb-2026-05-04.json",
+          "entryCount": 100,
+          "sourceFamilySlug": "rnb",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_2026_releases_kenya_2026_2026_05_04_csv_registry_import",
+        "edition_id": "edition_2026_releases_kenya_2026_2026_05_04",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/2026/2026-2026-05-04.json",
+          "entryCount": 100,
+          "sourceFamilySlug": "2026",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_top_songs_kenya_kenya_2026_05_11_csv_registry_import",
+        "edition_id": "edition_top_songs_kenya_kenya_2026_05_11",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/kenya/kenya-2026-05-11.json",
+          "entryCount": 100,
+          "sourceFamilySlug": "kenya",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_top_songs_kenya_kenya_2026_05_18_csv_registry_import",
+        "edition_id": "edition_top_songs_kenya_kenya_2026_05_18",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/kenya/kenya-2026-05-18.json",
+          "entryCount": 100,
+          "sourceFamilySlug": "kenya",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_gengetone_kenya_gengetone_2026_05_11_csv_registry_import",
+        "edition_id": "edition_gengetone_kenya_gengetone_2026_05_11",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/gengetone/gengetone-2026-05-11.json",
+          "entryCount": 50,
+          "sourceFamilySlug": "gengetone",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_gengetone_kenya_gengetone_2026_05_18_csv_registry_import",
+        "edition_id": "edition_gengetone_kenya_gengetone_2026_05_18",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/gengetone/gengetone-2026-05-18.json",
+          "entryCount": 50,
+          "sourceFamilySlug": "gengetone",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_2026_releases_kenya_2026_2026_01_26_csv_registry_import",
+        "edition_id": "edition_2026_releases_kenya_2026_2026_01_26",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/2026/2026-2026-01-26.json",
+          "entryCount": 10,
+          "sourceFamilySlug": "2026",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_rnb_kenya_rnb_2026_05_11_csv_registry_import",
+        "edition_id": "edition_rnb_kenya_rnb_2026_05_11",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/rnb/rnb-2026-05-11.json",
+          "entryCount": 100,
+          "sourceFamilySlug": "rnb",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_rnb_kenya_rnb_2026_05_18_csv_registry_import",
+        "edition_id": "edition_rnb_kenya_rnb_2026_05_18",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/rnb/rnb-2026-05-18.json",
+          "entryCount": 100,
+          "sourceFamilySlug": "rnb",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_2026_releases_kenya_2026_2026_05_11_csv_registry_import",
+        "edition_id": "edition_2026_releases_kenya_2026_2026_05_11",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/2026/2026-2026-05-11.json",
+          "entryCount": 100,
+          "sourceFamilySlug": "2026",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      },
+      {
+        "id": "coverage_edition_2026_releases_kenya_2026_2026_05_18_csv_registry_import",
+        "edition_id": "edition_2026_releases_kenya_2026_2026_05_18",
+        "source_name": "WAKILISHA CSV Registry Import",
+        "coverage_status": "manual",
+        "coverage_payload": {
+          "sourceFile": "entries/2026/2026-2026-05-18.json",
+          "entryCount": 100,
+          "sourceFamilySlug": "2026",
+          "methodologyVersion": "csv-registry-import-v1"
+        }
+      }
+    ],
+    "slugAliases": [
+      {
+        "id": "alias_chart_program_2026",
+        "legacy_slug": "2026",
+        "canonical_slug": "2026-releases-kenya",
+        "entity_type": "chart_program",
+        "redirect_status": "active"
+      },
+      {
+        "id": "alias_chart_program_top_kenyan_songs_released_in_2026",
+        "legacy_slug": "top-kenyan-songs-released-in-2026",
+        "canonical_slug": "2026-releases-kenya",
+        "entity_type": "chart_program",
+        "redirect_status": "active"
+      },
+      {
+        "id": "alias_chart_program_gengetone",
+        "legacy_slug": "gengetone",
+        "canonical_slug": "gengetone-kenya",
+        "entity_type": "chart_program",
+        "redirect_status": "active"
+      },
+      {
+        "id": "alias_chart_program_top_gengetone_songs",
+        "legacy_slug": "top-gengetone-songs",
+        "canonical_slug": "gengetone-kenya",
+        "entity_type": "chart_program",
+        "redirect_status": "active"
+      },
+      {
+        "id": "alias_chart_program_kenya",
+        "legacy_slug": "kenya",
+        "canonical_slug": "top-songs-kenya",
+        "entity_type": "chart_program",
+        "redirect_status": "active"
+      },
+      {
+        "id": "alias_chart_program_top_100_kenya",
+        "legacy_slug": "top-100-kenya",
+        "canonical_slug": "top-songs-kenya",
+        "entity_type": "chart_program",
+        "redirect_status": "active"
+      },
+      {
+        "id": "alias_chart_program_kenya_top_100",
+        "legacy_slug": "kenya-top-100",
+        "canonical_slug": "top-songs-kenya",
+        "entity_type": "chart_program",
+        "redirect_status": "active"
+      },
+      {
+        "id": "alias_chart_program_rnb",
+        "legacy_slug": "rnb",
+        "canonical_slug": "rnb-kenya",
+        "entity_type": "chart_program",
+        "redirect_status": "active"
+      },
+      {
+        "id": "alias_chart_program_kenyan_rnb",
+        "legacy_slug": "kenyan-rnb",
+        "canonical_slug": "rnb-kenya",
+        "entity_type": "chart_program",
+        "redirect_status": "active"
+      },
+      {
+        "id": "alias_chart_program_top_kenyan_rnb_songs",
+        "legacy_slug": "top-kenyan-rnb-songs",
+        "canonical_slug": "rnb-kenya",
+        "entity_type": "chart_program",
+        "redirect_status": "active"
+      }
+    ],
+    "entrySamples": [
+      {
+        "id": "entry_edition_2026_releases_kenya_2026_2026_02_02_001_08074af1_3cfc_dcba_3a63_c4b2700120fe",
+        "edition_id": "edition_2026_releases_kenya_2026_2026_02_02",
+        "rank": 1,
+        "previous_rank": 0,
+        "movement": "new",
+        "track_slug": "up-burukanga",
+        "track_title": "Up Burukanga",
+        "artist_name": "Collo Blue, ADDEH PRINCE",
+        "artist_slug": "collo-blue",
+        "artwork_url": "https://i.scdn.co/image/ab67616d0000b273da0173222f938ae4352af25b",
+        "source_entry_id": "08074af1-3cfc-dcba-3a63-c4b2700120fe",
+        "raw_payload": {
+          "source": "public-charts-data-json",
+          "sourceFile": "entries/2026/2026-2026-02-02.json",
+          "sourceEntryId": "08074af1-3cfc-dcba-3a63-c4b2700120fe",
+          "sourceEditionId": "2",
+          "sourceEditionSlug": "2026-2026-02-02",
+          "sourceFamilySlug": "2026",
+          "publicProgramSlug": "2026-releases-kenya"
+        }
+      },
+      {
+        "id": "entry_edition_2026_releases_kenya_2026_2026_02_02_002_77f6829a_85c5_882d_b1f2_79323eba54c5",
+        "edition_id": "edition_2026_releases_kenya_2026_2026_02_02",
+        "rank": 2,
+        "previous_rank": 0,
+        "movement": "new",
+        "track_slug": "farova-forever",
+        "track_title": "Farova Forever",
+        "artist_name": "Savara",
+        "artist_slug": "savara",
+        "artwork_url": "https://i.scdn.co/image/ab67616d0000b2731d96cb736fefce91ac43c169",
+        "source_entry_id": "77f6829a-85c5-882d-b1f2-79323eba54c5",
+        "raw_payload": {
+          "source": "public-charts-data-json",
+          "sourceFile": "entries/2026/2026-2026-02-02.json",
+          "sourceEntryId": "77f6829a-85c5-882d-b1f2-79323eba54c5",
+          "sourceEditionId": "2",
+          "sourceEditionSlug": "2026-2026-02-02",
+          "sourceFamilySlug": "2026",
+          "publicProgramSlug": "2026-releases-kenya"
+        }
+      },
+      {
+        "id": "entry_edition_2026_releases_kenya_2026_2026_02_02_003_5beb1d8a_4b2d_52ba_801b_03e0e90dd97d",
+        "edition_id": "edition_2026_releases_kenya_2026_2026_02_02",
+        "rank": 3,
+        "previous_rank": 0,
+        "movement": "new",
+        "track_slug": "4l",
+        "track_title": "4L",
+        "artist_name": "NSG, Bien",
+        "artist_slug": "nsg",
+        "artwork_url": "https://i.scdn.co/image/ab67616d0000b273d2b760548c985f0db2449b79",
+        "source_entry_id": "5beb1d8a-4b2d-52ba-801b-03e0e90dd97d",
+        "raw_payload": {
+          "source": "public-charts-data-json",
+          "sourceFile": "entries/2026/2026-2026-02-02.json",
+          "sourceEntryId": "5beb1d8a-4b2d-52ba-801b-03e0e90dd97d",
+          "sourceEditionId": "2",
+          "sourceEditionSlug": "2026-2026-02-02",
+          "sourceFamilySlug": "2026",
+          "publicProgramSlug": "2026-releases-kenya"
+        }
+      },
+      {
+        "id": "entry_edition_2026_releases_kenya_2026_2026_02_02_004_0898391a_32f9_7d2a_ec1c_31cb01bc8f1c",
+        "edition_id": "edition_2026_releases_kenya_2026_2026_02_02",
+        "rank": 4,
+        "previous_rank": 0,
+        "movement": "new",
+        "track_slug": "clapp",
+        "track_title": "Clapp",
+        "artist_name": "HOOD BOYZ, Mejja",
+        "artist_slug": "hood-boyz",
+        "artwork_url": "https://i.scdn.co/image/ab67616d0000b27347425f75861b9eb8e28a9525",
+        "source_entry_id": "0898391a-32f9-7d2a-ec1c-31cb01bc8f1c",
+        "raw_payload": {
+          "source": "public-charts-data-json",
+          "sourceFile": "entries/2026/2026-2026-02-02.json",
+          "sourceEntryId": "0898391a-32f9-7d2a-ec1c-31cb01bc8f1c",
+          "sourceEditionId": "2",
+          "sourceEditionSlug": "2026-2026-02-02",
+          "sourceFamilySlug": "2026",
+          "publicProgramSlug": "2026-releases-kenya"
+        }
+      },
+      {
+        "id": "entry_edition_2026_releases_kenya_2026_2026_02_02_005_14cdfca4_3d3c_b781_b029_fa38f07ed53b",
+        "edition_id": "edition_2026_releases_kenya_2026_2026_02_02",
+        "rank": 5,
+        "previous_rank": 0,
+        "movement": "new",
+        "track_slug": "mash-up",
+        "track_title": "Mash-Up",
+        "artist_name": "Zero Bandits, Exray Taniua",
+        "artist_slug": "zero-bandits",
+        "artwork_url": "https://i.scdn.co/image/ab67616d0000b273782ca2c2ac37c021bfec0c83",
+        "source_entry_id": "14cdfca4-3d3c-b781-b029-fa38f07ed53b",
+        "raw_payload": {
+          "source": "public-charts-data-json",
+          "sourceFile": "entries/2026/2026-2026-02-02.json",
+          "sourceEntryId": "14cdfca4-3d3c-b781-b029-fa38f07ed53b",
+          "sourceEditionId": "2",
+          "sourceEditionSlug": "2026-2026-02-02",
+          "sourceFamilySlug": "2026",
+          "publicProgramSlug": "2026-releases-kenya"
+        }
+      },
+      {
+        "id": "entry_edition_2026_releases_kenya_2026_2026_02_02_006_9fb1bc73_c775_615e_be29_35bb1e7093af",
+        "edition_id": "edition_2026_releases_kenya_2026_2026_02_02",
+        "rank": 6,
+        "previous_rank": 0,
+        "movement": "new",
+        "track_slug": "vurugu",
+        "track_title": "Vurugu",
+        "artist_name": "Mauru Gwash, Toxic Lyrikali",
+        "artist_slug": "mauru-gwash",
+        "artwork_url": "https://i.scdn.co/image/ab67616d0000b273f298cffae35d40796e2d7663",
+        "source_entry_id": "9fb1bc73-c775-615e-be29-35bb1e7093af",
+        "raw_payload": {
+          "source": "public-charts-data-json",
+          "sourceFile": "entries/2026/2026-2026-02-02.json",
+          "sourceEntryId": "9fb1bc73-c775-615e-be29-35bb1e7093af",
+          "sourceEditionId": "2",
+          "sourceEditionSlug": "2026-2026-02-02",
+          "sourceFamilySlug": "2026",
+          "publicProgramSlug": "2026-releases-kenya"
+        }
+      },
+      {
+        "id": "entry_edition_2026_releases_kenya_2026_2026_02_02_007_6e02fb7a_b970_792e_aa4a_966924231c79",
+        "edition_id": "edition_2026_releases_kenya_2026_2026_02_02",
+        "rank": 7,
+        "previous_rank": 0,
+        "movement": "new",
+        "track_slug": "diehatsu",
+        "track_title": "Diehatsu",
+        "artist_name": "Sewersydaa",
+        "artist_slug": "sewersydaa",
+        "artwork_url": "https://i.scdn.co/image/ab67616d0000b273dd88b8ab1f0721ef3445203c",
+        "source_entry_id": "6e02fb7a-b970-792e-aa4a-966924231c79",
+        "raw_payload": {
+          "source": "public-charts-data-json",
+          "sourceFile": "entries/2026/2026-2026-02-02.json",
+          "sourceEntryId": "6e02fb7a-b970-792e-aa4a-966924231c79",
+          "sourceEditionId": "2",
+          "sourceEditionSlug": "2026-2026-02-02",
+          "sourceFamilySlug": "2026",
+          "publicProgramSlug": "2026-releases-kenya"
+        }
+      },
+      {
+        "id": "entry_edition_2026_releases_kenya_2026_2026_02_02_008_d6dcb84a_d287_5118_8143_fada728db6e6",
+        "edition_id": "edition_2026_releases_kenya_2026_2026_02_02",
+        "rank": 8,
+        "previous_rank": 0,
+        "movement": "new",
+        "track_slug": "wild-fire",
+        "track_title": "Wild Fire",
+        "artist_name": "Sasha Shlain, Chemutai Sage, SocraTess",
+        "artist_slug": "sasha-shlain",
+        "artwork_url": "https://i.scdn.co/image/ab67616d0000b273479ca31a5da22cfee502b7d0",
+        "source_entry_id": "d6dcb84a-d287-5118-8143-fada728db6e6",
+        "raw_payload": {
+          "source": "public-charts-data-json",
+          "sourceFile": "entries/2026/2026-2026-02-02.json",
+          "sourceEntryId": "d6dcb84a-d287-5118-8143-fada728db6e6",
+          "sourceEditionId": "2",
+          "sourceEditionSlug": "2026-2026-02-02",
+          "sourceFamilySlug": "2026",
+          "publicProgramSlug": "2026-releases-kenya"
+        }
+      },
+      {
+        "id": "entry_edition_2026_releases_kenya_2026_2026_02_02_009_7e1f06f0_c821_f746_0f4c_28735636ff52",
+        "edition_id": "edition_2026_releases_kenya_2026_2026_02_02",
+        "rank": 9,
+        "previous_rank": 0,
+        "movement": "new",
+        "track_slug": "sioni-haja",
+        "track_title": "Sioni Haja",
+        "artist_name": "DENO",
+        "artist_slug": "deno",
+        "artwork_url": "https://i.scdn.co/image/ab67616d0000b2739b1aedf8d4cba7a76a3e7a8e",
+        "source_entry_id": "7e1f06f0-c821-f746-0f4c-28735636ff52",
+        "raw_payload": {
+          "source": "public-charts-data-json",
+          "sourceFile": "entries/2026/2026-2026-02-02.json",
+          "sourceEntryId": "7e1f06f0-c821-f746-0f4c-28735636ff52",
+          "sourceEditionId": "2",
+          "sourceEditionSlug": "2026-2026-02-02",
+          "sourceFamilySlug": "2026",
+          "publicProgramSlug": "2026-releases-kenya"
+        }
+      },
+      {
+        "id": "entry_edition_2026_releases_kenya_2026_2026_02_02_010_62a84c2c_ad4b_6b88_4f50_ce8c65a32e75",
+        "edition_id": "edition_2026_releases_kenya_2026_2026_02_02",
+        "rank": 10,
+        "previous_rank": 0,
+        "movement": "new",
+        "track_slug": "game",
+        "track_title": "Game",
+        "artist_name": "BURUKLYN BOYZ, AJAY",
+        "artist_slug": "buruklyn-boyz",
+        "artwork_url": "https://i.scdn.co/image/ab67616d0000b273e83ccbda44911df5019e9f60",
+        "source_entry_id": "62a84c2c-ad4b-6b88-4f50-ce8c65a32e75",
+        "raw_payload": {
+          "source": "public-charts-data-json",
+          "sourceFile": "entries/2026/2026-2026-02-02.json",
+          "sourceEntryId": "62a84c2c-ad4b-6b88-4f50-ce8c65a32e75",
+          "sourceEditionId": "2",
+          "sourceEditionSlug": "2026-2026-02-02",
+          "sourceFamilySlug": "2026",
+          "publicProgramSlug": "2026-releases-kenya"
+        }
+      },
+      {
+        "id": "entry_edition_2026_releases_kenya_2026_2026_02_02_011_49101dd3_6501_2a63_0c55_810330787bfc",
+        "edition_id": "edition_2026_releases_kenya_2026_2026_02_02",
+        "rank": 11,
+        "previous_rank": 0,
+        "movement": "new",
+        "track_slug": "uspimee",
+        "track_title": "Uspimee",
+        "artist_name": "Khaligraph Jones",
+        "artist_slug": "khaligraph-jones",
+        "artwork_url": "https://i.scdn.co/image/ab67616d0000b2730699bd5ce2ebb5c067ea4c65",
+        "source_entry_id": "49101dd3-6501-2a63-0c55-810330787bfc",
+        "raw_payload": {
+          "source": "public-charts-data-json",
+          "sourceFile": "entries/2026/2026-2026-02-02.json",
+          "sourceEntryId": "49101dd3-6501-2a63-0c55-810330787bfc",
+          "sourceEditionId": "2",
+          "sourceEditionSlug": "2026-2026-02-02",
+          "sourceFamilySlug": "2026",
+          "publicProgramSlug": "2026-releases-kenya"
+        }
+      },
+      {
+        "id": "entry_edition_2026_releases_kenya_2026_2026_02_02_012_3c7b4855_c847_13f6_1942_a3da80f0c418",
+        "edition_id": "edition_2026_releases_kenya_2026_2026_02_02",
+        "rank": 12,
+        "previous_rank": 0,
+        "movement": "new",
+        "track_slug": "animal",
+        "track_title": "Animal",
+        "artist_name": "Umoja Sounds, Elisha Elai",
+        "artist_slug": "umoja-sounds",
+        "artwork_url": "https://i.scdn.co/image/ab67616d0000b2731e36a030f0d87c3d99d1d032",
+        "source_entry_id": "3c7b4855-c847-13f6-1942-a3da80f0c418",
+        "raw_payload": {
+          "source": "public-charts-data-json",
+          "sourceFile": "entries/2026/2026-2026-02-02.json",
+          "sourceEntryId": "3c7b4855-c847-13f6-1942-a3da80f0c418",
+          "sourceEditionId": "2",
+          "sourceEditionSlug": "2026-2026-02-02",
+          "sourceFamilySlug": "2026",
+          "publicProgramSlug": "2026-releases-kenya"
+        }
+      },
+      {
+        "id": "entry_edition_2026_releases_kenya_2026_2026_02_02_013_a66797b6_700c_3c1d_66e8_a80f6f150d6f",
+        "edition_id": "edition_2026_releases_kenya_2026_2026_02_02",
+        "rank": 13,
+        "previous_rank": 0,
+        "movement": "new",
+        "track_slug": "kichapo",
+        "track_title": "Kichapo",
+        "artist_name": "Mordecai Dex",
+        "artist_slug": "mordecai-dex",
+        "artwork_url": "https://i.scdn.co/image/ab67616d0000b2730054d27cccd6dccee6c01285",
+        "source_entry_id": "a66797b6-700c-3c1d-66e8-a80f6f150d6f",
+        "raw_payload": {
+          "source": "public-charts-data-json",
+          "sourceFile": "entries/2026/2026-2026-02-02.json",
+          "sourceEntryId": "a66797b6-700c-3c1d-66e8-a80f6f150d6f",
+          "sourceEditionId": "2",
+          "sourceEditionSlug": "2026-2026-02-02",
+          "sourceFamilySlug": "2026",
+          "publicProgramSlug": "2026-releases-kenya"
+        }
+      },
+      {
+        "id": "entry_edition_2026_releases_kenya_2026_2026_02_02_014_93bf0e70_b35f_59cf_5b19_796dd00b8a56",
+        "edition_id": "edition_2026_releases_kenya_2026_2026_02_02",
+        "rank": 14,
+        "previous_rank": 0,
+        "movement": "new",
+        "track_slug": "heal",
+        "track_title": "Heal",
+        "artist_name": "Mūmbi",
+        "artist_slug": "mumbi",
+        "artwork_url": "https://i.scdn.co/image/ab67616d0000b273e449492b3d357919023418c2",
+        "source_entry_id": "93bf0e70-b35f-59cf-5b19-796dd00b8a56",
+        "raw_payload": {
+          "source": "public-charts-data-json",
+          "sourceFile": "entries/2026/2026-2026-02-02.json",
+          "sourceEntryId": "93bf0e70-b35f-59cf-5b19-796dd00b8a56",
+          "sourceEditionId": "2",
+          "sourceEditionSlug": "2026-2026-02-02",
+          "sourceFamilySlug": "2026",
+          "publicProgramSlug": "2026-releases-kenya"
+        }
+      },
+      {
+        "id": "entry_edition_2026_releases_kenya_2026_2026_02_02_015_b7bdfb3b_eb53_6b6e_41ee_638a3e1e9727",
+        "edition_id": "edition_2026_releases_kenya_2026_2026_02_02",
+        "rank": 15,
+        "previous_rank": 0,
+        "movement": "new",
+        "track_slug": "lowkey",
+        "track_title": "Lowkey",
+        "artist_name": "Toxic Lyrikali",
+        "artist_slug": "toxic-lyrikali",
+        "artwork_url": "https://i.scdn.co/image/ab67616d0000b273aad597d46d08af6bc3a8fda7",
+        "source_entry_id": "b7bdfb3b-eb53-6b6e-41ee-638a3e1e9727",
+        "raw_payload": {
+          "source": "public-charts-data-json",
+          "sourceFile": "entries/2026/2026-2026-02-02.json",
+          "sourceEntryId": "b7bdfb3b-eb53-6b6e-41ee-638a3e1e9727",
+          "sourceEditionId": "2",
+          "sourceEditionSlug": "2026-2026-02-02",
+          "sourceFamilySlug": "2026",
+          "publicProgramSlug": "2026-releases-kenya"
+        }
+      },
+      {
+        "id": "entry_edition_2026_releases_kenya_2026_2026_02_02_016_e14fe626_3bf8_8a19_2d88_5487ab123327",
+        "edition_id": "edition_2026_releases_kenya_2026_2026_02_02",
+        "rank": 16,
+        "previous_rank": 0,
+        "movement": "new",
+        "track_slug": "mali-safi",
+        "track_title": "Mali Safi",
+        "artist_name": "Iyanii",
+        "artist_slug": "iyanii",
+        "artwork_url": "https://i.scdn.co/image/ab67616d0000b273d4b4079c9189854c99740251",
+        "source_entry_id": "e14fe626-3bf8-8a19-2d88-5487ab123327",
+        "raw_payload": {
+          "source": "public-charts-data-json",
+          "sourceFile": "entries/2026/2026-2026-02-02.json",
+          "sourceEntryId": "e14fe626-3bf8-8a19-2d88-5487ab123327",
+          "sourceEditionId": "2",
+          "sourceEditionSlug": "2026-2026-02-02",
+          "sourceFamilySlug": "2026",
+          "publicProgramSlug": "2026-releases-kenya"
+        }
+      },
+      {
+        "id": "entry_edition_2026_releases_kenya_2026_2026_02_02_017_1217d97c_5395_d3f2_10d4_eb94780adf44",
+        "edition_id": "edition_2026_releases_kenya_2026_2026_02_02",
+        "rank": 17,
+        "previous_rank": 0,
+        "movement": "new",
+        "track_slug": "slow-whine",
+        "track_title": "Slow Whine",
+        "artist_name": "V-Be, Vic West",
+        "artist_slug": "v-be",
+        "artwork_url": "https://i.scdn.co/image/ab67616d0000b273f338aebefa62af57242fe22f",
+        "source_entry_id": "1217d97c-5395-d3f2-10d4-eb94780adf44",
+        "raw_payload": {
+          "source": "public-charts-data-json",
+          "sourceFile": "entries/2026/2026-2026-02-02.json",
+          "sourceEntryId": "1217d97c-5395-d3f2-10d4-eb94780adf44",
+          "sourceEditionId": "2",
+          "sourceEditionSlug": "2026-2026-02-02",
+          "sourceFamilySlug": "2026",
+          "publicProgramSlug": "2026-releases-kenya"
+        }
+      },
+      {
+        "id": "entry_edition_2026_releases_kenya_2026_2026_02_02_018_8fdc0921_0da1_dd46_8b64_fe70e0155f7f",
+        "edition_id": "edition_2026_releases_kenya_2026_2026_02_02",
+        "rank": 18,
+        "previous_rank": 0,
+        "movement": "new",
+        "track_slug": "lie-to-me-home-session",
+        "track_title": "Lie to Me - Home Session",
+        "artist_name": "Karun",
+        "artist_slug": "karun",
+        "artwork_url": "https://i.scdn.co/image/ab67616d0000b27338facd57e42673089142d0c5",
+        "source_entry_id": "8fdc0921-0da1-dd46-8b64-fe70e0155f7f",
+        "raw_payload": {
+          "source": "public-charts-data-json",
+          "sourceFile": "entries/2026/2026-2026-02-02.json",
+          "sourceEntryId": "8fdc0921-0da1-dd46-8b64-fe70e0155f7f",
+          "sourceEditionId": "2",
+          "sourceEditionSlug": "2026-2026-02-02",
+          "sourceFamilySlug": "2026",
+          "publicProgramSlug": "2026-releases-kenya"
+        }
+      },
+      {
+        "id": "entry_edition_2026_releases_kenya_2026_2026_02_02_019_e88f1ded_de81_5164_2684_1673da42f67a",
+        "edition_id": "edition_2026_releases_kenya_2026_2026_02_02",
+        "rank": 19,
+        "previous_rank": 0,
+        "movement": "new",
+        "track_slug": "malia",
+        "track_title": "Malia",
+        "artist_name": "Tuku Kantu",
+        "artist_slug": "tuku-kantu",
+        "artwork_url": "https://i.scdn.co/image/ab67616d0000b2730b5fc6b0d56f9a8c9f39ec9e",
+        "source_entry_id": "e88f1ded-de81-5164-2684-1673da42f67a",
+        "raw_payload": {
+          "source": "public-charts-data-json",
+          "sourceFile": "entries/2026/2026-2026-02-02.json",
+          "sourceEntryId": "e88f1ded-de81-5164-2684-1673da42f67a",
+          "sourceEditionId": "2",
+          "sourceEditionSlug": "2026-2026-02-02",
+          "sourceFamilySlug": "2026",
+          "publicProgramSlug": "2026-releases-kenya"
+        }
+      },
+      {
+        "id": "entry_edition_2026_releases_kenya_2026_2026_02_02_020_a25ae899_200f_94fd_42b7_5ef893a8f69c",
+        "edition_id": "edition_2026_releases_kenya_2026_2026_02_02",
+        "rank": 20,
+        "previous_rank": 0,
+        "movement": "new",
+        "track_slug": "tumia-pesa",
+        "track_title": "Tumia Pesa",
+        "artist_name": "Watendawili",
+        "artist_slug": "watendawili",
+        "artwork_url": "https://i.scdn.co/image/ab67616d0000b2737ef079cca70002fca6cd2dbf",
+        "source_entry_id": "a25ae899-200f-94fd-42b7-5ef893a8f69c",
+        "raw_payload": {
+          "source": "public-charts-data-json",
+          "sourceFile": "entries/2026/2026-2026-02-02.json",
+          "sourceEntryId": "a25ae899-200f-94fd-42b7-5ef893a8f69c",
+          "sourceEditionId": "2",
+          "sourceEditionSlug": "2026-2026-02-02",
+          "sourceFamilySlug": "2026",
+          "publicProgramSlug": "2026-releases-kenya"
+        }
+      }
+    ]
+  },
+  "omittedFromJson": {
+    "entries": 6332,
+    "reason": "Full entry insert rows are represented in reports/chart-v2-inserts.sql and by entrySamples in this JSON plan."
+  },
+  "warnings": []
+}
