@@ -24,9 +24,9 @@ function escapeSql(value: unknown): string {
   return `'${String(value).replace(/'/g, "''")}'`;
 }
 
-function jsonb(value: unknown): string {
-  if (value === null || value === undefined || value === '') return 'null';
-  return escapeSql(JSON.stringify(value));
+function jsonb(value: unknown): unknown {
+  if (value === null || value === undefined || value === '') return null;
+  return JSON.stringify(value);
 }
 
 function readRows(fileName: string): JsonRow[] {
