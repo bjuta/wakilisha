@@ -73,7 +73,54 @@ async function q(query: string, values: unknown[] = []): Promise<Row[]> {
 
 export async function repairedResponse(resource: string, limit = 120): Promise<Record<string, unknown>> {
   if (resource === "magazine") {
-    const rows = await q("select legacy_wp_post_id as id, slug, title, coalesce(nullif(source_payload->>'category',''),'Article') as section, coalesce(nullif(source_payload->>'excerpt',''), nullif(source_payload->>'post_excerpt',''), '') as dek, coalesce(nullif(source_payload->>'author',''),'WAKILISHA Editorial') as author, coalesce(nullif(source_payload->>'post_date',''), nullif(source_payload->>'date',''), 'Undated') as date, coalesce(nullif(source_payload->>'featured_image_url',''), nullif(source_payload->>'image',''), '') as hero_url from wakilisha_repaired.content_route_classification where classification='article' and migration_action='migrate_to_article' and coalesce(needs_review,false)=false and slug is not null and title is not null order by nullif(source_payload->>'post_date','') desc nulls last, title asc limit $1", [limit]);
+    const rows = await q(`
+      select
+        legacy_wp_post_id as id,
+        slug,
+        title,
+        coalesce(nullif(source_payload->>'category',''),'Article') as section,
+        coalesce(nullif(source_payload->>'excerpt',''), nullif(source_payload->>'post_excerpt',''), '') as dek,
+        coalesce(nullif(source_payload->>'author',''),'WAKILISHA Editorial') as author,
+        coalesce(nullif(source_payload->>'post_date',''), nullif(source_payload->>'date',''), 'Undated') as date,
+        coalesce(nullif(source_payload->>'featured_image_url',''), nullif(source_payload->>'image',''), '') as hero_url
+      from wakilisha_repaired.content_route_classification
+      where classification = 'article'
+        and migration_action = 'migrate_to_article'
+        and coalesce(needs_review,false) = false
+        and slug is not null
+        and title is not null
+        and lower(coalesce(source_payload->>'post_type', source_payload->>'type', 'post')) not in (
+          'page', 'product', 'attachment', 'nav_menu_item', 'revision'
+        )
+        and lower(coalesce(slug, '')) not in (
+          'about', 'account', 'account-settings', 'archive', 'cart', 'checkout', 'claim-your-name',
+          'contacts', 'corrections', 'faq', 'faqs', 'home', 'journal', 'labels', 'lifestyle',
+          'login', 'magazine', 'music', 'my-account', 'my-library', 'my-top-10', 'news-resources',
+          'opinion', 'order-tracking', 'plan', 'play', 'privacy', 'profile', 'profile1', 'settings',
+          'short-stories', 'sports', 'the-registry', 'venues'
+        )
+        and lower(coalesce(title, '')) not in (
+          'about', 'account', 'account settings', 'archive', 'artists', 'cart', 'chart methodology',
+          'checkout', 'claim your name', 'contacts', 'corrections', 'duka', 'events', 'faq', 'faqs', 'home',
+          'journal', 'labels', 'lifestyle', 'login', 'magazine', 'music', 'my account', 'my library',
+          'my top 10', 'news & resources', 'opinion', 'order tracking', 'plan', 'play', 'privacy',
+          'profile', 'science and technology', 'settings', 'short stories', 'sports', 'the registry©',
+          'venues'
+        )
+        and lower(coalesce(slug, '')) not like '%account%'
+        and lower(coalesce(slug, '')) not like '%checkout%'
+        and lower(coalesce(slug, '')) not like '%order-tracking%'
+        and lower(coalesce(slug, '')) not like '%privacy%'
+        and lower(coalesce(slug, '')) not like '%profile%'
+        and lower(coalesce(slug, '')) not like '%settings%'
+        and lower(coalesce(slug, '')) not like 'my-%'
+        and (
+          length(coalesce(nullif(source_payload->>'post_content',''), nullif(source_payload->>'content',''), '')) > 280
+          or length(coalesce(nullif(source_payload->>'excerpt',''), nullif(source_payload->>'post_excerpt',''), '')) > 80
+        )
+      order by nullif(source_payload->>'post_date','') desc nulls last, title asc
+      limit $1
+    `, [limit]);
     return { stories: rows.map((row, index) => ({ id: s(row, "id") || s(row, "slug"), slug: s(row, "slug"), title: s(row, "title"), section: s(row, "section") || "Article", dek: s(row, "dek"), author: s(row, "author"), date: s(row, "date"), readingTime: Math.max(1, Math.min(9, Math.round((s(row, "dek").length || 300) / 240))), heroUrl: s(row, "hero_url") || `https://picsum.photos/seed/wakilisha-story-${index}/1200/800` })) };
   }
 
