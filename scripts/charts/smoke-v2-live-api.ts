@@ -150,7 +150,7 @@ if (!shouldRunLive) {
     id: "LIVE-002",
     status: programsRes.ok && livePrograms.length === fixtures.counts.programs ? "pass" : "fail",
     title: "Program list count matches fixture contract",
-    detail: `live=${livePrograms.length}; fixture=${fixtures.counts.programs}; HTTP ${programsRes.status}`,
+    detail: `live=${livePrograms.length}; fixture=${fixtures.counts.programs}; HTTP ${programsRes.status}${programsRes.error ? `; ${programsRes.error}` : ""}`,
     endpoint: "/charts",
     durationMs: programsRes.durationMs,
   });
@@ -166,7 +166,7 @@ if (!shouldRunLive) {
       id: `LIVE-${String(counter++).padStart(3, "0")}`,
       status: latestRes.ok && (!expectedLatest || edition?.slug === expectedLatest.slug) ? "pass" : "fail",
       title: `Latest edition matches fixture for ${program.publicSlug}`,
-      detail: `live=${edition?.slug ?? "none"}; fixture=${expectedLatest?.slug ?? "none"}; HTTP ${latestRes.status}`,
+      detail: `live=${edition?.slug ?? "none"}; fixture=${expectedLatest?.slug ?? "none"}; HTTP ${latestRes.status}${latestRes.error ? `; ${latestRes.error}` : ""}`,
       endpoint: latestEndpoint,
       durationMs: latestRes.durationMs,
     });
@@ -179,7 +179,7 @@ if (!shouldRunLive) {
         id: `LIVE-${String(counter++).padStart(3, "0")}`,
         status: entriesRes.ok && entries.length === expectedLatest.entryCount ? "pass" : "fail",
         title: `Edition entry count matches fixture for ${program.publicSlug}/${expectedLatest.slug}`,
-        detail: `live=${entries.length}; fixture=${expectedLatest.entryCount}; HTTP ${entriesRes.status}`,
+        detail: `live=${entries.length}; fixture=${expectedLatest.entryCount}; HTTP ${entriesRes.status}${entriesRes.error ? `; ${entriesRes.error}` : ""}`,
         endpoint: entriesEndpoint,
         durationMs: entriesRes.durationMs,
       });
@@ -195,7 +195,7 @@ if (!shouldRunLive) {
       id: `LIVE-${String(counter++).padStart(3, "0")}`,
       status: aliasRes.ok && text.includes(String(alias.canonicalSlug)) ? "pass" : "fail",
       title: "Legacy alias resolves to canonical slug",
-      detail: `legacy=${alias.legacySlug}; expected=${alias.canonicalSlug}; HTTP ${aliasRes.status}`,
+      detail: `legacy=${alias.legacySlug}; expected=${alias.canonicalSlug}; HTTP ${aliasRes.status}${aliasRes.error ? `; ${aliasRes.error}` : ""}`,
       endpoint: aliasEndpoint,
       durationMs: aliasRes.durationMs,
     });
@@ -257,6 +257,12 @@ fs.writeFileSync(mdReportPath, md);
 console.log("Chart V2 live API smoke report generated");
 console.log(`Mode: ${report.mode}`);
 console.log(`Checks: ${summary.pass} pass, ${summary.warning} warning, ${summary.fail} fail, ${summary.skipped} skipped`);
+if (summary.fail > 0) {
+  console.error("\nFailed checks:");
+  for (const check of checks.filter((item) => item.status === "fail")) {
+    console.error(`- ${check.id} ${check.title}${check.endpoint ? ` (${check.endpoint})` : ""}: ${check.detail}`);
+  }
+}
 console.log(`JSON: ${path.relative(root, jsonReportPath)}`);
 console.log(`Markdown: ${path.relative(root, mdReportPath)}`);
 if (summary.fail > 0) process.exitCode = 1;
