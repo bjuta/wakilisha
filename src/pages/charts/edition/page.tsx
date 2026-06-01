@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useNavigate } from "react-router-dom";
 import { usePlayer } from "@/context/PlayerContext";
 import {
   getChartFamily,
@@ -17,6 +17,13 @@ import {
   type ChartEntryRowViewModel,
   type ChartArchiveViewModel,
 } from "@/services/chartsPublic/viewModels";
+import {
+  getLegacyRedirectTarget,
+  getCanonicalChartPath,
+  isLegacyChartSlug,
+  getSourceFamilySlug,
+  getCanonicalChartPathFromSlugs,
+} from "@/services/chartsPublic/chartRoutes";
 import { ShareButton } from "@/components/design-system/share/ShareSheet";
 import { ChartRefreshButton } from "@/components/charts/ChartRefreshButton";
 import { WkIcon } from "@/components/design-system/Icon";
@@ -36,6 +43,7 @@ export default function ChartEdition() {
     series: string;
     edition: string;
   }>();
+  const navigate = useNavigate();
   const { playTrack } = usePlayer();
 
   const [state, setState] = useState<
@@ -51,8 +59,11 @@ export default function ChartEdition() {
         familyLabel: string;
         familySlug: string;
         publicSlug: string;
+        sourceFamilySlug: string;
         archive: ChartArchiveViewModel;
         meta: { dataSource: "mock" | "wordpress" | "cache"; fetchedAt: string; isStale: boolean };
+        canonicalized: boolean;
+        requestedSlug: string;
       }
   >({ status: "loading" });
   const [showErrorDetails, setShowErrorDetails] = useState(false);
@@ -72,6 +83,18 @@ export default function ChartEdition() {
       }
 
       const publicSlug = family.publicSlug ?? family.slug ?? family.familyKey;
+      const sourceFamilySlug = getSourceFamilySlug(family);
+      const canonicalized = isLegacyChartSlug(series);
+
+      // Canonical redirect: if the URL uses a legacy slug, replace with canonical
+      if (canonicalized) {
+        const redirectTarget = getLegacyRedirectTarget(series, editionSlug);
+        if (redirectTarget) {
+          navigate(redirectTarget, { replace: true });
+          // After navigation, the component will re-mount with the new URL
+          return;
+        }
+      }
 
       let editionResult: Awaited<ReturnType<typeof getChartEdition>>;
       let editionMeta: { source: "mock" | "wordpress" | "cache"; fetchedAt: string; isStale: boolean };
@@ -106,11 +129,33 @@ export default function ChartEdition() {
       const entries = rawEntries.map(toChartEntryRowViewModel);
       const editionVM = toChartEditionViewModel(editionResult.data, family, rawEntries);
 
-      // Load archive
+      // Load archive with intelligence: load entries for latest + previous 3 editions
       const { data: allEditions } = await getChartEditionsForFamily(series);
+      const sortedEditions = [...allEditions].sort(
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+      );
+      const archiveEditions = sortedEditions.slice(0, 4); // latest + previous 3
+
       const entriesMap: Record<string, import("@/services/chartsPublic/types").ChartEditionEntry[]> = {
         [editionResult.data.slug]: rawEntries,
       };
+
+      // Load entries for other archive editions (latest + prev 3)
+      const otherArchiveEditions = archiveEditions.filter(
+        (e) => e.slug !== editionResult.data!.slug
+      );
+      await Promise.all(
+        otherArchiveEditions.slice(0, 3).map(async (ed) => {
+          try {
+            const { data: edEntries } = await getChartEditionEntries(series, ed.slug);
+            entriesMap[ed.slug] = edEntries;
+          } catch {
+            // If loading fails, leave entries empty — archive will show metadata only
+            entriesMap[ed.slug] = [];
+          }
+        })
+      );
+
       const archive = toChartArchiveViewModel(allEditions, entriesMap);
 
       setState({
@@ -120,8 +165,11 @@ export default function ChartEdition() {
         familyLabel: family.label,
         familySlug: series,
         publicSlug,
+        sourceFamilySlug,
         archive,
         meta: editionMeta,
+        canonicalized,
+        requestedSlug: series,
       });
     } catch (err) {
       const isRetryable = err instanceof Error && err.message.includes("timeout") || err instanceof Error && err.message.includes("Network error");
@@ -132,7 +180,7 @@ export default function ChartEdition() {
         retryable: isRetryable,
       });
     }
-  }, [series, editionSlug]);
+  }, [series, editionSlug, navigate]);
 
   useEffect(() => {
     load();
@@ -314,7 +362,7 @@ export default function ChartEdition() {
           </p>
           <div className="flex items-center justify-center gap-3">
             {state.latestEditionSlug && (
-              <Link to={`/charts/${state.familySlug}/${state.latestEditionSlug}`} className="wk-button wk-button-primary">
+              <Link to={getCanonicalChartPathFromSlugs(state.familySlug, state.latestEditionSlug)} className="wk-button wk-button-primary">
                 <i className="ri-arrow-right-line" /> Latest edition
               </Link>
             )}
@@ -347,7 +395,7 @@ export default function ChartEdition() {
     );
   }
 
-  const { edition, entries, familyLabel, publicSlug, archive, meta } = state;
+  const { edition, entries, familyLabel, publicSlug, sourceFamilySlug, archive, meta, canonicalized, requestedSlug } = state;
   const topTrack = entries[0] ?? null;
   const top3 = entries.slice(0, 3);
   const rows = entries.slice(3);
@@ -364,6 +412,18 @@ export default function ChartEdition() {
     : meta.dataSource === "cache"
     ? `Loaded from cache · Last updated ${new Date(meta.fetchedAt).toLocaleString()}`
     : `Loaded from ${meta.dataSource === "mock" ? "mock data" : "WordPress API"} · ${new Date(meta.fetchedAt).toLocaleTimeString()}`;
+
+  // Diagnostics data
+  const diagnosticsData = {
+    requestedSlug,
+    resolvedSourceFamilySlug: sourceFamilySlug,
+    canonicalPublicSlug: publicSlug,
+    editionSlug: edition.slug,
+    editionLabel: edition.label,
+    dataSource: meta.dataSource,
+    canonicalized: canonicalized ? "Yes" : "No",
+    totalEntries: entries.length,
+  };
 
   if (!entries.length || !topTrack) {
     return (
@@ -652,6 +712,43 @@ export default function ChartEdition() {
         <div className="wk-container-wide px-4 py-3 md:px-6 flex items-center justify-between gap-3">
           <div className="text-[11px] text-[var(--wk-text-faint)]">{metaLine}</div>
           <ChartRefreshButton onRefresh={load} size="sm" />
+        </div>
+      </div>
+
+      {/* Diagnostics panel — hidden by default, toggleable */}
+      <div className="border-t border-[var(--wk-border)] bg-[var(--wk-bg)]">
+        <div className="wk-container-wide px-4 py-2 md:px-6">
+          <button
+            onClick={() => setShowDiagnostics(!showDiagnostics)}
+            className="flex items-center gap-2 text-[11px] text-[var(--wk-text-muted)] hover:text-[var(--wk-text)] transition-colors"
+          >
+            <i className={`ri-${showDiagnostics ? "arrow-up" : "arrow-down"}-s-line`} />
+            {showDiagnostics ? "Hide" : "Show"} diagnostics
+          </button>
+          {showDiagnostics && (
+            <div className="mt-2 text-left rounded-lg bg-[var(--wk-surface)] border border-[var(--wk-border)] p-3 space-y-1 font-mono text-[11px] text-[var(--wk-text-soft)]">
+              <div className="grid grid-cols-[140px_1fr] gap-1">
+                <span className="text-[var(--wk-text-faint)]">Requested slug</span>
+                <span>{diagnosticsData.requestedSlug}</span>
+                <span className="text-[var(--wk-text-faint)]">Resolved sourceFamilySlug</span>
+                <span>{diagnosticsData.resolvedSourceFamilySlug}</span>
+                <span className="text-[var(--wk-text-faint)]">Canonical publicSlug</span>
+                <span className="text-[var(--wk-brand)]">{diagnosticsData.canonicalPublicSlug}</span>
+                <span className="text-[var(--wk-text-faint)]">Edition slug</span>
+                <span>{diagnosticsData.editionSlug}</span>
+                <span className="text-[var(--wk-text-faint)]">Edition label</span>
+                <span>{diagnosticsData.editionLabel}</span>
+                <span className="text-[var(--wk-text-faint)]">Data source</span>
+                <span>{diagnosticsData.dataSource}</span>
+                <span className="text-[var(--wk-text-faint)]">Canonicalized</span>
+                <span className={diagnosticsData.canonicalized === "Yes" ? "text-[var(--wk-brand)]" : ""}>
+                  {diagnosticsData.canonicalized}
+                </span>
+                <span className="text-[var(--wk-text-faint)]">Total entries</span>
+                <span>{diagnosticsData.totalEntries}</span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </main>

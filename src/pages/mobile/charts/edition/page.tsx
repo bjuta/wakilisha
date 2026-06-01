@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useNavigate } from "react-router-dom";
 import { usePlayer } from "@/context/PlayerContext";
 import { ChartRow } from "@/components/design-system/music/ChartRow";
 import { SkeletonChartRow } from "@/components/skeletons/Skeletons";
@@ -19,6 +19,13 @@ import {
   type ChartEntryRowViewModel,
   type ChartArchiveViewModel,
 } from "@/services/chartsPublic/viewModels";
+import {
+  getLegacyRedirectTarget,
+  getCanonicalChartPath,
+  isLegacyChartSlug,
+  getSourceFamilySlug,
+  getCanonicalChartPathFromSlugs,
+} from "@/services/chartsPublic/chartRoutes";
 import { ChartRefreshButton } from "@/components/charts/ChartRefreshButton";
 
 export default function MobileChartEdition() {
@@ -26,6 +33,7 @@ export default function MobileChartEdition() {
     series: string;
     edition: string;
   }>();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [errorDiagnostics, setErrorDiagnostics] = useState<string | null>(null);
@@ -36,9 +44,12 @@ export default function MobileChartEdition() {
   const [familyLabel, setFamilyLabel] = useState("WAKILISHA Charts");
   const [familySlug, setFamilySlug] = useState("");
   const [publicSlug, setPublicSlug] = useState("");
+  const [sourceFamilySlug, setSourceFamilySlug] = useState("");
   const [latestEditionSlug, setLatestEditionSlug] = useState<string | undefined>(undefined);
   const [archive, setArchive] = useState<ChartArchiveViewModel | null>(null);
   const [meta, setMeta] = useState<{ dataSource: "mock" | "wordpress" | "cache"; fetchedAt: string; isStale: boolean } | null>(null);
+  const [canonicalized, setCanonicalized] = useState(false);
+  const [requestedSlug, setRequestedSlug] = useState("");
   const { playTrack } = usePlayer();
 
   const load = useCallback(async () => {
@@ -60,7 +71,21 @@ export default function MobileChartEdition() {
       }
       setFamilyLabel(family.label);
       setFamilySlug(series);
-      setPublicSlug(family.publicSlug ?? family.slug ?? series);
+      const familyPublicSlug = family.publicSlug ?? family.slug ?? series;
+      setPublicSlug(familyPublicSlug);
+      setSourceFamilySlug(getSourceFamilySlug(family));
+      setRequestedSlug(series);
+      const wasCanonicalized = isLegacyChartSlug(series);
+      setCanonicalized(wasCanonicalized);
+
+      // Canonical redirect: if the URL uses a legacy slug, replace with canonical
+      if (wasCanonicalized) {
+        const redirectTarget = getLegacyRedirectTarget(series, editionSlug);
+        if (redirectTarget) {
+          navigate(redirectTarget, { replace: true });
+          return;
+        }
+      }
 
       let editionResult: Awaited<ReturnType<typeof getChartEdition>>;
       if (editionSlug) {
@@ -83,10 +108,33 @@ export default function MobileChartEdition() {
       const mappedEntries = rawEntries.map(toChartEntryRowViewModel);
       const editionVM = toChartEditionViewModel(editionResult.data, family, rawEntries);
 
+      // Load archive with intelligence: load entries for latest + previous 3 editions
       const { data: allEditions } = await getChartEditionsForFamily(series);
+      const sortedEditions = [...allEditions].sort(
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+      );
+      const archiveEditions = sortedEditions.slice(0, 4); // latest + previous 3
+
       const entriesMap: Record<string, import("@/services/chartsPublic/types").ChartEditionEntry[]> = {
         [editionResult.data.slug]: rawEntries,
       };
+
+      // Load entries for other archive editions (latest + prev 3)
+      const otherArchiveEditions = archiveEditions.filter(
+        (e) => e.slug !== editionResult.data!.slug
+      );
+      await Promise.all(
+        otherArchiveEditions.slice(0, 3).map(async (ed) => {
+          try {
+            const { data: edEntries } = await getChartEditionEntries(series, ed.slug);
+            entriesMap[ed.slug] = edEntries;
+          } catch {
+            // If loading fails, leave entries empty — archive will show metadata only
+            entriesMap[ed.slug] = [];
+          }
+        })
+      );
+
       const archiveVM = toChartArchiveViewModel(allEditions, entriesMap);
 
       setEdition(editionVM);
@@ -98,7 +146,7 @@ export default function MobileChartEdition() {
     } finally {
       setLoading(false);
     }
-  }, [series, editionSlug]);
+  }, [series, editionSlug, navigate]);
 
   useEffect(() => {
     load();
@@ -261,7 +309,7 @@ export default function MobileChartEdition() {
         </p>
         <div className="flex gap-3 justify-center">
           {latestEditionSlug && (
-            <Link to={`/charts/${series}/${latestEditionSlug}`} className="wk-button wk-button-primary text-[13px]">
+            <Link to={getCanonicalChartPathFromSlugs(familySlug || (series ?? ""), latestEditionSlug)} className="wk-button wk-button-primary text-[13px]">
               <i className="ri-arrow-right-line" /> Latest edition
             </Link>
           )}
@@ -401,7 +449,7 @@ export default function MobileChartEdition() {
           <div className="flex gap-2 overflow-x-auto snap-x snap-mandatory scrollbar-none" style={{ scrollbarWidth: "none" }}>
             {archive.latest && (
               <Link
-                to={`/charts/${publicSlug || familySlug}/${archive.latest.slug}`}
+                to={getCanonicalChartPathFromSlugs(publicSlug, archive.latest.slug)}
                 className={`flex-none snap-start rounded-xl border p-3 w-[140px] ${
                   archive.latest.slug === edition.slug
                     ? "border-[var(--wk-brand)] bg-[var(--wk-brand)]/5"
@@ -411,12 +459,24 @@ export default function MobileChartEdition() {
                 <div className="text-[10px] font-bold text-[var(--wk-brand)] mb-0.5">Latest</div>
                 <div className="text-[12px] font-bold text-[var(--wk-text)] truncate">{archive.latest.label}</div>
                 <div className="text-[10px] text-[var(--wk-text-muted)]">{archive.latest.entryCount} entries</div>
+                {archive.latest.no1Track && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <div className="h-6 w-6 rounded overflow-hidden bg-[var(--wk-surface-raised)]">
+                      {archive.latest.no1Track.artworkUrl ? (
+                        <img src={archive.latest.no1Track.artworkUrl} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <i className="ri-music-2-line text-[10px] flex items-center justify-center h-full" />
+                      )}
+                    </div>
+                    <div className="text-[10px] text-[var(--wk-text-muted)] truncate">{archive.latest.no1Track.title}</div>
+                  </div>
+                )}
               </Link>
             )}
-            {archive.previous.map((item) => (
+            {archive.previous.slice(0, 3).map((item) => (
               <Link
                 key={item.slug}
-                to={`/charts/${publicSlug || familySlug}/${item.slug}`}
+                to={getCanonicalChartPathFromSlugs(publicSlug, item.slug)}
                 className={`flex-none snap-start rounded-xl border p-3 w-[140px] ${
                   item.slug === edition.slug
                     ? "border-[var(--wk-brand)] bg-[var(--wk-brand)]/5"
@@ -425,6 +485,18 @@ export default function MobileChartEdition() {
               >
                 <div className="text-[12px] font-bold text-[var(--wk-text)] truncate">{item.label}</div>
                 <div className="text-[10px] text-[var(--wk-text-muted)]">{item.entryCount} entries</div>
+                {item.no1Track && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <div className="h-6 w-6 rounded overflow-hidden bg-[var(--wk-surface-raised)]">
+                      {item.no1Track.artworkUrl ? (
+                        <img src={item.no1Track.artworkUrl} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <i className="ri-music-2-line text-[10px] flex items-center justify-center h-full" />
+                      )}
+                    </div>
+                    <div className="text-[10px] text-[var(--wk-text-muted)] truncate">{item.no1Track.title}</div>
+                  </div>
+                )}
               </Link>
             ))}
           </div>
@@ -690,6 +762,39 @@ export default function MobileChartEdition() {
           </div>
         </div>
       )}
+
+      {/* Diagnostics panel */}
+      <div className="border-t border-[var(--wk-border)] bg-[var(--wk-bg)] px-5 py-3">
+        <button
+          onClick={() => setShowDiagnostics(!showDiagnostics)}
+          className="flex items-center gap-2 text-[10px] text-[var(--wk-text-muted)] hover:text-[var(--wk-text)] transition-colors"
+        >
+          <i className={`ri-${showDiagnostics ? "arrow-up" : "arrow-down"}-s-line`} />
+          {showDiagnostics ? "Hide" : "Show"} diagnostics
+        </button>
+        {showDiagnostics && (
+          <div className="mt-2 text-left rounded-lg bg-[var(--wk-surface)] border border-[var(--wk-border)] p-3 space-y-1 font-mono text-[10px] text-[var(--wk-text-soft)]">
+            <div className="grid grid-cols-[120px_1fr] gap-1">
+              <span className="text-[var(--wk-text-faint)]">Requested slug</span>
+              <span>{requestedSlug}</span>
+              <span className="text-[var(--wk-text-faint)]">Resolved sourceFamilySlug</span>
+              <span>{sourceFamilySlug}</span>
+              <span className="text-[var(--wk-text-faint)]">Canonical publicSlug</span>
+              <span className="text-[var(--wk-brand)]">{publicSlug}</span>
+              <span className="text-[var(--wk-text-faint)]">Edition slug</span>
+              <span>{edition?.slug}</span>
+              <span className="text-[var(--wk-text-faint)]">Edition label</span>
+              <span>{edition?.label}</span>
+              <span className="text-[var(--wk-text-faint)]">Data source</span>
+              <span>{meta?.dataSource}</span>
+              <span className="text-[var(--wk-text-faint)]">Canonicalized</span>
+              <span className={canonicalized ? "text-[var(--wk-brand)]" : ""}>{canonicalized ? "Yes" : "No"}</span>
+              <span className="text-[var(--wk-text-faint)]">Total entries</span>
+              <span>{entries.length}</span>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
