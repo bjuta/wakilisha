@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
 
 type Row = Record<string, unknown>;
 
@@ -90,6 +91,11 @@ function readJson<T>(filePath: string): T {
 
 function str(row: Row | undefined | null, key: string): string {
   return String(row?.[key] ?? "");
+}
+
+function sqlLiteral(value: unknown): string {
+  if (value === null || value === undefined) return "NULL";
+  return `'${String(value).replace(/'/g, "''")}'`;
 }
 
 export function programId(program: Row): string {
@@ -206,30 +212,193 @@ export class JsonV2Repository implements V2Repository {
 export class DatabaseV2Repository implements V2Repository {
   kind = "database" as const;
 
-  constructor(private databaseUrl = process.env.DATABASE_URL ?? "") {}
-
-  private notConfigured(): never {
-    throw new Error(
-      "DatabaseV2Repository is a scaffold. Wire a Postgres client and query wk_chart_*_v2 tables before enabling DB mode. DATABASE_URL provided: " +
-        Boolean(this.databaseUrl)
-    );
+  constructor(private databaseUrl = process.env.DATABASE_URL ?? "") {
+    if (!this.databaseUrl) {
+      throw new Error("DatabaseV2Repository requires DATABASE_URL.");
+    }
   }
 
-  getCounts(): Record<string, number> { return this.notConfigured(); }
-  getMigrationReadiness(): string { return this.notConfigured(); }
-  resolveProgramSlug(_slug: string): Promise<V2ResolvedSlug> { return Promise.resolve(this.notConfigured()); }
-  listPrograms(): Promise<Row[]> { return Promise.resolve(this.notConfigured()); }
-  getProgram(_slug: string): Promise<Row | null> { return Promise.resolve(this.notConfigured()); }
-  listEditionsForProgram(_program: Row): Promise<Row[]> { return Promise.resolve(this.notConfigured()); }
-  getLatestNonEmptyEdition(_program: Row): Promise<Row | null> { return Promise.resolve(this.notConfigured()); }
-  getEdition(_program: Row, _editionSlug: string): Promise<Row | null> { return Promise.resolve(this.notConfigured()); }
-  listEntries(_program: Row, _editionSlug: string): Promise<Entry[]> { return Promise.resolve(this.notConfigured()); }
-  listSourceCoverage(_editionId: string): Promise<Row[]> { return Promise.resolve(this.notConfigured()); }
-  getSeries(_seriesSlug: string): Promise<Row | null> { return Promise.resolve(this.notConfigured()); }
-  getMarket(_marketSlug: string): Promise<Row | null> { return Promise.resolve(this.notConfigured()); }
-  getMethodology(_methodologyVersion: string): Promise<Row | null> { return Promise.resolve(this.notConfigured()); }
-  getEligibilityRules(_eligibilityVersion: string): Promise<Row | null> { return Promise.resolve(this.notConfigured()); }
-  getTrackHistory(_trackSlug: string): Promise<TracksIndex[string] | null> { return Promise.resolve(this.notConfigured()); }
+  private queryJson<T>(sql: string): T {
+    const wrapped = `WITH q AS (${sql}) SELECT COALESCE(json_agg(q), '[]'::json) FROM q;`;
+    const result = spawnSync("psql", [this.databaseUrl, "-X", "-q", "-t", "-A", "-v", "ON_ERROR_STOP=1", "-c", wrapped], {
+      cwd: root,
+      encoding: "utf8",
+      maxBuffer: 1024 * 1024 * 20,
+    });
+    if (result.status !== 0) {
+      throw new Error(`psql query failed: ${result.stderr || result.stdout}`);
+    }
+    const output = result.stdout.trim() || "[]";
+    return JSON.parse(output) as T;
+  }
+
+  private first(sql: string): Row | null {
+    return (this.queryJson<Row[]>(sql)[0] as Row | undefined) ?? null;
+  }
+
+  getCounts(): Record<string, number> {
+    const row = this.first(`
+      SELECT
+        (SELECT COUNT(*)::int FROM wk_chart_series_v2) AS series,
+        (SELECT COUNT(*)::int FROM wk_chart_markets_v2) AS markets,
+        (SELECT COUNT(*)::int FROM wk_chart_programs_v2) AS programs,
+        (SELECT COUNT(*)::int FROM wk_chart_methodologies_v2) AS methodologies,
+        (SELECT COUNT(*)::int FROM wk_chart_eligibility_rules_v2) AS "eligibilityRules",
+        (SELECT COUNT(*)::int FROM wk_chart_editions_v2) AS editions,
+        (SELECT COUNT(*)::int FROM wk_chart_entries_v2) AS entries,
+        (SELECT COUNT(*)::int FROM wk_chart_source_coverage_v2) AS "sourceCoverage",
+        (SELECT COUNT(*)::int FROM wk_chart_slug_aliases_v2) AS "slugAliases"
+    `);
+    return row ?? {};
+  }
+
+  getMigrationReadiness(): string {
+    return "database_readonly";
+  }
+
+  async resolveProgramSlug(slug: string): Promise<V2ResolvedSlug> {
+    const alias = this.first(`
+      SELECT canonical_slug
+      FROM wk_chart_slug_aliases_v2
+      WHERE legacy_slug = ${sqlLiteral(slug)}
+        AND entity_type = 'chart_program'
+        AND redirect_status = 'active'
+      LIMIT 1
+    `);
+    const canonicalSlug = String(alias?.canonical_slug ?? slug);
+    return { requestedSlug: slug, canonicalSlug, canonicalized: canonicalSlug !== slug };
+  }
+
+  async listPrograms(): Promise<Row[]> {
+    return this.queryJson<Row[]>(`SELECT * FROM wk_chart_programs_v2 ORDER BY public_slug ASC`);
+  }
+
+  async getProgram(slug: string): Promise<Row | null> {
+    const { canonicalSlug } = await this.resolveProgramSlug(slug);
+    return this.first(`SELECT * FROM wk_chart_programs_v2 WHERE public_slug = ${sqlLiteral(canonicalSlug)} LIMIT 1`);
+  }
+
+  async listEditionsForProgram(program: Row): Promise<Row[]> {
+    return this.queryJson<Row[]>(`
+      SELECT *
+      FROM wk_chart_editions_v2
+      WHERE program_id = ${sqlLiteral(programId(program))}
+      ORDER BY edition_date DESC, edition_slug DESC
+    `);
+  }
+
+  async getLatestNonEmptyEdition(program: Row): Promise<Row | null> {
+    return this.first(`
+      SELECT *
+      FROM wk_chart_editions_v2
+      WHERE program_id = ${sqlLiteral(programId(program))}
+        AND entry_count > 0
+      ORDER BY edition_date DESC, edition_slug DESC
+      LIMIT 1
+    `);
+  }
+
+  async getEdition(program: Row, editionSlug: string): Promise<Row | null> {
+    return this.first(`
+      SELECT *
+      FROM wk_chart_editions_v2
+      WHERE program_id = ${sqlLiteral(programId(program))}
+        AND edition_slug = ${sqlLiteral(editionSlug)}
+      LIMIT 1
+    `);
+  }
+
+  async listEntries(program: Row, editionSlug: string): Promise<Entry[]> {
+    const edition = await this.getEdition(program, editionSlug);
+    if (!edition) return [];
+    return this.queryJson<Entry[]>(`
+      SELECT
+        id,
+        edition_id AS "editionId",
+        rank,
+        previous_rank AS "previousRank",
+        movement,
+        track_slug AS "trackSlug",
+        track_title AS "trackTitle",
+        CASE
+          WHEN artist_slug IS NULL OR artist_slug = '' THEN ARRAY[]::text[]
+          ELSE ARRAY[artist_slug]
+        END AS "artistSlugs",
+        CASE
+          WHEN artist_name IS NULL OR artist_name = '' THEN ARRAY[]::text[]
+          ELSE string_to_array(artist_name, ', ')
+        END AS "artistNames",
+        artwork_url AS "artworkUrl",
+        NULL::numeric AS score
+      FROM wk_chart_entries_v2
+      WHERE edition_id = ${sqlLiteral(str(edition, "id"))}
+      ORDER BY rank ASC
+    `);
+  }
+
+  async listSourceCoverage(editionId: string): Promise<Row[]> {
+    return this.queryJson<Row[]>(`
+      SELECT *
+      FROM wk_chart_source_coverage_v2
+      WHERE edition_id = ${sqlLiteral(editionId)}
+      ORDER BY source_name ASC
+    `);
+  }
+
+  async getSeries(seriesSlug: string): Promise<Row | null> {
+    return this.first(`SELECT * FROM wk_chart_series_v2 WHERE series_slug = ${sqlLiteral(seriesSlug)} LIMIT 1`);
+  }
+
+  async getMarket(marketSlug: string): Promise<Row | null> {
+    return this.first(`SELECT * FROM wk_chart_markets_v2 WHERE market_slug = ${sqlLiteral(marketSlug)} LIMIT 1`);
+  }
+
+  async getMethodology(methodologyVersion: string): Promise<Row | null> {
+    return this.first(`SELECT * FROM wk_chart_methodologies_v2 WHERE methodology_version = ${sqlLiteral(methodologyVersion)} LIMIT 1`);
+  }
+
+  async getEligibilityRules(eligibilityVersion: string): Promise<Row | null> {
+    return this.first(`SELECT * FROM wk_chart_eligibility_rules_v2 WHERE eligibility_version = ${sqlLiteral(eligibilityVersion)} LIMIT 1`);
+  }
+
+  async getTrackHistory(trackSlug: string): Promise<TracksIndex[string] | null> {
+    const rows = this.queryJson<Row[]>(`
+      SELECT
+        e.edition_slug AS "editionSlug",
+        e.edition_label AS "editionLabel",
+        e.edition_date AS "editionDate",
+        ce.rank,
+        ce.movement,
+        ce.track_title AS "trackTitle",
+        ce.artist_name AS "artistName"
+      FROM wk_chart_entries_v2 ce
+      INNER JOIN wk_chart_editions_v2 e ON e.id = ce.edition_id
+      WHERE ce.track_slug = ${sqlLiteral(trackSlug)}
+      ORDER BY e.edition_date ASC, ce.rank ASC
+    `);
+    if (!rows.length) return null;
+    const ranks = rows.map((row) => Number(row.rank)).filter((rank) => Number.isFinite(rank));
+    const firstRow = rows[0];
+    const latestRow = rows[rows.length - 1];
+    return {
+      trackSlug,
+      trackTitle: str(firstRow, "trackTitle"),
+      artistNames: str(firstRow, "artistName") ? str(firstRow, "artistName").split(", ") : [],
+      appearances: rows.map((row, index) => ({
+        editionSlug: str(row, "editionSlug"),
+        editionLabel: str(row, "editionLabel"),
+        rank: Number(row.rank ?? 0),
+        weeksOnChart: index + 1,
+        movement: ["up", "down", "same", "new", "re_entry"].includes(str(row, "movement"))
+          ? (str(row, "movement") as "up" | "down" | "same" | "new" | "re_entry")
+          : "same",
+      })),
+      peakPosition: ranks.length ? Math.min(...ranks) : 0,
+      totalWeeksOnChart: rows.length,
+      firstAppearance: str(firstRow, "editionSlug") || null,
+      latestAppearance: str(latestRow, "editionSlug") || null,
+    };
+  }
 }
 
 export function createV2Repository(): V2Repository {
