@@ -29,6 +29,7 @@
   "scripts": {
     "build": "vite build",
     "charts:generate-public-csv-data": "tsx scripts/charts/generate-public-csv-data.ts",
+    "charts:v2-execute-plan": "tsx scripts/charts/execute-v2-insert-plan.ts",
     "charts:v2-plan-inserts": "tsx scripts/charts/plan-v2-inserts.ts",
     "charts:v2-preview": "tsx scripts/charts/migrate-current-json-to-v2.ts",
     "charts:verify-partitioning": "tsx scripts/charts/verify-partitioning.ts",
