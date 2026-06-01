@@ -6,22 +6,23 @@ import type {
 } from "./types";
 import { PublicWpApiError } from "./wpAdapter";
 
+const VITE_PROXY_V2_API_BASE = "/__wakilisha-v2-api/wp-json/wakilisha/v2";
+
 const RAW_PUBLIC_V2_API_BASE =
-  import.meta.env.VITE_WAKILISHA_WP_V2_API_BASE || "/wp-json/wakilisha/v2";
+  import.meta.env.VITE_WAKILISHA_WP_V2_API_BASE || VITE_PROXY_V2_API_BASE;
 
 function resolvePublicV2ApiBase(base: string): string {
   if (typeof window === "undefined") return base;
   if (!window.location.hostname.endsWith(".app.github.dev")) return base;
 
+  if (base.startsWith("/wp-json/wakilisha/v2")) {
+    return VITE_PROXY_V2_API_BASE;
+  }
+
   try {
     const url = new URL(base);
     if (url.hostname !== "localhost" && url.hostname !== "127.0.0.1") return base;
-
-    const forwardedHost = window.location.hostname.replace(/-(\d+)\.app\.github\.dev$/, `-${url.port}.app.github.dev`);
-    url.protocol = window.location.protocol;
-    url.hostname = forwardedHost;
-    url.port = "";
-    return url.toString().replace(/\/$/, "");
+    return VITE_PROXY_V2_API_BASE;
   } catch {
     return base;
   }
