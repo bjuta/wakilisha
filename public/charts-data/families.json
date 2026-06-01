@@ -1,0 +1,60 @@
+{
+  "families": [
+    {
+      "id": "2026",
+      "familyKey": "2026",
+      "label": "Top Kenyan Songs Released in 2026",
+      "description": "Imported from the normalized WAKILISHA chart CSV export.",
+      "defaultChartSize": 100,
+      "defaultRegion": "Africa",
+      "editionFrequency": "weekly",
+      "defaultRuleset": "csv_registry_import_v1",
+      "defaultScoringModel": "csv_position_order",
+      "createdAt": "2026-05-29 20:55:23.51632+00",
+      "updatedAt": "2026-05-29 20:55:23.51632+00",
+      "slug": "2026"
+    },
+    {
+      "id": "gengetone",
+      "familyKey": "gengetone",
+      "label": "Top Gengetone Songs",
+      "description": "Imported from the normalized WAKILISHA chart CSV export.",
+      "defaultChartSize": 50,
+      "defaultRegion": "Africa",
+      "editionFrequency": "weekly",
+      "defaultRuleset": "csv_registry_import_v1",
+      "defaultScoringModel": "csv_position_order",
+      "createdAt": "2026-05-29 20:55:23.51632+00",
+      "updatedAt": "2026-05-29 20:55:23.51632+00",
+      "slug": "gengetone"
+    },
+    {
+      "id": "kenya",
+      "familyKey": "kenya",
+      "label": "Top 100 Songs in Kenya",
+      "description": "Imported from the normalized WAKILISHA chart CSV export.",
+      "defaultChartSize": 100,
+      "defaultRegion": "Africa",
+      "editionFrequency": "weekly",
+      "defaultRuleset": "csv_registry_import_v1",
+      "defaultScoringModel": "csv_position_order",
+      "createdAt": "2026-05-29 20:55:23.51632+00",
+      "updatedAt": "2026-05-29 20:55:23.51632+00",
+      "slug": "kenya"
+    },
+    {
+      "id": "rnb",
+      "familyKey": "rnb",
+      "label": "Top Kenyan R&B Songs",
+      "description": "Imported from the normalized WAKILISHA chart CSV export.",
+      "defaultChartSize": 100,
+      "defaultRegion": "Africa",
+      "editionFrequency": "weekly",
+      "defaultRuleset": "csv_registry_import_v1",
+      "defaultScoringModel": "csv_position_order",
+      "createdAt": "2026-05-29 20:55:23.51632+00",
+      "updatedAt": "2026-05-29 20:55:23.51632+00",
+      "slug": "rnb"
+    }
+  ]
+}
