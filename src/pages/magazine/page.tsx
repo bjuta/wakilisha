@@ -1,23 +1,59 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { SECTIONS, STORIES, EDITOR_PICKS, TRENDING_STORIES, CONTRIBUTORS } from "@/mocks/magazine";
 import { ShareButton } from "@/components/design-system/share/ShareSheet";
 import { WkIcon } from "@/components/design-system/Icon";
+import { listMagazineStories, type RepairedStory } from "@/services/repairedContent/client";
 
-const sectionNames = SECTIONS.map((section: any) => (typeof section === "string" ? section : section.name)).filter(Boolean);
+const fallbackSections = ["All", "Article"];
 
 export default function Magazine() {
   const [activeSection, setActiveSection] = useState("All");
   const [email, setEmail] = useState("");
   const [subscribed, setSubscribed] = useState(false);
-  const featured = STORIES[0];
-  const filtered = STORIES.slice(1).filter((story) => activeSection === "All" || story.section === activeSection);
+  const [stories, setStories] = useState<RepairedStory[]>([]);
+  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    setStatus("loading");
+    listMagazineStories()
+      .then((items) => {
+        if (!alive) return;
+        setStories(items.filter((story) => story.title && story.slug));
+        setStatus("ready");
+      })
+      .catch((err) => {
+        if (!alive) return;
+        setError(err instanceof Error ? err.message : "Could not load magazine stories.");
+        setStatus("error");
+      });
+    return () => { alive = false; };
+  }, []);
+
+  const sectionNames = useMemo(() => {
+    const sections = Array.from(new Set(stories.map((story) => story.section || "Article"))).sort();
+    return ["All", ...sections.filter((section) => section !== "All")];
+  }, [stories]);
+
+  const featured = stories[0];
+  const filtered = stories.slice(1).filter((story) => activeSection === "All" || story.section === activeSection);
+  const trending = stories.slice(1, 9);
+  const editorPicks = stories.slice(9, 12);
   const leadPair = filtered.slice(0, 2);
   const trio = filtered.slice(2, 5);
   const remaining = filtered.slice(5);
 
+  if (status === "loading") {
+    return <div className="wk-container px-6 py-20 text-[var(--wk-text-muted)]">Loading imported WAKILISHA magazine stories…</div>;
+  }
+
+  if (status === "error") {
+    return <div className="wk-container px-6 py-20 text-[var(--wk-text-muted)]">Magazine data could not be loaded: {error}</div>;
+  }
+
   if (!featured) {
-    return <div className="wk-container px-6 py-20 text-[var(--wk-text-muted)]">No magazine stories have been imported yet.</div>;
+    return <div className="wk-container px-6 py-20 text-[var(--wk-text-muted)]">No imported magazine stories are available from the repaired content graph yet.</div>;
   }
 
   return (
@@ -41,7 +77,7 @@ export default function Magazine() {
       <nav className="mag-toc">
         <div className="mag-toc-inner wk-container-wide">
           <span className="section-kicker m-0 shrink-0">In this issue</span>
-          {sectionNames.map((name) => (
+          {(sectionNames.length ? sectionNames : fallbackSections).map((name) => (
             <button key={name} onClick={() => setActiveSection(name)} className={`directory-filter ${activeSection === name ? "on" : ""}`}>
               {name}
             </button>
@@ -56,10 +92,10 @@ export default function Magazine() {
               <div className="section-kicker">Trending shelf</div>
               <h2 className="section-title">What people are reading</h2>
             </div>
-            <p className="section-copy">A publication surface with story hierarchy, not a generic blog grid.</p>
+            <p className="section-copy">Imported stories from the repaired WAKILISHA content graph.</p>
           </div>
           <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
-            {TRENDING_STORIES.map((story, index) => <StoryTile key={story.slug} story={story} rank={index + 1} compact />)}
+            {trending.map((story, index) => <StoryTile key={story.slug} story={story} rank={index + 1} compact />)}
           </div>
         </section>
 
@@ -79,7 +115,7 @@ export default function Magazine() {
             </div>
           </div>
           <div className="mag-grid trio">
-            {EDITOR_PICKS.slice(0, 3).map((story) => <StoryTile key={story.slug} story={story} />)}
+            {editorPicks.map((story) => <StoryTile key={story.slug} story={story} />)}
           </div>
         </section>
 
@@ -97,16 +133,9 @@ export default function Magazine() {
 
         <section className="pg-layout cols-2">
           <div className="pg-block">
-            <div className="pg-block-label">Contributors</div>
-            <div className="space-y-3">
-              {CONTRIBUTORS.slice(0, 6).map((person) => (
-                <div key={person.name} className="artist-list-item px-0">
-                  <div className="artist-list-ava flex items-center justify-center">{person.photo ? <img src={person.photo} alt="" /> : person.name.slice(0, 1)}</div>
-                  <div><div className="artist-list-name">{person.name}</div><div className="artist-list-sub">{person.role}</div></div>
-                  <WkIcon name="PenLine" size={16} />
-                </div>
-              ))}
-            </div>
+            <div className="pg-block-label">Imported content</div>
+            <h3 className="pg-block-title">{stories.length} magazine stories loaded.</h3>
+            <p className="pg-block-body">This page now uses the repaired content route classification instead of the old magazine mock file.</p>
           </div>
           <form className="mag-newsletter m-0" onSubmit={(e) => { e.preventDefault(); setSubscribed(true); }}>
             <div>
@@ -124,7 +153,7 @@ export default function Magazine() {
   );
 }
 
-function StoryTile({ story, large = false, compact = false, rank }: { story: typeof STORIES[number]; large?: boolean; compact?: boolean; rank?: number }) {
+function StoryTile({ story, large = false, compact = false, rank }: { story: RepairedStory; large?: boolean; compact?: boolean; rank?: number }) {
   return (
     <Link to={`/magazine/${story.slug}`} className={`mag-story-card ${compact ? "w-[280px] shrink-0" : ""}`}>
       <div className="mag-story-art"><img src={story.heroUrl} alt="" /></div>
