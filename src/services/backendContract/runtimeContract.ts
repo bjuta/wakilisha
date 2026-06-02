@@ -66,6 +66,13 @@ export const WAKILISHA_RUNTIME_ENDPOINTS = {
   },
 } as const;
 
+export type BackendCreateProgramRequest = Partial<BackendChartProgram> & {
+  label: string;
+  seriesSlug: string;
+  marketSlug: string;
+  publicSlug?: string;
+};
+
 export type BackendMatchDecisionRequest = {
   runId: string;
   rowId: string;
@@ -79,6 +86,7 @@ export type RuntimeBackendAdapter = {
   };
   charts: {
     getPrograms(): Promise<BackendResult<BackendChartProgram[]>>;
+    createProgram(payload: BackendCreateProgramRequest): Promise<BackendResult<BackendChartProgram>>;
     getEditions(): Promise<BackendResult<BackendChartEdition[]>>;
     getEdition(publicSlug: string, editionSlug: string): Promise<BackendResult<BackendChartEdition | null>>;
     getEditionEntries(publicSlug: string, editionSlug: string): Promise<BackendResult<BackendChartEntry[]>>;
