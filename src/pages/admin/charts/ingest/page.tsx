@@ -75,6 +75,20 @@ function createCustomFamily(label: string, key: string, chartSize: number, marke
   };
 }
 
+function toMarketScopeSnapshot(scope: StoredChartMarketScope | null) {
+  if (!scope) return null;
+  return {
+    id: scope.id,
+    name: scope.name,
+    slug: scope.slug,
+    primaryMarketSlug: scope.primaryMarketSlug,
+    includedMarkets: scope.includedMarkets,
+    aggregationMode: scope.aggregationMode,
+    visibility: scope.visibility,
+    description: scope.description,
+  };
+}
+
 export default function AdminChartsIngest() {
   const navigate = useNavigate();
   const mode = getIngestionMode();
@@ -168,6 +182,7 @@ export default function AdminChartsIngest() {
   const selectedFamily = useMemo(() => families.find((family) => family.id === existingSeriesId) ?? null, [families, existingSeriesId]);
   const selectedEligibilityProfile = useMemo(() => eligibilityProfiles.find((profile) => profile.id === selectedEligibilityProfileId || profile.slug === selectedEligibilityProfileId) ?? null, [eligibilityProfiles, selectedEligibilityProfileId]);
   const selectedMarketScope = useMemo(() => marketScopes.find((scope) => scope.id === selectedMarketScopeId || scope.slug === selectedMarketScopeId) ?? null, [marketScopes, selectedMarketScopeId]);
+  const marketScopeSnapshot = useMemo(() => toMarketScopeSnapshot(selectedMarketScope), [selectedMarketScope]);
   const publicUrlPreview = useMemo(() => (chartSlug && editionDate ? `/charts/${chartSlug}/${editionDate}` : null), [chartSlug, editionDate]);
   const filteredRows = useMemo(() => !dryRunResult ? [] : rowFilter === "all" ? dryRunResult.rows : dryRunResult.rows.filter((row) => row.matchStatus === rowFilter), [dryRunResult, rowFilter]);
   const activeRun = runs.find((run) => run.status === "running");
@@ -236,12 +251,27 @@ export default function AdminChartsIngest() {
     setFormError(null); setDryRunLoading(true); setDryRunResult(null); setSuccessMessage(null); setExpandedRowId(null);
     try {
       const urls = sourceUrls.split("\n").filter((url) => url.trim());
-      const response = await runDryRun({ chartTitle, chartSlug, editionDate, chartSize, market, chartKind, coverStyle, sourceUrls: urls, saveAsRecurringSeries: saveAsRecurring, existingSeriesId: existingSeriesId || null, eligibilityProfileId: selectedEligibilityProfileId });
+      const response = await runDryRun({
+        chartTitle,
+        chartSlug,
+        editionDate,
+        chartSize,
+        market,
+        chartKind,
+        coverStyle,
+        sourceUrls: urls,
+        saveAsRecurringSeries: saveAsRecurring,
+        existingSeriesId: existingSeriesId || null,
+        eligibilityProfileId: selectedEligibilityProfileId,
+        marketScopeId: selectedMarketScope?.id ?? selectedMarketScopeId,
+        marketScopeSnapshot,
+        enrichmentOptions: null,
+      });
       const run = await getIngestRuns().then((allRuns) => allRuns.find((item) => item.id === response.runId));
       if (run) {
         generateAndPersistIngestRunIntelligence(run, {
           marketScopeId: selectedMarketScope?.id ?? selectedMarketScopeId,
-          marketScopeSnapshot: selectedMarketScope ? { ...selectedMarketScope } : null,
+          marketScopeSnapshot,
         });
         setDryRunResult(run); setStep("preview");
         setSuccessMessage(`Dry run complete — ${run.summary.totalRows} rows, ${run.summary.matchRate.toFixed(1)}% match rate · intelligence generated${selectedEligibilityProfile ? ` · ${selectedEligibilityProfile.name}` : ""}${selectedMarketScope ? ` · ${selectedMarketScope.name}` : ""}`);
