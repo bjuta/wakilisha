@@ -20,7 +20,7 @@ import {
   type BackendUpdateChartEligibilityProfileRequest,
 } from "./backendTypes";
 import { backendConfig, getBackendModeWarnings } from "./backendConfig";
-import { WAKILISHA_RUNTIME_ENDPOINTS, type BackendMatchDecisionRequest, type RuntimeBackendAdapter } from "./runtimeContract";
+import { WAKILISHA_RUNTIME_ENDPOINTS, type BackendCreateProgramRequest, type BackendMatchDecisionRequest, type RuntimeBackendAdapter } from "./runtimeContract";
 import type {
   CreateChartMarketScopeRequest,
   StoredChartMarketScope,
@@ -73,6 +73,7 @@ export const apiBackendAdapter: RuntimeBackendAdapter = {
 
   charts: {
     async getPrograms(): Promise<BackendResult<BackendChartProgram[]>> { return unavailable(WAKILISHA_RUNTIME_ENDPOINTS.charts.programs, []); },
+    async createProgram(_payload: BackendCreateProgramRequest): Promise<BackendResult<BackendChartProgram>> { return unavailable(WAKILISHA_RUNTIME_ENDPOINTS.charts.createProgram); },
     async getEditions(): Promise<BackendResult<BackendChartEdition[]>> { return unavailable(WAKILISHA_RUNTIME_ENDPOINTS.charts.editions, []); },
     async getEdition(publicSlug: string, editionSlug: string): Promise<BackendResult<BackendChartEdition | null>> { return unavailable(`${WAKILISHA_RUNTIME_ENDPOINTS.charts.edition} (${publicSlug}/${editionSlug})`, null); },
     async getEditionEntries(publicSlug: string, editionSlug: string): Promise<BackendResult<BackendChartEntry[]>> { return unavailable(`${WAKILISHA_RUNTIME_ENDPOINTS.charts.editionEntries} (${publicSlug}/${editionSlug})`, []); },
