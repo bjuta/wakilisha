@@ -33,6 +33,7 @@ export type IngestStage =
   | "source_fetch"
   | "normalize"
   | "canonical_match"
+  | "eligibility_execution"
   | "methodology_scoring"
   | "enrichment"
   | "snapshot_commit";
@@ -115,6 +116,11 @@ export type IngestRunSummary = {
   gaps: number;
   duplicateCandidates: number;
   matchRate: number;
+  eligibilityProfileId?: string;
+  eligibleRows?: number;
+  excludedRows?: number;
+  reviewRows?: number;
+  eligibilityRate?: number;
   scoringMethodologyVersion?: string;
   averageMethodologyScore?: number;
 };
