@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { WkIcon } from "@/components/design-system/Icon";
 
 interface AdminChartsConfirmDialogProps {
   open: boolean;
@@ -47,7 +48,7 @@ export function AdminChartsConfirmDialog({
     <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/50">
       <div ref={ref} className="w-full max-w-sm rounded-xl border border-wk-border bg-wk-surface p-6 shadow-lg">
         <div className="flex items-center gap-2">
-          <i className={`${variant === "danger" ? "ri-error-warning-line text-wk-danger" : "ri-question-line text-wk-brand"} text-[18px]`} />
+          <WkIcon name={variant === "danger" ? "AlertTriangle" : "HelpCircle"} size={18} className={variant === "danger" ? "text-wk-danger" : "text-wk-brand"} />
           <h3 className="text-[15px] font-bold text-wk-text">{title}</h3>
         </div>
         <p className="mt-2 text-[13px] text-wk-text-muted">{description}</p>
@@ -64,7 +65,7 @@ export function AdminChartsConfirmDialog({
             disabled={loading}
             className={`inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-[13px] font-semibold transition-colors disabled:opacity-50 whitespace-nowrap ${confirmClasses}`}
           >
-            {loading && <i className="ri-loader-4-line animate-spin" />}
+            {loading && <WkIcon name="Loader" size={14} className="animate-spin" />}
             {confirmLabel}
           </button>
         </div>

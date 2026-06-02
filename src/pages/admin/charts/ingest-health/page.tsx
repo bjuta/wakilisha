@@ -279,10 +279,10 @@ VITE_APPLE_MUSIC_DEVELOPER_TOKEN=your_apple_developer_token`}</pre>
       {/* Probe summary */}
       {testedCount > 0 && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <AdminChartsKpiCard value={`${testedCount}/${allEndpointCount}`} label="Probed" icon="ri-radar-line" accent="muted" />
-          <AdminChartsKpiCard value={okCount} label="Responding" icon="ri-check-line" accent="success" />
-          <AdminChartsKpiCard value={notImplCount} label="Not Implemented" icon="ri-question-line" accent={notImplCount > 0 ? "warning" : "muted"} />
-          <AdminChartsKpiCard value={errorCount} label="Errors" icon="ri-error-warning-line" accent={errorCount > 0 ? "danger" : "muted"} />
+          <AdminChartsKpiCard value={`${testedCount}/${allEndpointCount}`} label="Probed" icon="Radar" accent="muted" />
+          <AdminChartsKpiCard value={okCount} label="Responding" icon="Check" accent="success" />
+          <AdminChartsKpiCard value={notImplCount} label="Not Implemented" icon="HelpCircle" accent={notImplCount > 0 ? "warning" : "muted"} />
+          <AdminChartsKpiCard value={errorCount} label="Errors" icon="AlertCircle" accent={errorCount > 0 ? "danger" : "muted"} />
         </div>
       )}
 

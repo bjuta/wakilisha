@@ -213,10 +213,10 @@ export default function AdminChartsReviewQueue() {
 
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <AdminChartsKpiCard value={needsReviewCount} label="Needs Review" icon="ri-flag-line" accent={needsReviewCount > 0 ? "brand" : "muted"} />
-        <AdminChartsKpiCard value={noMatchCount} label="No Match" icon="ri-close-circle-line" accent={noMatchCount > 0 ? "danger" : "muted"} />
-        <AdminChartsKpiCard value={shellCount} label="Shell Match" icon="ri-folder-add-line" accent={shellCount > 0 ? "warning" : "muted"} />
-        <AdminChartsKpiCard value={dupCount} label="Duplicates" icon="ri-file-copy-line" accent={dupCount > 0 ? "info" : "muted"} />
+        <AdminChartsKpiCard value={needsReviewCount} label="Needs Review" icon="Flag" accent={needsReviewCount > 0 ? "brand" : "muted"} />
+        <AdminChartsKpiCard value={noMatchCount} label="No Match" icon="XCircle" accent={noMatchCount > 0 ? "danger" : "muted"} />
+        <AdminChartsKpiCard value={shellCount} label="Shell Match" icon="FolderPlus" accent={shellCount > 0 ? "warning" : "muted"} />
+        <AdminChartsKpiCard value={dupCount} label="Duplicates" icon="Copy" accent={dupCount > 0 ? "info" : "muted"} />
       </div>
 
       {/* Filters */}
@@ -372,10 +372,10 @@ export default function AdminChartsReviewQueue() {
           <div className="px-4 py-14 text-center">
             {allRows.length === 0 ? (
               <AdminChartsEmptyState
-                icon="ri-checkbox-circle-line"
+                icon="CheckCircle2"
                 title="Queue is clear"
                 description="No rows from recent runs need review. Run a new ingest dry run to populate this queue."
-                action={{ label: "Open Ingest Studio", onClick: () => navigate("/admin/charts/ingest"), icon: "ri-add-line" }}
+                action={{ label: "Open Ingest Studio", onClick: () => navigate("/admin/charts/ingest"), icon: "Plus" }}
               />
             ) : (
               <div>

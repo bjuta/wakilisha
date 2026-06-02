@@ -98,10 +98,10 @@ export default function AdminChartsLegacyIngestJobs() {
 
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <AdminChartsKpiCard value={jobs.length} label="Total Jobs" icon="ri-file-list-3-line" accent="muted" />
-        <AdminChartsKpiCard value={activeCount} label="Active" icon="ri-database-2-line" accent={activeCount > 0 ? "info" : "muted"} />
-        <AdminChartsKpiCard value={failedCount} label="Failed" icon="ri-error-warning-line" accent={failedCount > 0 ? "danger" : "muted"} />
-        <AdminChartsKpiCard value={publishedCount} label="Published" icon="ri-check-double-line" accent="success" />
+        <AdminChartsKpiCard value={jobs.length} label="Total Jobs" icon="FileList2" accent="muted" />
+        <AdminChartsKpiCard value={activeCount} label="Active" icon="Database" accent={activeCount > 0 ? "info" : "muted"} />
+        <AdminChartsKpiCard value={failedCount} label="Failed" icon="AlertCircle" accent={failedCount > 0 ? "danger" : "muted"} />
+        <AdminChartsKpiCard value={publishedCount} label="Published" icon="CheckCircle2" accent="success" />
       </div>
 
       {/* Detail panel for specific job */}
@@ -259,7 +259,7 @@ export default function AdminChartsLegacyIngestJobs() {
         {filteredJobs.length === 0 && (
           <div className="px-4 py-14 text-center">
             <AdminChartsEmptyState
-              icon="ri-history-line"
+              icon="History"
               title="No legacy jobs match"
               description="Try adjusting your filters. Legacy jobs are created via the CSV ingestion pipeline."
             />

@@ -1,3 +1,4 @@
+import { Settings, Eye, CheckCircle2 } from "lucide-react";
 import type { IngestRun } from "@/services/chartsIngestion/ingestStudioTypes";
 
 interface StepperProps {
@@ -7,9 +8,9 @@ interface StepperProps {
 
 export function Stepper({ step, onStepChange }: StepperProps) {
   const steps = [
-    { key: "configure" as const, label: "Configure", icon: "ri-settings-3-line" },
-    { key: "preview" as const, label: "Preview", icon: "ri-eye-line" },
-    { key: "commit" as const, label: "Publish", icon: "ri-check-double-line" },
+    { key: "configure" as const, label: "Configure", icon: Settings },
+    { key: "preview" as const, label: "Preview", icon: Eye },
+    { key: "commit" as const, label: "Publish", icon: CheckCircle2 },
   ];
 
   const currentIndex = steps.findIndex((s) => s.key === step);
@@ -19,6 +20,7 @@ export function Stepper({ step, onStepChange }: StepperProps) {
       {steps.map((s, i) => {
         const isActive = s.key === step;
         const isDone = i < currentIndex;
+        const Icon = s.icon;
 
         return (
           <div key={s.key} className="flex items-center">
@@ -27,21 +29,21 @@ export function Stepper({ step, onStepChange }: StepperProps) {
               disabled={!isDone}
               className={`flex items-center gap-1.5 rounded-lg px-4 py-2 text-[12px] font-semibold transition-all ${
                 isActive
-                  ? "bg-primary-500 text-background-50 shadow-sm"
+                  ? "bg-wk-brand text-wk-text-on-brand shadow-sm"
                   : isDone
-                    ? "bg-primary-100 text-primary-700 cursor-pointer"
-                    : "bg-background-100 text-foreground-400 cursor-default"
+                    ? "bg-wk-brand-soft text-wk-brand cursor-pointer"
+                    : "bg-wk-bg-subtle text-wk-text-faint cursor-default"
               }`}
             >
               <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
-                isActive ? "bg-background-50 text-primary-600" : isDone ? "bg-primary-500 text-background-50" : "bg-background-200 text-foreground-400"
+                isActive ? "bg-wk-text-on-brand text-wk-brand" : isDone ? "bg-wk-brand text-wk-text-on-brand" : "bg-wk-border text-wk-text-faint"
               }`}>
-                {isDone ? <i className="ri-check-line" /> : i + 1}
+                {isDone ? <CheckCircle2 size={10} /> : i + 1}
               </span>
               {s.label}
             </button>
             {i < steps.length - 1 && (
-              <div className={`mx-2 h-px w-6 ${isDone ? "bg-primary-400" : "bg-background-200"}`} />
+              <div className={`mx-2 h-px w-6 ${isDone ? "bg-wk-brand" : "bg-wk-border"}`} />
             )}
           </div>
         );

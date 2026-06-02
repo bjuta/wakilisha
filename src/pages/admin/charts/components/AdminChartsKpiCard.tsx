@@ -1,11 +1,13 @@
 import { WkSurface } from "@/components/design-system/primitives/Surface";
+import { WkIcon } from "@/components/design-system/Icon";
+import type { WkIconName } from "@/components/design-system/Icon";
 
 interface AdminChartsKpiCardProps {
   value: string | number;
   label: string;
   trend?: string;
   positive?: boolean;
-  icon?: string;
+  icon?: WkIconName;
   accent?: "brand" | "success" | "warning" | "danger" | "info" | "muted";
 }
 
@@ -28,7 +30,6 @@ export function AdminChartsKpiCard({
 }: AdminChartsKpiCardProps) {
   const colors = ACCENT_MAP[accent] ?? ACCENT_MAP.muted;
   const trendClass = positive ? colors.trendUp : colors.trendDown;
-  const trendIcon = positive ? "ri-arrow-up-line" : "ri-arrow-down-line";
 
   return (
     <WkSurface className="p-4">
@@ -38,14 +39,14 @@ export function AdminChartsKpiCard({
           <p className={`mt-1 text-[24px] font-black tracking-tight ${colors.text}`}>{value}</p>
           {trend && (
             <div className={`mt-1 flex items-center gap-1 text-[12px] font-semibold ${trendClass}`}>
-              <i className={trendIcon} />
+              {positive ? <WkIcon name="ArrowUp" size={12} /> : <WkIcon name="ArrowDown" size={12} />}
               {trend}
             </div>
           )}
         </div>
         {icon && (
           <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${colors.bg} ${colors.text}`}>
-            <i className={icon} />
+            <WkIcon name={icon} size={20} />
           </div>
         )}
       </div>

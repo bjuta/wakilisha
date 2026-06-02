@@ -194,10 +194,10 @@ export default function AdminChartsCanonGaps() {
 
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <AdminChartsKpiCard value={allGapRows.length} label="Total Gaps" icon="ri-error-warning-line" accent={allGapRows.length > 0 ? "danger" : "muted"} />
-        <AdminChartsKpiCard value={allGapRows.filter((r) => r.matchStatus === "no_match").length} label="No Match" icon="ri-close-circle-line" accent="danger" />
-        <AdminChartsKpiCard value={allGapRows.filter((r) => r.matchStatus === "needs_review").length} label="Needs Review" icon="ri-flag-line" accent="warning" />
-        <AdminChartsKpiCard value={sentCount + shellCount} label="Actioned" icon="ri-check-line" accent={sentCount + shellCount > 0 ? "success" : "muted"} />
+        <AdminChartsKpiCard value={allGapRows.length} label="Total Gaps" icon="AlertCircle" accent={allGapRows.length > 0 ? "danger" : "muted"} />
+        <AdminChartsKpiCard value={allGapRows.filter((r) => r.matchStatus === "no_match").length} label="No Match" icon="XCircle" accent="danger" />
+        <AdminChartsKpiCard value={allGapRows.filter((r) => r.matchStatus === "needs_review").length} label="Needs Review" icon="Flag" accent="warning" />
+        <AdminChartsKpiCard value={sentCount + shellCount} label="Actioned" icon="Check" accent={sentCount + shellCount > 0 ? "success" : "muted"} />
       </div>
 
       {/* Filters */}
@@ -327,7 +327,7 @@ export default function AdminChartsCanonGaps() {
           <div className="px-4 py-14 text-center">
             {allGapRows.length === 0 ? (
               <AdminChartsEmptyState
-                icon="ri-check-double-line"
+                icon="CheckCircle2"
                 title="No canonical gaps"
                 description="All rows from recent ingest runs are canonically matched. No systemic gaps detected."
               />

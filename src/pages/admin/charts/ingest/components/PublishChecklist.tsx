@@ -1,3 +1,4 @@
+import { Check, X, AlertTriangle } from "lucide-react";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import type { IngestRun } from "@/services/chartsIngestion/ingestStudioTypes";
 
@@ -14,8 +15,8 @@ export function PublishChecklist({ run }: PublishChecklistProps) {
   return (
     <WkSurface className="p-4">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-[14px] font-bold text-foreground-950">Publish Readiness</h2>
-        <span className={`text-[12px] font-bold ${allPass ? "text-green-600" : "text-amber-600"}`}>
+        <h2 className="text-[14px] font-bold text-wk-text">Publish Readiness</h2>
+        <span className={`text-[12px] font-bold ${allPass ? "text-wk-success" : "text-wk-warning"}`}>
           {passCount}/{total} passed
         </span>
       </div>
@@ -23,20 +24,20 @@ export function PublishChecklist({ run }: PublishChecklistProps) {
         {checklist.map((item) => (
           <div key={item.label} className="flex items-center gap-2">
             <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] ${
-              item.pass ? "bg-green-500 text-background-50" : item.required ? "bg-red-500 text-background-50" : "bg-background-200 text-foreground-400"
+              item.pass ? "bg-wk-success text-wk-text-on-brand" : item.required ? "bg-wk-danger text-wk-text-on-brand" : "bg-wk-border text-wk-text-faint"
             }`}>
-              <i className={item.pass ? "ri-check-line" : "ri-close-line"} />
+              {item.pass ? <Check size={10} /> : <X size={10} />}
             </div>
-            <span className={`text-[12px] ${item.pass ? "text-foreground-700" : item.required ? "text-red-700 font-semibold" : "text-foreground-500"}`}>
+            <span className={`text-[12px] ${item.pass ? "text-wk-text-soft" : item.required ? "text-wk-danger font-semibold" : "text-wk-text-muted"}`}>
               {item.label}
-              {!item.required && <span className="ml-1 text-[10px] text-foreground-400">(optional)</span>}
+              {!item.required && <span className="ml-1 text-[10px] text-wk-text-faint">(optional)</span>}
             </span>
           </div>
         ))}
       </div>
       {!allPass && (
-        <p className="mt-3 text-[11px] text-amber-700">
-          <i className="ri-alert-line mr-1" />
+        <p className="mt-3 text-[11px] text-wk-warning">
+          <AlertTriangle size={12} className="mr-1 inline" />
           Fix failing required checks before publishing.
         </p>
       )}

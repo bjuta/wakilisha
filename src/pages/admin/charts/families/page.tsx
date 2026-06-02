@@ -362,10 +362,10 @@ export default function AdminChartsFamilies() {
 
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <AdminChartsKpiCard value={totalFamilies} label="Total Families" icon="ri-folder-chart-line" accent="muted" />
-        <AdminChartsKpiCard value={activeCount} label="Active" icon="ri-check-line" accent="success" />
-        <AdminChartsKpiCard value={families.filter((f) => f.status === "inactive").length} label="Inactive" icon="ri-pause-line" accent="muted" />
-        <AdminChartsKpiCard value={missingSourceCount} label="Missing Sources" icon="ri-alert-line" accent={missingSourceCount > 0 ? "warning" : "muted"} />
+        <AdminChartsKpiCard value={totalFamilies} label="Total Families" icon="FolderTree" accent="muted" />
+        <AdminChartsKpiCard value={activeCount} label="Active" icon="CheckCircle2" accent="success" />
+        <AdminChartsKpiCard value={families.filter((f) => f.status === "inactive").length} label="Inactive" icon="PauseCircle" accent="muted" />
+        <AdminChartsKpiCard value={missingSourceCount} label="Missing Sources" icon="AlertTriangle" accent={missingSourceCount > 0 ? "warning" : "muted"} />
       </div>
 
       {/* Filters */}
@@ -386,10 +386,10 @@ export default function AdminChartsFamilies() {
       {/* Families Grid */}
       {filtered.length === 0 ? (
         <AdminChartsEmptyState
-          icon="ri-folder-chart-line"
+          icon="FolderTree"
           title="No families found"
           description="Try clearing your search or create a new chart family."
-          action={{ label: "New Family", onClick: openCreate, icon: "ri-add-line" }}
+          action={{ label: "New Family", onClick: openCreate, icon: "Plus" }}
         />
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">

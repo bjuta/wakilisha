@@ -229,10 +229,10 @@ export default function AdminChartsEditions() {
 
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <AdminChartsKpiCard value={MOCK_EDITIONS.length} label="Total Editions" icon="ri-stack-line" accent="muted" />
-        <AdminChartsKpiCard value={publishedCount} label="Published" icon="ri-check-double-line" accent="success" />
-        <AdminChartsKpiCard value={draftCount} label="Drafts" icon="ri-draft-line" accent={draftCount > 0 ? "warning" : "muted"} />
-        <AdminChartsKpiCard value={totalNew} label="New Entries (Total)" icon="ri-star-line" accent="brand" />
+        <AdminChartsKpiCard value={MOCK_EDITIONS.length} label="Total Editions" icon="Layers" accent="muted" />
+        <AdminChartsKpiCard value={publishedCount} label="Published" icon="CheckCircle2" accent="success" />
+        <AdminChartsKpiCard value={draftCount} label="Drafts" icon="FileEdit" accent={draftCount > 0 ? "warning" : "muted"} />
+        <AdminChartsKpiCard value={totalNew} label="New Entries (Total)" icon="Star" accent="brand" />
       </div>
 
       {/* Filters */}
@@ -365,7 +365,7 @@ export default function AdminChartsEditions() {
         {filtered.length === 0 && (
           <div className="px-4 py-14 text-center">
             <AdminChartsEmptyState
-              icon="ri-stack-line"
+              icon="Layers"
               title="No editions match your filters"
               description="Try clearing the filters or publishing a new edition from the Ingest Studio."
             />

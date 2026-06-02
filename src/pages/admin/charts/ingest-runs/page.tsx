@@ -134,25 +134,25 @@ export default function AdminChartsIngestRuns() {
         <AdminChartsKpiCard
           value={kpis.editionsThisWeek}
           label="Editions This Week"
-          icon="ri-calendar-check-line"
+          icon="CalendarCheck"
           accent="brand"
         />
         <AdminChartsKpiCard
           value={`${kpis.canonicalMatchRate.toFixed(1)}%`}
           label="Match Rate"
-          icon="ri-bar-chart-grouped-line"
+          icon="BarChart3"
           accent={kpis.canonicalMatchRate >= 85 ? "success" : "warning"}
         />
         <AdminChartsKpiCard
           value={needsReviewCount}
           label="Needs Review"
-          icon="ri-flag-line"
+          icon="Flag"
           accent={needsReviewCount > 0 ? "warning" : "muted"}
         />
         <AdminChartsKpiCard
           value={failedCount}
           label="Failed"
-          icon="ri-error-warning-line"
+          icon="AlertCircle"
           accent={failedCount > 0 ? "danger" : "muted"}
         />
       </div>
@@ -344,10 +344,10 @@ export default function AdminChartsIngestRuns() {
           <div className="px-4 py-16 text-center">
             {runs.length === 0 ? (
               <AdminChartsEmptyState
-                icon="ri-database-2-line"
+                icon="Database"
                 title="No ingest runs yet"
                 description="Start a new provider-based run in the Ingest Studio. Runs will appear here once created."
-                action={{ label: "Open Ingest Studio", onClick: () => navigate("/admin/charts/ingest"), icon: "ri-add-line" }}
+                action={{ label: "Open Ingest Studio", onClick: () => navigate("/admin/charts/ingest"), icon: "Plus" }}
               />
             ) : (
               <div>

@@ -158,10 +158,10 @@ export default function AdminChartsNoMatch() {
 
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <AdminChartsKpiCard value={noMatchRows.length} label="Total No-match" icon="ri-close-circle-line" accent={noMatchRows.length > 0 ? "danger" : "muted"} />
-        <AdminChartsKpiCard value={shellCreatedCount} label="Shells Created" icon="ri-folder-add-line" accent={shellCreatedCount > 0 ? "warning" : "muted"} />
-        <AdminChartsKpiCard value={sentToReviewCount} label="Sent to Review" icon="ri-git-pull-request-line" accent={sentToReviewCount > 0 ? "brand" : "muted"} />
-        <AdminChartsKpiCard value={ignoredCount} label="Ignored" icon="ri-eye-off-line" accent="muted" />
+        <AdminChartsKpiCard value={noMatchRows.length} label="Total No-match" icon="XCircle" accent={noMatchRows.length > 0 ? "danger" : "muted"} />
+        <AdminChartsKpiCard value={shellCreatedCount} label="Shells Created" icon="FolderPlus" accent={shellCreatedCount > 0 ? "warning" : "muted"} />
+        <AdminChartsKpiCard value={sentToReviewCount} label="Sent to Review" icon="GitPullRequest" accent={sentToReviewCount > 0 ? "brand" : "muted"} />
+        <AdminChartsKpiCard value={ignoredCount} label="Ignored" icon="EyeOff" accent="muted" />
       </div>
 
       {/* Action progress */}
@@ -296,7 +296,7 @@ export default function AdminChartsNoMatch() {
           <div className="px-4 py-14 text-center">
             {noMatchRows.length === 0 ? (
               <AdminChartsEmptyState
-                icon="ri-check-double-line"
+                icon="CheckCircle2"
                 title="No no-match releases"
                 description="All rows from recent ingest runs have canonical matches. Run a new ingest to check for new no-match rows."
               />

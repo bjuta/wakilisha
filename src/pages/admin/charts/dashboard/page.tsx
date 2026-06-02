@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { AdminChartsPageHeader } from "../components/AdminChartsPageHeader";
 import { AdminChartsKpiCard } from "../components/AdminChartsKpiCard";
@@ -67,14 +68,14 @@ export default function AdminChartsDashboard() {
           onClick={() => navigate("/admin/charts/ingest")}
           className="wk-button wk-button-primary wk-button-sm whitespace-nowrap"
         >
-          <i className="ri-add-line" />
+          <WkIcon name="Plus" size={14} />
           New Ingest
         </button>
         <button
           onClick={() => navigate("/admin/charts/ingest-health")}
           className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap"
         >
-          <i className="ri-heart-pulse-line" />
+          <WkIcon name="HeartPulse" size={14} />
           Health
         </button>
       </AdminChartsPageHeader>
@@ -82,7 +83,7 @@ export default function AdminChartsDashboard() {
       {/* Mode indicator */}
       {mode === "mock" && (
         <div className="rounded-lg border border-wk-warning/20 bg-wk-warning-soft p-3 flex items-start gap-2">
-          <i className="ri-test-tube-line text-wk-warning mt-0.5" />
+          <WkIcon name="FlaskConical" size={16} className="text-wk-warning mt-0.5" />
           <div className="text-[12px] text-wk-warning">
             <strong>Mock mode active.</strong> All data is local. Switch to WordPress mode for live backend connectivity.
           </div>
@@ -94,37 +95,37 @@ export default function AdminChartsDashboard() {
         <AdminChartsKpiCard
           value={activeRuns.length}
           label="Active Runs"
-          icon="ri-database-2-line"
+          icon="Database"
           accent={activeRuns.length > 0 ? "brand" : "muted"}
         />
         <AdminChartsKpiCard
           value={failedJobs.length}
           label="Failed Jobs"
-          icon="ri-error-warning-line"
+          icon="AlertCircle"
           accent={failedJobs.length > 0 ? "danger" : "muted"}
         />
         <AdminChartsKpiCard
           value={needsReviewRuns.length}
           label="Needs Review"
-          icon="ri-flag-line"
+          icon="Flag"
           accent={needsReviewRuns.length > 0 ? "warning" : "muted"}
         />
         <AdminChartsKpiCard
           value={kpis.totalFamilies}
           label="Chart Families"
-          icon="ri-folder-chart-line"
+          icon="FolderTree"
           accent="brand"
         />
         <AdminChartsKpiCard
           value={kpis.totalPublishedEditions}
           label="Published Editions"
-          icon="ri-stack-line"
+          icon="Layers"
           accent="success"
         />
         <AdminChartsKpiCard
           value={studioKpis ? `${studioKpis.canonicalMatchRate.toFixed(1)}%` : "—"}
           label="Match Rate"
-          icon="ri-bar-chart-grouped-line"
+          icon="BarChart3"
           accent={studioKpis && studioKpis.canonicalMatchRate >= 85 ? "success" : "warning"}
         />
       </div>
@@ -133,7 +134,7 @@ export default function AdminChartsDashboard() {
       {needsAttention && (
         <div className="rounded-lg border border-wk-border bg-wk-surface p-4">
           <div className="flex items-center gap-2 mb-3">
-            <i className="ri-alarm-warning-line text-wk-warning" />
+            <WkIcon name="AlertTriangle" size={16} className="text-wk-warning" />
             <h2 className="text-[14px] font-bold text-wk-text">Needs Attention</h2>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -142,7 +143,7 @@ export default function AdminChartsDashboard() {
                 onClick={() => navigate("/admin/charts/ingest-jobs")}
                 className="inline-flex items-center gap-1.5 rounded-md border border-wk-danger/20 bg-wk-danger-soft px-3 py-1.5 text-[12px] font-semibold text-wk-danger transition-colors hover:bg-wk-danger/20 whitespace-nowrap"
               >
-                <i className="ri-error-warning-line" />
+                <WkIcon name="AlertCircle" size={14} />
                 {failedJobs.length} failed job{failedJobs.length !== 1 ? "s" : ""}
               </button>
             )}
@@ -151,7 +152,7 @@ export default function AdminChartsDashboard() {
                 onClick={() => navigate("/admin/charts/review-queue")}
                 className="inline-flex items-center gap-1.5 rounded-md border border-wk-warning/20 bg-wk-warning-soft px-3 py-1.5 text-[12px] font-semibold text-wk-warning transition-colors hover:bg-wk-warning/20 whitespace-nowrap"
               >
-                <i className="ri-git-pull-request-line" />
+                <WkIcon name="GitPullRequest" size={14} />
                 {needsReviewRuns.length} run{needsReviewRuns.length !== 1 ? "s" : ""} need review
               </button>
             )}
@@ -160,7 +161,7 @@ export default function AdminChartsDashboard() {
                 onClick={() => navigate("/admin/charts/ingest-runs")}
                 className="inline-flex items-center gap-1.5 rounded-md border border-wk-info/20 bg-wk-info-soft px-3 py-1.5 text-[12px] font-semibold text-wk-info transition-colors hover:bg-wk-info/20 whitespace-nowrap"
               >
-                <i className="ri-loader-4-line animate-spin" />
+                <WkIcon name="Loader" size={14} className="animate-spin" />
                 {activeRuns.length} active run{activeRuns.length !== 1 ? "s" : ""}
               </button>
             )}
@@ -176,7 +177,7 @@ export default function AdminChartsDashboard() {
           <WkSurface className="p-5">
             <div className="mb-4 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <i className="ri-database-2-line text-wk-brand" />
+                <WkIcon name="Database" size={16} className="text-wk-brand" />
                 <h2 className="text-[14px] font-bold text-wk-text">Active Ingest Runs</h2>
               </div>
               <button
@@ -188,10 +189,10 @@ export default function AdminChartsDashboard() {
             </div>
             {activeRuns.length === 0 ? (
               <AdminChartsEmptyState
-                icon="ri-database-2-line"
+                icon="Database"
                 title="No active runs"
                 description="Start a new ingest run from the Ingest Studio to populate this section."
-                action={{ label: "New Ingest", onClick: () => navigate("/admin/charts/ingest"), icon: "ri-add-line" }}
+                action={{ label: "New Ingest", onClick: () => navigate("/admin/charts/ingest"), icon: "Plus" }}
               />
             ) : (
               <div className="space-y-2">
@@ -202,7 +203,7 @@ export default function AdminChartsDashboard() {
                     className="flex w-full items-center gap-4 rounded-xl border border-wk-border bg-wk-bg-subtle p-4 text-left transition-all hover:border-wk-border-2 hover:bg-wk-surface-raised"
                   >
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-wk-brand-soft text-wk-brand">
-                      <i className="ri-bar-chart-grouped-line" />
+                      <WkIcon name="BarChart3" size={18} />
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
@@ -218,7 +219,7 @@ export default function AdminChartsDashboard() {
                       </div>
                     </div>
                     <div className="shrink-0 text-wk-text-faint">
-                      <i className="ri-arrow-right-line" />
+                      <WkIcon name="ArrowRight" size={16} />
                     </div>
                   </button>
                 ))}
@@ -230,7 +231,7 @@ export default function AdminChartsDashboard() {
           <WkSurface className="p-5">
             <div className="mb-4 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <i className="ri-check-double-line text-wk-success" />
+                <WkIcon name="CheckCircle2" size={16} className="text-wk-success" />
                 <h2 className="text-[14px] font-bold text-wk-text">Recent Editions</h2>
               </div>
               <button
@@ -252,7 +253,7 @@ export default function AdminChartsDashboard() {
                     className="flex items-center gap-3 rounded-lg border border-wk-border p-3"
                   >
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-wk-success-soft text-wk-success">
-                      <i className="ri-check-line" />
+                      <WkIcon name="Check" size={16} />
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="text-[13px] font-semibold text-wk-text truncate">{run.chartTitle}</div>
@@ -274,7 +275,7 @@ export default function AdminChartsDashboard() {
           <WkSurface className="p-5">
             <div className="mb-4 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <i className="ri-history-line text-wk-text-muted" />
+                <WkIcon name="History" size={16} className="text-wk-text-muted" />
                 <h2 className="text-[14px] font-bold text-wk-text">Legacy Active Jobs</h2>
               </div>
               <span className="text-[10px] font-semibold uppercase tracking-wider text-wk-text-faint">Legacy</span>
@@ -309,7 +310,7 @@ export default function AdminChartsDashboard() {
           {/* Failed Jobs */}
           <WkSurface className="p-5">
             <div className="mb-4 flex items-center gap-2">
-              <i className="ri-error-warning-line text-wk-danger" />
+              <WkIcon name="AlertCircle" size={16} className="text-wk-danger" />
               <h2 className="text-[14px] font-bold text-wk-text">Failed Jobs</h2>
               {failedJobs.length > 0 && (
                 <span className="rounded-full bg-wk-danger-soft px-2 py-0.5 text-[10px] font-bold text-wk-danger">
@@ -356,7 +357,7 @@ export default function AdminChartsDashboard() {
           {kpis.latestPublishedEdition && (
             <WkSurface className="p-5">
               <div className="mb-4 flex items-center gap-2">
-                <i className="ri-check-double-line text-wk-success" />
+                <WkIcon name="CheckCircle2" size={16} className="text-wk-success" />
                 <h2 className="text-[14px] font-bold text-wk-text">Latest Published</h2>
               </div>
               <div className="space-y-3">
@@ -393,7 +394,7 @@ export default function AdminChartsDashboard() {
                   onClick={() => navigate(`/admin/charts/editions`)}
                   className="mt-1 w-full rounded-md bg-wk-brand-soft px-3 py-2 text-[12px] font-semibold text-wk-brand transition-colors hover:bg-wk-brand/20"
                 >
-                  <i className="ri-eye-line mr-1" /> View in Editions
+                  <WkIcon name="Eye" size={14} className="inline mr-1" /> View in Editions
                 </button>
               </div>
             </WkSurface>
@@ -404,26 +405,26 @@ export default function AdminChartsDashboard() {
             <h2 className="mb-3 text-[14px] font-bold text-wk-text">Quick Actions</h2>
             <div className="space-y-2">
               <QuickActionButton
-                icon="ri-add-circle-line"
+                icon="CirclePlus"
                 label="Start New Ingest"
                 description="Create a new provider-based run"
                 onClick={() => navigate("/admin/charts/ingest")}
                 accent="brand"
               />
               <QuickActionButton
-                icon="ri-folder-chart-line"
+                icon="FolderTree"
                 label="Manage Families"
                 description="Configure chart series and rulesets"
                 onClick={() => navigate("/admin/charts/families")}
               />
               <QuickActionButton
-                icon="ri-stack-line"
+                icon="Layers"
                 label="View Editions"
                 description="Browse published and draft editions"
                 onClick={() => navigate("/admin/charts/editions")}
               />
               <QuickActionButton
-                icon="ri-git-pull-request-line"
+                icon="GitPullRequest"
                 label="Open Review Queue"
                 description={needsReviewRuns.length > 0 ? `${needsReviewRuns.length} runs need review` : "Queue is clear"}
                 onClick={() => navigate("/admin/charts/review-queue")}
@@ -431,7 +432,7 @@ export default function AdminChartsDashboard() {
                 disabledReason="No items in review queue"
               />
               <QuickActionButton
-                icon="ri-heart-pulse-line"
+                icon="HeartPulse"
                 label="API Health"
                 description="Check provider and backend status"
                 onClick={() => navigate("/admin/charts/ingest-health")}
@@ -474,13 +475,13 @@ function QuickActionButton({
       }`}
     >
       <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-wk-surface-raised ${iconColor}`}>
-        <i className={icon} />
+        <WkIcon name={icon as never} size={16} />
       </div>
       <div className="min-w-0 flex-1">
         <div className="text-[13px] font-semibold text-wk-text">{label}</div>
         <div className="text-[11px] text-wk-text-muted">{description}</div>
       </div>
-      <i className="ri-arrow-right-s-line text-wk-text-faint" />
+      <WkIcon name="ChevronRight" size={16} className="text-wk-text-faint" />
     </button>
   );
 }

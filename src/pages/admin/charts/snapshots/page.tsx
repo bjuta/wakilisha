@@ -170,10 +170,10 @@ export default function AdminChartsSnapshots() {
 
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <AdminChartsKpiCard value={MOCK_SNAPSHOTS.length} label="Total Snapshots" icon="ri-camera-lens-line" accent="muted" />
-        <AdminChartsKpiCard value={okCount} label="Integrity OK" icon="ri-shield-check-line" accent="success" />
-        <AdminChartsKpiCard value={warnCount} label="Warnings" icon="ri-shield-keyhole-line" accent={warnCount > 0 ? "warning" : "muted"} />
-        <AdminChartsKpiCard value={verifiedIds.size} label="Verified This Session" icon="ri-fingerprint-2-line" accent="brand" />
+        <AdminChartsKpiCard value={MOCK_SNAPSHOTS.length} label="Total Snapshots" icon="Camera" accent="muted" />
+        <AdminChartsKpiCard value={okCount} label="Integrity OK" icon="ShieldCheck" accent="success" />
+        <AdminChartsKpiCard value={warnCount} label="Warnings" icon="ShieldAlert" accent={warnCount > 0 ? "warning" : "muted"} />
+        <AdminChartsKpiCard value={verifiedIds.size} label="Verified This Session" icon="Fingerprint" accent="brand" />
       </div>
 
       {/* Filters */}
@@ -310,7 +310,7 @@ export default function AdminChartsSnapshots() {
         })}
         {filtered.length === 0 && (
           <AdminChartsEmptyState
-            icon="ri-camera-lens-line"
+            icon="Camera"
             title="No snapshots match"
             description="Snapshots are created automatically when editions are published. Try clearing your filters."
           />

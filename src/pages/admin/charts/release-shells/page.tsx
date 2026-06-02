@@ -130,9 +130,9 @@ export default function AdminChartsReleaseShells() {
 
       {/* KPIs */}
       <div className="grid grid-cols-3 gap-3">
-        <AdminChartsKpiCard value={shellRows.length} label="Total Shells" icon="ri-folder-add-line" accent={shellRows.length > 0 ? "warning" : "muted"} />
-        <AdminChartsKpiCard value={canonicalizedCount} label="Canonicalized" icon="ri-check-double-line" accent={canonicalizedCount > 0 ? "success" : "muted"} />
-        <AdminChartsKpiCard value={`${avgConfidence}%`} label="Avg Confidence" icon="ri-bar-chart-grouped-line" accent={avgConfidence >= 70 ? "success" : "warning"} />
+        <AdminChartsKpiCard value={shellRows.length} label="Total Shells" icon="FolderPlus" accent={shellRows.length > 0 ? "warning" : "muted"} />
+        <AdminChartsKpiCard value={canonicalizedCount} label="Canonicalized" icon="CheckCircle2" accent={canonicalizedCount > 0 ? "success" : "muted"} />
+        <AdminChartsKpiCard value={`${avgConfidence}%`} label="Avg Confidence" icon="BarChart3" accent={avgConfidence >= 70 ? "success" : "warning"} />
       </div>
 
       {/* Search */}
@@ -279,7 +279,7 @@ export default function AdminChartsReleaseShells() {
         {filtered.length === 0 && (
           <div className="px-4 py-14 text-center">
             <AdminChartsEmptyState
-              icon="ri-folder-check-line"
+              icon="FolderCheck"
               title="No release shells"
               description="Release shells appear here after a dry run identifies tracks without canonical entity matches."
             />

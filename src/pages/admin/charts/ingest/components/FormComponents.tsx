@@ -1,4 +1,5 @@
-import { getProviderLabel, getProviderColorClass, getProviderIcon } from "@/services/chartsIngestion/client";
+import { type LucideIcon } from "lucide-react";
+import { getProviderLabel, getProviderColorClass } from "@/services/chartsIngestion/client";
 import type { ProviderName } from "@/services/chartsIngestion/ingestStudioTypes";
 
 interface QuickTemplateButtonProps {
@@ -10,7 +11,7 @@ export function QuickTemplateButton({ label, onClick }: QuickTemplateButtonProps
   return (
     <button
       onClick={onClick}
-      className="rounded-lg border border-background-200 bg-background-50 px-3 py-1.5 text-[12px] font-semibold text-foreground-700 transition-all hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 active:scale-[0.97]"
+      className="rounded-lg border border-wk-border bg-wk-bg px-3 py-1.5 text-[12px] font-semibold text-wk-text-soft transition-all hover:border-wk-brand/50 hover:bg-wk-brand-soft hover:text-wk-brand active:scale-[0.97]"
     >
       {label}
     </button>
@@ -22,9 +23,17 @@ interface ProviderChipProps {
 }
 
 export function ProviderChip({ provider }: ProviderChipProps) {
+  const providerIconClass: Record<string, string> = {
+    spotify: "ri-spotify-fill",
+    apple_music: "ri-apple-fill",
+    youtube: "ri-youtube-fill",
+    csv: "ri-file-list-line",
+    manual: "ri-edit-line",
+  };
+  const iconClass = providerIconClass[provider] ?? "ri-database-2-line";
   return (
     <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-semibold border ${getProviderColorClass(provider)}`}>
-      <i className={getProviderIcon(provider)} />
+      <i className={iconClass} />
       {getProviderLabel(provider)}
     </span>
   );
@@ -33,21 +42,21 @@ export function ProviderChip({ provider }: ProviderChipProps) {
 interface KindToggleProps {
   active: boolean;
   onClick: () => void;
-  icon: string;
+  icon: LucideIcon;
   label: string;
 }
 
-export function KindToggle({ active, onClick, icon, label }: KindToggleProps) {
+export function KindToggle({ active, onClick, icon: Icon, label }: KindToggleProps) {
   return (
     <button
       onClick={onClick}
       className={`flex flex-1 items-center justify-center gap-1.5 rounded-md border px-3 py-2 text-[13px] font-semibold transition-all ${
         active
-          ? "border-primary-400 bg-primary-50 text-primary-700 shadow-sm"
-          : "border-background-200 bg-background-50 text-foreground-600 hover:bg-background-100"
+          ? "border-wk-brand bg-wk-brand-soft text-wk-brand shadow-sm"
+          : "border-wk-border bg-wk-bg text-wk-text-soft hover:bg-wk-bg-subtle"
       }`}
     >
-      <i className={icon} />
+      <Icon size={14} />
       {label}
     </button>
   );
