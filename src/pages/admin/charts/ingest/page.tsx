@@ -26,19 +26,19 @@ import type { BackendCommitResponse } from "@/services/backendContract/backendTy
 import { wakilishaBackend } from "@/services/backendContract/backendClient";
 import type { ChartEligibilityProfile } from "@/services/chartsEligibility/eligibilityTypes";
 import { getMarketScopes, type StoredChartMarketScope } from "@/services/chartsMarkets/marketScopeStore";
-import { WkIcon } from "@/components/design-system/Icon";
 
 import { CommitResultPanel } from "./components/CommitResultPanel";
+import { IngestPageHeader } from "./components/IngestPageHeader";
 import { IngestSidebar } from "./components/IngestSidebar";
 import { KpiCard } from "./components/KpiCard";
 import { MarketScopeStep } from "./components/MarketScopeStep";
 import { PreviewStep } from "./components/PreviewStep";
 import { ProgramSetupStep } from "./components/ProgramSetupStep";
 import { RulesStep } from "./components/RulesStep";
+import { StatusBanner } from "./components/StatusBanner";
 import { Stepper, type IngestStudioStep } from "./components/Stepper";
 
 const ADMIN_CHARTS_BASE = "/admin/settings/charts";
-const BTN_GHOST = "inline-flex items-center gap-1.5 rounded-md border border-wk-border bg-wk-surface px-4 py-2.5 text-[13px] font-semibold text-wk-text-soft transition-colors hover:bg-wk-surface-raised whitespace-nowrap";
 
 type QuickTemplateKey = "top40" | "kenyan" | "groups" | "eastAfrica";
 
@@ -279,11 +279,7 @@ export default function AdminChartsIngest() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div><div className="mb-1 text-[11px] font-bold uppercase tracking-wider text-wk-text-muted">Chart Operations</div><h1 className="text-[22px] font-bold text-wk-text">Ingest Studio</h1><p className="text-[13px] text-wk-text-soft">Create chart editions from streaming playlists — program, rules, sources, review, commit</p></div>
-        <div className="flex items-center gap-2"><span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${mode === "mock" ? "bg-wk-warning-soft text-wk-warning" : "bg-wk-success-soft text-wk-success"}`}><WkIcon name={mode === "mock" ? "FlaskConical" : "Globe"} size={12} />{mode === "mock" ? "Mock Mode" : "WordPress Mode"}</span><button onClick={() => navigate(`${ADMIN_CHARTS_BASE}/ingest-runs`)} className={BTN_GHOST}><WkIcon name="List" size={14} />All Runs</button><button onClick={() => navigate(`${ADMIN_CHARTS_BASE}/ingest-health`)} className={BTN_GHOST}><WkIcon name="HeartPulse" size={14} />API Health</button></div>
-      </div>
-
+      <IngestPageHeader mode={mode} onOpenRuns={() => navigate(`${ADMIN_CHARTS_BASE}/ingest-runs`)} onOpenHealth={() => navigate(`${ADMIN_CHARTS_BASE}/ingest-health`)} />
       <Stepper step={step} onStepChange={(nextStep) => { if (nextStep === "configure") handleReset(); if (nextStep === "rules") setStep("rules"); }} />
       {kpis && <div className="grid grid-cols-2 gap-3 md:grid-cols-4"><KpiCard label="Editions This Week" value={String(kpis.editionsThisWeek)} trend="+1" positive /><KpiCard label="Match Rate" value={`${kpis.canonicalMatchRate.toFixed(1)}%`} trend="-1.2%" positive={kpis.canonicalMatchRate >= 85} /><KpiCard label="Awaiting Review" value={String(kpis.rowsAwaitingReview)} trend="-4" positive={kpis.rowsAwaitingReview < 20} /><KpiCard label="Avg Run Time" value={`${(kpis.averageRunTimeMs / 1000).toFixed(1)}s`} trend="-0.3s" positive /></div>}
       {formError && <StatusBanner tone="danger" icon="AlertCircle" message={formError} />}
@@ -301,9 +297,4 @@ export default function AdminChartsIngest() {
       </div>
     </div>
   );
-}
-
-function StatusBanner({ tone, icon, message }: { tone: "danger" | "success" | "warning" | "info"; icon: string; message: string }) {
-  const classes = { danger: "border-wk-danger/20 bg-wk-danger-soft text-wk-danger", success: "border-wk-success/20 bg-wk-success-soft text-wk-success", warning: "border-wk-warning/20 bg-wk-warning-soft text-wk-warning", info: "border-wk-brand/20 bg-wk-brand-soft text-wk-brand" }[tone];
-  return <div className={`rounded-lg border p-3 ${classes}`}><div className="flex items-center gap-2"><WkIcon name={icon as any} size={16} /><span className="text-[13px] font-semibold">{message}</span></div></div>;
 }
