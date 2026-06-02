@@ -74,6 +74,44 @@ export type RelationalArtistCredit = {
   warnings?: string[];
 };
 
+export type EntityResolutionStatus = "resolved" | "needs_review" | "shell_created" | "duplicate_candidate" | "blocked";
+export type EntityResolutionKind = "artist" | "track" | "release" | "label";
+
+export type EntityResolutionCandidate = {
+  entityKind: EntityResolutionKind;
+  entityId: string;
+  displayName: string;
+  confidence: number;
+  method: "provider_id" | "isrc" | "alias" | "exact_name" | "title_artist" | "fuzzy" | "manual_history";
+  reasons: string[];
+  providerOverlap?: ProviderIdentifierSet[];
+};
+
+export type EntityResolutionDecision = {
+  entityKind: EntityResolutionKind;
+  sourceId: string;
+  sourceLabel: string;
+  status: EntityResolutionStatus;
+  canonicalEntityId?: string | null;
+  shellEntityId?: string | null;
+  confidence: number;
+  candidates: EntityResolutionCandidate[];
+  warnings: string[];
+  reviewRequired: boolean;
+  decidedAt: string;
+};
+
+export type EntityResolutionBundle = {
+  rowId: string;
+  trackDecision: EntityResolutionDecision;
+  releaseDecision?: EntityResolutionDecision | null;
+  artistDecisions: EntityResolutionDecision[];
+  labelDecision?: EntityResolutionDecision | null;
+  overallStatus: EntityResolutionStatus;
+  reviewRequired: boolean;
+  warnings: string[];
+};
+
 export type IngestExcludedRow = {
   id: string;
   runId: string;
@@ -123,6 +161,7 @@ export type IngestRowIntelligence = {
   rowId: string;
   richMetadata?: RichTrackMetadata;
   artistCredits?: RelationalArtistCredit[];
+  entityResolution?: EntityResolutionBundle;
   eligibilityDecision?: ChartEligibilityDecision;
   commercialReadiness?: CommercialReadinessCheck[];
   excludedRow?: IngestExcludedRow | null;
