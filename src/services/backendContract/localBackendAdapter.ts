@@ -18,7 +18,12 @@ import {
   type BackendUpdateChartEligibilityProfileRequest,
 } from "./backendTypes";
 import { backendConfig, getBackendModeWarnings } from "./backendConfig";
-import type { BackendMatchDecisionRequest, RuntimeBackendAdapter } from "./runtimeContract";
+import type {
+  BackendCreateProgramRequest,
+  BackendCreateRunRequest,
+  BackendMatchDecisionRequest,
+  RuntimeBackendAdapter,
+} from "./runtimeContract";
 import {
   getIngestRuns,
   getIngestRun,
@@ -193,6 +198,23 @@ export const localBackendAdapter: RuntimeBackendAdapter = {
       }
     },
 
+    async createProgram(payload: BackendCreateProgramRequest): Promise<BackendResult<BackendChartProgram>> {
+      const program: BackendChartProgram = {
+        id: payload.id ?? `local-program-${payload.publicSlug ?? payload.seriesSlug}-${payload.marketSlug}`,
+        publicSlug: payload.publicSlug ?? `${payload.seriesSlug}-${payload.marketSlug}`,
+        seriesSlug: payload.seriesSlug,
+        marketSlug: payload.marketSlug,
+        label: payload.label,
+        eligibilityProfileId: payload.eligibilityProfileId ?? null,
+        chartKind: payload.chartKind,
+        visibility: payload.visibility,
+        defaultMethodologyVersion: payload.defaultMethodologyVersion,
+        defaultEligibilityRulesVersion: payload.defaultEligibilityRulesVersion,
+        status: payload.status ?? "draft",
+      };
+      return backendOk(program, localMeta(["Created local demo program only."]));
+    },
+
     async getEligibilityProfiles(): Promise<BackendResult<BackendChartEligibilityProfile[]>> {
       try {
         return backendOk(getEligibilityProfiles(), localMeta(["Eligibility profiles are loaded from local demo storage."]));
@@ -302,6 +324,33 @@ export const localBackendAdapter: RuntimeBackendAdapter = {
       } catch (error) {
         return safeLocalFail<BackendIngestRun | null>(error, null);
       }
+    },
+
+    async createRun(payload: BackendCreateRunRequest): Promise<BackendResult<BackendIngestRun>> {
+      const timestamp = new Date().toISOString();
+      return backendOk(
+        {
+          id: payload.id ?? `local-run-${Date.now()}`,
+          chartTitle: payload.chartTitle,
+          chartSlug: payload.chartSlug,
+          editionDate: payload.editionDate,
+          status: payload.status ?? "draft",
+          publicSlug: payload.publicSlug ?? null,
+          programId: payload.programId ?? null,
+          eligibilityProfileId: payload.eligibilityProfileId ?? null,
+          marketScopeId: payload.marketScopeId ?? null,
+          marketScopeSnapshot: payload.marketScopeSnapshot ?? null,
+          enrichmentOptions: payload.enrichmentOptions ?? null,
+          sourceUrls: payload.sourceUrls,
+          excludedRows: payload.excludedRows ?? [],
+          commercialReadiness: payload.commercialReadiness ?? null,
+          rowIntelligence: payload.rowIntelligence ?? {},
+          createdAt: payload.createdAt ?? timestamp,
+          updatedAt: payload.updatedAt ?? timestamp,
+          errorMessage: payload.errorMessage ?? null,
+        },
+        localMeta(["Created local demo ingest run only."])
+      );
     },
 
     async runDryRun(request: BackendDryRunRequest): Promise<BackendResult<BackendDryRunResponse>> {
