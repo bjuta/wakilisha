@@ -1,23 +1,4 @@
 import {
-  backendError,
-  backendFail,
-  backendOk,
-  createBackendMeta,
-  endpointNotImplemented,
-  unknownBackendError,
-  type BackendChartEdition,
-  type BackendChartEntry,
-  type BackendChartProgram,
-  type BackendCommitRequest,
-  type BackendCommitResponse,
-  type BackendDryRunRequest,
-  type BackendDryRunResponse,
-  type BackendHealth,
-  type BackendIngestRun,
-  type BackendResult,
-} from "./backendTypes";
-import { backendConfig, getBackendModeWarnings } from "./backendConfig";
-import {
   getIngestRunsWp,
   getIngestRunWp,
   runDryRunWp,
@@ -28,10 +9,10 @@ import {
   getIngestHealthWp,
 } from "../chartsIngestion/wpAdapter";
 import {
-  getChartFamilies,
-  getChartEditionsForFamily,
-  getChartEditionEntries,
-} from "../chartsV2/v2Adapter";
+  getV2ChartFamilies,
+  getV2ChartEditionsForFamily,
+  getV2ChartEditionEntries,
+} from "../chartsPublic/v2Adapter";
 import type { IngestRun } from "../chartsIngestion/ingestStudioTypes";
 import type { CommitIngestRunResponse as LegacyCommitResponse } from "../chartsIngestion/commitTypes";
 
@@ -167,7 +148,7 @@ export const wordpressBackendAdapter = {
   charts: {
     async getPrograms(): Promise<BackendResult<BackendChartProgram[]>> {
       try {
-        const programs = await getChartFamilies();
+        const programs = await getV2ChartFamilies();
         return backendOk(
           programs.map((program) => ({
             id: program.id,
@@ -186,9 +167,9 @@ export const wordpressBackendAdapter = {
 
     async getEditions(): Promise<BackendResult<BackendChartEdition[]>> {
       try {
-        const programs = await getChartFamilies();
+        const programs = await getV2ChartFamilies();
         const groups = await Promise.all(
-          programs.map(async (program) => ({ program, editions: await getChartEditionsForFamily(program.familyKey) }))
+          programs.map(async (program) => ({ program, editions: await getV2ChartEditionsForFamily(program.familyKey) }))
         );
         const editions: BackendChartEdition[] = groups.flatMap(({ program, editions }) =>
           editions.map((edition) => ({
@@ -214,7 +195,7 @@ export const wordpressBackendAdapter = {
 
     async getEdition(publicSlug: string, editionSlug: string): Promise<BackendResult<BackendChartEdition | null>> {
       try {
-        const editions = await getChartEditionsForFamily(publicSlug);
+        const editions = await getV2ChartEditionsForFamily(publicSlug);
         const edition = editions.find((item) => item.editionKey === editionSlug || item.id === editionSlug);
         return backendOk(
           edition
@@ -242,7 +223,7 @@ export const wordpressBackendAdapter = {
 
     async getEditionEntries(publicSlug: string, editionSlug: string): Promise<BackendResult<BackendChartEntry[]>> {
       try {
-        const entries = await getChartEditionEntries(publicSlug, editionSlug);
+        const entries = await getV2ChartEditionEntries(publicSlug, editionSlug);
         return backendOk(
           entries.map((entry) => ({
             id: entry.id,
