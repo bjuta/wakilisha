@@ -17,6 +17,8 @@ import type {
 import { fetchFromAllSources } from "./providerFetch";
 import { normalizeToResolvedRows } from "./normalize";
 import { detectProviderFromUrl } from "./providerDetection";
+import { runCanonicalMatch } from "./canonicalMatch";
+import { enrichRows, applyEnrichmentToRow, checkEnrichmentCredentials } from "./enrichment";
 
 const STUDIO_STORE_KEY = "wkcharts_ingest_studio_v1";
 
@@ -676,11 +678,14 @@ async function simulateStageProgress(runId: string): Promise<void> {
   const providers = sourceUrls.map(detectProviderFromUrl).filter((p) => p !== "unknown");
   const providerDetectionStage: IngestStageStatus = {
     stage: "provider_detection",
-    status: "done",
+    status: providers.length > 0 ? "done" : "warning",
     durationMs: 40 + Math.floor(Math.random() * 40),
     startedAt: validateStage.finishedAt || new Date().toISOString(),
     finishedAt: new Date(Date.now() + 200).toISOString(),
     metrics: { detectedProviders: providers.length, spotify: providers.filter((p) => p === "spotify").length, appleMusic: providers.filter((p) => p === "apple_music").length },
+    message: providers.length === 0
+      ? "No recognized providers detected — check source URLs"
+      : `Detected: ${providers.join(", ")}`,
   };
 
   // Stage 3: resource_guard
@@ -691,6 +696,7 @@ async function simulateStageProgress(runId: string): Promise<void> {
     startedAt: providerDetectionStage.finishedAt || new Date().toISOString(),
     finishedAt: new Date(Date.now() + 300).toISOString(),
     metrics: { sourceCount: sourceUrls.length, estimatedRowCount: sourceUrls.length * chartSize },
+    message: `${sourceUrls.length} source(s) within budget — estimated ${sourceUrls.length * chartSize} rows`,
   };
 
   // Stage 4: source_fetch — REAL PROVIDER FETCH
@@ -705,6 +711,13 @@ async function simulateStageProgress(runId: string): Promise<void> {
   const appleCount = fetchResult.sourceResults.filter((r) => r.provider === "apple_music").reduce((sum, r) => sum + r.normalizedRows.length, 0);
   const failedSources = fetchResult.sourceResults.filter((r) => !r.success);
 
+  // Per-source warnings detail
+  const perSourceDetail = fetchResult.sourceResults.map((r) =>
+    r.success
+      ? `${r.provider}: ${r.normalizedRows.length} rows`
+      : `${r.provider}: FAILED — ${r.error || "unknown error"}`
+  ).join("; ");
+
   const sourceFetchStage: IngestStageStatus = {
     stage: "source_fetch",
     status: fetchResult.success ? "done" : failedSources.length === sourceUrls.length ? "failed" : "warning",
@@ -718,20 +731,15 @@ async function simulateStageProgress(runId: string): Promise<void> {
       failedSources: failedSources.length,
       successfulSources: fetchResult.overallMetrics.successfulSources,
     },
-    message: failedSources.length > 0
-      ? `${failedSources.length} source(s) failed: ${failedSources.map((f) => f.error).filter(Boolean).join("; ")}`
-      : `Fetched ${fetchResult.overallMetrics.totalFetched} rows from ${sourceUrls.length} source(s)`,
+    message: perSourceDetail,
   };
 
   // If all sources failed, mark run as failed
   if (failedSources.length === sourceUrls.length && sourceUrls.length > 0) {
     store.runs[idx].status = "failed";
-    store.runs[idx].errorMessage = fetchResult.overallError || "All sources failed to fetch";
+    store.runs[idx].errorMessage = fetchResult.overallError || "All sources failed to fetch. Check provider credentials and source URLs.";
     store.runs[idx].stages = [
-      validateStage,
-      providerDetectionStage,
-      resourceGuardStage,
-      sourceFetchStage,
+      validateStage, providerDetectionStage, resourceGuardStage, sourceFetchStage,
       { stage: "normalize", status: "idle" },
       { stage: "canonical_match", status: "idle" },
       { stage: "enrichment", status: "idle" },
@@ -745,7 +753,16 @@ async function simulateStageProgress(runId: string): Promise<void> {
   // Stage 5: normalize
   const normalizeStart = performance.now();
   const normalizedRows = fetchResult.allNormalizedRows;
+  // Deduplicate by providerTrackId
+  const seen = new Set<string>();
+  const dedupedRows = normalizedRows.filter((row) => {
+    const key = row.providerTrackId || row.trackTitle || "";
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
   const normalizeDurationMs = Math.round(performance.now() - normalizeStart);
+  const droppedCount = normalizedRows.length - dedupedRows.length + fetchResult.overallMetrics.totalDropped;
 
   const normalizeStage: IngestStageStatus = {
     stage: "normalize",
@@ -754,52 +771,113 @@ async function simulateStageProgress(runId: string): Promise<void> {
     startedAt: sourceFetchStage.finishedAt || new Date().toISOString(),
     finishedAt: new Date().toISOString(),
     metrics: {
-      normalizedRows: normalizedRows.length,
-      droppedRows: fetchResult.overallMetrics.totalDropped,
+      normalizedRows: dedupedRows.length,
+      droppedRows: droppedCount,
+      deduplicatedRows: normalizedRows.length - dedupedRows.length,
       sources: sourceUrls.length,
     },
-    message: `Normalized ${normalizedRows.length} rows from ${fetchResult.overallMetrics.successfulSources} source(s)`,
+    message: `Normalized ${dedupedRows.length} rows (${normalizedRows.length - dedupedRows.length} duplicates removed, ${droppedCount} dropped)`,
   };
 
-  // Stage 6: canonical_match
+  // Stage 6: canonical_match — REAL REGISTRY MATCHING
   const matchStart = performance.now();
-  const normalizedResult = normalizeToResolvedRows(normalizedRows);
+  const matchResult = runCanonicalMatch(dedupedRows);
   const matchDurationMs = Math.round(performance.now() - matchStart);
 
-  const resolvedRows = normalizedResult.resolvedRows.slice(0, chartSize);
-  const summary = normalizedResult.summary;
+  // Slice to chartSize
+  const resolvedRows = matchResult.resolvedRows.slice(0, chartSize);
+  const matchMetrics = matchResult.metrics;
 
   const canonicalMatchStage: IngestStageStatus = {
     stage: "canonical_match",
-    status: "done",
+    status: matchMetrics.noMatch > resolvedRows.length * 0.5 ? "warning" : "done",
     durationMs: matchDurationMs,
     startedAt: normalizeStage.finishedAt || new Date().toISOString(),
     finishedAt: new Date().toISOString(),
     metrics: {
-      canonical: summary.canonicalMatches,
-      shell: summary.shells,
-      noMatch: summary.gaps,
-      needsReview: summary.needsReview,
-      duplicate: summary.duplicateCandidates,
-      matchRate: Math.round(summary.matchRate * 10) / 10,
+      canonical: matchMetrics.canonical,
+      shell: matchMetrics.shell,
+      noMatch: matchMetrics.noMatch,
+      needsReview: matchMetrics.needsReview,
+      duplicate: matchMetrics.duplicateCandidate,
+      matchRate: matchMetrics.matchRate,
+      registryHits: matchMetrics.registryHits,
+      avgConfidence: matchMetrics.avgConfidence,
     },
-    message: `${summary.canonicalMatches} canonical, ${summary.shells} shells, ${summary.gaps} gaps, ${summary.needsReview} needs review`,
+    message: `${matchMetrics.canonical} canonical, ${matchMetrics.shell} shells, ${matchMetrics.noMatch} no_match, ${matchMetrics.needsReview} needs_review, ${matchMetrics.duplicateCandidate} duplicates (${matchMetrics.matchRate}% match rate, avg confidence ${matchMetrics.avgConfidence}%)`,
   };
 
-  // Stage 7: enrichment
-  const enrichmentStage: IngestStageStatus = {
+  // Collect stage warnings from matching
+  const matchWarnings = matchResult.stageWarnings;
+
+  // Stage 7: enrichment — REAL ENRICHMENT PIPELINE
+  const enrichStart = performance.now();
+  const credErrors = checkEnrichmentCredentials();
+  const enrichWarnings: string[] = credErrors.map((e) => e.message);
+
+  // Only enrich up to chartSize rows to keep runtime reasonable
+  const rowsToEnrich = resolvedRows.slice(0, Math.min(chartSize, 40));
+  let enrichedRows = resolvedRows;
+  let enrichmentStage: IngestStageStatus = {
     stage: "enrichment",
-    status: "done",
-    durationMs: 400 + Math.floor(Math.random() * 800),
+    status: "warning",
+    durationMs: 0,
     startedAt: canonicalMatchStage.finishedAt || new Date().toISOString(),
     finishedAt: new Date().toISOString(),
-    metrics: {
-      enriched: resolvedRows.length,
-      failed: 0,
-      enrichedFields: "artwork, preview, externalUrl",
-    },
-    message: `Enriched ${resolvedRows.length} rows with artwork, preview URLs, and external links`,
+    message: "Enrichment running in mock mode — no provider credentials configured",
+    metrics: { enriched: 0, failed: 0, credentialErrors: credErrors.length },
   };
+
+  try {
+    const enrichResult = await enrichRows(rowsToEnrich);
+    // Apply enrichment results back to rows
+    const enrichMap = new Map(enrichResult.results.map((r) => [r.rowId, r]));
+    enrichedRows = resolvedRows.map((row) => {
+      const result = enrichMap.get(row.id);
+      if (result && result.success && Object.keys(result.enriched).length > 0) {
+        return applyEnrichmentToRow(row, result.enriched);
+      }
+      return row;
+    });
+    const enrichDurationMs = Math.round(performance.now() - enrichStart);
+
+    // Collect enrichment warnings
+    enrichResult.results.forEach((r) => {
+      r.warnings.filter((w) => !w.includes("skipped")).forEach((w) => enrichWarnings.push(w));
+    });
+
+    enrichmentStage = {
+      stage: "enrichment",
+      status: credErrors.length === 4 ? "warning" : "done",
+      durationMs: enrichDurationMs,
+      startedAt: canonicalMatchStage.finishedAt || new Date().toISOString(),
+      finishedAt: new Date().toISOString(),
+      metrics: {
+        enriched: enrichResult.metrics.enriched + enrichResult.metrics.partial,
+        failed: enrichResult.metrics.failed,
+        spotifyHits: enrichResult.metrics.spotifyHits,
+        appleMusicHits: enrichResult.metrics.appleMusicHits,
+        youtubeHits: enrichResult.metrics.youtubeHits,
+        acrCloudHits: enrichResult.metrics.acrCloudHits,
+        credentialErrors: credErrors.length,
+      },
+      message: credErrors.length === 4
+        ? `Enrichment running in mock mode — ${credErrors.length} providers missing credentials. Set env vars to enable real enrichment.`
+        : `Enriched ${enrichResult.metrics.enriched + enrichResult.metrics.partial} rows via ${4 - credErrors.length} provider(s)`,
+    };
+  } catch {
+    const enrichDurationMs = Math.round(performance.now() - enrichStart);
+    enrichedRows = resolvedRows;
+    enrichmentStage = {
+      stage: "enrichment",
+      status: "warning",
+      durationMs: enrichDurationMs,
+      startedAt: canonicalMatchStage.finishedAt || new Date().toISOString(),
+      finishedAt: new Date().toISOString(),
+      message: "Enrichment encountered errors — running in degraded mode",
+      metrics: { enriched: 0, failed: resolvedRows.length, credentialErrors: credErrors.length },
+    };
+  }
 
   // Stage 8: snapshot_commit
   const snapshotStage: IngestStageStatus = {
@@ -808,45 +886,45 @@ async function simulateStageProgress(runId: string): Promise<void> {
     durationMs: 150 + Math.floor(Math.random() * 100),
     startedAt: enrichmentStage.finishedAt || new Date().toISOString(),
     finishedAt: new Date().toISOString(),
-    message: "Dry run snapshot created — not persisted to edition",
+    message: "Dry run snapshot created — not persisted to edition (Sprint 5 gate)",
   };
 
   // Build final run state
   const finalStages: IngestStageStatus[] = [
-    validateStage,
-    providerDetectionStage,
-    resourceGuardStage,
-    sourceFetchStage,
-    normalizeStage,
-    canonicalMatchStage,
-    enrichmentStage,
-    snapshotStage,
+    validateStage, providerDetectionStage, resourceGuardStage,
+    sourceFetchStage, normalizeStage, canonicalMatchStage,
+    enrichmentStage, snapshotStage,
   ];
 
   const finalSummary: IngestRunSummary = {
-    totalRows: resolvedRows.length,
-    canonicalMatches: summary.canonicalMatches,
-    shells: summary.shells,
-    gaps: summary.gaps,
-    duplicateCandidates: summary.duplicateCandidates,
-    matchRate: Math.round(summary.matchRate * 10) / 10,
+    totalRows: enrichedRows.length,
+    canonicalMatches: matchMetrics.canonical,
+    shells: matchMetrics.shell,
+    gaps: matchMetrics.noMatch,
+    duplicateCandidates: matchMetrics.duplicateCandidate,
+    matchRate: matchMetrics.matchRate,
   };
 
-  // Store raw payloads for audit
-  const rawPayloads = fetchResult.sourceResults.map((r) => ({
-    sourceUrl: r.sourceUrl,
-    provider: r.provider,
-    rawPayload: r.rawPayload,
-    warnings: r.warnings,
-  }));
+  // Aggregate all warnings for error message
+  const allWarnings = [...fetchResult.overallWarnings, ...matchWarnings, ...enrichWarnings];
+  const hasWarnings = allWarnings.length > 0;
+  const finalStatus = failedSources.length > 0 || hasWarnings ? "dry_run_complete" : "dry_run_complete";
 
-  store.runs[idx].status = "dry_run_complete";
+  // Store enriched rows and audit payloads
+  store.runs[idx].status = finalStatus;
   store.runs[idx].stages = finalStages;
   store.runs[idx].summary = finalSummary;
-  store.runs[idx].rows = resolvedRows;
+  store.runs[idx].rows = enrichedRows;
   store.runs[idx].dryRunCompletedAt = new Date().toISOString();
   store.runs[idx].updatedAt = new Date().toISOString();
-  store.runs[idx].notes = JSON.stringify({ rawPayloads, overallWarnings: fetchResult.overallWarnings });
+  store.runs[idx].notes = JSON.stringify({
+    rawPayloads: fetchResult.sourceResults.map((r) => ({
+      sourceUrl: r.sourceUrl, provider: r.provider, rawPayload: r.rawPayload, warnings: r.warnings,
+    })),
+    overallWarnings: allWarnings,
+    canonicalMatchMetrics: matchMetrics,
+    enrichmentCredentialErrors: credErrors.map((e) => ({ provider: e.provider, envVarName: e.envVarName })),
+  });
   commitStudioStore(store);
 
   addIngestActivity({
@@ -958,6 +1036,56 @@ export async function retryIngestRun(runId: string): Promise<IngestRun | null> {
     createdAt: new Date().toISOString(),
   });
 
+  return store.runs[idx];
+}
+
+// ─── Row-level Match Decision ───
+export async function applyRowMatchDecision(runId: string, rowId: string, action: string, canonicalTrackId?: string): Promise<IngestRun | null> {
+  const store = getStudioStore();
+  const idx = store.runs.findIndex((r) => r.id === runId);
+  if (idx === -1) return null;
+
+  const rowIdx = store.runs[idx].rows.findIndex((r) => r.id === rowId);
+  if (rowIdx === -1) return null;
+
+  const row = store.runs[idx].rows[rowIdx];
+
+  let updatedRow = { ...row };
+  switch (action) {
+    case "accept_canonical":
+      updatedRow = { ...row, matchStatus: "canonical", confidence: 100 };
+      break;
+    case "create_shell":
+      updatedRow = { ...row, matchStatus: "shell", releaseShellId: `shell-${rowId}`, canonicalTrackId: null };
+      break;
+    case "change_match":
+    case "attach_to_existing":
+      if (canonicalTrackId) updatedRow = { ...row, matchStatus: "canonical", canonicalTrackId, confidence: 95 };
+      break;
+    case "mark_duplicate":
+      updatedRow = { ...row, matchStatus: "duplicate_candidate" };
+      break;
+    case "send_to_review":
+      updatedRow = { ...row, matchStatus: "needs_review" };
+      break;
+    case "ignore":
+      updatedRow = { ...row, matchStatus: "no_match", canonicalTrackId: null };
+      break;
+  }
+
+  store.runs[idx].rows[rowIdx] = updatedRow;
+
+  // Recompute summary
+  const rows = store.runs[idx].rows;
+  const canonical = rows.filter((r) => r.matchStatus === "canonical").length;
+  const shells = rows.filter((r) => r.matchStatus === "shell").length;
+  const gaps = rows.filter((r) => r.matchStatus === "no_match").length;
+  const duplicateCandidates = rows.filter((r) => r.matchStatus === "duplicate_candidate").length;
+  const matchRate = rows.length > 0 ? Math.round((canonical / rows.length) * 1000) / 10 : 0;
+  store.runs[idx].summary = { ...store.runs[idx].summary, canonicalMatches: canonical, shells, gaps, duplicateCandidates, matchRate };
+  store.runs[idx].updatedAt = new Date().toISOString();
+
+  commitStudioStore(store);
   return store.runs[idx];
 }
 

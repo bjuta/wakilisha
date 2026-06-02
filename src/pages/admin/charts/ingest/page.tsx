@@ -477,7 +477,7 @@ export default function AdminChartsIngest() {
             <div className="space-y-5">
               <RunMetadataPanel run={dryRunResult} />
               <PipelinePanel run={dryRunResult} />
-              <MatchSummary summary={dryRunResult.summary} />
+              <MatchSummary summary={dryRunResult.summary} runId={dryRunResult.id} />
               <PublishChecklist run={dryRunResult} />
               <WkSurface className="p-4 overflow-hidden">
                 <div className="flex items-center justify-between mb-3">
@@ -506,13 +506,21 @@ export default function AdminChartsIngest() {
                   <table className="w-full text-left text-[13px]">
                     <thead>
                       <tr className="border-b border-wk-border">
-                        {["#", "Title", "Artist", "Match", "Confidence", "Warnings", ""].map((h, i) => (
+                        {["#", "Title & Artist", "Match", "Confidence", "Warnings", "Decision", ""].map((h, i) => (
                           <th key={i} className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-wk-text-muted">{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredRows.map((row) => <RowTableRow key={row.id} row={row} expanded={expandedRowId === row.id} onToggle={() => setExpandedRowId(expandedRowId === row.id ? null : row.id)} />)}
+                      {filteredRows.map((row) => (
+                        <RowTableRow
+                          key={row.id}
+                          row={row}
+                          expanded={expandedRowId === row.id}
+                          onToggle={() => setExpandedRowId(expandedRowId === row.id ? null : row.id)}
+                          onDecisionApplied={() => {}}
+                        />
+                      ))}
                     </tbody>
                   </table>
                 </div>
@@ -521,9 +529,14 @@ export default function AdminChartsIngest() {
                 )}
               </WkSurface>
               <div className="flex flex-wrap items-center gap-3">
-                <button onClick={handleCommit} disabled={commitLoading} className={BTN_PRIMARY}>
-                  <WkIcon name={commitLoading ? "Loader" : "CheckCircle2"} size={14} className={commitLoading ? "animate-spin" : ""} />
-                  {commitLoading ? "Committing…" : "Commit Edition"}
+                <button
+                  onClick={handleCommit}
+                  disabled={commitLoading || true}
+                  className={BTN_PRIMARY}
+                  title="Commit is gated until Sprint 5 — all required checks must pass and the snapshot persistence layer must be complete"
+                >
+                  <WkIcon name={commitLoading ? "Loader" : "Lock"} size={14} className={commitLoading ? "animate-spin" : ""} />
+                  {commitLoading ? "Committing…" : "Commit Edition (Sprint 5)"}
                 </button>
                 <button onClick={() => setStep("configure")} className={BTN_GHOST}>
                   <WkIcon name="ArrowLeft" size={14} />Back to Configure

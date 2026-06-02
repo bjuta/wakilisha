@@ -71,14 +71,8 @@ export default function AdminChartsIngestRunDetail() {
 
   async function handleCommit() {
     if (!runId) return;
-    setActionLoading("commit");
-    try {
-      await commitIngestRun({ runId, publishImmediately: true });
-      const r = await getIngestRun(runId);
-      setRun(r);
-    } finally {
-      setActionLoading(null);
-    }
+    // Commit gated until Sprint 5
+    alert("Commit is gated until Sprint 5. All required pipeline checks must pass and the snapshot persistence layer must be complete before an edition can be committed.");
   }
 
   async function handleCancel() {
@@ -395,6 +389,7 @@ export default function AdminChartsIngestRunDetail() {
                   <th className="px-4 py-3 font-semibold text-[var(--wk-text-muted)]">Provider</th>
                   <th className="px-4 py-3 font-semibold text-[var(--wk-text-muted)]">Match</th>
                   <th className="px-4 py-3 font-semibold text-[var(--wk-text-muted)]">Confidence</th>
+                  <th className="px-4 py-3 font-semibold text-[var(--wk-text-muted)]">Candidates</th>
                   <th className="px-4 py-3 font-semibold text-[var(--wk-text-muted)]">Warnings</th>
                 </tr>
               </thead>
@@ -428,6 +423,9 @@ export default function AdminChartsIngestRunDetail() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-[var(--wk-text-soft)]">{row.confidence}%</td>
+                    <td className="px-4 py-3">
+                      <span className="text-[11px] text-[var(--wk-text-muted)]">{row.canonicalTrackId ? <span className="font-mono text-[10px]">{row.canonicalTrackId.slice(0, 16)}</span> : row.releaseShellId ? <span className="text-[var(--wk-warning)] font-mono text-[10px]">{row.releaseShellId.slice(0, 16)}</span> : "—"}</span>
+                    </td>
                     <td className="px-4 py-3">
                       {row.warnings && row.warnings.length > 0 ? (
                         <span className="text-[11px] text-[var(--wk-warning)]" title={row.warnings.join("; ")}>

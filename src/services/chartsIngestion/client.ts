@@ -1041,6 +1041,7 @@ export const commitIngestRun = ingestStudioAdapter.commitIngestRunWp || ingestSt
 export const cancelIngestRun = ingestStudioAdapter.cancelIngestRunWp || ingestStudioAdapter.cancelIngestRun;
 export const retryIngestRun = ingestStudioAdapter.retryIngestRunWp || ingestStudioAdapter.retryIngestRun;
 export const sendGapsToReview = ingestStudioAdapter.sendGapsToReviewWp || ingestStudioAdapter.sendGapsToReview;
+export const applyRowMatchDecision = ingestStudioAdapter.applyRowMatchDecision;
 export const getResourceGuardStatus = ingestStudioAdapter.getResourceGuardStatusWp || ingestStudioAdapter.getResourceGuardStatus;
 export const getStudioStore = ingestStudioAdapter.getStudioStore;
 export const refreshStudioStore = ingestStudioAdapter.refreshStudioStore;
@@ -1068,6 +1069,41 @@ export type { SourceFetchResult, ProviderFetchAggregateResult, ProviderFetchConf
 export type { NormalizeResult } from "./normalize";
 export type { SpotifyFetchResult } from "./spotifyFetch";
 export type { AppleMusicFetchResult } from "./appleMusicFetch";
+
+// ─── Sprint 4: Canonical Matching & Enrichment ───
+export {
+  getCanonicalRegistry,
+  runCanonicalMatch,
+  searchRegistry,
+  searchRegistryByQuery,
+  assignMatchStatus,
+  scoreMatch,
+  applyMatchDecision,
+} from "./canonicalMatch";
+export type {
+  CanonicalTrack,
+  CanonicalRegistry,
+  MatchCandidate,
+  MatchDecision,
+  MatchDecisionResult,
+  MatchDecisionAction,
+} from "./canonicalMatch";
+
+export {
+  checkEnrichmentCredentials,
+  enrichRow,
+  enrichRows,
+  applyEnrichmentToRow,
+  getEnrichmentProviderHealth,
+} from "./enrichment";
+export type {
+  EnrichedMetadata,
+  EnrichmentRowResult,
+  EnrichmentBatchResult,
+  CredentialError,
+  ProviderHealthStatus,
+  EnrichmentConfig,
+} from "./enrichment";
 
 // ─── Ingest Studio Types ───
 export type {
