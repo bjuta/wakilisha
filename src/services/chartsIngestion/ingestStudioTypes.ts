@@ -10,6 +10,7 @@ import type { IngestEnrichmentOptions } from "../chartsEnrichment/enrichmentOpti
 import type { ChartMethodologyScoreBreakdown } from "../chartsMethodology/methodologyTypes";
 import type {
   CommercialReadinessReport,
+  EntityResolutionBundle,
   IngestExcludedRow,
   IngestRowIntelligence,
 } from "../chartsIntelligence/intelligenceTypes";
@@ -33,6 +34,7 @@ export type IngestStage =
   | "source_fetch"
   | "normalize"
   | "canonical_match"
+  | "entity_resolution"
   | "eligibility_execution"
   | "methodology_scoring"
   | "enrichment"
@@ -103,6 +105,7 @@ export type IngestResolvedRow = {
   canonicalArtistIds?: string[];
   releaseShellId?: string | null;
   warnings?: string[];
+  entityResolution?: EntityResolutionBundle | null;
   eligibilityDecision?: ChartEligibilityDecision | null;
   methodologyScore?: ChartMethodologyScoreBreakdown | null;
   excludedRowId?: string | null;
@@ -116,6 +119,10 @@ export type IngestRunSummary = {
   gaps: number;
   duplicateCandidates: number;
   matchRate: number;
+  entityResolvedRows?: number;
+  entityReviewRows?: number;
+  entityShellRows?: number;
+  entityDuplicateRows?: number;
   eligibilityProfileId?: string;
   eligibleRows?: number;
   excludedRows?: number;
