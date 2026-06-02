@@ -11,11 +11,10 @@ export type BackendConfig = {
   v2ApiBaseUrl: string;
   repositoryMode: WakilishaRepositoryMode;
   allowLocalFallback: boolean;
-  legacyModeAlias?: "mock" | "wordpress" | null;
+  legacyModeAlias?: "mock" | null;
 };
 
-const DEFAULT_WORDPRESS_V2_BASE = "/wp-json/wakilisha/v2";
-const DEFAULT_WORDPRESS_V1_BASE = "/wp-json/wakilisha/v1";
+const DEFAULT_RUNTIME_API_BASE = "/api/wakilisha";
 const DEFAULT_LOCAL_API_BASE = "/__wakilisha-local-api";
 
 function readEnv(key: string): string | undefined {
@@ -41,7 +40,7 @@ function normalizeRuntimeMode(value: string | undefined): WakilishaRuntimeMode |
 function normalizeBackendProvider(value: string | undefined): WakilishaBackendProvider {
   if (!value) return "unknown";
   const clean = value.trim().toLowerCase();
-  if (clean === "wordpress" || clean === "wp") return "wordpress";
+  if (clean === "api" || clean === "backend") return "api";
   if (clean === "node") return "node";
   if (clean === "supabase") return "supabase";
   return "unknown";
@@ -56,69 +55,38 @@ function normalizeRepositoryMode(value: string | undefined, runtimeMode: Wakilis
   return "unknown";
 }
 
-function resolveLegacyModeAlias(): "mock" | "wordpress" | null {
+function resolveLegacyModeAlias(): "mock" | null {
   const oldMode = readEnv("VITE_CHARTS_INGESTION_MODE")?.trim().toLowerCase();
-  if (oldMode === "mock") return "mock";
-  if (oldMode === "wordpress") return "wordpress";
-  return null;
-}
-
-function inferRuntimeFromLegacy(alias: "mock" | "wordpress" | null): WakilishaRuntimeMode {
-  if (alias === "wordpress") return "backend";
-  return "local";
-}
-
-function inferProviderFromLegacy(alias: "mock" | "wordpress" | null): WakilishaBackendProvider {
-  if (alias === "wordpress") return "wordpress";
-  return "unknown";
+  return oldMode === "mock" ? "mock" : null;
 }
 
 function stripTrailingSlash(value: string): string {
   return value.replace(/\/+$/, "");
 }
 
-function resolveApiBaseUrl(runtimeMode: WakilishaRuntimeMode, backendProvider: WakilishaBackendProvider): string {
+function resolveApiBaseUrl(runtimeMode: WakilishaRuntimeMode): string {
   const explicit = readEnv("VITE_WAKILISHA_API_BASE") || readEnv("VITE_WAKILISHA_BACKEND_API_BASE");
   if (explicit) return stripTrailingSlash(explicit);
-
-  const legacyWpBase = readEnv("VITE_WAKILISHA_WP_API_BASE");
-  if (legacyWpBase) return stripTrailingSlash(legacyWpBase);
-
-  if (runtimeMode === "local") return DEFAULT_LOCAL_API_BASE;
-  if (backendProvider === "wordpress") return DEFAULT_WORDPRESS_V2_BASE;
-  return DEFAULT_WORDPRESS_V2_BASE;
+  return runtimeMode === "local" ? DEFAULT_LOCAL_API_BASE : DEFAULT_RUNTIME_API_BASE;
 }
 
-function resolveV2ApiBaseUrl(apiBaseUrl: string, backendProvider: WakilishaBackendProvider): string {
+function resolveV2ApiBaseUrl(apiBaseUrl: string): string {
   const explicit = readEnv("VITE_WAKILISHA_V2_API_BASE");
-  if (explicit) return stripTrailingSlash(explicit);
-
-  if (backendProvider === "wordpress") {
-    if (apiBaseUrl.endsWith("/v1")) return apiBaseUrl.replace(/\/v1$/, "/v2");
-    if (apiBaseUrl.includes("/wp-json/wakilisha/v1")) {
-      return apiBaseUrl.replace("/wp-json/wakilisha/v1", "/wp-json/wakilisha/v2");
-    }
-  }
-
-  return apiBaseUrl || DEFAULT_WORDPRESS_V2_BASE;
+  return explicit ? stripTrailingSlash(explicit) : apiBaseUrl;
 }
 
 export function resolveBackendConfig(): BackendConfig {
   const legacyModeAlias = resolveLegacyModeAlias();
-  const runtimeMode =
-    normalizeRuntimeMode(readEnv("VITE_WAKILISHA_RUNTIME_MODE")) ?? inferRuntimeFromLegacy(legacyModeAlias);
-
-  const backendProvider =
-    normalizeBackendProvider(readEnv("VITE_WAKILISHA_BACKEND_PROVIDER")) || inferProviderFromLegacy(legacyModeAlias);
-
-  const resolvedProvider = backendProvider === "unknown" ? inferProviderFromLegacy(legacyModeAlias) : backendProvider;
+  const runtimeMode = normalizeRuntimeMode(readEnv("VITE_WAKILISHA_RUNTIME_MODE")) ?? "local";
+  const rawProvider = normalizeBackendProvider(readEnv("VITE_WAKILISHA_BACKEND_PROVIDER"));
+  const backendProvider = runtimeMode === "backend" && rawProvider === "unknown" ? "api" : rawProvider;
   const repositoryMode = normalizeRepositoryMode(readEnv("VITE_WAKILISHA_REPOSITORY_MODE"), runtimeMode);
-  const apiBaseUrl = resolveApiBaseUrl(runtimeMode, resolvedProvider);
-  const v2ApiBaseUrl = resolveV2ApiBaseUrl(apiBaseUrl, resolvedProvider);
+  const apiBaseUrl = resolveApiBaseUrl(runtimeMode);
+  const v2ApiBaseUrl = resolveV2ApiBaseUrl(apiBaseUrl);
 
   return {
     runtimeMode,
-    backendProvider: resolvedProvider,
+    backendProvider,
     apiBaseUrl,
     v2ApiBaseUrl,
     repositoryMode,
@@ -139,8 +107,8 @@ export function isBackendRuntime(config: BackendConfig = backendConfig): boolean
 
 export function getBackendModeLabel(config: BackendConfig = backendConfig): string {
   if (config.runtimeMode === "local") return "Local demo mode";
-  const provider = config.backendProvider === "unknown" ? "backend" : config.backendProvider;
-  return `${provider[0]?.toUpperCase() ?? "B"}${provider.slice(1)} backend mode`;
+  const provider = config.backendProvider === "unknown" ? "API" : config.backendProvider;
+  return `${provider[0]?.toUpperCase() ?? "A"}${provider.slice(1)} backend mode`;
 }
 
 export function getBackendModeWarnings(config: BackendConfig = backendConfig): string[] {
@@ -152,13 +120,17 @@ export function getBackendModeWarnings(config: BackendConfig = backendConfig): s
   }
 
   if (config.legacyModeAlias) {
-    warnings.push(
-      `VITE_CHARTS_INGESTION_MODE=${config.legacyModeAlias} is a legacy alias. Use VITE_WAKILISHA_RUNTIME_MODE and VITE_WAKILISHA_BACKEND_PROVIDER instead.`
-    );
+    warnings.push("VITE_CHARTS_INGESTION_MODE=mock is a legacy alias. Use VITE_WAKILISHA_RUNTIME_MODE=local instead.");
   }
 
-  if (config.runtimeMode === "backend" && config.backendProvider === "unknown") {
-    warnings.push("Backend runtime is enabled but VITE_WAKILISHA_BACKEND_PROVIDER is not set.");
+  const oldMode = readEnv("VITE_CHARTS_INGESTION_MODE")?.trim().toLowerCase();
+  if (oldMode === "wordpress") {
+    warnings.push("VITE_CHARTS_INGESTION_MODE=wordpress is ignored. WordPress is no longer a runtime backend.");
+  }
+
+  const rawProvider = readEnv("VITE_WAKILISHA_BACKEND_PROVIDER")?.trim().toLowerCase();
+  if (rawProvider === "wordpress" || rawProvider === "wp") {
+    warnings.push("VITE_WAKILISHA_BACKEND_PROVIDER=wordpress is ignored. Use api, node, or supabase.");
   }
 
   if (config.runtimeMode === "backend" && config.repositoryMode === "localStorage") {
@@ -168,10 +140,8 @@ export function getBackendModeWarnings(config: BackendConfig = backendConfig): s
   return warnings;
 }
 
-export function getDefaultApiBaseForProvider(provider: WakilishaBackendProvider): string {
-  if (provider === "wordpress") return DEFAULT_WORDPRESS_V2_BASE;
-  if (provider === "node" || provider === "supabase") return DEFAULT_LOCAL_API_BASE;
-  return DEFAULT_WORDPRESS_V2_BASE;
+export function getDefaultApiBaseForProvider(_provider: WakilishaBackendProvider): string {
+  return DEFAULT_RUNTIME_API_BASE;
 }
 
-export { DEFAULT_WORDPRESS_V2_BASE, DEFAULT_WORDPRESS_V1_BASE, DEFAULT_LOCAL_API_BASE };
+export { DEFAULT_RUNTIME_API_BASE, DEFAULT_LOCAL_API_BASE };
