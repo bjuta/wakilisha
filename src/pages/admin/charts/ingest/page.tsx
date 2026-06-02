@@ -28,9 +28,10 @@ import type { ChartEligibilityProfile } from "@/services/chartsEligibility/eligi
 import { getMarketScopes, type StoredChartMarketScope } from "@/services/chartsMarkets/marketScopeStore";
 
 import { CommitResultPanel } from "./components/CommitResultPanel";
+import { IngestKpiStrip } from "./components/IngestKpiStrip";
+import { IngestLoadingState } from "./components/IngestLoadingState";
 import { IngestPageHeader } from "./components/IngestPageHeader";
 import { IngestSidebar } from "./components/IngestSidebar";
-import { KpiCard } from "./components/KpiCard";
 import { MarketScopeStep } from "./components/MarketScopeStep";
 import { PreviewStep } from "./components/PreviewStep";
 import { ProgramSetupStep } from "./components/ProgramSetupStep";
@@ -275,13 +276,13 @@ export default function AdminChartsIngest() {
   async function handleCancelRun(runId: string) { setCancelLoading(runId); try { await cancelIngestRun(runId); await loadData(); } catch (err) { setFormError(err instanceof Error ? err.message : "Cancel failed"); } finally { setCancelLoading(null); } }
   async function handleRetryRun(runId: string) { setRetryLoading(runId); try { await retryIngestRun(runId); await loadData(); } catch (err) { setFormError(err instanceof Error ? err.message : "Retry failed"); } finally { setRetryLoading(null); } }
 
-  if (loading) return <div className="flex h-96 flex-col items-center justify-center gap-3"><div className="h-8 w-8 animate-spin rounded-full border-2 border-wk-brand/30 border-t-wk-brand" /><p className="text-[13px] font-medium text-wk-text-muted">Loading Ingest Studio…</p></div>;
+  if (loading) return <IngestLoadingState />;
 
   return (
     <div className="space-y-6">
       <IngestPageHeader mode={mode} onOpenRuns={() => navigate(`${ADMIN_CHARTS_BASE}/ingest-runs`)} onOpenHealth={() => navigate(`${ADMIN_CHARTS_BASE}/ingest-health`)} />
       <Stepper step={step} onStepChange={(nextStep) => { if (nextStep === "configure") handleReset(); if (nextStep === "rules") setStep("rules"); }} />
-      {kpis && <div className="grid grid-cols-2 gap-3 md:grid-cols-4"><KpiCard label="Editions This Week" value={String(kpis.editionsThisWeek)} trend="+1" positive /><KpiCard label="Match Rate" value={`${kpis.canonicalMatchRate.toFixed(1)}%`} trend="-1.2%" positive={kpis.canonicalMatchRate >= 85} /><KpiCard label="Awaiting Review" value={String(kpis.rowsAwaitingReview)} trend="-4" positive={kpis.rowsAwaitingReview < 20} /><KpiCard label="Avg Run Time" value={`${(kpis.averageRunTimeMs / 1000).toFixed(1)}s`} trend="-0.3s" positive /></div>}
+      <IngestKpiStrip kpis={kpis} />
       {formError && <StatusBanner tone="danger" icon="AlertCircle" message={formError} />}
       {successMessage && <StatusBanner tone="success" icon="CheckCircle2" message={successMessage} />}
       {editionExistsWarning && <StatusBanner tone="warning" icon="AlertTriangle" message={editionExistsWarning} />}
