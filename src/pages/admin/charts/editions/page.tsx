@@ -9,6 +9,8 @@ import { AdminChartsLoadingState } from "../components/AdminChartsLoadingState";
 import { WkIcon } from "@/components/design-system/Icon";
 import { getChartFamilies, getChartEditionsForFamily } from "@/services/chartsPublic/client";
 import type { ChartEdition, ChartFamily } from "@/services/chartsPublic/client";
+import { getAllV2Editions, refreshV2EditionStore } from "@/services/chartsIngestion/v2EditionStore";
+import type { V2Edition } from "@/services/chartsIngestion/commitTypes";
 
 // Augment with admin metadata (in production this comes from the backend)
 interface AdminEdition extends ChartEdition {
@@ -33,6 +35,7 @@ function toAdminEdition(edition: ChartEdition, family: ChartFamily): AdminEditio
 export default function AdminChartsEditions() {
   const navigate = useNavigate();
   const [editions, setEditions] = useState<AdminEdition[]>([]);
+  const [committedV2Editions, setCommittedV2Editions] = useState<V2Edition[]>([]);
   const [families, setFamilies] = useState<ChartFamily[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>("all");

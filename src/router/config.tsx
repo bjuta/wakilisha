@@ -26,6 +26,22 @@ import AdminChartsIngestRunDetail from "../pages/admin/charts/ingest-run-detail/
 import AdminChartsLegacyIngestJobs from "../pages/admin/charts/ingest-jobs/page";
 import AdminChartsIngestHealth from "../pages/admin/charts/ingest-health/page";
 
+// Admin Settings
+import { AdminSettingsLayout } from "../pages/admin/settings/AdminSettingsLayout";
+import AdminSettingsHub from "../pages/admin/settings/page";
+import AdminSettingsCharts from "../pages/admin/settings/charts/page";
+import AdminSettingsIntegrations from "../pages/admin/settings/integrations/page";
+import AdminSettingsGscData from "../pages/admin/settings/gsc-data/page";
+import AdminSettingsFrontendAppearance from "../pages/admin/settings/frontend-appearance/page";
+import AdminSettingsPlayerPlayback from "../pages/admin/settings/player-playback/page";
+import AdminSettingsRegistry from "../pages/admin/settings/registry/page";
+import AdminSettingsAirplay from "../pages/admin/settings/airplay/page";
+import AdminSettingsAudience from "../pages/admin/settings/audience/page";
+import AdminSettingsEmailBriefings from "../pages/admin/settings/email-briefings/page";
+import AdminSettingsMaintenance from "../pages/admin/settings/maintenance/page";
+import AdminSettingsNavigation from "../pages/admin/settings/navigation/page";
+import AdminSettingsAudit from "../pages/admin/settings/audit/page";
+
 // Charts
 import ChartsDirectory from "../pages/charts/directory/page";
 import ChartEdition from "../pages/charts/edition/page";
@@ -137,6 +153,31 @@ const routes: RouteObject[] = [
       { path: "public-api-qa", element: <AdminChartsPublicApiQa /> },
       { path: "ingest-health", element: <AdminChartsIngestHealth /> },
     ],
+  },
+  // Admin Settings
+  {
+    path: "/admin/settings",
+    element: <AdminSettingsLayout />,
+    children: [
+      { index: true, element: <AdminSettingsHub /> },
+      { path: "charts", element: <AdminSettingsCharts /> },
+      { path: "integrations", element: <AdminSettingsIntegrations /> },
+      { path: "gsc-data", element: <AdminSettingsGscData /> },
+      { path: "frontend-appearance", element: <AdminSettingsFrontendAppearance /> },
+      { path: "player-playback", element: <AdminSettingsPlayerPlayback /> },
+      { path: "registry", element: <AdminSettingsRegistry /> },
+      { path: "airplay", element: <AdminSettingsAirplay /> },
+      { path: "audience", element: <AdminSettingsAudience /> },
+      { path: "email-briefings", element: <AdminSettingsEmailBriefings /> },
+      { path: "maintenance", element: <AdminSettingsMaintenance /> },
+      { path: "navigation", element: <AdminSettingsNavigation /> },
+      { path: "audit", element: <AdminSettingsAudit /> },
+    ],
+  },
+  // Redirect legacy chart settings to admin settings
+  {
+    path: "/admin/charts/settings",
+    element: <Navigate to="/admin/settings/charts" replace />,
   },
   {
     path: "*",

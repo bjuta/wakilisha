@@ -1070,6 +1070,43 @@ export type { NormalizeResult } from "./normalize";
 export type { SpotifyFetchResult } from "./spotifyFetch";
 export type { AppleMusicFetchResult } from "./appleMusicFetch";
 
+// ─── Sprint 5: Commit Service ───
+export {
+  commitIngestRunToV2Edition,
+  checkCommitReadiness,
+  buildReadinessChecklist,
+  validateCommitReadiness,
+} from "./commitService";
+export {
+  CommitError,
+} from "./commitTypes";
+export type {
+  CommitIngestRunRequest,
+  CommitIngestRunResponse,
+  CommitReadyIngestRun,
+  CommitValidationResult,
+  PublishReadinessChecklist,
+  V2Edition,
+  V2Entry,
+  V2SourceCoverage,
+  V2Program,
+} from "./commitTypes";
+export {
+  V2_PROGRAMS,
+  resolveV2Program,
+} from "./v2Programs";
+export {
+  getAllV2Editions,
+  getV2EditionsByProgram,
+  getV2Edition,
+  getV2EditionBySlug,
+  getV2EditionEntries,
+  getV2EditionSourceCoverage,
+  refreshV2EditionStore,
+  resetV2EditionStore,
+  getCommittedRunMeta,
+} from "./v2EditionStore";
+
 // ─── Sprint 4: Canonical Matching & Enrichment ───
 export {
   getCanonicalRegistry,

@@ -6,8 +6,12 @@ import {
   cancelIngestRun,
   retryIngestRun,
   sendGapsToReview,
+  commitIngestRun,
+  validateCommitReadiness,
+  getCommittedRunMeta,
 } from "@/services/chartsIngestion/client";
 import type { IngestRun, IngestStageStatus, ResourceGuardStatus } from "@/services/chartsIngestion/ingestStudioTypes";
+import type { CommitIngestRunResponse } from "@/services/chartsIngestion/commitTypes";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { WkIcon } from "@/components/design-system/Icon";
 
@@ -73,7 +77,8 @@ export default function AdminChartsIngestRunDetail() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [isPolling, setIsPolling] = useState(false);
-  const [commitNotice, setCommitNotice] = useState(false);
+  const [commitResult, setCommitResult] = useState<CommitIngestRunResponse | null>(null);
+  const [commitError, setCommitError] = useState<string | null>(null);
 
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -123,8 +128,21 @@ export default function AdminChartsIngestRunDetail() {
   }, [run?.status]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleCommit() {
-    setCommitNotice(true);
-    setTimeout(() => setCommitNotice(false), 6000);
+    if (!runId || !run) return;
+    setActionLoading("commit");
+    setCommitError(null);
+    setCommitResult(null);
+    try {
+      const result = await commitIngestRun({ runId, publishImmediately: true });
+      setCommitResult(result);
+      const updated = await getIngestRun(runId);
+      setRun(updated);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Commit failed";
+      setCommitError(msg.replace(/^[^:]+: /, ""));
+    } finally {
+      setActionLoading(null);
+    }
   }
 
   async function handleCancel() {
@@ -187,24 +205,75 @@ export default function AdminChartsIngestRunDetail() {
 
   const doneStages = run.stages.filter((s) => s.status === "done").length;
   const progressPct = Math.round((doneStages / run.stages.length) * 100);
-  const canCommit = run.status === "dry_run_complete" || run.status === "ready_to_commit";
+  const canCommit = (run.status === "dry_run_complete" || run.status === "ready_to_commit") && !commitResult;
   const canCancel = run.status === "running" || run.status === "dry_run_complete" || run.status === "ready_to_commit";
   const canRetry = run.status === "failed" || run.status === "cancelled";
   const canSendGaps = run.status === "dry_run_complete" && run.summary.gaps > 0;
 
+  // Get commit readiness for button tooltip
+  const commitValidation = (run.status === "dry_run_complete" || run.status === "ready_to_commit")
+    ? validateCommitReadiness(run)
+    : null;
+  const commitButtonTitle = !commitValidation?.canCommit && commitValidation?.errors[0]
+    ? commitValidation.errors[0].message
+    : "Commit this edition to V2";
+
   return (
     <div className="space-y-6">
-      {/* Commit Sprint 5 notice */}
-      {commitNotice && (
-        <div className="rounded-lg border border-wk-warning/20 bg-wk-warning-soft p-4">
-          <div className="flex items-center gap-2">
-            <WkIcon name="Lock" size={16} className="text-wk-warning" />
-            <div>
-              <p className="text-[13px] font-bold text-wk-warning">Commit gated until Sprint 5</p>
-              <p className="text-[12px] text-wk-text mt-0.5">
-                All required pipeline checks must pass and the snapshot persistence layer must be complete before committing an edition.
-              </p>
+      {/* Commit result panel */}
+      {commitResult && (
+        <div className="rounded-lg border border-wk-success/20 bg-wk-success-soft p-4">
+          <div className="flex items-start gap-3">
+            <WkIcon name="CheckCircle2" size={20} className="text-wk-success shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="text-[14px] font-bold text-wk-success mb-1">Edition Committed</p>
+              <div className="text-[12px] text-wk-text grid grid-cols-1 sm:grid-cols-2 gap-1">
+                <span>Program: <strong className="font-mono">{commitResult.publicSlug}</strong></span>
+                <span>Edition: <strong className="font-mono">{commitResult.editionSlug}</strong></span>
+                <span>Entries: <strong>{commitResult.entryCount}</strong></span>
+                <span>Date: <strong>{commitResult.editionDate}</strong></span>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <a
+                  href={commitResult.publicUrl}
+                  className="inline-flex items-center gap-1 rounded bg-wk-success px-2.5 py-1 text-[11px] font-semibold text-white hover:opacity-90"
+                  onClick={(e) => { e.preventDefault(); navigate(commitResult.publicUrl); }}
+                >
+                  <WkIcon name="ExternalLink" size={11} />Open Chart
+                </a>
+                <button
+                  onClick={() => navigate("/admin/charts/editions")}
+                  className="inline-flex items-center gap-1 rounded border border-wk-success/30 bg-white px-2.5 py-1 text-[11px] font-semibold text-wk-success hover:bg-wk-success-soft"
+                >
+                  <WkIcon name="LayoutList" size={11} />View in Editions
+                </button>
+                <button
+                  onClick={() => navigate(`/admin/charts/public-api-qa?publicSlug=${commitResult.publicSlug}&editionSlug=${commitResult.editionSlug}`)}
+                  className="inline-flex items-center gap-1 rounded border border-wk-success/30 bg-white px-2.5 py-1 text-[11px] font-semibold text-wk-success hover:bg-wk-success-soft"
+                >
+                  <WkIcon name="TestTube2" size={11} />Test in QA
+                </button>
+              </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Commit error */}
+      {commitError && (
+        <div className="rounded-lg border border-wk-danger/20 bg-wk-danger-soft p-4">
+          <div className="flex items-center gap-2">
+            <WkIcon name="AlertCircle" size={16} className="text-wk-danger" />
+            <div>
+              <p className="text-[13px] font-bold text-wk-danger">Commit Failed</p>
+              <p className="text-[12px] text-wk-danger/90 mt-0.5">{commitError}</p>
+            </div>
+            <button
+              onClick={() => setCommitError(null)}
+              className="ml-auto text-wk-danger hover:text-wk-danger/80"
+            >
+              <WkIcon name="X" size={14} />
+            </button>
           </div>
         </div>
       )}
@@ -237,11 +306,22 @@ export default function AdminChartsIngestRunDetail() {
           {canCommit && (
             <button
               onClick={handleCommit}
-              disabled={actionLoading === "commit"}
-              className="wk-button wk-button-primary whitespace-nowrap disabled:opacity-50"
+              disabled={actionLoading === "commit" || !commitValidation?.canCommit}
+              className={`wk-button whitespace-nowrap disabled:opacity-50 ${
+                commitValidation?.canCommit ? "wk-button-primary" : "wk-button-ghost"
+              }`}
+              title={commitButtonTitle}
             >
-              <WkIcon name={actionLoading === "commit" ? "Loader" : "Lock"} size={14} className={actionLoading === "commit" ? "animate-spin" : ""} />
-              {actionLoading === "commit" ? "Committing…" : "Commit Edition (Sprint 5)"}
+              <WkIcon
+                name={actionLoading === "commit" ? "Loader" : commitValidation?.canCommit ? "SendHorizontal" : "Lock"}
+                size={14}
+                className={actionLoading === "commit" ? "animate-spin" : ""}
+              />
+              {actionLoading === "commit"
+                ? "Committing…"
+                : commitValidation?.canCommit
+                ? "Commit Edition to V2"
+                : "Commit Blocked"}
             </button>
           )}
           {canSendGaps && (

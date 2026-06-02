@@ -38,7 +38,9 @@ import { NavButton } from "./components/NavButton";
 import { ProviderHealthPanel } from "./components/ProviderHealthPanel";
 import { RunMetadataPanel } from "./components/RunMetadataPanel";
 import { PublishChecklist } from "./components/PublishChecklist";
+import { CommitResultPanel } from "./components/CommitResultPanel";
 import { QuickTemplateButton, ProviderChip, KindToggle } from "./components/FormComponents";
+import type { CommitIngestRunResponse } from "@/services/chartsIngestion/commitTypes";
 
 const INPUT_CLASS = "w-full rounded-md border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text outline-none focus:border-wk-border-strong focus:ring-1 focus:ring-wk-brand/20";
 const LABEL_CLASS = "mb-1 block text-[12px] font-semibold text-wk-text-soft";
@@ -88,6 +90,7 @@ export default function AdminChartsIngest() {
   const [newSeriesKey, setNewSeriesKey] = useState("");
   const [cancelLoading, setCancelLoading] = useState<string | null>(null);
   const [retryLoading, setRetryLoading] = useState<string | null>(null);
+  const [commitResult, setCommitResult] = useState<CommitIngestRunResponse | null>(null);
 
   const loadData = useCallback(async () => {
     const [k, a, r, f] = await Promise.all([
@@ -207,16 +210,29 @@ export default function AdminChartsIngest() {
     if (!dryRunResult) return;
     setCommitLoading(true);
     setFormError(null);
+    setCommitResult(null);
     try {
       const result = await commitIngestRun({ runId: dryRunResult.id, publishImmediately: true });
-      setSuccessMessage(`Edition committed! Public URL: ${result.publicUrl}`);
+      setCommitResult(result);
       setStep("commit");
       setDryRunResult(null);
       await loadData();
-      setTimeout(() => navigate(`/admin/charts/ingest-runs/${result.runId}`), 2500);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Commit failed";
-      setFormError(`Commit failed: ${msg}`);
+      // Parse specific error codes for better messages
+      if (msg.includes("duplicate_edition")) {
+        setFormError(msg.replace(/^[^:]+: /, ""));
+      } else if (msg.includes("program_not_found")) {
+        setFormError(msg.replace(/^[^:]+: /, ""));
+      } else if (msg.includes("no_rows_to_commit")) {
+        setFormError("No rows are eligible for commit. Resolve match statuses first.");
+      } else if (msg.includes("unresolved_required_gaps")) {
+        setFormError(msg.replace(/^[^:]+: /, ""));
+      } else if (msg.includes("commit_not_ready")) {
+        setFormError(msg.replace(/^[^:]+: /, ""));
+      } else {
+        setFormError(`Commit failed: ${msg}`);
+      }
     } finally {
       setCommitLoading(false);
     }
@@ -231,6 +247,7 @@ export default function AdminChartsIngest() {
     setExpandedRowId(null);
     setRowFilter("all");
     setEditionExistsWarning(null);
+    setCommitResult(null);
   }
 
   async function handleCancelRun(runId: string) {
@@ -478,7 +495,12 @@ export default function AdminChartsIngest() {
               <RunMetadataPanel run={dryRunResult} />
               <PipelinePanel run={dryRunResult} />
               <MatchSummary summary={dryRunResult.summary} runId={dryRunResult.id} />
-              <PublishChecklist run={dryRunResult} />
+              <PublishChecklist
+                run={dryRunResult}
+                onCommit={handleCommit}
+                commitLoading={commitLoading}
+                commitError={formError && formError.includes("Commit") ? formError : null}
+              />
               <WkSurface className="p-4 overflow-hidden">
                 <div className="flex items-center justify-between mb-3">
                   <h2 className="text-[14px] font-bold text-wk-text">Chart Preview</h2>
@@ -529,15 +551,6 @@ export default function AdminChartsIngest() {
                 )}
               </WkSurface>
               <div className="flex flex-wrap items-center gap-3">
-                <button
-                  onClick={handleCommit}
-                  disabled={commitLoading || true}
-                  className={BTN_PRIMARY}
-                  title="Commit is gated until Sprint 5 — all required checks must pass and the snapshot persistence layer must be complete"
-                >
-                  <WkIcon name={commitLoading ? "Loader" : "Lock"} size={14} className={commitLoading ? "animate-spin" : ""} />
-                  {commitLoading ? "Committing…" : "Commit Edition (Sprint 5)"}
-                </button>
                 <button onClick={() => setStep("configure")} className={BTN_GHOST}>
                   <WkIcon name="ArrowLeft" size={14} />Back to Configure
                 </button>
@@ -548,22 +561,8 @@ export default function AdminChartsIngest() {
             </div>
           )}
 
-          {step === "commit" && (
-            <WkSurface className="p-8 text-center">
-              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-wk-success-soft text-wk-success">
-                <WkIcon name="CheckCircle2" size={32} />
-              </div>
-              <h2 className="mb-2 text-[20px] font-bold text-wk-text">Edition Published!</h2>
-              <p className="mb-6 text-[13px] text-wk-text-soft">Your chart edition has been committed and is now live. Redirecting to the run detail page…</p>
-              <div className="flex items-center justify-center gap-3">
-                <button onClick={handleReset} className={BTN_PRIMARY}>
-                  <WkIcon name="Plus" size={14} />Start New Ingest
-                </button>
-                <button onClick={() => navigate("/admin/charts/ingest-runs")} className={BTN_GHOST}>
-                  <WkIcon name="List" size={14} />View All Runs
-                </button>
-              </div>
-            </WkSurface>
+          {step === "commit" && commitResult && (
+            <CommitResultPanel result={commitResult} onNewIngest={handleReset} />
           )}
         </div>
 

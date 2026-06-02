@@ -12,13 +12,14 @@ import type {
   RecentIngestActivity,
   ResourceGuardStatus,
   CreateIngestDryRunResponse,
-  CommitIngestRunResponse,
 } from "./ingestStudioTypes";
+import type { CommitIngestRunRequest, CommitIngestRunResponse } from "./commitTypes";
 import { fetchFromAllSources } from "./providerFetch";
 import { normalizeToResolvedRows } from "./normalize";
 import { detectProviderFromUrl } from "./providerDetection";
 import { runCanonicalMatch } from "./canonicalMatch";
 import { enrichRows, applyEnrichmentToRow, checkEnrichmentCredentials } from "./enrichment";
+import { commitIngestRunToV2Edition, validateCommitReadiness } from "./commitService";
 
 const STUDIO_STORE_KEY = "wkcharts_ingest_studio_v1";
 
@@ -939,28 +940,24 @@ async function simulateStageProgress(runId: string): Promise<void> {
   });
 }
 
-export async function commitIngestRun(request: {
-  runId: string;
-  publishImmediately?: boolean;
-  notes?: string;
-}): Promise<CommitIngestRunResponse> {
+export async function commitIngestRun(request: CommitIngestRunRequest): Promise<CommitIngestRunResponse> {
   const store = getStudioStore();
   const idx = store.runs.findIndex((r) => r.id === request.runId);
-  if (idx === -1) throw new Error("Run not found");
-
-  const run = store.runs[idx];
-  if (run.status !== "dry_run_complete" && run.status !== "ready_to_commit") {
-    throw new Error("Run must complete dry run before commit");
+  if (idx === -1) {
+    throw new Error("run_not_found: No ingest run was found for this run ID.");
   }
 
-  const editionId = `ed-${Date.now()}`;
-  const snapshotId = `snap-${Date.now()}`;
+  const run = store.runs[idx];
 
+  // Run the real commit service (10-step pipeline)
+  const result = await commitIngestRunToV2Edition(run, request, true);
+
+  // On success, update the ingest run status in our store
   store.runs[idx].status = "committed";
-  store.runs[idx].committedAt = new Date().toISOString();
-  store.runs[idx].editionId = editionId;
-  store.runs[idx].editionSlug = run.editionDate;
-  store.runs[idx].snapshotId = snapshotId;
+  store.runs[idx].committedAt = result.committedAt;
+  store.runs[idx].editionId = result.editionId;
+  store.runs[idx].editionSlug = result.editionSlug;
+  store.runs[idx].snapshotId = null;
   store.runs[idx].notes = request.notes ?? "";
   store.runs[idx].updatedAt = new Date().toISOString();
   store.runs[idx].stages = getCommittedStages();
@@ -977,19 +974,10 @@ export async function commitIngestRun(request: {
     summary: run.summary,
   });
 
-  return {
-    runId: request.runId,
-    editionId,
-    editionSlug: run.editionSlug || run.editionDate,
-    publicUrl: `/charts/${run.chartSlug}/${run.editionSlug || run.editionDate}`,
-    status: "committed",
-    snapshotId,
-    integrity: {
-      ok: true,
-      warnings: [],
-    },
-  };
+  return result;
 }
+
+export { validateCommitReadiness };
 
 export async function cancelIngestRun(runId: string): Promise<IngestRun | null> {
   const store = getStudioStore();

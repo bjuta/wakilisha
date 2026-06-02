@@ -147,15 +147,24 @@ export type CommitIngestRunRequest = {
 
 export type CommitIngestRunResponse = {
   runId: string;
+  status: "committed";
+  programId: string;
+  publicSlug: string;
   editionId: string;
   editionSlug: string;
+  editionDate: string;
+  entryCount: number;
+  snapshotId: string | null;
   publicUrl: string;
-  status: "committed";
-  snapshotId: string;
+  apiUrl: string;
   integrity: {
     ok: boolean;
     warnings: string[];
+    errors: string[];
   };
+  auditEventId: string | null;
+  committedAt: string;
+  committedBy: string;
 };
 
 export type ApiEnvelope<T> = {

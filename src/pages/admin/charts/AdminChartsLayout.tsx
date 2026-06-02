@@ -178,6 +178,7 @@ export function AdminChartsLayout() {
           {[
             { label: "Back to Site", icon: "Home" as WkIconName, onClick: () => navigate("/") },
             { label: "Design System", icon: "PanelTop" as WkIconName, onClick: () => navigate("/admin/design-system") },
+            { label: "Settings", icon: "Settings" as WkIconName, onClick: () => navigate("/admin/settings") },
             { label: theme === "dark" ? "Dark mode" : "Light mode", icon: (theme === "dark" ? "Moon" : "Sun") as WkIconName, onClick: toggle },
           ].map((item) => (
             <button
@@ -272,6 +273,7 @@ export function AdminChartsLayout() {
                 { label: "Ingest", path: "/admin/charts/ingest" },
                 { label: "Editions", path: "/admin/charts/editions" },
                 { label: "Health", path: "/admin/charts/ingest-health" },
+                { label: "Settings", path: "/admin/settings" },
                 { label: "Design System", path: "/admin/design-system" },
                 { label: "Public Site", path: "/" },
               ].map((link) => (
