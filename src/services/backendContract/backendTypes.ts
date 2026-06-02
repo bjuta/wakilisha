@@ -1,10 +1,9 @@
 /*
- * WAKILISHA Backend Contract — Commit 1
+ * WAKILISHA Backend Contract
  *
  * This file defines the one safe result shape that frontend code should use
- * when talking to any WAKILISHA backend implementation. Adapters may be local,
- * WordPress, Node, Supabase, or something else later; UI code should receive
- * typed success/failure data instead of raw thrown errors.
+ * when talking to the WAKILISHA runtime backend. WordPress is intentionally
+ * excluded from runtime providers and is only allowed through legacy import tooling.
  */
 
 import type { ChartEligibilityProfile, CreateChartEligibilityProfileRequest, UpdateChartEligibilityProfileRequest } from "../chartsEligibility/eligibilityTypes";
@@ -13,7 +12,7 @@ import type { CommercialReadinessReport, IngestExcludedRow, IngestRowIntelligenc
 import type { IngestMarketScopeSnapshot } from "../chartsIngestion/ingestStudioTypes";
 
 export type WakilishaRuntimeMode = "local" | "backend";
-export type WakilishaBackendProvider = "wordpress" | "node" | "supabase" | "unknown";
+export type WakilishaBackendProvider = "api" | "node" | "supabase" | "unknown";
 export type WakilishaRepositoryMode = "localStorage" | "api" | "database" | "unknown";
 export type BackendCapability = "available" | "degraded" | "unavailable";
 export type BackendResultSource = "backend" | "local_fallback" | "cache" | "fixture";
