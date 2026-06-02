@@ -8,6 +8,9 @@
  */
 
 import type { ChartEligibilityProfile, CreateChartEligibilityProfileRequest, UpdateChartEligibilityProfileRequest } from "../chartsEligibility/eligibilityTypes";
+import type { IngestEnrichmentOptions } from "../chartsEnrichment/enrichmentOptions";
+import type { CommercialReadinessReport, IngestExcludedRow, IngestRowIntelligence } from "../chartsIntelligence/intelligenceTypes";
+import type { IngestMarketScopeSnapshot } from "../chartsIngestion/ingestStudioTypes";
 
 export type WakilishaRuntimeMode = "local" | "backend";
 export type WakilishaBackendProvider = "wordpress" | "node" | "supabase" | "unknown";
@@ -147,7 +150,13 @@ export type BackendIngestRun = {
   publicSlug?: string | null;
   programId?: string | null;
   eligibilityProfileId?: string | null;
+  marketScopeId?: string | null;
+  marketScopeSnapshot?: IngestMarketScopeSnapshot | null;
+  enrichmentOptions?: IngestEnrichmentOptions | null;
   sourceUrls: string[];
+  excludedRows?: IngestExcludedRow[];
+  commercialReadiness?: CommercialReadinessReport | null;
+  rowIntelligence?: Record<string, IngestRowIntelligence>;
   createdAt: string;
   updatedAt: string;
   errorMessage?: string | null;
@@ -165,6 +174,9 @@ export type BackendDryRunRequest = {
   saveAsRecurringSeries?: boolean;
   existingSeriesId?: string | null;
   eligibilityProfileId?: string | null;
+  marketScopeId?: string | null;
+  marketScopeSnapshot?: IngestMarketScopeSnapshot | null;
+  enrichmentOptions?: IngestEnrichmentOptions | null;
 };
 
 export type BackendDryRunResponse = {
@@ -173,6 +185,9 @@ export type BackendDryRunResponse = {
   publicSlug?: string | null;
   rowCount?: number;
   warnings: string[];
+  excludedRows?: IngestExcludedRow[];
+  commercialReadiness?: CommercialReadinessReport | null;
+  rowIntelligence?: Record<string, IngestRowIntelligence>;
 };
 
 export type CommitPersistence = "local_only" | "backend_persisted" | "database_persisted";
