@@ -26,12 +26,12 @@ import {
   applyRowMatchDecision,
   getIngestKpis,
 } from "../chartsIngestion/ingestStudioMock";
+import { V2_PROGRAMS } from "../chartsIngestion/v2Programs";
 import {
-  V2_PROGRAMS,
   getAllV2Editions,
   getV2EditionBySlug,
   getV2EditionEntries,
-} from "../chartsIngestion/client";
+} from "../chartsIngestion/v2EditionStore";
 import type { IngestRun } from "../chartsIngestion/ingestStudioTypes";
 import type { V2Edition, V2Entry } from "../chartsIngestion/commitTypes";
 
