@@ -24,6 +24,8 @@ import { enrichRows, applyEnrichmentToRow, checkEnrichmentCredentials } from "./
 import { commitIngestRunToV2Edition, validateCommitReadiness } from "./commitService";
 import { getChartMethodology } from "../chartsMethodology/methodologyStore";
 import { scoreAndRankRows } from "../chartsMethodology/scoringEngine";
+import { getEligibilityProfile } from "../chartsEligibility/eligibilityStore";
+import { executeEligibility } from "../chartsEligibility/eligibilityEngine";
 
 const STUDIO_STORE_KEY = "wkcharts_ingest_studio_v1";
 
@@ -40,7 +42,7 @@ const mockResolvedRows: IngestResolvedRow[] = [
   { id: "row-010", rank: 10, previousRank: null, movement: "new", sourceProvider: "spotify", sourceUrl: "https://open.spotify.com/playlist/top40", title: "Unavailable", artistNames: ["Davido"], artworkUrl: "https://images.unsplash.com/photo-1459749411175-04bf5292ceea?w=200&h=200&fit=crop", matchStatus: "duplicate_candidate", confidence: 88, canonicalTrackId: "track-davido-001", canonicalReleaseId: null, canonicalArtistIds: ["artist-davido-001"], warnings: ["Possible duplicate of existing chart entry"], raw: { popularity: 90 } },
 ];
 
-function summarizeRows(rows: IngestResolvedRow[], methodologyVersion?: string): IngestRunSummary {
+function summarizeRows(rows: IngestResolvedRow[], methodologyVersion?: string, eligibility?: { profileId: string; eligibleRows: number; excludedRows: number; reviewRows: number; eligibilityRate: number }): IngestRunSummary {
   const scores = rows.map((row) => row.methodologyScore?.finalScore).filter((score): score is number => typeof score === "number");
   return {
     totalRows: rows.length,
@@ -49,6 +51,11 @@ function summarizeRows(rows: IngestResolvedRow[], methodologyVersion?: string): 
     gaps: rows.filter((r) => r.matchStatus === "no_match" || r.matchStatus === "needs_review").length,
     duplicateCandidates: rows.filter((r) => r.matchStatus === "duplicate_candidate").length,
     matchRate: rows.length ? (rows.filter((r) => r.matchStatus === "canonical").length / rows.length) * 100 : 0,
+    eligibilityProfileId: eligibility?.profileId,
+    eligibleRows: eligibility?.eligibleRows,
+    excludedRows: eligibility?.excludedRows,
+    reviewRows: eligibility?.reviewRows,
+    eligibilityRate: eligibility?.eligibilityRate,
     scoringMethodologyVersion: methodologyVersion,
     averageMethodologyScore: scores.length ? scores.reduce((sum, score) => sum + score, 0) / scores.length : undefined,
   };
@@ -57,7 +64,7 @@ function summarizeRows(rows: IngestResolvedRow[], methodologyVersion?: string): 
 const mockSummary = summarizeRows(mockResolvedRows, "top_songs_weighted_v1");
 
 function getInitialStages(): IngestStageStatus[] {
-  return ["validate", "provider_detection", "resource_guard", "source_fetch", "normalize", "canonical_match", "enrichment", "methodology_scoring", "snapshot_commit"].map((stage) => ({ stage: stage as IngestStageStatus["stage"], status: "idle" }));
+  return ["validate", "provider_detection", "resource_guard", "source_fetch", "normalize", "canonical_match", "enrichment", "eligibility_execution", "methodology_scoring", "snapshot_commit"].map((stage) => ({ stage: stage as IngestStageStatus["stage"], status: "idle" }));
 }
 function getDryRunCompleteStages(): IngestStageStatus[] { return getInitialStages().map((s) => ({ ...s, status: s.stage === "snapshot_commit" ? "idle" : "done", durationMs: 1000 + Math.floor(Math.random() * 4000) })); }
 function getCommittedStages(): IngestStageStatus[] { return getInitialStages().map((s) => ({ ...s, status: "done", durationMs: 1000 + Math.floor(Math.random() * 4000) })); }
@@ -67,7 +74,7 @@ const mockRuns: IngestRun[] = [
   { id: "run-001", chartTitle: "WAKILISHA Top 40 — Week 22, 2026", chartSlug: "wakilisha-top-40-week-22-2026", editionDate: "2026-05-30", chartSize: 40, market: "KE", chartKind: "tracks", coverStyle: "default", sourceUrls: ["https://open.spotify.com/playlist/37i9dQZF1DXc2aWXf7eND5", "https://music.apple.com/ug/playlist/afrobeats-2026/pl.123456789"], detectedProviders: ["spotify", "apple_music"], saveAsRecurringSeries: true, existingSeriesId: "series-top-40", eligibilityProfileId: "elig_all_artists", methodologyVersion: "top_songs_weighted_v1", status: "dry_run_complete", stages: getDryRunCompleteStages(), summary: mockSummary, rows: mockResolvedRows, createdBy: "James", createdAt: "2026-05-30T10:00:00Z", updatedAt: "2026-05-30T10:15:00Z", dryRunCompletedAt: "2026-05-30T10:15:00Z", committedAt: null, editionId: null, editionSlug: null, snapshotId: null, notes: "", errorMessage: null },
   { id: "run-002", chartTitle: "WAKILISHA Top 100 — Week 22, 2026", chartSlug: "wakilisha-top-100-week-22-2026", editionDate: "2026-05-30", chartSize: 100, market: "KE", chartKind: "tracks", coverStyle: "default", sourceUrls: ["https://open.spotify.com/playlist/37i9dQZF1DXc2aWXf7eND5", "https://music.apple.com/ug/playlist/top-100/pl.123456789"], detectedProviders: ["spotify", "apple_music"], saveAsRecurringSeries: true, existingSeriesId: "series-top-100", eligibilityProfileId: "elig_kenyan_artists_only", methodologyVersion: "top_songs_weighted_v1", status: "committed", stages: getCommittedStages(), summary: { ...mockSummary, totalRows: 847, canonicalMatches: 781, shells: 32, gaps: 20, duplicateCandidates: 14, matchRate: 92.2 }, rows: mockResolvedRows, createdBy: "Sarah", createdAt: "2026-05-30T09:30:00Z", updatedAt: "2026-05-30T12:30:00Z", dryRunCompletedAt: "2026-05-30T10:00:00Z", committedAt: "2026-05-30T12:30:00Z", editionId: "ed-2026-w22", editionSlug: "2026-week-22", snapshotId: "snap-2026-w22", notes: "Published immediately after commit", errorMessage: null },
   { id: "run-003", chartTitle: "WAKILISHA Top 40 — Week 21, 2026", chartSlug: "wakilisha-top-40-week-21-2026", editionDate: "2026-05-23", chartSize: 40, market: "KE", chartKind: "tracks", coverStyle: "default", sourceUrls: ["https://open.spotify.com/playlist/37i9dQZF1DXc2aWXf7eND5", "https://music.apple.com/ug/playlist/afrobeats-2026/pl.123456789"], detectedProviders: ["spotify", "apple_music"], saveAsRecurringSeries: true, existingSeriesId: "series-top-40", eligibilityProfileId: "elig_all_artists", methodologyVersion: "top_songs_weighted_v1", status: "committed", stages: getCommittedStages(), summary: { ...mockSummary, totalRows: 398, canonicalMatches: 356, shells: 22, gaps: 16, duplicateCandidates: 4, matchRate: 89.4 }, rows: mockResolvedRows, createdBy: "James", createdAt: "2026-05-23T10:00:00Z", updatedAt: "2026-05-23T12:15:00Z", dryRunCompletedAt: "2026-05-23T10:45:00Z", committedAt: "2026-05-23T12:15:00Z", editionId: "ed-2026-w21", editionSlug: "2026-week-21", snapshotId: "snap-2026-w21", notes: "", errorMessage: null },
-  { id: "run-004", chartTitle: "Afrobeats Top 20 — Week 22, 2026", chartSlug: "afrobeats-top-20-week-22-2026", editionDate: "2026-05-30", chartSize: 20, market: "KE", chartKind: "tracks", coverStyle: "genre", sourceUrls: ["https://open.spotify.com/playlist/afrobeats"], detectedProviders: ["spotify"], saveAsRecurringSeries: true, existingSeriesId: "series-afrobeats-20", eligibilityProfileId: "elig_all_artists", methodologyVersion: "top_songs_weighted_v1", status: "failed", stages: [{ stage: "validate", status: "done", durationMs: 100 }, { stage: "provider_detection", status: "done", durationMs: 60 }, { stage: "resource_guard", status: "done", durationMs: 120 }, { stage: "source_fetch", status: "failed", durationMs: 5000, message: "Spotify API rate limit exceeded" }, { stage: "normalize", status: "idle" }, { stage: "canonical_match", status: "idle" }, { stage: "enrichment", status: "idle" }, { stage: "methodology_scoring", status: "idle" }, { stage: "snapshot_commit", status: "idle" }], summary: { totalRows: 0, canonicalMatches: 0, shells: 0, gaps: 0, duplicateCandidates: 0, matchRate: 0, scoringMethodologyVersion: "top_songs_weighted_v1" }, rows: [], createdBy: "Michael", createdAt: "2026-05-30T08:30:00Z", updatedAt: "2026-05-30T08:45:00Z", dryRunCompletedAt: null, committedAt: null, editionId: null, editionSlug: null, snapshotId: null, notes: "", errorMessage: "Spotify API rate limit exceeded during source fetch. Retry after 15 minutes." },
+  { id: "run-004", chartTitle: "Afrobeats Top 20 — Week 22, 2026", chartSlug: "afrobeats-top-20-week-22-2026", editionDate: "2026-05-30", chartSize: 20, market: "KE", chartKind: "tracks", coverStyle: "genre", sourceUrls: ["https://open.spotify.com/playlist/afrobeats"], detectedProviders: ["spotify"], saveAsRecurringSeries: true, existingSeriesId: "series-afrobeats-20", eligibilityProfileId: "elig_all_artists", methodologyVersion: "top_songs_weighted_v1", status: "failed", stages: [{ stage: "validate", status: "done", durationMs: 100 }, { stage: "provider_detection", status: "done", durationMs: 60 }, { stage: "resource_guard", status: "done", durationMs: 120 }, { stage: "source_fetch", status: "failed", durationMs: 5000, message: "Spotify API rate limit exceeded" }, { stage: "normalize", status: "idle" }, { stage: "canonical_match", status: "idle" }, { stage: "enrichment", status: "idle" }, { stage: "eligibility_execution", status: "idle" }, { stage: "methodology_scoring", status: "idle" }, { stage: "snapshot_commit", status: "idle" }], summary: { totalRows: 0, canonicalMatches: 0, shells: 0, gaps: 0, duplicateCandidates: 0, matchRate: 0, scoringMethodologyVersion: "top_songs_weighted_v1" }, rows: [], createdBy: "Michael", createdAt: "2026-05-30T08:30:00Z", updatedAt: "2026-05-30T08:45:00Z", dryRunCompletedAt: null, committedAt: null, editionId: null, editionSlug: null, snapshotId: null, notes: "", errorMessage: "Spotify API rate limit exceeded during source fetch. Retry after 15 minutes." },
   { id: "run-005", chartTitle: "WAKILISHA Top 40 — Week 23, 2026", chartSlug: "wakilisha-top-40-week-23-2026", editionDate: "2026-06-06", chartSize: 40, market: "KE", chartKind: "tracks", coverStyle: "default", sourceUrls: ["https://open.spotify.com/playlist/37i9dQZF1DXc2aWXf7eND5", "https://music.apple.com/ug/playlist/afrobeats-2026/pl.123456789"], detectedProviders: ["spotify", "apple_music"], saveAsRecurringSeries: true, existingSeriesId: "series-top-40", eligibilityProfileId: "elig_kenyan_artists_only", methodologyVersion: "top_songs_weighted_v1", status: "running", stages: getRunningStages(), summary: { totalRows: 0, canonicalMatches: 0, shells: 0, gaps: 0, duplicateCandidates: 0, matchRate: 0, scoringMethodologyVersion: "top_songs_weighted_v1" }, rows: [], createdBy: "James", createdAt: "2026-05-31T09:00:00Z", updatedAt: "2026-05-31T09:00:30Z", dryRunCompletedAt: null, committedAt: null, editionId: null, editionSlug: null, snapshotId: null, notes: "", errorMessage: null },
 ];
 const mockIngestKpis: IngestStudioKpi = { editionsThisWeek: 3, canonicalMatchRate: 88.7, rowsAwaitingReview: 36, averageRunTimeMs: 18500 };
@@ -117,7 +124,7 @@ export async function runDryRun(request: CreateIngestDryRunRequest): Promise<Cre
     enrichmentOptions: request.enrichmentOptions ?? null,
     status: "running",
     stages: getInitialStages(),
-    summary: { totalRows: 0, canonicalMatches: 0, shells: 0, gaps: 0, duplicateCandidates: 0, matchRate: 0, scoringMethodologyVersion: request.methodologyVersion ?? "top_songs_weighted_v1" },
+    summary: { totalRows: 0, canonicalMatches: 0, shells: 0, gaps: 0, duplicateCandidates: 0, matchRate: 0, eligibilityProfileId: request.eligibilityProfileId ?? "elig_all_artists", scoringMethodologyVersion: request.methodologyVersion ?? "top_songs_weighted_v1" },
     rows: [],
     excludedRows: [],
     commercialReadiness: null,
@@ -142,10 +149,15 @@ async function simulateStageProgress(runId: string): Promise<void> {
   const market = run.market;
   const sourceUrls = run.sourceUrls;
   const methodology = getChartMethodology(run.methodologyVersion ?? "top_songs_weighted_v1");
-  const validateStage: IngestStageStatus = { stage: "validate", status: "done", durationMs: 80 + Math.floor(Math.random() * 60), startedAt: new Date().toISOString(), finishedAt: new Date(Date.now() + 100).toISOString(), message: run.eligibilityProfileId ? `Source URLs and eligibility profile ${run.eligibilityProfileId} validated` : "Source URLs validated" };
+  const eligibilityProfile = getEligibilityProfile(run.eligibilityProfileId ?? "elig_all_artists") ?? getEligibilityProfile("elig_all_artists");
+  const validateStage: IngestStageStatus = { stage: "validate", status: eligibilityProfile ? "done" : "failed", durationMs: 80 + Math.floor(Math.random() * 60), startedAt: new Date().toISOString(), finishedAt: new Date(Date.now() + 100).toISOString(), message: eligibilityProfile ? `Source URLs and eligibility profile ${eligibilityProfile.id} validated` : `Eligibility profile ${run.eligibilityProfileId} was not found` };
+  if (!eligibilityProfile) {
+    await updateIngestRun(runId, (current) => ({ ...current, status: "failed", stages: [validateStage, ...getInitialStages().filter((stage) => stage.stage !== "validate")], errorMessage: validateStage.message, updatedAt: new Date().toISOString() }));
+    return;
+  }
   const providers = sourceUrls.map(detectProviderFromUrl).filter((p) => p !== "unknown");
   const providerDetectionStage: IngestStageStatus = { stage: "provider_detection", status: providers.length > 0 ? "done" : "warning", durationMs: 60 + Math.floor(Math.random() * 40), message: providers.length > 0 ? `Detected ${providers.join(", ")}` : "No supported providers detected", metrics: { providers } };
-  const resourceGuardStage: IngestStageStatus = { stage: "resource_guard", status: "done", durationMs: 100 + Math.floor(Math.random() * 100), message: `Estimated ${sourceUrls.length * chartSize} rows`, metrics: { sourceCount: sourceUrls.length, chartSize, eligibilityProfileId: run.eligibilityProfileId ?? "elig_all_artists", marketScopeId: run.marketScopeId ?? null, methodologyVersion: methodology.version } };
+  const resourceGuardStage: IngestStageStatus = { stage: "resource_guard", status: "done", durationMs: 100 + Math.floor(Math.random() * 100), message: `Estimated ${sourceUrls.length * chartSize} rows`, metrics: { sourceCount: sourceUrls.length, chartSize, eligibilityProfileId: eligibilityProfile.id, marketScopeId: run.marketScopeId ?? null, methodologyVersion: methodology.version } };
   let rows: IngestResolvedRow[] = [];
   const startedFetch = Date.now();
   const fetched = await fetchFromAllSources(sourceUrls, { chartSize, market });
@@ -166,13 +178,18 @@ async function simulateStageProgress(runId: string): Promise<void> {
   const credentialErrors = checkEnrichmentCredentials();
   const totalProviderHits = enriched.metrics.spotifyHits + enriched.metrics.appleMusicHits + enriched.metrics.youtubeHits + enriched.metrics.acrCloudHits;
   const enrichmentStage: IngestStageStatus = { stage: "enrichment", status: credentialErrors.length > 0 ? "warning" : "done", durationMs: Date.now() - startedEnrich, message: credentialErrors.length > 0 ? `Enrichment completed with ${credentialErrors.length} credential warning(s)` : "Enrichment completed", metrics: { providerHits: totalProviderHits, credentialErrors: credentialErrors.length } };
+  const startedEligibility = Date.now();
+  const eligibility = executeEligibility(rows, { runId, market, profile: eligibilityProfile });
+  rows = eligibility.eligibleRows;
+  const rowIntelligence = Object.fromEntries(eligibility.allRows.map((row) => [row.id, { rowId: row.id, eligibilityDecision: row.eligibilityDecision, excludedRow: eligibility.excludedRows.find((excluded) => excluded.sourceRowId === row.id) ?? null }]));
+  const eligibilityStage: IngestStageStatus = { stage: "eligibility_execution", status: eligibility.metrics.excludedRows > 0 || eligibility.metrics.reviewRows > 0 ? "warning" : "done", durationMs: Date.now() - startedEligibility, message: `${eligibility.metrics.eligibleRows}/${eligibility.metrics.totalRows} rows passed ${eligibilityProfile.name}`, metrics: eligibility.metrics };
   const startedScoring = Date.now();
   rows = scoreAndRankRows(rows, { chartSize, editionDate: run.editionDate, market }, methodology).slice(0, chartSize);
-  summary = summarizeRows(rows, methodology.version);
+  summary = summarizeRows(rows, methodology.version, eligibility.metrics);
   const scoringStage: IngestStageStatus = { stage: "methodology_scoring", status: "done", durationMs: Date.now() - startedScoring, message: `Scored ${rows.length} rows using ${methodology.name}`, metrics: { methodologyVersion: methodology.version, averageScore: summary.averageMethodologyScore ?? 0, formula: methodology.formula.plainText } };
-  const finalStages = [validateStage, providerDetectionStage, resourceGuardStage, sourceFetchStage, normalizeStage, canonicalMatchStage, enrichmentStage, scoringStage, { stage: "snapshot_commit" as const, status: "idle" as const, message: "Ready for commit" }];
-  await updateIngestRun(runId, (current) => ({ ...current, methodologyVersion: methodology.version, status: summary.gaps > 0 ? "needs_review" : "dry_run_complete", stages: finalStages, summary, rows, updatedAt: new Date().toISOString(), dryRunCompletedAt: new Date().toISOString() }));
-  addIngestActivity({ id: `act-${Date.now()}`, type: "dry_run", chartTitle: run.chartTitle, runId, status: summary.gaps > 0 ? "needs_review" : "dry_run_complete", actor: "Current User", createdAt: new Date().toISOString(), summary });
+  const finalStages = [validateStage, providerDetectionStage, resourceGuardStage, sourceFetchStage, normalizeStage, canonicalMatchStage, enrichmentStage, eligibilityStage, scoringStage, { stage: "snapshot_commit" as const, status: "idle" as const, message: "Ready for commit" }];
+  await updateIngestRun(runId, (current) => ({ ...current, methodologyVersion: methodology.version, status: summary.gaps > 0 || eligibility.metrics.reviewRows > 0 ? "needs_review" : "dry_run_complete", stages: finalStages, summary, rows, excludedRows: eligibility.excludedRows, rowIntelligence, updatedAt: new Date().toISOString(), dryRunCompletedAt: new Date().toISOString() }));
+  addIngestActivity({ id: `act-${Date.now()}`, type: "dry_run", chartTitle: run.chartTitle, runId, status: summary.gaps > 0 || eligibility.metrics.reviewRows > 0 ? "needs_review" : "dry_run_complete", actor: "Current User", createdAt: new Date().toISOString(), summary });
 }
 
 export async function commitIngestRun(request: CommitIngestRunRequest): Promise<CommitIngestRunResponse> { const run = await getIngestRun(request.runId); return commitIngestRunToV2Edition(run, request, true); }
