@@ -7,6 +7,8 @@
  * typed success/failure data instead of raw thrown errors.
  */
 
+import type { ChartEligibilityProfile, CreateChartEligibilityProfileRequest, UpdateChartEligibilityProfileRequest } from "../chartsEligibility/eligibilityTypes";
+
 export type WakilishaRuntimeMode = "local" | "backend";
 export type WakilishaBackendProvider = "wordpress" | "node" | "supabase" | "unknown";
 export type WakilishaRepositoryMode = "localStorage" | "api" | "database" | "unknown";
@@ -22,6 +24,7 @@ export type BackendErrorCode =
   | "validation_failed"
   | "provider_credentials_missing"
   | "program_not_found"
+  | "eligibility_profile_not_found"
   | "duplicate_edition"
   | "commit_not_ready"
   | "public_api_verification_failed"
@@ -95,6 +98,9 @@ export type BackendChartProgram = {
   seriesSlug: string;
   marketSlug: string;
   label: string;
+  eligibilityProfileId?: string | null;
+  chartKind?: "tracks" | "releases" | "artists" | "videos";
+  visibility?: "public" | "private" | "internal_only";
   defaultMethodologyVersion?: string;
   defaultEligibilityRulesVersion?: string;
   status?: "active" | "draft" | "paused" | "archived";
@@ -140,6 +146,7 @@ export type BackendIngestRun = {
   status: "draft" | "running" | "dry_run_complete" | "ready_to_commit" | "needs_review" | "committed" | "failed" | "cancelled";
   publicSlug?: string | null;
   programId?: string | null;
+  eligibilityProfileId?: string | null;
   sourceUrls: string[];
   createdAt: string;
   updatedAt: string;
@@ -157,6 +164,7 @@ export type BackendDryRunRequest = {
   sourceUrls: string[];
   saveAsRecurringSeries?: boolean;
   existingSeriesId?: string | null;
+  eligibilityProfileId?: string | null;
 };
 
 export type BackendDryRunResponse = {
@@ -200,6 +208,9 @@ export type BackendCommitResponse = {
 };
 
 export type BackendAdminSettings = Record<string, unknown>;
+export type BackendChartEligibilityProfile = ChartEligibilityProfile;
+export type BackendCreateChartEligibilityProfileRequest = CreateChartEligibilityProfileRequest;
+export type BackendUpdateChartEligibilityProfileRequest = UpdateChartEligibilityProfileRequest;
 
 export function createBackendMeta(
   overrides: Partial<BackendResultMeta> & Pick<BackendResultMeta, "runtimeMode" | "backendProvider" | "repositoryMode" | "source">
