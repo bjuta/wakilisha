@@ -289,3 +289,14 @@ export const resetStudioStore = ingestStudioAdapter.resetStudioStore;
 export const commitStudioStore = ingestStudioAdapter.commitStudioStore;
 export { detectProviderFromUrl, detectProvidersFromUrls, isValidProviderUrl } from "./providerDetection";
 export * from "./ingestStudioTypes";
+
+export const getDiscoveredCsvSources = adapter.getDiscoveredCsvSources;
+export const getCsvImportSessions = adapter.getCsvImportSessions;
+export const attachCsvAsSource = adapter.attachCsvAsSource;
+export const normalizeCsvCandidates = adapter.normalizeCsvCandidates;
+export const validateCsvDraftIntegrity = adapter.validateCsvDraftIntegrity;
+export const createDraftFromCsvCandidates = adapter.createDraftFromCsvCandidates;
+export const exportDraftJson = adapter.exportDraftJson;
+export type { CsvIntegrityViolation } from "./api";
+export { validateCommitReadiness } from "./commitService";
+export { testWordPressConnection, WP_API_BASE, INGEST_STUDIO_WP_ENDPOINTS } from "./wpAdapter";

@@ -1,5 +1,5 @@
 import { type LucideIcon } from "lucide-react";
-import { getProviderLabel, getProviderColorClass } from "@/services/chartsIngestion/client";
+import { getProviderLabel, getProviderColorClass } from "@/services/chartsIngestion/providerDetection";
 import type { ProviderName } from "@/services/chartsIngestion/ingestStudioTypes";
 
 interface QuickTemplateButtonProps {

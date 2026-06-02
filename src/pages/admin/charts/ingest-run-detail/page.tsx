@@ -8,7 +8,6 @@ import {
   sendGapsToReview,
   commitIngestRun,
   validateCommitReadiness,
-  getCommittedRunMeta,
 } from "@/services/chartsIngestion/client";
 import type { IngestRun, IngestStageStatus, ResourceGuardStatus } from "@/services/chartsIngestion/ingestStudioTypes";
 import type { CommitIngestRunResponse } from "@/services/chartsIngestion/commitTypes";
