@@ -26,6 +26,7 @@ import type { BackendCommitResponse } from "@/services/backendContract/backendTy
 import { wakilishaBackend } from "@/services/backendContract/backendClient";
 import type { ChartEligibilityProfile } from "@/services/chartsEligibility/eligibilityTypes";
 import { getMarketScopes, type StoredChartMarketScope } from "@/services/chartsMarkets/marketScopeStore";
+import { generateAndPersistIngestRunIntelligence } from "@/services/chartsIntelligence/intelligenceStore";
 
 import { IngestKpiStrip } from "./components/IngestKpiStrip";
 import { IngestLoadingState } from "./components/IngestLoadingState";
@@ -238,8 +239,12 @@ export default function AdminChartsIngest() {
       const response = await runDryRun({ chartTitle, chartSlug, editionDate, chartSize, market, chartKind, coverStyle, sourceUrls: urls, saveAsRecurringSeries: saveAsRecurring, existingSeriesId: existingSeriesId || null, eligibilityProfileId: selectedEligibilityProfileId });
       const run = await getIngestRuns().then((allRuns) => allRuns.find((item) => item.id === response.runId));
       if (run) {
+        generateAndPersistIngestRunIntelligence(run, {
+          marketScopeId: selectedMarketScope?.id ?? selectedMarketScopeId,
+          marketScopeSnapshot: selectedMarketScope ? { ...selectedMarketScope } : null,
+        });
         setDryRunResult(run); setStep("preview");
-        setSuccessMessage(`Dry run complete — ${run.summary.totalRows} rows, ${run.summary.matchRate.toFixed(1)}% match rate${selectedEligibilityProfile ? ` · ${selectedEligibilityProfile.name}` : ""}${selectedMarketScope ? ` · ${selectedMarketScope.name}` : ""}`);
+        setSuccessMessage(`Dry run complete — ${run.summary.totalRows} rows, ${run.summary.matchRate.toFixed(1)}% match rate · intelligence generated${selectedEligibilityProfile ? ` · ${selectedEligibilityProfile.name}` : ""}${selectedMarketScope ? ` · ${selectedMarketScope.name}` : ""}`);
         setGuardStatus(await getResourceGuardStatus(run.id));
       }
       await loadData();
