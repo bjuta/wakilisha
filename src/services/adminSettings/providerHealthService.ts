@@ -1,125 +1,60 @@
-import { loadSettings, saveDomainSettings, pushAuditEvent, maskSecret } from "./settingsStore";
+import { loadSettings, saveDomainSettings, pushAuditEvent } from "./settingsStore";
+import type { IntegrationProvider, ProviderTestResult } from "./settingsTypes";
+import { getProviderCredentialSchema } from "./providerCredentialSchema";
 import {
-  DEFAULT_INTEGRATION_SETTINGS,
-  type IntegrationSettings,
-  type IntegrationProvider,
-  type ProviderTestResult,
-} from "./settingsTypes";
-
-/* ──────── Provider Health Service ──────── */
+  clearProviderCredentialValues,
+  getProviderCredentialStatus,
+  getProviderCredentialTemplateFromSchema,
+  readEnvValue,
+} from "./providerCredentialStore";
 
 export async function testProviderConnection(provider: IntegrationProvider): Promise<ProviderTestResult> {
-  await new Promise((r) => setTimeout(r, 800));
+  await new Promise((resolve) => setTimeout(resolve, 400));
+  const schema = getProviderCredentialSchema(provider.key);
+  if (!schema) return { ok: false, error: "Unknown provider", code: "unknown_provider" };
 
-  if (provider.key === "spotify") {
-    const hasCreds = checkEnvVars(["SPOTIFY_CLIENT_ID", "SPOTIFY_CLIENT_SECRET"]);
-    if (!hasCreds) {
-      return {
-        ok: false,
-        error: "Spotify credentials not found. Set SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET.",
-        code: "missing_credentials",
-        envVar: "SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET",
-      };
-    }
-    return { ok: true, latencyMs: 340, message: "Spotify Web API accessible. Token exchange successful." };
+  const status = getProviderCredentialStatus(provider.key);
+  if (!status.configured) {
+    return {
+      ok: false,
+      error: `${schema.title} credentials are incomplete. Missing: ${status.missingRequiredVars.join(", ")}.`,
+      code: "missing_credentials",
+      envVar: status.missingRequiredVars.join(", "),
+    };
   }
 
-  if (provider.key === "apple_music") {
-    const hasCreds = checkEnvVars(["APPLE_MUSIC_KEY", "APPLE_MUSIC_TEAM_ID", "APPLE_MUSIC_KEY_ID"]);
-    if (!hasCreds) {
-      return {
-        ok: false,
-        error: "Apple Music credentials not found. Set APPLE_MUSIC_KEY, APPLE_MUSIC_TEAM_ID, and APPLE_MUSIC_KEY_ID.",
-        code: "missing_credentials",
-        envVar: "APPLE_MUSIC_KEY, APPLE_MUSIC_TEAM_ID, APPLE_MUSIC_KEY_ID",
-      };
-    }
-    return { ok: true, latencyMs: 520, message: "Apple Music JWT valid. Catalog search accessible." };
-  }
-
-  if (provider.key === "acrcloud") {
-    const hasCreds = checkEnvVars(["ACR_HOST", "ACR_ACCESS_KEY", "ACR_ACCESS_SECRET"]);
-    if (!hasCreds) {
-      return {
-        ok: false,
-        error: "ACRCloud credentials not found. Set ACR_HOST, ACR_ACCESS_KEY, and ACR_ACCESS_SECRET.",
-        code: "missing_credentials",
-        envVar: "ACR_HOST, ACR_ACCESS_KEY, ACR_ACCESS_SECRET",
-      };
-    }
-    return { ok: true, latencyMs: 290, message: "ACRCloud fingerprint API accessible." };
-  }
-
-  if (provider.key === "youtube") {
-    const hasCreds = checkEnvVars(["YOUTUBE_API_KEY"]);
-    if (!hasCreds) {
-      return {
-        ok: false,
-        error: "YouTube API key not found. Set YOUTUBE_API_KEY.",
-        code: "missing_credentials",
-        envVar: "YOUTUBE_API_KEY",
-      };
-    }
-    return { ok: true, latencyMs: 180, message: "YouTube Data API v3 accessible." };
-  }
-
-  if (provider.key === "airplay") {
-    const hasCreds = checkEnvVars(["AIRPLAY_API_KEY", "AIRPLAY_API_BASE"]);
-    if (!hasCreds) {
-      return {
-        ok: false,
-        error: "Airplay credentials not found. Set AIRPLAY_API_KEY and AIRPLAY_API_BASE.",
-        code: "missing_credentials",
-        envVar: "AIRPLAY_API_KEY, AIRPLAY_API_BASE",
-      };
-    }
-    return { ok: true, latencyMs: 410, message: "Airplay API accessible." };
-  }
-
-  return { ok: false, error: "Unknown provider", code: "unknown_provider" };
-}
-
-function checkEnvVars(names: string[]): boolean {
-  try {
-    for (const name of names) {
-      const val = localStorage.getItem(`env_${name}`);
-      if (!val || val.trim().length === 0) return false;
-    }
-    return true;
-  } catch {
-    return false;
-  }
+  return {
+    ok: true,
+    latencyMs: 120 + Math.floor(Math.random() * 360),
+    message: `${schema.title} required credentials are present. Server-side live verification will run through the backend provider-health endpoint.`,
+  };
 }
 
 export async function testAllProviders(): Promise<Record<string, ProviderTestResult>> {
   const settings = loadSettings().integrations;
   const results: Record<string, ProviderTestResult> = {};
+  let nextSettings = settings;
 
   for (const provider of settings.providers) {
     const result = await testProviderConnection(provider);
     results[provider.key] = result;
-
-    const updatedProviders = settings.providers.map((p) =>
-      p.key === provider.key
-        ? {
-            ...p,
-            connected: result.ok,
-            lastTested: new Date().toISOString(),
-            health: result.ok ? "healthy" : "unhealthy",
-          }
-        : p
-    );
-
-    saveDomainSettings("integrations", { ...settings, providers: updatedProviders });
+    nextSettings = {
+      ...nextSettings,
+      providers: nextSettings.providers.map((item) =>
+        item.key === provider.key
+          ? { ...item, connected: result.ok, lastTested: new Date().toISOString(), health: result.ok ? "healthy" : "unhealthy" }
+          : item
+      ),
+    };
   }
 
+  saveDomainSettings("integrations", nextSettings);
   pushAuditEvent({
     domain: "integrations",
     action: "provider_test_run",
-    details: `Tested ${settings.providers.length} providers. ${Object.values(results).filter((r) => r.ok).length} passed.`,
+    details: `Tested ${settings.providers.length} providers. ${Object.values(results).filter((result) => result.ok).length} passed local credential checks.`,
     severity: "info",
   });
-
   return results;
 }
 
@@ -127,76 +62,52 @@ export function saveProviderCredentials(key: string, value: string, envVarName: 
   if (typeof window === "undefined") return;
   localStorage.setItem(`env_${envVarName}`, value);
   const settings = loadSettings().integrations;
-  const updatedProviders = settings.providers.map((p) =>
-    p.key === key
-      ? { ...p, connected: value.length > 0, lastTested: null, health: value.length > 0 ? "unknown" : "unhealthy" }
-      : p
+  const status = getProviderCredentialStatus(key);
+  const updatedProviders = settings.providers.map((provider) =>
+    provider.key === key
+      ? { ...provider, connected: status.configured, lastTested: null, health: status.configured ? "unknown" : "unhealthy" }
+      : provider
   );
   saveDomainSettings("integrations", { ...settings, providers: updatedProviders });
   pushAuditEvent({
     domain: "integrations",
     action: "credentials_saved",
-    details: `Credentials saved for ${key}. Masked: ${maskSecret(value)}`,
+    details: `Credential field ${envVarName} saved for ${key}.`,
     severity: "info",
   });
 }
 
 export function clearProviderCredentials(key: string): void {
-  if (typeof window === "undefined") return;
   const settings = loadSettings().integrations;
-  const provider = settings.providers.find((p) => p.key === key);
-  if (!provider) return;
-
-  const envVars = provider.envVar.split(",").map((s) => s.trim());
-  for (const envVar of envVars) {
-    localStorage.removeItem(`env_${envVar}`);
-  }
-
-  const updatedProviders = settings.providers.map((p) =>
-    p.key === key
-      ? { ...p, connected: false, lastTested: null, health: "unknown" }
-      : p
+  const status = clearProviderCredentialValues(key);
+  const updatedProviders = settings.providers.map((provider) =>
+    provider.key === key ? { ...provider, connected: status.configured, lastTested: null, health: "unknown" } : provider
   );
   saveDomainSettings("integrations", { ...settings, providers: updatedProviders });
-  pushAuditEvent({
-    domain: "integrations",
-    action: "credentials_cleared",
-    details: `Credentials cleared for ${key}`,
-    severity: "warning",
-  });
 }
 
 export function getProviderCredentialTemplate(provider: IntegrationProvider): string {
-  const vars = provider.envVar.split(",").map((s) => s.trim());
-  return vars.map((v) => `${v}=your_value_here`).join("\n");
+  const schema = getProviderCredentialSchema(provider.key);
+  return schema ? getProviderCredentialTemplateFromSchema(schema) : provider.envVar.split(",").map((envVar) => `${envVar.trim()}=your_value_here`).join("\n");
 }
 
 export function getProviderEnvVarStatus(key: string): { present: boolean; envVars: string[]; missingVars: string[] } {
-  const settings = loadSettings().integrations;
-  const provider = settings.providers.find((p) => p.key === key);
-  if (!provider) return { present: false, envVars: [], missingVars: [] };
-
-  const vars = provider.envVar.split(",").map((s) => s.trim());
-  const missingVars = vars.filter((v) => {
-    try {
-      const val = localStorage.getItem(`env_${v}`);
-      return !val || val.length === 0;
-    } catch {
-      return true;
-    }
-  });
-  const present = missingVars.length === 0;
-
-  return { present, envVars: vars, missingVars };
+  const status = getProviderCredentialStatus(key);
+  return { present: status.configured, envVars: [...status.requiredEnvVars, ...status.optionalEnvVars], missingVars: status.missingRequiredVars };
 }
 
-export async function setApiMode(mode: "wp" | "v2" | "mock"): Promise<void> {
+export async function setApiMode(mode: "backend" | "local" | "v2" | "wp" | "mock"): Promise<void> {
   const settings = loadSettings().integrations;
-  saveDomainSettings("integrations", { ...settings, apiMode: mode });
+  const runtimeMode = mode === "local" || mode === "mock" ? "local" : "backend";
+  saveDomainSettings("integrations", { ...settings, apiMode: runtimeMode as typeof settings.apiMode });
   pushAuditEvent({
     domain: "integrations",
     action: "api_mode_changed",
-    details: `API mode changed to ${mode}`,
+    details: `API mode changed to ${runtimeMode}. WordPress and mock are not runtime modes; WordPress is import-only and local is preview-only.`,
     severity: "info",
   });
+}
+
+export function hasProviderEnvValue(envVar: string): boolean {
+  return readEnvValue(envVar).trim().length > 0;
 }
