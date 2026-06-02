@@ -11,9 +11,11 @@ import type {
   IngestStudioKpi,
   RecentIngestActivity,
   ResourceGuardStatus,
+  CreateIngestDryRunRequest,
   CreateIngestDryRunResponse,
+  CommitIngestRunRequest,
+  CommitIngestRunResponse,
 } from "./ingestStudioTypes";
-import type { CommitIngestRunRequest, CommitIngestRunResponse } from "./commitTypes";
 import { fetchFromAllSources } from "./providerFetch";
 import { normalizeToResolvedRows } from "./normalize";
 import { detectProviderFromUrl } from "./providerDetection";
@@ -48,18 +50,9 @@ const mockSummary: IngestRunSummary = {
 function getInitialStages(): IngestStageStatus[] {
   return ["validate", "provider_detection", "resource_guard", "source_fetch", "normalize", "canonical_match", "enrichment", "snapshot_commit"].map((stage) => ({ stage: stage as IngestStageStatus["stage"], status: "idle" }));
 }
-
-function getDryRunCompleteStages(): IngestStageStatus[] {
-  return getInitialStages().map((s) => ({ ...s, status: s.stage === "snapshot_commit" ? "idle" : "done", durationMs: 1000 + Math.floor(Math.random() * 4000) }));
-}
-
-function getCommittedStages(): IngestStageStatus[] {
-  return getInitialStages().map((s) => ({ ...s, status: "done", durationMs: 1000 + Math.floor(Math.random() * 4000) }));
-}
-
-function getRunningStages(): IngestStageStatus[] {
-  return getInitialStages().map((s, i) => ({ ...s, status: i < 3 ? "done" : i === 3 ? "running" : "idle", durationMs: i < 3 ? 500 : undefined }));
-}
+function getDryRunCompleteStages(): IngestStageStatus[] { return getInitialStages().map((s) => ({ ...s, status: s.stage === "snapshot_commit" ? "idle" : "done", durationMs: 1000 + Math.floor(Math.random() * 4000) })); }
+function getCommittedStages(): IngestStageStatus[] { return getInitialStages().map((s) => ({ ...s, status: "done", durationMs: 1000 + Math.floor(Math.random() * 4000) })); }
+function getRunningStages(): IngestStageStatus[] { return getInitialStages().map((s, i) => ({ ...s, status: i < 3 ? "done" : i === 3 ? "running" : "idle", durationMs: i < 3 ? 500 : undefined })); }
 
 const mockRuns: IngestRun[] = [
   { id: "run-001", chartTitle: "WAKILISHA Top 40 — Week 22, 2026", chartSlug: "wakilisha-top-40-week-22-2026", editionDate: "2026-05-30", chartSize: 40, market: "KE", chartKind: "tracks", coverStyle: "default", sourceUrls: ["https://open.spotify.com/playlist/37i9dQZF1DXc2aWXf7eND5", "https://music.apple.com/ug/playlist/afrobeats-2026/pl.123456789"], detectedProviders: ["spotify", "apple_music"], saveAsRecurringSeries: true, existingSeriesId: "series-top-40", eligibilityProfileId: "elig_all_artists", status: "dry_run_complete", stages: getDryRunCompleteStages(), summary: mockSummary, rows: mockResolvedRows, createdBy: "James", createdAt: "2026-05-30T10:00:00Z", updatedAt: "2026-05-30T10:15:00Z", dryRunCompletedAt: "2026-05-30T10:15:00Z", committedAt: null, editionId: null, editionSlug: null, snapshotId: null, notes: "", errorMessage: null },
@@ -68,16 +61,12 @@ const mockRuns: IngestRun[] = [
   { id: "run-004", chartTitle: "Afrobeats Top 20 — Week 22, 2026", chartSlug: "afrobeats-top-20-week-22-2026", editionDate: "2026-05-30", chartSize: 20, market: "KE", chartKind: "tracks", coverStyle: "genre", sourceUrls: ["https://open.spotify.com/playlist/afrobeats"], detectedProviders: ["spotify"], saveAsRecurringSeries: true, existingSeriesId: "series-afrobeats-20", eligibilityProfileId: "elig_all_artists", status: "failed", stages: [{ stage: "validate", status: "done", durationMs: 100 }, { stage: "provider_detection", status: "done", durationMs: 60 }, { stage: "resource_guard", status: "done", durationMs: 120 }, { stage: "source_fetch", status: "failed", durationMs: 5000, message: "Spotify API rate limit exceeded" }, { stage: "normalize", status: "idle" }, { stage: "canonical_match", status: "idle" }, { stage: "enrichment", status: "idle" }, { stage: "snapshot_commit", status: "idle" }], summary: { totalRows: 0, canonicalMatches: 0, shells: 0, gaps: 0, duplicateCandidates: 0, matchRate: 0 }, rows: [], createdBy: "Michael", createdAt: "2026-05-30T08:30:00Z", updatedAt: "2026-05-30T08:45:00Z", dryRunCompletedAt: null, committedAt: null, editionId: null, editionSlug: null, snapshotId: null, notes: "", errorMessage: "Spotify API rate limit exceeded during source fetch. Retry after 15 minutes." },
   { id: "run-005", chartTitle: "WAKILISHA Top 40 — Week 23, 2026", chartSlug: "wakilisha-top-40-week-23-2026", editionDate: "2026-06-06", chartSize: 40, market: "KE", chartKind: "tracks", coverStyle: "default", sourceUrls: ["https://open.spotify.com/playlist/37i9dQZF1DXc2aWXf7eND5", "https://music.apple.com/ug/playlist/afrobeats-2026/pl.123456789"], detectedProviders: ["spotify", "apple_music"], saveAsRecurringSeries: true, existingSeriesId: "series-top-40", eligibilityProfileId: "elig_kenyan_artists_only", status: "running", stages: getRunningStages(), summary: { totalRows: 0, canonicalMatches: 0, shells: 0, gaps: 0, duplicateCandidates: 0, matchRate: 0 }, rows: [], createdBy: "James", createdAt: "2026-05-31T09:00:00Z", updatedAt: "2026-05-31T09:00:30Z", dryRunCompletedAt: null, committedAt: null, editionId: null, editionSlug: null, snapshotId: null, notes: "", errorMessage: null },
 ];
-
-export const mockIngestKpis: IngestStudioKpi = { editionsThisWeek: 3, canonicalMatchRate: 87.2, rowsAwaitingReview: 34, averageRunTimeMs: 8420 };
-export const mockRecentActivity: RecentIngestActivity[] = [
-  { id: "act-001", type: "dry_run", chartTitle: "WAKILISHA Top 40 — Week 22, 2026", runId: "run-001", status: "dry_run_complete", actor: "James", createdAt: "2026-05-30T10:15:00Z", summary: mockSummary },
-  { id: "act-002", type: "commit", chartTitle: "WAKILISHA Top 100 — Week 22, 2026", runId: "run-002", status: "committed", actor: "Sarah", createdAt: "2026-05-30T12:30:00Z", summary: { totalRows: 847, canonicalMatches: 781, shells: 32, gaps: 20, duplicateCandidates: 14, matchRate: 92.2 } },
-  { id: "act-003", type: "commit", chartTitle: "WAKILISHA Top 40 — Week 21, 2026", runId: "run-003", status: "committed", actor: "James", createdAt: "2026-05-23T12:15:00Z", summary: { totalRows: 398, canonicalMatches: 356, shells: 22, gaps: 16, duplicateCandidates: 4, matchRate: 89.4 } },
-  { id: "act-004", type: "dry_run", chartTitle: "WAKILISHA Top 40 — Week 23, 2026", runId: "run-005", status: "running", actor: "James", createdAt: "2026-05-31T09:00:00Z" },
-  { id: "act-005", type: "review", chartTitle: "WAKILISHA Top 40 — Week 22, 2026", runId: "run-001", status: "needs_review", actor: "James", createdAt: "2026-05-30T10:20:00Z" },
+const mockIngestKpis: IngestStudioKpi = { editionsThisWeek: 3, canonicalMatchRate: 88.7, rowsAwaitingReview: 36, averageRunTimeMs: 18500 };
+const mockRecentActivity: RecentIngestActivity[] = [
+  { id: "act-001", type: "commit", chartTitle: "WAKILISHA Top 100 — Week 22", runId: "run-002", status: "committed", actor: "Sarah", createdAt: "2026-05-30T12:30:00Z", summary: mockRuns[1].summary },
+  { id: "act-002", type: "dry_run", chartTitle: "WAKILISHA Top 40 — Week 22", runId: "run-001", status: "dry_run_complete", actor: "James", createdAt: "2026-05-30T10:15:00Z", summary: mockRuns[0].summary },
+  { id: "act-003", type: "retry", chartTitle: "Afrobeats Top 20 — Week 22", runId: "run-004", status: "failed", actor: "Michael", createdAt: "2026-05-30T08:45:00Z" },
 ];
-
 interface StudioStore { runs: IngestRun[]; kpis: IngestStudioKpi; activity: RecentIngestActivity[]; }
 function getInitialStudioStore(): StudioStore { return { runs: [...mockRuns], kpis: { ...mockIngestKpis }, activity: [...mockRecentActivity] }; }
 function loadStudioStore(): StudioStore { try { const raw = localStorage.getItem(STUDIO_STORE_KEY); if (raw) { const parsed = JSON.parse(raw) as StudioStore; if (parsed.runs && parsed.kpis) return parsed; } } catch { /* ignore */ } const initial = getInitialStudioStore(); saveStudioStore(initial); return initial; }
@@ -96,7 +85,7 @@ export function updateIngestRun(runId: string, updater: (run: IngestRun) => Inge
 export function addIngestActivity(activity: RecentIngestActivity): void { const store = getStudioStore(); store.activity = [activity, ...store.activity]; commitStudioStore(store); }
 export function getResourceGuardStatus(runId: string): Promise<ResourceGuardStatus> { const run = getStudioStore().runs.find((r) => r.id === runId); const sourceCount = run?.sourceUrls.length ?? 0; return Promise.resolve({ sourceCount, providerBudgetRemaining: 100 - sourceCount * 10, workerConcurrency: 4, estimatedRowCount: sourceCount * 200, duplicateRunWarning: null, sameEditionDateWarning: null }); }
 
-export async function runDryRun(request: { chartTitle: string; chartSlug: string; editionDate: string; chartSize: number; market: string; chartKind: "tracks" | "releases"; coverStyle?: string; sourceUrls: string[]; saveAsRecurringSeries?: boolean; existingSeriesId?: string | null; eligibilityProfileId?: string | null; }): Promise<CreateIngestDryRunResponse> {
+export async function runDryRun(request: CreateIngestDryRunRequest): Promise<CreateIngestDryRunResponse> {
   const runId = `run-${Date.now()}`;
   const now = new Date().toISOString();
   const run: IngestRun = {
@@ -113,10 +102,16 @@ export async function runDryRun(request: { chartTitle: string; chartSlug: string
     saveAsRecurringSeries: request.saveAsRecurringSeries ?? false,
     existingSeriesId: request.existingSeriesId ?? null,
     eligibilityProfileId: request.eligibilityProfileId ?? "elig_all_artists",
+    marketScopeId: request.marketScopeId ?? null,
+    marketScopeSnapshot: request.marketScopeSnapshot ?? null,
+    enrichmentOptions: request.enrichmentOptions ?? null,
     status: "running",
     stages: getInitialStages(),
     summary: { totalRows: 0, canonicalMatches: 0, shells: 0, gaps: 0, duplicateCandidates: 0, matchRate: 0 },
     rows: [],
+    excludedRows: [],
+    commercialReadiness: null,
+    rowIntelligence: {},
     createdBy: "Current User",
     createdAt: now,
     updatedAt: now,
@@ -125,7 +120,7 @@ export async function runDryRun(request: { chartTitle: string; chartSlug: string
   await simulateStageProgress(runId);
   const updatedRun = getStudioStore().runs.find((r) => r.id === runId);
   if (!updatedRun) throw new Error("Run not found after simulation");
-  return { runId, status: updatedRun.status, stages: updatedRun.stages, summary: updatedRun.summary, rows: updatedRun.rows };
+  return { runId, status: updatedRun.status, stages: updatedRun.stages, summary: updatedRun.summary, rows: updatedRun.rows, excludedRows: updatedRun.excludedRows, commercialReadiness: updatedRun.commercialReadiness, rowIntelligence: updatedRun.rowIntelligence };
 }
 
 async function simulateStageProgress(runId: string): Promise<void> {
@@ -139,7 +134,7 @@ async function simulateStageProgress(runId: string): Promise<void> {
   const validateStage: IngestStageStatus = { stage: "validate", status: "done", durationMs: 80 + Math.floor(Math.random() * 60), startedAt: new Date().toISOString(), finishedAt: new Date(Date.now() + 100).toISOString(), message: run.eligibilityProfileId ? `Source URLs and eligibility profile ${run.eligibilityProfileId} validated` : "Source URLs validated" };
   const providers = sourceUrls.map(detectProviderFromUrl).filter((p) => p !== "unknown");
   const providerDetectionStage: IngestStageStatus = { stage: "provider_detection", status: providers.length > 0 ? "done" : "warning", durationMs: 60 + Math.floor(Math.random() * 40), message: providers.length > 0 ? `Detected ${providers.join(", ")}` : "No supported providers detected", metrics: { providers } };
-  const resourceGuardStage: IngestStageStatus = { stage: "resource_guard", status: "done", durationMs: 100 + Math.floor(Math.random() * 100), message: `Estimated ${sourceUrls.length * chartSize} rows`, metrics: { sourceCount: sourceUrls.length, chartSize, eligibilityProfileId: run.eligibilityProfileId ?? "elig_all_artists" } };
+  const resourceGuardStage: IngestStageStatus = { stage: "resource_guard", status: "done", durationMs: 100 + Math.floor(Math.random() * 100), message: `Estimated ${sourceUrls.length * chartSize} rows`, metrics: { sourceCount: sourceUrls.length, chartSize, eligibilityProfileId: run.eligibilityProfileId ?? "elig_all_artists", marketScopeId: run.marketScopeId ?? null } };
   let rows: IngestResolvedRow[] = [];
   const startedFetch = Date.now();
   const fetched = await fetchFromAllSources(sourceUrls, { chartSize, market });
@@ -156,11 +151,7 @@ async function simulateStageProgress(runId: string): Promise<void> {
   const startedEnrich = Date.now();
   const enriched = await enrichRows(rows);
   const enrichedMap = new Map(enriched.results.map((r) => [r.rowId, r]));
-  rows = rows.map((row) => {
-    const result = enrichedMap.get(row.id);
-    if (!result) return row;
-    return applyEnrichmentToRow(row, result.enriched);
-  });
+  rows = rows.map((row) => { const result = enrichedMap.get(row.id); if (!result) return row; return applyEnrichmentToRow(row, result.enriched); });
   const credentialErrors = checkEnrichmentCredentials();
   const totalProviderHits = enriched.metrics.spotifyHits + enriched.metrics.appleMusicHits + enriched.metrics.youtubeHits + enriched.metrics.acrCloudHits;
   const enrichmentStage: IngestStageStatus = { stage: "enrichment", status: credentialErrors.length > 0 ? "warning" : "done", durationMs: Date.now() - startedEnrich, message: credentialErrors.length > 0 ? `Enrichment completed with ${credentialErrors.length} credential warning(s)` : "Enrichment completed", metrics: { providerHits: totalProviderHits, credentialErrors: credentialErrors.length } };
@@ -169,10 +160,7 @@ async function simulateStageProgress(runId: string): Promise<void> {
   addIngestActivity({ id: `act-${Date.now()}`, type: "dry_run", chartTitle: run.chartTitle, runId, status: summary.gaps > 0 ? "needs_review" : "dry_run_complete", actor: "Current User", createdAt: new Date().toISOString(), summary });
 }
 
-export async function commitIngestRun(request: CommitIngestRunRequest): Promise<CommitIngestRunResponse> {
-  const run = await getIngestRun(request.runId);
-  return commitIngestRunToV2Edition(run, request, true);
-}
+export async function commitIngestRun(request: CommitIngestRunRequest): Promise<CommitIngestRunResponse> { const run = await getIngestRun(request.runId); return commitIngestRunToV2Edition(run, request, true); }
 export function validateRunReadiness(runId: string) { const run = getStudioStore().runs.find((r) => r.id === runId); return validateCommitReadiness(run ?? null); }
 export async function cancelIngestRun(runId: string): Promise<IngestRun | null> { return updateIngestRun(runId, (run) => ({ ...run, status: "cancelled", updatedAt: new Date().toISOString(), errorMessage: "Run cancelled by admin" })); }
 export async function retryIngestRun(runId: string): Promise<IngestRun | null> { const run = await updateIngestRun(runId, (r) => ({ ...r, status: "running", stages: getInitialStages(), errorMessage: null, updatedAt: new Date().toISOString() })); if (run) await simulateStageProgress(runId); return getIngestRun(runId); }
