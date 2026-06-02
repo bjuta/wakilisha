@@ -598,3 +598,166 @@ export function retryWithBackoff<T>(
 
 export { WpApiError };
 export { WP_API_BASE };
+
+// ─── Ingest Studio (Provider-based Runs) — WordPress v2 endpoints ───
+export const WP_API_BASE_V2 = WP_API_BASE.replace(/\/v1/, "/v2");
+
+import type {
+  IngestRun,
+  IngestStudioKpi,
+  RecentIngestActivity,
+  ResourceGuardStatus,
+  CreateIngestDryRunResponse,
+  CommitIngestRunResponse,
+} from "./ingestStudioTypes";
+
+export function getIngestRunsWp(): Promise<IngestRun[]> {
+  return wpGet<{ runs: unknown[] }>(`${WP_API_BASE_V2}/charts/ingest/runs`)
+    .then((res) => (res.runs || []) as IngestRun[])
+    .catch(() => notImplemented("getIngestRunsWp GET /wp-json/wakilisha/v2/charts/ingest/runs"));
+}
+
+export function getIngestRunWp(runId: string): Promise<IngestRun | null> {
+  return wpGet<{ run: unknown }>(`${WP_API_BASE_V2}/charts/ingest/runs/${runId}`)
+    .then((res) => (res.run ?? null) as IngestRun | null)
+    .catch(() => notImplemented("getIngestRunWp GET /wp-json/wakilisha/v2/charts/ingest/runs/{runId}"));
+}
+
+export function getIngestKpisWp(): Promise<IngestStudioKpi> {
+  return wpGet<{ kpis: IngestStudioKpi }>(`${WP_API_BASE_V2}/charts/ingest/kpis`)
+    .then((res) => res.kpis || { editionsThisWeek: 0, canonicalMatchRate: 0, rowsAwaitingReview: 0, averageRunTimeMs: 0 })
+    .catch(() => notImplemented("getIngestKpisWp GET /wp-json/wakilisha/v2/charts/ingest/kpis"));
+}
+
+export function getRecentIngestActivityWp(): Promise<RecentIngestActivity[]> {
+  return wpGet<{ activity: unknown[] }>(`${WP_API_BASE_V2}/charts/ingest/activity`)
+    .then((res) => (res.activity || []) as RecentIngestActivity[])
+    .catch(() => notImplemented("getRecentIngestActivityWp GET /wp-json/wakilisha/v2/charts/ingest/activity"));
+}
+
+export function runDryRunWp(request: {
+  chartTitle: string;
+  chartSlug: string;
+  editionDate: string;
+  chartSize: number;
+  market: string;
+  chartKind: "tracks" | "releases";
+  coverStyle?: string;
+  sourceUrls: string[];
+  saveAsRecurringSeries?: boolean;
+  existingSeriesId?: string | null;
+}): Promise<CreateIngestDryRunResponse> {
+  return wpPost<CreateIngestDryRunResponse>(`${WP_API_BASE_V2}/charts/ingest/dry-run`, {
+    chart_title: request.chartTitle,
+    chart_slug: request.chartSlug,
+    edition_date: request.editionDate,
+    chart_size: request.chartSize,
+    market: request.market,
+    chart_kind: request.chartKind,
+    cover_style: request.coverStyle ?? "default",
+    source_urls: request.sourceUrls,
+    save_as_recurring_series: request.saveAsRecurringSeries ?? false,
+    existing_series_id: request.existingSeriesId ?? null,
+  }).catch(() => notImplemented("runDryRunWp POST /wp-json/wakilisha/v2/charts/ingest/dry-run"));
+}
+
+export function commitIngestRunWp(request: {
+  runId: string;
+  publishImmediately?: boolean;
+  notes?: string;
+}): Promise<CommitIngestRunResponse> {
+  return wpPost<CommitIngestRunResponse>(`${WP_API_BASE_V2}/charts/ingest/runs/${request.runId}/commit`, {
+    publish_immediately: request.publishImmediately ?? false,
+    notes: request.notes ?? "",
+  }).catch(() => notImplemented("commitIngestRunWp POST /wp-json/wakilisha/v2/charts/ingest/runs/{runId}/commit"));
+}
+
+export function cancelIngestRunWp(runId: string): Promise<IngestRun | null> {
+  return wpPost<{ run: IngestRun }>(`${WP_API_BASE_V2}/charts/ingest/runs/${runId}/cancel`)
+    .then((res) => res.run ?? null)
+    .catch(() => notImplemented("cancelIngestRunWp POST /wp-json/wakilisha/v2/charts/ingest/runs/{runId}/cancel"));
+}
+
+export function retryIngestRunWp(runId: string): Promise<IngestRun | null> {
+  return wpPost<{ run: IngestRun }>(`${WP_API_BASE_V2}/charts/ingest/runs/${runId}/retry`)
+    .then((res) => res.run ?? null)
+    .catch(() => notImplemented("retryIngestRunWp POST /wp-json/wakilisha/v2/charts/ingest/runs/{runId}/retry"));
+}
+
+export function sendGapsToReviewWp(runId: string): Promise<IngestRun | null> {
+  return wpPost<{ run: IngestRun }>(`${WP_API_BASE_V2}/charts/ingest/runs/${runId}/send-gaps`)
+    .then((res) => res.run ?? null)
+    .catch(() => notImplemented("sendGapsToReviewWp POST /wp-json/wakilisha/v2/charts/ingest/runs/{runId}/send-gaps"));
+}
+
+export function getResourceGuardStatusWp(runId: string): Promise<ResourceGuardStatus> {
+  return wpGet<{ guard: ResourceGuardStatus }>(`${WP_API_BASE_V2}/charts/ingest/runs/${runId}/resource-guard`)
+    .then((res) => res.guard || {
+      sourceCount: 0,
+      providerBudgetRemaining: 100,
+      workerConcurrency: 4,
+      estimatedRowCount: 0,
+      duplicateRunWarning: null,
+      sameEditionDateWarning: null,
+    })
+    .catch(() => notImplemented("getResourceGuardStatusWp GET /wp-json/wakilisha/v2/charts/ingest/runs/{runId}/resource-guard"));
+}
+
+export function getIngestHealthWp(): Promise<{
+  ok: boolean;
+  plugin: string;
+  charts_ingestion: boolean;
+  version: string;
+}> {
+  return wpGet<{
+    ok: boolean;
+    plugin: string;
+    charts_ingestion: boolean;
+    version: string;
+  }>(`${WP_API_BASE_V2}/charts/health`);
+}
+
+// ─── WordPress Ingest Studio endpoint definitions for Health page ───
+export interface IngestStudioEndpointDef {
+  key: string;
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+  path: string;
+  description: string;
+  status: "planned" | "not_configured";
+  group: string;
+}
+
+// ─── Stub store functions for WordPress mode (server-side) ───
+// These are no-ops in WordPress mode as state is server-side.
+export function getStudioStore(): { runs: IngestRun[]; kpis: { editionsThisWeek: number; canonicalMatchRate: number; rowsAwaitingReview: number; averageRunTimeMs: number }; activity: unknown[] } {
+  return { runs: [], kpis: { editionsThisWeek: 0, canonicalMatchRate: 0, rowsAwaitingReview: 0, averageRunTimeMs: 0 }, activity: [] };
+}
+
+export function refreshStudioStore(): ReturnType<typeof getStudioStore> {
+  return getStudioStore();
+}
+
+export function resetStudioStore(): ReturnType<typeof getStudioStore> {
+  // eslint-disable-next-line no-console
+  console.warn("[wpAdapter] resetStudioStore() is a no-op in WordPress mode.");
+  return getStudioStore();
+}
+
+export function commitStudioStore(_store: unknown): void {
+  // eslint-disable-next-line no-console
+  console.warn("[wpAdapter] commitStudioStore() is a no-op in WordPress mode.");
+}
+
+export const INGEST_STUDIO_WP_ENDPOINTS: IngestStudioEndpointDef[] = [
+  { key: "getIngestRuns", method: "GET", path: "/wp-json/wakilisha/v2/charts/ingest/runs", description: "List all provider-based ingest runs", status: "planned", group: "Runs" },
+  { key: "getIngestRun", method: "GET", path: "/wp-json/wakilisha/v2/charts/ingest/runs/{runId}", description: "Get a single ingest run with stages and resolved rows", status: "planned", group: "Runs" },
+  { key: "runDryRun", method: "POST", path: "/wp-json/wakilisha/v2/charts/ingest/dry-run", description: "Create and execute a new dry run from source URLs", status: "planned", group: "Runs" },
+  { key: "commitIngestRun", method: "POST", path: "/wp-json/wakilisha/v2/charts/ingest/runs/{runId}/commit", description: "Commit a dry-run-complete run to a published edition", status: "planned", group: "Runs" },
+  { key: "cancelIngestRun", method: "POST", path: "/wp-json/wakilisha/v2/charts/ingest/runs/{runId}/cancel", description: "Cancel a running or pending ingest run", status: "planned", group: "Runs" },
+  { key: "retryIngestRun", method: "POST", path: "/wp-json/wakilisha/v2/charts/ingest/runs/{runId}/retry", description: "Retry a failed ingest run", status: "planned", group: "Runs" },
+  { key: "sendGapsToReview", method: "POST", path: "/wp-json/wakilisha/v2/charts/ingest/runs/{runId}/send-gaps", description: "Flag gap rows for manual review", status: "planned", group: "Runs" },
+  { key: "getResourceGuard", method: "GET", path: "/wp-json/wakilisha/v2/charts/ingest/runs/{runId}/resource-guard", description: "Get resource guard / budget status for a run", status: "planned", group: "Runs" },
+  { key: "getIngestKpis", method: "GET", path: "/wp-json/wakilisha/v2/charts/ingest/kpis", description: "Dashboard KPIs for the ingest studio", status: "planned", group: "Studio" },
+  { key: "getIngestActivity", method: "GET", path: "/wp-json/wakilisha/v2/charts/ingest/activity", description: "Recent activity feed for the ingest studio", status: "planned", group: "Studio" },
+  { key: "healthCheck", method: "GET", path: "/wp-json/wakilisha/v2/charts/health", description: "Plugin health check — verifies plugin is active and ingestion module is enabled", status: "planned", group: "System" },
+];

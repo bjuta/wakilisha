@@ -1,6 +1,10 @@
 import { Pool } from 'pg';
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const dbUrl = typeof import.meta.env !== 'undefined' && import.meta.env.DATABASE_URL
+  ? import.meta.env.DATABASE_URL
+  : '';
+
+const pool = dbUrl ? new Pool({ connectionString: dbUrl }) : null as unknown as Pool;
 
 export async function getArtistById(artistId: string) {
   const res = await pool.query(

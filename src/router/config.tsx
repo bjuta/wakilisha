@@ -1,4 +1,5 @@
 import type { RouteObject } from "react-router-dom";
+import { Navigate } from "react-router-dom";
 import { ResponsiveAppLayout } from "@/components/mobile/ResponsiveAppLayout";
 import { ResponsivePage } from "@/components/mobile/ResponsivePage";
 import { MobileFullPlayer } from "@/components/mobile/MobileFullPlayer";
@@ -16,6 +17,14 @@ import AdminChartsEditions from "../pages/admin/charts/editions/page";
 import AdminChartsSnapshots from "../pages/admin/charts/snapshots/page";
 import AdminChartsIntegrationMap from "../pages/admin/charts/integration-map/page";
 import AdminChartsPublicApiQa from "../pages/admin/charts/public-api-qa/page";
+import AdminChartsReviewQueue from "../pages/admin/charts/review-queue/page";
+import AdminChartsNoMatch from "../pages/admin/charts/no-match/page";
+import AdminChartsReleaseShells from "../pages/admin/charts/release-shells/page";
+import AdminChartsCanonGaps from "../pages/admin/charts/canon-gaps/page";
+import AdminChartsIngestRuns from "../pages/admin/charts/ingest-runs/page";
+import AdminChartsIngestRunDetail from "../pages/admin/charts/ingest-run-detail/page";
+import AdminChartsLegacyIngestJobs from "../pages/admin/charts/ingest-jobs/page";
+import AdminChartsIngestHealth from "../pages/admin/charts/ingest-health/page";
 
 // Charts
 import ChartsDirectory from "../pages/charts/directory/page";
@@ -110,14 +119,24 @@ const routes: RouteObject[] = [
     path: "/admin/charts",
     element: <AdminChartsLayout />,
     children: [
+      { index: true, element: <Navigate to="/admin/charts/dashboard" replace /> },
       { path: "dashboard", element: <AdminChartsDashboard /> },
       { path: "families", element: <AdminChartsFamilies /> },
       { path: "ingest", element: <AdminChartsIngest /> },
-      { path: "ingest/:jobId", element: <AdminChartsIngestDetail /> },
+      { path: "ingest/:runId", element: <AdminChartsIngestRunDetail /> },
+      { path: "ingest-runs", element: <AdminChartsIngestRuns /> },
+      { path: "ingest-runs/:runId", element: <AdminChartsIngestRunDetail /> },
+      { path: "ingest-jobs", element: <AdminChartsLegacyIngestJobs /> },
+      { path: "ingest-jobs/:jobId", element: <AdminChartsIngestDetail /> },
       { path: "editions", element: <AdminChartsEditions /> },
       { path: "snapshots", element: <AdminChartsSnapshots /> },
+      { path: "review-queue", element: <AdminChartsReviewQueue /> },
+      { path: "no-match", element: <AdminChartsNoMatch /> },
+      { path: "release-shells", element: <AdminChartsReleaseShells /> },
+      { path: "canon-gaps", element: <AdminChartsCanonGaps /> },
       { path: "integration-map", element: <AdminChartsIntegrationMap /> },
       { path: "public-api-qa", element: <AdminChartsPublicApiQa /> },
+      { path: "ingest-health", element: <AdminChartsIngestHealth /> },
     ],
   },
   {

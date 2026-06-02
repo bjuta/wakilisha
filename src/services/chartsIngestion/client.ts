@@ -27,6 +27,7 @@ import type {
 
 import * as mockAdapter from "./api";
 import * as wpAdapter from "./wpAdapter";
+import * as ingestStudioMock from "./ingestStudioMock";
 
 // ─── Configuration ───
 export type IngestionMode = "mock" | "wordpress";
@@ -60,6 +61,9 @@ if (CHARTS_INGESTION_MODE === "wordpress" && import.meta.env.DEV) {
 
 // ─── Adapter Selector ───
 const adapter = CHARTS_INGESTION_MODE === "wordpress" ? wpAdapter : mockAdapter;
+
+// ─── Ingest Studio Adapter Selector ───
+const ingestStudioAdapter = CHARTS_INGESTION_MODE === "wordpress" ? wpAdapter : ingestStudioMock;
 
 // ─── WordPress Endpoint Definitions ───
 export type EndpointStatus =
@@ -774,7 +778,16 @@ export {
 } from "./workflow";
 
 // ─── Re-export WordPress adapter utilities ───
-export { WpApiError, testWordPressConnection, retryWithBackoff } from "./wpAdapter";
+export {
+  WpApiError,
+  testWordPressConnection,
+  retryWithBackoff,
+  WP_API_BASE,
+  WP_API_BASE_V2,
+  INGEST_STUDIO_WP_ENDPOINTS,
+  getIngestHealthWp,
+} from "./wpAdapter";
+export type { IngestStudioEndpointDef } from "./wpAdapter";
 
 // ─── Store internals (mock only) ───
 // These are exported for backward compatibility with components that need direct store access.
@@ -799,3 +812,65 @@ export const validateCsvDraftIntegrity = adapter.validateCsvDraftIntegrity;
 // ─── CSV Draft Creation ───
 export const createDraftFromCsvCandidates = adapter.createDraftFromCsvCandidates;
 export const exportDraftJson = adapter.exportDraftJson;
+
+// ─── Ingest Studio (Provider-based) ───
+// Routed through ingestStudioAdapter so mock vs WordPress is correctly selected
+export const getIngestRuns = ingestStudioAdapter.getIngestRunsWp || ingestStudioAdapter.getIngestRuns;
+export const getIngestRun = ingestStudioAdapter.getIngestRunWp || ingestStudioAdapter.getIngestRun;
+export const getIngestKpis = ingestStudioAdapter.getIngestKpisWp || ingestStudioAdapter.getIngestKpis;
+export const getRecentIngestActivity = ingestStudioAdapter.getRecentIngestActivityWp || ingestStudioAdapter.getRecentIngestActivity;
+export const createIngestRun = ingestStudioAdapter.createIngestRun;
+export const updateIngestRun = ingestStudioAdapter.updateIngestRun;
+export const runDryRun = ingestStudioAdapter.runDryRunWp || ingestStudioAdapter.runDryRun;
+export const commitIngestRun = ingestStudioAdapter.commitIngestRunWp || ingestStudioAdapter.commitIngestRun;
+export const cancelIngestRun = ingestStudioAdapter.cancelIngestRunWp || ingestStudioAdapter.cancelIngestRun;
+export const retryIngestRun = ingestStudioAdapter.retryIngestRunWp || ingestStudioAdapter.retryIngestRun;
+export const sendGapsToReview = ingestStudioAdapter.sendGapsToReviewWp || ingestStudioAdapter.sendGapsToReview;
+export const getResourceGuardStatus = ingestStudioAdapter.getResourceGuardStatusWp || ingestStudioAdapter.getResourceGuardStatus;
+export const getStudioStore = ingestStudioAdapter.getStudioStore;
+export const refreshStudioStore = ingestStudioAdapter.refreshStudioStore;
+export const resetStudioStore = ingestStudioAdapter.resetStudioStore;
+export const commitStudioStore = ingestStudioAdapter.commitStudioStore;
+
+// ─── Provider Detection ───
+export {
+  detectProviderFromUrl,
+  detectProvidersFromUrls,
+  getProviderLabel,
+  getProviderColorClass,
+  getProviderIcon,
+  getProviderBgColor,
+  isValidProviderUrl,
+} from "./providerDetection";
+
+// ─── Sprint 3: Provider Fetch & Normalization ───
+export { fetchFromAllSources, getProviderFetchStatusSummary } from "./providerFetch";
+export { normalizeToResolvedRows, mergeNormalizedRows } from "./normalize";
+export { fetchFromSpotify, parseSpotifyPlaylistUrl } from "./spotifyFetch";
+export { fetchFromAppleMusic, parseAppleMusicUrl } from "./appleMusicFetch";
+export { generateMockProviderRows, getMockProviderError } from "./mockTracks";
+export type { SourceFetchResult, ProviderFetchAggregateResult, ProviderFetchConfig } from "./providerFetch";
+export type { NormalizeResult } from "./normalize";
+export type { SpotifyFetchResult } from "./spotifyFetch";
+export type { AppleMusicFetchResult } from "./appleMusicFetch";
+
+// ─── Ingest Studio Types ───
+export type {
+  IngestRun,
+  IngestRunStatus,
+  IngestStage,
+  IngestStageStatus,
+  ProviderName,
+  NormalizedChartRow,
+  MatchStatus,
+  IngestResolvedRow,
+  IngestRunSummary,
+  IngestStudioKpi,
+  RecentIngestActivity,
+  ResourceGuardStatus,
+  CreateIngestDryRunRequest,
+  CreateIngestDryRunResponse,
+  CommitIngestRunRequest,
+  CommitIngestRunResponse,
+  ApiEnvelope,
+} from "./ingestStudioTypes";
