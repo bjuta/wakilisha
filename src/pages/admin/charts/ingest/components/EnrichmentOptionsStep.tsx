@@ -1,7 +1,9 @@
+import { useEffect } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import type { IngestEnrichmentOptions, PreviewProvider } from "@/services/chartsEnrichment/enrichmentOptions";
 import { summarizeEnrichmentOptions } from "@/services/chartsEnrichment/enrichmentOptions";
+import { setCurrentIngestEnrichmentOptionsSelection } from "@/services/chartsEnrichment/enrichmentOptionsPersistence";
 
 const providers: PreviewProvider[] = ["apple_music", "spotify", "youtube", "acrcloud"];
 
@@ -27,8 +29,14 @@ function Toggle({ checked, onChange, labelText, help }: { checked: boolean; onCh
 }
 
 export function EnrichmentOptionsStep({ options, onChange }: EnrichmentOptionsStepProps) {
+  useEffect(() => {
+    setCurrentIngestEnrichmentOptionsSelection({ enrichmentOptions: options });
+  }, [options]);
+
   function patch(next: Partial<IngestEnrichmentOptions>) {
-    onChange({ ...options, ...next });
+    const updated = { ...options, ...next };
+    setCurrentIngestEnrichmentOptionsSelection({ enrichmentOptions: updated });
+    onChange(updated);
   }
 
   function moveProvider(provider: PreviewProvider, direction: -1 | 1) {
