@@ -7,6 +7,7 @@
 
 import type { ChartEligibilityDecision } from "../chartsEligibility/eligibilityTypes";
 import type { IngestEnrichmentOptions } from "../chartsEnrichment/enrichmentOptions";
+import type { ChartMethodologyScoreBreakdown } from "../chartsMethodology/methodologyTypes";
 import type {
   CommercialReadinessReport,
   IngestExcludedRow,
@@ -32,6 +33,7 @@ export type IngestStage =
   | "source_fetch"
   | "normalize"
   | "canonical_match"
+  | "methodology_scoring"
   | "enrichment"
   | "snapshot_commit";
 
@@ -101,6 +103,7 @@ export type IngestResolvedRow = {
   releaseShellId?: string | null;
   warnings?: string[];
   eligibilityDecision?: ChartEligibilityDecision | null;
+  methodologyScore?: ChartMethodologyScoreBreakdown | null;
   excludedRowId?: string | null;
   raw?: unknown;
 };
@@ -112,6 +115,8 @@ export type IngestRunSummary = {
   gaps: number;
   duplicateCandidates: number;
   matchRate: number;
+  scoringMethodologyVersion?: string;
+  averageMethodologyScore?: number;
 };
 
 export interface IngestRun {
@@ -128,6 +133,7 @@ export interface IngestRun {
   saveAsRecurringSeries: boolean;
   existingSeriesId?: string | null;
   eligibilityProfileId?: string | null;
+  methodologyVersion?: string | null;
   marketScopeId?: string | null;
   marketScopeSnapshot?: IngestMarketScopeSnapshot | null;
   enrichmentOptions?: IngestEnrichmentOptions | null;
@@ -162,6 +168,7 @@ export type CreateIngestDryRunRequest = {
   saveAsRecurringSeries?: boolean;
   existingSeriesId?: string | null;
   eligibilityProfileId?: string | null;
+  methodologyVersion?: string | null;
   marketScopeId?: string | null;
   marketScopeSnapshot?: IngestMarketScopeSnapshot | null;
   enrichmentOptions?: IngestEnrichmentOptions | null;
