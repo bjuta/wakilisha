@@ -18,6 +18,7 @@ import {
   type BackendUpdateChartEligibilityProfileRequest,
 } from "./backendTypes";
 import { backendConfig, getBackendModeWarnings } from "./backendConfig";
+import type { BackendMatchDecisionRequest, RuntimeBackendAdapter } from "./runtimeContract";
 import {
   getIngestRuns,
   getIngestRun,
@@ -41,6 +42,14 @@ import {
   getEligibilityProfiles,
   updateEligibilityProfile,
 } from "../chartsEligibility/eligibilityStore";
+import {
+  createMarketScope,
+  getMarketScope,
+  getMarketScopes,
+  updateMarketScope,
+  type CreateChartMarketScopeRequest,
+  type UpdateChartMarketScopeRequest,
+} from "../chartsMarkets/marketScopeStore";
 import type { IngestRun } from "../chartsIngestion/ingestStudioTypes";
 import type { V2Edition, V2Entry } from "../chartsIngestion/commitTypes";
 
@@ -68,7 +77,13 @@ function toBackendRun(run: IngestRun): BackendIngestRun {
     publicSlug: run.editionSlug ?? run.existingSeriesId ?? null,
     programId: run.existingSeriesId ?? null,
     eligibilityProfileId: run.eligibilityProfileId ?? null,
+    marketScopeId: run.marketScopeId ?? null,
+    marketScopeSnapshot: run.marketScopeSnapshot ?? null,
+    enrichmentOptions: run.enrichmentOptions ?? null,
     sourceUrls: run.sourceUrls,
+    excludedRows: run.excludedRows ?? [],
+    commercialReadiness: run.commercialReadiness ?? null,
+    rowIntelligence: run.rowIntelligence ?? {},
     createdAt: run.createdAt,
     updatedAt: run.updatedAt,
     errorMessage: run.errorMessage ?? null,
@@ -124,6 +139,9 @@ function normalizeDryRunRequest(request: BackendDryRunRequest) {
     saveAsRecurringSeries: request.saveAsRecurringSeries,
     existingSeriesId: request.existingSeriesId,
     eligibilityProfileId: request.eligibilityProfileId,
+    marketScopeId: request.marketScopeId,
+    marketScopeSnapshot: request.marketScopeSnapshot,
+    enrichmentOptions: request.enrichmentOptions,
   };
 }
 
@@ -135,7 +153,7 @@ function normalizeCommitRequest(request: BackendCommitRequest) {
   };
 }
 
-export const localBackendAdapter = {
+export const localBackendAdapter: RuntimeBackendAdapter = {
   health: {
     async getSystemHealth(): Promise<BackendResult<BackendHealth>> {
       try {
@@ -207,6 +225,38 @@ export const localBackendAdapter = {
       }
     },
 
+    async getMarketScopes() {
+      try {
+        return backendOk(getMarketScopes(), localMeta(["Market scopes are loaded from local demo storage."]));
+      } catch (error) {
+        return safeLocalFail(error, []);
+      }
+    },
+
+    async getMarketScope(idOrSlug: string) {
+      try {
+        return backendOk(getMarketScope(idOrSlug), localMeta());
+      } catch (error) {
+        return safeLocalFail(error, null);
+      }
+    },
+
+    async createMarketScope(payload: CreateChartMarketScopeRequest) {
+      try {
+        return backendOk(createMarketScope(payload), localMeta(["Created local demo market scope only."]));
+      } catch (error) {
+        return safeLocalFail(error);
+      }
+    },
+
+    async updateMarketScope(payload: UpdateChartMarketScopeRequest) {
+      try {
+        return backendOk(updateMarketScope(payload), localMeta(["Updated local demo market scope only."]));
+      } catch (error) {
+        return safeLocalFail(error);
+      }
+    },
+
     async getEditions(): Promise<BackendResult<BackendChartEdition[]>> {
       try {
         return backendOk(getAllV2Editions().map(toBackendEdition), localMeta(["Editions are loaded from the browser local V2 edition store."]));
@@ -263,6 +313,9 @@ export const localBackendAdapter = {
             status: response.status,
             rowCount: response.rows?.length ?? response.summary?.totalRows ?? 0,
             warnings: ["Dry run completed locally. This run is stored in this browser only."],
+            excludedRows: response.excludedRows ?? [],
+            commercialReadiness: response.commercialReadiness ?? null,
+            rowIntelligence: response.rowIntelligence ?? {},
           },
           localMeta()
         );
@@ -326,13 +379,43 @@ export const localBackendAdapter = {
       }
     },
 
-    async applyMatchDecision(payload: { runId: string; rowId: string; action: string; canonicalTrackId?: string }): Promise<BackendResult<BackendIngestRun | null>> {
+    async applyMatchDecision(payload: BackendMatchDecisionRequest): Promise<BackendResult<BackendIngestRun | null>> {
       try {
         const run = await applyRowMatchDecision(payload.runId, payload.rowId, payload.action, payload.canonicalTrackId);
         return backendOk(run ? toBackendRun(run) : null, localMeta());
       } catch (error) {
         return safeLocalFail<BackendIngestRun | null>(error, null);
       }
+    },
+  },
+
+  settings: {
+    async getSettings(_domain?: string) {
+      return backendOk({}, localMeta(["Settings backend is not implemented in local mode."]));
+    },
+    async saveSettings(_domain: string, payload: Record<string, unknown>) {
+      return backendOk(payload, localMeta(["Saved local settings response only; no production persistence."]));
+    },
+  },
+
+  integrations: {
+    async getProviderHealth() {
+      return backendOk([], localMeta(["Provider credentials are not persisted in local demo mode."]));
+    },
+    async testProvider(providerKey: string) {
+      return backendOk({ providerKey, capability: "unavailable", isConfigured: false, missingFields: [], message: "Provider testing requires the production backend." }, localMeta());
+    },
+    async saveProviderConfig(providerKey: string) {
+      return backendOk({ providerKey, capability: "unavailable", isConfigured: false, missingFields: [], message: "Provider config cannot be saved in local demo mode." }, localMeta());
+    },
+    async clearProviderConfig(providerKey: string) {
+      return backendOk({ providerKey, capability: "unavailable", isConfigured: false, missingFields: [], message: "Provider config cannot be cleared in local demo mode." }, localMeta());
+    },
+  },
+
+  registry: {
+    async getHealth() {
+      return localBackendAdapter.health.getSystemHealth();
     },
   },
 };
