@@ -6,26 +6,6 @@
  * as a legacy import source, not as the active ingestion/publishing backend.
  */
 
-import type {
-  ChartFamily,
-  IngestJob,
-  IngestSource,
-  RawSourceItem,
-  IngestCandidate,
-  IngestMatch,
-  ReviewIssue,
-  DraftEntry,
-  IngestJobLog,
-  ChartEdition,
-  Snapshot,
-  DashboardKpis,
-  CreateIngestJobPayload,
-  AddSourcePayload,
-  ResolveIssuePayload,
-  RankOverridePayload,
-  IngestJobStatus,
-} from "./types";
-
 import * as mockAdapter from "./api";
 import * as ingestStudioMock from "./ingestStudioMock";
 
@@ -71,6 +51,10 @@ export interface EndpointDefinition {
   capabilities: string[];
 }
 
+export interface IngestStudioEndpointDef extends EndpointDefinition {
+  group: string;
+}
+
 export const RUNTIME_CHART_ENDPOINTS: Record<string, EndpointDefinition> = {
   getChartFamilies: {
     key: "getChartFamilies",
@@ -114,6 +98,41 @@ export const RUNTIME_CHART_ENDPOINTS: Record<string, EndpointDefinition> = {
 };
 
 export const WORDPRESS_CHART_ENDPOINTS = RUNTIME_CHART_ENDPOINTS;
+export const WP_API_BASE = "/legacy-import-only/wordpress-runtime-disabled";
+
+function withGroup(endpoint: EndpointDefinition, group: string): IngestStudioEndpointDef {
+  return { ...endpoint, group };
+}
+
+export const INGEST_STUDIO_WP_ENDPOINTS: IngestStudioEndpointDef[] = [
+  withGroup(
+    {
+      key: "getIngestRuns",
+      frontendFunction: "getIngestRuns()",
+      method: "GET",
+      path: "/api/charts/ingest/runs",
+      status: "planned",
+      tables: ["chart_ingest_runs"],
+      expectedResponse: ["runs"],
+      description: "List all provider-based ingest runs.",
+      payloadExample: {},
+      responseExample: { runs: [{ id: "run-001", status: "dry_run_complete" }] },
+      capabilities: ["read_wakilisha_charts"],
+    },
+    "Ingest Studio Runtime API"
+  ),
+  withGroup(RUNTIME_CHART_ENDPOINTS.runDryRun, "Ingest Studio Runtime API"),
+  withGroup(RUNTIME_CHART_ENDPOINTS.commitIngestRun, "Ingest Studio Runtime API"),
+];
+
+export async function testWordPressConnection(): Promise<{ ok: boolean; plugin: string; charts_ingestion: boolean; version: string }> {
+  return {
+    ok: false,
+    plugin: "wordpress-runtime-disabled",
+    charts_ingestion: false,
+    version: "legacy-import-only",
+  };
+}
 
 function getEndpointStatus(fnName: string): EndpointStatus {
   const cleanName = fnName.replace(/\([^)]*\)/g, "").trim();
@@ -138,26 +157,8 @@ export function getEndpointGroups(): Record<string, EndpointDefinition[]> {
 }
 
 export function getIngestStudioEndpointGroups(): Record<string, EndpointDefinition[]> {
-  const studioEndpoints: EndpointDefinition[] = [
-    {
-      key: "getIngestRuns",
-      frontendFunction: "getIngestRuns()",
-      method: "GET",
-      path: "/api/charts/ingest/runs",
-      status: "planned",
-      tables: ["chart_ingest_runs"],
-      expectedResponse: ["runs"],
-      description: "List all provider-based ingest runs.",
-      payloadExample: {},
-      responseExample: { runs: [{ id: "run-001", status: "dry_run_complete" }] },
-      capabilities: ["read_wakilisha_charts"],
-    },
-    RUNTIME_CHART_ENDPOINTS.runDryRun,
-    RUNTIME_CHART_ENDPOINTS.commitIngestRun,
-  ];
-
   return {
-    "Ingest Studio Runtime API": studioEndpoints.map((endpoint) => ({ ...endpoint, status: getEndpointStatus(endpoint.frontendFunction) })),
+    "Ingest Studio Runtime API": INGEST_STUDIO_WP_ENDPOINTS.map((endpoint) => ({ ...endpoint, status: getEndpointStatus(endpoint.frontendFunction) })),
   };
 }
 
@@ -207,8 +208,6 @@ export const getJobSummaryApi = adapter.getJobSummaryApi;
 export const getDemoJobId = adapter.getDemoJobId;
 export const searchCanonicalTracks = adapter.searchCanonicalTracks;
 
-export type { IngestionMode };
-export type { EndpointDefinition, EndpointStatus };
 export type { UserRole } from "./roles";
 export {
   ROLE_PERMISSIONS,
@@ -299,4 +298,3 @@ export const createDraftFromCsvCandidates = adapter.createDraftFromCsvCandidates
 export const exportDraftJson = adapter.exportDraftJson;
 export type { CsvIntegrityViolation } from "./api";
 export { validateCommitReadiness } from "./commitService";
-export { testWordPressConnection, WP_API_BASE, INGEST_STUDIO_WP_ENDPOINTS } from "./wpAdapter";
