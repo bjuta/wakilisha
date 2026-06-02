@@ -18,38 +18,25 @@ import {
   type SettingsField,
   type SettingsFieldValue,
 } from "@/services/adminSettings/providerCredentialSchema";
+import {
+  readProviderCredentialValues,
+  saveProviderCredentialValues,
+  type ProviderCredentialValues,
+} from "@/services/adminSettings/providerCredentialStore";
 
-type ProviderFormState = Record<string, Record<string, SettingsFieldValue>>;
+type ProviderFormState = Record<string, ProviderCredentialValues>;
 type ProviderFormErrors = Record<string, Record<string, string>>;
 
-function envStorageKey(envVar: string): string {
-  return `env_${envVar}`;
-}
+type RuntimeMode = "backend" | "local";
 
-function readEnv(envVar: string): string {
-  if (typeof window === "undefined") return "";
-  return localStorage.getItem(envStorageKey(envVar)) ?? "";
-}
-
-function writeEnv(envVar: string, value: SettingsFieldValue): void {
-  if (typeof window === "undefined") return;
-  const normalized = typeof value === "boolean" || typeof value === "number" ? String(value) : value;
-  if (!normalized.trim()) {
-    localStorage.removeItem(envStorageKey(envVar));
-    return;
-  }
-  localStorage.setItem(envStorageKey(envVar), normalized);
+function normalizeRuntimeMode(mode: IntegrationSettings["apiMode"] | RuntimeMode): RuntimeMode {
+  return mode === "mock" ? "local" : mode === "wp" || mode === "v2" ? "backend" : mode;
 }
 
 function makeInitialFormState(settings: IntegrationSettings): ProviderFormState {
   const next: ProviderFormState = {};
   for (const provider of settings.providers) {
-    const schema = getProviderCredentialSchema(provider.key);
-    if (!schema) continue;
-    next[provider.key] = {};
-    for (const field of schema.fields) {
-      next[provider.key][field.key] = field.envVar ? readEnv(field.envVar) : getDefaultFieldValue(field);
-    }
+    next[provider.key] = readProviderCredentialValues(provider.key);
   }
   return next;
 }
@@ -67,6 +54,8 @@ export default function AdminSettingsIntegrations() {
     () => new Map(settings.providers.map((provider) => [provider.key, getProviderCredentialSchema(provider.key)])),
     [settings.providers]
   );
+
+  const runtimeMode = normalizeRuntimeMode(settings.apiMode);
 
   const refreshSettings = () => {
     const next = getIntegrationSettings();
@@ -123,39 +112,33 @@ export default function AdminSettingsIntegrations() {
     setFormErrors((prev) => ({ ...prev, [providerKey]: errors }));
     if (Object.keys(errors).length > 0) return;
 
-    for (const field of schema.fields) {
-      if (!field.envVar) continue;
-      writeEnv(field.envVar, values[field.key] ?? "");
-      if (providerKey === "apple_music" && field.key === "developerToken") writeEnv("APPLE_MUSIC_KEY", values[field.key] ?? "");
-    }
-
+    const status = saveProviderCredentialValues(providerKey, values);
     const updatedProviders = settings.providers.map((provider) =>
-      provider.key === providerKey ? { ...provider, connected: true, lastTested: null, health: "unknown" as const } : provider
+      provider.key === providerKey ? { ...provider, connected: status.configured, lastTested: null, health: "unknown" as const } : provider
     );
     const next = { ...settings, providers: updatedProviders };
     saveDomainSettings("integrations", next);
     setSettings(next);
     setTestResults((prev) => ({
       ...prev,
-      [providerKey]: { ok: true, latencyMs: 0, message: `${schema.title} settings saved. Test the connection to verify server access.` },
+      [providerKey]: {
+        ok: status.configured,
+        latencyMs: 0,
+        message: status.configured
+          ? `${schema.title} settings saved. Test the connection to verify backend access.`
+          : `${schema.title} saved with missing required fields: ${status.missingRequiredVars.join(", ")}.`,
+      } as ProviderTestResult,
     }));
   };
 
   const handleClearProvider = (providerKey: string) => {
     clearProviderCredentials(providerKey);
-    const schema = providerSchemas.get(providerKey);
-    if (schema) {
-      for (const field of schema.fields) {
-        if (field.envVar && typeof window !== "undefined") localStorage.removeItem(envStorageKey(field.envVar));
-        if (providerKey === "apple_music" && field.key === "developerToken" && typeof window !== "undefined") localStorage.removeItem(envStorageKey("APPLE_MUSIC_KEY"));
-      }
-    }
     refreshSettings();
   };
 
-  const handleApiMode = (mode: "wp" | "v2" | "mock") => {
-    setApiMode(mode);
-    setSettings((current) => ({ ...current, apiMode: mode }));
+  const handleApiMode = async (mode: RuntimeMode) => {
+    await setApiMode(mode);
+    setSettings((current) => ({ ...current, apiMode: mode as IntegrationSettings["apiMode"] }));
   };
 
   return (
@@ -166,24 +149,27 @@ export default function AdminSettingsIntegrations() {
           <h1 className="text-[20px] font-black tracking-tight text-[var(--wk-text)]">Integrations</h1>
         </div>
         <p className="text-[13px] text-[var(--wk-text-muted)]">
-          Platform-level external integrations. Each provider now exposes the exact fields its function requires; secrets are masked after save.
+          Platform-level provider credentials. Each provider exposes the exact fields its function requires; WordPress is import-only, not a runtime API mode.
         </p>
       </div>
 
       <WkSurface className="p-5">
-        <h2 className="mb-3 text-[14px] font-bold text-[var(--wk-text)]">API Mode</h2>
+        <h2 className="mb-3 text-[14px] font-bold text-[var(--wk-text)]">Runtime API Mode</h2>
+        <div className="mb-3 rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] p-3 text-[12px] text-[var(--wk-text-muted)]">
+          Use <strong className="text-[var(--wk-text)]">Backend</strong> for production database/API publishing. Use <strong className="text-[var(--wk-text)]">Local preview</strong> only for UI testing; local commits are not public publications.
+        </div>
         <div className="flex flex-wrap gap-2">
-          {(["wp", "v2", "mock"] as const).map((mode) => (
+          {(["backend", "local"] as const).map((mode) => (
             <button
               key={mode}
               onClick={() => handleApiMode(mode)}
               className={`rounded-lg px-4 py-2 text-[13px] font-semibold transition-colors ${
-                settings.apiMode === mode
+                runtimeMode === mode
                   ? "bg-[var(--wk-brand)] text-[var(--wk-brand-on)]"
                   : "border border-[var(--wk-border)] bg-[var(--wk-surface)] text-[var(--wk-text)] hover:bg-[var(--wk-surface-raised)]"
               }`}
             >
-              {mode === "wp" ? "WordPress" : mode === "v2" ? "V2 API" : "Mock"}
+              {mode === "backend" ? "Backend API" : "Local Preview"}
             </button>
           ))}
         </div>
@@ -191,7 +177,7 @@ export default function AdminSettingsIntegrations() {
 
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-[14px] font-bold text-[var(--wk-text)]">Providers</h2>
+          <h2 className="text-[14px] font-bold text-[var(--wk-text)]">Provider Credentials</h2>
           <button onClick={handleTestAll} className="wk-button wk-button-primary wk-button-sm flex items-center gap-2">
             <WkIcon name="Activity" size={14} />
             Test All Connections
