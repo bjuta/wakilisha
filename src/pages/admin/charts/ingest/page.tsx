@@ -22,11 +22,14 @@ import type {
   ResourceGuardStatus,
 } from "@/services/chartsIngestion/ingestStudioTypes";
 import type { ChartFamily } from "@/services/chartsIngestion/types";
+import type { BackendCommitResponse } from "@/services/backendContract/backendTypes";
+import { wakilishaBackend } from "@/services/backendContract/backendClient";
+import type { ChartEligibilityProfile } from "@/services/chartsEligibility/eligibilityTypes";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { WkIcon } from "@/components/design-system/Icon";
 import { GitPullRequest, XCircle, FolderPlus, AlertCircle, History, Music, Disc3 } from "lucide-react";
 
-import { Stepper } from "./components/Stepper";
+import { Stepper, type IngestStudioStep } from "./components/Stepper";
 import { KpiCard } from "./components/KpiCard";
 import { MatchSummary } from "./components/MatchSummary";
 import { MiniChartRow, RowTableRow } from "./components/RowComponents";
@@ -39,13 +42,33 @@ import { ProviderHealthPanel } from "./components/ProviderHealthPanel";
 import { RunMetadataPanel } from "./components/RunMetadataPanel";
 import { PublishChecklist } from "./components/PublishChecklist";
 import { CommitResultPanel } from "./components/CommitResultPanel";
+import { RulesStep } from "./components/RulesStep";
 import { QuickTemplateButton, ProviderChip, KindToggle } from "./components/FormComponents";
-import type { CommitIngestRunResponse } from "@/services/chartsIngestion/commitTypes";
 
 const INPUT_CLASS = "w-full rounded-md border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text outline-none focus:border-wk-border-strong focus:ring-1 focus:ring-wk-brand/20";
 const LABEL_CLASS = "mb-1 block text-[12px] font-semibold text-wk-text-soft";
 const BTN_PRIMARY = "inline-flex items-center gap-1.5 rounded-md bg-wk-brand px-5 py-2.5 text-[13px] font-semibold text-wk-brand-on transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-50 whitespace-nowrap";
 const BTN_GHOST = "inline-flex items-center gap-1.5 rounded-md border border-wk-border bg-wk-surface px-4 py-2.5 text-[13px] font-semibold text-wk-text-soft transition-colors hover:bg-wk-surface-raised whitespace-nowrap";
+
+function toBackendCommitResponse(result: any): BackendCommitResponse {
+  return {
+    runId: result.runId,
+    status: "committed",
+    programId: result.programId,
+    publicSlug: result.publicSlug,
+    editionId: result.editionId,
+    editionSlug: result.editionSlug,
+    editionDate: result.editionDate,
+    entryCount: result.entryCount,
+    publicUrl: result.publicUrl,
+    apiUrl: result.apiUrl,
+    snapshotId: result.snapshotId ?? null,
+    commitPersistence: result.commitPersistence ?? "local_only",
+    publicAvailability: result.publicAvailability ?? "local_preview_only",
+    integrity: result.integrity ?? { ok: false, warnings: ["Integrity response missing."], errors: [] },
+    auditEventId: result.auditEventId ?? null,
+  };
+}
 
 export default function AdminChartsIngest() {
   const navigate = useNavigate();
@@ -55,9 +78,10 @@ export default function AdminChartsIngest() {
   const [activity, setActivity] = useState<RecentIngestActivity[]>([]);
   const [runs, setRuns] = useState<IngestRun[]>([]);
   const [families, setFamilies] = useState<ChartFamily[]>([]);
+  const [eligibilityProfiles, setEligibilityProfiles] = useState<ChartEligibilityProfile[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [step, setStep] = useState<"configure" | "preview" | "commit">("configure");
+  const [step, setStep] = useState<IngestStudioStep>("configure");
 
   const [chartTitle, setChartTitle] = useState("");
   const [chartSlug, setChartSlug] = useState("");
@@ -75,6 +99,7 @@ export default function AdminChartsIngest() {
   const [coverStyle, setCoverStyle] = useState("default");
   const [saveAsRecurring, setSaveAsRecurring] = useState(false);
   const [existingSeriesId, setExistingSeriesId] = useState("");
+  const [selectedEligibilityProfileId, setSelectedEligibilityProfileId] = useState("elig_all_artists");
   const [detectedProviders, setDetectedProviders] = useState<ProviderName[]>([]);
 
   const [dryRunLoading, setDryRunLoading] = useState(false);
@@ -90,21 +115,30 @@ export default function AdminChartsIngest() {
   const [newSeriesKey, setNewSeriesKey] = useState("");
   const [cancelLoading, setCancelLoading] = useState<string | null>(null);
   const [retryLoading, setRetryLoading] = useState<string | null>(null);
-  const [commitResult, setCommitResult] = useState<CommitIngestRunResponse | null>(null);
+  const [commitResult, setCommitResult] = useState<BackendCommitResponse | null>(null);
 
   const loadData = useCallback(async () => {
-    const [k, a, r, f] = await Promise.all([
+    const [k, a, r, f, eligibilityResult] = await Promise.all([
       getIngestKpis(),
       getRecentIngestActivity(),
       getIngestRuns(),
       getChartFamilies(),
+      wakilishaBackend.charts.getEligibilityProfiles(),
     ]);
     setKpis(k);
     setActivity(a);
     setRuns(r);
     setFamilies(f);
+    if (eligibilityResult.ok) {
+      setEligibilityProfiles(eligibilityResult.data);
+      if (!eligibilityResult.data.some((profile) => profile.id === selectedEligibilityProfileId)) {
+        setSelectedEligibilityProfileId(eligibilityResult.data[0]?.id ?? "elig_all_artists");
+      }
+    } else {
+      setFormError(eligibilityResult.error.message);
+    }
     setLoading(false);
-  }, []);
+  }, [selectedEligibilityProfileId]);
 
   useEffect(() => {
     loadData();
@@ -149,6 +183,11 @@ export default function AdminChartsIngest() {
     [families, existingSeriesId]
   );
 
+  const selectedEligibilityProfile = useMemo(
+    () => eligibilityProfiles.find((profile) => profile.id === selectedEligibilityProfileId || profile.slug === selectedEligibilityProfileId) || null,
+    [eligibilityProfiles, selectedEligibilityProfileId]
+  );
+
   useEffect(() => {
     if (selectedFamily) {
       setChartSize(selectedFamily.defaultChartSize);
@@ -165,17 +204,32 @@ export default function AdminChartsIngest() {
     return `/charts/${chartSlug}/${editionDate}`;
   }, [chartSlug, editionDate]);
 
-  function validateForm(): string | null {
+  function validateProgramStep(): string | null {
     if (!chartTitle.trim()) return "Chart title is required.";
     if (!chartSlug.trim()) return "Chart slug is required.";
     if (!editionDate) return "Edition date is required.";
+    if (chartSize < 1 || chartSize > 100) return "Chart size must be between 1 and 100.";
+    if (!existingSeriesId || existingSeriesId === "__new__") return "Select an existing chart series.";
+    return null;
+  }
+
+  function validateForm(): string | null {
+    const base = validateProgramStep();
+    if (base) return base;
+    if (!selectedEligibilityProfileId) return "Select an eligibility profile.";
     const urls = sourceUrls.split("\n").filter((u) => u.trim());
     if (urls.length === 0) return "At least one source URL is required.";
     const invalid = urls.filter((u) => !isValidProviderUrl(u));
     if (invalid.length > 0) return `Unrecognized provider URL(s): ${invalid.join(", ")}.`;
-    if (chartSize < 1 || chartSize > 100) return "Chart size must be between 1 and 100.";
-    if (!existingSeriesId || existingSeriesId === "__new__") return "Select an existing chart series.";
     return null;
+  }
+
+  function handleContinueToRules() {
+    const error = validateProgramStep();
+    if (error) { setFormError(error); return; }
+    setFormError(null);
+    setSuccessMessage(null);
+    setStep("rules");
   }
 
   async function handleDryRun() {
@@ -188,12 +242,12 @@ export default function AdminChartsIngest() {
     setExpandedRowId(null);
     try {
       const urls = sourceUrls.split("\n").filter((u) => u.trim());
-      const response = await runDryRun({ chartTitle, chartSlug, editionDate, chartSize, market, chartKind, coverStyle, sourceUrls: urls, saveAsRecurringSeries: saveAsRecurring, existingSeriesId: existingSeriesId || null });
+      const response = await runDryRun({ chartTitle, chartSlug, editionDate, chartSize, market, chartKind, coverStyle, sourceUrls: urls, saveAsRecurringSeries: saveAsRecurring, existingSeriesId: existingSeriesId || null, eligibilityProfileId: selectedEligibilityProfileId });
       const run = await getIngestRuns().then((r) => r.find((x) => x.id === response.runId));
       if (run) {
         setDryRunResult(run);
         setStep("preview");
-        setSuccessMessage(`Dry run complete — ${run.summary.totalRows} rows, ${run.summary.matchRate.toFixed(1)}% match rate`);
+        setSuccessMessage(`Dry run complete — ${run.summary.totalRows} rows, ${run.summary.matchRate.toFixed(1)}% match rate${selectedEligibilityProfile ? ` · ${selectedEligibilityProfile.name}` : ""}`);
         const guard = await getResourceGuardStatus(run.id);
         setGuardStatus(guard);
       }
@@ -213,13 +267,12 @@ export default function AdminChartsIngest() {
     setCommitResult(null);
     try {
       const result = await commitIngestRun({ runId: dryRunResult.id, publishImmediately: true });
-      setCommitResult(result);
+      setCommitResult(toBackendCommitResponse(result));
       setStep("commit");
       setDryRunResult(null);
       await loadData();
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Commit failed";
-      // Parse specific error codes for better messages
       if (msg.includes("duplicate_edition")) {
         setFormError(msg.replace(/^[^:]+: /, ""));
       } else if (msg.includes("program_not_found")) {
@@ -283,7 +336,7 @@ export default function AdminChartsIngest() {
         <div>
           <div className="mb-1 text-[11px] font-bold uppercase tracking-wider text-wk-text-muted">Chart Operations</div>
           <h1 className="text-[22px] font-bold text-wk-text">Ingest Studio</h1>
-          <p className="text-[13px] text-wk-text-soft">Create chart editions from streaming playlists — step by step</p>
+          <p className="text-[13px] text-wk-text-soft">Create chart editions from streaming playlists — program, rules, sources, review, commit</p>
         </div>
         <div className="flex items-center gap-2">
           <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${mode === "mock" ? "bg-wk-warning-soft text-wk-warning" : "bg-wk-success-soft text-wk-success"}`}>
@@ -299,7 +352,7 @@ export default function AdminChartsIngest() {
         </div>
       </div>
 
-      <Stepper step={step} onStepChange={(s) => { if (s === "configure") handleReset(); }} />
+      <Stepper step={step} onStepChange={(s) => { if (s === "configure") handleReset(); if (s === "rules") setStep("rules"); }} />
 
       {kpis && (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -339,15 +392,15 @@ export default function AdminChartsIngest() {
         <div className="lg:col-span-2 space-y-6">
           {step === "configure" && (
             <WkSurface className="p-5">
-              <h2 className="mb-4 text-[16px] font-bold text-wk-text">Configure Ingest</h2>
+              <h2 className="mb-4 text-[16px] font-bold text-wk-text">Program & Sources</h2>
 
               <div className="mb-5">
                 <label className={LABEL_CLASS}>Quick Start</label>
                 <div className="flex flex-wrap gap-2">
-                  <QuickTemplateButton label="Top 40 Kenya" onClick={() => { setChartTitle("WAKILISHA Top 40"); setChartSlug("wakilisha-top-40"); setChartSize(40); setMarket("KE"); setExistingSeriesId("kenya"); setSaveAsRecurring(true); }} />
-                  <QuickTemplateButton label="Top 100 Kenya" onClick={() => { setChartTitle("WAKILISHA Top 100"); setChartSlug("wakilisha-top-100"); setChartSize(100); setMarket("KE"); setExistingSeriesId("kenya"); setSaveAsRecurring(true); }} />
-                  <QuickTemplateButton label="Afrobeats 20" onClick={() => { setChartTitle("Afrobeats Top 20"); setChartSlug("afrobeats-top-20"); setChartSize(20); setMarket("KE"); setCoverStyle("genre"); setExistingSeriesId("kenya"); setSaveAsRecurring(true); }} />
-                  <QuickTemplateButton label="Nigeria Top 40" onClick={() => { setChartTitle("WAKILISHA Top 40 — Nigeria"); setChartSlug("wakilisha-top-40-nigeria"); setChartSize(40); setMarket("NG"); setExistingSeriesId(""); setSaveAsRecurring(false); }} />
+                  <QuickTemplateButton label="Top 40 Kenya" onClick={() => { setChartTitle("WAKILISHA Top 40"); setChartSlug("wakilisha-top-40"); setChartSize(40); setMarket("KE"); setExistingSeriesId("kenya"); setSelectedEligibilityProfileId("elig_all_artists"); setSaveAsRecurring(true); }} />
+                  <QuickTemplateButton label="Kenyan Artists Only" onClick={() => { setChartTitle("WAKILISHA Top 100 — Kenyan Artists"); setChartSlug("top-songs-kenya-artists-only"); setChartSize(100); setMarket("KE"); setExistingSeriesId("kenya"); setSelectedEligibilityProfileId("elig_kenyan_artists_only"); setSaveAsRecurring(true); }} />
+                  <QuickTemplateButton label="Groups Only" onClick={() => { setChartTitle("WAKILISHA Groups & Collectives"); setChartSlug("groups-collectives-kenya"); setChartSize(40); setMarket("KE"); setExistingSeriesId("kenya"); setSelectedEligibilityProfileId("elig_groups_collectives_only"); setSaveAsRecurring(true); }} />
+                  <QuickTemplateButton label="EA Artists" onClick={() => { setChartTitle("WAKILISHA East African Artists"); setChartSlug("east-african-artists"); setChartSize(100); setMarket("KE"); setExistingSeriesId("kenya"); setSelectedEligibilityProfileId("elig_east_africa_selected_markets"); setSaveAsRecurring(true); }} />
                 </div>
               </div>
 
@@ -479,9 +532,8 @@ export default function AdminChartsIngest() {
               </div>
 
               <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-wk-divider">
-                <button onClick={handleDryRun} disabled={dryRunLoading} className={BTN_PRIMARY}>
-                  <WkIcon name={dryRunLoading ? "Loader" : "FlaskConical"} size={14} className={dryRunLoading ? "animate-spin" : ""} />
-                  {dryRunLoading ? "Running dry run…" : "Run Dry Run"}
+                <button onClick={handleContinueToRules} className={BTN_PRIMARY}>
+                  <WkIcon name="SlidersHorizontal" size={14} />Continue to Rules
                 </button>
                 <button onClick={handleReset} className={BTN_GHOST}>
                   <WkIcon name="RotateCcw" size={14} />Reset
@@ -490,9 +542,33 @@ export default function AdminChartsIngest() {
             </WkSurface>
           )}
 
+          {step === "rules" && (
+            <RulesStep
+              profiles={eligibilityProfiles}
+              selectedEligibilityProfileId={selectedEligibilityProfileId}
+              onSelectEligibilityProfile={setSelectedEligibilityProfileId}
+              onBack={() => setStep("configure")}
+              onContinue={handleDryRun}
+            />
+          )}
+
           {step === "preview" && dryRunResult && (
             <div className="space-y-5">
               <RunMetadataPanel run={dryRunResult} />
+              {selectedEligibilityProfile && (
+                <WkSurface className="p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <h2 className="text-[14px] font-bold text-wk-text">Eligibility Profile</h2>
+                      <p className="mt-1 text-[12px] text-wk-text-soft">{selectedEligibilityProfile.name} · {selectedEligibilityProfile.slug}</p>
+                      <p className="mt-1 text-[11px] text-wk-text-muted">{selectedEligibilityProfile.description}</p>
+                    </div>
+                    <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${selectedEligibilityProfile.visibility === "public" ? "bg-wk-success-soft text-wk-success" : "bg-wk-warning-soft text-wk-warning"}`}>
+                      {selectedEligibilityProfile.visibility === "public" ? "Public label allowed" : "Admin-only rules"}
+                    </span>
+                  </div>
+                </WkSurface>
+              )}
               <PipelinePanel run={dryRunResult} />
               <MatchSummary summary={dryRunResult.summary} runId={dryRunResult.id} />
               <PublishChecklist
@@ -551,8 +627,8 @@ export default function AdminChartsIngest() {
                 )}
               </WkSurface>
               <div className="flex flex-wrap items-center gap-3">
-                <button onClick={() => setStep("configure")} className={BTN_GHOST}>
-                  <WkIcon name="ArrowLeft" size={14} />Back to Configure
+                <button onClick={() => setStep("rules")} className={BTN_GHOST}>
+                  <WkIcon name="ArrowLeft" size={14} />Back to Rules
                 </button>
                 <button onClick={() => navigate(`/admin/charts/ingest-runs/${dryRunResult.id}`)} className={BTN_GHOST}>
                   <WkIcon name="ExternalLink" size={14} />Open Run Detail
@@ -568,6 +644,14 @@ export default function AdminChartsIngest() {
 
         <div className="space-y-5">
           <ProviderHealthPanel />
+
+          {selectedEligibilityProfile && (step === "configure" || step === "rules") && (
+            <WkSurface className="p-4 border-l-4 border-l-wk-brand">
+              <h2 className="mb-2 text-[14px] font-bold text-wk-text">Selected Rules</h2>
+              <p className="text-[12px] font-semibold text-wk-text-soft">{selectedEligibilityProfile.name}</p>
+              <p className="mt-1 text-[11px] text-wk-text-muted">{selectedEligibilityProfile.description}</p>
+            </WkSurface>
+          )}
 
           {activeRun && !dryRunResult && (
             <WkSurface className="p-4 border-l-4 border-l-wk-brand">
