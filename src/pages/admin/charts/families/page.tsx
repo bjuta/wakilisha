@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { AdminChartsPageHeader } from "../components/AdminChartsPageHeader";
@@ -6,140 +6,77 @@ import { AdminChartsKpiCard } from "../components/AdminChartsKpiCard";
 import { AdminChartsEmptyState } from "../components/AdminChartsEmptyState";
 import { AdminChartsStatusBadge } from "../components/AdminChartsStatusBadge";
 import { AdminChartsConfirmDialog } from "../components/AdminChartsConfirmDialog";
+import { AdminChartsLoadingState } from "../components/AdminChartsLoadingState";
+import { WkIcon } from "@/components/design-system/Icon";
+import { getChartFamilies } from "@/services/chartsPublic/client";
+import type { ChartFamily } from "@/services/chartsPublic/client";
 
-interface ChartFamily {
-  id: string;
-  familyKey: string;
-  label: string;
-  description: string;
-  defaultChartSize: number;
-  defaultRegion: string;
-  editionFrequency: "weekly" | "monthly" | "daily";
-  defaultRuleset: string;
-  defaultScoringModel: string;
-  status: "active" | "inactive" | "archived";
-  lastEditionDate: string | null;
-  nextExpectedDate: string | null;
-  sourceUrls: string[];
-  createdAt: string;
-  updatedAt: string;
-}
-
-const INITIAL_FAMILIES: ChartFamily[] = [
-  {
-    id: "wakilisha-top-40",
-    familyKey: "wakilisha_top_40",
-    label: "WAKILISHA Top 40",
-    description: "The definitive weekly chart of the most streamed African tracks across all platforms.",
-    defaultChartSize: 40,
-    defaultRegion: "Africa",
-    editionFrequency: "weekly",
-    defaultRuleset: "standard_weekly",
-    defaultScoringModel: "weighted_multi_source_v1",
-    status: "active",
-    lastEditionDate: "2026-05-30",
-    nextExpectedDate: "2026-06-06",
-    sourceUrls: ["https://open.spotify.com/playlist/wakilisha-top40"],
-    createdAt: "2025-01-15T10:00:00Z",
-    updatedAt: "2026-05-30T12:00:00Z",
-  },
-  {
-    id: "wakilisha-top-100",
-    familyKey: "wakilisha_top_100",
-    label: "WAKILISHA Top 100",
-    description: "Extended weekly chart capturing the full breadth of African music consumption.",
-    defaultChartSize: 100,
-    defaultRegion: "Africa",
-    editionFrequency: "weekly",
-    defaultRuleset: "standard_weekly",
-    defaultScoringModel: "weighted_multi_source_v1",
-    status: "active",
-    lastEditionDate: "2026-05-30",
-    nextExpectedDate: "2026-06-06",
-    sourceUrls: ["https://open.spotify.com/playlist/wakilisha-top100"],
-    createdAt: "2025-02-01T10:00:00Z",
-    updatedAt: "2026-05-30T12:00:00Z",
-  },
-  {
-    id: "afrobeats-top-20",
-    familyKey: "wakilisha_afrobeats_20",
-    label: "Afrobeats Top 20",
-    description: "Weekly Afrobeats-specific chart focused on the genre&apos;s global reach.",
-    defaultChartSize: 20,
-    defaultRegion: "Africa",
-    editionFrequency: "weekly",
-    defaultRuleset: "genre_specific",
-    defaultScoringModel: "weighted_multi_source_v1",
-    status: "active",
-    lastEditionDate: "2026-05-30",
-    nextExpectedDate: "2026-06-06",
-    sourceUrls: [],
-    createdAt: "2025-03-10T10:00:00Z",
-    updatedAt: "2026-05-28T09:00:00Z",
-  },
-  {
-    id: "gengetone-top-20",
-    familyKey: "wakilisha_gengetone_20",
-    label: "Gengetone Top 20",
-    description: "Kenyan Gengetone chart tracking the most popular tracks in the genre.",
-    defaultChartSize: 20,
-    defaultRegion: "Kenya",
-    editionFrequency: "weekly",
-    defaultRuleset: "genre_specific",
-    defaultScoringModel: "weighted_multi_source_v1",
-    status: "active",
-    lastEditionDate: "2026-05-23",
-    nextExpectedDate: "2026-06-06",
-    sourceUrls: [],
-    createdAt: "2025-04-01T10:00:00Z",
-    updatedAt: "2026-05-23T12:00:00Z",
-  },
-  {
-    id: "rnb-top-20",
-    familyKey: "wakilisha_rnb_20",
-    label: "R&B Top 20",
-    description: "African R&B chart highlighting the best R&B tracks from the continent.",
-    defaultChartSize: 20,
-    defaultRegion: "Africa",
-    editionFrequency: "weekly",
-    defaultRuleset: "genre_specific",
-    defaultScoringModel: "weighted_multi_source_v1",
-    status: "inactive",
-    lastEditionDate: "2026-04-20",
-    nextExpectedDate: null,
-    sourceUrls: [],
-    createdAt: "2025-04-15T10:00:00Z",
-    updatedAt: "2026-04-20T12:00:00Z",
-  },
-];
-
-type ModalMode = "create" | "edit" | null;
-const EMPTY_FAMILY: Omit<ChartFamily, "id" | "createdAt" | "updatedAt"> = {
-  familyKey: "",
-  label: "",
-  description: "",
-  defaultChartSize: 40,
-  defaultRegion: "Africa",
-  editionFrequency: "weekly",
-  defaultRuleset: "standard_weekly",
-  defaultScoringModel: "weighted_multi_source_v1",
-  status: "active",
-  lastEditionDate: null,
-  nextExpectedDate: null,
-  sourceUrls: [],
+// V2 extended ChartFamily type
+type V2ChartFamily = ChartFamily & {
+  seriesSlug?: string;
+  seriesLabel?: string;
+  marketSlug?: string;
+  marketLabel?: string;
+  publicSlug?: string;
+  publicLabel?: string;
+  sourceFamilySlug?: string;
+  status?: "active" | "inactive" | "archived";
+  nextExpectedDate?: string | null;
+  lastEditionDate?: string | null;
+  sourceUrls?: string[];
 };
+
+// Well-known V2 programs with metadata
+const V2_PROGRAMS: Record<string, { series: string; market: string; seriesLabel: string; marketLabel: string; publicSlug: string; status: "active" | "inactive" }> = {
+  "top-songs-kenya": { series: "top-songs", market: "kenya", seriesLabel: "Top 100 Songs", marketLabel: "Kenya", publicSlug: "top-songs-kenya", status: "active" },
+  "rnb-kenya": { series: "rnb", market: "kenya", seriesLabel: "R&B Songs", marketLabel: "Kenya", publicSlug: "rnb-kenya", status: "active" },
+  "gengetone-kenya": { series: "gengetone", market: "kenya", seriesLabel: "Gengetone Songs", marketLabel: "Kenya", publicSlug: "gengetone-kenya", status: "active" },
+  "2026-releases-kenya": { series: "2026-releases", market: "kenya", seriesLabel: "2026 Releases", marketLabel: "Kenya", publicSlug: "2026-releases-kenya", status: "active" },
+};
+
+function getV2Meta(family: V2ChartFamily) {
+  if (family.publicSlug && V2_PROGRAMS[family.publicSlug]) return V2_PROGRAMS[family.publicSlug];
+  const byKey = Object.values(V2_PROGRAMS).find((p) => p.series === family.familyKey || p.publicSlug === family.familyKey);
+  return byKey || null;
+}
 
 export default function AdminChartsFamilies() {
   const navigate = useNavigate();
-  const [families, setFamilies] = useState<ChartFamily[]>(INITIAL_FAMILIES);
-  const [selectedFamily, setSelectedFamily] = useState<ChartFamily | null>(null);
+  const [families, setFamilies] = useState<V2ChartFamily[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedFamily, setSelectedFamily] = useState<V2ChartFamily | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [modalMode, setModalMode] = useState<ModalMode>(null);
-  const [formData, setFormData] = useState<Omit<ChartFamily, "id" | "createdAt" | "updatedAt">>(EMPTY_FAMILY);
-  const [formError, setFormError] = useState<string | null>(null);
-  const [archiveTarget, setArchiveTarget] = useState<ChartFamily | null>(null);
+  const [archiveTarget, setArchiveTarget] = useState<V2ChartFamily | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [dataSource, setDataSource] = useState<"mock" | "wordpress" | "cache">("mock");
+
+  useEffect(() => {
+    getChartFamilies().then((result) => {
+      // Merge V2 metadata in
+      const enriched = result.data.map((f) => {
+        const v2 = getV2Meta(f as V2ChartFamily);
+        return {
+          ...f,
+          status: "active" as const,
+          sourceUrls: [],
+          nextExpectedDate: null,
+          lastEditionDate: null,
+          ...v2 ? {
+            seriesSlug: v2.series,
+            seriesLabel: v2.seriesLabel,
+            marketSlug: v2.market,
+            marketLabel: v2.marketLabel,
+            publicSlug: v2.publicSlug,
+            publicLabel: `${v2.seriesLabel} · ${v2.marketLabel}`,
+          } : {},
+        } as V2ChartFamily;
+      });
+      setFamilies(enriched);
+      setDataSource(result.meta.source);
+      setLoading(false);
+    });
+  }, []);
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
@@ -149,100 +86,30 @@ export default function AdminChartsFamilies() {
   const filtered = families.filter((f) => {
     const matchSearch = !search ||
       f.label.toLowerCase().includes(search.toLowerCase()) ||
-      f.familyKey.toLowerCase().includes(search.toLowerCase());
-    const matchStatus = statusFilter === "all" || f.status === statusFilter;
+      f.familyKey.toLowerCase().includes(search.toLowerCase()) ||
+      (f.publicSlug ?? "").toLowerCase().includes(search.toLowerCase());
+    const matchStatus = statusFilter === "all" || (f.status ?? "active") === statusFilter;
     return matchSearch && matchStatus;
   });
 
-  const openCreate = () => {
-    setFormData(EMPTY_FAMILY);
-    setFormError(null);
-    setModalMode("create");
-  };
-
-  const openEdit = (family: ChartFamily) => {
-    setFormData({ ...family });
-    setFormError(null);
-    setSelectedFamily(family);
-    setModalMode("edit");
-  };
-
-  const handleDuplicate = (family: ChartFamily) => {
-    const newFamily: ChartFamily = {
-      ...family,
-      id: `${family.familyKey}_copy_${Date.now()}`,
-      familyKey: `${family.familyKey}_copy`,
-      label: `${family.label} (Copy)`,
-      status: "inactive",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    setFamilies((prev) => [...prev, newFamily]);
-    showToast(`"${family.label}" duplicated`);
-  };
-
-  const handleArchive = (family: ChartFamily) => {
+  const handleArchive = (family: V2ChartFamily) => {
     setFamilies((prev) =>
-      prev.map((f) => f.id === family.id ? { ...f, status: "archived", updatedAt: new Date().toISOString() } : f)
+      prev.map((f) => f.id === family.id ? { ...f, status: "archived" as const } : f)
     );
     setArchiveTarget(null);
     showToast(`"${family.label}" archived`);
     if (selectedFamily?.id === family.id) setSelectedFamily(null);
   };
 
-  const validateForm = (): string | null => {
-    if (!formData.label.trim()) return "Label is required";
-    if (!formData.familyKey.trim()) return "Family key is required";
-    if (!/^[a-z0-9_]+$/.test(formData.familyKey)) return "Family key must be lowercase alphanumeric with underscores only";
-    if (formData.defaultChartSize < 1 || formData.defaultChartSize > 200) return "Chart size must be 1–200";
-    if (modalMode === "create") {
-      const dup = families.find((f) => f.familyKey === formData.familyKey);
-      if (dup) return `Family key "${formData.familyKey}" already exists as "${dup.label}"`;
-    }
-    return null;
-  };
+  const activeCount = families.filter((f) => (f.status ?? "active") === "active").length;
+  const missingV2Count = families.filter((f) => !f.publicSlug).length;
 
-  const handleSave = () => {
-    const error = validateForm();
-    if (error) { setFormError(error); return; }
-    if (modalMode === "create") {
-      const newFamily: ChartFamily = {
-        ...formData,
-        id: formData.familyKey,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      setFamilies((prev) => [...prev, newFamily]);
-      showToast(`"${newFamily.label}" created`);
-    } else if (modalMode === "edit" && selectedFamily) {
-      setFamilies((prev) =>
-        prev.map((f) => f.id === selectedFamily.id ? { ...f, ...formData, updatedAt: new Date().toISOString() } : f)
-      );
-      setSelectedFamily((prev) => prev ? { ...prev, ...formData, updatedAt: new Date().toISOString() } : null);
-      showToast(`"${formData.label}" updated`);
-    }
-    setModalMode(null);
-    setFormError(null);
-  };
-
-  const handleLabelChange = (value: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      label: value,
-      ...(modalMode === "create" && !prev.familyKey ? {
-        familyKey: value.toLowerCase().replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, "_").substring(0, 50),
-      } : {}),
-    }));
-  };
-
-  const activeCount = families.filter((f) => f.status === "active").length;
-  const missingSourceCount = families.filter((f) => f.sourceUrls.length === 0 && f.status === "active").length;
-  const totalFamilies = families.length;
+  if (loading) return <AdminChartsLoadingState message="Loading chart programs…" />;
 
   return (
     <div className="space-y-6">
       {toastMsg && (
-        <div className="fixed bottom-6 right-6 z-50 rounded-xl bg-wk-surface-strong px-4 py-3 text-[13px] font-semibold text-wk-text shadow-lg border border-wk-border">
+        <div className="fixed bottom-6 right-6 z-50 rounded-xl bg-wk-surface-strong px-4 py-3 text-[13px] font-semibold text-wk-text border border-wk-border">
           {toastMsg}
         </div>
       )}
@@ -250,212 +117,209 @@ export default function AdminChartsFamilies() {
       <AdminChartsConfirmDialog
         open={!!archiveTarget}
         title={`Archive "${archiveTarget?.label}"?`}
-        description="This family will be archived. Existing editions remain accessible. You can reactivate it later."
-        confirmLabel="Archive Family"
+        description="This program will be archived. Existing editions remain accessible."
+        confirmLabel="Archive"
         variant="danger"
         onConfirm={() => archiveTarget && handleArchive(archiveTarget)}
         onCancel={() => setArchiveTarget(null)}
       />
 
-      {/* Modal */}
-      {modalMode && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-lg rounded-xl border border-wk-border bg-wk-surface p-6 shadow-xl">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-[16px] font-bold text-wk-text">
-                {modalMode === "create" ? "New Chart Family" : `Edit — ${selectedFamily?.label}`}
-              </h2>
-              <button onClick={() => { setModalMode(null); setFormError(null); }} className="flex h-8 w-8 items-center justify-center rounded-full text-wk-text-muted hover:bg-wk-surface-raised">
-                <i className="ri-close-line" />
-              </button>
-            </div>
-            {formError && (
-              <div className="mb-4 rounded-lg border border-wk-danger/20 bg-wk-danger-soft px-3 py-2 text-[13px] text-wk-danger">
-                <i className="ri-error-warning-line mr-1" />{formError}
-              </div>
-            )}
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="mb-1 block text-[12px] font-semibold text-wk-text-muted">Label *</label>
-                  <input type="text" value={formData.label} onChange={(e) => handleLabelChange(e.target.value)} placeholder="WAKILISHA Top 40" className="w-full rounded-md border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text outline-none focus:border-wk-border-strong" />
-                </div>
-                <div>
-                  <label className="mb-1 block text-[12px] font-semibold text-wk-text-muted">Family Key *</label>
-                  <input type="text" value={formData.familyKey} onChange={(e) => setFormData((p) => ({ ...p, familyKey: e.target.value }))} placeholder="wakilisha_top_40" className="w-full rounded-md border border-wk-border bg-wk-surface px-3 py-2 text-[13px] font-mono text-wk-text outline-none focus:border-wk-border-strong" />
-                </div>
-              </div>
-              <div>
-                <label className="mb-1 block text-[12px] font-semibold text-wk-text-muted">Description</label>
-                <textarea value={formData.description} onChange={(e) => setFormData((p) => ({ ...p, description: e.target.value }))} rows={2} className="w-full rounded-md border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text outline-none focus:border-wk-border-strong" />
-              </div>
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="mb-1 block text-[12px] font-semibold text-wk-text-muted">Chart Size *</label>
-                  <input type="number" min={1} max={200} value={formData.defaultChartSize} onChange={(e) => setFormData((p) => ({ ...p, defaultChartSize: Number(e.target.value) }))} className="w-full rounded-md border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text outline-none focus:border-wk-border-strong" />
-                </div>
-                <div>
-                  <label className="mb-1 block text-[12px] font-semibold text-wk-text-muted">Region</label>
-                  <select value={formData.defaultRegion} onChange={(e) => setFormData((p) => ({ ...p, defaultRegion: e.target.value }))} className="w-full rounded-md border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text outline-none">
-                    {["Africa", "Kenya", "Nigeria", "South Africa", "Ghana", "East Africa", "Global"].map((r) => <option key={r} value={r}>{r}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="mb-1 block text-[12px] font-semibold text-wk-text-muted">Frequency</label>
-                  <select value={formData.editionFrequency} onChange={(e) => setFormData((p) => ({ ...p, editionFrequency: e.target.value as ChartFamily["editionFrequency"] }))} className="w-full rounded-md border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text outline-none">
-                    <option value="daily">Daily</option>
-                    <option value="weekly">Weekly</option>
-                    <option value="monthly">Monthly</option>
-                  </select>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="mb-1 block text-[12px] font-semibold text-wk-text-muted">Ruleset</label>
-                  <select value={formData.defaultRuleset} onChange={(e) => setFormData((p) => ({ ...p, defaultRuleset: e.target.value }))} className="w-full rounded-md border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text outline-none">
-                    <option value="standard_weekly">standard_weekly</option>
-                    <option value="genre_specific">genre_specific</option>
-                    <option value="regional">regional</option>
-                    <option value="editorial">editorial</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="mb-1 block text-[12px] font-semibold text-wk-text-muted">Status</label>
-                  <select value={formData.status} onChange={(e) => setFormData((p) => ({ ...p, status: e.target.value as ChartFamily["status"] }))} className="w-full rounded-md border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text outline-none">
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-            <div className="mt-5 flex gap-2 justify-end">
-              <button onClick={() => { setModalMode(null); setFormError(null); }} className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap">Cancel</button>
-              <button onClick={handleSave} className="wk-button wk-button-primary wk-button-sm whitespace-nowrap">
-                <i className="ri-save-line" />
-                {modalMode === "create" ? "Create Family" : "Save Changes"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       <AdminChartsPageHeader
         eyebrow="Chart Configuration"
-        title="Chart Families"
-        description="Manage chart series configurations. Families are the backbone of Ingest Studio."
+        title="Chart Programs"
+        description="V2 chart programs — each defines a series (what) × market (where). Source: V2 public chart API."
       >
-        <button onClick={openCreate} className="wk-button wk-button-primary wk-button-sm whitespace-nowrap">
-          <i className="ri-add-line" /> New Family
+        <div className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold ${
+          dataSource === "wordpress" ? "bg-wk-success-soft text-wk-success" :
+          dataSource === "cache" ? "bg-wk-info-soft text-wk-info" :
+          "bg-wk-warning-soft text-wk-warning"
+        }`}>
+          <WkIcon name={dataSource === "mock" ? "FlaskConical" : dataSource === "cache" ? "Database" : "Globe"} size={12} />
+          {dataSource}
+        </div>
+        <button onClick={() => navigate("/admin/charts/ingest")} className="wk-button wk-button-primary wk-button-sm whitespace-nowrap">
+          <WkIcon name="Plus" size={14} /> New Ingest
         </button>
       </AdminChartsPageHeader>
 
-      {/* Warning: families missing source URLs */}
-      {missingSourceCount > 0 && (
-        <div className="rounded-lg border border-wk-warning/20 bg-wk-warning-soft p-3 flex items-start gap-2">
-          <i className="ri-alert-line text-wk-warning mt-0.5" />
-          <div className="text-[12px] text-wk-warning">
-            <strong>{missingSourceCount} active famil{missingSourceCount !== 1 ? "ies" : "y"}</strong> {missingSourceCount !== 1 ? "have" : "has"} no source URLs configured.
-            Ingest Studio won&apos;t be able to fetch data without source URLs.
+      {/* V2 Ontology explainer */}
+      <div className="rounded-lg border border-wk-brand/20 bg-wk-brand-soft p-4">
+        <div className="flex items-start gap-3">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-wk-brand text-wk-brand-on">
+            <WkIcon name="BarChart3" size={16} />
+          </div>
+          <div>
+            <p className="text-[13px] font-bold text-wk-text">V2 Chart Ontology: Program = Series × Market</p>
+            <p className="mt-1 text-[12px] text-wk-text-muted">
+              A <strong>ChartProgram</strong> is the combination of a <strong>ChartSeries</strong> (what is ranked — e.g., "R&B Songs") and a <strong>ChartMarket</strong> (where — e.g., "Kenya").
+              Programs have canonical public slugs: <code className="bg-white/30 text-[11px] rounded px-1">rnb-kenya</code>, <code className="bg-white/30 text-[11px] rounded px-1">top-songs-kenya</code>.
+              Legacy source slugs (<code className="bg-white/30 text-[11px] rounded px-1">rnb</code>, <code className="bg-white/30 text-[11px] rounded px-1">kenya</code>) redirect to canonical V2 slugs.
+            </p>
           </div>
         </div>
-      )}
+      </div>
+
+      {/* V2 Mapping Table */}
+      <WkSurface className="overflow-hidden">
+        <div className="px-4 py-3 border-b border-wk-border flex items-center gap-2">
+          <WkIcon name="Map" size={14} className="text-wk-brand" />
+          <h2 className="text-[13px] font-bold text-wk-text">V2 Program Mapping</h2>
+          <span className="text-[11px] text-wk-text-muted ml-auto">4 programs · 4 series · 1 market (Kenya)</span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-[12px]">
+            <thead>
+              <tr className="border-b border-wk-border">
+                {["Source Slug (Legacy)", "Series Slug", "Market Slug", "Public Slug (V2)", "Public Label", "Status"].map((h) => (
+                  <th key={h} className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider text-wk-text-muted">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {[
+                { source: "kenya", series: "top-songs", market: "kenya", slug: "top-songs-kenya", label: "Top 100 Songs · Kenya" },
+                { source: "rnb", series: "rnb", market: "kenya", slug: "rnb-kenya", label: "R&B Songs · Kenya" },
+                { source: "gengetone", series: "gengetone", market: "kenya", slug: "gengetone-kenya", label: "Gengetone Songs · Kenya" },
+                { source: "2026", series: "2026-releases", market: "kenya", slug: "2026-releases-kenya", label: "2026 Releases · Kenya" },
+              ].map((row) => (
+                <tr key={row.slug} className="border-b border-wk-border/50 hover:bg-wk-surface-raised/50">
+                  <td className="px-4 py-2.5">
+                    <code className="text-[11px] bg-wk-surface-raised border border-wk-border rounded px-1.5 py-0.5 text-wk-text-muted">{row.source}</code>
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <code className="text-[11px] text-wk-info">{row.series}</code>
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <code className="text-[11px] text-wk-warning">{row.market}</code>
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <code className="text-[11px] font-bold text-wk-brand">{row.slug}</code>
+                  </td>
+                  <td className="px-4 py-2.5 text-wk-text">{row.label}</td>
+                  <td className="px-4 py-2.5">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-wk-success-soft px-2 py-0.5 text-[10px] font-semibold text-wk-success">
+                      <WkIcon name="Check" size={10} />Active
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </WkSurface>
 
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <AdminChartsKpiCard value={totalFamilies} label="Total Families" icon="FolderTree" accent="muted" />
+        <AdminChartsKpiCard value={families.length} label="Total Programs" icon="FolderTree" accent="muted" />
         <AdminChartsKpiCard value={activeCount} label="Active" icon="CheckCircle2" accent="success" />
-        <AdminChartsKpiCard value={families.filter((f) => f.status === "inactive").length} label="Inactive" icon="PauseCircle" accent="muted" />
-        <AdminChartsKpiCard value={missingSourceCount} label="Missing Sources" icon="AlertTriangle" accent={missingSourceCount > 0 ? "warning" : "muted"} />
+        <AdminChartsKpiCard value={Object.keys(V2_PROGRAMS).length} label="V2 Wired" icon="Link" accent="brand" />
+        <AdminChartsKpiCard value={missingV2Count} label="No V2 Slug" icon="AlertTriangle" accent={missingV2Count > 0 ? "warning" : "muted"} />
       </div>
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative flex-1 min-w-[200px] max-w-md">
-          <i className="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-wk-text-faint text-[13px]" />
-          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search families…" className="w-full rounded-lg border border-wk-border bg-wk-surface py-2 pl-9 pr-3 text-[13px] text-wk-text placeholder:text-wk-text-faint outline-none focus:border-wk-border-strong" />
+          <WkIcon name="Search" size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-wk-text-faint" />
+          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search programs…"
+            className="w-full rounded-lg border border-wk-border bg-wk-surface py-2 pl-9 pr-3 text-[13px] text-wk-text placeholder:text-wk-text-faint outline-none focus:border-wk-border-strong" />
         </div>
         <div className="flex gap-1">
           {["all", "active", "inactive", "archived"].map((s) => (
-            <button key={s} onClick={() => setStatusFilter(s)} className={`whitespace-nowrap rounded-full px-3 py-1.5 text-[12px] font-semibold transition-all ${statusFilter === s ? "bg-wk-brand text-wk-brand-on" : "bg-wk-surface text-wk-text-soft border border-wk-border hover:bg-wk-surface-raised"}`}>
+            <button key={s} onClick={() => setStatusFilter(s)}
+              className={`whitespace-nowrap rounded-full px-3 py-1.5 text-[12px] font-semibold transition-all ${
+                statusFilter === s ? "bg-wk-brand text-wk-brand-on" : "bg-wk-surface text-wk-text-soft border border-wk-border hover:bg-wk-surface-raised"
+              }`}>
               {s === "all" ? "All" : s.charAt(0).toUpperCase() + s.slice(1)}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Families Grid */}
+      {/* Programs Grid */}
       {filtered.length === 0 ? (
-        <AdminChartsEmptyState
-          icon="FolderTree"
-          title="No families found"
-          description="Try clearing your search or create a new chart family."
-          action={{ label: "New Family", onClick: openCreate, icon: "Plus" }}
-        />
+        <AdminChartsEmptyState icon="FolderTree" title="No programs found" description="Try clearing your search or updating filters." />
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {filtered.map((family) => (
-            <FamilyCard
-              key={family.id}
-              family={family}
-              selected={selectedFamily?.id === family.id}
-              onClick={() => setSelectedFamily(selectedFamily?.id === family.id ? null : family)}
-              onIngest={() => navigate("/admin/charts/ingest")}
-              onEdit={() => openEdit(family)}
-              onDuplicate={() => handleDuplicate(family)}
-              onArchive={() => setArchiveTarget(family)}
-            />
-          ))}
+          {filtered.map((family) => {
+            const v2 = getV2Meta(family);
+            return (
+              <ProgramCard
+                key={family.id}
+                family={family}
+                v2={v2}
+                selected={selectedFamily?.id === family.id}
+                onClick={() => setSelectedFamily(selectedFamily?.id === family.id ? null : family)}
+                onIngest={() => navigate("/admin/charts/ingest")}
+                onArchive={() => setArchiveTarget(family)}
+              />
+            );
+          })}
         </div>
       )}
 
       {/* Detail panel */}
-      {selectedFamily && !modalMode && (
+      {selectedFamily && (
         <WkSurface className="p-5">
           <div className="flex items-start justify-between mb-4">
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-[16px] font-bold text-wk-text">{selectedFamily.label}</h2>
-                <AdminChartsStatusBadge status={selectedFamily.status} />
+                <AdminChartsStatusBadge status={selectedFamily.status ?? "active"} />
               </div>
-              <p className="text-[12px] font-mono text-wk-text-muted mt-0.5">{selectedFamily.familyKey}</p>
+              {selectedFamily.publicSlug && (
+                <div className="mt-1 flex items-center gap-2">
+                  <code className="text-[12px] font-bold text-wk-brand bg-wk-brand-soft rounded px-2 py-0.5">{selectedFamily.publicSlug}</code>
+                  <span className="text-[11px] text-wk-text-muted">V2 canonical slug</span>
+                </div>
+              )}
             </div>
             <button onClick={() => setSelectedFamily(null)} className="flex h-8 w-8 items-center justify-center rounded-full text-wk-text-muted hover:bg-wk-surface-raised">
-              <i className="ri-close-line" />
+              <WkIcon name="X" size={16} />
             </button>
           </div>
           <p className="text-[13px] text-wk-text-soft mb-4">{selectedFamily.description}</p>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 mb-4">
-            {[
-              { label: "Chart Size", value: selectedFamily.defaultChartSize },
-              { label: "Frequency", value: selectedFamily.editionFrequency },
-              { label: "Region", value: selectedFamily.defaultRegion },
-              { label: "Ruleset", value: selectedFamily.defaultRuleset },
-              { label: "Scoring Model", value: selectedFamily.defaultScoringModel },
-              { label: "Last Edition", value: selectedFamily.lastEditionDate || "Never" },
-              { label: "Next Expected", value: selectedFamily.nextExpectedDate || "Not scheduled" },
-              { label: "Source URLs", value: `${selectedFamily.sourceUrls.length} configured` },
-            ].map(({ label, value }) => (
-              <div key={label} className="rounded-lg bg-wk-surface-raised p-2.5">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-wk-text-faint">{label}</p>
-                <p className="mt-0.5 text-[13px] font-semibold text-wk-text">{value}</p>
+
+          {/* V2 Program info */}
+          {(() => {
+            const v2 = getV2Meta(selectedFamily);
+            return v2 ? (
+              <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div className="rounded-lg bg-wk-info-soft p-2.5">
+                  <p className="text-[10px] font-bold uppercase text-wk-info">Series</p>
+                  <p className="mt-1 text-[13px] font-semibold text-wk-text">{v2.series}</p>
+                  <p className="text-[11px] text-wk-text-muted">{v2.seriesLabel}</p>
+                </div>
+                <div className="rounded-lg bg-wk-warning-soft p-2.5">
+                  <p className="text-[10px] font-bold uppercase text-wk-warning">Market</p>
+                  <p className="mt-1 text-[13px] font-semibold text-wk-text">{v2.market}</p>
+                  <p className="text-[11px] text-wk-text-muted">{v2.marketLabel}</p>
+                </div>
+                <div className="rounded-lg bg-wk-brand-soft p-2.5">
+                  <p className="text-[10px] font-bold uppercase text-wk-brand">Public Slug</p>
+                  <p className="mt-1 text-[12px] font-bold text-wk-brand font-mono">{v2.publicSlug}</p>
+                </div>
+                <div className="rounded-lg bg-wk-surface-raised p-2.5">
+                  <p className="text-[10px] font-bold uppercase text-wk-text-faint">Chart Size</p>
+                  <p className="mt-1 text-[13px] font-semibold text-wk-text">{selectedFamily.defaultChartSize}</p>
+                  <p className="text-[11px] text-wk-text-muted">{selectedFamily.editionFrequency}</p>
+                </div>
               </div>
-            ))}
-          </div>
-          {selectedFamily.sourceUrls.length === 0 && (
-            <div className="mb-4 rounded-lg border border-wk-warning/20 bg-wk-warning-soft p-3 text-[12px] text-wk-warning">
-              <i className="ri-alert-line mr-1" />
-              No source URLs configured. Ingest Studio cannot fetch data for this family.
-              <button onClick={() => openEdit(selectedFamily)} className="ml-2 font-semibold underline hover:no-underline">Add source URLs</button>
-            </div>
-          )}
+            ) : null;
+          })()}
+
           <div className="flex gap-2 flex-wrap">
-            <button onClick={() => openEdit(selectedFamily)} className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap"><i className="ri-edit-line" /> Edit</button>
-            <button onClick={() => handleDuplicate(selectedFamily)} className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap"><i className="ri-file-copy-line" /> Duplicate</button>
-            <button onClick={() => navigate("/admin/charts/ingest")} className="wk-button wk-button-primary wk-button-sm whitespace-nowrap"><i className="ri-add-line" /> Start Ingest</button>
-            <button onClick={() => navigate("/admin/charts/editions")} className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap"><i className="ri-stack-line" /> View Editions</button>
-            {selectedFamily.status !== "archived" && (
+            <button onClick={() => navigate("/admin/charts/ingest")} className="wk-button wk-button-primary wk-button-sm whitespace-nowrap">
+              <WkIcon name="Plus" size={14} /> Start Ingest
+            </button>
+            <button onClick={() => navigate("/admin/charts/editions")} className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap">
+              <WkIcon name="Layers" size={14} /> View Editions
+            </button>
+            <button onClick={() => navigate("/admin/charts/public-api-qa")} className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap">
+              <WkIcon name="FlaskConical" size={14} /> API QA
+            </button>
+            {(selectedFamily.status ?? "active") !== "archived" && (
               <button onClick={() => setArchiveTarget(selectedFamily)} className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap text-wk-danger border-wk-danger/30 hover:bg-wk-danger-soft">
-                <i className="ri-archive-line" /> Archive
+                <WkIcon name="Archive" size={14} /> Archive
               </button>
             )}
           </div>
@@ -465,24 +329,21 @@ export default function AdminChartsFamilies() {
   );
 }
 
-function FamilyCard({
+function ProgramCard({
   family,
+  v2,
   selected,
   onClick,
   onIngest,
-  onEdit,
-  onDuplicate,
   onArchive,
 }: {
-  family: ChartFamily;
+  family: V2ChartFamily;
+  v2: (typeof V2_PROGRAMS)[string] | null;
   selected: boolean;
   onClick: () => void;
   onIngest: () => void;
-  onEdit: () => void;
-  onDuplicate: () => void;
   onArchive: () => void;
 }) {
-  const hasWarning = family.sourceUrls.length === 0 && family.status === "active";
   return (
     <div
       onClick={onClick}
@@ -490,44 +351,44 @@ function FamilyCard({
         selected
           ? "border-wk-brand bg-wk-brand-soft ring-1 ring-wk-brand"
           : "border-wk-border bg-wk-surface hover:border-wk-border-2 hover:bg-wk-surface-raised"
-      } ${family.status === "archived" ? "opacity-50" : ""}`}
+      } ${(family.status ?? "active") === "archived" ? "opacity-50" : ""}`}
     >
       <div className="flex items-start justify-between">
         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-wk-brand-soft text-wk-brand">
-          <i className="ri-bar-chart-grouped-line text-lg" />
+          <WkIcon name="BarChart3" size={18} />
         </div>
         <div className="flex items-center gap-1.5">
-          {hasWarning && (
-            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-wk-warning-soft text-wk-warning" title="No source URLs">
-              <i className="ri-alert-line text-[12px]" />
-            </div>
+          {v2 && (
+            <span className="rounded-full bg-wk-brand-soft px-1.5 py-0.5 text-[9px] font-bold text-wk-brand">V2</span>
           )}
-          <AdminChartsStatusBadge status={family.status} size="sm" />
+          <AdminChartsStatusBadge status={family.status ?? "active"} size="sm" />
         </div>
       </div>
+
       <h3 className="mt-3 text-[14px] font-bold text-wk-text">{family.label}</h3>
+      {v2 && (
+        <p className="text-[11px] font-mono text-wk-brand mt-0.5">{v2.publicSlug}</p>
+      )}
       <p className="mt-1 text-[12px] text-wk-text-muted line-clamp-2">{family.description}</p>
-      <div className="mt-3 flex flex-wrap gap-1.5">
-        <span className="rounded bg-wk-surface-raised px-1.5 py-0.5 text-[10px] font-semibold text-wk-text-muted">{family.defaultChartSize} tracks</span>
-        <span className="rounded bg-wk-surface-raised px-1.5 py-0.5 text-[10px] font-semibold text-wk-text-muted">{family.defaultRegion}</span>
-        <span className="rounded bg-wk-surface-raised px-1.5 py-0.5 text-[10px] font-semibold text-wk-text-muted">{family.editionFrequency}</span>
-        {family.lastEditionDate && (
-          <span className="rounded bg-wk-surface-raised px-1.5 py-0.5 text-[10px] font-semibold text-wk-text-muted">Last: {family.lastEditionDate}</span>
-        )}
-      </div>
+
+      {v2 && (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          <span className="rounded bg-wk-info-soft px-1.5 py-0.5 text-[10px] font-semibold text-wk-info">{v2.series}</span>
+          <span className="rounded bg-wk-warning-soft px-1.5 py-0.5 text-[10px] font-semibold text-wk-warning">{v2.market}</span>
+          <span className="rounded bg-wk-surface-raised px-1.5 py-0.5 text-[10px] font-semibold text-wk-text-muted">{family.defaultChartSize} tracks</span>
+          <span className="rounded bg-wk-surface-raised px-1.5 py-0.5 text-[10px] font-semibold text-wk-text-muted">{family.editionFrequency}</span>
+        </div>
+      )}
+
       <div className="mt-3 flex gap-1 flex-wrap">
-        <button onClick={(e) => { e.stopPropagation(); onIngest(); }} disabled={family.status !== "active"} className="wk-button wk-button-primary wk-button-sm whitespace-nowrap disabled:opacity-40" title={family.status !== "active" ? "Activate this family to start ingest" : undefined}>
-          <i className="ri-add-line" /> Ingest
+        <button onClick={(e) => { e.stopPropagation(); onIngest(); }}
+          className="wk-button wk-button-primary wk-button-sm whitespace-nowrap">
+          <WkIcon name="Plus" size={12} /> Ingest
         </button>
-        <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap">
-          <i className="ri-edit-line" />
-        </button>
-        <button onClick={(e) => { e.stopPropagation(); onDuplicate(); }} className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap">
-          <i className="ri-file-copy-line" />
-        </button>
-        {family.status !== "archived" && (
-          <button onClick={(e) => { e.stopPropagation(); onArchive(); }} className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap text-wk-danger border-wk-danger/20">
-            <i className="ri-archive-line" />
+        {(family.status ?? "active") !== "archived" && (
+          <button onClick={(e) => { e.stopPropagation(); onArchive(); }}
+            className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap text-wk-danger border-wk-danger/20">
+            <WkIcon name="Archive" size={12} />
           </button>
         )}
       </div>

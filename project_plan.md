@@ -80,12 +80,44 @@ Without credentials: deterministic mock data (same URL = same tracks, reproducib
 
 **Edge Function:** `charts-ingest-dry-run` ready to deploy when Supabase is connected (server-side credential storage).
 
-### 🔲 Sprint 4 — Canonical Matching + Review Gaps
-- Replace provisional match logic with real registry lookups (WAKILISHA entity graph)
-- Review Queue page: show rows needing manual resolution
-- No-match queue: release shells, gap tracking
-- Canon gap reporting against existing editions
-- Confidence threshold configuration
+### ✅ Sprint 4 — Entity Enrichment Hardening + V2 Alignment (COMPLETE)
+
+**Canonical Matching Engine** (`canonicalMatch.ts`)
+- Real registry search against canonical tracks with ISRC, provider ID, and fuzzy title/artist scoring
+- Deterministic confidence scoring: ISRC = 99%, provider ID = 97%, title+artist strong = ~85%+
+- Proper `matchStatus` assignment: `canonical | shell | no_match | needs_review | duplicate_candidate`
+- Release shell IDs auto-generated for no/low match rows
+- Full match decision API: Accept canonical, Change match, Attach, Create shell, Merge shell, Mark duplicate, Ignore, Send to review
+
+**Enrichment Pipeline** (`enrichment.ts`)
+- Spotify Web API enrichment (artwork, preview, ISRC, popularity, label)
+- Apple Music JWT preview enrichment
+- ACRCloud audio fingerprint/metadata with server-side proxy note
+- YouTube oEmbed/search for video IDs and preview URLs
+- All 4 providers fail gracefully — exact env var names shown in UI when missing
+- `checkEnrichmentCredentials()` returns structured `CredentialError[]` with exact var names
+
+**Updated UI:** Pipeline Panel, Provider Health Panel, Run Metadata Panel, Resolved Rows Table, PublishChecklist, MatchSummary — all real, no stubs.
+
+### 🔄 Sprint 5 — Admin Charts Refactor + V2 Charts Integration (IN PROGRESS)
+
+**Goals:**
+1. Align all admin/charts/* pages with V2 ontology (ChartSeries, ChartMarket, ChartProgram, ChartEdition)
+2. Migrate all admin pages from `ri-*` + `var(--wk-*)` inline CSS to `WkIcon` + `wk-*` Tailwind tokens
+3. Connect `public-api-qa` page to test V2 endpoints (not just V1)
+4. Surface V2 endpoints prominently in `integration-map` page
+5. Connect `editions` page to real V2 data via `v2Adapter.ts`
+6. Update `families` page to use V2 program terminology (series + market structure)
+7. Fix route conflict: remove `/admin/charts/ingest/:runId` duplicate (use `ingest-runs/:runId` only)
+8. Ensure every page uses `WkIcon` (Lucide) — no `ri-*` remains in admin/charts
+
+**V2 Ontology Reference:**
+| V2 Concept | Old Name | V2 Public Slug |
+|---|---|---|
+| ChartSeries | family type | `top-songs`, `rnb`, `gengetone`, `2026-releases` |
+| ChartMarket | region | `kenya`, `nigeria`, `south-africa` |
+| ChartProgram | chart family | `top-songs-kenya`, `rnb-kenya` |
+| ChartEdition | edition | `rnb-2026-05-18` |
 
 ## 4. Adapter Architecture
 
@@ -142,3 +174,16 @@ All endpoints require `X-WP-Nonce` header injected via `wp_localize_script` as `
   "rows": [{ "id": "row-001", "rank": 1, "title": "...", "matchStatus": "canonical", "confidence": 98 }]
 }
 ```
+
+## 6. V2 Endpoint Map (Sprint 5+)
+
+| Method | Path | Frontend function |
+|---|---|---|
+| GET | /wp-json/wakilisha/v2/charts | `getV2ChartFamilies()` |
+| GET | /wp-json/wakilisha/v2/charts/{programSlug} | `getV2ChartFamily(slug)` |
+| GET | /wp-json/wakilisha/v2/charts/{programSlug}/latest | `getV2LatestChartEdition(slug)` |
+| GET | /wp-json/wakilisha/v2/charts/{programSlug}/{editionSlug} | `getV2ChartEdition(slug, edition)` |
+| GET | /wp-json/wakilisha/v2/charts/{programSlug}/{editionSlug}/entries | `getV2ChartEditionEntries(slug, edition)` |
+| GET | /wp-json/wakilisha/v2/charts/resolve/{slug} | `resolveV2Alias(slug)` |
+| GET | /wp-json/wakilisha/v2/tracks/{trackSlug}/chart-history | `getV2TrackChartHistory(slug)` |
+| GET | /wp-json/wakilisha/v2/charts/health | `testPublicV2Connection()` |

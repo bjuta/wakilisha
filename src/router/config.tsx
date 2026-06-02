@@ -123,7 +123,6 @@ const routes: RouteObject[] = [
       { path: "dashboard", element: <AdminChartsDashboard /> },
       { path: "families", element: <AdminChartsFamilies /> },
       { path: "ingest", element: <AdminChartsIngest /> },
-      { path: "ingest/:runId", element: <AdminChartsIngestRunDetail /> },
       { path: "ingest-runs", element: <AdminChartsIngestRuns /> },
       { path: "ingest-runs/:runId", element: <AdminChartsIngestRunDetail /> },
       { path: "ingest-jobs", element: <AdminChartsLegacyIngestJobs /> },

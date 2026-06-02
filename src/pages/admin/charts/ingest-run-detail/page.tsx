@@ -1,11 +1,69 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { getIngestRun, getResourceGuardStatus, commitIngestRun, cancelIngestRun, retryIngestRun, sendGapsToReview } from "@/services/chartsIngestion/client";
+import {
+  getIngestRun,
+  getResourceGuardStatus,
+  cancelIngestRun,
+  retryIngestRun,
+  sendGapsToReview,
+} from "@/services/chartsIngestion/client";
 import type { IngestRun, IngestStageStatus, ResourceGuardStatus } from "@/services/chartsIngestion/ingestStudioTypes";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
+import { WkIcon } from "@/components/design-system/Icon";
 
 const POLLING_INTERVAL_MS = 3000;
 const TERMINAL_STATUSES = new Set(["dry_run_complete", "committed", "failed", "cancelled", "needs_review"]);
+
+function stageStatusColor(status: IngestStageStatus["status"]): string {
+  switch (status) {
+    case "done": return "bg-wk-success text-wk-brand-on";
+    case "running": return "bg-wk-info text-wk-brand-on animate-pulse";
+    case "warning": return "bg-wk-warning text-wk-brand-on";
+    case "failed": return "bg-wk-danger text-wk-brand-on";
+    default: return "bg-wk-surface-raised text-wk-text-faint";
+  }
+}
+
+function stageStatusLabel(status: IngestStageStatus["status"]): string {
+  switch (status) {
+    case "done": return "Done";
+    case "running": return "Running";
+    case "warning": return "Warning";
+    case "failed": return "Failed";
+    default: return "Idle";
+  }
+}
+
+function stageName(stage: string): string {
+  const names: Record<string, string> = {
+    validate: "Input & Validation",
+    provider_detection: "Provider Detection",
+    resource_guard: "Resource Guard",
+    source_fetch: "Source Fetch",
+    normalize: "Normalize",
+    canonical_match: "Canonical Match",
+    enrichment: "Enrichment",
+    snapshot_commit: "Snapshot / Commit",
+  };
+  return names[stage] || stage;
+}
+
+function RunStatusBadge({ status }: { status: string }) {
+  const styles: Record<string, string> = {
+    committed: "bg-wk-success-soft text-wk-success",
+    failed: "bg-wk-danger-soft text-wk-danger",
+    running: "bg-wk-info-soft text-wk-info",
+    dry_run_complete: "bg-wk-warning-soft text-wk-warning",
+    needs_review: "bg-wk-warning-soft text-wk-warning",
+    cancelled: "bg-wk-surface-raised text-wk-text-muted",
+  };
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${styles[status] ?? "bg-wk-surface-raised text-wk-text-muted"}`}>
+      {status === "running" && <WkIcon name="Loader" size={10} className="animate-spin" />}
+      {status.replace(/_/g, " ")}
+    </span>
+  );
+}
 
 export default function AdminChartsIngestRunDetail() {
   const { runId } = useParams<{ runId: string }>();
@@ -15,12 +73,13 @@ export default function AdminChartsIngestRunDetail() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [isPolling, setIsPolling] = useState(false);
+  const [commitNotice, setCommitNotice] = useState(false);
 
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   function startPolling(currentRun: IngestRun) {
     if (TERMINAL_STATUSES.has(currentRun.status)) return;
-    if (pollingRef.current) return; // already polling
+    if (pollingRef.current) return;
     setIsPolling(true);
     pollingRef.current = setInterval(async () => {
       if (!runId) return;
@@ -28,9 +87,7 @@ export default function AdminChartsIngestRunDetail() {
         const updated = await getIngestRun(runId);
         if (updated) {
           setRun(updated);
-          if (TERMINAL_STATUSES.has(updated.status)) {
-            stopPolling();
-          }
+          if (TERMINAL_STATUSES.has(updated.status)) stopPolling();
         }
       } catch {
         stopPolling();
@@ -59,20 +116,15 @@ export default function AdminChartsIngestRunDetail() {
     return () => stopPolling();
   }, [runId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Re-evaluate polling whenever run status changes externally
   useEffect(() => {
     if (!run) return;
-    if (TERMINAL_STATUSES.has(run.status)) {
-      stopPolling();
-    } else {
-      startPolling(run);
-    }
+    if (TERMINAL_STATUSES.has(run.status)) stopPolling();
+    else startPolling(run);
   }, [run?.status]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleCommit() {
-    if (!runId) return;
-    // Commit gated until Sprint 5
-    alert("Commit is gated until Sprint 5. All required pipeline checks must pass and the snapshot persistence layer must be complete before an edition can be committed.");
+    setCommitNotice(true);
+    setTimeout(() => setCommitNotice(false), 6000);
   }
 
   async function handleCancel() {
@@ -114,94 +166,70 @@ export default function AdminChartsIngestRunDetail() {
 
   if (loading) {
     return (
-      <div className="flex h-64 items-center justify-center">
-        <div className="text-[var(--wk-text-muted)]">Loading run details...</div>
+      <div className="flex h-64 items-center justify-center gap-3">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-wk-brand/30 border-t-wk-brand" />
+        <span className="text-[13px] text-wk-text-muted">Loading run details…</span>
       </div>
     );
   }
 
   if (!run) {
     return (
-      <div className="flex h-64 items-center justify-center">
-        <div className="text-[var(--wk-text-muted)]">Run not found</div>
+      <div className="flex h-64 flex-col items-center justify-center gap-3">
+        <WkIcon name="AlertCircle" size={32} className="text-wk-text-faint" />
+        <p className="text-[14px] font-semibold text-wk-text-muted">Run not found</p>
+        <button onClick={() => navigate("/admin/charts/ingest-runs")} className="wk-button wk-button-ghost wk-button-sm">
+          Back to Runs
+        </button>
       </div>
     );
   }
 
-  const stageStatusColor = (status: IngestStageStatus["status"]) => {
-    switch (status) {
-      case "done": return "bg-[var(--wk-success)]";
-      case "running": return "bg-[var(--wk-info)] animate-pulse";
-      case "warning": return "bg-[var(--wk-warning)]";
-      case "failed": return "bg-[var(--wk-danger)]";
-      default: return "bg-[var(--wk-surface-raised)]";
-    }
-  };
-
-  const stageStatusLabel = (status: IngestStageStatus["status"]) => {
-    switch (status) {
-      case "done": return "Done";
-      case "running": return "Running";
-      case "warning": return "Warning";
-      case "failed": return "Failed";
-      default: return "Idle";
-    }
-  };
-
-  const stageName = (stage: string) => {
-    const names: Record<string, string> = {
-      validate: "Validate",
-      provider_detection: "Provider Detection",
-      resource_guard: "Resource Guard",
-      source_fetch: "Source Fetch",
-      normalize: "Normalize",
-      canonical_match: "Canonical Match",
-      enrichment: "Enrichment",
-      snapshot_commit: "Snapshot / Commit",
-    };
-    return names[stage] || stage;
-  };
-
+  const doneStages = run.stages.filter((s) => s.status === "done").length;
+  const progressPct = Math.round((doneStages / run.stages.length) * 100);
   const canCommit = run.status === "dry_run_complete" || run.status === "ready_to_commit";
   const canCancel = run.status === "running" || run.status === "dry_run_complete" || run.status === "ready_to_commit";
   const canRetry = run.status === "failed" || run.status === "cancelled";
   const canSendGaps = run.status === "dry_run_complete" && run.summary.gaps > 0;
 
-  // Pipeline progress bar
-  const doneStages = run.stages.filter((s) => s.status === "done").length;
-  const progressPct = Math.round((doneStages / run.stages.length) * 100);
-
   return (
     <div className="space-y-6">
+      {/* Commit Sprint 5 notice */}
+      {commitNotice && (
+        <div className="rounded-lg border border-wk-warning/20 bg-wk-warning-soft p-4">
+          <div className="flex items-center gap-2">
+            <WkIcon name="Lock" size={16} className="text-wk-warning" />
+            <div>
+              <p className="text-[13px] font-bold text-wk-warning">Commit gated until Sprint 5</p>
+              <p className="text-[12px] text-wk-text mt-0.5">
+                All required pipeline checks must pass and the snapshot persistence layer must be complete before committing an edition.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap mb-1">
             <button
               onClick={() => navigate("/admin/charts/ingest-runs")}
-              className="text-[var(--wk-text-muted)] hover:text-[var(--wk-text)] transition-colors text-[13px]"
+              className="text-[13px] font-semibold text-wk-text-muted hover:text-wk-text transition-colors inline-flex items-center gap-1"
             >
-              <i className="ri-arrow-left-line" /> Runs
+              <WkIcon name="ChevronLeft" size={14} />
+              Runs
             </button>
-            <span className="text-[var(--wk-text-muted)]">/</span>
-            <h1 className="text-[18px] font-bold text-[var(--wk-text)]">{run.chartTitle}</h1>
-            <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
-              run.status === "committed" ? "bg-[var(--wk-success-soft)] text-[var(--wk-success)]" :
-              run.status === "failed" ? "bg-[var(--wk-danger-soft)] text-[var(--wk-danger)]" :
-              run.status === "running" ? "bg-[var(--wk-info-soft)] text-[var(--wk-info)]" :
-              run.status === "dry_run_complete" ? "bg-[var(--wk-warning-soft)] text-[var(--wk-warning)]" :
-              "bg-[var(--wk-surface-raised)] text-[var(--wk-text-muted)]"
-            }`}>
-              {run.status === "running" && <i className="ri-loader-4-line animate-spin mr-1 text-[10px]" />}
-              {run.status.replace(/_/g, " ")}
-            </span>
+            <WkIcon name="ChevronRight" size={12} className="text-wk-text-faint" />
+            <h1 className="text-[18px] font-bold text-wk-text">{run.chartTitle}</h1>
+            <RunStatusBadge status={run.status} />
             {isPolling && (
-              <span className="flex items-center gap-1 text-[11px] text-[var(--wk-info)]">
-                <i className="ri-wifi-line" /> Live
+              <span className="flex items-center gap-1 text-[11px] font-semibold text-wk-info">
+                <span className="h-1.5 w-1.5 rounded-full bg-wk-info animate-pulse" />Live
               </span>
             )}
           </div>
-          <p className="text-[12px] text-[var(--wk-text-muted)]">
+          <p className="text-[12px] text-wk-text-muted">
             {run.id} &bull; {run.editionDate} &bull; {run.chartSize} tracks &bull; {run.market}
           </p>
         </div>
@@ -212,8 +240,8 @@ export default function AdminChartsIngestRunDetail() {
               disabled={actionLoading === "commit"}
               className="wk-button wk-button-primary whitespace-nowrap disabled:opacity-50"
             >
-              <i className="ri-check-line" />
-              {actionLoading === "commit" ? "Committing..." : "Commit Edition"}
+              <WkIcon name={actionLoading === "commit" ? "Loader" : "Lock"} size={14} className={actionLoading === "commit" ? "animate-spin" : ""} />
+              {actionLoading === "commit" ? "Committing…" : "Commit Edition (Sprint 5)"}
             </button>
           )}
           {canSendGaps && (
@@ -222,8 +250,8 @@ export default function AdminChartsIngestRunDetail() {
               disabled={actionLoading === "gaps"}
               className="wk-button wk-button-ghost whitespace-nowrap disabled:opacity-50"
             >
-              <i className="ri-send-plane-line" />
-              {actionLoading === "gaps" ? "Sending..." : `Send ${run.summary.gaps} Gaps to Review`}
+              <WkIcon name={actionLoading === "gaps" ? "Loader" : "Send"} size={14} className={actionLoading === "gaps" ? "animate-spin" : ""} />
+              {actionLoading === "gaps" ? "Sending…" : `Send ${run.summary.gaps} Gaps to Review`}
             </button>
           )}
           {canCancel && (
@@ -232,8 +260,8 @@ export default function AdminChartsIngestRunDetail() {
               disabled={actionLoading === "cancel"}
               className="wk-button wk-button-danger whitespace-nowrap disabled:opacity-50"
             >
-              <i className="ri-close-line" />
-              {actionLoading === "cancel" ? "Cancelling..." : "Cancel"}
+              <WkIcon name={actionLoading === "cancel" ? "Loader" : "XCircle"} size={14} className={actionLoading === "cancel" ? "animate-spin" : ""} />
+              {actionLoading === "cancel" ? "Cancelling…" : "Cancel"}
             </button>
           )}
           {canRetry && (
@@ -242,57 +270,60 @@ export default function AdminChartsIngestRunDetail() {
               disabled={actionLoading === "retry"}
               className="wk-button wk-button-ghost whitespace-nowrap disabled:opacity-50"
             >
-              <i className="ri-refresh-line" />
-              {actionLoading === "retry" ? "Retrying..." : "Retry"}
+              <WkIcon name={actionLoading === "retry" ? "Loader" : "RefreshCw"} size={14} className={actionLoading === "retry" ? "animate-spin" : ""} />
+              {actionLoading === "retry" ? "Retrying…" : "Retry"}
             </button>
           )}
         </div>
       </div>
 
       {/* Pipeline */}
-      <WkSurface className="p-4">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-[14px] font-bold text-[var(--wk-text)]">Ingestion Pipeline</h2>
+      <WkSurface className="p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <WkIcon name="GitBranch" size={16} className="text-wk-brand" />
+            <h2 className="text-[14px] font-bold text-wk-text">Ingestion Pipeline</h2>
+          </div>
           {run.status === "running" && (
             <div className="flex items-center gap-2">
-              <div className="h-1.5 w-32 rounded-full bg-[var(--wk-surface-raised)] overflow-hidden">
+              <div className="h-1.5 w-32 rounded-full bg-wk-surface-raised overflow-hidden">
                 <div
-                  className="h-full rounded-full bg-[var(--wk-info)] transition-all duration-700"
+                  className="h-full rounded-full bg-wk-info transition-all duration-700"
                   style={{ width: `${progressPct}%` }}
                 />
               </div>
-              <span className="text-[11px] font-semibold text-[var(--wk-info)]">{progressPct}%</span>
+              <span className="text-[11px] font-semibold text-wk-info">{progressPct}%</span>
             </div>
           )}
         </div>
         <div className="space-y-3">
           {run.stages.map((stage, i) => (
-            <div key={stage.stage} className="flex items-center gap-3">
-              <div className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold text-[var(--wk-brand-on)] ${stageStatusColor(stage.status)}`}>
-                {stage.status === "done" ? <i className="ri-check-line" /> : i + 1}
+            <div key={stage.stage} className="flex items-start gap-3">
+              <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${stageStatusColor(stage.status)}`}>
+                {stage.status === "done" ? <WkIcon name="Check" size={14} /> : <span>{i + 1}</span>}
               </div>
-              <div className="flex-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-[13px] font-semibold text-[var(--wk-text)]">{stageName(stage.stage)}</span>
+              <div className="flex-1 pt-0.5">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <span className="text-[13px] font-semibold text-wk-text">{stageName(stage.stage)}</span>
                   <span className={`text-[11px] font-semibold ${
-                    stage.status === "done" ? "text-[var(--wk-success)]" :
-                    stage.status === "running" ? "text-[var(--wk-info)]" :
-                    stage.status === "failed" ? "text-[var(--wk-danger)]" :
-                    stage.status === "warning" ? "text-[var(--wk-warning)]" :
-                    "text-[var(--wk-text-muted)]"
+                    stage.status === "done" ? "text-wk-success" :
+                    stage.status === "running" ? "text-wk-info" :
+                    stage.status === "failed" ? "text-wk-danger" :
+                    stage.status === "warning" ? "text-wk-warning" :
+                    "text-wk-text-muted"
                   }`}>
                     {stageStatusLabel(stage.status)}
                     {stage.durationMs ? ` (${(stage.durationMs / 1000).toFixed(1)}s)` : ""}
                   </span>
                 </div>
                 {stage.message && (
-                  <p className="text-[11px] text-[var(--wk-text-muted)]">{stage.message}</p>
+                  <p className="text-[11px] text-wk-text-muted mt-0.5">{stage.message}</p>
                 )}
-                {stage.metrics && (
-                  <div className="mt-1 flex flex-wrap gap-2">
+                {stage.metrics && Object.keys(stage.metrics).length > 0 && (
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
                     {Object.entries(stage.metrics).map(([k, v]) => (
-                      <span key={k} className="rounded bg-[var(--wk-surface-raised)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--wk-text-muted)]">
-                        {k}: {String(v)}
+                      <span key={k} className="rounded-md bg-wk-surface-raised border border-wk-border px-1.5 py-0.5 text-[10px] font-semibold text-wk-text-muted">
+                        {k.replace(/_/g, " ")}: {String(v)}
                       </span>
                     ))}
                   </div>
@@ -305,69 +336,77 @@ export default function AdminChartsIngestRunDetail() {
 
       {/* Summary + Resource Guard */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <WkSurface className="p-4">
-          <h2 className="mb-3 text-[14px] font-bold text-[var(--wk-text)]">Match Summary</h2>
+        <WkSurface className="p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <WkIcon name="BarChart3" size={16} className="text-wk-brand" />
+            <h2 className="text-[14px] font-bold text-wk-text">Match Summary</h2>
+          </div>
           <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-lg bg-[var(--wk-surface-raised)] p-3">
-              <p className="text-[11px] text-[var(--wk-text-muted)]">Total Rows</p>
-              <p className="text-[18px] font-bold text-[var(--wk-text)]">{run.summary.totalRows}</p>
+            {[
+              { label: "Total Rows", value: run.summary.totalRows, color: "" },
+              { label: "Canonical", value: run.summary.canonicalMatches, color: "text-wk-success" },
+              { label: "Shells", value: run.summary.shells, color: "text-wk-warning" },
+              { label: "Gaps", value: run.summary.gaps, color: "text-wk-danger" },
+              { label: "Duplicates", value: run.summary.duplicateCandidates, color: "text-wk-text-soft" },
+              { label: "Match Rate", value: `${run.summary.matchRate.toFixed(1)}%`, color: "text-wk-brand" },
+            ].map(({ label, value, color }) => (
+              <div key={label} className="rounded-lg bg-wk-surface-raised p-3">
+                <p className="text-[11px] text-wk-text-muted mb-1">{label}</p>
+                <p className={`text-[20px] font-black ${color || "text-wk-text"}`}>{value}</p>
+              </div>
+            ))}
+          </div>
+          {/* Match rate bar */}
+          <div className="mt-3">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[11px] text-wk-text-muted">Match rate</span>
+              <span className="text-[11px] font-semibold text-wk-brand">{run.summary.matchRate.toFixed(1)}%</span>
             </div>
-            <div className="rounded-lg bg-[var(--wk-surface-raised)] p-3">
-              <p className="text-[11px] text-[var(--wk-text-muted)]">Canonical</p>
-              <p className="text-[18px] font-bold text-[var(--wk-success)]">{run.summary.canonicalMatches}</p>
-            </div>
-            <div className="rounded-lg bg-[var(--wk-surface-raised)] p-3">
-              <p className="text-[11px] text-[var(--wk-text-muted)]">Shells</p>
-              <p className="text-[18px] font-bold text-[var(--wk-warning)]">{run.summary.shells}</p>
-            </div>
-            <div className="rounded-lg bg-[var(--wk-surface-raised)] p-3">
-              <p className="text-[11px] text-[var(--wk-text-muted)]">Gaps</p>
-              <p className="text-[18px] font-bold text-[var(--wk-danger)]">{run.summary.gaps}</p>
-            </div>
-            <div className="rounded-lg bg-[var(--wk-surface-raised)] p-3">
-              <p className="text-[11px] text-[var(--wk-text-muted)]">Duplicates</p>
-              <p className="text-[18px] font-bold text-[var(--wk-text-soft)]">{run.summary.duplicateCandidates}</p>
-            </div>
-            <div className="rounded-lg bg-[var(--wk-surface-raised)] p-3">
-              <p className="text-[11px] text-[var(--wk-text-muted)]">Match Rate</p>
-              <p className="text-[18px] font-bold text-[var(--wk-brand)]">{run.summary.matchRate.toFixed(1)}%</p>
+            <div className="h-2 w-full rounded-full bg-wk-surface-raised overflow-hidden">
+              <div
+                className={`h-full rounded-full ${run.summary.matchRate >= 85 ? "bg-wk-success" : run.summary.matchRate >= 70 ? "bg-wk-warning" : "bg-wk-danger"}`}
+                style={{ width: `${run.summary.matchRate}%` }}
+              />
             </div>
           </div>
         </WkSurface>
 
-        <WkSurface className="p-4">
-          <h2 className="mb-3 text-[14px] font-bold text-[var(--wk-text)]">Resource Guard</h2>
+        <WkSurface className="p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <WkIcon name="ShieldCheck" size={16} className="text-wk-brand" />
+            <h2 className="text-[14px] font-bold text-wk-text">Resource Guard</h2>
+          </div>
           {guard ? (
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-[13px] text-[var(--wk-text-soft)]">Sources</span>
-                <span className="text-[13px] font-semibold text-[var(--wk-text)]">{guard.sourceCount}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-[13px] text-[var(--wk-text-soft)]">Provider Budget</span>
-                <span className="text-[13px] font-semibold text-[var(--wk-text)]">{guard.providerBudgetRemaining}%</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-[13px] text-[var(--wk-text-soft)]">Worker Concurrency</span>
-                <span className="text-[13px] font-semibold text-[var(--wk-text)]">{guard.workerConcurrency}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-[13px] text-[var(--wk-text-soft)]">Est. Rows</span>
-                <span className="text-[13px] font-semibold text-[var(--wk-text)]">{guard.estimatedRowCount}</span>
-              </div>
+              {[
+                { label: "Sources", value: String(guard.sourceCount) },
+                { label: "Provider Budget Remaining", value: `${guard.providerBudgetRemaining}%` },
+                { label: "Worker Concurrency", value: String(guard.workerConcurrency) },
+                { label: "Estimated Rows", value: String(guard.estimatedRowCount) },
+              ].map(({ label, value }) => (
+                <div key={label} className="flex items-center justify-between rounded-lg bg-wk-surface-raised px-3 py-2">
+                  <span className="text-[12px] text-wk-text-soft">{label}</span>
+                  <span className="text-[12px] font-semibold text-wk-text">{value}</span>
+                </div>
+              ))}
               {guard.duplicateRunWarning && (
-                <div className="rounded bg-[var(--wk-warning-soft)] p-2 text-[12px] text-[var(--wk-warning)]">
-                  <i className="ri-alert-line mr-1" />{guard.duplicateRunWarning}
+                <div className="rounded-lg border border-wk-warning/20 bg-wk-warning-soft p-2.5 flex items-center gap-2 text-[12px] text-wk-warning">
+                  <WkIcon name="AlertTriangle" size={14} />
+                  {guard.duplicateRunWarning}
                 </div>
               )}
               {guard.sameEditionDateWarning && (
-                <div className="rounded bg-[var(--wk-warning-soft)] p-2 text-[12px] text-[var(--wk-warning)]">
-                  <i className="ri-alert-line mr-1" />{guard.sameEditionDateWarning}
+                <div className="rounded-lg border border-wk-warning/20 bg-wk-warning-soft p-2.5 flex items-center gap-2 text-[12px] text-wk-warning">
+                  <WkIcon name="AlertTriangle" size={14} />
+                  {guard.sameEditionDateWarning}
                 </div>
               )}
             </div>
           ) : (
-            <p className="text-[13px] text-[var(--wk-text-muted)]">Resource guard data not available</p>
+            <div className="flex flex-col items-center justify-center py-8 gap-2">
+              <WkIcon name="ShieldOff" size={24} className="text-wk-text-faint" />
+              <p className="text-[13px] text-wk-text-muted">Resource guard data not available</p>
+            </div>
           )}
         </WkSurface>
       </div>
@@ -375,66 +414,80 @@ export default function AdminChartsIngestRunDetail() {
       {/* Resolved Rows */}
       {run.rows.length > 0 && (
         <WkSurface className="overflow-hidden">
-          <div className="flex items-center justify-between p-4 pb-0">
-            <h2 className="text-[14px] font-bold text-[var(--wk-text)]">Resolved Rows</h2>
-            <span className="text-[12px] text-[var(--wk-text-muted)]">{run.rows.length} rows</span>
+          <div className="flex items-center justify-between px-5 py-4 border-b border-wk-border">
+            <div className="flex items-center gap-2">
+              <WkIcon name="ListChecks" size={16} className="text-wk-brand" />
+              <h2 className="text-[14px] font-bold text-wk-text">Resolved Rows</h2>
+            </div>
+            <span className="text-[12px] text-wk-text-muted">{run.rows.length} rows</span>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-[13px]">
               <thead>
-                <tr className="border-b border-[var(--wk-border)]">
-                  <th className="px-4 py-3 font-semibold text-[var(--wk-text-muted)]">#</th>
-                  <th className="px-4 py-3 font-semibold text-[var(--wk-text-muted)]">Title</th>
-                  <th className="px-4 py-3 font-semibold text-[var(--wk-text-muted)]">Artist</th>
-                  <th className="px-4 py-3 font-semibold text-[var(--wk-text-muted)]">Provider</th>
-                  <th className="px-4 py-3 font-semibold text-[var(--wk-text-muted)]">Match</th>
-                  <th className="px-4 py-3 font-semibold text-[var(--wk-text-muted)]">Confidence</th>
-                  <th className="px-4 py-3 font-semibold text-[var(--wk-text-muted)]">Candidates</th>
-                  <th className="px-4 py-3 font-semibold text-[var(--wk-text-muted)]">Warnings</th>
+                <tr className="border-b border-wk-border">
+                  {["#", "Track", "Artist", "Provider", "Match", "Confidence", "Candidates", "Warnings"].map((h) => (
+                    <th key={h} className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-wk-text-muted">{h}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {run.rows.map((row) => (
-                  <tr key={row.id} className="border-b border-[var(--wk-border)]/50 transition-colors hover:bg-[var(--wk-surface-raised)]/50">
-                    <td className="px-4 py-3 font-bold text-[var(--wk-text)]">{row.rank}</td>
+                  <tr key={row.id} className="border-b border-wk-border/50 transition-colors hover:bg-wk-surface-raised/50">
+                    <td className="px-4 py-3 font-bold text-wk-text">{row.rank}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        {row.artworkUrl && (
-                          <img src={row.artworkUrl} alt="" className="h-8 w-8 rounded object-cover" />
-                        )}
-                        <span className="font-semibold text-[var(--wk-text)]">{row.title}</span>
+                        {row.artworkUrl && <img src={row.artworkUrl} alt="" className="h-8 w-8 rounded object-cover shrink-0" />}
+                        <span className="font-semibold text-wk-text">{row.title}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-[var(--wk-text-soft)]">{row.artistNames.join(", ")}</td>
+                    <td className="px-4 py-3 text-wk-text-soft">{row.artistNames.join(", ")}</td>
                     <td className="px-4 py-3">
-                      <span className="rounded bg-[var(--wk-surface-raised)] px-1.5 py-0.5 text-[11px] font-semibold text-[var(--wk-text-soft)] border border-[var(--wk-border)]">
+                      <span className="rounded-md bg-wk-surface-raised border border-wk-border px-1.5 py-0.5 text-[11px] font-semibold text-wk-text-soft">
                         {row.sourceProvider === "spotify" ? "Spotify" : "Apple"}
                       </span>
                     </td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                        row.matchStatus === "canonical" ? "bg-[var(--wk-success-soft)] text-[var(--wk-success)]" :
-                        row.matchStatus === "shell" ? "bg-[var(--wk-warning-soft)] text-[var(--wk-warning)]" :
-                        row.matchStatus === "no_match" ? "bg-[var(--wk-danger-soft)] text-[var(--wk-danger)]" :
-                        row.matchStatus === "needs_review" ? "bg-[var(--wk-info-soft)] text-[var(--wk-info)]" :
-                        "bg-[var(--wk-surface-raised)] text-[var(--wk-text-muted)]"
+                        row.matchStatus === "canonical" ? "bg-wk-success-soft text-wk-success" :
+                        row.matchStatus === "shell" ? "bg-wk-warning-soft text-wk-warning" :
+                        row.matchStatus === "no_match" ? "bg-wk-danger-soft text-wk-danger" :
+                        row.matchStatus === "needs_review" ? "bg-wk-info-soft text-wk-info" :
+                        "bg-wk-surface-raised text-wk-text-muted"
                       }`}>
                         {row.matchStatus.replace(/_/g, " ")}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-[var(--wk-text-soft)]">{row.confidence}%</td>
                     <td className="px-4 py-3">
-                      <span className="text-[11px] text-[var(--wk-text-muted)]">{row.canonicalTrackId ? <span className="font-mono text-[10px]">{row.canonicalTrackId.slice(0, 16)}</span> : row.releaseShellId ? <span className="text-[var(--wk-warning)] font-mono text-[10px]">{row.releaseShellId.slice(0, 16)}</span> : "—"}</span>
+                      <div className="flex items-center gap-2">
+                        <div className="h-1.5 w-10 rounded-full bg-wk-surface-raised overflow-hidden">
+                          <div
+                            className={`h-full rounded-full ${row.confidence >= 80 ? "bg-wk-success" : row.confidence >= 60 ? "bg-wk-warning" : "bg-wk-danger"}`}
+                            style={{ width: `${row.confidence}%` }}
+                          />
+                        </div>
+                        <span className="text-[12px] font-semibold text-wk-text-soft">{row.confidence}%</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-[11px] text-wk-text-muted font-mono">
+                        {row.canonicalTrackId
+                          ? <span className="text-wk-success">{row.canonicalTrackId.slice(0, 12)}…</span>
+                          : row.releaseShellId
+                            ? <span className="text-wk-warning">{row.releaseShellId.slice(0, 12)}…</span>
+                            : "—"}
+                      </span>
                     </td>
                     <td className="px-4 py-3">
                       {row.warnings && row.warnings.length > 0 ? (
-                        <span className="text-[11px] text-[var(--wk-warning)]" title={row.warnings.join("; ")}>
-                          <i className="ri-alert-line mr-1" />{row.warnings.length} warning{row.warnings.length > 1 ? "s" : ""}
-                        </span>
+                        <div className="flex items-center gap-1 text-[11px] text-wk-warning">
+                          <WkIcon name="AlertTriangle" size={12} />
+                          <span>{row.warnings.length} warning{row.warnings.length > 1 ? "s" : ""}</span>
+                        </div>
                       ) : (
-                        <span className="text-[11px] text-[var(--wk-success)]">
-                          <i className="ri-check-line mr-1" />OK
-                        </span>
+                        <div className="flex items-center gap-1 text-[11px] text-wk-success">
+                          <WkIcon name="Check" size={12} />
+                          <span>OK</span>
+                        </div>
                       )}
                     </td>
                   </tr>
@@ -447,43 +500,50 @@ export default function AdminChartsIngestRunDetail() {
 
       {/* Error */}
       {run.errorMessage && (
-        <div className="rounded-lg border border-[var(--wk-danger)]/30 bg-[var(--wk-danger-soft)] p-4">
-          <div className="flex items-center gap-2 text-[var(--wk-danger)]">
-            <i className="ri-error-warning-line text-lg" />
-            <span className="font-semibold text-[14px]">Error</span>
+        <div className="rounded-lg border border-wk-danger/30 bg-wk-danger-soft p-4">
+          <div className="flex items-center gap-2 mb-1">
+            <WkIcon name="AlertCircle" size={16} className="text-wk-danger" />
+            <span className="font-bold text-[14px] text-wk-danger">Error</span>
           </div>
-          <p className="mt-1 text-[13px] text-[var(--wk-danger)]">{run.errorMessage}</p>
+          <p className="text-[13px] text-wk-danger">{run.errorMessage}</p>
         </div>
       )}
 
-      {/* Footer: source details */}
-      <WkSurface className="p-4">
-        <h2 className="mb-2 text-[13px] font-bold text-[var(--wk-text)]">Source URLs</h2>
-        <div className="space-y-1">
+      {/* Source URLs */}
+      <WkSurface className="p-5">
+        <div className="flex items-center gap-2 mb-3">
+          <WkIcon name="Link" size={14} className="text-wk-text-muted" />
+          <h2 className="text-[13px] font-bold text-wk-text">Source URLs</h2>
+        </div>
+        <div className="space-y-1.5">
           {run.sourceUrls.map((url, i) => (
             <div key={i} className="flex items-center gap-2">
-              <i className={`text-[12px] ${
-                url.includes("spotify") ? "ri-spotify-fill text-[var(--wk-success)]" :
-                url.includes("apple") ? "ri-apple-fill text-[var(--wk-text-soft)]" :
-                "ri-link text-[var(--wk-text-muted)]"
-              }`} />
+              <WkIcon name={url.includes("spotify") ? "Music" : url.includes("apple") ? "Disc3" : "Globe"} size={12} className="text-wk-text-faint shrink-0" />
               <a
                 href={url}
                 target="_blank"
                 rel="noopener noreferrer nofollow"
-                className="font-mono text-[11px] text-[var(--wk-brand)] hover:underline break-all"
+                className="font-mono text-[11px] text-wk-brand hover:underline break-all"
               >
                 {url}
               </a>
             </div>
           ))}
         </div>
-        <div className="mt-3 flex items-center gap-3">
+        <div className="mt-3 flex flex-wrap items-center gap-3">
           <button
             onClick={() => navigate("/admin/charts/ingest-health")}
-            className="flex items-center gap-1 text-[12px] font-semibold text-[var(--wk-text-muted)] hover:text-[var(--wk-text)] transition-colors"
+            className="inline-flex items-center gap-1 text-[12px] font-semibold text-wk-text-muted hover:text-wk-text transition-colors"
           >
-            <i className="ri-heart-pulse-line" /> API Health &amp; Endpoint Map
+            <WkIcon name="HeartPulse" size={14} />
+            API Health &amp; Endpoint Map
+          </button>
+          <button
+            onClick={() => navigate("/admin/charts/review-queue")}
+            className="inline-flex items-center gap-1 text-[12px] font-semibold text-wk-text-muted hover:text-wk-text transition-colors"
+          >
+            <WkIcon name="GitPullRequest" size={14} />
+            Review Queue
           </button>
         </div>
       </WkSurface>
