@@ -22,9 +22,7 @@ import type {
 } from "../chartsMarkets/marketScopeStore";
 
 export const WAKILISHA_RUNTIME_ENDPOINTS = {
-  health: {
-    system: "GET /api/wakilisha/health",
-  },
+  health: { system: "GET /api/wakilisha/health" },
   settings: {
     readDomain: "GET /api/wakilisha/admin/settings/:domain",
     saveDomain: "PUT /api/wakilisha/admin/settings/:domain",
@@ -61,9 +59,7 @@ export const WAKILISHA_RUNTIME_ENDPOINTS = {
     sendGapsToReview: "POST /api/wakilisha/charts/ingest/runs/:runId/send-gaps",
     applyMatchDecision: "POST /api/wakilisha/charts/ingest/runs/:runId/rows/:rowId/match-decision",
   },
-  registry: {
-    health: "GET /api/wakilisha/registry/health",
-  },
+  registry: { health: "GET /api/wakilisha/registry/health" },
 } as const;
 
 export type BackendCreateProgramRequest = Partial<BackendChartProgram> & {
@@ -71,6 +67,13 @@ export type BackendCreateProgramRequest = Partial<BackendChartProgram> & {
   seriesSlug: string;
   marketSlug: string;
   publicSlug?: string;
+};
+
+export type BackendCreateRunRequest = Partial<BackendIngestRun> & {
+  chartTitle: string;
+  chartSlug: string;
+  editionDate: string;
+  sourceUrls: string[];
 };
 
 export type BackendMatchDecisionRequest = {
@@ -81,9 +84,7 @@ export type BackendMatchDecisionRequest = {
 };
 
 export type RuntimeBackendAdapter = {
-  health: {
-    getSystemHealth(): Promise<BackendResult<BackendHealth>>;
-  };
+  health: { getSystemHealth(): Promise<BackendResult<BackendHealth>> };
   charts: {
     getPrograms(): Promise<BackendResult<BackendChartProgram[]>>;
     createProgram(payload: BackendCreateProgramRequest): Promise<BackendResult<BackendChartProgram>>;
@@ -102,6 +103,7 @@ export type RuntimeBackendAdapter = {
   ingestion: {
     getRuns(): Promise<BackendResult<BackendIngestRun[]>>;
     getRun(runId: string): Promise<BackendResult<BackendIngestRun | null>>;
+    createRun(payload: BackendCreateRunRequest): Promise<BackendResult<BackendIngestRun>>;
     runDryRun(request: BackendDryRunRequest): Promise<BackendResult<BackendDryRunResponse>>;
     commitRun(request: BackendCommitRequest): Promise<BackendResult<BackendCommitResponse>>;
     cancelRun(runId: string): Promise<BackendResult<BackendIngestRun | null>>;
@@ -119,9 +121,7 @@ export type RuntimeBackendAdapter = {
     saveProviderConfig(providerKey: string, payload: Record<string, unknown>): Promise<BackendResult<BackendProviderHealth>>;
     clearProviderConfig(providerKey: string): Promise<BackendResult<BackendProviderHealth>>;
   };
-  registry: {
-    getHealth(): Promise<BackendResult<BackendHealth>>;
-  };
+  registry: { getHealth(): Promise<BackendResult<BackendHealth>> };
 };
 
 export type RuntimeBackendDomain = keyof typeof WAKILISHA_RUNTIME_ENDPOINTS;
