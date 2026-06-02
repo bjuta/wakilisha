@@ -476,7 +476,7 @@ async function verifyPublicApi(
         ok: false,
         warnings: [],
         errors: [
-          `The edition was written, but public API verification failed (HTTP ${res.status}). Check /admin/charts/public-api-qa.`,
+          `The edition was written, but public API verification failed (HTTP ${res.status}). Check /admin/settings/charts/public-api-qa.`,
         ],
       };
     }
@@ -485,7 +485,7 @@ async function verifyPublicApi(
     return {
       ok: false,
       warnings: [
-        `Public API verification timed out or network error. The edition may have been committed. Check /admin/charts/public-api-qa.`,
+        `Public API verification timed out or network error. The edition may have been committed. Check /admin/settings/charts/public-api-qa.`,
       ],
       errors: [],
     };

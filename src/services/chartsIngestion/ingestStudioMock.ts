@@ -80,8 +80,8 @@ export const mockRecentActivity: RecentIngestActivity[] = [
 
 interface StudioStore { runs: IngestRun[]; kpis: IngestStudioKpi; activity: RecentIngestActivity[]; }
 function getInitialStudioStore(): StudioStore { return { runs: [...mockRuns], kpis: { ...mockIngestKpis }, activity: [...mockRecentActivity] }; }
-function loadStudioStore(): StudioStore { try { const raw = localStorage.getItem(STUDIO_STORE_KEY); if (raw) { const parsed = JSON.parse(raw) as StudioStore; if (parsed.runs && parsed.kpis) return parsed; } } catch {} const initial = getInitialStudioStore(); saveStudioStore(initial); return initial; }
-function saveStudioStore(store: StudioStore): void { try { localStorage.setItem(STUDIO_STORE_KEY, JSON.stringify(store)); } catch {} }
+function loadStudioStore(): StudioStore { try { const raw = localStorage.getItem(STUDIO_STORE_KEY); if (raw) { const parsed = JSON.parse(raw) as StudioStore; if (parsed.runs && parsed.kpis) return parsed; } } catch { /* ignore */ } const initial = getInitialStudioStore(); saveStudioStore(initial); return initial; }
+function saveStudioStore(store: StudioStore): void { try { localStorage.setItem(STUDIO_STORE_KEY, JSON.stringify(store)); } catch { /* ignore */ } }
 let studioStore = loadStudioStore();
 export function getStudioStore(): StudioStore { return studioStore; }
 export function refreshStudioStore(): StudioStore { studioStore = loadStudioStore(); return studioStore; }
@@ -143,26 +143,37 @@ async function simulateStageProgress(runId: string): Promise<void> {
   let rows: IngestResolvedRow[] = [];
   const startedFetch = Date.now();
   const fetched = await fetchFromAllSources(sourceUrls, { chartSize, market });
-  const sourceFetchStage: IngestStageStatus = { stage: "source_fetch", status: fetched.overallError ? "warning" : "done", durationMs: Date.now() - startedFetch, message: fetched.overallError ?? `Fetched ${fetched.totalRows} rows from ${fetched.results.length} source(s)`, metrics: { totalRows: fetched.totalRows, providers: fetched.results.map((r) => r.provider), warnings: fetched.results.flatMap((r) => r.warnings ?? []) } };
+  const sourceFetchStage: IngestStageStatus = { stage: "source_fetch", status: fetched.overallError ? "warning" : "done", durationMs: Date.now() - startedFetch, message: fetched.overallError ?? `Fetched ${fetched.overallMetrics.totalFetched} rows from ${fetched.sourceResults.length} source(s)`, metrics: { totalRows: fetched.overallMetrics.totalFetched, providers: fetched.sourceResults.map((r) => r.provider), warnings: fetched.sourceResults.flatMap((r) => r.warnings ?? []) } };
+  const fetchedRows = fetched.allNormalizedRows;
   const startedNormalize = Date.now();
-  rows = normalizeToResolvedRows(fetched.rows, { sourceUrl: sourceUrls[0] ?? "manual" });
-  const normalizeStage: IngestStageStatus = { stage: "normalize", status: rows.length > 0 ? "done" : "warning", durationMs: Date.now() - startedNormalize, message: `Normalized ${rows.length} rows`, metrics: { rows: rows.length } };
+  const normalizeResult = normalizeToResolvedRows(fetchedRows);
+  const normalizeStage: IngestStageStatus = { stage: "normalize", status: normalizeResult.resolvedRows.length > 0 ? "done" : "warning", durationMs: Date.now() - startedNormalize, message: `Normalized ${normalizeResult.resolvedRows.length} rows`, metrics: { rows: normalizeResult.resolvedRows.length } };
   const startedMatch = Date.now();
-  rows = runCanonicalMatch(rows);
+  const matchResult = runCanonicalMatch(fetchedRows);
+  rows = matchResult.resolvedRows;
   const summary: IngestRunSummary = { totalRows: rows.length, canonicalMatches: rows.filter((r) => r.matchStatus === "canonical").length, shells: rows.filter((r) => r.matchStatus === "shell").length, gaps: rows.filter((r) => r.matchStatus === "no_match" || r.matchStatus === "needs_review").length, duplicateCandidates: rows.filter((r) => r.matchStatus === "duplicate_candidate").length, matchRate: rows.length ? (rows.filter((r) => r.matchStatus === "canonical").length / rows.length) * 100 : 0 };
   const canonicalMatchStage: IngestStageStatus = { stage: "canonical_match", status: summary.gaps > 0 ? "warning" : "done", durationMs: Date.now() - startedMatch, message: `${summary.canonicalMatches}/${summary.totalRows} canonical matches`, metrics: { matchRate: summary.matchRate, gaps: summary.gaps } };
   const startedEnrich = Date.now();
   const enriched = await enrichRows(rows);
-  rows = enriched.rows.map(applyEnrichmentToRow);
+  const enrichedMap = new Map(enriched.results.map((r) => [r.rowId, r]));
+  rows = rows.map((row) => {
+    const result = enrichedMap.get(row.id);
+    if (!result) return row;
+    return applyEnrichmentToRow(row, result.enriched);
+  });
   const credentialErrors = checkEnrichmentCredentials();
-  const enrichmentStage: IngestStageStatus = { stage: "enrichment", status: credentialErrors.length > 0 ? "warning" : "done", durationMs: Date.now() - startedEnrich, message: credentialErrors.length > 0 ? `Enrichment completed with ${credentialErrors.length} credential warning(s)` : "Enrichment completed", metrics: { providerHits: enriched.metrics.providerHits, credentialErrors: credentialErrors.length } };
+  const totalProviderHits = enriched.metrics.spotifyHits + enriched.metrics.appleMusicHits + enriched.metrics.youtubeHits + enriched.metrics.acrCloudHits;
+  const enrichmentStage: IngestStageStatus = { stage: "enrichment", status: credentialErrors.length > 0 ? "warning" : "done", durationMs: Date.now() - startedEnrich, message: credentialErrors.length > 0 ? `Enrichment completed with ${credentialErrors.length} credential warning(s)` : "Enrichment completed", metrics: { providerHits: totalProviderHits, credentialErrors: credentialErrors.length } };
   const finalStages = [validateStage, providerDetectionStage, resourceGuardStage, sourceFetchStage, normalizeStage, canonicalMatchStage, enrichmentStage, { stage: "snapshot_commit" as const, status: "idle" as const, message: "Ready for commit" }];
   await updateIngestRun(runId, (current) => ({ ...current, status: summary.gaps > 0 ? "needs_review" : "dry_run_complete", stages: finalStages, summary, rows: rows.slice(0, chartSize), updatedAt: new Date().toISOString(), dryRunCompletedAt: new Date().toISOString() }));
   addIngestActivity({ id: `act-${Date.now()}`, type: "dry_run", chartTitle: run.chartTitle, runId, status: summary.gaps > 0 ? "needs_review" : "dry_run_complete", actor: "Current User", createdAt: new Date().toISOString(), summary });
 }
 
-export async function commitIngestRun(request: CommitIngestRunRequest): Promise<CommitIngestRunResponse> { return commitIngestRunToV2Edition(request); }
-export function validateRunReadiness(runId: string) { return validateCommitReadiness(runId); }
+export async function commitIngestRun(request: CommitIngestRunRequest): Promise<CommitIngestRunResponse> {
+  const run = await getIngestRun(request.runId);
+  return commitIngestRunToV2Edition(run, request, true);
+}
+export function validateRunReadiness(runId: string) { const run = getStudioStore().runs.find((r) => r.id === runId); return validateCommitReadiness(run ?? null); }
 export async function cancelIngestRun(runId: string): Promise<IngestRun | null> { return updateIngestRun(runId, (run) => ({ ...run, status: "cancelled", updatedAt: new Date().toISOString(), errorMessage: "Run cancelled by admin" })); }
 export async function retryIngestRun(runId: string): Promise<IngestRun | null> { const run = await updateIngestRun(runId, (r) => ({ ...r, status: "running", stages: getInitialStages(), errorMessage: null, updatedAt: new Date().toISOString() })); if (run) await simulateStageProgress(runId); return getIngestRun(runId); }
 export async function sendGapsToReview(runId: string): Promise<IngestRun | null> { return updateIngestRun(runId, (run) => ({ ...run, status: "needs_review", updatedAt: new Date().toISOString(), notes: `${run.notes ?? ""}\nGaps sent to review queue at ${new Date().toISOString()}` })); }

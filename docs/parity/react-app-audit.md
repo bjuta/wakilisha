@@ -27,8 +27,8 @@ This audit should:
 | Settings | `/settings` | CONSOLIDATE | CONFIRMED | PARTIAL | React unified settings framework partially implemented; appearance & player defaults need consolidation. |
 | Profile | `/profile` | CARRY_OVER | CONFIRMED | IMPLEMENTED | Profile data backed by tokenized user graph; includes preferences. |
 | Corrections | `/corrections` | CONSOLIDATE | CONFIRMED | PARTIAL | React has workflow, but submission & audit UI enhancements pending. |
-| Ingestion | Ingest Studio `/admin/charts/ingest` | CARRY_OVER | CONFIRMED | IMPLEMENTED | Supports dry run, commit, snapshot; preserves new job queue and polling improvements. |
-| Admin Charts | Admin dashboard `/admin/charts/dashboard` | CARRY_OVER | CONFIRMED | IMPLEMENTED | Consolidates chart analytics and QA tools; maintains new taxonomy ordering. |
+| Ingestion | Ingest Studio `/admin/settings/charts/ingest` | CARRY_OVER | CONFIRMED | IMPLEMENTED | Supports dry run, commit, snapshot; preserves new job queue and polling improvements. |
+| Admin Charts | Admin dashboard `/admin/settings/charts/dashboard` | CARRY_OVER | CONFIRMED | IMPLEMENTED | Consolidates chart analytics and QA tools; maintains new taxonomy ordering. |
 | Design System | `/admin/design-system` | NEW_IN_REACT | CONFIRMED | IMPLEMENTED | Fully React-native, uses design tokens and element foundation; enhances WP admin approach. |
 | Player | Desktop & mobile player `/player` | CARRY_OVER | CONFIRMED | IMPLEMENTED | Maintains playback defaults, motion, audible UI, playlist state. |
 | Public Search | `/search` | CARRY_OVER | CONFIRMED | IMPLEMENTED | Enhanced React search with filters and registry integration. |

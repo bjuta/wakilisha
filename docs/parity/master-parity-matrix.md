@@ -168,7 +168,7 @@ Therefore:
 | Admin Domain | Feature / Surface | HTML Disposition | WP Verified | React Status | Action | Priority | Notes / Acceptance Criteria |
 |---|---|---:|---:|---:|---:|---:|---|
 | Admin IA | Ingest · Registry · Entities · Operations · Audience · Settings | CONSOLIDATE | WP_CONFIRMED | REACT_PARTIAL | CONSOLIDATE | P1 | Collapse WP admin sprawl into coherent React admin IA. |
-| Ingest | Admin charts dashboard | CARRY_OVER | WP_CONFIRMED | REACT_PRESENT | PROTECT | P0 | Preserve and improve current `/admin/charts/dashboard`. |
+| Ingest | Admin charts dashboard | CARRY_OVER | WP_CONFIRMED | REACT_PRESENT | PROTECT | P0 | Preserve and improve current `/admin/settings/charts/dashboard`. |
 | Ingest | Families/programs | CARRY_OVER | WP_CONFIRMED | REACT_PRESENT | PROTECT | P0 | Preserve chart-family admin. |
 | Ingest | Ingest Studio | CARRY_OVER | WP_CONFIRMED | REACT_PRESENT | PROTECT | P0 | Preserve dry-run/job improvements. Complete missing provider/canonicalization features. |
 | Ingest | Ingest detail/job status | CARRY_OVER | WP_CONFIRMED | REACT_PRESENT | KEEP | P1 | Ensure retry/cancel/logs/status are supported. |

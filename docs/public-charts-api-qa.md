@@ -2,13 +2,13 @@
 
 ## Overview
 
-The Public Charts API QA route (`/admin/charts/public-api-qa`) is a developer-facing diagnostic screen for validating all public chart service endpoints before switching from mock mode to live WordPress mode.
+The Public Charts API QA route (`/admin/settings/charts/public-api-qa`) is a developer-facing diagnostic screen for validating all public chart service endpoints before switching from mock mode to live WordPress mode.
 
 ---
 
 ## How to Run the QA Route
 
-1. Navigate to `/admin/charts/public-api-qa` (accessible from the **Public API QA** tab in the Admin Charts navigation)
+1. Navigate to `/admin/settings/charts/public-api-qa` (accessible from the **Public API QA** tab in the Admin Charts navigation)
 2. Click **Run all tests** to execute all 6 endpoint tests sequentially
 3. Review results — each test shows status, duration, data source, and result count
 4. Click **Copy smoke report** to copy a compact plain-text summary for sharing
@@ -49,7 +49,7 @@ The Public Charts API QA route (`/admin/charts/public-api-qa`) is a developer-fa
 
 2. Restart the dev server (or rebuild for production)
 
-3. Navigate back to `/admin/charts/public-api-qa`
+3. Navigate back to `/admin/settings/charts/public-api-qa`
 
 4. Click **Clear public chart cache** to ensure no mock data is served from cache
 

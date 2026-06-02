@@ -93,7 +93,7 @@ export default function AdminChartsIntegrationMap() {
       icon: "Globe" as const,
       color: "bg-wk-info-soft text-wk-info",
       description: "Spotify, Apple Music, CSV files",
-      navigate: () => navigate("/admin/charts/ingest"),
+      navigate: () => navigate("/admin/settings/charts/ingest"),
     },
     {
       id: "fetch",
@@ -101,7 +101,7 @@ export default function AdminChartsIntegrationMap() {
       icon: "Download" as const,
       color: "bg-wk-info-soft text-wk-info",
       description: "Source fetch, CSV parsing, row normalization",
-      navigate: () => navigate("/admin/charts/ingest"),
+      navigate: () => navigate("/admin/settings/charts/ingest"),
     },
     {
       id: "match",
@@ -109,7 +109,7 @@ export default function AdminChartsIntegrationMap() {
       icon: "GitMerge" as const,
       color: "bg-wk-warning-soft text-wk-warning",
       description: "Match rows to canonical tracks, releases, artists",
-      navigate: () => navigate("/admin/charts/review-queue"),
+      navigate: () => navigate("/admin/settings/charts/review-queue"),
     },
     {
       id: "review",
@@ -117,7 +117,7 @@ export default function AdminChartsIntegrationMap() {
       icon: "GitPullRequest" as const,
       color: "bg-wk-danger-soft text-wk-danger",
       description: "Human review for gaps, shells, duplicates",
-      navigate: () => navigate("/admin/charts/review-queue"),
+      navigate: () => navigate("/admin/settings/charts/review-queue"),
     },
     {
       id: "draft",
@@ -125,7 +125,7 @@ export default function AdminChartsIntegrationMap() {
       icon: "FileEdit" as const,
       color: "bg-wk-brand-soft text-wk-brand",
       description: "Assemble entries, apply scoring, ranking",
-      navigate: () => navigate("/admin/charts/ingest"),
+      navigate: () => navigate("/admin/settings/charts/ingest"),
     },
     {
       id: "snapshot",
@@ -133,7 +133,7 @@ export default function AdminChartsIntegrationMap() {
       icon: "Lock" as const,
       color: "bg-wk-success-soft text-wk-success",
       description: "Immutable snapshot, public edition, checksum",
-      navigate: () => navigate("/admin/charts/snapshots"),
+      navigate: () => navigate("/admin/settings/charts/snapshots"),
     },
     {
       id: "public",
@@ -141,7 +141,7 @@ export default function AdminChartsIntegrationMap() {
       icon: "BarChart3" as const,
       color: "bg-wk-success-soft text-wk-success",
       description: "Charts endpoint, entries, track history",
-      navigate: () => navigate("/admin/charts/public-api-qa"),
+      navigate: () => navigate("/admin/settings/charts/public-api-qa"),
     },
   ];
 
@@ -178,7 +178,7 @@ export default function AdminChartsIntegrationMap() {
           <div className="flex items-center gap-2">
             <span className="text-[11px] text-wk-text-muted font-mono truncate max-w-[220px]">{PUBLIC_V2_API_BASE}</span>
             <button
-              onClick={() => navigate("/admin/charts/public-api-qa")}
+              onClick={() => navigate("/admin/settings/charts/public-api-qa")}
               className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap"
             >
               <WkIcon name="FlaskConical" size={13} />

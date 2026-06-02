@@ -196,7 +196,7 @@ export default function AdminChartsIngestRunDetail() {
       <div className="flex h-64 flex-col items-center justify-center gap-3">
         <WkIcon name="AlertCircle" size={32} className="text-wk-text-faint" />
         <p className="text-[14px] font-semibold text-wk-text-muted">Run not found</p>
-        <button onClick={() => navigate("/admin/charts/ingest-runs")} className="wk-button wk-button-ghost wk-button-sm">
+        <button onClick={() => navigate("/admin/settings/charts/ingest-runs")} className="wk-button wk-button-ghost wk-button-sm">
           Back to Runs
         </button>
       </div>
@@ -242,13 +242,13 @@ export default function AdminChartsIngestRunDetail() {
                   <WkIcon name="ExternalLink" size={11} />Open Chart
                 </a>
                 <button
-                  onClick={() => navigate("/admin/charts/editions")}
+                  onClick={() => navigate("/admin/settings/charts/editions")}
                   className="inline-flex items-center gap-1 rounded border border-wk-success/30 bg-white px-2.5 py-1 text-[11px] font-semibold text-wk-success hover:bg-wk-success-soft"
                 >
                   <WkIcon name="LayoutList" size={11} />View in Editions
                 </button>
                 <button
-                  onClick={() => navigate(`/admin/charts/public-api-qa?publicSlug=${commitResult.publicSlug}&editionSlug=${commitResult.editionSlug}`)}
+                  onClick={() => navigate(`/admin/settings/charts/public-api-qa?publicSlug=${commitResult.publicSlug}&editionSlug=${commitResult.editionSlug}`)}
                   className="inline-flex items-center gap-1 rounded border border-wk-success/30 bg-white px-2.5 py-1 text-[11px] font-semibold text-wk-success hover:bg-wk-success-soft"
                 >
                   <WkIcon name="TestTube2" size={11} />Test in QA
@@ -283,7 +283,7 @@ export default function AdminChartsIngestRunDetail() {
         <div>
           <div className="flex items-center gap-2 flex-wrap mb-1">
             <button
-              onClick={() => navigate("/admin/charts/ingest-runs")}
+              onClick={() => navigate("/admin/settings/charts/ingest-runs")}
               className="text-[13px] font-semibold text-wk-text-muted hover:text-wk-text transition-colors inline-flex items-center gap-1"
             >
               <WkIcon name="ChevronLeft" size={14} />
@@ -612,14 +612,14 @@ export default function AdminChartsIngestRunDetail() {
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <button
-            onClick={() => navigate("/admin/charts/ingest-health")}
+            onClick={() => navigate("/admin/settings/charts/ingest-health")}
             className="inline-flex items-center gap-1 text-[12px] font-semibold text-wk-text-muted hover:text-wk-text transition-colors"
           >
             <WkIcon name="HeartPulse" size={14} />
             API Health &amp; Endpoint Map
           </button>
           <button
-            onClick={() => navigate("/admin/charts/review-queue")}
+            onClick={() => navigate("/admin/settings/charts/review-queue")}
             className="inline-flex items-center gap-1 text-[12px] font-semibold text-wk-text-muted hover:text-wk-text transition-colors"
           >
             <WkIcon name="GitPullRequest" size={14} />

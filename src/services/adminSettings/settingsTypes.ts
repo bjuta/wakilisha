@@ -31,7 +31,7 @@ export const SETTINGS_DOMAINS: SettingsDomainMeta[] = [
     label: "Charts",
     description: "Chart-specific defaults, V2 program defaults, ingest rules, commit gating",
     icon: "BarChart3",
-    route: "/admin/settings/charts",
+    route: "/admin/settings/chart-defaults",
     health: "healthy",
     primaryAction: "Edit defaults",
   },

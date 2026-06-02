@@ -82,7 +82,7 @@ function toScopePayload(draft: ScopeDraft) {
   };
 }
 
-export default function AdminSettingsChartMarketScopes() {
+export default function AdminSettingsChartDefaultsMarketScopes() {
   const navigate = useNavigate();
   const [scopes, setScopes] = useState<StoredChartMarketScope[]>(getMarketScopes());
   const [draft, setDraft] = useState<ScopeDraft>(blankDraft);
@@ -171,7 +171,7 @@ export default function AdminSettingsChartMarketScopes() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button onClick={() => navigate("/admin/charts/ingest")} className="wk-button wk-button-ghost wk-button-sm">Open Ingest Studio</button>
+          <button onClick={() => navigate("/admin/settings/charts/ingest")} className="wk-button wk-button-ghost wk-button-sm">Open Ingest Studio</button>
           <button onClick={newScope} className="wk-button wk-button-primary wk-button-sm">New Scope</button>
         </div>
       </div>

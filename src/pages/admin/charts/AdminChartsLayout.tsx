@@ -14,26 +14,26 @@ interface NavItem {
 }
 
 const CHARTS_GROUP: NavItem[] = [
-  { path: "/admin/charts/dashboard", label: "Dashboard", icon: "LayoutDashboard" },
-  { path: "/admin/charts/families", label: "Chart Families", icon: "FolderTree" },
-  { path: "/admin/charts/ingest", label: "Ingest Studio", icon: "Database" },
-  { path: "/admin/charts/ingest-runs", label: "Ingest Runs", icon: "ListChecks" },
-  { path: "/admin/charts/editions", label: "Editions", icon: "Layers" },
-  { path: "/admin/charts/snapshots", label: "Snapshots", icon: "Camera" },
+  { path: "/admin/settings/charts/dashboard", label: "Dashboard", icon: "LayoutDashboard" },
+  { path: "/admin/settings/charts/families", label: "Chart Families", icon: "FolderTree" },
+  { path: "/admin/settings/charts/ingest", label: "Ingest Studio", icon: "Database" },
+  { path: "/admin/settings/charts/ingest-runs", label: "Ingest Runs", icon: "ListChecks" },
+  { path: "/admin/settings/charts/editions", label: "Editions", icon: "Layers" },
+  { path: "/admin/settings/charts/snapshots", label: "Snapshots", icon: "Camera" },
 ];
 
 const OPS_GROUP: NavItem[] = [
-  { path: "/admin/charts/review-queue", label: "Review Queue", icon: "GitPullRequest" },
-  { path: "/admin/charts/no-match", label: "No-match", icon: "XCircle" },
-  { path: "/admin/charts/release-shells", label: "Release Shells", icon: "FolderPlus" },
-  { path: "/admin/charts/canon-gaps", label: "Canon Gaps", icon: "AlertCircle" },
+  { path: "/admin/settings/charts/review-queue", label: "Review Queue", icon: "GitPullRequest" },
+  { path: "/admin/settings/charts/no-match", label: "No-match", icon: "XCircle" },
+  { path: "/admin/settings/charts/release-shells", label: "Release Shells", icon: "FolderPlus" },
+  { path: "/admin/settings/charts/canon-gaps", label: "Canon Gaps", icon: "AlertCircle" },
 ];
 
 const SYSTEM_GROUP: NavItem[] = [
-  { path: "/admin/charts/ingest-jobs", label: "Legacy Jobs", icon: "History" },
-  { path: "/admin/charts/integration-map", label: "Integration Map", icon: "Map" },
-  { path: "/admin/charts/public-api-qa", label: "Public API QA", icon: "FlaskConical" },
-  { path: "/admin/charts/ingest-health", label: "API Health", icon: "HeartPulse" },
+  { path: "/admin/settings/charts/ingest-jobs", label: "Legacy Jobs", icon: "History" },
+  { path: "/admin/settings/charts/integration-map", label: "Integration Map", icon: "Map" },
+  { path: "/admin/settings/charts/public-api-qa", label: "Public API QA", icon: "FlaskConical" },
+  { path: "/admin/settings/charts/ingest-health", label: "API Health", icon: "HeartPulse" },
 ];
 
 /* ────────────────────────── Sidebar Link ────────────────────────── */
@@ -237,7 +237,7 @@ export function AdminChartsLayout() {
               <WkIcon name={collapsed ? "PanelLeftOpen" : "PanelLeftClose"} size={18} />
             </button>
             <div className="hidden h-6 w-px bg-[var(--wk-border)] md:block" />
-            <button onClick={() => navigate("/admin/charts/ingest")} className="wk-button wk-button-primary wk-button-sm whitespace-nowrap">
+            <button onClick={() => navigate("/admin/settings/charts/ingest")} className="wk-button wk-button-primary wk-button-sm whitespace-nowrap">
               <WkIcon name="Plus" size={14} />
               New Ingest
             </button>
@@ -269,10 +269,10 @@ export function AdminChartsLayout() {
             </div>
             <nav className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-[12px] text-[var(--wk-text-muted)]">
               {[
-                { label: "Dashboard", path: "/admin/charts/dashboard" },
-                { label: "Ingest", path: "/admin/charts/ingest" },
-                { label: "Editions", path: "/admin/charts/editions" },
-                { label: "Health", path: "/admin/charts/ingest-health" },
+                { label: "Dashboard", path: "/admin/settings/charts/dashboard" },
+                { label: "Ingest", path: "/admin/settings/charts/ingest" },
+                { label: "Editions", path: "/admin/settings/charts/editions" },
+                { label: "Health", path: "/admin/settings/charts/ingest-health" },
                 { label: "Settings", path: "/admin/settings" },
                 { label: "Design System", path: "/admin/design-system" },
                 { label: "Public Site", path: "/" },

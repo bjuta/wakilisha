@@ -119,9 +119,9 @@ export default function AdminSettingsRegistry() {
       <WkSurface className="p-4 border-l-4 border-[var(--wk-brand)]">
         <h3 className="text-[13px] font-bold text-[var(--wk-text)] mb-2">Actions</h3>
         <div className="flex flex-wrap gap-2">
-          <button onClick={() => navigate("/admin/charts/review-queue")} className="rounded-md border border-[var(--wk-border)] bg-[var(--wk-surface-raised)] px-3 py-1.5 text-[12px] font-semibold text-[var(--wk-text-soft)] hover:text-[var(--wk-brand)] transition-colors whitespace-nowrap">Open Review Queue</button>
-          <button onClick={() => navigate("/admin/charts/release-shells")} className="rounded-md border border-[var(--wk-border)] bg-[var(--wk-surface-raised)] px-3 py-1.5 text-[12px] font-semibold text-[var(--wk-text-soft)] hover:text-[var(--wk-brand)] transition-colors whitespace-nowrap">Open Release Shells</button>
-          <button onClick={() => navigate("/admin/charts/canon-gaps")} className="rounded-md border border-[var(--wk-border)] bg-[var(--wk-surface-raised)] px-3 py-1.5 text-[12px] font-semibold text-[var(--wk-text-soft)] hover:text-[var(--wk-brand)] transition-colors whitespace-nowrap">Open Canon Gaps</button>
+          <button onClick={() => navigate("/admin/settings/charts/review-queue")} className="rounded-md border border-[var(--wk-border)] bg-[var(--wk-surface-raised)] px-3 py-1.5 text-[12px] font-semibold text-[var(--wk-text-soft)] hover:text-[var(--wk-brand)] transition-colors whitespace-nowrap">Open Review Queue</button>
+          <button onClick={() => navigate("/admin/settings/charts/release-shells")} className="rounded-md border border-[var(--wk-border)] bg-[var(--wk-surface-raised)] px-3 py-1.5 text-[12px] font-semibold text-[var(--wk-text-soft)] hover:text-[var(--wk-brand)] transition-colors whitespace-nowrap">Open Release Shells</button>
+          <button onClick={() => navigate("/admin/settings/charts/canon-gaps")} className="rounded-md border border-[var(--wk-border)] bg-[var(--wk-surface-raised)] px-3 py-1.5 text-[12px] font-semibold text-[var(--wk-text-soft)] hover:text-[var(--wk-brand)] transition-colors whitespace-nowrap">Open Canon Gaps</button>
         </div>
       </WkSurface>
     </div>

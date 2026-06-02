@@ -65,14 +65,14 @@ export default function AdminChartsDashboard() {
         description="Command center for chart operations. What needs attention today."
       >
         <button
-          onClick={() => navigate("/admin/charts/ingest")}
+          onClick={() => navigate("/admin/settings/charts/ingest")}
           className="wk-button wk-button-primary wk-button-sm whitespace-nowrap"
         >
           <WkIcon name="Plus" size={14} />
           New Ingest
         </button>
         <button
-          onClick={() => navigate("/admin/charts/ingest-health")}
+          onClick={() => navigate("/admin/settings/charts/ingest-health")}
           className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap"
         >
           <WkIcon name="HeartPulse" size={14} />
@@ -140,7 +140,7 @@ export default function AdminChartsDashboard() {
           <div className="flex flex-wrap gap-2">
             {failedJobs.length > 0 && (
               <button
-                onClick={() => navigate("/admin/charts/ingest-jobs")}
+                onClick={() => navigate("/admin/settings/charts/ingest-jobs")}
                 className="inline-flex items-center gap-1.5 rounded-md border border-wk-danger/20 bg-wk-danger-soft px-3 py-1.5 text-[12px] font-semibold text-wk-danger transition-colors hover:bg-wk-danger/20 whitespace-nowrap"
               >
                 <WkIcon name="AlertCircle" size={14} />
@@ -149,7 +149,7 @@ export default function AdminChartsDashboard() {
             )}
             {needsReviewRuns.length > 0 && (
               <button
-                onClick={() => navigate("/admin/charts/review-queue")}
+                onClick={() => navigate("/admin/settings/charts/review-queue")}
                 className="inline-flex items-center gap-1.5 rounded-md border border-wk-warning/20 bg-wk-warning-soft px-3 py-1.5 text-[12px] font-semibold text-wk-warning transition-colors hover:bg-wk-warning/20 whitespace-nowrap"
               >
                 <WkIcon name="GitPullRequest" size={14} />
@@ -158,7 +158,7 @@ export default function AdminChartsDashboard() {
             )}
             {activeRuns.length > 0 && (
               <button
-                onClick={() => navigate("/admin/charts/ingest-runs")}
+                onClick={() => navigate("/admin/settings/charts/ingest-runs")}
                 className="inline-flex items-center gap-1.5 rounded-md border border-wk-info/20 bg-wk-info-soft px-3 py-1.5 text-[12px] font-semibold text-wk-info transition-colors hover:bg-wk-info/20 whitespace-nowrap"
               >
                 <WkIcon name="Loader" size={14} className="animate-spin" />
@@ -181,7 +181,7 @@ export default function AdminChartsDashboard() {
                 <h2 className="text-[14px] font-bold text-wk-text">Active Ingest Runs</h2>
               </div>
               <button
-                onClick={() => navigate("/admin/charts/ingest-runs")}
+                onClick={() => navigate("/admin/settings/charts/ingest-runs")}
                 className="text-[11px] font-semibold text-wk-brand hover:underline"
               >
                 View all
@@ -192,14 +192,14 @@ export default function AdminChartsDashboard() {
                 icon="Database"
                 title="No active runs"
                 description="Start a new ingest run from the Ingest Studio to populate this section."
-                action={{ label: "New Ingest", onClick: () => navigate("/admin/charts/ingest"), icon: "Plus" }}
+                action={{ label: "New Ingest", onClick: () => navigate("/admin/settings/charts/ingest"), icon: "Plus" }}
               />
             ) : (
               <div className="space-y-2">
                 {activeRuns.map((run) => (
                   <button
                     key={run.id}
-                    onClick={() => navigate(`/admin/charts/ingest-runs/${run.id}`)}
+                    onClick={() => navigate(`/admin/settings/charts/ingest-runs/${run.id}`)}
                     className="flex w-full items-center gap-4 rounded-xl border border-wk-border bg-wk-bg-subtle p-4 text-left transition-all hover:border-wk-border-2 hover:bg-wk-surface-raised"
                   >
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-wk-brand-soft text-wk-brand">
@@ -235,7 +235,7 @@ export default function AdminChartsDashboard() {
                 <h2 className="text-[14px] font-bold text-wk-text">Recent Editions</h2>
               </div>
               <button
-                onClick={() => navigate("/admin/charts/editions")}
+                onClick={() => navigate("/admin/settings/charts/editions")}
                 className="text-[11px] font-semibold text-wk-brand hover:underline"
               >
                 View all
@@ -260,7 +260,7 @@ export default function AdminChartsDashboard() {
                       <div className="text-[11px] text-wk-text-muted">{run.editionDate} · {run.summary.totalRows} entries</div>
                     </div>
                     <button
-                      onClick={() => navigate(`/admin/charts/ingest-runs/${run.id}`)}
+                      onClick={() => navigate(`/admin/settings/charts/ingest-runs/${run.id}`)}
                       className="shrink-0 text-[12px] font-semibold text-wk-brand hover:underline whitespace-nowrap"
                     >
                       View
@@ -289,7 +289,7 @@ export default function AdminChartsDashboard() {
                 {activeJobs.map((job) => (
                   <button
                     key={job.id}
-                    onClick={() => navigate(`/admin/charts/ingest-jobs/${job.id}`)}
+                    onClick={() => navigate(`/admin/settings/charts/ingest-jobs/${job.id}`)}
                     className="flex w-full items-center gap-3 rounded-lg border border-wk-border p-3 text-left transition-all hover:bg-wk-surface-raised"
                   >
                     <AdminChartsStatusBadge status={job.status} size="sm" />
@@ -335,13 +335,13 @@ export default function AdminChartsDashboard() {
                     <div className="mt-1 text-[11px] text-wk-text">{job.errorMessage}</div>
                     <div className="mt-2 flex gap-2">
                       <button
-                        onClick={() => navigate(`/admin/charts/ingest-jobs/${job.id}`)}
+                        onClick={() => navigate(`/admin/settings/charts/ingest-jobs/${job.id}`)}
                         className="wk-button wk-button-sm wk-button-ghost"
                       >
                         View
                       </button>
                       <button
-                        onClick={() => navigate(`/admin/charts/ingest`)}
+                        onClick={() => navigate(`/admin/settings/charts/ingest`)}
                         className="wk-button wk-button-sm wk-button-primary"
                       >
                         Retry as New Run
@@ -391,7 +391,7 @@ export default function AdminChartsDashboard() {
                   </span>
                 </div>
                 <button
-                  onClick={() => navigate(`/admin/charts/editions`)}
+                  onClick={() => navigate(`/admin/settings/charts/editions`)}
                   className="mt-1 w-full rounded-md bg-wk-brand-soft px-3 py-2 text-[12px] font-semibold text-wk-brand transition-colors hover:bg-wk-brand/20"
                 >
                   <WkIcon name="Eye" size={14} className="inline mr-1" /> View in Editions
@@ -408,26 +408,26 @@ export default function AdminChartsDashboard() {
                 icon="CirclePlus"
                 label="Start New Ingest"
                 description="Create a new provider-based run"
-                onClick={() => navigate("/admin/charts/ingest")}
+                onClick={() => navigate("/admin/settings/charts/ingest")}
                 accent="brand"
               />
               <QuickActionButton
                 icon="FolderTree"
                 label="Manage Families"
                 description="Configure chart series and rulesets"
-                onClick={() => navigate("/admin/charts/families")}
+                onClick={() => navigate("/admin/settings/charts/families")}
               />
               <QuickActionButton
                 icon="Layers"
                 label="View Editions"
                 description="Browse published and draft editions"
-                onClick={() => navigate("/admin/charts/editions")}
+                onClick={() => navigate("/admin/settings/charts/editions")}
               />
               <QuickActionButton
                 icon="GitPullRequest"
                 label="Open Review Queue"
                 description={needsReviewRuns.length > 0 ? `${needsReviewRuns.length} runs need review` : "Queue is clear"}
-                onClick={() => navigate("/admin/charts/review-queue")}
+                onClick={() => navigate("/admin/settings/charts/review-queue")}
                 disabled={needsReviewRuns.length === 0}
                 disabledReason="No items in review queue"
               />
@@ -435,7 +435,7 @@ export default function AdminChartsDashboard() {
                 icon="HeartPulse"
                 label="API Health"
                 description="Check provider and backend status"
-                onClick={() => navigate("/admin/charts/ingest-health")}
+                onClick={() => navigate("/admin/settings/charts/ingest-health")}
               />
             </div>
           </WkSurface>

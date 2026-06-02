@@ -108,14 +108,14 @@ export default function AdminChartsEditions() {
         description="Committed chart outputs from all chart programs. Source: V2 public chart API."
       >
         <button
-          onClick={() => navigate("/admin/charts/ingest")}
+          onClick={() => navigate("/admin/settings/charts/ingest")}
           className="wk-button wk-button-primary wk-button-sm whitespace-nowrap"
         >
           <WkIcon name="Plus" size={14} />
           New Edition
         </button>
         <button
-          onClick={() => navigate("/admin/charts/snapshots")}
+          onClick={() => navigate("/admin/settings/charts/snapshots")}
           className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap"
         >
           <WkIcon name="Camera" size={14} />
@@ -236,7 +236,7 @@ export default function AdminChartsEditions() {
                   <td className="px-4 py-3">
                     {edition.ingestRunId ? (
                       <button
-                        onClick={() => navigate(`/admin/charts/ingest-runs/${edition.ingestRunId}`)}
+                        onClick={() => navigate(`/admin/settings/charts/ingest-runs/${edition.ingestRunId}`)}
                         className="inline-flex items-center gap-1 text-[11px] font-semibold text-wk-info hover:underline whitespace-nowrap"
                       >
                         <WkIcon name="Database" size={11} />
@@ -244,7 +244,7 @@ export default function AdminChartsEditions() {
                       </button>
                     ) : edition.ingestJobId ? (
                       <button
-                        onClick={() => navigate(`/admin/charts/ingest-jobs/${edition.ingestJobId}`)}
+                        onClick={() => navigate(`/admin/settings/charts/ingest-jobs/${edition.ingestJobId}`)}
                         className="inline-flex items-center gap-1 text-[11px] font-semibold text-wk-text-muted hover:underline whitespace-nowrap"
                       >
                         <WkIcon name="History" size={11} />
@@ -271,7 +271,7 @@ export default function AdminChartsEditions() {
                         </a>
                       )}
                       <button
-                        onClick={() => navigate("/admin/charts/snapshots")}
+                        onClick={() => navigate("/admin/settings/charts/snapshots")}
                         className="flex h-7 w-7 items-center justify-center rounded text-wk-success hover:bg-wk-success-soft transition-colors"
                         title="View snapshot"
                       >
@@ -300,7 +300,7 @@ export default function AdminChartsEditions() {
                 icon="Layers"
                 title="No editions loaded"
                 description="Editions are loaded from the V2 public chart API. Make sure the public JSON data is available."
-                action={{ label: "Open Public API QA", onClick: () => navigate("/admin/charts/public-api-qa"), icon: "FlaskConical" }}
+                action={{ label: "Open Public API QA", onClick: () => navigate("/admin/settings/charts/public-api-qa"), icon: "FlaskConical" }}
               />
             ) : (
               <AdminChartsEmptyState
@@ -340,7 +340,7 @@ export default function AdminChartsEditions() {
             Data sourced from the V2 public chart API — same data served to the public site.
             Run{" "}
             <button
-              onClick={() => navigate("/admin/charts/public-api-qa")}
+              onClick={() => navigate("/admin/settings/charts/public-api-qa")}
               className="font-semibold text-wk-brand hover:underline"
             >
               Public API QA

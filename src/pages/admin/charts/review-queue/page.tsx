@@ -323,7 +323,7 @@ export default function AdminChartsReviewQueue() {
                     </td>
                     <td className="px-4 py-3">
                       <button
-                        onClick={() => navigate(`/admin/charts/ingest-runs/${row.runId}`)}
+                        onClick={() => navigate(`/admin/settings/charts/ingest-runs/${row.runId}`)}
                         className="text-[11px] font-semibold text-wk-brand hover:underline cursor-pointer whitespace-nowrap"
                         title={row.runTitle}
                       >
@@ -375,7 +375,7 @@ export default function AdminChartsReviewQueue() {
                 icon="CheckCircle2"
                 title="Queue is clear"
                 description="No rows from recent runs need review. Run a new ingest dry run to populate this queue."
-                action={{ label: "Open Ingest Studio", onClick: () => navigate("/admin/charts/ingest"), icon: "Plus" }}
+                action={{ label: "Open Ingest Studio", onClick: () => navigate("/admin/settings/charts/ingest"), icon: "Plus" }}
               />
             ) : (
               <div>
@@ -411,7 +411,7 @@ export default function AdminChartsReviewQueue() {
                     {run.summary.shells > 0 && <><span className="font-semibold text-wk-warning">{run.summary.shells}</span> shells</>}
                   </span>
                   <button
-                    onClick={() => navigate(`/admin/charts/ingest-runs/${run.id}`)}
+                    onClick={() => navigate(`/admin/settings/charts/ingest-runs/${run.id}`)}
                     className="text-[12px] font-semibold text-wk-brand hover:underline cursor-pointer whitespace-nowrap"
                   >
                     Open Run →

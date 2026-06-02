@@ -137,7 +137,7 @@ export default function AdminChartsFamilies() {
           <WkIcon name={dataSource === "mock" ? "FlaskConical" : dataSource === "cache" ? "Database" : "Globe"} size={12} />
           {dataSource}
         </div>
-        <button onClick={() => navigate("/admin/charts/ingest")} className="wk-button wk-button-primary wk-button-sm whitespace-nowrap">
+        <button onClick={() => navigate("/admin/settings/charts/ingest")} className="wk-button wk-button-primary wk-button-sm whitespace-nowrap">
           <WkIcon name="Plus" size={14} /> New Ingest
         </button>
       </AdminChartsPageHeader>
@@ -249,7 +249,7 @@ export default function AdminChartsFamilies() {
                 v2={v2}
                 selected={selectedFamily?.id === family.id}
                 onClick={() => setSelectedFamily(selectedFamily?.id === family.id ? null : family)}
-                onIngest={() => navigate("/admin/charts/ingest")}
+                onIngest={() => navigate("/admin/settings/charts/ingest")}
                 onArchive={() => setArchiveTarget(family)}
               />
             );
@@ -308,13 +308,13 @@ export default function AdminChartsFamilies() {
           })()}
 
           <div className="flex gap-2 flex-wrap">
-            <button onClick={() => navigate("/admin/charts/ingest")} className="wk-button wk-button-primary wk-button-sm whitespace-nowrap">
+            <button onClick={() => navigate("/admin/settings/charts/ingest")} className="wk-button wk-button-primary wk-button-sm whitespace-nowrap">
               <WkIcon name="Plus" size={14} /> Start Ingest
             </button>
-            <button onClick={() => navigate("/admin/charts/editions")} className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap">
+            <button onClick={() => navigate("/admin/settings/charts/editions")} className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap">
               <WkIcon name="Layers" size={14} /> View Editions
             </button>
-            <button onClick={() => navigate("/admin/charts/public-api-qa")} className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap">
+            <button onClick={() => navigate("/admin/settings/charts/public-api-qa")} className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap">
               <WkIcon name="FlaskConical" size={14} /> API QA
             </button>
             {(selectedFamily.status ?? "active") !== "archived" && (

@@ -100,7 +100,7 @@ function generateCanonicalIds(row: NormalizedChartRow, status: MatchStatus): {
     return {
       canonicalTrackId: row.providerTrackId ? `wk-${row.providerTrackId}` : null,
       canonicalReleaseId: row.providerReleaseId ? `wk-${row.providerReleaseId}` : null,
-      canonicalArtistIds: row.providerArtistIds.map((id) => `wk-${id}`),
+      canonicalArtistIds: (row.providerArtistIds ?? []).map((id) => `wk-${id}`),
       releaseShellId: null,
     };
   }
@@ -109,7 +109,7 @@ function generateCanonicalIds(row: NormalizedChartRow, status: MatchStatus): {
       canonicalTrackId: null,
       canonicalReleaseId: null,
       canonicalArtistIds: [],
-      releaseShellId: row.providerReleaseId ? `shell-${row.providerReleaseId}` : `shell-${row.providerTrackId}`,
+      releaseShellId: row.providerReleaseId ? `shell-${row.providerReleaseId}` : `shell-${row.providerTrackId ?? "unknown"}`,
     };
   }
   return {

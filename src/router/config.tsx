@@ -29,7 +29,8 @@ import AdminChartsIngestHealth from "../pages/admin/charts/ingest-health/page";
 // Admin Settings
 import { AdminSettingsLayout } from "../pages/admin/settings/AdminSettingsLayout";
 import AdminSettingsHub from "../pages/admin/settings/page";
-import AdminSettingsCharts from "../pages/admin/settings/charts/page";
+import AdminSettingsChartDefaults from "../pages/admin/settings/chart-defaults/page";
+import AdminSettingsChartDefaultsMarketScopes from "../pages/admin/settings/chart-defaults/market-scopes/page";
 import AdminSettingsIntegrations from "../pages/admin/settings/integrations/page";
 import AdminSettingsGscData from "../pages/admin/settings/gsc-data/page";
 import AdminSettingsFrontendAppearance from "../pages/admin/settings/frontend-appearance/page";
@@ -130,12 +131,12 @@ const routes: RouteObject[] = [
     path: "/admin/design-system",
     element: <AdminDesignSystem />,
   },
-  // Admin Charts Ingestion Studio
+  // Admin Charts Studio — now under /admin/settings/charts
   {
-    path: "/admin/charts",
+    path: "/admin/settings/charts",
     element: <AdminChartsLayout />,
     children: [
-      { index: true, element: <Navigate to="/admin/charts/dashboard" replace /> },
+      { index: true, element: <Navigate to="/admin/settings/charts/dashboard" replace /> },
       { path: "dashboard", element: <AdminChartsDashboard /> },
       { path: "families", element: <AdminChartsFamilies /> },
       { path: "ingest", element: <AdminChartsIngest /> },
@@ -160,7 +161,8 @@ const routes: RouteObject[] = [
     element: <AdminSettingsLayout />,
     children: [
       { index: true, element: <AdminSettingsHub /> },
-      { path: "charts", element: <AdminSettingsCharts /> },
+      { path: "chart-defaults", element: <AdminSettingsChartDefaults /> },
+      { path: "chart-defaults/market-scopes", element: <AdminSettingsChartDefaultsMarketScopes /> },
       { path: "integrations", element: <AdminSettingsIntegrations /> },
       { path: "gsc-data", element: <AdminSettingsGscData /> },
       { path: "frontend-appearance", element: <AdminSettingsFrontendAppearance /> },
@@ -173,11 +175,6 @@ const routes: RouteObject[] = [
       { path: "navigation", element: <AdminSettingsNavigation /> },
       { path: "audit", element: <AdminSettingsAudit /> },
     ],
-  },
-  // Redirect legacy chart settings to admin settings
-  {
-    path: "/admin/charts/settings",
-    element: <Navigate to="/admin/settings/charts" replace />,
   },
   {
     path: "*",

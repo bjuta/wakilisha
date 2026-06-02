@@ -243,7 +243,7 @@ export function backendError(
   };
 }
 
-export function endpointNotImplemented(endpoint: string, actionHref = "/admin/charts/ingest-health"): BackendError {
+export function endpointNotImplemented(endpoint: string, actionHref = "/admin/settings/charts/ingest-health"): BackendError {
   return backendError("endpoint_not_implemented", "The backend endpoint is not implemented.", {
     detail: `Expected endpoint: ${endpoint}`,
     retryable: false,

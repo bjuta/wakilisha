@@ -125,7 +125,7 @@ The React app detects the current mode at runtime:
 2. If `"wordpress"`, all admin ingestion calls route through `wpAdapter.ts`
 3. If `"mock"` (default), all calls use `api.ts` with localStorage
 
-The Integration Map page at `/admin/charts/integration-map` displays the current mode and a diagnostics panel.
+The Integration Map page at `/admin/settings/charts/integration-map` displays the current mode and a diagnostics panel.
 
 ---
 

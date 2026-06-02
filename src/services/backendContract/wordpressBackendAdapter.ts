@@ -15,6 +15,25 @@ import {
 } from "../chartsPublic/v2Adapter";
 import type { IngestRun } from "../chartsIngestion/ingestStudioTypes";
 import type { CommitIngestRunResponse as LegacyCommitResponse } from "../chartsIngestion/commitTypes";
+import {
+  backendFail,
+  backendOk,
+  createBackendMeta,
+  backendError,
+  endpointNotImplemented,
+  unknownBackendError,
+  type BackendChartEdition,
+  type BackendChartEntry,
+  type BackendChartProgram,
+  type BackendCommitRequest,
+  type BackendCommitResponse,
+  type BackendDryRunRequest,
+  type BackendDryRunResponse,
+  type BackendHealth,
+  type BackendIngestRun,
+  type BackendResult,
+} from "./backendTypes";
+import { backendConfig, getBackendModeWarnings } from "./backendConfig";
 
 function backendMeta(extraWarnings: string[] = []) {
   return createBackendMeta({
@@ -37,7 +56,7 @@ function toSafeError(error: unknown, expectedEndpoint?: string) {
     return backendError("network_error", "Unable to reach the WAKILISHA backend.", {
       detail: message,
       retryable: true,
-      action: { label: "Open API Health", href: "/admin/charts/ingest-health" },
+      action: { label: "Open API Health", href: "/admin/settings/charts/ingest-health" },
     });
   }
 

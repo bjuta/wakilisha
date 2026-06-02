@@ -16,13 +16,13 @@ This document is the reference implementation for the WordPress plugin / backend
 
 | Route | Page | Purpose |
 |-------|------|---------|
-| `/admin/charts/dashboard` | Dashboard | KPIs, active jobs, failed jobs, latest edition |
-| `/admin/charts/families` | Families | Chart family list (stub) |
-| `/admin/charts/ingest` | Ingest Jobs List | Filterable jobs table with status, counts, actions |
-| `/admin/charts/ingest/:jobId` | Job Detail | 9-step wizard with stepper, per-step content, summary rail |
-| `/admin/charts/editions` | Editions | Published editions list (stub) |
-| `/admin/charts/snapshots` | Snapshots | Immutable snapshots list (stub) |
-| `/admin/charts/integration-map` | Integration Map | **Dev-only.** Maps every frontend function to its future WordPress endpoint |
+| `/admin/settings/charts/dashboard` | Dashboard | KPIs, active jobs, failed jobs, latest edition |
+| `/admin/settings/charts/families` | Families | Chart family list (stub) |
+| `/admin/settings/charts/ingest` | Ingest Jobs List | Filterable jobs table with status, counts, actions |
+| `/admin/settings/charts/ingest/:jobId` | Job Detail | 9-step wizard with stepper, per-step content, summary rail |
+| `/admin/settings/charts/editions` | Editions | Published editions list (stub) |
+| `/admin/settings/charts/snapshots` | Snapshots | Immutable snapshots list (stub) |
+| `/admin/settings/charts/integration-map` | Integration Map | **Dev-only.** Maps every frontend function to its future WordPress endpoint |
 
 ---
 
@@ -209,7 +209,7 @@ The frontend enforces these guards (mirrored in `workflow.ts`). The backend **mu
    const CHARTS_INGESTION_MODE: IngestionMode = "wordpress";
    ```
 5. **Implement the WordPress adapter** in `client.ts` by replacing the `wpStub` with actual `fetch()` calls to the WordPress REST API.
-6. **Test against the Integration Map** at `/admin/charts/integration-map` — every endpoint should show `"ready"` status when wired.
+6. **Test against the Integration Map** at `/admin/settings/charts/integration-map` — every endpoint should show `"ready"` status when wired.
 
 ---
 

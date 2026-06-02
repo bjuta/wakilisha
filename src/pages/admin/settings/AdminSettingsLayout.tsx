@@ -114,7 +114,7 @@ export function AdminSettingsLayout() {
       <div className="border-t border-[var(--wk-border)] px-3 py-3">
         <div className="space-y-1">
           {[
-            { label: "Back to Admin", icon: "ArrowLeft" as WkIconName, onClick: () => navigate("/admin/charts/dashboard") },
+            { label: "Back to Admin", icon: "ArrowLeft" as WkIconName, onClick: () => navigate("/admin/settings/charts/dashboard") },
             { label: theme === "dark" ? "Dark mode" : "Light mode", icon: (theme === "dark" ? "Moon" : "Sun") as WkIconName, onClick: toggle },
           ].map((item) => (
             <button
@@ -196,7 +196,7 @@ export function AdminSettingsLayout() {
             </div>
             <nav className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-[12px] text-[var(--wk-text-muted)]">
               {[
-                { label: "Dashboard", path: "/admin/charts/dashboard" },
+                { label: "Dashboard", path: "/admin/settings/charts/dashboard" },
                 { label: "Settings", path: "/admin/settings" },
                 { label: "Charts", path: "/admin/settings/charts" },
                 { label: "Integrations", path: "/admin/settings/integrations" },
