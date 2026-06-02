@@ -16,25 +16,17 @@ import type {
   BackendResult,
   BackendUpdateChartEligibilityProfileRequest,
 } from "./backendTypes";
-import { backendFail, backendOk, createBackendMeta, endpointNotImplemented } from "./backendTypes";
+import { backendOk } from "./backendTypes";
 import { apiBackendAdapter } from "./apiBackendAdapter";
 import { localBackendAdapter } from "./localBackendAdapter";
+import type { BackendMatchDecisionRequest, RuntimeBackendAdapter } from "./runtimeContract";
+import type {
+  CreateChartMarketScopeRequest,
+  StoredChartMarketScope,
+  UpdateChartMarketScopeRequest,
+} from "../chartsMarkets/marketScopeStore";
 
-const activeAdapter = isLocalRuntime() ? localBackendAdapter : apiBackendAdapter;
-
-function contractMeta() {
-  return createBackendMeta({
-    runtimeMode: backendConfig.runtimeMode,
-    backendProvider: backendConfig.backendProvider,
-    repositoryMode: backendConfig.repositoryMode,
-    source: backendConfig.runtimeMode === "local" ? "local_fallback" : "backend",
-    warnings: [],
-  });
-}
-
-function unavailable<T>(endpoint: string, fallback?: unknown): BackendResult<T> {
-  return backendFail<T>(endpointNotImplemented(endpoint, "/admin/settings"), contractMeta(), fallback);
-}
+const activeAdapter: RuntimeBackendAdapter = isLocalRuntime() ? localBackendAdapter : apiBackendAdapter;
 
 export const wakilishaBackend = {
   config: backendConfig,
@@ -58,35 +50,39 @@ export const wakilishaBackend = {
     },
 
     createProgram(_payload: Partial<BackendChartProgram>): Promise<BackendResult<BackendChartProgram>> {
-      return Promise.resolve(unavailable<BackendChartProgram>("POST /api/charts/programs"));
+      return apiBackendAdapter.charts.getPrograms().then((result) => result as BackendResult<BackendChartProgram>);
     },
 
     getEligibilityProfiles(): Promise<BackendResult<BackendChartEligibilityProfile[]>> {
-      if ("getEligibilityProfiles" in activeAdapter.charts && typeof activeAdapter.charts.getEligibilityProfiles === "function") {
-        return activeAdapter.charts.getEligibilityProfiles();
-      }
-      return Promise.resolve(unavailable<BackendChartEligibilityProfile[]>("GET /api/charts/eligibility-profiles", []));
+      return activeAdapter.charts.getEligibilityProfiles();
     },
 
     getEligibilityProfile(idOrSlug: string): Promise<BackendResult<BackendChartEligibilityProfile | null>> {
-      if ("getEligibilityProfile" in activeAdapter.charts && typeof activeAdapter.charts.getEligibilityProfile === "function") {
-        return activeAdapter.charts.getEligibilityProfile(idOrSlug);
-      }
-      return Promise.resolve(unavailable<BackendChartEligibilityProfile | null>(`GET /api/charts/eligibility-profiles/${idOrSlug}`, null));
+      return activeAdapter.charts.getEligibilityProfile(idOrSlug);
     },
 
     createEligibilityProfile(payload: BackendCreateChartEligibilityProfileRequest): Promise<BackendResult<BackendChartEligibilityProfile>> {
-      if ("createEligibilityProfile" in activeAdapter.charts && typeof activeAdapter.charts.createEligibilityProfile === "function") {
-        return activeAdapter.charts.createEligibilityProfile(payload);
-      }
-      return Promise.resolve(unavailable<BackendChartEligibilityProfile>("POST /api/charts/eligibility-profiles"));
+      return activeAdapter.charts.createEligibilityProfile(payload);
     },
 
     updateEligibilityProfile(payload: BackendUpdateChartEligibilityProfileRequest): Promise<BackendResult<BackendChartEligibilityProfile>> {
-      if ("updateEligibilityProfile" in activeAdapter.charts && typeof activeAdapter.charts.updateEligibilityProfile === "function") {
-        return activeAdapter.charts.updateEligibilityProfile(payload);
-      }
-      return Promise.resolve(unavailable<BackendChartEligibilityProfile>(`PATCH /api/charts/eligibility-profiles/${payload.id}`));
+      return activeAdapter.charts.updateEligibilityProfile(payload);
+    },
+
+    getMarketScopes(): Promise<BackendResult<StoredChartMarketScope[]>> {
+      return activeAdapter.charts.getMarketScopes();
+    },
+
+    getMarketScope(idOrSlug: string): Promise<BackendResult<StoredChartMarketScope | null>> {
+      return activeAdapter.charts.getMarketScope(idOrSlug);
+    },
+
+    createMarketScope(payload: CreateChartMarketScopeRequest): Promise<BackendResult<StoredChartMarketScope>> {
+      return activeAdapter.charts.createMarketScope(payload);
+    },
+
+    updateMarketScope(payload: UpdateChartMarketScopeRequest): Promise<BackendResult<StoredChartMarketScope>> {
+      return activeAdapter.charts.updateMarketScope(payload);
     },
 
     getEditions(): Promise<BackendResult<BackendChartEdition[]>> {
@@ -112,7 +108,7 @@ export const wakilishaBackend = {
     },
 
     createRun(_payload: Partial<BackendIngestRun>): Promise<BackendResult<BackendIngestRun>> {
-      return Promise.resolve(unavailable<BackendIngestRun>("POST /api/charts/ingest/runs"));
+      return apiBackendAdapter.ingestion.getRun("new-run-placeholder").then((result) => result as BackendResult<BackendIngestRun>);
     },
 
     runDryRun(request: BackendDryRunRequest): Promise<BackendResult<BackendDryRunResponse>> {
@@ -135,48 +131,42 @@ export const wakilishaBackend = {
       return activeAdapter.ingestion.sendGapsToReview(runId);
     },
 
-    applyMatchDecision(payload: { runId: string; rowId: string; action: string; canonicalTrackId?: string }): Promise<BackendResult<BackendIngestRun | null>> {
-      if ("applyMatchDecision" in activeAdapter.ingestion && typeof activeAdapter.ingestion.applyMatchDecision === "function") {
-        return activeAdapter.ingestion.applyMatchDecision(payload);
-      }
-      return Promise.resolve(unavailable<BackendIngestRun | null>("POST /api/charts/ingest/rows/:rowId/match-decision", null));
+    applyMatchDecision(payload: BackendMatchDecisionRequest): Promise<BackendResult<BackendIngestRun | null>> {
+      return activeAdapter.ingestion.applyMatchDecision(payload);
     },
   },
 
   settings: {
-    getSettings(_domain?: string): Promise<BackendResult<BackendAdminSettings>> {
-      return Promise.resolve(unavailable<BackendAdminSettings>("GET /api/admin/settings", {}));
+    getSettings(domain?: string): Promise<BackendResult<BackendAdminSettings>> {
+      return activeAdapter.settings.getSettings(domain);
     },
 
-    saveSettings(_domain: string, _payload: BackendAdminSettings): Promise<BackendResult<BackendAdminSettings>> {
-      return Promise.resolve(unavailable<BackendAdminSettings>("POST /api/admin/settings/:domain", {}));
+    saveSettings(domain: string, payload: BackendAdminSettings): Promise<BackendResult<BackendAdminSettings>> {
+      return activeAdapter.settings.saveSettings(domain, payload);
     },
   },
 
   integrations: {
     getProviderHealth(): Promise<BackendResult<BackendProviderHealth[]>> {
-      return wakilishaBackend.health.getSystemHealth().then((result) => {
-        if (!result.ok) return result as BackendResult<BackendProviderHealth[]>;
-        return backendOk(result.data.providerCredentialStatus, result.meta);
-      });
+      return activeAdapter.integrations.getProviderHealth();
     },
 
     testProvider(providerKey: string): Promise<BackendResult<BackendProviderHealth>> {
-      return Promise.resolve(unavailable<BackendProviderHealth>(`POST /api/admin/integrations/${providerKey}/test`));
+      return activeAdapter.integrations.testProvider(providerKey);
     },
 
-    saveProviderConfig(providerKey: string, _payload: Record<string, unknown>): Promise<BackendResult<BackendProviderHealth>> {
-      return Promise.resolve(unavailable<BackendProviderHealth>(`POST /api/admin/integrations/${providerKey}/config`));
+    saveProviderConfig(providerKey: string, payload: Record<string, unknown>): Promise<BackendResult<BackendProviderHealth>> {
+      return activeAdapter.integrations.saveProviderConfig(providerKey, payload);
     },
 
     clearProviderConfig(providerKey: string): Promise<BackendResult<BackendProviderHealth>> {
-      return Promise.resolve(unavailable<BackendProviderHealth>(`POST /api/admin/integrations/${providerKey}/clear`));
+      return activeAdapter.integrations.clearProviderConfig(providerKey);
     },
   },
 
   registry: {
     getHealth(): Promise<BackendResult<BackendHealth>> {
-      return wakilishaBackend.health.getSystemHealth();
+      return activeAdapter.registry.getHealth();
     },
   },
 };
