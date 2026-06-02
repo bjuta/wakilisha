@@ -20,7 +20,13 @@ import {
   type BackendUpdateChartEligibilityProfileRequest,
 } from "./backendTypes";
 import { backendConfig, getBackendModeWarnings } from "./backendConfig";
-import { WAKILISHA_RUNTIME_ENDPOINTS, type BackendCreateProgramRequest, type BackendMatchDecisionRequest, type RuntimeBackendAdapter } from "./runtimeContract";
+import {
+  WAKILISHA_RUNTIME_ENDPOINTS,
+  type BackendCreateProgramRequest,
+  type BackendCreateRunRequest,
+  type BackendMatchDecisionRequest,
+  type RuntimeBackendAdapter,
+} from "./runtimeContract";
 import type {
   CreateChartMarketScopeRequest,
   StoredChartMarketScope,
@@ -90,6 +96,7 @@ export const apiBackendAdapter: RuntimeBackendAdapter = {
   ingestion: {
     async getRuns(): Promise<BackendResult<BackendIngestRun[]>> { return unavailable(WAKILISHA_RUNTIME_ENDPOINTS.ingestion.runs, []); },
     async getRun(runId: string): Promise<BackendResult<BackendIngestRun | null>> { return unavailable(`${WAKILISHA_RUNTIME_ENDPOINTS.ingestion.run} (${runId})`, null); },
+    async createRun(_payload: BackendCreateRunRequest): Promise<BackendResult<BackendIngestRun>> { return unavailable(WAKILISHA_RUNTIME_ENDPOINTS.ingestion.createRun); },
     async runDryRun(_request: BackendDryRunRequest): Promise<BackendResult<BackendDryRunResponse>> { return unavailable(WAKILISHA_RUNTIME_ENDPOINTS.ingestion.dryRun); },
     async commitRun(_request: BackendCommitRequest): Promise<BackendResult<BackendCommitResponse>> { return unavailable(WAKILISHA_RUNTIME_ENDPOINTS.ingestion.commit); },
     async cancelRun(runId: string): Promise<BackendResult<BackendIngestRun | null>> { return unavailable(`${WAKILISHA_RUNTIME_ENDPOINTS.ingestion.cancel} (${runId})`, null); },
