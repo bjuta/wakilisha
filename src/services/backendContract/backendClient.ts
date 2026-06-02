@@ -2,16 +2,19 @@ import { backendConfig, isLocalRuntime } from "./backendConfig";
 import type {
   BackendAdminSettings,
   BackendChartEdition,
+  BackendChartEligibilityProfile,
   BackendChartEntry,
   BackendChartProgram,
   BackendCommitRequest,
   BackendCommitResponse,
+  BackendCreateChartEligibilityProfileRequest,
   BackendDryRunRequest,
   BackendDryRunResponse,
   BackendHealth,
   BackendIngestRun,
   BackendProviderHealth,
   BackendResult,
+  BackendUpdateChartEligibilityProfileRequest,
 } from "./backendTypes";
 import { backendFail, backendOk, createBackendMeta, endpointNotImplemented } from "./backendTypes";
 import { localBackendAdapter } from "./localBackendAdapter";
@@ -56,6 +59,34 @@ export const wakilishaBackend = {
 
     createProgram(_payload: Partial<BackendChartProgram>): Promise<BackendResult<BackendChartProgram>> {
       return Promise.resolve(unavailable<BackendChartProgram>("POST /wp-json/wakilisha/v2/charts/programs"));
+    },
+
+    getEligibilityProfiles(): Promise<BackendResult<BackendChartEligibilityProfile[]>> {
+      if ("getEligibilityProfiles" in activeAdapter.charts && typeof activeAdapter.charts.getEligibilityProfiles === "function") {
+        return activeAdapter.charts.getEligibilityProfiles();
+      }
+      return Promise.resolve(unavailable<BackendChartEligibilityProfile[]>("GET /wp-json/wakilisha/v2/charts/eligibility-profiles", []));
+    },
+
+    getEligibilityProfile(idOrSlug: string): Promise<BackendResult<BackendChartEligibilityProfile | null>> {
+      if ("getEligibilityProfile" in activeAdapter.charts && typeof activeAdapter.charts.getEligibilityProfile === "function") {
+        return activeAdapter.charts.getEligibilityProfile(idOrSlug);
+      }
+      return Promise.resolve(unavailable<BackendChartEligibilityProfile | null>(`GET /wp-json/wakilisha/v2/charts/eligibility-profiles/${idOrSlug}`, null));
+    },
+
+    createEligibilityProfile(payload: BackendCreateChartEligibilityProfileRequest): Promise<BackendResult<BackendChartEligibilityProfile>> {
+      if ("createEligibilityProfile" in activeAdapter.charts && typeof activeAdapter.charts.createEligibilityProfile === "function") {
+        return activeAdapter.charts.createEligibilityProfile(payload);
+      }
+      return Promise.resolve(unavailable<BackendChartEligibilityProfile>("POST /wp-json/wakilisha/v2/charts/eligibility-profiles"));
+    },
+
+    updateEligibilityProfile(payload: BackendUpdateChartEligibilityProfileRequest): Promise<BackendResult<BackendChartEligibilityProfile>> {
+      if ("updateEligibilityProfile" in activeAdapter.charts && typeof activeAdapter.charts.updateEligibilityProfile === "function") {
+        return activeAdapter.charts.updateEligibilityProfile(payload);
+      }
+      return Promise.resolve(unavailable<BackendChartEligibilityProfile>(`PATCH /wp-json/wakilisha/v2/charts/eligibility-profiles/${payload.id}`));
     },
 
     getEditions(): Promise<BackendResult<BackendChartEdition[]>> {
