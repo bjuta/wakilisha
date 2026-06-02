@@ -1,6 +1,8 @@
+import { useEffect } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import type { StoredChartMarketScope } from "@/services/chartsMarkets/marketScopeStore";
+import { setCurrentIngestMarketScopeSelection } from "@/services/chartsMarkets/marketScopePersistence";
 
 const INPUT_CLASS = "w-full rounded-md border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text outline-none focus:border-wk-border-strong focus:ring-1 focus:ring-wk-brand/20";
 const LABEL_CLASS = "mb-1 block text-[12px] font-semibold text-wk-text-soft";
@@ -15,8 +17,32 @@ function formatAggregation(value: StoredChartMarketScope["aggregationMode"]): st
   return value.replace(/_/g, " ");
 }
 
+function toScopePatch(scope: StoredChartMarketScope) {
+  return {
+    marketScopeId: scope.id,
+    marketScopeSnapshot: {
+      id: scope.id,
+      name: scope.name,
+      slug: scope.slug,
+      primaryMarketSlug: scope.primaryMarketSlug,
+      includedMarkets: scope.includedMarkets,
+      aggregationMode: scope.aggregationMode,
+    },
+  };
+}
+
 export function MarketScopeStep({ scopes, selectedMarketScopeId, onSelectMarketScope }: MarketScopeStepProps) {
   const selectedScope = scopes.find((scope) => scope.id === selectedMarketScopeId || scope.slug === selectedMarketScopeId) ?? scopes[0];
+
+  useEffect(() => {
+    if (selectedScope) setCurrentIngestMarketScopeSelection(toScopePatch(selectedScope));
+  }, [selectedScope]);
+
+  function handleSelection(scopeId: string) {
+    const scope = scopes.find((item) => item.id === scopeId || item.slug === scopeId);
+    if (scope) setCurrentIngestMarketScopeSelection(toScopePatch(scope));
+    onSelectMarketScope(scopeId);
+  }
 
   return (
     <WkSurface className="p-4">
@@ -32,7 +58,7 @@ export function MarketScopeStep({ scopes, selectedMarketScopeId, onSelectMarketS
 
       <div className="mb-4">
         <label className={LABEL_CLASS}>Scope</label>
-        <select value={selectedMarketScopeId} onChange={(event) => onSelectMarketScope(event.target.value)} className={INPUT_CLASS}>
+        <select value={selectedMarketScopeId} onChange={(event) => handleSelection(event.target.value)} className={INPUT_CLASS}>
           {scopes.map((scope) => (
             <option key={scope.id} value={scope.id}>{scope.name} ({scope.slug})</option>
           ))}
