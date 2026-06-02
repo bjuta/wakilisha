@@ -5,24 +5,12 @@ import type {
   TrackChartHistory,
 } from "./types";
 
-import { fromWpChartFamily, fromWpChartEdition } from "../chartsIngestion/normalizers";
-
-import { publicWpGet, PublicWpApiError } from "./wpAdapter";
-import {
-  getV2ChartEdition,
-  getV2ChartEditionEntries,
-  getV2ChartEditionsForFamily,
-  getV2ChartFamilies,
-  getV2ChartFamily,
-  getV2LatestChartEdition,
-  getV2TrackChartHistory,
-} from "./v2Adapter";
-
 import {
   getCachedChart,
   setCachedChart,
   clearChartCache,
   DEFAULT_CACHE_TTL,
+  type PublicChartCacheSource,
 } from "./cache";
 
 import {
@@ -46,29 +34,26 @@ import {
   getCsvTrackHistory,
 } from "./csvData";
 
-// ─── Environment ───
-export const PUBLIC_API_BASE =
-  import.meta.env.VITE_WAKILISHA_WP_API_BASE || "/wp-json/wakilisha/v1";
+export const PUBLIC_API_BASE = import.meta.env.VITE_WAKILISHA_PUBLIC_API_BASE || "/api/wakilisha/public";
+export const PUBLIC_MODE = "local" as const;
+export const PUBLIC_API_VERSION = "runtime" as const;
 
-export const PUBLIC_MODE =
-  (import.meta.env.VITE_CHARTS_PUBLIC_MODE as "mock" | "wordpress") || "mock";
+export class PublicChartsApiError extends Error {
+  status: number;
+  code?: string;
+  retryable: boolean;
 
-export const PUBLIC_API_VERSION =
-  (import.meta.env.VITE_CHARTS_PUBLIC_API_VERSION as "v1" | "v2") || "v1";
-
-if (import.meta.env.DEV && !import.meta.env.VITE_WAKILISHA_WP_API_BASE) {
-  // eslint-disable-next-line no-console
-  console.warn(
-    "[chartsPublic] VITE_WAKILISHA_WP_API_BASE is not set. Public charts client will use default '/wp-json/wakilisha/v1'"
-  );
+  constructor(message: string, status = 500, code = "public_charts_error", retryable = false) {
+    super(message);
+    this.name = "PublicChartsApiError";
+    this.status = status;
+    this.code = code;
+    this.retryable = retryable;
+  }
 }
 
-// ─── Error type ───
-export { PublicWpApiError };
-
-// ─── Metadata types ───
 export interface ChartFetchMeta {
-  source: "mock" | "wordpress" | "cache";
+  source: PublicChartCacheSource | "cache";
   fetchedAt: string;
   isStale: boolean;
 }
@@ -78,25 +63,16 @@ export interface ChartResult<T> {
   meta: ChartFetchMeta;
 }
 
-// ─── Helpers ───
-function isMock(): boolean {
-  return PUBLIC_MODE === "mock";
-}
-
-function isV2WordPress(): boolean {
-  return PUBLIC_MODE === "wordpress" && PUBLIC_API_VERSION === "v2";
-}
-
 function now(): string {
   return new Date().toISOString();
 }
 
-function mockMeta(): ChartFetchMeta {
-  return { source: "mock", fetchedAt: now(), isStale: false };
+function localMeta(): ChartFetchMeta {
+  return { source: "local", fetchedAt: now(), isStale: false };
 }
 
 function cacheMeta(entry: {
-  source: "mock" | "wordpress";
+  source: PublicChartCacheSource;
   fetchedAt: number;
   isStale: boolean;
 }): ChartFetchMeta {
@@ -107,21 +83,13 @@ function cacheMeta(entry: {
   };
 }
 
-function wpMeta(): ChartFetchMeta {
-  return { source: "wordpress", fetchedAt: now(), isStale: false };
-}
-
 async function useCsvPublicData(): Promise<boolean> {
-  return isMock() && (await hasCsvPublicChartData());
+  return hasCsvPublicChartData();
 }
 
-/**
- * Core cache wrapper. Checks cache first, returns fresh if hit.
- * On fetch failure, falls back to stale cache if available.
- */
 async function withCache<T>(
   key: string,
-  fetchFn: () => Promise<{ data: T; source: "mock" | "wordpress" }>,
+  fetchFn: () => Promise<{ data: T; source: PublicChartCacheSource }>,
   ttlMs = DEFAULT_CACHE_TTL
 ): Promise<ChartResult<T>> {
   const cached = getCachedChart<T>(key);
@@ -132,7 +100,7 @@ async function withCache<T>(
   try {
     const { data, source } = await fetchFn();
     setCachedChart(key, data, source, ttlMs);
-    return { data, meta: source === "mock" ? mockMeta() : wpMeta() };
+    return { data, meta: source === "local" ? localMeta() : { source, fetchedAt: now(), isStale: false } };
   } catch (err) {
     if (cached) {
       return {
@@ -144,184 +112,78 @@ async function withCache<T>(
   }
 }
 
-// ─── API Functions ───
-
 export function getChartFamilies(): Promise<ChartResult<ChartFamily[]>> {
-  return withCache(`chart_families_${PUBLIC_API_VERSION}`, async () => {
-    if (isMock()) {
-      const csvData = await useCsvPublicData();
-      return {
-        data: csvData ? await getCsvFamilies() : [...MOCK_FAMILIES],
-        source: "mock",
-      };
-    }
-    if (isV2WordPress()) {
-      return { data: await getV2ChartFamilies(), source: "wordpress" };
-    }
-    const res = await publicWpGet<{ families: unknown[] }>("/charts");
+  return withCache("chart_families_runtime", async () => {
+    const csvData = await useCsvPublicData();
     return {
-      data: (res.families || []).map(fromWpChartFamily),
-      source: "wordpress",
+      data: csvData ? await getCsvFamilies() : [...MOCK_FAMILIES],
+      source: "local",
     };
   });
 }
 
-export function getChartFamily(
-  familySlug: string
-): Promise<ChartResult<ChartFamily | null>> {
-  return withCache(`chart_family_${PUBLIC_API_VERSION}_${familySlug}`, async () => {
-    if (isMock()) {
-      const csvData = await useCsvPublicData();
-      const family = csvData ? await getCsvFamily(familySlug) : getMockFamily(familySlug);
-      return { data: family ? { ...family } : null, source: "mock" };
-    }
-    if (isV2WordPress()) {
-      return { data: await getV2ChartFamily(familySlug), source: "wordpress" };
-    }
-    const res = await publicWpGet<{ family: unknown }>(`/charts/${familySlug}`);
+export function getChartFamily(familySlug: string): Promise<ChartResult<ChartFamily | null>> {
+  return withCache(`chart_family_runtime_${familySlug}`, async () => {
+    const csvData = await useCsvPublicData();
+    const family = csvData ? await getCsvFamily(familySlug) : getMockFamily(familySlug);
+    return { data: family ? { ...family } : null, source: "local" };
+  });
+}
+
+export function getChartEditionsForFamily(familySlug: string): Promise<ChartResult<ChartEdition[]>> {
+  return withCache(`chart_family_editions_runtime_${familySlug}`, async () => {
+    const csvData = await useCsvPublicData();
     return {
-      data: res.family ? fromWpChartFamily(res.family) : null,
-      source: "wordpress",
+      data: csvData ? await getCsvEditionsForFamily(familySlug) : getMockEditionsForFamily(familySlug),
+      source: "local",
     };
   });
 }
 
-export function getChartEditionsForFamily(
-  familySlug: string
-): Promise<ChartResult<ChartEdition[]>> {
-  return withCache(`chart_family_editions_${PUBLIC_API_VERSION}_${familySlug}`, async () => {
-    if (isMock()) {
-      const csvData = await useCsvPublicData();
-      return {
-        data: csvData ? await getCsvEditionsForFamily(familySlug) : getMockEditionsForFamily(familySlug),
-        source: "mock",
-      };
-    }
-    if (isV2WordPress()) {
-      return { data: await getV2ChartEditionsForFamily(familySlug), source: "wordpress" };
-    }
-    const res = await publicWpGet<{ editions: unknown[] }>(
-      `/charts/${familySlug}/editions`
-    );
+export function getLatestChartEdition(familySlug: string): Promise<ChartResult<ChartEdition | null>> {
+  return withCache(`chart_latest_runtime_${familySlug}`, async () => {
+    const csvData = await useCsvPublicData();
+    const edition = csvData ? await getCsvLatestEdition(familySlug) : getMockLatestEdition(familySlug);
+    return { data: edition ? { ...edition } : null, source: "local" };
+  });
+}
+
+export function getChartEdition(familySlug: string, editionSlug: string): Promise<ChartResult<ChartEdition | null>> {
+  return withCache(`chart_edition_runtime_${familySlug}_${editionSlug}`, async () => {
+    const csvData = await useCsvPublicData();
+    const edition = csvData ? await getCsvEdition(familySlug, editionSlug) : getMockEdition(familySlug, editionSlug);
+    return { data: edition ? { ...edition } : null, source: "local" };
+  });
+}
+
+export function getChartEditionEntries(familySlug: string, editionSlug: string): Promise<ChartResult<ChartEditionEntry[]>> {
+  return withCache(`chart_entries_runtime_${familySlug}_${editionSlug}`, async () => {
+    const csvData = await useCsvPublicData();
     return {
-      data: (res.editions || []).map(fromWpChartEdition),
-      source: "wordpress",
+      data: csvData ? await getCsvEntriesForEdition(familySlug, editionSlug) : getMockEntriesForEdition(familySlug, editionSlug),
+      source: "local",
     };
   });
 }
 
-export function getLatestChartEdition(
-  familySlug: string
-): Promise<ChartResult<ChartEdition | null>> {
-  return withCache(`chart_latest_${PUBLIC_API_VERSION}_${familySlug}`, async () => {
-    if (isMock()) {
-      const csvData = await useCsvPublicData();
-      const edition = csvData ? await getCsvLatestEdition(familySlug) : getMockLatestEdition(familySlug);
-      return { data: edition ? { ...edition } : null, source: "mock" };
-    }
-    if (isV2WordPress()) {
-      return { data: await getV2LatestChartEdition(familySlug), source: "wordpress" };
-    }
-    const res = await publicWpGet<{ edition: unknown }>(
-      `/charts/${familySlug}/latest`
-    );
+export function getTrackChartHistory(trackSlug: string): Promise<ChartResult<TrackChartHistory | null>> {
+  return withCache(`track_history_runtime_${trackSlug}`, async () => {
+    const csvData = await useCsvPublicData();
+    const csvHistory = csvData ? await getCsvTrackHistory(trackSlug) : null;
+    if (csvHistory) return { data: csvHistory, source: "local" };
+    if (trackSlug === "midnight-dreams") return { data: { ...MOCK_TRACK_HISTORY }, source: "local" };
     return {
-      data: res.edition ? fromWpChartEdition(res.edition) : null,
-      source: "wordpress",
-    };
-  });
-}
-
-export function getChartEdition(
-  familySlug: string,
-  editionSlug: string
-): Promise<ChartResult<ChartEdition | null>> {
-  return withCache(
-    `chart_edition_${PUBLIC_API_VERSION}_${familySlug}_${editionSlug}`,
-    async () => {
-      if (isMock()) {
-        const csvData = await useCsvPublicData();
-        const edition = csvData ? await getCsvEdition(familySlug, editionSlug) : getMockEdition(familySlug, editionSlug);
-        return { data: edition ? { ...edition } : null, source: "mock" };
-      }
-      if (isV2WordPress()) {
-        return { data: await getV2ChartEdition(familySlug, editionSlug), source: "wordpress" };
-      }
-      const res = await publicWpGet<{ edition: unknown }>(
-        `/charts/${familySlug}/${editionSlug}`
-      );
-      return {
-        data: res.edition ? fromWpChartEdition(res.edition) : null,
-        source: "wordpress",
-      };
-    }
-  );
-}
-
-export function getChartEditionEntries(
-  familySlug: string,
-  editionSlug: string
-): Promise<ChartResult<ChartEditionEntry[]>> {
-  return withCache(
-    `chart_entries_${PUBLIC_API_VERSION}_${familySlug}_${editionSlug}`,
-    async () => {
-      if (isMock()) {
-        const csvData = await useCsvPublicData();
-        return {
-          data: csvData
-            ? await getCsvEntriesForEdition(familySlug, editionSlug)
-            : getMockEntriesForEdition(familySlug, editionSlug),
-          source: "mock",
-        };
-      }
-      if (isV2WordPress()) {
-        return { data: await getV2ChartEditionEntries(familySlug, editionSlug), source: "wordpress" };
-      }
-      const res = await publicWpGet<{ entries: unknown[] }>(
-        `/charts/${familySlug}/${editionSlug}/entries`
-      );
-      return {
-        data: (res.entries || []) as ChartEditionEntry[],
-        source: "wordpress",
-      };
-    }
-  );
-}
-
-export function getTrackChartHistory(
-  trackSlug: string
-): Promise<ChartResult<TrackChartHistory | null>> {
-  return withCache(`track_history_${PUBLIC_API_VERSION}_${trackSlug}`, async () => {
-    if (isMock()) {
-      const csvData = await useCsvPublicData();
-      const csvHistory = csvData ? await getCsvTrackHistory(trackSlug) : null;
-      if (csvHistory) return { data: csvHistory, source: "mock" };
-      if (trackSlug === "midnight-dreams") {
-        return { data: { ...MOCK_TRACK_HISTORY }, source: "mock" };
-      }
-      return {
-        data: {
-          trackSlug,
-          trackTitle: "Unknown Track",
-          artistNames: [],
-          appearances: [],
-          peakPosition: 0,
-          totalWeeksOnChart: 0,
-          firstAppearance: null,
-          latestAppearance: null,
-        },
-        source: "mock",
-      };
-    }
-    if (isV2WordPress()) {
-      return { data: await getV2TrackChartHistory(trackSlug), source: "wordpress" };
-    }
-    const res = await publicWpGet<{ history: unknown }>(
-      `/tracks/${trackSlug}/chart-history`
-    );
-    return {
-      data: res.history ? (res.history as TrackChartHistory) : null,
-      source: "wordpress",
+      data: {
+        trackSlug,
+        trackTitle: "Unknown Track",
+        artistNames: [],
+        appearances: [],
+        peakPosition: 0,
+        totalWeeksOnChart: 0,
+        firstAppearance: null,
+        latestAppearance: null,
+      },
+      source: "local",
     };
   });
 }
