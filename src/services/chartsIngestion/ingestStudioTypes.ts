@@ -102,6 +102,7 @@ export interface IngestRun {
   detectedProviders: ProviderName[];
   saveAsRecurringSeries: boolean;
   existingSeriesId?: string | null;
+  eligibilityProfileId?: string | null;
   status: IngestRunStatus;
   stages: IngestStageStatus[];
   summary: IngestRunSummary;
@@ -129,6 +130,7 @@ export type CreateIngestDryRunRequest = {
   sourceUrls: string[];
   saveAsRecurringSeries?: boolean;
   existingSeriesId?: string | null;
+  eligibilityProfileId?: string | null;
 };
 
 export type CreateIngestDryRunResponse = {
