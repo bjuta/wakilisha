@@ -53,7 +53,7 @@ export default function Magazine() {
   }
 
   if (!featured) {
-    return <div className="wk-container px-6 py-20 text-[var(--wk-text-muted)]">No imported magazine stories matched the current editorial surface yet.</div>;
+    return <div className="wk-container px-6 py-20 text-[var(--wk-text-muted)]">No imported magazine stories are available from the repaired content graph yet.</div>;
   }
 
   return (
@@ -92,7 +92,7 @@ export default function Magazine() {
               <div className="section-kicker">Trending shelf</div>
               <h2 className="section-title">What people are reading</h2>
             </div>
-            <p className="section-copy">Imported stories from the WAKILISHA editorial content surface.</p>
+            <p className="section-copy">Imported stories from the repaired WAKILISHA content graph.</p>
           </div>
           <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
             {trending.map((story, index) => <StoryTile key={story.slug} story={story} rank={index + 1} compact />)}
@@ -111,7 +111,7 @@ export default function Magazine() {
           <div className="section-head">
             <div>
               <div className="section-kicker">Editor picks</div>
-              <h2 className="section-title">Selected from the surface</h2>
+              <h2 className="section-title">Selected from the graph</h2>
             </div>
           </div>
           <div className="mag-grid trio">
@@ -135,7 +135,7 @@ export default function Magazine() {
           <div className="pg-block">
             <div className="pg-block-label">Imported content</div>
             <h3 className="pg-block-title">{stories.length} magazine stories loaded.</h3>
-            <p className="pg-block-body">This page now uses imported editorial content surfaces instead of the old mock file.</p>
+            <p className="pg-block-body">This page now uses the repaired content route classification instead of the old magazine mock file.</p>
           </div>
           <form className="mag-newsletter m-0" onSubmit={(e) => { e.preventDefault(); setSubscribed(true); }}>
             <div>
