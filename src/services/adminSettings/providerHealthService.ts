@@ -171,22 +171,23 @@ export function getProviderCredentialTemplate(provider: IntegrationProvider): st
   return vars.map((v) => `${v}=your_value_here`).join("\n");
 }
 
-export function getProviderEnvVarStatus(key: string): { present: boolean; envVars: string[] } {
+export function getProviderEnvVarStatus(key: string): { present: boolean; envVars: string[]; missingVars: string[] } {
   const settings = loadSettings().integrations;
   const provider = settings.providers.find((p) => p.key === key);
-  if (!provider) return { present: false, envVars: [] };
+  if (!provider) return { present: false, envVars: [], missingVars: [] };
 
   const vars = provider.envVar.split(",").map((s) => s.trim());
-  const present = vars.every((v) => {
+  const missingVars = vars.filter((v) => {
     try {
       const val = localStorage.getItem(`env_${v}`);
-      return !!val && val.length > 0;
+      return !val || val.length === 0;
     } catch {
-      return false;
+      return true;
     }
   });
+  const present = missingVars.length === 0;
 
-  return { present, envVars: vars };
+  return { present, envVars: vars, missingVars };
 }
 
 export async function setApiMode(mode: "wp" | "v2" | "mock"): Promise<void> {
