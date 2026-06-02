@@ -4,15 +4,18 @@ import {
   createBackendMeta,
   unknownBackendError,
   type BackendChartEdition,
+  type BackendChartEligibilityProfile,
   type BackendChartEntry,
   type BackendChartProgram,
   type BackendCommitRequest,
   type BackendCommitResponse,
+  type BackendCreateChartEligibilityProfileRequest,
   type BackendDryRunRequest,
   type BackendDryRunResponse,
   type BackendHealth,
   type BackendIngestRun,
   type BackendResult,
+  type BackendUpdateChartEligibilityProfileRequest,
 } from "./backendTypes";
 import { backendConfig, getBackendModeWarnings } from "./backendConfig";
 import {
@@ -32,6 +35,12 @@ import {
   getV2EditionBySlug,
   getV2EditionEntries,
 } from "../chartsIngestion/v2EditionStore";
+import {
+  createEligibilityProfile,
+  getEligibilityProfile,
+  getEligibilityProfiles,
+  updateEligibilityProfile,
+} from "../chartsEligibility/eligibilityStore";
 import type { IngestRun } from "../chartsIngestion/ingestStudioTypes";
 import type { V2Edition, V2Entry } from "../chartsIngestion/commitTypes";
 
@@ -58,6 +67,7 @@ function toBackendRun(run: IngestRun): BackendIngestRun {
     status: run.status,
     publicSlug: run.editionSlug ?? run.existingSeriesId ?? null,
     programId: run.existingSeriesId ?? null,
+    eligibilityProfileId: run.eligibilityProfileId ?? null,
     sourceUrls: run.sourceUrls,
     createdAt: run.createdAt,
     updatedAt: run.updatedAt,
@@ -113,6 +123,7 @@ function normalizeDryRunRequest(request: BackendDryRunRequest) {
     sourceUrls: request.sourceUrls,
     saveAsRecurringSeries: request.saveAsRecurringSeries,
     existingSeriesId: request.existingSeriesId,
+    eligibilityProfileId: request.eligibilityProfileId,
   };
 }
 
@@ -161,6 +172,38 @@ export const localBackendAdapter = {
         return backendOk(V2_PROGRAMS.map((program) => ({ ...program, status: "active" as const })), localMeta());
       } catch (error) {
         return safeLocalFail<BackendChartProgram[]>(error, []);
+      }
+    },
+
+    async getEligibilityProfiles(): Promise<BackendResult<BackendChartEligibilityProfile[]>> {
+      try {
+        return backendOk(getEligibilityProfiles(), localMeta(["Eligibility profiles are loaded from local demo storage."]));
+      } catch (error) {
+        return safeLocalFail<BackendChartEligibilityProfile[]>(error, []);
+      }
+    },
+
+    async getEligibilityProfile(idOrSlug: string): Promise<BackendResult<BackendChartEligibilityProfile | null>> {
+      try {
+        return backendOk(getEligibilityProfile(idOrSlug), localMeta());
+      } catch (error) {
+        return safeLocalFail<BackendChartEligibilityProfile | null>(error, null);
+      }
+    },
+
+    async createEligibilityProfile(request: BackendCreateChartEligibilityProfileRequest): Promise<BackendResult<BackendChartEligibilityProfile>> {
+      try {
+        return backendOk(createEligibilityProfile(request), localMeta(["Created local demo eligibility profile only."]));
+      } catch (error) {
+        return safeLocalFail<BackendChartEligibilityProfile>(error);
+      }
+    },
+
+    async updateEligibilityProfile(request: BackendUpdateChartEligibilityProfileRequest): Promise<BackendResult<BackendChartEligibilityProfile>> {
+      try {
+        return backendOk(updateEligibilityProfile(request), localMeta(["Updated local demo eligibility profile only."]));
+      } catch (error) {
+        return safeLocalFail<BackendChartEligibilityProfile>(error);
       }
     },
 
