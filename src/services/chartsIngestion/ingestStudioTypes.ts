@@ -5,6 +5,14 @@
  * distinct from the legacy CSV-focused IngestJob types.
  */
 
+import type { ChartEligibilityDecision } from "../chartsEligibility/eligibilityTypes";
+import type { IngestEnrichmentOptions } from "../chartsEnrichment/enrichmentOptions";
+import type {
+  CommercialReadinessReport,
+  IngestExcludedRow,
+  IngestRowIntelligence,
+} from "../chartsIntelligence/intelligenceTypes";
+
 export type IngestRunStatus =
   | "draft"
   | "queued"
@@ -38,6 +46,21 @@ export type IngestStageStatus = {
 };
 
 export type ProviderName = "spotify" | "apple_music" | "unknown";
+
+export type IngestMarketScopeSnapshot = {
+  id?: string;
+  name?: string;
+  slug?: string;
+  primaryMarketSlug: string;
+  includedMarkets: Array<{
+    marketSlug: string;
+    countryCode: string;
+    weight?: number;
+  }>;
+  aggregationMode: "combined" | "separate_then_combined" | "weighted" | "minimum_presence" | "editorial";
+  visibility?: "public" | "admin_only";
+  description?: string;
+};
 
 export type NormalizedChartRow = {
   sourceProvider: "spotify" | "apple_music";
@@ -77,6 +100,8 @@ export type IngestResolvedRow = {
   canonicalArtistIds?: string[];
   releaseShellId?: string | null;
   warnings?: string[];
+  eligibilityDecision?: ChartEligibilityDecision | null;
+  excludedRowId?: string | null;
   raw?: unknown;
 };
 
@@ -103,10 +128,16 @@ export interface IngestRun {
   saveAsRecurringSeries: boolean;
   existingSeriesId?: string | null;
   eligibilityProfileId?: string | null;
+  marketScopeId?: string | null;
+  marketScopeSnapshot?: IngestMarketScopeSnapshot | null;
+  enrichmentOptions?: IngestEnrichmentOptions | null;
   status: IngestRunStatus;
   stages: IngestStageStatus[];
   summary: IngestRunSummary;
   rows: IngestResolvedRow[];
+  excludedRows?: IngestExcludedRow[];
+  commercialReadiness?: CommercialReadinessReport | null;
+  rowIntelligence?: Record<string, IngestRowIntelligence>;
   createdBy: string;
   createdAt: string;
   updatedAt: string;
@@ -131,6 +162,9 @@ export type CreateIngestDryRunRequest = {
   saveAsRecurringSeries?: boolean;
   existingSeriesId?: string | null;
   eligibilityProfileId?: string | null;
+  marketScopeId?: string | null;
+  marketScopeSnapshot?: IngestMarketScopeSnapshot | null;
+  enrichmentOptions?: IngestEnrichmentOptions | null;
 };
 
 export type CreateIngestDryRunResponse = {
@@ -139,6 +173,9 @@ export type CreateIngestDryRunResponse = {
   stages: IngestStageStatus[];
   summary: IngestRunSummary;
   rows: IngestResolvedRow[];
+  excludedRows?: IngestExcludedRow[];
+  commercialReadiness?: CommercialReadinessReport | null;
+  rowIntelligence?: Record<string, IngestRowIntelligence>;
 };
 
 export type CommitIngestRunRequest = {
