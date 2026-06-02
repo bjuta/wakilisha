@@ -27,21 +27,15 @@ import { wakilishaBackend } from "@/services/backendContract/backendClient";
 import type { ChartEligibilityProfile } from "@/services/chartsEligibility/eligibilityTypes";
 import { getMarketScopes, type StoredChartMarketScope } from "@/services/chartsMarkets/marketScopeStore";
 
-import { CommitResultPanel } from "./components/CommitResultPanel";
 import { IngestKpiStrip } from "./components/IngestKpiStrip";
 import { IngestLoadingState } from "./components/IngestLoadingState";
+import { IngestMainPanel, type QuickTemplateKey } from "./components/IngestMainPanel";
 import { IngestPageHeader } from "./components/IngestPageHeader";
 import { IngestSidebar } from "./components/IngestSidebar";
-import { MarketScopeStep } from "./components/MarketScopeStep";
-import { PreviewStep } from "./components/PreviewStep";
-import { ProgramSetupStep } from "./components/ProgramSetupStep";
-import { RulesStep } from "./components/RulesStep";
-import { StatusBanner } from "./components/StatusBanner";
+import { IngestStatusStack } from "./components/IngestStatusStack";
 import { Stepper, type IngestStudioStep } from "./components/Stepper";
 
 const ADMIN_CHARTS_BASE = "/admin/settings/charts";
-
-type QuickTemplateKey = "top40" | "kenyan" | "groups" | "eastAfrica";
 
 function toBackendCommitResponse(result: any): BackendCommitResponse {
   return {
@@ -283,17 +277,66 @@ export default function AdminChartsIngest() {
       <IngestPageHeader mode={mode} onOpenRuns={() => navigate(`${ADMIN_CHARTS_BASE}/ingest-runs`)} onOpenHealth={() => navigate(`${ADMIN_CHARTS_BASE}/ingest-health`)} />
       <Stepper step={step} onStepChange={(nextStep) => { if (nextStep === "configure") handleReset(); if (nextStep === "rules") setStep("rules"); }} />
       <IngestKpiStrip kpis={kpis} />
-      {formError && <StatusBanner tone="danger" icon="AlertCircle" message={formError} />}
-      {successMessage && <StatusBanner tone="success" icon="CheckCircle2" message={successMessage} />}
-      {editionExistsWarning && <StatusBanner tone="warning" icon="AlertTriangle" message={editionExistsWarning} />}
+      <IngestStatusStack formError={formError} successMessage={successMessage} editionExistsWarning={editionExistsWarning} />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="space-y-6 lg:col-span-2">
-          {step === "configure" && <ProgramSetupStep families={families} selectedFamily={selectedFamily} existingSeriesId={existingSeriesId} setExistingSeriesId={setExistingSeriesId} newSeriesLabel={newSeriesLabel} setNewSeriesLabel={setNewSeriesLabel} newSeriesKey={newSeriesKey} setNewSeriesKey={setNewSeriesKey} onCreateSeries={handleCreateSeries} chartTitle={chartTitle} setChartTitle={setChartTitle} chartSlug={chartSlug} setChartSlug={setChartSlug} publicUrlPreview={publicUrlPreview} editionDate={editionDate} setEditionDate={setEditionDate} chartSize={chartSize} setChartSize={setChartSize} market={market} setMarket={setMarket} sourceUrls={sourceUrls} setSourceUrls={setSourceUrls} detectedProviders={detectedProviders} chartKind={chartKind} setChartKind={setChartKind} coverStyle={coverStyle} setCoverStyle={setCoverStyle} saveAsRecurring={saveAsRecurring} setSaveAsRecurring={setSaveAsRecurring} onQuickTemplate={handleQuickTemplate} onContinueToRules={handleContinueToRules} onReset={handleReset} />}
-          {step === "rules" && <div className="space-y-5"><MarketScopeStep scopes={marketScopes} selectedMarketScopeId={selectedMarketScopeId} onSelectMarketScope={setSelectedMarketScopeId} /><RulesStep profiles={eligibilityProfiles} selectedEligibilityProfileId={selectedEligibilityProfileId} onSelectEligibilityProfile={setSelectedEligibilityProfileId} onBack={() => setStep("configure")} onContinue={handleDryRun} />{dryRunLoading && <StatusBanner tone="info" icon="RefreshCcw" message="Running dry run…" />}</div>}
-          {step === "preview" && dryRunResult && <PreviewStep run={dryRunResult} selectedMarketScope={selectedMarketScope} selectedEligibilityProfile={selectedEligibilityProfile} filteredRows={filteredRows} rowFilter={rowFilter} setRowFilter={setRowFilter} expandedRowId={expandedRowId} setExpandedRowId={setExpandedRowId} onCommit={handleCommit} commitLoading={commitLoading} commitError={formError && formError.includes("Commit") ? formError : null} onBackToRules={() => setStep("rules")} onOpenRun={() => navigate(`${ADMIN_CHARTS_BASE}/ingest-runs/${dryRunResult.id}`)} />}
-          {step === "commit" && commitResult && <CommitResultPanel result={commitResult} onNewIngest={handleReset} />}
-        </div>
+        <IngestMainPanel
+          step={step}
+          families={families}
+          selectedFamily={selectedFamily}
+          existingSeriesId={existingSeriesId}
+          setExistingSeriesId={setExistingSeriesId}
+          newSeriesLabel={newSeriesLabel}
+          setNewSeriesLabel={setNewSeriesLabel}
+          newSeriesKey={newSeriesKey}
+          setNewSeriesKey={setNewSeriesKey}
+          onCreateSeries={handleCreateSeries}
+          chartTitle={chartTitle}
+          setChartTitle={setChartTitle}
+          chartSlug={chartSlug}
+          setChartSlug={setChartSlug}
+          publicUrlPreview={publicUrlPreview}
+          editionDate={editionDate}
+          setEditionDate={setEditionDate}
+          chartSize={chartSize}
+          setChartSize={setChartSize}
+          market={market}
+          setMarket={setMarket}
+          sourceUrls={sourceUrls}
+          setSourceUrls={setSourceUrls}
+          detectedProviders={detectedProviders}
+          chartKind={chartKind}
+          setChartKind={setChartKind}
+          coverStyle={coverStyle}
+          setCoverStyle={setCoverStyle}
+          saveAsRecurring={saveAsRecurring}
+          setSaveAsRecurring={setSaveAsRecurring}
+          onQuickTemplate={handleQuickTemplate}
+          onContinueToRules={handleContinueToRules}
+          onReset={handleReset}
+          marketScopes={marketScopes}
+          selectedMarketScopeId={selectedMarketScopeId}
+          onSelectMarketScope={setSelectedMarketScopeId}
+          eligibilityProfiles={eligibilityProfiles}
+          selectedEligibilityProfileId={selectedEligibilityProfileId}
+          onSelectEligibilityProfile={setSelectedEligibilityProfileId}
+          onBackToProgram={() => setStep("configure")}
+          onDryRun={handleDryRun}
+          dryRunLoading={dryRunLoading}
+          dryRunResult={dryRunResult}
+          selectedMarketScope={selectedMarketScope}
+          selectedEligibilityProfile={selectedEligibilityProfile}
+          filteredRows={filteredRows}
+          rowFilter={rowFilter}
+          setRowFilter={setRowFilter}
+          expandedRowId={expandedRowId}
+          setExpandedRowId={setExpandedRowId}
+          onCommit={handleCommit}
+          commitLoading={commitLoading}
+          commitError={formError && formError.includes("Commit") ? formError : null}
+          onOpenRun={() => dryRunResult && navigate(`${ADMIN_CHARTS_BASE}/ingest-runs/${dryRunResult.id}`)}
+          commitResult={commitResult}
+        />
         <IngestSidebar activeRun={activeRun} dryRunResult={dryRunResult} selectedMarketScope={selectedMarketScope} selectedEligibilityProfile={selectedEligibilityProfile} guardStatus={guardStatus} runs={runs} activity={activity} cancelLoading={cancelLoading} retryLoading={retryLoading} onNavigate={navigate} onCancelRun={handleCancelRun} onRetryRun={handleRetryRun} />
       </div>
     </div>
