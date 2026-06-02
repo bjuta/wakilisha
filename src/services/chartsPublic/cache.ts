@@ -2,24 +2,22 @@
  * Public Charts Cache Layer
  *
  * In-memory cache for public chart data to avoid repeated fetches
- * on navigation. Both mock and WordPress modes use the same cache.
+ * on navigation. Runtime public chart data is local/fixture-backed until the
+ * new non-WordPress public API is implemented.
  */
+
+export type PublicChartCacheSource = "local" | "api" | "legacy_import";
 
 export interface CachedChart<T> {
   data: T;
-  source: "mock" | "wordpress";
+  source: PublicChartCacheSource;
   fetchedAt: number;
   isStale: boolean;
 }
 
 const cache = new Map<string, CachedChart<unknown>>();
-export const DEFAULT_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+export const DEFAULT_CACHE_TTL = 5 * 60 * 1000;
 
-/**
- * Retrieve a cached chart entry by key.
- * Returns null if not found.
- * Sets isStale=true if the entry has exceeded its TTL.
- */
 export function getCachedChart<T>(key: string): CachedChart<T> | null {
   const entry = cache.get(key);
   if (!entry) return null;
@@ -35,16 +33,11 @@ export function getCachedChart<T>(key: string): CachedChart<T> | null {
   };
 }
 
-/**
- * Store a chart entry in the cache.
- * @param source — whether the data came from mock or wordpress
- * @param ttlMs — optional override (default 5 minutes)
- */
 export function setCachedChart<T>(
   key: string,
   value: T,
-  source: "mock" | "wordpress",
-  ttlMs?: number
+  source: PublicChartCacheSource,
+  _ttlMs?: number
 ): void {
   cache.set(key, {
     data: value as unknown,
@@ -54,17 +47,14 @@ export function setCachedChart<T>(
   });
 }
 
-/** Clear the entire chart cache. */
 export function clearChartCache(): void {
   cache.clear();
 }
 
-/** Remove a single key from the cache. */
 export function invalidateChartCache(key: string): void {
   cache.delete(key);
 }
 
-/** Check if a key exists in the cache (even if stale). */
 export function hasCachedChart(key: string): boolean {
   return cache.has(key);
 }
