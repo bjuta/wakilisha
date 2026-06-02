@@ -19,7 +19,12 @@ import type {
 import { backendOk } from "./backendTypes";
 import { apiBackendAdapter } from "./apiBackendAdapter";
 import { localBackendAdapter } from "./localBackendAdapter";
-import type { BackendMatchDecisionRequest, RuntimeBackendAdapter } from "./runtimeContract";
+import type {
+  BackendCreateProgramRequest,
+  BackendCreateRunRequest,
+  BackendMatchDecisionRequest,
+  RuntimeBackendAdapter,
+} from "./runtimeContract";
 import type {
   CreateChartMarketScopeRequest,
   StoredChartMarketScope,
@@ -49,8 +54,8 @@ export const wakilishaBackend = {
       });
     },
 
-    createProgram(_payload: Partial<BackendChartProgram>): Promise<BackendResult<BackendChartProgram>> {
-      return apiBackendAdapter.charts.getPrograms().then((result) => result as BackendResult<BackendChartProgram>);
+    createProgram(payload: BackendCreateProgramRequest): Promise<BackendResult<BackendChartProgram>> {
+      return activeAdapter.charts.createProgram(payload);
     },
 
     getEligibilityProfiles(): Promise<BackendResult<BackendChartEligibilityProfile[]>> {
@@ -107,8 +112,8 @@ export const wakilishaBackend = {
       return activeAdapter.ingestion.getRun(runId);
     },
 
-    createRun(_payload: Partial<BackendIngestRun>): Promise<BackendResult<BackendIngestRun>> {
-      return apiBackendAdapter.ingestion.getRun("new-run-placeholder").then((result) => result as BackendResult<BackendIngestRun>);
+    createRun(payload: BackendCreateRunRequest): Promise<BackendResult<BackendIngestRun>> {
+      return activeAdapter.ingestion.createRun(payload);
     },
 
     runDryRun(request: BackendDryRunRequest): Promise<BackendResult<BackendDryRunResponse>> {
