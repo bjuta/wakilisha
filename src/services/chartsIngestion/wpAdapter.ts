@@ -486,6 +486,21 @@ export function publishEdition(jobId: string): Promise<IngestJob | null> {
     .catch(() => notImplemented("publishEdition POST /charts/ingest-jobs/{jobId}/publish"));
 }
 
+export function runPreflightCheck(
+  jobId: string
+): Promise<{ pass: boolean; checklist: { label: string; pass: boolean }[]; warnings: number; errors: number }> {
+  return wpPost<{
+    preflight: {
+      pass: boolean;
+      checklist: { label: string; pass: boolean }[];
+      warnings: number;
+      errors: number;
+    };
+  }>(`/charts/ingest-jobs/${jobId}/preflight`)
+    .then((res) => res.preflight)
+    .catch(() => notImplemented("runPreflightCheck POST /charts/ingest-jobs/{jobId}/preflight"));
+}
+
 // ─── Logs ───
 export function getJobLogs(jobId: string): Promise<IngestJobLog[]> {
   return wpGet<{ logs: unknown[] }>(`/charts/ingest-jobs/${jobId}/logs`)

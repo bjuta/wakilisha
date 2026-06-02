@@ -1,95 +1,149 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { getIngestRuns } from "@/services/chartsIngestion/client";
 import type { IngestRun, IngestResolvedRow } from "@/services/chartsIngestion/ingestStudioTypes";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
+import { AdminChartsPageHeader } from "../components/AdminChartsPageHeader";
+import { AdminChartsKpiCard } from "../components/AdminChartsKpiCard";
+import { AdminChartsEmptyState } from "../components/AdminChartsEmptyState";
+import { AdminChartsLoadingState } from "../components/AdminChartsLoadingState";
 
-interface EnrichedRow extends IngestResolvedRow {
+interface EnrichedShell extends IngestResolvedRow {
   runId: string;
   runTitle: string;
   editionDate: string;
 }
+
+type ShellState = "pending" | "canonicalized" | "editing";
+
+interface EditData { title: string; artist: string; isrc: string; }
 
 export default function AdminChartsReleaseShells() {
   const navigate = useNavigate();
   const [runs, setRuns] = useState<IngestRun[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [shellStates, setShellStates] = useState<Record<string, ShellState>>({});
+  const [editData, setEditData] = useState<Record<string, EditData>>({});
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [canonicalizingAll, setCanonicalizingAll] = useState(false);
 
-  useEffect(() => {
-    async function load() {
-      const r = await getIngestRuns();
-      setRuns(r);
-      setLoading(false);
-    }
-    load();
+  const load = useCallback(async () => {
+    setRuns(await getIngestRuns());
+    setLoading(false);
   }, []);
 
-  const shellRows: EnrichedRow[] = runs.flatMap((run) =>
+  useEffect(() => { load(); }, [load]);
+
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 3000);
+  };
+
+  const shellRows: EnrichedShell[] = runs.flatMap((run) =>
     run.rows
       .filter((row) => row.matchStatus === "shell")
       .map((row) => ({ ...row, runId: run.id, runTitle: run.chartTitle, editionDate: run.editionDate }))
   );
 
-  const filtered = shellRows.filter(
-    (row) =>
-      row.title.toLowerCase().includes(search.toLowerCase()) ||
-      row.artistNames.join(", ").toLowerCase().includes(search.toLowerCase())
+  const filtered = shellRows.filter((row) =>
+    !search ||
+    row.title.toLowerCase().includes(search.toLowerCase()) ||
+    row.artistNames.join(", ").toLowerCase().includes(search.toLowerCase())
   );
 
-  if (loading) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <div className="text-foreground-600">Loading release shells...</div>
-      </div>
-    );
-  }
+  const pendingRows = filtered.filter((row) => shellStates[row.id] !== "canonicalized");
+
+  const handleCanonicalize = (rowId: string, title: string) => {
+    setShellStates((prev) => ({ ...prev, [rowId]: "canonicalized" }));
+    setEditData((prev) => { const n = { ...prev }; delete n[rowId]; return n; });
+    showToast(`"${title}" — shell promoted to canonical`);
+  };
+
+  const handleStartEdit = (row: EnrichedShell) => {
+    setShellStates((prev) => ({ ...prev, [row.id]: "editing" }));
+    setEditData((prev) => ({ ...prev, [row.id]: { title: row.title, artist: row.artistNames.join(", "), isrc: "" } }));
+  };
+
+  const handleSaveEdit = (rowId: string) => {
+    const data = editData[rowId];
+    if (!data?.title?.trim()) { showToast("Title is required"); return; }
+    if (!data?.artist?.trim()) { showToast("Artist is required"); return; }
+    setShellStates((prev) => ({ ...prev, [rowId]: "pending" }));
+    showToast(`Shell metadata saved for "${data.title}"`);
+  };
+
+  const handleCanonicalizeAll = async () => {
+    if (pendingRows.length === 0) return;
+    setCanonicalizingAll(true);
+    await new Promise((res) => setTimeout(res, 800));
+    const newStates: Record<string, ShellState> = {};
+    pendingRows.forEach((row) => { newStates[row.id] = "canonicalized"; });
+    setShellStates((prev) => ({ ...prev, ...newStates }));
+    setCanonicalizingAll(false);
+    showToast(`${pendingRows.length} shell(s) canonicalized`);
+  };
+
+  if (loading) return <AdminChartsLoadingState message="Loading release shells…" />;
+
+  const canonicalizedCount = Object.values(shellStates).filter((s) => s === "canonicalized").length;
+  const avgConfidence = shellRows.length > 0
+    ? Math.round(shellRows.reduce((a, r) => a + r.confidence, 0) / shellRows.length)
+    : 0;
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="mb-1 text-[11px] font-bold uppercase tracking-wider text-foreground-500">Operations</div>
-          <h1 className="text-[20px] font-bold text-foreground-950">Release Shells</h1>
-          <p className="text-[13px] text-foreground-600">Tracks matched to release shells pending canonicalization</p>
+      {toastMsg && (
+        <div className="fixed bottom-6 right-6 z-50 rounded-xl bg-wk-surface-strong px-4 py-3 text-[13px] font-semibold text-wk-text shadow-lg border border-wk-border">
+          {toastMsg}
         </div>
-        <div className="flex items-center gap-2">
-          <button className="inline-flex items-center gap-1.5 rounded-md bg-primary-500 px-3 py-2 text-[12px] font-semibold text-background-50 transition-colors hover:bg-primary-600 whitespace-nowrap">
-            <i className="ri-check-double-line" /> Canonicalize All
-          </button>
+      )}
+
+      <AdminChartsPageHeader
+        eyebrow="Operations"
+        title="Release Shells"
+        description="Temporary release shells created during ingestion. Canonicalize them to prevent junk accumulation."
+      >
+        <button
+          onClick={handleCanonicalizeAll}
+          disabled={canonicalizingAll || pendingRows.length === 0}
+          className="wk-button wk-button-primary wk-button-sm whitespace-nowrap disabled:opacity-50"
+        >
+          <i className={canonicalizingAll ? "ri-loader-4-line animate-spin" : "ri-check-double-line"} />
+          {canonicalizingAll ? "Canonicalizing…" : `Canonicalize All (${pendingRows.length})`}
+        </button>
+      </AdminChartsPageHeader>
+
+      {/* Purpose callout */}
+      <div className="rounded-lg border border-wk-border bg-wk-surface p-4 flex items-start gap-3">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-wk-warning-soft text-wk-warning">
+          <i className="ri-folder-add-line" />
+        </div>
+        <div>
+          <p className="text-[13px] font-bold text-wk-text">Shells reduce future manual work</p>
+          <p className="mt-0.5 text-[12px] text-wk-text-muted">
+            A shell is a provisional registry entry. Canonicalize it to create a permanent entity.
+            Shells that are never canonicalized become junk — clean them up proactively.
+          </p>
         </div>
       </div>
 
       {/* KPIs */}
       <div className="grid grid-cols-3 gap-3">
-        <WkSurface className="p-4">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-foreground-500">Total Shells</p>
-          <p className="mt-1 text-[24px] font-black text-amber-700">{shellRows.length}</p>
-        </WkSurface>
-        <WkSurface className="p-4">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-foreground-500">With Shell ID</p>
-          <p className="mt-1 text-[24px] font-black text-foreground-950">
-            {shellRows.filter((r) => r.releaseShellId).length}
-          </p>
-        </WkSurface>
-        <WkSurface className="p-4">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-foreground-500">Avg Confidence</p>
-          <p className="mt-1 text-[24px] font-black text-foreground-950">
-            {shellRows.length > 0 ? Math.round(shellRows.reduce((a, r) => a + r.confidence, 0) / shellRows.length) : 0}%
-          </p>
-        </WkSurface>
+        <AdminChartsKpiCard value={shellRows.length} label="Total Shells" icon="ri-folder-add-line" accent={shellRows.length > 0 ? "warning" : "muted"} />
+        <AdminChartsKpiCard value={canonicalizedCount} label="Canonicalized" icon="ri-check-double-line" accent={canonicalizedCount > 0 ? "success" : "muted"} />
+        <AdminChartsKpiCard value={`${avgConfidence}%`} label="Avg Confidence" icon="ri-bar-chart-grouped-line" accent={avgConfidence >= 70 ? "success" : "warning"} />
       </div>
 
       {/* Search */}
       <div className="relative max-w-md">
-        <i className="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-foreground-400" />
+        <i className="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-wk-text-faint text-[13px]" />
         <input
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search shells..."
-          className="w-full rounded-md border border-background-200 bg-background-50 py-2 pl-9 pr-3 text-[13px] text-foreground-950 outline-none focus:border-primary-400 focus:ring-1 focus:ring-primary-400"
+          placeholder="Search shells by title or artist…"
+          className="w-full rounded-lg border border-wk-border bg-wk-surface py-2 pl-9 pr-3 text-[13px] text-wk-text placeholder:text-wk-text-faint outline-none focus:border-wk-border-strong"
         />
       </div>
 
@@ -98,73 +152,137 @@ export default function AdminChartsReleaseShells() {
         <div className="overflow-x-auto">
           <table className="w-full text-left text-[13px]">
             <thead>
-              <tr className="border-b border-background-200">
-                <th className="px-4 py-3 font-semibold text-foreground-500">#</th>
-                <th className="px-4 py-3 font-semibold text-foreground-500">Title</th>
-                <th className="px-4 py-3 font-semibold text-foreground-500">Artist</th>
-                <th className="px-4 py-3 font-semibold text-foreground-500">Shell ID</th>
-                <th className="px-4 py-3 font-semibold text-foreground-500">Confidence</th>
-                <th className="px-4 py-3 font-semibold text-foreground-500">Run</th>
-                <th className="px-4 py-3 font-semibold text-foreground-500">Warnings</th>
-                <th className="px-4 py-3 font-semibold text-foreground-500">Actions</th>
+              <tr className="border-b border-wk-border">
+                {["#", "Track", "Artist", "Shell ID", "Confidence", "Run", "Actions"].map((h) => (
+                  <th key={h} className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-wk-text-muted">{h}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {filtered.map((row) => (
-                <tr key={row.id} className="border-b border-background-200/50 transition-colors hover:bg-background-100/50">
-                  <td className="px-4 py-3 font-bold text-foreground-950">{row.rank}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      {row.artworkUrl && (
-                        <img src={row.artworkUrl} alt="" className="h-8 w-8 rounded object-cover" />
-                      )}
-                      <span className="font-semibold text-foreground-950">{row.title}</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-foreground-600">{row.artistNames.join(", ")}</td>
-                  <td className="px-4 py-3">
-                    <span className="font-mono text-[11px] text-foreground-500">
-                      {row.releaseShellId || "—"}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <div className="h-1.5 w-16 rounded-full bg-background-200 overflow-hidden">
-                        <div className="h-full rounded-full bg-amber-400" style={{ width: `${row.confidence}%` }} />
-                      </div>
-                      <span className="text-[12px] text-foreground-600">{row.confidence}%</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <button
-                      onClick={() => navigate(`/admin/charts/ingest-runs/${row.runId}`)}
-                      className="text-[11px] font-semibold text-primary-700 hover:underline"
+              {filtered.map((row) => {
+                const state = shellStates[row.id] ?? "pending";
+                const isEditing = state === "editing";
+                const isCanonical = state === "canonicalized";
+                const data = editData[row.id];
+
+                return (
+                  <>
+                    <tr
+                      key={row.id}
+                      className={`border-b border-wk-border/50 transition-colors hover:bg-wk-surface-raised/50 ${isCanonical ? "opacity-50" : ""}`}
                     >
-                      {row.editionDate}
-                    </button>
-                  </td>
-                  <td className="px-4 py-3 text-amber-600 text-[11px]">
-                    {row.warnings?.join("; ") || "—"}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex gap-1">
-                      <button className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold text-primary-700 hover:bg-primary-50 transition-colors whitespace-nowrap">
-                        <i className="ri-check-double-line" /> Canonicalize
-                      </button>
-                      <button className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold text-foreground-500 hover:bg-background-100 transition-colors whitespace-nowrap">
-                        <i className="ri-edit-line" /> Edit
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                      <td className="px-4 py-3 font-bold text-wk-text-muted">{row.rank}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          {row.artworkUrl && <img src={row.artworkUrl} alt="" className="h-8 w-8 rounded object-cover shrink-0" />}
+                          <span className="font-semibold text-wk-text">{row.title}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-wk-text-soft">{row.artistNames.join(", ")}</td>
+                      <td className="px-4 py-3">
+                        <span className="font-mono text-[11px] text-wk-text-muted">{row.releaseShellId || "—"}</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <div className="h-1.5 w-14 rounded-full bg-wk-surface-raised overflow-hidden">
+                            <div
+                              className={`h-full rounded-full ${row.confidence >= 80 ? "bg-wk-success" : row.confidence >= 60 ? "bg-wk-warning" : "bg-wk-danger"}`}
+                              style={{ width: `${row.confidence}%` }}
+                            />
+                          </div>
+                          <span className="text-[12px] font-semibold text-wk-text-soft">{row.confidence}%</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() => navigate(`/admin/charts/ingest-runs/${row.runId}`)}
+                          className="text-[11px] font-semibold text-wk-brand hover:underline cursor-pointer"
+                        >
+                          {row.editionDate}
+                        </button>
+                      </td>
+                      <td className="px-4 py-3">
+                        {isCanonical ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-wk-success-soft px-2 py-0.5 text-[11px] font-semibold text-wk-success">
+                            <i className="ri-check-double-line" /> Canonical
+                          </span>
+                        ) : (
+                          <div className="flex gap-1">
+                            <button
+                              onClick={() => handleCanonicalize(row.id, row.title)}
+                              disabled={isEditing}
+                              className="inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-semibold text-wk-brand hover:bg-wk-brand-soft transition-colors disabled:opacity-40 whitespace-nowrap"
+                            >
+                              <i className="ri-check-double-line" /> Promote
+                            </button>
+                            <button
+                              onClick={() => isEditing ? setShellStates((p) => ({ ...p, [row.id]: "pending" })) : handleStartEdit(row)}
+                              className="inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-semibold text-wk-text-muted hover:bg-wk-surface-raised transition-colors whitespace-nowrap"
+                            >
+                              <i className={isEditing ? "ri-close-line" : "ri-edit-line"} />
+                              {isEditing ? "Cancel" : "Edit"}
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                    {isEditing && data && (
+                      <tr key={`${row.id}-edit`} className="border-b border-wk-border bg-wk-surface-raised/50">
+                        <td colSpan={7} className="px-4 py-3">
+                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                            <div>
+                              <label className="mb-1 block text-[11px] font-semibold text-wk-text-muted">Title *</label>
+                              <input
+                                type="text"
+                                value={data.title}
+                                onChange={(e) => setEditData((p) => ({ ...p, [row.id]: { ...p[row.id], title: e.target.value } }))}
+                                className="w-full rounded-md border border-wk-border bg-wk-surface px-3 py-1.5 text-[12px] text-wk-text outline-none focus:border-wk-border-strong"
+                              />
+                            </div>
+                            <div>
+                              <label className="mb-1 block text-[11px] font-semibold text-wk-text-muted">Artist *</label>
+                              <input
+                                type="text"
+                                value={data.artist}
+                                onChange={(e) => setEditData((p) => ({ ...p, [row.id]: { ...p[row.id], artist: e.target.value } }))}
+                                className="w-full rounded-md border border-wk-border bg-wk-surface px-3 py-1.5 text-[12px] text-wk-text outline-none focus:border-wk-border-strong"
+                              />
+                            </div>
+                            <div>
+                              <label className="mb-1 block text-[11px] font-semibold text-wk-text-muted">ISRC (optional)</label>
+                              <input
+                                type="text"
+                                value={data.isrc}
+                                onChange={(e) => setEditData((p) => ({ ...p, [row.id]: { ...p[row.id], isrc: e.target.value } }))}
+                                placeholder="e.g. USRC17607839"
+                                className="w-full rounded-md border border-wk-border bg-wk-surface px-3 py-1.5 text-[12px] text-wk-text outline-none focus:border-wk-border-strong"
+                              />
+                            </div>
+                          </div>
+                          <div className="mt-3 flex gap-2">
+                            <button onClick={() => handleSaveEdit(row.id)} className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap">
+                              <i className="ri-save-line" /> Save Metadata
+                            </button>
+                            <button onClick={() => handleCanonicalize(row.id, data.title || row.title)} className="wk-button wk-button-primary wk-button-sm whitespace-nowrap">
+                              <i className="ri-check-double-line" /> Save &amp; Promote
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </>
+                );
+              })}
             </tbody>
           </table>
         </div>
         {filtered.length === 0 && (
-          <div className="px-4 py-12 text-center">
-            <i className="ri-folder-check-line mb-3 block text-3xl text-green-400" />
-            <p className="text-[13px] text-foreground-500">No release shells found.</p>
+          <div className="px-4 py-14 text-center">
+            <AdminChartsEmptyState
+              icon="ri-folder-check-line"
+              title="No release shells"
+              description="Release shells appear here after a dry run identifies tracks without canonical entity matches."
+            />
           </div>
         )}
       </WkSurface>

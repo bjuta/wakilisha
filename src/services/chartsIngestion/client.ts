@@ -549,8 +549,43 @@ export const WORDPRESS_CHART_ENDPOINTS: Record<string, EndpointDefinition> = {
   },
 };
 
+// ─── Endpoint Status Resolver ───
+function getEndpointStatus(fnName: string): EndpointStatus {
+  const mode = getIngestionMode();
+  const cleanName = fnName.replace(/\([^)]*\)/g, '').trim();
+
+  const nameMap: Record<string, string> = {
+    updateJobStatus: 'updateJobStatusApi',
+    deleteJob: 'deleteJobApi',
+    addSource: 'addSourceApi',
+    removeSource: 'removeSourceApi',
+    approveMatch: 'approveCandidateMatch',
+    rejectMatch: 'rejectCandidateMatch',
+    rematch: 'rematchCandidate',
+    markNewEntity: 'markAsNewEntity',
+    resolveIssue: 'resolveReviewIssue',
+    createDraft: 'createDraftEdition',
+    getEditions: 'getEditionsApi',
+    getDashboardKpis: 'getDashboardKpisApi',
+  };
+
+  const actualName = nameMap[cleanName] || cleanName;
+
+  const allExports = [adapter, ingestStudioAdapter, mockAdapter, wpAdapter];
+  const hasFunction = allExports.some(
+    (a) => typeof (a as Record<string, unknown>)[actualName] === 'function'
+  );
+
+  if (!hasFunction) return 'not_configured';
+  if (mode === 'mock') return 'mocked';
+  return 'ready';
+}
+
 export function getEndpointDefinitions(): EndpointDefinition[] {
-  return Object.values(WORDPRESS_CHART_ENDPOINTS);
+  return Object.values(WORDPRESS_CHART_ENDPOINTS).map((ep) => ({
+    ...ep,
+    status: getEndpointStatus(ep.frontendFunction),
+  }));
 }
 
 export function getEndpointByKey(key: string): EndpointDefinition | undefined {
@@ -558,7 +593,7 @@ export function getEndpointByKey(key: string): EndpointDefinition | undefined {
 }
 
 export function getEndpointGroups(): Record<string, EndpointDefinition[]> {
-  return {
+  const baseGroups = {
     "Jobs & Setup": [
       WORDPRESS_CHART_ENDPOINTS.getChartFamilies,
       WORDPRESS_CHART_ENDPOINTS.createIngestJob,
@@ -606,6 +641,185 @@ export function getEndpointGroups(): Record<string, EndpointDefinition[]> {
       WORDPRESS_CHART_ENDPOINTS.getDashboardKpis,
     ],
   };
+
+  return Object.fromEntries(
+    Object.entries(baseGroups).map(([groupName, endpoints]) => [
+      groupName,
+      endpoints.map((ep) => ({
+        ...ep,
+        status: getEndpointStatus(ep.frontendFunction),
+      })),
+    ])
+  );
+}
+
+// ─── Ingest Studio Endpoint Definitions ───
+export function getIngestStudioEndpointGroups(): Record<string, EndpointDefinition[]> {
+  const studioEndpoints: EndpointDefinition[] = [
+    {
+      key: "getIngestRuns",
+      frontendFunction: "getIngestRuns()",
+      method: "GET",
+      path: "/wp-json/wakilisha/v2/charts/ingest/runs",
+      status: "not_configured",
+      tables: ["wkcharts_ingest_runs"],
+      expectedResponse: ["runs"],
+      description: "List all provider-based ingest runs.",
+      payloadExample: {},
+      responseExample: { runs: [{ id: "run-001", status: "dry_run_complete" }] },
+      capabilities: ["read_wakilisha_charts"],
+    },
+    {
+      key: "getIngestRun",
+      frontendFunction: "getIngestRun(runId)",
+      method: "GET",
+      path: "/wp-json/wakilisha/v2/charts/ingest/runs/{runId}",
+      status: "not_configured",
+      tables: ["wkcharts_ingest_runs"],
+      expectedResponse: ["run"],
+      description: "Get a single ingest run with stages and resolved rows.",
+      payloadExample: {},
+      responseExample: { run: { id: "run-001", status: "dry_run_complete" } },
+      capabilities: ["read_wakilisha_charts"],
+    },
+    {
+      key: "getIngestKpis",
+      frontendFunction: "getIngestKpis()",
+      method: "GET",
+      path: "/wp-json/wakilisha/v2/charts/ingest/kpis",
+      status: "not_configured",
+      tables: ["wkcharts_ingest_runs"],
+      expectedResponse: ["kpis"],
+      description: "Dashboard KPIs for the ingest studio.",
+      payloadExample: {},
+      responseExample: { kpis: { editionsThisWeek: 3, canonicalMatchRate: 87.2 } },
+      capabilities: ["read_wakilisha_charts"],
+    },
+    {
+      key: "getRecentIngestActivity",
+      frontendFunction: "getRecentIngestActivity()",
+      method: "GET",
+      path: "/wp-json/wakilisha/v2/charts/ingest/activity",
+      status: "not_configured",
+      tables: ["wkcharts_ingest_runs"],
+      expectedResponse: ["activity"],
+      description: "Recent activity feed for the ingest studio.",
+      payloadExample: {},
+      responseExample: { activity: [{ id: "act-001", type: "dry_run" }] },
+      capabilities: ["read_wakilisha_charts"],
+    },
+    {
+      key: "createIngestRun",
+      frontendFunction: "createIngestRun(run)",
+      method: "POST",
+      path: "/wp-json/wakilisha/v2/charts/ingest/runs",
+      status: "not_configured",
+      tables: ["wkcharts_ingest_runs"],
+      expectedResponse: ["run"],
+      description: "Create a new provider-based ingest run.",
+      payloadExample: { chartTitle: "Top 40", chartSize: 40 },
+      responseExample: { run: { id: "run-001", status: "draft" } },
+      capabilities: ["create_wakilisha_charts"],
+    },
+    {
+      key: "updateIngestRun",
+      frontendFunction: "updateIngestRun(runId, updater)",
+      method: "PATCH",
+      path: "/wp-json/wakilisha/v2/charts/ingest/runs/{runId}",
+      status: "not_configured",
+      tables: ["wkcharts_ingest_runs"],
+      expectedResponse: ["run"],
+      description: "Update an existing ingest run.",
+      payloadExample: { status: "running" },
+      responseExample: { run: { id: "run-001", status: "running" } },
+      capabilities: ["edit_wakilisha_charts"],
+    },
+    {
+      key: "runDryRun",
+      frontendFunction: "runDryRun(request)",
+      method: "POST",
+      path: "/wp-json/wakilisha/v2/charts/ingest/dry-run",
+      status: "not_configured",
+      tables: ["wkcharts_ingest_runs"],
+      expectedResponse: ["runId", "status", "stages", "summary"],
+      description: "Execute a dry run from source URLs.",
+      payloadExample: { chartTitle: "Top 40", sourceUrls: [] },
+      responseExample: { runId: "run-001", status: "dry_run_complete" },
+      capabilities: ["create_wakilisha_charts"],
+    },
+    {
+      key: "commitIngestRun",
+      frontendFunction: "commitIngestRun(request)",
+      method: "POST",
+      path: "/wp-json/wakilisha/v2/charts/ingest/runs/{runId}/commit",
+      status: "not_configured",
+      tables: ["wkcharts_ingest_runs", "wkcharts_chart_editions"],
+      expectedResponse: ["runId", "editionId", "status"],
+      description: "Commit a dry run to a published edition.",
+      payloadExample: { runId: "run-001", publishImmediately: false },
+      responseExample: { runId: "run-001", editionId: "ed-001", status: "committed" },
+      capabilities: ["publish_wakilisha_charts"],
+    },
+    {
+      key: "cancelIngestRun",
+      frontendFunction: "cancelIngestRun(runId)",
+      method: "POST",
+      path: "/wp-json/wakilisha/v2/charts/ingest/runs/{runId}/cancel",
+      status: "not_configured",
+      tables: ["wkcharts_ingest_runs"],
+      expectedResponse: ["run"],
+      description: "Cancel a running or pending ingest run.",
+      payloadExample: {},
+      responseExample: { run: { id: "run-001", status: "cancelled" } },
+      capabilities: ["edit_wakilisha_charts"],
+    },
+    {
+      key: "retryIngestRun",
+      frontendFunction: "retryIngestRun(runId)",
+      method: "POST",
+      path: "/wp-json/wakilisha/v2/charts/ingest/runs/{runId}/retry",
+      status: "not_configured",
+      tables: ["wkcharts_ingest_runs"],
+      expectedResponse: ["run"],
+      description: "Retry a failed ingest run.",
+      payloadExample: {},
+      responseExample: { run: { id: "run-001", status: "running" } },
+      capabilities: ["edit_wakilisha_charts"],
+    },
+    {
+      key: "sendGapsToReview",
+      frontendFunction: "sendGapsToReview(runId)",
+      method: "POST",
+      path: "/wp-json/wakilisha/v2/charts/ingest/runs/{runId}/send-gaps",
+      status: "not_configured",
+      tables: ["wkcharts_ingest_runs"],
+      expectedResponse: ["run"],
+      description: "Flag gap rows for manual review.",
+      payloadExample: {},
+      responseExample: { run: { id: "run-001", status: "needs_review" } },
+      capabilities: ["edit_wakilisha_charts"],
+    },
+    {
+      key: "getResourceGuardStatus",
+      frontendFunction: "getResourceGuardStatus(runId)",
+      method: "GET",
+      path: "/wp-json/wakilisha/v2/charts/ingest/runs/{runId}/resource-guard",
+      status: "not_configured",
+      tables: ["wkcharts_ingest_runs"],
+      expectedResponse: ["guard"],
+      description: "Get resource guard / budget status for a run.",
+      payloadExample: {},
+      responseExample: { guard: { sourceCount: 2, providerBudgetRemaining: 80 } },
+      capabilities: ["read_wakilisha_charts"],
+    },
+  ];
+
+  const withStatus = studioEndpoints.map((ep) => ({
+    ...ep,
+    status: getEndpointStatus(ep.frontendFunction),
+  }));
+
+  return { "Ingest Studio (V2)": withStatus };
 }
 
 // ─── Adapter Exports ───
@@ -664,6 +878,7 @@ export const clearRankOverride = adapter.clearRankOverride;
 // Draft & Publish
 export const createDraftEdition = adapter.createDraftEdition;
 export const publishEdition = adapter.publishEdition;
+export const runPreflightCheck = adapter.runPreflightCheck;
 
 // Logs
 export const getJobLogs = adapter.getJobLogs;

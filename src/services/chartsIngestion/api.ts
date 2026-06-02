@@ -529,6 +529,57 @@ export function publishEdition(jobId: string): Promise<IngestJob | null> {
   return getIngestJob(jobId);
 }
 
+// ─── Preflight Check ───
+export function runPreflightCheck(
+  jobId: string
+): Promise<{ pass: boolean; checklist: { label: string; pass: boolean }[]; warnings: number; errors: number }> {
+  const job = getJob(jobId);
+  const sources = getJobSources(jobId);
+  const candidates = getJobCandidates(jobId);
+  const issues = getJobIssues(jobId);
+  const matches = getJobMatches(jobId);
+  const draftEntries = getJobDraftEntries(jobId);
+
+  const unresolvedMatches = matches.filter(
+    (m) => m.approvedBy === null && m.matchMethod !== "new_entity"
+  );
+  const highOpenIssues = issues.filter((i) => i.severity === "high" && i.status === "open");
+
+  const rankMap = new Map<number, number>();
+  for (const c of candidates) {
+    const rank = c.finalRank ?? c.calculatedRank;
+    if (rank > 0) rankMap.set(rank, (rankMap.get(rank) ?? 0) + 1);
+  }
+  const hasDuplicateRanks = Array.from(rankMap.values()).some((count) => count > 1);
+
+  const checklist = [
+    { label: "Job exists", pass: !!job },
+    { label: "Sources added", pass: sources.length > 0 },
+    { label: "Sources fetched", pass: sources.every((s) => s.status === "completed") },
+    { label: "Candidates normalized", pass: candidates.length > 0 },
+    { label: "Matches resolved", pass: unresolvedMatches.length === 0 },
+    { label: "No blocking issues", pass: highOpenIssues.length === 0 },
+    { label: "Draft entries exist", pass: draftEntries.length > 0 },
+    { label: "Rank integrity valid", pass: !hasDuplicateRanks },
+  ];
+
+  const warnings = issues.filter((i) => i.severity === "medium" && i.status === "open").length;
+  const errors = highOpenIssues.length;
+
+  appendJobLog(jobId, "preflight", "info", `Preflight check completed: ${checklist.filter((c) => c.pass).length}/${checklist.length} passed`, {
+    pass: checklist.every((c) => c.pass),
+    warnings,
+    errors,
+  });
+
+  return Promise.resolve({
+    pass: checklist.every((c) => c.pass),
+    checklist,
+    warnings,
+    errors,
+  });
+}
+
 // ─── Logs ───
 export function getJobLogs(jobId: string): Promise<IngestJobLog[]> {
   return Promise.resolve(getLogsForJob(jobId));

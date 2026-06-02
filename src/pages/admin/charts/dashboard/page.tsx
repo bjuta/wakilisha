@@ -1,54 +1,49 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
-import { WkTag } from "@/components/design-system/primitives/Tag";
-import { getDashboardKpisApi, getIngestJobs } from "@/services/chartsIngestion/client";
+import { AdminChartsPageHeader } from "../components/AdminChartsPageHeader";
+import { AdminChartsKpiCard } from "../components/AdminChartsKpiCard";
+import { AdminChartsStatusBadge } from "../components/AdminChartsStatusBadge";
+import { AdminChartsEmptyState } from "../components/AdminChartsEmptyState";
+import { AdminChartsLoadingState } from "../components/AdminChartsLoadingState";
+import {
+  getDashboardKpisApi,
+  getIngestJobs,
+  getIngestRuns,
+  getIngestKpis,
+  getIngestionMode,
+} from "@/services/chartsIngestion/client";
 import type { DashboardKpis, IngestJob } from "@/services/chartsIngestion/types";
-
-const STATUS_COLORS: Record<string, string> = {
-  draft: "bg-[var(--wk-text-faint)]/10 text-[var(--wk-text-faint)]",
-  fetching: "bg-[var(--wk-info-soft)] text-[var(--wk-info)]",
-  normalizing: "bg-[var(--wk-info-soft)] text-[var(--wk-info)]",
-  matching: "bg-[var(--wk-info-soft)] text-[var(--wk-info)]",
-  scoring: "bg-[var(--wk-warning-soft)] text-[var(--wk-warning)]",
-  review: "bg-[var(--wk-warning-soft)] text-[var(--wk-warning)]",
-  ready_to_draft: "bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]",
-  drafted: "bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]",
-  published: "bg-[var(--wk-success-soft)] text-[var(--wk-success)]",
-  failed: "bg-[var(--wk-danger-soft)] text-[var(--wk-danger)]",
-  cancelled: "bg-[var(--wk-text-faint)]/10 text-[var(--wk-text-faint)]",
-};
-
-function formatStatus(status: string): string {
-  return status
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (l) => l.toUpperCase());
-}
+import type { IngestRun } from "@/services/chartsIngestion/ingestStudioTypes";
 
 export default function AdminChartsDashboard() {
   const navigate = useNavigate();
   const [kpis, setKpis] = useState<DashboardKpis | null>(null);
+  const [studioKpis, setStudioKpis] = useState<ReturnType<typeof getIngestKpis> extends Promise<infer T> ? T : never | null>(null);
   const [jobs, setJobs] = useState<IngestJob[]>([]);
+  const [runs, setRuns] = useState<IngestRun[]>([]);
   const [loading, setLoading] = useState(true);
+  const [mode, setMode] = useState<string>("mock");
 
   useEffect(() => {
     async function load() {
-      const [k, j] = await Promise.all([getDashboardKpisApi(), getIngestJobs()]);
+      const [k, j, r, sk] = await Promise.all([
+        getDashboardKpisApi(),
+        getIngestJobs(),
+        getIngestRuns(),
+        getIngestKpis(),
+      ]);
       setKpis(k);
       setJobs(j);
+      setRuns(r);
+      setStudioKpis(sk);
+      setMode(getIngestionMode());
       setLoading(false);
     }
     load();
   }, []);
 
-  if (loading) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <div className="text-[var(--wk-text-muted)]">Loading dashboard...</div>
-      </div>
-    );
-  }
-
+  if (loading) return <AdminChartsLoadingState message="Loading dashboard..." />;
   if (!kpis) return null;
 
   const activeJobs = jobs.filter((j) =>
@@ -56,112 +51,173 @@ export default function AdminChartsDashboard() {
   );
   const failedJobs = jobs.filter((j) => j.status === "failed");
   const recentJobs = jobs.slice(0, 5);
+  const activeRuns = runs.filter((r) => r.status === "running" || r.status === "draft" || r.status === "dry_run_complete");
+  const needsReviewRuns = runs.filter((r) => r.status === "needs_review" || r.summary.gaps > 0);
+  const committedRuns = runs.filter((r) => r.status === "committed").slice(0, 3);
+
+  const needsAttention = failedJobs.length > 0 || needsReviewRuns.length > 0 || activeRuns.length > 0;
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="wk-eyebrow mb-2">Charts Ingestion</div>
-          <h1 className="wk-h-page">Dashboard</h1>
-        </div>
+      <AdminChartsPageHeader
+        title="Dashboard"
+        description="Command center for chart operations. What needs attention today."
+      >
         <button
           onClick={() => navigate("/admin/charts/ingest")}
-          className="wk-button wk-button-primary whitespace-nowrap"
+          className="wk-button wk-button-primary wk-button-sm whitespace-nowrap"
         >
           <i className="ri-add-line" />
-          New Ingest Job
+          New Ingest
         </button>
-      </div>
+        <button
+          onClick={() => navigate("/admin/charts/ingest-health")}
+          className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap"
+        >
+          <i className="ri-heart-pulse-line" />
+          Health
+        </button>
+      </AdminChartsPageHeader>
 
-      {/* KPI Cards */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        <KpiCard
-          value={kpis.activeJobs}
-          label="Active Jobs"
+      {/* Mode indicator */}
+      {mode === "mock" && (
+        <div className="rounded-lg border border-wk-warning/20 bg-wk-warning-soft p-3 flex items-start gap-2">
+          <i className="ri-test-tube-line text-wk-warning mt-0.5" />
+          <div className="text-[12px] text-wk-warning">
+            <strong>Mock mode active.</strong> All data is local. Switch to WordPress mode for live backend connectivity.
+          </div>
+        </div>
+      )}
+
+      {/* KPIs */}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
+        <AdminChartsKpiCard
+          value={activeRuns.length}
+          label="Active Runs"
           icon="ri-database-2-line"
-          color="var(--wk-info)"
+          accent={activeRuns.length > 0 ? "brand" : "muted"}
         />
-        <KpiCard
-          value={kpis.failedJobs}
+        <AdminChartsKpiCard
+          value={failedJobs.length}
           label="Failed Jobs"
           icon="ri-error-warning-line"
-          color="var(--wk-danger)"
+          accent={failedJobs.length > 0 ? "danger" : "muted"}
         />
-        <KpiCard
-          value={kpis.pendingReviewIssues}
-          label="Pending Issues"
+        <AdminChartsKpiCard
+          value={needsReviewRuns.length}
+          label="Needs Review"
           icon="ri-flag-line"
-          color="var(--wk-warning)"
+          accent={needsReviewRuns.length > 0 ? "warning" : "muted"}
         />
-        <KpiCard
+        <AdminChartsKpiCard
           value={kpis.totalFamilies}
           label="Chart Families"
           icon="ri-folder-chart-line"
-          color="var(--wk-brand)"
+          accent="brand"
         />
-        <KpiCard
+        <AdminChartsKpiCard
           value={kpis.totalPublishedEditions}
           label="Published Editions"
           icon="ri-stack-line"
-          color="var(--wk-success)"
+          accent="success"
         />
-        <KpiCard
-          value={kpis.latestPublishedEdition?.label ?? "—"}
-          label="Latest Edition"
-          icon="ri-calendar-line"
-          color="var(--wk-text-soft)"
-          isString
+        <AdminChartsKpiCard
+          value={studioKpis ? `${studioKpis.canonicalMatchRate.toFixed(1)}%` : "—"}
+          label="Match Rate"
+          icon="ri-bar-chart-grouped-line"
+          accent={studioKpis && studioKpis.canonicalMatchRate >= 85 ? "success" : "warning"}
         />
       </div>
 
-      {/* Main Grid */}
-      <div className="grid gap-5 lg:grid-cols-[1fr_380px]">
-        {/* Active Jobs */}
+      {/* Attention bar */}
+      {needsAttention && (
+        <div className="rounded-lg border border-wk-border bg-wk-surface p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <i className="ri-alarm-warning-line text-wk-warning" />
+            <h2 className="text-[14px] font-bold text-wk-text">Needs Attention</h2>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {failedJobs.length > 0 && (
+              <button
+                onClick={() => navigate("/admin/charts/ingest-jobs")}
+                className="inline-flex items-center gap-1.5 rounded-md border border-wk-danger/20 bg-wk-danger-soft px-3 py-1.5 text-[12px] font-semibold text-wk-danger transition-colors hover:bg-wk-danger/20 whitespace-nowrap"
+              >
+                <i className="ri-error-warning-line" />
+                {failedJobs.length} failed job{failedJobs.length !== 1 ? "s" : ""}
+              </button>
+            )}
+            {needsReviewRuns.length > 0 && (
+              <button
+                onClick={() => navigate("/admin/charts/review-queue")}
+                className="inline-flex items-center gap-1.5 rounded-md border border-wk-warning/20 bg-wk-warning-soft px-3 py-1.5 text-[12px] font-semibold text-wk-warning transition-colors hover:bg-wk-warning/20 whitespace-nowrap"
+              >
+                <i className="ri-git-pull-request-line" />
+                {needsReviewRuns.length} run{needsReviewRuns.length !== 1 ? "s" : ""} need review
+              </button>
+            )}
+            {activeRuns.length > 0 && (
+              <button
+                onClick={() => navigate("/admin/charts/ingest-runs")}
+                className="inline-flex items-center gap-1.5 rounded-md border border-wk-info/20 bg-wk-info-soft px-3 py-1.5 text-[12px] font-semibold text-wk-info transition-colors hover:bg-wk-info/20 whitespace-nowrap"
+              >
+                <i className="ri-loader-4-line animate-spin" />
+                {activeRuns.length} active run{activeRuns.length !== 1 ? "s" : ""}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Main grid */}
+      <div className="grid gap-5 lg:grid-cols-[1fr_360px]">
+        {/* Left column */}
         <div className="space-y-4">
+          {/* Active Provider Runs */}
           <WkSurface className="p-5">
             <div className="mb-4 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <i className="ri-database-2-line text-[var(--wk-brand)]" />
-                <h2 className="text-[14px] font-bold text-[var(--wk-text)]">Active Ingest Jobs</h2>
+                <i className="ri-database-2-line text-wk-brand" />
+                <h2 className="text-[14px] font-bold text-wk-text">Active Ingest Runs</h2>
               </div>
-              <WkTag variant="brand">{activeJobs.length} active</WkTag>
+              <button
+                onClick={() => navigate("/admin/charts/ingest-runs")}
+                className="text-[11px] font-semibold text-wk-brand hover:underline"
+              >
+                View all
+              </button>
             </div>
-            {activeJobs.length === 0 ? (
-              <div className="py-8 text-center text-[13px] text-[var(--wk-text-muted)]">
-                No active jobs. Start a new ingest job to begin.
-              </div>
+            {activeRuns.length === 0 ? (
+              <AdminChartsEmptyState
+                icon="ri-database-2-line"
+                title="No active runs"
+                description="Start a new ingest run from the Ingest Studio to populate this section."
+                action={{ label: "New Ingest", onClick: () => navigate("/admin/charts/ingest"), icon: "ri-add-line" }}
+              />
             ) : (
               <div className="space-y-2">
-                {activeJobs.map((job) => (
+                {activeRuns.map((run) => (
                   <button
-                    key={job.id}
-                    onClick={() => navigate(`/admin/charts/ingest/${job.id}`)}
-                    className="flex w-full items-center gap-4 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg-subtle)] p-4 text-left transition-all hover:border-[var(--wk-border-2)] hover:bg-[var(--wk-surface-raised)]"
+                    key={run.id}
+                    onClick={() => navigate(`/admin/charts/ingest-runs/${run.id}`)}
+                    className="flex w-full items-center gap-4 rounded-xl border border-wk-border bg-wk-bg-subtle p-4 text-left transition-all hover:border-wk-border-2 hover:bg-wk-surface-raised"
                   >
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-wk-brand-soft text-wk-brand">
                       <i className="ri-bar-chart-grouped-line" />
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="truncate text-[13px] font-bold text-[var(--wk-text)]">
-                          {job.chartFamily?.label ?? "Unknown Family"}
-                        </span>
-                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${STATUS_COLORS[job.status] ?? ""}`}>
-                          {formatStatus(job.status)}
-                        </span>
+                        <span className="truncate text-[13px] font-bold text-wk-text">{run.chartTitle}</span>
+                        <AdminChartsStatusBadge status={run.status} size="sm" />
                       </div>
-                      <div className="mt-0.5 flex items-center gap-3 text-[11px] text-[var(--wk-text-muted)]">
-                        <span>{job.editionSlug ?? job.editionDate}</span>
-                        <span>·</span>
-                        <span>{job.sourceSummary.totalSources} sources</span>
-                        <span>·</span>
-                        <span>{job.jobSummary.totalCandidates} candidates</span>
-                        <span>·</span>
-                        <span>{job.createdBy}</span>
+                      <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-wk-text-muted">
+                        <span>{run.editionDate}</span>
+                        <span>{run.detectedProviders.length} providers</span>
+                        <span>{run.summary.totalRows} rows</span>
+                        <span>{run.summary.matchRate.toFixed(1)}% match</span>
+                        <span>by {run.createdBy}</span>
                       </div>
                     </div>
-                    <div className="shrink-0 text-[var(--wk-text-faint)]">
+                    <div className="shrink-0 text-wk-text-faint">
                       <i className="ri-arrow-right-line" />
                     </div>
                   </button>
@@ -170,77 +226,124 @@ export default function AdminChartsDashboard() {
             )}
           </WkSurface>
 
-          {/* Recent Jobs */}
+          {/* Recent Committed Editions */}
           <WkSurface className="p-5">
             <div className="mb-4 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <i className="ri-time-line text-[var(--wk-text-soft)]" />
-                <h2 className="text-[14px] font-bold text-[var(--wk-text)]">Recent Jobs</h2>
+                <i className="ri-check-double-line text-wk-success" />
+                <h2 className="text-[14px] font-bold text-wk-text">Recent Editions</h2>
               </div>
               <button
-                onClick={() => navigate("/admin/charts/ingest")}
-                className="text-[11px] font-semibold text-[var(--wk-brand)] hover:underline"
+                onClick={() => navigate("/admin/charts/editions")}
+                className="text-[11px] font-semibold text-wk-brand hover:underline"
               >
                 View all
               </button>
             </div>
-            <div className="space-y-2">
-              {recentJobs.map((job) => (
-                <button
-                  key={job.id}
-                  onClick={() => navigate(`/admin/charts/ingest/${job.id}`)}
-                  className="flex w-full items-center gap-3 rounded-lg border border-[var(--wk-border)] p-3 text-left transition-all hover:bg-[var(--wk-surface-raised)]"
-                >
-                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${STATUS_COLORS[job.status] ?? ""}`}>
-                    {formatStatus(job.status)}
-                  </span>
-                  <span className="truncate text-[12px] font-semibold text-[var(--wk-text)]">
-                    {job.chartFamily?.label ?? "Unknown"}
-                  </span>
-                  <span className="text-[11px] text-[var(--wk-text-muted)]">{job.editionSlug ?? job.editionDate}</span>
-                  <span className="ml-auto text-[11px] text-[var(--wk-text-faint)]">{job.createdBy}</span>
-                </button>
-              ))}
+            {committedRuns.length === 0 ? (
+              <div className="py-4 text-center text-[12px] text-wk-text-muted">
+                No committed editions yet. Run a dry run and commit to publish.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {committedRuns.map((run) => (
+                  <div
+                    key={run.id}
+                    className="flex items-center gap-3 rounded-lg border border-wk-border p-3"
+                  >
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-wk-success-soft text-wk-success">
+                      <i className="ri-check-line" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[13px] font-semibold text-wk-text truncate">{run.chartTitle}</div>
+                      <div className="text-[11px] text-wk-text-muted">{run.editionDate} · {run.summary.totalRows} entries</div>
+                    </div>
+                    <button
+                      onClick={() => navigate(`/admin/charts/ingest-runs/${run.id}`)}
+                      className="shrink-0 text-[12px] font-semibold text-wk-brand hover:underline whitespace-nowrap"
+                    >
+                      View
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </WkSurface>
+
+          {/* Legacy Active Jobs */}
+          <WkSurface className="p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <i className="ri-history-line text-wk-text-muted" />
+                <h2 className="text-[14px] font-bold text-wk-text">Legacy Active Jobs</h2>
+              </div>
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-wk-text-faint">Legacy</span>
             </div>
+            {activeJobs.length === 0 ? (
+              <div className="py-4 text-center text-[12px] text-wk-text-muted">
+                No active legacy jobs. Provider-based runs are the new standard.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {activeJobs.map((job) => (
+                  <button
+                    key={job.id}
+                    onClick={() => navigate(`/admin/charts/ingest-jobs/${job.id}`)}
+                    className="flex w-full items-center gap-3 rounded-lg border border-wk-border p-3 text-left transition-all hover:bg-wk-surface-raised"
+                  >
+                    <AdminChartsStatusBadge status={job.status} size="sm" />
+                    <span className="truncate text-[12px] font-semibold text-wk-text">
+                      {job.chartFamily?.label ?? job.chartFamilyId}
+                    </span>
+                    <span className="text-[11px] text-wk-text-muted">{job.editionDate}</span>
+                    <span className="ml-auto text-[11px] text-wk-text-faint">{job.createdBy}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </WkSurface>
         </div>
 
-        {/* Right Panel */}
+        {/* Right column */}
         <div className="space-y-4">
           {/* Failed Jobs */}
           <WkSurface className="p-5">
             <div className="mb-4 flex items-center gap-2">
-              <i className="ri-error-warning-line text-[var(--wk-danger)]" />
-              <h2 className="text-[14px] font-bold text-[var(--wk-text)]">Failed Jobs</h2>
+              <i className="ri-error-warning-line text-wk-danger" />
+              <h2 className="text-[14px] font-bold text-wk-text">Failed Jobs</h2>
               {failedJobs.length > 0 && (
-                <span className="rounded-full bg-[var(--wk-danger-soft)] px-2 py-0.5 text-[10px] font-bold text-[var(--wk-danger)]">
+                <span className="rounded-full bg-wk-danger-soft px-2 py-0.5 text-[10px] font-bold text-wk-danger">
                   {failedJobs.length}
                 </span>
               )}
             </div>
             {failedJobs.length === 0 ? (
-              <div className="py-4 text-center text-[12px] text-[var(--wk-text-muted)]">
-                No failed jobs. All systems operational.
+              <div className="py-4 text-center text-[12px] text-wk-text-muted">
+                No failures. All systems operational.
               </div>
             ) : (
               <div className="space-y-2">
                 {failedJobs.map((job) => (
                   <div
                     key={job.id}
-                    className="rounded-lg border border-[var(--wk-danger)]/20 bg-[var(--wk-danger-soft)] p-3"
+                    className="rounded-lg border border-wk-danger/20 bg-wk-danger-soft p-3"
                   >
-                    <div className="text-[12px] font-bold text-[var(--wk-danger)]">
-                      {job.chartFamily?.label ?? "Unknown"}
+                    <div className="text-[12px] font-bold text-wk-danger">
+                      {job.chartFamily?.label ?? job.chartFamilyId}
                     </div>
-                    <div className="mt-1 text-[11px] text-[var(--wk-text)]">
-                      {job.errorMessage}
-                    </div>
+                    <div className="mt-1 text-[11px] text-wk-text">{job.errorMessage}</div>
                     <div className="mt-2 flex gap-2">
                       <button
-                        onClick={() => navigate(`/admin/charts/ingest/${job.id}`)}
+                        onClick={() => navigate(`/admin/charts/ingest-jobs/${job.id}`)}
                         className="wk-button wk-button-sm wk-button-ghost"
                       >
                         View
+                      </button>
+                      <button
+                        onClick={() => navigate(`/admin/charts/ingest`)}
+                        className="wk-button wk-button-sm wk-button-primary"
+                      >
+                        Retry as New Run
                       </button>
                     </div>
                   </div>
@@ -249,84 +352,90 @@ export default function AdminChartsDashboard() {
             )}
           </WkSurface>
 
-          {/* Latest Published Edition */}
+          {/* Latest Published */}
           {kpis.latestPublishedEdition && (
             <WkSurface className="p-5">
               <div className="mb-4 flex items-center gap-2">
-                <i className="ri-check-double-line text-[var(--wk-success)]" />
-                <h2 className="text-[14px] font-bold text-[var(--wk-text)]">Latest Published</h2>
+                <i className="ri-check-double-line text-wk-success" />
+                <h2 className="text-[14px] font-bold text-wk-text">Latest Published</h2>
               </div>
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-[12px] text-[var(--wk-text-muted)]">Edition</span>
-                  <span className="text-[12px] font-semibold text-[var(--wk-text)]">
-                    {kpis.latestPublishedEdition.label}
-                  </span>
+                  <span className="text-[12px] text-wk-text-muted">Edition</span>
+                  <span className="text-[12px] font-semibold text-wk-text">{kpis.latestPublishedEdition.label}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-[12px] text-[var(--wk-text-muted)]">Date</span>
-                  <span className="text-[12px] font-semibold text-[var(--wk-text)]">
-                    {kpis.latestPublishedEdition.date}
-                  </span>
+                  <span className="text-[12px] text-wk-text-muted">Date</span>
+                  <span className="text-[12px] font-semibold text-wk-text">{kpis.latestPublishedEdition.date}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-[12px] text-[var(--wk-text-muted)]">Entries</span>
-                  <span className="text-[12px] font-semibold text-[var(--wk-text)]">
-                    {kpis.latestPublishedEdition.entryCount}
-                  </span>
+                  <span className="text-[12px] text-wk-text-muted">Entries</span>
+                  <span className="text-[12px] font-semibold text-wk-text">{kpis.latestPublishedEdition.entryCount}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-[12px] text-[var(--wk-text-muted)]">New Entries</span>
-                  <span className="text-[12px] font-semibold text-[var(--wk-brand)]">
-                    {kpis.latestPublishedEdition.newEntries}
-                  </span>
+                  <span className="text-[12px] text-wk-text-muted">New Entries</span>
+                  <span className="text-[12px] font-semibold text-wk-brand">{kpis.latestPublishedEdition.newEntries}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-[12px] text-[var(--wk-text-muted)]">Re-entries</span>
-                  <span className="text-[12px] font-semibold text-[var(--wk-text)]">
-                    {kpis.latestPublishedEdition.reEntries}
-                  </span>
+                  <span className="text-[12px] text-wk-text-muted">Re-entries</span>
+                  <span className="text-[12px] font-semibold text-wk-text">{kpis.latestPublishedEdition.reEntries}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-[12px] text-[var(--wk-text-muted)]">Published By</span>
-                  <span className="text-[12px] font-semibold text-[var(--wk-text)]">
-                    {kpis.latestPublishedEdition.publishedBy}
-                  </span>
+                  <span className="text-[12px] text-wk-text-muted">Published By</span>
+                  <span className="text-[12px] font-semibold text-wk-text">{kpis.latestPublishedEdition.publishedBy}</span>
                 </div>
-                <div className="border-t border-[var(--wk-divider)] pt-3">
-                  <span className="text-[10px] text-[var(--wk-text-faint)]">
+                <div className="border-t border-wk-divider pt-3">
+                  <span className="text-[10px] text-wk-text-faint">
                     Published {kpis.latestPublishedEdition.publishedAt}
                   </span>
                 </div>
+                <button
+                  onClick={() => navigate(`/admin/charts/editions`)}
+                  className="mt-1 w-full rounded-md bg-wk-brand-soft px-3 py-2 text-[12px] font-semibold text-wk-brand transition-colors hover:bg-wk-brand/20"
+                >
+                  <i className="ri-eye-line mr-1" /> View in Editions
+                </button>
               </div>
             </WkSurface>
           )}
 
           {/* Quick Actions */}
           <WkSurface className="p-5">
-            <h2 className="mb-3 text-[14px] font-bold text-[var(--wk-text)]">Quick Actions</h2>
+            <h2 className="mb-3 text-[14px] font-bold text-wk-text">Quick Actions</h2>
             <div className="space-y-2">
-              <button
+              <QuickActionButton
+                icon="ri-add-circle-line"
+                label="Start New Ingest"
+                description="Create a new provider-based run"
                 onClick={() => navigate("/admin/charts/ingest")}
-                className="flex w-full items-center gap-2 rounded-lg border border-[var(--wk-border)] p-3 text-left transition-all hover:bg-[var(--wk-surface-raised)]"
-              >
-                <i className="ri-add-circle-line text-[var(--wk-brand)]" />
-                <span className="text-[12px] font-semibold text-[var(--wk-text)]">Start New Ingest</span>
-              </button>
-              <button
+                accent="brand"
+              />
+              <QuickActionButton
+                icon="ri-folder-chart-line"
+                label="Manage Families"
+                description="Configure chart series and rulesets"
                 onClick={() => navigate("/admin/charts/families")}
-                className="flex w-full items-center gap-2 rounded-lg border border-[var(--wk-border)] p-3 text-left transition-all hover:bg-[var(--wk-surface-raised)]"
-              >
-                <i className="ri-folder-chart-line text-[var(--wk-text-soft)]" />
-                <span className="text-[12px] font-semibold text-[var(--wk-text)]">Manage Families</span>
-              </button>
-              <button
+              />
+              <QuickActionButton
+                icon="ri-stack-line"
+                label="View Editions"
+                description="Browse published and draft editions"
                 onClick={() => navigate("/admin/charts/editions")}
-                className="flex w-full items-center gap-2 rounded-lg border border-[var(--wk-border)] p-3 text-left transition-all hover:bg-[var(--wk-surface-raised)]"
-              >
-                <i className="ri-stack-line text-[var(--wk-text-soft)]" />
-                <span className="text-[12px] font-semibold text-[var(--wk-text)]">View Editions</span>
-              </button>
+              />
+              <QuickActionButton
+                icon="ri-git-pull-request-line"
+                label="Open Review Queue"
+                description={needsReviewRuns.length > 0 ? `${needsReviewRuns.length} runs need review` : "Queue is clear"}
+                onClick={() => navigate("/admin/charts/review-queue")}
+                disabled={needsReviewRuns.length === 0}
+                disabledReason="No items in review queue"
+              />
+              <QuickActionButton
+                icon="ri-heart-pulse-line"
+                label="API Health"
+                description="Check provider and backend status"
+                onClick={() => navigate("/admin/charts/ingest-health")}
+              />
             </div>
           </WkSurface>
         </div>
@@ -335,36 +444,43 @@ export default function AdminChartsDashboard() {
   );
 }
 
-function KpiCard({
-  value,
-  label,
+function QuickActionButton({
   icon,
-  color,
-  isString,
+  label,
+  description,
+  onClick,
+  accent,
+  disabled,
+  disabledReason,
 }: {
-  value: number | string;
-  label: string;
   icon: string;
-  color: string;
-  isString?: boolean;
+  label: string;
+  description: string;
+  onClick: () => void;
+  accent?: "brand";
+  disabled?: boolean;
+  disabledReason?: string;
 }) {
+  const iconColor = accent === "brand" ? "text-wk-brand" : "text-wk-text-muted";
   return (
-    <WkSurface className="flex items-center gap-3 p-4">
-      <div
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
-        style={{ background: `${color}15`, color }}
-      >
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      title={disabled ? disabledReason : undefined}
+      className={`flex w-full items-center gap-3 rounded-lg border border-wk-border p-3 text-left transition-all ${
+        disabled
+          ? "opacity-40 cursor-not-allowed"
+          : "hover:bg-wk-surface-raised hover:border-wk-border-2"
+      }`}
+    >
+      <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-wk-surface-raised ${iconColor}`}>
         <i className={icon} />
       </div>
-      <div className="min-w-0">
-        <div
-          className={`font-black leading-none tracking-[-0.02em] ${isString ? "text-[13px]" : "text-[22px]"}`}
-          style={{ color: isString ? "var(--wk-text-soft)" : "var(--wk-text)" }}
-        >
-          {value}
-        </div>
-        <div className="mt-1 text-[11px] font-medium text-[var(--wk-text-muted)]">{label}</div>
+      <div className="min-w-0 flex-1">
+        <div className="text-[13px] font-semibold text-wk-text">{label}</div>
+        <div className="text-[11px] text-wk-text-muted">{description}</div>
       </div>
-    </WkSurface>
+      <i className="ri-arrow-right-s-line text-wk-text-faint" />
+    </button>
   );
 }
