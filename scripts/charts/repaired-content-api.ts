@@ -165,12 +165,50 @@ function n(row: Row, key: string): number {
   return Number.isFinite(value) ? value : 0;
 }
 
+function decodeHtml(value: string): string {
+  return value
+    .replace(/&amp;/g, "&")
+    .replace(/&#038;/g, "&")
+    .replace(/&#38;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&#034;/g, '"')
+    .replace(/&#34;/g, '"')
+    .replace(/&#039;/g, "'")
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&#8217;/g, "’")
+    .replace(/&#8216;/g, "‘")
+    .replace(/&#8220;/g, "“")
+    .replace(/&#8221;/g, "”")
+    .replace(/&#8211;/g, "–")
+    .replace(/&#8212;/g, "—");
+}
+
+function cleanDisplayText(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  const text = decodeHtml(String(value))
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!text) return "";
+  if (["null", "undefined", "false", "[object object]"].includes(text.toLowerCase())) return "";
+  return text;
+}
+
 function slugify(value: string): string {
-  return value.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "item";
+  return cleanDisplayText(value)
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "item";
 }
 
 function stripHtml(value: string): string {
-  return value.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  return cleanDisplayText(value);
 }
 
 function parsePayload(value: unknown): Row {
@@ -189,8 +227,7 @@ function parsePayload(value: unknown): Row {
 
 function firstText(...values: unknown[]): string {
   for (const value of values) {
-    if (value === null || value === undefined) continue;
-    const text = String(value).trim();
+    const text = cleanDisplayText(value);
     if (text) return text;
   }
   return "";
@@ -208,7 +245,7 @@ function isSystemSlug(slug: string): boolean {
 }
 
 function isSystemTitle(title: string): boolean {
-  return SYSTEM_TITLES.has(title.trim().toLowerCase());
+  return SYSTEM_TITLES.has(cleanDisplayText(title).toLowerCase());
 }
 
 function isPublicMagazineStory(story: PublicStory): boolean {
@@ -234,7 +271,7 @@ function storyFromRawArticle(row: Row, index: number): PublicStory {
   const immutablePayload = parsePayload(row.immutable_payload);
   const seoPayload = parsePayload(row.seo_payload);
   const rawMeta = parsePayload(row.raw_meta);
-  const dek = stripHtml(firstText(
+  const dek = firstText(
     row.excerpt_html,
     row.excerpt,
     row.dek,
@@ -245,7 +282,7 @@ function storyFromRawArticle(row: Row, index: number): PublicStory {
     seoPayload.excerpt,
     rawMeta.excerpt,
     ""
-  ));
+  );
   const content = firstText(row.content_html, row.content, editablePayload.content, immutablePayload.content, rawMeta.content);
   return {
     id: firstText(row.id, row.source_wp_post_id, slug),
@@ -264,7 +301,7 @@ function storyFromRouteClassification(row: Row, index: number): PublicStory {
   const payload = parsePayload(row.source_payload);
   const title = firstText(row.title, payload.title, payload.post_title, `Story ${index + 1}`);
   const slug = firstText(row.slug, payload.slug, payload.post_name, slugify(title));
-  const dek = stripHtml(firstText(row.dek, row.excerpt, payload.excerpt, payload.post_excerpt, ""));
+  const dek = firstText(row.dek, row.excerpt, payload.excerpt, payload.post_excerpt, "");
   const content = firstText(payload.post_content, payload.content);
   return {
     id: firstText(row.id, row.legacy_wp_post_id, payload.id, payload.ID, slug),
