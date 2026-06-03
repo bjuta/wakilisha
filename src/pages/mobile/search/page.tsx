@@ -1,11 +1,11 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { ARTISTS } from "@/mocks/artists";
 import { TRACK_DETAILS } from "@/mocks/trackDetails";
-import { RELEASES } from "@/mocks/releases";
 import { GENRES } from "@/mocks/genres";
 import { LABELS } from "@/mocks/labels";
 import { CHART_DATA } from "@/mocks/charts";
+import { listReleases, releaseUrl, type RepairedRelease } from "@/services/repairedContent/client";
 import { WkIcon } from "@/components/design-system/Icon";
 
 const hot = ["Burna Boy", "Afrobeats", "Amapiano", "Tems", "Wizkid", "Asake", "Davido", "Rema"];
@@ -13,7 +13,7 @@ const hot = ["Burna Boy", "Afrobeats", "Amapiano", "Tems", "Wizkid", "Asake", "D
 const browse = [
   { icon: "BarChart3", label: "Charts", to: "/charts" },
   { icon: "Mic2", label: "Artists", to: "/artists" },
-  { icon: "Album", label: "Releases", to: "/releases" },
+  { icon: "Album", label: "Releases", to: "/search" },
   { icon: "FolderMusic", label: "Genres", to: "/genres" },
   { icon: "Building2", label: "Labels", to: "/labels" },
   { icon: "Newspaper", label: "Magazine", to: "/magazine" },
@@ -21,18 +21,39 @@ const browse = [
 
 export default function MobileSearch() {
   const [query, setQuery] = useState("");
+  const [releases, setReleases] = useState<RepairedRelease[]>([]);
+  const [releasesLoading, setReleasesLoading] = useState(true);
   const q = query.trim().toLowerCase();
+
+  useEffect(() => {
+    let alive = true;
+    const load = async () => {
+      setReleasesLoading(true);
+      try {
+        const data = await listReleases();
+        if (!alive) return;
+        setReleases(data);
+      } catch (err) {
+        console.error("Failed to load releases for search:", err);
+      } finally {
+        if (alive) setReleasesLoading(false);
+      }
+    };
+    load();
+    return () => { alive = false; };
+  }, []);
+
   const results = useMemo(() => {
     if (!q) return null;
     return {
       artists: ARTISTS.filter((a) => a.name.toLowerCase().includes(q) || a.genres.some((g) => g.toLowerCase().includes(q))).slice(0, 6),
       tracks: TRACK_DETAILS.filter((t) => t.title.toLowerCase().includes(q) || t.artist.toLowerCase().includes(q)).slice(0, 8),
-      releases: RELEASES.filter((r) => r.title.toLowerCase().includes(q) || r.artist.toLowerCase().includes(q)).slice(0, 6),
+      releases: releasesLoading ? [] : releases.filter((r) => r.title.toLowerCase().includes(q) || r.artist.toLowerCase().includes(q)).slice(0, 6),
       genres: GENRES.filter((g) => g.name.toLowerCase().includes(q)).slice(0, 8),
       labels: LABELS.filter((l) => l.name.toLowerCase().includes(q) || (l.country || "").toLowerCase().includes(q)).slice(0, 8),
       charts: CHART_DATA.filter((c) => c.title.toLowerCase().includes(q) || c.artist.toLowerCase().includes(q) || (c.genre || "").toLowerCase().includes(q)).slice(0, 8),
     };
-  }, [q]);
+  }, [q, releases, releasesLoading]);
 
   return (
     <div className="wk-mobile-v5">
@@ -86,8 +107,8 @@ function ArtistHit({ artist }: { artist: typeof ARTISTS[number] }) {
 function TrackHit({ track }: { track: typeof TRACK_DETAILS[number] }) {
   return <Link to={`/tracks/${track.slug}`} className="lbl-row"><div className="lbl-avatar">{track.artworkUrl ? <img src={track.artworkUrl} alt="" /> : <WkIcon name="Music2" size={17} />}</div><div><div className="lbl-name">{track.title}</div><div className="lbl-meta">{track.artist}</div></div><WkIcon name="ChevronRight" size={16} className="lbl-chevron" /></Link>;
 }
-function ReleaseHit({ release }: { release: typeof RELEASES[number] }) {
-  return <Link to={`/releases/${release.slug}`} className="lbl-row"><div className="lbl-avatar">{release.artworkUrl ? <img src={release.artworkUrl} alt="" /> : <WkIcon name="Album" size={17} />}</div><div><div className="lbl-name">{release.title}</div><div className="lbl-meta">{release.artist}</div></div><WkIcon name="ChevronRight" size={16} className="lbl-chevron" /></Link>;
+function ReleaseHit({ release }: { release: RepairedRelease }) {
+  return <Link to={releaseUrl(release)} className="lbl-row"><div className="lbl-avatar">{release.artworkUrl ? <img src={release.artworkUrl} alt="" /> : <WkIcon name="Album" size={17} />}</div><div><div className="lbl-name">{release.title}</div><div className="lbl-meta">{release.artist}</div></div><WkIcon name="ChevronRight" size={16} className="lbl-chevron" /></Link>;
 }
 function ChartHit({ entry }: { entry: typeof CHART_DATA[number] }) {
   return (

@@ -1,16 +1,47 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { STORIES, TRENDING_STORIES, SECTIONS, EDITOR_PICKS, CONTRIBUTORS } from "@/mocks/magazine";
+import { useMagazineArticles, type MagazineArticle } from "@/services/magazineArticles";
 import { WkIcon } from "@/components/design-system/Icon";
 
 export default function MobileMagazine() {
   const [activeSection, setActiveSection] = useState("All");
   const [email, setEmail] = useState("");
   const [subscribed, setSubscribed] = useState(false);
+  const { articles, loading, error } = useMagazineArticles();
 
-  const featured = STORIES[0];
-  const sections = SECTIONS.map((s: { name: string }) => s.name);
-  const filtered = STORIES.slice(1).filter((story) => activeSection === "All" || story.section === activeSection);
+  if (loading) {
+    return (
+      <div className="wk-mobile-v5 px-5 py-16 text-[var(--wk-text-muted)]">
+        Loading magazine stories…
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="wk-mobile-v5 px-5 py-16 text-[var(--wk-text-muted)]">
+        {error}
+      </div>
+    );
+  }
+
+  const featured = articles[0];
+  const sections = ["All", ...Array.from(new Set(articles.map((story) => story.section || "Article")))];
+  const filtered = articles.slice(1).filter((story) => activeSection === "All" || story.section === activeSection);
+  const trending = articles.slice(1, 9);
+  const editorPicks = articles.slice(0, 5);
+  const contributors = Array.from(
+    new Map(
+      articles.map((story) => [
+        story.author,
+        {
+          name: story.author,
+          role: story.section === "Guide" ? "Guide Author" : "Contributor",
+          bio: `Published ${articles.filter((item) => item.author === story.author).length} WAKILISHA piece${articles.filter((item) => item.author === story.author).length === 1 ? "" : "s"}.`,
+        },
+      ])
+    ).values()
+  ).slice(0, 6);
 
   if (!featured) {
     return <div className="wk-mobile-v5 px-5 py-16 text-[var(--wk-text-muted)]">No magazine stories available yet.</div>;
@@ -35,7 +66,7 @@ export default function MobileMagazine() {
 
       <div className="spec-section-hd">Trending</div>
       <div className="home-shelf">
-        {TRENDING_STORIES.map((story, i) => (
+        {trending.map((story, i) => (
           <Link key={story.slug} to={`/magazine/${story.slug}`} className="hcard mobile-pressable">
             <div className="hcard-art" style={{ position: "relative" }}>
               <img src={story.heroUrl} alt="" />
@@ -62,15 +93,15 @@ export default function MobileMagazine() {
         {filtered.length === 0 && <div className="px-5 py-10 text-center text-[var(--wk-text-muted)]">No stories in this section yet.</div>}
       </div>
 
-      {EDITOR_PICKS.length > 0 && (
+      {editorPicks.length > 0 && (
         <>
           <div className="spec-section-hd">Editor's picks</div>
           <div className="mag-cards">
-            {EDITOR_PICKS.slice(0, 4).map((pick) => (
+            {editorPicks.slice(0, 4).map((pick) => (
               <Link key={pick.slug} to={`/magazine/${pick.slug}`} className="mag-card mobile-pressable">
                 <div className="mag-card-art" style={{ position: "relative" }}>
                   <img src={pick.heroUrl} alt="" />
-                  <span className="absolute left-2 top-2 rounded-full bg-[var(--wk-brand)] px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-[var(--wk-brand-on)]">{'pickReason' in pick ? (pick as { pickReason?: string }).pickReason || "Pick" : "Pick"}</span>
+                  <span className="absolute left-2 top-2 rounded-full bg-[var(--wk-brand)] px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-[var(--wk-brand-on)]">Pick</span>
                 </div>
                 <div>
                   <div className="mag-card-tag">{pick.section}</div>
@@ -83,13 +114,13 @@ export default function MobileMagazine() {
         </>
       )}
 
-      {CONTRIBUTORS.length > 0 && (
+      {contributors.length > 0 && (
         <>
           <div className="spec-section-hd">Contributors</div>
           <div className="flex flex-col gap-3 px-5 pb-4">
-            {CONTRIBUTORS.slice(0, 6).map((contributor) => (
+            {contributors.map((contributor) => (
               <div key={contributor.name} className="mobile-pressable flex min-h-[64px] items-center gap-3 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-3">
-                {contributor.photo ? <img src={contributor.photo} alt={contributor.name} className="h-12 w-12 shrink-0 rounded-full object-cover" /> : <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[var(--wk-brand-soft)] text-lg font-bold text-[var(--wk-brand)]">{contributor.name[0]}</div>}
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[var(--wk-brand-soft)] text-lg font-bold text-[var(--wk-brand)]">{contributor.name[0]}</div>
                 <div className="min-w-0">
                   <div className="text-[14px] font-bold text-[var(--wk-text)]">{contributor.name}</div>
                   <div className="text-[11px] font-semibold text-[var(--wk-brand)]">{contributor.role}</div>

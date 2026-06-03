@@ -7,6 +7,39 @@ import NotFound from "../pages/NotFound";
 import Home from "../pages/home/page";
 import AdminDesignSystem from "../pages/admin/design-system/page";
 
+// Admin Shell — WordPress-like production engine
+import { AdminShell } from "../pages/admin/AdminShell";
+import AdminDashboardPage from "../pages/admin/dashboard/page";
+import AdminArticlesPage from "../pages/admin/content/articles/page";
+import AdminGuidesPage from "../pages/admin/content/guides/page";
+import AdminPagesPage from "../pages/admin/content/pages/page";
+import AdminArtistsPage from "../pages/admin/registry/artists/page";
+import AdminTracksPage from "../pages/admin/registry/tracks/page";
+import AdminReleasesPage from "../pages/admin/registry/releases/page";
+import AdminLabelsPage from "../pages/admin/registry/labels/page";
+import AdminGenresPage from "../pages/admin/registry/genres/page";
+import AdminMediaLibraryPage from "../pages/admin/media/library/page";
+import AdminMissingImagesPage from "../pages/admin/media/missing/page";
+import AdminBrokenLinksPage from "../pages/admin/media/broken/page";
+import AdminReviewQueuePage from "../pages/admin/review/queue/page";
+import AdminImportsJobsPage from "../pages/admin/imports/jobs/page";
+import AdminArticleDetailPage from "../pages/admin/content/articles/detail/page";
+import AdminArtistDetailPage from "../pages/admin/registry/artists/detail/page";
+import AdminTrackDetailPage from "../pages/admin/registry/tracks/detail/page";
+import AdminReleaseDetailPage from "../pages/admin/registry/releases/detail/page";
+import AdminLabelDetailPage from "../pages/admin/registry/labels/detail/page";
+import AdminGenreDetailPage from "../pages/admin/registry/genres/detail/page";
+import AdminImportsJobDetailPage from "../pages/admin/imports/jobs/detail/page";
+import AdminImportsUploadPage from "../pages/admin/imports/upload/page";
+import AdminImportsReportsPage from "../pages/admin/imports/reports/page";
+import AdminImportsStagingPage from "../pages/admin/imports/staging/page";
+import AdminImportsFailedPage from "../pages/admin/imports/failed/page";
+import AdminRelationshipViewerPage from "../pages/admin/relationships/viewer/page";
+import AdminDuplicateMergePage from "../pages/admin/relationships/duplicates/page";
+import AdminPublishingDashboardPage from "../pages/admin/content/publishing/page";
+import AdminContentArchivePage from "../pages/admin/content/archive/page";
+import AdminMediaMigrationPage from "../pages/admin/content/migration/page";
+
 // Admin Charts Ingestion Studio
 import { AdminChartsLayout } from "../pages/admin/charts/AdminChartsLayout";
 import AdminChartsDashboard from "../pages/admin/charts/dashboard/page";
@@ -52,7 +85,6 @@ import Artists from "../pages/artists/page";
 import ArtistDetail from "../pages/artists/detail/page";
 
 // Other entity pages
-import Releases from "../pages/releases/page";
 import ReleaseDetail from "../pages/releases/detail/page";
 import Genres from "../pages/genres/page";
 import Labels from "../pages/labels/page";
@@ -74,7 +106,6 @@ import MobileChartsDirectory from "../pages/mobile/charts/directory/page";
 import MobileChartEdition from "../pages/mobile/charts/edition/page";
 import MobileArtists from "../pages/mobile/artists/page";
 import MobileArtistDetail from "../pages/mobile/artists/detail/page";
-import MobileReleases from "../pages/mobile/releases/page";
 import MobileGenres from "../pages/mobile/genres/page";
 import MobileLabels from "../pages/mobile/labels/page";
 import MobileMagazine from "../pages/mobile/magazine/page";
@@ -103,9 +134,8 @@ const routes: RouteObject[] = [
       // Tracks
       { path: "/tracks/:slug", element: <ResponsivePage mobile={<MobileTrackDetail />} desktop={<TrackDetail />} /> },
 
-      // Releases
-      { path: "/releases", element: <ResponsivePage mobile={<MobileReleases />} desktop={<Releases />} /> },
-      { path: "/releases/:slug", element: <ResponsivePage mobile={<MobileReleases />} desktop={<ReleaseDetail />} /> },
+      // Releases — detail only, no public catalog
+      { path: "/releases/:artistSlug/:releaseSlug", element: <ResponsivePage mobile={<ReleaseDetail />} desktop={<ReleaseDetail />} /> },
 
       // Genres
       { path: "/genres", element: <ResponsivePage mobile={<MobileGenres />} desktop={<Genres />} /> },
@@ -125,6 +155,43 @@ const routes: RouteObject[] = [
       { path: "/auth", element: <ResponsivePage mobile={<MobileAuth />} desktop={<MobileAuth />} /> },
       { path: "/profile", element: <ResponsivePage mobile={<MobileProfile />} desktop={<ProfilePage />} /> },
       { path: "/settings", element: <ResponsivePage mobile={<SettingsPage />} desktop={<SettingsPage />} /> },
+    ],
+  },
+  // Admin Production Engine — WordPress-like admin shell
+  {
+    path: "/admin",
+    element: <AdminShell />,
+    children: [
+      { index: true, element: <AdminDashboardPage /> },
+      { path: "content/articles", element: <AdminArticlesPage /> },
+      { path: "content/articles/:slug", element: <AdminArticleDetailPage /> },
+      { path: "content/guides", element: <AdminGuidesPage /> },
+      { path: "content/pages", element: <AdminPagesPage /> },
+      { path: "content/publishing", element: <AdminPublishingDashboardPage /> },
+      { path: "content/archive", element: <AdminContentArchivePage /> },
+      { path: "content/migration", element: <AdminMediaMigrationPage /> },
+      { path: "registry/artists", element: <AdminArtistsPage /> },
+      { path: "registry/artists/:slug", element: <AdminArtistDetailPage /> },
+      { path: "registry/tracks", element: <AdminTracksPage /> },
+      { path: "registry/tracks/:slug", element: <AdminTrackDetailPage /> },
+      { path: "registry/releases", element: <AdminReleasesPage /> },
+      { path: "registry/releases/:slug", element: <AdminReleaseDetailPage /> },
+      { path: "registry/labels", element: <AdminLabelsPage /> },
+      { path: "registry/labels/:slug", element: <AdminLabelDetailPage /> },
+      { path: "registry/genres", element: <AdminGenresPage /> },
+      { path: "registry/genres/:slug", element: <AdminGenreDetailPage /> },
+      { path: "relationships/viewer", element: <AdminRelationshipViewerPage /> },
+      { path: "relationships/duplicates", element: <AdminDuplicateMergePage /> },
+      { path: "media/library", element: <AdminMediaLibraryPage /> },
+      { path: "media/missing", element: <AdminMissingImagesPage /> },
+      { path: "media/broken", element: <AdminBrokenLinksPage /> },
+      { path: "review/queue", element: <AdminReviewQueuePage /> },
+      { path: "imports/jobs", element: <AdminImportsJobsPage /> },
+      { path: "imports/jobs/:id", element: <AdminImportsJobDetailPage /> },
+      { path: "imports/upload", element: <AdminImportsUploadPage /> },
+      { path: "imports/reports", element: <AdminImportsReportsPage /> },
+      { path: "imports/staging", element: <AdminImportsStagingPage /> },
+      { path: "imports/failed", element: <AdminImportsFailedPage /> },
     ],
   },
   // Admin Charts Studio — now under /admin/settings/charts

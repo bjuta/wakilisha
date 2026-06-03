@@ -29,7 +29,7 @@ export default function NotFound() {
           </Link>
         </div>
         <div className="mt-12 flex flex-wrap justify-center gap-2">
-          {["/artists", "/releases", "/genres", "/labels", "/magazine"].map((route) => (
+          {["/artists", "/genres", "/labels", "/magazine"].map((route) => (
             <Link key={route} to={route}>
               <WkTag>{route}</WkTag>
             </Link>

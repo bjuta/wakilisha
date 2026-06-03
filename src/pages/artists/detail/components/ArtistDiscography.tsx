@@ -1,6 +1,8 @@
 import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
+import { AlbumModal } from "@/components/design-system/releases/AlbumModal";
+import type { ModalRelease } from "@/components/design-system/releases/AlbumModal";
 
 interface DiscoRelease {
   slug: string;
@@ -11,6 +13,7 @@ interface DiscoRelease {
   year?: string | number;
   trackCount?: number;
   releaseDate?: string;
+  labelName?: string;
   tracks?: Array<{ title: string; duration: string }>;
 }
 
@@ -26,15 +29,34 @@ function formatYear(dateStr?: string, year?: string | number): string {
   return "";
 }
 
-function ReleaseCard({ release }: { release: DiscoRelease }) {
+function toModalRelease(r: DiscoRelease): ModalRelease {
+  return {
+    slug: r.slug,
+    title: r.title,
+    artist: r.artist || "",
+    releaseType: r.releaseType || "Release",
+    year: r.year || formatYear(r.releaseDate),
+    labelName: r.labelName,
+    artworkUrl: r.artworkUrl || "",
+    trackCount: r.trackCount || 0,
+  };
+}
+
+function ReleaseCard({
+  release,
+  onOpen,
+}: {
+  release: DiscoRelease;
+  onOpen: (release: DiscoRelease) => void;
+}) {
   const trackPreviews = release.tracks?.slice(0, 3) || [];
   const hasMoreTracks = (release.trackCount || 0) > 3;
   const releaseYear = formatYear(release.releaseDate, release.year);
 
   return (
-    <Link
-      to={`/releases/${release.slug}`}
-      className="group relative block overflow-hidden rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] transition-all duration-500 hover:border-[var(--wk-brand)]"
+    <button
+      onClick={() => onOpen(release)}
+      className="group relative block w-full overflow-hidden rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] text-left transition-all duration-500 hover:border-[var(--wk-brand)]"
     >
       {/* Artwork */}
       <div className="relative aspect-square bg-[var(--wk-surface-raised)] overflow-hidden">
@@ -98,12 +120,13 @@ function ReleaseCard({ release }: { release: DiscoRelease }) {
           {release.title}
         </h4>
       </div>
-    </Link>
+    </button>
   );
 }
 
 export function ArtistDiscography({ releases }: ArtistDiscographyProps) {
   const [filter, setFilter] = useState<Filter>("All");
+  const [modalRelease, setModalRelease] = useState<DiscoRelease | null>(null);
   const { ref, revealed } = useScrollReveal<HTMLElement>(0.1);
 
   // Sort releases by date descending (latest first)
@@ -173,9 +196,15 @@ export function ArtistDiscography({ releases }: ArtistDiscographyProps) {
       {/* Gallery wall — all releases, equal size */}
       <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-4">
         {filtered.map((release) => (
-          <ReleaseCard key={release.slug} release={release} />
+          <ReleaseCard key={release.slug} release={release} onOpen={setModalRelease} />
         ))}
       </div>
+
+      <AlbumModal
+        open={Boolean(modalRelease)}
+        release={modalRelease ? toModalRelease(modalRelease) : null}
+        onClose={() => setModalRelease(null)}
+      />
     </section>
   );
 }

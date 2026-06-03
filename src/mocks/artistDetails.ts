@@ -1,5 +1,4 @@
 import { CHART_DATA } from "./charts";
-import { RELEASES } from "./releases";
 import { TRACK_DETAILS } from "./trackDetails";
 
 export interface ArtistDetail {
@@ -32,6 +31,13 @@ export interface ArtistDetail {
     trackCount?: number;
   }[];
   relatedArtists?: { slug: string; name: string }[];
+  videos?: {
+    id: string;
+    title: string;
+    url: string;
+    thumbnail: string;
+    source: string;
+  }[];
 }
 
 /* ─── PREVIOUS 6 ─── */
@@ -62,6 +68,10 @@ export const ARTIST_DETAILS: ArtistDetail[] = [
       { slug: "davido", name: "Davido" },
       { slug: "asake", name: "Asake" },
     ],
+    videos: [
+      { id: "dQw4w9WgXcQ", title: "Burna Boy - Last Last (Official Music Video)", url: "https://www.youtube.com/embed/dQw4w9WgXcQ?rel=0&modestbranding=1", thumbnail: "https://img.youtube.com/vi/dQw4w9WgXcQ/mqdefault.jpg", platform: "youtube" },
+      { id: "3NycM8lD1hg", title: "Burna Boy - For My Hand (feat. Ed Sheeran) (Official Video)", url: "https://www.youtube.com/embed/3NycM8lD1hg?rel=0&modestbranding=1", thumbnail: "https://img.youtube.com/vi/3NycM8lD1hg/mqdefault.jpg", platform: "youtube" },
+    ],
   },
   {
     slug: "tems",
@@ -82,6 +92,9 @@ export const ARTIST_DETAILS: ArtistDetail[] = [
     relatedArtists: [
       { slug: "wizkid", name: "Wizkid" },
       { slug: "ayra-starr", name: "Ayra Starr" },
+    ],
+    videos: [
+      { id: "C4O1DfTh5wY", title: "Tems - Free Mind (Official Video)", url: "https://www.youtube.com/embed/C4O1DfTh5wY?rel=0&modestbranding=1", thumbnail: "https://img.youtube.com/vi/C4O1DfTh5wY/mqdefault.jpg", platform: "youtube" },
     ],
   },
   {
@@ -106,6 +119,10 @@ export const ARTIST_DETAILS: ArtistDetail[] = [
       { slug: "burna-boy", name: "Burna Boy" },
       { slug: "tems", name: "Tems" },
       { slug: "davido", name: "Davido" },
+    ],
+    videos: [
+      { id: "CZq1q0U7nZg", title: "WizKid - Essence (Official Video) ft. Tems", url: "https://www.youtube.com/embed/CZq1q0U7nZg?rel=0&modestbranding=1", thumbnail: "https://img.youtube.com/vi/CZq1q0U7nZg/mqdefault.jpg", platform: "youtube" },
+      { id: "s7GCgH2DJY4", title: "WizKid - Bad To Me (Official Video)", url: "https://www.youtube.com/embed/s7GCgH2DJY4?rel=0&modestbranding=1", thumbnail: "https://img.youtube.com/vi/s7GCgH2DJY4/mqdefault.jpg", platform: "youtube" },
     ],
   },
   {
@@ -446,19 +463,6 @@ export function generateArtistDetailFromBase(base: {
       isPlayable: entry.isPlayable,
     }));
 
-  // Find releases from RELEASES that match this artist
-  const releases = RELEASES
-    .filter((rel) => rel.artist.toLowerCase().includes(base.name.toLowerCase()))
-    .map((rel) => ({
-      slug: rel.slug,
-      title: rel.title,
-      artist: rel.artist,
-      artworkUrl: rel.artworkUrl,
-      releaseType: rel.releaseType,
-      year: rel.year,
-      trackCount: rel.trackCount,
-    }));
-
   // Find related artists from same genre
   const artistSlugs = ARTIST_DETAILS.map((a) => a.slug);
   const relatedArtists = ARTIST_DETAILS
@@ -477,7 +481,7 @@ export function generateArtistDetailFromBase(base: {
     isChartArtist: base.isChartArtist,
     bio: base.spotlightBio || `${base.name} is a ${base.genres.join(" / ")} artist from ${base.country || "Africa"}.`,
     chartEntries: chartEntries.length > 0 ? chartEntries : undefined,
-    releases: releases.length > 0 ? releases : undefined,
+    releases: undefined,
     relatedArtists: relatedArtists.length > 0 ? relatedArtists : undefined,
   };
 }

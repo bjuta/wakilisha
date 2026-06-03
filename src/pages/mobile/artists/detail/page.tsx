@@ -196,7 +196,7 @@ export default function MobileArtistDetail() {
                 {artist.releases.map((release) => (
                   <Link
                     key={release.slug}
-                    to={`/releases/${release.slug}`}
+                    to={`/releases/${slug}/${release.slug}`}
                     className="hcard mobile-pressable"
                   >
                     <div className="hcard-art">
@@ -299,7 +299,7 @@ export default function MobileArtistDetail() {
                 {artist.releases.map((release) => (
                   <Link
                     key={release.slug}
-                    to={`/releases/${release.slug}`}
+                    to={`/releases/${slug}/${release.slug}`}
                     className="mobile-pressable overflow-hidden rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)]"
                   >
                     <div className="relative aspect-square bg-[var(--wk-surface-raised)]">

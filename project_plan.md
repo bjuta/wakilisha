@@ -5,6 +5,22 @@ The Chart Ingestion Studio is the admin backend for WAKILISHA's flagship chart p
 
 ## 2. Admin Routes
 
+### Production Engine (New — WordPress-like Admin Shell)
+- `/admin` — Dashboard overview (KPIs, attention items, recent activity, system health)
+- `/admin/content/articles` — Article list view (read-only Phase 1)
+- `/admin/content/guides` — Guide list view
+- `/admin/content/pages` — Page/surface list view
+- `/admin/registry/artists` — Artist list view
+- `/admin/registry/tracks` — Track list view
+- `/admin/registry/releases` — Release list view
+- `/admin/registry/labels` — Label list view
+- `/admin/registry/genres` — Genre list view
+- `/admin/media/library` — Media library
+- `/admin/media/missing` — Missing images
+- `/admin/media/broken` — Broken media links
+- `/admin/review/queue` — Review queue
+- `/admin/imports/jobs` — Import jobs
+
 ### Primary Routes
 - `/admin/charts/dashboard` — KPIs, active jobs, failed jobs, latest editions
 - `/admin/charts/families` — Chart family management
@@ -13,7 +29,7 @@ The Chart Ingestion Studio is the admin backend for WAKILISHA's flagship chart p
 - `/admin/charts/ingest-runs/:runId` — Run detail with live polling + pipeline stages
 - `/admin/charts/editions` — Published editions
 - `/admin/charts/snapshots` — Immutable snapshots
-- `/admin/charts/ingest-health` — **[Sprint 2]** API Health & Endpoint Map
+- `/admin/charts/ingest-health` — API Health & Endpoint Map
 
 ### Operations Routes
 - `/admin/charts/review-queue` — Global review issue queue
@@ -24,6 +40,14 @@ The Chart Ingestion Studio is the admin backend for WAKILISHA's flagship chart p
 - `/admin/charts/public-api-qa` — Public API QA
 - `/admin/charts/ingest-jobs` — Legacy CSV ingest jobs
 - `/admin/charts/ingest-jobs/:jobId` — Legacy job detail wizard
+
+### Settings Routes
+- `/admin/settings` — Settings Hub
+- `/admin/settings/chart-defaults` — Chart defaults
+- `/admin/settings/integrations` — Provider integrations
+- `/admin/settings/frontend-appearance` — Appearance
+- `/admin/settings/navigation` — Navigation
+- `/admin/settings/audit` — Audit log
 
 ## 3. Sprint Progress
 
@@ -41,83 +65,40 @@ The Chart Ingestion Studio is the admin backend for WAKILISHA's flagship chart p
 ### ✅ Sprint 2 — Provider-based runs + API Health page
 - **`runDryRunWp`, `commitIngestRunWp`, etc.** — WP v2 adapter functions for provider-based runs
 - **`INGEST_STUDIO_WP_ENDPOINTS`** — 11 Sprint 2 endpoint definitions with path/method/description
-- **Live polling** on run detail page — auto-polls every 3s while status is `running`/`queued`, stops on terminal status
-- **API Health page** `/admin/charts/ingest-health`:
-  - Plugin health check via `GET /charts/health`
-  - Configuration panel showing mode, API base, nonce status
-  - Per-endpoint probe (GET each endpoint, detect 404 vs auth vs OK)
-  - "Probe All" button that sequences through all ~46 endpoints
-  - Sprint 2 endpoints grouped by domain (Runs / Studio / System)
-  - Sprint 1 legacy endpoints listed separately
-  - Backend developer notes: auth, response shapes, capability requirements
-- **Pipeline progress bar** added to run detail when status = `running`
+- **Live polling** on run detail page
+- **API Health page** `/admin/charts/ingest-health`
+- **Pipeline progress bar** on run detail
 - **Breadcrumb + back nav** on run detail
-- **Source URLs panel** on run detail with link to health page
-- Added "API Health" to secondary nav in `AdminChartsLayout`
+- **Source URLs panel** on run detail
 
 ### ✅ Sprint 3 — Real Provider Fetch + Normalization (COMPLETE)
-
-**New Services:**
-- `spotifyFetch.ts` — Real Spotify API fetch (Client Credentials). Falls back to seeded mock when env vars not set.
-- `appleMusicFetch.ts` — Real Apple Music API fetch. Falls back to seeded mock when token not set.
-- `providerFetch.ts` — Orchestrator: parallel source fetch with partial failure handling.
-- `normalize.ts` — `NormalizedChartRow` → `IngestResolvedRow` with provisional match status + confidence.
-- `mockTracks.ts` — 50+ African tracks (KE/NG/ZA/GH/UG/TZ) deterministically seeded from URL hash.
-
-**Updated:** `ingestStudioMock.ts` dry run pipeline now calls real provider fetch → normalize → provisional match. `ingestStudioMock.ts` no longer returns hardcoded rows.
-
-**Credentials (add to .env.local):**
-```
-VITE_SPOTIFY_CLIENT_ID=...
-VITE_SPOTIFY_CLIENT_SECRET=...
-VITE_APPLE_MUSIC_DEVELOPER_TOKEN=...
-```
-Without credentials: deterministic mock data (same URL = same tracks, reproducible across sessions).
-
-**Partial failure:** One bad source URL does not kill the run. Stage shows `warning` (not `failed`) when partial.
-
-**Raw payloads:** Persisted in `run.notes` as JSON for audit/debugging.
-
-**Edge Function:** `charts-ingest-dry-run` ready to deploy when Supabase is connected (server-side credential storage).
+- `spotifyFetch.ts`, `appleMusicFetch.ts`, `providerFetch.ts`, `normalize.ts`
+- `mockTracks.ts` — 50+ African tracks
+- `ingestStudioMock.ts` dry run pipeline with real provider fetch
+- Partial failure handling
+- Raw payloads persisted in `run.notes`
+- Edge Function `charts-ingest-dry-run` ready
 
 ### ✅ Sprint 4 — Entity Enrichment Hardening + V2 Alignment (COMPLETE)
+- **Canonical Matching Engine** (`canonicalMatch.ts`)
+- **Enrichment Pipeline** (`enrichment.ts`)
+- `checkEnrichmentCredentials()` structured credential errors
+- Updated UI: Pipeline Panel, Provider Health Panel, etc.
 
-**Canonical Matching Engine** (`canonicalMatch.ts`)
-- Real registry search against canonical tracks with ISRC, provider ID, and fuzzy title/artist scoring
-- Deterministic confidence scoring: ISRC = 99%, provider ID = 97%, title+artist strong = ~85%+
-- Proper `matchStatus` assignment: `canonical | shell | no_match | needs_review | duplicate_candidate`
-- Release shell IDs auto-generated for no/low match rows
-- Full match decision API: Accept canonical, Change match, Attach, Create shell, Merge shell, Mark duplicate, Ignore, Send to review
+### ✅ Sprint 5 — Admin Charts Refactor + V2 Charts Integration (IN PROGRESS)
+- V2 ontology alignment
+- V2 endpoint map for public API
+- V2 data connection via `v2Adapter.ts`
 
-**Enrichment Pipeline** (`enrichment.ts`)
-- Spotify Web API enrichment (artwork, preview, ISRC, popularity, label)
-- Apple Music JWT preview enrichment
-- ACRCloud audio fingerprint/metadata with server-side proxy note
-- YouTube oEmbed/search for video IDs and preview URLs
-- All 4 providers fail gracefully — exact env var names shown in UI when missing
-- `checkEnrichmentCredentials()` returns structured `CredentialError[]` with exact var names
-
-**Updated UI:** Pipeline Panel, Provider Health Panel, Run Metadata Panel, Resolved Rows Table, PublishChecklist, MatchSummary — all real, no stubs.
-
-### 🔄 Sprint 5 — Admin Charts Refactor + V2 Charts Integration (IN PROGRESS)
-
-**Goals:**
-1. Align all admin/charts/* pages with V2 ontology (ChartSeries, ChartMarket, ChartProgram, ChartEdition)
-2. Migrate all admin pages from `ri-*` + `var(--wk-*)` inline CSS to `WkIcon` + `wk-*` Tailwind tokens
-3. Connect `public-api-qa` page to test V2 endpoints (not just V1)
-4. Surface V2 endpoints prominently in `integration-map` page
-5. Connect `editions` page to real V2 data via `v2Adapter.ts`
-6. Update `families` page to use V2 program terminology (series + market structure)
-7. Fix route conflict: remove `/admin/charts/ingest/:runId` duplicate (use `ingest-runs/:runId` only)
-8. Ensure every page uses `WkIcon` (Lucide) — no `ri-*` remains in admin/charts
-
-**V2 Ontology Reference:**
-| V2 Concept | Old Name | V2 Public Slug |
-|---|---|---|
-| ChartSeries | family type | `top-songs`, `rnb`, `gengetone`, `2026-releases` |
-| ChartMarket | region | `kenya`, `nigeria`, `south-africa` |
-| ChartProgram | chart family | `top-songs-kenya`, `rnb-kenya` |
-| ChartEdition | edition | `rnb-2026-05-18` |
+### ✅ Phase 1 — Admin Shell + Dashboard + Read-only Visibility (NEW)
+- **AdminShell** layout with full sidebar navigation (11 sections: Dashboard, Content, Charts, Registry, Commerce, Media, Relationships, Review, Imports, Settings, Tools)
+- **Dashboard** with real Supabase counts, KPI cards, attention items, recent activity, quick actions, system health
+- **Read-only list views** for Articles, Guides, Pages, Artists, Tracks, Releases, Labels, Genres
+- **Media Library** with real media assets
+- **Review Queue** linking to charts review queue
+- **Import Jobs** with real ingestion runs
+- **Routing** wired under `/admin/*`
+- **Admin link** added to public site top bar
 
 ## 4. Adapter Architecture
 
@@ -132,50 +113,7 @@ normalizers.ts (camelCase ↔ snake_case)
 contracts.ts (shape assertions in DEV)
 ```
 
-## 5. WordPress Backend Contract (for backend dev handoff)
-
-### Authentication
-All endpoints require `X-WP-Nonce` header injected via `wp_localize_script` as `window.WAKILISHA_REST_NONCE`.
-
-### Capabilities
-- `read_wakilisha_charts` — GET endpoints
-- `edit_wakilisha_charts` — PATCH/PUT mutations
-- `create_wakilisha_charts` — POST creation endpoints
-- `publish_wakilisha_charts` — publish/draft endpoints
-- `delete_wakilisha_charts` — DELETE endpoints
-
-### Sprint 2 Endpoints (v2 paths — corrected in audit)
-| Method | Path | Frontend function |
-|--------|------|-------------------|
-| GET | /wp-json/wakilisha/v2/charts/ingest/runs | `getIngestRunsWp()` |
-| GET | /wp-json/wakilisha/v2/charts/ingest/runs/{runId} | `getIngestRunWp(runId)` |
-| POST | /wp-json/wakilisha/v2/charts/ingest/dry-run | `runDryRunWp(request)` |
-| POST | /wp-json/wakilisha/v2/charts/ingest/runs/{runId}/commit | `commitIngestRunWp(request)` |
-| POST | /wp-json/wakilisha/v2/charts/ingest/runs/{runId}/cancel | `cancelIngestRunWp(runId)` |
-| POST | /wp-json/wakilisha/v2/charts/ingest/runs/{runId}/retry | `retryIngestRunWp(runId)` |
-| POST | /wp-json/wakilisha/v2/charts/ingest/runs/{runId}/send-gaps | `sendGapsToReviewWp(runId)` |
-| GET | /wp-json/wakilisha/v2/charts/ingest/runs/{runId}/resource-guard | `getResourceGuardStatusWp(runId)` |
-| GET | /wp-json/wakilisha/v2/charts/ingest/kpis | `getIngestKpisWp()` |
-| GET | /wp-json/wakilisha/v2/charts/ingest/activity | `getRecentIngestActivityWp()` |
-| GET | /wp-json/wakilisha/v2/charts/health | `getIngestHealthWp()` |
-
-### Error Response Shape
-```json
-{ "error": "Human-readable message", "code": "machine_code", "retryable": false }
-```
-
-### Run Response Shape
-```json
-{
-  "runId": "string",
-  "status": "dry_run_complete",
-  "stages": [{ "stage": "validate", "status": "done", "durationMs": 120 }],
-  "summary": { "totalRows": 410, "canonicalMatches": 342, "shells": 28, "gaps": 24, "matchRate": 83.4 },
-  "rows": [{ "id": "row-001", "rank": 1, "title": "...", "matchStatus": "canonical", "confidence": 98 }]
-}
-```
-
-## 6. V2 Endpoint Map (Sprint 5+)
+## 5. V2 Endpoint Map (Sprint 5+)
 
 | Method | Path | Frontend function |
 |---|---|---|
@@ -187,3 +125,67 @@ All endpoints require `X-WP-Nonce` header injected via `wp_localize_script` as `
 | GET | /wp-json/wakilisha/v2/charts/resolve/{slug} | `resolveV2Alias(slug)` |
 | GET | /wp-json/wakilisha/v2/tracks/{trackSlug}/chart-history | `getV2TrackChartHistory(slug)` |
 | GET | /wp-json/wakilisha/v2/charts/health | `testPublicV2Connection()` |
+
+## 6. Phase Plan (PDF-aligned)
+
+### Phase 1: Admin Shell and Visibility ✅
+- Build: AdminShell layout with sidebar navigation
+- Build: Dashboard overview with summary cards + real counts
+- Build: Read-only list views for Articles, Artists, Tracks, Releases, Labels, Genres, Guides, Pages
+- Build: Detail view placeholders
+- Build: Search/filter basics
+- Build: Import job visibility
+- Build: Review queue visibility
+- Build: Settings visibility
+- **Goal:** We can see and inspect all content
+
+### ✅ Phase 2: Editable Content and Registry (COMPLETE)
+- **Article editor** ✅ — title, slug, excerpt, body HTML, author, status, categories, tags, SEO, publish/draft, save, delete
+- **Artist editor** ✅ — display_name, sort_name, bio, artist_type, gender, origin_iso2, image_url, status
+- **Track editor** ✅ — title, ISRC, duration_ms, explicit, track_number, disc_number, artwork_url, preview_url, status
+- **Release editor** ✅ — title, release_type, UPC, release_date, date_precision, label_id, description, artwork_url, status
+- **Label editor** ✅ — name, description, country_code, status
+- **Genre editor** ✅ — name, parent_genre_id, description, status
+- **All editors** support: draft save, status toggle, unsaved changes warning, keyboard shortcuts (Cmd+S), archive/delete, toast notifications, image preview, audio preview (tracks)
+- **Goal:** All imported content is now editable in the admin
+
+### ✅ Phase 3: Import Management (COMPLETE)
+- Build: Upload ZIP page with drag-drop, file validation, progress tracking
+- Build: Import Job Detail page with Validate→Stage→Promote pipeline visualization
+- Build: Import Reports page with summary stats and entity breakdowns
+- Build: Staging Records page with status filtering
+- Build: Failed Records page with individual retry and bulk retry
+- Build: All routes wired under /admin/imports/*
+- Build: Sidebar items enabled for all import sections
+- **Goal:** Clean WordPress export can be safely imported
+
+### ✅ Phase 4: Relationship and Repair Workflows (COMPLETE)
+- Build: Entity Relationship Viewer with graph + table views, filtering, search, entity type stats
+- Build: Duplicate Merge page with candidate list, confidence scores, match fields, merge/reject actions, confirmation modal, undo support
+- Build: Resolution run stats panel (total rows, resolved, review, shells, duplicates)
+- Enhance: Missing Images page with status tracking (pending/in-progress/resolved/skipped), priority indicators, bulk actions, batch upload modal, search/filter, resolve/skip/reopen actions
+- Enhance: Broken Links page with full scanner, repair workflow, auto-fix with suggested replacements, bulk actions, status tracking, last-checked timestamps
+- Enable: Relationships sidebar items (Entity Relationships, Duplicate Merge) - no more "Soon" badges
+- Enable: Media sidebar items with updated badge counts
+- **Goal:** Imported data can be repaired and improved
+
+### ✅ Phase 5: Publishing Workflow (COMPLETE)
+- Build: Publishing Dashboard — unified view of all content by status (draft, published, pending, trashed) with KPI cards and filtering
+- Build: Content Archive — trashed content with restore (individual + bulk) and type filtering
+- Build: Revision History component — expandable mock revision list with version numbers, editor info, change summaries, diff preview, and restore confirmation
+- Build: SEO/Social Preview component — Google search result, Facebook Open Graph, Twitter/X card previews with tab switcher and SEO score checker
+- Build: Publishing Timeline component — visual workflow status (Draft → Review → Scheduled → Published → Archived → Trashed) with animated indicators
+- Enhance: Article editor meta panel with collapsible sections for Publishing Timeline, SEO Preview, and Revision History
+- All routes wired under /admin/content/*
+- Sidebar items enabled (Publishing, Archive)
+- **Goal:** WAKILISHA can resume full content production with visibility, SEO, and version control
+
+### ⏳ Phase 6: Advanced Production Tools (NEXT)
+- Build: Content templates
+- Build: Homepage/module manager
+- Build: Collections
+- Build: Related content suggestions
+- Build: Bulk editorial workflows
+- Build: Analytics hooks
+- Build: Media download/mirroring jobs
+- **Goal:** Admin becomes a mature production engine

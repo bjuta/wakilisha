@@ -27,7 +27,6 @@ export function AppLayout() {
             <nav className="flex flex-wrap gap-x-8 gap-y-2 text-[13px] text-[var(--wk-text-muted)]">
               <Link to="/charts" className="hover:text-[var(--wk-text)]">Charts</Link>
               <Link to="/artists" className="hover:text-[var(--wk-text)]">Artists</Link>
-              <Link to="/releases" className="hover:text-[var(--wk-text)]">Releases</Link>
               <Link to="/genres" className="hover:text-[var(--wk-text)]">Genres</Link>
               <Link to="/labels" className="hover:text-[var(--wk-text)]">Labels</Link>
               <Link to="/magazine" className="hover:text-[var(--wk-text)]">Magazine</Link>

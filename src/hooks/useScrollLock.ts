@@ -3,32 +3,31 @@ import { useEffect, useRef } from "react";
 let lockCount = 0;
 let originalStyles: {
   overflow: string;
-  position: string;
-  top: string;
-  width: string;
+  paddingRight: string;
   touchAction: string;
 } | null = null;
 let scrollY = 0;
+
+function getScrollbarWidth() {
+  return window.innerWidth - document.documentElement.clientWidth;
+}
 
 function lock() {
   if (lockCount === 0) {
     const body = document.body;
     const html = document.documentElement;
+    const scrollbarWidth = getScrollbarWidth();
 
     scrollY = window.scrollY || html.scrollTop || body.scrollTop || 0;
 
     originalStyles = {
       overflow: body.style.overflow,
-      position: body.style.position,
-      top: body.style.top,
-      width: body.style.width,
+      paddingRight: body.style.paddingRight,
       touchAction: body.style.touchAction,
     };
 
+    body.style.paddingRight = scrollbarWidth > 0 ? `${scrollbarWidth}px` : "";
     body.style.overflow = "hidden";
-    body.style.position = "fixed";
-    body.style.top = `-${scrollY}px`;
-    body.style.width = "100%";
     body.style.touchAction = "none";
     html.style.overflow = "hidden";
   }
@@ -44,28 +43,23 @@ function unlock() {
     const html = document.documentElement;
 
     body.style.overflow = originalStyles.overflow;
-    body.style.position = originalStyles.position;
-    body.style.top = originalStyles.top;
-    body.style.width = originalStyles.width;
+    body.style.paddingRight = originalStyles.paddingRight;
     body.style.touchAction = originalStyles.touchAction;
     html.style.overflow = "";
 
-    window.scrollTo(0, scrollY);
+    // Restore scroll position in case the browser reset it
+    window.scrollTo({ top: scrollY, left: 0, behavior: "auto" });
     originalStyles = null;
   }
 }
 
 function preventTouchMove(event: TouchEvent) {
-  // Allow scrolling inside the locked overlay itself
-  // Only block touchmove on the body/html when scrolling would affect the background
   const target = event.target as HTMLElement;
   const scrollableParent = target.closest('[data-scroll-lock="container"]');
   if (scrollableParent) {
-    // Check if the element is actually scrollable
     const style = window.getComputedStyle(scrollableParent);
     const overflowY = style.overflowY;
     if (overflowY === "auto" || overflowY === "scroll") {
-      // Check if we're at the boundaries
       const isAtTop = scrollableParent.scrollTop <= 0;
       const isAtBottom =
         scrollableParent.scrollTop + scrollableParent.clientHeight >= scrollableParent.scrollHeight;
@@ -78,8 +72,6 @@ function preventTouchMove(event: TouchEvent) {
       return;
     }
   }
-
-  // If no scrollable parent found, prevent the touch
   event.preventDefault();
 }
 

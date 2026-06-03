@@ -5,7 +5,6 @@ import { useTheme } from "@/components/design-system/theme/ThemeProvider";
 const NAV_LINKS = [
   { label: "Charts", to: "/charts" },
   { label: "Artists", to: "/artists" },
-  { label: "Releases", to: "/releases" },
   { label: "Genres", to: "/genres" },
   { label: "Labels", to: "/labels" },
   { label: "Magazine", to: "/magazine" },
@@ -48,6 +47,12 @@ export function AppTopBar() {
               {link.label}
             </Link>
           ))}
+          <Link
+            to="/admin"
+            className="rounded-full px-3 py-1.5 text-[13px] font-semibold text-[var(--wk-brand)] transition-all hover:bg-[var(--wk-brand-soft)] whitespace-nowrap"
+          >
+            Admin
+          </Link>
         </nav>
 
         <div className="flex items-center gap-2">
@@ -86,6 +91,13 @@ export function AppTopBar() {
                   {link.label}
                 </Link>
               ))}
+              <Link
+                to="/admin"
+                onClick={closeMobile}
+                className="rounded-lg px-3 py-3 text-[14px] font-semibold text-[var(--wk-brand)] hover:bg-[var(--wk-brand-soft)] active:scale-[0.98] active:opacity-80 transition-all"
+              >
+                Admin
+              </Link>
             </nav>
           </div>
         </>

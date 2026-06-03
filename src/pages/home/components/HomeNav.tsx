@@ -10,7 +10,6 @@ interface HomeNavProps {
 const NAV_LINKS = [
   { label: "Charts", to: "/charts" },
   { label: "Artists", to: "/artists" },
-  { label: "Releases", to: "/releases" },
   { label: "Genres", to: "/genres" },
   { label: "Labels", to: "/labels" },
   { label: "Magazine", to: "/magazine" },

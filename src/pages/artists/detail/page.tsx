@@ -9,6 +9,7 @@ import { ArtistDiscography } from "./components/ArtistDiscography";
 import { RelatedArtistsShelf } from "./components/RelatedArtistsShelf";
 import { ArtistTopSongs } from "./components/ArtistTopSongs";
 import { ArtistBioSection } from "./components/ArtistBioSection";
+import { ArtistVideos } from "./components/ArtistVideos";
 
 export default function ArtistDetail() {
   const { slug } = useParams<{ slug: string }>();
@@ -86,6 +87,7 @@ export default function ArtistDetail() {
   const hasRelated = artist.relatedArtists.length > 0;
   const hasTopSongs = artist.topSongs.length > 0;
   const hasBio = artist.bio || artist.fullBio;
+  const hasVideos = artist.videos && artist.videos.length > 0;
 
   return (
     <div className="wk-app-shell">
@@ -136,6 +138,11 @@ export default function ArtistDetail() {
           {/* Discography */}
           {hasReleases && (
             <ArtistDiscography releases={artist.releases} />
+          )}
+
+          {/* Videos */}
+          {hasVideos && (
+            <ArtistVideos videos={artist.videos} />
           )}
 
           {/* Chart Entries */}

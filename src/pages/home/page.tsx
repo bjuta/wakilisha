@@ -13,6 +13,7 @@ import {
   listArtists,
   listReleases,
   listMagazineStories,
+  releaseUrl,
   type RepairedArtist,
   type RepairedRelease,
   type RepairedStory,
@@ -536,7 +537,7 @@ export default function Home() {
             eyebrow="Fresh"
             title="New releases"
             action="All releases"
-            actionHref="/releases"
+            actionHref="/search"
           />
 
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
@@ -556,7 +557,7 @@ export default function Home() {
               : recentReleases.map((release) => (
                   <Link
                     key={release.slug}
-                    to={`/releases/${release.slug}`}
+                  to={releaseUrl(release)}
                     className="group block rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] overflow-hidden transition-all hover:border-[var(--wk-border-2)]"
                   >
                     <div className="relative aspect-square bg-[var(--wk-surface-raised)]">

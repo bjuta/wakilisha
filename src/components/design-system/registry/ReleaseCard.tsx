@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { WkTag } from "@/components/design-system/primitives/Tag";
+import { releaseUrl } from "@/services/repairedContent/client";
 
 export interface ReleaseCardProps {
   slug: string;
@@ -28,7 +29,7 @@ export function ReleaseCard({
 }: ReleaseCardProps) {
   return (
     <div className="group relative rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] overflow-hidden transition-all hover:border-[var(--wk-border-2)]">
-      <Link to={`/releases/${slug}`} className="block">
+      <Link to={releaseUrl({ slug, artist })} className="block">
         <div className="relative aspect-square bg-[var(--wk-surface-raised)]">
           {artworkUrl ? (
             <img

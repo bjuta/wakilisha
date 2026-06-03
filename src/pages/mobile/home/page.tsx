@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { usePlayer } from "@/context/PlayerContext";
 import { WkIcon } from "@/components/design-system/Icon";
+import { slugify } from "@/services/repairedContent/client";
 import {
   HOME_CHART_ENTRIES,
   HOME_FEATURED_ARTISTS,
@@ -196,11 +197,11 @@ export default function MobileHome() {
       <section className="home-section">
         <div className="home-section-header">
           <div className="home-section-title">Recent releases</div>
-          <Link to="/releases" className="home-section-more">Releases</Link>
+          <Link to="/search" className="home-section-more">Releases</Link>
         </div>
         <div className="home-shelf">
           {HOME_RECENT_RELEASES.map((release) => (
-            <Link key={release.slug} to={`/releases/${release.slug}`} className="hcard mobile-pressable">
+            <Link key={release.slug} to={`/releases/${slugify(release.artist)}/${release.slug}`} className="hcard mobile-pressable">
               <div className="hcard-art"><img src={release.artworkUrl} alt="" /></div>
               <div className="hcard-title">{release.title}</div>
               <div className="hcard-sub">{release.artist}</div>

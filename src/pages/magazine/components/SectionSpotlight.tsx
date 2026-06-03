@@ -1,72 +1,57 @@
 import { Link } from "react-router-dom";
-import { WkTag } from "@/components/design-system/primitives/Tag";
+import type { RepairedStory } from "@/services/repairedContent/client";
 
-interface SectionStory {
-  slug: string;
-  title: string;
-  section: string;
-  date: string;
-  readingTime?: number;
-  heroUrl?: string;
-  author: string;
+interface SectionSpotlightProps {
+  stories: RepairedStory[];
 }
 
-interface WkSectionSpotlightProps {
-  stories: SectionStory[];
-}
+export function SectionSpotlight({ stories }: SectionSpotlightProps) {
+  if (!stories.length) return null;
 
-export function WkSectionSpotlight({ stories }: WkSectionSpotlightProps) {
   const sectionMap = stories.reduce((acc, story) => {
     if (!acc[story.section]) acc[story.section] = [];
     acc[story.section].push(story);
     return acc;
-  }, {} as Record<string, SectionStory[]>);
+  }, {} as Record<string, RepairedStory[]>);
 
   const sections = Object.keys(sectionMap).sort();
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <div className="wk-eyebrow">Latest by section</div>
+    <section className="mag-spotlight-v2">
+      <div className="mag-spotlight-v2-header">
+        <div className="mag-spotlight-v2-eyebrow">By section</div>
+        <h2 className="mag-spotlight-v2-heading">Browse by topic</h2>
       </div>
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+
+      <div className="mag-spotlight-v2-grid">
         {sections.map((section) => {
           const sectionStories = sectionMap[section].slice(0, 3);
           return (
-            <div
-              key={section}
-              className="rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4"
-            >
-              <div className="mb-3 flex items-center justify-between">
-                <WkTag variant="brand">{section}</WkTag>
-                <span className="text-[11px] text-[var(--wk-text-faint)]">
+            <div key={section} className="mag-spotlight-v2-card">
+              <div className="mag-spotlight-v2-card-header">
+                <span className="mag-spotlight-v2-section-name">{section}</span>
+                <span className="mag-spotlight-v2-count">
                   {sectionMap[section].length} stories
                 </span>
               </div>
-              <div className="space-y-3">
+              <div className="mag-spotlight-v2-stories">
                 {sectionStories.map((story) => (
                   <Link
                     key={story.slug}
                     to={`/magazine/${story.slug}`}
-                    className="group flex items-start gap-3"
+                    className="mag-spotlight-v2-story"
                   >
-                    {story.heroUrl && (
-                      <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-[var(--wk-surface-raised)]">
-                        <img
-                          src={story.heroUrl}
-                          alt={story.title}
-                          className="h-full w-full object-cover object-top transition-transform duration-[var(--wk-d-fast)] group-hover:scale-105"
-                        />
-                      </div>
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <h4 className="line-clamp-2 text-[12px] font-bold leading-snug text-[var(--wk-text)]">
+                    <div className="mag-spotlight-v2-story-image">
+                      <img src={story.heroUrl} alt="" />
+                    </div>
+                    <div className="mag-spotlight-v2-story-content">
+                      <h4 className="mag-spotlight-v2-story-title">
                         {story.title}
                       </h4>
-                      <div className="mt-1 flex items-center gap-2 text-[11px] text-[var(--wk-text-faint)]">
+                      <div className="mag-spotlight-v2-story-meta">
                         <span>{story.author}</span>
-                        <span>·</span>
-                        <span>{story.date}</span>
+                        <span className="mag-spotlight-v2-meta-sep">·</span>
+                        <span>{story.readingTime} min</span>
                       </div>
                     </div>
                   </Link>
@@ -76,6 +61,6 @@ export function WkSectionSpotlight({ stories }: WkSectionSpotlightProps) {
           );
         })}
       </div>
-    </div>
+    </section>
   );
 }

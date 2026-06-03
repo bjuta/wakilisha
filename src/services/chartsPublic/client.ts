@@ -13,6 +13,8 @@ import {
   type PublicChartCacheSource,
 } from "./cache";
 
+import { supabase } from "@/lib/supabase";
+
 import {
   MOCK_FAMILIES,
   MOCK_TRACK_HISTORY,
@@ -37,50 +39,6 @@ import {
 export const PUBLIC_API_BASE = import.meta.env.VITE_WAKILISHA_PUBLIC_API_BASE || "/__wakilisha-v2-api/wp-json/wakilisha/v2";
 export const PUBLIC_MODE = "api-first" as const;
 export const PUBLIC_API_VERSION = "runtime" as const;
-
-type ApiRow = Record<string, unknown>;
-
-type ApiProgram = ApiRow & {
-  id?: string;
-  publicSlug?: string;
-  publicLabel?: string;
-  shortLabel?: string | null;
-  sourceFamilySlug?: string | null;
-  seriesSlug?: string;
-  seriesLabel?: string;
-  marketSlug?: string;
-  marketLabel?: string;
-  periodType?: string | null;
-  methodologyVersion?: string | null;
-  eligibilityRulesVersion?: string | null;
-  latestEdition?: ApiEdition | null;
-  archive?: ApiEdition[];
-};
-
-type ApiEdition = ApiRow & {
-  id?: string;
-  slug?: string;
-  label?: string;
-  date?: string;
-  periodStart?: string | null;
-  periodEnd?: string | null;
-  entryCount?: number;
-};
-
-type ApiEntry = ApiRow & {
-  id?: string;
-  editionId?: string;
-  rank?: number;
-  previousRank?: number | null;
-  movement?: string;
-  trackSlug?: string | null;
-  trackTitle?: string;
-  artistSlugs?: string[];
-  artistNames?: string[];
-  artworkUrl?: string | null;
-  score?: number | null;
-  sourceEntryId?: string;
-};
 
 export class PublicChartsApiError extends Error {
   status: number;
@@ -115,26 +73,8 @@ function localMeta(): ChartFetchMeta {
   return { source: "local", fetchedAt: now(), isStale: false };
 }
 
-async function fetchPublicApi<T>(path: string): Promise<T> {
-  const base = PUBLIC_API_BASE.replace(/\/$/, "");
-  const target = `${base}${path.startsWith("/") ? path : `/${path}`}`;
-  const response = await fetch(target, { headers: { Accept: "application/json" } });
-
-  if (!response.ok) {
-    throw new PublicChartsApiError(
-      `Public charts API request failed: ${response.status}`,
-      response.status,
-      "public_charts_api_failed",
-      response.status >= 500
-    );
-  }
-
-  const payload = await response.json() as { data?: T };
-  if (!payload || !("data" in payload)) {
-    throw new PublicChartsApiError("Public charts API returned an invalid payload.", 502, "public_charts_invalid_payload", true);
-  }
-
-  return payload.data as T;
+function apiMeta(): ChartFetchMeta {
+  return { source: "api", fetchedAt: now(), isStale: false };
 }
 
 function cacheMeta(entry: {
@@ -147,10 +87,6 @@ function cacheMeta(entry: {
     fetchedAt: new Date(entry.fetchedAt).toISOString(),
     isStale: entry.isStale,
   };
-}
-
-async function csvPublicDataAvailable(): Promise<boolean> {
-  return hasCsvPublicChartData();
 }
 
 async function withCache<T>(
@@ -187,10 +123,6 @@ function asNumber(value: unknown, fallback = 0): number {
   return Number.isFinite(next) ? next : fallback;
 }
 
-function asArray(value: unknown): string[] {
-  return Array.isArray(value) ? value.map((item) => String(item)).filter(Boolean) : [];
-}
-
 function asPeriodType(value: unknown): ChartFamily["periodType"] {
   return value === "daily" || value === "monthly" || value === "yearly" || value === "evergreen" ? value : "weekly";
 }
@@ -203,79 +135,113 @@ function asMovement(value: unknown): ChartEditionEntry["movement"] {
   return value === "up" || value === "down" || value === "same" || value === "new" || value === "re_entry" ? value : "same";
 }
 
-function toChartFamilyFromApi(program: ApiProgram): ChartFamily {
-  const publicSlug = asString(program.publicSlug, asString(program.id, "chart"));
-  const publicLabel = asString(program.publicLabel, publicSlug);
-  const periodType = asPeriodType(program.periodType);
+function resolveSeriesLabel(slug: string | null | undefined): string {
+  if (!slug) return "Series";
+  switch (slug) {
+    case "weekly": return "Weekly";
+    case "monthly": return "Monthly";
+    case "yearly": return "Yearly";
+    case "decade": return "Decade";
+    case "all-time": return "All-Time";
+    case "event": return "Event";
+    default: return slug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+}
+
+function resolveMarketLabel(slug: string | null | undefined): string {
+  if (!slug) return "Kenya";
+  switch (slug) {
+    case "ke": return "Kenya";
+    case "ng": return "Nigeria";
+    case "gh": return "Ghana";
+    case "sa": return "South Africa";
+    case "tz": return "Tanzania";
+    case "ug": return "Uganda";
+    default: return slug.toUpperCase();
+  }
+}
+
+function dbProgramToChartFamily(p: Record<string, unknown>): ChartFamily {
+  const publicSlug = asString(p.public_slug, asString(p.id, "chart"));
+  const publicLabel = asString(p.label, publicSlug);
+  const periodType = asPeriodType(p.default_period_type);
+  const seriesSlug = asString(p.series_slug, publicSlug);
+  const marketSlug = asString(p.market_slug, "kenya");
 
   return {
-    id: asString(program.id, publicSlug),
+    id: asString(p.id, publicSlug),
     familyKey: publicSlug,
     label: publicLabel,
     description: "",
-    defaultChartSize: asNumber(program.latestEdition?.entryCount, 100),
-    defaultRegion: asString(program.marketLabel, asString(program.marketSlug, "Kenya")),
-    editionFrequency: asEditionFrequency(program.periodType),
-    defaultRuleset: asString(program.eligibilityRulesVersion, "legacy-import-v1"),
-    defaultScoringModel: asString(program.methodologyVersion, "legacy-import-v1"),
+    defaultChartSize: asNumber(p.default_chart_size, 100),
+    defaultRegion: resolveMarketLabel(marketSlug),
+    editionFrequency: asEditionFrequency(p.default_period_type),
+    defaultRuleset: "legacy-import-v1",
+    defaultScoringModel: asString(p.default_methodology_version, "legacy-import-v1"),
     createdAt: "",
     updatedAt: "",
     slug: publicSlug,
-    sourceFamilySlug: asString(program.sourceFamilySlug, publicSlug),
-    seriesSlug: asString(program.seriesSlug, publicSlug),
-    seriesLabel: asString(program.seriesLabel, publicLabel),
-    marketSlug: asString(program.marketSlug, "kenya"),
-    marketLabel: asString(program.marketLabel, "Kenya"),
+    sourceFamilySlug: publicSlug,
+    seriesSlug,
+    seriesLabel: resolveSeriesLabel(seriesSlug),
+    marketSlug,
+    marketLabel: resolveMarketLabel(marketSlug),
     publicSlug,
     publicLabel,
-    shortLabel: asString(program.shortLabel, publicLabel),
+    shortLabel: publicLabel,
     chartMode: "data",
     periodType,
-    methodologyVersion: asString(program.methodologyVersion, "legacy-import-v1"),
-    eligibilityRulesVersion: asString(program.eligibilityRulesVersion, "legacy-import-v1"),
+    methodologyVersion: asString(p.default_methodology_version, "legacy-import-v1"),
+    eligibilityRulesVersion: "legacy-import-v1",
     legacySlugs: [],
   };
 }
 
-function toChartEditionFromApi(edition: ApiEdition, familyId: string): ChartEdition {
-  const slug = asString(edition.slug, asString(edition.id, "edition"));
-  const date = asString(edition.date);
+function dbEditionToChartEdition(e: Record<string, unknown>, familyId: string): ChartEdition {
+  const slug = asString(e.edition_slug, asString(e.id, "edition"));
+  const date = asString(e.edition_date);
   return {
-    id: asString(edition.id, slug),
+    id: asString(e.id, slug),
     familyId,
     slug,
-    label: asString(edition.label, slug),
+    label: asString(e.edition_label, slug),
     date,
-    periodStart: asString(edition.periodStart, date),
-    periodEnd: asString(edition.periodEnd, date),
+    periodStart: asString(e.period_start, date),
+    periodEnd: asString(e.period_end, date),
     status: "published",
     ingestJobId: null,
     publishedAt: null,
     publishedBy: null,
-    entryCount: asNumber(edition.entryCount),
+    entryCount: asNumber(e.entry_count),
     newEntries: 0,
     reEntries: 0,
   };
 }
 
-function toChartEntryFromApi(entry: ApiEntry, editionId: string): ChartEditionEntry {
-  const trackSlug = asString(entry.trackSlug);
+function dbEntryToChartEditionEntry(e: Record<string, unknown>, editionId: string): ChartEditionEntry {
+  const trackSlug = asString(e.track_slug);
+  const artistName = asString(e.artist_name);
+  const artistSlug = asString(e.artist_slug);
   return {
-    id: asString(entry.id, asString(entry.sourceEntryId, `${editionId}-${entry.rank ?? "entry"}`)),
-    editionId: asString(entry.editionId, editionId),
-    rank: asNumber(entry.rank),
-    previousRank: entry.previousRank === null || entry.previousRank === undefined ? null : asNumber(entry.previousRank),
-    movement: asMovement(entry.movement),
+    id: asString(e.id, `${editionId}-${e.rank ?? "entry"}`),
+    editionId,
+    rank: asNumber(e.rank),
+    previousRank: e.previous_rank === null || e.previous_rank === undefined ? null : asNumber(e.previous_rank),
+    movement: asMovement(e.movement),
     peakPosition: null,
     weeksOnChart: null,
     trackSlug,
-    trackTitle: asString(entry.trackTitle, trackSlug),
-    artistSlugs: asArray(entry.artistSlugs),
-    artistNames: asArray(entry.artistNames),
-    artworkUrl: asString(entry.artworkUrl) || null,
-    score: entry.score === null || entry.score === undefined ? 0 : asNumber(entry.score),
-    entryPayload: entry,
+    trackTitle: asString(e.track_title, trackSlug),
+    artistSlugs: artistSlug ? [artistSlug] : artistName ? [artistName.toLowerCase().replace(/\s+/g, "-")] : [],
+    artistNames: artistName ? [artistName] : [],
+    artworkUrl: asString(e.artwork_url) || null,
+    score: e.score === null || e.score === undefined ? 0 : asNumber(e.score),
+    entryPayload: e,
   };
+}
+
+async function csvPublicDataAvailable(): Promise<boolean> {
+  return hasCsvPublicChartData();
 }
 
 async function fallbackFamilies(): Promise<ChartFamily[]> {
@@ -311,8 +277,14 @@ async function fallbackEntries(familySlug: string, editionSlug: string): Promise
 export function getChartFamilies(): Promise<ChartResult<ChartFamily[]>> {
   return withCache("chart_families_runtime", async () => {
     try {
-      const api = await fetchPublicApi<{ programs: ApiProgram[] }>("/charts");
-      return { data: (api.programs ?? []).map(toChartFamilyFromApi), source: "api" };
+      const { data: programs, error } = await supabase
+        .from("chart_programs")
+        .select("id, public_slug, label, series_slug, market_slug, default_chart_size, default_period_type, default_methodology_version, status")
+        .eq("status", "active")
+        .order("label", { ascending: true });
+
+      if (error) throw new PublicChartsApiError(error.message, 500, "supabase_error");
+      return { data: (programs ?? []).map(dbProgramToChartFamily), source: "api" };
     } catch {
       return { data: await fallbackFamilies(), source: "local" };
     }
@@ -322,8 +294,15 @@ export function getChartFamilies(): Promise<ChartResult<ChartFamily[]>> {
 export function getChartFamily(familySlug: string): Promise<ChartResult<ChartFamily | null>> {
   return withCache(`chart_family_runtime_${familySlug}`, async () => {
     try {
-      const api = await fetchPublicApi<{ program: ApiProgram }>(`/charts/${encodeURIComponent(familySlug)}`);
-      return { data: api.program ? toChartFamilyFromApi(api.program) : null, source: "api" };
+      const { data: program, error } = await supabase
+        .from("chart_programs")
+        .select("id, public_slug, label, series_slug, market_slug, default_chart_size, default_period_type, default_methodology_version, status")
+        .eq("public_slug", familySlug)
+        .eq("status", "active")
+        .maybeSingle();
+
+      if (error) throw new PublicChartsApiError(error.message, 500, "supabase_error");
+      return { data: program ? dbProgramToChartFamily(program) : null, source: "api" };
     } catch {
       const family = await fallbackFamily(familySlug);
       return { data: family ? { ...family } : null, source: "local" };
@@ -334,9 +313,25 @@ export function getChartFamily(familySlug: string): Promise<ChartResult<ChartFam
 export function getChartEditionsForFamily(familySlug: string): Promise<ChartResult<ChartEdition[]>> {
   return withCache(`chart_family_editions_runtime_${familySlug}`, async () => {
     try {
-      const api = await fetchPublicApi<{ program: ApiProgram }>(`/charts/${encodeURIComponent(familySlug)}`);
-      const familyId = asString(api.program?.publicSlug, familySlug);
-      return { data: (api.program?.archive ?? []).map((edition) => toChartEditionFromApi(edition, familyId)), source: "api" };
+      const { data: program, error: progError } = await supabase
+        .from("chart_programs")
+        .select("id, public_slug")
+        .eq("public_slug", familySlug)
+        .eq("status", "active")
+        .maybeSingle();
+
+      if (progError) throw new PublicChartsApiError(progError.message, 500, "supabase_error");
+      if (!program) return { data: [], source: "api" };
+
+      const { data: editions, error: edError } = await supabase
+        .from("chart_editions")
+        .select("id, edition_slug, edition_label, edition_date, period_start, period_end, entry_count, status")
+        .eq("program_id", program.id)
+        .eq("status", "published")
+        .order("edition_date", { ascending: false });
+
+      if (edError) throw new PublicChartsApiError(edError.message, 500, "supabase_error");
+      return { data: (editions ?? []).map((e) => dbEditionToChartEdition(e, familySlug)), source: "api" };
     } catch {
       return { data: await fallbackEditionsForFamily(familySlug), source: "local" };
     }
@@ -346,9 +341,27 @@ export function getChartEditionsForFamily(familySlug: string): Promise<ChartResu
 export function getLatestChartEdition(familySlug: string): Promise<ChartResult<ChartEdition | null>> {
   return withCache(`chart_latest_runtime_${familySlug}`, async () => {
     try {
-      const api = await fetchPublicApi<{ edition: ApiEdition | null; program?: ApiProgram }>(`/charts/${encodeURIComponent(familySlug)}/latest`);
-      const familyId = asString(api.program?.publicSlug, familySlug);
-      return { data: api.edition ? toChartEditionFromApi(api.edition, familyId) : null, source: "api" };
+      const { data: program, error: progError } = await supabase
+        .from("chart_programs")
+        .select("id, public_slug")
+        .eq("public_slug", familySlug)
+        .eq("status", "active")
+        .maybeSingle();
+
+      if (progError) throw new PublicChartsApiError(progError.message, 500, "supabase_error");
+      if (!program) return { data: null, source: "api" };
+
+      const { data: edition, error: edError } = await supabase
+        .from("chart_editions")
+        .select("id, edition_slug, edition_label, edition_date, period_start, period_end, entry_count, status")
+        .eq("program_id", program.id)
+        .eq("status", "published")
+        .order("edition_date", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (edError) throw new PublicChartsApiError(edError.message, 500, "supabase_error");
+      return { data: edition ? dbEditionToChartEdition(edition, familySlug) : null, source: "api" };
     } catch {
       const edition = await fallbackLatestEdition(familySlug);
       return { data: edition ? { ...edition } : null, source: "local" };
@@ -359,9 +372,26 @@ export function getLatestChartEdition(familySlug: string): Promise<ChartResult<C
 export function getChartEdition(familySlug: string, editionSlug: string): Promise<ChartResult<ChartEdition | null>> {
   return withCache(`chart_edition_runtime_${familySlug}_${editionSlug}`, async () => {
     try {
-      const api = await fetchPublicApi<{ edition: ApiEdition | null; program?: ApiProgram }>(`/charts/${encodeURIComponent(familySlug)}/${encodeURIComponent(editionSlug)}`);
-      const familyId = asString(api.program?.publicSlug, familySlug);
-      return { data: api.edition ? toChartEditionFromApi(api.edition, familyId) : null, source: "api" };
+      const { data: program, error: progError } = await supabase
+        .from("chart_programs")
+        .select("id, public_slug")
+        .eq("public_slug", familySlug)
+        .eq("status", "active")
+        .maybeSingle();
+
+      if (progError) throw new PublicChartsApiError(progError.message, 500, "supabase_error");
+      if (!program) return { data: null, source: "api" };
+
+      const { data: edition, error: edError } = await supabase
+        .from("chart_editions")
+        .select("id, edition_slug, edition_label, edition_date, period_start, period_end, entry_count, status")
+        .eq("program_id", program.id)
+        .eq("edition_slug", editionSlug)
+        .eq("status", "published")
+        .maybeSingle();
+
+      if (edError) throw new PublicChartsApiError(edError.message, 500, "supabase_error");
+      return { data: edition ? dbEditionToChartEdition(edition, familySlug) : null, source: "api" };
     } catch {
       const edition = await fallbackEdition(familySlug, editionSlug);
       return { data: edition ? { ...edition } : null, source: "local" };
@@ -372,8 +402,35 @@ export function getChartEdition(familySlug: string, editionSlug: string): Promis
 export function getChartEditionEntries(familySlug: string, editionSlug: string): Promise<ChartResult<ChartEditionEntry[]>> {
   return withCache(`chart_entries_runtime_${familySlug}_${editionSlug}`, async () => {
     try {
-      const api = await fetchPublicApi<{ entries: ApiEntry[] }>(`/charts/${encodeURIComponent(familySlug)}/${encodeURIComponent(editionSlug)}/entries`);
-      return { data: (api.entries ?? []).map((entry) => toChartEntryFromApi(entry, editionSlug)), source: "api" };
+      const { data: program, error: progError } = await supabase
+        .from("chart_programs")
+        .select("id, public_slug")
+        .eq("public_slug", familySlug)
+        .eq("status", "active")
+        .maybeSingle();
+
+      if (progError) throw new PublicChartsApiError(progError.message, 500, "supabase_error");
+      if (!program) return { data: [], source: "api" };
+
+      const { data: edition, error: edError } = await supabase
+        .from("chart_editions")
+        .select("id")
+        .eq("program_id", program.id)
+        .eq("edition_slug", editionSlug)
+        .eq("status", "published")
+        .maybeSingle();
+
+      if (edError) throw new PublicChartsApiError(edError.message, 500, "supabase_error");
+      if (!edition) return { data: [], source: "api" };
+
+      const { data: entries, error: entError } = await supabase
+        .from("chart_entries")
+        .select("id, rank, previous_rank, movement, track_slug, track_title, artist_name, artist_slug, artwork_url, score, source_entry_id")
+        .eq("edition_id", edition.id)
+        .order("rank", { ascending: true });
+
+      if (entError) throw new PublicChartsApiError(entError.message, 500, "supabase_error");
+      return { data: (entries ?? []).map((e) => dbEntryToChartEditionEntry(e, editionSlug)), source: "api" };
     } catch {
       return { data: await fallbackEntries(familySlug, editionSlug), source: "local" };
     }
@@ -383,8 +440,55 @@ export function getChartEditionEntries(familySlug: string, editionSlug: string):
 export function getTrackChartHistory(trackSlug: string): Promise<ChartResult<TrackChartHistory | null>> {
   return withCache(`track_history_runtime_${trackSlug}`, async () => {
     try {
-      const api = await fetchPublicApi<{ history: TrackChartHistory | null }>(`/tracks/${encodeURIComponent(trackSlug)}/chart-history`);
-      return { data: api.history ?? null, source: "api" };
+      const { data: entries, error } = await supabase
+        .from("chart_entries")
+        .select("rank, movement, track_title, artist_name, edition_id")
+        .eq("track_slug", trackSlug)
+        .order("rank", { ascending: true });
+
+      if (error) throw new PublicChartsApiError(error.message, 500, "supabase_error");
+      if (!entries || entries.length === 0) return { data: null, source: "api" };
+
+      const editionIds = [...new Set(entries.map((e) => e.edition_id).filter(Boolean))];
+      const { data: editions, error: edError } = await supabase
+        .from("chart_editions")
+        .select("id, edition_slug, edition_label, edition_date")
+        .in("id", editionIds)
+        .eq("status", "published")
+        .order("edition_date", { ascending: true });
+
+      if (edError) throw new PublicChartsApiError(edError.message, 500, "supabase_error");
+
+      const editionMap = new Map((editions ?? []).map((e) => [e.id, e]));
+      const appearances = entries.map((e) => {
+        const ed = editionMap.get(e.edition_id);
+        return {
+          editionSlug: asString(ed?.edition_slug, ""),
+          editionLabel: asString(ed?.edition_label, ""),
+          rank: asNumber(e.rank),
+          weeksOnChart: 1,
+          movement: asMovement(e.movement),
+          date: asString(ed?.edition_date, ""),
+        };
+      }).filter((a) => a.editionSlug);
+
+      const trackTitle = asString(entries[0]?.track_title, "Unknown Track");
+      const artistName = asString(entries[0]?.artist_name, "");
+      const ranks = appearances.map((a) => a.rank);
+      const peak = ranks.length > 0 ? Math.min(...ranks) : 0;
+
+      const history: TrackChartHistory = {
+        trackSlug,
+        trackTitle,
+        artistNames: artistName ? [artistName] : [],
+        appearances,
+        peakPosition: peak,
+        totalWeeksOnChart: appearances.length,
+        firstAppearance: appearances[0]?.date ?? null,
+        latestAppearance: appearances[appearances.length - 1]?.date ?? null,
+      };
+
+      return { data: history, source: "api" };
     } catch {
       const csvData = await csvPublicDataAvailable();
       const csvHistory = csvData ? await getCsvTrackHistory(trackSlug) : null;

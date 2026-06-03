@@ -6,10 +6,10 @@ import { ArtistCard } from "@/components/design-system/registry/ArtistCard";
 import { ReleaseCard } from "@/components/design-system/registry/ReleaseCard";
 import { ARTISTS } from "@/mocks/artists";
 import { TRACK_DETAILS } from "@/mocks/trackDetails";
-import { RELEASES } from "@/mocks/releases";
 import { GENRES } from "@/mocks/genres";
 import { LABELS } from "@/mocks/labels";
 import { CHART_DATA } from "@/mocks/charts";
+import { listReleases, type RepairedRelease } from "@/services/repairedContent/client";
 
 const TABS = ["All", "Artists", "Tracks", "Releases", "Genres", "Labels", "Charts"] as const;
 
@@ -31,9 +31,29 @@ export default function Search() {
   const [query, setQuery] = useState("");
   const [activeTab, setActiveTab] = useState<Tab>("All");
   const [loading, setLoading] = useState(false);
+  const [releases, setReleases] = useState<RepairedRelease[]>([]);
+  const [releasesLoading, setReleasesLoading] = useState(true);
   const { playTrack } = usePlayer();
 
   const q = query.trim().toLowerCase();
+
+  useEffect(() => {
+    let alive = true;
+    const load = async () => {
+      setReleasesLoading(true);
+      try {
+        const data = await listReleases();
+        if (!alive) return;
+        setReleases(data);
+      } catch (err) {
+        console.error("Failed to load releases for search:", err);
+      } finally {
+        if (alive) setReleasesLoading(false);
+      }
+    };
+    load();
+    return () => { alive = false; };
+  }, []);
 
   useEffect(() => {
     if (!q) { setLoading(false); return; }
@@ -47,13 +67,13 @@ export default function Search() {
 
     const artists = ARTISTS.filter((a) => a.name.toLowerCase().includes(q) || a.genres.some((g) => g.toLowerCase().includes(q)) || (a.country || "").toLowerCase().includes(q));
     const tracks = TRACK_DETAILS.filter((t) => t.title.toLowerCase().includes(q) || t.artist.toLowerCase().includes(q) || t.genre.toLowerCase().includes(q));
-    const releases = RELEASES.filter((r) => r.title.toLowerCase().includes(q) || r.artist.toLowerCase().includes(q) || (r.labelName || "").toLowerCase().includes(q));
+    const releases = releasesLoading ? [] : releases.filter((r) => r.title.toLowerCase().includes(q) || r.artist.toLowerCase().includes(q) || (r.labelName || "").toLowerCase().includes(q));
     const genres = GENRES.filter((g) => g.name.toLowerCase().includes(q) || g.representativeArtists?.some((a) => a.toLowerCase().includes(q)));
     const labels = LABELS.filter((l) => l.name.toLowerCase().includes(q) || (l.country || "").toLowerCase().includes(q));
     const charts = CHART_DATA.filter((c) => c.title.toLowerCase().includes(q) || c.artist.toLowerCase().includes(q) || (c.genre || "").toLowerCase().includes(q));
 
     return { artists, tracks, releases, genres, labels, charts };
-  }, [q]);
+  }, [q, releases, releasesLoading]);
 
   const total = results.artists.length + results.tracks.length + results.releases.length + results.genres.length + results.labels.length + results.charts.length;
 
@@ -146,7 +166,7 @@ export default function Search() {
                 {[
                   { icon: "ri-bar-chart-line", label: "Charts", to: "/charts", desc: "Current rankings" },
                   { icon: "ri-user-line", label: "Artists", to: "/artists", desc: "Artist directory" },
-                  { icon: "ri-album-line", label: "Releases", to: "/releases", desc: "Albums & singles" },
+                  { icon: "ri-album-line", label: "Releases", to: "/search?q=releases", desc: "Albums & singles" },
                   { icon: "ri-folder-music-line", label: "Genres", to: "/genres", desc: "Genre territories" },
                   { icon: "ri-building-2-line", label: "Labels", to: "/labels", desc: "Label registry" },
                   { icon: "ri-article-line", label: "Magazine", to: "/magazine", desc: "Editorial stories" },

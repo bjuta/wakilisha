@@ -75,11 +75,11 @@ export function ArtistDetailHero({
             {/* Profile Picture — 4:5 portrait card */}
             {avatarSrc && (
               <div className="shrink-0">
-                <div className="relative overflow-hidden rounded-2xl border-[3px] border-white/30 shadow-2xl">
+                <div className="relative overflow-hidden rounded-2xl border border-accent-500/30 shadow-2xl">
                   <img
                     src={avatarSrc}
                     alt={name}
-                    className="h-60 w-48 md:h-80 md:w-64 object-cover object-top"
+                    className="h-44 w-36 md:h-56 md:w-44 object-cover object-top"
                   />
                 </div>
               </div>

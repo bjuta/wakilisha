@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useTheme } from "@/components/design-system/theme/ThemeProvider";
 import { WkIcon } from "@/components/design-system/Icon";
 import { HOME_FEATURED_ARTISTS, HOME_TRENDING_TRACKS } from "@/mocks/home";
-import { STORIES } from "@/mocks/magazine";
+import { useMagazineArticles } from "@/services/magazineArticles";
 
 type Tab = "Likes" | "Tracks" | "Reads" | "Settings";
 const tabs: Tab[] = ["Likes", "Tracks", "Reads", "Settings"];
@@ -27,8 +27,9 @@ export default function ProfilePage() {
   const { theme, toggle } = useTheme();
   const savedTracks = HOME_TRENDING_TRACKS.slice(0, 10);
   const followedArtists = HOME_FEATURED_ARTISTS.slice(0, 8);
-  const savedStories = STORIES.slice(0, 6);
-  const likesGrid = [...savedTracks, ...savedStories].slice(0, 15);
+  const { articles: savedStories, loading: storiesLoading, error: storiesError } = useMagazineArticles();
+  const displayStories = savedStories.slice(0, 6);
+  const likesGrid = [...savedTracks, ...displayStories].slice(0, 15);
   const [showThemeSheet, setShowThemeSheet] = useState(false);
   const [tab, setTab] = useState<Tab>("Likes");
 
@@ -178,20 +179,37 @@ export default function ProfilePage() {
                 <div className="profile-dt-section-kicker">Reads</div>
                 <h2 className="profile-dt-section-title">Reading list</h2>
               </div>
-              <div className="profile-dt-reads-grid">
-                {savedStories.map((story) => (
-                  <Link key={story.slug} to={`/magazine/${story.slug}`} className="profile-dt-read-card">
-                    <div className="profile-dt-read-art">
-                      <img src={story.heroUrl} alt="" />
+              {storiesLoading ? (
+                <div className="profile-dt-reads-grid">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <div key={i} className="profile-dt-read-card animate-pulse">
+                      <div className="profile-dt-read-art bg-[var(--wk-surface-raised)]" />
+                      <div className="profile-dt-read-body space-y-2">
+                        <div className="h-3 w-16 rounded bg-[var(--wk-surface-raised)]" />
+                        <div className="h-4 w-3/4 rounded bg-[var(--wk-surface-raised)]" />
+                        <div className="h-3 w-1/2 rounded bg-[var(--wk-surface-raised)]" />
+                      </div>
                     </div>
-                    <div className="profile-dt-read-body">
-                      <div className="profile-dt-read-tag">{story.section}</div>
-                      <div className="profile-dt-read-title">{story.title}</div>
-                      <div className="profile-dt-read-meta">{story.readingTime} min read · {story.date || "Undated"}</div>
-                    </div>
-                  </Link>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : storiesError ? (
+                <div className="text-[var(--wk-text-muted)]">{storiesError}</div>
+              ) : (
+                <div className="profile-dt-reads-grid">
+                  {displayStories.map((story) => (
+                    <Link key={story.slug} to={`/magazine/${story.slug}`} className="profile-dt-read-card">
+                      <div className="profile-dt-read-art">
+                        <img src={story.heroUrl} alt="" />
+                      </div>
+                      <div className="profile-dt-read-body">
+                        <div className="profile-dt-read-tag">{story.section}</div>
+                        <div className="profile-dt-read-title">{story.title}</div>
+                        <div className="profile-dt-read-meta">{story.readingTime} min read · {story.date || "Undated"}</div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
-import { STORIES } from "@/mocks/magazine";
+import { useMagazineArticle, useMagazineArticles, type MagazineArticle } from "@/services/magazineArticles";
 
 function formatReadCount(count: number): string {
   if (count >= 1000) return `${(count / 1000).toFixed(1)}k`;
@@ -9,29 +9,62 @@ function formatReadCount(count: number): string {
 
 export default function MobileArticle() {
   const { slug } = useParams<{ slug: string }>();
-  const article = STORIES.find((s) => s.slug === slug);
+  const { article, loading, error } = useMagazineArticle(slug);
+  const { articles: allArticles } = useMagazineArticles();
   const [copyToast, setCopyToast] = useState(false);
+  const [progress, setProgress] = useState(0);
 
   useEffect(() => {
     setCopyToast(false);
   }, [slug]);
 
-  if (!article) {
+  useEffect(() => {
+    const onScroll = () => {
+      const doc = document.documentElement;
+      const max = doc.scrollHeight - window.innerHeight;
+      setProgress(max > 0 ? window.scrollY / max : 0);
+    };
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  if (loading) {
     return (
-      <div className="px-5 py-20 text-center">
-        <i className="ri-article-line mb-3 block text-4xl text-[var(--wk-text-faint)]" />
-        <p className="text-[var(--wk-text-muted)]">Article not found</p>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-[var(--wk-brand)] border-t-transparent" />
+          <p className="text-sm text-[var(--wk-text-muted)]">Loading article…</p>
+        </div>
       </div>
     );
   }
 
-  const relatedStories = STORIES.filter(
-    (s) => s.slug !== article.slug && s.section === article.section
-  ).slice(0, 3);
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-5">
+        <div className="text-center">
+          <i className="ri-article-line mb-3 block text-4xl text-[var(--wk-text-faint)]" />
+          <p className="text-[var(--wk-text-muted)]">{error}</p>
+        </div>
+      </div>
+    );
+  }
 
-  const pullQuotes = article.body
-    ?.map((p, i) => (i === 1 || i === 3 ? p : null))
-    .filter(Boolean) || [];
+  if (!article) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-5">
+        <div className="text-center">
+          <i className="ri-article-line mb-3 block text-4xl text-[var(--wk-text-faint)]" />
+          <p className="text-[var(--wk-text-muted)]">Article not found</p>
+        </div>
+      </div>
+    );
+  }
+
+  const relatedStories = allArticles
+    .filter((s) => s.slug !== article.slug && s.section === article.section)
+    .slice(0, 3);
 
   const handleShare = () => {
     navigator.clipboard?.writeText(window.location.href);
@@ -40,9 +73,17 @@ export default function MobileArticle() {
   };
 
   return (
-    <article className="min-h-screen">
-      {/* Article Hero — full cinematic, same as desktop */}
-      <section className="relative min-h-[60dvh] flex items-end overflow-hidden">
+    <article className="min-h-screen bg-[var(--wk-bg)]">
+      {/* Reading progress */}
+      <div className="fixed top-0 left-0 right-0 z-50 h-[2px] bg-transparent">
+        <div
+          className="h-full bg-[var(--wk-brand)] origin-left"
+          style={{ transform: `scaleX(${progress})` }}
+        />
+      </div>
+
+      {/* Article Hero */}
+      <section className="relative min-h-[70dvh] flex items-end overflow-hidden">
         {article.heroUrl && (
           <>
             <div
@@ -53,17 +94,15 @@ export default function MobileArticle() {
                 backgroundPosition: "center",
               }}
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-black/15" />
-            <div className="absolute inset-0 bg-gradient-to-r from-black/40 via-transparent to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[var(--wk-bg)] via-black/60 to-black/20" />
           </>
         )}
 
-        {/* Top bar */}
         <div className="absolute top-0 left-0 right-0 z-10 px-5 py-4">
           <div className="flex items-center justify-between">
             <Link
               to="/magazine"
-              className="flex items-center gap-2 text-[12px] font-semibold uppercase tracking-wider text-[var(--wk-text-muted)] transition-colors hover:text-[var(--wk-text)] active:opacity-80"
+              className="flex items-center gap-2 rounded-full border border-white/15 bg-black/20 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-white/80 backdrop-blur-md transition-colors hover:bg-black/40"
             >
               <i className="ri-arrow-left-line" />
               Magazine
@@ -71,7 +110,7 @@ export default function MobileArticle() {
             <div className="flex items-center gap-2">
               <button
                 onClick={handleShare}
-                className="flex items-center gap-2 rounded-full border border-[var(--wk-border-2)] bg-[var(--wk-surface-raised)] px-3 py-1.5 text-[12px] font-semibold text-[var(--wk-text-soft)] backdrop-blur-sm transition-colors hover:bg-[var(--wk-surface)] active:scale-[0.97] whitespace-nowrap"
+                className="flex items-center gap-2 rounded-full border border-white/15 bg-black/20 px-3 py-1.5 text-[11px] font-bold text-white/80 backdrop-blur-md transition-colors hover:bg-black/40 whitespace-nowrap"
               >
                 <i className="ri-share-line" />
                 Share
@@ -87,33 +126,34 @@ export default function MobileArticle() {
 
         <div className="relative w-full px-5 pb-10 pt-20">
           <div className="mb-4 flex items-center gap-3">
-            <span className="rounded-full bg-[var(--wk-brand)] px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[var(--wk-brand-on)]">
+            <span className="rounded-full bg-[var(--wk-brand)] px-3 py-1 text-[10px] font-black uppercase tracking-wider text-[var(--wk-brand-on)]">
               {article.section}
             </span>
             {article.readingTime && (
-              <span className="text-[12px] font-medium text-[var(--wk-text-muted)]">
+              <span className="text-[12px] font-medium text-white/60">
                 {article.readingTime} min read
               </span>
             )}
           </div>
           <h1
-            className="mb-4 max-w-lg font-black leading-[0.92] tracking-[-0.04em]"
-            style={{ color: "var(--wk-text)", fontSize: "clamp(28px, 8vw, 44px)" }}
+            className="mb-4 max-w-lg font-black leading-[0.92] tracking-[-0.04em] text-white"
+            style={{ fontSize: "clamp(32px, 8vw, 48px)" }}
           >
             {article.title}
           </h1>
           {article.dek && (
-            <p className="max-w-md text-[15px] leading-relaxed" style={{ color: "var(--wk-text-soft)" }}>
+            <p className="max-w-md text-[16px] leading-relaxed text-white/70">
               {article.dek}
             </p>
           )}
-          <div className="mt-6 flex items-center gap-3 text-[12px]" style={{ color: "var(--wk-text-muted)" }}>
-            <span className="font-semibold" style={{ color: "var(--wk-text)" }}>
-              {article.author}
-            </span>
+          <div className="mt-6 flex items-center gap-3 text-[12px] text-white/60">
+            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--wk-brand)] text-[10px] font-bold text-[var(--wk-brand-on)]">
+              {article.author.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+            </div>
+            <span className="font-semibold text-white/90">{article.author}</span>
             <span>·</span>
             <span>{article.date}</span>
-            {article.readCount && (
+            {article.readCount > 0 && (
               <>
                 <span>·</span>
                 <span>{formatReadCount(article.readCount)} reads</span>
@@ -125,44 +165,16 @@ export default function MobileArticle() {
 
       {/* Article Body */}
       <div className="px-5 py-10">
-        {/* Lead paragraph with drop cap */}
-        {article.body && article.body.length > 0 && (
-          <p className="text-[16px] leading-[1.8] text-[var(--wk-text)]">
-            <span
-              className="float-left mr-3 mt-1 font-black leading-none text-[var(--wk-brand)]"
-              style={{ fontSize: "clamp(40px, 8vw, 56px)" }}
-            >
-              {article.body[0].charAt(0)}
-            </span>
-            {article.body[0].slice(1)}
-          </p>
-        )}
-
-        {/* Rest of body */}
-        <div className="mt-6 space-y-6">
-          {article.body?.slice(1).map((paragraph, index) => {
-            const pq = pullQuotes[index];
-            return (
-              <div key={index}>
-                <p className="text-[15px] leading-[1.8] text-[var(--wk-text-soft)]">
-                  {paragraph}
-                </p>
-                {pq && index % 2 === 0 && (
-                  <blockquote className="my-6 border-l-4 border-[var(--wk-brand)] pl-4">
-                    <p className="text-[18px] font-bold leading-snug tracking-[-0.01em] text-[var(--wk-text)]">
-                      "{pq}"
-                    </p>
-                  </blockquote>
-                )}
-              </div>
-            );
-          })}
-        </div>
+        <div
+          className="article-content-v2-mobile max-w-none text-[16px] leading-[1.8]"
+          style={{ color: "var(--wk-text-soft)" }}
+          dangerouslySetInnerHTML={{ __html: article.contentHtml }}
+        />
 
         {/* Tags */}
         {article.tags && article.tags.length > 0 && (
           <div className="mt-10 flex flex-wrap items-center gap-2">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--wk-text-muted)]">
+            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--wk-text-muted)]">
               Topics
             </span>
             {article.tags.map((tag) => (
@@ -176,54 +188,11 @@ export default function MobileArticle() {
           </div>
         )}
 
-        {/* Related in the graph */}
-        {article.relatedEntities && article.relatedEntities.length > 0 && (
-          <div className="mt-10 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-5">
-            <h3 className="mb-4 text-[10px] font-bold uppercase tracking-wider text-[var(--wk-text-muted)]">
-              Related in the graph
-            </h3>
-            <div className="flex flex-wrap gap-2">
-              {article.relatedEntities.map((entity) => (
-                <Link
-                  key={entity.slug}
-                  to={`/${
-                    entity.type === "track"
-                      ? "tracks"
-                      : entity.type === "release"
-                      ? "releases"
-                      : entity.type === "chart"
-                      ? "charts"
-                      : entity.type === "genre"
-                      ? "genres"
-                      : "artists"
-                  }/${entity.slug}`}
-                  className="flex items-center gap-1.5 rounded-full border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-1.5 text-[12px] font-semibold text-[var(--wk-text)] active:scale-[0.97] transition-transform"
-                >
-                  <i
-                    className={
-                      entity.type === "artist"
-                        ? "ri-user-line"
-                        : entity.type === "release"
-                        ? "ri-album-line"
-                        : entity.type === "track"
-                        ? "ri-music-2-line"
-                        : entity.type === "genre"
-                        ? "ri-folder-music-line"
-                        : "ri-bar-chart-line"
-                    }
-                  />
-                  {entity.name}
-                </Link>
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* Share + subscribe */}
         <div className="mt-10 flex flex-col items-center gap-4 border-t border-[var(--wk-divider)] pt-8 text-center">
           <div>
-            <p className="text-[14px] font-semibold text-[var(--wk-text)]">Enjoyed this story?</p>
-            <p className="text-[13px] text-[var(--wk-text-muted)]">
+            <p className="text-[15px] font-bold text-[var(--wk-text)]">Enjoyed this story?</p>
+            <p className="mt-1 text-[13px] text-[var(--wk-text-muted)]">
               Share it or explore more from the WAKILISHA editorial graph.
             </p>
           </div>
@@ -264,15 +233,21 @@ export default function MobileArticle() {
                   to={`/magazine/${story.slug}`}
                   className="group flex gap-3 active:scale-[0.98] active:opacity-80 transition-all"
                 >
-                  <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-[var(--wk-surface-raised)]">
-                    <img src={story.heroUrl} alt={story.title} className="h-full w-full object-cover" />
+                  <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-[var(--wk-surface-raised)]">
+                    <img
+                      src={story.heroUrl}
+                      alt={story.title}
+                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-110"
+                    />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--wk-brand)]">{story.section}</span>
-                    <h3 className="mt-0.5 text-[14px] font-bold leading-snug text-[var(--wk-text)] group-hover:text-[var(--wk-brand)] transition-colors">
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--wk-brand)]">
+                      {story.section}
+                    </span>
+                    <h3 className="mt-1 text-[15px] font-bold leading-snug text-[var(--wk-text)] group-hover:text-[var(--wk-brand)] transition-colors line-clamp-2">
                       {story.title}
                     </h3>
-                    <div className="mt-1 text-[10px] text-[var(--wk-text-faint)]">
+                    <div className="mt-1 text-[11px] text-[var(--wk-text-muted)]">
                       {story.author} · {story.readingTime} min
                     </div>
                   </div>
@@ -282,6 +257,23 @@ export default function MobileArticle() {
           </div>
         </section>
       )}
+
+      {/* Footer CTA */}
+      <section className="py-12 px-5 text-center">
+        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--wk-brand)] mb-3">
+          WAKILISHA Magazine
+        </p>
+        <h3 className="text-[20px] font-bold leading-tight tracking-[-0.02em] text-[var(--wk-text)] mb-4">
+          Stories that move East African culture forward.
+        </h3>
+        <Link
+          to="/magazine"
+          className="inline-flex items-center gap-2 rounded-full bg-[var(--wk-brand)] px-5 py-3 text-[13px] font-bold text-[var(--wk-brand-on)] whitespace-nowrap active:scale-[0.97] transition-transform"
+        >
+          Explore all stories
+          <i className="ri-arrow-right-line" />
+        </Link>
+      </section>
     </article>
   );
 }

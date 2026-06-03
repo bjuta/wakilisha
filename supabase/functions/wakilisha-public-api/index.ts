@@ -13,6 +13,208 @@ function jsonResponse(data: unknown, status = 200) {
   });
 }
 
+async function resolveSeriesLabels(
+  supabase: ReturnType<typeof createClient>,
+  seriesSlugs: string[]
+): Promise<Map<string, string>> {
+  const unique = [...new Set(seriesSlugs.filter(Boolean))];
+  if (unique.length === 0) return new Map();
+  const { data: rows } = await supabase
+    .from("chart_series")
+    .select("slug, label")
+    .in("slug", unique)
+    .eq("status", "active");
+  const map = new Map<string, string>();
+  for (const row of (rows ?? [])) {
+    map.set(String(row.slug), String(row.label || row.slug));
+  }
+  return map;
+}
+
+async function resolveMarketLabels(
+  supabase: ReturnType<typeof createClient>,
+  marketSlugs: string[]
+): Promise<Map<string, string>> {
+  const unique = [...new Set(marketSlugs.filter(Boolean))];
+  if (unique.length === 0) return new Map();
+  const { data: rows } = await supabase
+    .from("chart_markets")
+    .select("slug, label")
+    .in("slug", unique)
+    .eq("status", "active");
+  const map = new Map<string, string>();
+  for (const row of (rows ?? [])) {
+    map.set(String(row.slug), String(row.label || row.slug));
+  }
+  return map;
+}
+
+// ─── Editorial Excerpt Generator ──────────────────────────────────────
+
+function formatDateNicely(dateStr: string): string {
+  if (!dateStr) return "";
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+  } catch {
+    return dateStr;
+  }
+}
+
+function formatDurationApprox(seconds: number): string {
+  const m = Math.round(seconds / 60);
+  if (m < 60) return `approximately ${m} minutes`;
+  const h = Math.floor(m / 60);
+  const rm = m % 60;
+  if (rm === 0) return `approximately ${h} hour${h > 1 ? "s" : ""}`;
+  return `approximately ${h} hour${h > 1 ? "s" : ""} and ${rm} minutes`;
+}
+
+function pickOpeners(): string[] {
+  return [
+    "marks a significant moment",
+    "represents an important chapter",
+    "stands as a notable release",
+    "showcases the artist's evolving sound",
+    "delivers a compelling body of work",
+    "captures the artist at a pivotal point",
+    "offers a rich listening experience",
+    "brings together a carefully curated set of tracks",
+  ];
+}
+
+function pickClosers(): string[] {
+  return [
+    "adding to the artist's growing catalog.",
+    "cementing their place in the contemporary landscape.",
+    "reflecting the creative momentum of the period.",
+    "contributing to the broader cultural conversation.",
+    "demonstrating the breadth of their artistic vision.",
+    "offering listeners a definitive statement of intent.",
+    "positioning the artist within their genre's evolution.",
+  ];
+}
+
+function releaseTypeLabel(type: string): string {
+  const t = type.toLowerCase();
+  if (t === "album" || t === "studio album") return "studio album";
+  if (t === "ep" || t === "extended play") return "extended play";
+  if (t === "single") return "single";
+  if (t === "compilation" || t === "mixtape") return t;
+  return t;
+}
+
+function getNotableTracks(tracks: Array<Record<string, unknown>>, count: number): string[] {
+  const sorted = [...tracks].filter((t) => t.title && String(t.title).trim()).sort((a, b) => {
+    const an = Number(a.trackNumber || a.track_number || 0);
+    const bn = Number(b.trackNumber || b.track_number || 0);
+    return an - bn;
+  });
+  if (sorted.length <= 2) return sorted.slice(1).map((t) => String(t.title));
+  const middle = sorted.slice(1, -1);
+  const picked: string[] = [];
+  const step = Math.max(1, Math.floor(middle.length / count));
+  for (let i = 0; i < middle.length && picked.length < count; i += step) {
+    picked.push(String(middle[i].title));
+  }
+  return picked;
+}
+
+function articleize(word: string): string {
+  const first = word.charAt(0).toLowerCase();
+  if ("aeiou".includes(first)) return `an ${word}`;
+  return `a ${word}`;
+}
+
+function generateReleaseExcerpt(opts: {
+  title: string;
+  artist: string;
+  releaseDate: string;
+  releaseType: string;
+  labelName: string;
+  trackCount: number;
+  tracks: Array<Record<string, unknown>>;
+  totalDuration: number;
+}): string {
+  const { title, artist, releaseDate, releaseType, labelName, trackCount, tracks, totalDuration } = opts;
+  const rType = releaseTypeLabel(releaseType);
+  const niceDate = formatDateNicely(releaseDate);
+  const yearOnly = releaseDate ? String(releaseDate).split("-")[0] : "";
+
+  const parts: string[] = [];
+
+  // Opening sentence
+  let open = `${title} is ${articleize(rType)} by ${artist}`;
+  if (niceDate && niceDate !== yearOnly) {
+    open += `, released on ${niceDate}`;
+  } else if (yearOnly) {
+    open += `, released in ${yearOnly}`;
+  }
+  if (labelName && labelName !== "Independent" && labelName !== "Unknown") {
+    open += ` through ${labelName}`;
+  }
+  open += ".";
+  parts.push(open);
+
+  // Track details
+  if (trackCount > 0 && tracks.length > 0) {
+    const sorted = [...tracks].filter((t) => t.title && String(t.title).trim()).sort((a, b) => {
+      const an = Number(a.trackNumber || a.track_number || 0);
+      const bn = Number(b.trackNumber || b.track_number || 0);
+      return an - bn;
+    });
+
+    const firstTrack = sorted[0]?.title ? String(sorted[0].title) : "";
+    const lastTrack = sorted.length > 1 && sorted[sorted.length - 1]?.title
+      ? String(sorted[sorted.length - 1].title)
+      : "";
+
+    let trackSentence = "";
+    if (trackCount === 1 && firstTrack) {
+      trackSentence = `The release consists of a single track, "${firstTrack}."`;
+    } else if (trackCount === 2 && firstTrack && lastTrack) {
+      trackSentence = `The release spans ${trackCount} tracks, opening with "${firstTrack}" and closing with "${lastTrack}."`;
+    } else if (trackCount > 2) {
+      const middle = getNotableTracks(sorted, 2);
+      if (firstTrack) {
+        trackSentence = `The ${trackCount}-track project opens with "${firstTrack}"`;
+        if (middle.length === 1) {
+          trackSentence += ` and includes "${middle[0]}" among its standout cuts`;
+        } else if (middle.length === 2) {
+          trackSentence += `, with notable inclusions like "${middle[0]}" and "${middle[1]}"`;
+        }
+        if (lastTrack) {
+          trackSentence += `, concluding with "${lastTrack}"`;
+        }
+        trackSentence += ".";
+      } else {
+        trackSentence = `The release features ${trackCount} tracks.`;
+      }
+    }
+    if (trackSentence) parts.push(trackSentence);
+
+    // Duration
+    if (totalDuration > 0) {
+      const dur = formatDurationApprox(totalDuration);
+      const durSentence = `With a total runtime of ${dur}, the project delivers ${trackCount > 5 ? "a substantial listening experience" : "a concise but complete statement"}.`;
+      parts.push(durSentence);
+    }
+  } else if (trackCount > 0) {
+    parts.push(`The release features ${trackCount} tracks.`);
+    if (totalDuration > 0) {
+      parts.push(`With a total runtime of ${formatDurationApprox(totalDuration)}, it offers a complete listening experience.`);
+    }
+  }
+
+  // Context / significance sentence
+  const opener = pickOpeners()[Math.floor(Math.random() * pickOpeners().length)];
+  const closer = pickClosers()[Math.floor(Math.random() * pickClosers().length)];
+  parts.push(`${title} ${opener} in ${artist}'s discography, ${closer}`);
+
+  return parts.join(" ");
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders });
@@ -28,7 +230,6 @@ Deno.serve(async (req) => {
   try {
     let data: unknown;
 
-    // ─── Repaired: Magazine ───────────────────────────────────────────────
     if (path === "/repaired/magazine" || path === "/repaired/magazine/") {
       const { data: articles } = await supabase
         .from("wk_articles")
@@ -58,7 +259,6 @@ Deno.serve(async (req) => {
       };
     }
 
-    // ─── Repaired: Single Artist ──────────────────────────────────────────
     else if (path.startsWith("/repaired/artists/")) {
       const slug = path.replace(/^\/repaired\/artists\//, "").replace(/\/$/, "");
 
@@ -251,6 +451,39 @@ Deno.serve(async (req) => {
       const isChartArtist = chartEntryList.length > 0;
       const topChartPosition = isChartArtist ? Math.min(...chartEntryList.map((e: Record<string, unknown>) => Number(e.rank))) : null;
 
+      const videos: Array<Record<string, unknown>> = [];
+      try {
+        const oEmbedKeys = Object.keys(rawMeta).filter((k) => k.startsWith("_oembed_") && !k.startsWith("_oembed_time_"));
+        for (const key of oEmbedKeys) {
+          const html = String(rawMeta[key] || "");
+          if (!html || html.trim() === "") continue;
+          const srcMatch = html.match(/src=["'](https?:\/\/[^"']+)["']/);
+          if (!srcMatch) continue;
+          const src = srcMatch[1];
+          const titleMatch = html.match(/title=["']([^"']+)["']/);
+          const title = titleMatch ? titleMatch[1] : "";
+          const ytMatch = src.match(/youtube\.com\/embed\/([^?&]+)/) || src.match(/youtu\.be\/([^?&]+)/);
+          if (ytMatch) {
+            const videoId = ytMatch[1];
+            videos.push({
+              id: videoId,
+              title: title || "Video",
+              url: `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1`,
+              thumbnail: `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`,
+              source: "youtube",
+            });
+          } else {
+            videos.push({
+              id: src,
+              title: title || "Video",
+              url: src,
+              thumbnail: "",
+              source: "generic",
+            });
+          }
+        }
+      } catch { /* ignore */ }
+
       data = {
         artist: {
           id: String(artist.id),
@@ -275,11 +508,11 @@ Deno.serve(async (req) => {
           releases,
           topSongs,
           relatedArtists,
+          videos,
         },
       };
     }
 
-    // ─── Repaired: Artists (list) ─────────────────────────────────────────
     else if (path === "/repaired/artists" || path === "/repaired/artists/") {
       const { data: publishedWpArtists } = await supabase
         .from("wk_artists")
@@ -322,12 +555,115 @@ Deno.serve(async (req) => {
       };
     }
 
-    // ─── Repaired: Releases ───────────────────────────────────────────────
+    else if (path.startsWith("/repaired/releases/")) {
+      const pathRemainder = path.replace(/^\/repaired\/releases\//, "").replace(/\/$/, "");
+      const segments = pathRemainder.split("/").filter(Boolean);
+      const releaseSlug = segments.length >= 2 ? segments[segments.length - 1] : pathRemainder;
+
+      const { data: release } = await supabase
+        .from("registry_releases")
+        .select("id, slug, title, release_date, release_type, artwork_url, label_id, metadata, status, description")
+        .eq("slug", releaseSlug)
+        .in("status", ["active", "draft"])
+        .maybeSingle();
+
+      if (!release) return jsonResponse({ data: null }, 404);
+
+      const releaseId = String(release.id);
+
+      const { data: tracks } = await supabase
+        .from("registry_tracks")
+        .select("id, slug, title, duration_ms, track_number, artwork_url")
+        .eq("release_id", releaseId)
+        .order("track_number", { ascending: true });
+
+      const trackIds = (tracks ?? []).map((t: Record<string, unknown>) => String(t.id));
+      const { data: credits } = trackIds.length > 0
+        ? await supabase
+            .from("registry_track_artist_credits")
+            .select("track_id, display_name, role, credit_order")
+            .in("track_id", trackIds)
+            .eq("role", "primary")
+            .order("credit_order", { ascending: true })
+        : { data: [] };
+
+      const { data: label } = release.label_id
+        ? await supabase
+            .from("registry_labels")
+            .select("id, slug, name, country_code")
+            .eq("id", String(release.label_id))
+            .maybeSingle()
+        : { data: null };
+
+      const trackArtistMap = new Map<string, string>();
+      for (const c of (credits ?? [])) {
+        const tid = String(c.track_id);
+        if (!trackArtistMap.has(tid)) {
+          trackArtistMap.set(tid, String(c.display_name));
+        }
+      }
+
+      const trackList = (tracks ?? []).map((t: Record<string, unknown>) => ({
+        id: String(t.id),
+        slug: String(t.slug || t.id),
+        title: String(t.title),
+        artist: trackArtistMap.get(String(t.id)) || "Unknown",
+        duration: Number(t.duration_ms || 0) / 1000,
+        trackNumber: t.track_number || 0,
+        artworkUrl: t.artwork_url || "",
+      }));
+
+      const totalDuration = trackList.reduce((sum: number, tr: Record<string, unknown>) => sum + (Number(tr.duration) || 0), 0);
+
+      const artistName = trackArtistMap.get(trackIds[0]) || (label?.name || "Unknown");
+
+      let description = release.description || "";
+      if (!description || description.trim().length === 0) {
+        description = generateReleaseExcerpt({
+          title: String(release.title),
+          artist: artistName,
+          releaseDate: String(release.release_date || ""),
+          releaseType: String(release.release_type || "album"),
+          labelName: label?.name || "Independent",
+          trackCount: trackList.length,
+          tracks: trackList,
+          totalDuration,
+        });
+
+        try {
+          await supabase
+            .from("registry_releases")
+            .update({ description })
+            .eq("id", releaseId);
+        } catch { /* ignore write errors */ }
+      }
+
+      data = {
+        release: {
+          id: releaseId,
+          slug: String(release.slug),
+          title: String(release.title),
+          artist: artistName,
+          year: release.release_date ? String(release.release_date).split("-")[0] : "",
+          releaseDate: release.release_date || "",
+          releaseType: String(release.release_type || "album"),
+          labelName: label?.name || "Independent",
+          labelSlug: label?.slug || "",
+          artworkUrl: release.artwork_url || "",
+          trackCount: trackList.length,
+          tracks: trackList,
+          totalDuration,
+          description,
+          metadata: release.metadata || {},
+        },
+      };
+    }
+
     else if (path === "/repaired/releases" || path === "/repaired/releases/") {
       const { data: releases } = await supabase
         .from("registry_releases")
-        .select("id, slug, title, release_date, release_type, artwork_url, label_id, status")
-        .eq("status", "active")
+        .select("id, slug, title, release_date, release_type, artwork_url, label_id, status, description")
+        .in("status", ["active", "draft"])
         .order("release_date", { ascending: false })
         .limit(200);
 
@@ -335,7 +671,7 @@ Deno.serve(async (req) => {
       const labelIds = (releases ?? []).map((r: Record<string, unknown>) => r.label_id).filter(Boolean).map(String);
 
       const { data: tracks } = releaseIds.length > 0
-        ? await supabase.from("registry_tracks").select("id, release_id").in("release_id", releaseIds)
+        ? await supabase.from("registry_tracks").select("id, release_id, duration_ms, track_number, title").in("release_id", releaseIds)
         : { data: [] };
 
       const trackIds = (tracks ?? []).map((t: Record<string, unknown>) => String(t.id));
@@ -367,26 +703,62 @@ Deno.serve(async (req) => {
         const rid = String(t.release_id);
         releaseTrackCount.set(rid, (releaseTrackCount.get(rid) || 0) + 1);
       }
+      const releaseTotalDuration = new Map<string, number>();
+      for (const t of (tracks ?? [])) {
+        const rid = String(t.release_id);
+        const dur = Number(t.duration_ms || 0) / 1000;
+        releaseTotalDuration.set(rid, (releaseTotalDuration.get(rid) || 0) + dur);
+      }
+      const releaseTracks = new Map<string, Array<Record<string, unknown>>>();
+      for (const t of (tracks ?? [])) {
+        const rid = String(t.release_id);
+        if (!releaseTracks.has(rid)) releaseTracks.set(rid, []);
+        releaseTracks.get(rid)!.push({
+          title: t.title,
+          trackNumber: t.track_number || 0,
+          duration: Number(t.duration_ms || 0) / 1000,
+        });
+      }
 
       data = {
         releases: (releases ?? []).map((r: Record<string, unknown>) => {
           const rid = String(r.id);
+          const artistName = releaseArtistMap.get(rid) || "Unknown";
+          const labelName = labelMap.get(String(r.label_id)) || "Independent";
+          const trackCount = releaseTrackCount.get(rid) || 0;
+          const totalDuration = releaseTotalDuration.get(rid) || 0;
+          const trackList = releaseTracks.get(rid) || [];
+
+          let description = r.description || "";
+          if (!description || description.trim().length === 0) {
+            description = generateReleaseExcerpt({
+              title: String(r.title),
+              artist: artistName,
+              releaseDate: String(r.release_date || ""),
+              releaseType: String(r.release_type || "album"),
+              labelName,
+              trackCount,
+              tracks: trackList,
+              totalDuration,
+            });
+          }
+
           return {
             id: rid,
             slug: String(r.slug),
             title: String(r.title),
-            artist: releaseArtistMap.get(rid) || "Unknown",
+            artist: artistName,
             year: r.release_date ? String(r.release_date).split("-")[0] : "",
             releaseType: String(r.release_type || "album"),
-            labelName: labelMap.get(String(r.label_id)) || "Independent",
+            labelName,
             artworkUrl: r.artwork_url || "",
-            trackCount: releaseTrackCount.get(rid) || 0,
+            trackCount,
+            description,
           };
         }),
       };
     }
 
-    // ─── Repaired: Genres ─────────────────────────────────────────────────
     else if (path === "/repaired/genres" || path === "/repaired/genres/") {
       const { data: genres } = await supabase
         .from("registry_genres")
@@ -406,7 +778,6 @@ Deno.serve(async (req) => {
       };
     }
 
-    // ─── Repaired: Labels ─────────────────────────────────────────────────
     else if (path === "/repaired/labels" || path === "/repaired/labels/") {
       const { data: labels } = await supabase
         .from("registry_labels")
@@ -431,7 +802,6 @@ Deno.serve(async (req) => {
       };
     }
 
-    // ─── Charts ───────────────────────────────────────────────────────────
     else if (path === "/charts" || path === "/charts/") {
       const { data: programs } = await supabase
         .from("chart_programs")
@@ -456,20 +826,29 @@ Deno.serve(async (req) => {
         editionsByProgram.get(pid)!.push(e);
       }
 
+      const seriesSlugs = (programs ?? []).map((p: Record<string, unknown>) => String(p.series_slug)).filter(Boolean);
+      const marketSlugs = (programs ?? []).map((p: Record<string, unknown>) => String(p.market_slug)).filter(Boolean);
+      const [seriesLabelMap, marketLabelMap] = await Promise.all([
+        resolveSeriesLabels(supabase, seriesSlugs),
+        resolveMarketLabels(supabase, marketSlugs),
+      ]);
+
       const programsResult = (programs ?? []).map((p: Record<string, unknown>) => {
         const pid = String(p.id);
         const edList = editionsByProgram.get(pid) || [];
         const latest = edList[0];
+        const seriesSlug = String(p.series_slug || "");
+        const marketSlug = String(p.market_slug || "");
         return {
           id: pid,
           publicSlug: String(p.public_slug),
           publicLabel: String(p.label),
           shortLabel: String(p.label),
           sourceFamilySlug: String(p.public_slug),
-          seriesSlug: String(p.series_slug),
-          seriesLabel: String(p.label),
-          marketSlug: String(p.market_slug),
-          marketLabel: String(p.market_slug),
+          seriesSlug,
+          seriesLabel: seriesLabelMap.get(seriesSlug) || seriesSlug,
+          marketSlug,
+          marketLabel: marketLabelMap.get(marketSlug) || marketSlug,
           periodType: String(p.default_period_type || "weekly"),
           methodologyVersion: String(p.default_methodology_version || "legacy-import-v1"),
           eligibilityRulesVersion: "legacy-import-v1",
@@ -497,7 +876,6 @@ Deno.serve(async (req) => {
       data = { programs: programsResult };
     }
 
-    // ─── Charts: family detail, latest, edition, entries, track history ────
     else if (path.startsWith("/charts/")) {
       const chartPath = path.replace(/^\/charts\//, "");
       const segments = chartPath.split("/").filter(Boolean);
@@ -520,6 +898,14 @@ Deno.serve(async (req) => {
           .eq("status", "published")
           .order("edition_date", { ascending: false });
 
+        const [seriesLabelMap, marketLabelMap] = await Promise.all([
+          resolveSeriesLabels(supabase, [String(program.series_slug || "")]),
+          resolveMarketLabels(supabase, [String(program.market_slug || "")]),
+        ]);
+
+        const seriesSlug = String(program.series_slug || "");
+        const marketSlug = String(program.market_slug || "");
+
         data = {
           program: {
             id: String(program.id),
@@ -527,10 +913,10 @@ Deno.serve(async (req) => {
             publicLabel: String(program.label),
             shortLabel: String(program.label),
             sourceFamilySlug: String(program.public_slug),
-            seriesSlug: String(program.series_slug),
-            seriesLabel: String(program.label),
-            marketSlug: String(program.market_slug),
-            marketLabel: String(program.market_slug),
+            seriesSlug,
+            seriesLabel: seriesLabelMap.get(seriesSlug) || seriesSlug,
+            marketSlug,
+            marketLabel: marketLabelMap.get(marketSlug) || marketSlug,
             periodType: String(program.default_period_type || "weekly"),
             methodologyVersion: String(program.default_methodology_version || "legacy-import-v1"),
             eligibilityRulesVersion: "legacy-import-v1",
@@ -574,6 +960,14 @@ Deno.serve(async (req) => {
           .limit(1)
           .maybeSingle();
 
+        const [seriesLabelMap, marketLabelMap] = await Promise.all([
+          resolveSeriesLabels(supabase, [String(program.series_slug || "")]),
+          resolveMarketLabels(supabase, [String(program.market_slug || "")]),
+        ]);
+
+        const seriesSlug = String(program.series_slug || "");
+        const marketSlug = String(program.market_slug || "");
+
         data = {
           edition: edition ? {
             id: String(edition.edition_slug),
@@ -588,8 +982,10 @@ Deno.serve(async (req) => {
             id: String(program.id),
             publicSlug: String(program.public_slug),
             publicLabel: String(program.label),
-            seriesSlug: String(program.series_slug),
-            marketSlug: String(program.market_slug),
+            seriesSlug,
+            seriesLabel: seriesLabelMap.get(seriesSlug) || seriesSlug,
+            marketSlug,
+            marketLabel: marketLabelMap.get(marketSlug) || marketSlug,
           },
         };
       } else if (segments.length === 2) {
@@ -612,6 +1008,14 @@ Deno.serve(async (req) => {
           .eq("edition_slug", editionSlug)
           .maybeSingle();
 
+        const [seriesLabelMap, marketLabelMap] = await Promise.all([
+          resolveSeriesLabels(supabase, [String(program.series_slug || "")]),
+          resolveMarketLabels(supabase, [String(program.market_slug || "")]),
+        ]);
+
+        const seriesSlug = String(program.series_slug || "");
+        const marketSlug = String(program.market_slug || "");
+
         data = {
           edition: edition ? {
             id: String(edition.edition_slug),
@@ -626,8 +1030,10 @@ Deno.serve(async (req) => {
             id: String(program.id),
             publicSlug: String(program.public_slug),
             publicLabel: String(program.label),
-            seriesSlug: String(program.series_slug),
-            marketSlug: String(program.market_slug),
+            seriesSlug,
+            seriesLabel: seriesLabelMap.get(seriesSlug) || seriesSlug,
+            marketSlug,
+            marketLabel: marketLabelMap.get(marketSlug) || marketSlug,
           },
         };
       } else if (segments.length === 3 && segments[2] === "entries") {
@@ -683,7 +1089,6 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ─── Track Chart History ──────────────────────────────────────────────
     else if (path.startsWith("/tracks/")) {
       const trackPath = path.replace(/^\/tracks\//, "");
       const segments = trackPath.split("/").filter(Boolean);

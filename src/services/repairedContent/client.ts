@@ -1,24 +1,4 @@
-const API_BASE =
-  (import.meta.env.VITE_WAKILISHA_PUBLIC_API_BASE as string | undefined) ||
-  (import.meta.env.VITE_WAKILISHA_V2_API_BASE as string | undefined) ||
-  (import.meta.env.VITE_WAKILISHA_WP_V2_API_BASE as string | undefined) ||
-  "/__wakilisha-v2-api/wp-json/wakilisha/v2";
-
-type Envelope<T> = {
-  data: T;
-  meta?: Record<string, unknown>;
-};
-
-async function repairedGet<T>(path: string): Promise<T> {
-  const url = `${API_BASE.replace(/\/$/, "")}/repaired${path.startsWith("/") ? path : `/${path}`}`;
-  const response = await fetch(url, { headers: { Accept: "application/json" } });
-  if (!response.ok) {
-    const text = await response.text().catch(() => "");
-    throw new Error(`WAKILISHA entity API ${response.status}: ${text || response.statusText}`);
-  }
-  const payload = (await response.json()) as Envelope<T> | T;
-  return payload && typeof payload === "object" && "data" in payload ? (payload as Envelope<T>).data : (payload as T);
-}
+import { listMagazineArticles, toRepairedStory } from '@/services/magazineArticles';
 
 export type RepairedStory = {
   id: string;
@@ -56,6 +36,7 @@ export type RepairedRelease = {
   labelName: string;
   artworkUrl: string;
   trackCount: number;
+  description?: string;
 };
 
 export type RepairedGenre = {
@@ -80,9 +61,31 @@ export type RepairedLabel = {
   description?: string | null;
 };
 
+const API_BASE =
+  (import.meta.env.VITE_WAKILISHA_PUBLIC_API_BASE as string | undefined) ||
+  (import.meta.env.VITE_WAKILISHA_V2_API_BASE as string | undefined) ||
+  (import.meta.env.VITE_WAKILISHA_WP_V2_API_BASE as string | undefined) ||
+  "/__wakilisha-v2-api/wp-json/wakilisha/v2";
+
+type Envelope<T> = {
+  data: T;
+  meta?: Record<string, unknown>;
+};
+
+async function repairedGet<T>(path: string): Promise<T> {
+  const url = `${API_BASE.replace(/\/$/, "")}/repaired${path.startsWith("/") ? path : `/${path}`}`;
+  const response = await fetch(url, { headers: { Accept: "application/json" } });
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    throw new Error(`WAKILISHA entity API ${response.status}: ${text || response.statusText}`);
+  }
+  const payload = (await response.json()) as Envelope<T> | T;
+  return payload && typeof payload === "object" && "data" in payload ? (payload as Envelope<T>).data : (payload as T);
+}
+
 export async function listMagazineStories(): Promise<RepairedStory[]> {
-  const result = await repairedGet<{ stories: RepairedStory[] }>("/magazine");
-  return result.stories;
+  const articles = await listMagazineArticles();
+  return articles.map(toRepairedStory);
 }
 
 export async function listArtists(): Promise<RepairedArtist[]> {
@@ -95,10 +98,57 @@ export async function listReleases(): Promise<RepairedRelease[]> {
   return result.releases;
 }
 
+export type RepairedReleaseDetail = {
+  id: string;
+  slug: string;
+  title: string;
+  artist: string;
+  year: string;
+  releaseDate: string;
+  releaseType: string;
+  labelName: string;
+  labelSlug: string;
+  artworkUrl: string;
+  trackCount: number;
+  totalDuration: number;
+  tracks: Array<{
+    id: string;
+    slug: string;
+    title: string;
+    artist: string;
+    duration: number;
+    trackNumber: number;
+    artworkUrl: string;
+  }>;
+  description?: string;
+  metadata: Record<string, unknown>;
+};
+
+export function slugify(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
+export function releaseUrl(release: { slug: string; artist: string }): string {
+  return `/releases/${slugify(release.artist)}/${release.slug}`;
+}
+
+export async function getRelease(artistSlug: string, releaseSlug: string): Promise<RepairedReleaseDetail | null> {
+  const result = await repairedGet<{ release: RepairedReleaseDetail | null }>(`/releases/${artistSlug}/${releaseSlug}`);
+  return result.release || null;
+}
+
 export async function listGenres(): Promise<RepairedGenre[]> {
   const result = await repairedGet<{ genres: RepairedGenre[] }>("/genres");
   return result.genres;
 }
+
+export type RepairedArtistVideo = {
+  id: string;
+  title: string;
+  url: string;
+  thumbnail: string;
+  platform: string;
+};
 
 export type RepairedArtistDetail = {
   id: string;
@@ -153,6 +203,7 @@ export type RepairedArtistDetail = {
     name: string;
     imageUrl: string;
   }>;
+  videos?: RepairedArtistVideo[];
 };
 
 export async function getArtist(slug: string): Promise<RepairedArtistDetail | null> {
