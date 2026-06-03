@@ -1,4 +1,6 @@
 const API_BASE =
+  (import.meta.env.VITE_WAKILISHA_PUBLIC_API_BASE as string | undefined) ||
+  (import.meta.env.VITE_WAKILISHA_V2_API_BASE as string | undefined) ||
   (import.meta.env.VITE_WAKILISHA_WP_V2_API_BASE as string | undefined) ||
   "/__wakilisha-v2-api/wp-json/wakilisha/v2";
 
@@ -12,7 +14,7 @@ async function repairedGet<T>(path: string): Promise<T> {
   const response = await fetch(url, { headers: { Accept: "application/json" } });
   if (!response.ok) {
     const text = await response.text().catch(() => "");
-    throw new Error(`WAKILISHA repaired API ${response.status}: ${text || response.statusText}`);
+    throw new Error(`WAKILISHA entity API ${response.status}: ${text || response.statusText}`);
   }
   const payload = (await response.json()) as Envelope<T> | T;
   return payload && typeof payload === "object" && "data" in payload ? (payload as Envelope<T>).data : (payload as T);
