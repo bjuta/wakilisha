@@ -133,16 +133,27 @@ function normalizeArtworkUrl(url: string): string {
   return url.replace(/\{w\}x\{h\}/g, "1200x1200").replace(/\{w\}/g, "1200").replace(/\{h\}/g, "1200");
 }
 
+function extractFirstUrl(value: string): string {
+  const match = value.match(/https?:\/\/[^\s"'<>]+|\/[A-Za-z0-9_./%?=&:@+-]+/i);
+  return match?.[0] ?? value;
+}
+
+function isVideoOrAudioAsset(value: string): boolean {
+  return /\.(mp4|m4v|mov|webm|avi|mkv|mp3|m4a|wav|aac|ogg)(\?|#|$)/i.test(value) || /\b(video|audio)\//i.test(value);
+}
+
 function looksLikeImageUrl(value: string): boolean {
   if (!/^https?:\/\//i.test(value) && !value.startsWith("/")) return false;
+  if (isVideoOrAudioAsset(value)) return false;
   if (/\.(jpe?g|png|webp|gif|avif)(\?|#|$)/i.test(value)) return true;
-  return /(image\/thumb|\/image\/|\/wp-content\/uploads\/|cloudinary|mzstatic|images\.unsplash|cdn)/i.test(value);
+  return /(image\/thumb|\/image\/|cloudinary|mzstatic|images\.unsplash|cdn)/i.test(value) && !/\/wp-content\/uploads\/[^\s]+\.(mp4|m4v|mov|webm|mp3|m4a|wav)/i.test(value);
 }
 
 function cleanUrl(value: unknown): string {
   const text = cleanDisplayText(value);
   if (!text) return "";
-  const normalized = normalizeArtworkUrl(text);
+  const candidate = extractFirstUrl(text);
+  const normalized = normalizeArtworkUrl(candidate);
   if (!looksLikeImageUrl(normalized)) return "";
   return normalized;
 }
