@@ -18,6 +18,7 @@ type HeroLookups = {
   bySlug: Map<string, string>;
   byTitle: Map<string, string>;
   byAttachmentParent: Map<string, string>;
+  allImages: string[];
 };
 
 let pool: pg.Pool | null = null;
@@ -142,9 +143,13 @@ function isVideoOrAudioAsset(value: string): boolean {
   return /\.(mp4|m4v|mov|webm|avi|mkv|mp3|m4a|wav|aac|ogg)(\?|#|$)/i.test(value) || /\b(video|audio)\//i.test(value);
 }
 
+function isPlaceholderAsset(value: string): boolean {
+  return /picsum\.photos|placeholder|placehold\.co|dummyimage/i.test(value);
+}
+
 function looksLikeImageUrl(value: string): boolean {
   if (!/^https?:\/\//i.test(value) && !value.startsWith("/")) return false;
-  if (isVideoOrAudioAsset(value)) return false;
+  if (isVideoOrAudioAsset(value) || isPlaceholderAsset(value)) return false;
   if (/\.(jpe?g|png|webp|gif|avif)(\?|#|$)/i.test(value)) return true;
   return /(image\/thumb|\/image\/|cloudinary|mzstatic|images\.unsplash|cdn)/i.test(value) && !/\/wp-content\/uploads\/[^\s]+\.(mp4|m4v|mov|webm|mp3|m4a|wav)/i.test(value);
 }
@@ -273,6 +278,11 @@ async function hasTable(tableName: string): Promise<boolean> {
   return Boolean(rows[0]?.table_name);
 }
 
+function rememberImage(lookups: HeroLookups, url: string): void {
+  if (!url || lookups.allImages.includes(url)) return;
+  lookups.allImages.push(url);
+}
+
 function addLookup(map: Map<string, string>, key: unknown, url: string): void {
   const normalizedKey = cleanDisplayText(key);
   if (!normalizedKey || !url || map.has(normalizedKey)) return;
@@ -298,16 +308,21 @@ function addTitleLookup(lookups: HeroLookups, key: unknown, url: string): void {
   if (slug !== "item") addLookup(lookups.byTitle, slug, url);
 }
 
-function findLookupUrl(lookups: HeroLookups, key: unknown): string {
+function emptyLookups(): HeroLookups {
+  return { byId: new Map(), bySlug: new Map(), byTitle: new Map(), byAttachmentParent: new Map(), allImages: [] };
+}
+
+function findLookupUrl(lookups: HeroLookups | undefined, key: unknown): string {
   const text = cleanDisplayText(key);
   if (!text) return "";
-  return lookups.byId.get(text)
-    || lookups.bySlug.get(text)
-    || lookups.bySlug.get(slugify(text))
-    || lookups.byTitle.get(text)
-    || lookups.byTitle.get(text.toLowerCase())
-    || lookups.byTitle.get(slugify(text))
-    || lookups.byAttachmentParent.get(text)
+  const safeLookups = lookups ?? emptyLookups();
+  return safeLookups.byId.get(text)
+    || safeLookups.bySlug.get(text)
+    || safeLookups.bySlug.get(slugify(text))
+    || safeLookups.byTitle.get(text)
+    || safeLookups.byTitle.get(text.toLowerCase())
+    || safeLookups.byTitle.get(slugify(text))
+    || safeLookups.byAttachmentParent.get(text)
     || "";
 }
 
@@ -334,20 +349,31 @@ function imageUrlFromWpItem(row: Row): string {
   return firstUrl(row.featured_image_url, row.source_url, row.guid, row.url, row.image_url, row.media_url, row.raw_meta, row);
 }
 
+function deterministicIndex(seed: string, length: number): number {
+  if (length <= 0) return -1;
+  let hash = 0;
+  for (let index = 0; index < seed.length; index += 1) {
+    hash = ((hash << 5) - hash + seed.charCodeAt(index)) | 0;
+  }
+  return Math.abs(hash) % length;
+}
+
+function pooledHeroUrl(seed: string, lookups?: HeroLookups): string {
+  const images = lookups?.allImages ?? [];
+  const index = deterministicIndex(seed, images.length);
+  return index >= 0 ? images[index] : "";
+}
+
 async function buildHeroLookups(): Promise<HeroLookups> {
-  const lookups: HeroLookups = {
-    byId: new Map(),
-    bySlug: new Map(),
-    byTitle: new Map(),
-    byAttachmentParent: new Map(),
-  };
+  const lookups: HeroLookups = emptyLookups();
 
   if (await hasTable("wakilisha_raw.wk_media_assets")) {
-    const mediaRows = await q("select * from wakilisha_raw.wk_media_assets limit 5000");
+    const mediaRows = await q("select * from wakilisha_raw.wk_media_assets limit 10000");
     for (const row of mediaRows) {
       const url = mediaUrlFromRow(row);
       if (!url) continue;
       const payload = parsePayload(row.raw_meta);
+      rememberImage(lookups, url);
       addLookup(lookups.byId, row.id, url);
       addLookup(lookups.byId, row.source_wp_post_id, url);
       addSlugLookup(lookups, row.slug, url);
@@ -364,11 +390,12 @@ async function buildHeroLookups(): Promise<HeroLookups> {
   }
 
   if (await hasTable("wakilisha_raw.wk_wordpress_items")) {
-    const itemRows = await q("select * from wakilisha_raw.wk_wordpress_items limit 5000");
+    const itemRows = await q("select * from wakilisha_raw.wk_wordpress_items limit 10000");
     for (const row of itemRows) {
       const url = imageUrlFromWpItem(row);
       if (!url) continue;
       const payload = parsePayload(row.raw_meta);
+      rememberImage(lookups, url);
       addLookup(lookups.byId, row.id, url);
       addLookup(lookups.byId, row.source_wp_post_id, url);
       addLookup(lookups.byId, row.featured_media, url);
@@ -406,32 +433,34 @@ function resolveHeroUrl(row: Row, lookups?: HeroLookups): string {
   const immutablePayload = parsePayload(row.immutable_payload);
   const seoPayload = parsePayload(row.seo_payload);
   const rawMeta = parsePayload(row.raw_meta);
-  const direct = firstUrl(row, editablePayload, immutablePayload, seoPayload, rawMeta);
+  const sourcePayload = parsePayload(row.source_payload);
+  const direct = firstUrl(row, editablePayload, immutablePayload, seoPayload, rawMeta, sourcePayload);
   if (direct) return direct;
 
   const idCandidates = [
     row.featured_media, row.featured_media_id, row.thumbnail_id, row.post_thumbnail_id,
     editablePayload.featured_media, editablePayload.featured_media_id, immutablePayload.featured_media,
     seoPayload.featured_media, rawMeta.featured_media, rawMeta.featured_media_id, rawMeta.thumbnail_id,
+    sourcePayload.featured_media, sourcePayload.featured_media_id, sourcePayload.thumbnail_id,
   ];
   for (const key of idCandidates) {
-    const url = findLookupUrl(lookups ?? { byId: new Map(), bySlug: new Map(), byTitle: new Map(), byAttachmentParent: new Map() }, key);
+    const url = findLookupUrl(lookups, key);
     if (url) return url;
   }
 
-  const articleIdCandidates = [row.source_wp_post_id, row.id, rawMeta.ID, rawMeta.id];
+  const articleIdCandidates = [row.source_wp_post_id, row.legacy_wp_post_id, row.id, rawMeta.ID, rawMeta.id, sourcePayload.ID, sourcePayload.id];
   for (const key of articleIdCandidates) {
-    const url = findLookupUrl(lookups ?? { byId: new Map(), bySlug: new Map(), byTitle: new Map(), byAttachmentParent: new Map() }, key);
+    const url = findLookupUrl(lookups, key);
     if (url) return url;
   }
 
-  const slugUrl = findLookupUrl(lookups ?? { byId: new Map(), bySlug: new Map(), byTitle: new Map(), byAttachmentParent: new Map() }, row.slug);
+  const slugUrl = findLookupUrl(lookups, row.slug) || findLookupUrl(lookups, sourcePayload.slug) || findLookupUrl(lookups, sourcePayload.post_name);
   if (slugUrl) return slugUrl;
 
-  const titleUrl = findLookupUrl(lookups ?? { byId: new Map(), bySlug: new Map(), byTitle: new Map(), byAttachmentParent: new Map() }, row.title);
+  const titleUrl = findLookupUrl(lookups, row.title) || findLookupUrl(lookups, sourcePayload.title) || findLookupUrl(lookups, sourcePayload.post_title);
   if (titleUrl) return titleUrl;
 
-  return "";
+  return pooledHeroUrl(firstText(row.slug, row.title, row.id), lookups);
 }
 
 function storyFromRawArticle(row: Row, index: number, heroLookups?: HeroLookups): PublicStory {
@@ -455,17 +484,16 @@ function storyFromRawArticle(row: Row, index: number, heroLookups?: HeroLookups)
     author: firstText(row.author, row.author_name, editablePayload.author, rawMeta.author, "WAKILISHA Editorial"),
     date: firstText(row.published_at, row.published_date, row.modified_at, row.updated_at, rawMeta.date, "Undated"),
     readingTime: estimateReadingTime(dek, content),
-    heroUrl: resolveHeroUrl(row, heroLookups) || `https://picsum.photos/seed/wakilisha-story-${slug}/1200/800`,
+    heroUrl: resolveHeroUrl(row, heroLookups),
   };
 }
 
-function storyFromRouteClassification(row: Row, index: number): PublicStory {
+function storyFromRouteClassification(row: Row, index: number, heroLookups?: HeroLookups): PublicStory {
   const payload = parsePayload(row.source_payload);
   const title = firstText(row.title, payload.title, payload.post_title, `Story ${index + 1}`);
   const slug = firstText(row.slug, payload.slug, payload.post_name, slugify(title));
   const dek = firstText(row.dek, row.excerpt, payload.excerpt, payload.post_excerpt, "");
   const content = firstText(payload.post_content, payload.content);
-  const heroUrl = firstUrl(row.hero_url, payload.featured_image_url, payload.image, payload.hero_image_url);
   return {
     id: firstText(row.id, row.legacy_wp_post_id, payload.id, payload.ID, slug),
     slug,
@@ -475,12 +503,14 @@ function storyFromRouteClassification(row: Row, index: number): PublicStory {
     author: firstText(row.author, payload.author, payload.author_name, "WAKILISHA Editorial"),
     date: firstText(row.date, payload.post_date, payload.date, payload.modified, "Undated"),
     readingTime: estimateReadingTime(dek, content),
-    heroUrl: heroUrl || `https://picsum.photos/seed/wakilisha-story-${slug}/1200/800`,
+    heroUrl: resolveHeroUrl(row, heroLookups),
   };
 }
 
 export async function repairedResponse(resource: string, limit = 120): Promise<Record<string, unknown>> {
   if (resource === "magazine") {
+    const heroLookups = await buildHeroLookups();
+
     if (await hasTable("wakilisha_raw.wk_articles")) {
       const rows = await q(`
         select *
@@ -500,7 +530,6 @@ export async function repairedResponse(resource: string, limit = 120): Promise<R
         order by title asc
         limit $1
       `, [limit]);
-      const heroLookups = await buildHeroLookups();
       return { stories: rows.map((row, index) => storyFromRawArticle(row, index, heroLookups)).filter(isPublicMagazineStory) };
     }
 
@@ -539,7 +568,7 @@ export async function repairedResponse(resource: string, limit = 120): Promise<R
         order by created_at desc nulls last, title asc nulls last
         limit $1
       `, [limit]);
-      return { stories: rows.map(storyFromRouteClassification).filter(isPublicMagazineStory) };
+      return { stories: rows.map((row, index) => storyFromRouteClassification(row, index, heroLookups)).filter(isPublicMagazineStory) };
     }
 
     return { stories: [] };
@@ -602,7 +631,17 @@ export async function repairedResponse(resource: string, limit = 120): Promise<R
       order by rr.release_date desc nulls last, rr.title asc
       limit $1
     `, [limit]);
-    return { releases: rows.map((row) => ({ id: s(row, "id"), slug: s(row, "slug") || slugify(s(row, "title")), title: s(row, "title"), artist: s(row, "artist"), year: s(row, "year"), releaseType: s(row, "release_type") || "unknown", labelName: s(row, "label_name"), artworkUrl: s(row, "artwork_url") || `https://picsum.photos/seed/wakilisha-release-${s(row, "id")}/800/800`, trackCount: n(row, "track_count") })) };
+    return { releases: rows.map((row) => ({
+      id: s(row, "id"),
+      slug: s(row, "slug") || slugify(s(row, "title")),
+      title: s(row, "title"),
+      artist: s(row, "artist"),
+      year: s(row, "year"),
+      releaseType: s(row, "release_type") || "unknown",
+      labelName: s(row, "label_name"),
+      artworkUrl: s(row, "artwork_url") || `https://picsum.photos/seed/wakilisha-release-${s(row, "id")}/800/800`,
+      trackCount: n(row, "track_count"),
+    })) };
   }
 
   if (resource === "genres") {
@@ -619,7 +658,14 @@ export async function repairedResponse(resource: string, limit = 120): Promise<R
       order by rg.name asc
       limit $1
     `, [limit]);
-    return { genres: rows.map((row) => ({ id: s(row, "id"), slug: s(row, "slug") || slugify(s(row, "name")), name: s(row, "name"), artistCount: n(row, "artist_count"), trackCount: n(row, "track_count"), representativeArtists: Array.isArray(row.representative_artists) ? row.representative_artists.map(String).slice(0, 6) : [] })) };
+    return { genres: rows.map((row) => ({
+      id: s(row, "id"),
+      slug: s(row, "slug") || slugify(s(row, "name")),
+      name: s(row, "name"),
+      artistCount: n(row, "artist_count"),
+      trackCount: n(row, "track_count"),
+      representativeArtists: Array.isArray(row.representative_artists) ? row.representative_artists.map(String).slice(0, 6) : [],
+    })) };
   }
 
   if (resource === "labels") {
@@ -639,7 +685,18 @@ export async function repairedResponse(resource: string, limit = 120): Promise<R
       order by count(distinct rr.id) desc, rl.name asc
       limit $1
     `, [limit]);
-    return { labels: rows.map((row) => ({ id: s(row, "id"), slug: s(row, "slug") || slugify(s(row, "name")), name: s(row, "name"), country: s(row, "country") || null, logoUrl: s(row, "logo_url") || null, artistCount: 0, releaseCount: n(row, "release_count"), featuredArtists: [], isFeatured: n(row, "release_count") > 0, description: s(row, "description") || `${s(row, "name")} appears in the canonical WAKILISHA registry.` })) };
+    return { labels: rows.map((row) => ({
+      id: s(row, "id"),
+      slug: s(row, "slug") || slugify(s(row, "name")),
+      name: s(row, "name"),
+      country: s(row, "country") || null,
+      logoUrl: s(row, "logo_url") || null,
+      artistCount: 0,
+      releaseCount: n(row, "release_count"),
+      featuredArtists: [],
+      isFeatured: n(row, "release_count") > 0,
+      description: s(row, "description") || `${s(row, "name")} appears in the canonical WAKILISHA registry.`,
+    })) };
   }
 
   throw Object.assign(new Error("Public entity resource not found."), { status: 404 });
