@@ -150,12 +150,20 @@ function looksLikeImageUrl(value: string): boolean {
 }
 
 function cleanUrl(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  const raw = decodeHtml(String(value));
+  if (["", "null", "undefined", "false", "[object object]"].includes(raw.trim().toLowerCase())) return "";
+
+  const candidateFromRaw = extractFirstUrl(raw);
+  const normalizedFromRaw = normalizeArtworkUrl(candidateFromRaw);
+  if (looksLikeImageUrl(normalizedFromRaw)) return normalizedFromRaw;
+
   const text = cleanDisplayText(value);
   if (!text) return "";
-  const candidate = extractFirstUrl(text);
-  const normalized = normalizeArtworkUrl(candidate);
-  if (!looksLikeImageUrl(normalized)) return "";
-  return normalized;
+  const candidateFromCleanText = extractFirstUrl(text);
+  const normalizedFromCleanText = normalizeArtworkUrl(candidateFromCleanText);
+  if (!looksLikeImageUrl(normalizedFromCleanText)) return "";
+  return normalizedFromCleanText;
 }
 
 function slugify(value: string): string {
