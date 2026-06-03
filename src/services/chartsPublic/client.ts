@@ -149,7 +149,7 @@ function cacheMeta(entry: {
   };
 }
 
-async function useCsvPublicData(): Promise<boolean> {
+async function csvPublicDataAvailable(): Promise<boolean> {
   return hasCsvPublicChartData();
 }
 
@@ -279,32 +279,32 @@ function toChartEntryFromApi(entry: ApiEntry, editionId: string): ChartEditionEn
 }
 
 async function fallbackFamilies(): Promise<ChartFamily[]> {
-  const csvData = await useCsvPublicData();
+  const csvData = await csvPublicDataAvailable();
   return csvData ? await getCsvFamilies() : [...MOCK_FAMILIES];
 }
 
 async function fallbackFamily(familySlug: string): Promise<ChartFamily | null> {
-  const csvData = await useCsvPublicData();
+  const csvData = await csvPublicDataAvailable();
   return csvData ? await getCsvFamily(familySlug) : getMockFamily(familySlug);
 }
 
 async function fallbackEditionsForFamily(familySlug: string): Promise<ChartEdition[]> {
-  const csvData = await useCsvPublicData();
+  const csvData = await csvPublicDataAvailable();
   return csvData ? await getCsvEditionsForFamily(familySlug) : getMockEditionsForFamily(familySlug);
 }
 
 async function fallbackLatestEdition(familySlug: string): Promise<ChartEdition | null> {
-  const csvData = await useCsvPublicData();
+  const csvData = await csvPublicDataAvailable();
   return csvData ? await getCsvLatestEdition(familySlug) : getMockLatestEdition(familySlug);
 }
 
 async function fallbackEdition(familySlug: string, editionSlug: string): Promise<ChartEdition | null> {
-  const csvData = await useCsvPublicData();
+  const csvData = await csvPublicDataAvailable();
   return csvData ? await getCsvEdition(familySlug, editionSlug) : getMockEdition(familySlug, editionSlug);
 }
 
 async function fallbackEntries(familySlug: string, editionSlug: string): Promise<ChartEditionEntry[]> {
-  const csvData = await useCsvPublicData();
+  const csvData = await csvPublicDataAvailable();
   return csvData ? await getCsvEntriesForEdition(familySlug, editionSlug) : getMockEntriesForEdition(familySlug, editionSlug);
 }
 
@@ -386,7 +386,7 @@ export function getTrackChartHistory(trackSlug: string): Promise<ChartResult<Tra
       const api = await fetchPublicApi<{ history: TrackChartHistory | null }>(`/tracks/${encodeURIComponent(trackSlug)}/chart-history`);
       return { data: api.history ?? null, source: "api" };
     } catch {
-      const csvData = await useCsvPublicData();
+      const csvData = await csvPublicDataAvailable();
       const csvHistory = csvData ? await getCsvTrackHistory(trackSlug) : null;
       if (csvHistory) return { data: csvHistory, source: "local" };
       if (trackSlug === "midnight-dreams") return { data: { ...MOCK_TRACK_HISTORY }, source: "local" };

@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useTheme } from "@/components/design-system/theme/ThemeProvider";
-import { WkButton } from "@/components/design-system/primitives/Button";
 
 const NAV_LINKS = [
   { label: "Charts", to: "/charts" },
@@ -59,12 +58,6 @@ export function AppTopBar() {
           >
             <i className={theme === "dark" ? "ri-moon-line" : "ri-sun-line"} />
           </button>
-          <Link to="/admin/design-system" className="hidden lg:block">
-            <WkButton variant="soft">
-              <i className="ri-layout-masonry-line" />
-              Design system
-            </WkButton>
-          </Link>
           <button
             onClick={() => setMobileOpen(!mobileOpen)}
             aria-label="Open menu"
@@ -93,13 +86,6 @@ export function AppTopBar() {
                   {link.label}
                 </Link>
               ))}
-              <Link
-                to="/admin/design-system"
-                onClick={closeMobile}
-                className="rounded-lg px-3 py-3 text-[14px] font-semibold text-[var(--wk-brand)] hover:bg-[var(--wk-surface-raised)] active:scale-[0.98] active:opacity-80 transition-all"
-              >
-                Design system
-              </Link>
             </nav>
           </div>
         </>

@@ -6,6 +6,7 @@ export interface ArtistDetail {
   slug: string;
   name: string;
   imageUrl?: string;
+  profileImageUrl?: string;
   genres: string[];
   trackCount: number;
   releaseCount: number;
@@ -40,6 +41,7 @@ export const ARTIST_DETAILS: ArtistDetail[] = [
     slug: "burna-boy",
     name: "Burna Boy",
     imageUrl: "https://readdy.ai/api/search-image?query=African%20afrobeats%20male%20music%20artist%20portrait%2C%20studio%20photography%2C%20dark%20background%2C%20warm%20lighting%2C%20professional%20music%20artist%20photo%2C%20cinematic%20quality%2C%20detailed%20face&width=900&height=480&seq=artist-detail-1&orientation=landscape",
+    profileImageUrl: "https://readdy.ai/api/search-image?query=African%20afrobeats%20male%20artist%20portrait%20headshot%2C%20professional%20studio%20photography%20with%20dramatic%20warm%20lighting%2C%20dark%20moody%20background%2C%20close-up%20face%20shot%2C%20editorial%20fashion%20photography%20style%2C%20clean%20studio%20backdrop%20with%20soft%20bokeh%2C%20high%20quality%20portrait%20photography%2C%204:5%20ratio%20portrait%20composition%2C%20face%20centered%20and%20well%20lit%2C%20professional%20headshot%20style&width=480&height=600&seq=artist-profile-burna&orientation=portrait",
     genres: ["Afrobeats", "Afrofusion"],
     trackCount: 142,
     releaseCount: 8,
@@ -65,6 +67,7 @@ export const ARTIST_DETAILS: ArtistDetail[] = [
     slug: "tems",
     name: "Tems",
     imageUrl: "https://readdy.ai/api/search-image?query=African%20female%20singer%20artist%20portrait%2C%20studio%20photography%2C%20warm%20golden%20lighting%2C%20contemporary%20music%20artist%2C%20cinematic%20quality&width=900&height=480&seq=artist-detail-2&orientation=landscape",
+    profileImageUrl: "https://readdy.ai/api/search-image?query=African%20female%20singer%20artist%20portrait%20headshot%2C%20professional%20studio%20photography%20with%20warm%20golden%20lighting%2C%20elegant%20close-up%20face%20shot%2C%20contemporary%20music%20artist%20portrait%2C%20clean%20dark%20background%2C%20editorial%20fashion%20photography%20style%2C%20soft%20bokeh%2C%204:5%20ratio%20portrait%20composition%2C%20face%20centered%20and%20well%20lit%2C%20professional%20headshot%20style&width=480&height=600&seq=artist-profile-tems&orientation=portrait",
     genres: ["Afropop", "R&B"],
     trackCount: 38,
     releaseCount: 3,
@@ -85,6 +88,7 @@ export const ARTIST_DETAILS: ArtistDetail[] = [
     slug: "wizkid",
     name: "Wizkid",
     imageUrl: "https://readdy.ai/api/search-image?query=Nigerian%20male%20afrobeats%20music%20artist%20portrait%2C%20dark%20studio%20backdrop%2C%20professional%20lighting%2C%20contemporary%20musician&width=900&height=480&seq=artist-detail-3&orientation=landscape",
+    profileImageUrl: "https://readdy.ai/api/search-image?query=Nigerian%20male%20afrobeats%20artist%20portrait%20headshot%2C%20professional%20studio%20photography%2C%20dramatic%20lighting%2C%20close-up%20face%20shot%2C%20dark%20studio%20backdrop%2C%20contemporary%20musician%20portrait%2C%20editorial%20style%2C%20clean%20background%20with%20soft%20bokeh%2C%204:5%20ratio%20portrait%20composition%2C%20face%20centered%20and%20well%20lit%2C%20professional%20headshot%20style&width=480&height=600&seq=artist-profile-wizkid&orientation=portrait",
     genres: ["Afrobeats", "Dancehall"],
     trackCount: 198,
     releaseCount: 6,
@@ -108,6 +112,7 @@ export const ARTIST_DETAILS: ArtistDetail[] = [
     slug: "ayra-starr",
     name: "Ayra Starr",
     imageUrl: "https://readdy.ai/api/search-image?query=African%20female%20afropop%20artist%20portrait%2C%20warm%20studio%20lighting%2C%20stylish%20contemporary%20music%20artist%20photo&width=900&height=480&seq=artist-detail-4&orientation=landscape",
+    profileImageUrl: "https://readdy.ai/api/search-image?query=African%20female%20afropop%20artist%20portrait%20headshot%2C%20warm%20studio%20lighting%2C%20stylish%20young%20artist%20close-up%20face%20shot%2C%20contemporary%20music%20photography%2C%20clean%20background%2C%20editorial%20fashion%20portrait%20style%2C%20soft%20bokeh%2C%204:5%20ratio%20portrait%20composition%2C%20face%20centered%20and%20well%20lit%2C%20professional%20headshot%20style&width=480&height=600&seq=artist-profile-ayra&orientation=portrait",
     genres: ["Afropop", "Soul"],
     trackCount: 24,
     releaseCount: 2,
@@ -129,6 +134,7 @@ export const ARTIST_DETAILS: ArtistDetail[] = [
     slug: "asake",
     name: "Asake",
     imageUrl: "https://readdy.ai/api/search-image?query=Nigerian%20male%20music%20artist%20amapiano%20portrait%2C%20contemporary%20studio%20photography%2C%20warm%20tones&width=900&height=480&seq=artist-detail-5&orientation=landscape",
+    profileImageUrl: "https://readdy.ai/api/search-image?query=Nigerian%20male%20amapiano%20artist%20portrait%20headshot%2C%20professional%20studio%20photography%2C%20warm%20tones%2C%20close-up%20face%20shot%2C%20contemporary%20music%20artist%2C%20clean%20background%2C%20editorial%20portrait%20style%2C%20soft%20bokeh%2C%204:5%20ratio%20portrait%20composition%2C%20face%20centered%20and%20well%20lit%2C%20professional%20headshot%20style&width=480&height=600&seq=artist-profile-asake&orientation=portrait",
     genres: ["Amapiano", "Street Afrobeats"],
     trackCount: 56,
     releaseCount: 3,
@@ -150,6 +156,7 @@ export const ARTIST_DETAILS: ArtistDetail[] = [
     slug: "davido",
     name: "Davido",
     imageUrl: "https://readdy.ai/api/search-image?query=Nigerian%20celebrity%20male%20musician%20portrait%2C%20glamorous%20lighting%2C%20professional%20music%20photography&width=900&height=480&seq=artist-detail-6&orientation=landscape",
+    profileImageUrl: "https://readdy.ai/api/search-image?query=Nigerian%20celebrity%20male%20musician%20portrait%20headshot%2C%20glamorous%20professional%20lighting%2C%20close-up%20face%20shot%2C%20dark%20studio%20background%2C%20editorial%20fashion%20photography%2C%20clean%20backdrop%2C%20soft%20bokeh%2C%204:5%20ratio%20portrait%20composition%2C%20face%20centered%20and%20well%20lit%2C%20professional%20headshot%20style&width=480&height=600&seq=artist-profile-davido&orientation=portrait",
     genres: ["Afrobeats"],
     trackCount: 164,
     releaseCount: 7,
@@ -173,6 +180,7 @@ export const ARTIST_DETAILS: ArtistDetail[] = [
     slug: "fireboy-dml",
     name: "Fireboy DML",
     imageUrl: "https://readdy.ai/api/search-image?query=African male R&B singer portrait, moody studio lighting, contemporary music photography, professional portrait, warm ambient tones, artistic composition, head and shoulders shot, studio background with soft bokeh effect, high end fashion editorial style&width=900&height=480&seq=artist-detail-fireboy&orientation=landscape",
+    profileImageUrl: "https://readdy.ai/api/search-image?query=African male R&B singer portrait headshot, moody studio lighting, close-up face shot, professional portrait photography, warm ambient tones, clean studio background, editorial fashion style, soft bokeh, 4:5 ratio portrait composition, face centered and well lit, professional headshot style&width=480&height=600&seq=artist-profile-fireboy&orientation=portrait",
     genres: ["Afropop", "R&B"],
     trackCount: 72,
     releaseCount: 4,
@@ -198,6 +206,7 @@ export const ARTIST_DETAILS: ArtistDetail[] = [
     slug: "black-sherif",
     name: "Black Sherif",
     imageUrl: "https://readdy.ai/api/search-image?query=Ghanaian%20male%20rap%20artist%20portrait%2C%20urban%20style%20photography%2C%20dramatic%20side%20lighting%2C%20dark%20moody%20background%2C%20dreadlocked%20artist%20with%20intense%20expression%2C%20streetwear%20fashion%2C%20hip%20hop%20aesthetic%2C%20cinematic%20editorial%20portrait%20photography%2C%20professional%20studio%20lighting%20with%20contrast&width=900&height=480&seq=artist-detail-sherif&orientation=landscape",
+    profileImageUrl: "https://readdy.ai/api/search-image?query=Ghanaian%20male%20rap%20artist%20portrait%20headshot%2C%20dramatic%20side%20lighting%2C%20close-up%20face%20shot%2C%20dark%20moody%20background%2C%20dreadlocked%20artist%2C%20hip%20hop%20aesthetic%2C%20editorial%20portrait%20photography%2C%20clean%20backdrop%2C%20soft%20bokeh%2C%204:5%20ratio%20portrait%20composition%2C%20face%20centered%20and%20well%20lit%2C%20professional%20headshot%20style&width=480&height=600&seq=artist-profile-sherif&orientation=portrait",
     genres: ["Afrobeats", "Rap"],
     trackCount: 31,
     releaseCount: 2,
@@ -220,6 +229,7 @@ export const ARTIST_DETAILS: ArtistDetail[] = [
     slug: "oxlade",
     name: "Oxlade",
     imageUrl: "https://readdy.ai/api/search-image?query=African%20male%20singer%20songwriter%20portrait%2C%20acoustic%20music%20artist%2C%20warm%20studio%20light%2C%20professional%20portrait%20photography%2C%20soft%20focus%20background%2C%20soulful%20artist%20aesthetic%2C%20gentle%20expression%2C%20warm%20amber%20lighting%2C%20editorial%20portrait%20style%2C%20contemporary%20musician%20photography&width=900&height=480&seq=artist-detail-oxlade&orientation=landscape",
+    profileImageUrl: "https://readdy.ai/api/search-image?query=African%20male%20singer%20songwriter%20portrait%20headshot%2C%20warm%20studio%20light%2C%20close-up%20face%20shot%2C%20professional%20portrait%20photography%2C%20soft%20focus%20background%2C%20soulful%20artist%20aesthetic%2C%20editorial%20portrait%20style%2C%20clean%20backdrop%2C%20soft%20bokeh%2C%204:5%20ratio%20portrait%20composition%2C%20face%20centered%20and%20well%20lit%2C%20professional%20headshot%20style&width=480&height=600&seq=artist-profile-oxlade&orientation=portrait",
     genres: ["Afropop", "R&B"],
     trackCount: 44,
     releaseCount: 2,
@@ -243,6 +253,7 @@ export const ARTIST_DETAILS: ArtistDetail[] = [
     slug: "kizz-daniel",
     name: "Kizz Daniel",
     imageUrl: "https://readdy.ai/api/search-image?query=Nigerian%20male%20afropop%20artist%20portrait%2C%20professional%20studio%20photography%2C%20confident%20pose%2C%20stylish%20urban%20outfit%2C%20warm%20background%20with%20soft%20lighting%2C%20contemporary%20African%20artist%2C%20headshot%20with%20dramatic%20lighting%2C%20clean%20background%2C%20editorial%20portrait%20style&width=900&height=480&seq=artist-detail-kizz&orientation=landscape",
+    profileImageUrl: "https://readdy.ai/api/search-image?query=Nigerian%20male%20afropop%20artist%20portrait%20headshot%2C%20professional%20studio%20photography%2C%20confident%20pose%2C%20close-up%20face%20shot%2C%20stylish%20urban%20outfit%2C%20clean%20background%2C%20editorial%20portrait%20style%2C%20soft%20bokeh%2C%204:5%20ratio%20portrait%20composition%2C%20face%20centered%20and%20well%20lit%2C%20professional%20headshot%20style&width=480&height=600&seq=artist-profile-kizz&orientation=portrait",
     genres: ["Afropop", "Afrobeats"],
     trackCount: 88,
     releaseCount: 5,
@@ -265,6 +276,7 @@ export const ARTIST_DETAILS: ArtistDetail[] = [
     slug: "bnxn",
     name: "BNXN",
     imageUrl: "https://readdy.ai/api/search-image?query=African%20male%20contemporary%20music%20artist%20portrait%2C%20cool%20studio%20photography%2C%20minimalist%20background%2C%20modern%20fashion%2C%20clean%20aesthetic%2C%20young%20Nigerian%20artist%2C%20artistic%20portrait%20with%20subtle%20lighting%2C%20confident%20gaze%2C%20editorial%20photography%20style%2C%20professional%20studio%20composition&width=900&height=480&seq=artist-detail-bnxn&orientation=landscape",
+    profileImageUrl: "https://readdy.ai/api/search-image?query=African%20male%20contemporary%20music%20artist%20portrait%20headshot%2C%20cool%20studio%20photography%2C%20minimalist%20background%2C%20close-up%20face%20shot%2C%20modern%20fashion%2C%20clean%20aesthetic%2C%20editorial%20portrait%20style%2C%20soft%20bokeh%2C%204:5%20ratio%20portrait%20composition%2C%20face%20centered%20and%20well%20lit%2C%20professional%20headshot%20style&width=480&height=600&seq=artist-profile-bnxn&orientation=portrait",
     genres: ["Afropop", "R&B"],
     trackCount: 29,
     releaseCount: 2,
@@ -288,6 +300,7 @@ export const ARTIST_DETAILS: ArtistDetail[] = [
     slug: "rema",
     name: "Rema",
     imageUrl: "https://readdy.ai/api/search-image?query=Nigerian%20young%20male%20afrobeats%20artist%20portrait%2C%20energetic%20music%20photography%2C%20vibrant%20youth%20culture%2C%20bold%20fashion%2C%20colorful%20studio%20background%2C%20dynamic%20pose%2C%20modern%20African%20pop%20star%20aesthetic%2C%20high%20energy%20portrait%20with%20artistic%20lighting%2C%20professional%20editorial%20photography%2C%20creative%20composition&width=900&height=480&seq=artist-detail-rema&orientation=landscape",
+    profileImageUrl: "https://readdy.ai/api/search-image?query=Nigerian%20young%20male%20afrobeats%20artist%20portrait%20headshot%2C%20energetic%20music%20photography%2C%20vibrant%20youth%20culture%2C%20close-up%20face%20shot%2C%20bold%20fashion%2C%20colorful%20studio%20background%2C%20editorial%20portrait%20style%2C%20soft%20bokeh%2C%204:5%20ratio%20portrait%20composition%2C%20face%20centered%20and%20well%20lit%2C%20professional%20headshot%20style&width=480&height=600&seq=artist-profile-rema&orientation=portrait",
     genres: ["Afrobeats", "Afrorave"],
     trackCount: 52,
     releaseCount: 3,
@@ -311,6 +324,7 @@ export const ARTIST_DETAILS: ArtistDetail[] = [
     slug: "cruel-santino",
     name: "Cruel Santino",
     imageUrl: "https://readdy.ai/api/search-image?query=Alternative%20African%20music%20artist%20portrait%2C%20artistic%20studio%20photography%2C%20moody%20lighting%2C%20creative%20expression%2C%20eclectic%20fashion%2C%20dark%20background%20with%20colored%20light%20accents%2C%20artistic%20composition%2C%20alternative%20afrobeats%20musician%2C%20professional%20editorial%20portrait%20with%20avant-garde%20style%2C%20dramatic%20shadows&width=900&height=480&seq=artist-detail-santino&orientation=landscape",
+    profileImageUrl: "https://readdy.ai/api/search-image?query=Alternative%20African%20music%20artist%20portrait%20headshot%2C%20artistic%20studio%20photography%2C%20moody%20lighting%2C%20close-up%20face%20shot%2C%20creative%20expression%2C%20eclectic%20fashion%2C%20dark%20background%2C%20editorial%20portrait%20style%2C%20soft%20bokeh%2C%204:5%20ratio%20portrait%20composition%2C%20face%20centered%20and%20well%20lit%2C%20professional%20headshot%20style&width=480&height=600&seq=artist-profile-santino&orientation=portrait",
     genres: ["Alt-Afrobeats", "Afropop"],
     trackCount: 45,
     releaseCount: 3,
@@ -332,6 +346,7 @@ export const ARTIST_DETAILS: ArtistDetail[] = [
     slug: "amaarae",
     name: "Amaarae",
     imageUrl: "https://readdy.ai/api/search-image?query=African%20female%20alternative%20music%20artist%20portrait%2C%20artistic%20creative%20studio%20lighting%2C%20colorful%20expression%2C%20bold%20fashion%2C%20vibrant%20makeup%2C%20dramatic%20lighting%20with%20pink%20and%20blue%20hues%2C%20avant-garde%20fashion%20photography%2C%20editorial%20style%20with%20artistic%20composition%2C%20professional%20studio%20portrait%20with%20colorful%20gel%20lighting&width=900&height=480&seq=artist-detail-amaarae&orientation=landscape",
+    profileImageUrl: "https://readdy.ai/api/search-image?query=African%20female%20alternative%20music%20artist%20portrait%20headshot%2C%20artistic%20creative%20studio%20lighting%2C%20colorful%20expression%2C%20close-up%20face%20shot%2C%20bold%20fashion%2C%20dramatic%20lighting%2C%20editorial%20portrait%20style%2C%20soft%20bokeh%2C%204:5%20ratio%20portrait%20composition%2C%20face%20centered%20and%20well%20lit%2C%20professional%20headshot%20style&width=480&height=600&seq=artist-profile-amaarae&orientation=portrait",
     genres: ["Alt-Afrobeats", "Afropop"],
     trackCount: 28,
     releaseCount: 2,
@@ -353,6 +368,7 @@ export const ARTIST_DETAILS: ArtistDetail[] = [
     slug: "stonebwoy",
     name: "Stonebwoy",
     imageUrl: "https://readdy.ai/api/search-image?query=Ghanaian%20dancehall%20music%20artist%20portrait%2C%20dreadlocks%2C%20dramatic%20studio%20lighting%2C%20reggae%20artist%2C%20powerful%20presence%2C%20dark%20background%20with%20warm%20amber%20lighting%2C%20professional%20portrait%20photography%2C%20roots%20reggae%20aesthetic%2C%20confident%20expression%2C%20editorial%20style%20with%20theatrical%20lighting%2C%20high%20contrast&width=900&height=480&seq=artist-detail-stonebwoy&orientation=landscape",
+    profileImageUrl: "https://readdy.ai/api/search-image?query=Ghanaian%20dancehall%20music%20artist%20portrait%20headshot%2C%20dreadlocks%2C%20dramatic%20studio%20lighting%2C%20close-up%20face%20shot%2C%20powerful%20presence%2C%20dark%20background%2C%20editorial%20portrait%20style%2C%20soft%20bokeh%2C%204:5%20ratio%20portrait%20composition%2C%20face%20centered%20and%20well%20lit%2C%20professional%20headshot%20style&width=480&height=600&seq=artist-profile-stonebwoy&orientation=portrait",
     genres: ["Dancehall", "Afrobeats"],
     trackCount: 76,
     releaseCount: 5,
@@ -374,6 +390,7 @@ export const ARTIST_DETAILS: ArtistDetail[] = [
     slug: "omah-lay",
     name: "Omah Lay",
     imageUrl: "https://readdy.ai/api/search-image?query=Nigerian%20male%20afropop%20artist%20portrait%2C%20contemplative%20studio%20photography%2C%20warm%20lighting%2C%20introspective%20expression%2C%20soft%20background%20with%20gentle%20bokeh%2C%20emotional%20artist%20aesthetic%2C%20professional%20portrait%20photography%2C%20warm%20amber%20and%20brown%20tones%2C%20editorial%20style%20with%20artistic%20composition%2C%20clean%20modern%20studio%20background&width=900&height=480&seq=artist-detail-omah&orientation=landscape",
+    profileImageUrl: "https://readdy.ai/api/search-image?query=Nigerian%20male%20afropop%20artist%20portrait%20headshot%2C%20contemplative%20studio%20photography%2C%20warm%20lighting%2C%20close-up%20face%20shot%2C%20introspective%20expression%2C%20soft%20background%2C%20editorial%20portrait%20style%2C%20soft%20bokeh%2C%204:5%20ratio%20portrait%20composition%2C%20face%20centered%20and%20well%20lit%2C%20professional%20headshot%20style&width=480&height=600&seq=artist-profile-omah&orientation=portrait",
     genres: ["Afropop", "Afro-fusion"],
     trackCount: 35,
     releaseCount: 2,
@@ -412,6 +429,7 @@ export function generateArtistDetailFromBase(base: {
   monthlyStreams?: number;
   topChartPosition?: number;
   spotlightBio?: string;
+  profileImageUrl?: string;
 }): ArtistDetail {
   // Find chart entries from CHART_DATA that match this artist
   const chartEntries = CHART_DATA
@@ -452,6 +470,7 @@ export function generateArtistDetailFromBase(base: {
     slug: base.slug,
     name: base.name,
     imageUrl: base.imageUrl,
+    profileImageUrl: base.profileImageUrl,
     genres: base.genres,
     trackCount: base.trackCount,
     releaseCount: base.releaseCount,

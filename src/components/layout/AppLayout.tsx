@@ -31,7 +31,6 @@ export function AppLayout() {
               <Link to="/genres" className="hover:text-[var(--wk-text)]">Genres</Link>
               <Link to="/labels" className="hover:text-[var(--wk-text)]">Labels</Link>
               <Link to="/magazine" className="hover:text-[var(--wk-text)]">Magazine</Link>
-              <Link to="/admin/design-system" className="hover:text-[var(--wk-text)]">Design system</Link>
             </nav>
           </div>
           <div className="mt-8 border-t border-[var(--wk-divider)] pt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">

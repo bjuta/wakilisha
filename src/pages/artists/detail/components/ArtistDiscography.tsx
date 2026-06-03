@@ -1,95 +1,179 @@
-import { useRef } from "react";
+import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
+import { useScrollReveal } from "@/hooks/useScrollReveal";
 
 interface DiscoRelease {
   slug: string;
   title: string;
-  artist: string;
+  artist?: string;
   artworkUrl?: string;
   releaseType?: string;
   year?: string | number;
   trackCount?: number;
+  releaseDate?: string;
+  tracks?: Array<{ title: string; duration: string }>;
 }
 
 interface ArtistDiscographyProps {
   releases: DiscoRelease[];
 }
 
-export function ArtistDiscography({ releases }: ArtistDiscographyProps) {
-  const scrollRef = useRef<HTMLDivElement>(null);
+type Filter = "All" | "Albums" | "EPs";
 
-  const scroll = (dir: "left" | "right") => {
-    if (!scrollRef.current) return;
-    scrollRef.current.scrollBy({ left: dir === "left" ? -280 : 280, behavior: "smooth" });
-  };
+function formatYear(dateStr?: string, year?: string | number): string {
+  if (year) return String(year);
+  if (dateStr) return dateStr.split("-")[0];
+  return "";
+}
+
+function ReleaseCard({ release }: { release: DiscoRelease }) {
+  const trackPreviews = release.tracks?.slice(0, 3) || [];
+  const hasMoreTracks = (release.trackCount || 0) > 3;
+  const releaseYear = formatYear(release.releaseDate, release.year);
 
   return (
-    <section className="py-10 md:py-14">
-      <div className="wk-container px-6">
-        <div className="mb-6 flex items-end justify-between">
-          <div>
-            <div className="wk-eyebrow mb-2">Discography</div>
-            <h3 className="text-[clamp(24px,3vw,40px)] font-black leading-[0.92] tracking-[-0.04em] text-[var(--wk-text)]">
-              Releases
-            </h3>
+    <Link
+      to={`/releases/${release.slug}`}
+      className="group relative block overflow-hidden rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] transition-all duration-500 hover:border-[var(--wk-brand)]"
+    >
+      {/* Artwork */}
+      <div className="relative aspect-square bg-[var(--wk-surface-raised)] overflow-hidden">
+        {release.artworkUrl ? (
+          <img
+            src={release.artworkUrl}
+            alt={release.title}
+            className="h-full w-full object-cover object-top transition-transform duration-700 group-hover:scale-[1.06]"
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center">
+            <i className="ri-album-line text-5xl text-[var(--wk-text-faint)]" />
           </div>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => scroll("left")}
-              className="flex h-8 w-8 items-center justify-center rounded-full border border-[var(--wk-border)] text-[var(--wk-text-muted)] transition-all hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]"
-            >
-              <i className="ri-arrow-left-line text-sm" />
-            </button>
-            <button
-              onClick={() => scroll("right")}
-              className="flex h-8 w-8 items-center justify-center rounded-full border border-[var(--wk-border)] text-[var(--wk-text-muted)] transition-all hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]"
-            >
-              <i className="ri-arrow-right-line text-sm" />
-            </button>
+        )}
+
+        {/* Type chip on artwork */}
+        <div className="absolute top-3 left-3">
+          <span className="inline-flex items-center rounded-full bg-black/50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.1em] text-white backdrop-blur-sm">
+            {release.releaseType || "Release"}
+          </span>
+        </div>
+
+        {/* Hover overlay with track preview */}
+        <div className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-0 transition-all duration-300 group-hover:opacity-100">
+          <div className="p-4 pb-5">
+            <div className="space-y-1.5">
+              {trackPreviews.map((track, idx) => (
+                <div key={idx} className="flex items-center gap-2 text-[13px] text-white/90">
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/15 text-[10px] font-bold">
+                    {idx + 1}
+                  </span>
+                  <span className="truncate">{track.title}</span>
+                </div>
+              ))}
+              {hasMoreTracks && (
+                <div className="text-[12px] text-white/60 font-semibold">
+                  +{release.trackCount! - 3} more
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
-      <div
-        ref={scrollRef}
-        className="flex gap-4 overflow-x-auto px-6 pb-3 scrollbar-hide"
-        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-      >
-        {releases.map((release) => (
-          <Link
-            key={release.slug}
-            to={`/releases/${release.slug}`}
-            className="group block shrink-0 overflow-hidden rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] transition-all hover:border-[var(--wk-border-2)]"
-            style={{ width: "200px" }}
-          >
-            <div className="relative aspect-square bg-[var(--wk-surface-raised)]">
-              {release.artworkUrl ? (
-                <img
-                  src={release.artworkUrl}
-                  alt={release.title}
-                  className="h-full w-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
-                />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center">
-                  <i className="ri-album-line text-4xl text-[var(--wk-text-faint)]" />
-                </div>
-              )}
-            </div>
-            <div className="p-3">
-              <h4 className="truncate text-[14px] font-bold text-[var(--wk-text)]">{release.title}</h4>
-              <div className="mt-1 flex items-center gap-2 text-[12px] text-[var(--wk-text-muted)]">
-                {release.releaseType && (
-                  <span className="rounded-full border border-[var(--wk-border)] bg-[var(--wk-bg)] px-2 py-0.5 text-[11px] font-semibold text-[var(--wk-text-soft)]">
-                    {release.releaseType}
-                  </span>
-                )}
-                {release.year && <span>{release.year}</span>}
-                {release.trackCount !== undefined && (
-                  <span>· {release.trackCount} tracks</span>
-                )}
-              </div>
-            </div>
-          </Link>
+      {/* Info below artwork */}
+      <div className="p-4">
+        <div className="flex items-center gap-2 mb-2">
+          {releaseYear && (
+            <span className="text-[12px] font-bold text-[var(--wk-text-faint)]">
+              {releaseYear}
+            </span>
+          )}
+          {release.trackCount !== undefined && (
+            <span className="text-[12px] text-[var(--wk-text-faint)]">
+              · {release.trackCount} tracks
+            </span>
+          )}
+        </div>
+
+        <h4 className="text-[16px] font-bold leading-tight text-[var(--wk-text)] group-hover:text-[var(--wk-brand)] transition-colors">
+          {release.title}
+        </h4>
+      </div>
+    </Link>
+  );
+}
+
+export function ArtistDiscography({ releases }: ArtistDiscographyProps) {
+  const [filter, setFilter] = useState<Filter>("All");
+  const { ref, revealed } = useScrollReveal<HTMLElement>(0.1);
+
+  // Sort releases by date descending (latest first)
+  const sortedReleases = useMemo(() => {
+    return [...releases].sort((a, b) => {
+      const da = a.releaseDate ? new Date(a.releaseDate).getTime() : 0;
+      const db = b.releaseDate ? new Date(b.releaseDate).getTime() : 0;
+      return db - da;
+    });
+  }, [releases]);
+
+  const filtered = sortedReleases.filter((r) => {
+    if (filter === "All") return true;
+    if (filter === "Albums") return r.releaseType === "Album";
+    if (filter === "EPs") return r.releaseType === "EP";
+    return true;
+  });
+
+  const filters: Filter[] = ["All", "Albums", "EPs"];
+  const counts: Record<Filter, number> = {
+    All: sortedReleases.length,
+    Albums: sortedReleases.filter((r) => r.releaseType === "Album").length,
+    EPs: sortedReleases.filter((r) => r.releaseType === "EP").length,
+  };
+
+  return (
+    <section ref={ref} className={`${revealed ? "is-visible" : ""} reveal-up`}>
+      {/* Header */}
+      <div className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <div className="wk-eyebrow mb-2">Discography</div>
+          <h2 className="text-[clamp(26px,3vw,40px)] font-black leading-[0.92] tracking-[-0.04em] text-[var(--wk-text)]">
+            Releases
+          </h2>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {filters.map((f) => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`rounded-full px-4 py-2 text-[12px] font-bold transition-all ${
+                filter === f
+                  ? "bg-[var(--wk-brand)] text-[var(--wk-brand-on)]"
+                  : "border border-[var(--wk-border)] bg-[var(--wk-surface)] text-[var(--wk-text-muted)] hover:border-[var(--wk-border-2)] hover:text-[var(--wk-text)]"
+              }`}
+            >
+              {f}
+              <span className={`ml-1.5 text-[11px] ${filter === f ? "text-[var(--wk-brand-on)]/70" : "text-[var(--wk-text-faint)]"}`}>
+                {counts[f]}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {filtered.length === 0 && (
+        <div className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-14 text-center">
+          <i className="ri-album-line mb-3 block text-5xl text-[var(--wk-text-faint)]" />
+          <p className="text-[15px] font-semibold text-[var(--wk-text-muted)]">No releases</p>
+          <p className="mt-1 text-[13px] text-[var(--wk-text-faint)]">
+            No releases match the selected filter.
+          </p>
+        </div>
+      )}
+
+      {/* Gallery wall — all releases, equal size */}
+      <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-4">
+        {filtered.map((release) => (
+          <ReleaseCard key={release.slug} release={release} />
         ))}
       </div>
     </section>

@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { WkButton } from "@/components/design-system/primitives/Button";
 import { useTheme } from "@/components/design-system/theme/ThemeProvider";
 
 interface HomeNavProps {
@@ -50,12 +49,6 @@ export function HomeNav({ theme, onToggleTheme }: HomeNavProps) {
           >
             <i className={theme === "dark" ? "ri-moon-line" : "ri-sun-line"} />
           </button>
-          <Link to="/admin/design-system" className="hidden lg:block">
-            <WkButton variant="soft">
-              <i className="ri-layout-masonry-line" />
-              Design system
-            </WkButton>
-          </Link>
           <button
             onClick={() => setMobileOpen(!mobileOpen)}
             aria-label="Open menu"
@@ -79,13 +72,6 @@ export function HomeNav({ theme, onToggleTheme }: HomeNavProps) {
                 {link.label}
               </Link>
             ))}
-            <Link
-              to="/admin/design-system"
-              onClick={() => setMobileOpen(false)}
-              className="rounded-lg px-3 py-2.5 text-[13px] font-semibold text-[var(--wk-brand)] hover:bg-[var(--wk-surface-raised)]"
-            >
-              Design system
-            </Link>
           </nav>
         </div>
       )}

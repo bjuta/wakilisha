@@ -177,7 +177,6 @@ export function AdminChartsLayout() {
         <div className="space-y-1">
           {[
             { label: "Back to Site", icon: "Home" as WkIconName, onClick: () => navigate("/") },
-            { label: "Design System", icon: "PanelTop" as WkIconName, onClick: () => navigate("/admin/design-system") },
             { label: "Settings", icon: "Settings" as WkIconName, onClick: () => navigate("/admin/settings") },
             { label: theme === "dark" ? "Dark mode" : "Light mode", icon: (theme === "dark" ? "Moon" : "Sun") as WkIconName, onClick: toggle },
           ].map((item) => (
@@ -274,7 +273,6 @@ export function AdminChartsLayout() {
                 { label: "Editions", path: "/admin/settings/charts/editions" },
                 { label: "Health", path: "/admin/settings/charts/ingest-health" },
                 { label: "Settings", path: "/admin/settings" },
-                { label: "Design System", path: "/admin/design-system" },
                 { label: "Public Site", path: "/" },
               ].map((link) => (
                 <button key={link.path} onClick={() => navigate(link.path)} className="hover:text-[var(--wk-text)] transition-colors">

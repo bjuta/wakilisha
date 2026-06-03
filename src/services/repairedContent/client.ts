@@ -100,6 +100,66 @@ export async function listGenres(): Promise<RepairedGenre[]> {
   return result.genres;
 }
 
+export type RepairedArtistDetail = {
+  id: string;
+  slug: string;
+  name: string;
+  country: string;
+  imageUrl: string;
+  profileImageUrl?: string;
+  genres: string[];
+  trackCount: number;
+  releaseCount: number;
+  isChartArtist: boolean;
+  isRising: boolean;
+  topChartPosition: number | null;
+  bio: string;
+  fullBio: string;
+  artistType: string | null;
+  followerCount: number;
+  popularity: number;
+  spotifyUrl: string;
+  instagram: string;
+  chartEntries: Array<{
+    rank: number;
+    title: string;
+    artist: string;
+    slug: string;
+    movement: "up" | "down" | "new" | "same";
+    movementAmount: number;
+    peakPosition: number;
+    weeksOnChart: number;
+    artworkUrl: string;
+  }>;
+  releases: Array<{
+    slug: string;
+    title: string;
+    releaseType: string;
+    year: string;
+    releaseDate: string;
+    trackCount: number;
+    artworkUrl: string;
+    tracks: Array<{ title: string; duration: string }>;
+  }>;
+  topSongs: Array<{
+    title: string;
+    artists: string;
+    image: string;
+    duration: string;
+    songUrl: string;
+  }>;
+  relatedArtists: Array<{
+    slug: string;
+    name: string;
+    imageUrl: string;
+  }>;
+};
+
+export async function getArtist(slug: string): Promise<RepairedArtistDetail | null> {
+  const result = await repairedGet<{ artist: RepairedArtistDetail | null }>(`/artists/${slug}`);
+  return result.artist || null;
+}
+
 export async function listLabels(): Promise<RepairedLabel[]> {
   const result = await repairedGet<{ labels: RepairedLabel[] }>("/labels");
   return result.labels;

@@ -12,7 +12,8 @@ export type AdminSettingsDomain =
   | "emailBriefings"
   | "maintenance"
   | "navigation"
-  | "audit";
+  | "audit"
+  | "designSystem";
 
 export interface SettingsDomainMeta {
   key: AdminSettingsDomain;
@@ -34,6 +35,15 @@ export const SETTINGS_DOMAINS: SettingsDomainMeta[] = [
     route: "/admin/settings/chart-defaults",
     health: "healthy",
     primaryAction: "Edit defaults",
+  },
+  {
+    key: "designSystem",
+    label: "Design System",
+    description: "Design tokens, component specimens, theme browser, and visual QA gates",
+    icon: "PanelTop",
+    route: "/admin/settings/design-system",
+    health: "healthy",
+    primaryAction: "Open bible",
   },
   {
     key: "integrations",

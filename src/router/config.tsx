@@ -127,10 +127,6 @@ const routes: RouteObject[] = [
       { path: "/settings", element: <ResponsivePage mobile={<SettingsPage />} desktop={<SettingsPage />} /> },
     ],
   },
-  {
-    path: "/admin/design-system",
-    element: <AdminDesignSystem />,
-  },
   // Admin Charts Studio — now under /admin/settings/charts
   {
     path: "/admin/settings/charts",
@@ -161,6 +157,7 @@ const routes: RouteObject[] = [
     element: <AdminSettingsLayout />,
     children: [
       { index: true, element: <AdminSettingsHub /> },
+      { path: "design-system", element: <AdminDesignSystem /> },
       { path: "chart-defaults", element: <AdminSettingsChartDefaults /> },
       { path: "chart-defaults/market-scopes", element: <AdminSettingsChartDefaultsMarketScopes /> },
       { path: "integrations", element: <AdminSettingsIntegrations /> },
@@ -175,6 +172,10 @@ const routes: RouteObject[] = [
       { path: "navigation", element: <AdminSettingsNavigation /> },
       { path: "audit", element: <AdminSettingsAudit /> },
     ],
+  },
+  {
+    path: "/admin/design-system",
+    element: <Navigate to="/admin/settings/design-system" replace />,
   },
   {
     path: "*",
