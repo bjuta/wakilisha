@@ -13,6 +13,13 @@ type PublicStory = {
   heroUrl: string;
 };
 
+type HeroLookups = {
+  byId: Map<string, string>;
+  bySlug: Map<string, string>;
+  byTitle: Map<string, string>;
+  byAttachmentParent: Map<string, string>;
+};
+
 let pool: pg.Pool | null = null;
 
 const SYSTEM_SLUGS = new Set([
@@ -96,15 +103,7 @@ const SYSTEM_TITLES = new Set([
   "venues",
 ]);
 
-const SYSTEM_SLUG_PATTERNS = [
-  "account",
-  "checkout",
-  "order-tracking",
-  "privacy",
-  "profile",
-  "settings",
-  "wp-",
-];
+const SYSTEM_SLUG_PATTERNS = ["account", "checkout", "order-tracking", "privacy", "profile", "settings", "wp-"];
 
 function normalizeDatabaseUrl(databaseUrl: string): string {
   try {
@@ -189,22 +188,21 @@ function decodeHtml(value: string): string {
 
 function cleanDisplayText(value: unknown): string {
   if (value === null || value === undefined) return "";
-  const text = decodeHtml(String(value))
-    .replace(/<[^>]+>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  const text = decodeHtml(String(value)).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
   if (!text) return "";
   if (["null", "undefined", "false", "[object object]"].includes(text.toLowerCase())) return "";
   return text;
 }
 
+function cleanUrl(value: unknown): string {
+  const text = cleanDisplayText(value);
+  if (!text) return "";
+  if (!/^https?:\/\//i.test(text) && !text.startsWith("/")) return "";
+  return text;
+}
+
 function slugify(value: string): string {
-  return cleanDisplayText(value)
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "") || "item";
+  return cleanDisplayText(value).toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "item";
 }
 
 function stripHtml(value: string): string {
@@ -228,6 +226,14 @@ function parsePayload(value: unknown): Row {
 function firstText(...values: unknown[]): string {
   for (const value of values) {
     const text = cleanDisplayText(value);
+    if (text) return text;
+  }
+  return "";
+}
+
+function firstUrl(...values: unknown[]): string {
+  for (const value of values) {
+    const text = cleanUrl(value);
     if (text) return text;
   }
   return "";
@@ -264,7 +270,157 @@ async function hasTable(tableName: string): Promise<boolean> {
   return Boolean(rows[0]?.table_name);
 }
 
-function storyFromRawArticle(row: Row, index: number): PublicStory {
+function addLookup(map: Map<string, string>, key: unknown, url: string): void {
+  const normalizedKey = cleanDisplayText(key);
+  if (!normalizedKey || !url || map.has(normalizedKey)) return;
+  map.set(normalizedKey, url);
+}
+
+function mediaUrlFromRow(row: Row): string {
+  const payload = parsePayload(row.raw_meta);
+  return firstUrl(
+    row.source_url,
+    row.url,
+    row.guid,
+    row.local_url,
+    row.image_url,
+    row.featured_image_url,
+    row.media_url,
+    row.file_url,
+    payload.source_url,
+    payload.guid,
+    payload.url,
+    payload.media_url,
+  );
+}
+
+function imageUrlFromWpItem(row: Row): string {
+  const payload = parsePayload(row.raw_meta);
+  return firstUrl(
+    row.featured_image_url,
+    row.source_url,
+    row.guid,
+    row.url,
+    row.image_url,
+    row.media_url,
+    payload.featured_image_url,
+    payload.source_url,
+    payload.guid,
+    payload.url,
+    payload.media_url,
+  );
+}
+
+async function buildHeroLookups(): Promise<HeroLookups> {
+  const lookups: HeroLookups = {
+    byId: new Map(),
+    bySlug: new Map(),
+    byTitle: new Map(),
+    byAttachmentParent: new Map(),
+  };
+
+  if (await hasTable("wakilisha_raw.wk_media_assets")) {
+    const mediaRows = await q("select * from wakilisha_raw.wk_media_assets limit 5000");
+    for (const row of mediaRows) {
+      const url = mediaUrlFromRow(row);
+      if (!url) continue;
+      const payload = parsePayload(row.raw_meta);
+      addLookup(lookups.byId, row.id, url);
+      addLookup(lookups.byId, row.source_wp_post_id, url);
+      addLookup(lookups.bySlug, row.slug, url);
+      addLookup(lookups.byTitle, row.title, url);
+      addLookup(lookups.byAttachmentParent, row.attached_to_post_id, url);
+      addLookup(lookups.byAttachmentParent, row.parent_id, url);
+      addLookup(lookups.byAttachmentParent, row.post_parent, url);
+      addLookup(lookups.byAttachmentParent, payload.attached_to_post_id, url);
+      addLookup(lookups.byAttachmentParent, payload.parent_id, url);
+      addLookup(lookups.byAttachmentParent, payload.post_parent, url);
+    }
+  }
+
+  if (await hasTable("wakilisha_raw.wk_wordpress_items")) {
+    const itemRows = await q("select * from wakilisha_raw.wk_wordpress_items limit 5000");
+    for (const row of itemRows) {
+      const url = imageUrlFromWpItem(row);
+      if (!url) continue;
+      const payload = parsePayload(row.raw_meta);
+      addLookup(lookups.byId, row.id, url);
+      addLookup(lookups.byId, row.source_wp_post_id, url);
+      addLookup(lookups.byId, row.featured_media, url);
+      addLookup(lookups.byId, row.featured_media_id, url);
+      addLookup(lookups.byId, payload.featured_media, url);
+      addLookup(lookups.byId, payload.featured_media_id, url);
+      addLookup(lookups.bySlug, row.slug, url);
+      addLookup(lookups.byTitle, row.title, url);
+      addLookup(lookups.byAttachmentParent, row.parent_id, url);
+      addLookup(lookups.byAttachmentParent, payload.parent_id, url);
+      addLookup(lookups.byAttachmentParent, payload.post_parent, url);
+    }
+  }
+
+  return lookups;
+}
+
+function resolveHeroUrl(row: Row, lookups?: HeroLookups): string {
+  const editablePayload = parsePayload(row.editable_payload);
+  const immutablePayload = parsePayload(row.immutable_payload);
+  const seoPayload = parsePayload(row.seo_payload);
+  const rawMeta = parsePayload(row.raw_meta);
+  const direct = firstUrl(
+    row.featured_image_url,
+    row.hero_image_url,
+    row.image_url,
+    row.thumbnail_url,
+    row.cover_image_url,
+    editablePayload.featured_image_url,
+    editablePayload.hero_image_url,
+    immutablePayload.featured_image_url,
+    seoPayload.og_image,
+    seoPayload.twitter_image,
+    rawMeta.featured_image_url,
+    rawMeta.hero_image_url,
+    rawMeta.image,
+    rawMeta.image_url,
+  );
+  if (direct) return direct;
+
+  const idCandidates = [
+    row.featured_media,
+    row.featured_media_id,
+    row.thumbnail_id,
+    row.post_thumbnail_id,
+    editablePayload.featured_media,
+    editablePayload.featured_media_id,
+    immutablePayload.featured_media,
+    seoPayload.featured_media,
+    rawMeta.featured_media,
+    rawMeta.featured_media_id,
+    rawMeta.thumbnail_id,
+  ];
+  for (const key of idCandidates) {
+    const url = lookups?.byId.get(cleanDisplayText(key));
+    if (url) return url;
+  }
+
+  const articleIdCandidates = [row.source_wp_post_id, row.id, rawMeta.ID, rawMeta.id];
+  for (const key of articleIdCandidates) {
+    const cleanKey = cleanDisplayText(key);
+    const byId = lookups?.byId.get(cleanKey);
+    if (byId) return byId;
+    const byParent = lookups?.byAttachmentParent.get(cleanKey);
+    if (byParent) return byParent;
+  }
+
+  const slugUrl = lookups?.bySlug.get(cleanDisplayText(row.slug));
+  if (slugUrl) return slugUrl;
+
+  const titleUrl = lookups?.byTitle.get(cleanDisplayText(row.title));
+  if (titleUrl) return titleUrl;
+
+  return "";
+}
+
+function storyFromRawArticle(row: Row, index: number, heroLookups?: HeroLookups): PublicStory {
   const title = firstText(row.title, `Story ${index + 1}`);
   const slug = firstText(row.slug, slugify(title));
   const editablePayload = parsePayload(row.editable_payload);
@@ -293,7 +449,7 @@ function storyFromRawArticle(row: Row, index: number): PublicStory {
     author: firstText(row.author, row.author_name, editablePayload.author, rawMeta.author, "WAKILISHA Editorial"),
     date: firstText(row.published_at, row.published_date, row.modified_at, row.updated_at, rawMeta.date, "Undated"),
     readingTime: estimateReadingTime(dek, content),
-    heroUrl: firstText(row.featured_image_url, row.hero_image_url, row.image_url, editablePayload.featured_image_url, rawMeta.featured_image_url, `https://picsum.photos/seed/wakilisha-story-${slug}/1200/800`),
+    heroUrl: resolveHeroUrl(row, heroLookups) || `https://picsum.photos/seed/wakilisha-story-${slug}/1200/800`,
   };
 }
 
@@ -303,6 +459,7 @@ function storyFromRouteClassification(row: Row, index: number): PublicStory {
   const slug = firstText(row.slug, payload.slug, payload.post_name, slugify(title));
   const dek = firstText(row.dek, row.excerpt, payload.excerpt, payload.post_excerpt, "");
   const content = firstText(payload.post_content, payload.content);
+  const heroUrl = firstUrl(row.hero_url, payload.featured_image_url, payload.image, payload.hero_image_url);
   return {
     id: firstText(row.id, row.legacy_wp_post_id, payload.id, payload.ID, slug),
     slug,
@@ -312,7 +469,7 @@ function storyFromRouteClassification(row: Row, index: number): PublicStory {
     author: firstText(row.author, payload.author, payload.author_name, "WAKILISHA Editorial"),
     date: firstText(row.date, payload.post_date, payload.date, payload.modified, "Undated"),
     readingTime: estimateReadingTime(dek, content),
-    heroUrl: firstText(row.hero_url, payload.featured_image_url, payload.image, payload.hero_image_url, `https://picsum.photos/seed/wakilisha-story-${slug}/1200/800`),
+    heroUrl: heroUrl || `https://picsum.photos/seed/wakilisha-story-${slug}/1200/800`,
   };
 }
 
@@ -337,7 +494,8 @@ export async function repairedResponse(resource: string, limit = 120): Promise<R
         order by title asc
         limit $1
       `, [limit]);
-      return { stories: rows.map(storyFromRawArticle).filter(isPublicMagazineStory) };
+      const heroLookups = await buildHeroLookups();
+      return { stories: rows.map((row, index) => storyFromRawArticle(row, index, heroLookups)).filter(isPublicMagazineStory) };
     }
 
     if (await hasTable("wakilisha_repaired.content_route_classification")) {
