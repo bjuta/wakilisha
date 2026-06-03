@@ -138,7 +138,7 @@ export default function Artists() {
               <div className="section-kicker">Full artist directory</div>
               <h2 className="section-title">{filtered.length} artists found</h2>
             </div>
-            <p className="section-copy">This directory now loads from wakilisha_repaired.track_artists, release_tracks, chart_entry_tracks, and artist_genres.</p>
+            <p className="section-copy">This directory now loads from the canonical WAKILISHA registry.</p>
           </div>
 
           {view === "grid" ? (
@@ -171,8 +171,8 @@ export default function Artists() {
           </div>
           <div className="pg-block">
             <div className="pg-block-label">Data source</div>
-            <h3 className="pg-block-title">Artists are now graph-backed.</h3>
-            <p className="pg-block-body">This page no longer imports the old artist mock file. It hydrates from repaired relational tables through the V2 API.</p>
+            <h3 className="pg-block-title">Artists are now registry-backed.</h3>
+            <p className="pg-block-body">This page hydrates from the canonical WAKILISHA registry through the V2 API.</p>
           </div>
         </section>
       </div>
