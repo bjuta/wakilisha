@@ -66,62 +66,110 @@ function slugify(value: string): string {
   return value.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "item";
 }
 
+function parsePayload(value: unknown): Row {
+  if (!value) return {};
+  if (typeof value === "object" && !Array.isArray(value)) return value as Row;
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value) as unknown;
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Row : {};
+    } catch {
+      return {};
+    }
+  }
+  return {};
+}
+
+function firstText(...values: unknown[]): string {
+  for (const value of values) {
+    if (value === null || value === undefined) continue;
+    const text = String(value).trim();
+    if (text) return text;
+  }
+  return "";
+}
+
+function estimateReadingTime(...values: string[]): number {
+  const text = values.join(" ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  if (!text) return 3;
+  return Math.max(1, Math.min(18, Math.ceil(text.split(" ").length / 220)));
+}
+
 async function q(query: string, values: unknown[] = []): Promise<Row[]> {
   const result = await db().query(query, values);
   return result.rows as Row[];
 }
 
+async function hasTable(tableName: string): Promise<boolean> {
+  const rows = await q("select to_regclass($1) as table_name", [tableName]);
+  return Boolean(rows[0]?.table_name);
+}
+
+function storyFromRawArticle(row: Row, index: number) {
+  const title = firstText(row.title, `Story ${index + 1}`);
+  const slug = firstText(row.slug, slugify(title));
+  const dek = firstText(row.excerpt_html, row.excerpt, row.seo_payload, "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  const content = firstText(row.content_html, row.content);
+  return {
+    id: firstText(row.id, row.source_wp_post_id, slug),
+    slug,
+    title,
+    section: firstText(row.category, row.section, "Article"),
+    dek,
+    author: firstText(row.author, row.author_name, "WAKILISHA Editorial"),
+    date: firstText(row.published_at, row.modified_at, row.updated_at, "Undated"),
+    readingTime: estimateReadingTime(dek, content),
+    heroUrl: firstText(row.featured_image_url, row.hero_image_url, row.image_url, `https://picsum.photos/seed/wakilisha-story-${slug}/1200/800`),
+  };
+}
+
+function storyFromRouteClassification(row: Row, index: number) {
+  const payload = parsePayload(row.source_payload);
+  const title = firstText(row.title, payload.title, payload.post_title, `Story ${index + 1}`);
+  const slug = firstText(row.slug, payload.slug, payload.post_name, slugify(title));
+  const dek = firstText(row.dek, row.excerpt, payload.excerpt, payload.post_excerpt, "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  const content = firstText(payload.post_content, payload.content);
+  return {
+    id: firstText(row.id, row.legacy_wp_post_id, payload.id, payload.ID, slug),
+    slug,
+    title,
+    section: firstText(row.section, payload.category, payload.post_type, "Article"),
+    dek,
+    author: firstText(row.author, payload.author, payload.author_name, "WAKILISHA Editorial"),
+    date: firstText(row.date, payload.post_date, payload.date, payload.modified, "Undated"),
+    readingTime: estimateReadingTime(dek, content),
+    heroUrl: firstText(row.hero_url, payload.featured_image_url, payload.image, payload.hero_image_url, `https://picsum.photos/seed/wakilisha-story-${slug}/1200/800`),
+  };
+}
+
 export async function repairedResponse(resource: string, limit = 120): Promise<Record<string, unknown>> {
   if (resource === "magazine") {
-    const rows = await q(`
-      select
-        legacy_wp_post_id as id,
-        slug,
-        title,
-        coalesce(nullif(source_payload->>'category',''),'Article') as section,
-        coalesce(nullif(source_payload->>'excerpt',''), nullif(source_payload->>'post_excerpt',''), '') as dek,
-        coalesce(nullif(source_payload->>'author',''),'WAKILISHA Editorial') as author,
-        coalesce(nullif(source_payload->>'post_date',''), nullif(source_payload->>'date',''), 'Undated') as date,
-        coalesce(nullif(source_payload->>'featured_image_url',''), nullif(source_payload->>'image',''), '') as hero_url
-      from wakilisha_repaired.content_route_classification
-      where classification = 'article'
-        and migration_action = 'migrate_to_article'
-        and coalesce(needs_review,false) = false
-        and slug is not null
-        and title is not null
-        and lower(coalesce(source_payload->>'post_type', source_payload->>'type', 'post')) not in (
-          'page', 'product', 'attachment', 'nav_menu_item', 'revision'
-        )
-        and lower(coalesce(slug, '')) not in (
-          'about', 'account', 'account-settings', 'archive', 'cart', 'checkout', 'claim-your-name',
-          'contacts', 'corrections', 'faq', 'faqs', 'home', 'journal', 'labels', 'lifestyle',
-          'login', 'magazine', 'music', 'my-account', 'my-library', 'my-top-10', 'news-resources',
-          'opinion', 'order-tracking', 'plan', 'play', 'privacy', 'profile', 'profile1', 'settings',
-          'short-stories', 'sports', 'the-registry', 'venues'
-        )
-        and lower(coalesce(title, '')) not in (
-          'about', 'account', 'account settings', 'archive', 'artists', 'cart', 'chart methodology',
-          'checkout', 'claim your name', 'contacts', 'corrections', 'duka', 'events', 'faq', 'faqs', 'home',
-          'journal', 'labels', 'lifestyle', 'login', 'magazine', 'music', 'my account', 'my library',
-          'my top 10', 'news & resources', 'opinion', 'order tracking', 'plan', 'play', 'privacy',
-          'profile', 'science and technology', 'settings', 'short stories', 'sports', 'the registry©',
-          'venues'
-        )
-        and lower(coalesce(slug, '')) not like '%account%'
-        and lower(coalesce(slug, '')) not like '%checkout%'
-        and lower(coalesce(slug, '')) not like '%order-tracking%'
-        and lower(coalesce(slug, '')) not like '%privacy%'
-        and lower(coalesce(slug, '')) not like '%profile%'
-        and lower(coalesce(slug, '')) not like '%settings%'
-        and lower(coalesce(slug, '')) not like 'my-%'
-        and (
-          length(coalesce(nullif(source_payload->>'post_content',''), nullif(source_payload->>'content',''), '')) > 280
-          or length(coalesce(nullif(source_payload->>'excerpt',''), nullif(source_payload->>'post_excerpt',''), '')) > 80
-        )
-      order by nullif(source_payload->>'post_date','') desc nulls last, title asc
-      limit $1
-    `, [limit]);
-    return { stories: rows.map((row, index) => ({ id: s(row, "id") || s(row, "slug"), slug: s(row, "slug"), title: s(row, "title"), section: s(row, "section") || "Article", dek: s(row, "dek"), author: s(row, "author"), date: s(row, "date"), readingTime: Math.max(1, Math.min(9, Math.round((s(row, "dek").length || 300) / 240))), heroUrl: s(row, "hero_url") || `https://picsum.photos/seed/wakilisha-story-${index}/1200/800` })) };
+    if (await hasTable("wakilisha_raw.wk_articles")) {
+      const rows = await q(`
+        select *
+        from wakilisha_raw.wk_articles
+        where nullif(title, '') is not null
+          and nullif(slug, '') is not null
+          and lower(coalesce(wp_status, 'publish')) in ('publish', 'published', 'active')
+        order by coalesce(nullif(published_at, ''), nullif(modified_at, ''), nullif(updated_at, '')) desc nulls last, title asc
+        limit $1
+      `, [limit]);
+      return { stories: rows.map(storyFromRawArticle) };
+    }
+
+    if (await hasTable("wakilisha_repaired.content_route_classification")) {
+      const rows = await q(`
+        select *
+        from wakilisha_repaired.content_route_classification
+        where classification = 'article'
+          and coalesce(migration_action, '') in ('migrate_to_article', 'review_or_retire', '')
+        order by created_at desc nulls last, title asc nulls last
+        limit $1
+      `, [limit]);
+      return { stories: rows.map(storyFromRouteClassification).filter((story) => story.title && story.slug) };
+    }
+
+    return { stories: [] };
   }
 
   if (resource === "artists") {
