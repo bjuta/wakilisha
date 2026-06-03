@@ -230,18 +230,33 @@ async function hasTable(tableName: string): Promise<boolean> {
 function storyFromRawArticle(row: Row, index: number): PublicStory {
   const title = firstText(row.title, `Story ${index + 1}`);
   const slug = firstText(row.slug, slugify(title));
-  const dek = stripHtml(firstText(row.excerpt_html, row.excerpt, row.seo_payload, ""));
-  const content = firstText(row.content_html, row.content);
+  const editablePayload = parsePayload(row.editable_payload);
+  const immutablePayload = parsePayload(row.immutable_payload);
+  const seoPayload = parsePayload(row.seo_payload);
+  const rawMeta = parsePayload(row.raw_meta);
+  const dek = stripHtml(firstText(
+    row.excerpt_html,
+    row.excerpt,
+    row.dek,
+    editablePayload.excerpt,
+    editablePayload.dek,
+    immutablePayload.excerpt,
+    seoPayload.description,
+    seoPayload.excerpt,
+    rawMeta.excerpt,
+    ""
+  ));
+  const content = firstText(row.content_html, row.content, editablePayload.content, immutablePayload.content, rawMeta.content);
   return {
     id: firstText(row.id, row.source_wp_post_id, slug),
     slug,
     title,
-    section: firstText(row.category, row.section, "Article"),
+    section: firstText(row.category, row.section, editablePayload.category, rawMeta.category, "Article"),
     dek,
-    author: firstText(row.author, row.author_name, "WAKILISHA Editorial"),
-    date: firstText(row.published_at, row.modified_at, row.updated_at, "Undated"),
+    author: firstText(row.author, row.author_name, editablePayload.author, rawMeta.author, "WAKILISHA Editorial"),
+    date: firstText(row.published_at, row.published_date, row.modified_at, row.updated_at, rawMeta.date, "Undated"),
     readingTime: estimateReadingTime(dek, content),
-    heroUrl: firstText(row.featured_image_url, row.hero_image_url, row.image_url, `https://picsum.photos/seed/wakilisha-story-${slug}/1200/800`),
+    heroUrl: firstText(row.featured_image_url, row.hero_image_url, row.image_url, editablePayload.featured_image_url, rawMeta.featured_image_url, `https://picsum.photos/seed/wakilisha-story-${slug}/1200/800`),
   };
 }
 
@@ -282,11 +297,7 @@ export async function repairedResponse(resource: string, limit = 120): Promise<R
             'about', 'account', 'account settings', 'accordions', 'archive', 'cart', 'checkout',
             'contacts', 'faq', 'faqs', 'home', 'journal', 'login', 'magazine', 'privacy', 'profile', 'settings'
           )
-          and (
-            length(regexp_replace(coalesce(content_html, ''), '<[^>]+>', ' ', 'g')) > 240
-            or length(regexp_replace(coalesce(excerpt_html, ''), '<[^>]+>', ' ', 'g')) > 60
-          )
-        order by coalesce(nullif(published_at, ''), nullif(modified_at, ''), nullif(updated_at, '')) desc nulls last, title asc
+        order by title asc
         limit $1
       `, [limit]);
       return { stories: rows.map(storyFromRawArticle).filter(isPublicMagazineStory) };
