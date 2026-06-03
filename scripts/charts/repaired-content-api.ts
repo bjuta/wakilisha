@@ -134,7 +134,7 @@ function normalizeArtworkUrl(url: string): string {
 }
 
 function extractFirstUrl(value: string): string {
-  const match = value.match(/https?:\/\/[^\s"'<>]+|\/[A-Za-z0-9_./%?=&:@+-]+/i);
+  const match = value.match(/https?:\/\/[^\s"'<>,]+|\/[A-Za-z0-9_./%?=&:@+-]+/i);
   return match?.[0] ?? value;
 }
 
