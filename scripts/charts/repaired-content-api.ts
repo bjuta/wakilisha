@@ -18,7 +18,6 @@ type HeroLookups = {
   bySlug: Map<string, string>;
   byTitle: Map<string, string>;
   byAttachmentParent: Map<string, string>;
-  allImages: string[];
 };
 
 let pool: pg.Pool | null = null;
@@ -147,11 +146,15 @@ function isPlaceholderAsset(value: string): boolean {
   return /picsum\.photos|placeholder|placehold\.co|dummyimage/i.test(value);
 }
 
+function isMusicArtworkAsset(value: string): boolean {
+  return /i\.scdn\.co|scdn\.co\/image|mzstatic\.com\/image\/thumb\/Music|is\d+-ssl\.mzstatic\.com\/image\/thumb\/Music|audio-ssl\.itunes\.apple\.com/i.test(value);
+}
+
 function looksLikeImageUrl(value: string): boolean {
   if (!/^https?:\/\//i.test(value) && !value.startsWith("/")) return false;
-  if (isVideoOrAudioAsset(value) || isPlaceholderAsset(value)) return false;
+  if (isVideoOrAudioAsset(value) || isPlaceholderAsset(value) || isMusicArtworkAsset(value)) return false;
   if (/\.(jpe?g|png|webp|gif|avif)(\?|#|$)/i.test(value)) return true;
-  return /(image\/thumb|\/image\/|cloudinary|mzstatic|images\.unsplash|cdn)/i.test(value) && !/\/wp-content\/uploads\/[^\s]+\.(mp4|m4v|mov|webm|mp3|m4a|wav)/i.test(value);
+  return /(image\/thumb|\/image\/|cloudinary|images\.unsplash|cdn)/i.test(value) && !/\/wp-content\/uploads\/[^\s]+\.(mp4|m4v|mov|webm|mp3|m4a|wav)/i.test(value);
 }
 
 function cleanUrl(value: unknown): string {
@@ -230,10 +233,6 @@ function findImageUrlDeep(value: unknown, depth = 0): string {
       const found = findImageUrlDeep(row[key], depth + 1);
       if (found) return found;
     }
-    for (const item of Object.values(row)) {
-      const found = findImageUrlDeep(item, depth + 1);
-      if (found) return found;
-    }
   }
 
   return "";
@@ -278,11 +277,6 @@ async function hasTable(tableName: string): Promise<boolean> {
   return Boolean(rows[0]?.table_name);
 }
 
-function rememberImage(lookups: HeroLookups, url: string): void {
-  if (!url || lookups.allImages.includes(url)) return;
-  lookups.allImages.push(url);
-}
-
 function addLookup(map: Map<string, string>, key: unknown, url: string): void {
   const normalizedKey = cleanDisplayText(key);
   if (!normalizedKey || !url || map.has(normalizedKey)) return;
@@ -309,7 +303,7 @@ function addTitleLookup(lookups: HeroLookups, key: unknown, url: string): void {
 }
 
 function emptyLookups(): HeroLookups {
-  return { byId: new Map(), bySlug: new Map(), byTitle: new Map(), byAttachmentParent: new Map(), allImages: [] };
+  return { byId: new Map(), bySlug: new Map(), byTitle: new Map(), byAttachmentParent: new Map() };
 }
 
 function findLookupUrl(lookups: HeroLookups | undefined, key: unknown): string {
@@ -341,27 +335,27 @@ function rowTextValues(row: Row): string[] {
   return [...values];
 }
 
+function hasAttachmentParent(row: Row, payload: Row): boolean {
+  return Boolean(
+    cleanDisplayText(row.attached_to_post_id)
+    || cleanDisplayText(row.parent_id)
+    || cleanDisplayText(row.post_parent)
+    || cleanDisplayText(payload.attached_to_post_id)
+    || cleanDisplayText(payload.parent_id)
+    || cleanDisplayText(payload.post_parent)
+  );
+}
+
+function isLikelyWordPressArticleMediaUrl(url: string): boolean {
+  return looksLikeImageUrl(url) && /\/wp-content\/uploads\//i.test(url);
+}
+
 function mediaUrlFromRow(row: Row): string {
-  return firstUrl(row.url, row.source_url, row.guid, row.local_url, row.image_url, row.featured_image_url, row.media_url, row.file_url, row.raw_meta, row);
+  return firstUrl(row.url, row.source_url, row.guid, row.local_url, row.image_url, row.featured_image_url, row.media_url, row.file_url, row.raw_meta);
 }
 
 function imageUrlFromWpItem(row: Row): string {
-  return firstUrl(row.featured_image_url, row.source_url, row.guid, row.url, row.image_url, row.media_url, row.raw_meta, row);
-}
-
-function deterministicIndex(seed: string, length: number): number {
-  if (length <= 0) return -1;
-  let hash = 0;
-  for (let index = 0; index < seed.length; index += 1) {
-    hash = ((hash << 5) - hash + seed.charCodeAt(index)) | 0;
-  }
-  return Math.abs(hash) % length;
-}
-
-function pooledHeroUrl(seed: string, lookups?: HeroLookups): string {
-  const images = lookups?.allImages ?? [];
-  const index = deterministicIndex(seed, images.length);
-  return index >= 0 ? images[index] : "";
+  return firstUrl(row.featured_image_url, row.source_url, row.guid, row.url, row.image_url, row.media_url, row.raw_meta);
 }
 
 async function buildHeroLookups(): Promise<HeroLookups> {
@@ -370,10 +364,9 @@ async function buildHeroLookups(): Promise<HeroLookups> {
   if (await hasTable("wakilisha_raw.wk_media_assets")) {
     const mediaRows = await q("select * from wakilisha_raw.wk_media_assets limit 10000");
     for (const row of mediaRows) {
-      const url = mediaUrlFromRow(row);
-      if (!url) continue;
       const payload = parsePayload(row.raw_meta);
-      rememberImage(lookups, url);
+      const url = mediaUrlFromRow(row);
+      if (!url || !hasAttachmentParent(row, payload) || !isLikelyWordPressArticleMediaUrl(url)) continue;
       addLookup(lookups.byId, row.id, url);
       addLookup(lookups.byId, row.source_wp_post_id, url);
       addSlugLookup(lookups, row.slug, url);
@@ -392,10 +385,9 @@ async function buildHeroLookups(): Promise<HeroLookups> {
   if (await hasTable("wakilisha_raw.wk_wordpress_items")) {
     const itemRows = await q("select * from wakilisha_raw.wk_wordpress_items limit 10000");
     for (const row of itemRows) {
-      const url = imageUrlFromWpItem(row);
-      if (!url) continue;
       const payload = parsePayload(row.raw_meta);
-      rememberImage(lookups, url);
+      const url = imageUrlFromWpItem(row);
+      if (!url || !isLikelyWordPressArticleMediaUrl(url)) continue;
       addLookup(lookups.byId, row.id, url);
       addLookup(lookups.byId, row.source_wp_post_id, url);
       addLookup(lookups.byId, row.featured_media, url);
@@ -428,13 +420,24 @@ async function buildHeroLookups(): Promise<HeroLookups> {
   return lookups;
 }
 
+function directArticleHeroUrl(row: Row, editablePayload: Row, immutablePayload: Row, seoPayload: Row, rawMeta: Row, sourcePayload: Row): string {
+  return firstUrl(
+    row.featured_image_url, row.hero_image_url, row.image_url, row.thumbnail_url, row.cover_image_url, row.og_image, row.twitter_image,
+    editablePayload.featured_image_url, editablePayload.hero_image_url, editablePayload.image_url, editablePayload.thumbnail_url, editablePayload.cover_image_url,
+    immutablePayload.featured_image_url, immutablePayload.hero_image_url, immutablePayload.image_url, immutablePayload.thumbnail_url, immutablePayload.cover_image_url,
+    seoPayload.og_image, seoPayload.twitter_image, seoPayload.featured_image_url, seoPayload.image_url,
+    rawMeta.featured_image_url, rawMeta.hero_image_url, rawMeta.image_url, rawMeta.thumbnail_url, rawMeta.cover_image_url,
+    sourcePayload.featured_image_url, sourcePayload.hero_image_url, sourcePayload.image_url, sourcePayload.thumbnail_url, sourcePayload.cover_image_url
+  );
+}
+
 function resolveHeroUrl(row: Row, lookups?: HeroLookups): string {
   const editablePayload = parsePayload(row.editable_payload);
   const immutablePayload = parsePayload(row.immutable_payload);
   const seoPayload = parsePayload(row.seo_payload);
   const rawMeta = parsePayload(row.raw_meta);
   const sourcePayload = parsePayload(row.source_payload);
-  const direct = firstUrl(row, editablePayload, immutablePayload, seoPayload, rawMeta, sourcePayload);
+  const direct = directArticleHeroUrl(row, editablePayload, immutablePayload, seoPayload, rawMeta, sourcePayload);
   if (direct) return direct;
 
   const idCandidates = [
@@ -460,7 +463,7 @@ function resolveHeroUrl(row: Row, lookups?: HeroLookups): string {
   const titleUrl = findLookupUrl(lookups, row.title) || findLookupUrl(lookups, sourcePayload.title) || findLookupUrl(lookups, sourcePayload.post_title);
   if (titleUrl) return titleUrl;
 
-  return pooledHeroUrl(firstText(row.slug, row.title, row.id), lookups);
+  return "";
 }
 
 function storyFromRawArticle(row: Row, index: number, heroLookups?: HeroLookups): PublicStory {
