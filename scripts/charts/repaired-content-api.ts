@@ -23,84 +23,19 @@ type HeroLookups = {
 let pool: pg.Pool | null = null;
 
 const SYSTEM_SLUGS = new Set([
-  "about",
-  "about-old",
-  "account",
-  "account-settings",
-  "archive",
-  "cart",
-  "checkout",
-  "claim-your-name",
-  "contacts",
-  "corrections",
-  "faq",
-  "faqs",
-  "home",
-  "journal",
-  "labels",
-  "lifestyle",
-  "login",
-  "magazine",
-  "music",
-  "my-account",
-  "my-library",
-  "my-top-10",
-  "news-resources",
-  "opinion",
-  "order-tracking",
-  "plan",
-  "play",
-  "privacy",
-  "profile",
-  "profile1",
-  "settings",
-  "settings-2",
-  "short-stories",
-  "sports",
-  "the-registry",
-  "venues",
+  "about", "about-old", "account", "account-settings", "archive", "cart", "checkout", "claim-your-name",
+  "contacts", "corrections", "faq", "faqs", "home", "journal", "labels", "lifestyle", "login",
+  "magazine", "music", "my-account", "my-library", "my-top-10", "news-resources", "opinion",
+  "order-tracking", "plan", "play", "privacy", "profile", "profile1", "settings", "settings-2",
+  "short-stories", "sports", "the-registry", "venues",
 ]);
 
 const SYSTEM_TITLES = new Set([
-  "about",
-  "account",
-  "account settings",
-  "accordions",
-  "archive",
-  "artists",
-  "cart",
-  "chart methodology",
-  "checkout",
-  "claim your name",
-  "contacts",
-  "corrections",
-  "duka",
-  "events",
-  "faq",
-  "faqs",
-  "home",
-  "journal",
-  "labels",
-  "lifestyle",
-  "login",
-  "magazine",
-  "music",
-  "my account",
-  "my library",
-  "my top 10",
-  "news & resources",
-  "opinion",
-  "order tracking",
-  "plan",
-  "play",
-  "privacy",
-  "profile",
-  "science and technology",
-  "settings",
-  "short stories",
-  "sports",
-  "the registry©",
-  "venues",
+  "about", "account", "account settings", "accordions", "archive", "artists", "cart", "chart methodology",
+  "checkout", "claim your name", "contacts", "corrections", "duka", "events", "faq", "faqs", "home",
+  "journal", "labels", "lifestyle", "login", "magazine", "music", "my account", "my library",
+  "my top 10", "news & resources", "opinion", "order tracking", "plan", "play", "privacy", "profile",
+  "science and technology", "settings", "short stories", "sports", "the registry©", "venues",
 ]);
 
 const SYSTEM_SLUG_PATTERNS = ["account", "checkout", "order-tracking", "privacy", "profile", "settings", "wp-"];
@@ -194,11 +129,22 @@ function cleanDisplayText(value: unknown): string {
   return text;
 }
 
+function normalizeArtworkUrl(url: string): string {
+  return url.replace(/\{w\}x\{h\}/g, "1200x1200").replace(/\{w\}/g, "1200").replace(/\{h\}/g, "1200");
+}
+
+function looksLikeImageUrl(value: string): boolean {
+  if (!/^https?:\/\//i.test(value) && !value.startsWith("/")) return false;
+  if (/\.(jpe?g|png|webp|gif|avif)(\?|#|$)/i.test(value)) return true;
+  return /(image\/thumb|\/image\/|\/wp-content\/uploads\/|cloudinary|mzstatic|images\.unsplash|cdn)/i.test(value);
+}
+
 function cleanUrl(value: unknown): string {
   const text = cleanDisplayText(value);
   if (!text) return "";
-  if (!/^https?:\/\//i.test(text) && !text.startsWith("/")) return "";
-  return text;
+  const normalized = normalizeArtworkUrl(text);
+  if (!looksLikeImageUrl(normalized)) return "";
+  return normalized;
 }
 
 function slugify(value: string): string {
@@ -231,9 +177,47 @@ function firstText(...values: unknown[]): string {
   return "";
 }
 
+function findImageUrlDeep(value: unknown, depth = 0): string {
+  if (depth > 5 || value === null || value === undefined) return "";
+  const direct = cleanUrl(value);
+  if (direct) return direct;
+
+  if (typeof value === "string") {
+    const parsed = parsePayload(value);
+    if (Object.keys(parsed).length) return findImageUrlDeep(parsed, depth + 1);
+    return "";
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = findImageUrlDeep(item, depth + 1);
+      if (found) return found;
+    }
+    return "";
+  }
+
+  if (typeof value === "object") {
+    const row = value as Row;
+    const preferredKeys = [
+      "featured_image_url", "hero_image_url", "image_url", "thumbnail_url", "cover_image_url", "source_url",
+      "url", "guid", "media_url", "file_url", "artwork_url", "og_image", "twitter_image",
+    ];
+    for (const key of preferredKeys) {
+      const found = findImageUrlDeep(row[key], depth + 1);
+      if (found) return found;
+    }
+    for (const item of Object.values(row)) {
+      const found = findImageUrlDeep(item, depth + 1);
+      if (found) return found;
+    }
+  }
+
+  return "";
+}
+
 function firstUrl(...values: unknown[]): string {
   for (const value of values) {
-    const text = cleanUrl(value);
+    const text = findImageUrlDeep(value);
     if (text) return text;
   }
   return "";
@@ -277,38 +261,11 @@ function addLookup(map: Map<string, string>, key: unknown, url: string): void {
 }
 
 function mediaUrlFromRow(row: Row): string {
-  const payload = parsePayload(row.raw_meta);
-  return firstUrl(
-    row.source_url,
-    row.url,
-    row.guid,
-    row.local_url,
-    row.image_url,
-    row.featured_image_url,
-    row.media_url,
-    row.file_url,
-    payload.source_url,
-    payload.guid,
-    payload.url,
-    payload.media_url,
-  );
+  return firstUrl(row.url, row.source_url, row.guid, row.local_url, row.image_url, row.featured_image_url, row.media_url, row.file_url, row.raw_meta, row);
 }
 
 function imageUrlFromWpItem(row: Row): string {
-  const payload = parsePayload(row.raw_meta);
-  return firstUrl(
-    row.featured_image_url,
-    row.source_url,
-    row.guid,
-    row.url,
-    row.image_url,
-    row.media_url,
-    payload.featured_image_url,
-    payload.source_url,
-    payload.guid,
-    payload.url,
-    payload.media_url,
-  );
+  return firstUrl(row.featured_image_url, row.source_url, row.guid, row.url, row.image_url, row.media_url, row.raw_meta, row);
 }
 
 async function buildHeroLookups(): Promise<HeroLookups> {
@@ -328,7 +285,9 @@ async function buildHeroLookups(): Promise<HeroLookups> {
       addLookup(lookups.byId, row.id, url);
       addLookup(lookups.byId, row.source_wp_post_id, url);
       addLookup(lookups.bySlug, row.slug, url);
+      addLookup(lookups.bySlug, row.entity_slug, url);
       addLookup(lookups.byTitle, row.title, url);
+      addLookup(lookups.byTitle, row.alt_text, url);
       addLookup(lookups.byAttachmentParent, row.attached_to_post_id, url);
       addLookup(lookups.byAttachmentParent, row.parent_id, url);
       addLookup(lookups.byAttachmentParent, row.post_parent, url);
@@ -366,36 +325,13 @@ function resolveHeroUrl(row: Row, lookups?: HeroLookups): string {
   const immutablePayload = parsePayload(row.immutable_payload);
   const seoPayload = parsePayload(row.seo_payload);
   const rawMeta = parsePayload(row.raw_meta);
-  const direct = firstUrl(
-    row.featured_image_url,
-    row.hero_image_url,
-    row.image_url,
-    row.thumbnail_url,
-    row.cover_image_url,
-    editablePayload.featured_image_url,
-    editablePayload.hero_image_url,
-    immutablePayload.featured_image_url,
-    seoPayload.og_image,
-    seoPayload.twitter_image,
-    rawMeta.featured_image_url,
-    rawMeta.hero_image_url,
-    rawMeta.image,
-    rawMeta.image_url,
-  );
+  const direct = firstUrl(row, editablePayload, immutablePayload, seoPayload, rawMeta);
   if (direct) return direct;
 
   const idCandidates = [
-    row.featured_media,
-    row.featured_media_id,
-    row.thumbnail_id,
-    row.post_thumbnail_id,
-    editablePayload.featured_media,
-    editablePayload.featured_media_id,
-    immutablePayload.featured_media,
-    seoPayload.featured_media,
-    rawMeta.featured_media,
-    rawMeta.featured_media_id,
-    rawMeta.thumbnail_id,
+    row.featured_media, row.featured_media_id, row.thumbnail_id, row.post_thumbnail_id,
+    editablePayload.featured_media, editablePayload.featured_media_id, immutablePayload.featured_media,
+    seoPayload.featured_media, rawMeta.featured_media, rawMeta.featured_media_id, rawMeta.thumbnail_id,
   ];
   for (const key of idCandidates) {
     const url = lookups?.byId.get(cleanDisplayText(key));
@@ -428,16 +364,8 @@ function storyFromRawArticle(row: Row, index: number, heroLookups?: HeroLookups)
   const seoPayload = parsePayload(row.seo_payload);
   const rawMeta = parsePayload(row.raw_meta);
   const dek = firstText(
-    row.excerpt_html,
-    row.excerpt,
-    row.dek,
-    editablePayload.excerpt,
-    editablePayload.dek,
-    immutablePayload.excerpt,
-    seoPayload.description,
-    seoPayload.excerpt,
-    rawMeta.excerpt,
-    ""
+    row.excerpt_html, row.excerpt, row.dek, editablePayload.excerpt, editablePayload.dek,
+    immutablePayload.excerpt, seoPayload.description, seoPayload.excerpt, rawMeta.excerpt, ""
   );
   const content = firstText(row.content_html, row.content, editablePayload.content, immutablePayload.content, rawMeta.content);
   return {
@@ -557,25 +485,23 @@ export async function repairedResponse(resource: string, limit = 120): Promise<R
       order by coalesce(count(distinct ce.edition_id), 0) desc, coalesce(count(distinct ce.track_id), 0) desc, ra.display_name asc
       limit $1
     `, [limit]);
-    return {
-      artists: rows.map((row) => {
-        const topChartPosition = row.top_chart_position === null ? null : n(row, "top_chart_position");
-        const chartCount = n(row, "chart_count");
-        return {
-          id: s(row, "id"),
-          slug: s(row, "slug") || slugify(s(row, "name")),
-          name: s(row, "name"),
-          country: s(row, "country") || null,
-          imageUrl: s(row, "image_url") || null,
-          genres: [],
-          trackCount: n(row, "chart_track_count"),
-          releaseCount: 0,
-          isChartArtist: chartCount > 0 && topChartPosition !== null,
-          isRising: chartCount > 0 && topChartPosition !== null && topChartPosition <= 20,
-          topChartPosition,
-        };
-      })
-    };
+    return { artists: rows.map((row) => {
+      const topChartPosition = row.top_chart_position === null ? null : n(row, "top_chart_position");
+      const chartCount = n(row, "chart_count");
+      return {
+        id: s(row, "id"),
+        slug: s(row, "slug") || slugify(s(row, "name")),
+        name: s(row, "name"),
+        country: s(row, "country") || null,
+        imageUrl: s(row, "image_url") || null,
+        genres: [],
+        trackCount: n(row, "chart_track_count"),
+        releaseCount: 0,
+        isChartArtist: chartCount > 0 && topChartPosition !== null,
+        isRising: chartCount > 0 && topChartPosition !== null && topChartPosition <= 20,
+        topChartPosition,
+      };
+    }) };
   }
 
   if (resource === "releases") {
