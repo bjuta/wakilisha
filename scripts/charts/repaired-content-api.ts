@@ -279,6 +279,53 @@ function addLookup(map: Map<string, string>, key: unknown, url: string): void {
   map.set(normalizedKey, url);
 }
 
+function addSlugLookup(lookups: HeroLookups, key: unknown, url: string): void {
+  const text = cleanDisplayText(key);
+  if (!text || !url) return;
+  addLookup(lookups.bySlug, text, url);
+  const slug = slugify(text);
+  if (slug !== "item") addLookup(lookups.bySlug, slug, url);
+  const tail = text.split("/").filter(Boolean).pop();
+  if (tail) addLookup(lookups.bySlug, tail, url);
+}
+
+function addTitleLookup(lookups: HeroLookups, key: unknown, url: string): void {
+  const text = cleanDisplayText(key);
+  if (!text || !url) return;
+  addLookup(lookups.byTitle, text, url);
+  addLookup(lookups.byTitle, text.toLowerCase(), url);
+  const slug = slugify(text);
+  if (slug !== "item") addLookup(lookups.byTitle, slug, url);
+}
+
+function findLookupUrl(lookups: HeroLookups, key: unknown): string {
+  const text = cleanDisplayText(key);
+  if (!text) return "";
+  return lookups.byId.get(text)
+    || lookups.bySlug.get(text)
+    || lookups.bySlug.get(slugify(text))
+    || lookups.byTitle.get(text)
+    || lookups.byTitle.get(text.toLowerCase())
+    || lookups.byTitle.get(slugify(text))
+    || lookups.byAttachmentParent.get(text)
+    || "";
+}
+
+function rowTextValues(row: Row): string[] {
+  const values = new Set<string>();
+  for (const value of Object.values(row)) {
+    if (value === null || value === undefined || typeof value === "object") continue;
+    const text = cleanDisplayText(value);
+    if (!text || text.length > 220 || looksLikeImageUrl(text)) continue;
+    values.add(text);
+    const slug = slugify(text);
+    if (slug !== "item") values.add(slug);
+    const tail = text.split("/").filter(Boolean).pop();
+    if (tail) values.add(tail);
+  }
+  return [...values];
+}
+
 function mediaUrlFromRow(row: Row): string {
   return firstUrl(row.url, row.source_url, row.guid, row.local_url, row.image_url, row.featured_image_url, row.media_url, row.file_url, row.raw_meta, row);
 }
@@ -303,10 +350,10 @@ async function buildHeroLookups(): Promise<HeroLookups> {
       const payload = parsePayload(row.raw_meta);
       addLookup(lookups.byId, row.id, url);
       addLookup(lookups.byId, row.source_wp_post_id, url);
-      addLookup(lookups.bySlug, row.slug, url);
-      addLookup(lookups.bySlug, row.entity_slug, url);
-      addLookup(lookups.byTitle, row.title, url);
-      addLookup(lookups.byTitle, row.alt_text, url);
+      addSlugLookup(lookups, row.slug, url);
+      addSlugLookup(lookups, row.entity_slug, url);
+      addTitleLookup(lookups, row.title, url);
+      addTitleLookup(lookups, row.alt_text, url);
       addLookup(lookups.byAttachmentParent, row.attached_to_post_id, url);
       addLookup(lookups.byAttachmentParent, row.parent_id, url);
       addLookup(lookups.byAttachmentParent, row.post_parent, url);
@@ -328,11 +375,26 @@ async function buildHeroLookups(): Promise<HeroLookups> {
       addLookup(lookups.byId, row.featured_media_id, url);
       addLookup(lookups.byId, payload.featured_media, url);
       addLookup(lookups.byId, payload.featured_media_id, url);
-      addLookup(lookups.bySlug, row.slug, url);
-      addLookup(lookups.byTitle, row.title, url);
+      addSlugLookup(lookups, row.slug, url);
+      addTitleLookup(lookups, row.title, url);
       addLookup(lookups.byAttachmentParent, row.parent_id, url);
       addLookup(lookups.byAttachmentParent, payload.parent_id, url);
       addLookup(lookups.byAttachmentParent, payload.post_parent, url);
+    }
+  }
+
+  if (await hasTable("wakilisha_raw.wk_old_primary_slugs")) {
+    const aliasRows = await q("select * from wakilisha_raw.wk_old_primary_slugs limit 20000");
+    for (const row of aliasRows) {
+      const values = rowTextValues(row);
+      const bridgedUrl = values.map((value) => findLookupUrl(lookups, value)).find(Boolean);
+      if (!bridgedUrl) continue;
+      for (const value of values) {
+        addLookup(lookups.byId, value, bridgedUrl);
+        addSlugLookup(lookups, value, bridgedUrl);
+        addTitleLookup(lookups, value, bridgedUrl);
+        addLookup(lookups.byAttachmentParent, value, bridgedUrl);
+      }
     }
   }
 
@@ -353,23 +415,20 @@ function resolveHeroUrl(row: Row, lookups?: HeroLookups): string {
     seoPayload.featured_media, rawMeta.featured_media, rawMeta.featured_media_id, rawMeta.thumbnail_id,
   ];
   for (const key of idCandidates) {
-    const url = lookups?.byId.get(cleanDisplayText(key));
+    const url = findLookupUrl(lookups ?? { byId: new Map(), bySlug: new Map(), byTitle: new Map(), byAttachmentParent: new Map() }, key);
     if (url) return url;
   }
 
   const articleIdCandidates = [row.source_wp_post_id, row.id, rawMeta.ID, rawMeta.id];
   for (const key of articleIdCandidates) {
-    const cleanKey = cleanDisplayText(key);
-    const byId = lookups?.byId.get(cleanKey);
-    if (byId) return byId;
-    const byParent = lookups?.byAttachmentParent.get(cleanKey);
-    if (byParent) return byParent;
+    const url = findLookupUrl(lookups ?? { byId: new Map(), bySlug: new Map(), byTitle: new Map(), byAttachmentParent: new Map() }, key);
+    if (url) return url;
   }
 
-  const slugUrl = lookups?.bySlug.get(cleanDisplayText(row.slug));
+  const slugUrl = findLookupUrl(lookups ?? { byId: new Map(), bySlug: new Map(), byTitle: new Map(), byAttachmentParent: new Map() }, row.slug);
   if (slugUrl) return slugUrl;
 
-  const titleUrl = lookups?.byTitle.get(cleanDisplayText(row.title));
+  const titleUrl = findLookupUrl(lookups ?? { byId: new Map(), bySlug: new Map(), byTitle: new Map(), byAttachmentParent: new Map() }, row.title);
   if (titleUrl) return titleUrl;
 
   return "";
