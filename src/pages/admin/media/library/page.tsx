@@ -14,6 +14,14 @@ interface MediaAsset {
   source: string;
 }
 
+interface BucketItem {
+  name: string;
+  id: string | null;
+  path: string;
+  isFolder: boolean;
+  publicUrl?: string;
+}
+
 const CMS_BUCKET = "cms-media";
 const PAGE_SIZE = 50;
 
@@ -29,6 +37,13 @@ export default function AdminMediaLibraryPage() {
   const [deleting, setDeleting] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Migrated images tab state
+  const [activeTab, setActiveTab] = useState<"assets" | "migrated">("assets");
+  const [bucketPath, setBucketPath] = useState("wp-import");
+  const [bucketItems, setBucketItems] = useState<BucketItem[]>([]);
+  const [bucketLoading, setBucketLoading] = useState(false);
+  const [selectedBucketItem, setSelectedBucketItem] = useState<BucketItem | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -48,6 +63,34 @@ export default function AdminMediaLibraryPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  const loadBucket = useCallback(async () => {
+    setBucketLoading(true);
+    const { data, error } = await supabase.storage.from("article-media").list(bucketPath);
+
+    if (error) {
+      console.error("Error loading bucket:", error);
+      setBucketItems([]);
+    } else {
+      const items: BucketItem[] = (data ?? []).map((item) => {
+        const isFolder = !item.id;
+        const path = bucketPath ? `${bucketPath}/${item.name}` : item.name;
+        let publicUrl: string | undefined;
+        if (!isFolder) {
+          const { data: urlData } = supabase.storage.from("article-media").getPublicUrl(path);
+          publicUrl = urlData.publicUrl;
+        }
+        return { name: item.name, id: item.id ?? null, path, isFolder, publicUrl };
+      });
+      setBucketItems(items);
+    }
+    setBucketLoading(false);
+  }, [bucketPath]);
+
+  useEffect(() => {
+    if (activeTab !== "migrated") return;
+    loadBucket();
+  }, [activeTab, bucketPath, loadBucket]);
 
   const handleUpload = useCallback(async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -163,254 +206,415 @@ export default function AdminMediaLibraryPage() {
             Media Library
           </h1>
           <p className="mt-1 text-[13px] text-wk-text-muted">
-            {media.length} media assets in the library.
+            {activeTab === "assets" ? `${media.length} media assets` : "Migrated WordPress images"} in the library.
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            multiple
-            className="hidden"
-            onChange={(e) => handleUpload(e.target.files)}
-          />
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-            className="wk-button wk-button-primary wk-button-sm whitespace-nowrap disabled:opacity-50"
-          >
-            <WkIcon
-              name={uploading ? "Loader2" : "Upload"}
-              size={14}
-              className={uploading ? "animate-spin" : ""}
-            />
-            {uploading ? "Uploading..." : "Upload"}
-          </button>
+          <div className="flex items-center rounded-lg border border-wk-border bg-wk-bg-subtle p-0.5">
+            <button
+              onClick={() => setActiveTab("assets")}
+              className={`rounded-md px-3 py-1.5 text-[12px] font-semibold transition-all ${
+                activeTab === "assets"
+                  ? "bg-wk-surface text-wk-text"
+                  : "text-wk-text-muted hover:text-wk-text"
+              }`}
+            >
+              Media Assets
+            </button>
+            <button
+              onClick={() => setActiveTab("migrated")}
+              className={`rounded-md px-3 py-1.5 text-[12px] font-semibold transition-all ${
+                activeTab === "migrated"
+                  ? "bg-wk-surface text-wk-text"
+                  : "text-wk-text-muted hover:text-wk-text"
+              }`}
+            >
+              Migrated Images
+            </button>
+          </div>
+          {activeTab === "assets" && (
+            <>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={(e) => handleUpload(e.target.files)}
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                className="wk-button wk-button-primary wk-button-sm whitespace-nowrap disabled:opacity-50"
+              >
+                <WkIcon
+                  name={uploading ? "Loader2" : "Upload"}
+                  size={14}
+                  className={uploading ? "animate-spin" : ""}
+                />
+                {uploading ? "Uploading..." : "Upload"}
+              </button>
+            </>
+          )}
         </div>
       </div>
 
-      {/* Filters */}
-      <WkSurface className="p-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="flex items-center gap-2 rounded-lg border border-wk-border bg-wk-bg-subtle px-3 py-2 flex-1 max-w-md">
-            <WkIcon name="Search" size={14} className="text-wk-text-faint" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setPage(0);
-              }}
-              placeholder="Search media by entity or role..."
-              className="w-full bg-transparent text-[13px] text-wk-text placeholder:text-wk-text-faint outline-none"
-            />
-            {search && (
-              <button
-                onClick={() => {
-                  setSearch("");
-                  setPage(0);
-                }}
-                className="text-wk-text-faint hover:text-wk-text"
-              >
-                <WkIcon name="X" size={14} />
-              </button>
+      {/* Media Assets Tab */}
+      {activeTab === "assets" && (
+        <>
+          {/* Filters */}
+          <WkSurface className="p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <div className="flex items-center gap-2 rounded-lg border border-wk-border bg-wk-bg-subtle px-3 py-2 flex-1 max-w-md">
+                <WkIcon name="Search" size={14} className="text-wk-text-faint" />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setPage(0);
+                  }}
+                  placeholder="Search media by entity or role..."
+                  className="w-full bg-transparent text-[13px] text-wk-text placeholder:text-wk-text-faint outline-none"
+                />
+                {search && (
+                  <button
+                    onClick={() => {
+                      setSearch("");
+                      setPage(0);
+                    }}
+                    className="text-wk-text-faint hover:text-wk-text"
+                  >
+                    <WkIcon name="X" size={14} />
+                  </button>
+                )}
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <select
+                  value={roleFilter}
+                  onChange={(e) => {
+                    setRoleFilter(e.target.value);
+                    setPage(0);
+                  }}
+                  className="rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text outline-none cursor-pointer"
+                >
+                  <option value="all">All Roles</option>
+                  {roles
+                    .filter((r) => r !== "all")
+                    .map((r) => (
+                      <option key={r} value={r}>
+                        {r.charAt(0).toUpperCase() + r.slice(1).replace("_", " ")}
+                      </option>
+                    ))}
+                </select>
+                <select
+                  value={sourceFilter}
+                  onChange={(e) => {
+                    setSourceFilter(e.target.value);
+                    setPage(0);
+                  }}
+                  className="rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text outline-none cursor-pointer"
+                >
+                  <option value="all">All Sources</option>
+                  {sources.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+                <span className="text-[12px] text-wk-text-muted whitespace-nowrap">
+                  {filtered.length} of {media.length}
+                </span>
+              </div>
+            </div>
+          </WkSurface>
+
+          {/* Table */}
+          {loading ? (
+            <div className="space-y-3">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="animate-pulse rounded-xl border border-wk-border bg-wk-surface p-4"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-lg bg-wk-surface-raised" />
+                    <div className="flex-1 space-y-2">
+                      <div className="h-4 w-48 rounded bg-wk-surface-raised" />
+                      <div className="h-3 w-32 rounded bg-wk-surface-raised" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <>
+              <AdminTable
+                columns={[
+                  {
+                    key: "url",
+                    label: "Preview",
+                    width: "60px",
+                    render: (row) => (
+                      <button
+                        onClick={() => setPreviewing(row)}
+                        className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-wk-surface-raised hover:ring-2 hover:ring-wk-brand cursor-pointer"
+                      >
+                        {row.url ? (
+                          <img
+                            src={row.url}
+                            alt={row.alt_text || ""}
+                            className="h-full w-full object-cover"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-wk-text-faint">
+                            <WkIcon name="Image" size={16} />
+                          </div>
+                        )}
+                      </button>
+                    ),
+                  },
+                  {
+                    key: "entity_slug",
+                    label: "Entity",
+                    render: (row) => (
+                      <div>
+                        <div className="text-[13px] font-semibold text-wk-text">
+                          {row.entity_slug}
+                        </div>
+                        <div className="text-[11px] text-wk-text-muted">
+                          {row.entity_type}
+                        </div>
+                      </div>
+                    ),
+                  },
+                  {
+                    key: "role",
+                    label: "Role",
+                    width: "100px",
+                    render: (row) => (
+                      <span className="wk-tag text-[10px]">{row.role}</span>
+                    ),
+                  },
+                  {
+                    key: "source",
+                    label: "Source",
+                    width: "100px",
+                    render: (row) => (
+                      <span className="text-[12px] text-wk-text-muted">
+                        {row.source}
+                      </span>
+                    ),
+                  },
+                  {
+                    key: "alt_text",
+                    label: "Alt Text",
+                    width: "200px",
+                    render: (row) => (
+                      <span className="text-[12px] text-wk-text-muted">
+                        {row.alt_text || "—"}
+                      </span>
+                    ),
+                  },
+                  {
+                    key: "actions",
+                    label: "",
+                    width: "120px",
+                    render: (row) => (
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleCopy(row.url)}
+                          className="rounded-md p-1.5 text-wk-text-muted hover:bg-wk-surface-raised hover:text-wk-brand"
+                          title="Copy URL"
+                        >
+                          <WkIcon name={copied ? "Check" : "Copy"} size={14} />
+                        </button>
+                        <button
+                          onClick={() => setPreviewing(row)}
+                          className="rounded-md p-1.5 text-wk-text-muted hover:bg-wk-surface-raised hover:text-wk-brand"
+                          title="Preview"
+                        >
+                          <WkIcon name="Eye" size={14} />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(row)}
+                          disabled={deleting === row.id}
+                          className="rounded-md p-1.5 text-wk-text-muted hover:bg-wk-surface-raised hover:text-rose-600 disabled:opacity-50"
+                          title="Delete"
+                        >
+                          <WkIcon
+                            name={deleting === row.id ? "Loader2" : "Trash2"}
+                            size={14}
+                            className={deleting === row.id ? "animate-spin" : ""}
+                          />
+                        </button>
+                      </div>
+                    ),
+                  },
+                ]}
+                rows={paged}
+                keyField="id"
+                emptyMessage="No media assets found."
+              />
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between rounded-lg border border-wk-border bg-wk-surface px-4 py-3">
+                  <span className="text-[12px] text-wk-text-muted">
+                    Page {page + 1} of {totalPages} ({filtered.length} total)
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setPage((p) => Math.max(0, p - 1))}
+                      disabled={page === 0}
+                      className="rounded-md border border-wk-border px-3 py-1.5 text-[12px] font-semibold text-wk-text hover:bg-wk-surface-raised disabled:opacity-50"
+                    >
+                      Previous
+                    </button>
+                    <button
+                      onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                      disabled={page >= totalPages - 1}
+                      className="rounded-md border border-wk-border px-3 py-1.5 text-[12px] font-semibold text-wk-text hover:bg-wk-surface-raised disabled:opacity-50"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </>
+      )}
+
+      {/* Migrated Images Tab */}
+      {activeTab === "migrated" && (
+        <WkSurface className="p-4">
+          {/* Breadcrumb */}
+          <div className="flex items-center gap-1 mb-4 text-[12px] text-wk-text-muted">
+            <button
+              onClick={() => setBucketPath("wp-import")}
+              className="rounded-md px-2 py-1 hover:bg-wk-surface-raised text-wk-brand font-semibold"
+            >
+              wp-import
+            </button>
+            {bucketPath !== "wp-import" && (
+              <>
+                <WkIcon name="ChevronRight" size={12} />
+                <span className="font-mono">{bucketPath.replace("wp-import/", "")}</span>
+                <button
+                  onClick={() => {
+                    const parts = bucketPath.split("/");
+                    if (parts.length > 1) {
+                      setBucketPath(parts.slice(0, -1).join("/"));
+                    } else {
+                      setBucketPath("wp-import");
+                    }
+                    setSelectedBucketItem(null);
+                  }}
+                  className="ml-2 rounded-md px-2 py-1 text-[11px] hover:bg-wk-surface-raised text-wk-text-muted"
+                >
+                  <WkIcon name="ArrowUp" size={12} />
+                  Up
+                </button>
+              </>
             )}
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <select
-              value={roleFilter}
-              onChange={(e) => {
-                setRoleFilter(e.target.value);
-                setPage(0);
-              }}
-              className="rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text outline-none cursor-pointer"
-            >
-              <option value="all">All Roles</option>
-              {roles
-                .filter((r) => r !== "all")
-                .map((r) => (
-                  <option key={r} value={r}>
-                    {r.charAt(0).toUpperCase() + r.slice(1).replace("_", " ")}
-                  </option>
-                ))}
-            </select>
-            <select
-              value={sourceFilter}
-              onChange={(e) => {
-                setSourceFilter(e.target.value);
-                setPage(0);
-              }}
-              className="rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text outline-none cursor-pointer"
-            >
-              <option value="all">All Sources</option>
-              {sources.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-            <span className="text-[12px] text-wk-text-muted whitespace-nowrap">
-              {filtered.length} of {media.length}
-            </span>
-          </div>
-        </div>
-      </WkSurface>
 
-      {/* Table */}
-      {loading ? (
-        <div className="space-y-3">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div
-              key={i}
-              className="animate-pulse rounded-xl border border-wk-border bg-wk-surface p-4"
-            >
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-wk-surface-raised" />
-                <div className="flex-1 space-y-2">
-                  <div className="h-4 w-48 rounded bg-wk-surface-raised" />
-                  <div className="h-3 w-32 rounded bg-wk-surface-raised" />
+          {bucketLoading ? (
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-4">
+              {Array.from({ length: 12 }).map((_, i) => (
+                <div key={i} className="aspect-square animate-pulse rounded-lg bg-wk-surface-raised" />
+              ))}
+            </div>
+          ) : bucketItems.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-wk-text-muted">
+              <WkIcon name="Image" size={40} className="mb-3 text-wk-text-faint" />
+              <p className="text-[14px] font-semibold">No images in this folder</p>
+              <p className="text-[12px] mt-1">This folder may be empty or the migration is still in progress.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-4">
+              {bucketItems.map((item) => (
+                <button
+                  key={item.path}
+                  onClick={() => {
+                    if (item.isFolder) {
+                      setBucketPath(item.path);
+                      setSelectedBucketItem(null);
+                    } else {
+                      setSelectedBucketItem(item);
+                    }
+                  }}
+                  className={`group relative aspect-square overflow-hidden rounded-lg border bg-wk-surface-raised transition-all text-left ${
+                    item.isFolder
+                      ? "border-wk-border hover:border-wk-border-2"
+                      : selectedBucketItem?.path === item.path
+                      ? "ring-2 ring-wk-brand border-wk-brand"
+                      : "border-wk-border hover:border-wk-border-2"
+                  }`}
+                >
+                  {item.isFolder ? (
+                    <div className="flex h-full flex-col items-center justify-center gap-2 text-wk-text-muted">
+                      <WkIcon name="Folder" size={32} />
+                      <span className="text-[11px] font-semibold truncate max-w-full px-2">{item.name}</span>
+                    </div>
+                  ) : (
+                    <>
+                      <img
+                        src={item.publicUrl}
+                        alt={item.name}
+                        className="h-full w-full object-cover"
+                        loading="lazy"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                      />
+                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
+                        <p className="text-[10px] font-semibold text-white truncate">{item.name}</p>
+                      </div>
+                    </>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Selected item details */}
+          {selectedBucketItem && !selectedBucketItem.isFolder && (
+            <div className="mt-6 rounded-lg border border-wk-border bg-wk-bg-subtle p-4">
+              <div className="flex items-start gap-4">
+                <div className="h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-wk-surface-raised">
+                  <img
+                    src={selectedBucketItem.publicUrl}
+                    alt={selectedBucketItem.name}
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13px] font-semibold text-wk-text truncate">{selectedBucketItem.name}</p>
+                  <p className="text-[11px] font-mono text-wk-text-muted mt-1 break-all">{selectedBucketItem.publicUrl}</p>
+                  <div className="mt-3 flex items-center gap-2">
+                    <button
+                      onClick={() => selectedBucketItem.publicUrl && handleCopy(selectedBucketItem.publicUrl)}
+                      className="inline-flex items-center gap-1.5 rounded-md border border-wk-border px-3 py-1.5 text-[12px] font-semibold text-wk-text hover:bg-wk-surface-raised"
+                    >
+                      <WkIcon name={copied ? "Check" : "Copy"} size={13} />
+                      {copied ? "Copied" : "Copy URL"}
+                    </button>
+                    <a
+                      href={selectedBucketItem.publicUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 rounded-md border border-wk-border px-3 py-1.5 text-[12px] font-semibold text-wk-text hover:bg-wk-surface-raised"
+                    >
+                      <WkIcon name="ExternalLink" size={13} />
+                      Open
+                    </a>
+                  </div>
                 </div>
               </div>
             </div>
-          ))}
-        </div>
-      ) : (
-        <>
-          <AdminTable
-            columns={[
-              {
-                key: "url",
-                label: "Preview",
-                width: "60px",
-                render: (row) => (
-                  <button
-                    onClick={() => setPreviewing(row)}
-                    className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-wk-surface-raised hover:ring-2 hover:ring-wk-brand cursor-pointer"
-                  >
-                    {row.url ? (
-                      <img
-                        src={row.url}
-                        alt={row.alt_text || ""}
-                        className="h-full w-full object-cover"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center text-wk-text-faint">
-                        <WkIcon name="Image" size={16} />
-                      </div>
-                    )}
-                  </button>
-                ),
-              },
-              {
-                key: "entity_slug",
-                label: "Entity",
-                render: (row) => (
-                  <div>
-                    <div className="text-[13px] font-semibold text-wk-text">
-                      {row.entity_slug}
-                    </div>
-                    <div className="text-[11px] text-wk-text-muted">
-                      {row.entity_type}
-                    </div>
-                  </div>
-                ),
-              },
-              {
-                key: "role",
-                label: "Role",
-                width: "100px",
-                render: (row) => (
-                  <span className="wk-tag text-[10px]">{row.role}</span>
-                ),
-              },
-              {
-                key: "source",
-                label: "Source",
-                width: "100px",
-                render: (row) => (
-                  <span className="text-[12px] text-wk-text-muted">
-                    {row.source}
-                  </span>
-                ),
-              },
-              {
-                key: "alt_text",
-                label: "Alt Text",
-                width: "200px",
-                render: (row) => (
-                  <span className="text-[12px] text-wk-text-muted">
-                    {row.alt_text || "—"}
-                  </span>
-                ),
-              },
-              {
-                key: "actions",
-                label: "",
-                width: "120px",
-                render: (row) => (
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => handleCopy(row.url)}
-                      className="rounded-md p-1.5 text-wk-text-muted hover:bg-wk-surface-raised hover:text-wk-brand"
-                      title="Copy URL"
-                    >
-                      <WkIcon name={copied ? "Check" : "Copy"} size={14} />
-                    </button>
-                    <button
-                      onClick={() => setPreviewing(row)}
-                      className="rounded-md p-1.5 text-wk-text-muted hover:bg-wk-surface-raised hover:text-wk-brand"
-                      title="Preview"
-                    >
-                      <WkIcon name="Eye" size={14} />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(row)}
-                      disabled={deleting === row.id}
-                      className="rounded-md p-1.5 text-wk-text-muted hover:bg-wk-surface-raised hover:text-rose-600 disabled:opacity-50"
-                      title="Delete"
-                    >
-                      <WkIcon
-                        name={deleting === row.id ? "Loader2" : "Trash2"}
-                        size={14}
-                        className={deleting === row.id ? "animate-spin" : ""}
-                      />
-                    </button>
-                  </div>
-                ),
-              },
-            ]}
-            rows={paged}
-            keyField="id"
-            emptyMessage="No media assets found."
-          />
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between rounded-lg border border-wk-border bg-wk-surface px-4 py-3">
-              <span className="text-[12px] text-wk-text-muted">
-                Page {page + 1} of {totalPages} ({filtered.length} total)
-              </span>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setPage((p) => Math.max(0, p - 1))}
-                  disabled={page === 0}
-                  className="rounded-md border border-wk-border px-3 py-1.5 text-[12px] font-semibold text-wk-text hover:bg-wk-surface-raised disabled:opacity-50"
-                >
-                  Previous
-                </button>
-                <button
-                  onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-                  disabled={page >= totalPages - 1}
-                  className="rounded-md border border-wk-border px-3 py-1.5 text-[12px] font-semibold text-wk-text hover:bg-wk-surface-raised disabled:opacity-50"
-                >
-                  Next
-                </button>
-              </div>
-            </div>
           )}
-        </>
+        </WkSurface>
       )}
 
       {/* Preview Modal */}

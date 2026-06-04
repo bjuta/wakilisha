@@ -18,36 +18,56 @@ interface GenreRowsProps {
   shelves: GenreShelf[];
 }
 
-function GenreShelfRow({ genre, artists }: GenreShelf) {
+const GENRE_COLORS: Record<string, string> = {
+  Afrobeats: "rgba(132,194,65,0.06)",
+  Amapiano: "rgba(168,72,60,0.06)",
+  BongoFlava: "rgba(45,107,181,0.06)",
+  Gengetone: "rgba(160,104,0,0.06)",
+  "R&B": "rgba(158,56,121,0.06)",
+  HipHop: "rgba(100,82,199,0.06)",
+};
+
+function getGenreColor(genre: string): string {
+  for (const [key, color] of Object.entries(GENRE_COLORS)) {
+    if (genre.includes(key) || key.includes(genre)) return color;
+  }
+  return "rgba(132,194,65,0.04)";
+}
+
+function GenreShelfRow({ genre, artists, index }: GenreShelf & { index: number }) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const scroll = (dir: "left" | "right") => {
     if (!scrollRef.current) return;
-    scrollRef.current.scrollBy({ left: dir === "left" ? -280 : 280, behavior: "smooth" });
+    scrollRef.current.scrollBy({ left: dir === "left" ? -360 : 360, behavior: "smooth" });
   };
 
+  const bgColor = getGenreColor(genre);
+
   return (
-    <div className="mb-10 last:mb-0">
+    <div className="relative mb-6 overflow-hidden rounded-2xl last:mb-0" style={{ background: bgColor }}>
       {/* Header */}
-      <div className="mb-4 flex items-end justify-between">
+      <div className="flex items-end justify-between px-5 pt-5 md:px-6 md:pt-6">
         <div className="flex items-baseline gap-3">
-          <h4 className="text-[22px] font-bold text-[var(--wk-text)] md:text-[26px]">{genre}</h4>
+          <h4 className="text-[22px] font-black tracking-[-0.025em] text-[var(--wk-text)] md:text-[28px]">
+            {genre}
+          </h4>
           <span className="text-[13px] font-semibold text-[var(--wk-text-muted)]">
-            {artists.length} artist{artists.length !== 1 ? "s" : ""}
+            {artists.length} artists
           </span>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
           <button
             onClick={() => scroll("left")}
-            className="flex h-8 w-8 items-center justify-center rounded-full border border-[var(--wk-border)] text-[var(--wk-text-muted)] transition-all hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]"
+            className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--wk-border-2)] bg-[var(--wk-surface)] text-[var(--wk-text-soft)] transition-all hover:border-[var(--wk-brand)] hover:text-[var(--wk-brand)]"
           >
-            <i className="ri-arrow-left-line text-sm" />
+            <i className="ri-arrow-left-s-line text-base" />
           </button>
           <button
             onClick={() => scroll("right")}
-            className="flex h-8 w-8 items-center justify-center rounded-full border border-[var(--wk-border)] text-[var(--wk-text-muted)] transition-all hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]"
+            className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--wk-border-2)] bg-[var(--wk-surface)] text-[var(--wk-text-soft)] transition-all hover:border-[var(--wk-brand)] hover:text-[var(--wk-brand)]"
           >
-            <i className="ri-arrow-right-line text-sm" />
+            <i className="ri-arrow-right-s-line text-base" />
           </button>
         </div>
       </div>
@@ -55,23 +75,22 @@ function GenreShelfRow({ genre, artists }: GenreShelf) {
       {/* Scrollable row */}
       <div
         ref={scrollRef}
-        className="flex gap-3 overflow-x-auto pb-3 scrollbar-hide"
-        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+        className="flex gap-4 overflow-x-auto px-5 pb-5 pt-4 scrollbar-hide md:px-6 md:pb-6 md:pt-5"
+        style={{ scrollbarWidth: "none", msOverflowStyle: "none", scrollSnapType: "x mandatory" }}
       >
         {artists.map((artist) => (
           <Link
             key={artist.slug}
             to={`/artists/${artist.slug}`}
-            className="group relative block shrink-0 overflow-hidden rounded-xl border border-[var(--wk-border)] transition-all hover:border-[var(--wk-border-2)]"
-            style={{ width: "200px", aspectRatio: "3/4" }}
+            className="group relative shrink-0 overflow-hidden rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] transition-all duration-[var(--wk-d-standard)] hover:-translate-y-1.5 hover:border-[var(--wk-border-2)] hover:shadow-lg"
+            style={{ width: "200px", aspectRatio: "3/4", scrollSnapAlign: "start" }}
           >
-            <div className="absolute inset-0 bg-[var(--wk-surface-raised)]"
-            >
+            <div className="absolute inset-0 bg-[var(--wk-surface-raised)]">
               {artist.imageUrl ? (
                 <img
                   src={artist.imageUrl}
                   alt={artist.name}
-                  className="h-full w-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
+                  className="h-full w-full object-cover object-top transition-transform duration-[var(--wk-d-slow)] group-hover:scale-105"
                 />
               ) : (
                 <div className="flex h-full w-full items-center justify-center">
@@ -79,11 +98,22 @@ function GenreShelfRow({ genre, artists }: GenreShelf) {
                 </div>
               )}
             </div>
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
-            <div className="absolute bottom-0 left-0 right-0 p-3">
-              <h5 className="text-[14px] font-bold text-white">{artist.name}</h5>
-              <div className="mt-0.5 text-[11px] text-white/60">
-                {artist.trackCount} tracks · {artist.releaseCount} releases
+            <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-transparent" />
+            <div className="absolute bottom-0 left-0 right-0 p-4">
+              <h5 className="text-[14px] font-extrabold leading-tight text-white md:text-[15px]">
+                {artist.name}
+              </h5>
+              <div className="mt-1 flex items-center gap-x-2 text-[11px] text-white/50">
+                <span>{artist.trackCount} tracks</span>
+                <span>·</span>
+                <span>{artist.releaseCount} releases</span>
+              </div>
+            </div>
+
+            {/* Hover play button */}
+            <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition-all duration-[var(--wk-d-standard)] group-hover:bg-black/20">
+              <div className="flex h-11 w-11 translate-y-3 items-center justify-center rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] opacity-0 transition-all duration-[var(--wk-d-standard)] group-hover:translate-y-0 group-hover:opacity-100">
+                <i className="ri-arrow-right-line text-lg" />
               </div>
             </div>
           </Link>
@@ -97,16 +127,16 @@ export function GenreRows({ shelves }: GenreRowsProps) {
   if (shelves.length === 0) return null;
 
   return (
-    <section className="wk-container px-6 py-14 md:py-20">
-      <div className="mb-10">
-        <div className="wk-eyebrow mb-3">Explore by sound</div>
-        <h3 className="text-[clamp(28px,3.5vw,48px)] font-black leading-[0.92] tracking-[-0.04em] text-[var(--wk-text)]">
-          Find your frequency
-        </h3>
+    <section className="px-4 py-14 md:px-6 md:py-20">
+      <div className="wk-container-wide">
+        <div className="mb-10">
+          <div className="wk-eyebrow mb-3">Explore by sound</div>
+          <h3 className="wk-h-page max-w-[16ch]">Find your frequency</h3>
+        </div>
+        {shelves.map((shelf, i) => (
+          <GenreShelfRow key={shelf.genre} genre={shelf.genre} artists={shelf.artists} index={i} />
+        ))}
       </div>
-      {shelves.map((shelf) => (
-        <GenreShelfRow key={shelf.genre} genre={shelf.genre} artists={shelf.artists} />
-      ))}
     </section>
   );
 }

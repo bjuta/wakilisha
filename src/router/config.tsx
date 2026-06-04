@@ -7,6 +7,9 @@ import NotFound from "../pages/NotFound";
 import Home from "../pages/home/page";
 import AdminDesignSystem from "../pages/admin/design-system/page";
 
+// Author profiles
+import AuthorProfilePage from "../pages/authors/detail/page";
+
 // Admin Shell — WordPress-like production engine
 import { AdminShell } from "../pages/admin/AdminShell";
 import AdminDashboardPage from "../pages/admin/dashboard/page";
@@ -39,6 +42,7 @@ import AdminDuplicateMergePage from "../pages/admin/relationships/duplicates/pag
 import AdminPublishingDashboardPage from "../pages/admin/content/publishing/page";
 import AdminContentArchivePage from "../pages/admin/content/archive/page";
 import AdminMediaMigrationPage from "../pages/admin/content/migration/page";
+import AdminUsersPage from "../pages/admin/users/page";
 
 // Admin Charts Ingestion Studio
 import { AdminChartsLayout } from "../pages/admin/charts/AdminChartsLayout";
@@ -115,6 +119,7 @@ import MobileNotFound from "../pages/mobile/NotFound";
 import MobileTrackDetail from "../pages/mobile/tracks/detail/page";
 import MobileAuth from "../pages/mobile/auth/page";
 import MobileProfile from "../pages/mobile/profile/page";
+import MobileAuthorProfile from "../pages/mobile/authors/detail/page";
 
 const routes: RouteObject[] = [
   {
@@ -154,6 +159,7 @@ const routes: RouteObject[] = [
       { path: "/player", element: <ResponsivePage mobile={<MobileHome />} desktop={<DesktopPlayerPage />} /> },
       { path: "/auth", element: <ResponsivePage mobile={<MobileAuth />} desktop={<MobileAuth />} /> },
       { path: "/profile", element: <ResponsivePage mobile={<MobileProfile />} desktop={<ProfilePage />} /> },
+      { path: "/authors/:slug", element: <ResponsivePage mobile={<MobileAuthorProfile />} desktop={<AuthorProfilePage />} /> },
       { path: "/settings", element: <ResponsivePage mobile={<SettingsPage />} desktop={<SettingsPage />} /> },
     ],
   },
@@ -170,6 +176,7 @@ const routes: RouteObject[] = [
       { path: "content/publishing", element: <AdminPublishingDashboardPage /> },
       { path: "content/archive", element: <AdminContentArchivePage /> },
       { path: "content/migration", element: <AdminMediaMigrationPage /> },
+      { path: "users", element: <AdminUsersPage /> },
       { path: "registry/artists", element: <AdminArtistsPage /> },
       { path: "registry/artists/:slug", element: <AdminArtistDetailPage /> },
       { path: "registry/tracks", element: <AdminTracksPage /> },

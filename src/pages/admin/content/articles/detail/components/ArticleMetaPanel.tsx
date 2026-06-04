@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
+import { MediaPickerModal } from "@/components/admin/MediaPickerModal";
 import { ArticlePublishTimeline } from "./ArticlePublishTimeline";
 import { ArticleSeoPreview } from "./ArticleSeoPreview";
 import { ArticleRevisionHistory } from "./ArticleRevisionHistory";
@@ -85,11 +86,13 @@ export function ArticleMetaPanel({
   const [revisionsOpen, setRevisionsOpen] = useState(false);
   const [heroUrlInput, setHeroUrlInput] = useState(heroImageUrl);
   const [heroPreviewError, setHeroPreviewError] = useState(false);
+  const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
 
-  // Sync heroUrlInput if heroImageUrl prop changes (on load)
-  useState(() => {
+  // Sync heroUrlInput when heroImageUrl prop changes
+  useEffect(() => {
     setHeroUrlInput(heroImageUrl);
-  });
+    setHeroPreviewError(false);
+  }, [heroImageUrl]);
 
   function addCategory() {
     const trimmed = newCategory.trim();
@@ -173,28 +176,50 @@ export function ArticleMetaPanel({
             placeholder="https://example.com/image.jpg"
             className="w-full rounded-lg border border-wk-border bg-wk-bg-subtle px-3 py-2 text-[12px] text-wk-text placeholder:text-wk-text-faint outline-none focus:border-wk-brand transition-colors font-mono"
           />
-          <button
-            onClick={() => onHeroImageSave?.(heroUrlInput)}
-            disabled={isSavingHero || heroUrlInput === heroImageUrl}
-            className="w-full flex items-center justify-center gap-2 rounded-lg border border-wk-border bg-wk-surface py-2 text-[12px] font-semibold text-wk-text-muted hover:bg-wk-surface-raised hover:text-wk-text disabled:opacity-40 transition-colors"
-          >
-            {isSavingHero ? (
-              <>
-                <i className="ri-loader-4-line animate-spin text-[14px]" />
-                Saving…
-              </>
-            ) : (
-              <>
-                <WkIcon name="Save" size={13} />
-                Save to Media Library
-              </>
-            )}
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setMediaPickerOpen(true)}
+              className="flex-1 flex items-center justify-center gap-2 rounded-lg border border-wk-border bg-wk-surface py-2 text-[12px] font-semibold text-wk-text-muted hover:bg-wk-surface-raised hover:text-wk-text transition-colors"
+            >
+              <WkIcon name="Image" size={13} />
+              Browse Library
+            </button>
+            <button
+              onClick={() => onHeroImageSave?.(heroUrlInput)}
+              disabled={isSavingHero || heroUrlInput === heroImageUrl}
+              className="flex-1 flex items-center justify-center gap-2 rounded-lg border border-wk-brand bg-wk-brand-soft py-2 text-[12px] font-semibold text-wk-brand hover:bg-wk-brand hover:text-wk-brand-on disabled:opacity-40 transition-colors"
+            >
+              {isSavingHero ? (
+                <>
+                  <i className="ri-loader-4-line animate-spin text-[14px]" />
+                  Saving…
+                </>
+              ) : (
+                <>
+                  <WkIcon name="Save" size={13} />
+                  Save
+                </>
+              )}
+            </button>
+          </div>
           <p className="text-[10px] text-wk-text-faint leading-relaxed">
-            Paste a direct image URL. WP import images link to wakilisha.africa. Upload new images via the media library or your CDN, then paste the URL here.
+            Paste a direct image URL or browse the media library. WP import images link to wakilisha.africa.
           </p>
         </div>
       </WkSurface>
+
+      {/* Media Picker Modal */}
+      <MediaPickerModal
+        open={mediaPickerOpen}
+        onClose={() => setMediaPickerOpen(false)}
+        onSelect={(url) => {
+          setHeroUrlInput(url);
+          setHeroPreviewError(false);
+          onHeroImageSave?.(url);
+          setMediaPickerOpen(false);
+        }}
+        title="Select Hero Image"
+      />
 
       {/* Status Info */}
       <WkSurface className="p-4">

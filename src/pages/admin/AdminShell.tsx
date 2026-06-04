@@ -5,6 +5,7 @@ import { WkIcon } from "@/components/design-system/Icon";
 import { useAdminBadgeCounts } from "@/hooks/useAdminBadgeCounts";
 import { useAdminUser } from "@/hooks/useAdminUser";
 import { supabase } from "@/lib/supabase";
+import { ROLE_LABELS, type UserRole } from "@/services/userRoles";
 import type { WkIconName } from "@/components/design-system/Icon";
 
 /* ────────────────────────── Types ────────────────────────── */
@@ -15,11 +16,13 @@ interface NavItem {
   icon: WkIconName;
   badgeKey?: string;
   disabled?: boolean;
+  requiredCapability?: string;
 }
 
 interface NavGroup {
   label: string;
   items: NavItem[];
+  visible: (role: UserRole | null) => boolean;
 }
 
 /* ────────────────────────── Navigation Groups ────────────────────────── */
@@ -27,10 +30,12 @@ interface NavGroup {
 const NAV_GROUPS: NavGroup[] = [
   {
     label: "Dashboard",
+    visible: (r) => r === "administrator" || r === "editor" || r === "author",
     items: [{ path: "/admin", label: "Overview", icon: "LayoutDashboard" }],
   },
   {
     label: "Content",
+    visible: (r) => r === "administrator" || r === "editor" || r === "author" || r === "writer",
     items: [
       { path: "/admin/content/articles", label: "Articles", icon: "FileText" },
       { path: "/admin/content/guides", label: "Guides", icon: "BookOpen" },
@@ -45,6 +50,7 @@ const NAV_GROUPS: NavGroup[] = [
   },
   {
     label: "Charts",
+    visible: (r) => r === "administrator",
     items: [
       { path: "/admin/settings/charts/dashboard", label: "Dashboard", icon: "LayoutDashboard" },
       { path: "/admin/settings/charts/families", label: "Chart Families", icon: "FolderTree" },
@@ -56,6 +62,7 @@ const NAV_GROUPS: NavGroup[] = [
   },
   {
     label: "Registry",
+    visible: (r) => r === "administrator",
     items: [
       { path: "/admin/registry/artists", label: "Artists", icon: "Mic2" },
       { path: "/admin/registry/tracks", label: "Tracks", icon: "Music" },
@@ -66,6 +73,7 @@ const NAV_GROUPS: NavGroup[] = [
   },
   {
     label: "Commerce",
+    visible: () => false,
     items: [
       { path: "/admin/commerce/products", label: "Products", icon: "ShoppingBag", disabled: true },
       { path: "/admin/commerce/categories", label: "Categories", icon: "FolderTree", disabled: true },
@@ -74,6 +82,7 @@ const NAV_GROUPS: NavGroup[] = [
   },
   {
     label: "Media",
+    visible: (r) => r === "administrator" || r === "editor" || r === "author" || r === "writer",
     items: [
       { path: "/admin/media/library", label: "Media Library", icon: "Image" },
       { path: "/admin/media/missing", label: "Missing Images", icon: "ImageOff", badgeKey: "missingImages" },
@@ -83,6 +92,7 @@ const NAV_GROUPS: NavGroup[] = [
   },
   {
     label: "Relationships",
+    visible: (r) => r === "administrator",
     items: [
       { path: "/admin/relationships/viewer", label: "Entity Relationships", icon: "Network" },
       { path: "/admin/relationships/duplicates", label: "Duplicate Merge", icon: "Copy" },
@@ -92,6 +102,7 @@ const NAV_GROUPS: NavGroup[] = [
   },
   {
     label: "Review",
+    visible: (r) => r === "administrator" || r === "editor",
     items: [
       { path: "/admin/review/queue", label: "Review Queue", icon: "GitPullRequest", badgeKey: "reviewQueue" },
       { path: "/admin/review/migration", label: "Migration Issues", icon: "AlertTriangle", disabled: true },
@@ -103,6 +114,7 @@ const NAV_GROUPS: NavGroup[] = [
   },
   {
     label: "Imports",
+    visible: (r) => r === "administrator",
     items: [
       { path: "/admin/imports/jobs", label: "Import Jobs", icon: "Upload" },
       { path: "/admin/imports/upload", label: "Upload ZIP", icon: "FileUp" },
@@ -113,6 +125,7 @@ const NAV_GROUPS: NavGroup[] = [
   },
   {
     label: "Settings",
+    visible: (r) => r === "administrator",
     items: [
       { path: "/admin/settings", label: "Settings Hub", icon: "Settings" },
       { path: "/admin/settings/integrations", label: "Integrations", icon: "Plug" },
@@ -122,7 +135,15 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
+    label: "Users",
+    visible: (r) => r === "administrator",
+    items: [
+      { path: "/admin/users", label: "Manage Users", icon: "Users" },
+    ],
+  },
+  {
     label: "Tools",
+    visible: () => false,
     items: [
       { path: "/admin/tools/health", label: "Data Health", icon: "Activity", disabled: true },
       { path: "/admin/tools/cache", label: "Cache / Rebuild", icon: "RefreshCw", disabled: true },
@@ -224,6 +245,33 @@ function UserProfileDropdown({ user, collapsed }: { user: ReturnType<typeof useA
     navigate("/");
   };
 
+  const roleLabel = user.role ? ROLE_LABELS[user.role] : null;
+
+  const roleBadgeColors: Record<string, string> = {
+    administrator: "bg-wk-danger/10 text-wk-danger border-wk-danger/20",
+    editor: "bg-wk-brand/10 text-wk-brand border-wk-brand/20",
+    author: "bg-wk-success/10 text-wk-success border-wk-success/20",
+    writer: "bg-wk-warning/10 text-wk-warning border-wk-warning/20",
+  };
+
+  if (!user.id) {
+    return (
+      <button
+        onClick={() => navigate("/auth")}
+        className="flex items-center gap-2 rounded-full hover:bg-wk-surface-raised transition-colors px-3 py-2"
+      >
+        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-wk-surface-raised text-wk-text-muted">
+          <WkIcon name="LogIn" size={14} />
+        </span>
+        {!collapsed && (
+          <span className="hidden lg:block text-[12px] font-semibold text-wk-text-muted whitespace-nowrap">
+            Sign In
+          </span>
+        )}
+      </button>
+    );
+  }
+
   return (
     <div className="relative" ref={ref}>
       <button
@@ -238,9 +286,16 @@ function UserProfileDropdown({ user, collapsed }: { user: ReturnType<typeof useA
           )}
         </div>
         {!collapsed && (
-          <span className="hidden lg:block text-[12px] font-semibold text-wk-text-soft max-w-[120px] truncate">
-            {user.name}
-          </span>
+          <div className="hidden lg:flex flex-col items-start min-w-0 max-w-[120px]">
+            <span className="text-[12px] font-semibold text-wk-text-soft truncate w-full text-left">
+              {user.name}
+            </span>
+            {roleLabel && (
+              <span className={`text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full border ${roleBadgeColors[user.role ?? ""] ?? "bg-wk-surface-raised text-wk-text-muted border-wk-border"}`}>
+                {roleLabel}
+              </span>
+            )}
+          </div>
         )}
       </button>
 
@@ -249,22 +304,38 @@ function UserProfileDropdown({ user, collapsed }: { user: ReturnType<typeof useA
           <div className="px-4 py-3 border-b border-wk-border">
             <p className="text-[13px] font-semibold text-wk-text truncate">{user.name}</p>
             <p className="text-[11px] text-wk-text-muted truncate">{user.email}</p>
+            {roleLabel && (
+              <span className={`mt-1.5 inline-block text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full border ${roleBadgeColors[user.role ?? ""] ?? ""}`}>
+                {roleLabel}
+              </span>
+            )}
           </div>
           <div className="p-1">
             <button
-              onClick={() => { navigate("/admin/settings"); setOpen(false); }}
+              onClick={() => { navigate("/profile"); setOpen(false); }}
               className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-[12px] font-semibold text-wk-text-muted hover:bg-wk-surface-raised hover:text-wk-text transition-colors"
             >
-              <WkIcon name="Settings" size={14} />
-              Settings
+              <WkIcon name="User" size={14} />
+              Public Profile
             </button>
-            <button
-              onClick={() => { navigate("/admin/settings/audit"); setOpen(false); }}
-              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-[12px] font-semibold text-wk-text-muted hover:bg-wk-surface-raised hover:text-wk-text transition-colors"
-            >
-              <WkIcon name="ClipboardList" size={14} />
-              Audit Log
-            </button>
+            {user.role === "administrator" && (
+              <>
+                <button
+                  onClick={() => { navigate("/admin/settings"); setOpen(false); }}
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-[12px] font-semibold text-wk-text-muted hover:bg-wk-surface-raised hover:text-wk-text transition-colors"
+                >
+                  <WkIcon name="Settings" size={14} />
+                  Settings
+                </button>
+                <button
+                  onClick={() => { navigate("/admin/users"); setOpen(false); }}
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-[12px] font-semibold text-wk-text-muted hover:bg-wk-surface-raised hover:text-wk-text transition-colors"
+                >
+                  <WkIcon name="Users" size={14} />
+                  Manage Users
+                </button>
+              </>
+            )}
           </div>
           <div className="border-t border-wk-border p-1">
             <button
@@ -374,8 +445,8 @@ export function AdminShell() {
         items: g.items.filter((i) =>
           i.label.toLowerCase().includes(searchQuery.toLowerCase())
         ),
-      })).filter((g) => g.items.length > 0)
-    : NAV_GROUPS;
+      })).filter((g) => g.items.length > 0 && g.visible(adminUser.role))
+    : NAV_GROUPS.filter((g) => g.visible(adminUser.role));
 
   /* ──────── Sidebar Content ──────── */
   const sidebarContent = (
@@ -456,8 +527,25 @@ export function AdminShell() {
           </div>
         ))}
         {filteredGroups.length === 0 && !collapsed && (
-          <div className="px-4 py-4 text-[12px] text-wk-text-muted text-center">
-            No results for "{searchQuery}"
+          <div className="px-4 py-8 text-center">
+            {adminUser.role ? (
+              <>
+                <div className="flex h-10 w-10 mx-auto items-center justify-center rounded-xl bg-wk-surface-raised mb-3">
+                  <WkIcon name="Search" size={18} className="text-wk-text-faint" />
+                </div>
+                <div className="text-[12px] text-wk-text-muted">No results for "{searchQuery}"</div>
+              </>
+            ) : (
+              <>
+                <div className="flex h-10 w-10 mx-auto items-center justify-center rounded-xl bg-wk-warning/10 mb-3">
+                  <WkIcon name="ShieldAlert" size={18} className="text-wk-warning" />
+                </div>
+                <p className="text-[13px] font-semibold text-wk-text mb-1">No Role Assigned</p>
+                <p className="text-[11px] text-wk-text-muted leading-relaxed">
+                  Contact an administrator to get access to the production engine.
+                </p>
+              </>
+            )}
           </div>
         )}
       </div>
@@ -558,15 +646,18 @@ export function AdminShell() {
             >
               <WkIcon name={collapsed ? "PanelLeftOpen" : "PanelLeftClose"} size={18} />
             </button>
-            <div className="hidden h-6 w-px bg-wk-border md:block" />
-            <button
-              onClick={() => navigate("/admin/settings/charts/ingest")}
-              className="wk-button wk-button-primary wk-button-sm whitespace-nowrap"
-            >
-              <WkIcon name="Plus" size={14} />
-              New Ingest
-            </button>
-            <div className="hidden h-6 w-px bg-wk-border md:block" />
+            {adminUser.role === "administrator" && (
+              <>
+                <div className="hidden h-6 w-px bg-wk-border md:block" />
+                <button
+                  onClick={() => navigate("/admin/settings/charts/ingest")}
+                  className="wk-button wk-button-primary wk-button-sm whitespace-nowrap"
+                >
+                  <WkIcon name="Plus" size={14} />
+                  New Ingest
+                </button>
+              </>
+            )}
             <UserProfileDropdown user={adminUser} collapsed={collapsed} />
           </div>
         </header>

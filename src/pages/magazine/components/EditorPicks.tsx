@@ -1,8 +1,9 @@
 import { Link } from "react-router-dom";
-import type { RepairedStory } from "@/services/repairedContent/client";
+import { getAuthorMeta } from "@/services/authorProfiles";
+import type { MagazineArticle } from "@/services/magazineArticles";
 
 interface EditorPicksProps {
-  stories: RepairedStory[];
+  stories: MagazineArticle[];
 }
 
 export function EditorPicks({ stories }: EditorPicksProps) {
@@ -33,7 +34,12 @@ export function EditorPicks({ stories }: EditorPicksProps) {
                 <p className="mag-picks-v2-dek">{story.dek}</p>
               )}
               <div className="mag-picks-v2-meta">
-                <span>{story.author}</span>
+                <Link
+                  to={`/authors/${getAuthorMeta(story.author).slug}`}
+                  className="hover:text-[var(--wk-brand)] transition-colors"
+                >
+                  {story.author}
+                </Link>
                 <span className="mag-picks-v2-meta-sep">·</span>
                 <span>{story.readingTime} min</span>
               </div>

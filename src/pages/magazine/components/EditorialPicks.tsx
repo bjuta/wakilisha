@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { getAuthorMeta } from "@/services/authorProfiles";
 import { WkTag } from "@/components/design-system/primitives/Tag";
 
 interface EditorPick {
@@ -53,7 +54,12 @@ export function WkEditorialPicks({ picks }: WkEditorialPicksProps) {
                 {pick.title}
               </h3>
               <div className="mt-2 flex items-center gap-2 text-[11px] text-[var(--wk-text-faint)]">
-                <span>{pick.author}</span>
+                <Link
+                  to={`/authors/${getAuthorMeta(pick.author).slug}`}
+                  className="hover:text-[var(--wk-brand)] transition-colors"
+                >
+                  {pick.author}
+                </Link>
                 <span>·</span>
                 <span>{pick.date}</span>
               </div>

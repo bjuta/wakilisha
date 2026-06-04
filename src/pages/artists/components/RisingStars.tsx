@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { Link } from "react-router-dom";
 
 interface RisingArtist {
@@ -10,6 +11,7 @@ interface RisingArtist {
   country: string;
   debutYear: number;
   monthlyStreams: number;
+  spotlightBio: string;
 }
 
 interface RisingStarsProps {
@@ -17,25 +19,55 @@ interface RisingStarsProps {
 }
 
 export function RisingStars({ artists }: RisingStarsProps) {
+  const scrollRef = useRef<HTMLDivElement>(null);
   if (artists.length === 0) return null;
 
+  const scroll = (dir: "left" | "right") => {
+    if (!scrollRef.current) return;
+    scrollRef.current.scrollBy({ left: dir === "left" ? -340 : 340, behavior: "smooth" });
+  };
+
   return (
-    <section className="bg-[var(--wk-surface)]">
-      <div className="wk-container px-6 py-14 md:py-20">
-        <div className="mb-8">
-          <div className="wk-eyebrow mb-3">Fresh voices</div>
-          <h3 className="text-[clamp(28px,3.5vw,48px)] font-black leading-[0.92] tracking-[-0.04em] text-[var(--wk-text)]">
-            On the rise
-          </h3>
+    <section className="px-4 py-14 md:px-6 md:py-20">
+      <div className="wk-container-wide">
+        <div className="mb-10 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+          <div>
+            <div className="wk-eyebrow mb-3">Rising voices</div>
+            <h3 className="wk-h-page">The next wave</h3>
+          </div>
+          <div className="flex items-center gap-3">
+            <p className="wk-copy hidden max-w-[40ch] text-[13px] md:block">
+              Emerging artists making their mark with trajectories pointing straight up.
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => scroll("left")}
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-[var(--wk-border-2)] bg-[var(--wk-surface)] text-[var(--wk-text-soft)] transition-all hover:border-[var(--wk-brand)] hover:text-[var(--wk-brand)]"
+              >
+                <i className="ri-arrow-left-s-line text-lg" />
+              </button>
+              <button
+                onClick={() => scroll("right")}
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-[var(--wk-border-2)] bg-[var(--wk-surface)] text-[var(--wk-text-soft)] transition-all hover:border-[var(--wk-brand)] hover:text-[var(--wk-brand)]"
+              >
+                <i className="ri-arrow-right-s-line text-lg" />
+              </button>
+            </div>
+          </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+        {/* Filmstrip scroll */}
+        <div
+          ref={scrollRef}
+          className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide"
+          style={{ scrollbarWidth: "none", msOverflowStyle: "none", scrollSnapType: "x mandatory" }}
+        >
           {artists.map((artist) => (
             <Link
               key={artist.slug}
               to={`/artists/${artist.slug}`}
-              className="group relative block overflow-hidden rounded-xl border border-[var(--wk-border)] transition-all hover:border-[var(--wk-border-2)]"
-              style={{ aspectRatio: "3/4" }}
+              className="group relative shrink-0 overflow-hidden rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] transition-all duration-[var(--wk-d-standard)] hover:-translate-y-2 hover:border-[var(--wk-border-2)]"
+              style={{ width: "240px", aspectRatio: "3/4", scrollSnapAlign: "start" }}
             >
               {/* Image */}
               <div className="absolute inset-0 bg-[var(--wk-surface-raised)]">
@@ -43,7 +75,7 @@ export function RisingStars({ artists }: RisingStarsProps) {
                   <img
                     src={artist.imageUrl}
                     alt={artist.name}
-                    className="h-full w-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
+                    className="h-full w-full object-cover object-top transition-transform duration-[var(--wk-d-slow)] group-hover:scale-105"
                   />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center">
@@ -52,41 +84,38 @@ export function RisingStars({ artists }: RisingStarsProps) {
                 )}
               </div>
 
-              {/* Gradient overlay */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
+              {/* Gradient */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-transparent" />
 
-              {/* Fire badge */}
-              <div className="absolute right-3 top-3">
-                <span className="inline-flex items-center gap-1 rounded-full bg-[var(--wk-brand-2)] px-2.5 py-1 text-[10px] font-bold text-[var(--wk-brand-2-on)] uppercase tracking-wider">
-                  <i className="ri-fire-line text-[9px]" />
+              {/* Rising badge */}
+              <div className="absolute left-4 top-4">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--wk-brand)] px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.12em] text-[var(--wk-brand-on)]">
+                  <i className="ri-fire-line text-[10px]" />
                   Rising
                 </span>
               </div>
 
               {/* Content */}
-              <div className="absolute bottom-0 left-0 right-0 p-4">
-                <h4 className="text-[16px] font-bold leading-tight text-white">{artist.name}</h4>
-                <div className="mt-1 flex items-center gap-1.5 text-[11px] text-white/60">
+              <div className="absolute bottom-0 left-0 right-0 p-5">
+                <h4 className="text-[17px] font-extrabold leading-tight text-white md:text-[18px]">
+                  {artist.name}
+                </h4>
+                <p className="mt-1.5 line-clamp-2 text-[12px] leading-[1.5] text-white/50">
+                  {artist.spotlightBio}
+                </p>
+                <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-white/40">
                   <span>{artist.country}</span>
                   <span>·</span>
-                  <span>{artist.monthlyStreams}M streams</span>
+                  <span>{artist.monthlyStreams}M</span>
+                  <span>·</span>
+                  <span>Since {artist.debutYear}</span>
                 </div>
-                <div className="mt-2 flex flex-wrap gap-1">
+                <div className="mt-2.5 flex flex-wrap gap-1.5">
                   {artist.genres.slice(0, 2).map((g) => (
-                    <span
-                      key={g}
-                      className="rounded-full border border-white/20 bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-white/80 backdrop-blur-sm"
-                    >
+                    <span key={g} className="rounded-full border border-white/15 bg-white/8 px-2.5 py-1 text-[10px] font-semibold text-white/70 backdrop-blur-sm">
                       {g}
                     </span>
                   ))}
-                </div>
-              </div>
-
-              {/* Hover arrow */}
-              <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition-all group-hover:bg-black/30">
-                <div className="flex h-11 w-11 translate-y-4 items-center justify-center rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] opacity-0 transition-all group-hover:translate-y-0 group-hover:opacity-100">
-                  <i className="ri-arrow-right-line text-lg" />
                 </div>
               </div>
             </Link>

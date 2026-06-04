@@ -1,8 +1,9 @@
 import { Link } from "react-router-dom";
-import type { RepairedStory } from "@/services/repairedContent/client";
+import { getAuthorMeta } from "@/services/authorProfiles";
+import type { MagazineArticle } from "@/services/magazineArticles";
 
 interface LeadStoriesProps {
-  stories: RepairedStory[];
+  stories: MagazineArticle[];
 }
 
 export function LeadStories({ stories }: LeadStoriesProps) {
@@ -32,7 +33,12 @@ export function LeadStories({ stories }: LeadStoriesProps) {
                 <p className="mag-lead-v2-primary-dek">{primary.dek}</p>
               )}
               <div className="mag-lead-v2-primary-meta">
-                <span>By {primary.author}</span>
+                <Link
+                  to={`/authors/${getAuthorMeta(primary.author).slug}`}
+                  className="hover:text-[var(--wk-brand)] transition-colors"
+                >
+                  By {primary.author}
+                </Link>
                 <span className="mag-lead-v2-meta-sep">·</span>
                 <span>{primary.readingTime} min</span>
                 <span className="mag-lead-v2-meta-sep">·</span>
@@ -59,7 +65,12 @@ export function LeadStories({ stories }: LeadStoriesProps) {
                 <p className="mag-lead-v2-secondary-dek">{secondary.dek}</p>
               )}
               <div className="mag-lead-v2-secondary-meta">
-                <span>By {secondary.author}</span>
+                <Link
+                  to={`/authors/${getAuthorMeta(secondary.author).slug}`}
+                  className="hover:text-[var(--wk-brand)] transition-colors"
+                >
+                  By {secondary.author}
+                </Link>
                 <span className="mag-lead-v2-meta-sep">·</span>
                 <span>{secondary.readingTime} min</span>
               </div>

@@ -5,11 +5,13 @@ import { ShareButton } from "@/components/design-system/share/ShareSheet";
 import { getAuthorMeta } from "@/services/authorProfiles";
 import type { MagazineArticle } from "@/services/magazineArticles";
 
-interface MagazineHeroProps {
+interface IssueCoverHeroProps {
   story: MagazineArticle;
+  issueNumber: number;
+  issueDate: string;
 }
 
-export function MagazineHero({ story }: MagazineHeroProps) {
+export function IssueCoverHero({ story, issueNumber, issueDate }: IssueCoverHeroProps) {
   const heroRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
 
@@ -46,9 +48,15 @@ export function MagazineHero({ story }: MagazineHeroProps) {
       </div>
 
       <div className="mag-hero-v2-content">
+        <div className="mag-hero-v2-issue-badge">
+          <span className="mag-hero-v2-issue-num">Issue {issueNumber}</span>
+          <span className="mag-hero-v2-issue-sep">·</span>
+          <span>{issueDate}</span>
+        </div>
+
         <div className="mag-hero-v2-eyebrow">
           <WkIcon name="Newspaper" size={14} />
-          <span>{story.section}</span>
+          <span>Cover Story</span>
         </div>
 
         <h1 className="mag-hero-v2-title">{story.title}</h1>
@@ -77,11 +85,8 @@ export function MagazineHero({ story }: MagazineHeroProps) {
         </div>
 
         <div className="mag-hero-v2-actions">
-          <Link
-            to={`/magazine/${story.slug}`}
-            className="mag-hero-v2-cta"
-          >
-            Read cover story
+          <Link to={`/magazine/${story.slug}`} className="mag-hero-v2-cta">
+            Read the cover story
             <WkIcon name="ArrowRight" size={16} />
           </Link>
           <ShareButton

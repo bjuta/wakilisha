@@ -8,6 +8,8 @@ interface CoverArtist {
   monthlyStreams: number;
   topChartPosition: number;
   spotlightBio: string;
+  trackCount: number;
+  country: string;
 }
 
 interface CoverStoriesProps {
@@ -15,81 +17,122 @@ interface CoverStoriesProps {
 }
 
 export function CoverStories({ artists }: CoverStoriesProps) {
-  const featured = artists.slice(0, 4);
-  if (featured.length === 0) return null;
+  if (artists.length === 0) return null;
+
+  const hero = artists[0];
+  const side = artists.slice(1, 5);
 
   return (
-    <section className="wk-container px-6 py-14 md:py-20">
-      <div className="mb-8">
-        <div className="wk-eyebrow mb-3">Cover stories</div>
-        <h3 className="text-[clamp(28px,3.5vw,48px)] font-black leading-[0.92] tracking-[-0.04em] text-[var(--wk-text)]">
-          The artists defining the moment
-        </h3>
+    <section className="relative overflow-hidden px-4 py-14 md:px-6 md:py-20">
+      {/* Background accent */}
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute right-0 top-0 h-[500px] w-[500px] translate-x-1/2 rounded-full bg-[var(--wk-brand)] opacity-[0.02] blur-[100px]" />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        {featured.map((artist, index) => (
+      <div className="wk-container-wide relative z-10">
+        {/* Section header */}
+        <div className="mb-10">
+          <div className="wk-eyebrow mb-3">Spotlight</div>
+          <h3 className="wk-h-page max-w-[16ch]">The artists defining the moment</h3>
+        </div>
+
+        {/* Asymmetric layout: 1 big hero + side stack */}
+        <div className="flex flex-col gap-4 lg:flex-row lg:gap-5">
+          {/* HERO CARD — spans 2/3 */}
           <Link
-            key={artist.slug}
-            to={`/artists/${artist.slug}`}
-            className="group relative block overflow-hidden rounded-xl border border-[var(--wk-border)] transition-all hover:border-[var(--wk-border-2)]"
-            style={{ aspectRatio: index === 0 ? "16/10" : "16/9" }}
+            to={`/artists/${hero.slug}`}
+            className="group relative flex min-h-[420px] flex-col justify-end overflow-hidden rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] transition-all duration-[var(--wk-d-standard)] hover:-translate-y-1 hover:border-[var(--wk-border-2)] lg:w-[62%] lg:min-h-[520px]"
           >
-            {/* Background image */}
+            {/* Image fill */}
             <div className="absolute inset-0 bg-[var(--wk-surface-raised)]">
-              {artist.imageUrl ? (
+              {hero.imageUrl ? (
                 <img
-                  src={artist.imageUrl}
-                  alt={artist.name}
-                  className="h-full w-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
+                  src={hero.imageUrl}
+                  alt={hero.name}
+                  className="h-full w-full object-cover object-top transition-transform duration-[700ms] ease-out group-hover:scale-105"
                 />
               ) : (
                 <div className="flex h-full w-full items-center justify-center">
-                  <i className="ri-user-3-line text-4xl text-[var(--wk-text-faint)]" />
+                  <i className="ri-user-3-line text-6xl text-[var(--wk-text-faint)]" />
                 </div>
               )}
             </div>
 
             {/* Gradient overlay */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-black/10" />
 
-            {/* Rank badge */}
-            <div className="absolute left-4 top-4">
-              <span className="text-[48px] font-black leading-none tracking-[-0.04em] text-white/20">
-                {String(index + 1).padStart(2, "0")}
-              </span>
-            </div>
+            {/* Content */}
+            <div className="relative z-10 p-6 md:p-8 lg:p-10">
+              {/* Badge */}
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-[var(--wk-brand)] px-3 py-1.5">
+                <span className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-[var(--wk-brand-on)]">Featured</span>
+              </div>
 
-            {/* Peak position */}
-            <div className="absolute right-4 top-4">
-              <span className="inline-flex items-center gap-1 rounded-full bg-[var(--wk-brand)] px-2.5 py-1 text-[10px] font-bold text-[var(--wk-brand-on)] uppercase tracking-wider">
-                <i className="ri-bar-chart-line text-[10px]" />
-                Peak #{artist.topChartPosition}
-              </span>
-            </div>
-
-            {/* Content at bottom */}
-            <div className="absolute bottom-0 left-0 right-0 p-5 md:p-6">
-              <h4 className="mb-1 text-[20px] font-bold leading-tight text-white md:text-[24px]">
-                {artist.name}
+              <h4 className="mb-3 font-black text-[clamp(28px,4vw,52px)] leading-[0.95] tracking-[-0.035em] text-white">
+                {hero.name}
               </h4>
-              <p className="mb-3 line-clamp-2 text-[13px] leading-[1.5] text-white/60">
-                {artist.spotlightBio}
+              <p className="mb-4 line-clamp-2 max-w-[52ch] text-[15px] leading-[1.6] text-white/60 md:text-[16px]">
+                {hero.spotlightBio}
               </p>
-              <div className="flex items-center gap-3 text-[12px] text-white/50">
-                <span>{artist.monthlyStreams}M streams</span>
+              <div className="flex flex-wrap items-center gap-3 text-[13px] text-white/45">
+                <span className="inline-flex items-center gap-1.5">
+                  <i className="ri-bar-chart-line text-[12px]" />
+                  Peak #{hero.topChartPosition}
+                </span>
                 <span>·</span>
-                <div className="flex gap-1">
-                  {artist.genres.slice(0, 2).map((g) => (
-                    <span key={g} className="text-white/70">
-                      {g}
-                    </span>
-                  ))}
-                </div>
+                <span>{hero.monthlyStreams}M streams</span>
+                <span>·</span>
+                <span>{hero.country}</span>
+                <span>·</span>
+                <span>{hero.trackCount} tracks</span>
               </div>
             </div>
           </Link>
-        ))}
+
+          {/* SIDE STACK — 4 cards in 2x2 grid */}
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:w-[38%]">
+            {side.map((artist) => (
+              <Link
+                key={artist.slug}
+                to={`/artists/${artist.slug}`}
+                className="group relative flex flex-col justify-end overflow-hidden rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] transition-all duration-[var(--wk-d-standard)] hover:-translate-y-1 hover:border-[var(--wk-border-2)]"
+                style={{ minHeight: "200px" }}
+              >
+                <div className="absolute inset-0 bg-[var(--wk-surface-raised)]">
+                  {artist.imageUrl ? (
+                    <img
+                      src={artist.imageUrl}
+                      alt={artist.name}
+                      className="h-full w-full object-cover object-top transition-transform duration-[var(--wk-d-slow)] group-hover:scale-105"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center">
+                      <i className="ri-user-3-line text-3xl text-[var(--wk-text-faint)]" />
+                    </div>
+                  )}
+                </div>
+                <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
+                <div className="relative z-10 p-4">
+                  <h5 className="text-[15px] font-extrabold leading-tight text-white md:text-[16px]">
+                    {artist.name}
+                  </h5>
+                  <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-white/50">
+                    <span>{artist.country}</span>
+                    <span>·</span>
+                    <span>#{artist.topChartPosition}</span>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {artist.genres.slice(0, 2).map((g) => (
+                      <span key={g} className="rounded-full border border-white/15 bg-white/8 px-2 py-0.5 text-[9px] font-semibold text-white/70 backdrop-blur-sm">
+                        {g}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
       </div>
     </section>
   );

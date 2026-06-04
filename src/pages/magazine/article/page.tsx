@@ -1,29 +1,99 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
-import { useMagazineArticle, useMagazineArticles, getRelatedArticles, type MagazineArticle } from "@/services/magazineArticles";
-import { ShareButton } from "@/components/design-system/share/ShareSheet";
+import { Link, useParams, useSearchParams } from "react-router-dom";
+import {
+  useMagazineArticle,
+  useMagazineArticles,
+  getRelatedArticles,
+  type MagazineArticle,
+  type MediaAsset,
+} from "@/services/magazineArticles";
 import { WkIcon } from "@/components/design-system/Icon";
+import { ArticleFloatHeader } from "./components/ArticleFloatHeader";
+import { ArticleRelated } from "./components/ArticleRelated";
 
-function sectionMeta(name: string) {
-  const palette: Record<string, string> = {
-    Analysis: "#C44A3B",
-    Focus: "#D97706",
-    Industry: "#78716C",
-    Culture: "#BE185D",
-    Interview: "#256B5A",
-    Article: "#334155",
-    Guide: "#4F46E5",
-  };
-  return { color: palette[name] || "var(--wk-brand)" };
+/* ─── Inline media gallery ─── */
+function InlineMediaGallery({ assets }: { assets: MediaAsset[] }) {
+  const inlineAssets = assets.filter((a) => a.role !== "hero" && a.url);
+  if (!inlineAssets.length) return null;
+  return (
+    <div className="my-10 grid gap-4 sm:grid-cols-2">
+      {inlineAssets.map((asset) => (
+        <figure
+          key={asset.id}
+          className="overflow-hidden rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)]"
+        >
+          <img src={asset.url} alt={asset.altText || ""} className="h-full w-full object-cover" loading="lazy" />
+          {asset.altText && (
+            <figcaption className="px-4 py-2 text-[11px] text-[var(--wk-text-muted)]">
+              {asset.altText}
+            </figcaption>
+          )}
+        </figure>
+      ))}
+    </div>
+  );
 }
 
+/* ─── Bottom share prompt ─── */
+function ArticleBottomShare({ article }: { article: MagazineArticle }) {
+  const [copyDone, setCopyDone] = useState(false);
+  const handleCopy = () => {
+    navigator.clipboard?.writeText(window.location.href);
+    setCopyDone(true);
+    setTimeout(() => setCopyDone(false), 2500);
+  };
+
+  return (
+    <div className="rounded-2xl bg-[var(--wk-surface)] border border-[var(--wk-border)] p-6 lg:p-8 text-center">
+      <p className="text-[15px] font-bold text-[var(--wk-text)] mb-1">
+        Enjoyed this piece?
+      </p>
+      <p className="text-[13px] text-[var(--wk-text-muted)] mb-6">
+        Share it with someone who cares about East African culture.
+      </p>
+      <div className="flex items-center justify-center gap-3 flex-wrap">
+        <button
+          onClick={handleCopy}
+          className="h-9 px-5 rounded-full border border-[var(--wk-border)] bg-[var(--wk-bg)] text-[13px] font-bold text-[var(--wk-text-soft)] hover:border-[var(--wk-brand)] hover:text-[var(--wk-brand)] transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap"
+        >
+          <i className="ri-link-m" />
+          {copyDone ? "Copied!" : "Copy link"}
+        </button>
+        <a
+          href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(article.title)}&url=${encodeURIComponent(window.location.href)}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="h-9 px-5 rounded-full bg-[#000] text-white text-[13px] font-bold flex items-center gap-2 hover:opacity-85 transition-opacity whitespace-nowrap"
+        >
+          <i className="ri-twitter-x-line" /> Share on X
+        </a>
+        <a
+          href={`https://wa.me/?text=${encodeURIComponent(`${article.title} ${window.location.href}`)}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="h-9 px-5 rounded-full bg-[#25D366] text-white text-[13px] font-bold flex items-center gap-2 hover:opacity-85 transition-opacity whitespace-nowrap"
+        >
+          <i className="ri-whatsapp-line" /> WhatsApp
+        </a>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Main page ─── */
 export default function ArticlePage() {
   const { slug } = useParams<{ slug: string }>();
-  const { article, loading: articleLoading, error: articleError } = useMagazineArticle(slug);
+  const [searchParams] = useSearchParams();
+  const previewNonce = searchParams.get("preview");
+
+  const { article, loading: articleLoading, error: articleError } = useMagazineArticle(slug, previewNonce);
   const { articles: allArticles } = useMagazineArticles();
+
   const [related, setRelated] = useState<MagazineArticle[]>([]);
-  const [progress, setProgress] = useState(0);
   const [relatedLoading, setRelatedLoading] = useState(true);
+  const [progress, setProgress] = useState(0);
+  const [scrolled, setScrolled] = useState(false);
+  const [copyDone, setCopyDone] = useState(false);
 
   useEffect(() => {
     if (!article) return;
@@ -31,14 +101,13 @@ export default function ArticlePage() {
     setRelatedLoading(true);
     getRelatedArticles(article, 3)
       .then((items) => {
-        if (!alive) return;
-        setRelated(items);
-        setRelatedLoading(false);
+        if (alive) { setRelated(items); setRelatedLoading(false); }
       })
       .catch(() => {
-        if (!alive) return;
-        setRelated(allArticles.filter((a) => a.slug !== article.slug).slice(0, 3));
-        setRelatedLoading(false);
+        if (alive) {
+          setRelated(allArticles.filter((a) => a.slug !== article.slug).slice(0, 3));
+          setRelatedLoading(false);
+        }
       });
     return () => { alive = false; };
   }, [article, allArticles]);
@@ -48,14 +117,20 @@ export default function ArticlePage() {
       const doc = document.documentElement;
       const max = doc.scrollHeight - window.innerHeight;
       setProgress(max > 0 ? window.scrollY / max : 0);
+      setScrolled(window.scrollY > window.innerHeight * 0.55);
     };
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const meta = article ? sectionMeta(article.section) : { color: "var(--wk-brand)" };
+  const handleNavCopy = () => {
+    navigator.clipboard?.writeText(window.location.href);
+    setCopyDone(true);
+    setTimeout(() => setCopyDone(false), 2500);
+  };
 
+  /* Loading / error states */
   if (articleLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -91,126 +166,121 @@ export default function ArticlePage() {
 
   return (
     <main className="min-h-screen bg-[var(--wk-bg)]">
-      {/* Reading progress bar */}
+      {/* Reading progress */}
       <div className="article-progress">
         <span style={{ transform: `scaleX(${progress})` }} />
       </div>
 
-      {/* Navigation bar */}
-      <nav className="absolute top-0 left-0 right-0 z-30 px-6 py-5">
-        <div className="flex items-center justify-between">
+      {/* Sticky mini-header — slides in after scroll */}
+      <div
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+          scrolled ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-full pointer-events-none"
+        } bg-[var(--wk-bg)]/95 backdrop-blur-md border-b border-[var(--wk-border)]`}
+      >
+        <div className="max-w-[1180px] mx-auto px-6 h-14 flex items-center gap-4">
           <Link
             to="/magazine"
-            className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-black/20 px-4 py-2 text-[11px] font-bold uppercase tracking-[0.18em] text-white/80 backdrop-blur-md transition-all hover:bg-black/40 hover:text-white"
+            className="flex items-center gap-1.5 text-[12px] font-bold text-[var(--wk-text-muted)] hover:text-[var(--wk-brand)] transition-colors whitespace-nowrap shrink-0"
           >
             <WkIcon name="ArrowLeft" size={14} />
-            WAKILISHA Magazine
+            Magazine
+          </Link>
+          <div className="h-4 w-px bg-[var(--wk-border)] shrink-0" />
+          <h2 className="text-[13px] font-bold text-[var(--wk-text)] flex-1 min-w-0 truncate">
+            {article.title}
+          </h2>
+          <button
+            onClick={handleNavCopy}
+            className="ml-auto shrink-0 h-8 px-3 rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] text-[11px] font-semibold text-[var(--wk-text-soft)] hover:border-[var(--wk-brand)] hover:text-[var(--wk-brand)] transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+          >
+            <i className="ri-link-m" />
+            {copyDone ? "Copied!" : "Share"}
+          </button>
+        </div>
+      </div>
+
+      {/* ── Full-bleed hero ── */}
+      <section className="relative overflow-hidden" style={{ height: "70vh", minHeight: "480px" }}>
+        <img
+          src={article.heroUrl}
+          alt={article.title}
+          className="absolute inset-0 w-full h-full object-cover object-top"
+        />
+        {/* Gradient fades to page background so float card feels seamless */}
+        <div
+          className="absolute inset-0"
+          style={{
+            background: "linear-gradient(to bottom, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.28) 45%, rgba(0,0,0,0.55) 72%, var(--wk-bg) 100%)",
+          }}
+        />
+
+        {/* Nav overlay */}
+        <div className="absolute top-0 left-0 right-0 z-20 px-6 py-5 flex items-center justify-between">
+          <Link
+            to="/magazine"
+            className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/25 backdrop-blur-sm px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-white/85 hover:bg-black/45 transition-all whitespace-nowrap"
+          >
+            <WkIcon name="ArrowLeft" size={13} />
+            Magazine
           </Link>
           <div className="flex items-center gap-2">
-            <ShareButton
-              item={{
-                title: article.title,
-                subtitle: article.author,
-                description: article.dek,
-                imageUrl: article.heroUrl,
-                type: "article",
-              }}
-            />
-          </div>
-        </div>
-      </nav>
-
-      {/* Hero Section */}
-      <section className="article-hero-v2">
-        <div className="article-hero-v2-media">
-          <img src={article.heroUrl} alt={article.title} className="article-hero-v2-img" />
-          <div className="article-hero-v2-overlay" />
-        </div>
-        <div className="article-hero-v2-content">
-          <div className="mx-auto max-w-[860px] text-center">
-            <span
-              className="mb-6 inline-block rounded-full px-4 py-1.5 text-[10px] font-black uppercase tracking-[0.2em]"
-              style={{ background: meta.color, color: '#fff' }}
+            <a
+              href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(article.title)}&url=${encodeURIComponent(window.location.href)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="h-8 w-8 rounded-full border border-white/20 bg-black/25 backdrop-blur-sm flex items-center justify-center text-white/80 hover:bg-black/45 transition-all"
+              aria-label="Share on X"
             >
-              {article.section}
-            </span>
-            <h1 className="article-hero-v2-title">{article.title}</h1>
-            {article.dek && (
-              <p className="article-hero-v2-dek">{article.dek}</p>
-            )}
-            <div className="article-hero-v2-byline">
-              <div className="article-hero-v2-avatar">
-                <span className="text-[11px] font-bold uppercase tracking-wider">
-                  {article.author.split(' ').map((n) => n[0]).join('').slice(0, 2)}
-                </span>
-              </div>
-              <div className="article-hero-v2-meta">
-                <span className="font-semibold text-white/90">{article.author}</span>
-                <span className="text-white/40">·</span>
-                <span className="text-white/60">{article.date}</span>
-                <span className="text-white/40">·</span>
-                <span className="text-white/60">{article.readingTime} min read</span>
-                {article.readCount > 0 && (
-                  <>
-                    <span className="text-white/40">·</span>
-                    <span className="text-white/60">{article.readCount.toLocaleString()} reads</span>
-                  </>
-                )}
-              </div>
-            </div>
+              <i className="ri-twitter-x-line text-[12px]" />
+            </a>
+            <button
+              onClick={handleNavCopy}
+              className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/25 backdrop-blur-sm px-3 py-2 text-[11px] font-bold text-white/80 hover:bg-black/45 transition-all cursor-pointer whitespace-nowrap"
+            >
+              <i className="ri-share-line" />
+              {copyDone ? "Copied!" : "Share"}
+            </button>
           </div>
         </div>
       </section>
 
-      {/* Body + Sidebar */}
-      <div className="article-shell-v2">
-        <article className="article-body-v2">
+      {/* ── Floating content card ── */}
+      <div
+        className="relative z-10 rounded-t-[28px] bg-[var(--wk-bg)]"
+        style={{
+          marginTop: "-72px",
+          boxShadow: "0 -8px 48px -12px rgba(0,0,0,0.14)",
+        }}
+      >
+        {/* Float card header: stats, title, dek, author, share */}
+        <ArticleFloatHeader article={article} />
+
+        {/* Divider into body */}
+        <div className="max-w-[740px] mx-auto px-6 lg:px-8">
+          <div className="h-px bg-[var(--wk-border)] mb-10" />
+        </div>
+
+        {/* Article body */}
+        <article className="max-w-[740px] mx-auto px-6 lg:px-8 pb-12">
           <div
             className="article-content-v2"
             dangerouslySetInnerHTML={{ __html: article.contentHtml }}
           />
+          <InlineMediaGallery assets={article.mediaAssets} />
         </article>
 
-        <aside className="article-sidebar-v2">
-          <div className="article-sidebox-v2">
-            <div className="article-sidebox-v2-title">Share</div>
-            <ShareButton
-              item={{
-                title: article.title,
-                subtitle: article.author,
-                description: article.dek,
-                imageUrl: article.heroUrl,
-                type: "article",
-              }}
-            />
-          </div>
-
-          <div className="article-sidebox-v2">
-            <div className="article-sidebox-v2-title">Reading</div>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between text-[13px]">
-                <span className="text-[var(--wk-text-muted)]">Time</span>
-                <span className="font-semibold text-[var(--wk-text)]">{article.readingTime} min</span>
-              </div>
-              <div className="flex items-center justify-between text-[13px]">
-                <span className="text-[var(--wk-text-muted)]">Words</span>
-                <span className="font-semibold text-[var(--wk-text)]">{article.body.join(' ').split(/\s+/).length.toLocaleString()}</span>
-              </div>
-              <div className="flex items-center justify-between text-[13px]">
-                <span className="text-[var(--wk-text-muted)]">Published</span>
-                <span className="font-semibold text-[var(--wk-text)]">{article.date}</span>
-              </div>
-            </div>
-          </div>
-
+        {/* Tags + bottom share */}
+        <div className="max-w-[740px] mx-auto px-6 lg:px-8 pb-16">
           {article.tags?.length > 0 && (
-            <div className="article-sidebox-v2">
-              <div className="article-sidebox-v2-title">Topics</div>
+            <div className="mb-8">
+              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--wk-text-faint)] mb-3">
+                Topics
+              </p>
               <div className="flex flex-wrap gap-2">
                 {article.tags.map((tag) => (
                   <span
                     key={tag}
-                    className="rounded-full border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-1 text-[11px] font-semibold text-[var(--wk-text-soft)] transition-colors hover:border-[var(--wk-brand)] hover:text-[var(--wk-brand)]"
+                    className="px-3 py-1.5 rounded-full border border-[var(--wk-border)] text-[11px] font-semibold text-[var(--wk-text-soft)] hover:border-[var(--wk-brand)] hover:text-[var(--wk-brand)] cursor-pointer transition-all"
                   >
                     {tag}
                   </span>
@@ -218,95 +288,31 @@ export default function ArticlePage() {
               </div>
             </div>
           )}
-
-          <div className="article-sidebox-v2">
-            <div className="article-sidebox-v2-title">Related</div>
-            <div className="space-y-3">
-              {relatedLoading ? (
-                <div className="text-[12px] text-[var(--wk-text-muted)]">Loading…</div>
-              ) : related.length > 0 ? (
-                related.slice(0, 3).map((story) => (
-                  <Link
-                    key={story.slug}
-                    to={`/magazine/${story.slug}`}
-                    className="group flex gap-3"
-                  >
-                    <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-[var(--wk-surface-raised)]">
-                      <img src={story.heroUrl} alt="" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-110" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--wk-brand)]">{story.section}</span>
-                      <p className="mt-0.5 text-[13px] font-semibold leading-snug text-[var(--wk-text)] group-hover:text-[var(--wk-brand)] transition-colors line-clamp-2">
-                        {story.title}
-                      </p>
-                    </div>
-                  </Link>
-                ))
-              ) : (
-                <div className="text-[12px] text-[var(--wk-text-muted)]">No related stories.</div>
-              )}
-            </div>
-          </div>
-        </aside>
+          <ArticleBottomShare article={article} />
+        </div>
       </div>
 
       {/* Related stories */}
-      <section className="article-related-v2">
-        <div className="article-related-v2-header">
-          <div className="wk-eyebrow">Continue reading</div>
-          <h2 className="article-related-v2-title">Related stories</h2>
-        </div>
-        <div className="article-related-v2-grid">
-          {relatedLoading ? (
-            <div className="col-span-full text-center text-[var(--wk-text-muted)]">Loading related stories…</div>
-          ) : related.length > 0 ? (
-            related.map((story) => <RelatedStoryV2 key={story.slug} story={story} />)
-          ) : (
-            <div className="col-span-full text-center text-[var(--wk-text-muted)]">No related stories found.</div>
-          )}
-        </div>
-      </section>
+      <ArticleRelated stories={related} loading={relatedLoading} />
 
       {/* Footer CTA */}
-      <section className="article-footer-cta">
-        <div className="article-footer-cta-inner">
-          <p className="article-footer-cta-label">WAKILISHA Magazine</p>
-          <h3 className="article-footer-cta-title">Stories that move East African culture forward.</h3>
-          <Link to="/magazine" className="wk-button wk-button-primary">
+      <section className="bg-[var(--wk-surface)] border-t border-[var(--wk-border)] py-16 px-6 text-center">
+        <div className="max-w-[480px] mx-auto">
+          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--wk-brand)] mb-3">
+            WAKILISHA Magazine
+          </p>
+          <h3 className="text-[24px] lg:text-[28px] font-black tracking-[-0.035em] text-[var(--wk-text)] mb-6 leading-snug">
+            Stories that move East African culture forward.
+          </h3>
+          <Link
+            to="/magazine"
+            className="inline-flex items-center gap-2 rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] px-7 py-3.5 text-[14px] font-black transition-all hover:-translate-y-0.5 whitespace-nowrap"
+          >
             Explore all stories
             <WkIcon name="ArrowRight" size={16} />
           </Link>
         </div>
       </section>
     </main>
-  );
-}
-
-function RelatedStoryV2({ story }: { story: MagazineArticle }) {
-  return (
-    <Link to={`/magazine/${story.slug}`} className="group block">
-      <div className="overflow-hidden rounded-xl bg-[var(--wk-surface)] border border-[var(--wk-border)] transition-all duration-300 hover:border-[var(--wk-border-2)] hover:-translate-y-1">
-        <div className="aspect-[16/10] overflow-hidden bg-[var(--wk-surface-raised)]">
-          <img
-            src={story.heroUrl}
-            alt={story.title}
-            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-          />
-        </div>
-        <div className="p-5">
-          <span className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--wk-brand)]">
-            {story.section}
-          </span>
-          <h3 className="mt-2 text-[18px] font-bold leading-snug tracking-[-0.02em] text-[var(--wk-text)] group-hover:text-[var(--wk-brand)] transition-colors line-clamp-2">
-            {story.title}
-          </h3>
-          <div className="mt-3 flex items-center gap-2 text-[12px] text-[var(--wk-text-muted)]">
-            <span className="font-medium">{story.author}</span>
-            <span>·</span>
-            <span>{story.readingTime} min</span>
-          </div>
-        </div>
-      </div>
-    </Link>
   );
 }

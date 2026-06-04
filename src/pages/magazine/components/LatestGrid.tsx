@@ -1,8 +1,9 @@
 import { Link } from "react-router-dom";
-import type { RepairedStory } from "@/services/repairedContent/client";
+import { getAuthorMeta } from "@/services/authorProfiles";
+import type { MagazineArticle } from "@/services/magazineArticles";
 
 interface LatestGridProps {
-  stories: RepairedStory[];
+  stories: MagazineArticle[];
 }
 
 export function LatestGrid({ stories }: LatestGridProps) {
@@ -35,7 +36,12 @@ export function LatestGrid({ stories }: LatestGridProps) {
                 <p className="mag-latest-v2-dek">{story.dek}</p>
               )}
               <div className="mag-latest-v2-meta">
-                <span>{story.author}</span>
+                <Link
+                  to={`/authors/${getAuthorMeta(story.author).slug}`}
+                  className="hover:text-[var(--wk-brand)] transition-colors"
+                >
+                  {story.author}
+                </Link>
                 <span className="mag-latest-v2-meta-sep">·</span>
                 <span>{story.readingTime} min</span>
                 <span className="mag-latest-v2-meta-sep">·</span>

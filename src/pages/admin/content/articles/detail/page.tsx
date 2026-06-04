@@ -2,9 +2,13 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { supabase } from "@/lib/supabase";
+import { rewriteWpImageUrl, rewriteWpImageUrls } from "@/services/wpImageRewrite";
+import { decodeHtmlEntities } from "@/utils/decodeHtmlEntities";
+import { createPreviewNonce } from "@/services/magazineArticles";
 import { ArticleEditorHeader } from "./components/ArticleEditorHeader";
 import { ArticleContentEditor } from "./components/ArticleContentEditor";
 import { ArticleMetaPanel } from "./components/ArticleMetaPanel";
+import { useAdminUser } from "@/hooks/useAdminUser";
 
 /* ─── Types ─── */
 
@@ -66,6 +70,10 @@ let toastCounter = 0;
 export default function ArticleDetailPage() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
+  const adminUser = useAdminUser();
+
+  const userCanPublish = adminUser.can("publish_articles");
+  const userCanEditOthers = adminUser.can("edit_others_articles");
 
   const [article, setArticle] = useState<ArticleRecord | null>(null);
   const [loading, setLoading] = useState(true);
@@ -89,6 +97,7 @@ export default function ArticleDetailPage() {
   const [isDirty, setIsDirty] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [isPreviewing, setIsPreviewing] = useState(false);
   const [isAutosaving, setIsAutosaving] = useState(false);
   const [lastAutosavedAt, setLastAutosavedAt] = useState<string | null>(null);
   const [toasts, setToasts] = useState<ToastMsg[]>([]);
@@ -130,15 +139,28 @@ export default function ArticleDetailPage() {
         return;
       }
 
-      setArticle(data);
-      setHeroImageUrl(data.hero_image_url ?? "");
+      setArticle({ ...data, title: decodeHtmlEntities(data.title ?? "") });
+      setHeroImageUrl(rewriteWpImageUrl(data.hero_image_url ?? ""));
+
+      // Check ownership: writers/authors can only edit their own articles
+      if (!userCanEditOthers) {
+        const articleAuthor = (data.author ?? "").toLowerCase();
+        const currentUserName = adminUser.name?.toLowerCase() ?? "";
+        if (articleAuthor && currentUserName && articleAuthor !== currentUserName && !articleAuthor.includes(currentUserName)) {
+          addToast("error", "You can only edit your own articles.");
+          setTimeout(() => navigate("/admin/content/articles"), 2000);
+          setLoading(false);
+          return;
+        }
+      }
+
       setDraft({
-        title: data.title ?? "",
-        excerpt: data.excerpt ?? "",
-        content: data.content_html ?? "",
-        author: data.author ?? "",
-        categories: normalizeTaxonomyTerms(data.categories),
-        tags: normalizeTaxonomyTerms(data.tags),
+        title: decodeHtmlEntities(data.title ?? ""),
+        excerpt: decodeHtmlEntities(data.excerpt ?? ""),
+        content: rewriteWpImageUrls(data.content_html ?? ""),
+        author: decodeHtmlEntities(data.author ?? ""),
+        categories: normalizeTaxonomyTerms(data.categories).map((c) => decodeHtmlEntities(c)),
+        tags: normalizeTaxonomyTerms(data.tags).map((t) => decodeHtmlEntities(t)),
         publishedAt: data.published_at ?? "",
         seo: (data.seo as { title?: string; description?: string; keywords?: string }) ?? {},
       });
@@ -169,12 +191,12 @@ export default function ArticleDetailPage() {
 
     if (autosaveTime > articleTime) {
       setShowRecovery({
-        title: data.title || "",
-        excerpt: data.excerpt || "",
+        title: decodeHtmlEntities(data.title || ""),
+        excerpt: decodeHtmlEntities(data.excerpt || ""),
         content: data.content_html || "",
-        author: data.author || "",
-        categories: normalizeTaxonomyTerms(data.categories),
-        tags: normalizeTaxonomyTerms(data.tags),
+        author: decodeHtmlEntities(data.author || ""),
+        categories: normalizeTaxonomyTerms(data.categories).map((c) => decodeHtmlEntities(c)),
+        tags: normalizeTaxonomyTerms(data.tags).map((t) => decodeHtmlEntities(t)),
         seo: (data.seo as Record<string, unknown>) || {},
         publishedAt: data.published_at || "",
         wpStatus: data.wp_status,
@@ -436,6 +458,20 @@ export default function ArticleDetailPage() {
     }
   }
 
+  async function handlePreview() {
+    if (!article) return;
+    setIsPreviewing(true);
+    try {
+      const nonce = await createPreviewNonce(article.slug);
+      window.open(`/magazine/${article.slug}?preview=${nonce}`, "_blank");
+      addToast("success", "Preview opened in new tab.");
+    } catch (err) {
+      addToast("error", "Failed to generate preview link.");
+    } finally {
+      setIsPreviewing(false);
+    }
+  }
+
   /* ─── Unsaved changes warning ─── */
   useEffect(() => {
     function handleBeforeUnload(e: BeforeUnloadEvent) {
@@ -503,10 +539,14 @@ export default function ArticleDetailPage() {
         isDirty={isDirty}
         isSaving={isSaving}
         isPublishing={isPublishing}
+        isPreviewing={isPreviewing}
         onSaveDraft={handleSaveDraft}
         onPublish={handlePublish}
         onUnpublish={handleUnpublish}
         onDelete={() => setShowDeleteConfirm(true)}
+        onPreview={handlePreview}
+        userCanPublish={userCanPublish}
+        userCanEditOthers={userCanEditOthers}
       />
 
       {/* Keyboard hint */}

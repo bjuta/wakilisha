@@ -4,6 +4,8 @@ import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { AdminTable } from "@/components/design-system/admin/AdminTable";
 import { supabase } from "@/lib/supabase";
+import { decodeHtmlEntities } from "@/utils/decodeHtmlEntities";
+import { useAdminUser } from "@/hooks/useAdminUser";
 
 interface Article {
   slug: string;
@@ -32,10 +34,13 @@ function normalizeTaxonomyTerms(raw: unknown): string[] {
 
 export default function AdminArticlesPage() {
   const navigate = useNavigate();
+  const adminUser = useAdminUser();
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+
+  const canEditOthers = adminUser.can("edit_others_articles");
 
   useEffect(() => {
     async function load() {
@@ -55,7 +60,16 @@ export default function AdminArticlesPage() {
     load();
   }, []);
 
-  const filtered = articles.filter((a) => {
+  // For authors/writers: only show own articles
+  const visibleArticles = canEditOthers
+    ? articles
+    : articles.filter((a) => {
+        const currentUserName = adminUser.name?.toLowerCase();
+        const articleAuthor = a.author?.toLowerCase() ?? "";
+        return articleAuthor === currentUserName || articleAuthor.includes(currentUserName);
+      });
+
+  const filtered = visibleArticles.filter((a) => {
     const matchesSearch =
       !search ||
       (a.title?.toLowerCase().includes(search.toLowerCase()) ?? false) ||
@@ -76,6 +90,9 @@ export default function AdminArticlesPage() {
           <h1 className="text-[22px] font-black tracking-tight text-wk-text">Articles</h1>
           <p className="mt-1 text-[13px] text-wk-text-muted">
             {articles.length} articles imported. {articles.filter((a) => !a.title || !a.excerpt).length} need review.
+            {!canEditOthers && (
+              <span className="ml-1 text-wk-brand">Showing {adminUser.name}&apos;s articles.</span>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -142,7 +159,7 @@ export default function AdminArticlesPage() {
               label: "Title",
               render: (row) => (
                 <div>
-                  <div className="text-[13px] font-semibold text-wk-text">{row.title || "(Untitled)"}</div>
+                  <div className="text-[13px] font-semibold text-wk-text">{row.title ? decodeHtmlEntities(row.title) : "(Untitled)"}</div>
                   <div className="text-[11px] text-wk-text-muted">{row.slug}</div>
                 </div>
               ),

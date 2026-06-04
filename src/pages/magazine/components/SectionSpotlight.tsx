@@ -1,8 +1,9 @@
 import { Link } from "react-router-dom";
-import type { RepairedStory } from "@/services/repairedContent/client";
+import { getAuthorMeta } from "@/services/authorProfiles";
+import type { MagazineArticle } from "@/services/magazineArticles";
 
 interface SectionSpotlightProps {
-  stories: RepairedStory[];
+  stories: MagazineArticle[];
 }
 
 export function SectionSpotlight({ stories }: SectionSpotlightProps) {
@@ -12,7 +13,7 @@ export function SectionSpotlight({ stories }: SectionSpotlightProps) {
     if (!acc[story.section]) acc[story.section] = [];
     acc[story.section].push(story);
     return acc;
-  }, {} as Record<string, RepairedStory[]>);
+  }, {} as Record<string, MagazineArticle[]>);
 
   const sections = Object.keys(sectionMap).sort();
 
@@ -49,7 +50,12 @@ export function SectionSpotlight({ stories }: SectionSpotlightProps) {
                         {story.title}
                       </h4>
                       <div className="mag-spotlight-v2-story-meta">
-                        <span>{story.author}</span>
+                        <Link
+                          to={`/authors/${getAuthorMeta(story.author).slug}`}
+                          className="hover:text-[var(--wk-brand)] transition-colors"
+                        >
+                          {story.author}
+                        </Link>
                         <span className="mag-spotlight-v2-meta-sep">·</span>
                         <span>{story.readingTime} min</span>
                       </div>

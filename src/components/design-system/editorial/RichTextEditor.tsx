@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
+import { MediaPickerModal } from "@/components/admin/MediaPickerModal";
 
 /* ─── Types ─── */
 
@@ -69,6 +70,7 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 500 }
     x: 0,
     y: 0,
   });
+  const [imagePickerOpen, setImagePickerOpen] = useState(false);
 
   const editorRef = useRef<HTMLDivElement>(null);
   const htmlRef = useRef<HTMLTextAreaElement>(null);
@@ -172,6 +174,38 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 500 }
     },
     [handleEditorChange, updateActiveCommands]
   );
+
+  /* ─── Image insertion ─── */
+  const handleInsertImage = useCallback((url: string) => {
+    if (!editorRef.current || !url) return;
+    editorRef.current.focus();
+
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+      const img = document.createElement("img");
+      img.src = url;
+      img.alt = "";
+      img.style.maxWidth = "100%";
+      img.style.borderRadius = "8px";
+      img.style.margin = "16px 0";
+      img.style.display = "block";
+      range.deleteContents();
+      range.insertNode(img);
+
+      // Move cursor after image
+      const newRange = document.createRange();
+      newRange.setStartAfter(img);
+      newRange.collapse(true);
+      selection.removeAllRanges();
+      selection.addRange(newRange);
+    } else {
+      document.execCommand("insertHTML", false, `<img src="${url}" alt="" style="max-width:100%;border-radius:8px;margin:16px 0;display:block;" />`);
+    }
+
+    setImagePickerOpen(false);
+    handleEditorChange();
+  }, [handleEditorChange]);
 
   /* ─── Link handling ─── */
   const handleLinkButton = useCallback(() => {
@@ -418,6 +452,14 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 500 }
           />
         ))}
 
+        {/* Image Insert */}
+        <ToolbarBtn
+          icon="ImagePlus"
+          label="Insert Image"
+          active={false}
+          onClick={() => setImagePickerOpen(true)}
+        />
+
         <div className="w-px h-6 bg-[var(--wk-border)] mx-1 hidden sm:block" />
 
         {/* Undo/Redo */}
@@ -520,6 +562,14 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 500 }
           </div>
         </div>
       )}
+
+      {/* Media Picker Modal */}
+      <MediaPickerModal
+        open={imagePickerOpen}
+        onClose={() => setImagePickerOpen(false)}
+        onSelect={handleInsertImage}
+        title="Insert Image"
+      />
 
       {/* Editor Area */}
       <div

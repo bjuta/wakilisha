@@ -8,10 +8,14 @@ interface Props {
   isDirty: boolean;
   isSaving: boolean;
   isPublishing: boolean;
+  isPreviewing: boolean;
   onSaveDraft: () => void;
   onPublish: () => void;
   onUnpublish: () => void;
   onDelete: () => void;
+  onPreview: () => void;
+  userCanPublish?: boolean;
+  userCanEditOthers?: boolean;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -30,10 +34,14 @@ export function ArticleEditorHeader({
   isDirty,
   isSaving,
   isPublishing,
+  isPreviewing,
   onSaveDraft,
   onPublish,
   onUnpublish,
   onDelete,
+  onPreview,
+  userCanPublish = true,
+  userCanEditOthers = true,
 }: Props) {
   const navigate = useNavigate();
   const statusColor = status ? (STATUS_COLORS[status] ?? STATUS_COLORS.draft) : STATUS_COLORS.draft;
@@ -89,6 +97,27 @@ export function ArticleEditorHeader({
           </a>
         )}
 
+        {/* Preview (for drafts) */}
+        {!isPublished && (
+          <button
+            onClick={onPreview}
+            disabled={isPreviewing || isSaving}
+            className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap"
+          >
+            {isPreviewing ? (
+              <>
+                <WkIcon name="Loader2" size={14} className="animate-spin" />
+                Previewing…
+              </>
+            ) : (
+              <>
+                <WkIcon name="Eye" size={14} />
+                Preview
+              </>
+            )}
+          </button>
+        )}
+
         {/* Delete */}
         <button
           onClick={onDelete}
@@ -119,17 +148,19 @@ export function ArticleEditorHeader({
           )}
         </button>
 
-        {/* Publish / Unpublish */}
+        {/* Publish / Unpublish / Submit */}
         {isPublished ? (
-          <button
-            onClick={onUnpublish}
-            disabled={isSaving || isPublishing}
-            className="wk-button wk-button-secondary wk-button-sm whitespace-nowrap"
-          >
-            <WkIcon name="EyeOff" size={14} />
-            Unpublish
-          </button>
-        ) : (
+          userCanPublish ? (
+            <button
+              onClick={onUnpublish}
+              disabled={isSaving || isPublishing}
+              className="wk-button wk-button-secondary wk-button-sm whitespace-nowrap"
+            >
+              <WkIcon name="EyeOff" size={14} />
+              Unpublish
+            </button>
+          ) : null
+        ) : userCanPublish ? (
           <button
             onClick={onPublish}
             disabled={isSaving || isPublishing}
@@ -146,6 +177,15 @@ export function ArticleEditorHeader({
                 Publish
               </>
             )}
+          </button>
+        ) : (
+          <button
+            onClick={onSaveDraft}
+            disabled={isSaving}
+            className="wk-button wk-button-secondary wk-button-sm whitespace-nowrap"
+          >
+            <WkIcon name="Send" size={14} />
+            Submit for Review
           </button>
         )}
       </div>

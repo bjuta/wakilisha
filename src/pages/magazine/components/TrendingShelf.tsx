@@ -1,9 +1,10 @@
 import { useRef } from "react";
 import { Link } from "react-router-dom";
-import type { RepairedStory } from "@/services/repairedContent/client";
+import { getAuthorMeta } from "@/services/authorProfiles";
+import type { MagazineArticle } from "@/services/magazineArticles";
 
 interface TrendingShelfProps {
-  stories: RepairedStory[];
+  stories: MagazineArticle[];
 }
 
 export function TrendingShelf({ stories }: TrendingShelfProps) {
@@ -61,7 +62,12 @@ export function TrendingShelf({ stories }: TrendingShelfProps) {
               <span className="mag-trending-v2-section">{story.section}</span>
               <h3 className="mag-trending-v2-card-title">{story.title}</h3>
               <div className="mag-trending-v2-card-meta">
-                <span>{story.author}</span>
+                <Link
+                  to={`/authors/${getAuthorMeta(story.author).slug}`}
+                  className="hover:text-[var(--wk-brand)] transition-colors"
+                >
+                  {story.author}
+                </Link>
                 <span className="mag-trending-v2-meta-sep">·</span>
                 <span>{story.readingTime} min</span>
               </div>

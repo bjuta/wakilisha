@@ -4,6 +4,7 @@ import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { AdminTable } from "@/components/design-system/admin/AdminTable";
 import { supabase } from "@/lib/supabase";
+import { decodeHtmlEntities } from "@/utils/decodeHtmlEntities";
 
 /* ─── Types ─── */
 
@@ -229,7 +230,7 @@ export default function AdminContentArchivePage() {
               label: "Title",
               render: (row) => (
                 <div>
-                  <div className="text-[13px] font-semibold text-wk-text">{row.title || "(Untitled)"}</div>
+                  <div className="text-[13px] font-semibold text-wk-text">{row.title ? decodeHtmlEntities(row.title) : "(Untitled)"}</div>
                   <div className="text-[11px] text-wk-text-muted">{row.slug}</div>
                 </div>
               ),
