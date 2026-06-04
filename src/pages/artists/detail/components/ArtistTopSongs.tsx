@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
+import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 
 interface ArtistTopSongsProps {
   songs: Array<{
@@ -52,7 +53,7 @@ export function ArtistTopSongs({ songs }: ArtistTopSongsProps) {
                 {song.image ? (
                   <img src={song.image} alt="" className="h-full w-full object-cover" />
                 ) : (
-                  <i className="ri-music-2-line text-[var(--wk-text-faint)]" />
+                  <Ch19GradientImage slug={`song-${index}`} name={song.title} />
                 )}
               </div>
 

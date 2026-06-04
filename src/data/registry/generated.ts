@@ -26064,7 +26064,7 @@ export const importedRegistry: ImportedRegistry = {
     {
       "id": "7fdbc912-d226-5f3e-fbcf-92927608f4da",
       "slug": "nyashinski-pam-wyre-abbas-kubaff-jua-cali-nameless",
-      "name": "Nyashinski, Pam, Wyre, Abbas K뫿, Jua Cali, Nameless",
+      "name": "Nyashinski, Pam, Wyre, Abbas Kubaff, Jua Cali, Nameless",
       "imageUrl": "null",
       "genres": [],
       "country": "null",
@@ -30425,7 +30425,7 @@ export const importedRegistry: ImportedRegistry = {
     {
       "id": "9dfb938c-3be3-f347-f762-2e239c9aeab4",
       "slug": "khaligraph-jones-dyana-cods-abbas-kubaff-jakk-quill-ruyonga-fresh-like-uhh-mex-cortez",
-      "name": "Khaligraph Jones, Dyana Cods, Abbas K뫿, Jakk Quill, Ruyonga, Fresh Like UHH, MEX CORTEZ",
+      "name": "Khaligraph Jones, Dyana Cods, Abbas Kubaff, Jakk Quill, Ruyonga, Fresh Like UHH, MEX CORTEZ",
       "imageUrl": "null",
       "genres": [],
       "country": "null",
@@ -31785,7 +31785,7 @@ export const importedRegistry: ImportedRegistry = {
     {
       "id": "0334abea-0763-f8a3-354a-346f1b2211b5",
       "slug": "breeder-lw-rekles-abbas-kubaff",
-      "name": "Breeder LW, Rekles, Abbas K뫿",
+      "name": "Breeder LW, Rekles, Abbas Kubaff",
       "imageUrl": "null",
       "genres": [],
       "country": "null",
@@ -32601,7 +32601,7 @@ export const importedRegistry: ImportedRegistry = {
     {
       "id": "1f9aa8e7-2eda-86ed-24c9-ced5d5200b46",
       "slug": "masterpiece-king-abass-kubaff-scar-mkadinali",
-      "name": "Masterpiece King, Abass K뫿, SCAR MKADINALI",
+      "name": "Masterpiece King, Abbas Kubaff, SCAR MKADINALI",
       "imageUrl": "null",
       "genres": [],
       "country": "null",
@@ -32645,7 +32645,7 @@ export const importedRegistry: ImportedRegistry = {
     {
       "id": "faa0d620-4dfd-fd81-8183-77d1ae2a100c",
       "slug": "abbas-kubaff",
-      "name": "Abbas K뫿",
+      "name": "Abbas Kubaff",
       "imageUrl": "null",
       "genres": [],
       "country": "KE",
@@ -37102,8 +37102,8 @@ export const importedRegistry: ImportedRegistry = {
     },
     {
       "id": "998b6699-8da7-3ea6-e812-17f164bb1a4d",
-      "slug": "abass-kubaff",
-      "name": "Abass K뫿",
+      "slug": "abbas-kubaff",
+      "name": "Abbas Kubaff",
       "imageUrl": "null",
       "genres": [],
       "country": "null",
@@ -39443,7 +39443,7 @@ export const importedRegistry: ImportedRegistry = {
     {
       "id": "6060f793-77dd-c3f1-595f-07a5600a8d40",
       "slug": "khaligraph-jones-dyana-cods-abbas-kubaff",
-      "name": "Khaligraph Jones, Dyana Cods & Abbas K뫿",
+      "name": "Khaligraph Jones, Dyana Cods & Abbas Kubaff",
       "imageUrl": "null",
       "genres": [],
       "country": "null",
@@ -47079,7 +47079,7 @@ export const importedRegistry: ImportedRegistry = {
       "title": "Vile Inafaa",
       "artistNames": [
         "Masterpiece King",
-        "Abass K뫿",
+        "Abbas Kubaff",
         "SCAR MKADINALI"
       ],
       "artistSlugs": [
@@ -65318,12 +65318,12 @@ export const importedRegistry: ImportedRegistry = {
     {
       "id": "cbec23fc-ec9a-e641-24e7-3a46fd9bba8f",
       "slug": "usimpe-roho-feat-pam-wyre-abbas-k-eb-ab-bf-jua-cali-nameless",
-      "title": "Usimpe Roho (feat. Pam, Wyre, Abbas K뫿, Jua Cali & Nameless)",
+      "title": "Usimpe Roho (feat. Pam, Wyre, Abbas Kubaff, Jua Cali & Nameless)",
       "artistNames": [
         "Nyashinski",
         "Pam",
         "Wyre",
-        "Abbas K뫿",
+        "Abbas Kubaff",
         "Jua Cali",
         "Nameless"
       ],
@@ -77338,7 +77338,7 @@ export const importedRegistry: ImportedRegistry = {
       "artistNames": [
         "Khaligraph Jones",
         "Dyana Cods",
-        "Abbas K뫿",
+        "Abbas Kubaff",
         "Jakk Quill",
         "Ruyonga",
         "Fresh Like UHH",
@@ -80681,7 +80681,7 @@ export const importedRegistry: ImportedRegistry = {
       "artistNames": [
         "Breeder LW",
         "Rekles",
-        "Abbas K뫿"
+        "Abbas Kubaff"
       ],
       "artistSlugs": [
         "breeder-lw"
@@ -84463,7 +84463,7 @@ export const importedRegistry: ImportedRegistry = {
     {
       "id": "c1524836-743a-3e4a-5240-682cb78e5952",
       "slug": "khali-cartel-5-feat-dyana-cods-abbas-k-eb-ab-bf-jakk-quill-ruyonga-fresh-like-uhh-mex-cortez",
-      "title": "Khali Cartel 5 (feat. Dyana Cods, Abbas K뫿, Jakk Quill, Ruyonga, Fresh Like UHH, MEX CORTEZ)",
+      "title": "Khali Cartel 5 (feat. Dyana Cods, Abbas Kubaff, Jakk Quill, Ruyonga, Fresh Like UHH, MEX CORTEZ)",
       "artistNames": [
         "Khaligraph Jones"
       ],
@@ -86584,7 +86584,7 @@ export const importedRegistry: ImportedRegistry = {
     {
       "id": "06e36d98-fe4a-8127-842e-27b44c37d848",
       "slug": "kum-baba-feat-abbas-k-eb-ab-bf-wakuu-pepela-masterpiece-king",
-      "title": "Kum Baba (feat. Abbas K뫿, Wakuu, Pepela, Masterpiece King)",
+      "title": "Kum Baba (feat. Abbas Kubaff, Wakuu, Pepela, Masterpiece King)",
       "artistNames": [
         "Wakadinali"
       ],
@@ -87298,7 +87298,7 @@ export const importedRegistry: ImportedRegistry = {
     {
       "id": "94fef1df-af29-b624-e863-c9686f0eb91a",
       "slug": "avoid-those-people-feat-boutross-breeder-lw-abbas-k-elisha-elai-dyana-cods",
-      "title": "Avoid Those People (feat. Boutross, Breeder LW, Abbas K뫿, Elisha Elai, Dyana Cods)",
+      "title": "Avoid Those People (feat. Boutross, Breeder LW, Abbas Kubaff, Elisha Elai, Dyana Cods)",
       "artistNames": [
         "Wakadinali"
       ],

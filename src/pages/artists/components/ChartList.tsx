@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 
 interface ChartArtist {
   slug: string;
@@ -66,9 +67,7 @@ export function ChartList({ artists }: ChartListProps) {
                       className="h-full w-full object-cover object-top transition-transform duration-[var(--wk-d-slow)] group-hover:scale-105"
                     />
                   ) : (
-                    <div className="flex h-full w-full items-center justify-center">
-                      <i className="ri-user-3-line text-5xl text-[var(--wk-text-faint)]" />
-                    </div>
+                    <Ch19GradientImage slug={artist.slug} name={artist.name} />
                   )}
                   {/* Medal badge */}
                   <div className="absolute left-3 top-3 flex h-10 w-10 items-center justify-center rounded-full bg-black/60 backdrop-blur-md">
@@ -124,9 +123,7 @@ export function ChartList({ artists }: ChartListProps) {
                   {artist.imageUrl ? (
                     <img src={artist.imageUrl} alt={artist.name} className="h-full w-full object-cover object-top transition-transform duration-[var(--wk-d-slow)] group-hover:scale-110" />
                   ) : (
-                    <div className="flex h-full w-full items-center justify-center">
-                      <i className="ri-user-3-line text-xl text-[var(--wk-text-faint)]" />
-                    </div>
+                    <Ch19GradientImage slug={artist.slug} name={artist.name} />
                   )}
                 </div>
 

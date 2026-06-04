@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
 import { usePlayer } from "@/context/PlayerContext";
+import { ChartRowExpandedPanel } from "@/components/design-system/music/ChartRowExpandedPanel";
+import { ChartHighlights } from "./components/ChartHighlights";
 import {
   getChartFamilies,
   getLatestChartEdition,
@@ -8,785 +10,825 @@ import {
 } from "@/services/chartsPublic/client";
 import {
   toChartDirectoryViewModel,
+  toChartFamilyViewModel,
+  toChartEditionViewModel,
+  toChartEntryRowViewModel,
   toChartTrackPlayerModels,
-  type ChartDirectoryViewModel,
+  type ChartFamilyViewModel,
+  type ChartEditionViewModel,
   type ChartEntryRowViewModel,
+  type ChartPageMeta,
 } from "@/services/chartsPublic/viewModels";
+import type { ChartEdition, ChartEditionEntry } from "@/services/chartsPublic/types";
 import { ChartRefreshButton } from "@/components/charts/ChartRefreshButton";
+import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 
-const HERO_IMAGE = "https://readdy.ai/api/search-image?query=abstract%20dark%20minimalist%20music%20visualization%20with%20subtle%20green%20neon%20light%20streaks%20on%20deep%20black%20background%20geometric%20waveforms%20and%20floating%20particles%20premium%20cinematic%20atmosphere%20no%20text%20high%20contrast%20editorial%20photography%20style&width=1600&height=640&seq=charts-hero-01&orientation=landscape";
+// ─── Constants ───
 
-const GOLD = "#C9A96E";
-const SILVER = "#B8C4CE";
-const BRONZE = "#C4956A";
+const METALLIC = {
+  gold: "#C9A96E",
+  silver: "#A8A8A8",
+  bronze: "#B87333",
+} as const;
 
-function AnimatedCounter({ value, label }: { value: number; label: string }) {
-  const [display, setDisplay] = useState(0);
-  useEffect(() => {
-    const duration = 1200;
-    const startTime = Date.now();
-    const timer = setInterval(() => {
-      const elapsed = Date.now() - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      setDisplay(Math.floor(eased * value));
-      if (progress >= 1) clearInterval(timer);
-    }, 16);
-    return () => clearInterval(timer);
-  }, [value]);
-  return (
-    <div className="flex flex-col items-center">
-      <div className="text-[28px] md:text-[40px] font-black leading-none text-[var(--wk-brand)]">{display}</div>
-      <div className="mt-1 text-[10px] md:text-[11px] font-bold uppercase tracking-wider text-[var(--wk-text-muted)]">{label}</div>
-    </div>
-  );
+const HERO_FALLBACK =
+  "https://readdy.ai/api/search-image?query=abstract%20african%20music%20visualization%20with%20vibrant%20green%20and%20gold%20energy%20waves%20radiating%20from%20a%20central%20point%20on%20deep%20charcoal%20black%20background%20rhythmic%20geometric%20patterns%20inspired%20by%20african%20textile%20art%20premium%20cinematic%20atmosphere%20with%20subtle%20luminous%20particles%20no%20text%20high%20contrast%20editorial%20photography%20style&width=1600&height=720&seq=charts-home-hero-v2&orientation=landscape";
+
+// ─── Helpers ───
+
+function rankAccent(rank: number) {
+  if (rank === 1) return { color: METALLIC.gold, ring: "ring-[#C9A96E]/25" };
+  if (rank === 2) return { color: METALLIC.silver, ring: "ring-[#A8A8A8]/20" };
+  if (rank === 3) return { color: METALLIC.bronze, ring: "ring-[#B87333]/20" };
+  return null;
 }
 
-function PodiumCard({
+
+function entryPlaylist(entries: ChartEntryRowViewModel[]) {
+  return entries
+    .filter((e) => e.isPlayable !== false)
+    .map((e) => ({
+      id: e.slug,
+      title: e.title,
+      artist: e.artist,
+      artworkUrl: e.artworkUrl ?? undefined,
+      isPlayable: e.isPlayable,
+      source: e.source,
+      duration: e.duration,
+    }));
+}
+
+// ─── Sub-components ───
+
+function LeaderboardRow({
   entry,
-  rank,
-  color,
   onPlay,
-  featured,
+  rowId,
+  isHighlighted,
 }: {
   entry: ChartEntryRowViewModel;
-  rank: number;
-  color: "gold" | "silver" | "bronze";
   onPlay: () => void;
-  featured?: boolean;
+  rowId?: string;
+  isHighlighted?: boolean;
 }) {
-  const colors = {
-    gold: { border: GOLD, text: GOLD, bg: "rgba(201,169,110,0.08)", label: "1st" },
-    silver: { border: SILVER, text: SILVER, bg: "rgba(184,196,206,0.08)", label: "2nd" },
-    bronze: { border: BRONZE, text: BRONZE, bg: "rgba(196,149,106,0.08)", label: "3rd" },
-  };
-  const c = colors[color];
+  const [isExpanded, setIsExpanded] = useState(false);
+  const accent = rankAccent(entry.rank);
+  const mvtAmt = entry.movementAmount && entry.movementAmount > 0 ? entry.movementAmount : null;
 
   return (
     <div
-      className="relative flex flex-col rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] overflow-hidden transition-all duration-300 hover:shadow-xl"
-      style={{ borderTopColor: c.border, borderTopWidth: "4px" }}
+      id={rowId}
+      className={`group transition-colors ${isHighlighted ? "bg-[var(--wk-brand-soft)] duration-700" : isExpanded ? "bg-[var(--wk-surface-raised)] duration-200" : "hover:bg-[var(--wk-surface-raised)] duration-200"}`}
     >
-      {featured && (
-        <div className="absolute -inset-px rounded-2xl opacity-25 blur-xl" style={{ backgroundColor: c.border }} />
-      )}
-      <div className={`relative flex flex-col ${featured ? "p-5 md:p-6" : "p-5"}`}>
-        <div className="mb-3 flex items-center gap-2">
-          <span className={`font-black leading-none ${featured ? "text-[32px] md:text-[36px]" : "text-[28px]"}`} style={{ color: c.text }}>
-            #{rank}
-          </span>
-          <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--wk-text-faint)]">{c.label}</span>
-        </div>
-
-        <div className={`relative mb-3 w-full overflow-hidden rounded-xl bg-[var(--wk-surface-raised)] ${featured ? "aspect-square" : "aspect-[4/3]"}`}>
-          {entry.artworkUrl ? (
-            <img src={entry.artworkUrl} alt={entry.title} className="h-full w-full object-cover object-top" />
+      {/* Row */}
+      <div
+        onClick={() => setIsExpanded((v) => !v)}
+        className="flex cursor-pointer select-none items-center gap-2.5 px-3 py-2.5 md:gap-3.5 md:px-4 md:py-3"
+      >
+        {/* Rank */}
+        <div className="flex w-8 shrink-0 items-center justify-center md:w-10">
+          {accent ? (
+            <span
+              className="flex h-8 w-8 items-center justify-center rounded-full text-[15px] font-black md:h-9 md:w-9 md:text-[16px]"
+              style={{ backgroundColor: `${accent.color}18`, color: accent.color }}
+            >
+              {entry.rank}
+            </span>
           ) : (
-            <div className="flex h-full w-full items-center justify-center text-[var(--wk-text-faint)]">
-              <i className={`ri-music-2-line ${featured ? "text-4xl" : "text-3xl"}`} />
-            </div>
+            <span className="text-[14px] font-bold text-[var(--wk-text-muted)] tabular-nums md:text-[15px]">
+              {entry.rank}
+            </span>
           )}
         </div>
 
-        <div className="mb-2">
-          <Link to={`/tracks/${entry.slug}`} className="block truncate text-[15px] font-bold text-[var(--wk-text)] hover:text-[var(--wk-brand)] transition-colors">
-            {entry.title}
-          </Link>
-          <div className="truncate text-[13px] text-[var(--wk-text-muted)]">{entry.artist}</div>
-        </div>
-
-        <div className="mb-3 flex flex-wrap items-center gap-1.5">
-          {entry.genre && (
-            <span className="rounded-full bg-[var(--wk-bg)] px-2 py-0.5 text-[10px] font-semibold text-[var(--wk-text-muted)]">{entry.genre}</span>
-          )}
-          {entry.weeksOnChart !== undefined && (
-            <span className="text-[10px] text-[var(--wk-text-faint)]">{entry.weeksOnChart} wk{entry.weeksOnChart !== 1 ? "s" : ""}</span>
-          )}
-          {entry.peakPosition === rank && (
-            <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ backgroundColor: c.bg, color: c.text }}>PEAK</span>
+        {/* Artwork */}
+        <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-[var(--wk-surface-raised)] md:h-12 md:w-12">
+          {entry.artworkUrl ? (
+            <img src={entry.artworkUrl} alt="" className="h-full w-full object-cover object-top" loading="lazy" />
+          ) : (
+            <Ch19GradientImage slug={entry.slug} name={entry.title} />
           )}
         </div>
 
+        {/* Track info */}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <Link
+              to={`/tracks/${entry.slug}`}
+              onClick={(e) => e.stopPropagation()}
+              className="truncate text-[13px] font-bold text-[var(--wk-text)] hover:text-[var(--wk-brand)] transition-colors md:text-[14px]"
+            >
+              {entry.title}
+            </Link>
+            {entry.movement === "new" && (
+              <span className="shrink-0 rounded-full bg-[var(--wk-brand-soft)] px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-[var(--wk-brand)]">
+                NEW
+              </span>
+            )}
+            {entry.peakPosition === entry.rank && entry.movement !== "new" && (
+              <span className="shrink-0 rounded-full bg-[var(--wk-brand-soft)] px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-[var(--wk-brand)]">
+                PEAK
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2 mt-0.5">
+            <span className="truncate text-[11px] text-[var(--wk-text-muted)] md:text-[12px]">{entry.artist}</span>
+          </div>
+        </div>
+
+        {/* Movement delta */}
+        <div className="flex shrink-0 w-16 items-center justify-end">
+          {entry.movement === "up" && (
+            <span className="flex items-center gap-0.5 text-[12px] font-bold tabular-nums" style={{ color: "var(--wk-success)" }}>
+              <i className="ri-arrow-up-line text-[11px]" />
+              +{mvtAmt ?? 0}
+            </span>
+          )}
+          {entry.movement === "down" && (
+            <span className="flex items-center gap-0.5 text-[12px] font-bold tabular-nums" style={{ color: "var(--wk-danger)" }}>
+              <i className="ri-arrow-down-line text-[11px]" />
+              −{mvtAmt ?? 0}
+            </span>
+          )}
+          {entry.movement === "new" && (
+            <span className="rounded-full px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider" style={{ backgroundColor: "var(--wk-brand-soft)", color: "var(--wk-brand)" }}>
+              NEW
+            </span>
+          )}
+          {entry.movement === "re_entry" && (
+            <span className="rounded-full px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider flex items-center gap-0.5" style={{ backgroundColor: "var(--wk-brand-soft)", color: "var(--wk-brand)" }}>
+              <i className="ri-refresh-line text-[9px]" />RE
+            </span>
+          )}
+          {(entry.movement === "same" || !entry.movement) && (
+            <span className="text-[12px] font-bold" style={{ color: "var(--wk-text-faint)" }}>—</span>
+          )}
+        </div>
+
+        {/* Weeks + Peak */}
+        <div className="hidden w-16 shrink-0 flex-col items-end gap-0.5 md:flex">
+          <span className="text-[11px] text-[var(--wk-text-soft)] tabular-nums">
+            {entry.weeksOnChart} wk{entry.weeksOnChart !== 1 ? "s" : ""}
+          </span>
+          <span className="text-[10px] text-[var(--wk-text-faint)] tabular-nums">
+            #{entry.peakPosition}
+          </span>
+        </div>
+
+        {/* Play button */}
         <button
-          onClick={onPlay}
-          className={`wk-button wk-button-primary w-full justify-center ${featured ? "text-[13px]" : "text-[12px]"}`}
+          onClick={(e) => { e.stopPropagation(); onPlay(); }}
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] opacity-0 transition-all duration-200 group-hover:opacity-100 hover:scale-110 md:h-9 md:w-9"
+          aria-label={`Play ${entry.title}`}
         >
-          <i className="ri-play-fill" /> Play
+          <i className="ri-play-mini-fill text-sm" />
         </button>
+
+        {/* Expand chevron */}
+        <div
+          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[var(--wk-text-faint)] transition-all duration-200 ${isExpanded ? "rotate-180 bg-[var(--wk-surface-raised)] text-[var(--wk-text)]" : "group-hover:text-[var(--wk-text-muted)]"}`}
+        >
+          <i className="ri-arrow-down-s-line text-[16px]" />
+        </div>
+      </div>
+
+      {/* Expandable panel */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateRows: isExpanded ? "1fr" : "0fr",
+          transition: "grid-template-rows 0.25s ease",
+        }}
+      >
+        <ChartRowExpandedPanel
+          rank={entry.rank}
+          slug={entry.slug}
+          artistNames={entry.artistNames}
+          artistSlugs={entry.artistSlugs}
+          peakPosition={entry.peakPosition}
+          weeksOnChart={entry.weeksOnChart}
+          movement={entry.movement}
+          movementAmount={entry.movementAmount}
+          previousRank={entry.previousRank}
+          duration={entry.duration}
+          genre={entry.genre ?? undefined}
+          score={entry.score}
+        />
       </div>
     </div>
   );
 }
 
-function MovementIndicator({ movement, amount }: { movement?: string; amount?: number }) {
-  if (!movement) return null;
-  const config: Record<string, { color: string; icon: string }> = {
-    up: { color: "var(--wk-success)", icon: "ri-arrow-up-line" },
-    down: { color: "var(--wk-danger)", icon: "ri-arrow-down-line" },
-    new: { color: "var(--wk-brand)", icon: "ri-star-smile-line" },
-    same: { color: "var(--wk-text-faint)", icon: "ri-subtract-line" },
-  };
-  const c = config[movement] || config.same;
+function StatTile({ value, label }: { value: string | number; label: string }) {
   return (
-    <span className="mt-0.5 flex items-center gap-0.5 text-[10px] font-bold" style={{ color: c.color }}>
-      <i className={`text-[10px] ${c.icon}`} />
-      {amount && amount > 0 ? amount : ""}
-    </span>
+    <div className="rounded-xl bg-[var(--wk-bg)] p-3">
+      <div className="text-[20px] font-black text-[var(--wk-brand)] tabular-nums">{value}</div>
+      <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--wk-text-faint)] mt-0.5">{label}</div>
+    </div>
   );
 }
 
-function ChartRow({ entry, onPlay }: { entry: ChartEntryRowViewModel; onPlay: () => void }) {
-  const rankColors: Record<number, string> = { 1: GOLD, 2: SILVER, 3: BRONZE };
+function MiniEntryRow({
+  entry,
+  badge,
+}: {
+  entry: ChartEntryRowViewModel;
+  badge: string;
+}) {
   return (
-    <div className="group flex items-center gap-3 px-4 py-3 transition-all duration-200 hover:bg-[var(--wk-surface-raised)] hover:translate-x-1">
-      <div className="flex w-12 shrink-0 flex-col items-center">
-        <span className="text-[22px] font-black leading-none" style={{ color: rankColors[entry.rank] || "var(--wk-text-muted)" }}>
-          {entry.rank}
-        </span>
-        <MovementIndicator movement={entry.movement} amount={entry.movementAmount} />
+    <Link
+      to={`/tracks/${entry.slug}`}
+      className="flex items-center gap-2.5 rounded-lg p-2 transition-colors hover:bg-[var(--wk-bg)] group"
+    >
+      <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--wk-brand)] text-[10px] font-black text-[var(--wk-brand-on)] tabular-nums">
+        {entry.rank}
       </div>
-      <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-[var(--wk-surface-raised)]">
+      <div className="h-8 w-8 shrink-0 overflow-hidden rounded-md bg-[var(--wk-surface-raised)]">
         {entry.artworkUrl ? (
-          <img src={entry.artworkUrl} alt="" className="h-full w-full object-cover object-top" />
+          <img src={entry.artworkUrl} alt="" className="h-full w-full object-cover object-top" loading="lazy" />
         ) : (
-          <div className="flex h-full w-full items-center justify-center text-[var(--wk-text-faint)]">
-            <i className="ri-music-2-line text-lg" />
-          </div>
+          <Ch19GradientImage slug={entry.slug} name={entry.title} />
         )}
       </div>
       <div className="min-w-0 flex-1">
-        <div className="mb-0.5 flex items-center gap-2">
-          <Link to={`/tracks/${entry.slug}`} className="truncate text-[14px] font-bold text-[var(--wk-text)] hover:text-[var(--wk-brand)] transition-colors">
-            {entry.title}
-          </Link>
-          {entry.peakPosition === entry.rank && (
-            <span className="shrink-0 rounded-full bg-[var(--wk-brand-soft)] border border-[var(--wk-brand)]/30 px-2 py-0.5 text-[10px] font-bold text-[var(--wk-brand)]">PEAK</span>
-          )}
+        <div className="truncate text-[12px] font-bold text-[var(--wk-text)] group-hover:text-[var(--wk-brand)] transition-colors">
+          {entry.title}
         </div>
-        <div className="flex items-center gap-2">
-          <span className="truncate text-[12px] text-[var(--wk-text-muted)]">{entry.artist}</span>
-          {entry.genre && (
-            <span className="hidden sm:inline-block rounded-full bg-[var(--wk-bg)] px-2 py-0.5 text-[10px] text-[var(--wk-text-muted)]">{entry.genre}</span>
-          )}
-        </div>
+        <div className="truncate text-[10px] text-[var(--wk-text-muted)]">{entry.artist}</div>
       </div>
-      <div className="hidden shrink-0 flex-col items-end gap-0.5 md:flex">
-        {entry.weeksOnChart !== undefined && (
-          <span className="text-[11px] text-[var(--wk-text-faint)]">{entry.weeksOnChart} wk{entry.weeksOnChart !== 1 ? "s" : ""}</span>
-        )}
-        {entry.peakPosition !== undefined && entry.peakPosition !== entry.rank && (
-          <span className="text-[11px] text-[var(--wk-text-faint)]">Peak #{entry.peakPosition}</span>
-        )}
-      </div>
-      <button
-        onClick={onPlay}
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] opacity-0 transition-all duration-200 group-hover:opacity-100 hover:scale-110"
-      >
-        <i className="ri-play-mini-fill text-sm" />
-      </button>
-    </div>
+      <span className="shrink-0 text-[10px] font-bold text-[var(--wk-brand)] uppercase">{badge}</span>
+    </Link>
   );
 }
 
-function SignalStrip({ title, entries, badge }: { title: string; entries: ChartEntryRowViewModel[]; badge: string }) {
+function SidebarCard({
+  title,
+  entries,
+  badge,
+  emptyLabel,
+}: {
+  title: string;
+  entries: ChartEntryRowViewModel[];
+  badge: string;
+  emptyLabel?: string;
+}) {
   return (
     <div className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4">
       <div className="mb-3 flex items-center justify-between">
-        <div className="text-[11px] font-bold uppercase tracking-wider text-[var(--wk-text-faint)]">{title}</div>
-        <span className="text-[11px] font-bold text-[var(--wk-brand)]">{entries.length}</span>
+        <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--wk-text-faint)]">{title}</span>
+        <span className="text-[11px] font-bold text-[var(--wk-brand)] tabular-nums">{entries.length}</span>
       </div>
-      <div className="space-y-1">
-        {entries.slice(0, 5).map((entry) => (
-          <div key={entry.rank} className="flex items-center gap-2 rounded-lg p-2 transition-colors hover:bg-[var(--wk-bg)]">
-            <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--wk-brand)] text-[10px] font-black text-[var(--wk-brand-on)]">{entry.rank}</div>
-            <div className="h-9 w-9 shrink-0 overflow-hidden rounded-md bg-[var(--wk-surface-raised)]">
-              <img src={entry.artworkUrl ?? ""} alt="" className="h-full w-full object-cover" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-[12px] font-bold text-[var(--wk-text)]">{entry.title}</div>
-              <div className="truncate text-[11px] text-[var(--wk-text-muted)]">{entry.artist}</div>
-            </div>
-            <span className="text-[10px] font-bold text-[var(--wk-brand)]">{badge}</span>
-          </div>
-        ))}
-        {entries.length === 0 && <div className="py-2 text-[12px] text-[var(--wk-text-faint)]">No entries this week.</div>}
-      </div>
+      {entries.length > 0 ? (
+        <div className="space-y-0.5">
+          {entries.slice(0, 8).map((entry) => (
+            <MiniEntryRow key={`${badge}-${entry.rank}`} entry={entry} badge={badge} />
+          ))}
+        </div>
+      ) : (
+        <div className="py-3 text-center text-[12px] text-[var(--wk-text-faint)]">{emptyLabel ?? "None this week."}</div>
+      )}
     </div>
   );
 }
 
+// ─── Main Component ───
+
 export default function ChartsDirectory() {
   const { playTrack } = usePlayer();
-  const [state, setState] = useState<
-    | { status: "loading" }
-    | { status: "error"; error: string; diagnostics?: string }
-    | { status: "empty" }
-    | { status: "loaded"; data: ChartDirectoryViewModel }
-  >({ status: "loading" });
-  const [showErrorDetails, setShowErrorDetails] = useState(false);
+  const scrollY = useRef(0);
+  const [scrollPos, setScrollPos] = useState(0);
 
-  const load = useCallback(async () => {
-    setState({ status: "loading" });
+  // ── core state ──
+  const [phase, setPhase] = useState<"loading" | "error" | "empty" | "ready">("loading");
+  const [errorMsg, setErrorMsg] = useState("");
+  const [families, setFamilies] = useState<ChartFamilyViewModel[]>([]);
+  const [activeSlug, setActiveSlug] = useState<string>("");
+  const [cache, setCache] = useState<Record<string, { edition: ChartEditionViewModel | null; entries: ChartEntryRowViewModel[] }>>({});
+  const [switching, setSwitching] = useState(false);
+  const [meta, setMeta] = useState<ChartPageMeta | null>(null);
+  const [highlightedSlug, setHighlightedSlug] = useState<string | null>(null);
+
+  // ── scroll listener ──
+  useEffect(() => {
+    const onScroll = () => {
+      scrollY.current = window.scrollY;
+      setScrollPos(window.scrollY);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  // ── load families on mount ──
+  const metaRef = useRef(meta);
+  metaRef.current = meta;
+
+  const loadFamilyEntry = useCallback(async (slug: string, family: ChartFamilyViewModel) => {
+    setSwitching(true);
     try {
-      const { data: families, meta: familiesMeta } = await getChartFamilies();
-      if (families.length === 0) {
-        setState({ status: "empty" });
-        return;
-      }
-      const featuredFamily = families[0];
-      const featuredSlug = featuredFamily.publicSlug ?? featuredFamily.slug ?? featuredFamily.familyKey;
-      const { data: edition, meta: editionMeta } = await getLatestChartEdition(featuredSlug);
+      const { data: edition, meta: edMeta } = await getLatestChartEdition(slug);
       if (!edition) {
-        setState({ status: "empty" });
+        setCache((prev) => ({ ...prev, [slug]: { edition: null, entries: [] } }));
+        if (!metaRef.current) setMeta(edMeta);
         return;
       }
-      const { data: entries } = await getChartEditionEntries(featuredSlug, edition.slug);
-      const data = toChartDirectoryViewModel(
-        families,
-        [edition],
-        featuredSlug,
+      const { data: entries } = await getChartEditionEntries(slug, edition.slug);
+      const edVM = toChartEditionViewModel(
         edition,
-        entries,
-        editionMeta.source === "cache" ? { ...editionMeta, isStale: editionMeta.isStale || familiesMeta.isStale } : editionMeta
+        { ...family, sourceFamilySlug: family.sourceFamilySlug, familyKey: slug } as any,
+        entries
       );
-      setState({ status: "loaded", data });
-    } catch (err) {
-      setState({
-        status: "error",
-        error: err instanceof Error ? err.message : "Unknown error",
-        diagnostics: err instanceof Error ? err.stack : undefined,
-      });
+      const entryVMs = entries.map(toChartEntryRowViewModel);
+      setCache((prev) => ({ ...prev, [slug]: { edition: edVM, entries: entryVMs } }));
+      if (!metaRef.current) setMeta(edMeta);
+    } catch {
+      setCache((prev) => ({ ...prev, [slug]: { edition: null, entries: [] } }));
+    } finally {
+      setSwitching(false);
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
-  const handleRetry = () => load();
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      setPhase("loading");
+      try {
+        const { data: familiesData, meta: familiesMeta } = await getChartFamilies();
+        if (cancelled) return;
+        if (familiesData.length === 0) { setPhase("empty"); return; }
+        const editionsForFamilies: ChartEdition[] = [];
+        const vms = familiesData.map((f) => toChartFamilyViewModel(f, editionsForFamilies));
+        setFamilies(vms);
+        setMeta(familiesMeta);
+        const first = vms[0];
+        setActiveSlug(first.slug);
+        setPhase("ready");
+        loadFamilyEntry(first.slug, first);
+      } catch (err) {
+        if (cancelled) return;
+        setPhase("error");
+        setErrorMsg(err instanceof Error ? err.message : "Failed to load chart data");
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const loadedData = state.status === "loaded" ? state.data : null;
-  const allTracks = useMemo(() => loadedData ? toChartTrackPlayerModels(loadedData.topEntries) : [], [loadedData]);
-  const top10Playlist = useMemo(() => {
-    if (!loadedData) return [];
-    const list = loadedData.topEntries.slice(0, 10);
-    return toChartTrackPlayerModels(list);
-  }, [loadedData]);
+  // ── retry ──
+  const retry = useCallback(() => {
+    setPhase("loading");
+    setErrorMsg("");
+    setCache({});
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data: familiesData, meta: familiesMeta } = await getChartFamilies();
+        if (cancelled) return;
+        if (familiesData.length === 0) { setPhase("empty"); return; }
+        const vms = familiesData.map((f) => toChartFamilyViewModel(f, []));
+        setFamilies(vms);
+        setMeta(familiesMeta);
+        const first = vms[0];
+        setActiveSlug(first.slug);
+        setPhase("ready");
+        loadFamilyEntry(first.slug, first);
+      } catch (err) {
+        if (cancelled) return;
+        setPhase("error");
+        setErrorMsg(err instanceof Error ? err.message : "Failed to load chart data");
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [loadFamilyEntry]);
+
+  // ── derived ──
+  const activeFamily = useMemo(
+    () => families.find((f) => f.slug === activeSlug) ?? families[0] ?? null,
+    [families, activeSlug]
+  );
+  const activeData = cache[activeSlug];
+  const activeEntries = activeData?.entries ?? [];
+  const activeEdition = activeData?.edition ?? null;
+  const playerTracks = useMemo(() => entryPlaylist(activeEntries), [activeEntries]);
+  const playerTop10 = useMemo(() => entryPlaylist(activeEntries.slice(0, 10)), [activeEntries]);
+  const entryCount = activeEdition?.totalEntries ?? activeEntries.length;
+
+  // 10% preview — minimum 5, always a whole number
+  const previewCount = Math.max(5, Math.ceil(entryCount * 0.1));
+  const previewEntries = activeEntries.slice(0, previewCount);
+  const hiddenCount = Math.max(0, entryCount - previewCount);
+
+  const newEntries = useMemo(() => activeEntries.filter((e) => e.movement === "new"), [activeEntries]);
+  const climbers = useMemo(
+    () => activeEntries.filter((e) => e.movement === "up").sort((a, b) => (b.movementAmount ?? 0) - (a.movementAmount ?? 0)),
+    [activeEntries]
+  );
+
+  const topTrack = activeEntries[0] ?? null;
+  const heroBg = topTrack?.artworkUrl ?? HERO_FALLBACK;
+  const heroStyle = topTrack?.artworkUrl
+    ? { backgroundImage: `url(${topTrack.artworkUrl})`, filter: "blur(90px) saturate(1.5)", transform: `scale(1.12) translateY(${scrollPos * 0.04}px)` }
+    : { backgroundImage: `url(${HERO_FALLBACK})`, backgroundSize: "cover", backgroundPosition: "center" };
+
+  const handleTabClick = useCallback(
+    (slug: string) => {
+      if (slug === activeSlug) return;
+      setActiveSlug(slug);
+      if (!cache[slug]) {
+        const family = families.find((f) => f.slug === slug);
+        if (family) loadFamilyEntry(slug, family);
+      }
+    },
+    [activeSlug, cache, families, loadFamilyEntry]
+  );
 
   const handlePlayTop10 = useCallback(() => {
-    if (top10Playlist.length > 0) playTrack(top10Playlist[0], top10Playlist);
-  }, [top10Playlist, playTrack]);
+    if (playerTop10.length > 0) playTrack(playerTop10[0], playerTop10);
+  }, [playerTop10, playTrack]);
 
-  const handlePlay = useCallback((globalIndex: number) => {
-    const track = allTracks[globalIndex];
-    if (!track) return;
-    playTrack(track, allTracks);
-  }, [allTracks, playTrack]);
+  const handlePlayEntry = useCallback(
+    (idx: number) => {
+      const t = playerTracks[idx];
+      if (t) playTrack(t, playerTracks);
+    },
+    [playerTracks, playTrack]
+  );
 
-  if (state.status === "loading") {
+  const handleJumpTo = useCallback((slug: string) => {
+    setHighlightedSlug(slug);
+    // slight delay so discovery panels can close first
+    setTimeout(() => {
+      document.getElementById(`entry-${slug}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 280);
+    // clear highlight after the scroll + glow animation
+    setTimeout(() => setHighlightedSlug(null), 2600);
+  }, []); 
+
+  const metaLine = meta?.isStale
+    ? `Cached (stale) · ${new Date(meta.fetchedAt).toLocaleString()}`
+    : meta?.dataSource === "cache"
+    ? `Cached · ${new Date(meta.fetchedAt).toLocaleString()}`
+    : meta
+    ? `Live · ${new Date(meta.fetchedAt).toLocaleTimeString()}`
+    : "";
+
+  // ── render: loading ──
+  if (phase === "loading") {
     return (
-      <div className="min-h-screen">
-        <section className="relative min-h-[600px] md:min-h-[720px] overflow-hidden flex items-end">
-          <div className="absolute inset-0 bg-[var(--wk-bg)]" />
-          <div className="absolute inset-0 bg-gradient-to-t from-[var(--wk-bg)] via-[var(--wk-bg)]/85 to-[var(--wk-bg)]/30" />
-          <div className="relative wk-container px-4 pb-10 pt-20 md:px-6 md:pb-16 md:pt-28 w-full">
-            <div className="space-y-4">
-              <div className="h-4 w-32 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
-              <div className="h-20 w-3/4 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
-              <div className="h-4 w-1/2 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
-              <div className="h-10 w-40 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
-              <div className="flex gap-6 mt-6">
-                <div className="h-8 w-16 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
-                <div className="h-8 w-16 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
-                <div className="h-8 w-16 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
-                <div className="h-8 w-16 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
-              </div>
-            </div>
+      <div className="min-h-screen bg-[var(--wk-bg)]">
+        <section className="relative min-h-[420px] md:min-h-[540px] overflow-hidden flex items-end">
+          <div className="absolute inset-0 bg-[var(--wk-surface-raised)] animate-pulse" />
+          <div className="relative wk-container px-4 pb-8 pt-20 md:px-6 md:pb-14 md:pt-28 w-full space-y-4">
+            <div className="h-8 w-32 rounded-full bg-[var(--wk-surface-strong)] animate-pulse" />
+            <div className="h-14 w-2/3 rounded-xl bg-[var(--wk-surface-strong)] animate-pulse" />
+            <div className="flex gap-3"><div className="h-9 w-36 rounded-full bg-[var(--wk-surface-strong)] animate-pulse" /><div className="h-9 w-24 rounded-full bg-[var(--wk-surface-strong)] animate-pulse" /></div>
           </div>
         </section>
-        <section className="relative z-10 -mt-20 px-4 md:px-6 lg:px-8">
-          <div className="mx-auto max-w-4xl rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-6 md:p-8">
-            <div className="grid grid-cols-2 gap-6 md:grid-cols-4">
-              {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="flex flex-col items-center">
-                  <div className="h-10 w-16 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
-                  <div className="mt-1 h-3 w-20 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
-                </div>
-              ))}
-            </div>
+        <section className="wk-container px-4 pt-12 md:px-6 md:pt-20">
+          <div className="flex gap-2 mb-6 overflow-hidden">
+            {[1,2,3,4].map((n) => <div key={n} className="h-9 w-32 rounded-full bg-[var(--wk-surface-raised)] animate-pulse shrink-0" />)}
           </div>
-        </section>
-        <section className="wk-container px-4 pt-16 md:px-6 md:pt-24">
-          <div className="mb-8 text-center">
-            <div className="h-3 w-24 mx-auto rounded bg-[var(--wk-surface-raised)] animate-pulse mb-2" />
-            <div className="h-8 w-48 mx-auto rounded bg-[var(--wk-surface-raised)] animate-pulse" />
-          </div>
-          <div className="flex flex-col gap-4 md:hidden">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-80 rounded-2xl bg-[var(--wk-surface-raised)] animate-pulse" />
+          <div className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4 space-y-2">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3 py-2"><div className="h-8 w-8 rounded-full bg-[var(--wk-surface-raised)] animate-pulse" /><div className="h-10 w-10 rounded-lg bg-[var(--wk-surface-raised)] animate-pulse" /><div className="flex-1 space-y-1.5"><div className="h-3.5 w-1/2 rounded bg-[var(--wk-surface-raised)] animate-pulse" /><div className="h-2.5 w-1/3 rounded bg-[var(--wk-surface-raised)] animate-pulse" /></div></div>
             ))}
           </div>
-          <div className="hidden md:flex items-end justify-center gap-5">
-            <div className="w-[300px] pb-4">
-              <div className="h-[420px] rounded-2xl bg-[var(--wk-surface-raised)] animate-pulse" />
-            </div>
-            <div className="w-[340px] pb-10">
-              <div className="h-[460px] rounded-2xl bg-[var(--wk-surface-raised)] animate-pulse" />
-            </div>
-            <div className="w-[300px]">
-              <div className="h-[380px] rounded-2xl bg-[var(--wk-surface-raised)] animate-pulse" />
-            </div>
-          </div>
-        </section>
-        <section className="wk-container px-4 pt-14 md:px-6 md:pt-20">
-          <div className="mb-6 flex items-end justify-between gap-4">
-            <div>
-              <div className="h-3 w-20 rounded bg-[var(--wk-surface-raised)] animate-pulse mb-2" />
-              <div className="h-8 w-40 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
-            </div>
-            <div className="h-5 w-24 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
-          </div>
-          <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_340px]">
-            <div className="space-y-3">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="flex items-center gap-3 px-4 py-3">
-                  <div className="h-8 w-8 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
-                  <div className="h-12 w-12 rounded-lg bg-[var(--wk-surface-raised)] animate-pulse" />
-                  <div className="flex-1 space-y-2">
-                    <div className="h-4 w-1/2 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
-                    <div className="h-3 w-1/3 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="space-y-3">
-              <div className="h-40 rounded-2xl bg-[var(--wk-surface-raised)] animate-pulse" />
-              <div className="h-40 rounded-2xl bg-[var(--wk-surface-raised)] animate-pulse" />
-            </div>
-          </div>
         </section>
       </div>
     );
   }
 
-  if (state.status === "error") {
+  // ── render: error ──
+  if (phase === "error") {
     return (
-      <div className="min-h-screen">
-        <section className="wk-container px-4 py-16 md:px-6 md:py-24">
-          <div className="max-w-2xl rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-8">
-            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--wk-danger-soft)] text-[var(--wk-danger)]">
-              <i className="ri-error-warning-line text-2xl" />
-            </div>
-            <div className="wk-eyebrow mb-3">WAKILISHA charts</div>
-            <h1 className="wk-h-page">Could not load chart data</h1>
-            <p className="mt-4 text-[15px] leading-relaxed text-[var(--wk-text-muted)]">
-              Something went wrong while fetching the chart directory. Please try again.
-            </p>
-            <div className="mt-6 flex items-center gap-3">
-              <button onClick={handleRetry} className="wk-button wk-button-primary">
-                <i className="ri-refresh-line" /> Retry
-              </button>
-              <button onClick={() => setShowErrorDetails(!showErrorDetails)} className="wk-button wk-button-ghost text-[13px]">
-                {showErrorDetails ? "Hide" : "Show"} details
-              </button>
-            </div>
-            {showErrorDetails && (
-              <div className="mt-4 rounded-xl bg-[var(--wk-bg)] p-4 font-mono text-[12px] text-[var(--wk-text-soft)] overflow-auto">
-                <div className="mb-2 font-bold text-[var(--wk-text)]">Diagnostics</div>
-                <div className="space-y-1">
-                  <div>Mode: {import.meta.env.VITE_CHARTS_PUBLIC_MODE ?? "mock"}</div>
-                  <div>Endpoint: GET /charts</div>
-                  <div>Error: {state.error}</div>
-                </div>
-                {state.diagnostics && <div className="mt-2 text-[var(--wk-text-faint)]">{state.diagnostics}</div>}
-              </div>
-            )}
+      <div className="min-h-screen bg-[var(--wk-bg)] flex items-center justify-center px-4 py-20">
+        <div className="max-w-sm w-full text-center">
+          <div className="mb-4 mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--wk-danger-soft)] text-[var(--wk-danger)]">
+            <i className="ri-error-warning-line text-2xl" />
           </div>
-        </section>
+          <h1 className="text-[20px] font-black text-[var(--wk-text)] mb-2">Charts unavailable</h1>
+          <p className="text-[14px] text-[var(--wk-text-muted)] mb-6">{errorMsg}</p>
+          <button onClick={retry} className="inline-flex items-center gap-2 rounded-full bg-[var(--wk-brand)] px-5 py-2.5 text-[13px] font-bold text-[var(--wk-brand-on)] transition-all hover:opacity-90">
+            <i className="ri-refresh-line" /> Try again
+          </button>
+        </div>
       </div>
     );
   }
 
-  if (state.status === "empty") {
+  // ── render: empty ──
+  if (phase === "empty") {
     return (
-      <div className="min-h-screen">
-        <section className="wk-container px-4 py-16 md:px-6 md:py-24">
-          <div className="max-w-2xl rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-8">
-            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]">
-              <i className="ri-bar-chart-box-line text-2xl" />
-            </div>
-            <div className="wk-eyebrow mb-3">WAKILISHA charts</div>
-            <h1 className="wk-h-page">No published chart edition found</h1>
-            <p className="mt-4 text-[15px] leading-relaxed text-[var(--wk-text-muted)]">
-              There are no published chart editions available at the moment. Check back soon.
-            </p>
-            <div className="mt-6">
-              <button onClick={handleRetry} className="wk-button wk-button-primary">
-                <i className="ri-refresh-line" /> Refresh
-              </button>
-            </div>
+      <div className="min-h-screen bg-[var(--wk-bg)] flex items-center justify-center px-4 py-20">
+        <div className="max-w-sm w-full text-center">
+          <div className="mb-4 mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]">
+            <i className="ri-bar-chart-box-line text-2xl" />
           </div>
-        </section>
+          <h1 className="text-[20px] font-black text-[var(--wk-text)] mb-2">No charts published yet</h1>
+          <p className="text-[14px] text-[var(--wk-text-muted)] mb-6">Check back soon — the African charts are being compiled.</p>
+          <button onClick={retry} className="inline-flex items-center gap-2 rounded-full bg-[var(--wk-brand)] px-5 py-2.5 text-[13px] font-bold text-[var(--wk-brand-on)] transition-all hover:opacity-90">
+            <i className="ri-refresh-line" /> Refresh
+          </button>
+        </div>
       </div>
     );
   }
 
-  const data = state.data;
-  const featured = data.featuredFamily;
-  const edition = data.featuredEdition;
-  const topTrack = data.topEntries[0] ?? null;
-  const top3 = data.topEntries.slice(0, 3);
-  const chartList = data.topEntries.slice(0, 10);
-  const newEntries = data.topEntries.filter((e) => e.movement === "new");
-  const climbers = data.topEntries
-    .filter((e) => e.movement === "up")
-    .sort((a, b) => (b.movementAmount ?? 0) - (a.movementAmount ?? 0));
-
-  const latestEditionHref = edition
-    ? `/charts/${featured?.slug ?? "weekly-top-40"}/${edition.slug}`
-    : `/charts/${featured?.slug ?? "weekly-top-40"}`;
-
-  const totalEditions = data.families.reduce((sum, s) => sum + (s.editionCount ?? 0), 0);
-
-  const metaLine = data.meta.isStale
-    ? `Loaded from cache (stale) · Last updated ${new Date(data.meta.fetchedAt).toLocaleString()}`
-    : data.meta.dataSource === "cache"
-    ? `Loaded from cache · Last updated ${new Date(data.meta.fetchedAt).toLocaleString()}`
-    : `Loaded from ${data.meta.dataSource === "mock" ? "mock data" : "WordPress API"} · ${new Date(data.meta.fetchedAt).toLocaleTimeString()}`;
+  // ── render: main ──
+  const totalEditions = families.reduce((sum, f) => sum + (f.editionCount ?? 0), 0);
+  const totalEntries = families.reduce((sum, f) => sum + (f.entryCount ?? 0), 0);
 
   return (
     <div className="min-h-screen bg-[var(--wk-bg)]">
-      {/* Cinematic Hero */}
-      <section className="relative min-h-[600px] md:min-h-[720px] overflow-hidden flex items-end">
-        {topTrack?.artworkUrl ? (
-          <div
-            className="absolute inset-0 bg-cover bg-center"
-            style={{ backgroundImage: `url(${topTrack.artworkUrl})`, filter: "blur(60px) saturate(1.3)", transform: "scale(1.15)" }}
-          />
-        ) : (
-          <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${HERO_IMAGE})` }} />
-        )}
-        <div className="absolute inset-0 bg-gradient-to-t from-[var(--wk-bg)] via-[var(--wk-bg)]/90 to-[var(--wk-bg)]/40" />
-        <div className="absolute inset-0 bg-gradient-to-r from-[var(--wk-bg)]/90 via-transparent to-[var(--wk-bg)]/90" />
-        <div className="absolute inset-0 bg-[var(--wk-brand)]/[0.04]" />
+      {/* ═══════════════════════════════════════════
+          HERO
+          ═══════════════════════════════════════════ */}
+      <section className="relative min-h-[480px] md:min-h-[620px] overflow-hidden flex items-end">
+        <div
+          className="absolute inset-0 bg-cover bg-center transition-transform duration-[var(--wk-d-slow)]"
+          style={heroStyle}
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-[var(--wk-bg)] via-[var(--wk-bg)]/80 to-[var(--wk-bg)]/20" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[var(--wk-bg)]/60 via-transparent to-[var(--wk-bg)]/60" />
 
-        <div className="relative wk-container px-4 pb-10 pt-20 md:px-6 md:pb-16 md:pt-28 w-full">
-          <div className="max-w-3xl">
-            <div className="mb-4 flex items-center gap-3">
-              <div className="wk-eyebrow">WAKILISHA charts</div>
-              <span className="inline-block h-1 w-1 rounded-full bg-[var(--wk-brand)]" />
-              <span className="text-[11px] font-bold uppercase tracking-[0.15em] text-[var(--wk-brand)]">Directory</span>
-            </div>
-
-            <h1 className="text-[clamp(52px,8vw,110px)] font-black leading-[0.88] tracking-[-0.06em] text-[var(--wk-text)]">
-              {featured?.publicLabel ?? featured?.label ?? "Chart Universe"}
-            </h1>
-
-            <div className="mt-4 flex flex-wrap items-center gap-3 text-[13px] text-[var(--wk-text-muted)]">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--wk-bg)]/80 backdrop-blur-sm px-3 py-1 text-[var(--wk-text)]">
-                <i className="ri-calendar-line text-[var(--wk-brand)]" />
-                {edition?.weekNumber ? `Week ${edition.weekNumber}` : ""} · {edition?.date ?? ""}
+        <div className="relative z-10 wk-container w-full px-4 pb-10 pt-20 md:px-6 md:pb-16 md:pt-28">
+          {/* Badge row */}
+          <div className="mb-4 flex flex-wrap items-center gap-3">
+            <span className="inline-flex items-center gap-2 rounded-full bg-[var(--wk-brand-soft)] border border-[var(--wk-brand)]/25 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.15em] text-[var(--wk-brand)]">
+              <i className="ri-bar-chart-line text-[12px]" />
+              WAKILISHA Charts
+            </span>
+            {activeEdition?.date && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)]/70 backdrop-blur-sm px-3 py-1.5 text-[11px] font-bold text-[var(--wk-text)]">
+                <i className="ri-calendar-line text-[var(--wk-brand)] text-[12px]" />
+                {activeEdition.date}
               </span>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--wk-bg)]/80 backdrop-blur-sm px-3 py-1 text-[var(--wk-text)]">
-                <i className="ri-bar-chart-box-line text-[var(--wk-brand)]" />
-                Top {featured?.entryCount ?? data.stats.entries}
-              </span>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--wk-bg)]/80 backdrop-blur-sm px-3 py-1 text-[var(--wk-text)]">
-                <i className="ri-global-line text-[var(--wk-brand)]" />
-                {featured?.marketLabel ?? "Global"}
-              </span>
-            </div>
-
-            <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-[var(--wk-text-soft)]">
-              {featured?.description ?? "The definitive index of African music charts."} Track what is rising, what has stayed, and what is breaking through.
-            </p>
-
-            <div className="mt-6 flex flex-wrap items-center gap-3">
-              <button onClick={handlePlayTop10} className="wk-button wk-button-primary">
-                <i className="ri-play-fill" /> Listen to top 10
-              </button>
-              <button className="wk-button wk-button-ghost">
-                <i className="ri-share-line" /> Share
-              </button>
-              <Link to={latestEditionHref} className="hidden md:inline-flex items-center gap-1 text-[13px] font-semibold text-[var(--wk-brand)] whitespace-nowrap">
-                View edition <i className="ri-arrow-right-line" />
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Floating Stats Strip */}
-      <section className="relative z-10 -mt-20 px-4 md:px-6 lg:px-8">
-        <div className="mx-auto max-w-4xl rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-6 md:p-8 shadow-lg">
-          <div className="grid grid-cols-2 gap-6 md:grid-cols-4">
-            <AnimatedCounter value={data.stats.entries} label="Chart Entries" />
-            <AnimatedCounter value={data.stats.series} label="Series" />
-            <AnimatedCounter value={totalEditions} label="Editions" />
-            <AnimatedCounter value={data.stats.newThisWeek} label="New This Week" />
-          </div>
-        </div>
-      </section>
-
-      {/* Top 3 Podium */}
-      {top3.length > 0 && (
-        <section className="wk-container px-4 pt-16 md:px-6 md:pt-24">
-          <div className="mb-8 text-center">
-            <div className="wk-eyebrow mb-2">This Week</div>
-            <h2 className="wk-h-section">Top 3 Positions</h2>
-          </div>
-
-          {/* Mobile */}
-          <div className="flex flex-col gap-4 md:hidden">
-            <PodiumCard entry={top3[0]} rank={1} color="gold" onPlay={() => handlePlay(0)} featured />
-            {top3[1] && <PodiumCard entry={top3[1]} rank={2} color="silver" onPlay={() => handlePlay(1)} />}
-            {top3[2] && <PodiumCard entry={top3[2]} rank={3} color="bronze" onPlay={() => handlePlay(2)} />}
-          </div>
-
-          {/* Desktop */}
-          <div className="hidden md:flex items-end justify-center gap-5">
-            {top3[1] && (
-              <div className="w-[300px] pb-4">
-                <PodiumCard entry={top3[1]} rank={2} color="silver" onPlay={() => handlePlay(1)} />
-              </div>
-            )}
-            <div className="w-[340px] pb-10">
-              <PodiumCard entry={top3[0]} rank={1} color="gold" onPlay={() => handlePlay(0)} featured />
-            </div>
-            {top3[2] && (
-              <div className="w-[300px]">
-                <PodiumCard entry={top3[2]} rank={3} color="bronze" onPlay={() => handlePlay(2)} />
-              </div>
             )}
           </div>
-        </section>
-      )}
 
-      {/* Chart List + Sidebar */}
-      <section className="wk-container px-4 pt-14 md:px-6 md:pt-20">
-        <div className="mb-6 flex items-end justify-between gap-4">
-          <div>
-            <div className="wk-eyebrow mb-2">Full Chart</div>
-            <h2 className="wk-h-section">Top Positions</h2>
-            <p className="mt-1 text-[14px] text-[var(--wk-text-muted)]">
-              {edition?.weekNumber ? `Week ${edition.weekNumber} · ` : ""}{edition?.date ?? ""} · Top {featured?.entryCount ?? data.stats.entries}
-            </p>
+          {/* Title */}
+          <h1 className="max-w-[780px] text-[clamp(36px,6.5vw,80px)] font-black leading-[0.90] tracking-[-0.055em] text-[var(--wk-text)]">
+            {activeFamily?.publicLabel ?? activeFamily?.label ?? "African Charts"}
+          </h1>
+
+          {/* Description */}
+          <p className="mt-4 max-w-[540px] text-[14px] leading-relaxed text-[var(--wk-text-soft)] md:text-[15px]">
+            {activeFamily?.description || "The definitive index of African music — tracking what is rising, what has stayed, and what is breaking through across the continent."}
+          </p>
+
+          {/* Meta pills */}
+          <div className="mt-5 flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)]/70 backdrop-blur-sm px-3 py-1.5 text-[11px] text-[var(--wk-text)]">
+              <i className="ri-music-2-line text-[var(--wk-brand)] text-[12px]" />
+              Top {entryCount}
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)]/70 backdrop-blur-sm px-3 py-1.5 text-[11px] text-[var(--wk-text)]">
+              <i className="ri-global-line text-[var(--wk-brand)] text-[12px]" />
+              {activeFamily?.marketLabel ?? "Africa"}
+            </span>
+            {newEntries.length > 0 && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)]/70 backdrop-blur-sm px-3 py-1.5 text-[11px] text-[var(--wk-text)]">
+                <span className="font-black text-[var(--wk-brand)]">{newEntries.length}</span> new this week
+              </span>
+            )}
           </div>
-          <Link to={latestEditionHref} className="hidden md:inline-flex items-center gap-1 text-[13px] font-semibold text-[var(--wk-brand)] whitespace-nowrap">
-            View full chart <i className="ri-arrow-right-line" />
-          </Link>
-        </div>
 
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_340px]">
-          <div className="overflow-hidden rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)]">
-            <div className="grid grid-cols-[48px_56px_1fr_80px_40px] items-center gap-3 px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-[var(--wk-text-faint)] border-b border-[var(--wk-divider)]">
-              <div className="text-center">#</div>
-              <div></div>
-              <div>Track</div>
-              <div className="hidden md:block text-right">Stats</div>
-              <div></div>
-            </div>
-            <div className="divide-y divide-[var(--wk-divider)]">
-              {chartList.map((entry, idx) => (
-                <ChartRow key={entry.rank} entry={entry} onPlay={() => handlePlay(idx)} />
-              ))}
-            </div>
-            <div className="border-t border-[var(--wk-divider)] px-4 py-3">
-              <Link to={latestEditionHref} className="inline-flex items-center gap-1 text-[13px] font-semibold text-[var(--wk-brand)]">
-                View all {featured?.entryCount ?? data.stats.entries} positions <i className="ri-arrow-right-line" />
+          {/* CTAs */}
+          <div className="mt-6 flex flex-wrap items-center gap-3">
+            <button
+              onClick={handlePlayTop10}
+              disabled={playerTop10.length === 0}
+              className="inline-flex items-center gap-2 rounded-full bg-[var(--wk-brand)] px-5 py-2.5 text-[13px] font-bold text-[var(--wk-brand-on)] transition-all hover:opacity-90 disabled:opacity-40 whitespace-nowrap"
+            >
+              <i className="ri-play-fill" /> Listen to top 10
+            </button>
+            {activeEdition && (
+              <Link
+                to={`/charts/${activeSlug}/${activeEdition.slug}`}
+                className="inline-flex items-center gap-2 rounded-full border border-[var(--wk-border-2)] px-5 py-2.5 text-[13px] font-bold text-[var(--wk-text)] transition-all hover:bg-[var(--wk-surface)] whitespace-nowrap"
+              >
+                <i className="ri-arrow-right-line" /> Edition details
               </Link>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-5">
-            <SignalStrip title="New entries" entries={newEntries} badge="New" />
-            <SignalStrip title="Biggest climbers" entries={climbers} badge="Climber" />
+            )}
           </div>
         </div>
       </section>
 
-      {/* Chart Family Grid */}
-      <section className="border-t border-[var(--wk-border)] bg-[var(--wk-surface)] mt-10">
-        <div className="wk-container px-4 py-10 md:px-6 md:py-14">
-          <div className="mb-8 flex items-end justify-between gap-4">
-            <div>
-              <div className="wk-eyebrow mb-2">Chart families</div>
-              <h2 className="wk-h-section">Browse by chart</h2>
-            </div>
-            <span className="text-[13px] text-[var(--wk-text-muted)]">{data.families.length} active</span>
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {data.families.map((series) => {
-              const href = series.latestEditionSlug
-                ? `/charts/${series.slug}/${series.latestEditionSlug}`
-                : `/charts/${series.slug}`;
+      {/* ═══════════════════════════════════════════
+          CHART FAMILY TABS
+          ═══════════════════════════════════════════ */}
+      <section className="sticky top-0 z-30 border-b border-[var(--wk-border)] bg-[var(--wk-bg)]/95 backdrop-blur-md">
+        <div className="wk-container px-4 md:px-6">
+          <div className="flex gap-1 overflow-x-auto py-2 scrollbar-hide -mx-1 px-1">
+            {families.map((family) => {
+              const isActive = family.slug === activeSlug;
+              const data = cache[family.slug];
+              const count = data?.edition?.totalEntries ?? family.entryCount;
               return (
-                <Link
-                  key={series.id}
-                  to={href}
-                  className="group flex flex-col rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-bg)] p-5 transition-all duration-300 hover:border-[var(--wk-border-2)] hover:bg-[var(--wk-surface)] hover:-translate-y-1 hover:shadow-lg"
+                <button
+                  key={family.slug}
+                  onClick={() => handleTabClick(family.slug)}
+                  className={`flex shrink-0 items-center gap-2 rounded-full px-3.5 py-2 text-[12px] font-bold transition-all duration-[var(--wk-d-fast)] whitespace-nowrap ${
+                    isActive
+                      ? "bg-[var(--wk-brand)] text-[var(--wk-brand-on)]"
+                      : "text-[var(--wk-text-muted)] hover:text-[var(--wk-text)] hover:bg-[var(--wk-surface-raised)]"
+                  }`}
                 >
-                  <div className="mb-4 flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl transition-colors" style={{ backgroundColor: `${series.accentColor}15` }}>
-                        <i className={`${series.icon} text-xl`} style={{ color: series.accentColor }} />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="text-[16px] font-bold text-[var(--wk-text)]">{series.publicLabel}</div>
-                        {series.shortLabel && series.shortLabel !== series.publicLabel && (
-                          <div className="text-[11px] text-[var(--wk-text-faint)]">{series.shortLabel}</div>
-                        )}
-                      </div>
-                    </div>
-                    <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[var(--wk-brand)] bg-[var(--wk-brand-soft)]">Active</span>
-                  </div>
-
-                  <div className="mb-3 flex flex-wrap items-center gap-2">
-                    <span className="text-[11px] text-[var(--wk-text-muted)]">
-                      <span className="font-semibold text-[var(--wk-text)]">Series:</span> {series.seriesLabel}
-                    </span>
-                    <span className="text-[var(--wk-text-faint)]">·</span>
-                    <span className="text-[11px] text-[var(--wk-text-muted)]">
-                      <span className="font-semibold text-[var(--wk-text)]">Market:</span> {series.marketLabel}
-                    </span>
-                    <span className="text-[var(--wk-text-faint)]">·</span>
-                    <span className="text-[11px] text-[var(--wk-text-muted)]">
-                      <span className="font-semibold text-[var(--wk-text)]">Mode:</span> {series.chartMode === "data" ? "Data" : series.chartMode === "editorial" ? "Editorial" : "Hybrid"}
-                    </span>
-                  </div>
-
-                  <div className="mb-4 flex items-center gap-3 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-3">
-                    <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-[var(--wk-surface-raised)]">
-                      {topTrack?.artworkUrl ? (
-                        <img src={topTrack.artworkUrl} alt="" className="h-full w-full object-cover" />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center text-[var(--wk-text-faint)]">
-                          <i className="ri-music-2-line" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="text-[12px] font-bold text-[var(--wk-text)]">Latest #1</div>
-                      <div className="truncate text-[11px] text-[var(--wk-text-muted)]">{topTrack?.title ?? "No data"}</div>
-                    </div>
-                  </div>
-
-                  <div className="mt-auto flex items-center justify-between gap-3 border-t border-[var(--wk-divider)] pt-4">
-                    <div className="flex items-center gap-3 text-[12px] text-[var(--wk-text-muted)]">
-                      <span className="font-bold text-[var(--wk-text)]">Top {series.entryCount}</span>
-                      <span className="text-[var(--wk-text-faint)]">·</span>
-                      <span><span className="font-bold text-[var(--wk-text)]">{series.editionCount}</span> editions</span>
-                      {series.latestEditionDate && (
-                        <>
-                          <span className="text-[var(--wk-text-faint)]">·</span>
-                          <span>{series.latestEditionDate}</span>
-                        </>
-                      )}
-                    </div>
-                    <i className="ri-arrow-right-line text-[var(--wk-text-faint)] transition-colors group-hover:text-[var(--wk-brand)]" />
-                  </div>
-                </Link>
+                  <i className={`${family.icon} text-[13px]`} />
+                  <span className="hidden sm:inline">{family.shortLabel ?? family.publicLabel}</span>
+                  <span className="sm:hidden">{family.shortLabel ?? family.publicLabel?.split(" ")[0] ?? family.slug}</span>
+                  <span className={`text-[10px] tabular-nums ${isActive ? "opacity-70" : "opacity-40"}`}>
+                    {count}
+                  </span>
+                </button>
               );
             })}
           </div>
         </div>
       </section>
 
-      {/* Recent Editions */}
-      <section className="wk-container px-4 py-10 md:px-6 md:py-14">
-        <div className="mb-6 flex items-end justify-between gap-4">
+      {/* ═══════════════════════════════════════════
+          WAYS INTO THE CHARTS
+          ═══════════════════════════════════════════ */}
+      {activeEntries.length > 0 && (
+        <ChartHighlights
+          entries={activeEntries}
+          onJumpTo={handleJumpTo}
+        />
+      )}
+
+      {/* ═══════════════════════════════════════════
+          LEADERBOARD + SIDEBAR
+          ═══════════════════════════════════════════ */}
+      <section className="wk-container px-4 py-8 md:px-6 md:py-12">
+        <div className="mb-5 flex items-end justify-between gap-4">
           <div>
-            <div className="wk-eyebrow mb-2">Archive</div>
-            <h2 className="wk-h-section">Recent editions</h2>
+            <div className="wk-eyebrow mb-2">This Week</div>
+            <h2 className="wk-h-section">Top {previewCount}</h2>
+            <p className="mt-1 text-[13px] text-[var(--wk-text-muted)]">
+              {activeEdition?.date ?? ""} · Showing {previewCount} of {entryCount} positions
+            </p>
+          </div>
+          <div className="hidden md:flex items-center gap-2 text-[12px] text-[var(--wk-text-faint)]">
+            <span className="inline-flex items-center gap-1"><i className="ri-arrow-up-line text-[var(--wk-success)]" /> Up</span>
+            <span className="inline-flex items-center gap-1"><i className="ri-arrow-down-line text-[var(--wk-danger)]" /> Down</span>
+            <span className="inline-flex items-center gap-1"><i className="ri-star-smile-line text-[var(--wk-brand)]" /> New</span>
+            <span className="inline-flex items-center gap-1"><i className="ri-refresh-line text-[var(--wk-info)]" /> Re</span>
           </div>
         </div>
-        <div className="overflow-hidden rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)]">
-          <div className="hidden grid-cols-[1.5fr_1.5fr_1fr_1fr] gap-3 px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-[var(--wk-text-faint)] border-b border-[var(--wk-divider)] md:grid">
-            <div>Chart</div>
-            <div>Edition</div>
-            <div className="text-right">Entries</div>
-            <div className="text-right">Date</div>
-          </div>
-          <div className="divide-y divide-[var(--wk-divider)]">
-            {data.families
-              .filter((f) => f.latestEditionSlug)
-              .map((row) => (
-                <Link
-                  key={`${row.id}-${row.latestEditionSlug}`}
-                  to={`/charts/${row.slug}/${row.latestEditionSlug}`}
-                  className="grid grid-cols-1 items-center gap-2 px-5 py-3 transition-colors hover:bg-[var(--wk-bg)] md:grid-cols-[1.5fr_1.5fr_1fr_1fr] md:gap-3"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 shrink-0 overflow-hidden rounded-md bg-[var(--wk-surface-raised)]">
-                      {topTrack?.artworkUrl ? (
-                        <img src={topTrack.artworkUrl} alt="" className="h-full w-full object-cover" />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center text-[var(--wk-text-faint)]">
-                          <i className="ri-bar-chart-line text-sm" />
+
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_320px]">
+          {/* Leaderboard card */}
+          <div className="overflow-hidden rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)]">
+            {/* Column headers (desktop) */}
+            <div className="hidden md:flex items-center gap-3.5 px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--wk-text-faint)] border-b border-[var(--wk-divider)]">
+              <div className="w-10 text-center">#</div>
+              <div className="w-12" />
+              <div className="flex-1">Track</div>
+              <div className="w-16 text-right">Move</div>
+              <div className="w-16 text-right">Stats</div>
+              <div className="w-9" />
+            </div>
+
+            {/* Loading state for tab switch */}
+            {switching && activeEntries.length === 0 ? (
+              <div className="space-y-0 divide-y divide-[var(--wk-divider)]">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="flex items-center gap-3 px-4 py-3 animate-pulse">
+                    <div className="h-8 w-8 rounded-full bg-[var(--wk-surface-raised)]" />
+                    <div className="h-10 w-10 rounded-lg bg-[var(--wk-surface-raised)]" />
+                    <div className="flex-1 space-y-1.5"><div className="h-3.5 w-1/2 rounded bg-[var(--wk-surface-raised)]" /><div className="h-2.5 w-1/3 rounded bg-[var(--wk-surface-raised)]" /></div>
+                  </div>
+                ))}
+              </div>
+            ) : previewEntries.length > 0 ? (
+              <div>
+                <div className="divide-y divide-[var(--wk-divider)]">
+                  {previewEntries.map((entry, idx) => (
+                    <LeaderboardRow
+                      key={`${activeSlug}-${entry.rank}`}
+                      entry={entry}
+                      onPlay={() => handlePlayEntry(idx)}
+                      rowId={`entry-${entry.slug}`}
+                      isHighlighted={highlightedSlug === entry.slug}
+                    />
+                  ))}
+                </div>
+
+                {/* ── Teaser gate ── */}
+                {hiddenCount > 0 && activeEdition && (
+                  <div className="relative">
+                    {/* Blurred ghost rows */}
+                    <div className="pointer-events-none select-none opacity-30 blur-[2px]">
+                      {activeEntries.slice(previewCount, previewCount + 3).map((entry) => (
+                        <div key={`ghost-${entry.slug}`} className="flex items-center gap-3.5 border-t border-[var(--wk-divider)] px-4 py-3">
+                          <div className="flex w-10 items-center justify-center">
+                            <span className="text-[14px] font-bold text-[var(--wk-text-muted)] tabular-nums">{entry.rank}</span>
+                          </div>
+                          <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-[var(--wk-surface-raised)]">
+                            {entry.artworkUrl && <img src={entry.artworkUrl} alt="" className="h-full w-full object-cover object-top" />}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-[14px] font-bold text-[var(--wk-text)]">{entry.title}</div>
+                            <div className="truncate text-[12px] text-[var(--wk-text-muted)]">{entry.artist}</div>
+                          </div>
                         </div>
-                      )}
+                      ))}
                     </div>
-                    <div>
-                      <div className="text-[13px] font-bold text-[var(--wk-text)]">{row.publicLabel}</div>
-                      <div className="text-[11px] text-[var(--wk-text-muted)] md:hidden">{row.latestEditionLabel}</div>
+
+                    {/* Gradient fade + CTA */}
+                    <div className="absolute inset-x-0 bottom-0 flex flex-col items-center justify-end pb-6 pt-16"
+                      style={{ background: "linear-gradient(to bottom, transparent, var(--wk-surface) 55%)" }}
+                    >
+                      <p className="mb-3 text-[13px] font-semibold text-[var(--wk-text-muted)]">
+                        +{hiddenCount} more tracks in this edition
+                      </p>
+                      <Link
+                        to={`/charts/${activeSlug}/${activeEdition.slug}`}
+                        className="inline-flex items-center gap-2 rounded-full bg-[var(--wk-brand)] px-6 py-2.5 text-[13px] font-bold text-[var(--wk-brand-on)] transition-all hover:opacity-90 whitespace-nowrap"
+                      >
+                        See the full chart
+                        <i className="ri-arrow-right-line text-[13px]" />
+                      </Link>
                     </div>
                   </div>
-                  <div className="hidden text-[13px] text-[var(--wk-text)] md:block">{row.latestEditionLabel}</div>
-                  <div className="text-[12px] font-bold text-[var(--wk-text-muted)] md:text-right">Top {row.entryCount}</div>
-                  <div className="text-[12px] text-[var(--wk-text-muted)] md:text-right">{row.latestEditionDate}</div>
-                </Link>
-              ))}
-            {data.families.filter((f) => f.latestEditionSlug).length === 0 && (
-              <div className="px-5 py-6 text-[13px] text-[var(--wk-text-muted)]">No recent editions available.</div>
+                )}
+              </div>
+            ) : (
+              <div className="px-4 py-12 text-center">
+                <p className="text-[14px] text-[var(--wk-text-muted)]">No entries available for this chart yet.</p>
+              </div>
             )}
+          </div>
+
+          {/* Sidebar */}
+          <div className="flex flex-col gap-4">
+            {/* Quick stats */}
+            <div className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4">
+              <div className="text-[11px] font-bold uppercase tracking-wider text-[var(--wk-text-faint)] mb-3">
+                Chart stats
+              </div>
+              <div className="grid grid-cols-2 gap-2.5">
+                <StatTile value={entryCount} label="Positions" />
+                <StatTile value={families.length} label="Series" />
+                <StatTile value={totalEditions} label="Editions" />
+                <StatTile value={newEntries.length} label="New" />
+              </div>
+            </div>
+
+            {/* New entries */}
+            <SidebarCard
+              title="New entries"
+              entries={newEntries}
+              badge="New"
+              emptyLabel="No debuts this week"
+            />
+
+            {/* Biggest climbers */}
+            <SidebarCard
+              title="Biggest climbers"
+              entries={climbers}
+              badge="↑"
+              emptyLabel="No climbers this week"
+            />
           </div>
         </div>
       </section>
 
-      {/* Methodology */}
-      <section className="border-t border-[var(--wk-border)] bg-[var(--wk-surface)]">
-        <div className="wk-container px-4 py-10 md:px-6 md:py-14">
-          <div className="mb-6">
-            <div className="wk-eyebrow mb-2">Trust</div>
-            <h2 className="wk-h-section">How the charts are compiled</h2>
-          </div>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {[
-              { icon: "ri-database-2-line", title: "Verified data", desc: "Streaming data from Spotify, Apple Music, YouTube, and Boomplay." },
-              { icon: "ri-radio-line", title: "Radio airplay", desc: "Monitored across 12 African countries and major FM networks." },
-              { icon: "ri-line-chart-line", title: "Digital activity", desc: "Social engagement, playlist adds, and search volume combined." },
-              { icon: "ri-shield-check-line", title: "Verified tracks", desc: "All tracks verified against ISRC and graph relationship data." },
-            ].map((item) => (
-              <div key={item.title} className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-bg)] p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
-                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]">
-                  <i className={`${item.icon} text-lg`} />
-                </div>
-                <div className="text-[15px] font-bold text-[var(--wk-text)] mb-1">{item.title}</div>
-                <div className="text-[13px] leading-[1.6] text-[var(--wk-text-muted)]">{item.desc}</div>
+      {/* ═══════════════════════════════════════════
+          METHODOLOGY
+          ═══════════════════════════════════════════ */}
+      <section className="wk-container px-4 py-6 md:px-6 md:py-12">
+        <div className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-5 md:p-6">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-start gap-4">
+              <div className="hidden md:flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]">
+                <i className="ri-shield-check-line text-lg" />
               </div>
-            ))}
-          </div>
-          <div className="mt-6 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-bg)] p-5">
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div>
-                <div className="text-[13px] font-bold text-[var(--wk-text)] mb-1">Methodology</div>
-                <div className="text-[13px] text-[var(--wk-text-muted)]">
-                  {edition?.methodology ?? "Combined streaming data from Spotify, Apple Music, YouTube, and Boomplay. Radio airplay monitored across 12 African countries."}
+                <div className="text-[13px] font-bold text-[var(--wk-text)] mb-1">How the charts work</div>
+                <div className="text-[12px] leading-relaxed text-[var(--wk-text-muted)] max-w-[640px]">
+                  Combined streaming data from Spotify, Apple Music, YouTube, and Boomplay. Radio airplay monitored across 12 African countries. All tracks verified against ISRC and graph relationship data.
                 </div>
               </div>
-              <div className="flex items-center gap-4 text-[12px] text-[var(--wk-text-muted)] shrink-0">
-                <span><span className="font-bold text-[var(--wk-text)]">{totalEditions}</span> editions</span>
-                <span className="text-[var(--wk-text-faint)]">·</span>
-                <span><span className="font-bold text-[var(--wk-text)]">{data.stats.entries}</span> entries tracked</span>
-              </div>
+            </div>
+            <div className="flex items-center gap-4 text-[11px] text-[var(--wk-text-faint)] shrink-0">
+              <span><span className="font-bold text-[var(--wk-text)] tabular-nums">{totalEditions}</span> editions</span>
+              <span>·</span>
+              <span><span className="font-bold text-[var(--wk-text)] tabular-nums">{totalEntries}</span> entries tracked</span>
+              <span>·</span>
+              <ChartRefreshButton onRefresh={retry} size="sm" />
             </div>
           </div>
         </div>
       </section>
 
-      {/* Footer Metadata */}
+      {/* ═══════════════════════════════════════════
+          FOOTER META
+          ═══════════════════════════════════════════ */}
       <div className="border-t border-[var(--wk-border)] bg-[var(--wk-bg)]">
-        <div className="wk-container px-4 py-3 md:px-6 flex items-center justify-between gap-3">
-          <div className="text-[11px] text-[var(--wk-text-faint)]">{metaLine}</div>
-          <ChartRefreshButton onRefresh={load} size="sm" />
+        <div className="wk-container px-4 py-3 md:px-6 text-center">
+          <span className="text-[11px] text-[var(--wk-text-faint)]">{metaLine}</span>
         </div>
       </div>
     </div>

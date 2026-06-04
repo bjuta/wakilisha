@@ -135,6 +135,86 @@ function asMovement(value: unknown): ChartEditionEntry["movement"] {
   return value === "up" || value === "down" || value === "same" || value === "new" || value === "re_entry" ? value : "same";
 }
 
+// ─── Movement Enrichment ────────────────────────────────────────────
+// Computes real movement data by comparing current entries against the
+// chronologically prior edition. This runs inside getChartEditionEntries
+// so every surface (edition page, directory, home, mobile, artist detail,
+// search, track detail, shared components) gets correct movement automatically.
+
+async function enrichMovementFromPriorEdition(
+  entries: ChartEditionEntry[],
+  programId: string,
+  currentEditionSlug: string
+): Promise<ChartEditionEntry[]> {
+  if (entries.length === 0) return entries;
+
+  try {
+    // Get all published editions for this program, ordered by date desc
+    const { data: allEditions } = await supabase
+      .from("chart_editions")
+      .select("id, edition_slug, edition_date")
+      .eq("program_id", programId)
+      .eq("status", "published")
+      .order("edition_date", { ascending: false });
+
+    if (!allEditions || allEditions.length < 2) return entries;
+
+    // Find the chronologically prior edition (the one with an earlier date)
+    const currentIdx = allEditions.findIndex(
+      (e) => e.edition_slug === currentEditionSlug
+    );
+    if (currentIdx < 0 || currentIdx >= allEditions.length - 1) return entries;
+
+    const priorEdition = allEditions[currentIdx + 1];
+
+    // Get prior edition's track ranks
+    const { data: priorEntries } = await supabase
+      .from("chart_entries")
+      .select("rank, track_slug")
+      .eq("edition_id", priorEdition.id)
+      .order("rank", { ascending: true });
+
+    if (!priorEntries || priorEntries.length === 0) return entries;
+
+    // Build rank lookup by track slug
+    const priorRankMap = new Map<string, number>();
+    for (const pe of priorEntries) {
+      if (pe.track_slug) priorRankMap.set(pe.track_slug, pe.rank);
+    }
+
+    // Compute movement for each entry
+    return entries.map((entry) => {
+      const prevRank = priorRankMap.get(entry.trackSlug) ?? null;
+      let movement: ChartEditionEntry["movement"];
+      let movementAmount: number | undefined;
+
+      if (prevRank === null) {
+        movement = "new";
+        movementAmount = 0;
+      } else if (prevRank > entry.rank) {
+        movement = "up";
+        movementAmount = prevRank - entry.rank;
+      } else if (prevRank < entry.rank) {
+        movement = "down";
+        movementAmount = entry.rank - prevRank;
+      } else {
+        movement = "same";
+        movementAmount = 0;
+      }
+
+      return {
+        ...entry,
+        previousRank: prevRank,
+        movement,
+        movementAmount,
+      };
+    });
+  } catch {
+    // Silently fall back to raw entries if enrichment fails
+    return entries;
+  }
+}
+
 function resolveSeriesLabel(slug: string | null | undefined): string {
   if (!slug) return "Series";
   switch (slug) {
@@ -430,7 +510,9 @@ export function getChartEditionEntries(familySlug: string, editionSlug: string):
         .order("rank", { ascending: true });
 
       if (entError) throw new PublicChartsApiError(entError.message, 500, "supabase_error");
-      return { data: (entries ?? []).map((e) => dbEntryToChartEditionEntry(e, editionSlug)), source: "api" };
+      const mappedEntries = (entries ?? []).map((e) => dbEntryToChartEditionEntry(e, editionSlug));
+      const enriched = await enrichMovementFromPriorEdition(mappedEntries, program.id, editionSlug);
+      return { data: enriched, source: "api" };
     } catch {
       return { data: await fallbackEntries(familySlug, editionSlug), source: "local" };
     }

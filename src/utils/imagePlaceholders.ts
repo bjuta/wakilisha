@@ -1,4 +1,6 @@
 export function withPlaceholderImage(url?: string | null, _identity?: unknown): string {
-  const value = String(url ?? "").trim();
-  return value.length > 0 ? value : "";
+  if (url == null) return "";
+  const value = String(url).trim();
+  if (value.length === 0 || value === "null" || value === "undefined") return "";
+  return value;
 }

@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 
 export interface ArtistCardProps {
   slug: string;
@@ -36,24 +37,12 @@ export function ArtistCard({
             className="h-full w-full object-cover object-top transition-transform duration-[var(--wk-d-standard)] group-hover:scale-105"
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center">
-            <i className="ri-user-3-line text-4xl text-[var(--wk-text-faint)]" />
-          </div>
+          <Ch19GradientImage slug={slug} name={name} />
         )}
       </div>
 
       {/* Dark gradient overlay for text */}
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
-
-      {/* Chart badge */}
-      {isChartArtist && (
-        <div className="absolute right-3 top-3">
-          <span className="inline-flex items-center gap-1 rounded-full bg-[var(--wk-brand)] px-2.5 py-1 text-[10px] font-bold text-[var(--wk-brand-on)] uppercase tracking-wider">
-            <i className="ri-bar-chart-line text-[9px]" />
-            Charts
-          </span>
-        </div>
-      )}
 
       {/* Text overlay at bottom */}
       <div className="absolute bottom-0 left-0 right-0 p-4">

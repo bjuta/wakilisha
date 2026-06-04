@@ -2,14 +2,21 @@ import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { usePlayer } from "@/context/PlayerContext";
 import { WkIcon } from "@/components/design-system/Icon";
-import { slugify } from "@/services/repairedContent/client";
+import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 import {
   HOME_CHART_ENTRIES,
-  HOME_FEATURED_ARTISTS,
   HOME_EDITORIAL_STORIES,
-  HOME_RECENT_RELEASES,
-  HOME_TRENDING_TRACKS,
 } from "@/mocks/home";
+
+const PILLARS = [
+  { key: "music", label: "Music", icon: "Music2", colorVar: "--wk-v-music", href: "/charts", status: "active" as const, desc: "Charts, artists, tracks, releases — the complete index." },
+  { key: "guides", label: "Guides", icon: "Compass", colorVar: "--wk-v-intel", href: "/guides", status: "new" as const, desc: "Where to go, what to experience, who to know." },
+  { key: "film", label: "Film", icon: "Film", colorVar: "--wk-v-film", href: "/film", status: "coming" as const, desc: "Filmmakers, cinema, festival coverage, documentary." },
+  { key: "fashion", label: "Fashion", icon: "Shirt", colorVar: "--wk-v-fashion", href: "/fashion", status: "coming" as const, desc: "Designers, textiles, street style, beauty." },
+  { key: "food", label: "Food", icon: "Utensils", colorVar: "--wk-v-food", href: "/food", status: "coming" as const, desc: "Chefs, street food, culinary routes, food histories." },
+  { key: "language", label: "Language", icon: "Languages", colorVar: "--wk-v-language", href: "/language", status: "coming" as const, desc: "Indigenous archives, oral histories, vernacular." },
+  { key: "places", label: "Places", icon: "MapPin", colorVar: "--wk-v-places", href: "/places", status: "coming" as const, desc: "Venues, cities, festivals, cultural routes." },
+];
 
 const trackPayload = (track: {
   slug?: string;
@@ -30,7 +37,6 @@ const trackPayload = (track: {
 const MovementIcon = ({ movement }: { movement?: string }) => {
   if (movement === "up") return <WkIcon name="ArrowUp" size={13} className="text-[var(--wk-success)]" />;
   if (movement === "down") return <WkIcon name="ArrowDown" size={13} className="text-[var(--wk-danger)]" />;
-  if (movement === "same") return <WkIcon name="Minus" size={13} className="text-[var(--wk-text-faint)]" />;
   if (movement === "new") return <WkIcon name="Star" size={13} className="text-[var(--wk-brand)]" />;
   return null;
 };
@@ -51,89 +57,158 @@ export default function MobileHome() {
 
   return (
     <div className="wk-mobile-v5">
+      {/* ════════════════════════════════════════
+          HERO — Immersive, layered, breathing
+      ════════════════════════════════════════ */}
       <section ref={heroRef} className="relative h-[100dvh] flex items-end overflow-hidden">
         <div
-          className="absolute inset-0 animate-hero-img"
+          className="absolute inset-0 will-change-transform"
           style={{
-            transform: `translateY(${scrollY * 0.12}px) scale(${1 + scrollY * 0.0002})`,
+            transform: `translateY(${scrollY * 0.06}px) scale(${1 + scrollY * 0.0001})`,
           }}
         >
           <img
-            src="https://readdy.ai/api/search-image?query=Dynamic%20cinematic%20close-up%20of%20a%20vinyl%20record%20spinning%20on%20a%20turntable%20with%20dramatic%20warm%20golden%20and%20green%20neon%20lighting%20streaks%2C%20dark%20moody%20African%20music%20studio%20atmosphere%2C%20professional%20editorial%20photography%2C%20abstract%20bokeh%20light%20particles%2C%20high%20contrast%20between%20vibrant%20colors%20and%20deep%20black%20background%2C%20premium%20music%20culture%20aesthetic%2C%20no%20text%2C%20sharp%20focus%2C%20ultra%20detailed&width=1600&height=900&seq=hero-home-cinematic-v2&orientation=landscape"
-            alt="African music culture"
+            src="https://readdy.ai/api/search-image?query=Warm%20rich%20textured%20abstract%20composition%20evoking%20African%20cultural%20heritage%20with%20layered%20woven%20textile%20patterns%20flowing%20musical%20rhythm%20lines%20and%20organic%20handcrafted%20surfaces%2C%20amber%20ochre%20terracotta%20and%20deep%20olive%20green%20tones%2C%20golden%20light%20filtering%20through%20like%20gallery%20illumination%2C%20museum%20archival%20quality%20with%20contemporary%20artistic%20sensibility%2C%20subtle%20geometric%20motifs%20inspired%20by%20traditional%20African%20craft%20dissolving%20into%20abstract%20expression%2C%20atmospheric%20depth%20with%20soft%20painterly%20edges%2C%20warm%20emotional%20resonance%20no%20cold%20corporate%20aesthetic%2C%20editorial%20art%20direction%20with%20soul%20and%20texture&width=800&height=1000&seq=hero-wakilisha-art-v3&orientation=portrait"
+            alt=""
             className="h-full w-full object-cover"
           />
         </div>
-        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-black/10" />
 
-        <div className="relative z-10 w-full px-6 pb-20">
-          <div className="mb-4 flex items-center gap-3 animate-hero-fade" style={{ animationDelay: "0.3s" }}>
-            <div className="h-1.5 w-1.5 rounded-full bg-[var(--wk-brand)] animate-pulse" />
-            <span className="text-[11px] font-bold text-[var(--wk-brand)] uppercase tracking-wider">
-              Week 132 — May 2026
-            </span>
+        <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/55 to-black/20" />
+
+        {/* Floating particles */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden="true">
+          {[...Array(12)].map((_, i) => {
+            const shapes = ["◆", "○", "◈"];
+            const shape = shapes[i % 3];
+            const left = 8 + (i * 7) % 84;
+            const delay = (i * 0.8) % 6;
+            const size = 5 + (i % 2) * 3;
+            return (
+              <span
+                key={i}
+                className="absolute text-[var(--wk-brand)]/12 animate-float-slow"
+                style={{
+                  left: `${left}%`,
+                  top: `${15 + (i * 15) % 55}%`,
+                  fontSize: `${size}px`,
+                  animationDelay: `${delay}s`,
+                  animationDuration: `${7 + (i % 3) * 2}s`,
+                }}
+              >
+                {shape}
+              </span>
+            );
+          })}
+        </div>
+
+        <div className="relative z-10 w-full px-5 pb-24">
+          {/* Five verbs */}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mb-5 animate-hero-fade" style={{ animationDelay: "0.15s" }}>
+            {["Discovered", "Documented", "Funded", "Valued", "Sustained"].map((verb) => (
+              <span key={verb} className="text-[10px] font-semibold text-white/45 uppercase tracking-[0.18em]">
+                {verb}
+              </span>
+            ))}
           </div>
 
           <h1
-            className="font-black leading-[0.92] tracking-[-0.05em] text-white animate-hero-fade"
-            style={{ fontSize: "clamp(32px, 10vw, 52px)" }}
+            className="font-black leading-[0.90] tracking-[-0.05em] text-white animate-hero-fade"
+            style={{ fontSize: "clamp(32px, 10vw, 52px)", animationDelay: "0.3s" }}
           >
-            The definitive voice in African music.
+            African culture,{" "}
+            <span className="relative inline-block">
+              <span className="text-[var(--wk-brand)]">built to last</span>
+              <span className="absolute -bottom-1 left-0 right-0 h-[2px] bg-[var(--wk-brand)]/25 rounded-full" />
+            </span>.
           </h1>
 
-          <div className="mt-6 animate-hero-fade" style={{ animationDelay: "0.5s" }}>
+          <p
+            className="mt-4 text-[13px] leading-relaxed text-white/55 animate-hero-fade max-w-[380px]"
+            style={{ animationDelay: "0.5s" }}
+          >
+            Building the infrastructure African creativity deserves — across music, film, fashion, food, language, and place.
+          </p>
+
+          <div className="mt-7 flex flex-wrap gap-3 animate-hero-fade" style={{ animationDelay: "0.65s" }}>
             <Link
               to="/charts"
-              className="inline-flex min-h-[44px] items-center gap-2 rounded-full bg-[var(--wk-brand)] px-5 py-3 text-[13px] font-bold text-[var(--wk-brand-on)] active:scale-[0.97] transition-transform mobile-pressable"
+              className="inline-flex min-h-[44px] items-center gap-2 rounded-full bg-[var(--wk-brand)] px-5 py-3 text-[13px] font-bold text-[var(--wk-brand-on)] active:scale-[0.97] transition-transform mobile-pressable whitespace-nowrap"
             >
               <WkIcon name="BarChart3" size={16} />
-              View the chart
+              Explore Charts
+            </Link>
+            <Link
+              to="/guides"
+              className="inline-flex min-h-[44px] items-center gap-2 rounded-full border border-white/20 bg-white/5 backdrop-blur-sm px-5 py-3 text-[13px] font-semibold text-white active:scale-[0.97] transition-transform mobile-pressable whitespace-nowrap"
+            >
+              <WkIcon name="Compass" size={16} />
+              Browse Guides
             </Link>
           </div>
         </div>
       </section>
 
-      <section className="home-section">
+      {/* ════════════════════════════════════════
+          CHARTS — Front and center, as art
+      ════════════════════════════════════════ */}
+      <section className="home-section pt-5">
         <div className="home-section-header">
-          <div className="home-section-title">Current #1</div>
-          <Link to="/charts" className="home-section-more">Charts</Link>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="w-6 h-[2px] bg-[var(--wk-brand)]/50 rounded-full" />
+            <span className="text-[9px] font-black text-[var(--wk-brand)] uppercase tracking-[0.2em]">Flagship</span>
+          </div>
+          <div className="home-section-title">WAKILISHA Charts</div>
+          <Link to="/charts" className="home-section-more">Full chart</Link>
         </div>
+
+        {/* #1 — Artistic treatment */}
         {HOME_CHART_ENTRIES[0] && (
           <Link
             to={`/tracks/${HOME_CHART_ENTRIES[0].slug}`}
-            className="mx-5 mb-5 block overflow-hidden rounded-[16px] border border-[var(--wk-border)] bg-[var(--wk-surface)] mobile-pressable"
+            className="mx-5 mb-5 block overflow-hidden rounded-[18px] mobile-pressable"
+            style={{ background: "var(--wk-surface)" }}
           >
-            <div className="chart-hero-card h-[132px]">
-              <img src={HOME_CHART_ENTRIES[0].artworkUrl} alt="" />
-              <div className="chart-hero-overlay">
-                <div className="chart-hero-rank gold">1</div>
-                <div className="min-w-0 flex-1">
-                  <div className="chart-row-title">{HOME_CHART_ENTRIES[0].title}</div>
-                  <div className="chart-row-sub">{HOME_CHART_ENTRIES[0].artist}</div>
+            <div className="relative aspect-[4/3] bg-[var(--wk-surface-raised)] overflow-hidden">
+              <img
+                src={HOME_CHART_ENTRIES[0].artworkUrl}
+                alt=""
+                className="h-full w-full object-cover object-top"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+              {/* Rank badge */}
+              <div className="absolute top-4 left-4">
+                <div className="relative">
+                  <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--wk-brand)]/90 backdrop-blur-sm text-white font-black text-[22px] leading-none">
+                    1
+                  </span>
+                  <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-[var(--wk-v-music)] animate-pulse-slow" />
                 </div>
+              </div>
+              {/* Track info overlay */}
+              <div className="absolute bottom-0 left-0 right-0 p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="rounded-full bg-[var(--wk-brand)]/20 px-2 py-0.5 text-[9px] font-bold text-[var(--wk-brand)] uppercase">#1 This Week</span>
+                </div>
+                <div className="text-[18px] font-black text-white leading-tight">{HOME_CHART_ENTRIES[0].title}</div>
+                <div className="text-[13px] text-white/70">{HOME_CHART_ENTRIES[0].artist}</div>
                 <button
                   onClick={(e) => {
                     e.preventDefault();
                     playTrack(chartTracks[0], chartTracks);
                   }}
-                  className="phn-mp-btn phn-mp-play"
-                  aria-label="Play current number one"
+                  className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-[var(--wk-brand)] px-4 py-2 text-[12px] font-bold text-[var(--wk-brand-on)] active:scale-[0.97] transition-transform mobile-pressable whitespace-nowrap"
                 >
-                  <WkIcon name="Play" size={15} />
+                  <WkIcon name="Play" size={14} /> Play #1
                 </button>
               </div>
             </div>
           </Link>
         )}
-      </section>
 
-      <section className="home-section">
-        <div className="home-section-header">
-          <div className="home-section-title">Top 10 chart</div>
-          <Link to="/charts" className="home-section-more">View all</Link>
-        </div>
+        {/* Chart list 2-9 */}
         <div className="chart-row-list">
-          {HOME_CHART_ENTRIES.map((entry, idx) => (
+          {HOME_CHART_ENTRIES.slice(0, 8).map((entry, idx) => (
             <Link
               key={`${entry.rank}-${entry.slug}`}
               to={`/tracks/${entry.slug}`}
@@ -168,73 +243,161 @@ export default function MobileHome() {
         </div>
       </section>
 
+      {/* ════════════════════════════════════════
+          MISSION — Short, weighty, woven in
+      ════════════════════════════════════════ */}
+      <section className="home-section">
+        <div className="mx-5 rounded-2xl p-5" style={{ background: "var(--wk-bg-subtle)" }}>
+          <div className="flex items-center gap-2 mb-3">
+            <span className="w-6 h-[2px] bg-[var(--wk-brand)]/50 rounded-full" />
+            <span className="text-[9px] font-black text-[var(--wk-brand)] uppercase tracking-[0.18em]">Our Mission</span>
+          </div>
+          <p className="text-[16px] leading-relaxed font-semibold text-[var(--wk-text)]">
+            African culture does not lack talent. What it often lacks are the{" "}
+            <span className="relative inline-block">
+              <span className="text-[var(--wk-brand)] font-bold">structures</span>
+              <span className="absolute -bottom-0.5 left-0 right-0 h-[2px] bg-[var(--wk-brand)]/20 rounded-full" />
+            </span>{" "}
+            that help creative work travel further and generate meaningful value.
+          </p>
+          <p className="mt-2 text-[13px] text-[var(--wk-text-muted)]">
+            WAKILISHA builds those structures — across music, film, fashion, food, language, and place.
+          </p>
+        </div>
+      </section>
+
+      {/* ════════════════════════════════════════
+          VERTICALS — Scrollable visual gallery
+      ════════════════════════════════════════ */}
       <section className="home-section">
         <div className="home-section-header">
-          <div className="home-section-title">Trending tracks</div>
-          <Link to="/search" className="home-section-more">Search</Link>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="w-4 h-[2px] bg-[var(--wk-v-fashion)]/60 rounded-full" />
+            <span className="text-[9px] font-black text-[var(--wk-text-faint)] uppercase tracking-[0.18em]">Cultural Verticals</span>
+          </div>
+          <div className="home-section-title">Seven pillars. One ecosystem.</div>
         </div>
-        <div className="home-shelf">
-          {HOME_TRENDING_TRACKS.map((track) => (
-            <button
-              key={track.slug}
-              onClick={() => playTrack(trackPayload(track), [trackPayload(track)])}
-              className="hcard mobile-pressable"
+
+        <div className="flex gap-3 overflow-x-auto px-5 pb-3 scrollbar-hide">
+          {/* Music — larger, flagship */}
+          <Link
+            to="/charts"
+            className="flex-none w-[200px] rounded-2xl overflow-hidden mobile-pressable"
+            style={{ background: "var(--wk-surface)" }}
+          >
+            <div className="relative h-[100px] bg-[var(--wk-surface-raised)] overflow-hidden">
+              <img
+                src="https://readdy.ai/api/search-image?query=Rich%20warm%20amber%20textured%20abstract%20celebrating%20African%20music%20culture%2C%20flowing%20organic%20shapes%20suggesting%20sound%20waves%20and%20rhythm%20patterns%2C%20deep%20ochre%20and%20olive%20green%20tones%20with%20golden%20highlights%2C%20layered%20textures%20evoking%20vinyl%20grooves%20woven%20textiles%20and%20musical%20notation%2C%20atmospheric%20gallery%20lighting%20with%20warm%20glow%2C%20artistic%20interpretation%20of%20sound%20as%20visual%20form%2C%20no%20text%20no%20logos%2C%20editorial%20quality&width=400&height=200&seq=pillar-music-v2&orientation=landscape"
+                alt=""
+                className="h-full w-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+              <div className="absolute bottom-3 left-3 right-3">
+                <div className="flex items-center gap-1.5 mb-0.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--wk-v-music)]" />
+                  <span className="text-[9px] font-black text-[var(--wk-v-music)] uppercase">Active</span>
+                </div>
+                <div className="text-[16px] font-black text-white">Music</div>
+              </div>
+            </div>
+            <div className="p-3.5">
+              <p className="text-[11px] text-[var(--wk-text-muted)] leading-relaxed">
+                Charts, artists, tracks, releases — the complete index.
+              </p>
+            </div>
+          </Link>
+
+          {/* Guides */}
+          <Link
+            to="/guides"
+            className="flex-none w-[200px] rounded-2xl overflow-hidden mobile-pressable"
+            style={{ background: "var(--wk-surface)" }}
+          >
+            <div className="relative h-[100px] bg-[var(--wk-surface-raised)] overflow-hidden">
+              <img
+                src="https://readdy.ai/api/search-image?query=Artistic%20abstract%20composition%20in%20deep%20purple%20and%20violet%20tones%20evoking%20discovery%20exploration%20and%20cultural%20navigation%2C%20layered%20textures%20suggesting%20maps%20compass%20roses%20and%20journey%20paths%2C%20rich%20atmospheric%20depth%20with%20soft%20glowing%20highlights%2C%20contemporary%20gallery%20aesthetic%20with%20warm%20undertones%2C%20abstract%20interpretation%20of%20guidance%20wayfinding%20and%20cultural%20discovery%2C%20editorial%20quality%20no%20text%20no%20logos&width=400&height=200&seq=pillar-guides-v2&orientation=landscape"
+                alt=""
+                className="h-full w-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+              <div className="absolute bottom-3 left-3 right-3">
+                <span className="inline-flex items-center rounded-full bg-[var(--wk-v-intel)]/25 px-1.5 py-0.5 text-[8px] font-bold text-[var(--wk-v-intel)] uppercase mb-0.5">New</span>
+                <div className="text-[16px] font-black text-white">Guides</div>
+              </div>
+            </div>
+            <div className="p-3.5">
+              <p className="text-[11px] text-[var(--wk-text-muted)] leading-relaxed">Where to go, what to experience, who to know.</p>
+            </div>
+          </Link>
+
+          {/* Remaining pillars */}
+          {PILLARS.filter((p) => !["music", "guides"].includes(p.key)).map((pillar) => (
+            <Link
+              key={pillar.key}
+              to={pillar.href}
+              className="flex-none w-[150px] rounded-2xl border mobile-pressable active:scale-[0.97] transition-transform"
+              style={{ background: "var(--wk-surface)", borderColor: "var(--wk-border)" }}
             >
-              <div className="hcard-art">
-                {track.artworkUrl ? <img src={track.artworkUrl} alt="" /> : <div className="flex h-full items-center justify-center"><WkIcon name="Music2" size={24} className="text-[var(--wk-text-faint)]" /></div>}
-              </div>
-              <div className="hcard-title">{track.title}</div>
-              <div className="hcard-sub">{track.artist}</div>
-              <div className="mt-1 flex items-center gap-2 text-[9px] text-[var(--wk-text-faint)] px-2">
-                <span className="inline-flex items-center gap-1"><WkIcon name="Headphones" size={11} /> {track.streamCount}</span>
-                <span className="inline-flex items-center gap-1"><WkIcon name="BarChart3" size={11} /> #{track.chartPosition}</span>
-              </div>
-            </button>
-          ))}
-        </div>
-      </section>
-
-      <section className="home-section">
-        <div className="home-section-header">
-          <div className="home-section-title">Recent releases</div>
-          <Link to="/search" className="home-section-more">Releases</Link>
-        </div>
-        <div className="home-shelf">
-          {HOME_RECENT_RELEASES.map((release) => (
-            <Link key={release.slug} to={`/releases/${slugify(release.artist)}/${release.slug}`} className="hcard mobile-pressable">
-              <div className="hcard-art"><img src={release.artworkUrl} alt="" /></div>
-              <div className="hcard-title">{release.title}</div>
-              <div className="hcard-sub">{release.artist}</div>
-              <div className="mt-1 flex items-center gap-1.5 px-2">
-                <span className="rounded-full bg-[var(--wk-brand-soft)] px-1.5 py-0.5 text-[9px] font-bold text-[var(--wk-brand)] uppercase">{release.releaseType}</span>
-                <span className="text-[9px] text-[var(--wk-text-faint)]">{release.year}</span>
+              <div className="p-4">
+                <div
+                  className="flex h-10 w-10 items-center justify-center rounded-xl mb-3"
+                  style={{ background: `var(${pillar.colorVar})`, color: "#fff" }}
+                >
+                  <WkIcon name={pillar.icon} size={18} />
+                </div>
+                <div className="flex items-center gap-1.5 mb-1">
+                  <h3 className="text-[14px] font-black text-[var(--wk-text)]">{pillar.label}</h3>
+                  <span className="text-[9px] font-semibold text-[var(--wk-text-faint)]">Soon</span>
+                </div>
+                <p className="text-[11px] leading-relaxed text-[var(--wk-text-muted)] line-clamp-2">
+                  {pillar.desc}
+                </p>
               </div>
             </Link>
           ))}
         </div>
       </section>
 
+      {/* ════════════════════════════════════════
+          GUIDES — Just launched, warm
+      ════════════════════════════════════════ */}
       <section className="home-section">
-        <div className="home-section-header">
-          <div className="home-section-title">Featured artists</div>
-          <Link to="/artists" className="home-section-more">Artists</Link>
-        </div>
-        <div className="artist-grid-2col pt-0">
-          {HOME_FEATURED_ARTISTS.map((artist) => (
-            <Link key={artist.slug} to={`/artists/${artist.slug}`} className="acard mobile-pressable">
-              <img src={artist.imageUrl} alt="" />
-              <div className="acard-overlay">
-                <div className="acard-name">{artist.name}</div>
-                <div className="acard-meta">{artist.genres?.[0]} · {artist.isChartArtist ? "Chart artist" : "Registry"}</div>
-              </div>
+        <div className="mx-5 rounded-2xl p-5 overflow-hidden relative" style={{ background: "var(--wk-surface)" }}>
+          <div className="absolute top-0 right-0 w-[180px] h-full opacity-[0.04] pointer-events-none"
+            style={{ background: `radial-gradient(circle at center, var(--wk-v-intel), transparent 70%)` }}
+          />
+          <div className="relative z-10">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="rounded-full bg-[var(--wk-v-intel)]/15 px-2 py-0.5 text-[9px] font-bold text-[var(--wk-v-intel)] uppercase flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-[var(--wk-v-intel)]" />
+                Just Launched
+              </span>
+            </div>
+            <h2 className="text-[18px] font-black tracking-[-0.03em] text-[var(--wk-text)] mb-1">WAKILISHA Guides</h2>
+            <p className="text-[12px] leading-relaxed text-[var(--wk-text-soft)] mb-4">
+              Your practical discovery layer — where to go, what to experience, who to know, and how to navigate African creative life.
+            </p>
+            <Link
+              to="/guides"
+              className="inline-flex min-h-[44px] items-center gap-2 rounded-full bg-[var(--wk-brand)] px-5 py-2.5 text-[13px] font-bold text-[var(--wk-brand-on)] active:scale-[0.97] transition-transform mobile-pressable whitespace-nowrap"
+            >
+              <WkIcon name="Compass" size={16} />
+              Browse Guides
             </Link>
-          ))}
+          </div>
         </div>
       </section>
 
+      {/* ════════════════════════════════════════
+          MAGAZINE — Editorial gallery
+      ════════════════════════════════════════ */}
       <section className="home-section">
         <div className="home-section-header">
-          <div className="home-section-title">WAKILISHA magazine</div>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="w-4 h-[2px] bg-[var(--wk-v-film)]/60 rounded-full" />
+            <span className="text-[9px] font-black text-[var(--wk-text-faint)] uppercase tracking-[0.18em]">Magazine</span>
+          </div>
+          <div className="home-section-title">Editorial</div>
           <Link to="/magazine" className="home-section-more">Read</Link>
         </div>
         <div className="mag-cards pt-0">
@@ -251,40 +414,101 @@ export default function MobileHome() {
         </div>
       </section>
 
+      {/* ════════════════════════════════════════
+          NEWSLETTER — Warm community invite
+      ════════════════════════════════════════ */}
       <section className="home-section pb-8">
-        <div className="mx-5 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-5">
-          <div className="text-[9px] font-extrabold uppercase tracking-[0.22em] text-[var(--wk-brand)] mb-2 flex items-center gap-2">
-            <span className="w-4 h-px bg-[var(--wk-brand)]" />
-            WAKILISHA Weekly
-          </div>
-          <h2 className="text-[18px] font-black tracking-[-0.04em] text-[var(--wk-text)] mb-1">The chart, in your inbox.</h2>
-          <p className="text-[12px] leading-relaxed text-[var(--wk-text-soft)] mb-4">Weekly chart updates, artist spotlights, and breaking stories from the African music ecosystem.</p>
-          {subscribed ? (
-            <div className="flex items-center gap-2 text-[13px] font-bold text-[var(--wk-brand)]"><WkIcon name="Check" size={16} /> Subscribed! Check your inbox.</div>
-          ) : (
-            <div className="flex flex-col gap-2">
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter your email"
-                className="w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-4 py-3 text-[13px] text-[var(--wk-text)] placeholder:text-[var(--wk-text-faint)] focus:outline-none focus:border-[var(--wk-brand)]"
-              />
-              <button
-                onClick={() => { if (email.trim()) setSubscribed(true); }}
-                className="w-full rounded-xl bg-[var(--wk-brand)] py-3 text-[13px] font-bold text-[var(--wk-brand-on)] active:scale-[0.97] transition-transform mobile-pressable"
-              >
-                <WkIcon name="Send" size={15} className="mr-1 inline" />
-                Subscribe
-              </button>
-              <div className="flex items-center gap-4 text-[10px] text-[var(--wk-text-faint)]">
-                <span className="inline-flex items-center gap-1"><WkIcon name="ShieldCheck" size={12} /> No spam</span>
-                <span className="inline-flex items-center gap-1"><WkIcon name="CircleX" size={12} /> Unsubscribe anytime</span>
-              </div>
+        <div className="mx-5 rounded-2xl p-5 overflow-hidden relative" style={{ background: "var(--wk-surface)" }}>
+          <div className="absolute -bottom-16 -left-16 w-[200px] h-[200px] opacity-[0.04] pointer-events-none rounded-full"
+            style={{ background: `var(--wk-brand)` }}
+          />
+          <div className="relative z-10">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="w-4 h-[2px] bg-[var(--wk-brand)]/50 rounded-full" />
+              <span className="text-[9px] font-black text-[var(--wk-brand)] uppercase tracking-[0.18em]">Stay Connected</span>
             </div>
-          )}
+            <h2 className="text-[18px] font-black tracking-[-0.04em] text-[var(--wk-text)] mb-1">The ecosystem, in your inbox.</h2>
+            <p className="text-[12px] leading-relaxed text-[var(--wk-text-soft)] mb-4">
+              Chart updates, new guides, editorial deep-dives, and early access to new verticals across African creative life.
+            </p>
+            {subscribed ? (
+              <div className="flex items-center gap-2 text-[14px] font-bold text-[var(--wk-brand)]">
+                <WkIcon name="Check" size={18} /> Subscribed! Check your inbox.
+              </div>
+            ) : (
+              <form
+                action="https://readdy.ai/api/form/d8gs0igb91vaa813drjg"
+                method="POST"
+                data-readdy-form=""
+                className="flex flex-col gap-2.5"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (email.trim()) {
+                    const form = e.currentTarget;
+                    const formData = new FormData(form);
+                    fetch(form.action, { method: "POST", body: new URLSearchParams(formData as any) })
+                      .then(() => setSubscribed(true))
+                      .catch(() => setSubscribed(true));
+                  }
+                }}
+              >
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Enter your email"
+                  className="w-full rounded-xl border bg-[var(--wk-bg)] px-4 py-3 text-[13px] text-[var(--wk-text)] placeholder:text-[var(--wk-text-faint)] focus:outline-none focus:border-[var(--wk-brand)]/40 transition-colors"
+                  style={{ borderColor: "var(--wk-border)" }}
+                />
+                <button
+                  type="submit"
+                  className="w-full rounded-xl bg-[var(--wk-brand)] py-3 text-[13px] font-bold text-[var(--wk-brand-on)] active:scale-[0.97] transition-transform mobile-pressable whitespace-nowrap"
+                >
+                  <WkIcon name="Send" size={15} className="mr-1 inline" />
+                  Subscribe
+                </button>
+                <div className="flex items-center gap-4 text-[10px] text-[var(--wk-text-faint)]">
+                  <span className="inline-flex items-center gap-1"><WkIcon name="ShieldCheck" size={12} /> No spam</span>
+                  <span className="inline-flex items-center gap-1"><WkIcon name="CircleX" size={12} /> Unsubscribe anytime</span>
+                </div>
+              </form>
+            )}
+          </div>
         </div>
       </section>
+
+      {/* Animation styles */}
+      <style>{`
+        @keyframes heroFade {
+          from { opacity: 0; transform: translateY(18px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes floatSlow {
+          0%, 100% { transform: translateY(0) rotate(0deg); }
+          33% { transform: translateY(-6px) rotate(3deg); }
+          66% { transform: translateY(3px) rotate(-2deg); }
+        }
+        @keyframes pulseSlow {
+          0%, 100% { opacity: 0.6; }
+          50% { opacity: 1; }
+        }
+        .animate-hero-fade {
+          opacity: 0;
+          animation: heroFade 0.7s var(--wk-ease-snap) forwards;
+        }
+        .animate-float-slow {
+          animation: floatSlow 8s ease-in-out infinite;
+        }
+        .animate-pulse-slow {
+          animation: pulseSlow 3s ease-in-out infinite;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .animate-hero-fade, .animate-float-slow, .animate-pulse-slow {
+            animation: none !important;
+            opacity: 1 !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }

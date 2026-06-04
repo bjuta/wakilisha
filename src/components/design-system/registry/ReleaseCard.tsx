@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { WkTag } from "@/components/design-system/primitives/Tag";
 import { releaseUrl } from "@/services/repairedContent/client";
+import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 
 export interface ReleaseCardProps {
   slug: string;
@@ -38,9 +39,7 @@ export function ReleaseCard({
               className="h-full w-full object-cover object-top transition-transform duration-[var(--wk-d-standard)] group-hover:scale-105"
             />
           ) : (
-            <div className="flex h-full w-full items-center justify-center">
-              <i className="ri-album-line text-4xl text-[var(--wk-text-faint)]" />
-            </div>
+            <Ch19GradientImage slug={slug} name={title} />
           )}
         </div>
         <div className="p-3">

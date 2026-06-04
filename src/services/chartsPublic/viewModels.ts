@@ -80,6 +80,8 @@ export interface ChartEntryRowViewModel {
   movementAmount: number | null;
   title: string;
   artist: string;
+  artistNames: string[];
+  artistSlugs: string[];
   artworkUrl: string | null;
   slug: string;
   genre: string | null;
@@ -128,6 +130,8 @@ export interface ChartEditionArchiveItem {
     artist: string;
     artworkUrl: string | null;
   };
+  newCount?: number;
+  droppedCount?: number;
 }
 
 export interface ChartArchiveViewModel {
@@ -220,19 +224,28 @@ export function toChartEntryRowViewModel(
     movementAmount?: number;
   };
 
+  // previousRank of 0 means no prior comparison data exists (first ingest or broken pipeline).
+  // Treat it as null so movementAmount stays null (correctly indicating unknown delta).
+  const effectivePreviousRank =
+    entry.previousRank !== null && entry.previousRank > 0
+      ? entry.previousRank
+      : null;
+
   const movementAmount =
     rich.movementAmount ??
-    (entry.previousRank !== null
-      ? Math.abs(entry.previousRank - entry.rank)
+    (effectivePreviousRank !== null
+      ? Math.abs(effectivePreviousRank - entry.rank)
       : null);
 
   return {
     rank: entry.rank,
-    previousRank: entry.previousRank,
+    previousRank: effectivePreviousRank,
     movement: entry.movement,
     movementAmount,
     title: entry.trackTitle,
     artist: entry.artistNames.join(", "),
+    artistNames: entry.artistNames,
+    artistSlugs: entry.artistSlugs ?? [],
     artworkUrl: entry.artworkUrl,
     slug: entry.trackSlug,
     genre: rich.genre ?? null,
@@ -380,7 +393,6 @@ export function toChartDirectoryViewModel(
     familyVMs.find((f) => f.slug === featuredFamilySlug || f.sourceFamilySlug === featuredFamilySlug || f.legacySlugs.includes(featuredFamilySlug)) ?? familyVMs[0] ?? null;
 
   const topEntries = featuredEntries
-    .slice(0, 5)
     .map(toChartEntryRowViewModel);
 
   const totalEditions = editions.length;
@@ -424,11 +436,32 @@ export function toChartArchiveViewModel(
   const items: ChartEditionArchiveItem[] = sorted.map((edition, idx) => {
     const entries = entriesMap[edition.slug] ?? [];
     const no1 = entries[0];
+
+    // Compute new/dropped counts by comparing with the chronologically prior edition
+    let newCount: number | undefined;
+    let droppedCount: number | undefined;
+
+    if (idx < sorted.length - 1) {
+      const priorEdition = sorted[idx + 1];
+      const priorEntries = entriesMap[priorEdition.slug];
+
+      if (priorEntries && priorEntries.length > 0) {
+        const currentSlugs = new Set(entries.map((e) => e.trackSlug));
+        const priorSlugs = new Set(priorEntries.map((e) => e.trackSlug));
+
+        // Tracks in current but not in prior = new entries
+        newCount = [...currentSlugs].filter((s) => !priorSlugs.has(s)).length;
+
+        // Tracks in prior but not in current = dropped entries
+        droppedCount = [...priorSlugs].filter((s) => !currentSlugs.has(s)).length;
+      }
+    }
+
     return {
       slug: edition.slug,
       label: edition.label,
       date: edition.date,
-      entryCount: entries.length,
+      entryCount: entries.length > 0 ? entries.length : edition.entryCount,
       isLatest: idx === 0,
       no1Track: no1
         ? {
@@ -437,6 +470,8 @@ export function toChartArchiveViewModel(
             artworkUrl: no1.artworkUrl,
           }
         : undefined,
+      newCount,
+      droppedCount,
     };
   });
 
@@ -478,4 +513,59 @@ export function toChartTrackHistoryViewModel(
     firstAppearance: history.firstAppearance,
     latestAppearance: history.latestAppearance,
   };
+}
+
+// ─── Movement computation from prior edition ───
+
+export interface ComputedMovement {
+  previousRank: number | null;
+  movement: ChartEditionEntry["movement"];
+  movementAmount: number | null;
+}
+
+/**
+ * Computes real movement data by comparing current edition entries
+ * against the same track's rank in the previous edition (by chart date).
+ * 
+ * This exists because the database `previous_rank` field is often 0/null
+ * when all editions are ingested at once — the ingest pipeline doesn't
+ * always populate comparison data. We derive it ourselves by loading
+ * the prior edition and cross-referencing by track slug.
+ */
+export function computeMovementFromPriorEdition(
+  currentEntries: ChartEditionEntry[],
+  priorRankMap: Map<string, number>,
+): ChartEditionEntry[] {
+  return currentEntries.map((entry) => {
+    const priorRank = priorRankMap.get(entry.trackSlug);
+    
+    if (priorRank === undefined) {
+      // Track wasn't in the prior edition — it's either a debut or re-entry
+      // We can't distinguish the two without more data, so call it "new"
+      return {
+        ...entry,
+        previousRank: null,
+        movement: "new" as const,
+      };
+    }
+    
+    const delta = priorRank - entry.rank;
+    const movementAmount = Math.abs(delta);
+    
+    let movement: ChartEditionEntry["movement"];
+    if (delta > 0) {
+      movement = "up";
+    } else if (delta < 0) {
+      movement = "down";
+    } else {
+      movement = "same";
+    }
+    
+    return {
+      ...entry,
+      previousRank: priorRank,
+      movement,
+      movementAmount,
+    };
+  });
 }

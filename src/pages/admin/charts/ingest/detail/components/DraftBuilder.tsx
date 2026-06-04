@@ -15,6 +15,8 @@ import {
   hasCapability,
 } from "@/services/chartsIngestion/client";
 import type { UserRole, CsvIntegrityViolation } from "@/services/chartsIngestion/client";
+import { useDraftMovement } from "./useDraftMovement";
+import type { EnrichedDraftEntry } from "./useDraftMovement";
 
 interface DraftBuilderProps {
   jobId: string;
@@ -43,7 +45,10 @@ export function DraftBuilder({
   const [creating, setCreating] = useState(false);
   const [draftResult, setDraftResult] = useState<{ success: boolean; message: string } | null>(null);
   const [exportCopied, setExportCopied] = useState(false);
-  const [selectedEntry, setSelectedEntry] = useState<DraftEntry | null>(null);
+  const [selectedEntry, setSelectedEntry] = useState<EnrichedDraftEntry | null>(null);
+
+  // Compute real movement by comparing against the prior published edition
+  const enrichedEntries = useDraftMovement(job, draftEntries);
 
   const csvCandidates = candidates.filter((c) => c.sourceType === "csv");
   const violations: CsvIntegrityViolation[] = csvCandidates.length > 0
@@ -270,20 +275,38 @@ export function DraftBuilder({
                 </tr>
               </thead>
               <tbody>
-                {draftEntries.map((entry) => {
+                {enrichedEntries.map((entry) => {
                   const track = entry.entryPayload?.track as Record<string, unknown> | undefined;
+                  const prevRank = entry.displayPreviousRank;
+                  const movement = entry.displayMovement;
+                  const movementAmount = entry.displayMovementAmount;
+                  const isNewByRelease = entry.displayMovement === "new" && entry.displayPreviousRank === null;
+
                   return (
                     <tr key={entry.id} className={entry.sourceType === "csv" ? "bg-[var(--wk-brand-soft)]/10" : ""}>
                       <td className="tabular-nums font-bold text-[var(--wk-text)]">{entry.finalRank}</td>
-                      <td className="tabular-nums text-[12px] text-[var(--wk-text-muted)]">{entry.previousRank ?? "—"}</td>
+                      <td className="tabular-nums text-[12px] text-[var(--wk-text-muted)]">
+                        {prevRank !== null ? `#${prevRank}` : "—"}
+                      </td>
                       <td>
-                        <span className={`text-[12px] font-semibold ${
-                          entry.movement === "up" ? "text-[var(--wk-success)]" :
-                          entry.movement === "down" ? "text-[var(--wk-danger)]" :
-                          entry.movement === "new" ? "text-[var(--wk-brand)]" :
+                        <span className={`inline-flex items-center gap-0.5 text-[12px] font-semibold ${
+                          movement === "up" ? "text-[var(--wk-success)]" :
+                          movement === "down" ? "text-[var(--wk-danger)]" :
+                          movement === "new" ? "text-[var(--wk-brand)]" :
+                          movement === "re_entry" ? "text-[var(--wk-info)]" :
                           "text-[var(--wk-text-muted)]"
                         }`}>
-                          {entry.movement === "up" ? "↑" : entry.movement === "down" ? "↓" : entry.movement === "new" ? "NEW" : "—"}
+                          {movement === "up" && (
+                            <><i className="ri-arrow-up-line" />{movementAmount && movementAmount > 0 ? ` ${movementAmount}` : ""}</>
+                          )}
+                          {movement === "down" && (
+                            <><i className="ri-arrow-down-line" />{movementAmount && movementAmount > 0 ? ` ${movementAmount}` : ""}</>
+                          )}
+                          {movement === "new" && "NEW"}
+                          {movement === "re_entry" && "RE"}
+                          {movement === "same" && (
+                            <><i className="ri-subtract-line" />{movementAmount === 0 ? " 0" : ""}</>
+                          )}
                         </span>
                       </td>
                       <td className="font-semibold text-[var(--wk-text)]">
@@ -328,7 +351,7 @@ export function DraftBuilder({
   );
 }
 
-function DraftEntryDrawer({ entry, onClose }: { entry: DraftEntry; onClose: () => void }) {
+function DraftEntryDrawer({ entry, onClose }: { entry: EnrichedDraftEntry; onClose: () => void }) {
   const track = entry.entryPayload?.track as Record<string, unknown> | undefined;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -349,8 +372,8 @@ function DraftEntryDrawer({ entry, onClose }: { entry: DraftEntry; onClose: () =
         <div className="mt-4 grid gap-2 sm:grid-cols-2">
           {[
             { label: "Final Rank", value: String(entry.finalRank), color: "text-[var(--wk-brand)]" },
-            { label: "Previous Rank", value: String(entry.previousRank ?? "—") },
-            { label: "Movement", value: entry.movement },
+            { label: "Previous Rank", value: entry.displayPreviousRank !== null ? `#${entry.displayPreviousRank}` : "—" },
+            { label: "Movement", value: `${entry.displayMovement}${entry.displayMovementAmount && entry.displayMovementAmount > 0 && entry.displayMovement !== "new" ? ` (${entry.displayMovementAmount})` : ""}` },
             { label: "Peak Position", value: String(entry.peakPosition ?? "—") },
             { label: "Weeks on Chart", value: String(entry.weeksOnChart ?? "—") },
             { label: "Score", value: entry.score.toFixed(1) },

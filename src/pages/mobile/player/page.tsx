@@ -59,7 +59,7 @@ export default function MobilePlayer() {
       </div>
 
       <div className="fp-art-zone">
-        {currentTrack.artworkUrl ? <img src={currentTrack.artworkUrl} alt={currentTrack.title} /> : <div className="aspect-square bg-[var(--wk-surface-raised)]" />}
+        {currentTrack.artworkUrl ? <img src={currentTrack.artworkUrl} alt={currentTrack.title} className="h-full w-full object-cover" /> : <div className="aspect-square bg-[var(--wk-surface-raised)]" />}
       </div>
 
       <div className="fp-controls">

@@ -38,7 +38,7 @@ export default function ProfilePage() {
       {/* Full-width hero */}
       <section className="profile-dt-hero">
         <div className="profile-dt-cover">
-          <img src={profile.cover} alt="" />
+          <img src={profile.cover} alt="" className="h-full w-full object-cover" />
         </div>
       </section>
 
@@ -47,7 +47,7 @@ export default function ProfilePage() {
         <div className="profile-dt-header">
           <div className="profile-dt-avatar-wrap">
             <div className="profile-dt-avatar">
-              <img src={profile.avatar} alt="" />
+              <img src={profile.avatar} alt="" className="h-full w-full object-cover" />
             </div>
             <div className="profile-dt-badge">
               <WkIcon name="Check" size={12} />
@@ -137,7 +137,7 @@ export default function ProfilePage() {
                         : "/search";
                   return (
                     <Link key={`${item.slug}-${index}`} to={to} className="profile-dt-like">
-                      {img ? <img src={img} alt="" /> : null}
+                      {img ? <img src={img} alt="" className="h-full w-full object-cover" /> : null}
                     </Link>
                   );
                 })}
@@ -156,7 +156,7 @@ export default function ProfilePage() {
                   <Link key={track.slug} to={`/tracks/${track.slug}`} className="profile-dt-track-row">
                     <div className="profile-dt-track-num">{index + 1}</div>
                     <div className="profile-dt-track-art">
-                      {track.artworkUrl ? <img src={track.artworkUrl} alt="" /> : <WkIcon name="Music2" size={20} />}
+                      {track.artworkUrl ? <img src={track.artworkUrl} alt="" className="h-full w-full object-cover" /> : <WkIcon name="Music2" size={20} />}
                     </div>
                     <div className="profile-dt-track-info">
                       <div className="profile-dt-track-title">{track.title}</div>
@@ -199,7 +199,7 @@ export default function ProfilePage() {
                   {displayStories.map((story) => (
                     <Link key={story.slug} to={`/magazine/${story.slug}`} className="profile-dt-read-card">
                       <div className="profile-dt-read-art">
-                        <img src={story.heroUrl} alt="" />
+                        <img src={story.heroUrl} alt="" className="h-full w-full object-cover" />
                       </div>
                       <div className="profile-dt-read-body">
                         <div className="profile-dt-read-tag">{story.section}</div>

@@ -1,5 +1,6 @@
 import { useRef } from "react";
 import { Link } from "react-router-dom";
+import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 
 interface RisingArtist {
   slug: string;
@@ -78,9 +79,7 @@ export function RisingStars({ artists }: RisingStarsProps) {
                     className="h-full w-full object-cover object-top transition-transform duration-[var(--wk-d-slow)] group-hover:scale-105"
                   />
                 ) : (
-                  <div className="flex h-full w-full items-center justify-center">
-                    <i className="ri-user-3-line text-4xl text-[var(--wk-text-faint)]" />
-                  </div>
+                  <Ch19GradientImage slug={artist.slug} name={artist.name} />
                 )}
               </div>
 

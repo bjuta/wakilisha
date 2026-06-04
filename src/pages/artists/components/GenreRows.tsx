@@ -1,5 +1,6 @@
 import { useRef } from "react";
 import { Link } from "react-router-dom";
+import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 
 interface ShelfArtist {
   slug: string;
@@ -93,9 +94,7 @@ function GenreShelfRow({ genre, artists, index }: GenreShelf & { index: number }
                   className="h-full w-full object-cover object-top transition-transform duration-[var(--wk-d-slow)] group-hover:scale-105"
                 />
               ) : (
-                <div className="flex h-full w-full items-center justify-center">
-                  <i className="ri-user-3-line text-3xl text-[var(--wk-text-faint)]" />
-                </div>
+                <Ch19GradientImage slug={artist.slug} name={artist.name} />
               )}
             </div>
             <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-transparent" />

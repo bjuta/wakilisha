@@ -79,6 +79,7 @@ import AdminSettingsEmailBriefings from "../pages/admin/settings/email-briefings
 import AdminSettingsMaintenance from "../pages/admin/settings/maintenance/page";
 import AdminSettingsNavigation from "../pages/admin/settings/navigation/page";
 import AdminSettingsAudit from "../pages/admin/settings/audit/page";
+import AdminSettingsSiteIdentity from "../pages/admin/settings/site-identity/page";
 
 // Charts
 import ChartsDirectory from "../pages/charts/directory/page";
@@ -100,6 +101,18 @@ import SettingsPage from "../pages/settings/page";
 
 // Search
 import Search from "../pages/search/page";
+
+// Guides
+import GuidesPage from "../pages/guides/page";
+import MobileGuides from "../pages/mobile/guides/page";
+
+// Vertical pages
+import FilmPage from "../pages/film/page";
+import FashionPage from "../pages/fashion/page";
+import FoodPage from "../pages/food/page";
+import LanguagePage from "../pages/language/page";
+import PlacesPage from "../pages/places/page";
+import { MobileFilm, MobileFashion, MobileFood, MobileLanguage, MobilePlaces } from "../pages/mobile/verticals/page";
 
 // Desktop player
 import DesktopPlayerPage from "../pages/player/page";
@@ -151,6 +164,16 @@ const routes: RouteObject[] = [
       // Magazine
       { path: "/magazine", element: <ResponsivePage mobile={<MobileMagazine />} desktop={<Magazine />} /> },
       { path: "/magazine/:slug", element: <ResponsivePage mobile={<MobileArticlePage />} desktop={<ArticlePage />} /> },
+
+      // Guides
+      { path: "/guides", element: <ResponsivePage mobile={<MobileGuides />} desktop={<GuidesPage />} /> },
+
+      // Culture Verticals
+      { path: "/film", element: <ResponsivePage mobile={<MobileFilm />} desktop={<FilmPage />} /> },
+      { path: "/fashion", element: <ResponsivePage mobile={<MobileFashion />} desktop={<FashionPage />} /> },
+      { path: "/food", element: <ResponsivePage mobile={<MobileFood />} desktop={<FoodPage />} /> },
+      { path: "/language", element: <ResponsivePage mobile={<MobileLanguage />} desktop={<LanguagePage />} /> },
+      { path: "/places", element: <ResponsivePage mobile={<MobilePlaces />} desktop={<PlacesPage />} /> },
 
       // Search
       { path: "/search", element: <ResponsivePage mobile={<MobileSearch />} desktop={<Search />} /> },
@@ -245,6 +268,7 @@ const routes: RouteObject[] = [
       { path: "maintenance", element: <AdminSettingsMaintenance /> },
       { path: "navigation", element: <AdminSettingsNavigation /> },
       { path: "audit", element: <AdminSettingsAudit /> },
+      { path: "site-identity", element: <AdminSettingsSiteIdentity /> },
     ],
   },
   {

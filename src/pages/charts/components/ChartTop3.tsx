@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { usePlayer } from "@/context/PlayerContext";
+import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 
 export interface Top3Entry {
   rank: number;
@@ -133,9 +134,7 @@ export function ChartTop3({
                     className={`h-full w-full object-cover object-top transition-transform duration-[var(--wk-d-slow)] ${isHovered ? "scale-110" : "scale-100"}`}
                   />
                 ) : (
-                  <div className="flex h-full w-full items-center justify-center">
-                    <i className="ri-music-2-line text-4xl text-[var(--wk-text-faint)]" />
-                  </div>
+                  <Ch19GradientImage slug={entry.slug || `top3-${entry.rank}`} name={entry.title} />
                 )}
 
                 {/* Overlays */}

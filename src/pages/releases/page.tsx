@@ -153,7 +153,7 @@ export default function Releases() {
           {featured && (
             <>
               <div className="album41-cover">
-                <img src={featured.artworkUrl} alt={featured.title} />
+                <img src={featured.artworkUrl} alt={featured.title} className="h-full w-full object-cover" />
               </div>
               <div>
                 <div className="album41-kicker">
@@ -265,7 +265,7 @@ export default function Releases() {
                   className="artist-list-item w-full px-0 text-left"
                 >
                   <div className="artist-list-ava artist-list-avatar">
-                    <img src={release.artworkUrl} alt="" />
+                    <img src={release.artworkUrl} alt="" className="h-full w-full object-cover" />
                   </div>
                   <div>
                     <div className="artist-list-name">{release.title}</div>
@@ -308,7 +308,7 @@ function ReleaseTile({
         onClick={() => onPreview(release)}
         className="artist-card-img block w-full text-left"
       >
-        <img src={release.artworkUrl} alt={release.title} />
+        <img src={release.artworkUrl} alt={release.title} className="h-full w-full object-cover" />
       </button>
       <div className="artist-card-body">
         <div className="artist-card-name">{release.title}</div>

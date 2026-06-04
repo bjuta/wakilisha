@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { usePlayer } from "@/context/PlayerContext";
 import {
@@ -27,22 +27,34 @@ import {
 import { ShareButton } from "@/components/design-system/share/ShareSheet";
 import { ChartRefreshButton } from "@/components/charts/ChartRefreshButton";
 import { WkIcon } from "@/components/design-system/Icon";
+import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
+import { ChartRow } from "@/components/design-system/music/ChartRow";
+import { ArtistRolodex } from "@/pages/charts/directory/components/ArtistRolodex";
 
 const rankTone = (rank: number) =>
   rank === 1 ? "gold" : rank === 2 ? "silver" : rank === 3 ? "bronze" : "";
 
-const movementLabel = (entry: ChartEntryRowViewModel) =>
-  entry.movement === "new"
-    ? "NEW"
-    : entry.movement === "same"
-    ? "—"
-    : `${entry.movement === "up" ? "+" : "-"}${entry.movementAmount ?? 0}`;
+function useScrollReveal(deps: unknown[] = []) {
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("chart-reveal-visible");
+            observer.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.08, rootMargin: "0px 0px -36px 0px" },
+    );
+    const els = document.querySelectorAll(".chart-reveal");
+    els.forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
+  }, deps);
+}
 
 export default function ChartEdition() {
-  const { series, edition: editionSlug } = useParams<{
-    series: string;
-    edition: string;
-  }>();
+  const { series, edition: editionSlug } = useParams<{ series: string; edition: string }>();
   const navigate = useNavigate();
   const { playTrack } = usePlayer();
 
@@ -66,7 +78,6 @@ export default function ChartEdition() {
         requestedSlug: string;
       }
   >({ status: "loading" });
-  const [showErrorDetails, setShowErrorDetails] = useState(false);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
 
   const load = useCallback(async () => {
@@ -86,12 +97,10 @@ export default function ChartEdition() {
       const sourceFamilySlug = getSourceFamilySlug(family);
       const canonicalized = isLegacyChartSlug(series);
 
-      // Canonical redirect: if the URL uses a legacy slug, replace with canonical
       if (canonicalized) {
         const redirectTarget = getLegacyRedirectTarget(series, editionSlug);
         if (redirectTarget) {
           navigate(redirectTarget, { replace: true });
-          // After navigation, the component will re-mount with the new URL
           return;
         }
       }
@@ -126,21 +135,21 @@ export default function ChartEdition() {
         return;
       }
 
+      // Entries are auto-enriched with real movement data by getChartEditionEntries
       const entries = rawEntries.map(toChartEntryRowViewModel);
       const editionVM = toChartEditionViewModel(editionResult.data, family, rawEntries);
 
-      // Load archive with intelligence: load entries for latest + previous 3 editions
+      // Load all editions for archive and navigation
       const { data: allEditions } = await getChartEditionsForFamily(series);
       const sortedEditions = [...allEditions].sort(
         (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
       );
-      const archiveEditions = sortedEditions.slice(0, 4); // latest + previous 3
+      const archiveEditions = sortedEditions.slice(0, 4);
 
       const entriesMap: Record<string, import("@/services/chartsPublic/types").ChartEditionEntry[]> = {
         [editionResult.data.slug]: rawEntries,
       };
 
-      // Load entries for other archive editions (latest + prev 3)
       const otherArchiveEditions = archiveEditions.filter(
         (e) => e.slug !== editionResult.data!.slug
       );
@@ -150,7 +159,6 @@ export default function ChartEdition() {
             const { data: edEntries } = await getChartEditionEntries(series, ed.slug);
             entriesMap[ed.slug] = edEntries;
           } catch {
-            // If loading fails, leave entries empty — archive will show metadata only
             entriesMap[ed.slug] = [];
           }
         })
@@ -172,7 +180,7 @@ export default function ChartEdition() {
         requestedSlug: series,
       });
     } catch (err) {
-      const isRetryable = err instanceof Error && err.message.includes("timeout") || err instanceof Error && err.message.includes("Network error");
+      const isRetryable = err instanceof Error && (err.message.includes("timeout") || err.message.includes("Network error"));
       setState({
         status: "error",
         error: err instanceof Error ? err.message : "Unknown error",
@@ -182,13 +190,9 @@ export default function ChartEdition() {
     }
   }, [series, editionSlug, navigate]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
-
+  useEffect(() => { load(); setDisplayedCount(20); }, [load]);
   const handleRetry = () => load();
 
-  // Hoist all hooks before any early return
   const loadedState = state.status === "loaded" ? state : null;
 
   const chartTracks = useMemo(
@@ -221,129 +225,115 @@ export default function ChartEdition() {
       .map(([genre, count]) => ({ genre, count }));
   }, [loadedState?.entries]);
 
-  const topTrackForTrajectory = loadedState?.entries[0] ?? null;
-  const trajectory = useMemo(() => {
-    const weeks = Math.max(6, Math.min(12, topTrackForTrajectory?.weeksOnChart || 8));
-    return Array.from(
-      { length: weeks },
-      (_, i) => Math.max(8, 90 - (i * 5 + (topTrackForTrajectory?.rank || 1) * 2))
+  const biggestUpMover = useMemo(() => {
+    const upMovers = (loadedState?.entries ?? []).filter(
+      (e) => e.movement === "up" && e.previousRank !== null
     );
-  }, [topTrackForTrajectory]);
+    if (upMovers.length === 0) return null;
+    return upMovers.reduce((best, e) =>
+      ((e.movementAmount ?? 0) > (best.movementAmount ?? 0)) ? e : best
+    );
+  }, [loadedState?.entries]);
 
+  const biggestDownMover = useMemo(() => {
+    const downMovers = (loadedState?.entries ?? []).filter(
+      (e) => e.movement === "down" && e.previousRank !== null
+    );
+    if (downMovers.length === 0) return null;
+    return downMovers.reduce((worst, e) =>
+      ((e.movementAmount ?? 0) > (worst.movementAmount ?? 0)) ? e : worst
+    );
+  }, [loadedState?.entries]);
+
+  // Detect whether ANY entry has usable movement data
+  const hasMovementData = useMemo(
+    () => (loadedState?.entries ?? []).some(
+      (e) => e.previousRank !== null && (e.movement === "up" || e.movement === "down")
+    ),
+    [loadedState?.entries]
+  );
+
+  const [displayedCount, setDisplayedCount] = useState(20);
+  const PAGE_SIZE = 12;
+  const [highlightedSlug, setHighlightedSlug] = useState<string | null>(null);
+
+  const handleJumpTo = useCallback((slug: string) => {
+    setHighlightedSlug(slug);
+    setTimeout(() => {
+      document.getElementById(`edition-entry-${slug}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 280);
+    setTimeout(() => setHighlightedSlug(null), 2600);
+  }, []);
+
+  const playAt = useCallback((idx: number) => {
+    const track = chartTracks[idx];
+    if (!track) return;
+    playTrack(track, chartTracks);
+  }, [chartTracks, playTrack]);
+
+  // ─── Parallax hero scroll ───
+  const heroImgRef = useRef<HTMLImageElement>(null);
+  useEffect(() => {
+    if (state.status !== "loaded") return;
+    const img = heroImgRef.current;
+    if (!img) return;
+    const onScroll = () => {
+      const scrollY = window.scrollY;
+      const p = Math.min(scrollY / 600, 1);
+      img.style.transform = `scale(${1 + p * 0.06})`;
+      img.style.opacity = String(Math.max(0.7 - p * 0.25, 0.35));
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [state.status]);
+
+  useScrollReveal([state.status]);
+
+  // ─── Loading state ───
   if (state.status === "loading") {
     return (
-      <main className="min-h-screen">
-        <section className="chart-edition-hero">
-          <div className="chart-edition-shade" />
-          <div className="chart-edition-inner wk-container-wide">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <div className="space-y-4">
-                <div className="h-4 w-40 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
-                <div className="h-12 w-3/4 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
-                <div className="h-4 w-1/2 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
-                <div className="flex gap-3 mt-6">
-                  <div className="h-10 w-28 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
-                  <div className="h-10 w-28 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
-                </div>
-                <div className="flex gap-4 mt-6">
-                  <div className="h-16 w-24 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
-                  <div className="h-16 w-24 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
-                  <div className="h-16 w-24 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
-                  <div className="h-16 w-24 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
-                </div>
-              </div>
-              <div className="h-64 rounded-xl bg-[var(--wk-surface-raised)] animate-pulse" />
-            </div>
-          </div>
-        </section>
-        <div className="wk-container-wide px-4 py-10 md:px-6">
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-8">
-            <div className="space-y-3">
-              {Array.from({ length: 8 }).map((_, i) => (
-                <div key={i} className="flex items-center gap-3 py-2">
-                  <div className="h-6 w-6 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
-                  <div className="h-12 w-12 rounded-lg bg-[var(--wk-surface-raised)] animate-pulse" />
-                  <div className="flex-1 space-y-2">
-                    <div className="h-4 w-1/2 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
-                    <div className="h-3 w-1/3 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="space-y-4">
-              <div className="h-48 rounded-xl bg-[var(--wk-surface-raised)] animate-pulse" />
-              <div className="h-48 rounded-xl bg-[var(--wk-surface-raised)] animate-pulse" />
-            </div>
+      <main className="min-h-screen chart-hero-v2">
+        <div className="chart-hero-v2-overlay" style={{ background: "linear-gradient(180deg, rgba(0,0,0,.4), rgba(0,0,0,.85))" }} />
+        <div className="chart-hero-v2-content flex items-center justify-center">
+          <div className="flex flex-col items-center gap-4">
+            <div className="w-8 h-8 border-2 border-white/20 border-t-[var(--wk-brand)] rounded-full animate-spin" />
+            <span className="text-[13px] font-semibold text-white/50">Loading chart…</span>
           </div>
         </div>
       </main>
     );
   }
 
+  // ─── Error state ───
   if (state.status === "error") {
     return (
-      <main className="min-h-screen wk-container px-6 py-20">
-        <div className="max-w-2xl mx-auto rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-8 text-center">
+      <main className="min-h-screen flex items-center justify-center bg-[var(--wk-bg)]">
+        <div className="max-w-md mx-auto text-center px-6">
           <WkIcon name="BarChart3" size={42} className="mx-auto mb-4 text-[var(--wk-text-faint)]" />
-          <h1 className="wk-h-section mb-2">Could not load chart data</h1>
-          <p className="text-[var(--wk-text-muted)] mb-6">Something went wrong while loading this chart edition.</p>
+          <h1 className="text-[24px] font-black tracking-[-.03em] text-[var(--wk-text)] mb-2">Could not load chart</h1>
+          <p className="text-[14px] text-[var(--wk-text-muted)] mb-6">{state.error}</p>
           <div className="flex items-center justify-center gap-3">
-            <button onClick={handleRetry} className="wk-button wk-button-primary">
+            <button onClick={handleRetry} className="chart-hero-v2-cta">
               <i className="ri-refresh-line" /> Retry
             </button>
-            <button onClick={() => setShowErrorDetails(!showErrorDetails)} className="wk-button wk-button-ghost">
-              {showErrorDetails ? "Hide" : "Show"} details
-            </button>
-          </div>
-          {showErrorDetails && (
-            <div className="mt-4 text-left rounded-xl bg-[var(--wk-bg)] p-4 font-mono text-[12px] text-[var(--wk-text-soft)] overflow-auto">
-              {state.error}
-            </div>
-          )}
-
-          {/* Collapsible diagnostics */}
-          <div className="mt-6 border-t border-[var(--wk-border)] pt-4">
-            <button
-              onClick={() => setShowDiagnostics(!showDiagnostics)}
-              className="flex items-center gap-2 text-[12px] text-[var(--wk-text-muted)] mx-auto"
-            >
-              <i className={`ri-${showDiagnostics ? "arrow-up" : "arrow-down"}-s-line`} />
-              {showDiagnostics ? "Hide" : "Show"} diagnostics
-            </button>
-            {showDiagnostics && (
-              <div className="mt-3 text-left rounded-lg bg-[var(--wk-bg)] p-3 space-y-1 font-mono text-[11px] text-[var(--wk-text-soft)]">
-                <div className="grid grid-cols-[100px_1fr] gap-1">
-                  <span className="text-[var(--wk-text-faint)]">Mode</span>
-                  <span>{import.meta.env.VITE_CHARTS_PUBLIC_MODE ?? "mock"}</span>
-                  <span className="text-[var(--wk-text-faint)]">Family slug</span>
-                  <span>{series ?? "—"}</span>
-                  <span className="text-[var(--wk-text-faint)]">Edition slug</span>
-                  <span>{editionSlug ?? "latest"}</span>
-                  <span className="text-[var(--wk-text-faint)]">Endpoint</span>
-                  <span>GET /charts/{series}{editionSlug ? `/${editionSlug}` : "/latest"}</span>
-                  <span className="text-[var(--wk-text-faint)]">Error status</span>
-                  <span>{state.error.includes("HTTP") ? state.error.match(/HTTP\s+(\d+)/)?.[1] ?? "—" : "—"}</span>
-                  <span className="text-[var(--wk-text-faint)]">Message</span>
-                  <span className="text-[var(--wk-danger)]">{state.error}</span>
-                  <span className="text-[var(--wk-text-faint)]">Retryable</span>
-                  <span>{state.retryable ? "Yes" : "No"}</span>
-                </div>
-              </div>
-            )}
+            <Link to="/charts" className="chart-hero-v2-cta chart-hero-v2-cta-ghost">
+              Back to charts
+            </Link>
           </div>
         </div>
       </main>
     );
   }
 
+  // ─── Family not found ───
   if (state.status === "family_not_found") {
     return (
-      <main className="min-h-screen wk-container px-6 py-20">
-        <div className="max-w-2xl mx-auto rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-8 text-center">
+      <main className="min-h-screen flex items-center justify-center bg-[var(--wk-bg)]">
+        <div className="max-w-md mx-auto text-center px-6">
           <WkIcon name="BarChart3" size={42} className="mx-auto mb-4 text-[var(--wk-text-faint)]" />
-          <h1 className="wk-h-section mb-2">Chart not found</h1>
-          <p className="text-[var(--wk-text-muted)] mb-6">The chart series you are looking for does not exist.</p>
-          <Link to="/charts" className="wk-button wk-button-primary">
+          <h1 className="text-[24px] font-black tracking-[-.03em] text-[var(--wk-text)] mb-2">Chart not found</h1>
+          <p className="text-[14px] text-[var(--wk-text-muted)] mb-6">The chart series you are looking for does not exist.</p>
+          <Link to="/charts" className="chart-hero-v2-cta">
             <i className="ri-arrow-left-line" /> Back to charts
           </Link>
         </div>
@@ -351,23 +341,24 @@ export default function ChartEdition() {
     );
   }
 
+  // ─── Edition not found ───
   if (state.status === "edition_not_found") {
     return (
-      <main className="min-h-screen wk-container px-6 py-20">
-        <div className="max-w-2xl mx-auto rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-8 text-center">
+      <main className="min-h-screen flex items-center justify-center bg-[var(--wk-bg)]">
+        <div className="max-w-md mx-auto text-center px-6">
           <WkIcon name="BarChart3" size={42} className="mx-auto mb-4 text-[var(--wk-text-faint)]" />
-          <h1 className="wk-h-section mb-2">Edition not found</h1>
-          <p className="text-[var(--wk-text-muted)] mb-6">
+          <h1 className="text-[24px] font-black tracking-[-.03em] text-[var(--wk-text)] mb-2">Edition not found</h1>
+          <p className="text-[14px] text-[var(--wk-text-muted)] mb-6">
             The edition <code className="font-mono text-[12px] bg-[var(--wk-bg)] px-1 rounded">{editionSlug}</code> does not exist in the <strong>{state.familyLabel}</strong> series.
           </p>
           <div className="flex items-center justify-center gap-3">
             {state.latestEditionSlug && (
-              <Link to={getCanonicalChartPathFromSlugs(state.familySlug, state.latestEditionSlug)} className="wk-button wk-button-primary">
+              <Link to={getCanonicalChartPathFromSlugs(state.familySlug, state.latestEditionSlug)} className="chart-hero-v2-cta">
                 <i className="ri-arrow-right-line" /> Latest edition
               </Link>
             )}
-            <Link to="/charts" className="wk-button wk-button-ghost">
-              <i className="ri-arrow-left-line" /> Back to charts
+            <Link to="/charts" className="chart-hero-v2-cta chart-hero-v2-cta-ghost">
+              Back to charts
             </Link>
           </div>
         </div>
@@ -375,19 +366,20 @@ export default function ChartEdition() {
     );
   }
 
+  // ─── Empty state ───
   if (state.status === "empty") {
     return (
-      <main className="min-h-screen wk-container px-6 py-20">
-        <div className="max-w-2xl mx-auto rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-8 text-center">
+      <main className="min-h-screen flex items-center justify-center bg-[var(--wk-bg)]">
+        <div className="max-w-md mx-auto text-center px-6">
           <WkIcon name="BarChart3" size={42} className="mx-auto mb-4 text-[var(--wk-text-faint)]" />
-          <h1 className="wk-h-section mb-2">No published chart edition found</h1>
-          <p className="text-[var(--wk-text-muted)] mb-6">There are no entries for this chart edition yet.</p>
+          <h1 className="text-[24px] font-black tracking-[-.03em] text-[var(--wk-text)] mb-2">No published chart edition found</h1>
+          <p className="text-[14px] text-[var(--wk-text-muted)] mb-6">There are no entries for this chart edition yet.</p>
           <div className="flex items-center justify-center gap-3">
-            <button onClick={handleRetry} className="wk-button wk-button-primary">
+            <button onClick={handleRetry} className="chart-hero-v2-cta">
               <i className="ri-refresh-line" /> Refresh
             </button>
-            <Link to="/charts" className="wk-button wk-button-ghost">
-              <i className="ri-arrow-left-line" /> Back to charts
+            <Link to="/charts" className="chart-hero-v2-cta chart-hero-v2-cta-ghost">
+              Back to charts
             </Link>
           </div>
         </div>
@@ -395,25 +387,36 @@ export default function ChartEdition() {
     );
   }
 
-  const { edition, entries, familyLabel, publicSlug, sourceFamilySlug, archive, meta, canonicalized, requestedSlug } = state;
-  const topTrack = entries[0] ?? null;
+  // ─── Loaded state ───
+  const { edition, entries, familyLabel, publicSlug, archive, meta, requestedSlug, canonicalized, sourceFamilySlug } = state;
+  const topTrack = entries[0];
   const top3 = entries.slice(0, 3);
   const rows = entries.slice(3);
+  const INITIAL_DISPLAY_COUNT = 20;
+  const hasMoreEntries = rows.length > displayedCount;
+  const canCollapse = displayedCount > INITIAL_DISPLAY_COUNT;
+  const displayedRows = rows.slice(0, displayedCount);
+  const nextLoadCount = Math.min(PAGE_SIZE, rows.length - displayedCount);
+  const totalRemaining = rows.length - displayedCount;
 
-  const playAt = (idx: number) => {
-    const track = chartTracks[idx];
-    if (!track) return;
-    playTrack(track, chartTracks);
-  };
+  if (!entries.length || !topTrack) {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-[var(--wk-bg)]">
+        <div className="text-center">
+          <WkIcon name="BarChart3" size={42} className="mx-auto mb-4 text-[var(--wk-text-faint)]" />
+          <h1 className="text-[24px] font-black text-[var(--wk-text)] mb-2">No chart entries available</h1>
+          <p className="text-[14px] text-[var(--wk-text-muted)]">This chart edition has no entries to display.</p>
+        </div>
+      </main>
+    );
+  }
 
-  // Subtle metadata
   const metaLine = meta.isStale
     ? `Loaded from cache (stale) · Last updated ${new Date(meta.fetchedAt).toLocaleString()}`
     : meta.dataSource === "cache"
     ? `Loaded from cache · Last updated ${new Date(meta.fetchedAt).toLocaleString()}`
     : `Loaded from ${meta.dataSource === "mock" ? "mock data" : "WordPress API"} · ${new Date(meta.fetchedAt).toLocaleTimeString()}`;
 
-  // Diagnostics data
   const diagnosticsData = {
     requestedSlug,
     resolvedSourceFamilySlug: sourceFamilySlug,
@@ -425,147 +428,194 @@ export default function ChartEdition() {
     totalEntries: entries.length,
   };
 
-  if (!entries.length || !topTrack) {
-    return (
-      <main className="wk-container px-6 py-20 text-center">
-        <WkIcon name="BarChart3" size={42} className="mx-auto mb-4 text-[var(--wk-text-faint)]" />
-        <h1 className="wk-h-section mb-2">No chart entries available</h1>
-        <p className="text-[var(--wk-text-muted)]">This chart edition has no entries to display.</p>
-      </main>
-    );
-  }
-
   return (
-    <main className="min-h-screen">
-      <section className="chart-edition-hero">
-        <div className="chart-edition-bg" style={{ backgroundImage: `url(${topTrack.artworkUrl})` }} />
-        <div className="chart-edition-shade" />
-        <div className="chart-edition-inner wk-container-wide">
-          <div className="chart-edition-grid">
-            <div>
-              <div className="chart-edition-kicker">
-                <WkIcon name="BarChart3" size={14} /> {familyLabel}
-              </div>
-              {/* Show publicLabel as the main title */}
-              <h1 className="chart-edition-title">{edition.publicLabel}</h1>
-              <p className="chart-edition-sub">
-                {edition.label} · {edition.date}. {edition.totalEntries} ranked positions, {edition.totalArtists} artists, {edition.newEntries} new entries.
-              </p>
-              {/* Taxonomy chips */}
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--wk-brand)]/20 bg-[var(--wk-brand)]/10 px-3 py-1 text-[11px] text-[var(--wk-brand)]">
-                  <span className="font-bold">Series:</span> {edition.seriesLabel}
-                </span>
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-1 text-[11px] text-[var(--wk-text-muted)]">
-                  <span className="font-bold text-[var(--wk-text)]">Market:</span> {edition.marketLabel}
-                </span>
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-1 text-[11px] text-[var(--wk-text-muted)]">
-                  <span className="font-bold text-[var(--wk-text)]">Methodology:</span> {edition.methodologyVersion}
-                </span>
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-1 text-[11px] text-[var(--wk-text-muted)]">
-                  <span className="font-bold text-[var(--wk-text)]">Eligibility:</span> {edition.eligibilityRulesVersion}
-                </span>
-              </div>
-              <div className="chart-edition-actions">
-                <button className="wk-button wk-button-primary" onClick={() => playAt(0)}>
-                  <WkIcon name="Play" size={16} /> Play #1
-                </button>
-                <button className="wk-button wk-button-ghost" onClick={() => playAt(0)}>
-                  <WkIcon name="ListMusic" size={16} /> Play chart
-                </button>
-                <Link to="/charts" className="wk-button wk-button-ghost">
-                  <WkIcon name="Archive" size={16} /> Archive
-                </Link>
-                <ShareButton
-                  item={{
-                    title: edition.publicLabel,
-                    subtitle: edition.label || "Current edition",
-                    description: edition.methodology,
-                    imageUrl: topTrack.artworkUrl,
-                    type: "chart",
-                  }}
-                />
-              </div>
-              <div className="chart-stats-strip">
-                <Stat value={edition.totalEntries} label="Entries" />
-                <Stat value={edition.totalArtists} label="Artists" />
-                <Stat value={edition.newEntries} label="New" />
-                <Stat value={edition.longestRunning?.weeks ?? "—"} label="Longest" />
-              </div>
-            </div>
-            <aside className="chart-no1-card">
-              <div className="chart-no1-art">
-                <img src={topTrack.artworkUrl} alt="" />
-                <div className="chart-no1-badge">#1</div>
-              </div>
-              <div className="chart-no1-title">{topTrack.title}</div>
-              <div className="chart-no1-artist">
-                {topTrack.artist} · Peak #{topTrack.peakPosition}
-              </div>
-            </aside>
+    <main className="min-h-screen bg-[var(--wk-bg)]">
+
+      {/* ═══════════════════════ HERO ═══════════════════════ */}
+      <section className="chart-hero-v2">
+        <div className="chart-hero-v2-media">
+          <img
+            ref={heroImgRef}
+            src={topTrack.artworkUrl}
+            alt=""
+            className="chart-hero-v2-img"
+          />
+        </div>
+        <div className="chart-hero-v2-overlay" />
+        <div className="chart-hero-v2-grain" />
+
+        <div className="chart-hero-v2-content">
+          {/* Date badge */}
+          <div className="chart-hero-v2-issue-badge">
+            <span className="chart-hero-v2-badge-num">{edition.date}</span>
+            <span className="chart-hero-v2-badge-sep">·</span>
+            <span>{edition.totalEntries} positions</span>
           </div>
+
+          {/* Chart family eyebrow */}
+          <div className="chart-hero-v2-eyebrow">
+            <i className="ri-bar-chart-2-line text-[13px]" />
+            {familyLabel}
+          </div>
+
+          <h1 className="chart-hero-v2-title">{edition.publicLabel}</h1>
+
+          <p className="chart-hero-v2-sub">
+            {edition.label}. {edition.totalEntries} ranked positions across {edition.totalArtists} artists, with {edition.newEntries} new entries this week.
+          </p>
+
+          {/* Metadata pills */}
+          <div className="chart-hero-v2-meta-strip">
+            <span className="chart-hero-v2-meta-pill">
+              <span className="font-bold text-white/90">Series:</span> {edition.seriesLabel}
+            </span>
+            <span className="chart-hero-v2-meta-pill">
+              <span className="font-bold text-white/90">Market:</span> {edition.marketLabel}
+            </span>
+            <span className="chart-hero-v2-meta-pill">
+              <span className="font-bold text-white/90">Methodology:</span> {edition.methodologyVersion}
+            </span>
+          </div>
+
+          {/* CTAs */}
+          <div className="chart-hero-v2-actions">
+            <button onClick={() => playAt(0)} className="chart-hero-v2-cta">
+              <WkIcon name="Play" size={16} /> Play #1
+            </button>
+            <button onClick={() => playAt(0)} className="chart-hero-v2-cta chart-hero-v2-cta-ghost">
+              <WkIcon name="ListMusic" size={16} /> Play chart
+            </button>
+            <Link to="/charts" className="chart-hero-v2-cta chart-hero-v2-cta-ghost">
+              <WkIcon name="Archive" size={16} /> Archive
+            </Link>
+            <ShareButton
+              item={{
+                title: edition.publicLabel,
+                subtitle: edition.label || "Current edition",
+                description: edition.methodology,
+                imageUrl: topTrack.artworkUrl,
+                type: "chart",
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Scroll hint */}
+        <div className="chart-hero-v2-scroll-hint">
+          <div className="chart-hero-v2-scroll-line" />
+          <span className="chart-hero-v2-scroll-text">Scroll to explore</span>
         </div>
       </section>
 
-      <div className="wk-container-wide px-4 py-10 md:px-6">
-        {/* Archive switcher — use publicSlug for links */}
+      {/* ═══════════════════════ STICKY SUBNAV ═══════════════════════ */}
+      <nav className="chart-subnav">
+        <div className="chart-subnav-inner">
+          <div className="chart-subnav-label">
+            <span className="chart-subnav-dot" />
+            {familyLabel} · {edition.date}
+          </div>
+          <div className="chart-subnav-actions">
+            <button onClick={() => playAt(0)} className="chart-subnav-btn">
+              <WkIcon name="Play" size={13} /> Play
+            </button>
+            <Link to="/charts" className="chart-subnav-btn">
+              <WkIcon name="Archive" size={13} /> All charts
+            </Link>
+            <ChartRefreshButton onRefresh={load} size="sm" />
+          </div>
+        </div>
+      </nav>
+
+      {/* ═══════════════════════ CONTENT BODY ═══════════════════════ */}
+      <div className="chart-page-body">
+
+        {/* ── Archive Carousel ── */}
         {archive.previous.length > 0 && (
-          <section className="mb-10">
-            <div className="mb-4 flex items-end justify-between gap-4">
-              <div>
-                <div className="section-kicker">Archive</div>
-                <h2 className="section-title">Edition history</h2>
-              </div>
+          <section className="chart-reveal">
+            <div className="chart-section-header">
+              <div className="chart-section-eyebrow">Edition history</div>
+              <h2 className="chart-section-title">Recent editions</h2>
+              <p className="chart-section-sub">Browse through previous editions of this chart series.</p>
             </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="chart-archive-carousel">
               {archive.latest && (
                 <Link
                   to={`/charts/${publicSlug}/${archive.latest.slug}`}
-                  className={`rounded-xl border p-4 transition-all hover:border-[var(--wk-brand)]/40 ${
-                    archive.latest.slug === edition.slug
-                      ? "border-[var(--wk-brand)] bg-[var(--wk-brand)]/5"
-                      : "border-[var(--wk-border)] bg-[var(--wk-surface)]"
-                  }`}
+                  className={`chart-archive-card ${archive.latest.slug === edition.slug ? "active" : ""}`}
                 >
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--wk-brand)] mb-1">Latest</div>
-                  <div className="text-[14px] font-bold text-[var(--wk-text)]">{archive.latest.label}</div>
-                  <div className="text-[12px] text-[var(--wk-text-muted)]">{archive.latest.date} · {archive.latest.entryCount} entries</div>
+                  <span className="chart-archive-card-badge">Latest</span>
+                  <span className="chart-archive-card-label">{archive.latest.label}</span>
+                  <span className="chart-archive-card-date">{archive.latest.date} · {archive.latest.entryCount} entries</span>
+                  {(archive.latest.newCount !== undefined || archive.latest.droppedCount !== undefined) && (
+                    <div className="flex items-center gap-2 mt-1.5">
+                      {archive.latest.newCount !== undefined && archive.latest.newCount > 0 && (
+                        <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-[var(--wk-success)]">
+                          <i className="ri-arrow-up-line text-[10px]" />
+                          {archive.latest.newCount} new
+                        </span>
+                      )}
+                      {archive.latest.droppedCount !== undefined && archive.latest.droppedCount > 0 && (
+                        <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-[var(--wk-danger)]">
+                          <i className="ri-arrow-down-line text-[10px]" />
+                          {archive.latest.droppedCount} out
+                        </span>
+                      )}
+                      {archive.latest.newCount === 0 && archive.latest.droppedCount === 0 && (
+                        <span className="text-[10px] text-[var(--wk-text-faint)]">No changes</span>
+                      )}
+                    </div>
+                  )}
                   {archive.latest.no1Track && (
-                    <div className="mt-2 flex items-center gap-2">
-                      <div className="h-6 w-6 rounded overflow-hidden bg-[var(--wk-surface-raised)]">
+                    <div className="chart-archive-card-no1">
+                      <div className="chart-archive-card-art">
                         {archive.latest.no1Track.artworkUrl ? (
-                          <img src={archive.latest.no1Track.artworkUrl} alt="" className="h-full w-full object-cover" />
+                          <img src={archive.latest.no1Track.artworkUrl} alt="" />
                         ) : (
-                          <i className="ri-music-2-line text-[10px] flex items-center justify-center h-full" />
+                          <Ch19GradientImage slug={archive.latest.no1Track.slug || `archive-${archive.latest.slug}`} name={archive.latest.no1Track.title} />
                         )}
                       </div>
-                      <div className="text-[11px] text-[var(--wk-text-muted)] truncate">{archive.latest.no1Track.title}</div>
+                      <span className="chart-archive-card-track">#{archive.latest.no1Track.title}</span>
                     </div>
                   )}
                 </Link>
               )}
-              {archive.previous.slice(0, 3).map((item) => (
+              {archive.previous.slice(0, 8).map((item) => (
                 <Link
                   key={item.slug}
                   to={`/charts/${publicSlug}/${item.slug}`}
-                  className={`rounded-xl border p-4 transition-all hover:border-[var(--wk-brand)]/40 ${
-                    item.slug === edition.slug
-                      ? "border-[var(--wk-brand)] bg-[var(--wk-brand)]/5"
-                      : "border-[var(--wk-border)] bg-[var(--wk-surface)]"
-                  }`}
+                  className={`chart-archive-card ${item.slug === edition.slug ? "active" : ""}`}
                 >
-                  <div className="text-[14px] font-bold text-[var(--wk-text)]">{item.label}</div>
-                  <div className="text-[12px] text-[var(--wk-text-muted)]">{item.date} · {item.entryCount} entries</div>
+                  <span className="chart-archive-card-label">{item.label}</span>
+                  <span className="chart-archive-card-date">{item.date} · {item.entryCount} entries</span>
+                  {(item.newCount !== undefined || item.droppedCount !== undefined) && (
+                    <div className="flex items-center gap-2 mt-1.5">
+                      {item.newCount !== undefined && item.newCount > 0 && (
+                        <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-[var(--wk-success)]">
+                          <i className="ri-arrow-up-line text-[10px]" />
+                          {item.newCount} new
+                        </span>
+                      )}
+                      {item.droppedCount !== undefined && item.droppedCount > 0 && (
+                        <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-[var(--wk-danger)]">
+                          <i className="ri-arrow-down-line text-[10px]" />
+                          {item.droppedCount} out
+                        </span>
+                      )}
+                      {item.newCount === 0 && item.droppedCount === 0 && (
+                        <span className="text-[10px] text-[var(--wk-text-faint)]">No changes</span>
+                      )}
+                    </div>
+                  )}
                   {item.no1Track && (
-                    <div className="mt-2 flex items-center gap-2">
-                      <div className="h-6 w-6 rounded overflow-hidden bg-[var(--wk-surface-raised)]">
+                    <div className="chart-archive-card-no1">
+                      <div className="chart-archive-card-art">
                         {item.no1Track.artworkUrl ? (
-                          <img src={item.no1Track.artworkUrl} alt="" className="h-full w-full object-cover" />
+                          <img src={item.no1Track.artworkUrl} alt="" />
                         ) : (
-                          <i className="ri-music-2-line text-[10px] flex items-center justify-center h-full" />
+                          <Ch19GradientImage slug={item.no1Track.slug || `archive-${item.slug}`} name={item.no1Track.title} />
                         )}
                       </div>
-                      <div className="text-[11px] text-[var(--wk-text-muted)] truncate">{item.no1Track.title}</div>
+                      <span className="chart-archive-card-track">#{item.no1Track.title}</span>
                     </div>
                   )}
                 </Link>
@@ -574,228 +624,409 @@ export default function ChartEdition() {
           </section>
         )}
 
-        <section className="chart-top3-grid">
-          {top3.map((entry, idx) => (
-            <Link
-              key={`${entry.rank}-${entry.slug}`}
-              to={`/tracks/${entry.slug}`}
-              className="chart-podium-card"
-            >
-              <img src={entry.artworkUrl} alt="" />
-              <div className={`chart-podium-rank ${rankTone(entry.rank)}`}>{entry.rank}</div>
-              <div className="chart-podium-body">
-                <div className="chart-podium-title">{entry.title}</div>
-                <div className="chart-podium-artist">
-                  {entry.artist} · {movementLabel(entry)}
-                </div>
-                <button
-                  onClick={(e) => {
-                    e.preventDefault();
-                    playAt(idx);
-                  }}
-                  className="wk-button wk-button-sm wk-button-primary mt-3"
-                >
-                  <WkIcon name="Play" size={14} /> Play
-                </button>
-              </div>
-            </Link>
-          ))}
-        </section>
-
-        <section className="chart-trajectory">
-          <div className="chart-trajectory-head">
-            <div>
-              <div className="section-kicker">#1 trajectory</div>
-              <div className="section-title" style={{ fontSize: 24 }}>
-                {topTrack.title}
-              </div>
-            </div>
-            <div className="artist-list-sub">
-              {topTrack.weeksOnChart || 0} weeks · Peak #{topTrack.peakPosition}
-            </div>
+        {/* ── Top 3 Podium ── */}
+        <section className="chart-reveal">
+          <div className="chart-section-header">
+            <div className="chart-section-eyebrow">Podium</div>
+            <h2 className="chart-section-title">Top 3 this week</h2>
           </div>
-          <div className="chart-trajectory-line">
-            {trajectory.map((height, i) => (
-              <div key={i} className="chart-trajectory-bar" style={{ height: `${height}%` }} />
+          <div className="chart-podium-v2">
+            {top3.map((entry, idx) => (
+              <Link
+                key={`${entry.rank}-${entry.slug}`}
+                to={`/tracks/${entry.slug}`}
+                className="chart-podium-v2-card"
+              >
+                <img src={entry.artworkUrl} alt="" className="chart-podium-v2-img" />
+                <div className="chart-podium-v2-overlay" />
+                <div className={`chart-podium-v2-rank ${rankTone(entry.rank)}`}>{entry.rank}</div>
+                <div className="chart-podium-v2-body">
+                  <div className="chart-podium-v2-title">{entry.title}</div>
+                  <div className="chart-podium-v2-artist">
+                    {entry.artist}
+                    {entry.movement === "new" ? " · NEW" : entry.movement === "up" ? ` · +${entry.movementAmount ?? 0}` : entry.movement === "down" ? ` · -${entry.movementAmount ?? 0}` : ""}
+                  </div>
+                  <button
+                    onClick={(e) => { e.preventDefault(); playAt(idx); }}
+                    className="chart-podium-v2-play"
+                  >
+                    <WkIcon name="Play" size={13} /> Play
+                  </button>
+                </div>
+              </Link>
             ))}
           </div>
         </section>
 
-        <section className="chart-table-shell">
-          <div>
-            <div className="section-head">
-              <div>
-                <div className="section-kicker">Positions 4–{entries.length}</div>
-                <h2 className="section-title">Full ranked list</h2>
-              </div>
-              <p className="section-copy">
-                Rows after the podium stay dense for comparison, movement, weeks, peak, source, and play actions.
-              </p>
-            </div>
-            <div className="chart-table-card">
-              {rows.map((entry, idx) => (
-                <Link
-                  key={`${entry.rank}-${entry.slug}`}
-                  to={`/tracks/${entry.slug}`}
-                  className="chart-row-39"
-                >
-                  <div className="chart-row-rank">{entry.rank}</div>
-                  <div className="chart-row-art">
-                    <img src={entry.artworkUrl} alt="" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="chart-row-name">{entry.title}</div>
-                    <div className="chart-row-sub">
-                      {entry.artist} · {entry.genre || "Genre pending"}
-                    </div>
-                  </div>
-                  <div className="chart-row-stats">
-                    Peak #{entry.peakPosition}
-                    <br />
-                    {entry.weeksOnChart || 0} weeks
-                  </div>
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      playAt(idx + 3);
-                    }}
-                    className="chart-btn"
-                  >
-                    <WkIcon name="Play" size={14} />
-                  </button>
-                </Link>
-              ))}
-            </div>
+        {/* ── Biggest Movers ── */}
+        <section className="chart-reveal">
+          <div className="chart-section-header">
+            <div className="chart-section-eyebrow">Movement radar</div>
+            <h2 className="chart-section-title">Biggest movers this week</h2>
+            {hasMovementData ? (
+              <p className="chart-section-sub">The tracks that made the most dramatic shifts — one soaring, one sliding. Here's what the data says.</p>
+            ) : (
+              <p className="chart-section-sub">This is the earliest edition available — there's no prior chart date to compare against. Movement data will appear once a second edition is published.</p>
+            )}
           </div>
 
-          <aside className="chart-side-stack">
-            <SideCard
-              title="New entries"
-              entries={newEntries}
-              metric={(entry) => "NEW"}
-            />
-            <SideCard
-              title="Biggest climbers"
-              entries={climbers}
-              metric={(entry) => `+${entry.movementAmount ?? 0}`}
-            />
-            <div className="chart-side-card">
-              <div className="chart-side-title">Genre breakdown</div>
-              {genreBreakdown.map((g) => {
-                const pct = entries.length ? Math.round((g.count / entries.length) * 100) : 0;
-                return (
-                  <div key={g.genre} className="mb-3">
-                    <div className="flex justify-between text-[12px]">
-                      <b>{g.genre}</b>
-                      <span className="text-[var(--wk-text-muted)]">{pct}%</span>
+          {hasMovementData ? (
+            <div className="chart-movers-duet">
+              {/* ── Biggest climber ── */}
+              {biggestUpMover ? (
+                <Link
+                  to={`/tracks/${biggestUpMover.slug}`}
+                  className="chart-mover-card chart-mover-card--up"
+                >
+                  <div className="chart-mover-card-badge chart-mover-card-badge--up">
+                    <i className="ri-arrow-up-line" />
+                    <span>Biggest climber</span>
+                  </div>
+
+                  <div className="chart-mover-card-body">
+                    <div className="chart-mover-card-art">
+                      <img src={biggestUpMover.artworkUrl ?? undefined} alt="" />
+                      <div className="chart-mover-card-rank-pip chart-mover-card-rank-pip--up">
+                        #{biggestUpMover.rank}
+                      </div>
                     </div>
-                    <div className="mt-1 h-2 overflow-hidden rounded-full bg-[var(--wk-bg)]">
-                      <div className="h-full rounded-full bg-[var(--wk-brand)]" style={{ width: `${pct}%` }} />
+
+                    <div className="chart-mover-card-info">
+                      <div className="chart-mover-card-title">{biggestUpMover.title}</div>
+                      <div className="chart-mover-card-artist">{biggestUpMover.artist}</div>
+
+                      <div className="chart-mover-card-delta">
+                        <span className="chart-mover-card-delta-val chart-mover-card-delta-val--up">
+                          +{biggestUpMover.movementAmount ?? 0}
+                        </span>
+                        <span className="chart-mover-card-delta-range">
+                          from #{biggestUpMover.previousRank} to #{biggestUpMover.rank}
+                        </span>
+                      </div>
+
+                      <p className="chart-mover-card-story">
+                        {biggestUpMover.rank <= 10
+                          ? `A massive ${biggestUpMover.movementAmount ?? 0}-position leap propels this track straight into the top 10. The biggest upward surge of any track this week — momentum doesn't get more decisive than this.`
+                          : biggestUpMover.rank <= 20
+                          ? `Climbing ${biggestUpMover.movementAmount ?? 0} spots in a single week, this track is charging toward the top tier with unstoppable velocity. No other track gained more ground this edition.`
+                          : `The most aggressive climb of the week — ${biggestUpMover.movementAmount ?? 0} positions gained. From the outskirts of the ranking into serious contention, this is the kind of move that signals a breakout.`}
+                      </p>
+
+                      <div className="chart-mover-card-context">
+                        <span>{biggestUpMover.weeksOnChart || 0} weeks on chart</span>
+                        <span className="opacity-40">·</span>
+                        <span>Peak #{biggestUpMover.peakPosition}</span>
+                      </div>
                     </div>
                   </div>
-                );
-              })}
-            </div>
-            <div className="chart-side-card">
-              <div className="chart-side-title">Archive / series</div>
-              <Link to="/charts" className="chart-archive-link">
-                <span>All charts</span>
-                <WkIcon name="ArrowRight" size={14} />
-              </Link>
-            </div>
-          </aside>
-        </section>
-      </div>
+                </Link>
+              ) : (
+                <div className="chart-mover-card chart-mover-card--empty">
+                  <div className="chart-mover-card-badge chart-mover-card-badge--neutral">
+                    <span>No climbers</span>
+                  </div>
+                  <p className="text-[14px] text-[var(--wk-text-muted)] text-center py-8">
+                    No tracks moved up this week.
+                  </p>
+                </div>
+              )}
 
-      {/* Subtle metadata */}
-      <div className="border-t border-[var(--wk-border)] bg-[var(--wk-bg)]">
-        <div className="wk-container-wide px-4 py-3 md:px-6 flex items-center justify-between gap-3">
-          <div className="text-[11px] text-[var(--wk-text-faint)]">{metaLine}</div>
-          <ChartRefreshButton onRefresh={load} size="sm" />
-        </div>
-      </div>
+              {/* ── Biggest fall ── */}
+              {biggestDownMover ? (
+                <Link
+                  to={`/tracks/${biggestDownMover.slug}`}
+                  className="chart-mover-card chart-mover-card--down"
+                >
+                  <div className="chart-mover-card-badge chart-mover-card-badge--down">
+                    <i className="ri-arrow-down-line" />
+                    <span>Steepest drop</span>
+                  </div>
 
-      {/* Diagnostics panel — hidden by default, toggleable */}
-      <div className="border-t border-[var(--wk-border)] bg-[var(--wk-bg)]">
-        <div className="wk-container-wide px-4 py-2 md:px-6">
-          <button
-            onClick={() => setShowDiagnostics(!showDiagnostics)}
-            className="flex items-center gap-2 text-[11px] text-[var(--wk-text-muted)] hover:text-[var(--wk-text)] transition-colors"
-          >
-            <i className={`ri-${showDiagnostics ? "arrow-up" : "arrow-down"}-s-line`} />
-            {showDiagnostics ? "Hide" : "Show"} diagnostics
-          </button>
-          {showDiagnostics && (
-            <div className="mt-2 text-left rounded-lg bg-[var(--wk-surface)] border border-[var(--wk-border)] p-3 space-y-1 font-mono text-[11px] text-[var(--wk-text-soft)]">
-              <div className="grid grid-cols-[140px_1fr] gap-1">
-                <span className="text-[var(--wk-text-faint)]">Requested slug</span>
-                <span>{diagnosticsData.requestedSlug}</span>
-                <span className="text-[var(--wk-text-faint)]">Resolved sourceFamilySlug</span>
-                <span>{diagnosticsData.resolvedSourceFamilySlug}</span>
-                <span className="text-[var(--wk-text-faint)]">Canonical publicSlug</span>
-                <span className="text-[var(--wk-brand)]">{diagnosticsData.canonicalPublicSlug}</span>
-                <span className="text-[var(--wk-text-faint)]">Edition slug</span>
-                <span>{diagnosticsData.editionSlug}</span>
-                <span className="text-[var(--wk-text-faint)]">Edition label</span>
-                <span>{diagnosticsData.editionLabel}</span>
-                <span className="text-[var(--wk-text-faint)]">Data source</span>
-                <span>{diagnosticsData.dataSource}</span>
-                <span className="text-[var(--wk-text-faint)]">Canonicalized</span>
-                <span className={diagnosticsData.canonicalized === "Yes" ? "text-[var(--wk-brand)]" : ""}>
-                  {diagnosticsData.canonicalized}
-                </span>
-                <span className="text-[var(--wk-text-faint)]">Total entries</span>
-                <span>{diagnosticsData.totalEntries}</span>
+                  <div className="chart-mover-card-body">
+                    <div className="chart-mover-card-art">
+                      <img src={biggestDownMover.artworkUrl ?? undefined} alt="" />
+                      <div className="chart-mover-card-rank-pip chart-mover-card-rank-pip--down">
+                        #{biggestDownMover.rank}
+                      </div>
+                    </div>
+
+                    <div className="chart-mover-card-info">
+                      <div className="chart-mover-card-title">{biggestDownMover.title}</div>
+                      <div className="chart-mover-card-artist">{biggestDownMover.artist}</div>
+
+                      <div className="chart-mover-card-delta">
+                        <span className="chart-mover-card-delta-val chart-mover-card-delta-val--down">
+                          −{biggestDownMover.movementAmount ?? 0}
+                        </span>
+                        <span className="chart-mover-card-delta-range">
+                          from #{biggestDownMover.previousRank} to #{biggestDownMover.rank}
+                        </span>
+                      </div>
+
+                      <p className="chart-mover-card-story">
+                        {biggestDownMover.previousRank !== null && biggestDownMover.previousRank <= 10
+                          ? `A ${biggestDownMover.movementAmount ?? 0}-position tumble from the top 10. Once commanding a premium spot, this track now faces the steepest decline of any entry this week — a sharp correction that reshuffles the upper tier.`
+                          : biggestDownMover.previousRank !== null && biggestDownMover.previousRank <= 20
+                          ? `Slipping ${biggestDownMover.movementAmount ?? 0} positions, this track experienced the single largest downward shift this week. Momentum can be fleeting, and this drop marks the most dramatic reversal on the chart.`
+                          : `The heaviest fall of the edition — down ${biggestDownMover.movementAmount ?? 0} spots. Whether it's a temporary dip or the start of a longer slide, no other track lost more ground this week.`}
+                      </p>
+
+                      <div className="chart-mover-card-context">
+                        <span>{biggestDownMover.weeksOnChart || 0} weeks on chart</span>
+                        <span className="opacity-40">·</span>
+                        <span>Peak #{biggestDownMover.peakPosition}</span>
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+              ) : (
+                <div className="chart-mover-card chart-mover-card--empty">
+                  <div className="chart-mover-card-badge chart-mover-card-badge--neutral">
+                    <span>No drops</span>
+                  </div>
+                  <p className="text-[14px] text-[var(--wk-text-muted)] text-center py-8">
+                    No tracks dropped this week.
+                  </p>
+                </div>
+              )}
+            </div>
+          ) : null}
+          </section>
+
+        {/* ── Full Leaderboard + Sidebar ── */}
+        <section className="chart-reveal" id="chart-leaderboard">
+          <div className="chart-section-header">
+            <div className="chart-section-eyebrow">Full ranking</div>
+            <h2 className="chart-section-title">Positions 4–{entries.length}</h2>
+            <p className="chart-section-sub">Every track ranked by composite score. Click any row for full track details, or play directly.</p>
+          </div>
+          <div className="chart-body-grid">
+            {/* Table */}
+            <div className="chart-table-card-v2 flex flex-col gap-0.5 p-2">
+              {displayedRows.map((entry, idx) => (
+                <div
+                  key={`${entry.rank}-${entry.slug}`}
+                  id={`edition-entry-${entry.slug}`}
+                  className={`rounded-xl transition-colors duration-700 ${highlightedSlug === entry.slug ? "bg-[var(--wk-brand-soft)]" : ""}`}
+                >
+                  <ChartRow
+                    rank={entry.rank}
+                    artworkUrl={entry.artworkUrl ?? undefined}
+                    title={entry.title}
+                    artist={entry.artist}
+                    artistNames={entry.artistNames}
+                    artistSlugs={entry.artistSlugs}
+                    movement={entry.movement}
+                    movementAmount={entry.movementAmount ?? undefined}
+                    previousRank={entry.previousRank}
+                    weeksOnChart={entry.weeksOnChart}
+                    peakPosition={entry.peakPosition}
+                    isPlayable={entry.isPlayable}
+                    source={entry.source}
+                    genre={entry.genre ?? undefined}
+                    slug={entry.slug}
+                    score={entry.score}
+                    duration={entry.duration}
+                    onPlay={() => playAt(idx + 3)}
+                  />
+                </div>
+              ))}
+            </div>
+
+            {/* Sidebar */}
+            <aside className="chart-sidebar-v2">
+              {/* New entries */}
+              <div className="chart-sidebox-v2">
+                <div className="chart-sidebox-v2-title">New entries</div>
+                {newEntries.map((entry) => (
+                  <Link
+                    key={`new-${entry.rank}-${entry.slug}`}
+                    to={`/tracks/${entry.slug}`}
+                    className="chart-sidebox-v2-row"
+                  >
+                    <span className="chart-sidebox-v2-row-metric">NEW</span>
+                    <div className="chart-sidebox-v2-row-art">
+                      <img src={entry.artworkUrl} alt="" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="chart-sidebox-v2-row-name">{entry.title}</div>
+                      <div className="chart-sidebox-v2-row-sub">{entry.artist}</div>
+                    </div>
+                    <WkIcon name="ArrowRightS" size={13} />
+                  </Link>
+                ))}
+                {newEntries.length === 0 && (
+                  <p className="text-[12px] text-[var(--wk-text-faint)] py-2">No new entries this week.</p>
+                )}
+              </div>
+
+              {/* Biggest climbers */}
+              <div className="chart-sidebox-v2">
+                <div className="chart-sidebox-v2-title">Biggest climbers</div>
+                {climbers.map((entry) => (
+                  <Link
+                    key={`climb-${entry.rank}-${entry.slug}`}
+                    to={`/tracks/${entry.slug}`}
+                    className="chart-sidebox-v2-row"
+                  >
+                    <span className="chart-sidebox-v2-row-metric">+{entry.movementAmount ?? 0}</span>
+                    <div className="chart-sidebox-v2-row-art">
+                      <img src={entry.artworkUrl} alt="" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="chart-sidebox-v2-row-name">{entry.title}</div>
+                      <div className="chart-sidebox-v2-row-sub">{entry.artist}</div>
+                    </div>
+                    <WkIcon name="ArrowRightS" size={13} />
+                  </Link>
+                ))}
+                {climbers.length === 0 && (
+                  <p className="text-[12px] text-[var(--wk-text-faint)] py-2">No climbers this week.</p>
+                )}
+              </div>
+
+              {/* Genre breakdown */}
+              <div className="chart-sidebox-v2">
+                <div className="chart-sidebox-v2-title">Genre breakdown</div>
+                {genreBreakdown.map((g) => {
+                  const pct = entries.length ? Math.round((g.count / entries.length) * 100) : 0;
+                  return (
+                    <div key={g.genre} className="chart-sidebox-v2-genre-row">
+                      <div className="chart-sidebox-v2-genre-label">
+                        <span>{g.genre}</span>
+                        <span className="chart-sidebox-v2-genre-pct">{pct}%</span>
+                      </div>
+                      <div className="chart-sidebox-v2-genre-bar">
+                        <div className="chart-sidebox-v2-genre-fill" style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Quick links */}
+              <div className="chart-sidebox-v2">
+                <div className="chart-sidebox-v2-title">Quick links</div>
+                <Link to="/charts" className="chart-sidebox-v2-link">
+                  <span>All charts</span>
+                  <WkIcon name="ArrowRight" size={14} />
+                </Link>
+                <Link to={getCanonicalChartPath(publicSlug)} className="chart-sidebox-v2-link">
+                  <span>Latest edition</span>
+                  <WkIcon name="ArrowRight" size={14} />
+                </Link>
+              </div>
+            </aside>
+          </div>
+
+          {/* Load more / collapse */}
+          {(hasMoreEntries || canCollapse) && (
+            <div className="chart-load-more-v2">
+              <div className="flex items-center gap-3">
+                {hasMoreEntries && (
+                  <button
+                    onClick={() => setDisplayedCount((n) => Math.min(n + PAGE_SIZE, rows.length))}
+                    className="chart-load-more-v2-btn"
+                  >
+                    <WkIcon name="ArrowDownS" size={14} />
+                    Load {nextLoadCount} more
+                    <span className="opacity-50 text-[11px]">({totalRemaining} left)</span>
+                  </button>
+                )}
+                {canCollapse && (
+                  <button
+                    onClick={() => {
+                      setDisplayedCount(INITIAL_DISPLAY_COUNT);
+                      document.getElementById("chart-leaderboard")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                    }}
+                    className="chart-load-more-v2-btn"
+                    style={{ opacity: 0.6 }}
+                  >
+                    <WkIcon name="ArrowUpS" size={14} /> Collapse
+                  </button>
+                )}
               </div>
             </div>
           )}
+        </section>
+
+        {/* ── Artist Rolodex ── */}
+        <ArtistRolodex
+          entries={entries}
+          onJumpTo={handleJumpTo}
+          familyLabel={familyLabel}
+        />
+
+        {/* ── Newsletter ── */}
+        <section className="chart-reveal chart-newsletter-v2">
+          <div className="chart-newsletter-v2-inner">
+            <div className="chart-newsletter-v2-icon">
+              <i className="ri-mail-line" />
+            </div>
+            <h2 className="chart-newsletter-v2-heading">Stay in the loop</h2>
+            <p className="chart-newsletter-v2-body">
+              Weekly roundups of {familyLabel} chart movements, new entries, and analysis. No spam, ever.
+            </p>
+            <form
+              data-readdy-form
+              action="https://readdy.ai/api/form/d8gpjt4gel9neuviahfg"
+              method="POST"
+              className="chart-newsletter-v2-form"
+            >
+              <div className="chart-newsletter-v2-input-wrap">
+                <i className="ri-mail-line chart-newsletter-v2-input-icon" />
+                <input
+                  type="email"
+                  name="email"
+                  placeholder="your@email.com"
+                  required
+                  className="chart-newsletter-v2-input"
+                />
+              </div>
+              <button type="submit" className="chart-newsletter-v2-submit">
+                Subscribe
+              </button>
+            </form>
+            <p className="chart-newsletter-v2-footer">Unsubscribe anytime. We respect your inbox.</p>
+          </div>
+        </section>
+      </div>
+
+      {/* ═══════════════════════ METADATA BAR ═══════════════════════ */}
+      <div className="chart-meta-bar">
+        <div className="chart-meta-bar-inner">
+          <span className="chart-meta-bar-text">{metaLine}</span>
+          <button
+            onClick={() => setShowDiagnostics(!showDiagnostics)}
+            className="chart-meta-bar-toggle"
+          >
+            <i className={`ri-${showDiagnostics ? "arrow-up" : "arrow-down"}-s-line text-[12px]`} />
+            {showDiagnostics ? "Hide" : "Show"} diagnostics
+          </button>
         </div>
+        {showDiagnostics && (
+          <div className="chart-meta-bar-inner">
+            <div className="chart-meta-bar-diagnostics">
+              <span className="text-[var(--wk-text-faint)]">Requested slug</span>
+              <span>{diagnosticsData.requestedSlug}</span>
+              <span className="text-[var(--wk-text-faint)]">Resolved sourceFamilySlug</span>
+              <span>{diagnosticsData.resolvedSourceFamilySlug}</span>
+              <span className="text-[var(--wk-text-faint)]">Canonical publicSlug</span>
+              <span className="text-[var(--wk-brand)]">{diagnosticsData.canonicalPublicSlug}</span>
+              <span className="text-[var(--wk-text-faint)]">Edition slug</span>
+              <span>{diagnosticsData.editionSlug}</span>
+              <span className="text-[var(--wk-text-faint)]">Edition label</span>
+              <span>{diagnosticsData.editionLabel}</span>
+              <span className="text-[var(--wk-text-faint)]">Data source</span>
+              <span>{diagnosticsData.dataSource}</span>
+              <span className="text-[var(--wk-text-faint)]">Canonicalized</span>
+              <span className={diagnosticsData.canonicalized === "Yes" ? "text-[var(--wk-brand)]" : ""}>{diagnosticsData.canonicalized}</span>
+              <span className="text-[var(--wk-text-faint)]">Total entries</span>
+              <span>{diagnosticsData.totalEntries}</span>
+            </div>
+          </div>
+        )}
       </div>
     </main>
-  );
-}
-
-function Stat({ value, label }: { value: string | number; label: string }) {
-  return (
-    <div className="chart-stat-card">
-      <div className="chart-stat-value">{value}</div>
-      <div className="chart-stat-label">{label}</div>
-    </div>
-  );
-}
-
-function SideCard({
-  title,
-  entries,
-  metric,
-}: {
-  title: string;
-  entries: ChartEntryRowViewModel[];
-  metric: (entry: ChartEntryRowViewModel) => string;
-}) {
-  return (
-    <div className="chart-side-card">
-      <div className="chart-side-title">{title}</div>
-      {entries.map((entry) => (
-        <Link
-          key={`${title}-${entry.rank}-${entry.slug}`}
-          to={`/tracks/${entry.slug}`}
-          className="chart-signal-row"
-        >
-          <div className="chart-row-rank text-[12px]">{metric(entry)}</div>
-          <div className="chart-signal-art">
-            <img src={entry.artworkUrl} alt="" />
-          </div>
-          <div className="min-w-0">
-            <div className="chart-row-name text-[12px]">{entry.title}</div>
-            <div className="chart-row-sub">{entry.artist}</div>
-          </div>
-          <WkIcon name="ArrowRight" size={13} />
-        </Link>
-      ))}
-      {entries.length === 0 && (
-        <div className="artist-list-sub">No entries for this signal.</div>
-      )}
-    </div>
   );
 }

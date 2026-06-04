@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { getCountryFlagUrl, getCountryAccent, getCountryLabel } from "@/utils/countries";
+import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 
 interface OriginArtist {
   slug: string;
@@ -96,9 +97,7 @@ export function OriginBento({ groups }: OriginBentoProps) {
                         {a.imageUrl ? (
                           <img src={a.imageUrl} alt="" className="h-full w-full object-cover object-top" />
                         ) : (
-                          <span className="flex h-full w-full items-center justify-center text-[8px] text-[var(--wk-text-faint)]">
-                            <i className="ri-user-3-line" />
-                          </span>
+                          <Ch19GradientImage slug={a.slug} name={a.name} />
                         )}
                       </span>
                       {a.name}

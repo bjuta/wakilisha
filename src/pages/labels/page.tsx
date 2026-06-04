@@ -222,7 +222,7 @@ export default function Labels() {
               <div className="label43-spot-body">
                 <div className="label43-logo">
                   {spotlight.logoUrl ? (
-                    <img src={spotlight.logoUrl} alt="" />
+                    <img src={spotlight.logoUrl} alt="" className="h-full w-full object-cover" />
                   ) : (
                     initials(spotlight.name)
                   )}
@@ -359,7 +359,7 @@ function LabelMini({ label }: { label: RepairedLabel }) {
     <Link to={`/labels/${label.slug}`} className="label43-mini">
       <div className="label43-mini-logo">
         {label.logoUrl ? (
-          <img src={label.logoUrl} alt="" />
+          <img src={label.logoUrl} alt="" className="h-full w-full object-contain" />
         ) : (
           initials(label.name)
         )}
@@ -382,7 +382,7 @@ function LabelTile({ label }: { label: RepairedLabel }) {
       <div className="label43-card-head">
         <div className="label43-card-logo">
           {label.logoUrl ? (
-            <img src={label.logoUrl} alt="" />
+            <img src={label.logoUrl} alt="" className="h-full w-full object-contain" />
           ) : (
             initials(label.name)
           )}

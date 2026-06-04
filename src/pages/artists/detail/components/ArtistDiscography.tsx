@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
 import { AlbumModal } from "@/components/design-system/releases/AlbumModal";
+import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 import type { ModalRelease } from "@/components/design-system/releases/AlbumModal";
 
 interface DiscoRelease {
@@ -67,9 +68,7 @@ function ReleaseCard({
             className="h-full w-full object-cover object-top transition-transform duration-700 group-hover:scale-[1.06]"
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center">
-            <i className="ri-album-line text-5xl text-[var(--wk-text-faint)]" />
-          </div>
+          <Ch19GradientImage slug={release.slug} name={release.title} />
         )}
 
         {/* Type chip on artwork */}

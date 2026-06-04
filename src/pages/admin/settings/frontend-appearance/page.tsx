@@ -10,6 +10,33 @@ import {
   type FrontendAppearanceSettings,
 } from "@/services/adminSettings/settingsTypes";
 
+/* ──── Hero density helpers ──── */
+function getColumnCount(imageCount: number): number {
+  if (imageCount <= 1) return 1;
+  if (imageCount <= 3) return 2;
+  if (imageCount <= 8) return 3;
+  if (imageCount <= 20) return 4;
+  if (imageCount <= 40) return 5;
+  if (imageCount <= 60) return 7;
+  if (imageCount <= 90) return 9;
+  if (imageCount <= 120) return 11;
+  if (imageCount <= 160) return 14;
+  return Math.min(20, Math.round(imageCount / 9));
+}
+
+function getDensityLabel(count: number): { label: string; description: string; color: string } {
+  if (count <= 1) return { label: "Full-width portrait", description: "One single artist, completely filling the hero — maximum impact, minimum crowd", color: "var(--wk-brand)" };
+  if (count <= 3) return { label: "Duet", description: "2 columns — two faces side by side, intimate and editorial", color: "var(--wk-v-music)" };
+  if (count <= 8) return { label: "Sparse mosaic", description: "3 columns — breathing room, each face gets space and weight", color: "var(--wk-v-intel)" };
+  if (count <= 20) return { label: "Light grid", description: "4 columns — a curated shortlist, feels like a gallery lineup", color: "var(--wk-v-film)" };
+  if (count <= 40) return { label: "Standard collage", description: "5 columns — the default. Rich, visual, immersive without being overwhelming", color: "var(--wk-success)" };
+  if (count <= 60) return { label: "Dense mosaic", description: "7 columns — starts to feel like a living wall of faces", color: "var(--wk-v-fashion)" };
+  if (count <= 90) return { label: "Magazine wall", description: "9 columns — editorial density, every face is still distinct", color: "var(--wk-warning)" };
+  if (count <= 120) return { label: "Editorial tapestry", description: "11 columns — near-cinematic. Faces begin to weave together", color: "var(--wk-v-food)" };
+  if (count <= 160) return { label: "Gallery canvas", description: "14 columns — a true canvas. Individual faces become part of a larger texture", color: "var(--wk-v-places)" };
+  return { label: "Maximum density", description: `${getColumnCount(count)} columns — extreme density. The continent's faces become a single living mural`, color: "var(--wk-danger)" };
+}
+
 export default function AdminSettingsFrontendAppearance() {
   const [settings, setSettings] = useState<FrontendAppearanceSettings>(getFrontendAppearanceSettings());
   const [saved, setSaved] = useState(false);
@@ -171,6 +198,117 @@ export default function AdminSettingsFrontendAppearance() {
               <option value="collapse_by_year">Collapse by Year</option>
             </select>
           </div>
+        </div>
+      </WkSurface>
+
+      {/* Artist Hero Image Count */}
+      <WkSurface className="p-5">
+        <h2 className="text-[14px] font-bold text-[var(--wk-text)] mb-1 flex items-center gap-2">
+          <WkIcon name="LayoutGrid" size={16} />
+          Artists Hero — Image Canvas Density
+        </h2>
+        <p className="text-[12px] text-[var(--wk-text-muted)] mb-5">
+          Controls how many artist images appear in the full-bleed masonry collage on the Artists page hero.
+          At 1, it&apos;s a fullwidth single portrait. At 200, it&apos;s a 20-column mural.
+        </p>
+
+        {/* Slider */}
+        <div className="mb-4">
+          <div className="mb-3 flex items-center justify-between">
+            <label className="text-[12px] font-semibold text-[var(--wk-text-muted)]">Image count</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={1}
+                max={200}
+                value={settings.artistHeroImageCount}
+                onChange={(e) => {
+                  const v = Math.max(1, Math.min(200, Number(e.target.value)));
+                  update("artistHeroImageCount", v);
+                }}
+                className="w-16 rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-2 py-1 text-[13px] font-bold text-center text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none"
+              />
+              <span className="text-[12px] text-[var(--wk-text-faint)]">/200</span>
+            </div>
+          </div>
+          <input
+            type="range"
+            min={1}
+            max={200}
+            value={settings.artistHeroImageCount}
+            onChange={(e) => update("artistHeroImageCount", Number(e.target.value))}
+            className="w-full h-2 rounded-full cursor-pointer accent-[var(--wk-brand)]"
+          />
+          <div className="mt-1.5 flex justify-between text-[10px] text-[var(--wk-text-faint)]">
+            <span>1 — Fullwidth portrait</span>
+            <span>200 — 20-col mural</span>
+          </div>
+        </div>
+
+        {/* Density indicator */}
+        {(() => {
+          const density = getDensityLabel(settings.artistHeroImageCount);
+          const cols = getColumnCount(settings.artistHeroImageCount);
+          return (
+            <div className="rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] p-4">
+              <div className="flex items-start gap-4">
+                {/* Visual column preview */}
+                <div className="shrink-0 flex items-end gap-[3px] h-12">
+                  {Array.from({ length: Math.min(cols, 20) }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="rounded-sm flex-1"
+                      style={{
+                        width: `${Math.max(3, Math.floor(80 / Math.min(cols, 20)))}px`,
+                        height: `${48 - (i % 3) * 8}px`,
+                        background: density.color,
+                        opacity: 0.7 + (i % 2) * 0.2,
+                      }}
+                    />
+                  ))}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-[13px] font-bold text-[var(--wk-text)]" style={{ color: density.color }}>
+                      {density.label}
+                    </span>
+                    <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold bg-[var(--wk-surface-raised)] text-[var(--wk-text-muted)]">
+                      {cols} col{cols !== 1 ? "s" : ""}
+                    </span>
+                    <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold bg-[var(--wk-surface-raised)] text-[var(--wk-text-muted)]">
+                      {settings.artistHeroImageCount} images
+                    </span>
+                  </div>
+                  <p className="text-[12px] text-[var(--wk-text-muted)] leading-relaxed">{density.description}</p>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Quick preset buttons */}
+        <div className="mt-4 flex flex-wrap gap-2">
+          <span className="self-center text-[11px] font-bold uppercase tracking-[0.1em] text-[var(--wk-text-faint)] mr-1">Quick presets</span>
+          {[
+            { label: "1 (portrait)", value: 1 },
+            { label: "12 (light)", value: 12 },
+            { label: "40 (default)", value: 40 },
+            { label: "80 (dense)", value: 80 },
+            { label: "150 (tapestry)", value: 150 },
+            { label: "200 (mural)", value: 200 },
+          ].map((p) => (
+            <button
+              key={p.value}
+              onClick={() => update("artistHeroImageCount", p.value)}
+              className={`inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-bold transition-all ${
+                settings.artistHeroImageCount === p.value
+                  ? "border-[var(--wk-brand)] bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]"
+                  : "border-[var(--wk-border)] text-[var(--wk-text-muted)] hover:border-[var(--wk-brand)] hover:text-[var(--wk-brand)]"
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
         </div>
       </WkSurface>
 

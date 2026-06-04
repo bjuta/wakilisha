@@ -1,5 +1,6 @@
 import { usePlayer } from "@/context/PlayerContext";
 import { WkTag } from "@/components/design-system/primitives/Tag";
+import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 
 export interface TrackRowProps {
   position?: number;
@@ -65,9 +66,7 @@ export function TrackRow({
         {artworkUrl ? (
           <img src={artworkUrl} alt="" className="h-full w-full object-cover" />
         ) : (
-          <div className="flex h-full w-full items-center justify-center text-[var(--wk-text-faint)]">
-            <i className="ri-music-2-line text-lg" />
-          </div>
+          <Ch19GradientImage slug={trackId} name={title} />
         )}
         <button
             onClick={handlePlay}

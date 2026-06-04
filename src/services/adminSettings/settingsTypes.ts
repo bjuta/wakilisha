@@ -4,6 +4,7 @@ export type AdminSettingsDomain =
   | "charts"
   | "integrations"
   | "gscData"
+  | "siteIdentity"
   | "frontendAppearance"
   | "playerPlayback"
   | "registry"
@@ -27,6 +28,15 @@ export interface SettingsDomainMeta {
 }
 
 export const SETTINGS_DOMAINS: SettingsDomainMeta[] = [
+  {
+    key: "siteIdentity",
+    label: "Site Identity",
+    description: "Logo, site name, tagline, and favicon — the face of WAKILISHA across every page",
+    icon: "Fingerprint",
+    route: "/admin/settings/site-identity",
+    health: "healthy",
+    primaryAction: "Edit identity",
+  },
   {
     key: "charts",
     label: "Charts",
@@ -289,6 +299,7 @@ export interface FrontendAppearanceSettings {
   defaultLabelHeroFallback: string;
   defaultLoginBackground: string;
   archiveFilterBehavior: "show_all" | "collapse_by_year";
+  artistHeroImageCount: number;
 }
 
 export const DEFAULT_FRONTEND_APPEARANCE_SETTINGS: FrontendAppearanceSettings = {
@@ -301,6 +312,23 @@ export const DEFAULT_FRONTEND_APPEARANCE_SETTINGS: FrontendAppearanceSettings = 
   defaultLabelHeroFallback: "",
   defaultLoginBackground: "",
   archiveFilterBehavior: "collapse_by_year",
+  artistHeroImageCount: 40,
+};
+
+/* ──────── Site Identity ──────── */
+
+export interface SiteIdentitySettings {
+  logoUrl: string;
+  siteName: string;
+  tagline: string;
+  faviconUrl: string;
+}
+
+export const DEFAULT_SITE_IDENTITY_SETTINGS: SiteIdentitySettings = {
+  logoUrl: "",
+  siteName: "WAKILISHA",
+  tagline: "Documenting and shaping contemporary African culture",
+  faviconUrl: "",
 };
 
 /* ──────── Player & Playback ──────── */
@@ -520,6 +548,7 @@ export interface AdminSettingsState {
   charts: ChartSettings;
   integrations: IntegrationSettings;
   gscData: GscSettings;
+  siteIdentity: SiteIdentitySettings;
   frontendAppearance: FrontendAppearanceSettings;
   playerPlayback: PlayerPlaybackSettings;
   registry: RegistrySettings;
@@ -535,6 +564,7 @@ export const DEFAULT_ADMIN_SETTINGS: AdminSettingsState = {
   charts: DEFAULT_CHART_SETTINGS,
   integrations: DEFAULT_INTEGRATION_SETTINGS,
   gscData: DEFAULT_GSC_SETTINGS,
+  siteIdentity: DEFAULT_SITE_IDENTITY_SETTINGS,
   frontendAppearance: DEFAULT_FRONTEND_APPEARANCE_SETTINGS,
   playerPlayback: DEFAULT_PLAYER_PLAYBACK_SETTINGS,
   registry: DEFAULT_REGISTRY_SETTINGS,

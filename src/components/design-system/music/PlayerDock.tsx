@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { usePlayer } from "@/context/PlayerContext";
+import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 
 export function PlayerDock() {
   const {
@@ -48,9 +49,7 @@ export function PlayerDock() {
                 className="h-full w-full object-cover object-top"
               />
             ) : (
-              <div className="flex h-full w-full items-center justify-center">
-                <i className="ri-music-2-line text-[var(--wk-text-faint)]" />
-              </div>
+              <Ch19GradientImage slug={currentTrack.id} name={currentTrack.title} />
             )}
           </div>
           <div className="min-w-0">

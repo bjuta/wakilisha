@@ -171,7 +171,7 @@ export default function AuthorProfilePage() {
       return (
         <Link key={`${story.slug}-${globalIndex}`} to={`/magazine/${story.slug}`} className="author-mag-card-portrait">
           <div className="author-mag-card-portrait-image">
-            <img src={story.heroUrl} alt="" loading="lazy" />
+            <img src={story.heroUrl} alt="" loading="lazy" className="w-full h-full object-cover" />
           </div>
           <div className="author-mag-card-portrait-body">
             <span className="author-mag-card-section">{story.section}</span>
@@ -194,7 +194,7 @@ export default function AuthorProfilePage() {
       return (
         <Link key={`${story.slug}-${globalIndex}`} to={`/magazine/${story.slug}`} className="author-mag-card-feature">
           <div className="author-mag-card-feature-image">
-            <img src={story.heroUrl} alt="" loading="lazy" />
+            <img src={story.heroUrl} alt="" loading="lazy" className="w-full h-full object-cover" />
           </div>
           <div className="author-mag-card-feature-body">
             <span className="author-mag-card-section">{story.section}</span>
@@ -217,7 +217,7 @@ export default function AuthorProfilePage() {
       return (
         <Link key={`${story.slug}-${globalIndex}`} to={`/magazine/${story.slug}`} className="author-mag-card-wide">
           <div className="author-mag-card-wide-image">
-            <img src={story.heroUrl} alt="" loading="lazy" />
+            <img src={story.heroUrl} alt="" loading="lazy" className="w-full h-full object-cover" />
           </div>
           <div className="author-mag-card-wide-body">
             <span className="author-mag-card-section">{story.section}</span>
@@ -424,7 +424,7 @@ export default function AuthorProfilePage() {
                 {/* Featured Hero Cover */}
                 <Link to={`/magazine/${featuredArticles[0].slug}`} className="author-mag-featured-hero block">
                   <div className="author-mag-featured-hero-image">
-                    <img src={featuredArticles[0].heroUrl} alt="" />
+                    <img src={featuredArticles[0].heroUrl} alt="" className="w-full h-full object-cover" />
                   </div>
                   <div className="author-mag-featured-hero-overlay">
                     <div className="author-mag-featured-hero-eye">Featured Story</div>
@@ -458,7 +458,7 @@ export default function AuthorProfilePage() {
                             className="author-mag-carousel-card"
                           >
                             <div className="author-mag-carousel-card-image">
-                              <img src={story.heroUrl} alt="" loading="lazy" />
+                              <img src={story.heroUrl} alt="" loading="lazy" className="w-full h-full object-cover" />
                             </div>
                             <div className="author-mag-carousel-card-body">
                               <div className="author-mag-carousel-card-section">{story.section}</div>

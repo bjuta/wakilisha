@@ -8,6 +8,7 @@ import {
   type ChartSettings,
   type IntegrationSettings,
   type GscSettings,
+  type SiteIdentitySettings,
   type FrontendAppearanceSettings,
   type PlayerPlaybackSettings,
   type RegistrySettings,
@@ -39,6 +40,8 @@ export function saveSettings(state: AdminSettingsState): SettingsSaveResult {
   }
   try {
     localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(state));
+    // Notify all listeners (same-tab reactivity)
+    window.dispatchEvent(new CustomEvent("wk_settings_changed"));
     return { ok: true, message: "Settings saved" };
   } catch {
     return { ok: false, error: "Failed to save settings", code: "save_failed" };
@@ -152,6 +155,10 @@ export function getMaintenanceSettings(): MaintenanceSettings {
 
 export function getNavigationSettings(): NavigationSettings {
   return loadSettings().navigation;
+}
+
+export function getSiteIdentitySettings(): SiteIdentitySettings {
+  return loadSettings().siteIdentity;
 }
 
 /* ──────── Secret masking ──────── */

@@ -39,7 +39,7 @@ export function AlbumModal({ release, open, onClose }: AlbumModalProps) {
     <div className="album-modal-backdrop" onClick={onClose} role="dialog" aria-modal="true">
       <div data-scroll-lock="container" className="album-modal" onClick={(event) => event.stopPropagation()}>
         <div className="album-modal-head">
-          <div className="album-modal-cover"><img src={release.artworkUrl} alt={release.title} /></div>
+          <div className="album-modal-cover"><img src={release.artworkUrl} alt={release.title} className="h-full w-full object-cover" /></div>
           <div>
             <div className="album41-kicker"><WkIcon name="Album" size={14} /> {release.releaseType}</div>
             <h2 className="album-modal-title">{release.title}</h2>
