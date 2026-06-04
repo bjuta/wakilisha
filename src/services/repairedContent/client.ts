@@ -1,4 +1,5 @@
 import { listMagazineArticles, toRepairedStory } from '@/services/magazineArticles';
+import { withPlaceholderImage } from '@/utils/imagePlaceholders';
 
 export type RepairedStory = {
   id: string;
@@ -90,12 +91,28 @@ export async function listMagazineStories(): Promise<RepairedStory[]> {
 
 export async function listArtists(): Promise<RepairedArtist[]> {
   const result = await repairedGet<{ artists: RepairedArtist[] }>("/artists");
-  return result.artists;
+  return result.artists.map((artist) => ({
+    ...artist,
+    imageUrl: withPlaceholderImage(artist.imageUrl, {
+      id: artist.id,
+      slug: artist.slug,
+      name: artist.name,
+      type: "artist",
+    }),
+  }));
 }
 
 export async function listReleases(): Promise<RepairedRelease[]> {
   const result = await repairedGet<{ releases: RepairedRelease[] }>("/releases");
-  return result.releases;
+  return result.releases.map((release) => ({
+    ...release,
+    artworkUrl: withPlaceholderImage(release.artworkUrl, {
+      id: release.id,
+      slug: release.slug,
+      name: release.title,
+      type: "release",
+    }),
+  }));
 }
 
 export type RepairedReleaseDetail = {
@@ -134,7 +151,26 @@ export function releaseUrl(release: { slug: string; artist: string }): string {
 
 export async function getRelease(artistSlug: string, releaseSlug: string): Promise<RepairedReleaseDetail | null> {
   const result = await repairedGet<{ release: RepairedReleaseDetail | null }>(`/releases/${artistSlug}/${releaseSlug}`);
-  return result.release || null;
+  if (!result.release) return null;
+
+  return {
+    ...result.release,
+    artworkUrl: withPlaceholderImage(result.release.artworkUrl, {
+      id: result.release.id,
+      slug: result.release.slug,
+      name: result.release.title,
+      type: "release",
+    }),
+    tracks: result.release.tracks.map((track) => ({
+      ...track,
+      artworkUrl: withPlaceholderImage(track.artworkUrl, {
+        id: track.id,
+        slug: track.slug,
+        name: track.title,
+        type: "track",
+      }),
+    })),
+  };
 }
 
 export async function listGenres(): Promise<RepairedGenre[]> {
@@ -208,10 +244,78 @@ export type RepairedArtistDetail = {
 
 export async function getArtist(slug: string): Promise<RepairedArtistDetail | null> {
   const result = await repairedGet<{ artist: RepairedArtistDetail | null }>(`/artists/${slug}`);
-  return result.artist || null;
+  if (!result.artist) return null;
+
+  const artist = result.artist;
+  const artistImage = withPlaceholderImage(artist.imageUrl, {
+    id: artist.id,
+    slug: artist.slug,
+    name: artist.name,
+    type: "artist",
+  });
+
+  return {
+    ...artist,
+    imageUrl: artistImage,
+    profileImageUrl: withPlaceholderImage(artist.profileImageUrl ?? artist.imageUrl, {
+      id: artist.id,
+      slug: artist.slug,
+      name: artist.name,
+      type: "artist",
+    }),
+    chartEntries: artist.chartEntries.map((entry) => ({
+      ...entry,
+      artworkUrl: withPlaceholderImage(entry.artworkUrl, {
+        slug: entry.slug,
+        name: entry.title,
+        type: "track",
+      }),
+    })),
+    releases: artist.releases.map((release) => ({
+      ...release,
+      artworkUrl: withPlaceholderImage(release.artworkUrl, {
+        slug: release.slug,
+        name: release.title,
+        type: "release",
+      }),
+    })),
+    topSongs: artist.topSongs.map((song) => ({
+      ...song,
+      image: withPlaceholderImage(song.image, {
+        slug: song.songUrl,
+        name: song.title,
+        type: "track",
+      }),
+    })),
+    relatedArtists: artist.relatedArtists.map((related) => ({
+      ...related,
+      imageUrl: withPlaceholderImage(related.imageUrl, {
+        slug: related.slug,
+        name: related.name,
+        type: "artist",
+      }),
+    })),
+    videos: artist.videos?.map((video) => ({
+      ...video,
+      thumbnail: withPlaceholderImage(video.thumbnail, {
+        id: video.id,
+        slug: video.url,
+        name: video.title,
+        type: "track",
+      }),
+    })),
+  };
 }
 
 export async function listLabels(): Promise<RepairedLabel[]> {
   const result = await repairedGet<{ labels: RepairedLabel[] }>("/labels");
-  return result.labels;
+  return result.labels.map((label) => ({
+    ...label,
+    logoUrl: withPlaceholderImage(label.logoUrl, {
+      id: label.id,
+      slug: label.slug,
+      name: label.name,
+      type: "label",
+    }),
+  }));
 }
