@@ -33,7 +33,7 @@ import AdminReleaseDetailPage from "../pages/admin/registry/releases/detail/page
 import AdminLabelDetailPage from "../pages/admin/registry/labels/detail/page";
 import AdminGenreDetailPage from "../pages/admin/registry/genres/detail/page";
 import AdminImportsJobDetailPage from "../pages/admin/imports/jobs/detail/page";
-import AdminImportsUploadPage from "../pages/admin/imports/upload/page";
+import AdminImportsUploadPage from "../pages/admin/imports/upload/real-page";
 import AdminImportsReportsPage from "../pages/admin/imports/reports/page";
 import AdminImportsStagingPage from "../pages/admin/imports/staging/page";
 import AdminImportsFailedPage from "../pages/admin/imports/failed/page";
