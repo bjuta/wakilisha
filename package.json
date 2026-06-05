@@ -47,6 +47,7 @@
     "dev:v2": "tsx scripts/dev/start-chart-v2-dev.ts",
     "extract:local": "WAKILISHA_SKIP_DOWNLOAD=1 WAKILISHA_IMPORT_ZIP_PATH=./wakilisha_supabase_import_2026-05-30.zip tsx packages/migration/src/extractZip.ts",
     "extract:zip": "tsx packages/migration/src/extractZip.ts",
+    "magazine:visual-assets-api": "tsx scripts/magazine/serve-visual-assets-api.ts",
     "migration:audit": "tsx packages/migration/src/index.ts audit",
     "migration:chunked-seed": "tsx packages/migration/src/chunkedSeed.ts",
     "migration:generate-registry": "tsx packages/migration/src/generateRegistry.ts",
