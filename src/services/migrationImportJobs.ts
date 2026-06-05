@@ -93,3 +93,34 @@ export function totalImported(run?: Pick<IngestionRun, 'imported_counts'> | null
   if (!run?.imported_counts) return 0;
   return Object.values(run.imported_counts).reduce((sum, value) => sum + (typeof value === 'number' ? value : 0), 0);
 }
+
+// ---- Trigger the processor ----
+export type ProcessResult = {
+  success: boolean;
+  runId: string;
+  stats: { total: number; imported: number; failed: number; skipped: number };
+  importedCounts: Record<string, number>;
+  errorCount: number;
+  warningCount: number;
+  error?: string;
+};
+
+export async function processImportRun(runId: string, maxItems = 500): Promise<ProcessResult> {
+  const { data, error } = await supabase.functions.invoke("process-wp-import", {
+    body: { runId, maxItems },
+  });
+
+  if (error) {
+    return {
+      success: false,
+      runId,
+      stats: { total: 0, imported: 0, failed: 0, skipped: 0 },
+      importedCounts: {},
+      errorCount: 0,
+      warningCount: 0,
+      error: error.message,
+    };
+  }
+
+  return data as ProcessResult;
+}

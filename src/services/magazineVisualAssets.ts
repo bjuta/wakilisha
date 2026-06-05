@@ -41,7 +41,7 @@ function emitChange() { if (typeof window !== 'undefined') window.dispatchEvent(
 function readLocal(): MagazineVisualAsset[] { if (!canUseStorage()) return []; try { const raw = window.localStorage.getItem(STORAGE_KEY); if (!raw) return []; const parsed = JSON.parse(raw); return Array.isArray(parsed) ? parsed : []; } catch { return []; } }
 function writeLocal(assets: MagazineVisualAsset[]) { if (!canUseStorage()) return; window.localStorage.setItem(STORAGE_KEY, JSON.stringify(assets)); }
 function sortAssets(assets: MagazineVisualAsset[]) { return [...assets].sort((a, b) => b.updated_at.localeCompare(a.updated_at)); }
-async function request<T>(url: string, init?: RequestInit): Promise<T> { const response = await fetch(url, { ...init, headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...(init?.headers ?? {}) } }); if (!response.ok) throw new Error(`Visual assets API ${response.status}`); return response.json() as Promise<T>; }
+async function request<T>(url: string, init?: Record<string, unknown>): Promise<T> { const response = await fetch(url, { ...init, headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...((init?.headers as Record<string, string>) ?? {}) } }); if (!response.ok) throw new Error(`Visual assets API ${response.status}`); return response.json() as Promise<T>; }
 
 type Envelope<T> = { data?: T };
 
