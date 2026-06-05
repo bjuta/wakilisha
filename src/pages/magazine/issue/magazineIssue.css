@@ -25,6 +25,12 @@
   font-family: var(--mag-body);
 }
 
+.mag-shell-mood-paper { --mag-black: #14110b; --mag-paper: #f7f3e7; --mag-green: #6c982f; }
+.mag-shell-mood-travel { --mag-black: #071111; --mag-paper: #f3f0df; --mag-green: #4fd9c2; --mag-green-hi: #a4dc60; }
+.mag-shell-mood-signal { --mag-black: #070814; --mag-paper: #f2f1e8; --mag-green: #9c8ff5; --mag-green-hi: #84c241; }
+.mag-shell-mood-archive { --mag-black: #0e0d0a; --mag-paper: #eee8d7; --mag-green: #e6a85c; --mag-green-hi: #84c241; }
+.mag-shell-mood-image { --mag-black: #070a08; --mag-paper: #f2f1e8; --mag-green: #6ba8f5; --mag-green-hi: #84c241; }
+
 .magazine-shell { max-width: 1120px; margin: 0 auto; padding: clamp(18px, 4vw, 44px) clamp(12px, 3vw, 28px) 80px; }
 .magazine-spread { position: relative; overflow: hidden; margin: 0 auto 32px; border-radius: 4px; box-shadow: 0 40px 100px -55px rgba(0,0,0,.75), 0 0 0 1px color-mix(in srgb, var(--wk-border) 70%, transparent); }
 .magazine-spread.dark { background: var(--mag-black); color: var(--mag-on-dark); }
@@ -44,8 +50,12 @@
 .mag-bolt svg { width: 100%; height: 100%; }
 
 .mag-cover { min-height: min(1240px, 122svh); isolation: isolate; background: #070805; }
-.mag-cover::before { content: ''; position: absolute; inset: 0; z-index: 0; background: radial-gradient(95% 55% at 50% 30%, rgba(28,34,22,.9), transparent 70%), linear-gradient(180deg,#0b0e08 0%,#090b07 52%,#060704 100%); }
-.mag-cover::after { content: ''; position: absolute; left: 0; right: 0; bottom: 12%; height: 220px; z-index: 1; opacity: .48; mix-blend-mode: screen; filter: blur(8px); background: radial-gradient(40% 80% at 12% 70%, rgba(240,239,232,.18), transparent 70%), radial-gradient(30% 90% at 28% 60%, rgba(164,220,96,.14), transparent 70%), radial-gradient(36% 85% at 46% 75%, rgba(240,239,232,.12), transparent 70%), radial-gradient(30% 80% at 64% 62%, rgba(240,239,232,.16), transparent 70%), radial-gradient(34% 88% at 82% 72%, rgba(132,194,65,.12), transparent 70%); }
+.mag-cover::before { content: ''; position: absolute; inset: 0; z-index: 0; background: radial-gradient(95% 55% at 50% 30%, color-mix(in srgb, var(--mag-green) 15%, transparent), transparent 70%), linear-gradient(180deg,var(--mag-black) 0%,#090b07 52%,#060704 100%); }
+.mag-cover::after { content: ''; position: absolute; left: 0; right: 0; bottom: 12%; height: 220px; z-index: 1; opacity: .42; mix-blend-mode: screen; filter: blur(8px); background: radial-gradient(40% 80% at 12% 70%, rgba(240,239,232,.18), transparent 70%), radial-gradient(30% 90% at 28% 60%, color-mix(in srgb, var(--mag-green) 22%, transparent), transparent 70%), radial-gradient(36% 85% at 46% 75%, rgba(240,239,232,.12), transparent 70%), radial-gradient(30% 80% at 64% 62%, rgba(240,239,232,.16), transparent 70%); }
+.mag-cover-trace { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .2; filter: grayscale(1) contrast(1.2); mix-blend-mode: screen; }
+.mag-cover-paper-cover::before { background: linear-gradient(180deg,#282319,#12100b); }
+.mag-cover-signal-grid::before { background: radial-gradient(80% 55% at 80% 20%, color-mix(in srgb, var(--mag-green) 25%, transparent), transparent 70%), repeating-linear-gradient(90deg, rgba(255,255,255,.04) 0 1px, transparent 1px 82px), linear-gradient(180deg,#060714,#05050a); }
+.mag-cover-type-cover .mag-cover-title { font-size: clamp(68px, 13vw, 170px); max-width: 7ch; }
 .mag-cover-inner { position: relative; z-index: 2; min-height: inherit; display: flex; flex-direction: column; padding: clamp(26px, 5vw, 52px); }
 .mag-cover-masthead { display: flex; flex-direction: column; align-items: center; gap: 14px; }
 .mag-cover-row { width: 100%; display: flex; justify-content: space-between; gap: 14px; border-top: 1px solid var(--mag-rule-strong); border-bottom: 1px solid var(--mag-rule-strong); padding: 11px 2px; color: var(--mag-on-dark-soft); }
@@ -66,12 +76,22 @@
 .mag-note { display: grid; grid-template-columns: 240px 1fr; gap: 48px; padding: clamp(30px, 6vw, 58px); }
 .mag-note-side { border-right: 1px solid var(--mag-rule-ink); padding-right: 28px; }
 .mag-note-side p { color: var(--mag-ink-muted); font-size: 13px; line-height: 1.62; margin: 0 0 13px; }
+.mag-editor-name { font-family: var(--mag-display); font-style: italic; font-size: 22px !important; color: var(--mag-ink) !important; margin-top: 18px !important; }
+.mag-editor-role { font-family: var(--mag-mono); text-transform: uppercase; letter-spacing: .16em; font-size: 10px !important; color: var(--mag-green-deep) !important; }
 .mag-note-label { color: var(--mag-green-deep); margin-bottom: 16px; }
 .mag-note-open { font-family: var(--mag-display); font-size: clamp(30px, 4.5vw, 50px); line-height: 1.05; letter-spacing: -.02em; }
 .mag-note-open em { color: var(--mag-green-deep); }
 .mag-note-flow { column-count: 2; column-gap: 40px; margin-top: 32px; }
 .mag-note-flow p { color: var(--mag-ink-soft); font-size: 15px; line-height: 1.72; margin: 0 0 15px; break-inside: avoid; }
 .mag-pull { column-span: all; font-family: var(--mag-display); font-style: italic; font-size: clamp(23px, 3vw, 30px); line-height: 1.25; border-left: 3px solid var(--mag-green); padding-left: 20px; margin: 8px 0 16px; }
+.mag-note-one-line .mag-note-open { font-size: clamp(42px, 8vw, 90px); max-width: 12ch; }
+.mag-editor-image { margin: 0 0 28px; }
+.mag-editor-image img { width: 100%; max-height: 420px; object-fit: cover; filter: grayscale(.2); }
+.mag-editor-image figcaption { font-family: var(--mag-mono); text-transform: uppercase; letter-spacing: .12em; color: var(--mag-ink-muted); font-size: 10px; margin-top: 8px; }
+.mag-editor-playlist { display: grid; gap: 8px; margin: 24px 0; }
+.mag-editor-playlist a, .mag-editor-loved { display: flex; gap: 12px; align-items: center; border-top: 1px solid var(--mag-rule-ink); padding: 10px 0; font-family: var(--mag-display); color: var(--mag-ink); font-size: 20px; }
+.mag-editor-playlist span { font-family: var(--mag-mono); color: var(--mag-green-deep); font-size: 11px; }
+.mag-editor-loved { border-bottom: 1px solid var(--mag-rule-ink); margin: 22px 0; }
 
 .mag-toc { min-height: 920px; padding: clamp(30px, 6vw, 58px); display: flex; flex-direction: column; }
 .mag-toc-top, .mag-rail { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; }
@@ -92,6 +112,18 @@
 .mag-map-bg { position: absolute; inset: 0; opacity: .92; background: radial-gradient(55% 65% at 78% 24%, color-mix(in srgb, var(--mag-green) 35%, transparent), transparent 58%), radial-gradient(45% 55% at 26% 76%, rgba(240,239,232,.17), transparent 60%), linear-gradient(130deg,#080908,#0b120a 48%,#050705); }
 .mag-map-bg::before { content: ''; position: absolute; inset: 0; opacity: .28; background-image: linear-gradient(rgba(240,239,232,.08) 1px, transparent 1px), linear-gradient(90deg, rgba(240,239,232,.08) 1px, transparent 1px); background-size: 160px 160px; }
 .mag-route { position: absolute; inset: 0; pointer-events: none; }
+.mag-route-label { color: var(--mag-green-hi); margin-top: 40px; }
+.mag-feature-photo, .mag-feature-photo-shade { position: absolute; inset: 0; width: 100%; height: 100%; }
+.mag-feature-photo { object-fit: cover; filter: grayscale(.35) contrast(1.15); opacity: .62; }
+.mag-feature-photo-shade { background: linear-gradient(90deg, rgba(0,0,0,.9), rgba(0,0,0,.42), rgba(0,0,0,.86)); }
+.mag-type-field { position: absolute; inset: 0; display: flex; flex-wrap: wrap; align-content: center; gap: 18px; padding: 50px; opacity: .18; font-family: var(--mag-display); font-size: clamp(64px, 12vw, 150px); line-height: .78; color: var(--mag-green); }
+.mag-signal-board { position: absolute; inset: 48px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; opacity: .45; }
+.mag-signal-board span { border: 1px solid var(--mag-rule-strong); display: flex; align-items: center; justify-content: center; font-family: var(--mag-mono); color: var(--mag-green); text-transform: uppercase; letter-spacing: .16em; }
+.mag-paper-file { position: absolute; inset: 70px; background: var(--mag-paper); color: var(--mag-ink); transform: rotate(-2deg); padding: 46px; box-shadow: 0 20px 90px rgba(0,0,0,.35); font-family: var(--mag-display); font-size: clamp(40px, 7vw, 88px); line-height: .9; opacity: .7; }
+.mag-paper-file p { margin-top: 24px; font-family: var(--mag-mono); font-size: 12px; text-transform: uppercase; letter-spacing: .16em; }
+.mag-archive-board { position: absolute; inset: 0; display: grid; grid-template-columns: .9fr 1.1fr; opacity: .46; }
+.mag-archive-board img { width: 100%; height: 100%; object-fit: cover; filter: grayscale(1); }
+.mag-archive-board div { padding: 54px; display: grid; align-content: center; gap: 12px; font-family: var(--mag-mono); text-transform: uppercase; letter-spacing: .18em; color: var(--mag-green); }
 .mag-feature-content { position: relative; z-index: 2; min-height: inherit; padding: clamp(30px, 5vw, 52px); display: flex; flex-direction: column; }
 .mag-feature-title { margin-top: auto; font-family: var(--mag-display); font-weight: 300; font-size: clamp(48px, 8vw, 98px); max-width: 13ch; line-height: .9; letter-spacing: -.03em; color: #fff; }
 .mag-feature-title em { color: var(--mag-green-hi); }
@@ -151,7 +183,7 @@
 .mag-reviews-title { font-size: clamp(38px, 6vw, 72px); line-height: .92; color: white; }
 .mag-review-row { display: grid; grid-template-columns: 64px 1fr auto; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--mag-rule-faint); align-items: center; }
 .mag-review-row img { width: 64px; height: 64px; object-fit: cover; border-radius: 3px; }
-.mag-partner { min-height: 560px; display: flex; flex-direction: column; justify-content: center; background: radial-gradient(70% 60% at 50% 50%, rgba(132,194,65,.10), transparent 65%), linear-gradient(180deg,#0c0f09,#070805); }
+.mag-partner { min-height: 560px; display: flex; flex-direction: column; justify-content: center; background: radial-gradient(70% 60% at 50% 50%, color-mix(in srgb, var(--mag-green) 12%, transparent), transparent 65%), linear-gradient(180deg,#0c0f09,#070805); }
 .mag-partner h2 { font-family: var(--mag-display); font-weight: 300; font-size: clamp(42px, 7vw, 82px); line-height: .92; color: white; }
 .mag-partner p { margin-top: 24px; max-width: 56ch; font-family: var(--mag-display); font-style: italic; font-size: 22px; line-height: 1.4; color: var(--mag-on-dark-soft); }
 .mag-back { min-height: 720px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
