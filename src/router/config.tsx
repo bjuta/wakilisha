@@ -175,7 +175,8 @@ const routes: RouteObject[] = [
       // Magazine
       { path: "/magazine", element: <ResponsivePage mobile={<MobileMagazine />} desktop={<Magazine />} /> },
       { path: "/magazine/issues", element: <ResponsivePage mobile={<MobileAllIssuesPage />} desktop={<AllIssuesPage />} /> },
-      { path: "/magazine/issue/:issueKey", element: <ResponsivePage mobile={<MobileMagazineIssuePage />} desktop={<MagazineIssuePage />} /> },
+      { path: "/magazine/issues/:issueKey", element: <ResponsivePage mobile={<MobileMagazineIssuePage />} desktop={<MagazineIssuePage />} /> },
+      { path: "/magazine/issue/:issueKey", element: <Navigate to="/magazine/issues/:issueKey" replace /> },
       { path: "/magazine/:slug", element: <ResponsivePage mobile={<MobileArticlePage />} desktop={<ArticlePage />} /> },
 
       // Guides
@@ -247,28 +248,26 @@ const routes: RouteObject[] = [
       { path: "dashboard", element: <AdminChartsDashboard /> },
       { path: "families", element: <AdminChartsFamilies /> },
       { path: "ingest", element: <AdminChartsIngest /> },
-      { path: "ingest-runs", element: <AdminChartsIngestRuns /> },
-      { path: "ingest-runs/:runId", element: <AdminChartsIngestRunDetail /> },
-      { path: "ingest-jobs", element: <AdminChartsLegacyIngestJobs /> },
-      { path: "ingest-jobs/:jobId", element: <AdminChartsIngestDetail /> },
+      { path: "ingest/:id", element: <AdminChartsIngestDetail /> },
       { path: "editions", element: <AdminChartsEditions /> },
       { path: "snapshots", element: <AdminChartsSnapshots /> },
+      { path: "integration-map", element: <AdminChartsIntegrationMap /> },
+      { path: "public-api-qa", element: <AdminChartsPublicApiQa /> },
       { path: "review-queue", element: <AdminChartsReviewQueue /> },
       { path: "no-match", element: <AdminChartsNoMatch /> },
       { path: "release-shells", element: <AdminChartsReleaseShells /> },
       { path: "canon-gaps", element: <AdminChartsCanonGaps /> },
-      { path: "integration-map", element: <AdminChartsIntegrationMap /> },
-      { path: "public-api-qa", element: <AdminChartsPublicApiQa /> },
-      { path: "ingest-health", element: <AdminChartsIngestHealth /> },
+      { path: "ingest-runs", element: <AdminChartsIngestRuns /> },
+      { path: "ingest-runs/:id", element: <AdminChartsIngestRunDetail /> },
+      { path: "legacy-ingest-jobs", element: <AdminChartsLegacyIngestJobs /> },
+      { path: "health", element: <AdminChartsIngestHealth /> },
     ],
   },
-  // Admin Settings
   {
     path: "/admin/settings",
     element: <AdminSettingsLayout />,
     children: [
       { index: true, element: <AdminSettingsHub /> },
-      { path: "design-system", element: <AdminDesignSystem /> },
       { path: "chart-defaults", element: <AdminSettingsChartDefaults /> },
       { path: "chart-defaults/market-scopes", element: <AdminSettingsChartDefaultsMarketScopes /> },
       { path: "integrations", element: <AdminSettingsIntegrations /> },
@@ -285,14 +284,7 @@ const routes: RouteObject[] = [
       { path: "site-identity", element: <AdminSettingsSiteIdentity /> },
     ],
   },
-  {
-    path: "/admin/design-system",
-    element: <Navigate to="/admin/settings/design-system" replace />,
-  },
-  {
-    path: "*",
-    element: <ResponsivePage mobile={<MobileNotFound />} desktop={<NotFound />} />,
-  },
+  { path: "*", element: <ResponsivePage mobile={<MobileNotFound />} desktop={<NotFound />} /> },
 ];
 
 export default routes;
