@@ -29,6 +29,11 @@ function getMappings(run: IngestRun) {
   return mappings && typeof mappings === "object" ? mappings as { summary?: { total?: number; auto_matched?: number; needs_review?: number }; candidates?: unknown[] } : null;
 }
 
+function getStagingPlan(run: IngestRun) {
+  const plan = run.source_manifest?.staging_plan;
+  return plan && typeof plan === "object" ? plan as { buckets?: unknown[]; readiness?: { ready_bucket_count?: number; blocked_bucket_count?: number; can_stage_anything?: boolean } } : null;
+}
+
 export default function AdminImportsJobsPage() {
   const navigate = useNavigate();
   const [runs, setRuns] = useState<IngestRun[]>([]);
@@ -56,7 +61,7 @@ export default function AdminImportsJobsPage() {
     return matchesSearch && matchesStatus;
   });
 
-  const statusOptions = ["all", "queued", "scanning", "scanned", "mapped", "running", "completed", "failed", "paused"];
+  const statusOptions = ["all", "queued", "scanning", "scanned", "mapped", "planned", "running", "completed", "failed", "paused"];
   function getTotalImported(counts: Record<string, number> | null) { if (!counts) return 0; return Object.values(counts).reduce((sum, v) => sum + (typeof v === "number" ? v : 0), 0); }
 
   return (
@@ -65,7 +70,7 @@ export default function AdminImportsJobsPage() {
         <div>
           <div className="mb-1 text-[11px] font-black uppercase tracking-wider text-wk-brand">Imports</div>
           <h1 className="text-[22px] font-black tracking-tight text-wk-text">Import Jobs</h1>
-          <p className="mt-1 text-[13px] text-wk-text-muted">{runs.length} import jobs. {runs.filter((r) => r.status === "failed").length} failed. {runs.filter((r) => r.status === "mapped").length} mapped.</p>
+          <p className="mt-1 text-[13px] text-wk-text-muted">{runs.length} import jobs. {runs.filter((r) => r.status === "failed").length} failed. {runs.filter((r) => r.status === "planned").length} planned.</p>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => void load()} className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap"><WkIcon name="RefreshCw" size={14} /> Refresh</button>
@@ -87,6 +92,7 @@ export default function AdminImportsJobsPage() {
             { key: "status", label: "Status", width: "100px", render: (row) => <StatusBadge status={row.status} /> },
             { key: "scan", label: "Scan", width: "120px", render: (row) => { const scan = getScan(row); return <span className="text-[12px] text-wk-text-muted">{scan ? `${scan.archive?.file_count ?? 0} files` : "—"}</span>; } },
             { key: "mappings", label: "Mappings", width: "120px", render: (row) => { const mappings = getMappings(row); const total = mappings?.summary?.total ?? mappings?.candidates?.length ?? 0; return <span className="text-[12px] text-wk-text-muted">{total ? `${total} found` : "—"}</span>; } },
+            { key: "plan", label: "Plan", width: "130px", render: (row) => { const plan = getStagingPlan(row); if (!plan) return <span className="text-[12px] text-wk-text-muted">—</span>; return <span className="text-[12px] text-wk-text-muted">{plan.readiness?.ready_bucket_count ?? 0} ready / {plan.readiness?.blocked_bucket_count ?? 0} blocked</span>; } },
             { key: "imported_counts", label: "Imported", width: "100px", render: (row) => <span className="text-[12px] text-wk-text-muted">{getTotalImported(row.imported_counts)} items</span> },
             { key: "warnings", label: "Warnings", width: "80px", render: (row) => <span className={`text-[12px] font-semibold ${(row.warnings?.length ?? 0) > 0 ? "text-wk-warning" : "text-wk-text-muted"}`}>{row.warnings?.length ?? 0}</span> },
             { key: "errors", label: "Errors", width: "80px", render: (row) => <span className={`text-[12px] font-semibold ${(row.errors?.length ?? 0) > 0 ? "text-wk-danger" : "text-wk-text-muted"}`}>{row.errors?.length ?? 0}</span> },
@@ -104,6 +110,6 @@ export default function AdminImportsJobsPage() {
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const color = status === "completed" ? "bg-wk-success-soft text-wk-success" : status === "running" || status === "scanning" ? "bg-wk-info-soft text-wk-info" : status === "failed" ? "bg-wk-danger-soft text-wk-danger" : status === "queued" ? "bg-wk-warning-soft text-wk-warning" : status === "scanned" || status === "mapped" ? "bg-wk-brand-soft text-wk-brand" : "bg-wk-surface-raised text-wk-text-muted";
+  const color = status === "completed" ? "bg-wk-success-soft text-wk-success" : status === "running" || status === "scanning" ? "bg-wk-info-soft text-wk-info" : status === "failed" ? "bg-wk-danger-soft text-wk-danger" : status === "queued" ? "bg-wk-warning-soft text-wk-warning" : status === "scanned" || status === "mapped" || status === "planned" ? "bg-wk-brand-soft text-wk-brand" : "bg-wk-surface-raised text-wk-text-muted";
   return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${color}`}>{status}</span>;
 }
