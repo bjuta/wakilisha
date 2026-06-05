@@ -1,11 +1,17 @@
 import type { MagazineIssue, MagazineIssueArticle } from './magazineIssues';
 
+export const WAKILISHA_MAGAZINE_EDITOR = {
+  name: 'Muiruri Beautah',
+  role: 'Founder & Editor-in-Chief',
+} as const;
+
 export type EditorNoteMode = 'letter' | 'one-line' | 'image-note' | 'song-note' | 'playlist-note';
 export type FeatureVisualMode = 'issue-one-route' | 'photo-led' | 'type-led' | 'archive-board' | 'signal-board' | 'paper-file';
 
 export type MagazineEditorialSystem = {
   issueMood: 'night' | 'paper' | 'travel' | 'signal' | 'archive' | 'image';
   coverVariant: 'seal-key-visual' | 'image-trace' | 'paper-cover' | 'signal-grid' | 'type-cover';
+  editor: typeof WAKILISHA_MAGAZINE_EDITOR;
   editorNote: {
     mode: EditorNoteMode;
     eyebrow: string;
@@ -105,7 +111,7 @@ function editorNoteForIssue(issue: MagazineIssue): MagazineEditorialSystem['edit
   if (issue.issueNumber === 1) {
     return {
       mode: 'letter',
-      eyebrow: 'Why we made this',
+      eyebrow: 'Editor’s note',
       title: 'We did not set out to build a music site. We set out to make sure the good nights got remembered.',
       pull: 'Documentation is a form of respect. Putting someone on the record is a way of saying: this counted.',
       body: [
@@ -237,6 +243,7 @@ export function buildIssueEditorialSystem(issue: MagazineIssue): MagazineEditori
   return {
     issueMood: moodForIssue(issue),
     coverVariant: coverVariantForIssue(issue),
+    editor: WAKILISHA_MAGAZINE_EDITOR,
     editorNote: editorNoteForIssue(issue),
     featureVisualMode: featureModeForIssue(issue),
     featureFrame: featureFrameForIssue(issue),
