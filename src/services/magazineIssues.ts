@@ -162,6 +162,83 @@ function makeIssueArticle(article: MagazineArticle): MagazineIssueArticle | null
   };
 }
 
+function sectionCounts(articles: MagazineIssueArticle[]) {
+  return Array.from(
+    articles.reduce((map, article) => {
+      map.set(article.canonicalSection, (map.get(article.canonicalSection) ?? 0) + 1);
+      return map;
+    }, new Map<string, number>())
+  ).sort((a, b) => b[1] - a[1]);
+}
+
+function topArticlePhrase(articles: MagazineIssueArticle[]): string | null {
+  const title = [...articles].sort((a, b) => b.score - a.score)[0]?.title ?? '';
+  const clean = title
+    .replace(/[“”"']/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!clean) return null;
+  if (clean.length <= 34) return clean;
+  const words = clean.split(' ').filter((word) => word.length > 2);
+  return words.slice(0, 4).join(' ');
+}
+
+function titleForDominantSection(section: string, issueNumber: number, articles: MagazineIssueArticle[]): string {
+  const phrase = topArticlePhrase(articles);
+  const rotations: Record<string, string[]> = {
+    'The Sound of Now': [
+      'The Room Remembers',
+      'Signals From the Floor',
+      'The Night Has Notes',
+      'Songs With a Long Tail',
+      'The Sound Finds a Room',
+      'After the Speakers Cool',
+    ],
+    'Sound, Conflict, Form': [
+      'The Shape of the Argument',
+      'When the Form Fights Back',
+      'The Image Talks Back',
+      'Notes From the Faultline',
+    ],
+    'The Scene Is a Place': [
+      'Where the Culture Gathered',
+      'The Scene Had an Address',
+      'Rooms That Carried the Work',
+      'The City Kept Receipts',
+    ],
+    'Field Notes': [
+      'Carry This With You',
+      'A Map for the Feeling',
+      'What to Notice First',
+      'The Guide Becomes Memory',
+    ],
+    'On Record': [
+      'The Year on the Table',
+      'The Records That Stayed',
+      'A Listening Note Survives',
+      'The Verdict Has Texture',
+    ],
+    'Books, Language, Memory': [
+      'What Refuses to Disappear',
+      'The Archive Speaks Back',
+      'Words That Carried Home',
+      'Memory Had a Language',
+    ],
+    'Systems & Futures': [
+      'The System Under the Song',
+      'Who Owns the Future',
+      'The Machinery Beneath Culture',
+      'Rights, Platforms, Memory',
+    ],
+  };
+  const options = rotations[section] ?? ['The Culture on Record', 'A Field Record Survives', 'The Archive Has a Pulse'];
+  const rotated = options[(issueNumber - 2) % options.length];
+
+  // Every fourth back-issue borrows a short phrase from its strongest piece so the archive does not feel templated.
+  if (phrase && issueNumber % 4 === 0) return phrase;
+  return rotated;
+}
+
 function deriveIssueTheme(issueNumber: number, articles: MagazineIssueArticle[]): Pick<MagazineIssue, 'title' | 'subtitle' | 'deck' | 'coverTheme'> {
   if (issueNumber === 1) {
     return {
@@ -172,29 +249,18 @@ function deriveIssueTheme(issueNumber: number, articles: MagazineIssueArticle[])
     };
   }
 
-  const topSections = Array.from(
-    articles.reduce((map, article) => {
-      map.set(article.canonicalSection, (map.get(article.canonicalSection) ?? 0) + 1);
-      return map;
-    }, new Map<string, number>())
-  ).sort((a, b) => b[1] - a[1]);
-
-  const dominant = topSections[0]?.[0] ?? 'Field Notes';
-  const titleMap: Record<string, string> = {
-    'The Sound of Now': 'What the Room Remembered',
-    'Sound, Conflict, Form': 'The Shape of the Argument',
-    'The Scene Is a Place': 'Where the Culture Gathered',
-    'Field Notes': 'Carry This With You',
-    'On Record': 'The Year on the Table',
-    'Books, Language, Memory': 'What Refuses to Disappear',
-    'Systems & Futures': 'The System Under the Song',
-  };
+  const counts = sectionCounts(articles);
+  const dominant = counts[0]?.[0] ?? 'Field Notes';
+  const secondary = counts[1]?.[0];
+  const title = titleForDominantSection(dominant, issueNumber, articles);
+  const subtitle = secondary ? `${dominant} / ${secondary}` : dominant;
+  const focus = secondary ? `${dominant.toLowerCase()}, ${secondary.toLowerCase()}` : dominant.toLowerCase();
 
   return {
-    title: titleMap[dominant] ?? 'The Culture on Record',
-    subtitle: dominant,
-    deck: `A WAKILISHA field record drawn from ${dominant.toLowerCase()} and the cultural signals around it.`,
-    coverTheme: dominant.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+    title,
+    subtitle,
+    deck: `A WAKILISHA field record drawn from ${focus}, and the cultural signals around them.`,
+    coverTheme: `${dominant}-${secondary ?? 'solo'}`.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
   };
 }
 
@@ -211,14 +277,15 @@ function buildIssueSpreads(issueNumber: number, articles: MagazineIssueArticle[]
   const usable = articles.filter((article) => article.role !== 'stale' && article.role !== 'excluded');
   const core = usable.filter((article) => article.role === 'core').sort((a, b) => b.score - a.score);
   const coverFeature = core[0] ?? usable[0];
+  const theme = deriveIssueTheme(issueNumber, usable);
   const grouped = Array.from(groupBySection(usable).entries()).sort((a, b) => b[1].length - a[1].length);
   const spreads: MagazineSpread[] = [
     {
       id: `issue-${issueNumber}-cover`,
       type: 'cover',
-      title: issueNumber === 1 ? 'Your People Are Here' : deriveIssueTheme(issueNumber, usable).title,
+      title: theme.title,
       eyebrow: 'African creative life, on the record',
-      deck: deriveIssueTheme(issueNumber, usable).deck,
+      deck: theme.deck,
       articles: coverFeature ? [coverFeature] : [],
       variant: 'field-record-cover',
     },
@@ -337,7 +404,7 @@ function sectionAccent(section: string): string {
 function buildWindows(maxDate: Date): Array<{ start: Date; end: Date }> {
   const windows: Array<{ start: Date; end: Date }> = [];
   let end = endOfMonth(maxDate);
-  let start = startOfMonth(addMonths(maxDate, -3)); // latest issue deliberately covers Feb–May when max month is May
+  let start = startOfMonth(addMonths(maxDate, -3));
   windows.push({ start, end });
 
   end = new Date(start.getFullYear(), start.getMonth(), 0, 23, 59, 59, 999);
