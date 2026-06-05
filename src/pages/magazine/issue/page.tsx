@@ -1,5 +1,6 @@
+import { useId } from "react";
 import { Link, useParams } from "react-router-dom";
-import { useMagazineArticles, type MagazineArticle } from "@/services/magazineArticles";
+import { useMagazineArticles } from "@/services/magazineArticles";
 import { SkeletonMagazinePage } from "@/components/skeletons/Skeletons";
 import {
   buildMagazineIssues,
@@ -30,16 +31,17 @@ function Masthead({ small = false }: { small?: boolean }) {
 }
 
 function MagazineSeal({ size = "medium" }: { size?: "small" | "medium" | "cover" }) {
+  const pathId = useId().replace(/:/g, "");
   return (
     <span className={`mag-seal ${size}`} aria-label="WAKILISHA field-record seal">
       <svg viewBox="0 0 100 100" role="img">
         <defs>
-          <path id={`seal-ring-${size}`} d="M50,50 m-36,0 a36,36 0 1,1 72,0 a36,36 0 1,1 -72,0" />
+          <path id={`seal-ring-${pathId}`} d="M50,50 m-36,0 a36,36 0 1,1 72,0 a36,36 0 1,1 -72,0" />
         </defs>
         <circle cx="50" cy="50" r="46.5" fill="none" stroke="currentColor" strokeWidth="1" />
         <circle cx="50" cy="50" r="40" fill="none" stroke="currentColor" strokeOpacity=".14" strokeWidth=".5" />
         <text className="ring-text" fill="currentColor">
-          <textPath href={`#seal-ring-${size}`} startOffset="0%">· RECORDED IN NAIROBI · WAKILISHA FIELD RECORD · </textPath>
+          <textPath href={`#seal-ring-${pathId}`} startOffset="0%">· RECORDED IN NAIROBI · WAKILISHA FIELD RECORD · </textPath>
         </text>
         <g transform="translate(50,52) scale(1.5) translate(-132.4,-15)">
           <path fill="currentColor" d="M132.91,11.14l-7.87,18.73,15.96-17.97c.26-.29.05-.76-.34-.76h-7.75Z" />
