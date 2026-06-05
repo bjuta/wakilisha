@@ -13,7 +13,10 @@ export type MagazineSpreadType =
   | 'review'
   | 'partner'
   | 'back-matter'
-  | 'article-list';
+  | 'article-list'
+  | 'full-bleed-image'
+  | 'quote-only'
+  | 'color-interlude';
 
 export type MagazineIssueArticle = MagazineArticle & {
   sourceDate: Date;
@@ -173,10 +176,7 @@ function sectionCounts(articles: MagazineIssueArticle[]) {
 
 function topArticlePhrase(articles: MagazineIssueArticle[]): string | null {
   const title = [...articles].sort((a, b) => b.score - a.score)[0]?.title ?? '';
-  const clean = title
-    .replace(/[“”"']/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
+  const clean = title.replace(/[“”"']/g, '').replace(/\s+/g, ' ').trim();
   if (!clean) return null;
   if (clean.length <= 34) return clean;
   const words = clean.split(' ').filter((word) => word.length > 2);
@@ -186,55 +186,16 @@ function topArticlePhrase(articles: MagazineIssueArticle[]): string | null {
 function titleForDominantSection(section: string, issueNumber: number, articles: MagazineIssueArticle[]): string {
   const phrase = topArticlePhrase(articles);
   const rotations: Record<string, string[]> = {
-    'The Sound of Now': [
-      'The Room Remembers',
-      'Signals From the Floor',
-      'The Night Has Notes',
-      'Songs With a Long Tail',
-      'The Sound Finds a Room',
-      'After the Speakers Cool',
-    ],
-    'Sound, Conflict, Form': [
-      'The Shape of the Argument',
-      'When the Form Fights Back',
-      'The Image Talks Back',
-      'Notes From the Faultline',
-    ],
-    'The Scene Is a Place': [
-      'Where the Culture Gathered',
-      'The Scene Had an Address',
-      'Rooms That Carried the Work',
-      'The City Kept Receipts',
-    ],
-    'Field Notes': [
-      'Carry This With You',
-      'A Map for the Feeling',
-      'What to Notice First',
-      'The Guide Becomes Memory',
-    ],
-    'On Record': [
-      'The Year on the Table',
-      'The Records That Stayed',
-      'A Listening Note Survives',
-      'The Verdict Has Texture',
-    ],
-    'Books, Language, Memory': [
-      'What Refuses to Disappear',
-      'The Archive Speaks Back',
-      'Words That Carried Home',
-      'Memory Had a Language',
-    ],
-    'Systems & Futures': [
-      'The System Under the Song',
-      'Who Owns the Future',
-      'The Machinery Beneath Culture',
-      'Rights, Platforms, Memory',
-    ],
+    'The Sound of Now': ['The Room Remembers', 'Signals From the Floor', 'The Night Has Notes', 'Songs With a Long Tail', 'The Sound Finds a Room', 'After the Speakers Cool'],
+    'Sound, Conflict, Form': ['The Shape of the Argument', 'When the Form Fights Back', 'The Image Talks Back', 'Notes From the Faultline'],
+    'The Scene Is a Place': ['Where the Culture Gathered', 'The Scene Had an Address', 'Rooms That Carried the Work', 'The City Kept Receipts'],
+    'Field Notes': ['Carry This With You', 'A Map for the Feeling', 'What to Notice First', 'The Guide Becomes Memory'],
+    'On Record': ['The Year on the Table', 'The Records That Stayed', 'A Listening Note Survives', 'The Verdict Has Texture'],
+    'Books, Language, Memory': ['What Refuses to Disappear', 'The Archive Speaks Back', 'Words That Carried Home', 'Memory Had a Language'],
+    'Systems & Futures': ['The System Under the Song', 'Who Owns the Future', 'The Machinery Beneath Culture', 'Rights, Platforms, Memory'],
   };
   const options = rotations[section] ?? ['The Culture on Record', 'A Field Record Survives', 'The Archive Has a Pulse'];
   const rotated = options[(issueNumber - 2) % options.length];
-
-  // Every fourth back-issue borrows a short phrase from its strongest piece so the archive does not feel templated.
   if (phrase && issueNumber % 4 === 0) return phrase;
   return rotated;
 }
@@ -248,14 +209,12 @@ function deriveIssueTheme(issueNumber: number, articles: MagazineIssueArticle[])
       coverTheme: 'field-record-seal',
     };
   }
-
   const counts = sectionCounts(articles);
   const dominant = counts[0]?.[0] ?? 'Field Notes';
   const secondary = counts[1]?.[0];
   const title = titleForDominantSection(dominant, issueNumber, articles);
   const subtitle = secondary ? `${dominant} / ${secondary}` : dominant;
   const focus = secondary ? `${dominant.toLowerCase()}, ${secondary.toLowerCase()}` : dominant.toLowerCase();
-
   return {
     title,
     subtitle,
@@ -273,105 +232,87 @@ function groupBySection(articles: MagazineIssueArticle[]) {
   }, new Map<string, MagazineIssueArticle[]>());
 }
 
+function pullQuoteFrom(article?: MagazineIssueArticle): string {
+  if (!article) return 'Some issues need a sentence big enough to stop the room.';
+  const body = (article.body ?? []).find((paragraph) => paragraph && paragraph.length > 90 && paragraph.length < 220);
+  if (body) return body.replace(/\s+/g, ' ').trim();
+  if (article.dek && article.dek.length > 40) return article.dek.replace(/\s+/g, ' ').trim();
+  return article.title;
+}
+
 function buildIssueSpreads(issueNumber: number, articles: MagazineIssueArticle[], excluded: MagazineIssueArticle[]): MagazineSpread[] {
   const usable = articles.filter((article) => article.role !== 'stale' && article.role !== 'excluded');
   const core = usable.filter((article) => article.role === 'core').sort((a, b) => b.score - a.score);
   const coverFeature = core[0] ?? usable[0];
+  const imageLead = usable.find((article) => article.heroUrl && article.slug !== coverFeature?.slug) ?? coverFeature;
   const theme = deriveIssueTheme(issueNumber, usable);
   const grouped = Array.from(groupBySection(usable).entries()).sort((a, b) => b[1].length - a[1].length);
   const spreads: MagazineSpread[] = [
-    {
-      id: `issue-${issueNumber}-cover`,
-      type: 'cover',
-      title: theme.title,
-      eyebrow: 'African creative life, on the record',
-      deck: theme.deck,
-      articles: coverFeature ? [coverFeature] : [],
-      variant: 'field-record-cover',
-    },
-    {
-      id: `issue-${issueNumber}-editors-note`,
-      type: 'editors-note',
-      title: 'We did not set out to build a music site.',
-      deck: 'We set out to make sure the good nights got remembered.',
-      variant: 'paper-note',
-    },
-    {
-      id: `issue-${issueNumber}-contents`,
-      type: 'contents',
-      title: issueNumber === 1 ? 'The whole night, on the record.' : 'In this issue, the culture leaves a trace.',
-      articles: usable,
-      variant: 'expressive-index',
-    },
+    { id: `issue-${issueNumber}-cover`, type: 'cover', title: theme.title, eyebrow: 'African creative life, on the record', deck: theme.deck, articles: coverFeature ? [coverFeature] : [], variant: 'field-record-cover' },
+    { id: `issue-${issueNumber}-editors-note`, type: 'editors-note', title: 'Editor’s note', deck: 'A note from Muiruri Beautah.', variant: 'paper-note' },
   ];
 
-  if (coverFeature) {
+  if (imageLead && issueNumber !== 1 && issueNumber % 2 === 0) {
     spreads.push({
-      id: `issue-${issueNumber}-feature`,
-      type: 'feature',
-      title: coverFeature.title,
-      eyebrow: 'Feature',
-      deck: coverFeature.dek,
-      section: coverFeature.canonicalSection,
-      articles: [coverFeature],
-      variant: coverFeature.canonicalSection === 'The Sound of Now' ? 'sound-migration' : 'editorial-feature',
+      id: `issue-${issueNumber}-fullbleed-a`,
+      type: 'full-bleed-image',
+      title: imageLead.title,
+      eyebrow: 'Image record',
+      deck: imageLead.dek,
+      articles: [imageLead],
+      variant: issueNumber % 4 === 0 ? 'caption-bottom' : 'title-overlay',
+      accent: sectionAccent(imageLead.canonicalSection),
+    });
+  }
+
+  spreads.push({ id: `issue-${issueNumber}-contents`, type: 'contents', title: issueNumber === 1 ? 'The whole night, on the record.' : 'In this issue, the culture leaves a trace.', articles: usable, variant: 'expressive-index' });
+
+  if (coverFeature) {
+    spreads.push({ id: `issue-${issueNumber}-feature`, type: 'feature', title: coverFeature.title, eyebrow: 'Feature', deck: coverFeature.dek, section: coverFeature.canonicalSection, articles: [coverFeature], variant: coverFeature.canonicalSection === 'The Sound of Now' ? 'sound-migration' : 'editorial-feature' });
+  }
+
+  if (issueNumber !== 1 && issueNumber % 3 === 0) {
+    spreads.push({
+      id: `issue-${issueNumber}-quote-a`,
+      type: 'quote-only',
+      title: pullQuoteFrom(coverFeature),
+      eyebrow: 'Margin note',
+      articles: coverFeature ? [coverFeature] : [],
+      variant: issueNumber % 6 === 0 ? 'white' : 'accent',
+      accent: sectionAccent(coverFeature?.canonicalSection ?? 'The Sound of Now'),
     });
   }
 
   const soundArticles = usable.filter((article) => article.canonicalSection === 'The Sound of Now' || article.canonicalSection === 'On Record');
   if (soundArticles.length >= 3) {
-    spreads.push({
-      id: `issue-${issueNumber}-signal`,
-      type: 'signal',
-      title: 'What the issue is quietly telling us.',
-      eyebrow: 'The Signal',
-      deck: 'A cultural-intelligence reading of the strongest music and scene signals in this issue.',
-      articles: soundArticles.slice(0, 12),
-      variant: 'ownership-strip',
-      accent: '#9C8FF5',
-    });
+    spreads.push({ id: `issue-${issueNumber}-signal`, type: 'signal', title: 'What the issue is quietly telling us.', eyebrow: 'The Signal', deck: 'A cultural-intelligence reading of the strongest music and scene signals in this issue.', articles: soundArticles.slice(0, 12), variant: 'ownership-strip', accent: '#9C8FF5' });
   }
 
   grouped.slice(0, 5).forEach(([section, sectionArticles], idx) => {
-    spreads.push({
-      id: `issue-${issueNumber}-section-${idx}`,
-      type: 'section-opener',
-      title: section,
-      eyebrow: `Section ${String(idx + 1).padStart(2, '0')}`,
-      deck: sectionDeck(section),
-      section,
-      articles: sectionArticles.slice(0, 4),
-      variant: idx % 2 === 0 ? 'cinematic' : 'paper-cut',
-      accent: sectionAccent(section),
-    });
+    const accent = sectionAccent(section);
+    if (issueNumber !== 1 && idx === 1 && issueNumber % 4 === 1) {
+      spreads.push({ id: `issue-${issueNumber}-interlude-${idx}`, type: 'color-interlude', title: section, eyebrow: `Interlude ${String(idx + 1).padStart(2, '0')}`, deck: sectionDeck(section), section, articles: sectionArticles.slice(0, 2), variant: 'vertical-color', accent });
+    }
+
+    spreads.push({ id: `issue-${issueNumber}-section-${idx}`, type: 'section-opener', title: section, eyebrow: `Section ${String(idx + 1).padStart(2, '0')}`, deck: sectionDeck(section), section, articles: sectionArticles.slice(0, 4), variant: idx % 2 === 0 ? 'cinematic' : 'paper-cut', accent });
 
     const first = sectionArticles[0];
     if (!first) return;
     if (section === 'Field Notes') {
-      spreads.push({ id: `issue-${issueNumber}-guide-${idx}`, type: 'guide', title: first.title, deck: first.dek, section, articles: sectionArticles.slice(0, 3), variant: 'travel-field-guide', accent: sectionAccent(section) });
+      spreads.push({ id: `issue-${issueNumber}-guide-${idx}`, type: 'guide', title: first.title, deck: first.dek, section, articles: sectionArticles.slice(0, 3), variant: 'travel-field-guide', accent });
     } else if (section === 'On Record') {
-      spreads.push({ id: `issue-${issueNumber}-review-${idx}`, type: 'review', title: 'On Record', deck: 'The releases, weighed and filed.', section, articles: sectionArticles.slice(0, 4), variant: 'taste-making', accent: sectionAccent(section) });
+      spreads.push({ id: `issue-${issueNumber}-review-${idx}`, type: 'review', title: 'On Record', deck: 'The releases, weighed and filed.', section, articles: sectionArticles.slice(0, 4), variant: 'taste-making', accent });
     } else {
-      spreads.push({ id: `issue-${issueNumber}-articles-${idx}`, type: 'article-list', title: section, deck: sectionDeck(section), section, articles: sectionArticles.slice(0, 6), variant: idx % 2 === 0 ? 'feature-row' : 'editorial-list', accent: sectionAccent(section) });
+      spreads.push({ id: `issue-${issueNumber}-articles-${idx}`, type: 'article-list', title: section, deck: sectionDeck(section), section, articles: sectionArticles.slice(0, 6), variant: idx % 2 === 0 ? 'feature-row' : 'editorial-list', accent });
     }
   });
 
-  spreads.push({
-    id: `issue-${issueNumber}-partner`,
-    type: 'partner',
-    title: 'Cultural Partner',
-    deck: 'Patronage, not interruption.',
-    variant: 'patronage-surface',
-  });
-  spreads.push({
-    id: `issue-${issueNumber}-back`,
-    type: 'back-matter',
-    title: 'Your people are here.',
-    deck: 'Partner with WAKILISHA, or put your scene on the record.',
-    articles: usable,
-    metadata: { excluded: excluded.length },
-  });
+  if (issueNumber !== 1 && imageLead && issueNumber % 5 === 0) {
+    spreads.push({ id: `issue-${issueNumber}-fullbleed-b`, type: 'full-bleed-image', title: imageLead.title, eyebrow: 'Afterimage', deck: imageLead.dek, articles: [imageLead], variant: 'quiet-image', accent: sectionAccent(imageLead.canonicalSection) });
+  }
 
+  spreads.push({ id: `issue-${issueNumber}-partner`, type: 'partner', title: 'Cultural Partner', deck: 'Patronage, not interruption.', variant: 'patronage-surface' });
+  spreads.push({ id: `issue-${issueNumber}-back`, type: 'back-matter', title: 'Your people are here.', deck: 'Partner with WAKILISHA, or put your scene on the record.', articles: usable, metadata: { excluded: excluded.length } });
   return spreads;
 }
 
@@ -391,12 +332,17 @@ function sectionDeck(section: string): string {
 function sectionAccent(section: string): string {
   const accents: Record<string, string> = {
     'The Sound of Now': '#84C241',
-    'Sound, Conflict, Form': '#F2645A',
+    'Sound, Conflict, Form': '#D6766A',
     'The Scene Is a Place': '#4FD9C2',
     'Field Notes': '#6BA8F5',
     'On Record': '#A4DC60',
-    'Books, Language, Memory': '#E6A85C',
+    'Books, Language, Memory': '#C7A06D',
     'Systems & Futures': '#9C8FF5',
+    Art: '#D85AAB',
+    Fashion: '#C7A06D',
+    Food: '#E8A23A',
+    Language: '#6BA8F5',
+    Places: '#4FD9C2',
   };
   return accents[section] ?? '#84C241';
 }
@@ -406,7 +352,6 @@ function buildWindows(maxDate: Date): Array<{ start: Date; end: Date }> {
   let end = endOfMonth(maxDate);
   let start = startOfMonth(addMonths(maxDate, -3));
   windows.push({ start, end });
-
   end = new Date(start.getFullYear(), start.getMonth(), 0, 23, 59, 59, 999);
   while (windows.length < 80) {
     start = startOfMonth(addMonths(end, -2));
@@ -418,17 +363,11 @@ function buildWindows(maxDate: Date): Array<{ start: Date; end: Date }> {
 }
 
 export function buildMagazineIssues(articles: MagazineArticle[]): MagazineIssue[] {
-  const mapped = articles
-    .map(makeIssueArticle)
-    .filter((article): article is MagazineIssueArticle => Boolean(article))
-    .sort((a, b) => b.sourceDate.getTime() - a.sourceDate.getTime());
-
+  const mapped = articles.map(makeIssueArticle).filter((article): article is MagazineIssueArticle => Boolean(article)).sort((a, b) => b.sourceDate.getTime() - a.sourceDate.getTime());
   if (!mapped.length) return [];
-
   const maxDate = mapped[0].sourceDate;
   const windows = buildWindows(maxDate);
   const issues: MagazineIssue[] = [];
-
   windows.forEach((window) => {
     const inWindow = mapped.filter((article) => article.sourceDate >= window.start && article.sourceDate <= window.end);
     if (!inWindow.length) return;
@@ -457,7 +396,6 @@ export function buildMagazineIssues(articles: MagazineArticle[]): MagazineIssue[
       generatedFromRange: true,
     });
   });
-
   return issues;
 }
 
@@ -465,12 +403,10 @@ export function resolveIssueByKey(issues: MagazineIssue[], issueKey: string | un
   if (!issueKey) return issues[0] ?? null;
   const direct = issues.find((issue) => issue.slug === issueKey || issue.id === issueKey || String(issue.issueNumber) === issueKey);
   if (direct) return direct;
-
   const legacyMonth = /^\d{4}-\d{2}$/.test(issueKey) ? new Date(`${issueKey}-01T00:00:00`) : null;
   if (legacyMonth && !Number.isNaN(legacyMonth.getTime())) {
     return issues.find((issue) => legacyMonth >= issue.sourceStartDate && legacyMonth <= issue.sourceEndDate) ?? null;
   }
-
   return null;
 }
 
