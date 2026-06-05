@@ -4,6 +4,7 @@ import { useMagazineArticles, type MagazineArticle } from "@/services/magazineAr
 import { getAuthorMeta } from "@/services/authorProfiles";
 import { MagazineCard } from "./components/MagazineCard";
 import { SectionCarousel } from "./components/SectionCarousel";
+import { SkeletonMagazinePage } from "@/components/skeletons/Skeletons";
 
 /* ── Scroll reveal ── */
 function useScrollReveal(deps: unknown[] = []) {
@@ -125,15 +126,36 @@ export default function Magazine() {
     [sectionMap],
   );
 
+  const pastIssues = useMemo(() => {
+    const grouped: Record<string, { articles: MagazineArticle[]; coverArticle: MagazineArticle }> = {};
+    for (const article of stories) {
+      const parsed = new Date(article.date);
+      if (Number.isNaN(parsed.getTime())) continue;
+      const key = `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}`;
+      if (!grouped[key]) {
+        grouped[key] = { articles: [], coverArticle: article };
+      }
+      grouped[key].articles.push(article);
+    }
+    const sorted = Object.entries(grouped)
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([key, val], idx, arr) => {
+        const [y, m] = key.split('-');
+        const monthName = new Date(Number(y), Number(m) - 1).toLocaleDateString('en', { month: 'long', year: 'numeric' });
+        return {
+          key,
+          monthName,
+          issueNumber: arr.length - idx, // most recent = highest number
+          coverUrl: val.coverArticle.heroUrl,
+          articleCount: val.articles.length,
+          firstSlug: val.coverArticle.slug,
+        };
+      });
+    return sorted.slice(1); // skip current issue
+  }, [stories]);
+
   if (status === "loading") {
-    return (
-      <main className="min-h-screen flex items-center justify-center bg-[var(--wk-bg)]">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-8 h-8 border-2 border-[var(--wk-border)] border-t-[var(--wk-brand)] rounded-full animate-spin" />
-          <span className="text-[13px] font-semibold text-[var(--wk-text-muted)]">Loading the magazine…</span>
-        </div>
-      </main>
-    );
+    return <SkeletonMagazinePage />;
   }
 
   if (status === "error" || !heroStory) {
@@ -151,7 +173,11 @@ export default function Magazine() {
     <main className="min-h-screen bg-[var(--wk-bg)]">
 
       {/* ═══════════════════════ HERO ═══════════════════════ */}
-      <div ref={heroRef} className="relative min-h-[88vh] flex items-end overflow-hidden bg-[#0a0a0a]">
+      <Link
+        to={`/magazine/${heroStory.slug}`}
+        ref={heroRef}
+        className="relative min-h-[88vh] flex items-end overflow-hidden bg-[#0a0a0a] block group cursor-pointer"
+      >
         {/* Image */}
         <img
           ref={heroImgRef}
@@ -159,70 +185,43 @@ export default function Magazine() {
           alt=""
           className="absolute inset-0 w-full h-full object-cover opacity-85 will-change-transform"
         />
-        {/* Gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/15 via-black/35 to-black/88" />
-        {/* Grain texture */}
-        <div className="absolute inset-0 opacity-[0.035] pointer-events-none" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`, backgroundSize: '200px' }} />
+        {/* Gradient overlay — heavier at bottom for text legibility */}
+        <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/25 to-black/90" />
 
-        {/* Content */}
-        <div className="relative z-10 w-full max-w-[1280px] mx-auto px-6 lg:px-8 pb-20 pt-28 text-white">
-          {/* Issue badge */}
-          <div className="inline-flex items-center gap-2.5 rounded-full bg-black/45 border border-white/18 text-white/90 text-[12px] font-bold tracking-[0.14em] uppercase px-4 py-2 mb-5 backdrop-blur-sm">
-            <span className="text-[var(--wk-brand)] font-extrabold">Issue {issueNum}</span>
-            <span className="text-white/35">·</span>
-            <span>{issueDate}</span>
-          </div>
-
-          {/* Eyebrow */}
-          <div className="inline-flex items-center gap-2 rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] text-[11px] font-black uppercase tracking-[0.18em] px-3.5 py-2 mb-6">
-            <i className="ri-newspaper-line text-[13px]" />
-            Cover Story
-          </div>
-
-          <h1 className="text-[clamp(46px,7vw,90px)] font-black tracking-[-0.055em] leading-[0.9] max-w-[14ch]">
+        {/* Content — anchored bottom-left */}
+        <div className="relative z-10 w-full max-w-[1280px] mx-auto px-6 lg:px-8 pb-16 pt-28 text-white">
+          <h1 className="text-[clamp(40px,6vw,80px)] font-black tracking-[-0.05em] leading-[0.92] max-w-[16ch] group-hover:opacity-90 transition-opacity duration-500">
             {heroStory.title}
           </h1>
 
           {heroStory.dek && (
-            <p className="mt-5 text-[17px] lg:text-[18px] leading-relaxed text-white/70 max-w-[54ch]">
+            <p className="mt-5 text-[16px] lg:text-[18px] leading-relaxed text-white/60 max-w-[52ch]">
               {heroStory.dek}
             </p>
           )}
 
-          {/* Meta + actions */}
-          <div className="flex items-center gap-6 mt-8 flex-wrap">
+          <div className="flex items-center gap-2 mt-6 text-[12px] flex-wrap">
             <Link
               to={`/authors/${getAuthorMeta(heroStory.author).slug}`}
-              className="flex items-center gap-3 hover:opacity-80 transition-opacity"
+              className="inline-flex items-center gap-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-white/85 font-semibold px-3 py-1.5 hover:bg-white/18 hover:text-white transition-all"
+              onClick={(e) => e.stopPropagation()}
             >
-              <span className="w-10 h-10 rounded-full bg-[var(--wk-brand)] flex items-center justify-center text-[var(--wk-brand-on)] text-[13px] font-extrabold shrink-0">
-                {heroStory.author.slice(0, 2).toUpperCase()}
-              </span>
-              <div className="flex flex-col">
-                <span className="text-[14px] font-bold text-white leading-tight">
-                  {heroStory.author}
-                </span>
-                <span className="text-[12px] text-white/50 leading-tight">
-                  {heroStory.date || issueDate} · {heroStory.readingTime} min read
-                </span>
-              </div>
+              {heroStory.author}
             </Link>
-
-            <Link
-              to={`/magazine/${heroStory.slug}`}
-              className="inline-flex items-center gap-2.5 bg-[var(--wk-brand)] text-[var(--wk-brand-on)] text-[14px] font-extrabold px-6 py-3 rounded-full hover:-translate-y-0.5 transition-transform whitespace-nowrap"
-            >
-              Read the cover story
-              <i className="ri-arrow-right-line text-[15px]" />
-            </Link>
+            <span className="inline-flex items-center rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-white/65 px-3 py-1.5">
+              {heroStory.date || issueDate}
+            </span>
+            <span className="inline-flex items-center rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-white/65 px-3 py-1.5">
+              {heroStory.readingTime} min read
+            </span>
           </div>
         </div>
 
         {/* Scroll hint */}
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 hidden lg:flex flex-col items-center gap-2">
-          <div className="w-px h-12 bg-gradient-to-b from-white/50 to-transparent animate-pulse" />
+          <div className="w-px h-12 bg-gradient-to-b from-white/40 to-transparent" />
         </div>
-      </div>
+      </Link>
 
       {/* ═══════════════════════ STICKY SECTION NAV ═══════════════════════ */}
       <div className="sticky top-0 z-40 border-b border-[var(--wk-border)] bg-[color-mix(in_srgb,var(--wk-surface)_92%,transparent)] backdrop-blur-[20px]">
@@ -293,6 +292,59 @@ export default function Magazine() {
             <div className="w-12 h-1 rounded-full bg-[var(--wk-brand)] mx-auto mt-7" />
           </div>
         </div>
+
+        {/* ── Past Issues Archive ── */}
+        {pastIssues.length > 0 && (
+          <section className="mag-reveal">
+            <div className="flex items-end justify-between mb-8 gap-4 flex-wrap">
+              <div className="flex items-center gap-3">
+                <span className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--wk-brand)]">
+                  Past Issues
+                </span>
+                <span className="text-[11px] font-semibold text-[var(--wk-text-faint)] bg-[var(--wk-surface)] border border-[var(--wk-border)] px-2.5 py-0.5 rounded-full">
+                  {pastIssues.length} issues
+                </span>
+              </div>
+              <Link to="/magazine/issues" className="text-[12px] font-bold text-[var(--wk-text-muted)] hover:text-[var(--wk-brand)] transition-colors flex items-center gap-1 whitespace-nowrap">
+                Browse all <i className="ri-arrow-right-line text-[11px]" />
+              </Link>
+            </div>
+            <div
+              className="flex gap-5 overflow-x-auto scrollbar-none pb-2 -mx-6 lg:-mx-8 px-6 lg:px-8"
+              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+            >
+              {pastIssues.map((issue) => (
+                <Link
+                  key={issue.key}
+                  to={`/magazine/issue/${issue.key}`}
+                  className="group relative shrink-0 w-[200px] lg:w-[240px] aspect-[3/4] rounded-xl overflow-hidden bg-[#0a0a0a]"
+                >
+                  <img
+                    src={issue.coverUrl}
+                    alt={issue.monthName}
+                    className="absolute inset-0 w-full h-full object-cover object-top transition-transform duration-600 group-hover:scale-105"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-black/10" />
+                  {/* Top-right issue number */}
+                  <div className="absolute top-3 right-3 z-10">
+                    <span className="inline-flex items-center rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-white/80 text-[10px] font-black tracking-[0.12em] px-2.5 py-1">
+                      No. {issue.issueNumber}
+                    </span>
+                  </div>
+                  {/* Bottom content */}
+                  <div className="absolute bottom-0 left-0 right-0 z-10 p-4">
+                    <p className="text-[12px] lg:text-[13px] font-bold text-white/50 tracking-[0.06em] uppercase mb-0.5">
+                      {issue.monthName}
+                    </p>
+                    <p className="text-[10px] text-white/35">
+                      {issue.articleCount} {issue.articleCount === 1 ? 'story' : 'stories'}
+                    </p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* ── Section Blocks ── */}
         {topSections.map((section, sectionIndex) => {

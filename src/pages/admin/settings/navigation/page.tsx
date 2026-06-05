@@ -71,7 +71,7 @@ export default function AdminSettingsNavigation() {
                     onClick={() => updateNavItem(index, { visible: !item.visible })}
                     className={`relative h-5 w-9 rounded-full transition-colors ${item.visible ? "bg-[var(--wk-brand)]" : "bg-[var(--wk-border-2)]"}`}
                   >
-                    <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-[var(--wk-surface)] transition-transform ${item.visible ? "translate-x-4.5" : "translate-x-0.5"}`} />
+                    <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-[var(--wk-surface)] transition-transform ${item.visible ? "translate-x-[18px]" : "translate-x-0.5"}`} />
                   </button>
                   <span className="text-[12px] text-[var(--wk-text-muted)]">{item.visible ? "Visible" : "Hidden"}</span>
                 </div>
@@ -87,7 +87,7 @@ export default function AdminSettingsNavigation() {
           <div className="flex items-center justify-between rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2.5">
             <span className="text-[13px] font-semibold text-[var(--wk-text)]">Share Enabled</span>
             <button onClick={() => setSettings((s) => ({ ...s, shareConfig: { ...s.shareConfig, enabled: !s.shareConfig.enabled } }))} className={`relative h-6 w-11 rounded-full transition-colors ${settings.shareConfig.enabled ? "bg-[var(--wk-brand)]" : "bg-[var(--wk-border-2)]"}`}>
-              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-[var(--wk-surface)] transition-transform ${settings.shareConfig.enabled ? "translate-x-5.5" : "translate-x-0.5"}`} />
+              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-[var(--wk-surface)] transition-transform ${settings.shareConfig.enabled ? "translate-x-[22px]" : "translate-x-0.5"}`} />
             </button>
           </div>
           <div>

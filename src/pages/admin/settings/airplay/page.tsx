@@ -15,6 +15,7 @@ export default function AdminSettingsAirplay() {
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [testMessage, setTestMessage] = useState<string | null>(null);
 
   const update = <K extends keyof AirplaySettings>(key: K, value: AirplaySettings[K]) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
@@ -32,9 +33,10 @@ export default function AdminSettingsAirplay() {
 
   const handleTest = () => {
     setTesting(true);
+    setTestMessage(null);
     setTimeout(() => {
       setTesting(false);
-      alert("Airplay test completed. Worker connection required for live sync.");
+      setTestMessage("Airplay test completed. Worker connection required for live sync.");
     }, 1500);
   };
 
@@ -55,7 +57,7 @@ export default function AdminSettingsAirplay() {
             <label className="block text-[12px] font-semibold text-[var(--wk-text-muted)] mb-1.5">Enable Airplay Sync</label>
             <div className="flex items-center gap-3">
               <button onClick={() => update("enabled", !settings.enabled)} className={`relative h-6 w-11 rounded-full transition-colors ${settings.enabled ? "bg-[var(--wk-brand)]" : "bg-[var(--wk-border-2)]"}`}>
-                <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-[var(--wk-surface)] transition-transform ${settings.enabled ? "translate-x-5.5" : "translate-x-0.5"}`} />
+                <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-[var(--wk-surface)] transition-transform ${settings.enabled ? "translate-x-[22px]" : "translate-x-0.5"}`} />
               </button>
               <span className="text-[13px] text-[var(--wk-text)]">{settings.enabled ? "Enabled" : "Disabled"}</span>
             </div>
@@ -106,13 +108,13 @@ export default function AdminSettingsAirplay() {
           <div className="flex items-center justify-between rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2.5">
             <span className="text-[13px] font-semibold text-[var(--wk-text)]">Auto-Link Detections to Registry</span>
             <button onClick={() => update("autoLinkDetections", !settings.autoLinkDetections)} className={`relative h-6 w-11 rounded-full transition-colors ${settings.autoLinkDetections ? "bg-[var(--wk-brand)]" : "bg-[var(--wk-border-2)]"}`}>
-              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-[var(--wk-surface)] transition-transform ${settings.autoLinkDetections ? "translate-x-5.5" : "translate-x-0.5"}`} />
+              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-[var(--wk-surface)] transition-transform ${settings.autoLinkDetections ? "translate-x-[22px]" : "translate-x-0.5"}`} />
             </button>
           </div>
         </div>
       </WkSurface>
 
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <button onClick={handleSave} disabled={saving} className="wk-button wk-button-primary wk-button-sm flex items-center gap-2">
           <WkIcon name={saving ? "Loader" : "Save"} size={14} /> {saving ? "Saving..." : "Save Changes"}
         </button>
@@ -121,6 +123,15 @@ export default function AdminSettingsAirplay() {
         </button>
         {saved && <span className="inline-flex items-center gap-1 text-[12px] font-semibold text-[var(--wk-success)]"><WkIcon name="Check" size={14} /> Saved</span>}
       </div>
+      {testMessage && (
+        <div className="flex items-center gap-2 rounded-lg border border-[var(--wk-info)]/30 bg-[var(--wk-info)]/8 px-4 py-3 text-[13px] text-[var(--wk-text)]">
+          <i className="ri-information-line text-[var(--wk-info)]" />
+          {testMessage}
+          <button onClick={() => setTestMessage(null)} className="ml-auto text-[var(--wk-text-faint)] hover:text-[var(--wk-text)]">
+            <WkIcon name="X" size={13} />
+          </button>
+        </div>
+      )}
 
       <WkSurface className="p-4 border-l-4 border-[var(--wk-warning)]">
         <div className="flex items-start gap-3">

@@ -9,6 +9,7 @@ import { TRACK_DETAILS } from "@/mocks/trackDetails";
 import { GENRES } from "@/mocks/genres";
 import { LABELS } from "@/mocks/labels";
 import { CHART_DATA } from "@/mocks/charts";
+import { SkeletonBlock } from "@/components/skeletons/Skeletons";
 import { listReleases, type RepairedRelease } from "@/services/repairedContent/client";
 
 const TABS = ["All", "Artists", "Tracks", "Releases", "Genres", "Labels", "Charts"] as const;
@@ -205,9 +206,18 @@ export default function Search() {
         )}
 
         {q && loading && (
-          <div className="py-20 text-center text-[var(--wk-text-muted)]">
-            <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-[var(--wk-brand)] border-t-transparent" />
-            <div className="mt-3 text-[13px]">Searching...</div>
+          <div className="py-20 space-y-6">
+            <div className="max-w-2xl mx-auto space-y-3">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="animate-pulse flex items-center gap-4 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4">
+                  <SkeletonBlock className="h-12 w-12 rounded-md" />
+                  <div className="flex-1 space-y-2">
+                    <SkeletonBlock className="h-4 w-1/3 rounded" />
+                    <SkeletonBlock className="h-3 w-2/3 rounded" />
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

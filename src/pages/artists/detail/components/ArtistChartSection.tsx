@@ -1,6 +1,8 @@
 import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
+import { usePlayer } from "@/context/PlayerContext";
+import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 
 interface ChartEntry {
   rank: number;
@@ -13,6 +15,7 @@ interface ChartEntry {
   isPlayable?: boolean;
   slug?: string;
   editionDate?: string;
+  artworkUrl?: string;
 }
 
 interface TrackChartSummary {
@@ -26,6 +29,7 @@ interface TrackChartSummary {
   latestRank: number;
   latestMovement: "up" | "down" | "new" | "same";
   latestMovementAmount: number;
+  artworkUrl?: string;
   entries: ChartEntry[];
 }
 
@@ -66,42 +70,6 @@ function Movement({ movement, amount }: { movement: ChartEntry["movement"]; amou
   return (
     <span className="text-[12px] font-bold text-[var(--wk-text-faint)]">—</span>
   );
-}
-
-function HonorBadge({ peak }: { peak: number }) {
-  if (peak === 1) {
-    return (
-      <span className="flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.1em] text-amber-700 border border-amber-200">
-        <i className="ri-vip-crown-line" />
-        #1
-      </span>
-    );
-  }
-  if (peak <= 3) {
-    return (
-      <span className="flex items-center gap-1 rounded-full bg-slate-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.1em] text-slate-600 border border-slate-200">
-        <i className="ri-medal-line" />
-        Top 3
-      </span>
-    );
-  }
-  if (peak <= 5) {
-    return (
-      <span className="flex items-center gap-1 rounded-full bg-orange-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.1em] text-orange-700 border border-orange-200">
-        <i className="ri-fire-line" />
-        Top 5
-      </span>
-    );
-  }
-  if (peak <= 10) {
-    return (
-      <span className="flex items-center gap-1 rounded-full bg-[var(--wk-surface-raised)] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.1em] text-[var(--wk-brand)] border border-[var(--wk-border)]">
-        <i className="ri-trophy-line" />
-        Top 10
-      </span>
-    );
-  }
-  return null;
 }
 
 function formatDate(dateStr: string): string {
@@ -266,12 +234,27 @@ function TrackChartRow({
   isExpanded: boolean;
   onToggle: () => void;
 }) {
+  const { currentTrack, isPlaying, playTrack } = usePlayer();
   const trackSlug = track.slug || track.title.toLowerCase().replace(/\s+/g, "-");
+  const trackId = trackSlug;
+  const isCurrentTrack = currentTrack?.id === trackId;
+  const playable = true;
+
+  const handlePlay = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    playTrack(
+      { id: trackId, title: track.title, artist: track.artist, artworkUrl: track.artworkUrl, isPlayable: playable },
+      [],
+    );
+  };
 
   return (
-    <div className="border-b border-[var(--wk-divider)] last:border-b-0">
+    <div className="group border-b border-[var(--wk-divider)] last:border-b-0">
       {/* Main row */}
-      <div className="flex items-center gap-3 px-4 py-4 md:px-5 md:py-4">
+      <div
+        onClick={onToggle}
+        className="flex cursor-pointer items-center gap-3 px-4 py-4 md:px-5 md:py-4 select-none transition-colors hover:bg-[var(--wk-surface-raised)]/60"
+      >
         {/* Peak position — big visual anchor */}
         <div className="flex flex-col items-center justify-center w-[52px] md:w-[60px] shrink-0">
           <span className={`text-[28px] md:text-[32px] font-black leading-none ${
@@ -287,52 +270,100 @@ function TrackChartRow({
           </span>
         </div>
 
+        {/* Artwork */}
+        <div className="relative h-12 w-12 md:h-14 md:w-14 shrink-0 overflow-hidden rounded-lg bg-[var(--wk-surface-raised)]">
+          {track.artworkUrl ? (
+            <img src={track.artworkUrl} alt="" className="h-full w-full object-cover object-top" />
+          ) : (
+            <Ch19GradientImage slug={trackSlug} name={track.title} />
+          )}
+          {playable && (
+            <button
+              onClick={handlePlay}
+              className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity duration-150 group-hover:opacity-100"
+              aria-label={isCurrentTrack && isPlaying ? "Pause" : "Play"}
+            >
+              <i className={`text-white text-lg ${isCurrentTrack && isPlaying ? "ri-pause-fill" : "ri-play-fill"}`} />
+            </button>
+          )}
+        </div>
+
         {/* Song info */}
         <div className="flex-1 min-w-0">
-          <Link
-            to={`/tracks/${trackSlug}`}
-            className="group/track inline-flex items-center gap-2"
-          >
-            <span className="text-[15px] font-bold text-[var(--wk-text)] group-hover/track:text-[var(--wk-brand)] transition-colors truncate">
-              {track.title}
-            </span>
-            <i className="ri-arrow-right-up-line text-[12px] text-[var(--wk-text-faint)] opacity-0 group-hover/track:opacity-100 transition-opacity" />
-          </Link>
+          <div className="flex items-center gap-2 mb-0.5">
+            {trackSlug ? (
+              <Link
+                to={`/tracks/${trackSlug}`}
+                onClick={(e) => e.stopPropagation()}
+                className="truncate text-[14px] md:text-[15px] font-bold text-[var(--wk-text)] hover:text-[var(--wk-brand)] transition-colors"
+              >
+                {track.title}
+              </Link>
+            ) : (
+              <span className="truncate text-[14px] md:text-[15px] font-bold text-[var(--wk-text)]">{track.title}</span>
+            )}
+            {track.peakPosition === 1 && (
+              <span className="shrink-0 inline-flex items-center gap-0.5 rounded-full bg-amber-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.08em] text-amber-700 border border-amber-200">
+                <i className="ri-vip-crown-line text-[9px]" />
+                #1
+              </span>
+            )}
+            {track.peakPosition !== 1 && track.peakPosition <= 3 && (
+              <span className="shrink-0 rounded-full bg-[var(--wk-brand-soft)] px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.08em] text-[var(--wk-brand)]">
+                Top 3
+              </span>
+            )}
+          </div>
 
-          <div className="flex items-center gap-2 mt-1 flex-wrap">
-            <HonorBadge peak={track.peakPosition} />
-            <span className="text-[11px] text-[var(--wk-text-muted)]">
-              {track.weeksOnChart} week{track.weeksOnChart !== 1 ? "s" : ""} on chart
-            </span>
+          <div className="flex items-center gap-2 flex-wrap text-[11px] text-[var(--wk-text-muted)]">
+            <span>{track.artist}</span>
             <span className="text-[var(--wk-divider)]">·</span>
-            <span className="text-[11px] text-[var(--wk-text-muted)]">
-              Debut {formatDate(track.debutDate)}
-            </span>
+            <span>{track.weeksOnChart} wk{track.weeksOnChart !== 1 ? "s" : ""}</span>
+            <span className="text-[var(--wk-divider)]">·</span>
+            <span>Debut {formatDate(track.debutDate)}</span>
           </div>
         </div>
 
-        {/* Latest + toggle */}
-        <div className="flex items-center gap-3 md:gap-4 shrink-0">
-          <div className="hidden md:flex flex-col items-end">
-            <span className="text-[13px] font-bold text-[var(--wk-text)]">
-              #{track.latestRank}
-            </span>
+        {/* Latest + movement */}
+        <div className="hidden md:flex items-center gap-3 shrink-0">
+          <div className="flex flex-col items-end">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[15px] font-bold text-[var(--wk-text)]">
+                #{track.latestRank}
+              </span>
+              {track.latestMovement === "up" && (
+                <span className="flex items-center gap-0.5 text-[11px] font-bold text-[var(--wk-success)]">
+                  <i className="ri-arrow-up-line text-[11px]" />{track.latestMovementAmount || ""}
+                </span>
+              )}
+              {track.latestMovement === "down" && (
+                <span className="flex items-center gap-0.5 text-[11px] font-bold text-[var(--wk-danger)]">
+                  <i className="ri-arrow-down-line text-[11px]" />{track.latestMovementAmount || ""}
+                </span>
+              )}
+              {track.latestMovement === "new" && (
+                <span className="rounded-full bg-[var(--wk-brand-soft)] px-1.5 py-0.5 text-[9px] font-black uppercase text-[var(--wk-brand)]">
+                  NEW
+                </span>
+              )}
+            </div>
             <span className="text-[9px] font-black uppercase tracking-[0.12em] text-[var(--wk-text-faint)]">
               Latest
             </span>
           </div>
+        </div>
 
-          <button
-            onClick={onToggle}
-            className="flex h-8 w-8 items-center justify-center rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] text-[var(--wk-text-muted)] transition-all hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)] hover:border-[var(--wk-brand)]"
-            aria-label={isExpanded ? "Collapse weekly timeline" : "Expand weekly timeline"}
-          >
-            <i className={`ri-${isExpanded ? "subtract-line" : "add-line"} text-sm`} />
-          </button>
+        {/* Expand chevron */}
+        <div
+          className={`hidden md:flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[var(--wk-border)] text-[var(--wk-text-faint)] transition-all duration-200 ${
+            isExpanded ? "rotate-180 bg-[var(--wk-surface)] text-[var(--wk-text)]" : "hover:text-[var(--wk-text-muted)] hover:border-[var(--wk-brand)]"
+          }`}
+        >
+          <i className="ri-arrow-down-s-line text-[16px]" />
         </div>
       </div>
 
-      {/* Expanded weekly timeline — now uses same horizontal padding as main row */}
+      {/* Expanded weekly timeline */}
       {isExpanded && (
         <div className="px-4 md:px-5 pb-4 animate-in slide-in-from-top-2 duration-200">
           <div className="mb-3">
@@ -376,6 +407,9 @@ export function ArtistChartSection({ entries }: { entries: ChartEntry[] }) {
       const peakPosition = Math.min(...trackEntries.map((e) => e.peakPosition || e.rank));
       const weeksOnChart = Math.max(...trackEntries.map((e) => e.weeksOnChart || 0));
 
+      // Pick artwork: prefer the most recent entry's artwork, fallback to any
+      const artworkUrl = latest?.artworkUrl || trackEntries.find((e) => e.artworkUrl)?.artworkUrl;
+
       summaries.push({
         title,
         artist: trackEntries[0].artist || "",
@@ -387,6 +421,7 @@ export function ArtistChartSection({ entries }: { entries: ChartEntry[] }) {
         latestRank: latest?.rank || 0,
         latestMovement: latest?.movement || "same",
         latestMovementAmount: latest?.movementAmount || 0,
+        artworkUrl,
         entries: trackEntries,
       });
     }

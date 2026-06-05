@@ -6,6 +6,7 @@ import {
   type MagazineArticle,
 } from "@/services/magazineArticles";
 import { getAuthorMeta } from "@/services/authorProfiles";
+import { SkeletonArticlePage } from "@/components/skeletons/Skeletons";
 
 function formatReadCount(count: number): string {
   if (count >= 1000) return `${(count / 1000).toFixed(1)}k`;
@@ -79,14 +80,7 @@ export default function MobileArticle() {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-[var(--wk-brand)] border-t-transparent" />
-          <p className="text-sm text-[var(--wk-text-muted)]">Loading article…</p>
-        </div>
-      </div>
-    );
+    return <SkeletonArticlePage />;
   }
 
   if (error || !article) {

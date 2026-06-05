@@ -1,22 +1,29 @@
-import { useMemo, useState, useEffect, useCallback } from "react";
+import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
-import { PageHero } from "@/components/design-system/PageHero";
 import { ShareButton } from "@/components/design-system/share/ShareSheet";
 import { WkIcon } from "@/components/design-system/Icon";
+import { Chapter19FallbackImage } from "@/components/media/Chapter19FallbackImage";
 import { listGenres, type RepairedGenre } from "@/services/repairedContent/client";
-
-const genreVisual = (slug: string) =>
-  `linear-gradient(135deg, rgba(132,194,65,.35), rgba(8,9,8,.92)), url(https://picsum.photos/seed/wk-genre-${slug}/800/1100)`;
 
 const filters = ["All", "High activity", "Artist-rich", "Track-rich", "Recently updated"];
 
-function accentVarForGenre(name: string): string {
-  const lower = name.toLowerCase();
-  if (lower.includes("dance") || lower.includes("piano") || lower.includes("gqom") || lower.includes("kwaito") || lower.includes("gengetone")) return "--wk-v-dance";
-  if (lower.includes("highlife") || lower.includes("soul") || lower.includes("gospel")) return "--wk-v-intel";
-  if (lower.includes("bongo") || lower.includes("swahili") || lower.includes("east")) return "--wk-v-places";
-  if (lower.includes("r&b") || lower.includes("rap") || lower.includes("trap") || lower.includes("film")) return "--wk-v-film";
-  return "--wk-v-music";
+function useScrollReveal(deps: unknown[] = []) {
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("genre43-reveal-visible");
+            observer.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.06, rootMargin: "0px 0px -28px 0px" },
+    );
+    const els = document.querySelectorAll(".genre43-reveal");
+    els.forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
+  }, deps);
 }
 
 export default function Genres() {
@@ -43,10 +50,18 @@ export default function Genres() {
     loadData();
   }, [loadData]);
 
+  useScrollReveal([loading]);
+
   const totalArtists = genres.reduce((s, g) => s + g.artistCount, 0);
   const totalTracks = genres.reduce((s, g) => s + g.trackCount, 0);
-  const featured = genres[0];
-  const sideGenres = genres.slice(1, 4);
+
+  const sortedByActivity = useMemo(
+    () => [...genres].sort((a, b) => b.trackCount - a.trackCount),
+    [genres]
+  );
+
+  const spotlight = sortedByActivity[0];
+  const compactGenres = sortedByActivity.slice(1, 4);
 
   const filteredGenres = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -67,34 +82,39 @@ export default function Genres() {
     });
   }, [activeFilter, query, genres]);
 
-  const trendingGenres = useMemo(() => {
-    return [...genres]
-      .sort((a, b) => b.trackCount - a.trackCount)
-      .slice(0, 4);
-  }, [genres]);
+  const trendingGenres = useMemo(
+    () => sortedByActivity.slice(0, 8),
+    [sortedByActivity]
+  );
 
   if (loading) {
     return (
-      <div className="min-h-screen">
-        <div className="wk-container-wide px-4 md:px-6 py-20">
-          <div className="space-y-4">
-            <div className="h-4 w-32 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
-            <div className="h-12 w-3/4 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
-            <div className="h-4 w-1/2 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
-          </div>
-          <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <main className="min-h-screen">
+        <div className="genre43-hero-skel">
+          <div className="h-4 w-32 rounded bg-white/10 animate-pulse" />
+          <div className="h-16 w-96 rounded bg-white/10 animate-pulse mt-6" />
+          <div className="h-5 w-[500px] rounded bg-white/10 animate-pulse mt-4" />
+        </div>
+        <div className="wk-container-wide px-4 py-10 md:px-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="h-48 rounded-xl bg-[var(--wk-surface-raised)] animate-pulse" />
+              <div key={i} className="rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] overflow-hidden">
+                <div className="h-32 bg-[var(--wk-surface-raised)] animate-pulse" />
+                <div className="p-3 space-y-2">
+                  <div className="h-4 w-3/4 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
+                  <div className="h-3 w-1/2 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
+                </div>
+              </div>
             ))}
           </div>
         </div>
-      </div>
+      </main>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen wk-container px-6 py-20">
+      <main className="min-h-screen wk-container px-6 py-20">
         <div className="max-w-2xl mx-auto rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-8 text-center">
           <WkIcon name="Compass" size={42} className="mx-auto mb-4 text-[var(--wk-text-faint)]" />
           <h1 className="wk-h-section mb-2">Could not load genres</h1>
@@ -103,28 +123,35 @@ export default function Genres() {
             <i className="ri-refresh-line" /> Retry
           </button>
         </div>
-      </div>
+      </main>
     );
   }
 
   return (
-    <div className="min-h-screen">
-      <div className="wk-container-wide px-4 md:px-6">
-        <PageHero
-          variant="default"
-          eyebrow={
-            <>
-              <WkIcon name="Compass" size={14} /> Cultural territories
-            </>
-          }
-          title="Genre directory"
-          subtitle="Browse WAKILISHA by genre as living cultural territory: artists, tracks, activity, representative voices, and routes into discovery."
-          stats={[
-            { value: genres.length, label: "Genres" },
-            { value: totalArtists.toLocaleString(), label: "Artists" },
-            { value: totalTracks.toLocaleString(), label: "Tracks" },
-          ]}
-          actions={
+    <main className="min-h-screen bg-[var(--wk-bg)]">
+
+      {/* ═══════════════════════ HERO ═══════════════════════ */}
+      <section className="genre43-hero">
+        <div className="genre43-hero-overlay" />
+        <div className="genre43-hero-content">
+          <div className="genre43-hero-badge">
+            <WkIcon name="Compass" size={12} /> Cultural territories
+          </div>
+          <h1 className="genre43-hero-title">Genres</h1>
+          <p className="genre43-hero-sub">
+            Browse WAKILISHA by genre as living cultural territory: artists, tracks,
+            activity, representative voices, and routes into discovery.
+          </p>
+          <div className="genre43-hero-row">
+            <div className="genre43-hero-search-wrap">
+              <i className="ri-search-line genre43-hero-search-icon" />
+              <input
+                className="genre43-hero-search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search genre or representative artist..."
+              />
+            </div>
             <ShareButton
               item={{
                 title: "WAKILISHA Genre Directory",
@@ -133,177 +160,248 @@ export default function Genres() {
                 type: "page",
               }}
             />
-          }
-        />
+          </div>
+          <div className="genre43-hero-stats">
+            <div className="genre43-hero-stat">
+              <span className="genre43-hero-stat-val">{genres.length}</span>
+              <span className="genre43-hero-stat-lbl">Genres</span>
+            </div>
+            <div className="genre43-hero-stat">
+              <span className="genre43-hero-stat-val">{totalArtists.toLocaleString()}</span>
+              <span className="genre43-hero-stat-lbl">Artists</span>
+            </div>
+            <div className="genre43-hero-stat">
+              <span className="genre43-hero-stat-val">{totalTracks.toLocaleString()}</span>
+              <span className="genre43-hero-stat-lbl">Tracks</span>
+            </div>
+          </div>
+        </div>
+        <div className="genre43-hero-scroll-hint">
+          <div className="genre43-hero-scroll-line" />
+        </div>
+      </section>
 
-        <div className="directory-toolbar">
-          <div className="directory-filters">
-            {filters.map((filter) => (
+      {/* ═══════════════════════ STICKY NAV ═══════════════════════ */}
+      <div className="genre43-toolbar">
+        <div className="genre43-toolbar-inner">
+          <span className="genre43-toolbar-label">Filter</span>
+          <div className="genre43-filter-pills">
+            {filters.map((f) => (
               <button
-                key={filter}
-                onClick={() => setActiveFilter(filter)}
-                className={`directory-filter ${activeFilter === filter ? "on" : ""}`}
+                key={f}
+                onClick={() => setActiveFilter(f)}
+                className={`genre43-filter-pill ${activeFilter === f ? "on" : ""}`}
               >
-                {filter}
+                {f}
               </button>
             ))}
           </div>
-          <input
-            className="directory-search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search genre or representative artist"
-          />
         </div>
+      </div>
 
-        {featured && (
-          <section className="genre-featured">
-            <Link to={`/genres/${featured.slug}`} className="genre-feature-card">
-              <div
-                className="genre-feature-art"
-                style={{ backgroundImage: genreVisual(featured.slug) }}
-              />
-              <div className="genre-feature-shade" />
-              <div className="genre-feature-body">
-                <div className="genre-feature-kicker">Genre of the week</div>
-                <h2 className="genre-feature-title">{featured.name}</h2>
-                <p className="genre-feature-copy">
-                  {featured.artistCount} artists and {featured.trackCount} tracks
-                  currently mapped in this territory. Representative voices:{" "}
-                  {featured.representativeArtists?.slice(0, 3).join(", ") ||
-                    "registry pending"}
-                  .
-                </p>
+      {/* ═══════════════════════ CONTENT BODY ═══════════════════════ */}
+      <div className="genre43-body">
+
+        {/* ── Spotlight · asymmetrical ── */}
+        {spotlight && (
+          <section className="genre43-reveal">
+            <SectionLabel>Spotlight</SectionLabel>
+            <div className="genre43-asym-grid">
+              <Link to={`/genres/${spotlight.slug}`} className="genre43-spot-card group">
+                <Chapter19FallbackImage
+                  slug={spotlight.slug}
+                  name={spotlight.name}
+                  className="genre43-spot-artwork"
+                />
+                <div className="genre43-spot-gradient" />
+                <div className="genre43-spot-info">
+                  <div className="genre43-spot-kicker">Most active genre</div>
+                  <h2 className="genre43-spot-title">{spotlight.name}</h2>
+                  <div className="genre43-spot-meta-row">
+                    <span>{spotlight.artistCount} artists</span>
+                    <span className="genre43-spot-dot" />
+                    <span>{spotlight.trackCount} tracks</span>
+                  </div>
+                  <p className="genre43-spot-desc">
+                    Representative voices:{" "}
+                    {spotlight.representativeArtists?.slice(0, 4).join(", ") ||
+                      "registry pending"}.
+                  </p>
+                </div>
+              </Link>
+              <div className="genre43-compact-stack">
+                {compactGenres.map((genre, i) => (
+                  <Link key={genre.slug} to={`/genres/${genre.slug}`} className="genre43-compact-card group">
+                    <div className="genre43-compact-artwork-wrap">
+                      <Chapter19FallbackImage
+                        slug={genre.slug}
+                        name={genre.name}
+                        className="genre43-compact-artwork"
+                      />
+                    </div>
+                    <div className="genre43-compact-body">
+                      <div className="genre43-compact-rank">#{i + 2}</div>
+                      <h4 className="genre43-compact-name">{genre.name}</h4>
+                      <div className="genre43-compact-meta">
+                        <span>{genre.artistCount} artists</span>
+                        <span className="genre43-compact-dot" />
+                        <span>{genre.trackCount} tracks</span>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
               </div>
-            </Link>
-            <div className="genre-side-stack">
-              {sideGenres.map((genre) => (
-                <Link key={genre.slug} to={`/genres/${genre.slug}`} className="genre-side-card">
-                  <div className="genre-side-icon">
-                    <WkIcon name="AudioWaveform" size={28} />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="artist-list-name">{genre.name}</div>
-                    <div className="artist-list-sub">
-                      {genre.artistCount} artists · {genre.trackCount} tracks
-                    </div>
-                    <div className="artist-card-tags">
-                      {genre.representativeArtists?.slice(0, 2).map((artist) => (
-                        <span key={artist} className="tag tag-sm">
-                          {artist}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                </Link>
+            </div>
+          </section>
+        )}
+
+        {/* ── Trending genres · symmetrical grid ── */}
+        {trendingGenres.length > 0 && (
+          <section className="genre43-reveal">
+            <SectionLabel count={trendingGenres.length}>Trending genres</SectionLabel>
+            <div className="genre43-grid">
+              {trendingGenres.map((genre) => (
+                <GenreCard key={genre.slug} genre={genre} />
               ))}
             </div>
           </section>
         )}
 
-        <section>
-          <div className="section-head">
-            <div>
-              <div className="section-kicker">Featured genres</div>
-              <h2 className="section-title">Cultural entry points</h2>
-            </div>
-            <p className="section-copy">
-              Genre cards use color, texture, iconography, and activity signals
-              instead of fake human faces.
+        {/* ── Pullquote ── */}
+        <div className="genre43-reveal genre43-pullquote">
+          <div className="genre43-pullquote-inner">
+            <div className="genre43-pullquote-line" />
+            <p className="genre43-pullquote-text">
+              Genres are portals, not people. Every territory is mapped through
+              texture, color, metadata density, and cultural routing — because
+              sound deserves an ecosystem, not a headshot.
             </p>
+            <div className="genre43-pullquote-line" />
           </div>
-          <div className="genre-grid">
-            {trendingGenres.map((genre) => (
-              <GenreTile key={genre.slug} genre={genre} featured />
-            ))}
-          </div>
-        </section>
+        </div>
 
-        <section>
-          <div className="section-head">
-            <div>
-              <div className="section-kicker">Full genre grid</div>
-              <h2 className="section-title">All mapped territories</h2>
-            </div>
-            <p className="section-copy">
-              Showing {filteredGenres.length} of {genres.length} imported genres.
-            </p>
-          </div>
-          <div className="genre-grid">
+        {/* ── Full directory ── */}
+        <section className="genre43-reveal">
+          <SectionLabel count={filteredGenres.length}>Full directory</SectionLabel>
+
+          <div className="genre43-grid">
             {filteredGenres.map((genre) => (
-              <GenreTile key={genre.slug} genre={genre} />
+              <GenreCard key={genre.slug} genre={genre} />
             ))}
           </div>
+
           {filteredGenres.length === 0 && (
-            <div className="artist-empty">
+            <div className="genre43-empty">
               <WkIcon name="Compass" size={32} />
-              <div className="mt-3">No genres match this search.</div>
+              <span>No genres match this search.</span>
             </div>
           )}
         </section>
 
-        <section className="pg-layout cols-2 pb-10">
-          <div className="pg-block">
-            <div className="pg-block-label">Recently updated</div>
-            <div className="space-y-3">
-              {genres.slice(0, 5).map((genre) => (
-                <Link
-                  key={genre.slug}
-                  to={`/genres/${genre.slug}`}
-                  className="artist-list-item px-0"
-                >
-                  <div className="artist-list-ava flex items-center justify-center">
-                    <WkIcon name="Radio" size={20} />
-                  </div>
-                  <div>
-                    <div className="artist-list-name">{genre.name}</div>
-                    <div className="artist-list-sub">
-                      {genre.representativeArtists?.slice(0, 2).join(", ") ||
-                        "Representative artists pending"}
-                    </div>
-                  </div>
-                  <div className="artist-list-stat">{genre.trackCount}</div>
-                </Link>
-              ))}
+        {/* ── Context block ── */}
+        <section className="genre43-reveal genre43-context">
+          <div className="genre43-context-inner">
+            <div className="genre43-context-block">
+              <span className="genre43-context-eyebrow">Recently active</span>
+              <div className="genre43-context-list">
+                {sortedByActivity.slice(0, 6).map((genre) => (
+                  <Link
+                    key={genre.slug}
+                    to={`/genres/${genre.slug}`}
+                    className="genre43-context-row group"
+                  >
+                    <div className="genre43-context-dot-brand" />
+                    <span className="genre43-context-row-name">{genre.name}</span>
+                    <span className="genre43-context-row-stat">{genre.trackCount} tracks</span>
+                    <i className="ri-arrow-right-s-line genre43-context-row-arrow" />
+                  </Link>
+                ))}
+              </div>
+            </div>
+            <div className="genre43-context-block">
+              <span className="genre43-context-eyebrow">Directory rule</span>
+              <h3 className="genre43-context-title">Genres are portals.</h3>
+              <p className="genre43-context-body">
+                This chapter uses abstract visual treatment, metadata density,
+                iconography, and cultural routing. Human photography belongs to
+                artist pages, not genre cards. Every genre here carries a unique
+                gradient identity derived from its name — a visual signature for
+                each cultural territory.
+              </p>
+              <div className="genre43-context-stats">
+                <div className="genre43-context-stat">
+                  <span className="genre43-context-stat-val">{genres.length}</span>
+                  <span className="genre43-context-stat-lbl">Genres mapped</span>
+                </div>
+                <div className="genre43-context-stat">
+                  <span className="genre43-context-stat-val">{totalTracks.toLocaleString()}</span>
+                  <span className="genre43-context-stat-lbl">Tracks classified</span>
+                </div>
+              </div>
             </div>
           </div>
-          <div className="pg-block">
-            <div className="pg-block-label">Directory rule</div>
-            <h3 className="pg-block-title">Genres are portals, not people.</h3>
-            <p className="pg-block-body">
-              This chapter uses abstract visual treatment, metadata density,
-              iconography, and cultural routing. Human photography belongs to
-              artist pages, not genre cards.
-            </p>
-          </div>
         </section>
+
+        {/* ── Footer ── */}
+        <footer className="genre43-reveal genre43-footer">
+          <span className="genre43-footer-brand">WAKILISHA Cultural Map</span>
+          <p className="genre43-footer-tagline">
+            {genres.length} genres across the continent. Every territory mapped
+            as a living ecosystem.
+          </p>
+          <p className="genre43-footer-meta">
+            {totalArtists.toLocaleString()} artists &middot; {totalTracks.toLocaleString()} tracks
+          </p>
+        </footer>
+      </div>
+    </main>
+  );
+}
+
+/* ── Section label ── */
+function SectionLabel({ children, count }: { children: string; count?: number }) {
+  return (
+    <div className="genre43-section-label-row">
+      <div className="genre43-section-label-left">
+        <span className="genre43-section-label-text">{children}</span>
+        {count !== undefined && (
+          <span className="genre43-section-label-count">{count}</span>
+        )}
       </div>
     </div>
   );
 }
 
-function GenreTile({
-  genre,
-  featured = false,
-}: {
-  genre: RepairedGenre;
-  featured?: boolean;
-}) {
+/* ── Genre card ── */
+function GenreCard({ genre }: { genre: RepairedGenre }) {
   return (
-    <Link to={`/genres/${genre.slug}`} className="genre-card">
-      <div
-        className="genre-card-bg"
-        style={{ backgroundImage: genreVisual(genre.slug) }}
-      />
-      <div className="genre-card-overlay" />
-      <div className="genre-card-icon">
-        <WkIcon name={featured ? "Flame" : "Music2"} size={15} />
+    <Link to={`/genres/${genre.slug}`} className="genre43-card group">
+      <div className="genre43-card-artwork-wrap">
+        <Chapter19FallbackImage
+          slug={genre.slug}
+          name={genre.name}
+          className="genre43-card-artwork"
+        />
+        <div className="genre43-card-artwork-name">{genre.name}</div>
       </div>
-      <div className="genre-card-body">
-        <div className="genre-card-name">{genre.name}</div>
-        <div className="genre-card-count">
-          {genre.artistCount} artists · {genre.trackCount} tracks
+      <div className="genre43-card-body">
+        <div className="genre43-card-stats-row">
+          <div className="genre43-card-stat-pill">
+            <strong>{genre.artistCount}</strong>
+            <span>Artists</span>
+          </div>
+          <div className="genre43-card-stat-pill">
+            <strong>{genre.trackCount}</strong>
+            <span>Tracks</span>
+          </div>
         </div>
+        {genre.representativeArtists && genre.representativeArtists.length > 0 && (
+          <div className="genre43-card-roster">
+            {genre.representativeArtists.slice(0, 4).map((artist) => (
+              <span key={artist} className="genre43-card-roster-tag">{artist}</span>
+            ))}
+          </div>
+        )}
       </div>
     </Link>
   );

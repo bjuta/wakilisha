@@ -2,11 +2,16 @@ interface AdminChartsLoadingStateProps {
   message?: string;
 }
 
+import { SkeletonBlock } from "@/components/skeletons/Skeletons";
+
 export function AdminChartsLoadingState({ message = "Loading..." }: AdminChartsLoadingStateProps) {
   return (
-    <div className="flex h-64 flex-col items-center justify-center gap-3">
-      <div className="h-8 w-8 animate-spin rounded-full border-2 border-wk-border-2 border-t-wk-brand" />
-      <p className="text-[13px] font-medium text-wk-text-muted">{message}</p>
+    <div className="space-y-4 p-6">
+      <div className="flex items-center gap-3 mb-6">
+        <SkeletonBlock className="h-8 w-8 rounded-lg" />
+        <SkeletonBlock className="h-5 w-48 rounded" />
+      </div>
+      <SkeletonBlock className="h-[300px] rounded-xl border border-[var(--wk-border)]" />
     </div>
   );
 }

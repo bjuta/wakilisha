@@ -220,7 +220,7 @@ function mapRow(
     section: decodeHtmlEntities(categories[0] || 'Article'),
     author,
     date: normalizeDate(row.published_at as string | null),
-    readingTime: opts?.includeContent ? estimateReadingTime(contentHtml) : 3,
+    readingTime: rawContentHtml ? estimateReadingTime(rawContentHtml) : 3,
     heroUrl,
     dek,
     body: opts?.includeContent ? parseBody(contentHtml).map((p) => decodeHtmlEntities(p)) : [],

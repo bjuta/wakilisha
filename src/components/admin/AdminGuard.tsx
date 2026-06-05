@@ -2,6 +2,7 @@ import { Navigate, useLocation } from "react-router-dom";
 import { useAdminUser } from "@/hooks/useAdminUser";
 import type { Capability } from "@/services/userRoles";
 import { getDefaultRoute } from "@/services/userRoles";
+import { SkeletonAdminGuard } from "@/components/skeletons/Skeletons";
 
 interface AdminGuardProps {
   children: React.ReactNode;
@@ -18,14 +19,7 @@ export function AdminGuard({ children, capabilities, fallback }: AdminGuardProps
   // Still loading — show loading skeleton or nothing
   if (user.loading) {
     return (
-      fallback ?? (
-        <div className="flex h-screen items-center justify-center bg-wk-bg">
-          <div className="flex flex-col items-center gap-3">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-wk-brand border-t-transparent" />
-            <span className="text-[13px] text-wk-text-muted">Checking permissions...</span>
-          </div>
-        </div>
-      )
+      fallback ?? <SkeletonAdminGuard />
     );
   }
 

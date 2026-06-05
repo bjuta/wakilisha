@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useMagazineArticles, type MagazineArticle } from "@/services/magazineArticles";
 import { getAuthorMeta } from "@/services/authorProfiles";
 import { MagazineCard } from "@/pages/magazine/components/MagazineCard";
+import { SkeletonMagazinePage } from "@/components/skeletons/Skeletons";
 
 function useScrollReveal(deps: unknown[] = []) {
   useEffect(() => {
@@ -120,15 +121,36 @@ export default function MobileMagazine() {
     [sectionMap],
   );
 
+  const pastIssues = useMemo(() => {
+    const grouped: Record<string, { articles: MagazineArticle[]; coverArticle: MagazineArticle }> = {};
+    for (const article of stories) {
+      const parsed = new Date(article.date);
+      if (Number.isNaN(parsed.getTime())) continue;
+      const key = `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}`;
+      if (!grouped[key]) {
+        grouped[key] = { articles: [], coverArticle: article };
+      }
+      grouped[key].articles.push(article);
+    }
+    const sorted = Object.entries(grouped)
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([key, val], idx, arr) => {
+        const [y, m] = key.split('-');
+        const monthName = new Date(Number(y), Number(m) - 1).toLocaleDateString('en', { month: 'long', year: 'numeric' });
+        return {
+          key,
+          monthName,
+          issueNumber: arr.length - idx,
+          coverUrl: val.coverArticle.heroUrl,
+          articleCount: val.articles.length,
+          firstSlug: val.coverArticle.slug,
+        };
+      });
+    return sorted.slice(1);
+  }, [stories]);
+
   if (status === "loading") {
-    return (
-      <div className="wk-mobile-v5 flex min-h-screen items-center justify-center bg-[var(--wk-bg)]">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-7 h-7 border-2 border-[var(--wk-border)] border-t-[var(--wk-brand)] rounded-full animate-spin" />
-          <span className="text-[13px] font-semibold text-[var(--wk-text-muted)]">Loading…</span>
-        </div>
-      </div>
-    );
+    return <SkeletonMagazinePage />;
   }
 
   if (status === "error" || !heroStory) {
@@ -146,60 +168,47 @@ export default function MobileMagazine() {
     <div className="wk-mobile-v5 min-h-screen bg-[var(--wk-bg)]">
 
       {/* ═══════════════════════ HERO ═══════════════════════ */}
-      <div ref={heroRef} className="relative min-h-[78vh] flex items-end overflow-hidden bg-[#0a0a0a]">
+      <Link
+        to={`/magazine/${heroStory.slug}`}
+        ref={heroRef}
+        className="relative h-screen flex items-end overflow-hidden bg-[#0a0a0a] block"
+      >
         <img
           ref={heroImgRef}
           src={heroStory.heroUrl}
           alt=""
           className="absolute inset-0 w-full h-full object-cover opacity-85 will-change-transform"
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/15 via-black/35 to-black/90" />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/25 to-black/90" />
 
-        <div className="relative z-10 w-full px-5 pb-16 pt-24 text-white">
-          <div className="inline-flex items-center gap-2 rounded-full bg-black/45 border border-white/18 text-white/90 text-[11px] font-bold tracking-[0.14em] uppercase px-3.5 py-1.5 mb-4 backdrop-blur-sm">
-            <span className="text-[var(--wk-brand)] font-extrabold">Issue {issueNum}</span>
-            <span className="text-white/35">·</span>
-            <span>{issueDate}</span>
-          </div>
-
-          <div className="inline-flex items-center gap-2 rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] text-[10px] font-black uppercase tracking-[0.18em] px-3 py-1.5 mb-5">
-            <i className="ri-newspaper-line text-[12px]" />
-            Cover Story
-          </div>
-
-          <h1 className="text-[36px] sm:text-[44px] font-black tracking-[-0.05em] leading-[0.92]">
+        <div className="relative z-10 w-full px-5 pb-12 pt-24 text-white">
+          <h1 className="text-[34px] sm:text-[42px] font-black tracking-[-0.05em] leading-[0.94]">
             {heroStory.title}
           </h1>
 
           {heroStory.dek && (
-            <p className="mt-4 text-[15px] leading-relaxed text-white/65 max-w-[48ch]">
+            <p className="mt-4 text-[14px] leading-relaxed text-white/55 max-w-[48ch]">
               {heroStory.dek}
             </p>
           )}
 
-          <div className="flex items-center gap-3 mt-6 flex-wrap">
+          <div className="flex items-center gap-2 mt-5 text-[11px] flex-wrap">
             <Link
               to={`/authors/${getAuthorMeta(heroStory.author).slug}`}
-              className="flex items-center gap-2.5 hover:opacity-80 transition-opacity"
+              className="inline-flex items-center rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-white/85 font-semibold px-3 py-1.5 hover:bg-white/18 hover:text-white transition-all"
+              onClick={(e) => e.stopPropagation()}
             >
-              <span className="w-9 h-9 rounded-full bg-[var(--wk-brand)] flex items-center justify-center text-[var(--wk-brand-on)] text-[12px] font-extrabold shrink-0">
-                {heroStory.author.slice(0, 2).toUpperCase()}
-              </span>
-              <span className="text-[13px] font-bold text-white">{heroStory.author}</span>
+              {heroStory.author}
             </Link>
-            <span className="text-white/30">·</span>
-            <span className="text-[12px] text-white/50">{heroStory.date || issueDate} · {heroStory.readingTime} min</span>
+            <span className="inline-flex items-center rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-white/65 px-3 py-1.5">
+              {heroStory.date || issueDate}
+            </span>
+            <span className="inline-flex items-center rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-white/65 px-3 py-1.5">
+              {heroStory.readingTime} min read
+            </span>
           </div>
-
-          <Link
-            to={`/magazine/${heroStory.slug}`}
-            className="inline-flex items-center gap-2.5 bg-[var(--wk-brand)] text-[var(--wk-brand-on)] text-[13px] font-extrabold px-5 py-2.5 rounded-full mt-5 hover:-translate-y-0.5 transition-transform whitespace-nowrap"
-          >
-            Read the cover story
-            <i className="ri-arrow-right-line text-[14px]" />
-          </Link>
         </div>
-      </div>
+      </Link>
 
       {/* ═══════════════════════ STICKY SECTION NAV ═══════════════════════ */}
       <div className="sticky top-0 z-40 border-b border-[var(--wk-border)] bg-[color-mix(in_srgb,var(--wk-surface)_92%,transparent)] backdrop-blur-[20px]">
@@ -242,7 +251,27 @@ export default function MobileMagazine() {
             <MobileSectionLabel href="/magazine">Latest Stories</MobileSectionLabel>
             <div className="grid grid-cols-2 gap-3">
               {sectionBlockStories.slice(0, 6).map((story, i) => (
-                <MagazineCard key={story.slug} variant="standard" story={story} rank={i + 1} />
+                <Link
+                  key={story.slug}
+                  to={`/magazine/${story.slug}`}
+                  className="group flex flex-col rounded-xl overflow-hidden border border-[var(--wk-border)] bg-[var(--wk-surface)] hover:border-[var(--wk-border-strong)] active:scale-[0.98] transition-all duration-200"
+                >
+                  <div className="aspect-[4/5] overflow-hidden bg-[var(--wk-surface-raised)]">
+                    <img
+                      src={story.heroUrl}
+                      alt={story.title}
+                      className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
+                    />
+                  </div>
+                  <div className="p-2.5 flex flex-col gap-1 flex-1">
+                    <h4 className="text-[12px] sm:text-[13px] font-black tracking-[-0.015em] leading-snug text-[var(--wk-text)] group-hover:text-[var(--wk-brand)] transition-colors line-clamp-2">
+                      {story.title}
+                    </h4>
+                    <div className="flex items-center gap-1.5 text-[10px] text-[var(--wk-text-faint)] mt-auto">
+                      <span className="font-semibold text-[var(--wk-text-muted)] truncate">{story.author}</span>
+                    </div>
+                  </div>
+                </Link>
               ))}
             </div>
           </section>
@@ -259,16 +288,275 @@ export default function MobileMagazine() {
           </div>
         </div>
 
+        {/* ── Past Issues Archive ── */}
+        {pastIssues.length > 0 && (
+          <section className="mag-reveal">
+            <div className="flex items-end justify-between mb-5 gap-3">
+              <div className="flex items-center gap-2.5">
+                <span className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--wk-brand)]">
+                  Past Issues
+                </span>
+                <span className="text-[10px] font-bold text-[var(--wk-text-faint)] bg-[var(--wk-surface)] border border-[var(--wk-border)] px-2 py-0.5 rounded-full">
+                  {pastIssues.length}
+                </span>
+              </div>
+              <Link to="/magazine/issues" className="text-[11px] font-bold text-[var(--wk-text-muted)] hover:text-[var(--wk-brand)] transition-colors flex items-center gap-1 whitespace-nowrap">
+                All <i className="ri-arrow-right-line text-[10px]" />
+              </Link>
+            </div>
+            <div
+              className="flex gap-3 overflow-x-auto scrollbar-none snap-x snap-mandatory -mx-4 px-4"
+              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+            >
+              {pastIssues.map((issue) => (
+                <Link
+                  key={issue.key}
+                  to={`/magazine/issue/${issue.key}`}
+                  className="group relative shrink-0 snap-start w-[160px] aspect-[3/4] rounded-xl overflow-hidden bg-[#0a0a0a]"
+                >
+                  <img
+                    src={issue.coverUrl}
+                    alt={issue.monthName}
+                    className="absolute inset-0 w-full h-full object-cover object-top transition-transform duration-600 group-hover:scale-105"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-black/10" />
+                  <div className="absolute top-2.5 right-2.5 z-10">
+                    <span className="inline-flex items-center rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-white/80 text-[9px] font-black tracking-[0.12em] px-2 py-0.5">
+                      No. {issue.issueNumber}
+                    </span>
+                  </div>
+                  <div className="absolute bottom-0 left-0 right-0 z-10 p-3">
+                    <p className="text-[11px] font-bold text-white/50 tracking-[0.06em] uppercase mb-0.5">
+                      {issue.monthName}
+                    </p>
+                    <p className="text-[9px] text-white/35">
+                      {issue.articleCount} {issue.articleCount === 1 ? 'story' : 'stories'}
+                    </p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
+
         {/* ── Section Blocks ── */}
-        {topSections.map((section) => {
+        {topSections.map((section, sectionIndex) => {
           const secStories = sectionMap[section] || [];
           if (secStories.length === 0) return null;
+
+          // Layout 0: Carousel — image-overlay portrait cards, horizontal scroll
+          if (sectionIndex === 0) {
+            return (
+              <section key={section} className="mag-reveal">
+                <MobileSectionLabel count={secStories.length} href="/magazine">{section}</MobileSectionLabel>
+                <div
+                  className="flex gap-3 overflow-x-auto scrollbar-none snap-x snap-mandatory -mx-4 px-4"
+                  style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                >
+                  {secStories.map((story) => (
+                    <Link
+                      key={story.slug}
+                      to={`/magazine/${story.slug}`}
+                      className="group relative shrink-0 snap-start w-[260px] sm:w-[300px] aspect-[4/5] rounded-2xl overflow-hidden bg-[#0a0a0a]"
+                    >
+                      <img
+                        src={story.heroUrl}
+                        alt={story.title}
+                        className="absolute inset-0 w-full h-full object-cover object-top transition-transform duration-700 group-hover:scale-105"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/45 to-black/10" />
+                      <div className="absolute top-3 left-3 z-10">
+                        <span className="inline-block text-[9px] font-black uppercase tracking-[0.18em] text-white/80 bg-black/35 backdrop-blur-sm px-2.5 py-1 rounded-full">
+                          {story.section}
+                        </span>
+                      </div>
+                      <div className="absolute top-3 right-3 z-10 w-7 h-7 rounded-full bg-black/25 backdrop-blur-sm flex items-center justify-center text-white/50 hover:text-white/85 transition-colors cursor-pointer">
+                        <i className="ri-bookmark-line text-[13px]" />
+                      </div>
+                      <div className="absolute bottom-0 left-0 right-0 z-10 p-4 pb-5">
+                        <h4 className="text-[15px] sm:text-[16px] font-black tracking-[-0.025em] leading-snug text-white group-hover:text-white/90 transition-colors line-clamp-2 mb-2">
+                          {story.title}
+                        </h4>
+                        {story.dek && (
+                          <p className="text-[11px] sm:text-[12px] leading-relaxed text-white/55 line-clamp-2 mb-3">
+                            {story.dek}
+                          </p>
+                        )}
+                        <div className="flex items-center gap-2 text-[10px] sm:text-[11px] text-white/40">
+                          <Link
+                            to={`/authors/${getAuthorMeta(story.author).slug}`}
+                            className="flex items-center gap-1.5 font-semibold text-white/60 hover:text-white/90 transition-colors"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <span className="w-4 h-4 rounded-full bg-[var(--wk-brand)] flex items-center justify-center text-[7px] font-black text-[var(--wk-brand-on)] shrink-0">
+                              {story.author.split(' ').map((n) => n[0]).join('').slice(0, 2)}
+                            </span>
+                            {story.author}
+                          </Link>
+                          <span className="text-white/15">·</span>
+                          <span>{story.readingTime} min</span>
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </section>
+            );
+          }
+
+          // Layout 1: Wide Landscape Scroll — cinematic widescreen cards, horizontal scroll
+          if (sectionIndex === 1) {
+            return (
+              <section key={section} className="mag-reveal">
+                <MobileSectionLabel count={secStories.length} href="/magazine">{section}</MobileSectionLabel>
+                <div
+                  className="flex gap-3 overflow-x-auto scrollbar-none snap-x snap-mandatory -mx-4 px-4"
+                  style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                >
+                  {secStories.map((story) => (
+                    <Link
+                      key={story.slug}
+                      to={`/magazine/${story.slug}`}
+                      className="group relative shrink-0 snap-start w-[300px] sm:w-[360px] aspect-[3/2] rounded-2xl overflow-hidden bg-[#0a0a0a]"
+                    >
+                      <img
+                        src={story.heroUrl}
+                        alt={story.title}
+                        className="absolute inset-0 w-full h-full object-cover object-top transition-transform duration-700 group-hover:scale-105"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/35 to-black/10" />
+                      <div className="absolute top-3 left-3 z-10">
+                        <span className="inline-block text-[9px] font-black uppercase tracking-[0.18em] text-[var(--wk-brand)] bg-black/35 backdrop-blur-sm px-2.5 py-1 rounded-full">
+                          {story.section}
+                        </span>
+                      </div>
+                      <div className="absolute bottom-0 left-0 right-0 z-10 p-4 pb-5">
+                        <h4 className="text-[16px] sm:text-[18px] font-black tracking-[-0.03em] leading-snug text-white group-hover:text-white/90 transition-colors line-clamp-2 mb-1.5">
+                          {story.title}
+                        </h4>
+                        <div className="flex items-center gap-2 text-[11px] text-white/40">
+                          <span className="font-semibold text-white/60">{story.author}</span>
+                          <span className="text-white/15">·</span>
+                          <span>{story.readingTime} min</span>
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </section>
+            );
+          }
+
+          // Layout 2: 2-Column Grid — image-forward vertical cards with taller images
+          if (sectionIndex === 2) {
+            return (
+              <section key={section} className="mag-reveal">
+                <MobileSectionLabel count={secStories.length} href="/magazine">{section}</MobileSectionLabel>
+                <div className="grid grid-cols-2 gap-3">
+                  {secStories.slice(0, 6).map((story) => (
+                    <Link
+                      key={story.slug}
+                      to={`/magazine/${story.slug}`}
+                      className="group flex flex-col rounded-xl overflow-hidden border border-[var(--wk-border)] bg-[var(--wk-surface)] hover:border-[var(--wk-border-strong)] hover:-translate-y-0.5 transition-all duration-300"
+                    >
+                      <div className="aspect-[3/4] overflow-hidden bg-[var(--wk-surface-raised)]">
+                        <img
+                          src={story.heroUrl}
+                          alt={story.title}
+                          className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
+                        />
+                      </div>
+                      <div className="p-3 flex flex-col gap-1.5 flex-1">
+                        <span className="text-[9px] font-black uppercase tracking-[0.16em] text-[var(--wk-brand)]">
+                          {story.section}
+                        </span>
+                        <h4 className="text-[13px] sm:text-[14px] font-black tracking-[-0.02em] leading-snug text-[var(--wk-text)] group-hover:text-[var(--wk-brand)] transition-colors line-clamp-3">
+                          {story.title}
+                        </h4>
+                        {story.dek && (
+                          <p className="text-[10px] sm:text-[11px] leading-relaxed text-[var(--wk-text-soft)] line-clamp-2">
+                            {story.dek}
+                          </p>
+                        )}
+                        <div className="flex items-center gap-1.5 text-[10px] text-[var(--wk-text-faint)] mt-auto pt-1">
+                          <span className="font-semibold">{story.author}</span>
+                          <span className="text-[var(--wk-border-strong)]">·</span>
+                          <span>{story.readingTime} min</span>
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </section>
+            );
+          }
+
+          // Layout 3: Hero + Compact List — one big image-overlay hero, rest as thumb rows
+          const [heroItem, ...restItems] = secStories;
           return (
             <section key={section} className="mag-reveal">
               <MobileSectionLabel count={secStories.length} href="/magazine">{section}</MobileSectionLabel>
               <div className="flex flex-col gap-3">
-                {secStories.slice(0, 3).map((story, i) => (
-                  <MagazineCard key={story.slug} variant="compact" story={story} rank={i + 1} />
+                {heroItem && (
+                  <Link
+                    to={`/magazine/${heroItem.slug}`}
+                    className="group relative overflow-hidden rounded-2xl bg-[#0a0a0a] aspect-[16/10]"
+                  >
+                    <img
+                      src={heroItem.heroUrl}
+                      alt={heroItem.title}
+                      className="absolute inset-0 w-full h-full object-cover object-top transition-transform duration-700 group-hover:scale-105"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-black/10" />
+                    <div className="absolute top-3 left-3 z-10">
+                      <span className="inline-block text-[9px] font-black uppercase tracking-[0.18em] text-white/80 bg-black/35 backdrop-blur-sm px-2.5 py-1 rounded-full">
+                        {heroItem.section}
+                      </span>
+                    </div>
+                    <div className="absolute bottom-0 left-0 right-0 z-10 p-4 pb-5">
+                      <h4 className="text-[18px] sm:text-[20px] font-black tracking-[-0.035em] leading-snug text-white line-clamp-2 mb-1.5">
+                        {heroItem.title}
+                      </h4>
+                      {heroItem.dek && (
+                        <p className="text-[12px] leading-relaxed text-white/55 line-clamp-2 mb-2">
+                          {heroItem.dek}
+                        </p>
+                      )}
+                      <div className="flex items-center gap-2 text-[11px] text-white/40">
+                        <span className="font-semibold text-white/60">{heroItem.author}</span>
+                        <span className="text-white/15">·</span>
+                        <span>{heroItem.readingTime} min</span>
+                      </div>
+                    </div>
+                  </Link>
+                )}
+                {restItems.slice(0, 3).map((story) => (
+                  <Link
+                    key={story.slug}
+                    to={`/magazine/${story.slug}`}
+                    className="group flex gap-3 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-3 hover:border-[var(--wk-border-strong)] hover:bg-[var(--wk-surface-raised)] transition-all duration-300"
+                  >
+                    <div className="w-[72px] h-[72px] shrink-0 rounded-lg overflow-hidden bg-[var(--wk-surface-raised)]">
+                      <img
+                        src={story.heroUrl}
+                        alt=""
+                        className="w-full h-full object-cover object-top transition-transform duration-400 group-hover:scale-110"
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
+                      <span className="text-[9px] font-black uppercase tracking-[0.16em] text-[var(--wk-brand)]">
+                        {story.section}
+                      </span>
+                      <h4 className="text-[14px] font-bold tracking-[-0.02em] leading-snug text-[var(--wk-text)] group-hover:text-[var(--wk-brand)] transition-colors line-clamp-2">
+                        {story.title}
+                      </h4>
+                      <div className="flex items-center gap-1.5 text-[10px] text-[var(--wk-text-faint)]">
+                        <span className="font-semibold">{story.author}</span>
+                        <span className="text-[var(--wk-border-strong)]">·</span>
+                        <span>{story.readingTime} min</span>
+                      </div>
+                    </div>
+                  </Link>
                 ))}
               </div>
             </section>

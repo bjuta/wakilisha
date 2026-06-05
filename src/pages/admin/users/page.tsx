@@ -13,7 +13,7 @@ import {
   type UserRole,
   type UserRoleRecord,
 } from "@/services/userRoles";
-import { supabase } from "@/lib/supabase";
+import { SkeletonAdminTable } from "@/components/skeletons/Skeletons";
 
 interface AuthUser {
   id: string;
@@ -219,10 +219,7 @@ export default function AdminUsersPage() {
       {/* Users Table */}
       <WkSurface className="overflow-hidden">
         {loading ? (
-          <div className="p-8 text-center">
-            <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-wk-brand border-t-transparent" />
-            <p className="mt-3 text-[13px] text-wk-text-muted">Loading users...</p>
-          </div>
+          <SkeletonAdminTable rows={6} cols={4} />
         ) : error ? (
           <div className="p-8 text-center">
             <div className="flex h-10 w-10 mx-auto items-center justify-center rounded-xl bg-wk-danger/10 mb-3">

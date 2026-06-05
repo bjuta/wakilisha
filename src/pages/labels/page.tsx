@@ -1,7 +1,8 @@
-import { useMemo, useState, useEffect, useCallback } from "react";
+import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
 import { ShareButton } from "@/components/design-system/share/ShareSheet";
 import { WkIcon } from "@/components/design-system/Icon";
+import { Chapter19FallbackImage } from "@/components/media/Chapter19FallbackImage";
 import {
   listLabels,
   listReleases,
@@ -10,14 +11,26 @@ import {
 } from "@/services/repairedContent/client";
 
 const PAGE_SIZE = 24;
-const initials = (name: string) =>
-  name
-    .split(/[\s&]+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join("")
-    .toUpperCase();
+
+/* ── Scroll reveal ── */
+function useScrollReveal(deps: unknown[] = []) {
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("label43-reveal-visible");
+            observer.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.06, rootMargin: "0px 0px -28px 0px" },
+    );
+    const els = document.querySelectorAll(".label43-reveal");
+    els.forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
+  }, deps);
+}
 
 export default function Labels() {
   const [query, setQuery] = useState("");
@@ -27,6 +40,7 @@ export default function Labels() {
   const [releases, setReleases] = useState<RepairedRelease[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const heroRef = useRef<HTMLDivElement>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -49,6 +63,8 @@ export default function Labels() {
     loadData();
   }, [loadData]);
 
+  useScrollReveal([loading]);
+
   const labelArtists = useMemo(() => {
     const map: Record<string, string[]> = {};
     releases.forEach((release) => {
@@ -64,7 +80,9 @@ export default function Labels() {
 
   const countries = useMemo(
     () =>
-      ["All", ...Array.from(new Set(labels.map((label) => label.country).filter(Boolean)))],
+      ["All", ...Array.from(new Set(labels.map((l) => l.country).filter(Boolean)))].sort((a, b) =>
+        a === "All" ? -1 : b === "All" ? 1 : a.localeCompare(b)
+      ),
     [labels]
   );
 
@@ -84,23 +102,28 @@ export default function Labels() {
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-  const spotlight =
-    [...labels]
-      .sort(
-        (a, b) =>
-          b.artistCount + b.releaseCount - (a.artistCount + a.releaseCount)
-      )[0] || labels[0];
-  const sideLabels = labels
-    .filter((label) => label.slug !== spotlight?.slug)
-    .slice(0, 4);
-  const totalArtists = labels.reduce((sum, label) => sum + label.artistCount, 0);
-  const totalReleases = labels.reduce((sum, label) => sum + label.releaseCount, 0);
+
+  /* Sort labels by prominence */
+  const sortedByProminence = useMemo(
+    () =>
+      [...labels].sort(
+        (a, b) => b.artistCount + b.releaseCount - (a.artistCount + a.releaseCount)
+      ),
+    [labels]
+  );
+
+  const spotlight = sortedByProminence[0];
+  const compactLabels = sortedByProminence.slice(1, 4);
+  const featuredLabels = labels.filter((l) => l.isFeatured);
+  const totalArtists = labels.reduce((sum, l) => sum + l.artistCount, 0);
+  const totalReleases = labels.reduce((sum, l) => sum + l.releaseCount, 0);
   const featuredCount = labels.filter((l) => l.isFeatured).length;
+
   const countryGroups = countries
     .filter((item) => item !== "All")
     .map((name) => ({
       name,
-      count: labels.filter((label) => label.country === name).length,
+      count: labels.filter((l) => l.country === name).length,
     }))
     .sort((a, b) => b.count - a.count);
 
@@ -112,18 +135,21 @@ export default function Labels() {
   if (loading) {
     return (
       <main className="min-h-screen">
-        <div className="wk-container-wide px-4 py-20 md:px-6">
-          <div className="space-y-4">
-            <div className="h-4 w-40 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
-            <div className="h-12 w-3/4 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
-            <div className="h-4 w-1/2 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
-          </div>
-          <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div
-                key={i}
-                className="h-48 rounded-xl bg-[var(--wk-surface-raised)] animate-pulse"
-              />
+        <div className="label43-hero-skel">
+          <div className="h-4 w-32 rounded bg-white/10 animate-pulse" />
+          <div className="h-16 w-96 rounded bg-white/10 animate-pulse mt-6" />
+          <div className="h-5 w-[500px] rounded bg-white/10 animate-pulse mt-4" />
+        </div>
+        <div className="wk-container-wide px-4 py-10 md:px-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] overflow-hidden">
+                <div className="h-32 bg-[var(--wk-surface-raised)] animate-pulse" />
+                <div className="p-3 space-y-2">
+                  <div className="h-4 w-3/4 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
+                  <div className="h-3 w-1/2 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
+                </div>
+              </div>
             ))}
           </div>
         </div>
@@ -135,11 +161,7 @@ export default function Labels() {
     return (
       <main className="min-h-screen wk-container px-6 py-20">
         <div className="max-w-2xl mx-auto rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-8 text-center">
-          <WkIcon
-            name="Building2"
-            size={42}
-            className="mx-auto mb-4 text-[var(--wk-text-faint)]"
-          />
+          <WkIcon name="Building2" size={42} className="mx-auto mb-4 text-[var(--wk-text-faint)]" />
           <h1 className="wk-h-section mb-2">Could not load labels</h1>
           <p className="text-[var(--wk-text-muted)] mb-6">{error}</p>
           <button onClick={loadData} className="wk-button wk-button-primary">
@@ -151,187 +173,241 @@ export default function Labels() {
   }
 
   return (
-    <main className="min-h-screen">
-      <section className="label43-hero">
-        <div className="label43-bg" />
-        <div className="label43-inner wk-container-wide">
-          <div>
-            <div className="label43-kicker">
-              <WkIcon name="Building2" size={14} /> Institutions
-            </div>
-            <h1 className="label43-title">Labels</h1>
-            <p className="label43-sub">
-              Record labels, imprints, distributors, and music institutions
-              mapped as ecosystems: rosters, releases, chart presence, country
-              footprint, and catalog relationships.
-            </p>
-            <div className="label43-actions">
-              <a
-                href="#label-directory"
-                className="wk-button wk-button-lg wk-button-primary"
-              >
-                <WkIcon name="Search" size={18} /> Browse directory
-              </a>
-              <ShareButton
-                item={{
-                  title: "WAKILISHA Labels",
-                  subtitle: `${labels.length} labels`,
-                  description:
-                    "Browse WAKILISHA labels and music institutions by country, roster, catalog and chart presence.",
-                  type: "page",
+    <main className="min-h-screen bg-[var(--wk-bg)]">
+
+      {/* ═══════════════════════ HERO ═══════════════════════ */}
+      <section ref={heroRef} className="label43-hero-v2">
+        <div className="label43-hero-overlay" />
+        <div className="label43-hero-content">
+          <div className="label43-hero-badge">
+            <WkIcon name="Building2" size={12} /> Institutions
+          </div>
+          <h1 className="label43-hero-title">Labels</h1>
+          <p className="label43-hero-sub">
+            Record labels, imprints, distributors, and music institutions mapped as
+            ecosystems — rosters, releases, chart presence, country footprint, and
+            catalog relationships.
+          </p>
+          <div className="label43-hero-row">
+            <div className="label43-hero-search-wrap">
+              <i className="ri-search-line label43-hero-search-icon" />
+              <input
+                className="label43-hero-search"
+                value={query}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  setPage(1);
                 }}
+                placeholder="Search labels, countries, or roster artists..."
               />
             </div>
+            <ShareButton
+              item={{
+                title: "WAKILISHA Labels",
+                subtitle: `${labels.length} labels`,
+                description:
+                  "Browse WAKILISHA labels and music institutions by country, roster, catalog and chart presence.",
+                type: "page",
+              }}
+            />
           </div>
-          <div className="label43-stats">
-            <Stat value={labels.length} label="Labels" />
-            <Stat value={totalArtists.toLocaleString()} label="Artists" />
-            <Stat value={totalReleases.toLocaleString()} label="Releases" />
-            <Stat value={featuredCount} label="Featured" />
+          <div className="label43-hero-stats">
+            <div className="label43-hero-stat">
+              <span className="label43-hero-stat-val">{labels.length}</span>
+              <span className="label43-hero-stat-lbl">Labels</span>
+            </div>
+            <div className="label43-hero-stat">
+              <span className="label43-hero-stat-val">{totalArtists.toLocaleString()}</span>
+              <span className="label43-hero-stat-lbl">Artists</span>
+            </div>
+            <div className="label43-hero-stat">
+              <span className="label43-hero-stat-val">{totalReleases.toLocaleString()}</span>
+              <span className="label43-hero-stat-lbl">Releases</span>
+            </div>
+            <div className="label43-hero-stat">
+              <span className="label43-hero-stat-val">{featuredCount}</span>
+              <span className="label43-hero-stat-lbl">Featured</span>
+            </div>
           </div>
+        </div>
+        {/* Scroll hint */}
+        <div className="label43-hero-scroll-hint">
+          <div className="label43-hero-scroll-line" />
         </div>
       </section>
 
-      <div className="label43-toolbar">
-        <div className="directory-filters">
-          {countries.slice(0, 14).map((item) => (
-            <button
-              key={item}
-              onClick={() => updateCountry(item)}
-              className={`directory-filter ${country === item ? "on" : ""}`}
-            >
-              {item}
-            </button>
-          ))}
+      {/* ═══════════════════════ STICKY NAV ═══════════════════════ */}
+      <div className="label43-toolbar-v2">
+        <div className="label43-toolbar-inner">
+          <span className="label43-toolbar-label">Countries</span>
+          <div className="label43-country-pills">
+            {countries.slice(0, 14).map((item) => (
+              <button
+                key={item}
+                onClick={() => updateCountry(item)}
+                className={`label43-country-pill ${country === item ? "on" : ""}`}
+              >
+                {item}
+              </button>
+            ))}
+          </div>
         </div>
-        <input
-          className="label43-search"
-          value={query}
-          onChange={(e) => {
-            setQuery(e.target.value);
-            setPage(1);
-          }}
-          placeholder="Search label, country, or roster artist"
-        />
       </div>
 
-      <div className="wk-container-wide px-4 py-10 md:px-6">
+      {/* ═══════════════════════ CONTENT BODY ═══════════════════════ */}
+      <div className="label43-body">
+
+        {/* ── Spotlight · asymmetrical (1 large + 3 compact) ── */}
         {spotlight && (
-          <section className="label43-spotlight">
-            <Link to={`/labels/${spotlight.slug}`} className="label43-spot-card">
-              <div className="label43-spot-body">
-                <div className="label43-logo">
-                  {spotlight.logoUrl ? (
-                    <img src={spotlight.logoUrl} alt="" className="h-full w-full object-cover" />
-                  ) : (
-                    initials(spotlight.name)
-                  )}
+          <section className="label43-reveal">
+            <SectionLabel>Spotlight</SectionLabel>
+            <div className="label43-asym-grid">
+              <Link to={`/labels/${spotlight.slug}`} className="label43-spot-card-v2 group">
+                <Chapter19FallbackImage
+                  slug={spotlight.slug}
+                  name={spotlight.name}
+                  className="label43-spot-artwork"
+                />
+                <div className="label43-spot-gradient" />
+                <div className="label43-spot-info">
+                  <div className="label43-spot-kicker">Most prominent label</div>
+                  <h2 className="label43-spot-title">{spotlight.name}</h2>
+                  <div className="label43-spot-meta-row">
+                    <span>{spotlight.country || "Global"}</span>
+                    <span className="label43-spot-dot" />
+                    <span>{spotlight.artistCount} artists</span>
+                    <span className="label43-spot-dot" />
+                    <span>{spotlight.releaseCount} releases</span>
+                  </div>
+                  <p className="label43-spot-desc">
+                    {spotlight.description ||
+                      `${spotlight.name} is represented in the WAKILISHA registry as a label ecosystem with roster, catalog and chart relationships.`}
+                  </p>
                 </div>
-                <div className="label43-spot-name">{spotlight.name}</div>
-                <div className="label43-spot-meta">
-                  {spotlight.country || "Global"} · {spotlight.artistCount}{" "}
-                  artists · {spotlight.releaseCount} releases
-                </div>
-                <p className="label43-spot-copy">
-                  {spotlight.description ||
-                    `${spotlight.name} is represented in the WAKILISHA registry as a label ecosystem with roster, catalog and chart relationships.`}
-                </p>
+              </Link>
+              <div className="label43-compact-stack">
+                {compactLabels.map((label, i) => (
+                  <Link key={label.slug} to={`/labels/${label.slug}`} className="label43-compact-card group">
+                    <div className="label43-compact-artwork-wrap">
+                      <Chapter19FallbackImage
+                        slug={label.slug}
+                        name={label.name}
+                        className="label43-compact-artwork"
+                      />
+                    </div>
+                    <div className="label43-compact-body">
+                      <div className="label43-compact-rank">#{i + 2}</div>
+                      <h4 className="label43-compact-name">{label.name}</h4>
+                      <div className="label43-compact-meta">
+                        <span>{label.country || "Global"}</span>
+                        <span className="label43-compact-dot" />
+                        <span>{label.artistCount} artists</span>
+                        <span className="label43-compact-dot" />
+                        <span>{label.releaseCount} releases</span>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
               </div>
-            </Link>
-            <div className="label43-side-stack">
-              {sideLabels.map((label) => (
-                <LabelMini key={label.slug} label={label} />
+            </div>
+          </section>
+        )}
+
+        {/* ── Featured labels · symmetrical grid ── */}
+        {featuredLabels.length > 0 && (
+          <section className="label43-reveal">
+            <SectionLabel count={featuredLabels.length}>Featured institutions</SectionLabel>
+            <div className="label43-grid-v2">
+              {featuredLabels.slice(0, 8).map((label) => (
+                <LabelCard key={label.slug} label={label} />
               ))}
             </div>
           </section>
         )}
 
-        <section>
-          <div className="section-head">
-            <div>
-              <div className="section-kicker">Featured institutions</div>
-              <h2 className="section-title">Labels with visible ecosystems</h2>
-            </div>
-            <p className="section-copy">
-              Labels are not decorative logos. Each card exposes roster size,
-              releases, chart presence, country, and known artists.
+        {/* ── Pullquote · visual rhythm break ── */}
+        <div className="label43-reveal label43-pullquote">
+          <div className="label43-pullquote-inner">
+            <div className="label43-pullquote-line" />
+            <p className="label43-pullquote-text">
+              Labels are not logos. They are systems of influence — rosters,
+              catalogs, countries, and chart presence. Every institution carries
+              its own character.
             </p>
+            <div className="label43-pullquote-line" />
           </div>
-          <div className="label43-grid">
-            {labels
-              .filter((l) => l.isFeatured)
-              .slice(0, 6)
-              .map((label) => (
-                <LabelTile key={label.slug} label={label} />
-              ))}
-          </div>
-        </section>
+        </div>
 
-        <section className="pg-layout cols-2">
-          <div className="pg-block">
-            <div className="pg-block-label">Country footprint</div>
-            <div className="label43-country-grid">
-              {countryGroups.slice(0, 10).map((group) => (
-                <button
-                  key={group.name}
-                  onClick={() => updateCountry(group.name)}
-                  className="label43-country text-left"
-                >
-                  <div className="label43-country-name">{group.name}</div>
-                  <div className="label43-country-meta">
-                    {group.count} label{group.count === 1 ? "" : "s"}
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="pg-block">
-            <div className="pg-block-label">Directory rule</div>
-            <h3 className="pg-block-title">Labels are institutions.</h3>
-            <p className="pg-block-body">
-              A label page should show systems of influence: roster, releases,
-              catalog activity, country, and chart presence. It should never
-              reduce labels to logo tiles alone.
-            </p>
-          </div>
-        </section>
+        {/* ── Country footprint · horizontal carousel ── */}
+        {countryGroups.length > 0 && (
+          <section className="label43-reveal">
+            <SectionLabel count={countryGroups.length}>Country footprint</SectionLabel>
+            <CountryCarousel groups={countryGroups} onSelect={updateCountry} />
+          </section>
+        )}
 
-        <section id="label-directory">
-          <div className="section-head">
-            <div>
-              <div className="section-kicker">Full label directory</div>
-              <h2 className="section-title">{filtered.length} labels found</h2>
+        {/* ── Full directory · section blocks ── */}
+        <section id="label-directory" className="label43-reveal">
+          <SectionLabel count={filtered.length} href="#label-directory">
+            Full directory
+          </SectionLabel>
+
+          {/* First row: asymmetrical if we have enough labels */}
+          {paginated.length >= 4 && page === 1 ? (
+            <div className="label43-asym-grid mb-6">
+              <LabelCard variant="hero" label={paginated[0]} />
+              <div className="label43-compact-stack">
+                {paginated.slice(1, 4).map((label, i) => (
+                  <Link key={label.slug} to={`/labels/${label.slug}`} className="label43-compact-card group">
+                    <div className="label43-compact-artwork-wrap">
+                      <Chapter19FallbackImage
+                        slug={label.slug}
+                        name={label.name}
+                        className="label43-compact-artwork"
+                      />
+                    </div>
+                    <div className="label43-compact-body">
+                      <h4 className="label43-compact-name">{label.name}</h4>
+                      <div className="label43-compact-meta">
+                        <span>{label.country || "Global"}</span>
+                        <span className="label43-compact-dot" />
+                        <span>{label.artistCount} artists</span>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
             </div>
-            <p className="section-copy">
-              Showing page {page} of {totalPages}. Search and country filters
-              apply to real label registry data.
-            </p>
-          </div>
-          <div className="label43-grid">
-            {paginated.map((label) => (
-              <LabelTile key={label.slug} label={label} />
+          ) : null}
+
+          {/* Remaining grid */}
+          <div className="label43-grid-v2">
+            {(page === 1 ? paginated.slice(paginated.length >= 4 ? 4 : 0) : paginated).map((label) => (
+              <LabelCard key={label.slug} label={label} />
             ))}
           </div>
+
           {filtered.length === 0 && (
-            <div className="artist-empty">
+            <div className="label43-empty">
               <WkIcon name="Building2" size={32} />
-              <div className="mt-3">No labels match this search.</div>
+              <span>No labels match this search.</span>
             </div>
           )}
+
           {totalPages > 1 && (
-            <div className="mt-8 flex items-center justify-center gap-2">
+            <div className="label43-pagination">
               <button
-                className="directory-filter"
+                className="label43-page-btn"
                 disabled={page === 1}
                 onClick={() => setPage(Math.max(1, page - 1))}
               >
                 <WkIcon name="ArrowLeft" size={14} />
               </button>
-              <span className="text-[12px] font-bold text-[var(--wk-text-muted)]">
+              <span className="label43-page-indicator">
                 Page {page} of {totalPages}
               </span>
               <button
-                className="directory-filter"
+                className="label43-page-btn"
                 disabled={page === totalPages}
                 onClick={() => setPage(Math.min(totalPages, page + 1))}
               >
@@ -340,90 +416,188 @@ export default function Labels() {
             </div>
           )}
         </section>
+
+        {/* ── Footer ── */}
+        <footer className="label43-reveal label43-footer">
+          <span className="label43-footer-brand">WAKILISHA Registry</span>
+          <p className="label43-footer-tagline">
+            {labels.length} labels across {countries.length - 1} countries.
+            Every institution mapped as an ecosystem.
+          </p>
+          <p className="label43-footer-meta">
+            {totalArtists.toLocaleString()} artists &middot; {totalReleases.toLocaleString()} releases &middot; {featuredCount} featured
+          </p>
+        </footer>
       </div>
     </main>
   );
 }
 
-function Stat({ value, label }: { value: string | number; label: string }) {
+/* ── Section label ── */
+function SectionLabel({
+  children,
+  count,
+  href,
+}: {
+  children: string;
+  count?: number;
+  href?: string;
+}) {
   return (
-    <div className="label43-stat">
-      <div className="label43-stat-val">{value}</div>
-      <div className="label43-stat-lbl">{label}</div>
+    <div className="label43-section-label-row">
+      <div className="label43-section-label-left">
+        <span className="label43-section-label-text">{children}</span>
+        {count !== undefined && (
+          <span className="label43-section-label-count">{count}</span>
+        )}
+      </div>
+      {href && (
+        <Link to={href} className="label43-section-label-link">
+          View all <i className="ri-arrow-right-line text-[11px]" />
+        </Link>
+      )}
     </div>
   );
 }
 
-function LabelMini({ label }: { label: RepairedLabel }) {
+/* ── Country carousel ── */
+function CountryCarousel({
+  groups,
+  onSelect,
+}: {
+  groups: { name: string; count: number }[];
+  onSelect: (name: string) => void;
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
   return (
-    <Link to={`/labels/${label.slug}`} className="label43-mini">
-      <div className="label43-mini-logo">
-        {label.logoUrl ? (
-          <img src={label.logoUrl} alt="" className="h-full w-full object-contain" />
-        ) : (
-          initials(label.name)
-        )}
+    <div className="label43-carousel-wrap">
+      <div
+        ref={scrollRef}
+        className="label43-carousel"
+      >
+        {groups.map((group) => (
+          <button
+            key={group.name}
+            onClick={() => onSelect(group.name)}
+            className="label43-carousel-card group"
+          >
+            <div className="label43-carousel-artwork">
+              <Chapter19FallbackImage
+                slug={`country-${group.name.toLowerCase().replace(/\s+/g, "-")}`}
+                name={group.name}
+                className="label43-carousel-img"
+              />
+              <div className="label43-carousel-gradient" />
+              <div className="label43-carousel-content">
+                <span className="label43-carousel-name">{group.name}</span>
+                <span className="label43-carousel-count">
+                  {group.count} label{group.count === 1 ? "" : "s"}
+                </span>
+              </div>
+            </div>
+          </button>
+        ))}
       </div>
-      <div className="min-w-0">
-        <div className="label43-mini-name">{label.name}</div>
-        <div className="label43-mini-meta">
-          {label.country || "Global"} · {label.releaseCount} releases
-        </div>
-      </div>
-      <WkIcon name="ArrowRight" size={15} />
-    </Link>
+    </div>
   );
 }
 
-function LabelTile({ label }: { label: RepairedLabel }) {
-  const roster = (label.featuredArtists || []).slice(0, 6);
-  return (
-    <Link to={`/labels/${label.slug}`} className="label43-card">
-      <div className="label43-card-head">
-        <div className="label43-card-logo">
-          {label.logoUrl ? (
-            <img src={label.logoUrl} alt="" className="h-full w-full object-contain" />
-          ) : (
-            initials(label.name)
+/* ── Label card · ch19 gradient artwork ── */
+function LabelCard({
+  label,
+  variant = "standard",
+}: {
+  label: RepairedLabel;
+  variant?: "standard" | "hero";
+}) {
+  const roster = (label.featuredArtists || []).slice(0, 5);
+
+  if (variant === "hero") {
+    return (
+      <Link to={`/labels/${label.slug}`} className="label43-card-hero group">
+        <Chapter19FallbackImage
+          slug={label.slug}
+          name={label.name}
+          className="label43-card-hero-artwork"
+        />
+        <div className="label43-card-hero-overlay" />
+        <div className="label43-card-hero-info">
+          {label.isFeatured && (
+            <span className="label43-card-hero-badge">
+              <i className="ri-star-fill text-[9px]" /> Featured
+            </span>
+          )}
+          <h3 className="label43-card-hero-name">{label.name}</h3>
+          <div className="label43-card-hero-meta">
+            <span>{label.country || "Global"}</span>
+            <span className="label43-hero-meta-dot" />
+            <span>{label.artistCount} artists</span>
+            <span className="label43-hero-meta-dot" />
+            <span>{label.releaseCount} releases</span>
+          </div>
+          {roster.length > 0 && (
+            <div className="label43-card-hero-roster">
+              {roster.map((artist) => (
+                <span key={artist} className="label43-card-hero-roster-tag">
+                  {artist}
+                </span>
+              ))}
+            </div>
           )}
         </div>
-        <div className="min-w-0">
-          <div className="label43-card-name">{label.name}</div>
-          <div className="label43-card-country">
-            {label.country || "Unknown"}
+      </Link>
+    );
+  }
+
+  return (
+    <Link to={`/labels/${label.slug}`} className="label43-card-v2 group">
+      <div className="label43-card-artwork-wrap">
+        <Chapter19FallbackImage
+          slug={label.slug}
+          name={label.name}
+          className="label43-card-artwork"
+        />
+        {label.isFeatured && (
+          <span className="label43-card-featured-badge">
+            <i className="ri-star-fill text-[9px]" /> Featured
+          </span>
+        )}
+        <div className="label43-card-artwork-name">{label.name}</div>
+      </div>
+      <div className="label43-card-body">
+        <div className="label43-card-meta">
+          <span className="label43-card-country">
+            <i className="ri-map-pin-line text-[10px]" />
+            {label.country || "Global"}
+          </span>
+          <span className="label43-card-dot" />
+          <span>{label.releaseCount} releases</span>
+        </div>
+        <div className="label43-card-stats-row">
+          <div className="label43-card-stat-pill">
+            <strong>{label.artistCount}</strong>
+            <span>Artists</span>
+          </div>
+          <div className="label43-card-stat-pill">
+            <strong>{label.releaseCount}</strong>
+            <span>Releases</span>
+          </div>
+          <div className="label43-card-stat-pill">
+            <strong>{roster.length}</strong>
+            <span>Roster</span>
           </div>
         </div>
-        {label.isFeatured && (
-          <WkIcon
-            name="BadgeCheck"
-            size={17}
-            className="text-[var(--wk-brand)]"
-          />
+        {roster.length > 0 && (
+          <div className="label43-card-roster">
+            {roster.map((artist) => (
+              <span key={artist} className="label43-card-roster-tag">
+                {artist}
+              </span>
+            ))}
+          </div>
         )}
       </div>
-      <div className="label43-card-stats">
-        <div className="label43-card-stat">
-          <strong>{label.artistCount}</strong>
-          <span>Artists</span>
-        </div>
-        <div className="label43-card-stat">
-          <strong>{label.releaseCount}</strong>
-          <span>Releases</span>
-        </div>
-        <div className="label43-card-stat">
-          <strong>{roster.length}</strong>
-          <span>Roster</span>
-        </div>
-      </div>
-      {roster.length > 0 && (
-        <div className="label43-roster">
-          {roster.map((artist) => (
-            <span key={artist} className="tag tag-sm">
-              {artist}
-            </span>
-          ))}
-        </div>
-      )}
     </Link>
   );
 }

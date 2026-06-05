@@ -45,7 +45,7 @@ export default function AdminSettingsAudience() {
           <div className="flex items-center justify-between rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2.5">
             <span className="text-[13px] font-semibold text-[var(--wk-text)]">Default Opt-In</span>
             <button onClick={() => update("subscriberDefaults", { ...settings.subscriberDefaults, defaultOptIn: !settings.subscriberDefaults.defaultOptIn })} className={`relative h-6 w-11 rounded-full transition-colors ${settings.subscriberDefaults.defaultOptIn ? "bg-[var(--wk-brand)]" : "bg-[var(--wk-border-2)]"}`}>
-              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-[var(--wk-surface)] transition-transform ${settings.subscriberDefaults.defaultOptIn ? "translate-x-5.5" : "translate-x-0.5"}`} />
+              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-[var(--wk-surface)] transition-transform ${settings.subscriberDefaults.defaultOptIn ? "translate-x-[22px]" : "translate-x-0.5"}`} />
             </button>
           </div>
           <div>
@@ -65,13 +65,13 @@ export default function AdminSettingsAudience() {
           <div className="flex items-center justify-between rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2.5">
             <span className="text-[13px] font-semibold text-[var(--wk-text)]">Require Double Opt-In</span>
             <button onClick={() => update("optInSettings", { ...settings.optInSettings, requireDoubleOptIn: !settings.optInSettings.requireDoubleOptIn })} className={`relative h-6 w-11 rounded-full transition-colors ${settings.optInSettings.requireDoubleOptIn ? "bg-[var(--wk-brand)]" : "bg-[var(--wk-border-2)]"}`}>
-              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-[var(--wk-surface)] transition-transform ${settings.optInSettings.requireDoubleOptIn ? "translate-x-5.5" : "translate-x-0.5"}`} />
+              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-[var(--wk-surface)] transition-transform ${settings.optInSettings.requireDoubleOptIn ? "translate-x-[22px]" : "translate-x-0.5"}`} />
             </button>
           </div>
           <div className="flex items-center justify-between rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2.5">
             <span className="text-[13px] font-semibold text-[var(--wk-text)]">Show Opt-In on Signup</span>
             <button onClick={() => update("optInSettings", { ...settings.optInSettings, showOptInOnSignup: !settings.optInSettings.showOptInOnSignup })} className={`relative h-6 w-11 rounded-full transition-colors ${settings.optInSettings.showOptInOnSignup ? "bg-[var(--wk-brand)]" : "bg-[var(--wk-border-2)]"}`}>
-              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-[var(--wk-surface)] transition-transform ${settings.optInSettings.showOptInOnSignup ? "translate-x-5.5" : "translate-x-0.5"}`} />
+              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-[var(--wk-surface)] transition-transform ${settings.optInSettings.showOptInOnSignup ? "translate-x-[22px]" : "translate-x-0.5"}`} />
             </button>
           </div>
         </div>
@@ -83,7 +83,7 @@ export default function AdminSettingsAudience() {
           <div className="flex items-center justify-between rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2.5">
             <span className="text-[13px] font-semibold text-[var(--wk-text)]">Enabled</span>
             <button onClick={() => update("followNotificationDefaults", { ...settings.followNotificationDefaults, enabled: !settings.followNotificationDefaults.enabled })} className={`relative h-6 w-11 rounded-full transition-colors ${settings.followNotificationDefaults.enabled ? "bg-[var(--wk-brand)]" : "bg-[var(--wk-border-2)]"}`}>
-              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-[var(--wk-surface)] transition-transform ${settings.followNotificationDefaults.enabled ? "translate-x-5.5" : "translate-x-0.5"}`} />
+              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-[var(--wk-surface)] transition-transform ${settings.followNotificationDefaults.enabled ? "translate-x-[22px]" : "translate-x-0.5"}`} />
             </button>
           </div>
           <div>

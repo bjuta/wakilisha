@@ -53,26 +53,29 @@ export function ArtistStatsBar({ stats }: ArtistStatsBarProps) {
   const { ref, revealed } = useScrollReveal<HTMLDivElement>(0.2);
 
   return (
-    <div ref={ref} className="relative z-10 -mt-10 md:-mt-12 px-6">
+    <div ref={ref} className="relative z-10 -mt-8 md:-mt-12 px-3 md:px-6">
       <div className="wk-container">
+        {/* Mobile: single-row pill strip that scrolls horizontally */}
+        {/* Desktop: 4-column card grid */}
         <div
-          className={`grid grid-cols-2 gap-3 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4 md:grid-cols-4 md:gap-6 md:p-6 ${
+          className={`flex gap-0 overflow-x-auto rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] divide-x divide-[var(--wk-divider)] md:grid md:grid-cols-4 md:divide-x md:overflow-visible ${
             revealed ? "is-visible" : ""
           } reveal-up`}
+          style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
         >
           {stats.map((stat, i) => (
             <div
               key={i}
-              className="flex flex-col items-start gap-1 md:items-center md:gap-1.5"
+              className="flex min-w-[80px] flex-col items-center gap-0.5 px-4 py-3 md:min-w-0 md:gap-1.5 md:p-6"
               style={{ animationDelay: `${i * 100}ms` }}
             >
               {stat.icon && (
-                <i className={`${stat.icon} text-[16px] text-[var(--wk-brand)] md:text-[18px]`} />
+                <i className={`${stat.icon} text-[13px] text-[var(--wk-brand)] md:text-[18px]`} />
               )}
-              <div className="text-[22px] font-black tracking-[-0.04em] text-[var(--wk-text)] md:text-[28px]">
+              <div className="text-[18px] font-black tracking-[-0.04em] text-[var(--wk-text)] md:text-[28px]">
                 <AnimatedValue value={stat.value} suffix={stat.suffix} />
               </div>
-              <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--wk-text-muted)]">
+              <span className="text-[9px] font-bold uppercase tracking-[0.1em] text-[var(--wk-text-muted)] whitespace-nowrap md:text-[10px] md:tracking-[0.14em]">
                 {stat.label}
               </span>
             </div>

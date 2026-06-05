@@ -10,6 +10,7 @@ import {
 import { WkIcon } from "@/components/design-system/Icon";
 import { ArticleFloatHeader } from "./components/ArticleFloatHeader";
 import { ArticleRelated } from "./components/ArticleRelated";
+import { SkeletonArticlePage } from "@/components/skeletons/Skeletons";
 
 /* ─── Inline media gallery ─── */
 function InlineMediaGallery({ assets }: { assets: MediaAsset[] }) {
@@ -132,14 +133,7 @@ export default function ArticlePage() {
 
   /* Loading / error states */
   if (articleLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-[var(--wk-brand)] border-t-transparent" />
-          <p className="text-sm font-medium text-[var(--wk-text-muted)]">Loading article…</p>
-        </div>
-      </div>
-    );
+    return <SkeletonArticlePage />;
   }
 
   if (articleError) {

@@ -9,8 +9,9 @@ import {
   commitIngestRun,
   validateCommitReadiness,
 } from "@/services/chartsIngestion/client";
-import type { IngestRun, IngestStageStatus, ResourceGuardStatus } from "@/services/chartsIngestion/ingestStudioTypes";
+import { SkeletonBlock } from "@/components/skeletons/Skeletons";
 import type { CommitIngestRunResponse } from "@/services/chartsIngestion/commitTypes";
+import type { IngestRun, IngestStageStatus, ResourceGuardStatus } from "@/services/chartsIngestion/ingestStudioTypes";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { WkIcon } from "@/components/design-system/Icon";
 
@@ -183,9 +184,17 @@ export default function AdminChartsIngestRunDetail() {
 
   if (loading) {
     return (
-      <div className="flex h-64 items-center justify-center gap-3">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-wk-brand/30 border-t-wk-brand" />
-        <span className="text-[13px] text-wk-text-muted">Loading run details…</span>
+      <div className="space-y-6">
+        <div className="animate-pulse space-y-2">
+          <SkeletonBlock className="h-4 w-32 rounded" />
+          <SkeletonBlock className="h-6 w-64 rounded" />
+          <SkeletonBlock className="h-3 w-48 rounded" />
+        </div>
+        <SkeletonBlock className="h-[300px] rounded-xl border border-[var(--wk-border)]" />
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <SkeletonBlock className="h-[200px] rounded-xl border border-[var(--wk-border)]" />
+          <SkeletonBlock className="h-[200px] rounded-xl border border-[var(--wk-border)]" />
+        </div>
       </div>
     );
   }

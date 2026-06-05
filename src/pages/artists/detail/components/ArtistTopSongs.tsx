@@ -2,18 +2,210 @@ import { useState } from "react";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
 import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 
-interface ArtistTopSongsProps {
-  songs: Array<{
-    title: string;
-    artists: string;
-    image: string;
-    duration: string;
-    songUrl: string;
-  }>;
+interface Song {
+  title: string;
+  artists: string;
+  image: string;
+  duration: string;
+  songUrl: string;
 }
 
+interface ArtistTopSongsProps {
+  songs: Song[];
+}
+
+/* ─────────────────────────────────────────────
+   Expanded panel — same design language as
+   ChartRowExpandedPanel, adapted for song data
+   ───────────────────────────────────────────── */
+function SongExpandedPanel({
+  song,
+  rank,
+}: {
+  song: Song;
+  rank: number;
+}) {
+  const artistList = song.artists
+    .split(/,\s*|feat\.\s*|ft\.\s*/i)
+    .map((a) => a.trim())
+    .filter(Boolean);
+
+  return (
+    <div className="overflow-hidden">
+      <div className="mx-3 mb-3 rounded-xl border border-[var(--wk-divider)] bg-[var(--wk-surface-raised)]/60 px-4 py-3.5">
+
+        {/* Stat strip */}
+        <div className="mb-3.5 flex flex-wrap items-end gap-x-5 gap-y-2 border-b border-[var(--wk-divider)] pb-3.5">
+          {/* Popularity rank */}
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[9px] font-black uppercase tracking-widest text-[var(--wk-text-faint)]">
+              Popularity
+            </span>
+            <span className="text-[20px] font-black leading-none text-[var(--wk-brand)]">
+              #{rank}
+            </span>
+          </div>
+
+          {song.duration && (
+            <>
+              <div className="h-7 w-px self-end mb-0.5 bg-[var(--wk-divider)]" />
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[9px] font-black uppercase tracking-widest text-[var(--wk-text-faint)]">
+                  Length
+                </span>
+                <span className="text-[20px] font-black leading-none text-[var(--wk-text)]">
+                  {song.duration}
+                </span>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Bottom row: artist chips + listen link */}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
+            {artistList.map((name) => (
+              <span
+                key={name}
+                className="flex items-center rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] px-2.5 py-1 text-[11px] font-semibold text-[var(--wk-text-muted)] whitespace-nowrap"
+              >
+                {name}
+              </span>
+            ))}
+          </div>
+
+          {song.songUrl && (
+            <a
+              href={song.songUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="flex items-center gap-1 text-[11px] font-bold text-[var(--wk-brand)] transition-opacity hover:opacity-70 whitespace-nowrap"
+            >
+              <i className="ri-external-link-line text-[10px]" />
+              Listen
+            </a>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────
+   Single song row — mirrors ChartRow exactly
+   ───────────────────────────────────────────── */
+function ArtistSongRow({ song, index }: { song: Song; index: number }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const rank = index + 1;
+
+  return (
+    <div
+      className={`group rounded-xl transition-all duration-200 ${
+        isExpanded ? "bg-[var(--wk-surface-raised)]" : "hover:bg-[var(--wk-surface-raised)]"
+      }`}
+    >
+      {/* Main row */}
+      <div
+        onClick={() => setIsExpanded((v) => !v)}
+        className="flex cursor-pointer items-center gap-3 px-3 py-3 select-none"
+      >
+        {/* Rank */}
+        <div className="flex w-10 shrink-0 flex-col items-center">
+          <span className="text-[20px] font-black leading-none text-[var(--wk-text-muted)]">
+            {rank}
+          </span>
+        </div>
+
+        {/* Artwork — visible on all screen sizes */}
+        <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-[var(--wk-surface-raised)]">
+          {song.image ? (
+            <img
+              src={song.image}
+              alt={song.title}
+              className="h-full w-full object-cover object-top"
+            />
+          ) : (
+            <Ch19GradientImage slug={`song-${index}-${song.title}`} name={song.title} />
+          )}
+          {/* Hover play overlay */}
+          {song.songUrl && (
+            <a
+              href={song.songUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100"
+              aria-label={`Play ${song.title}`}
+            >
+              <i className="ri-play-fill text-white text-lg" />
+            </a>
+          )}
+        </div>
+
+        {/* Title + artist */}
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-[14px] font-bold text-[var(--wk-text)]">
+            {song.title}
+          </div>
+          <div className="truncate text-[12px] text-[var(--wk-text-muted)]">
+            {song.artists}
+          </div>
+        </div>
+
+        {/* Duration — desktop only in the row, shown in expanded panel on mobile */}
+        {song.duration && (
+          <span className="hidden shrink-0 text-[12px] tabular-nums text-[var(--wk-text-faint)] sm:block">
+            {song.duration}
+          </span>
+        )}
+
+        {/* Play button */}
+        {song.songUrl ? (
+          <a
+            href={song.songUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            aria-label={`Listen to ${song.title}`}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] transition-all opacity-0 group-hover:opacity-100 group-hover:scale-100 scale-75 duration-150"
+          >
+            <i className="ri-play-mini-fill text-sm" />
+          </a>
+        ) : (
+          <div className="h-9 w-9 shrink-0" />
+        )}
+
+        {/* Expand chevron */}
+        <div
+          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[var(--wk-text-faint)] transition-all duration-200 ${
+            isExpanded
+              ? "rotate-180 bg-[var(--wk-surface-raised)] text-[var(--wk-text)]"
+              : "group-hover:text-[var(--wk-text-muted)]"
+          }`}
+        >
+          <i className="ri-arrow-down-s-line text-[16px]" />
+        </div>
+      </div>
+
+      {/* Expandable panel — smooth grid-rows animation */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateRows: isExpanded ? "1fr" : "0fr",
+          transition: "grid-template-rows 0.25s ease",
+        }}
+      >
+        <SongExpandedPanel song={song} rank={rank} />
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────
+   Section
+   ───────────────────────────────────────────── */
 export function ArtistTopSongs({ songs }: ArtistTopSongsProps) {
-  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const { ref, revealed } = useScrollReveal<HTMLElement>(0.1);
 
   return (
@@ -26,73 +218,19 @@ export function ArtistTopSongs({ songs }: ArtistTopSongsProps) {
       </div>
 
       <div className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] overflow-hidden">
-        {/* Header row */}
-        <div className="hidden md:grid grid-cols-[48px_56px_1fr_80px_56px] items-center gap-3 px-5 py-3 text-[10px] font-black uppercase tracking-[0.15em] text-[var(--wk-text-faint)] border-b border-[var(--wk-divider)]">
-          <span className="text-center">#</span>
-          <span></span>
-          <span>Title</span>
-          <span className="text-center">Duration</span>
-          <span className="text-center"></span>
+        {/* Column header — desktop only */}
+        <div className="hidden sm:flex items-center gap-3 border-b border-[var(--wk-divider)] px-3 py-2.5">
+          <span className="w-10 shrink-0 text-center text-[10px] font-black uppercase tracking-[0.15em] text-[var(--wk-text-faint)]">#</span>
+          <span className="w-12 shrink-0" />
+          <span className="flex-1 text-[10px] font-black uppercase tracking-[0.15em] text-[var(--wk-text-faint)]">Title</span>
+          <span className="hidden sm:block text-[10px] font-black uppercase tracking-[0.15em] text-[var(--wk-text-faint)]">Time</span>
+          <span className="w-9 shrink-0" />
+          <span className="w-7 shrink-0" />
         </div>
 
         <div className="divide-y divide-[var(--wk-divider)]">
           {songs.map((song, index) => (
-            <div
-              key={`${index}-${song.title}`}
-              className="group flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-[var(--wk-surface-raised)] md:grid md:grid-cols-[48px_56px_1fr_80px_56px] md:gap-3"
-              onMouseEnter={() => setHoveredIndex(index)}
-              onMouseLeave={() => setHoveredIndex(null)}
-            >
-              {/* Rank */}
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[13px] font-black text-[var(--wk-text-faint)] md:mx-auto transition-colors group-hover:bg-[var(--wk-brand-soft)] group-hover:text-[var(--wk-brand)]">
-                {index + 1}
-              </span>
-
-              {/* Artwork */}
-              <div className="hidden md:flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[var(--wk-surface-raised)]">
-                {song.image ? (
-                  <img src={song.image} alt="" className="h-full w-full object-cover" />
-                ) : (
-                  <Ch19GradientImage slug={`song-${index}`} name={song.title} />
-                )}
-              </div>
-
-              {/* Title & Artists */}
-              <div className="min-w-0 flex-1 md:flex-none">
-                <div className="truncate text-[14px] font-bold text-[var(--wk-text)]">{song.title}</div>
-                <div className="truncate text-[12px] text-[var(--wk-text-muted)] md:hidden">
-                  {song.artists} · {song.duration}
-                </div>
-                <div className="hidden md:block truncate text-[12px] text-[var(--wk-text-muted)]">
-                  {song.artists}
-                </div>
-              </div>
-
-              {/* Duration */}
-              <span className="hidden text-center text-[13px] font-semibold text-[var(--wk-text-muted)] md:block">
-                {song.duration}
-              </span>
-
-              {/* Play / More */}
-              <span className="hidden md:flex items-center justify-center">
-                {song.songUrl ? (
-                  <a
-                    href={song.songUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`flex h-9 w-9 items-center justify-center rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] transition-all ${
-                      hoveredIndex === index ? "opacity-100 scale-100" : "opacity-0 scale-75"
-                    }`}
-                  >
-                    <i className="ri-play-mini-fill text-sm" />
-                  </a>
-                ) : (
-                  <span className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--wk-text-faint)] opacity-0 group-hover:opacity-100 transition-opacity">
-                    <i className="ri-more-2-line text-sm" />
-                  </span>
-                )}
-              </span>
-            </div>
+            <ArtistSongRow key={`${index}-${song.title}`} song={song} index={index} />
           ))}
         </div>
       </div>

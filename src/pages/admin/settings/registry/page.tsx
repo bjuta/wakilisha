@@ -96,13 +96,13 @@ export default function AdminSettingsRegistry() {
           <div className="flex items-center justify-between rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2.5">
             <span className="text-[13px] font-semibold text-[var(--wk-text)]">Auto-Create Release Shells</span>
             <button onClick={() => update("autoCreateReleaseShells", !settings.autoCreateReleaseShells)} className={`relative h-6 w-11 rounded-full transition-colors ${settings.autoCreateReleaseShells ? "bg-[var(--wk-brand)]" : "bg-[var(--wk-border-2)]"}`}>
-              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-[var(--wk-surface)] transition-transform ${settings.autoCreateReleaseShells ? "translate-x-5.5" : "translate-x-0.5"}`} />
+              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-[var(--wk-surface)] transition-transform ${settings.autoCreateReleaseShells ? "translate-x-[22px]" : "translate-x-0.5"}`} />
             </button>
           </div>
           <div className="flex items-center justify-between rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2.5">
             <span className="text-[13px] font-semibold text-[var(--wk-text)]">Auto-Send No-Match Rows to Review</span>
             <button onClick={() => update("autoSendNoMatchRowsToReview", !settings.autoSendNoMatchRowsToReview)} className={`relative h-6 w-11 rounded-full transition-colors ${settings.autoSendNoMatchRowsToReview ? "bg-[var(--wk-brand)]" : "bg-[var(--wk-border-2)]"}`}>
-              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-[var(--wk-surface)] transition-transform ${settings.autoSendNoMatchRowsToReview ? "translate-x-5.5" : "translate-x-0.5"}`} />
+              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-[var(--wk-surface)] transition-transform ${settings.autoSendNoMatchRowsToReview ? "translate-x-[22px]" : "translate-x-0.5"}`} />
             </button>
           </div>
         </div>

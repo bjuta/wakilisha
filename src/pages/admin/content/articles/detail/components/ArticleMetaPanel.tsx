@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
-import { MediaPickerModal } from "@/components/admin/MediaPickerModal";
+import { MediaPickerButton } from "@/components/admin/MediaPickerButton";
 import { ArticlePublishTimeline } from "./ArticlePublishTimeline";
 import { ArticleSeoPreview } from "./ArticleSeoPreview";
 import { ArticleRevisionHistory } from "./ArticleRevisionHistory";
@@ -86,7 +86,6 @@ export function ArticleMetaPanel({
   const [revisionsOpen, setRevisionsOpen] = useState(false);
   const [heroUrlInput, setHeroUrlInput] = useState(heroImageUrl);
   const [heroPreviewError, setHeroPreviewError] = useState(false);
-  const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
 
   // Sync heroUrlInput when heroImageUrl prop changes
   useEffect(() => {
@@ -177,13 +176,16 @@ export function ArticleMetaPanel({
             className="w-full rounded-lg border border-wk-border bg-wk-bg-subtle px-3 py-2 text-[12px] text-wk-text placeholder:text-wk-text-faint outline-none focus:border-wk-brand transition-colors font-mono"
           />
           <div className="flex gap-2">
-            <button
-              onClick={() => setMediaPickerOpen(true)}
-              className="flex-1 flex items-center justify-center gap-2 rounded-lg border border-wk-border bg-wk-surface py-2 text-[12px] font-semibold text-wk-text-muted hover:bg-wk-surface-raised hover:text-wk-text transition-colors"
-            >
-              <WkIcon name="Image" size={13} />
-              Browse Library
-            </button>
+            <MediaPickerButton
+              label="Browse Library"
+              title="Select Hero Image"
+              className="flex-1 justify-center py-2 text-[12px] hover:bg-[var(--wk-surface-raised)]"
+              onSelect={(url) => {
+                setHeroUrlInput(url);
+                setHeroPreviewError(false);
+                onHeroImageSave?.(url);
+              }}
+            />
             <button
               onClick={() => onHeroImageSave?.(heroUrlInput)}
               disabled={isSavingHero || heroUrlInput === heroImageUrl}
@@ -207,19 +209,6 @@ export function ArticleMetaPanel({
           </p>
         </div>
       </WkSurface>
-
-      {/* Media Picker Modal */}
-      <MediaPickerModal
-        open={mediaPickerOpen}
-        onClose={() => setMediaPickerOpen(false)}
-        onSelect={(url) => {
-          setHeroUrlInput(url);
-          setHeroPreviewError(false);
-          onHeroImageSave?.(url);
-          setMediaPickerOpen(false);
-        }}
-        title="Select Hero Image"
-      />
 
       {/* Status Info */}
       <WkSurface className="p-4">

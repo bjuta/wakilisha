@@ -30,6 +30,7 @@ import { WkIcon } from "@/components/design-system/Icon";
 import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 import { ChartRow } from "@/components/design-system/music/ChartRow";
 import { ArtistRolodex } from "@/pages/charts/directory/components/ArtistRolodex";
+import { SkeletonChartEdition } from "@/components/skeletons/Skeletons";
 
 const rankTone = (rank: number) =>
   rank === 1 ? "gold" : rank === 2 ? "silver" : rank === 3 ? "bronze" : "";
@@ -291,17 +292,7 @@ export default function ChartEdition() {
 
   // ─── Loading state ───
   if (state.status === "loading") {
-    return (
-      <main className="min-h-screen chart-hero-v2">
-        <div className="chart-hero-v2-overlay" style={{ background: "linear-gradient(180deg, rgba(0,0,0,.4), rgba(0,0,0,.85))" }} />
-        <div className="chart-hero-v2-content flex items-center justify-center">
-          <div className="flex flex-col items-center gap-4">
-            <div className="w-8 h-8 border-2 border-white/20 border-t-[var(--wk-brand)] rounded-full animate-spin" />
-            <span className="text-[13px] font-semibold text-white/50">Loading chart…</span>
-          </div>
-        </div>
-      </main>
-    );
+    return <SkeletonChartEdition />;
   }
 
   // ─── Error state ───

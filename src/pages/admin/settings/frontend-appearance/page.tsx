@@ -9,6 +9,7 @@ import {
   DEFAULT_FRONTEND_APPEARANCE_SETTINGS,
   type FrontendAppearanceSettings,
 } from "@/services/adminSettings/settingsTypes";
+import { MediaPickerButton } from "@/components/admin/MediaPickerButton";
 
 /* ──── Hero density helpers ──── */
 function getColumnCount(imageCount: number): number {
@@ -137,56 +138,31 @@ export default function AdminSettingsFrontendAppearance() {
           Hero Fallbacks
         </h2>
         <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label className="block text-[12px] font-semibold text-[var(--wk-text-muted)] mb-1.5">Default Chart Hero Image URL</label>
-            <input
-              type="text"
-              value={settings.defaultChartHeroImage}
-              onChange={(e) => update("defaultChartHeroImage", e.target.value)}
-              placeholder="https://..."
-              className="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none focus:ring-1 focus:ring-[var(--wk-brand)]"
-            />
-          </div>
-          <div>
-            <label className="block text-[12px] font-semibold text-[var(--wk-text-muted)] mb-1.5">Default Artist Hero Fallback</label>
-            <input
-              type="text"
-              value={settings.defaultArtistHeroFallback}
-              onChange={(e) => update("defaultArtistHeroFallback", e.target.value)}
-              placeholder="https://..."
-              className="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none focus:ring-1 focus:ring-[var(--wk-brand)]"
-            />
-          </div>
-          <div>
-            <label className="block text-[12px] font-semibold text-[var(--wk-text-muted)] mb-1.5">Default Genre Hero Fallback</label>
-            <input
-              type="text"
-              value={settings.defaultGenreHeroFallback}
-              onChange={(e) => update("defaultGenreHeroFallback", e.target.value)}
-              placeholder="https://..."
-              className="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none focus:ring-1 focus:ring-[var(--wk-brand)]"
-            />
-          </div>
-          <div>
-            <label className="block text-[12px] font-semibold text-[var(--wk-text-muted)] mb-1.5">Default Label Hero Fallback</label>
-            <input
-              type="text"
-              value={settings.defaultLabelHeroFallback}
-              onChange={(e) => update("defaultLabelHeroFallback", e.target.value)}
-              placeholder="https://..."
-              className="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none focus:ring-1 focus:ring-[var(--wk-brand)]"
-            />
-          </div>
-          <div>
-            <label className="block text-[12px] font-semibold text-[var(--wk-text-muted)] mb-1.5">Default Login Background</label>
-            <input
-              type="text"
-              value={settings.defaultLoginBackground}
-              onChange={(e) => update("defaultLoginBackground", e.target.value)}
-              placeholder="https://..."
-              className="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none focus:ring-1 focus:ring-[var(--wk-brand)]"
-            />
-          </div>
+          {([
+            { key: "defaultChartHeroImage",    label: "Default Chart Hero Image" },
+            { key: "defaultArtistHeroFallback", label: "Default Artist Hero Fallback" },
+            { key: "defaultGenreHeroFallback",  label: "Default Genre Hero Fallback" },
+            { key: "defaultLabelHeroFallback",  label: "Default Label Hero Fallback" },
+            { key: "defaultLoginBackground",    label: "Default Login Background" },
+          ] as { key: keyof FrontendAppearanceSettings; label: string }[]).map(({ key, label }) => (
+            <div key={key}>
+              <label className="block text-[12px] font-semibold text-[var(--wk-text-muted)] mb-1.5">{label}</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={String(settings[key] ?? "")}
+                  onChange={(e) => update(key, e.target.value as FrontendAppearanceSettings[typeof key])}
+                  placeholder="https://..."
+                  className="flex-1 rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none focus:ring-1 focus:ring-[var(--wk-brand)]"
+                />
+                <MediaPickerButton
+                  onSelect={(url) => update(key, url as FrontendAppearanceSettings[typeof key])}
+                  title={`Select ${label}`}
+                  iconOnly
+                />
+              </div>
+            </div>
+          ))}
           <div>
             <label className="block text-[12px] font-semibold text-[var(--wk-text-muted)] mb-1.5">Archive Filter Behavior</label>
             <select

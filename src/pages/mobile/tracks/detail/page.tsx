@@ -3,6 +3,8 @@ import { useParams, Link } from "react-router-dom";
 import { usePlayer } from "@/context/PlayerContext";
 import { TRACK_DETAILS, getTrackBySlug, getRelatedTracks } from "@/mocks/trackDetails";
 import { TrackChartHistorySection } from "@/components/charts/TrackChartHistory";
+import { SyncedLyricsDisplay } from "@/components/lyrics/SyncedLyricsDisplay";
+import { getTimedLyrics } from "@/mocks/timedLyrics";
 import { WkIcon } from "@/components/design-system/Icon";
 
 const TABS = ["Overview", "Chart stats", "Lyrics", "Credits"] as const;
@@ -204,8 +206,69 @@ function ChartStatsTab({ track }: { track: NonNullable<ReturnType<typeof getTrac
 }
 
 function LyricsTab({ track }: { track: NonNullable<ReturnType<typeof getTrackBySlug>> }) {
-  if (!track.lyrics) return <div className="py-10 text-center"><div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[var(--wk-surface-raised)]"><WkIcon name="FileText" size={28} className="text-[var(--wk-text-faint)]" /></div><h3 className="mb-2 text-[16px] font-bold text-[var(--wk-text)]">No lyrics yet</h3><p className="mx-auto mb-4 max-w-[260px] text-[13px] leading-relaxed text-[var(--wk-text-muted)]">Be the first to add lyrics and get credited as the contributor.</p><div className="flex items-center justify-center gap-4 text-[10px] text-[var(--wk-text-faint)]"><span className="inline-flex items-center gap-1"><WkIcon name="UserStar" size={12} /> You get credit</span><span className="inline-flex items-center gap-1"><WkIcon name="Clock3" size={12} /> Reviewed in 24h</span></div></div>;
-  return <div className="px-5 py-5">{track.lyricsContributor && <div className="mb-4 flex items-center gap-1.5 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-3 py-2 text-[11px] text-[var(--wk-text-muted)]"><WkIcon name="UserStar" size={14} className="text-[var(--wk-brand)]" /><span>Contributed by <span className="font-bold text-[var(--wk-text)]">{track.lyricsContributor.name}</span>{track.lyricsContributor.source && <span className="text-[var(--wk-text-faint)]"> · {track.lyricsContributor.source}</span>}</span></div>}<div className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-5"><p className="text-[15px] leading-[2] text-[var(--wk-text)]"><span className="float-left mr-2 mt-1 font-black leading-none text-[var(--wk-brand)]" style={{ fontSize: "clamp(36px, 8vw, 48px)" }}>{track.lyrics.charAt(0)}</span><span className="whitespace-pre-line">{track.lyrics.slice(1)}</span></p></div></div>;
+  const { isPlaying, currentTrack } = usePlayer();
+  const timedLyrics = getTimedLyrics(track.slug);
+  const isThisTrackPlaying = currentTrack?.id === track.slug && isPlaying;
+
+  const handleContribute = () => {
+    window.REACT_APP_NAVIGATE?.(`/tracks/${track.slug}/lyrics/contribute`);
+  };
+
+  if (timedLyrics && timedLyrics.lines.length > 0) {
+    return (
+      <div className="px-5 py-5">
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1.5 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-3 py-2 text-[11px] text-[var(--wk-text-muted)]">
+            <WkIcon name="UserStar" size={13} className="text-[var(--wk-brand)]" />
+            <span>Contributed by <span className="font-bold text-[var(--wk-text)]">{timedLyrics.submitterName}</span></span>
+          </div>
+          <div className="flex items-center gap-1 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-2.5 py-2 text-[11px]">
+            <button className="flex items-center gap-1 rounded-lg px-1.5 py-0.5 transition-all hover:bg-[var(--wk-brand)]/10 hover:text-[var(--wk-brand)]" title="Upvote">
+              <WkIcon name="ArrowUp" size={12} /><span className="text-[var(--wk-text)] font-semibold">{timedLyrics.upvotes}</span>
+            </button>
+            <span className="h-3 w-px bg-[var(--wk-divider)]" />
+            <button className="flex items-center gap-1 rounded-lg px-1.5 py-0.5 transition-all hover:bg-red-500/10 hover:text-red-500" title="Downvote">
+              <WkIcon name="ArrowDown" size={12} /><span className="text-[var(--wk-text-muted)]">{timedLyrics.downvotes}</span>
+            </button>
+          </div>
+          {timedLyrics.status === 'approved' ? (
+            <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[9px] font-bold uppercase text-emerald-600">Verified</span>
+          ) : timedLyrics.status === 'pending_review' ? (
+            <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[9px] font-bold uppercase text-amber-600">Under Review</span>
+          ) : null}
+          <button onClick={handleContribute} className="ml-auto flex items-center gap-1 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-3 py-2 text-[11px] font-semibold text-[var(--wk-text-soft)]">
+            <WkIcon name="Edit" size={11} /> Revise
+          </button>
+        </div>
+        <SyncedLyricsDisplay lines={timedLyrics.lines} isPlaying={isThisTrackPlaying} />
+        {!isThisTrackPlaying && (
+          <div className="mt-3 text-center text-[11px] text-[var(--wk-text-faint)]">Play this track to see lyrics come alive</div>
+        )}
+      </div>
+    );
+  }
+
+  if (!track.lyrics) return (
+    <div className="py-10 text-center">
+      <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[var(--wk-surface-raised)]"><WkIcon name="FileText" size={28} className="text-[var(--wk-text-faint)]" /></div>
+      <h3 className="mb-2 text-[16px] font-bold text-[var(--wk-text)]">No lyrics yet</h3>
+      <p className="mx-auto mb-5 max-w-[260px] text-[13px] leading-relaxed text-[var(--wk-text-muted)]">Be the first to contribute timed lyrics and get credited.</p>
+      <button onClick={handleContribute} className="inline-flex items-center gap-2 rounded-xl bg-[var(--wk-brand)] px-5 py-2.5 text-[13px] font-bold text-white">
+        <WkIcon name="Edit" size={14} /> Contribute lyrics
+      </button>
+      <div className="mt-4 flex items-center justify-center gap-4 text-[10px] text-[var(--wk-text-faint)]">
+        <span className="inline-flex items-center gap-1"><WkIcon name="UserStar" size={12} /> You get credit</span>
+        <span className="inline-flex items-center gap-1"><WkIcon name="Users" size={12} /> Community reviewed</span>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="px-5 py-5">
+      {track.lyricsContributor && <div className="mb-4 flex items-center gap-1.5 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-3 py-2 text-[11px] text-[var(--wk-text-muted)]"><WkIcon name="UserStar" size={14} className="text-[var(--wk-brand)]" /><span>Contributed by <span className="font-bold text-[var(--wk-text)]">{track.lyricsContributor.name}</span>{track.lyricsContributor.source && <span className="text-[var(--wk-text-faint)]"> · {track.lyricsContributor.source}</span>}</span></div>}
+      <div className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-5"><p className="text-[15px] leading-[2] text-[var(--wk-text)]"><span className="float-left mr-2 mt-1 font-black leading-none text-[var(--wk-brand)]" style={{ fontSize: "clamp(36px, 8vw, 48px)" }}>{track.lyrics.charAt(0)}</span><span className="whitespace-pre-line">{track.lyrics.slice(1)}</span></p></div>
+    </div>
+  );
 }
 
 function CreditsTab({ track }: { track: NonNullable<ReturnType<typeof getTrackBySlug>> }) {

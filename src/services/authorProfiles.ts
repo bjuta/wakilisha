@@ -10,19 +10,37 @@ export type AuthorProfile = {
   avatarUrl: string;
   coverUrl: string;
   articleCount: number;
+  location: string;
+  areas: string[];
+  socialLinks: { label: string; url: string; icon: string }[];
+  joinedDate: string;
 };
 
-/* ─── Author display-name map ───
-   Maps the raw author string from wk_articles.author → display name + metadata.
-   Falls back to capitalizing the slug for any author not listed. */
+/* ─── Author display-name map ─── */
 
-const AUTHOR_META: Record<string, { displayName: string; role: string; bio: string; avatarSeq: number; coverSeq: number }> = {
+const AUTHOR_META: Record<string, {
+  displayName: string;
+  role: string;
+  bio: string;
+  avatarSeq: number;
+  coverSeq: number;
+  location: string;
+  areas: string[];
+  socialLinks: { label: string; url: string; icon: string }[];
+  joinedDate: string;
+}> = {
   wakilishaji: {
     displayName: 'Wakilisha Ji',
     role: 'Founder & Editor-in-Chief',
     bio: 'Founder of WAKILISHA. Covering East African music, charts, and the culture that moves the sound. Building the definitive archive of African popular music since day one.',
     avatarSeq: 1,
     coverSeq: 101,
+    location: 'Nairobi, Kenya',
+    areas: ['Music', 'Guides', 'Essays'],
+    socialLinks: [
+      { label: 'X', url: '#', icon: 'ri-twitter-x-line' },
+    ],
+    joinedDate: '2023-01',
   },
   james: {
     displayName: 'James Gichuru',
@@ -30,6 +48,12 @@ const AUTHOR_META: Record<string, { displayName: string; role: string; bio: stri
     bio: 'Music journalist and editor with over a decade covering East African hip-hop, gengetone, and R&B. Believes the best stories are told by the people who live them.',
     avatarSeq: 2,
     coverSeq: 102,
+    location: 'Nairobi, Kenya',
+    areas: ['Music', 'Film', 'Places'],
+    socialLinks: [
+      { label: 'X', url: '#', icon: 'ri-twitter-x-line' },
+    ],
+    joinedDate: '2023-01',
   },
   hafare: {
     displayName: 'Hafare Mwangi',
@@ -37,6 +61,13 @@ const AUTHOR_META: Record<string, { displayName: string; role: string; bio: stri
     bio: 'Nairobi-based culture writer focused on the intersection of music, fashion, and youth identity. Always chasing the next sound before it breaks.',
     avatarSeq: 3,
     coverSeq: 103,
+    location: 'Nairobi, Kenya',
+    areas: ['Music', 'Fashion', 'Style'],
+    socialLinks: [
+      { label: 'X', url: '#', icon: 'ri-twitter-x-line' },
+      { label: 'Instagram', url: '#', icon: 'ri-instagram-line' },
+    ],
+    joinedDate: '2023-06',
   },
   frank: {
     displayName: 'Frank Odhiambo',
@@ -44,6 +75,10 @@ const AUTHOR_META: Record<string, { displayName: string; role: string; bio: stri
     bio: 'Long-form features and investigative music journalism. Frank digs deep into the business of East African entertainment, from label deals to streaming economics.',
     avatarSeq: 4,
     coverSeq: 104,
+    location: 'Kisumu, Kenya',
+    areas: ['Music', 'Essays'],
+    socialLinks: [],
+    joinedDate: '2023-08',
   },
   kendi: {
     displayName: 'Kendi Muthoni',
@@ -51,6 +86,12 @@ const AUTHOR_META: Record<string, { displayName: string; role: string; bio: stri
     bio: 'Curating the cultural conversation around East African music. Kendi writes about identity, diaspora, and the evolving sound of the region with sharp insight.',
     avatarSeq: 5,
     coverSeq: 105,
+    location: 'Nairobi, Kenya',
+    areas: ['Music', 'Language', 'Places'],
+    socialLinks: [
+      { label: 'X', url: '#', icon: 'ri-twitter-x-line' },
+    ],
+    joinedDate: '2023-01',
   },
   k_matiri: {
     displayName: 'K. Matiri',
@@ -58,6 +99,10 @@ const AUTHOR_META: Record<string, { displayName: string; role: string; bio: stri
     bio: 'The numbers person. K. Matiri breaks down chart data, streaming trends, and airplay analytics to reveal what the industry is actually listening to.',
     avatarSeq: 6,
     coverSeq: 106,
+    location: 'Nairobi, Kenya',
+    areas: ['Music', 'Guides'],
+    socialLinks: [],
+    joinedDate: '2024-01',
   },
   vicmuia: {
     displayName: 'Victor Muia',
@@ -65,6 +110,12 @@ const AUTHOR_META: Record<string, { displayName: string; role: string; bio: stri
     bio: 'Covering breaking music news, album releases, and the pulse of Nairobi nightlife. Victor brings the immediacy of the moment to every story.',
     avatarSeq: 7,
     coverSeq: 107,
+    location: 'Nairobi, Kenya',
+    areas: ['Music', 'Places', 'Food'],
+    socialLinks: [
+      { label: 'X', url: '#', icon: 'ri-twitter-x-line' },
+    ],
+    joinedDate: '2024-03',
   },
   michael: {
     displayName: 'Michael Otieno',
@@ -72,6 +123,10 @@ const AUTHOR_META: Record<string, { displayName: string; role: string; bio: stri
     bio: 'Essayist and critic exploring the deeper currents in East African music. Michael writes with a literary edge, connecting songs to society.',
     avatarSeq: 8,
     coverSeq: 108,
+    location: 'Nairobi, Kenya',
+    areas: ['Music', 'Essays', 'Film'],
+    socialLinks: [],
+    joinedDate: '2024-02',
   },
   wangari: {
     displayName: 'Wangari Kamau',
@@ -79,6 +134,12 @@ const AUTHOR_META: Record<string, { displayName: string; role: string; bio: stri
     bio: 'Profile writer and storyteller. Wangari captures the human stories behind the artists — their struggles, triumphs, and what drives them to create.',
     avatarSeq: 9,
     coverSeq: 109,
+    location: 'Nairobi, Kenya',
+    areas: ['Music', 'Style'],
+    socialLinks: [
+      { label: 'X', url: '#', icon: 'ri-twitter-x-line' },
+    ],
+    joinedDate: '2024-05',
   },
   kiuta: {
     displayName: 'Kiuta M.',
@@ -86,6 +147,10 @@ const AUTHOR_META: Record<string, { displayName: string; role: string; bio: stri
     bio: 'Independent music writer with an ear for the underground. Kiuta covers emerging scenes and sounds before they hit the mainstream.',
     avatarSeq: 10,
     coverSeq: 110,
+    location: 'Dar es Salaam, Tanzania',
+    areas: ['Music'],
+    socialLinks: [],
+    joinedDate: '2024-06',
   },
   timo: {
     displayName: 'Timo K.',
@@ -93,6 +158,10 @@ const AUTHOR_META: Record<string, { displayName: string; role: string; bio: stri
     bio: 'DJ, producer, and writer. Timo brings an insider perspective on production culture, beat-making, and the studio side of East African music.',
     avatarSeq: 11,
     coverSeq: 111,
+    location: 'Nairobi, Kenya',
+    areas: ['Music', 'Guides'],
+    socialLinks: [],
+    joinedDate: '2024-08',
   },
   swambi: {
     displayName: 'Swambi A.',
@@ -100,6 +169,10 @@ const AUTHOR_META: Record<string, { displayName: string; role: string; bio: stri
     bio: 'Multidisciplinary creative writing at the crossroads of music, visual art, and design. Swambi brings a distinctive voice to every piece.',
     avatarSeq: 12,
     coverSeq: 112,
+    location: 'Kampala, Uganda',
+    areas: ['Music', 'Fashion', 'Style'],
+    socialLinks: [],
+    joinedDate: '2024-09',
   },
   mary: {
     displayName: 'Mary Wanjiku',
@@ -107,6 +180,10 @@ const AUTHOR_META: Record<string, { displayName: string; role: string; bio: stri
     bio: 'Radio veteran turned digital writer. Mary bridges the gap between traditional broadcast and online music journalism with warmth and authority.',
     avatarSeq: 13,
     coverSeq: 113,
+    location: 'Nairobi, Kenya',
+    areas: ['Music', 'Film'],
+    socialLinks: [],
+    joinedDate: '2025-01',
   },
   gatwiri_c: {
     displayName: 'Gatwiri C.',
@@ -114,8 +191,34 @@ const AUTHOR_META: Record<string, { displayName: string; role: string; bio: stri
     bio: 'Emerging voice in music journalism. Gatwiri brings fresh perspective and Gen-Z energy to the WAKILISHA editorial roster.',
     avatarSeq: 14,
     coverSeq: 114,
+    location: 'Nairobi, Kenya',
+    areas: ['Music', 'Style'],
+    socialLinks: [
+      { label: 'X', url: '#', icon: 'ri-twitter-x-line' },
+    ],
+    joinedDate: '2025-04',
   },
 };
+
+/* ─── Section → vertical color mapping ─── */
+const SECTION_VERTICAL_MAP: Record<string, string> = {
+  'Music': 'var(--wk-v-music)',
+  'Film': 'var(--wk-v-film)',
+  'Fashion': 'var(--wk-v-fashion)',
+  'Food': 'var(--wk-v-food)',
+  'Language': 'var(--wk-v-language)',
+  'Style': 'var(--wk-v-fashion)',
+  'Places': 'var(--wk-v-places)',
+  'Guides': 'var(--wk-v-intel)',
+  'Essays': 'var(--wk-v-intel)',
+  'Chart Notes': 'var(--wk-v-music)',
+  'Reviews': 'var(--wk-v-music)',
+  'Interviews': 'var(--wk-v-music)',
+};
+
+export function getVerticalColor(sectionName: string): string {
+  return SECTION_VERTICAL_MAP[sectionName] || 'var(--wk-brand)';
+}
 
 function normalizeAuthorSlug(raw: string): string {
   return raw.trim().toLowerCase().replace(/\s+/g, '-');
@@ -128,6 +231,10 @@ export function getAuthorMeta(rawAuthor: string): {
   bio: string;
   avatarUrl: string;
   coverUrl: string;
+  location: string;
+  areas: string[];
+  socialLinks: { label: string; url: string; icon: string }[];
+  joinedDate: string;
 } {
   const slug = normalizeAuthorSlug(rawAuthor);
   const meta = AUTHOR_META[slug];
@@ -140,6 +247,10 @@ export function getAuthorMeta(rawAuthor: string): {
       bio: meta.bio,
       avatarUrl: `https://readdy.ai/api/search-image?query=Professional%20portrait%20photograph%20of%20African%20music%20journalist%2C%20editorial%20style%2C%20warm%20natural%20lighting%2C%20Nairobi%20creative%20scene%2C%20clean%20simple%20background%20with%20earth%20tones%2C%20confident%20expression%2C%20professional%20headshot%20composition&width=480&height=480&seq=author-av-${meta.avatarSeq}&orientation=squarish`,
       coverUrl: `https://readdy.ai/api/search-image?query=Abstract%20African%20music%20culture%20landscape%2C%20artistic%20gradient%20with%20warm%20amber%20and%20deep%20green%20tones%2C%20Nairobi%20skyline%20silhouette%20at%20dusk%2C%20editorial%20atmosphere%2C%20modern%20minimal%20banner%20composition%2C%20no%20text%20no%20logos%2C%20cinematic%20wide%20aspect&width=1600&height=400&seq=author-cv-${meta.coverSeq}&orientation=landscape`,
+      location: meta.location,
+      areas: meta.areas,
+      socialLinks: meta.socialLinks,
+      joinedDate: meta.joinedDate,
     };
   }
 
@@ -167,6 +278,10 @@ export function getAuthorMeta(rawAuthor: string): {
         <circle cx="1300" cy="300" r="250" fill="#85C441" fill-opacity="0.05"/>
       </svg>`
     )}`,
+    location: '',
+    areas: [],
+    socialLinks: [],
+    joinedDate: '',
   };
 }
 
@@ -190,7 +305,6 @@ export function getAllAuthorSlugs(articles: MagazineArticle[]): string[] {
   for (const a of articles) {
     slugs.add(normalizeAuthorSlug(a.author));
   }
-  // Also include known authors who might not have published articles yet
   for (const slug of Object.keys(AUTHOR_META)) {
     slugs.add(slug);
   }

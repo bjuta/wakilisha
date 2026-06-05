@@ -42,6 +42,7 @@ import AdminDuplicateMergePage from "../pages/admin/relationships/duplicates/pag
 import AdminPublishingDashboardPage from "../pages/admin/content/publishing/page";
 import AdminContentArchivePage from "../pages/admin/content/archive/page";
 import AdminMediaMigrationPage from "../pages/admin/content/migration/page";
+import AdminLyricsPage from "../pages/admin/content/lyrics/page";
 import AdminUsersPage from "../pages/admin/users/page";
 
 // Admin Charts Ingestion Studio
@@ -95,7 +96,10 @@ import Genres from "../pages/genres/page";
 import Labels from "../pages/labels/page";
 import Magazine from "../pages/magazine/page";
 import ArticlePage from "../pages/magazine/article/page";
+import MagazineIssuePage from "../pages/magazine/issue/page";
+import AllIssuesPage from "../pages/magazine/issues/page";
 import TrackDetail from "../pages/tracks/detail/page";
+import LyricContribution from "../pages/tracks/lyrics/contribute/page";
 import ProfilePage from "../pages/profile/page";
 import SettingsPage from "../pages/settings/page";
 
@@ -127,12 +131,16 @@ import MobileGenres from "../pages/mobile/genres/page";
 import MobileLabels from "../pages/mobile/labels/page";
 import MobileMagazine from "../pages/mobile/magazine/page";
 import MobileArticlePage from "../pages/mobile/magazine/article/page";
+import MobileMagazineIssuePage from "../pages/mobile/magazine/issue/page";
+import MobileAllIssuesPage from "../pages/mobile/magazine/issues/page";
 import MobileSearch from "../pages/mobile/search/page";
 import MobileNotFound from "../pages/mobile/NotFound";
 import MobileTrackDetail from "../pages/mobile/tracks/detail/page";
+import MobileLyricContribution from "../pages/mobile/tracks/lyrics/contribute/page";
 import MobileAuth from "../pages/mobile/auth/page";
 import MobileProfile from "../pages/mobile/profile/page";
 import MobileAuthorProfile from "../pages/mobile/authors/detail/page";
+import AuthPage from "../pages/auth/page";
 
 const routes: RouteObject[] = [
   {
@@ -152,6 +160,9 @@ const routes: RouteObject[] = [
       // Tracks
       { path: "/tracks/:slug", element: <ResponsivePage mobile={<MobileTrackDetail />} desktop={<TrackDetail />} /> },
 
+      // Lyric contribution
+      { path: "/tracks/:slug/lyrics/contribute", element: <ResponsivePage mobile={<MobileLyricContribution />} desktop={<LyricContribution />} /> },
+
       // Releases — detail only, no public catalog
       { path: "/releases/:artistSlug/:releaseSlug", element: <ResponsivePage mobile={<ReleaseDetail />} desktop={<ReleaseDetail />} /> },
 
@@ -163,6 +174,8 @@ const routes: RouteObject[] = [
 
       // Magazine
       { path: "/magazine", element: <ResponsivePage mobile={<MobileMagazine />} desktop={<Magazine />} /> },
+      { path: "/magazine/issues", element: <ResponsivePage mobile={<MobileAllIssuesPage />} desktop={<AllIssuesPage />} /> },
+      { path: "/magazine/issue/:issueKey", element: <ResponsivePage mobile={<MobileMagazineIssuePage />} desktop={<MagazineIssuePage />} /> },
       { path: "/magazine/:slug", element: <ResponsivePage mobile={<MobileArticlePage />} desktop={<ArticlePage />} /> },
 
       // Guides
@@ -180,7 +193,7 @@ const routes: RouteObject[] = [
 
       // Player — desktop player page, mobile uses overlay state
       { path: "/player", element: <ResponsivePage mobile={<MobileHome />} desktop={<DesktopPlayerPage />} /> },
-      { path: "/auth", element: <ResponsivePage mobile={<MobileAuth />} desktop={<MobileAuth />} /> },
+      { path: "/auth", element: <ResponsivePage mobile={<MobileAuth />} desktop={<AuthPage />} /> },
       { path: "/profile", element: <ResponsivePage mobile={<MobileProfile />} desktop={<ProfilePage />} /> },
       { path: "/authors/:slug", element: <ResponsivePage mobile={<MobileAuthorProfile />} desktop={<AuthorProfilePage />} /> },
       { path: "/settings", element: <ResponsivePage mobile={<SettingsPage />} desktop={<SettingsPage />} /> },
@@ -199,6 +212,7 @@ const routes: RouteObject[] = [
       { path: "content/publishing", element: <AdminPublishingDashboardPage /> },
       { path: "content/archive", element: <AdminContentArchivePage /> },
       { path: "content/migration", element: <AdminMediaMigrationPage /> },
+      { path: "content/lyrics", element: <AdminLyricsPage /> },
       { path: "users", element: <AdminUsersPage /> },
       { path: "registry/artists", element: <AdminArtistsPage /> },
       { path: "registry/artists/:slug", element: <AdminArtistDetailPage /> },

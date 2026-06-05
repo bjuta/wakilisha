@@ -133,7 +133,7 @@ function ToggleField({ label, value, onChange }: { label: string; value: boolean
     <div className="flex items-center justify-between rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2.5">
       <span className="text-[13px] font-semibold text-[var(--wk-text)]">{label}</span>
       <button onClick={() => onChange(!value)} className={`relative h-6 w-11 rounded-full transition-colors ${value ? "bg-[var(--wk-brand)]" : "bg-[var(--wk-border-2)]"}`}>
-        <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-[var(--wk-surface)] transition-transform ${value ? "translate-x-5.5" : "translate-x-0.5"}`} />
+        <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-[var(--wk-surface)] transition-transform ${value ? "translate-x-[22px]" : "translate-x-0.5"}`} />
       </button>
     </div>
   );

@@ -15,6 +15,7 @@ export default function AdminSettingsEmailBriefings() {
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [sendingTest, setSendingTest] = useState(false);
+  const [testResult, setTestResult] = useState<string | null>(null);
 
   const update = <K extends keyof EmailBriefingsSettings>(key: K, value: EmailBriefingsSettings[K]) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
@@ -32,9 +33,10 @@ export default function AdminSettingsEmailBriefings() {
 
   const handleSendTest = () => {
     setSendingTest(true);
+    setTestResult(null);
     setTimeout(() => {
       setSendingTest(false);
-      alert(`Test email sent to ${settings.testRecipientEmail || "no recipient configured"}. Check your inbox.`);
+      setTestResult(`Test email sent to ${settings.testRecipientEmail || "no recipient configured"}. Check your inbox.`);
     }, 1500);
   };
 
@@ -68,19 +70,19 @@ export default function AdminSettingsEmailBriefings() {
           <div className="flex items-center justify-between rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2.5">
             <span className="text-[13px] font-semibold text-[var(--wk-text)]">Artist Opt-In Weekly Emails</span>
             <button onClick={() => update("enableArtistOptInEmails", !settings.enableArtistOptInEmails)} className={`relative h-6 w-11 rounded-full transition-colors ${settings.enableArtistOptInEmails ? "bg-[var(--wk-brand)]" : "bg-[var(--wk-border-2)]"}`}>
-              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-[var(--wk-surface)] transition-transform ${settings.enableArtistOptInEmails ? "translate-x-5.5" : "translate-x-0.5"}`} />
+              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-[var(--wk-surface)] transition-transform ${settings.enableArtistOptInEmails ? "translate-x-[22px]" : "translate-x-0.5"}`} />
             </button>
           </div>
           <div className="flex items-center justify-between rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2.5">
             <span className="text-[13px] font-semibold text-[var(--wk-text)]">Follow Notifications</span>
             <button onClick={() => update("enableFollowNotifications", !settings.enableFollowNotifications)} className={`relative h-6 w-11 rounded-full transition-colors ${settings.enableFollowNotifications ? "bg-[var(--wk-brand)]" : "bg-[var(--wk-border-2)]"}`}>
-              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-[var(--wk-surface)] transition-transform ${settings.enableFollowNotifications ? "translate-x-5.5" : "translate-x-0.5"}`} />
+              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-[var(--wk-surface)] transition-transform ${settings.enableFollowNotifications ? "translate-x-[22px]" : "translate-x-0.5"}`} />
             </button>
           </div>
           <div className="flex items-center justify-between rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2.5">
             <span className="text-[13px] font-semibold text-[var(--wk-text)]">Briefing Issues</span>
             <button onClick={() => update("enableBriefingIssues", !settings.enableBriefingIssues)} className={`relative h-6 w-11 rounded-full transition-colors ${settings.enableBriefingIssues ? "bg-[var(--wk-brand)]" : "bg-[var(--wk-border-2)]"}`}>
-              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-[var(--wk-surface)] transition-transform ${settings.enableBriefingIssues ? "translate-x-5.5" : "translate-x-0.5"}`} />
+              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-[var(--wk-surface)] transition-transform ${settings.enableBriefingIssues ? "translate-x-[22px]" : "translate-x-0.5"}`} />
             </button>
           </div>
           <div>
@@ -105,6 +107,15 @@ export default function AdminSettingsEmailBriefings() {
             <WkIcon name={sendingTest ? "Loader" : "Send"} size={14} /> {sendingTest ? "Sending..." : "Send Test"}
           </button>
         </div>
+        {testResult && (
+          <div className="mt-3 flex items-center gap-2 rounded-lg border border-[var(--wk-success)]/30 bg-[var(--wk-success)]/8 px-3 py-2.5 text-[12px] text-[var(--wk-success)]">
+            <WkIcon name="Check" size={14} />
+            {testResult}
+            <button onClick={() => setTestResult(null)} className="ml-auto text-[var(--wk-success)]/60 hover:text-[var(--wk-success)]">
+              <WkIcon name="X" size={13} />
+            </button>
+          </div>
+        )}
       </WkSurface>
 
       <div className="flex items-center gap-3">

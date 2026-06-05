@@ -306,7 +306,7 @@ function ProviderField({ providerKey, field, value, error, showSecret, onToggleS
         <button type="button" onClick={() => onChange(!(value === true))} className="flex w-full items-center justify-between rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2.5 text-left">
           <span className="text-[13px] font-semibold text-[var(--wk-text)]">{value === true ? "Enabled" : "Disabled"}</span>
           <span className={`relative h-6 w-11 rounded-full transition-colors ${value === true ? "bg-[var(--wk-brand)]" : "bg-[var(--wk-border-2)]"}`}>
-            <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-[var(--wk-surface)] transition-transform ${value === true ? "translate-x-5.5" : "translate-x-0.5"}`} />
+            <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-[var(--wk-surface)] transition-transform ${value === true ? "translate-x-[22px]" : "translate-x-0.5"}`} />
           </span>
         </button>
       ) : field.type === "select" ? (

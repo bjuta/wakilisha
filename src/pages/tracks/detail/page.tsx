@@ -3,6 +3,8 @@ import { useParams, Link } from "react-router-dom";
 import { usePlayer } from "@/context/PlayerContext";
 import { TRACK_DETAILS, getTrackBySlug, getRelatedTracks } from "@/mocks/trackDetails";
 import { TrackChartHistorySection } from "@/components/charts/TrackChartHistory";
+import { SyncedLyricsDisplay } from "@/components/lyrics/SyncedLyricsDisplay";
+import { getTimedLyrics } from "@/mocks/timedLyrics";
 import { WkIcon } from "@/components/design-system/Icon";
 
 const TABS = ["Overview", "Chart stats", "Lyrics", "Credits"] as const;
@@ -317,6 +319,74 @@ function ChartStatsTab({ track }: { track: NonNullable<ReturnType<typeof getTrac
 }
 
 function LyricsTab({ track }: { track: NonNullable<ReturnType<typeof getTrackBySlug>> }) {
+  const { isPlaying, currentTrack } = usePlayer();
+  const timedLyrics = getTimedLyrics(track.slug);
+  const isThisTrackPlaying = currentTrack?.id === track.slug && isPlaying;
+
+  const handleContribute = () => {
+    // Navigate to lyric contribution page
+    window.REACT_APP_NAVIGATE?.(`/tracks/${track.slug}/lyrics/contribute`);
+  };
+
+  // If we have timed lyrics, show the synced display
+  if (timedLyrics && timedLyrics.lines.length > 0) {
+    return (
+      <div className="px-4 py-6 lg:px-6 lg:py-8">
+        {/* Contributor + voting bar */}
+        <div className="mb-5 flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-4 py-2.5 text-[12px] text-[var(--wk-text-muted)]">
+            <WkIcon name="UserStar" size={15} className="text-[var(--wk-brand)]" />
+            <span>
+              Contributed by <span className="font-bold text-[var(--wk-text)]">{timedLyrics.submitterName}</span>
+              {timedLyrics.sourceDescription && (
+                <span className="text-[var(--wk-text-faint)]"> · {timedLyrics.sourceDescription}</span>
+              )}
+            </span>
+          </div>
+
+          {/* Vote status */}
+          <div className="flex items-center gap-1.5 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-3 py-2.5 text-[12px]">
+            <button className="flex items-center gap-1 rounded-lg px-2 py-1 transition-all hover:bg-[var(--wk-brand)]/10 hover:text-[var(--wk-brand)]" title="Upvote">
+              <WkIcon name="ArrowUp" size={14} />
+              <span className="text-[var(--wk-text)] font-semibold">{timedLyrics.upvotes}</span>
+            </button>
+            <span className="h-4 w-px bg-[var(--wk-divider)]" />
+            <button className="flex items-center gap-1 rounded-lg px-2 py-1 transition-all hover:bg-red-500/10 hover:text-red-500" title="Downvote">
+              <WkIcon name="ArrowDown" size={14} />
+              <span className="text-[var(--wk-text-muted)]">{timedLyrics.downvotes}</span>
+            </button>
+          </div>
+
+          {/* Status badge */}
+          {timedLyrics.status === 'approved' ? (
+            <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-600">Verified</span>
+          ) : timedLyrics.status === 'pending_review' ? (
+            <span className="rounded-full bg-amber-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-600">Under Review</span>
+          ) : null}
+
+          <button
+            onClick={handleContribute}
+            className="ml-auto flex items-center gap-1.5 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-4 py-2.5 text-[12px] font-semibold text-[var(--wk-text-soft)] transition-all hover:border-[var(--wk-brand)] hover:text-[var(--wk-brand)]"
+          >
+            <WkIcon name="Edit" size={13} />
+            Submit revision
+          </button>
+        </div>
+
+        {/* Synced lyrics display */}
+        <SyncedLyricsDisplay lines={timedLyrics.lines} isPlaying={isThisTrackPlaying} />
+
+        {/* Playback hint */}
+        {!isThisTrackPlaying && (
+          <div className="mt-4 text-center text-[12px] text-[var(--wk-text-faint)]">
+            Play this track to see lyrics come alive
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Fallback: static lyrics (no timed data)
   if (!track.lyrics) {
     return (
       <div className="py-16 text-center">
@@ -324,14 +394,26 @@ function LyricsTab({ track }: { track: NonNullable<ReturnType<typeof getTrackByS
           <WkIcon name="FileText" size={32} className="text-[var(--wk-text-faint)]" />
         </div>
         <h3 className="mb-2 text-[18px] font-bold text-[var(--wk-text)]">No lyrics yet</h3>
-        <p className="mx-auto mb-4 max-w-[320px] text-[14px] leading-relaxed text-[var(--wk-text-muted)]">Be the first to add lyrics and get credited as the contributor.</p>
-        <div className="flex items-center justify-center gap-5 text-[11px] text-[var(--wk-text-faint)]">
+        <p className="mx-auto mb-6 max-w-[360px] text-[14px] leading-relaxed text-[var(--wk-text-muted)]">
+          Be the first to contribute timed lyrics for this track. Your name gets credited and the community votes on accuracy.
+        </p>
+        <button
+          onClick={handleContribute}
+          className="inline-flex items-center gap-2 rounded-xl bg-[var(--wk-brand)] px-6 py-3 text-[14px] font-bold text-[var(--wk-brand-on)] transition-all hover:opacity-90"
+        >
+          <WkIcon name="Edit" size={16} />
+          Contribute lyrics
+        </button>
+        <div className="mt-5 flex items-center justify-center gap-5 text-[11px] text-[var(--wk-text-faint)]">
           <span className="inline-flex items-center gap-1"><WkIcon name="UserStar" size={14} /> You get credit</span>
-          <span className="inline-flex items-center gap-1"><WkIcon name="Clock3" size={14} /> Reviewed in 24h</span>
+          <span className="inline-flex items-center gap-1"><WkIcon name="Users" size={14} /> Community reviewed</span>
+          <span className="inline-flex items-center gap-1"><WkIcon name="Clock3" size={14} /> Timed &amp; synced</span>
         </div>
       </div>
     );
   }
+
+  // Static lyrics with contributor info (legacy fallback)
   return (
     <div className="px-4 py-6 lg:px-6 lg:py-8">
       {track.lyricsContributor && (

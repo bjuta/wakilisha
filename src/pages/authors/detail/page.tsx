@@ -1,8 +1,8 @@
-import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { WkIcon } from '@/components/design-system/Icon';
 import { getArticlesByAuthor, type MagazineArticle } from '@/services/magazineArticles';
-import { getAuthorMeta } from '@/services/authorProfiles';
+import { getAuthorMeta, getVerticalColor } from '@/services/authorProfiles';
 
 type SortMode = 'latest' | 'oldest' | 'longest';
 
@@ -11,9 +11,9 @@ const LOAD_MORE = 6;
 const FEATURED_COUNT = 5;
 
 const SORT_OPTIONS: { mode: SortMode; label: string; icon: string }[] = [
-  { mode: 'latest', label: 'Latest first', icon: 'ri-arrow-down-line' },
-  { mode: 'oldest', label: 'Oldest first', icon: 'ri-arrow-up-line' },
-  { mode: 'longest', label: 'Longest reads', icon: 'ri-time-line' },
+  { mode: 'latest', label: 'Latest', icon: 'ri-arrow-down-line' },
+  { mode: 'oldest', label: 'Oldest', icon: 'ri-arrow-up-line' },
+  { mode: 'longest', label: 'Longest', icon: 'ri-time-line' },
 ];
 
 export default function AuthorProfilePage() {
@@ -30,6 +30,7 @@ export default function AuthorProfilePage() {
 
   const normalizedSlug = (slug || '').toLowerCase().replace(/[\s_-]+/g, '-');
   const authorMeta = getAuthorMeta(normalizedSlug);
+  const firstName = authorMeta.displayName.split(' ')[0];
 
   useEffect(() => {
     if (!normalizedSlug) {
@@ -57,7 +58,6 @@ export default function AuthorProfilePage() {
     return () => { alive = false; };
   }, [normalizedSlug]);
 
-  // Close sort dropdown on outside click
   useEffect(() => {
     if (!sortOpen) return;
     const handler = (e: MouseEvent) => {
@@ -69,7 +69,7 @@ export default function AuthorProfilePage() {
     return () => document.removeEventListener('mousedown', handler);
   }, [sortOpen]);
 
-  // Compute sections & counts
+  /* ─── Section counts ─── */
   const { sections, sectionCounts } = useMemo(() => {
     const map: Record<string, number> = {};
     for (const a of articles) {
@@ -80,7 +80,7 @@ export default function AuthorProfilePage() {
     return { sections: sorted.map(([name]) => name), sectionCounts: map };
   }, [articles]);
 
-  // Filter & sort
+  /* ─── Filter & sort ─── */
   const filteredArticles = useMemo(() => {
     let filtered = activeCategory === 'all'
       ? articles
@@ -96,7 +96,22 @@ export default function AuthorProfilePage() {
     }
   }, [articles, activeCategory, sortMode]);
 
-  // Featured articles (first FEATURED_COUNT) + rest
+  /* ─── Derived stats ─── */
+  const stats = useMemo(() => {
+    if (articles.length === 0) return null;
+    const totalMin = articles.reduce((s, a) => s + a.readingTime, 0);
+    const topSection = sections[0] || '—';
+    const topSectionPct = Math.round(((sectionCounts[topSection] || 0) / articles.length) * 100);
+    const dates = articles.map((a) => new Date(a.date)).filter((d) => !Number.isNaN(d.getTime()));
+    const firstDate = dates.length > 0 ? dates[dates.length - 1] : null;
+    const latestDate = dates.length > 0 ? dates[0] : null;
+    const monthsActive = firstDate && latestDate
+      ? Math.max(1, Math.ceil((latestDate.getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24 * 30)))
+      : 0;
+    return { totalMin, topSection, topSectionPct, monthsActive, firstDate, latestDate };
+  }, [articles, sections, sectionCounts]);
+
+  /* ─── Featured + grid split ─── */
   const hasFeatured = filteredArticles.length >= 3;
   const featuredArticles = useMemo(
     () => (hasFeatured ? filteredArticles.slice(0, FEATURED_COUNT) : []),
@@ -107,30 +122,16 @@ export default function AuthorProfilePage() {
     [filteredArticles, hasFeatured],
   );
 
-  // Group grid articles by section only when showing "all"
-  const sectionGroups = useMemo(() => {
-    if (activeCategory !== 'all') return null;
-    const groups: { section: string; items: MagazineArticle[] }[] = [];
-    const seen = new Set<string>();
-    for (const a of gridArticles) {
-      const sec = a.section || 'Uncategorized';
-      if (!seen.has(sec)) {
-        seen.add(sec);
-        groups.push({ section: sec, items: [] });
-      }
-    }
-    for (const a of gridArticles) {
-      const sec = a.section || 'Uncategorized';
-      const group = groups.find((g) => g.section === sec);
-      if (group) group.items.push(a);
-    }
-    return groups.filter((g) => g.items.length > 0);
-  }, [gridArticles, activeCategory]);
+  /* ─── Carousel items ─── */
+  const carouselItems = useMemo(() => {
+    if (featuredArticles.length <= 1) return [];
+    const items = featuredArticles.slice(1);
+    return [...items, ...items];
+  }, [featuredArticles]);
 
-  // Reset visible count
   useEffect(() => { setVisibleCount(BATCH_SIZE); }, [activeCategory, sortMode]);
 
-  // Infinite scroll
+  /* ─── Infinite scroll ─── */
   useEffect(() => {
     const sentinel = sentinelRef.current;
     if (!sentinel) return;
@@ -151,289 +152,347 @@ export default function AuthorProfilePage() {
 
   const hasMore = visibleCount < gridArticles.length;
 
-
-  const firstName = authorMeta.displayName.split(' ')[0];
-
-  // Build carousel items (duplicated for infinite scroll illusion)
-  const carouselItems = useMemo(() => {
-    if (featuredArticles.length <= 1) return [];
-    const items = featuredArticles.slice(1); // skip first (used as hero)
-    // Duplicate for seamless loop
-    return [...items, ...items];
-  }, [featuredArticles]);
-
-  // --- Render a card for the grid (positions start after featured) ---
-  const renderGridCard = useCallback((story: MagazineArticle, globalIndex: number) => {
-    const patternIdx = globalIndex % 10;
-
-    // Portrait card (pos 3, 8) — taller, image-heavy
-    if (patternIdx === 3 || patternIdx === 8) {
-      return (
-        <Link key={`${story.slug}-${globalIndex}`} to={`/magazine/${story.slug}`} className="author-mag-card-portrait">
-          <div className="author-mag-card-portrait-image">
-            <img src={story.heroUrl} alt="" loading="lazy" className="w-full h-full object-cover" />
-          </div>
-          <div className="author-mag-card-portrait-body">
-            <span className="author-mag-card-section">{story.section}</span>
-            <h3 className="author-mag-card-portrait-title">{story.title}</h3>
-            {story.dek && (
-              <p className="author-mag-card-portrait-dek">{story.dek}</p>
-            )}
-            <div className="author-mag-card-meta mt-3">
-              <span>{story.readingTime} min</span>
-              <span className="author-mag-card-meta-sep">&middot;</span>
-              <span>{story.date}</span>
-            </div>
-          </div>
-        </Link>
-      );
+  /* ─── Total computed areas from article sections ─── */
+  const actualAreas = useMemo(() => {
+    if (articles.length === 0) return authorMeta.areas;
+    const set = new Set(authorMeta.areas);
+    for (const sec of sections) {
+      set.add(sec);
     }
-
-    // Feature card (pos 0, 5) — full-width
-    if (patternIdx === 0 || patternIdx === 5) {
-      return (
-        <Link key={`${story.slug}-${globalIndex}`} to={`/magazine/${story.slug}`} className="author-mag-card-feature">
-          <div className="author-mag-card-feature-image">
-            <img src={story.heroUrl} alt="" loading="lazy" className="w-full h-full object-cover" />
-          </div>
-          <div className="author-mag-card-feature-body">
-            <span className="author-mag-card-section">{story.section}</span>
-            <h3 className="author-mag-card-feature-title">{story.title}</h3>
-            {story.dek && (
-              <p className="author-mag-card-feature-dek">{story.dek}</p>
-            )}
-            <div className="author-mag-card-meta">
-              <span>{story.readingTime} min read</span>
-              <span className="author-mag-card-meta-sep">&middot;</span>
-              <span>{story.date}</span>
-            </div>
-          </div>
-        </Link>
-      );
+    const ordered = authorMeta.areas.filter((a) => set.has(a));
+    for (const a of Array.from(set)) {
+      if (!ordered.includes(a)) ordered.push(a);
     }
+    return ordered.slice(0, 6);
+  }, [articles, sections, authorMeta.areas]);
 
-    // Wide horizontal (pos 7)
-    if (patternIdx === 7) {
-      return (
-        <Link key={`${story.slug}-${globalIndex}`} to={`/magazine/${story.slug}`} className="author-mag-card-wide">
-          <div className="author-mag-card-wide-image">
-            <img src={story.heroUrl} alt="" loading="lazy" className="w-full h-full object-cover" />
-          </div>
-          <div className="author-mag-card-wide-body">
-            <span className="author-mag-card-section">{story.section}</span>
-            <h3 className="author-mag-card-wide-title">{story.title}</h3>
-            {story.dek && (
-              <p className="author-mag-card-wide-dek">{story.dek}</p>
-            )}
-            <div className="author-mag-card-meta mt-2">
-              <span>{story.readingTime} min</span>
-              <span className="author-mag-card-meta-sep">&middot;</span>
-              <span>{story.date}</span>
-            </div>
-          </div>
-        </Link>
-      );
+  /* ─── Row-based grid ─── */
+  const visibleArticles = useMemo(
+    () => gridArticles.slice(0, visibleCount),
+    [gridArticles, visibleCount],
+  );
+
+  const rows = useMemo(() => {
+    const r: { articles: MagazineArticle[]; pattern: 'three-up' | 'split' | 'full-bleed' }[] = [];
+    let idx = 0;
+    let rowIdx = 0;
+    while (idx < visibleArticles.length) {
+      const p = rowIdx % 4;
+      let pattern: 'three-up' | 'split' | 'full-bleed';
+      let consume: number;
+      if (p === 0) { pattern = 'three-up'; consume = 3; }
+      else if (p === 2) { pattern = 'full-bleed'; consume = 1; }
+      else { pattern = 'split'; consume = 2; }
+      const slice = visibleArticles.slice(idx, idx + consume);
+      if (slice.length === 0) break;
+      r.push({ articles: slice, pattern });
+      idx += consume;
+      rowIdx++;
     }
+    return r;
+  }, [visibleArticles]);
 
-    // Medium cards (pos 1, 2, 4, 6, 9)
+  const MediumCard = ({ story }: { story: MagazineArticle }) => {
+    const vc = getVerticalColor(story.section);
     return (
-      <Link key={`${story.slug}-${globalIndex}`} to={`/magazine/${story.slug}`} className="author-mag-card-medium">
-        <div className="author-mag-card-medium-image">
-          <img src={story.heroUrl} alt="" loading="lazy" />
+      <Link
+        to={`/magazine/${story.slug}`}
+        className="group border border-[var(--wk-border)] rounded-2xl overflow-hidden bg-[var(--wk-surface)] hover:-translate-y-0.5 hover:border-[var(--wk-border-2)] transition-all duration-200 flex flex-col h-full"
+      >
+        <div className="aspect-[16/10] overflow-hidden bg-[var(--wk-surface-raised)]">
+          <img src={story.heroUrl} alt="" loading="lazy" className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500" />
         </div>
-        <div className="author-mag-card-medium-body">
-          <span className="author-mag-card-section">{story.section}</span>
-          <h3 className="author-mag-card-medium-title">{story.title}</h3>
-          {story.dek && (
-            <p className="author-mag-card-medium-dek">{story.dek}</p>
-          )}
-          <div className="author-mag-card-meta mt-2">
+        <div className="p-5 flex flex-col flex-1">
+          <span className="author-profile-card-section" style={{ color: vc }}>{story.section}</span>
+          <h3 className="font-black text-[15px] leading-[1.16] tracking-[-0.02em] text-[var(--wk-text)] line-clamp-2 mb-2 group-hover:text-[var(--wk-brand)] transition-colors">{story.title}</h3>
+          {story.dek && <p className="font-normal text-xs leading-[1.45] text-[var(--wk-text-soft)] line-clamp-2 mb-3">{story.dek}</p>}
+          <div className="mt-auto flex items-center gap-2 text-[11px] font-semibold text-[var(--wk-text-muted)]">
             <span>{story.readingTime} min</span>
-            <span className="author-mag-card-meta-sep">&middot;</span>
+            <span className="text-[var(--wk-border-strong)]">&middot;</span>
             <span>{story.date}</span>
           </div>
         </div>
       </Link>
     );
-  }, []);
+  };
 
-  return (
-    <main className="min-h-screen bg-[var(--wk-bg)]">
-      {/* ── Full-bleed cover hero ── */}
-      <section className="relative overflow-hidden" style={{ height: "48vh", minHeight: "300px" }}>
-        <img
-          src={authorMeta.coverUrl}
-          alt=""
-          className="absolute inset-0 w-full h-full object-cover object-top"
-        />
-        {/* gradient fades to page background at bottom — same trick as article page */}
-        <div
-          className="absolute inset-0"
-          style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.12) 0%, rgba(0,0,0,0.18) 50%, var(--wk-bg) 100%)" }}
-        />
-        {/* Back nav */}
-        <div className="absolute top-5 left-6 right-6 z-20 flex items-center justify-between">
-          <Link
-            to="/magazine"
-            className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/25 backdrop-blur-sm px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-white/85 hover:bg-black/45 transition-all whitespace-nowrap"
-          >
-            <WkIcon name="ArrowLeft" size={13} />
-            Magazine
-          </Link>
-        </div>
-      </section>
-
-      {/* ── Floating profile card (same pattern as article page) ── */}
-      <div
-        className="relative z-10 rounded-t-[28px] bg-[var(--wk-bg)]"
-        style={{ marginTop: "-64px", boxShadow: "0 -8px 48px -12px rgba(0,0,0,0.12)" }}
+  const FeatureCard = ({ story, wide }: { story: MagazineArticle; wide?: boolean }) => {
+    const vc = getVerticalColor(story.section);
+    return (
+      <Link
+        to={`/magazine/${story.slug}`}
+        className={`group border border-[var(--wk-border)] rounded-2xl overflow-hidden bg-[var(--wk-surface)] hover:-translate-y-0.5 hover:border-[var(--wk-border-2)] transition-all duration-200 grid grid-cols-1 sm:grid-cols-[1.2fr_1fr] h-full ${wide ? 'sm:grid-cols-[5fr_4fr]' : ''}`}
       >
-        {/* Avatar peeks above the card boundary */}
-        <div className="absolute -top-12 left-8 xl:left-12">
-          <div className="relative">
-            <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-[var(--wk-bg)] bg-[var(--wk-brand)] shadow-md">
-              <img
-                src={authorMeta.avatarUrl}
-                alt={authorMeta.displayName}
-                className="w-full h-full object-cover"
-              />
+        <div className="overflow-hidden bg-[var(--wk-surface-raised)] min-h-[160px] sm:min-h-0">
+          <img src={story.heroUrl} alt="" loading="lazy" className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500" />
+        </div>
+        <div className={`flex flex-col justify-center ${wide ? 'p-5 sm:p-7 md:p-9' : 'p-5 sm:p-6'}`}>
+          <span className="author-profile-card-section" style={{ color: vc }}>{story.section}</span>
+          <h3 className={`font-black tracking-[-0.03em] text-[var(--wk-text)] mb-2.5 group-hover:text-[var(--wk-brand)] transition-colors ${wide ? 'text-lg leading-[1.12] sm:text-[22px] sm:leading-[1.10] md:text-[26px]' : 'text-base leading-[1.18] sm:text-[17px] sm:leading-[1.15]'}`}>{story.title}</h3>
+          {story.dek && <p className={`font-normal text-[var(--wk-text-soft)] line-clamp-2 ${wide ? 'text-xs leading-[1.5] sm:text-sm sm:leading-[1.55] mb-3 sm:mb-4' : 'text-[11px] leading-[1.5] sm:text-xs sm:leading-[1.5] mb-2 sm:mb-3'}`}>{story.dek}</p>}
+          <div className="flex items-center gap-2 text-[11px] font-semibold text-[var(--wk-text-muted)]">
+            <span>{story.readingTime} min</span>
+            <span className="text-[var(--wk-border-strong)]">&middot;</span>
+            <span>{story.date}</span>
+          </div>
+        </div>
+      </Link>
+    );
+  };
+
+  /* ─── ─── LOADING STATE ─── ─── */
+  if (loading) {
+    return (
+      <main className="author-profile-shell">
+        <div className="author-profile-content">
+          {/* Hero skeleton */}
+          <section className="author-profile-hero animate-pulse">
+            <div className="author-profile-hero-portrait rounded-2xl bg-[var(--wk-surface-raised)]" />
+            <div className="author-profile-hero-details">
+              <div className="space-y-4">
+                <div className="h-4 w-28 rounded-full bg-[var(--wk-surface-raised)]" />
+                <div className="h-12 w-72 rounded-lg bg-[var(--wk-surface-raised)]" />
+                <div className="h-5 w-44 rounded bg-[var(--wk-surface-raised)]" />
+                <div className="space-y-2">
+                  <div className="h-4 w-full rounded bg-[var(--wk-surface-raised)]" />
+                  <div className="h-4 w-3/4 rounded bg-[var(--wk-surface-raised)]" />
+                </div>
+                <div className="flex gap-3">
+                  <div className="h-8 w-20 rounded-full bg-[var(--wk-surface-raised)]" />
+                  <div className="h-8 w-24 rounded-full bg-[var(--wk-surface-raised)]" />
+                  <div className="h-8 w-16 rounded-full bg-[var(--wk-surface-raised)]" />
+                </div>
+              </div>
+              <div className="flex gap-8 mt-6">
+                <div className="h-16 w-20 rounded bg-[var(--wk-surface-raised)]" />
+                <div className="h-16 w-20 rounded bg-[var(--wk-surface-raised)]" />
+                <div className="h-16 w-20 rounded bg-[var(--wk-surface-raised)]" />
+              </div>
             </div>
-            <div className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-[var(--wk-brand)] border-2 border-[var(--wk-bg)] flex items-center justify-center text-[var(--wk-brand-on)]">
-              <WkIcon name="PenLine" size={11} />
+          </section>
+          {/* Grid skeleton — mirroring the row rhythm */}
+          <div className="flex flex-col mt-12">
+            {/* Three-up row */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] overflow-hidden">
+                  <div className="aspect-[16/10] bg-[var(--wk-surface-raised)] animate-pulse" />
+                  <div className="p-5 space-y-3">
+                    <div className="h-3 w-16 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
+                    <div className="h-5 w-3/4 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
+                    <div className="h-3 w-1/2 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
+                  </div>
+                </div>
+              ))}
+            </div>
+            {/* Section break skeleton */}
+            <div className="flex items-center gap-4 my-9 sm:my-11">
+              <span className="flex-1 h-px bg-[var(--wk-divider)]" />
+              <span className="h-3 w-24 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
+              <span className="flex-1 h-px bg-[var(--wk-divider)]" />
+            </div>
+            {/* Split row */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+              <div className="sm:col-span-2 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] overflow-hidden">
+                <div className="grid grid-cols-1 sm:grid-cols-[1.2fr_1fr]">
+                  <div className="min-h-[120px] sm:min-h-[160px] bg-[var(--wk-surface-raised)] animate-pulse" />
+                  <div className="p-5 sm:p-6 space-y-3">
+                    <div className="h-3 w-16 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
+                    <div className="h-6 w-3/4 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
+                    <div className="h-3 w-1/2 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
+                  </div>
+                </div>
+              </div>
+              <div className="sm:col-span-2 lg:col-span-1 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] overflow-hidden">
+                <div className="aspect-[16/10] bg-[var(--wk-surface-raised)] animate-pulse" />
+                <div className="p-5 space-y-3">
+                  <div className="h-3 w-16 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
+                  <div className="h-5 w-3/4 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
+                  <div className="h-3 w-1/2 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
+                </div>
+              </div>
             </div>
           </div>
         </div>
+      </main>
+    );
+  }
 
-        <div className="max-w-[1280px] mx-auto px-6 xl:px-8">
-          {/* Name / bio / actions row */}
-          <div className="flex items-start justify-between gap-6 pt-16 pb-7 border-b border-[var(--wk-border)] flex-wrap">
-            <div className="min-w-0">
-              <h1 className="text-[28px] lg:text-[38px] font-black tracking-[-0.045em] text-[var(--wk-text)] leading-tight">
-                {authorMeta.displayName}
-              </h1>
-              <div className="flex items-center gap-2 mt-2 flex-wrap">
-                <span className="text-[12px] font-semibold text-[var(--wk-text-muted)]">WAKILISHA Contributor</span>
-                <span className="text-[var(--wk-text-faint)]">&middot;</span>
-                <span className="inline-flex items-center gap-1.5 text-[12px] font-bold text-[var(--wk-brand)]">
-                  <WkIcon name="PenLine" size={12} />{authorMeta.role}
-                </span>
-              </div>
-              {authorMeta.bio && (
-                <p className="mt-3 text-[14px] leading-relaxed text-[var(--wk-text-soft)] max-w-[58ch]">
-                  {authorMeta.bio}
-                </p>
+  /* ─── ─── ERROR STATE ─── ─── */
+  if (error && articles.length === 0) {
+    return (
+      <main className="author-profile-shell">
+        <div className="author-profile-content py-20 text-center">
+          <WkIcon name="AlertCircle" size={36} className="mx-auto mb-4 text-[var(--wk-danger)]" />
+          <p className="text-sm font-bold text-[var(--wk-text-muted)]">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-5 inline-flex items-center gap-2 rounded-lg bg-[var(--wk-surface-raised)] px-5 py-2.5 text-sm font-bold text-[var(--wk-text)] hover:bg-[var(--wk-surface)] transition-colors cursor-pointer"
+          >
+            <WkIcon name="RotateCw" size={14} /> Retry
+          </button>
+        </div>
+      </main>
+    );
+  }
+
+  /* ─── ─── MAIN PAGE ─── ─── */
+  return (
+    <main className="author-profile-shell">
+      <div className="author-profile-content">
+
+        {/* ═══════════ HERO ═══════════ */}
+        <section className="author-profile-hero">
+          {/* Portrait */}
+          <div className="author-profile-hero-portrait">
+            <img
+              src={authorMeta.avatarUrl}
+              alt={authorMeta.displayName}
+              className="w-full h-full object-cover"
+            />
+            <div className="author-profile-hero-portrait-badge">
+              <WkIcon name="PenLine" size={12} />
+            </div>
+          </div>
+
+          {/* Details */}
+          <div className="author-profile-hero-details">
+            {/* Eyebrow */}
+            <div className="author-profile-hero-eyebrow">
+              WAKILISHA Contributor
+            </div>
+
+            {/* Name */}
+            <h1 className="author-profile-hero-name">{authorMeta.displayName}</h1>
+
+            {/* Role + location */}
+            <div className="author-profile-hero-role-row">
+              <span className="author-profile-hero-role">
+                <WkIcon name="Briefcase" size={13} className="opacity-70" />
+                {authorMeta.role}
+              </span>
+              {authorMeta.location && (
+                <>
+                  <span className="author-profile-hero-dot">&middot;</span>
+                  <span className="author-profile-hero-location">
+                    <i className="ri-map-pin-line" />
+                    {authorMeta.location}
+                  </span>
+                </>
+              )}
+              {authorMeta.joinedDate && (
+                <>
+                  <span className="author-profile-hero-dot">&middot;</span>
+                  <span className="author-profile-hero-joined">
+                    Since {(() => {
+                      const d = new Date(authorMeta.joinedDate);
+                      return d.toLocaleDateString('en', { month: 'short', year: 'numeric' });
+                    })()}
+                  </span>
+                </>
               )}
             </div>
-            <div className="flex items-center gap-3 shrink-0 pt-1">
-              <Link
-                to="/magazine"
-                className="inline-flex items-center gap-2 rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] px-5 py-2.5 text-[13px] font-bold text-[var(--wk-text-soft)] hover:border-[var(--wk-brand)] hover:text-[var(--wk-brand)] transition-all whitespace-nowrap"
-              >
-                <WkIcon name="BookOpen" size={14} /> All stories
-              </Link>
-            </div>
-          </div>
 
-          {/* Stats strip */}
-          <div className="flex gap-10 py-5 border-b border-[var(--wk-border)] flex-wrap">
-            <div>
-              <div className="text-[28px] font-black tracking-[-0.05em] leading-tight text-[var(--wk-text)]">{articles.length}</div>
-              <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--wk-text-faint)] mt-0.5">Articles</div>
-            </div>
-            <div>
-              <div className="text-[28px] font-black tracking-[-0.05em] leading-tight text-[var(--wk-text)]">{sections.length}</div>
-              <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--wk-text-faint)] mt-0.5">Sections</div>
-            </div>
-            <div>
-              <div className="text-[28px] font-black tracking-[-0.05em] leading-tight text-[var(--wk-text)]">
-                {articles.reduce((sum, a) => sum + a.readingTime, 0)}
-              </div>
-              <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--wk-text-faint)] mt-0.5">Min read</div>
-            </div>
-            <div>
-              <div className="text-[16px] font-black tracking-[-0.02em] leading-tight text-[var(--wk-text)] pt-1.5">
-                {articles.length > 0 ? articles[0].date : '—'}
-              </div>
-              <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--wk-text-faint)] mt-0.5">Latest</div>
-            </div>
-          </div>
-        </div>
+            {/* Bio */}
+            {authorMeta.bio && (
+              <p className="author-profile-hero-bio">{authorMeta.bio}</p>
+            )}
 
-        {/* Loading */}
-        {loading && (
-          <div className="mt-8 space-y-5">
-            <div className="grid grid-cols-4 gap-4">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="author-mag-summary-item animate-pulse">
-                  <div className="h-9 w-9 rounded-[10px] bg-[var(--wk-surface-raised)]" />
-                  <div className="h-3 w-20 rounded bg-[var(--wk-surface-raised)] mt-1" />
-                  <div className="h-6 w-16 rounded bg-[var(--wk-surface-raised)]" />
+            {/* Areas of focus */}
+            {actualAreas.length > 0 && (
+              <div className="author-profile-hero-areas">
+                <span className="author-profile-hero-areas-label">Areas of focus</span>
+                <div className="author-profile-hero-areas-tags">
+                  {actualAreas.map((area) => (
+                    <span
+                      key={area}
+                      className="author-profile-hero-area-tag"
+                      style={{
+                        '--area-color': getVerticalColor(area),
+                      } as React.CSSProperties}
+                    >
+                      {area}
+                    </span>
+                  ))}
                 </div>
-              ))}
-            </div>
-            <div className="h-[420px] rounded-2xl bg-[var(--wk-surface)] animate-pulse" />
-            <div className="author-mag-grid">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className={`${i === 0 ? 'col-span-3' : ''} rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] animate-pulse`}>
-                  <div className={`${i === 0 ? 'aspect-[2/1]' : 'aspect-[16/10]'} bg-[var(--wk-surface-raised)]`} />
-                  <div className="p-5 space-y-3">
-                    <div className="h-3 w-16 rounded bg-[var(--wk-surface-raised)]" />
-                    <div className="h-5 w-3/4 rounded bg-[var(--wk-surface-raised)]" />
-                    <div className="h-3 w-1/2 rounded bg-[var(--wk-surface-raised)]" />
-                  </div>
+              </div>
+            )}
+
+            {/* Social links */}
+            {authorMeta.socialLinks.length > 0 && (
+              <div className="author-profile-hero-socials">
+                {authorMeta.socialLinks.map((link) => (
+                  <a
+                    key={link.label}
+                    href={link.url}
+                    className="author-profile-hero-social-link"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={link.label}
+                  >
+                    <i className={`${link.icon} text-[17px]`} />
+                  </a>
+                ))}
+              </div>
+            )}
+
+            {/* Stats */}
+            <div className="author-profile-hero-stats">
+              <div className="author-profile-hero-stat">
+                <div className="author-profile-hero-stat-val">{articles.length}</div>
+                <div className="author-profile-hero-stat-lbl">Articles</div>
+              </div>
+              <div className="author-profile-hero-stat">
+                <div className="author-profile-hero-stat-val">
+                  {stats ? stats.totalMin : 0}
                 </div>
-              ))}
+                <div className="author-profile-hero-stat-lbl">Min read</div>
+              </div>
+              <div className="author-profile-hero-stat">
+                <div className="author-profile-hero-stat-val">{sections.length}</div>
+                <div className="author-profile-hero-stat-lbl">Verticals</div>
+              </div>
+              {stats?.topSection && (
+                <div className="author-profile-hero-stat">
+                  <div className="author-profile-hero-stat-val">{stats.topSection}</div>
+                  <div className="author-profile-hero-stat-lbl">Main beat</div>
+                </div>
+              )}
             </div>
           </div>
-        )}
+        </section>
 
-        {/* Error */}
-        {!loading && error && (
-          <div className="mt-8 rounded-2xl border border-[var(--wk-danger)]/20 bg-[var(--wk-danger)]/5 p-10 text-center">
-            <WkIcon name="AlertCircle" size={32} className="mx-auto mb-4 text-[var(--wk-danger)]" />
-            <p className="text-sm font-bold text-[var(--wk-text-muted)]">{error}</p>
-            <button
-              onClick={() => window.location.reload()}
-              className="mt-5 inline-flex items-center gap-2 rounded-lg bg-[var(--wk-surface-raised)] px-5 py-2.5 text-sm font-bold text-[var(--wk-text)] transition-colors hover:bg-[var(--wk-surface)]"
-            >
-              <WkIcon name="RotateCw" size={14} /> Retry
-            </button>
-          </div>
-        )}
-
-        {/* Empty */}
-        {!loading && !error && articles.length === 0 && (
-          <div className="mt-8 rounded-2xl border border-dashed border-[var(--wk-border)] p-16 text-center">
-            <WkIcon name="FileX" size={36} className="mx-auto mb-4 text-[var(--wk-text-faint)]" />
-            <p className="text-sm font-bold text-[var(--wk-text-muted)]">No published articles yet.</p>
-            <Link
-              to="/magazine"
-              className="mt-5 inline-flex items-center gap-2 rounded-lg bg-[var(--wk-brand)] px-5 py-2.5 text-sm font-bold text-[var(--wk-brand-on)] transition-opacity hover:opacity-90"
-            >
-              <WkIcon name="BookOpen" size={14} /> Browse magazine
-            </Link>
-          </div>
-        )}
-
-        {/* Content */}
-        {!loading && !error && articles.length > 0 && (
+        {/* ═══════════ BODY OF WORK ═══════════ */}
+        {articles.length > 0 && (
           <>
+            {/* Divider */}
+            <div className="author-profile-divider">
+              <span className="author-profile-divider-line" />
+              <span className="author-profile-divider-text">Body of work</span>
+              <span className="author-profile-divider-line" />
+            </div>
+
             {/* ====== FEATURED SECTION ====== */}
             {hasFeatured && featuredArticles.length > 0 && (
-              <div className="mt-8">
-                {/* Featured Hero Cover */}
-                <Link to={`/magazine/${featuredArticles[0].slug}`} className="author-mag-featured-hero block">
-                  <div className="author-mag-featured-hero-image">
+              <div className="author-profile-featured-wrap">
+                {/* Featured hero */}
+                <Link
+                  to={`/magazine/${featuredArticles[0].slug}`}
+                  className="author-profile-featured-hero group"
+                >
+                  <div className="author-profile-featured-hero-image">
                     <img src={featuredArticles[0].heroUrl} alt="" className="w-full h-full object-cover" />
                   </div>
-                  <div className="author-mag-featured-hero-overlay">
-                    <div className="author-mag-featured-hero-eye">Featured Story</div>
-                    <h2 className="author-mag-featured-hero-title">{featuredArticles[0].title}</h2>
+                  <div className="author-profile-featured-hero-overlay">
+                    <div className="author-profile-featured-hero-eye">
+                      Featured story
+                    </div>
+                    <h2 className="author-profile-featured-hero-title">{featuredArticles[0].title}</h2>
                     {featuredArticles[0].dek && (
-                      <p className="author-mag-featured-hero-dek">{featuredArticles[0].dek}</p>
+                      <p className="author-profile-featured-hero-dek">{featuredArticles[0].dek}</p>
                     )}
-                    <div className="author-mag-featured-hero-meta">
-                      <span>{featuredArticles[0].section}</span>
+                    <div className="author-profile-featured-hero-row">
+                      <span style={{ color: getVerticalColor(featuredArticles[0].section) }}>{featuredArticles[0].section}</span>
                       <span>&middot;</span>
                       <span>{featuredArticles[0].readingTime} min read</span>
                       <span>&middot;</span>
@@ -442,33 +501,31 @@ export default function AuthorProfilePage() {
                   </div>
                 </Link>
 
-                {/* Carousel — more featured stories */}
+                {/* Carousel */}
                 {carouselItems.length > 0 && (
-                  <div className="author-mag-carousel-wrap">
-                    <div className="author-mag-carousel-label">
-                      <span className="author-mag-carousel-label-text">More from {firstName}</span>
-                      <span className="author-mag-carousel-label-line" />
+                  <div className="author-profile-carousel-wrap">
+                    <div className="author-profile-carousel-label">
+                      <span>More from {firstName}</span>
+                      <span className="author-profile-carousel-label-line" />
                     </div>
-                    <div className="author-mag-carousel-track-wrap">
-                      <div className="author-mag-carousel-track">
+                    <div className="author-profile-carousel-track-wrap">
+                      <div className="author-profile-carousel-track">
                         {carouselItems.map((story, i) => (
                           <Link
                             key={`carousel-${story.slug}-${i}`}
                             to={`/magazine/${story.slug}`}
-                            className="author-mag-carousel-card"
+                            className="author-profile-carousel-card group"
                           >
-                            <div className="author-mag-carousel-card-image">
+                            <div className="author-profile-carousel-card-image">
                               <img src={story.heroUrl} alt="" loading="lazy" className="w-full h-full object-cover" />
                             </div>
-                            <div className="author-mag-carousel-card-body">
-                              <div className="author-mag-carousel-card-section">{story.section}</div>
-                              <h3 className="author-mag-carousel-card-title">{story.title}</h3>
-                              {story.dek && (
-                                <p className="author-mag-carousel-card-dek">{story.dek}</p>
-                              )}
-                              <div className="author-mag-card-meta">
+                            <div className="author-profile-carousel-card-body">
+                              <span className="author-profile-card-section" style={{ color: getVerticalColor(story.section) }}>{story.section}</span>
+                              <h3 className="author-profile-carousel-card-title">{story.title}</h3>
+                              {story.dek && <p className="author-profile-carousel-card-dek">{story.dek}</p>}
+                              <div className="author-profile-card-meta">
                                 <span>{story.readingTime} min</span>
-                                <span className="author-mag-card-meta-sep">&middot;</span>
+                                <span className="author-profile-card-meta-sep">&middot;</span>
                                 <span>{story.date}</span>
                               </div>
                             </div>
@@ -478,69 +535,53 @@ export default function AuthorProfilePage() {
                     </div>
                   </div>
                 )}
-
-                {/* Divider before grid */}
-                <div className="author-mag-featured-divider">
-                  <span className="author-mag-featured-divider-line" />
-                  <span className="author-mag-featured-divider-text">All Stories</span>
-                  <span className="author-mag-featured-divider-line" />
-                </div>
               </div>
             )}
 
-
-            {/* ====== FILTER BAR (v2 with integrated sort dropdown) ====== */}
-            {!hasFeatured && (
-              <div className="profile-dt-section-head">
-                <div className="profile-dt-section-kicker">Articles</div>
-                <h2 className="profile-dt-section-title">Stories by {firstName}</h2>
-              </div>
-            )}
-
-            <div className="author-mag-filter-bar-v2">
-              <div className="author-mag-filter-pills-v2">
+            {/* ====== FILTER BAR ====== */}
+            <div className="author-profile-filter-bar">
+              <div className="author-profile-filter-pills">
                 <button
-                  className={`author-mag-filter-pill-v2 ${activeCategory === 'all' ? 'active' : ''}`}
+                  className={`author-profile-filter-pill ${activeCategory === 'all' ? 'active' : ''}`}
                   onClick={() => setActiveCategory('all')}
                 >
                   All
-                  <span className="pill-count-v2">{articles.length}</span>
+                  <span className="author-profile-filter-pill-count">{articles.length}</span>
                 </button>
-                {sections.map((section) => (
+                {sections.map((sec) => (
                   <button
-                    key={section}
-                    className={`author-mag-filter-pill-v2 ${activeCategory === section ? 'active' : ''}`}
-                    onClick={() => setActiveCategory(activeCategory === section ? 'all' : section)}
+                    key={sec}
+                    className={`author-profile-filter-pill ${activeCategory === sec ? 'active' : ''}`}
+                    onClick={() => setActiveCategory(activeCategory === sec ? 'all' : sec)}
+                    style={activeCategory === sec ? {} : { '--pill-color': getVerticalColor(sec) } as React.CSSProperties}
                   >
-                    {section}
-                    <span className="pill-count-v2">{sectionCounts[section]}</span>
+                    {sec}
+                    <span className="author-profile-filter-pill-count">{sectionCounts[sec]}</span>
                   </button>
                 ))}
               </div>
 
-              {/* Sort dropdown */}
-              <div className="author-mag-sort-wrap" ref={sortWrapRef}>
+              {/* Sort */}
+              <div className="author-profile-sort-wrap" ref={sortWrapRef}>
                 <button
-                  className={`author-mag-sort-trigger ${sortOpen ? 'open' : ''}`}
+                  className={`author-profile-sort-trigger ${sortOpen ? 'open' : ''}`}
                   onClick={() => setSortOpen((p) => !p)}
                 >
                   <i className={`${SORT_OPTIONS.find((o) => o.mode === sortMode)?.icon || 'ri-arrow-down-line'} text-xs`} />
                   <span>{SORT_OPTIONS.find((o) => o.mode === sortMode)?.label || 'Sort'}</span>
-                  <i className="ri-arrow-down-s-line text-xs author-mag-sort-trigger-icon" />
+                  <i className="ri-arrow-down-s-line text-xs author-profile-sort-chevron" />
                 </button>
                 {sortOpen && (
-                  <div className="author-mag-sort-dropdown">
+                  <div className="author-profile-sort-dropdown">
                     {SORT_OPTIONS.map((opt) => (
                       <button
                         key={opt.mode}
-                        className={`author-mag-sort-option ${sortMode === opt.mode ? 'active' : ''}`}
+                        className={`author-profile-sort-option ${sortMode === opt.mode ? 'active' : ''}`}
                         onClick={() => { setSortMode(opt.mode); setSortOpen(false); }}
                       >
                         <i className={`${opt.icon} text-sm`} />
                         <span>{opt.label}</span>
-                        {sortMode === opt.mode && (
-                          <i className="ri-check-line text-sm author-mag-sort-option-check" />
-                        )}
+                        {sortMode === opt.mode && <i className="ri-check-line text-sm author-profile-sort-check" />}
                       </button>
                     ))}
                   </div>
@@ -548,18 +589,16 @@ export default function AuthorProfilePage() {
               </div>
             </div>
 
-            {/* Empty filtered */}
+            {/* ====== EMPTY FILTERED ====== */}
             {filteredArticles.length === 0 && (
-              <div className="author-mag-empty">
-                <div className="author-mag-empty-icon">
-                  <WkIcon name="SearchX" size={32} />
-                </div>
-                <div className="author-mag-empty-title">No articles in {activeCategory}</div>
-                <div className="author-mag-empty-sub">
-                  {firstName} hasn't written any {activeCategory} articles yet. Try a different filter.
+              <div className="author-profile-empty">
+                <WkIcon name="SearchX" size={32} />
+                <div className="author-profile-empty-title">No articles in {activeCategory}</div>
+                <div className="author-profile-empty-sub">
+                  {firstName} hasn't written any {activeCategory} articles yet.
                 </div>
                 <button
-                  className="mt-5 inline-flex items-center gap-2 rounded-lg bg-[var(--wk-surface-raised)] px-4 py-2 text-sm font-bold text-[var(--wk-text)] hover:bg-[var(--wk-surface)] transition-colors"
+                  className="mt-5 inline-flex items-center gap-2 rounded-lg bg-[var(--wk-surface-raised)] px-4 py-2 text-sm font-bold text-[var(--wk-text)] hover:bg-[var(--wk-surface)] transition-colors cursor-pointer"
                   onClick={() => setActiveCategory('all')}
                 >
                   <WkIcon name="RotateCw" size={14} /> Show all
@@ -567,79 +606,131 @@ export default function AuthorProfilePage() {
               </div>
             )}
 
-            {/* ====== GRID (below featured) ====== */}
-            {filteredArticles.length > 0 && gridArticles.length > 0 && sectionGroups && (
-              <div className="author-mag-sections">
-                {sectionGroups.map((group, gi) => {
-                  const groupStartIndex = sectionGroups
-                    .slice(0, gi)
-                    .reduce((sum, g) => sum + g.items.length, 0);
+            {/* ====== SYMMETRIC GRID ====== */}
+            {filteredArticles.length > 0 && gridArticles.length > 0 && rows.length > 0 && (
+              <div className="flex flex-col">
+                {rows.map((row, rowIdx) => {
+                  const needsSectionBreak = rowIdx > 0 && rowIdx % 3 === 0;
+                  const sectionBreak = needsSectionBreak ? (
+                    <div key={`section-break-${rowIdx}`} className="flex items-center gap-4 my-9 sm:my-11">
+                      <span className="flex-1 h-px bg-[var(--wk-divider)]" />
+                      <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.18em] text-[var(--wk-text-faint)] whitespace-nowrap">
+                        {rowIdx <= 4 ? 'More stories' : 'Continuing'}
+                      </span>
+                      <span className="flex-1 h-px bg-[var(--wk-divider)]" />
+                    </div>
+                  ) : null;
 
-                  if (groupStartIndex >= visibleCount) return null;
+                  const rowEl = (() => {
+                    if (row.pattern === 'full-bleed') {
+                      return <FeatureCard key={`row-${rowIdx}`} story={row.articles[0]} wide />;
+                    }
+                    if (row.pattern === 'split') {
+                      if (row.articles.length < 2) {
+                        return (
+                          <div key={`row-${rowIdx}`} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+                            <div className="lg:col-span-1"><MediumCard story={row.articles[0]} /></div>
+                          </div>
+                        );
+                      }
+                      return (
+                        <div key={`row-${rowIdx}`} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+                          <div className="sm:col-span-2"><FeatureCard story={row.articles[0]} /></div>
+                          <div className="sm:col-span-2 lg:col-span-1"><MediumCard story={row.articles[1]} /></div>
+                          {row.articles[2] && (
+                            <div className="sm:col-span-2 lg:col-span-1"><MediumCard story={row.articles[2]} /></div>
+                          )}
+                        </div>
+                      );
+                    }
+                    return (
+                      <div key={`row-${rowIdx}`} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+                        {row.articles.map((story, i) => (
+                          <MediumCard key={`${story.slug}-${i}`} story={story} />
+                        ))}
+                      </div>
+                    );
+                  })();
 
                   return (
-                    <div key={group.section} className="author-mag-group">
-                      <div className="author-mag-group-header">
-                        <span className="author-mag-group-kicker">{group.section}</span>
-                        <span className="author-mag-group-count">{group.items.length} article{group.items.length !== 1 ? 's' : ''}</span>
-                      </div>
-                      <div className="author-mag-grid">
-                        {group.items.map((story, i) => {
-                          const gi2 = groupStartIndex + i;
-                          if (gi2 >= visibleCount) return null;
-                          return renderGridCard(story, gi2);
-                        })}
-                      </div>
+                    <div key={`row-wrap-${rowIdx}`} className="flex flex-col">
+                      {sectionBreak}
+                      {rowEl}
                     </div>
                   );
                 })}
               </div>
             )}
 
-            {filteredArticles.length > 0 && gridArticles.length > 0 && !sectionGroups && (
-              <div className="author-mag-grid">
-                {gridArticles.map((story, i) => {
-                  if (i >= visibleCount) return null;
-                  return renderGridCard(story, i);
-                })}
-              </div>
-            )}
-
-            {/* No grid articles but featured exists */}
+            {/* ====== ONLY FEATURED ====== */}
             {filteredArticles.length > 0 && gridArticles.length === 0 && (
-              <div className="author-mag-sentinel">
-                <div className="author-mag-sentinel-done">
-                  <span className="author-mag-sentinel-done-line" />
-                  <span className="author-mag-sentinel-done-text">
-                    All {filteredArticles.length} articles shown above
-                  </span>
-                  <span className="author-mag-sentinel-done-line" />
-                </div>
+              <div className="author-profile-sentinel">
+                <span className="author-profile-sentinel-line" />
+                <span className="author-profile-sentinel-text">
+                  All {filteredArticles.length} articles shown above
+                </span>
+                <span className="author-profile-sentinel-line" />
               </div>
             )}
 
-            {/* Infinite scroll sentinel */}
+            {/* ====== INFINITE SCROLL ====== */}
             {gridArticles.length > 0 && (
-              <div ref={sentinelRef} className="author-mag-sentinel">
+              <div ref={sentinelRef} className="author-profile-sentinel">
                 {hasMore ? (
-                  <div className="author-mag-sentinel-loading">
-                    <div className="author-mag-sentinel-spinner" />
-                    <span className="author-mag-sentinel-text">
-                      Loading more stories&hellip;
-                    </span>
+                  <div className="author-profile-sentinel-loading">
+                    <div className="author-profile-sentinel-spinner" />
+                    <span>Loading more stories&hellip;</span>
                   </div>
                 ) : visibleCount > BATCH_SIZE ? (
-                  <div className="author-mag-sentinel-done">
-                    <span className="author-mag-sentinel-done-line" />
-                    <span className="author-mag-sentinel-done-text">
+                  <>
+                    <span className="author-profile-sentinel-line" />
+                    <span className="author-profile-sentinel-text">
                       All {gridArticles.length} articles loaded
                     </span>
-                    <span className="author-mag-sentinel-done-line" />
-                  </div>
+                    <span className="author-profile-sentinel-line" />
+                  </>
                 ) : null}
               </div>
             )}
           </>
+        )}
+
+        {/* ═══════════ EMPTY STATE ═══════════ */}
+        {!loading && !error && articles.length === 0 && (
+          <div className="author-profile-empty mt-8">
+            <WkIcon name="FileX" size={36} />
+            <div className="author-profile-empty-title">No published articles yet</div>
+            <div className="author-profile-empty-sub">Check back soon for {firstName}'s first piece.</div>
+            <Link
+              to="/magazine"
+              className="mt-5 inline-flex items-center gap-2 rounded-lg bg-[var(--wk-brand)] px-5 py-2.5 text-sm font-bold text-[var(--wk-brand-on)] hover:opacity-90 transition-opacity whitespace-nowrap"
+            >
+              <WkIcon name="BookOpen" size={14} /> Browse magazine
+            </Link>
+          </div>
+        )}
+
+        {/* ═══════════ EXPLORE CTA ═══════════ */}
+        {articles.length > 0 && (
+          <section className="author-profile-explore">
+            <p className="author-profile-explore-text">
+              {firstName} is part of WAKILISHA's cultural memory system — documenting and interpreting East African creative life.
+            </p>
+            <div className="author-profile-explore-links">
+              <Link to="/magazine" className="author-profile-explore-link">
+                <WkIcon name="BookOpen" size={15} />
+                All stories
+              </Link>
+              <Link to="/guides" className="author-profile-explore-link">
+                <WkIcon name="Compass" size={15} />
+                Guides
+              </Link>
+              <Link to="/artists" className="author-profile-explore-link">
+                <WkIcon name="Users" size={15} />
+                Artists
+              </Link>
+            </div>
+          </section>
         )}
       </div>
     </main>

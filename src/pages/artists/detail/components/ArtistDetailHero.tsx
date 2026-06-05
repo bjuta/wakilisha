@@ -1,15 +1,9 @@
+import { Link } from "react-router-dom";
+
 export interface ArtistDetailHeroProps {
   name: string;
   imageUrl?: string;
   profileImageUrl?: string;
-  genres: string[];
-  country: string;
-  debutYear: number;
-  followerCount: number;
-  trackCount: number;
-  releaseCount: number;
-  isChartArtist?: boolean;
-  topChartPosition?: number;
   bio: string;
   isRising?: boolean;
   spotifyUrl?: string;
@@ -20,14 +14,6 @@ export function ArtistDetailHero({
   name,
   imageUrl,
   profileImageUrl,
-  genres,
-  country,
-  debutYear,
-  followerCount,
-  trackCount,
-  releaseCount,
-  isChartArtist,
-  topChartPosition,
   bio,
   isRising,
   spotifyUrl,
@@ -36,8 +22,9 @@ export function ArtistDetailHero({
   const avatarSrc = profileImageUrl || imageUrl;
 
   return (
-    <section className="relative min-h-[520px] md:min-h-[600px] flex items-end overflow-hidden">
-      {/* Background image with Ken Burns */}
+    <section className="relative min-h-[420px] md:min-h-[600px] flex items-end overflow-hidden">
+
+      {/* Background image — full bleed, acts as artist photo on mobile */}
       {imageUrl && (
         <div
           className="absolute inset-0 bg-[var(--wk-surface-raised)] hero-ken-burns"
@@ -49,15 +36,17 @@ export function ArtistDetailHero({
           }}
         />
       )}
-      {/* Gradient overlays */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/55 to-black/25" />
-      <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-transparent to-black/50" />
 
-      {/* Content */}
+      {/* Gradient overlays */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/50 to-black/10" />
+      <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-transparent to-black/40" />
+
+      {/* ─── Content ─── */}
       <div className="relative w-full">
-        <div className="wk-container px-6 pb-12 pt-20 md:pb-16 md:pt-24">
-          {/* Breadcrumb */}
-          <div className="hero-text-reveal mb-6 flex items-center gap-3">
+        <div className="wk-container px-4 pb-7 pt-16 md:px-6 md:pb-16 md:pt-24">
+
+          {/* Breadcrumb — desktop only (mobile has floating back button) */}
+          <div className="hero-text-reveal mb-4 md:mb-6 hidden md:flex items-center gap-3">
             <Link
               to="/artists"
               className="text-[11px] font-extrabold uppercase tracking-[0.22em] text-[var(--wk-brand)] transition-opacity hover:opacity-70"
@@ -70,16 +59,17 @@ export function ArtistDetailHero({
             </span>
           </div>
 
-          {/* Main row: profile + text */}
-          <div className="flex flex-col md:flex-row gap-5 md:gap-8 items-end">
-            {/* Profile Picture — 4:5 portrait card */}
+          {/* Main row: profile card + text block */}
+          <div className="flex flex-col md:flex-row gap-5 md:gap-8 md:items-end">
+
+            {/* Profile picture — desktop only */}
             {avatarSrc && (
-              <div className="shrink-0">
-                <div className="relative overflow-hidden rounded-2xl border border-accent-500/30 shadow-2xl">
+              <div className="hidden md:block shrink-0">
+                <div className="relative overflow-hidden rounded-2xl border border-white/20 shadow-2xl">
                   <img
                     src={avatarSrc}
                     alt={name}
-                    className="h-44 w-36 md:h-56 md:w-44 object-cover object-top"
+                    className="h-56 w-44 object-cover object-top"
                   />
                 </div>
               </div>
@@ -87,29 +77,52 @@ export function ArtistDetailHero({
 
             {/* Text content */}
             <div className="flex-1 min-w-0">
-              {/* Name */}
+
+              {/* Artist name */}
               <h1
-                className="hero-text-reveal hero-text-reveal-d1 mb-5 font-black leading-[0.88] tracking-[-0.04em] text-[#F0EFE8]"
-                style={{ fontSize: "clamp(44px, 8vw, 96px)" }}
+                className="hero-text-reveal hero-text-reveal-d1 mb-4 md:mb-5 font-black leading-[0.88] tracking-[-0.04em] text-[#F0EFE8]"
+                style={{ fontSize: "clamp(34px, 7vw, 96px)" }}
               >
                 {name}
               </h1>
 
+              {/* ════ MOBILE ONLY: minimal action bar ════
+                  Country label + Spotify + Follow + Share — all in one line */}
+              <div className="hero-text-reveal hero-text-reveal-d2 flex md:hidden items-center gap-2 flex-wrap">
+                {spotifyUrl && (
+                  <a
+                    href={spotifyUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 rounded-full bg-[#1DB954] px-3.5 py-1.5 text-[12px] font-bold text-white whitespace-nowrap transition-all active:scale-95"
+                  >
+                    <i className="ri-spotify-fill text-[13px]" />
+                    Spotify
+                  </a>
+                )}
+
+                <button className="flex items-center gap-1.5 rounded-full border border-white/30 bg-white/10 px-3.5 py-1.5 text-[12px] font-bold text-white backdrop-blur-sm whitespace-nowrap transition-all active:scale-95">
+                  <i className="ri-user-add-line text-[12px]" />
+                  Follow
+                </button>
+
+                <button className="flex h-7 w-7 items-center justify-center rounded-full border border-white/30 bg-white/10 text-white backdrop-blur-sm transition-all active:scale-95">
+                  <i className="ri-share-line text-[13px]" />
+                </button>
+              </div>
+
+              {/* ════ DESKTOP ONLY: badges + meta + bio + full actions ════ */}
+
               {/* Badges row */}
-              <div className="hero-text-reveal hero-text-reveal-d2 mb-5 flex flex-wrap items-center gap-3">
+              <div className="hero-text-reveal hero-text-reveal-d2 hidden md:flex mb-5 flex-wrap items-center gap-3">
                 {artistType && (
                   <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[11px] font-bold text-white/90 backdrop-blur-sm uppercase tracking-wider">
                     <i className="ri-mic-line text-[10px]" />
                     {artistType}
                   </span>
                 )}
-                {isChartArtist && (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--wk-brand)] px-3 py-1.5 text-[11px] font-bold text-[var(--wk-brand-on)] uppercase tracking-wider">
-                    <i className="ri-bar-chart-line text-[10px]" />
-                    Chart #{topChartPosition}
-                  </span>
-                )}
-                {isRising && !isChartArtist && (
+
+                {isRising && (
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--wk-brand-2)] px-3 py-1.5 text-[11px] font-bold text-[var(--wk-brand-on)] uppercase tracking-wider">
                     <i className="ri-fire-line text-[10px]" />
                     Rising
@@ -117,62 +130,29 @@ export function ArtistDetailHero({
                 )}
               </div>
 
-              {/* Meta row */}
-              <div className="hero-text-reveal hero-text-reveal-d3 mb-6 flex flex-wrap items-center gap-3 text-[14px] text-white/70">
-                {genres.map((g) => (
-                  <span
-                    key={g}
-                    className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[12px] font-semibold backdrop-blur-sm"
-                  >
-                    {g}
-                  </span>
-                ))}
-                {genres.length > 0 && <span className="text-white/40">·</span>}
-                <span className="flex items-center gap-1.5">
-                  <i className="ri-map-pin-line text-[12px]" />
-                  {country || "Unknown"}
-                </span>
-                <span className="text-white/40">·</span>
-                <span className="flex items-center gap-1.5">
-                  <i className="ri-calendar-line text-[12px]" />
-                  Since {debutYear}
-                </span>
-                <span className="text-white/40">·</span>
-                <span className="flex items-center gap-1.5">
-                  <i className="ri-user-follow-line text-[12px]" />
-                  {followerCount > 0 ? `${(followerCount / 1000).toFixed(1)}K` : "—"} followers
-                </span>
-                <span className="text-white/40">·</span>
-                <span className="flex items-center gap-1.5">
-                  <i className="ri-music-2-line text-[12px]" />
-                  {trackCount} tracks
-                </span>
-                <span className="text-white/40">·</span>
-                <span className="flex items-center gap-1.5">
-                  <i className="ri-album-line text-[12px]" />
-                  {releaseCount} releases
-                </span>
-              </div>
 
-              {/* Bio tagline */}
-              <p className="hero-text-reveal hero-text-reveal-d4 mb-8 max-w-2xl text-[15px] leading-[1.6] text-white/60 md:text-[17px]">
-                {bio}
-              </p>
 
-              {/* Actions */}
-              <div className="hero-text-reveal hero-text-reveal-d5 flex items-center gap-3">
+              {/* Bio tagline — tablet 2-line clamp, full on desktop */}
+              {bio && (
+                <p className="hero-text-reveal hero-text-reveal-d4 mb-8 hidden sm:block w-full md:max-w-2xl text-[13px] leading-[1.65] text-white/60 md:text-[17px]">
+                  <span className="sm:block line-clamp-2 md:line-clamp-none">{bio}</span>
+                </p>
+              )}
+
+              {/* Desktop actions */}
+              <div className="hero-text-reveal hero-text-reveal-d5 hidden md:flex items-center gap-3">
                 {spotifyUrl && (
                   <a
                     href={spotifyUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-2 rounded-full bg-[#1DB954] px-7 py-3.5 text-[13px] font-bold text-white transition-all hover:bg-[#1ed760] hover:scale-[1.02]"
+                    className="flex items-center gap-2 rounded-full bg-[#1DB954] px-7 py-3.5 text-[13px] font-bold text-white transition-all hover:bg-[#1ed760] hover:scale-[1.02] whitespace-nowrap"
                   >
                     <i className="ri-spotify-fill text-lg" />
                     Listen on Spotify
                   </a>
                 )}
-                <button className="flex items-center gap-2 rounded-full border border-white/30 bg-white/10 px-6 py-3.5 text-[13px] font-bold text-white backdrop-blur-sm transition-all hover:bg-white/20 hover:scale-[1.02]">
+                <button className="flex items-center gap-2 rounded-full border border-white/30 bg-white/10 px-6 py-3.5 text-[13px] font-bold text-white backdrop-blur-sm transition-all hover:bg-white/20 hover:scale-[1.02] whitespace-nowrap">
                   <i className="ri-user-add-line text-[15px]" />
                   Follow
                 </button>
@@ -180,6 +160,7 @@ export function ArtistDetailHero({
                   <i className="ri-share-line text-[16px]" />
                 </button>
               </div>
+
             </div>
           </div>
         </div>

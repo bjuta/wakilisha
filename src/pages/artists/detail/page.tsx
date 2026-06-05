@@ -3,7 +3,6 @@ import { useParams, Link } from "react-router-dom";
 import { WkButton } from "@/components/design-system/primitives/Button";
 import { getArtist, type RepairedArtistDetail } from "@/services/repairedContent/client";
 import { ArtistDetailHero } from "./components/ArtistDetailHero";
-import { ArtistStatsBar } from "./components/ArtistStatsBar";
 import { ArtistChartSection } from "./components/ArtistChartSection";
 import { ArtistDiscography } from "./components/ArtistDiscography";
 import { RelatedArtistsShelf } from "./components/RelatedArtistsShelf";
@@ -75,13 +74,6 @@ export default function ArtistDetail() {
     .filter((y) => y > 0);
   const debutYear = releaseYears.length > 0 ? Math.min(...releaseYears) : new Date().getFullYear();
 
-  const stats = [
-    { label: "Tracks", value: artist.trackCount, icon: "ri-music-2-line" },
-    { label: "Releases", value: artist.releaseCount, icon: "ri-album-line" },
-    { label: "Followers", value: artist.followerCount > 0 ? (artist.followerCount / 1000).toFixed(1) : "—", suffix: artist.followerCount > 0 ? "K" : "", icon: "ri-user-follow-line" },
-    { label: "Peak chart", value: artist.isChartArtist ? `#${artist.topChartPosition}` : "—", icon: "ri-bar-chart-line" },
-  ];
-
   const hasChartEntries = artist.chartEntries.length > 0;
   const hasReleases = artist.releases.length > 0;
   const hasRelated = artist.relatedArtists.length > 0;
@@ -96,22 +88,13 @@ export default function ArtistDetail() {
         name={artist.name}
         imageUrl={artist.imageUrl}
         profileImageUrl={artist.profileImageUrl || artist.imageUrl}
-        genres={artist.genres}
-        country={artist.country}
-        debutYear={debutYear}
-        followerCount={artist.followerCount}
-        trackCount={artist.trackCount}
-        releaseCount={artist.releaseCount}
-        isChartArtist={artist.isChartArtist}
-        topChartPosition={artist.topChartPosition ?? undefined}
         bio={artist.bio}
         isRising={artist.isRising}
         spotifyUrl={artist.spotifyUrl}
         artistType={artist.artistType}
       />
 
-      {/* Floating Stats Ribbon */}
-      <ArtistStatsBar stats={stats} />
+
 
       {/* Main Content — full width */}
       <div className="wk-container px-6 py-10 md:py-14">

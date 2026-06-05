@@ -46,7 +46,6 @@ export function AlbumModal({ release, open, onClose }: AlbumModalProps) {
             <div className="album-modal-sub">{release.artist} · {release.year}{release.labelName ? ` · ${release.labelName}` : ""}</div>
             <div className="album-modal-actions">
               <button className="wk-button wk-button-primary"><WkIcon name="Play" size={16} /> Play</button>
-              <button className="wk-button wk-button-ghost"><WkIcon name="Shuffle" size={16} /> Shuffle</button>
               <ShareButton item={{ title: release.title, subtitle: release.artist, description: `${release.releaseType} by ${release.artist}`, imageUrl: release.artworkUrl, type: "album" }} />
               <Link to={releaseUrl(release)} className="wk-button wk-button-ghost"><WkIcon name="ArrowUpRight" size={16} /> Full page</Link>
             </div>
@@ -54,7 +53,6 @@ export function AlbumModal({ release, open, onClose }: AlbumModalProps) {
           <button className="chart-btn album-modal-close" onClick={onClose} aria-label="Close album modal"><WkIcon name="X" size={18} /></button>
         </div>
         <div className="album-modal-body">
-          <div className="album41-card-title mt-5"><WkIcon name="ListMusic" size={15} /> Tracklist preview</div>
           <div className="album41-tracklist">
             {tracks.map((track, index) => (
               <div key={`${track.title}-${index}`} className="album41-track">

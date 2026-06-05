@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { getSiteIdentitySettings, saveDomainSettings } from "@/services/adminSettings/settingsStore";
 import { DEFAULT_SITE_IDENTITY_SETTINGS, type SiteIdentitySettings } from "@/services/adminSettings/settingsTypes";
+import { MediaPickerButton } from "@/components/admin/MediaPickerButton";
 
 export default function AdminSettingsSiteIdentity() {
   const [settings, setSettings] = useState<SiteIdentitySettings>(getSiteIdentitySettings());
@@ -137,18 +138,25 @@ export default function AdminSettingsSiteIdentity() {
           </div>
           <div className="flex-1">
             <label className="block text-[12px] font-semibold text-[var(--wk-text-muted)] mb-1.5">Logo URL</label>
-            <input
-              ref={logoInputRef}
-              type="text"
-              value={settings.logoUrl}
-              onChange={(e) => update("logoUrl", e.target.value)}
-              placeholder="https://your-cdn.com/wakilisha-logo.svg"
-              className={`w-full rounded-lg border px-3 py-2.5 text-[13px] font-mono text-[var(--wk-text)] bg-[var(--wk-bg)] focus:outline-none focus:ring-1 ${
-                logoError
-                  ? "border-[var(--wk-danger)] focus:ring-[var(--wk-danger)]"
-                  : "border-[var(--wk-border)] focus:border-[var(--wk-brand)] focus:ring-[var(--wk-brand)]"
-              }`}
-            />
+            <div className="flex gap-2">
+              <input
+                ref={logoInputRef}
+                type="text"
+                value={settings.logoUrl}
+                onChange={(e) => update("logoUrl", e.target.value)}
+                placeholder="https://your-cdn.com/wakilisha-logo.svg"
+                className={`flex-1 rounded-lg border px-3 py-2.5 text-[13px] font-mono text-[var(--wk-text)] bg-[var(--wk-bg)] focus:outline-none focus:ring-1 ${
+                  logoError
+                    ? "border-[var(--wk-danger)] focus:ring-[var(--wk-danger)]"
+                    : "border-[var(--wk-border)] focus:border-[var(--wk-brand)] focus:ring-[var(--wk-brand)]"
+                }`}
+              />
+              <MediaPickerButton
+                onSelect={(url) => update("logoUrl", url)}
+                title="Select Logo"
+                label="Library"
+              />
+            </div>
             {logoError && (
               <p className="mt-1.5 text-[11px] text-[var(--wk-danger)] flex items-center gap-1">
                 <i className="ri-error-warning-line" /> Could not load image from this URL
@@ -238,17 +246,24 @@ export default function AdminSettingsSiteIdentity() {
           </div>
           <div className="flex-1">
             <label className="block text-[12px] font-semibold text-[var(--wk-text-muted)] mb-1.5">Favicon URL</label>
-            <input
-              type="text"
-              value={settings.faviconUrl}
-              onChange={(e) => update("faviconUrl", e.target.value)}
-              placeholder="https://your-cdn.com/favicon-512.png"
-              className={`w-full rounded-lg border px-3 py-2.5 text-[13px] font-mono text-[var(--wk-text)] bg-[var(--wk-bg)] focus:outline-none focus:ring-1 ${
-                faviconError
-                  ? "border-[var(--wk-danger)] focus:ring-[var(--wk-danger)]"
-                  : "border-[var(--wk-border)] focus:border-[var(--wk-brand)] focus:ring-[var(--wk-brand)]"
-              }`}
-            />
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={settings.faviconUrl}
+                onChange={(e) => update("faviconUrl", e.target.value)}
+                placeholder="https://your-cdn.com/favicon-512.png"
+                className={`flex-1 rounded-lg border px-3 py-2.5 text-[13px] font-mono text-[var(--wk-text)] bg-[var(--wk-bg)] focus:outline-none focus:ring-1 ${
+                  faviconError
+                    ? "border-[var(--wk-danger)] focus:ring-[var(--wk-danger)]"
+                    : "border-[var(--wk-border)] focus:border-[var(--wk-brand)] focus:ring-[var(--wk-brand)]"
+                }`}
+              />
+              <MediaPickerButton
+                onSelect={(url) => update("faviconUrl", url)}
+                title="Select Favicon"
+                label="Library"
+              />
+            </div>
             {faviconError && (
               <p className="mt-1.5 text-[11px] text-[var(--wk-danger)] flex items-center gap-1">
                 <i className="ri-error-warning-line" /> Could not load favicon from this URL
