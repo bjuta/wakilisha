@@ -44,7 +44,7 @@
   font-style: italic;
   font-size: clamp(18px, 2.4vw, 24px);
   line-height: 1.36;
-  color: rgba(255,255,255,.78);
+  color: rgba(255,255,255,.88);
 }
 .mag-fullbleed-caption-bottom .mag-fullbleed-copy {
   max-width: none;
@@ -56,13 +56,13 @@
 .mag-fullbleed-caption-bottom .mag-fullbleed-copy p {
   align-self: flex-end;
   max-width: 38ch;
-  background: rgba(0,0,0,.42);
+  background: rgba(0,0,0,.72);
   border-left: 3px solid var(--section-accent);
   padding: 18px 20px;
   backdrop-filter: blur(14px);
 }
 .mag-fullbleed-quiet-image .mag-fullbleed-shade {
-  background: linear-gradient(90deg, rgba(0,0,0,.84), rgba(0,0,0,.24) 48%, rgba(0,0,0,.72));
+  background: linear-gradient(90deg, rgba(0,0,0,.9), rgba(0,0,0,.48) 48%, rgba(0,0,0,.82));
 }
 .mag-fullbleed-quiet-image .mag-fullbleed-copy {
   justify-content: center;
@@ -92,7 +92,7 @@
   text-align: center;
 }
 .mag-quote-inner .magazine-meta {
-  color: color-mix(in srgb, currentColor 70%, transparent);
+  color: color-mix(in srgb, currentColor 78%, transparent);
   margin-bottom: 26px;
 }
 .mag-quote-inner blockquote {
@@ -144,7 +144,7 @@
   justify-content: flex-end;
 }
 .mag-color-interlude .magazine-meta {
-  color: color-mix(in srgb, currentColor 72%, transparent);
+  color: color-mix(in srgb, currentColor 78%, transparent);
   margin-bottom: 18px;
 }
 .mag-color-interlude h2 {
@@ -157,6 +157,7 @@
 }
 .mag-color-interlude h2 em {
   color: #fff;
+  text-shadow: 0 1px 16px rgba(0,0,0,.22);
 }
 .mag-color-interlude p {
   max-width: 48ch;
@@ -186,20 +187,189 @@
 .mag-section-paper .mag-section-title { color: #0c0d0a; }
 .mag-section-paper .mag-section-title em { color: var(--section-accent); }
 .mag-section-paper .mag-section-deck { color: #3f4138; }
-.mag-section-paper .mag-rail { color: #6b6e62; }
+.mag-section-paper .mag-rail { color: #4a4d43; }
 
 .mag-article-list-paper .mag-article-list {
   background: #fff;
   color: #0c0d0a;
 }
-.mag-article-list-paper .mag-rail { color: #6b6e62; }
+.mag-article-list-paper .mag-rail { color: #4a4d43; }
 .mag-article-list-paper .mag-article-card {
   background: #f7f8f3;
-  border-color: rgba(12,13,10,.11);
+  border-color: rgba(12,13,10,.14);
   color: #0c0d0a;
 }
 .mag-article-list-paper .mag-article-card h4 { color: #0c0d0a; }
 .mag-article-list-paper .mag-article-card p { color: #3f4138; }
+
+/* Contrast guardrails: expressive treatment is allowed, unreadable text is not. */
+.magazine-spread.dark {
+  background-color: #050605;
+}
+.magazine-spread.dark,
+.magazine-spread.dark p,
+.magazine-spread.dark a,
+.magazine-spread.dark h1,
+.magazine-spread.dark h2,
+.magazine-spread.dark h3,
+.magazine-spread.dark h4 {
+  text-shadow: 0 1px 18px rgba(0,0,0,.38);
+}
+.magazine-spread.paper {
+  background: #fff !important;
+  color: #0c0d0a !important;
+}
+.magazine-spread.paper p,
+.magazine-spread.paper a,
+.magazine-spread.paper h1,
+.magazine-spread.paper h2,
+.magazine-spread.paper h3,
+.magazine-spread.paper h4,
+.magazine-spread.paper .mag-toc-line,
+.magazine-spread.paper .magazine-meta {
+  text-shadow: none !important;
+}
+.magazine-spread.paper p,
+.magazine-spread.paper .mag-toc-line,
+.magazine-spread.paper .mag-guide-body p {
+  color: #2b2d27 !important;
+}
+.magazine-spread.paper h1,
+.magazine-spread.paper h2,
+.magazine-spread.paper h3,
+.magazine-spread.paper h4,
+.magazine-spread.paper b {
+  color: #080908 !important;
+}
+.magazine-spread.paper .magazine-meta,
+.magazine-spread.paper .mag-toc-line .pg {
+  color: #4f5349 !important;
+}
+.magazine-spread.paper .mag-seal,
+.magazine-spread.paper em,
+.magazine-spread.paper .mag-toc-page,
+.magazine-spread.paper .mag-note-label,
+.magazine-spread.paper .mag-editor-role {
+  color: var(--mag-green-deep) !important;
+}
+
+.mag-feature-open {
+  position: relative;
+  overflow: hidden;
+  background: #050605;
+}
+.mag-feature-open::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(180deg, rgba(0,0,0,.04), rgba(0,0,0,.34)), linear-gradient(90deg, rgba(0,0,0,.8), rgba(0,0,0,.24), rgba(0,0,0,.78));
+  pointer-events: none;
+}
+.mag-feature-content {
+  position: relative;
+  z-index: 3 !important;
+}
+.mag-feature-body {
+  position: relative;
+  z-index: 4;
+  background: #050605;
+}
+.mag-feature-body::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(90deg, rgba(0,0,0,.35), rgba(0,0,0,.78));
+}
+.mag-copy p {
+  color: #d9d8d1 !important;
+}
+.mag-side-card {
+  background: #10140f !important;
+  border-color: rgba(255,255,255,.18) !important;
+}
+.mag-side-card p,
+.mag-side-item p {
+  color: #b6b4ac !important;
+}
+.mag-side-item a {
+  color: #fff !important;
+}
+.mag-type-field,
+.mag-signal-board,
+.mag-paper-file,
+.mag-archive-board {
+  z-index: 0;
+  pointer-events: none;
+}
+.mag-type-field {
+  opacity: .07 !important;
+  color: #fff !important;
+  mix-blend-mode: normal;
+}
+.mag-archive-board {
+  opacity: .22 !important;
+}
+.mag-paper-file {
+  opacity: .2 !important;
+}
+.mag-map-bg,
+.mag-route,
+.mag-feature-photo,
+.mag-feature-photo-shade {
+  z-index: 0;
+}
+.mag-feature-photo-shade {
+  z-index: 1;
+  background: linear-gradient(90deg, rgba(0,0,0,.92), rgba(0,0,0,.54), rgba(0,0,0,.88)) !important;
+}
+.mag-feature-title,
+.mag-section-title,
+.mag-cover-title,
+.mag-signal-head h2,
+.mag-back-title,
+.mag-reviews-title {
+  color: #fff;
+}
+.mag-feature-deck,
+.mag-section-deck,
+.mag-signal-text,
+.mag-partner p,
+.mag-back p {
+  color: #d4d2ca !important;
+}
+.mag-chart-row p,
+.mag-chart-row .rank {
+  color: #a9a79f !important;
+}
+.mag-chart-row h4 {
+  color: #f4f3ed !important;
+}
+.mag-finding p {
+  color: #d0cec7 !important;
+}
+
+.mag-section.dark::after,
+.magazine-spread.dark .mag-signal::before,
+.magazine-spread.dark .mag-article-list::before,
+.magazine-spread.dark .mag-reviews::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: rgba(0,0,0,.18);
+  z-index: 0;
+}
+.mag-section-inner,
+.mag-signal,
+.mag-article-list,
+.mag-reviews,
+.mag-partner,
+.mag-back {
+  position: relative;
+  z-index: 1;
+}
 
 @media (max-width: 860px) {
   .mag-fullbleed,
