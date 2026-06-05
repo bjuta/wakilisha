@@ -34,7 +34,8 @@ async function main() {
   const args = passthroughArgs();
   await runStep("scan queued WordPress ZIP jobs", ["scripts/imports/process-wordpress-zips.ts", ...args]);
   await runStep("discover mappings from real scan evidence", ["scripts/imports/discover-wordpress-mappings.ts", ...args]);
-  console.log("[pipeline] done");
+  await runStep("plan staging from real mappings", ["scripts/imports/plan-wordpress-staging.ts", ...args]);
+  console.log("[pipeline] done: queued → scanned → mapped → planned where data allowed");
 }
 
 main().catch((error) => {
