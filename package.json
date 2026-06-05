@@ -48,6 +48,7 @@
     "extract:local": "WAKILISHA_SKIP_DOWNLOAD=1 WAKILISHA_IMPORT_ZIP_PATH=./wakilisha_supabase_import_2026-05-30.zip tsx packages/migration/src/extractZip.ts",
     "extract:zip": "tsx packages/migration/src/extractZip.ts",
     "imports:discover-wordpress-mappings": "tsx scripts/imports/discover-wordpress-mappings.ts",
+    "imports:process-wordpress-pipeline": "tsx scripts/imports/process-wordpress-pipeline.ts",
     "imports:process-wordpress-zips": "tsx scripts/imports/process-wordpress-zips.ts",
     "imports:watch-wordpress-zips": "tsx scripts/imports/process-wordpress-zips.ts --watch",
     "magazine:visual-assets-api": "tsx scripts/magazine/serve-visual-assets-api.ts",
