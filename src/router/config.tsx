@@ -131,7 +131,7 @@ import MobileGenres from "../pages/mobile/genres/page";
 import MobileLabels from "../pages/mobile/labels/page";
 import MobileMagazine from "../pages/mobile/magazine/page";
 import MobileArticlePage from "../pages/mobile/magazine/article/page";
-import MobileMagazineIssuePage from "../pages/mobile/magazine/issue/page";
+import MobileMagazineIssuePage from "../pages/magazine/issue/page";
 import MobileAllIssuesPage from "../pages/mobile/magazine/issues/page";
 import MobileSearch from "../pages/mobile/search/page";
 import MobileNotFound from "../pages/mobile/NotFound";
@@ -147,52 +147,28 @@ const routes: RouteObject[] = [
     element: <ResponsiveAppLayout />,
     children: [
       { path: "/", element: <ResponsivePage mobile={<MobileHome />} desktop={<Home />} /> },
-
-      // Charts: directory at /charts, edition at /charts/:series/:edition
       { path: "/charts", element: <ResponsivePage mobile={<MobileChartsDirectory />} desktop={<ChartsDirectory />} /> },
       { path: "/charts/:series", element: <ResponsivePage mobile={<MobileChartEdition />} desktop={<ChartEdition />} /> },
       { path: "/charts/:series/:edition", element: <ResponsivePage mobile={<MobileChartEdition />} desktop={<ChartEdition />} /> },
-
-      // Artists
       { path: "/artists", element: <ResponsivePage mobile={<MobileArtists />} desktop={<Artists />} /> },
       { path: "/artists/:slug", element: <ResponsivePage mobile={<MobileArtistDetail />} desktop={<ArtistDetail />} /> },
-
-      // Tracks
       { path: "/tracks/:slug", element: <ResponsivePage mobile={<MobileTrackDetail />} desktop={<TrackDetail />} /> },
-
-      // Lyric contribution
       { path: "/tracks/:slug/lyrics/contribute", element: <ResponsivePage mobile={<MobileLyricContribution />} desktop={<LyricContribution />} /> },
-
-      // Releases — detail only, no public catalog
       { path: "/releases/:artistSlug/:releaseSlug", element: <ResponsivePage mobile={<ReleaseDetail />} desktop={<ReleaseDetail />} /> },
-
-      // Genres
       { path: "/genres", element: <ResponsivePage mobile={<MobileGenres />} desktop={<Genres />} /> },
-
-      // Labels
       { path: "/labels", element: <ResponsivePage mobile={<MobileLabels />} desktop={<Labels />} /> },
-
-      // Magazine
       { path: "/magazine", element: <ResponsivePage mobile={<MobileMagazine />} desktop={<Magazine />} /> },
       { path: "/magazine/issues", element: <ResponsivePage mobile={<MobileAllIssuesPage />} desktop={<AllIssuesPage />} /> },
       { path: "/magazine/issues/:issueKey", element: <ResponsivePage mobile={<MobileMagazineIssuePage />} desktop={<MagazineIssuePage />} /> },
-      { path: "/magazine/issue/:issueKey", element: <Navigate to="/magazine/issues/:issueKey" replace /> },
+      { path: "/magazine/issue/:issueKey", element: <ResponsivePage mobile={<MobileMagazineIssuePage />} desktop={<MagazineIssuePage />} /> },
       { path: "/magazine/:slug", element: <ResponsivePage mobile={<MobileArticlePage />} desktop={<ArticlePage />} /> },
-
-      // Guides
       { path: "/guides", element: <ResponsivePage mobile={<MobileGuides />} desktop={<GuidesPage />} /> },
-
-      // Culture Verticals
       { path: "/film", element: <ResponsivePage mobile={<MobileFilm />} desktop={<FilmPage />} /> },
       { path: "/fashion", element: <ResponsivePage mobile={<MobileFashion />} desktop={<FashionPage />} /> },
       { path: "/food", element: <ResponsivePage mobile={<MobileFood />} desktop={<FoodPage />} /> },
       { path: "/language", element: <ResponsivePage mobile={<MobileLanguage />} desktop={<LanguagePage />} /> },
       { path: "/places", element: <ResponsivePage mobile={<MobilePlaces />} desktop={<PlacesPage />} /> },
-
-      // Search
       { path: "/search", element: <ResponsivePage mobile={<MobileSearch />} desktop={<Search />} /> },
-
-      // Player — desktop player page, mobile uses overlay state
       { path: "/player", element: <ResponsivePage mobile={<MobileHome />} desktop={<DesktopPlayerPage />} /> },
       { path: "/auth", element: <ResponsivePage mobile={<MobileAuth />} desktop={<AuthPage />} /> },
       { path: "/profile", element: <ResponsivePage mobile={<MobileProfile />} desktop={<ProfilePage />} /> },
@@ -200,7 +176,6 @@ const routes: RouteObject[] = [
       { path: "/settings", element: <ResponsivePage mobile={<SettingsPage />} desktop={<SettingsPage />} /> },
     ],
   },
-  // Admin Production Engine — WordPress-like admin shell
   {
     path: "/admin",
     element: <AdminShell />,
@@ -239,51 +214,42 @@ const routes: RouteObject[] = [
       { path: "imports/failed", element: <AdminImportsFailedPage /> },
     ],
   },
-  // Admin Charts Studio — now under /admin/settings/charts
-  {
-    path: "/admin/settings/charts",
-    element: <AdminChartsLayout />,
-    children: [
-      { index: true, element: <Navigate to="/admin/settings/charts/dashboard" replace /> },
-      { path: "dashboard", element: <AdminChartsDashboard /> },
-      { path: "families", element: <AdminChartsFamilies /> },
-      { path: "ingest", element: <AdminChartsIngest /> },
-      { path: "ingest/:id", element: <AdminChartsIngestDetail /> },
-      { path: "editions", element: <AdminChartsEditions /> },
-      { path: "snapshots", element: <AdminChartsSnapshots /> },
-      { path: "integration-map", element: <AdminChartsIntegrationMap /> },
-      { path: "public-api-qa", element: <AdminChartsPublicApiQa /> },
-      { path: "review-queue", element: <AdminChartsReviewQueue /> },
-      { path: "no-match", element: <AdminChartsNoMatch /> },
-      { path: "release-shells", element: <AdminChartsReleaseShells /> },
-      { path: "canon-gaps", element: <AdminChartsCanonGaps /> },
-      { path: "ingest-runs", element: <AdminChartsIngestRuns /> },
-      { path: "ingest-runs/:id", element: <AdminChartsIngestRunDetail /> },
-      { path: "legacy-ingest-jobs", element: <AdminChartsLegacyIngestJobs /> },
-      { path: "health", element: <AdminChartsIngestHealth /> },
-    ],
-  },
-  {
-    path: "/admin/settings",
-    element: <AdminSettingsLayout />,
-    children: [
-      { index: true, element: <AdminSettingsHub /> },
-      { path: "chart-defaults", element: <AdminSettingsChartDefaults /> },
-      { path: "chart-defaults/market-scopes", element: <AdminSettingsChartDefaultsMarketScopes /> },
-      { path: "integrations", element: <AdminSettingsIntegrations /> },
-      { path: "gsc-data", element: <AdminSettingsGscData /> },
-      { path: "frontend-appearance", element: <AdminSettingsFrontendAppearance /> },
-      { path: "player-playback", element: <AdminSettingsPlayerPlayback /> },
-      { path: "registry", element: <AdminSettingsRegistry /> },
-      { path: "airplay", element: <AdminSettingsAirplay /> },
-      { path: "audience", element: <AdminSettingsAudience /> },
-      { path: "email-briefings", element: <AdminSettingsEmailBriefings /> },
-      { path: "maintenance", element: <AdminSettingsMaintenance /> },
-      { path: "navigation", element: <AdminSettingsNavigation /> },
-      { path: "audit", element: <AdminSettingsAudit /> },
-      { path: "site-identity", element: <AdminSettingsSiteIdentity /> },
-    ],
-  },
+  { path: "/admin/settings/charts", element: <AdminChartsLayout />, children: [
+    { index: true, element: <Navigate to="/admin/settings/charts/dashboard" replace /> },
+    { path: "dashboard", element: <AdminChartsDashboard /> },
+    { path: "families", element: <AdminChartsFamilies /> },
+    { path: "ingest", element: <AdminChartsIngest /> },
+    { path: "ingest/:id", element: <AdminChartsIngestDetail /> },
+    { path: "editions", element: <AdminChartsEditions /> },
+    { path: "snapshots", element: <AdminChartsSnapshots /> },
+    { path: "integration-map", element: <AdminChartsIntegrationMap /> },
+    { path: "public-api-qa", element: <AdminChartsPublicApiQa /> },
+    { path: "review-queue", element: <AdminChartsReviewQueue /> },
+    { path: "no-match", element: <AdminChartsNoMatch /> },
+    { path: "release-shells", element: <AdminChartsReleaseShells /> },
+    { path: "canon-gaps", element: <AdminChartsCanonGaps /> },
+    { path: "ingest-runs", element: <AdminChartsIngestRuns /> },
+    { path: "ingest-runs/:id", element: <AdminChartsIngestRunDetail /> },
+    { path: "legacy-ingest-jobs", element: <AdminChartsLegacyIngestJobs /> },
+    { path: "health", element: <AdminChartsIngestHealth /> },
+  ]},
+  { path: "/admin/settings", element: <AdminSettingsLayout />, children: [
+    { index: true, element: <AdminSettingsHub /> },
+    { path: "chart-defaults", element: <AdminSettingsChartDefaults /> },
+    { path: "chart-defaults/market-scopes", element: <AdminSettingsChartDefaultsMarketScopes /> },
+    { path: "integrations", element: <AdminSettingsIntegrations /> },
+    { path: "gsc-data", element: <AdminSettingsGscData /> },
+    { path: "frontend-appearance", element: <AdminSettingsFrontendAppearance /> },
+    { path: "player-playback", element: <AdminSettingsPlayerPlayback /> },
+    { path: "registry", element: <AdminSettingsRegistry /> },
+    { path: "airplay", element: <AdminSettingsAirplay /> },
+    { path: "audience", element: <AdminSettingsAudience /> },
+    { path: "email-briefings", element: <AdminSettingsEmailBriefings /> },
+    { path: "maintenance", element: <AdminSettingsMaintenance /> },
+    { path: "navigation", element: <AdminSettingsNavigation /> },
+    { path: "audit", element: <AdminSettingsAudit /> },
+    { path: "site-identity", element: <AdminSettingsSiteIdentity /> },
+  ]},
   { path: "*", element: <ResponsivePage mobile={<MobileNotFound />} desktop={<NotFound />} /> },
 ];
 
