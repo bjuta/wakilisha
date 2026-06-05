@@ -37,6 +37,7 @@ import AdminImportsUploadPage from "../pages/admin/imports/upload/page";
 import AdminImportsReportsPage from "../pages/admin/imports/reports/page";
 import AdminImportsStagingPage from "../pages/admin/imports/staging/page";
 import AdminImportsFailedPage from "../pages/admin/imports/failed/page";
+import AdminWordPressReactMigrationWizardPage from "../pages/admin/imports/wizard/page";
 import AdminRelationshipViewerPage from "../pages/admin/relationships/viewer/page";
 import AdminDuplicateMergePage from "../pages/admin/relationships/duplicates/page";
 import AdminPublishingDashboardPage from "../pages/admin/content/publishing/page";
@@ -208,6 +209,7 @@ const routes: RouteObject[] = [
       { path: "media/missing", element: <AdminMissingImagesPage /> },
       { path: "media/broken", element: <AdminBrokenLinksPage /> },
       { path: "review/queue", element: <AdminReviewQueuePage /> },
+      { path: "imports/wizard", element: <AdminWordPressReactMigrationWizardPage /> },
       { path: "imports/jobs", element: <AdminImportsJobsPage /> },
       { path: "imports/jobs/:id", element: <AdminImportsJobDetailPage /> },
       { path: "imports/upload", element: <AdminImportsUploadPage /> },
