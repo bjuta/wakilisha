@@ -13,6 +13,7 @@ import {
 } from "@/services/magazineIssues";
 import { buildIssueEditorialSystem, type MagazineEditorialSystem } from "@/services/magazineNlg";
 import "./magazineIssue.css";
+import "./magazineIssueVariants.css";
 
 const LOGO_DARK = "/assets/logos/wakilisha-logo-dark.svg";
 
