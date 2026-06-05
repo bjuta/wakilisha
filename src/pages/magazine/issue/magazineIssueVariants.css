@@ -1,0 +1,212 @@
+.mag-fullbleed {
+  min-height: min(980px, 96svh);
+  color: #fff;
+  background: #050605;
+  isolation: isolate;
+}
+.mag-fullbleed img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: saturate(.92) contrast(1.08);
+}
+.mag-fullbleed-shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0,0,0,.18), rgba(0,0,0,.78)), radial-gradient(70% 80% at 10% 85%, color-mix(in srgb, var(--section-accent) 34%, transparent), transparent 62%);
+  z-index: 1;
+}
+.mag-fullbleed-copy {
+  position: relative;
+  z-index: 2;
+  min-height: inherit;
+  padding: clamp(30px, 6vw, 68px);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  max-width: 760px;
+}
+.mag-fullbleed-copy .magazine-meta { color: var(--section-accent); margin-bottom: 18px; }
+.mag-fullbleed-copy h2 {
+  font-family: var(--mag-display);
+  font-weight: 300;
+  font-size: clamp(54px, 10vw, 124px);
+  line-height: .86;
+  letter-spacing: -.045em;
+  color: #fff;
+}
+.mag-fullbleed-copy p {
+  margin-top: 20px;
+  max-width: 52ch;
+  font-family: var(--mag-display);
+  font-style: italic;
+  font-size: clamp(18px, 2.4vw, 24px);
+  line-height: 1.36;
+  color: rgba(255,255,255,.78);
+}
+.mag-fullbleed-caption-bottom .mag-fullbleed-copy {
+  max-width: none;
+  justify-content: space-between;
+}
+.mag-fullbleed-caption-bottom .mag-fullbleed-copy h2 {
+  max-width: 8ch;
+}
+.mag-fullbleed-caption-bottom .mag-fullbleed-copy p {
+  align-self: flex-end;
+  max-width: 38ch;
+  background: rgba(0,0,0,.42);
+  border-left: 3px solid var(--section-accent);
+  padding: 18px 20px;
+  backdrop-filter: blur(14px);
+}
+.mag-fullbleed-quiet-image .mag-fullbleed-shade {
+  background: linear-gradient(90deg, rgba(0,0,0,.84), rgba(0,0,0,.24) 48%, rgba(0,0,0,.72));
+}
+.mag-fullbleed-quiet-image .mag-fullbleed-copy {
+  justify-content: center;
+}
+.mag-fullbleed-quiet-image .mag-fullbleed-copy h2 {
+  font-size: clamp(40px, 7vw, 88px);
+}
+
+.mag-quote-only {
+  min-height: min(860px, 92svh);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(30px, 6vw, 70px);
+  background: var(--section-accent);
+  color: #081006;
+}
+.mag-quote-only::before {
+  content: '';
+  position: absolute;
+  inset: 28px;
+  border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+  pointer-events: none;
+}
+.mag-quote-inner {
+  max-width: 900px;
+  text-align: center;
+}
+.mag-quote-inner .magazine-meta {
+  color: color-mix(in srgb, currentColor 70%, transparent);
+  margin-bottom: 26px;
+}
+.mag-quote-inner blockquote {
+  font-family: var(--mag-display);
+  font-weight: 300;
+  font-style: italic;
+  font-size: clamp(42px, 8.5vw, 116px);
+  line-height: .96;
+  letter-spacing: -.04em;
+}
+.mag-quote-inner a {
+  display: inline-flex;
+  margin-top: 28px;
+  font-family: var(--mag-mono);
+  text-transform: uppercase;
+  letter-spacing: .16em;
+  font-size: 10px;
+  border-bottom: 1px solid currentColor;
+  padding-bottom: 5px;
+}
+.mag-quote-white {
+  background: #fff;
+  color: #0c0d0a;
+}
+.mag-quote-white .magazine-meta,
+.mag-quote-white a { color: color-mix(in srgb, var(--section-accent) 70%, #0c0d0a); }
+
+.mag-color-interlude {
+  min-height: 720px;
+  background: var(--section-accent);
+  color: #081006;
+  display: flex;
+  align-items: stretch;
+}
+.mag-color-interlude::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(70% 80% at 80% 20%, rgba(255,255,255,.26), transparent 62%), radial-gradient(60% 90% at 10% 100%, rgba(0,0,0,.16), transparent 65%);
+  pointer-events: none;
+}
+.mag-color-interlude-inner {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  padding: clamp(34px, 6vw, 72px);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+.mag-color-interlude .magazine-meta {
+  color: color-mix(in srgb, currentColor 72%, transparent);
+  margin-bottom: 18px;
+}
+.mag-color-interlude h2 {
+  max-width: 9ch;
+  font-family: var(--mag-display);
+  font-weight: 300;
+  font-size: clamp(70px, 16vw, 190px);
+  line-height: .78;
+  letter-spacing: -.055em;
+}
+.mag-color-interlude h2 em {
+  color: #fff;
+}
+.mag-color-interlude p {
+  max-width: 48ch;
+  margin-top: 24px;
+  font-family: var(--mag-display);
+  font-style: italic;
+  font-size: clamp(19px, 2.4vw, 25px);
+  line-height: 1.35;
+}
+.mag-color-interlude a {
+  margin-top: 28px;
+  width: fit-content;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  padding: 11px 16px;
+  font-weight: 800;
+  font-size: 13px;
+}
+
+.mag-section-paper {
+  background: #fff;
+  color: #0c0d0a;
+}
+.mag-section-paper::before {
+  background: radial-gradient(60% 60% at 26% 24%, color-mix(in srgb, var(--section-accent) 18%, transparent), transparent 62%), linear-gradient(180deg, #fff, color-mix(in srgb, var(--section-accent) 10%, #fff));
+}
+.mag-section-paper .mag-section-title { color: #0c0d0a; }
+.mag-section-paper .mag-section-title em { color: var(--section-accent); }
+.mag-section-paper .mag-section-deck { color: #3f4138; }
+.mag-section-paper .mag-rail { color: #6b6e62; }
+
+.mag-article-list-paper .mag-article-list {
+  background: #fff;
+  color: #0c0d0a;
+}
+.mag-article-list-paper .mag-rail { color: #6b6e62; }
+.mag-article-list-paper .mag-article-card {
+  background: #f7f8f3;
+  border-color: rgba(12,13,10,.11);
+  color: #0c0d0a;
+}
+.mag-article-list-paper .mag-article-card h4 { color: #0c0d0a; }
+.mag-article-list-paper .mag-article-card p { color: #3f4138; }
+
+@media (max-width: 860px) {
+  .mag-fullbleed,
+  .mag-quote-only,
+  .mag-color-interlude { min-height: 82svh; }
+  .mag-fullbleed-copy,
+  .mag-color-interlude-inner { padding: 28px; }
+  .mag-quote-only::before { inset: 16px; }
+  .mag-quote-inner blockquote { font-size: clamp(38px, 13vw, 74px); }
+}
