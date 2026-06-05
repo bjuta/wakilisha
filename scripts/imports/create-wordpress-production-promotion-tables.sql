@@ -1,6 +1,6 @@
 -- WAKILISHA WordPress -> React production promotion tables
 -- These are canonical promotion targets for staged imports.
--- Run after create-wordpress-staging-tables.sql and before npm run imports:promote-wordpress-staging.
+-- Run after create-wordpress-staging-tables.sql and before npm run imports:finalize-wordpress-staging.
 
 CREATE TABLE IF NOT EXISTS wk_content_items (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -86,6 +86,51 @@ CREATE TABLE IF NOT EXISTS wk_media_assets (
 CREATE INDEX IF NOT EXISTS idx_wk_media_assets_run ON wk_media_assets(source_ingestion_run_id);
 CREATE INDEX IF NOT EXISTS idx_wk_media_assets_status ON wk_media_assets(status);
 
+CREATE TABLE IF NOT EXISTS wk_wakilisha_entities (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  entity_type text NOT NULL,
+  slug text NOT NULL,
+  title text NOT NULL,
+  body text,
+  excerpt text,
+  status text NOT NULL DEFAULT 'published' CHECK (status IN ('draft', 'published', 'needs_review', 'archived')),
+  published_at timestamptz,
+  source_url text,
+  source_kind text NOT NULL DEFAULT 'wordpress_export_zip',
+  source_ingestion_run_id uuid NOT NULL,
+  source_staging_record_id uuid NOT NULL UNIQUE,
+  source_record_id text,
+  raw_record jsonb NOT NULL DEFAULT '{}'::jsonb,
+  mapped_record jsonb NOT NULL DEFAULT '{}'::jsonb,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE(entity_type, slug)
+);
+
+CREATE INDEX IF NOT EXISTS idx_wk_wakilisha_entities_type ON wk_wakilisha_entities(entity_type);
+CREATE INDEX IF NOT EXISTS idx_wk_wakilisha_entities_run ON wk_wakilisha_entities(source_ingestion_run_id);
+CREATE INDEX IF NOT EXISTS idx_wk_wakilisha_entities_status ON wk_wakilisha_entities(status);
+
+CREATE TABLE IF NOT EXISTS wk_import_review_artifacts (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  artifact_type text NOT NULL,
+  title text,
+  source_kind text NOT NULL DEFAULT 'wordpress_export_zip',
+  source_ingestion_run_id uuid NOT NULL,
+  source_staging_record_id uuid NOT NULL UNIQUE,
+  source_record_id text,
+  raw_record jsonb NOT NULL DEFAULT '{}'::jsonb,
+  mapped_record jsonb NOT NULL DEFAULT '{}'::jsonb,
+  review_status text NOT NULL DEFAULT 'needs_review' CHECK (review_status IN ('needs_review', 'resolved', 'ignored')),
+  notes text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_wk_import_review_artifacts_type ON wk_import_review_artifacts(artifact_type);
+CREATE INDEX IF NOT EXISTS idx_wk_import_review_artifacts_run ON wk_import_review_artifacts(source_ingestion_run_id);
+CREATE INDEX IF NOT EXISTS idx_wk_import_review_artifacts_status ON wk_import_review_artifacts(review_status);
+
 CREATE TABLE IF NOT EXISTS wk_import_promotion_events (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   ingestion_run_id uuid NOT NULL,
@@ -119,3 +164,9 @@ CREATE TRIGGER trg_wk_taxonomy_terms_touch_updated_at BEFORE UPDATE ON wk_taxono
 
 DROP TRIGGER IF EXISTS trg_wk_media_assets_touch_updated_at ON wk_media_assets;
 CREATE TRIGGER trg_wk_media_assets_touch_updated_at BEFORE UPDATE ON wk_media_assets FOR EACH ROW EXECUTE FUNCTION wk_promotion_touch_updated_at();
+
+DROP TRIGGER IF EXISTS trg_wk_wakilisha_entities_touch_updated_at ON wk_wakilisha_entities;
+CREATE TRIGGER trg_wk_wakilisha_entities_touch_updated_at BEFORE UPDATE ON wk_wakilisha_entities FOR EACH ROW EXECUTE FUNCTION wk_promotion_touch_updated_at();
+
+DROP TRIGGER IF EXISTS trg_wk_import_review_artifacts_touch_updated_at ON wk_import_review_artifacts;
+CREATE TRIGGER trg_wk_import_review_artifacts_touch_updated_at BEFORE UPDATE ON wk_import_review_artifacts FOR EACH ROW EXECUTE FUNCTION wk_promotion_touch_updated_at();
