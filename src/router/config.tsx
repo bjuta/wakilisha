@@ -44,6 +44,7 @@ import AdminContentArchivePage from "../pages/admin/content/archive/page";
 import AdminMediaMigrationPage from "../pages/admin/content/migration/page";
 import AdminLyricsPage from "../pages/admin/content/lyrics/page";
 import AdminUsersPage from "../pages/admin/users/page";
+import AdminMagazineVisualsPage from "../pages/admin/magazine/visuals/page";
 
 // Admin Charts Ingestion Studio
 import { AdminChartsLayout } from "../pages/admin/charts/AdminChartsLayout";
@@ -190,6 +191,7 @@ const routes: RouteObject[] = [
       { path: "content/migration", element: <AdminMediaMigrationPage /> },
       { path: "content/lyrics", element: <AdminLyricsPage /> },
       { path: "users", element: <AdminUsersPage /> },
+      { path: "magazine/visuals", element: <AdminMagazineVisualsPage /> },
       { path: "registry/artists", element: <AdminArtistsPage /> },
       { path: "registry/artists/:slug", element: <AdminArtistDetailPage /> },
       { path: "registry/tracks", element: <AdminTracksPage /> },
