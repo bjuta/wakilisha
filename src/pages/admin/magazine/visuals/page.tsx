@@ -6,14 +6,24 @@ import { buildIssueEditorialSystem } from "@/services/magazineNlg";
 import { buildMagazineIssueVisualBriefing } from "@/services/magazineVisualDirector";
 import { MAGAZINE_VISUAL_PALETTES } from "@/services/magazineVisualTaxonomy";
 import { MagazineGeneratedVisual } from "@/components/magazine/visuals/MagazineGeneratedVisual";
+import { magazineVisualAssetStore, useMagazineVisualAssets } from "@/services/magazineVisualAssets";
 
 export default function AdminMagazineVisualsPage() {
   const { articles, loading, error } = useMagazineArticles();
   const [showContext, setShowContext] = useState(false);
   const [showPreviews, setShowPreviews] = useState(true);
+  const assets = useMagazineVisualAssets();
 
   const issues = useMemo(() => buildMagazineIssues(articles), [articles]);
   const previewIssues = issues.slice(0, 8);
+  const assetById = useMemo(() => new Map(assets.map((asset) => [asset.id, asset])), [assets]);
+  const assetCounts = useMemo(() => ({
+    total: assets.length,
+    generated: assets.filter((asset) => asset.status === 'generated').length,
+    approved: assets.filter((asset) => asset.status === 'approved').length,
+    rejected: assets.filter((asset) => asset.status === 'rejected').length,
+    locked: assets.filter((asset) => asset.status === 'locked').length,
+  }), [assets]);
 
   if (loading) return <div className="p-8 text-sm text-[var(--wk-text-muted)]">Loading magazine visual director…</div>;
   if (error) return <div className="p-8 text-sm text-red-500">{error}</div>;
@@ -23,36 +33,26 @@ export default function AdminMagazineVisualsPage() {
       <div className="mx-auto max-w-7xl px-6 py-8">
         <div className="mb-8 flex flex-col gap-4 border-b border-[var(--wk-border)] pb-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-[var(--wk-brand)]">Phase 2</p>
-            <h1 className="mt-2 text-4xl font-black tracking-[-0.04em] lg:text-6xl">Deterministic Visual Renderers</h1>
+            <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-[var(--wk-brand)]">Phase 3</p>
+            <h1 className="mt-2 text-4xl font-black tracking-[-0.04em] lg:text-6xl">Visual Asset Review & Locking</h1>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-[var(--wk-text-muted)]">
-              This page now previews the actual React/SVG renderer output from the Phase 1 visual briefs. These are deterministic, contrast-safe graphics rendered from article context — not AI raster images.
+              Generate, approve, reject and lock deterministic magazine visuals. This currently persists through a storage adapter backed by localStorage; the service is shaped so it can later be swapped for Supabase/API without changing the renderer.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
-            <button onClick={() => setShowPreviews((value) => !value)} className="rounded-full border border-[var(--wk-border)] px-4 py-2 text-sm font-bold hover:border-[var(--wk-brand)] hover:text-[var(--wk-brand)]">
-              {showPreviews ? "Hide visual previews" : "Show visual previews"}
-            </button>
-            <button onClick={() => setShowContext((value) => !value)} className="rounded-full border border-[var(--wk-border)] px-4 py-2 text-sm font-bold hover:border-[var(--wk-brand)] hover:text-[var(--wk-brand)]">
-              {showContext ? "Hide extracted context" : "Show extracted context"}
-            </button>
-            <Link to="/magazine/issues" className="rounded-full border border-[var(--wk-border)] px-4 py-2 text-sm font-bold hover:border-[var(--wk-brand)] hover:text-[var(--wk-brand)]">
-              View issue archive
-            </Link>
+            <button onClick={() => setShowPreviews((value) => !value)} className="rounded-full border border-[var(--wk-border)] px-4 py-2 text-sm font-bold hover:border-[var(--wk-brand)] hover:text-[var(--wk-brand)]">{showPreviews ? "Hide visual previews" : "Show visual previews"}</button>
+            <button onClick={() => setShowContext((value) => !value)} className="rounded-full border border-[var(--wk-border)] px-4 py-2 text-sm font-bold hover:border-[var(--wk-brand)] hover:text-[var(--wk-brand)]">{showContext ? "Hide extracted context" : "Show extracted context"}</button>
+            <button onClick={() => magazineVisualAssetStore.clearUnlocked()} className="rounded-full border border-red-500/40 px-4 py-2 text-sm font-bold text-red-500 hover:bg-red-500 hover:text-white">Clear unlocked assets</button>
+            <Link to="/magazine/issues" className="rounded-full border border-[var(--wk-border)] px-4 py-2 text-sm font-bold hover:border-[var(--wk-brand)] hover:text-[var(--wk-brand)]">View issue archive</Link>
           </div>
         </div>
 
+        <section className="mb-8 grid gap-4 md:grid-cols-5">
+          {Object.entries(assetCounts).map(([key, value]) => <div key={key} className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4"><p className="text-[11px] font-black uppercase tracking-[0.18em] text-[var(--wk-text-muted)]">{key}</p><p className="mt-2 text-3xl font-black">{value}</p></div>)}
+        </section>
+
         <section className="mb-8 grid gap-4 md:grid-cols-4">
-          {Object.entries(MAGAZINE_VISUAL_PALETTES).map(([key, palette]) => (
-            <div key={key} className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4">
-              <div className="mb-3 flex h-12 items-center justify-between rounded-xl px-3" style={{ background: palette.background, border: `2px solid ${palette.accent}`, color: palette.foreground }}>
-                <span className="text-[10px] font-black uppercase tracking-[0.14em]">Aa</span>
-                <span className="h-5 w-5 rounded-full" style={{ background: palette.accent }} />
-              </div>
-              <p className="text-xs font-black uppercase tracking-[0.18em]">{key}</p>
-              <p className="mt-1 text-xs text-[var(--wk-text-muted)]">{palette.contrast} · {palette.accent}</p>
-            </div>
-          ))}
+          {Object.entries(MAGAZINE_VISUAL_PALETTES).map(([key, palette]) => <div key={key} className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4"><div className="mb-3 flex h-12 items-center justify-between rounded-xl px-3" style={{ background: palette.background, border: `2px solid ${palette.accent}`, color: palette.foreground }}><span className="text-[10px] font-black uppercase tracking-[0.14em]">Aa</span><span className="h-5 w-5 rounded-full" style={{ background: palette.accent }} /></div><p className="text-xs font-black uppercase tracking-[0.18em]">{key}</p><p className="mt-1 text-xs text-[var(--wk-text-muted)]">{palette.contrast} · {palette.accent}</p></div>)}
         </section>
 
         <div className="space-y-8">
@@ -63,55 +63,34 @@ export default function AdminMagazineVisualsPage() {
               <section key={issue.slug} className="overflow-hidden rounded-3xl border border-[var(--wk-border)] bg-[var(--wk-surface)]">
                 <div className="border-b border-[var(--wk-border)] p-5 lg:p-6">
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                    <div>
-                      <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-[var(--wk-text-faint)]">{issue.issueLabel} · {issue.sourceWindowLabel}</p>
-                      <h2 className="mt-2 text-3xl font-black tracking-[-0.035em]">{issue.title}</h2>
-                      <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--wk-text-muted)]">{briefing.summary}</p>
-                    </div>
-                    <div className="flex flex-col gap-2 text-right text-xs text-[var(--wk-text-muted)]">
-                      <span><b className="text-[var(--wk-text)]">Family:</b> {briefing.dominant_visual_family}</span>
-                      <span><b className="text-[var(--wk-text)]">Palette:</b> {briefing.dominant_palette}</span>
-                      <Link to={`/magazine/issues/${issue.slug}`} className="mt-2 rounded-full bg-[var(--wk-brand)] px-4 py-2 text-center text-sm font-black text-black">Open issue</Link>
-                    </div>
+                    <div><p className="text-[11px] font-bold uppercase tracking-[0.22em] text-[var(--wk-text-faint)]">{issue.issueLabel} · {issue.sourceWindowLabel}</p><h2 className="mt-2 text-3xl font-black tracking-[-0.035em]">{issue.title}</h2><p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--wk-text-muted)]">{briefing.summary}</p></div>
+                    <div className="flex flex-col gap-2 text-right text-xs text-[var(--wk-text-muted)]"><span><b className="text-[var(--wk-text)]">Family:</b> {briefing.dominant_visual_family}</span><span><b className="text-[var(--wk-text)]">Palette:</b> {briefing.dominant_palette}</span><Link to={`/magazine/issues/${issue.slug}`} className="mt-2 rounded-full bg-[var(--wk-brand)] px-4 py-2 text-center text-sm font-black text-black">Open issue</Link></div>
                   </div>
                 </div>
-
                 <div className="grid gap-px bg-[var(--wk-border)] lg:grid-cols-2">
                   {briefing.briefs.map((brief) => {
                     const spread = issue.spreads.find((item) => item.id === brief.spread_id);
                     const article = spread?.articles?.[0];
+                    const asset = assetById.get(brief.id);
+                    const isLocked = asset?.status === 'locked';
                     return (
                       <article key={brief.id} className="bg-[var(--wk-surface)] p-5">
-                        {showPreviews && spread && (
-                          <div className="mb-5 overflow-hidden rounded-2xl border border-[var(--wk-border)]">
-                            <MagazineGeneratedVisual issue={issue} spread={spread} article={article} editorialSystem={editorial} inline />
-                          </div>
-                        )}
+                        {showPreviews && spread && <div className="mb-5 overflow-hidden rounded-2xl border border-[var(--wk-border)]"><MagazineGeneratedVisual issue={issue} spread={spread} article={article} editorialSystem={editorial} inline adminPreview /></div>}
                         <div className="flex items-start justify-between gap-4">
-                          <div>
-                            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--wk-brand)]">{brief.spread_role} · {brief.renderer_hint.renderer_family}</p>
-                            <h3 className="mt-2 text-xl font-black tracking-[-0.02em]">{brief.visual_type}</h3>
-                          </div>
-                          <div className="flex flex-col items-end gap-1">
-                            <div className="rounded-full px-3 py-1 text-xs font-black" style={{ background: String(brief.required_data.safe_accent), color: String(brief.required_data.safe_foreground) }}>{Math.round(brief.confidence * 100)}%</div>
-                            <span className={`text-[10px] font-black uppercase tracking-[0.16em] ${brief.approval_risk === 'low' ? 'text-emerald-500' : brief.approval_risk === 'medium' ? 'text-amber-500' : 'text-red-500'}`}>{brief.approval_risk} risk</span>
-                          </div>
+                          <div><p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--wk-brand)]">{brief.spread_role} · {brief.renderer_hint.renderer_family}</p><h3 className="mt-2 text-xl font-black tracking-[-0.02em]">{brief.visual_type}</h3></div>
+                          <div className="flex flex-col items-end gap-1"><div className="rounded-full px-3 py-1 text-xs font-black" style={{ background: String(brief.required_data.safe_accent), color: String(brief.required_data.safe_foreground) }}>{Math.round(brief.confidence * 100)}%</div><span className={`text-[10px] font-black uppercase tracking-[0.16em] ${asset?.status === 'locked' ? 'text-purple-500' : asset?.status === 'approved' ? 'text-emerald-500' : asset?.status === 'rejected' ? 'text-red-500' : asset?.status === 'generated' ? 'text-blue-500' : 'text-[var(--wk-text-faint)]'}`}>{asset?.status ?? 'not saved'}</span></div>
                         </div>
-                        <div className="mt-4 grid gap-3 text-xs text-[var(--wk-text-muted)] md:grid-cols-2">
-                          <p><b className="text-[var(--wk-text)]">Family:</b> {brief.visual_family}</p>
-                          <p><b className="text-[var(--wk-text)]">Intent:</b> {brief.editorial_intent}</p>
-                          <p><b className="text-[var(--wk-text)]">Treatment:</b> {brief.treatment}</p>
-                          <p><b className="text-[var(--wk-text)]">Palette:</b> {brief.palette} / {brief.contrast_mode}</p>
-                          <p><b className="text-[var(--wk-text)]">Complexity:</b> {brief.complexity}</p>
-                          <p><b className="text-[var(--wk-text)]">Safe zones:</b> {brief.renderer_hint.safe_text_zones.join(', ')}</p>
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          <button disabled={isLocked} onClick={() => magazineVisualAssetStore.upsertFromBrief(brief, 'generated')} className="rounded-full border border-[var(--wk-border)] px-3 py-2 text-xs font-black disabled:cursor-not-allowed disabled:opacity-40 hover:border-blue-500 hover:text-blue-500">Generate / save</button>
+                          <button disabled={!asset || isLocked} onClick={() => magazineVisualAssetStore.setStatus(brief.id, 'approved')} className="rounded-full border border-[var(--wk-border)] px-3 py-2 text-xs font-black disabled:cursor-not-allowed disabled:opacity-40 hover:border-emerald-500 hover:text-emerald-500">Approve</button>
+                          <button disabled={!asset || isLocked} onClick={() => magazineVisualAssetStore.setStatus(brief.id, 'rejected')} className="rounded-full border border-[var(--wk-border)] px-3 py-2 text-xs font-black disabled:cursor-not-allowed disabled:opacity-40 hover:border-red-500 hover:text-red-500">Reject</button>
+                          <button disabled={!asset} onClick={() => magazineVisualAssetStore.setStatus(brief.id, 'locked')} className="rounded-full border border-[var(--wk-border)] px-3 py-2 text-xs font-black disabled:cursor-not-allowed disabled:opacity-40 hover:border-purple-500 hover:text-purple-500">Lock</button>
+                          {asset && !isLocked && <button onClick={() => magazineVisualAssetStore.remove(brief.id)} className="rounded-full border border-[var(--wk-border)] px-3 py-2 text-xs font-black hover:border-red-500 hover:text-red-500">Delete</button>}
                         </div>
+                        {asset && <div className="mt-3 rounded-2xl border border-[var(--wk-border)] p-3 text-xs leading-5 text-[var(--wk-text-muted)]"><p><b className="text-[var(--wk-text)]">Asset:</b> {asset.id}</p><p><b className="text-[var(--wk-text)]">Updated:</b> {new Date(asset.updated_at).toLocaleString()}</p>{asset.approved_at && <p><b className="text-[var(--wk-text)]">Approved:</b> {new Date(asset.approved_at).toLocaleString()}</p>}{asset.locked_at && <p><b className="text-[var(--wk-text)]">Locked:</b> {new Date(asset.locked_at).toLocaleString()}</p>}</div>}
+                        <div className="mt-4 grid gap-3 text-xs text-[var(--wk-text-muted)] md:grid-cols-2"><p><b className="text-[var(--wk-text)]">Family:</b> {brief.visual_family}</p><p><b className="text-[var(--wk-text)]">Intent:</b> {brief.editorial_intent}</p><p><b className="text-[var(--wk-text)]">Treatment:</b> {brief.treatment}</p><p><b className="text-[var(--wk-text)]">Palette:</b> {brief.palette} / {brief.contrast_mode}</p><p><b className="text-[var(--wk-text)]">Complexity:</b> {brief.complexity}</p><p><b className="text-[var(--wk-text)]">Safe zones:</b> {brief.renderer_hint.safe_text_zones.join(', ')}</p></div>
                         <p className="mt-4 text-sm leading-6 text-[var(--wk-text-muted)]">{brief.rationale}</p>
-                        {showContext && brief.extracted_context && (
-                          <details open className="mt-4 rounded-2xl border border-[var(--wk-border)] p-3">
-                            <summary className="cursor-pointer text-xs font-black uppercase tracking-[0.16em] text-[var(--wk-text)]">Extracted context</summary>
-                            <pre className="mt-3 max-h-64 overflow-auto rounded-xl bg-[var(--wk-bg)] p-3 text-[11px] leading-5 text-[var(--wk-text-muted)]">{JSON.stringify({ places: brief.extracted_context.places, dates: brief.extracted_context.dates, keywords: brief.extracted_context.keywords, pullQuotes: brief.extracted_context.pullQuotes, signals: brief.extracted_context.signals }, null, 2)}</pre>
-                          </details>
-                        )}
+                        {showContext && brief.extracted_context && <details open className="mt-4 rounded-2xl border border-[var(--wk-border)] p-3"><summary className="cursor-pointer text-xs font-black uppercase tracking-[0.16em] text-[var(--wk-text)]">Extracted context</summary><pre className="mt-3 max-h-64 overflow-auto rounded-xl bg-[var(--wk-bg)] p-3 text-[11px] leading-5 text-[var(--wk-text-muted)]">{JSON.stringify({ places: brief.extracted_context.places, dates: brief.extracted_context.dates, keywords: brief.extracted_context.keywords, pullQuotes: brief.extracted_context.pullQuotes, signals: brief.extracted_context.signals }, null, 2)}</pre></details>}
                         {brief.warnings.length > 0 && <div className="mt-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs leading-5 text-amber-600 dark:text-amber-300">{brief.warnings.map((warning) => <p key={warning}>• {warning}</p>)}</div>}
                       </article>
                     );
