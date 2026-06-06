@@ -1,4 +1,3 @@
-import { listMagazineArticles, toRepairedStory } from '@/services/magazineArticles';
 import { withPlaceholderImage } from '@/utils/imagePlaceholders';
 
 export type RepairedStory = {
@@ -74,23 +73,44 @@ type Envelope<T> = {
 };
 
 async function repairedGet<T>(path: string): Promise<T> {
-  const url = `${API_BASE.replace(/\/$/, "")}/repaired${path.startsWith("/") ? path : `/${path}`}`;
+  const normalizedBase = API_BASE.replace(/\/$/, "");
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  const url = `${normalizedBase}/repaired${normalizedPath}`;
   const response = await fetch(url, { headers: { Accept: "application/json" } });
+
   if (!response.ok) {
     const text = await response.text().catch(() => "");
-    throw new Error(`WAKILISHA entity API ${response.status}: ${text || response.statusText}`);
+    throw new Error(`WAKILISHA public API ${response.status}: ${text || response.statusText}`);
   }
+
   const payload = (await response.json()) as Envelope<T> | T;
   return payload && typeof payload === "object" && "data" in payload ? (payload as Envelope<T>).data : (payload as T);
 }
 
+async function safeRepairedGet<T>(path: string, fallback: T): Promise<T> {
+  try {
+    return await repairedGet<T>(path);
+  } catch (err) {
+    console.warn(err instanceof Error ? err.message : "WAKILISHA public API request failed.");
+    return fallback;
+  }
+}
+
 export async function listMagazineStories(): Promise<RepairedStory[]> {
-  const articles = await listMagazineArticles();
-  return articles.map(toRepairedStory);
+  const result = await safeRepairedGet<{ stories: RepairedStory[] }>("/magazine?limit=500", { stories: [] });
+  return result.stories.map((story) => ({
+    ...story,
+    heroUrl: withPlaceholderImage(story.heroUrl, {
+      id: story.id,
+      slug: story.slug,
+      name: story.title,
+      type: "article",
+    }),
+  }));
 }
 
 export async function listArtists(): Promise<RepairedArtist[]> {
-  const result = await repairedGet<{ artists: RepairedArtist[] }>("/artists");
+  const result = await safeRepairedGet<{ artists: RepairedArtist[] }>("/artists?limit=500", { artists: [] });
   return result.artists.map((artist) => ({
     ...artist,
     imageUrl: withPlaceholderImage(artist.imageUrl, {
@@ -103,7 +123,7 @@ export async function listArtists(): Promise<RepairedArtist[]> {
 }
 
 export async function listReleases(): Promise<RepairedRelease[]> {
-  const result = await repairedGet<{ releases: RepairedRelease[] }>("/releases");
+  const result = await safeRepairedGet<{ releases: RepairedRelease[] }>("/releases?limit=500", { releases: [] });
   return result.releases.map((release) => ({
     ...release,
     artworkUrl: withPlaceholderImage(release.artworkUrl, {
@@ -150,7 +170,7 @@ export function releaseUrl(release: { slug: string; artist: string }): string {
 }
 
 export async function getRelease(artistSlug: string, releaseSlug: string): Promise<RepairedReleaseDetail | null> {
-  const result = await repairedGet<{ release: RepairedReleaseDetail | null }>(`/releases/${artistSlug}/${releaseSlug}`);
+  const result = await safeRepairedGet<{ release: RepairedReleaseDetail | null }>(`/releases/${artistSlug}/${releaseSlug}`, { release: null });
   if (!result.release) return null;
 
   return {
@@ -174,7 +194,7 @@ export async function getRelease(artistSlug: string, releaseSlug: string): Promi
 }
 
 export async function listGenres(): Promise<RepairedGenre[]> {
-  const result = await repairedGet<{ genres: RepairedGenre[] }>("/genres");
+  const result = await safeRepairedGet<{ genres: RepairedGenre[] }>("/genres?limit=500", { genres: [] });
   return result.genres;
 }
 
@@ -243,7 +263,7 @@ export type RepairedArtistDetail = {
 };
 
 export async function getArtist(slug: string): Promise<RepairedArtistDetail | null> {
-  const result = await repairedGet<{ artist: RepairedArtistDetail | null }>(`/artists/${slug}`);
+  const result = await safeRepairedGet<{ artist: RepairedArtistDetail | null }>(`/artists/${slug}`, { artist: null });
   if (!result.artist) return null;
 
   const artist = result.artist;
@@ -308,7 +328,7 @@ export async function getArtist(slug: string): Promise<RepairedArtistDetail | nu
 }
 
 export async function listLabels(): Promise<RepairedLabel[]> {
-  const result = await repairedGet<{ labels: RepairedLabel[] }>("/labels");
+  const result = await safeRepairedGet<{ labels: RepairedLabel[] }>("/labels?limit=500", { labels: [] });
   return result.labels.map((label) => ({
     ...label,
     logoUrl: withPlaceholderImage(label.logoUrl, {
