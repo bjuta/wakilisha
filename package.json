@@ -58,6 +58,7 @@
     "imports:promote-wordpress-artist-relationships": "tsx scripts/imports/promote-wordpress-artist-relationships.ts",
     "imports:promote-wordpress-registry": "tsx scripts/imports/promote-wordpress-registry-entities.ts",
     "imports:resolve-wordpress-artists": "tsx scripts/imports/resolve-wordpress-artists.ts",
+    "imports:resolve-wordpress-term-relationships": "tsx scripts/imports/resolve-wordpress-term-relationships.ts",
     "imports:stage-wordpress-database-records": "tsx scripts/imports/stage-wordpress-database-records.ts",
     "imports:stage-wordpress-records": "tsx scripts/imports/stage-wordpress-records.ts",
     "imports:watch-wordpress-zips": "tsx scripts/imports/process-wordpress-zips.ts --watch",
