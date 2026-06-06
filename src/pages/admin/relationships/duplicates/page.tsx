@@ -2,7 +2,8 @@ import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { AdminTable } from "@/components/design-system/admin/AdminTable";
-import { mockDuplicateCandidates, mockResolutionRuns } from "@/mocks/duplicates";
+const mockDuplicateCandidates: any[] = [];
+const mockResolutionRuns: any[] = [];
 
 /* ────────────────────────── Types ────────────────────────── */
 

@@ -5,55 +5,34 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Target entities that go to wk_content_items
-const CONTENT_ENTITIES = new Set(["articles", "pages"]);
-
-// Target entities that go to wk_authors
-const AUTHOR_ENTITIES = new Set(["authors"]);
-
-// Target entities that go to wk_taxonomy_terms
-const TAXONOMY_ENTITIES = new Set(["taxonomy_terms", "artist_taxonomy_terms"]);
-
-// Target entities that go to wk_media_assets
-const MEDIA_ENTITIES = new Set(["media_assets"]);
-
-// Target entities that go to wk_import_review_artifacts
-const REVIEW_ENTITIES = new Set(["entity_relationships", "custom_fields"]);
-
-// Everything else goes to wk_wakilisha_entities
-const WAKILISHA_ENTITIES = new Set([
-  "artists", "tracks", "releases", "labels", "genres", "guides",
-  "chart_series", "chart_editions", "chart_programs",
-  "chart_surfaces", "magazine_surfaces", "magazine_issues",
-  "methodologies", "corrections",
-  "play_surfaces", "label_surfaces", "settings_surfaces", "profile_surfaces",
-  "content_entities",
-]);
-
-function slugify(text: string): string {
-  return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/, "").slice(0, 200);
-}
-
-async function promoteToContentItems(
+async function chunkedInsert(
   supabase: ReturnType<typeof createClient>,
   runId: string,
+  label: string,
+  rpcName: string,
+  chunkSize: number
 ): Promise<number> {
-  const { data, error } = await supabase.rpc("promote_staging_to_content_items", { run_id: runId });
-  if (error) throw new Error(`Content promotion failed: ${error.message}`);
-  return data ?? 0;
-}
-
-async function promoteToWakilishaEntities(
-  supabase: ReturnType<typeof createClient>,
-  runId: string,
-  entities: string[],
-): Promise<number> {
-  const { data, error } = await supabase.rpc("promote_staging_to_wakilisha_entities", {
-    run_id: runId,
-    entity_types: entities,
-  });
-  if (error) throw new Error(`Wakilisha entity promotion failed: ${error.message}`);
-  return data ?? 0;
+  let total = 0;
+  let cursor: string | null = null;
+  let num = 0;
+  console.log(`${label} (chunk=${chunkSize})...`);
+  while (true) {
+    num++;
+    const { data, error } = await supabase.rpc(rpcName, {
+      p_run_id: runId, p_limit: chunkSize, p_min_id: cursor,
+    });
+    if (error) throw new Error(`${label} chunk ${num}: ${error.message}`);
+    if (!data || data.last_id === null) break;
+    const n = data.count ?? 0;
+    total += n;
+    if (num % 10 === 0) {
+      console.log(`  -> ${label} chunk ${num}: +${n} (total ${total})`);
+    }
+    cursor = data.last_id;
+    if (n === 0 && total === 0) break;
+  }
+  console.log(`  -> ${label} done: ${total} (${num} chunks)`);
+  return total;
 }
 
 Deno.serve(async (req: Request) => {
@@ -74,409 +53,140 @@ Deno.serve(async (req: Request) => {
 
   try {
     const body = await req.json();
-    const { runId } = body;
+    const { runId, step } = body;
     if (!runId) {
       return new Response(JSON.stringify({ error: "runId is required." }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Load the run
-    const { data: run, error: runErr } = await supabase
-      .from("wk_ingestion_runs").select("*").eq("id", runId).maybeSingle();
+    const { data: runData, error: runErr } = await supabase
+      .from("wk_ingestion_runs")
+      .select("id,status")
+      .eq("id", runId)
+      .single();
 
-    if (runErr || !run) {
-      return new Response(JSON.stringify({ error: "Ingestion run not found." }), {
+    if (runErr || !runData) {
+      return new Response(JSON.stringify({ error: "Run not found" }), {
         status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    if (run.status !== "staged") {
-      return new Response(JSON.stringify({ error: `Run must be staged. Current status: ${run.status}` }), {
+    const requestedStep = (step ?? "all") as string;
+
+    // ===== REVIEW-ONLY =====
+    if (requestedStep === "review") {
+      if (runData.status !== "finalized" && runData.status !== "staged") {
+        return new Response(JSON.stringify({ error: `Run must be finalized or staged. Current: ${runData.status}` }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Entity relationships — chunked via v8 (single CTE, no OFFSET)
+      const cRel = await chunkedInsert(supabase, runId, "ER", "finalize_step_ers_chunk_v8", 500);
+
+      // Custom fields — also chunked now (was the hidden monster at 20K rows)
+      const cCf = await chunkedInsert(supabase, runId, "CF", "finalize_step_cf_chunk", 500);
+
+      const cReview = cRel + cCf;
+      await supabase.rpc("finalize_step_complete", {
+        p_run_id: runId, p_content: 0, p_authors: 0, p_tax: 0, p_media: 0, p_entities: 0, p_review: cReview, p_errors: [],
+      });
+
+      return new Response(JSON.stringify({ success: true, review_artifacts: cReview, entity_relationships: cRel, custom_fields: cCf }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ===== ENTITIES-ONLY =====
+    if (requestedStep === "entities") {
+      if (runData.status !== "staged" && runData.status !== "finalizing") {
+        return new Response(JSON.stringify({ error: `Run must be staged. Current: ${runData.status}` }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (runData.status === "staged") {
+        await supabase.from("wk_ingestion_runs").update({ status: "finalizing", errors: [] }).eq("id", runId);
+      }
+
+      const allErrors: string[] = [];
+      let cEntities = 0;
+
+      console.log("Entities-only: Wakilisha entities (chunk=2000)...");
+      let lastId: string | null = null;
+      let chunkNum = 0;
+      while (true) {
+        chunkNum++;
+        const { data: chunk, error: chunkErr } = await supabase.rpc("finalize_step_entities_chunk", {
+          p_run_id: runId, p_limit: 2000, p_min_id: lastId,
+        });
+        if (chunkErr) throw new Error(`Entity chunk ${chunkNum} failed: ${chunkErr.message}`);
+        if (!chunk || chunk.last_id === null) break;
+        const n = chunk.count ?? 0;
+        cEntities += n;
+        console.log(`  -> chunk ${chunkNum}: ${n} rows (last_id ${lastId?.slice(0,8)} -> ${chunk.last_id?.slice(0,8)})`);
+        lastId = chunk.last_id;
+      }
+      console.log(`  -> wakilisha_entities total: ${cEntities}`);
+
+      await supabase.rpc("finalize_step_complete", {
+        p_run_id: runId, p_content: 0, p_authors: 0, p_tax: 0, p_media: 0, p_entities: cEntities, p_review: 0, p_errors: allErrors,
+      });
+
+      return new Response(JSON.stringify({ success: true, wakilisha_entities: cEntities }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ===== ALL (phase 1: content + entities) =====
+    if (runData.status !== "staged") {
+      return new Response(JSON.stringify({ error: `Run must be staged. Current: ${runData.status}` }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Mark as finalizing
-    await supabase.from("wk_ingestion_runs").update({
-      status: "finalizing", errors: [],
-    }).eq("id", runId);
+    await supabase.from("wk_ingestion_runs").update({ status: "finalizing", errors: [] }).eq("id", runId);
+    let allErrors: string[] = [];
+    let cContent = 0, cAuthors = 0, cTax = 0, cEntities = 0;
 
-    // Get all ready records grouped by target entity
-    const { data: readyRecords, error: readyErr } = await supabase
-      .from("wk_import_staging_records")
-      .select("target_entity, id")
-      .eq("ingestion_run_id", runId)
-      .eq("target_status", "ready");
+    console.log("Step 1: Content, authors, taxonomy...");
+    const { data: r1, error: e1 } = await supabase.rpc("finalize_step_content", { p_run_id: runId });
+    if (e1) throw new Error(`Step 1 failed: ${e1.message}`);
+    cContent = r1.content_items ?? 0;
+    cAuthors = r1.authors ?? 0;
+    cTax = r1.taxonomy_terms ?? 0;
+    if (r1.errors?.length) allErrors.push(...r1.errors);
+    console.log(`  -> content:${cContent} authors:${cAuthors} taxonomy:${cTax}`);
 
-    if (readyErr) throw new Error(`Failed to query staging records: ${readyErr.message}`);
+    console.log("Step 2: Media assets — SKIPPED");
 
-    if (!readyRecords || readyRecords.length === 0) {
-      await supabase.from("wk_ingestion_runs").update({
-        status: "finalized",
-        finished_at: new Date().toISOString(),
-        warnings: supabase.sql`array_append(coalesce(warnings, ''::text[]), 'No ready staging records to finalize.')`,
-      }).eq("id", runId);
-
-      return new Response(JSON.stringify({
-        success: true, runId,
-        message: "No ready records to finalize.",
-        summary: { total: 0, content_items: 0, authors: 0, taxonomy_terms: 0, media_assets: 0, wakilisha_entities: 0, review_artifacts: 0 },
-      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    console.log("Step 3: Wakilisha entities (cursor-chunked)...");
+    let lastId: string | null = null;
+    let chunkNum = 0;
+    while (true) {
+      chunkNum++;
+      const { data: chunk, error: chunkErr } = await supabase.rpc("finalize_step_entities_chunk", {
+        p_run_id: runId, p_limit: 2000, p_min_id: lastId,
+      });
+      if (chunkErr) throw new Error(`Entity chunk ${chunkNum} failed: ${chunkErr.message}`);
+      if (!chunk || chunk.last_id === null) break;
+      const n = chunk.count ?? 0;
+      cEntities += n;
+      console.log(`  -> chunk ${chunkNum}: ${n} rows (last_id ${lastId?.slice(0,8)} -> ${chunk.last_id?.slice(0,8)})`);
+      lastId = chunk.last_id;
     }
+    console.log(`  -> wakilisha_entities total: ${cEntities}`);
 
-    // Group by entity type
-    const entityGroups: Map<string, string[]> = new Map();
-    for (const rec of readyRecords) {
-      const entity = rec.target_entity;
-      if (!entityGroups.has(entity)) entityGroups.set(entity, []);
-      entityGroups.get(entity)!.push(rec.id);
-    }
+    console.log("Marking run finalized...");
+    const { data: result, error: e5 } = await supabase.rpc("finalize_step_complete", {
+      p_run_id: runId, p_content: cContent, p_authors: cAuthors, p_tax: cTax,
+      p_media: 0, p_entities: cEntities, p_review: 0, p_errors: allErrors,
+    });
+    if (e5) throw new Error(`Complete step failed: ${e5.message}`);
 
-    const summary = { total: readyRecords.length, content_items: 0, authors: 0, taxonomy_terms: 0, media_assets: 0, wakilisha_entities: 0, review_artifacts: 0 };
-    const promotionEvents: Array<Record<string, unknown>> = [];
-    const errors: string[] = [];
-
-    for (const [targetEntity, stagingIds] of entityGroups) {
-      try {
-        if (CONTENT_ENTITIES.has(targetEntity)) {
-          // Promote to wk_content_items
-          const contentPromoted = 0;
-          for (const sid of stagingIds) {
-            const { data: rec, error: recErr } = await supabase
-              .from("wk_import_staging_records")
-              .select("*")
-              .eq("id", sid)
-              .maybeSingle();
-
-            if (recErr || !rec) {
-              promotionEvents.push({
-                ingestion_run_id: runId, staging_record_id: sid,
-                target_table: "wk_content_items", event_type: "failed",
-                message: recErr ? recErr.message : "Record not found",
-              });
-              continue;
-            }
-
-            const content_type = targetEntity === "pages" ? "page" : "article";
-            const status = rec.mapped_record?.source_status === "publish" ? "published" : "draft";
-
-            const { error: insertErr } = await supabase.from("wk_content_items").insert({
-              content_type,
-              slug: rec.target_slug || slugify(rec.title || sid),
-              title: rec.title || "Untitled",
-              body: rec.body || "",
-              excerpt: rec.excerpt || "",
-              status,
-              published_at: rec.published_at,
-              author_name: rec.author_name,
-              source_url: rec.source_url,
-              source_kind: rec.source_kind,
-              source_ingestion_run_id: runId,
-              source_staging_record_id: sid,
-              source_record_id: rec.source_record_id,
-              raw_record: rec.raw_record,
-              mapped_record: rec.mapped_record,
-            });
-
-            if (insertErr) {
-              if (insertErr.message.includes("duplicate key") || insertErr.code === "23505") {
-                promotionEvents.push({
-                  ingestion_run_id: runId, staging_record_id: sid,
-                  target_table: "wk_content_items", event_type: "skipped",
-                  message: "Duplicate slug — already exists.",
-                });
-              } else {
-                promotionEvents.push({
-                  ingestion_run_id: runId, staging_record_id: sid,
-                  target_table: "wk_content_items", event_type: "failed",
-                  message: insertErr.message,
-                });
-              }
-            } else {
-              summary.content_items++;
-              promotionEvents.push({
-                ingestion_run_id: runId, staging_record_id: sid,
-                target_table: "wk_content_items", event_type: "promoted",
-                message: `Promoted ${targetEntity} record.`,
-              });
-            }
-          }
-        } else if (AUTHOR_ENTITIES.has(targetEntity)) {
-          for (const sid of stagingIds) {
-            const { data: rec, error: recErr } = await supabase
-              .from("wk_import_staging_records")
-              .select("*")
-              .eq("id", sid)
-              .maybeSingle();
-
-            if (recErr || !rec) continue;
-
-            const { error: insertErr } = await supabase.from("wk_authors").insert({
-              slug: rec.target_slug || slugify(rec.title || sid),
-              name: rec.title || "Unknown Author",
-              email: rec.mapped_record?.email || null,
-              url: rec.mapped_record?.url || null,
-              source_kind: rec.source_kind,
-              source_ingestion_run_id: runId,
-              source_staging_record_id: sid,
-              source_record_id: rec.source_record_id,
-              raw_record: rec.raw_record,
-              mapped_record: rec.mapped_record,
-            });
-
-            if (insertErr) {
-              promotionEvents.push({
-                ingestion_run_id: runId, staging_record_id: sid,
-                target_table: "wk_authors", event_type: insertErr.code === "23505" ? "skipped" : "failed",
-                message: insertErr.message,
-              });
-            } else {
-              summary.authors++;
-              promotionEvents.push({
-                ingestion_run_id: runId, staging_record_id: sid,
-                target_table: "wk_authors", event_type: "promoted",
-                message: "Promoted author record.",
-              });
-            }
-          }
-        } else if (TAXONOMY_ENTITIES.has(targetEntity)) {
-          for (const sid of stagingIds) {
-            const { data: rec, error: recErr } = await supabase
-              .from("wk_import_staging_records")
-              .select("*")
-              .eq("id", sid)
-              .maybeSingle();
-
-            if (recErr || !rec) continue;
-
-            const taxonomy = rec.mapped_record?.taxonomy || "term";
-            const { error: insertErr } = await supabase.from("wk_taxonomy_terms").insert({
-              taxonomy,
-              slug: rec.target_slug || slugify(rec.title || sid),
-              name: rec.title || "Unnamed",
-              description: rec.body || null,
-              source_kind: rec.source_kind,
-              source_ingestion_run_id: runId,
-              source_staging_record_id: sid,
-              source_record_id: rec.source_record_id,
-              raw_record: rec.raw_record,
-              mapped_record: rec.mapped_record,
-            });
-
-            if (insertErr) {
-              promotionEvents.push({
-                ingestion_run_id: runId, staging_record_id: sid,
-                target_table: "wk_taxonomy_terms", event_type: insertErr.code === "23505" ? "skipped" : "failed",
-                message: insertErr.message,
-              });
-            } else {
-              summary.taxonomy_terms++;
-              promotionEvents.push({
-                ingestion_run_id: runId, staging_record_id: sid,
-                target_table: "wk_taxonomy_terms", event_type: "promoted",
-                message: `Promoted ${taxonomy} term record.`,
-              });
-            }
-          }
-        } else if (MEDIA_ENTITIES.has(targetEntity)) {
-          for (const sid of stagingIds) {
-            const { data: rec, error: recErr } = await supabase
-              .from("wk_import_staging_records")
-              .select("*")
-              .eq("id", sid)
-              .maybeSingle();
-
-            if (recErr || !rec) continue;
-
-            if (!rec.source_url) {
-              promotionEvents.push({
-                ingestion_run_id: runId, staging_record_id: sid,
-                target_table: "wk_media_assets", event_type: "skipped",
-                message: "No source_url — media asset requires a URL.",
-              });
-              continue;
-            }
-
-            const { error: insertErr } = await supabase.from("wk_media_assets").insert({
-              slug: rec.target_slug || slugify(rec.title || sid),
-              title: rec.title || "Untitled Media",
-              source_url: rec.source_url,
-              mime_type: rec.mapped_record?.mime_type || null,
-              status: "needs_review",
-              source_kind: rec.source_kind,
-              source_ingestion_run_id: runId,
-              source_staging_record_id: sid,
-              source_record_id: rec.source_record_id,
-              raw_record: rec.raw_record,
-              mapped_record: rec.mapped_record,
-            });
-
-            if (insertErr) {
-              promotionEvents.push({
-                ingestion_run_id: runId, staging_record_id: sid,
-                target_table: "wk_media_assets", event_type: insertErr.code === "23505" ? "skipped" : "failed",
-                message: insertErr.message,
-              });
-            } else {
-              summary.media_assets++;
-              promotionEvents.push({
-                ingestion_run_id: runId, staging_record_id: sid,
-                target_table: "wk_media_assets", event_type: "promoted",
-                message: "Promoted media asset record.",
-              });
-            }
-          }
-        } else if (WAKILISHA_ENTITIES.has(targetEntity)) {
-          // Promote to wk_wakilisha_entities
-          for (const sid of stagingIds) {
-            const { data: rec, error: recErr } = await supabase
-              .from("wk_import_staging_records")
-              .select("*")
-              .eq("id", sid)
-              .maybeSingle();
-
-            if (recErr || !rec) continue;
-
-            const status = rec.mapped_record?.source_status === "publish" ? "published" : "draft";
-            const { error: insertErr } = await supabase.from("wk_wakilisha_entities").insert({
-              entity_type: targetEntity,
-              slug: rec.target_slug || slugify(rec.title || sid),
-              title: rec.title || "Untitled",
-              body: rec.body || "",
-              excerpt: rec.excerpt || "",
-              status,
-              published_at: rec.published_at,
-              source_url: rec.source_url,
-              source_kind: rec.source_kind,
-              source_ingestion_run_id: runId,
-              source_staging_record_id: sid,
-              source_record_id: rec.source_record_id,
-              raw_record: rec.raw_record,
-              mapped_record: rec.mapped_record,
-            });
-
-            if (insertErr) {
-              promotionEvents.push({
-                ingestion_run_id: runId, staging_record_id: sid,
-                target_table: "wk_wakilisha_entities", event_type: insertErr.code === "23505" ? "skipped" : "failed",
-                message: insertErr.message,
-              });
-            } else {
-              summary.wakilisha_entities++;
-              promotionEvents.push({
-                ingestion_run_id: runId, staging_record_id: sid,
-                target_table: "wk_wakilisha_entities", event_type: "promoted",
-                message: `Promoted ${targetEntity} wakilisha entity record.`,
-              });
-            }
-          }
-        } else if (REVIEW_ENTITIES.has(targetEntity)) {
-          for (const sid of stagingIds) {
-            const { data: rec, error: recErr } = await supabase
-              .from("wk_import_staging_records")
-              .select("*")
-              .eq("id", sid)
-              .maybeSingle();
-
-            if (recErr || !rec) continue;
-
-            const { error: insertErr } = await supabase.from("wk_import_review_artifacts").insert({
-              artifact_type: targetEntity,
-              title: rec.title || null,
-              source_kind: rec.source_kind,
-              source_ingestion_run_id: runId,
-              source_staging_record_id: sid,
-              source_record_id: rec.source_record_id,
-              raw_record: rec.raw_record,
-              mapped_record: rec.mapped_record,
-              review_status: "needs_review",
-              notes: "Relationship/custom-field artifact preserved for resolver review.",
-            });
-
-            if (insertErr) {
-              promotionEvents.push({
-                ingestion_run_id: runId, staging_record_id: sid,
-                target_table: "wk_import_review_artifacts", event_type: insertErr.code === "23505" ? "skipped" : "failed",
-                message: insertErr.message,
-              });
-            } else {
-              summary.review_artifacts++;
-              promotionEvents.push({
-                ingestion_run_id: runId, staging_record_id: sid,
-                target_table: "wk_import_review_artifacts", event_type: "promoted",
-                message: `Preserved ${targetEntity} as review artifact.`,
-              });
-            }
-          }
-        } else {
-          // Unknown target entity — skip
-          for (const sid of stagingIds) {
-            promotionEvents.push({
-              ingestion_run_id: runId, staging_record_id: sid,
-              target_table: "unknown", event_type: "skipped",
-              message: `Unknown target entity: ${targetEntity}`,
-            });
-          }
-        }
-      } catch (entityErr) {
-        const msg = entityErr instanceof Error ? entityErr.message : "Unknown";
-        errors.push(`${targetEntity}: ${msg}`);
-      }
-    }
-
-    // Count also non-ready records that were skipped
-    const { count: skippedCount } = await supabase
-      .from("wk_import_staging_records")
-      .select("*", { count: "exact", head: true })
-      .eq("ingestion_run_id", runId)
-      .neq("target_status", "ready");
-
-    // Insert promotion events
-    if (promotionEvents.length > 0) {
-      await supabase.from("wk_import_promotion_events").insert(promotionEvents);
-    }
-
-    const totalFinalized = summary.content_items + summary.authors + summary.taxonomy_terms + summary.media_assets + summary.wakilisha_entities + summary.review_artifacts;
-    const finalizationPayload = {
-      finalized_at: new Date().toISOString(),
-      processor: "finalize-wp-staging",
-      version: "1.0.0",
-      finalized: totalFinalized,
-      skipped: skippedCount ?? 0,
-      counts_by_target_entity: summary,
-      only_ready_records: true,
-    };
-
-    const updatedManifest = {
-      ...(run.source_manifest ?? {}),
-      finalization: finalizationPayload,
-    };
-
-    const warnings = [
-      ...(run.warnings ?? []),
-      `Finalized ${totalFinalized} records across ${Object.values(summary).filter((v) => v > 0).length} target groups.`,
-      skippedCount && skippedCount > 0 ? `${skippedCount} non-ready staging records were skipped (needs_review/blocked/draft).` : "",
-      errors.length > 0 ? `${errors.length} entity group errors during finalization.` : "",
-    ].filter(Boolean);
-
-    await supabase.from("wk_ingestion_runs").update({
-      status: "finalized",
-      finished_at: new Date().toISOString(),
-      source_manifest: updatedManifest,
-      warnings,
-      errors: errors.slice(0, 200),
-    }).eq("id", runId);
-
-    return new Response(JSON.stringify({
-      success: true,
-      runId,
-      summary,
-      totalFinalized,
-      skipped: skippedCount ?? 0,
-      promotionEvents: promotionEvents.length,
-      errorCount: errors.length,
-    }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    return new Response(JSON.stringify(result), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
 
   } catch (err) {
     return new Response(

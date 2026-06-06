@@ -1,6 +1,10 @@
 import { useEffect, useRef } from 'react';
 import { usePlayer } from '@/context/PlayerContext';
-import type { TimedLyricLine } from '@/mocks/timedLyrics';
+
+export interface TimedLyricLine {
+  timestampSeconds: number;
+  text: string;
+}
 
 interface SyncedLyricsDisplayProps {
   lines: TimedLyricLine[];

@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { WkIcon } from '@/components/design-system/Icon';
-import { TIMED_LYRICS, type TimedLyricsSubmission, type TimedLyricLine } from '@/mocks/timedLyrics';
+interface TimedLyricLine { timestampSeconds: number; text: string; }
+interface TimedLyricsSubmission { id: number; trackSlug: string; status: 'approved' | 'pending_review' | 'draft' | 'rejected'; submitterName: string; lines: TimedLyricLine[]; upvotes: number; downvotes: number; sourceDescription?: string; createdAt: string; }
+const TIMED_LYRICS: Record<string, TimedLyricsSubmission> = {};
 
 type AdminTab = 'pending' | 'approved' | 'all';
 

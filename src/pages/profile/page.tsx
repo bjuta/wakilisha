@@ -2,7 +2,8 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useTheme } from "@/components/design-system/theme/ThemeProvider";
 import { WkIcon } from "@/components/design-system/Icon";
-import { HOME_FEATURED_ARTISTS, HOME_TRENDING_TRACKS } from "@/mocks/home";
+const HOME_FEATURED_ARTISTS: any[] = [];
+const HOME_TRENDING_TRACKS: any[] = [];
 import { useMagazineArticles } from "@/services/magazineArticles";
 
 type Tab = "Likes" | "Tracks" | "Reads" | "Settings";

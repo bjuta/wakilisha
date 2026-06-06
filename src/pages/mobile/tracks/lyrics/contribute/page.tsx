@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { usePlayer } from '@/context/PlayerContext';
-import { TRACK_DETAILS, getTrackBySlug } from '@/mocks/trackDetails';
 import { WkIcon } from '@/components/design-system/Icon';
+
+const TRACK_DETAILS: any[] = [];
+function getTrackBySlug(_slug: string): any { return undefined; }
 
 interface DraftLine {
   id: string;

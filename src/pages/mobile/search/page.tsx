@@ -1,10 +1,10 @@
 import { useState, useMemo, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { ARTISTS } from "@/mocks/artists";
-import { TRACK_DETAILS } from "@/mocks/trackDetails";
-import { GENRES } from "@/mocks/genres";
-import { LABELS } from "@/mocks/labels";
-import { CHART_DATA } from "@/mocks/charts";
+const ARTISTS: any[] = [];
+const TRACK_DETAILS: any[] = [];
+const GENRES: any[] = [];
+const LABELS: any[] = [];
+const CHART_DATA: any[] = [];
 import { listReleases, releaseUrl, type RepairedRelease } from "@/services/repairedContent/client";
 import { WkIcon } from "@/components/design-system/Icon";
 

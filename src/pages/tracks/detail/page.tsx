@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { usePlayer } from "@/context/PlayerContext";
-import { TRACK_DETAILS, getTrackBySlug, getRelatedTracks } from "@/mocks/trackDetails";
+const TRACK_DETAILS: any[] = [];
+function getTrackBySlug(_slug: string): any { return undefined; }
+function getRelatedTracks(_artistSlug: string, _excludeSlug: string): any[] { return []; }
+function getTimedLyrics(_trackSlug: string): any { return undefined; }
 import { TrackChartHistorySection } from "@/components/charts/TrackChartHistory";
 import { SyncedLyricsDisplay } from "@/components/lyrics/SyncedLyricsDisplay";
-import { getTimedLyrics } from "@/mocks/timedLyrics";
 import { WkIcon } from "@/components/design-system/Icon";
 
 const TABS = ["Overview", "Chart stats", "Lyrics", "Credits"] as const;

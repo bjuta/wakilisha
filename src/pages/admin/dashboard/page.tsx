@@ -2,15 +2,17 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
-import {
-  DASHBOARD_KPIS,
-  ATTENTION_ITEMS,
-  RECENT_ACTIVITY,
-  QUICK_ACTIONS,
-  SYSTEM_HEALTH,
-  OPERATIONAL_COUNTS,
-} from "@/mocks/adminDashboard";
-import type { DashboardKpi, AttentionItem, RecentActivityItem, QuickAction, SystemHealthItem } from "@/mocks/adminDashboard";
+interface DashboardKpi { label: string; value: number; icon: string; accent: string; href: string; change?: number; }
+interface AttentionItem { id: string; title: string; count: number; type: string; href: string; }
+interface RecentActivityItem { id: number; action: string; entity: string; actor: string; timestamp: string; status: string; }
+interface QuickAction { label: string; icon: string; href: string; description: string; accent: string; disabled?: boolean; }
+interface SystemHealthItem { label: string; status: string; }
+const DASHBOARD_KPIS: DashboardKpi[] = [];
+const ATTENTION_ITEMS: AttentionItem[] = [];
+const RECENT_ACTIVITY: RecentActivityItem[] = [];
+const QUICK_ACTIONS: QuickAction[] = [];
+const SYSTEM_HEALTH: SystemHealthItem[] = [];
+const OPERATIONAL_COUNTS = { recentlyImported: 0, recentlyEdited: 0, recentlyPublished: 0, draftsAwaitingReview: 0, recordsMissingHeroImages: 0, recordsMissingSlugs: 0, failedImports: 0, contentConflicts: 0 };
 import { supabase } from "@/lib/supabase";
 
 const KPI_TO_TABLE: Record<string, string> = {

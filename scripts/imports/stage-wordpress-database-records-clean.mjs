@@ -303,7 +303,7 @@ function extraColumns(row, cols) { const o={}; for(const c of cols){ if(c in row
 
 async function stage(pool, wp, cfg, runId) {
   console.log(`[stage] Connected to MySQL ${cfg.host}:${cfg.port}/${cfg.database}`);
-  await pool.query("update wk_ingestion_runs set status='staging', errors='' where id=$1",[runId]);
+  await pool.query("update wk_ingestion_runs set status='staging' where id=$1",[runId]);
   await clearPrior(pool, runId);
 
   const records = [];
@@ -398,7 +398,8 @@ async function stage(pool, wp, cfg, runId) {
     ignored_post_type_counts:ignoredPostTypeCounts,
   };
 
-  await pool.query("update wk_ingestion_runs set status='staged', source_manifest=jsonb_set(coalesce(source_manifest,''::jsonb),'{staging}',$2::jsonb,true), imported_counts=$3::jsonb, warnings=array_append(coalesce(warnings,''::text[]),'Plugin tables (wp_wkcharts_*) staged alongside wp_posts. Unknown post types quarantined as ignored_post_types.') where id=$1",[runId,safeJson(summary),safeJson(readyCounts)]);
+  const stagingWarnings = ['Plugin tables (wp_wkcharts_*) staged alongside wp_posts. Unknown post types quarantined as ignored_post_types.'];
+  await pool.query("update wk_ingestion_runs set status='staged', source_manifest=jsonb_set(coalesce(source_manifest,'{}'::jsonb),'{staging}',$2::jsonb,true), imported_counts=$3::jsonb, warnings = coalesce(warnings,'[]'::jsonb) || $4::jsonb where id=$1",[runId,safeJson(summary),safeJson(readyCounts),safeJson(stagingWarnings)]);
 
   console.log(`\n[stage] DONE! ${runId}: ${records.length} total records`);
   console.log(`[stage] Ready counts by entity:`,JSON.stringify(readyCounts,null,2));

@@ -4,11 +4,11 @@ import { usePlayer } from "@/context/PlayerContext";
 import { WkTag } from "@/components/design-system/primitives/Tag";
 import { ArtistCard } from "@/components/design-system/registry/ArtistCard";
 import { ReleaseCard } from "@/components/design-system/registry/ReleaseCard";
-import { ARTISTS } from "@/mocks/artists";
-import { TRACK_DETAILS } from "@/mocks/trackDetails";
-import { GENRES } from "@/mocks/genres";
-import { LABELS } from "@/mocks/labels";
-import { CHART_DATA } from "@/mocks/charts";
+const ARTISTS: any[] = [];
+const TRACK_DETAILS: any[] = [];
+const GENRES: any[] = [];
+const LABELS: any[] = [];
+const CHART_DATA: any[] = [];
 import { SkeletonBlock } from "@/components/skeletons/Skeletons";
 import { listReleases, type RepairedRelease } from "@/services/repairedContent/client";
 
