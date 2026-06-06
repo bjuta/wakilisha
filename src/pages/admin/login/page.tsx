@@ -123,6 +123,17 @@ export default function AdminLoginPage() {
     navigate("/auth", { replace: true });
   };
 
+  const signOutAndRetry = async () => {
+    setLoading(true);
+    clearMessages();
+    await supabase.auth.signOut();
+    setEmail("");
+    setPassword("");
+    setDeniedEmail(null);
+    setMode("signin");
+    setLoading(false);
+  };
+
   const backToSignin = () => {
     clearMessages();
     setMode("signin");
@@ -173,8 +184,8 @@ export default function AdminLoginPage() {
                     </div>
                   </div>
                 </div>
-                <button onClick={() => setMode("signin")} className="wk-button wk-button-primary w-full">Try another admin account</button>
-                <button onClick={signOutAndPublic} className="wk-button wk-button-ghost w-full">Continue to public account login</button>
+                <button onClick={signOutAndRetry} disabled={loading} className="wk-button wk-button-primary w-full">{loading ? "Signing out…" : "Sign out and try another admin account"}</button>
+                <button onClick={signOutAndPublic} disabled={loading} className="wk-button wk-button-ghost w-full">Continue to public account login</button>
               </div>
             )}
 
