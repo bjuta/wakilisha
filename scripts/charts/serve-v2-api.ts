@@ -6,6 +6,7 @@ import {
   type V2Repository,
 } from "./v2-api-repository";
 import { repairedResponse } from "./repaired-content-api";
+import { repairedDetailResponse } from "./repaired-content-details-api";
 
 type Row = Record<string, unknown>;
 type Entry = {
@@ -143,6 +144,10 @@ async function route(req: http.IncomingMessage, res: http.ServerResponse) {
 
     if (parts.length >= 2 && parts[0] === "repaired") {
       const limit = Math.min(Number(url.searchParams.get("limit") ?? 120) || 120, 500);
+      if (parts.length > 2) {
+        const data = await repairedDetailResponse(parts[1], parts.slice(2));
+        return json(res, 200, envelope(data, { namespace: "repaired", resource: parts[1], detailPath: parts.slice(2).join("/") }));
+      }
       const data = await repairedResponse(parts[1], limit);
       return json(res, 200, envelope(data, { namespace: "repaired", resource: parts[1] }));
     }
@@ -225,8 +230,6 @@ async function route(req: http.IncomingMessage, res: http.ServerResponse) {
 }
 
 async function startServer(): Promise<void> {
-  // Warm up DB connection before starting the HTTP server.
-  // This prevents intermittent 502s where the proxy is ready but the DB pool is not.
   if (repo.kind === "database") {
     const dbOk = await repo.testConnection();
     if (!dbOk) {
