@@ -39,7 +39,8 @@ function toModalRelease(r: DiscoRelease): ModalRelease {
     year: r.year || formatYear(r.releaseDate),
     labelName: r.labelName,
     artworkUrl: r.artworkUrl || "",
-    trackCount: r.trackCount || 0,
+    trackCount: r.trackCount || (r.tracks?.length || 0),
+    tracks: r.tracks || [],
   };
 }
 

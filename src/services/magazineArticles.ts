@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { listMagazineStories, type RepairedStory } from '@/services/repairedContent/client';
+import { listMagazineStories, getArticle, type RepairedStory } from '@/services/repairedContent/client';
+import { rewriteWpImageUrls } from '@/services/wpImageRewrite';
 
 export type MediaAsset = {
   id: string;
@@ -58,10 +59,31 @@ export async function listMagazineArticles(): Promise<MagazineArticle[]> {
   return stories.map(storyToArticle);
 }
 
-export async function getMagazineArticleBySlug(slug: string | undefined): Promise<MagazineArticle | null> {
+export async function getMagazineArticleBySlug(
+  slug: string | undefined,
+  _previewNonce?: string | null
+): Promise<MagazineArticle | null> {
   if (!slug) return null;
-  const articles = await listMagazineArticles();
-  return articles.find((article) => article.slug === slug) ?? null;
+  const detail = await getArticle(slug);
+  if (!detail) return null;
+  return {
+    id: detail.id,
+    slug: detail.slug,
+    title: detail.title,
+    section: detail.section,
+    author: detail.author,
+    date: detail.date,
+    readingTime: detail.readingTime,
+    heroUrl: detail.heroUrl,
+    dek: detail.dek,
+    body: detail.contentHtml ? [detail.contentHtml] : [],
+    contentHtml: rewriteWpImageUrls(detail.contentHtml),
+    tags: detail.tags || [],
+    relatedEntities: [],
+    isFeatured: false,
+    readCount: 0,
+    mediaAssets: [],
+  };
 }
 
 export async function getRelatedArticles(article: MagazineArticle, limit = 3): Promise<MagazineArticle[]> {

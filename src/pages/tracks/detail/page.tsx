@@ -1,18 +1,100 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { usePlayer } from "@/context/PlayerContext";
-const TRACK_DETAILS: any[] = [];
-function getTrackBySlug(_slug: string): any { return undefined; }
-function getRelatedTracks(_artistSlug: string, _excludeSlug: string): any[] { return []; }
-function getTimedLyrics(_trackSlug: string): any { return undefined; }
+import { getTrack, type RepairedTrackDetail } from "@/services/repaired/client";
 import { TrackChartHistorySection } from "@/components/charts/TrackChartHistory";
 import { SyncedLyricsDisplay } from "@/components/lyrics/SyncedLyricsDisplay";
 import { WkIcon } from "@/components/design-system/Icon";
+
+type TrackViewModel = {
+  slug: string;
+  title: string;
+  artist: string;
+  artistSlug: string;
+  genre: string;
+  label: string;
+  labelSlug: string;
+  genreSlug: string;
+  rank: number;
+  peakPosition: number;
+  weeksOnChart: number;
+  movement: "up" | "down" | "new" | "same";
+  movementAmount: number;
+  previousWeek: number | null;
+  artworkUrl: string;
+  duration: number;
+  streamCount: string | null;
+  releaseYear: string;
+  source: string;
+  isPlayable: boolean;
+  albumTitle: string;
+  credits: Array<{ role: string; name: string }>;
+  chartHistory: number[];
+  streamingLinks: Array<{ platform: string; url: string }>;
+  lyrics: string | null;
+  lyricsContributor: { name: string; source?: string } | null;
+  artistImage: string;
+};
+
+function apiToViewModel(api: RepairedTrackDetail): TrackViewModel {
+  const history = api.chartHistory || [];
+  const currentRank = api.currentRank ?? 0;
+  const prevIdx = history.length > 1 ? 1 : -1;
+  const prevRank = prevIdx >= 0 ? history[prevIdx] : 0;
+
+  let movement: TrackViewModel["movement"] = "same";
+  let movementAmount = 0;
+  if (history.length <= 1) {
+    movement = "new";
+  } else if (currentRank > 0 && prevRank > 0) {
+    if (currentRank < prevRank) { movement = "up"; movementAmount = prevRank - currentRank; }
+    else if (currentRank > prevRank) { movement = "down"; movementAmount = currentRank - prevRank; }
+  }
+
+  const primaryGenre = api.genres && api.genres.length > 0 ? api.genres[0].name : "Unknown";
+  const primaryGenreSlug = api.genres && api.genres.length > 0 ? api.genres[0].slug : "";
+  const duration = api.track.durationMs ? Math.round(api.track.durationMs / 1000) : 0;
+  const artworkUrl = api.track.artworkUrl || api.release?.artworkUrl || api.artist?.imageUrl || "";
+
+  return {
+    slug: api.track.slug,
+    title: api.track.title,
+    artist: api.artist.name,
+    artistSlug: api.artist.slug,
+    genre: primaryGenre,
+    genreSlug: primaryGenreSlug,
+    label: api.label?.name || "Unknown",
+    labelSlug: api.label?.slug || "",
+    rank: currentRank,
+    peakPosition: api.peakRank ?? currentRank,
+    weeksOnChart: api.weeksOnChart,
+    movement,
+    movementAmount,
+    previousWeek: prevRank > 0 ? prevRank : null,
+    artworkUrl,
+    duration,
+    streamCount: null,
+    releaseYear: api.release?.releaseDate ? api.release.releaseDate.split("-")[0] : "",
+    source: "WAKILISHA Registry",
+    isPlayable: false,
+    albumTitle: api.release?.title || "",
+    credits: [],
+    chartHistory: history,
+    streamingLinks: [],
+    lyrics: null,
+    lyricsContributor: null,
+    artistImage: api.artist.imageUrl,
+  };
+}
+
+function getRelatedTracks(_artistSlug: string, _excludeSlug: string): TrackViewModel[] { return []; }
+function getTimedLyrics(_trackSlug: string): any { return undefined; }
 
 const TABS = ["Overview", "Chart stats", "Lyrics", "Credits"] as const;
 type Tab = (typeof TABS)[number];
 
 function formatDuration(seconds: number): string {
+  if (!seconds || seconds <= 0) return "";
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
   return `${m}:${s.toString().padStart(2, "0")}`;
@@ -60,7 +142,7 @@ function ChartSparkline({ data }: { data: number[] }) {
 }
 
 function StreamingBadge({ platform }: { platform: string }) {
-  const iconMap: Record<string, any> = {
+  const iconMap: Record<string, string> = {
     Spotify: "Radio",
     "Apple Music": "Music2",
     YouTube: "Youtube",
@@ -91,21 +173,57 @@ export default function TrackDetail() {
   const { playTrack, currentTrack, isPlaying, togglePlay } = usePlayer();
   const [activeTab, setActiveTab] = useState<Tab>("Overview");
   const [copied, setCopied] = useState(false);
+  const [track, setTrack] = useState<TrackViewModel | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const track = getTrackBySlug(slug || "");
-  const related = track?.artistSlug ? getRelatedTracks(track.artistSlug, track.slug) : [];
+  useEffect(() => {
+    let alive = true;
+    if (!slug) { setLoading(false); setError("No track slug provided"); return; }
+    setLoading(true);
+    setError(null);
+    getTrack(slug)
+      .then((apiData) => {
+        if (!alive) return;
+        if (!apiData) {
+          setError("Track not found in the registry.");
+          setLoading(false);
+          return;
+        }
+        setTrack(apiToViewModel(apiData));
+        setLoading(false);
+      })
+      .catch((err) => {
+        if (!alive) return;
+        setError(err instanceof Error ? err.message : "Could not load track.");
+        setLoading(false);
+      });
+    return () => { alive = false; };
+  }, [slug]);
 
-  if (!track) {
+  if (loading) {
     return (
-      <main className="min-h-screen px-6 py-20 text-center">
-        <WkIcon name="Music2" size={42} className="mx-auto mb-4 text-[var(--wk-text-faint)]" />
-        <h1 className="mb-2 text-[28px] font-black text-[var(--wk-text)]">Track not found</h1>
-        <p className="text-[var(--wk-text-muted)]">This track does not exist in the registry.</p>
-        <Link to="/charts" className="wk-button wk-button-primary mt-6">Back to charts</Link>
+      <main className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="mx-auto mb-4 h-20 w-20 rounded-2xl bg-[var(--wk-surface-raised)] animate-pulse" />
+          <p className="text-[15px] font-semibold text-[var(--wk-text-muted)]">Loading track&hellip;</p>
+        </div>
       </main>
     );
   }
 
+  if (error || !track) {
+    return (
+      <main className="min-h-screen px-6 py-20 text-center">
+        <WkIcon name="Music2" size={42} className="mx-auto mb-4 text-[var(--wk-text-faint)]" />
+        <h1 className="mb-2 text-[28px] font-black text-[var(--wk-text)]">Track not found</h1>
+        <p className="text-[var(--wk-text-muted)]">{error || "This track does not exist in the registry."}</p>
+        <Link to="/charts" className="inline-block mt-6 rounded-xl bg-[var(--wk-brand)] px-6 py-3 text-[14px] font-bold text-[var(--wk-brand-on)]">Back to charts</Link>
+      </main>
+    );
+  }
+
+  const related = track.artistSlug ? getRelatedTracks(track.artistSlug, track.slug) : [];
   const isCurrentTrack = currentTrack?.id === track.slug;
   const isTrackPlaying = isCurrentTrack && isPlaying;
 
@@ -114,7 +232,7 @@ export default function TrackDetail() {
     if (isCurrentTrack) { togglePlay(); return; }
     playTrack(
       { id: track.slug, title: track.title, artist: track.artist, artworkUrl: track.artworkUrl, isPlayable: track.isPlayable, source: track.source, duration: track.duration },
-      TRACK_DETAILS.filter((t) => t.isPlayable).map((t) => ({ id: t.slug, title: t.title, artist: t.artist, artworkUrl: t.artworkUrl, isPlayable: t.isPlayable, source: t.source, duration: t.duration }))
+      [track].filter((t) => t.isPlayable).map((t) => ({ id: t.slug, title: t.title, artist: t.artist, artworkUrl: t.artworkUrl, isPlayable: t.isPlayable, source: t.source, duration: t.duration }))
     );
   };
 
@@ -135,18 +253,33 @@ export default function TrackDetail() {
           <div className="mx-auto max-w-[1100px]">
             <div className="mb-3 flex items-center gap-3">
               <Link to="/charts" className="flex items-center gap-2 text-[11px] font-extrabold uppercase tracking-[0.22em] text-[var(--wk-brand)]"><span className="h-px w-5 bg-[var(--wk-brand)]" />Charts</Link>
-              <span className="rounded-full bg-[var(--wk-brand-soft)] px-2.5 py-0.5 text-[10px] font-bold uppercase text-[var(--wk-brand)]">#{track.rank}</span>
+              {track.rank > 0 && <span className="rounded-full bg-[var(--wk-brand-soft)] px-2.5 py-0.5 text-[10px] font-bold uppercase text-[var(--wk-brand)]">#{track.rank}</span>}
               {track.movement === "new" && <span className="rounded-full bg-[var(--wk-brand)] px-2.5 py-0.5 text-[10px] font-bold uppercase text-[var(--wk-brand-on)]">New Entry</span>}
             </div>
             <h1 className="font-black leading-[0.92] tracking-[-0.04em] text-[var(--wk-text)]" style={{ fontSize: "clamp(36px, 6vw, 72px)" }}>{track.title}</h1>
             <div className="mt-3 flex flex-wrap items-center gap-2 text-[14px] text-[var(--wk-text-muted)]">
-              {track.artistSlug ? <Link to={`/artists/${track.artistSlug}`} className="font-semibold text-[var(--wk-text-soft)] hover:text-[var(--wk-brand)] transition-colors">{track.artist}</Link> : <span className="font-semibold text-[var(--wk-text-soft)]">{track.artist}</span>}
-              <span>·</span><span>{track.genre}</span><span>·</span><span>{track.label}</span>
+              {track.artistSlug ? (
+                <Link to={`/artists/${track.artistSlug}`} className="font-semibold text-[var(--wk-text-soft)] hover:text-[var(--wk-brand)] transition-colors">{track.artist}</Link>
+              ) : (
+                <span className="font-semibold text-[var(--wk-text-soft)]">{track.artist}</span>
+              )}
+              {track.genre && track.genre !== "Unknown" && (
+                <>
+                  <span>·</span>
+                  <Link to={`/genres/${track.genreSlug}`} className="hover:text-[var(--wk-brand)] transition-colors">{track.genre}</Link>
+                </>
+              )}
+              {track.label && track.label !== "Unknown" && (
+                <>
+                  <span>·</span>
+                  <Link to={`/labels/${track.labelSlug}`} className="hover:text-[var(--wk-brand)] transition-colors">{track.label}</Link>
+                </>
+              )}
             </div>
             <div className="mt-4 flex flex-wrap items-center gap-4 text-[12px] text-[var(--wk-text-muted)]">
               {track.streamCount && <span className="inline-flex items-center gap-1"><WkIcon name="Headphones" size={14} className="text-[var(--wk-brand)]" />{track.streamCount}</span>}
-              {track.duration && <span className="inline-flex items-center gap-1"><WkIcon name="Clock3" size={14} />{formatDuration(track.duration)}</span>}
-              {track.peakPosition && <span className="inline-flex items-center gap-1"><WkIcon name="Trophy" size={14} className="text-[var(--wk-brand)]" />Peak #{track.peakPosition}</span>}
+              {track.duration > 0 && <span className="inline-flex items-center gap-1"><WkIcon name="Clock3" size={14} />{formatDuration(track.duration)}</span>}
+              {track.peakPosition > 0 && <span className="inline-flex items-center gap-1"><WkIcon name="Trophy" size={14} className="text-[var(--wk-brand)]" />Peak #{track.peakPosition}</span>}
               {track.releaseYear && <span className="inline-flex items-center gap-1"><WkIcon name="Calendar" size={14} />{track.releaseYear}</span>}
             </div>
           </div>
@@ -205,11 +338,11 @@ export default function TrackDetail() {
   );
 }
 
-function OverviewTab({ track, related }: { track: NonNullable<ReturnType<typeof getTrackBySlug>>; related: typeof TRACK_DETAILS }) {
+function OverviewTab({ track, related }: { track: TrackViewModel; related: TrackViewModel[] }) {
   return (
     <div>
       <div className="grid grid-cols-4 gap-px border-b border-[var(--wk-border)]" style={{ background: "var(--wk-border)" }}>
-        {[{ label: "Rank", value: `#${track.rank}` },{ label: "Peak", value: `#${track.peakPosition}` },{ label: "Weeks", value: track.weeksOnChart },{ label: "Year", value: track.releaseYear || "—" }].map((stat) => (
+        {[{ label: "Rank", value: track.rank > 0 ? `#${track.rank}` : "—" },{ label: "Peak", value: track.peakPosition > 0 ? `#${track.peakPosition}` : "—" },{ label: "Weeks", value: track.weeksOnChart || "—" },{ label: "Year", value: track.releaseYear || "—" }].map((stat) => (
           <div key={stat.label} className="bg-[var(--wk-surface)] px-3 py-4 text-center lg:py-5">
             <div className="text-[20px] font-black text-[var(--wk-brand)] lg:text-[24px]">{stat.value}</div>
             <div className="mt-1 text-[10px] font-bold uppercase tracking-wider text-[var(--wk-text-muted)]">{stat.label}</div>
@@ -225,7 +358,7 @@ function OverviewTab({ track, related }: { track: NonNullable<ReturnType<typeof 
               <Link key={rel.slug} to={`/tracks/${rel.slug}`} className="overflow-hidden rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] transition-all hover:border-[var(--wk-brand)]">
                 <div className="relative aspect-square bg-[var(--wk-surface-raised)]">
                   <img src={rel.artworkUrl} alt={rel.title} className="h-full w-full object-cover" />
-                  {rel.rank && <div className="absolute left-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-[11px] font-black text-white">#{rel.rank}</div>}
+                  {rel.rank > 0 && <div className="absolute left-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-[11px] font-black text-white">#{rel.rank}</div>}
                 </div>
                 <div className="p-3">
                   <div className="truncate text-[13px] font-bold text-[var(--wk-text)]">{rel.title}</div>
@@ -241,28 +374,32 @@ function OverviewTab({ track, related }: { track: NonNullable<ReturnType<typeof 
   );
 }
 
-function MetaRows({ track }: { track: NonNullable<ReturnType<typeof getTrackBySlug>> }) {
+function MetaRows({ track }: { track: TrackViewModel }) {
   const rows = [
-    { label: "Genre", value: track.genre },
-    { label: "Label", value: track.label },
+    { label: "Genre", value: track.genre, link: track.genre && track.genre !== "Unknown" ? `/genres/${track.genreSlug}` : undefined },
+    { label: "Label", value: track.label, link: track.label && track.label !== "Unknown" ? `/labels/${track.labelSlug}` : undefined },
     track.albumTitle ? { label: "Album", value: track.albumTitle } : null,
     track.releaseYear ? { label: "Released", value: track.releaseYear } : null,
     track.source ? { label: "Source", value: track.source } : null,
     { label: "Playable", value: track.isPlayable ? "Full track" : "Preview only" },
-  ].filter(Boolean) as { label: string; value: string | number }[];
+  ].filter(Boolean) as Array<{ label: string; value: string | number; link?: string }>;
   return (
     <div className="divide-y divide-[var(--wk-divider)] border-b border-[var(--wk-divider)]">
       {rows.map((row) => (
         <div key={row.label} className="flex items-center justify-between px-4 py-3 lg:px-6 lg:py-4">
           <span className="text-[14px] text-[var(--wk-text-soft)]">{row.label}</span>
-          <span className="text-[15px] font-bold text-[var(--wk-text)]">{row.value}</span>
+          {row.link ? (
+            <Link to={row.link} className="text-[15px] font-bold text-[var(--wk-text)] hover:text-[var(--wk-brand)] transition-colors">{row.value}</Link>
+          ) : (
+            <span className="text-[15px] font-bold text-[var(--wk-text)]">{row.value}</span>
+          )}
         </div>
       ))}
     </div>
   );
 }
 
-function ChartStatsTab({ track }: { track: NonNullable<ReturnType<typeof getTrackBySlug>> }) {
+function ChartStatsTab({ track }: { track: TrackViewModel }) {
   return (
     <div>
       {track.chartHistory && track.chartHistory.length > 1 && (
@@ -288,7 +425,6 @@ function ChartStatsTab({ track }: { track: NonNullable<ReturnType<typeof getTrac
         </div>
       )}
 
-      {/* Public chart history from chartsPublic service */}
       <TrackChartHistorySection
         trackSlug={track.slug}
         trackRank={track.rank ?? 0}
@@ -298,14 +434,14 @@ function ChartStatsTab({ track }: { track: NonNullable<ReturnType<typeof getTrac
       />
 
       <div className="divide-y divide-[var(--wk-divider)] border-b border-[var(--wk-divider)]">
-        {[
-          { label: "Current position", value: `#${track.rank}` },
-          { label: "Peak position", value: `#${track.peakPosition}` },
-          { label: "Weeks on chart", value: track.weeksOnChart },
+        {([
+          track.rank > 0 ? { label: "Current position", value: `#${track.rank}` } : null,
+          track.peakPosition > 0 ? { label: "Peak position", value: `#${track.peakPosition}` } : null,
+          track.weeksOnChart > 0 ? { label: "Weeks on chart", value: track.weeksOnChart } : null,
           track.previousWeek && track.previousWeek > 0 ? { label: "Previous week", value: `#${track.previousWeek}` } : null,
-          track.duration ? { label: "Duration", value: formatDuration(track.duration) } : null,
+          track.duration > 0 ? { label: "Duration", value: formatDuration(track.duration) } : null,
           track.streamCount ? { label: "Verified streams", value: track.streamCount } : null,
-        ].filter(Boolean).map((row: any) => (
+        ].filter(Boolean) as Array<{ label: string; value: string | number }>).map((row) => (
           <div key={row.label} className="flex items-center justify-between px-4 py-3 lg:px-6 lg:py-4">
             <span className="text-[14px] text-[var(--wk-text-soft)]">{row.label}</span>
             <span className="text-[15px] font-bold text-[var(--wk-text)]">{row.value}</span>
@@ -320,21 +456,18 @@ function ChartStatsTab({ track }: { track: NonNullable<ReturnType<typeof getTrac
   );
 }
 
-function LyricsTab({ track }: { track: NonNullable<ReturnType<typeof getTrackBySlug>> }) {
+function LyricsTab({ track }: { track: TrackViewModel }) {
   const { isPlaying, currentTrack } = usePlayer();
   const timedLyrics = getTimedLyrics(track.slug);
   const isThisTrackPlaying = currentTrack?.id === track.slug && isPlaying;
 
   const handleContribute = () => {
-    // Navigate to lyric contribution page
     window.REACT_APP_NAVIGATE?.(`/tracks/${track.slug}/lyrics/contribute`);
   };
 
-  // If we have timed lyrics, show the synced display
-  if (timedLyrics && timedLyrics.lines.length > 0) {
+  if (timedLyrics && timedLyrics.lines && timedLyrics.lines.length > 0) {
     return (
       <div className="px-4 py-6 lg:px-6 lg:py-8">
-        {/* Contributor + voting bar */}
         <div className="mb-5 flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-4 py-2.5 text-[12px] text-[var(--wk-text-muted)]">
             <WkIcon name="UserStar" size={15} className="text-[var(--wk-brand)]" />
@@ -345,8 +478,6 @@ function LyricsTab({ track }: { track: NonNullable<ReturnType<typeof getTrackByS
               )}
             </span>
           </div>
-
-          {/* Vote status */}
           <div className="flex items-center gap-1.5 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-3 py-2.5 text-[12px]">
             <button className="flex items-center gap-1 rounded-lg px-2 py-1 transition-all hover:bg-[var(--wk-brand)]/10 hover:text-[var(--wk-brand)]" title="Upvote">
               <WkIcon name="ArrowUp" size={14} />
@@ -358,27 +489,17 @@ function LyricsTab({ track }: { track: NonNullable<ReturnType<typeof getTrackByS
               <span className="text-[var(--wk-text-muted)]">{timedLyrics.downvotes}</span>
             </button>
           </div>
-
-          {/* Status badge */}
           {timedLyrics.status === 'approved' ? (
             <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-600">Verified</span>
           ) : timedLyrics.status === 'pending_review' ? (
             <span className="rounded-full bg-amber-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-600">Under Review</span>
           ) : null}
-
-          <button
-            onClick={handleContribute}
-            className="ml-auto flex items-center gap-1.5 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-4 py-2.5 text-[12px] font-semibold text-[var(--wk-text-soft)] transition-all hover:border-[var(--wk-brand)] hover:text-[var(--wk-brand)]"
-          >
+          <button onClick={handleContribute} className="ml-auto flex items-center gap-1.5 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-4 py-2.5 text-[12px] font-semibold text-[var(--wk-text-soft)] transition-all hover:border-[var(--wk-brand)] hover:text-[var(--wk-brand)]">
             <WkIcon name="Edit" size={13} />
             Submit revision
           </button>
         </div>
-
-        {/* Synced lyrics display */}
         <SyncedLyricsDisplay lines={timedLyrics.lines} isPlaying={isThisTrackPlaying} />
-
-        {/* Playback hint */}
         {!isThisTrackPlaying && (
           <div className="mt-4 text-center text-[12px] text-[var(--wk-text-faint)]">
             Play this track to see lyrics come alive
@@ -388,7 +509,6 @@ function LyricsTab({ track }: { track: NonNullable<ReturnType<typeof getTrackByS
     );
   }
 
-  // Fallback: static lyrics (no timed data)
   if (!track.lyrics) {
     return (
       <div className="py-16 text-center">
@@ -399,10 +519,7 @@ function LyricsTab({ track }: { track: NonNullable<ReturnType<typeof getTrackByS
         <p className="mx-auto mb-6 max-w-[360px] text-[14px] leading-relaxed text-[var(--wk-text-muted)]">
           Be the first to contribute timed lyrics for this track. Your name gets credited and the community votes on accuracy.
         </p>
-        <button
-          onClick={handleContribute}
-          className="inline-flex items-center gap-2 rounded-xl bg-[var(--wk-brand)] px-6 py-3 text-[14px] font-bold text-[var(--wk-brand-on)] transition-all hover:opacity-90"
-        >
+        <button onClick={handleContribute} className="inline-flex items-center gap-2 rounded-xl bg-[var(--wk-brand)] px-6 py-3 text-[14px] font-bold text-[var(--wk-brand-on)] transition-all hover:opacity-90">
           <WkIcon name="Edit" size={16} />
           Contribute lyrics
         </button>
@@ -415,7 +532,6 @@ function LyricsTab({ track }: { track: NonNullable<ReturnType<typeof getTrackByS
     );
   }
 
-  // Static lyrics with contributor info (legacy fallback)
   return (
     <div className="px-4 py-6 lg:px-6 lg:py-8">
       {track.lyricsContributor && (
@@ -434,7 +550,7 @@ function LyricsTab({ track }: { track: NonNullable<ReturnType<typeof getTrackByS
   );
 }
 
-function CreditsTab({ track }: { track: NonNullable<ReturnType<typeof getTrackBySlug>> }) {
+function CreditsTab({ track }: { track: TrackViewModel }) {
   if (!track.credits || track.credits.length === 0) {
     return (
       <div className="px-4 py-12 text-center text-[var(--wk-text-muted)]">

@@ -1,4 +1,5 @@
 import { withPlaceholderImage } from '@/utils/imagePlaceholders';
+import { rewriteWpImageUrl } from '@/services/wpImageRewrite';
 
 export type RepairedStory = {
   id: string;
@@ -100,7 +101,7 @@ export async function listMagazineStories(): Promise<RepairedStory[]> {
   const result = await safeRepairedGet<{ stories: RepairedStory[] }>("/magazine?limit=500", { stories: [] });
   return result.stories.map((story) => ({
     ...story,
-    heroUrl: withPlaceholderImage(story.heroUrl, {
+    heroUrl: rewriteWpImageUrl(story.heroUrl) || withPlaceholderImage(story.heroUrl, {
       id: story.id,
       slug: story.slug,
       name: story.title,
@@ -161,6 +162,22 @@ export type RepairedReleaseDetail = {
   metadata: Record<string, unknown>;
 };
 
+export type RepairedArticleDetail = {
+  id: string;
+  slug: string;
+  title: string;
+  section: string;
+  dek: string;
+  author: string;
+  date: string;
+  readingTime: number;
+  heroUrl: string;
+  contentHtml: string;
+  tags: string[];
+  seo?: Record<string, unknown>;
+  categories: string[];
+};
+
 export function slugify(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
@@ -190,6 +207,23 @@ export async function getRelease(artistSlug: string, releaseSlug: string): Promi
         type: "track",
       }),
     })),
+  };
+}
+
+export async function getArticle(slug: string): Promise<RepairedArticleDetail | null> {
+  const result = await safeRepairedGet<{ article: RepairedArticleDetail | null }>(
+    `/magazine/${slug}`,
+    { article: null }
+  );
+  if (!result.article) return null;
+  return {
+    ...result.article,
+    heroUrl: rewriteWpImageUrl(result.article.heroUrl) || withPlaceholderImage(result.article.heroUrl, {
+      id: result.article.id,
+      slug: result.article.slug,
+      name: result.article.title,
+      type: "article",
+    }),
   };
 }
 
@@ -258,6 +292,12 @@ export type RepairedArtistDetail = {
     slug: string;
     name: string;
     imageUrl: string;
+    score?: number;
+    sharedTracksAll?: number;
+    sharedChartTracks?: number;
+    featuresThem?: number;
+    theyFeature?: number;
+    sharedTitles?: string[];
   }>;
   videos?: RepairedArtistVideo[];
 };

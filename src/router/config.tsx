@@ -91,7 +91,9 @@ import ArtistDetail from "../pages/artists/detail/page";
 // Other entity pages
 import ReleaseDetail from "../pages/releases/detail/page";
 import Genres from "../pages/genres/page";
+import GenreDetail from "../pages/genres/detail/page";
 import Labels from "../pages/labels/page";
+import LabelDetail from "../pages/labels/detail/page";
 import Magazine from "../pages/magazine/page";
 import ArticlePage from "../pages/magazine/article/page";
 import MagazineIssuePage from "../pages/magazine/issue/page";
@@ -126,7 +128,9 @@ import MobileChartEdition from "../pages/mobile/charts/edition/page";
 import MobileArtists from "../pages/mobile/artists/page";
 import MobileArtistDetail from "../pages/mobile/artists/detail/page";
 import MobileGenres from "../pages/mobile/genres/page";
+import MobileGenreDetail from "../pages/mobile/genres/detail/page";
 import MobileLabels from "../pages/mobile/labels/page";
+import MobileLabelDetail from "../pages/mobile/labels/detail/page";
 import MobileMagazine from "../pages/mobile/magazine/page";
 import MobileArticlePage from "../pages/mobile/magazine/article/page";
 import MobileMagazineIssuePage from "../pages/magazine/issue/page";
@@ -153,7 +157,9 @@ const routes: RouteObject[] = [
       { path: "/tracks/:slug", element: <ResponsivePage mobile={<MobileTrackDetail />} desktop={<TrackDetail />} /> },
       { path: "/tracks/:slug/lyrics/contribute", element: <ResponsivePage mobile={<MobileLyricContribution />} desktop={<LyricContribution />} /> },
       { path: "/releases/:artistSlug/:releaseSlug", element: <ResponsivePage mobile={<ReleaseDetail />} desktop={<ReleaseDetail />} /> },
+      { path: "/genres/:slug", element: <ResponsivePage mobile={<MobileGenreDetail />} desktop={<GenreDetail />} /> },
       { path: "/genres", element: <ResponsivePage mobile={<MobileGenres />} desktop={<Genres />} /> },
+      { path: "/labels/:slug", element: <ResponsivePage mobile={<MobileLabelDetail />} desktop={<LabelDetail />} /> },
       { path: "/labels", element: <ResponsivePage mobile={<MobileLabels />} desktop={<Labels />} /> },
       { path: "/magazine", element: <ResponsivePage mobile={<MobileMagazine />} desktop={<Magazine />} /> },
       { path: "/magazine/issues", element: <ResponsivePage mobile={<MobileAllIssuesPage />} desktop={<AllIssuesPage />} /> },
