@@ -216,79 +216,19 @@ export interface IntegrationSettings {
 
 export const DEFAULT_INTEGRATION_SETTINGS: IntegrationSettings = {
   providers: [
-    {
-      name: "Spotify",
-      key: "spotify",
-      envVar: "SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET",
-      connected: false,
-      lastTested: null,
-      health: "unknown",
-      description: "Web API for track metadata, previews, and artwork.",
-    },
-    {
-      name: "Apple Music",
-      key: "apple_music",
-      envVar: "APPLE_MUSIC_KEY, APPLE_MUSIC_TEAM_ID, APPLE_MUSIC_KEY_ID",
-      connected: false,
-      lastTested: null,
-      health: "unknown",
-      description: "JWT-based previews and catalog metadata.",
-    },
-    {
-      name: "ACRCloud",
-      key: "acrcloud",
-      envVar: "ACR_HOST, ACR_ACCESS_KEY, ACR_ACCESS_SECRET",
-      connected: false,
-      lastTested: null,
-      health: "unknown",
-      description: "Audio fingerprinting and preview recovery.",
-    },
-    {
-      name: "YouTube",
-      key: "youtube",
-      envVar: "YOUTUBE_API_KEY",
-      connected: false,
-      lastTested: null,
-      health: "unknown",
-      description: "oEmbed previews and watch page metadata.",
-    },
-    {
-      name: "Airplay",
-      key: "airplay",
-      envVar: "AIRPLAY_API_KEY, AIRPLAY_API_BASE",
-      connected: false,
-      lastTested: null,
-      health: "unknown",
-      description: "Airplay detection and sync.",
-    },
+    { name: "Spotify", key: "spotify", envVar: "SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET", connected: false, lastTested: null, health: "unknown", description: "Web API for track metadata, previews, and artwork." },
+    { name: "Apple Music", key: "apple_music", envVar: "APPLE_MUSIC_KEY, APPLE_MUSIC_TEAM_ID, APPLE_MUSIC_KEY_ID", connected: false, lastTested: null, health: "unknown", description: "JWT-based previews and catalog metadata." },
+    { name: "ACRCloud", key: "acrcloud", envVar: "ACR_HOST, ACR_ACCESS_KEY, ACR_ACCESS_SECRET", connected: false, lastTested: null, health: "unknown", description: "Audio fingerprinting and preview recovery." },
+    { name: "YouTube", key: "youtube", envVar: "YOUTUBE_API_KEY", connected: false, lastTested: null, health: "unknown", description: "oEmbed previews and watch page metadata." },
+    { name: "Airplay", key: "airplay", envVar: "AIRPLAY_API_KEY, AIRPLAY_API_BASE", connected: false, lastTested: null, health: "unknown", description: "Airplay provider for radio monitoring and detections." },
   ],
-  apiMode: "mock",
+  apiMode: getIngestionMode(),
 };
 
-/* ──────── GSC Settings ──────── */
-
-export interface GscSettings {
-  enabled: boolean;
-  oauthStatus: "disconnected" | "connected" | "pending" | "error";
-  selectedProperty: string | null;
-  importSchedule: "manual" | "daily" | "weekly";
-  queryRowRetentionDays: number;
-  enableArtistMatching: boolean;
-  minimumMatchConfidence: number;
-}
-
-export const DEFAULT_GSC_SETTINGS: GscSettings = {
-  enabled: false,
-  oauthStatus: "disconnected",
-  selectedProperty: null,
-  importSchedule: "manual",
-  queryRowRetentionDays: 90,
-  enableArtistMatching: true,
-  minimumMatchConfidence: 0.75,
-};
+export interface GscSettings { enabled: boolean; propertyUrl: string; lastSyncAt: string | null; }
+export const DEFAULT_GSC_SETTINGS: GscSettings = { enabled: false, propertyUrl: "", lastSyncAt: null };
 
 /* ──────── Frontend Appearance ──────── */
-
 export interface FrontendAppearanceSettings {
   lightModeAccent: string;
   darkModeAccent: string;
@@ -319,6 +259,8 @@ export const DEFAULT_FRONTEND_APPEARANCE_SETTINGS: FrontendAppearanceSettings = 
 
 export interface SiteIdentitySettings {
   logoUrl: string;
+  lightLogoUrl: string;
+  darkLogoUrl: string;
   siteName: string;
   tagline: string;
   faviconUrl: string;
@@ -326,13 +268,14 @@ export interface SiteIdentitySettings {
 
 export const DEFAULT_SITE_IDENTITY_SETTINGS: SiteIdentitySettings = {
   logoUrl: "",
+  lightLogoUrl: "",
+  darkLogoUrl: "",
   siteName: "WAKILISHA",
   tagline: "Documenting and shaping contemporary African culture",
   faviconUrl: "",
 };
 
 /* ──────── Player & Playback ──────── */
-
 export interface PlayerPlaybackSettings {
   previewSourceMode: "auto" | "spotify" | "apple" | "youtube" | "acrcloud";
   desktopPlayerVariant: "compact" | "full" | "minimal";
@@ -360,7 +303,6 @@ export const DEFAULT_PLAYER_PLAYBACK_SETTINGS: PlayerPlaybackSettings = {
 };
 
 /* ──────── Registry Settings ──────── */
-
 export interface RegistrySettings {
   schemaVersion: string;
   dbStatus: "connected" | "disconnected" | "unknown";
@@ -384,215 +326,31 @@ export const DEFAULT_REGISTRY_SETTINGS: RegistrySettings = {
 };
 
 /* ──────── Airplay Settings ──────── */
-
-export interface AirplaySettings {
-  enabled: boolean;
-  provider: string;
-  apiBaseUrl: string;
-  apiKey: string;
-  syncFrequency: "manual" | "hourly" | "daily" | "weekly";
-  defaultMarket: string;
-  evidenceStorageMode: "local" | "s3" | "db";
-  autoLinkDetections: boolean;
-  minimumConfidenceThreshold: number;
-}
-
-export const DEFAULT_AIRPLAY_SETTINGS: AirplaySettings = {
-  enabled: false,
-  provider: "default",
-  apiBaseUrl: "",
-  apiKey: "",
-  syncFrequency: "manual",
-  defaultMarket: "kenya",
-  evidenceStorageMode: "local",
-  autoLinkDetections: true,
-  minimumConfidenceThreshold: 0.70,
-};
+export interface AirplaySettings { enabled: boolean; provider: string; apiBaseUrl: string; apiKey: string; syncFrequency: "manual" | "hourly" | "daily" | "weekly"; defaultMarket: string; evidenceStorageMode: "local" | "s3" | "db"; autoLinkDetections: boolean; minimumConfidenceThreshold: number; }
+export const DEFAULT_AIRPLAY_SETTINGS: AirplaySettings = { enabled: false, provider: "default", apiBaseUrl: "", apiKey: "", syncFrequency: "manual", defaultMarket: "kenya", evidenceStorageMode: "local", autoLinkDetections: true, minimumConfidenceThreshold: 0.70 };
 
 /* ──────── Audience Settings ──────── */
-
-export interface AudienceSettings {
-  subscriberDefaults: {
-    defaultOptIn: boolean;
-    defaultBriefingFrequency: "weekly" | "biweekly" | "monthly";
-  };
-  optInSettings: {
-    requireDoubleOptIn: boolean;
-    showOptInOnSignup: boolean;
-  };
-  followNotificationDefaults: {
-    enabled: boolean;
-    frequency: "immediate" | "daily_digest" | "weekly_digest";
-  };
-  segmentationDefaults: {
-    enabled: boolean;
-    defaultSegments: string[];
-  };
-  newsletterIssueDefaults: {
-    defaultSendDay: "monday" | "friday";
-    defaultSendTime: string;
-  };
-}
-
-export const DEFAULT_AUDIENCE_SETTINGS: AudienceSettings = {
-  subscriberDefaults: {
-    defaultOptIn: true,
-    defaultBriefingFrequency: "weekly",
-  },
-  optInSettings: {
-    requireDoubleOptIn: false,
-    showOptInOnSignup: true,
-  },
-  followNotificationDefaults: {
-    enabled: true,
-    frequency: "weekly_digest",
-  },
-  segmentationDefaults: {
-    enabled: false,
-    defaultSegments: ["music", "charts"],
-  },
-  newsletterIssueDefaults: {
-    defaultSendDay: "friday",
-    defaultSendTime: "09:00",
-  },
-};
+export interface AudienceSettings { subscriberDefaults: { defaultOptIn: boolean; defaultBriefingFrequency: "weekly" | "biweekly" | "monthly" }; optInSettings: { requireDoubleOptIn: boolean; showOptInOnSignup: boolean }; followNotificationDefaults: { enabled: boolean; frequency: "immediate" | "daily_digest" | "weekly_digest" }; segmentationDefaults: { enabled: boolean; defaultSegments: string[] }; newsletterIssueDefaults: { defaultSendDay: "monday" | "friday"; defaultSendTime: string } }
+export const DEFAULT_AUDIENCE_SETTINGS: AudienceSettings = { subscriberDefaults: { defaultOptIn: true, defaultBriefingFrequency: "weekly" }, optInSettings: { requireDoubleOptIn: false, showOptInOnSignup: true }, followNotificationDefaults: { enabled: true, frequency: "weekly_digest" }, segmentationDefaults: { enabled: false, defaultSegments: ["music", "charts"] }, newsletterIssueDefaults: { defaultSendDay: "friday", defaultSendTime: "09:00" } };
 
 /* ──────── Email & Briefings ──────── */
-
-export interface EmailBriefingsSettings {
-  fromName: string;
-  fromAddress: string;
-  enableArtistOptInEmails: boolean;
-  enableFollowNotifications: boolean;
-  enableBriefingIssues: boolean;
-  briefingSendCadence: "weekly" | "biweekly" | "monthly";
-  testRecipientEmail: string;
-}
-
-export const DEFAULT_EMAIL_BRIEFINGS_SETTINGS: EmailBriefingsSettings = {
-  fromName: "WAKILISHA",
-  fromAddress: "briefings@wakilisha.com",
-  enableArtistOptInEmails: false,
-  enableFollowNotifications: false,
-  enableBriefingIssues: false,
-  briefingSendCadence: "weekly",
-  testRecipientEmail: "",
-};
+export interface EmailBriefingsSettings { fromName: string; fromAddress: string; enableArtistOptInEmails: boolean; enableFollowNotifications: boolean; enableBriefingIssues: boolean; briefingSendCadence: "weekly" | "biweekly" | "monthly"; testRecipientEmail: string; }
+export const DEFAULT_EMAIL_BRIEFINGS_SETTINGS: EmailBriefingsSettings = { fromName: "WAKILISHA", fromAddress: "briefings@wakilisha.com", enableArtistOptInEmails: false, enableFollowNotifications: false, enableBriefingIssues: false, briefingSendCadence: "weekly", testRecipientEmail: "" };
 
 /* ──────── Maintenance Settings ──────── */
-
-export interface MaintenanceSettings {
-  debugMode: boolean;
-  lastIntegrityCheck: string | null;
-  lastDuplicateScan: string | null;
-  lastOrphanedScan: string | null;
-  lastSnapshotIntegrityCheck: string | null;
-}
-
-export const DEFAULT_MAINTENANCE_SETTINGS: MaintenanceSettings = {
-  debugMode: false,
-  lastIntegrityCheck: null,
-  lastDuplicateScan: null,
-  lastOrphanedScan: null,
-  lastSnapshotIntegrityCheck: null,
-};
+export interface MaintenanceSettings { debugMode: boolean; lastIntegrityCheck: string | null; lastDuplicateScan: string | null; lastOrphanedScan: string | null; lastSnapshotIntegrityCheck: string | null; }
+export const DEFAULT_MAINTENANCE_SETTINGS: MaintenanceSettings = { debugMode: false, lastIntegrityCheck: null, lastDuplicateScan: null, lastOrphanedScan: null, lastSnapshotIntegrityCheck: null };
 
 /* ──────── Navigation Settings ──────── */
+export interface NavigationSettings { adminNavCollapsed: boolean; publicNavItems: { label: string; path: string; visible: boolean; order: number }[]; shareConfig: { enabled: boolean; platforms: string[] } }
+export const DEFAULT_NAVIGATION_SETTINGS: NavigationSettings = { adminNavCollapsed: false, publicNavItems: [{ label: "Home", path: "/", visible: true, order: 1 }, { label: "Charts", path: "/charts", visible: true, order: 2 }, { label: "Artists", path: "/artists", visible: true, order: 3 }, { label: "Magazine", path: "/magazine", visible: true, order: 4 }], shareConfig: { enabled: true, platforms: ["x", "facebook", "whatsapp"] } };
 
-export interface NavigationSettings {
-  adminNavCollapsed: boolean;
-  publicNavItems: {
-    label: string;
-    path: string;
-    visible: boolean;
-    order: number;
-  }[];
-  shareConfig: {
-    enabled: boolean;
-    platforms: string[];
-  };
-}
+export interface AuditEvent { id: string; timestamp: string; actor: string; domain: AdminSettingsDomain; action: string; details: string; severity: "info" | "warning" | "critical"; }
+export interface SettingsSaveResult { ok: boolean; message?: string; error?: string; code?: string; }
 
-export const DEFAULT_NAVIGATION_SETTINGS: NavigationSettings = {
-  adminNavCollapsed: false,
-  publicNavItems: [
-    { label: "Home", path: "/", visible: true, order: 1 },
-    { label: "Charts", path: "/charts", visible: true, order: 2 },
-    { label: "Artists", path: "/artists", visible: true, order: 3 },
-    { label: "Releases", path: "/releases", visible: true, order: 4 },
-    { label: "Genres", path: "/genres", visible: true, order: 5 },
-    { label: "Labels", path: "/labels", visible: true, order: 6 },
-    { label: "Magazine", path: "/magazine", visible: true, order: 7 },
-  ],
-  shareConfig: {
-    enabled: true,
-    platforms: ["twitter", "facebook", "whatsapp", "copy"],
-  },
-};
+export interface AdminSettingsState { charts: ChartSettings; integrations: IntegrationSettings; gscData: GscSettings; siteIdentity: SiteIdentitySettings; frontendAppearance: FrontendAppearanceSettings; playerPlayback: PlayerPlaybackSettings; registry: RegistrySettings; airplay: AirplaySettings; audience: AudienceSettings; emailBriefings: EmailBriefingsSettings; maintenance: MaintenanceSettings; navigation: NavigationSettings; audit?: AuditEvent[]; }
 
-/* ──────── Audit Event ──────── */
+export const SETTINGS_STORAGE_KEY = "wk_admin_settings";
+export const AUDIT_STORAGE_KEY = "wk_admin_settings_audit";
 
-export interface AuditEvent {
-  id: string;
-  timestamp: string;
-  actor: string;
-  domain: AdminSettingsDomain;
-  action: string;
-  details: string;
-  severity: "info" | "warning" | "error";
-}
-
-/* ──────── Full Settings State ──────── */
-
-export interface AdminSettingsState {
-  charts: ChartSettings;
-  integrations: IntegrationSettings;
-  gscData: GscSettings;
-  siteIdentity: SiteIdentitySettings;
-  frontendAppearance: FrontendAppearanceSettings;
-  playerPlayback: PlayerPlaybackSettings;
-  registry: RegistrySettings;
-  airplay: AirplaySettings;
-  audience: AudienceSettings;
-  emailBriefings: EmailBriefingsSettings;
-  maintenance: MaintenanceSettings;
-  navigation: NavigationSettings;
-  audit: AuditEvent[];
-}
-
-export const DEFAULT_ADMIN_SETTINGS: AdminSettingsState = {
-  charts: DEFAULT_CHART_SETTINGS,
-  integrations: DEFAULT_INTEGRATION_SETTINGS,
-  gscData: DEFAULT_GSC_SETTINGS,
-  siteIdentity: DEFAULT_SITE_IDENTITY_SETTINGS,
-  frontendAppearance: DEFAULT_FRONTEND_APPEARANCE_SETTINGS,
-  playerPlayback: DEFAULT_PLAYER_PLAYBACK_SETTINGS,
-  registry: DEFAULT_REGISTRY_SETTINGS,
-  airplay: DEFAULT_AIRPLAY_SETTINGS,
-  audience: DEFAULT_AUDIENCE_SETTINGS,
-  emailBriefings: DEFAULT_EMAIL_BRIEFINGS_SETTINGS,
-  maintenance: DEFAULT_MAINTENANCE_SETTINGS,
-  navigation: DEFAULT_NAVIGATION_SETTINGS,
-  audit: [],
-};
-
-/* ──────── Utility types ──────── */
-
-export type SettingsSaveResult =
-  | { ok: true; message: string }
-  | { ok: false; error: string; code: string };
-
-export type ProviderTestResult =
-  | { ok: true; latencyMs: number; message: string }
-  | { ok: false; error: string; code: string; envVar?: string };
-
-export type MaintenanceActionResult =
-  | { ok: true; message: string; itemsAffected?: number }
-  | { ok: false; error: string; reason: string };
-
-export const SETTINGS_STORAGE_KEY = "wk_admin_settings_v1";
-export const AUDIT_STORAGE_KEY = "wk_admin_audit_v1";
-
-export function isMockMode(): boolean {
-  return getIngestionMode() === "mock";
-}
+export const DEFAULT_ADMIN_SETTINGS: AdminSettingsState = { charts: DEFAULT_CHART_SETTINGS, integrations: DEFAULT_INTEGRATION_SETTINGS, gscData: DEFAULT_GSC_SETTINGS, siteIdentity: DEFAULT_SITE_IDENTITY_SETTINGS, frontendAppearance: DEFAULT_FRONTEND_APPEARANCE_SETTINGS, playerPlayback: DEFAULT_PLAYER_PLAYBACK_SETTINGS, registry: DEFAULT_REGISTRY_SETTINGS, airplay: DEFAULT_AIRPLAY_SETTINGS, audience: DEFAULT_AUDIENCE_SETTINGS, emailBriefings: DEFAULT_EMAIL_BRIEFINGS_SETTINGS, maintenance: DEFAULT_MAINTENANCE_SETTINGS, navigation: DEFAULT_NAVIGATION_SETTINGS };
