@@ -1,498 +1,182 @@
-import { useEffect, useState, useCallback } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
-import { useAdminUser } from "@/hooks/useAdminUser";
-import {
-  fetchAllUserRoles,
-  assignUserRole,
-  removeUserRole,
-  ROLES,
-  ROLE_LABELS,
-  ROLE_DESCRIPTIONS,
-  type UserRole,
-  type UserRoleRecord,
-} from "@/services/userRoles";
 import { SkeletonAdminTable } from "@/components/skeletons/Skeletons";
+import { useAdminUser } from "@/hooks/useAdminUser";
+import { supabase } from "@/lib/supabase";
+import { ROLE_DESCRIPTIONS, ROLE_LABELS, ROLES, type AccessScope, type UserRole } from "@/services/userRoles";
 
-interface AuthUser {
-  id: string;
-  email: string;
+type ProfileRow = { user_id: string; email: string | null; display_name: string | null; status: string | null; created_at: string | null; updated_at: string | null };
+type AssignmentRow = { id: string; user_id: string; role_key: UserRole; status: string; created_at: string; updated_at: string };
+type AuditRow = { id: string; actor_user_id: string | null; target_user_id: string | null; event_type: string; target_table: string | null; target_record_id: string | null; message: string | null; created_at: string };
+type RecoveryRow = { id: string; target_email: string; target_user_id: string | null; delivery_status: string; redirect_to: string | null; created_at: string };
+type InviteRow = { id: string; email: string; role_key: UserRole; display_name: string | null; invite_status: string; invited_user_id: string | null; created_at: string };
+type UserAccess = { profile: ProfileRow; roles: AssignmentRow[]; scopes: AccessScope[] };
+
+type Modal = "invite" | "scope" | "reset" | null;
+
+const ADMIN_ROLES = ROLES.filter((role) => !["subscriber", "customer", "member", "premium_member"].includes(role));
+const SCOPE_TYPES = ["global", "market", "country", "region", "series", "vertical", "entity_type"];
+
+function shortId(value: string) { return value ? `${value.slice(0, 8)}…` : "—"; }
+function date(value?: string | null) { return value ? new Date(value).toLocaleString() : "—"; }
+function roleTone(role: string) {
+  if (role === "administrator") return "border-wk-danger/20 bg-wk-danger/10 text-wk-danger";
+  if (role.includes("chart")) return "border-wk-brand/20 bg-wk-brand/10 text-wk-brand";
+  if (role.includes("registry") || role.includes("media")) return "border-wk-success/20 bg-wk-success/10 text-wk-success";
+  if (role.includes("review") || role.includes("moderator")) return "border-wk-warning/20 bg-wk-warning/10 text-wk-warning";
+  return "border-wk-border bg-wk-surface-raised text-wk-text-muted";
+}
+
+async function callAdminUserOps(payload: Record<string, unknown>) {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const token = sessionData.session?.access_token;
+  if (!token) throw new Error("Admin session is missing. Sign in again.");
+  const { data, error } = await supabase.functions.invoke("admin-user-ops", { body: payload, headers: { Authorization: `Bearer ${token}` } });
+  if (error) throw error;
+  if (data?.error) throw new Error(String(data.error));
+  return data;
 }
 
 export default function AdminUsersPage() {
   const navigate = useNavigate();
   const currentUser = useAdminUser();
-
-  const [roleRecords, setRoleRecords] = useState<UserRoleRecord[]>([]);
-  const [authUsers, setAuthUsers] = useState<Map<string, AuthUser>>(new Map());
+  const [users, setUsers] = useState<UserAccess[]>([]);
+  const [invites, setInvites] = useState<InviteRow[]>([]);
+  const [audits, setAudits] = useState<AuditRow[]>([]);
+  const [recoveries, setRecoveries] = useState<RecoveryRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [modal, setModal] = useState<Modal>(null);
+  const [busy, setBusy] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<UserAccess | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
 
-  // Assign modal state
-  const [showAssignModal, setShowAssignModal] = useState(false);
-  const [assignEmail, setAssignEmail] = useState("");
-  const [assignRole, setAssignRole] = useState<UserRole>("writer");
-  const [assignDisplayName, setAssignDisplayName] = useState("");
-  const [assignBio, setAssignBio] = useState("");
-  const [assigning, setAssigning] = useState(false);
-  const [assignError, setAssignError] = useState<string | null>(null);
-  const [assignSuccess, setAssignSuccess] = useState<string | null>(null);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteName, setInviteName] = useState("");
+  const [inviteRole, setInviteRole] = useState<UserRole>("editor");
+  const [inviteScopeType, setInviteScopeType] = useState("global");
+  const [inviteScopeValue, setInviteScopeValue] = useState("*");
+  const [inviteCanEdit, setInviteCanEdit] = useState(true);
+  const [inviteCanPublish, setInviteCanPublish] = useState(false);
 
-  // Edit modal state
-  const [editRecord, setEditRecord] = useState<UserRoleRecord | null>(null);
-  const [editRole, setEditRole] = useState<UserRole>("writer");
-  const [editDisplayName, setEditDisplayName] = useState("");
-  const [editBio, setEditBio] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [scopeRole, setScopeRole] = useState<UserRole>("chart_editor_regional");
+  const [scopeType, setScopeType] = useState("market");
+  const [scopeValue, setScopeValue] = useState("");
+  const [scopeCanEdit, setScopeCanEdit] = useState(true);
+  const [scopeCanPublish, setScopeCanPublish] = useState(false);
 
-  // Delete confirm
-  const [deleteId, setDeleteId] = useState<number | null>(null);
-  const [deleting, setDeleting] = useState(false);
+  const canManageUsers = currentUser.can("manage_users");
 
   const loadData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const records = await fetchAllUserRoles();
-      setRoleRecords(records);
-
-      // Fetch auth users for email display
-      const userIds = records.map((r) => r.user_id).filter(Boolean);
-      const userMap = new Map<string, AuthUser>();
-
-      if (userIds.length > 0) {
-        // We can't list all auth users from client side, but we can show what we have
-        // For display purposes, we'll just use user_id and look up display_name from role record
-        for (const id of userIds) {
-          userMap.set(id, { id, email: id }); // placeholder - real email comes from auth admin API
-        }
-      }
-      setAuthUsers(userMap);
-    } catch (err: any) {
-      setError(err?.message ?? "Failed to load users");
+      const [profilesRes, rolesRes, scopesRes, invitesRes, auditsRes, recoveryRes] = await Promise.all([
+        supabase.from("user_profiles").select("user_id,email,display_name,status,created_at,updated_at").order("updated_at", { ascending: false }).limit(500),
+        supabase.from("user_role_assignments").select("id,user_id,role_key,status,created_at,updated_at").neq("status", "revoked").order("updated_at", { ascending: false }).limit(1000),
+        supabase.from("user_access_scopes").select("id,user_id,role_key,scope_type,scope_value,can_view,can_edit,can_publish,status").neq("status", "revoked").order("updated_at", { ascending: false }).limit(1000),
+        supabase.from("admin_user_invites").select("id,email,role_key,display_name,invite_status,invited_user_id,created_at").order("created_at", { ascending: false }).limit(50),
+        supabase.from("admin_audit_events").select("id,actor_user_id,target_user_id,event_type,target_table,target_record_id,message,created_at").order("created_at", { ascending: false }).limit(40),
+        supabase.from("admin_account_recovery_events").select("id,target_email,target_user_id,delivery_status,redirect_to,created_at").order("created_at", { ascending: false }).limit(25),
+      ]);
+      for (const res of [profilesRes, rolesRes, scopesRes, invitesRes, auditsRes, recoveryRes]) if (res.error) throw res.error;
+      const profiles = (profilesRes.data ?? []) as ProfileRow[];
+      const roles = (rolesRes.data ?? []) as AssignmentRow[];
+      const scopes = (scopesRes.data ?? []) as AccessScope[];
+      const userIds = new Set([...profiles.map((p) => p.user_id), ...roles.map((r) => r.user_id), ...scopes.map((s) => String((s as any).user_id ?? ""))].filter(Boolean));
+      const profileById = new Map(profiles.map((p) => [p.user_id, p]));
+      setUsers(Array.from(userIds).map((userId) => ({
+        profile: profileById.get(userId) ?? { user_id: userId, email: null, display_name: null, status: "active", created_at: null, updated_at: null },
+        roles: roles.filter((r) => r.user_id === userId),
+        scopes: scopes.filter((s) => String((s as any).user_id) === userId),
+      })).sort((a, b) => String(b.profile.updated_at ?? "").localeCompare(String(a.profile.updated_at ?? ""))));
+      setInvites((invitesRes.data ?? []) as InviteRow[]);
+      setAudits((auditsRes.data ?? []) as AuditRow[]);
+      setRecoveries((recoveryRes.data ?? []) as RecoveryRow[]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load access console.");
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
+  useEffect(() => { loadData(); }, [loadData]);
 
-  // Check if current user is admin
-  if (!currentUser.loading && currentUser.role !== "administrator") {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 text-center">
-        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-wk-danger/10 mb-4">
-          <WkIcon name="ShieldOff" size={24} className="text-wk-danger" />
-        </div>
-        <h2 className="text-[18px] font-bold text-wk-text mb-1">Access Denied</h2>
-        <p className="text-[13px] text-wk-text-muted max-w-md mb-4">
-          Only administrators can manage user roles. You are signed in as{" "}
-          <strong>{currentUser.role ? ROLE_LABELS[currentUser.role] : "unassigned"}</strong>.
-        </p>
-        <button onClick={() => navigate("/admin")} className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap">
-          Back to Dashboard
-        </button>
-      </div>
-    );
+  const totals = useMemo(() => ({
+    users: users.length,
+    admins: users.filter((u) => u.roles.some((r) => r.role_key === "administrator" && r.status === "active")).length,
+    scoped: users.filter((u) => u.scopes.length > 0).length,
+    invites: invites.filter((i) => ["pending", "sent"].includes(i.invite_status)).length,
+  }), [users, invites]);
+
+  if (!currentUser.loading && !canManageUsers) {
+    return <div className="py-20 text-center"><WkIcon name="ShieldOff" size={34} className="mx-auto mb-4 text-wk-danger" /><h2 className="text-[18px] font-bold text-wk-text">Access denied</h2><p className="mt-1 text-[13px] text-wk-text-muted">Only users with manage_users can operate roles, scopes, invites, and password recovery.</p><button onClick={() => navigate("/admin")} className="wk-button wk-button-ghost wk-button-sm mt-4">Back to Dashboard</button></div>;
   }
 
-  const handleAssign = async () => {
-    if (!assignEmail.trim()) {
-      setAssignError("Email is required");
-      return;
-    }
-
-    setAssigning(true);
-    setAssignError(null);
-    setAssignSuccess(null);
-
+  async function handleInvite() {
+    setBusy(true); setError(null); setMessage(null);
     try {
-      // Look up user by email via Supabase Auth Admin - we need an edge function for this
-      // For now, we'll try to get the user ID from the auth session context
-      // This requires an admin-level edge function to properly look up by email
+      const scopes = inviteScopeType && inviteScopeValue ? [{ scope_type: inviteScopeType, scope_value: inviteScopeValue, can_view: true, can_edit: inviteCanEdit, can_publish: inviteCanPublish }] : [];
+      await callAdminUserOps({ action: "invite_user", email: inviteEmail, role_key: inviteRole, display_name: inviteName || undefined, redirect_to: `${window.location.origin}/admin/login`, scopes });
+      setMessage(`Invite/role assignment sent for ${inviteEmail}.`); setModal(null); setInviteEmail(""); setInviteName(""); await loadData();
+    } catch (err) { setError(err instanceof Error ? err.message : "Invite failed."); } finally { setBusy(false); }
+  }
 
-      // Since we can't look up users by email from the client, we'll show guidance
-      // The proper way is via an edge function with service_role key
-
-      // For now, let's use the email as a direct key (temporary workaround)
-      // In production, you'd use an edge function to resolve email -> user ID
-
-      setAssignError(
-        "User lookup by email requires an admin edge function. For now, ask the user to sign in first so their ID is registered, then assign their role here.",
-      );
-    } finally {
-      setAssigning(false);
-    }
-  };
-
-  const handleEdit = (record: UserRoleRecord) => {
-    setEditRecord(record);
-    setEditRole(record.role);
-    setEditDisplayName(record.display_name ?? "");
-    setEditBio(record.bio ?? "");
-  };
-
-  const handleSaveEdit = async () => {
-    if (!editRecord) return;
-    setSaving(true);
+  async function handleAddScope() {
+    if (!selectedUser) return;
+    setBusy(true); setError(null); setMessage(null);
     try {
-      await assignUserRole(editRecord.user_id, editRole, editDisplayName || undefined, editBio || undefined);
-      setEditRecord(null);
-      await loadData();
-    } catch (err: any) {
-      console.error("Failed to save:", err);
-    } finally {
-      setSaving(false);
-    }
-  };
+      const { error } = await supabase.rpc("upsert_user_scope_admin", { target_user_id: selectedUser.profile.user_id, target_role_key: scopeRole, target_scope_type: scopeType, target_scope_value: scopeValue, target_can_view: true, target_can_edit: scopeCanEdit, target_can_publish: scopeCanPublish });
+      if (error) throw error;
+      setMessage("Scope assigned."); setModal(null); await loadData();
+    } catch (err) { setError(err instanceof Error ? err.message : "Scope assignment failed."); } finally { setBusy(false); }
+  }
 
-  const handleDelete = async () => {
-    if (deleteId === null) return;
-    setDeleting(true);
+  async function handleRevokeRole(userId: string, role: UserRole) {
+    if (!confirm(`Revoke ${ROLE_LABELS[role] ?? role}?`)) return;
+    setBusy(true); setError(null);
+    try { const { error } = await supabase.rpc("revoke_user_role_admin", { target_user_id: userId, target_role_key: role }); if (error) throw error; await loadData(); }
+    catch (err) { setError(err instanceof Error ? err.message : "Role revocation failed."); }
+    finally { setBusy(false); }
+  }
+
+  async function handleSuspend(user: UserAccess) {
+    if (!confirm(`Suspend access for ${user.profile.email || user.profile.user_id}?`)) return;
+    setBusy(true); setError(null);
+    try { const { error } = await supabase.rpc("suspend_user_access_admin", { target_user_id: user.profile.user_id, reason: "Suspended from Admin Users console." }); if (error) throw error; await loadData(); }
+    catch (err) { setError(err instanceof Error ? err.message : "Suspend failed."); }
+    finally { setBusy(false); }
+  }
+
+  async function handlePasswordReset() {
+    if (!selectedUser) return;
+    const email = selectedUser.profile.email;
+    if (!email) { setError("This user has no email in user_profiles. Use Supabase Auth dashboard or invite by email first."); return; }
+    setBusy(true); setError(null); setMessage(null);
     try {
-      const record = roleRecords.find((r) => r.id === deleteId);
-      if (record) {
-        await removeUserRole(record.user_id);
-      }
-      setDeleteId(null);
-      await loadData();
-    } catch (err: any) {
-      console.error("Failed to delete:", err);
-    } finally {
-      setDeleting(false);
-    }
-  };
+      await callAdminUserOps({ action: "send_password_reset", user_id: selectedUser.profile.user_id, email, redirect_to: `${window.location.origin}/auth` });
+      setMessage(`Password reset email sent to ${email}.`); setModal(null); await loadData();
+    } catch (err) { setError(err instanceof Error ? err.message : "Password reset failed."); } finally { setBusy(false); }
+  }
 
-  const roleBadgeColors: Record<string, string> = {
-    administrator: "bg-wk-danger/10 text-wk-danger border-wk-danger/20",
-    editor: "bg-wk-brand/10 text-wk-brand border-wk-brand/20",
-    author: "bg-wk-success/10 text-wk-success border-wk-success/20",
-    writer: "bg-wk-warning/10 text-wk-warning border-wk-warning/20",
-  };
-
-  const getEmailFromId = (userId: string) => {
-    return authUsers.get(userId)?.email ?? userId.substring(0, 12) + "...";
-  };
-
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <div className="mb-1 text-[11px] font-black uppercase tracking-wider text-wk-brand">
-            Administration
-          </div>
-          <h1 className="text-[22px] font-black tracking-tight text-wk-text">User Roles</h1>
-          <p className="mt-1 text-[13px] text-wk-text-muted">
-            Manage who has access to the production engine. WordPress-style roles — each role unlocks specific areas.
-          </p>
-        </div>
-        <button
-          onClick={() => setShowAssignModal(true)}
-          className="wk-button wk-button-primary wk-button-sm whitespace-nowrap"
-        >
-          <WkIcon name="UserPlus" size={14} />
-          Assign Role
-        </button>
-      </div>
-
-      {/* Role Legend */}
-      <WkSurface className="p-5">
-        <h2 className="text-[14px] font-bold text-wk-text mb-3">Role Permissions</h2>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {ROLES.map((role) => (
-            <div key={role} className="rounded-lg border border-wk-border p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase ${roleBadgeColors[role]}`}>
-                  {ROLE_LABELS[role]}
-                </span>
-              </div>
-              <p className="text-[12px] text-wk-text-muted leading-relaxed">{ROLE_DESCRIPTIONS[role]}</p>
-            </div>
-          ))}
-        </div>
-      </WkSurface>
-
-      {/* Users Table */}
-      <WkSurface className="overflow-hidden">
-        {loading ? (
-          <SkeletonAdminTable rows={6} cols={4} />
-        ) : error ? (
-          <div className="p-8 text-center">
-            <div className="flex h-10 w-10 mx-auto items-center justify-center rounded-xl bg-wk-danger/10 mb-3">
-              <WkIcon name="AlertCircle" size={18} className="text-wk-danger" />
-            </div>
-            <p className="text-[13px] font-semibold text-wk-text mb-1">Failed to load</p>
-            <p className="text-[12px] text-wk-text-muted mb-3">{error}</p>
-            <button onClick={loadData} className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap">
-              Retry
-            </button>
-          </div>
-        ) : roleRecords.length === 0 ? (
-          <div className="p-12 text-center">
-            <div className="flex h-12 w-12 mx-auto items-center justify-center rounded-xl bg-wk-surface-raised mb-4">
-              <WkIcon name="Users" size={22} className="text-wk-text-faint" />
-            </div>
-            <p className="text-[14px] font-semibold text-wk-text mb-1">No users assigned yet</p>
-            <p className="text-[12px] text-wk-text-muted max-w-sm mx-auto mb-4">
-              When team members sign in to the site, assign them a role here to grant access to the admin area.
-            </p>
-            <button
-              onClick={() => setShowAssignModal(true)}
-              className="wk-button wk-button-primary wk-button-sm whitespace-nowrap"
-            >
-              <WkIcon name="UserPlus" size={14} />
-              Assign First User
-            </button>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-wk-border bg-wk-bg-subtle">
-                  <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-wk-text-muted">User</th>
-                  <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-wk-text-muted">Role</th>
-                  <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-wk-text-muted hidden md:table-cell">Display Name</th>
-                  <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-wk-text-muted hidden lg:table-cell">Assigned</th>
-                  <th className="px-4 py-3 text-right text-[11px] font-bold uppercase tracking-wider text-wk-text-muted">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {roleRecords.map((record) => {
-                  const isCurrentUser = record.user_id === currentUser.id;
-                  return (
-                    <tr
-                      key={record.id}
-                      className="border-b border-wk-border last:border-0 hover:bg-wk-surface-raised transition-colors"
-                    >
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-wk-brand-soft text-wk-brand">
-                            <WkIcon name="User" size={14} />
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-[13px] font-semibold text-wk-text truncate max-w-[160px]">
-                              {record.display_name || getEmailFromId(record.user_id)}
-                            </p>
-                            <p className="text-[11px] text-wk-text-muted truncate max-w-[160px]">
-                              {getEmailFromId(record.user_id)}
-                            </p>
-                          </div>
-                          {isCurrentUser && (
-                            <span className="shrink-0 rounded-full bg-wk-brand/10 px-1.5 py-0.5 text-[9px] font-bold text-wk-brand">
-                              YOU
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase ${roleBadgeColors[record.role] ?? ""}`}>
-                          {ROLE_LABELS[record.role] ?? record.role}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 hidden md:table-cell">
-                        <span className="text-[13px] text-wk-text-muted">{record.display_name || "—"}</span>
-                      </td>
-                      <td className="px-4 py-3 hidden lg:table-cell">
-                        <span className="text-[12px] text-wk-text-muted">
-                          {new Date(record.created_at).toLocaleDateString()}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <button
-                            onClick={() => handleEdit(record)}
-                            className="flex h-8 w-8 items-center justify-center rounded-lg text-wk-text-muted hover:bg-wk-surface-raised hover:text-wk-text transition-colors"
-                            title="Edit role"
-                          >
-                            <WkIcon name="Pencil" size={14} />
-                          </button>
-                          {!isCurrentUser && (
-                            <button
-                              onClick={() => setDeleteId(record.id)}
-                              className="flex h-8 w-8 items-center justify-center rounded-lg text-wk-text-faint hover:bg-wk-danger/10 hover:text-wk-danger transition-colors"
-                              title="Remove role"
-                            >
-                              <WkIcon name="Trash2" size={14} />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </WkSurface>
-
-      {/* Assign Role Modal */}
-      {showAssignModal && (
-        <>
-          <div className="fixed inset-0 z-50 bg-black/50" onClick={() => setShowAssignModal(false)} />
-          <div className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl border border-wk-border bg-wk-surface shadow-xl p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-[16px] font-bold text-wk-text">Assign Role</h3>
-              <button
-                onClick={() => setShowAssignModal(false)}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-wk-text-muted hover:bg-wk-surface-raised"
-              >
-                <WkIcon name="X" size={16} />
-              </button>
-            </div>
-
-            <p className="text-[12px] text-wk-text-muted mb-4">
-              To assign a role, the user must first sign in to the site. Once they appear in the auth system, you can look up their user ID and assign a role here.
-            </p>
-
-            <div className="bg-wk-info/5 border border-wk-info/20 rounded-lg p-4 mb-4">
-              <div className="flex items-start gap-2">
-                <WkIcon name="Info" size={16} className="text-wk-info shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-[12px] font-semibold text-wk-text mb-1">How to assign roles</p>
-                  <p className="text-[11px] text-wk-text-muted leading-relaxed">
-                    Have the user sign in at <strong>/auth</strong>. After they sign in, their user ID will be registered. Come back here to assign their role. For bulk management, use the Supabase dashboard.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setShowAssignModal(false)}
-                className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* Edit Role Modal */}
-      {editRecord && (
-        <>
-          <div className="fixed inset-0 z-50 bg-black/50" onClick={() => setEditRecord(null)} />
-          <div className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl border border-wk-border bg-wk-surface shadow-xl p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-[16px] font-bold text-wk-text">Edit Role</h3>
-              <button
-                onClick={() => setEditRecord(null)}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-wk-text-muted hover:bg-wk-surface-raised"
-              >
-                <WkIcon name="X" size={16} />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-[12px] font-semibold text-wk-text mb-1.5">User</label>
-                <p className="text-[13px] text-wk-text-muted bg-wk-bg-subtle rounded-lg px-3 py-2 border border-wk-border">
-                  {editRecord.display_name || getEmailFromId(editRecord.user_id)}
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-[12px] font-semibold text-wk-text mb-1.5">Role</label>
-                <select
-                  value={editRole}
-                  onChange={(e) => setEditRole(e.target.value as UserRole)}
-                  className="w-full rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text outline-none focus:border-wk-brand"
-                >
-                  {ROLES.map((r) => (
-                    <option key={r} value={r}>{ROLE_LABELS[r]}</option>
-                  ))}
-                </select>
-                <p className="mt-1 text-[11px] text-wk-text-muted">{ROLE_DESCRIPTIONS[editRole]}</p>
-              </div>
-
-              <div>
-                <label className="block text-[12px] font-semibold text-wk-text mb-1.5">Display Name</label>
-                <input
-                  type="text"
-                  value={editDisplayName}
-                  onChange={(e) => setEditDisplayName(e.target.value)}
-                  placeholder="e.g. Jane Doe"
-                  className="w-full rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text outline-none focus:border-wk-brand placeholder:text-wk-text-faint"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[12px] font-semibold text-wk-text mb-1.5">Bio</label>
-                <textarea
-                  value={editBio}
-                  onChange={(e) => setEditBio(e.target.value)}
-                  placeholder="Short bio for this user..."
-                  rows={2}
-                  className="w-full rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text outline-none focus:border-wk-brand placeholder:text-wk-text-faint resize-none"
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2 mt-6">
-              <button
-                onClick={() => setEditRecord(null)}
-                className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSaveEdit}
-                disabled={saving}
-                className="wk-button wk-button-primary wk-button-sm whitespace-nowrap"
-              >
-                {saving ? (
-                  <>
-                    <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                    Saving...
-                  </>
-                ) : (
-                  "Save Changes"
-                )}
-              </button>
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* Delete Confirmation */}
-      {deleteId !== null && (
-        <>
-          <div className="fixed inset-0 z-50 bg-black/50" onClick={() => setDeleteId(null)} />
-          <div className="fixed left-1/2 top-1/2 z-50 w-full max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-xl border border-wk-border bg-wk-surface shadow-xl p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-wk-danger/10">
-                <WkIcon name="AlertTriangle" size={20} className="text-wk-danger" />
-              </div>
-              <div>
-                <h3 className="text-[15px] font-bold text-wk-text">Remove Role?</h3>
-                <p className="text-[12px] text-wk-text-muted">
-                  This user will lose all admin access. They can still browse the public site.
-                </p>
-              </div>
-            </div>
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setDeleteId(null)}
-                className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDelete}
-                disabled={deleting}
-                className="wk-button wk-button-danger wk-button-sm whitespace-nowrap"
-              >
-                {deleting ? "Removing..." : "Remove Role"}
-              </button>
-            </div>
-          </div>
-        </>
-      )}
-    </div>
-  );
+  return <div className="space-y-6">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><div className="mb-1 text-[11px] font-black uppercase tracking-wider text-wk-brand">Administration</div><h1 className="text-[24px] font-black tracking-tight text-wk-text">Access Console</h1><p className="mt-1 max-w-3xl text-[13px] leading-6 text-wk-text-muted">Invite users, assign roles, grant market/series scopes, suspend access, trigger password recovery, and inspect audit trails.</p></div><button onClick={() => setModal("invite")} className="wk-button wk-button-primary wk-button-sm"><WkIcon name="UserPlus" size={14} /> Invite / assign user</button></div>
+    {error && <div className="rounded-xl border border-wk-danger/30 bg-wk-danger-soft p-3 text-[13px] text-wk-danger">{error}</div>}
+    {message && <div className="rounded-xl border border-wk-success/30 bg-wk-success-soft p-3 text-[13px] text-wk-success">{message}</div>}
+    <div className="grid gap-3 sm:grid-cols-4"><Kpi label="Users" value={totals.users} icon="Users" /><Kpi label="Administrators" value={totals.admins} icon="ShieldCheck" /><Kpi label="Scoped users" value={totals.scoped} icon="Map" /><Kpi label="Open invites" value={totals.invites} icon="Mail" /></div>
+    <WkSurface className="overflow-hidden">{loading ? <SkeletonAdminTable rows={8} cols={5} /> : <div className="overflow-x-auto"><table className="w-full text-left text-[12px]"><thead className="border-b border-wk-border bg-wk-surface-raised text-[10px] uppercase tracking-wider text-wk-text-faint"><tr><th className="px-4 py-3">User</th><th className="px-4 py-3">Roles</th><th className="px-4 py-3">Scopes</th><th className="px-4 py-3">Status</th><th className="px-4 py-3 text-right">Actions</th></tr></thead><tbody className="divide-y divide-wk-border">{users.map((user) => <tr key={user.profile.user_id} className="hover:bg-wk-surface-raised"><td className="px-4 py-3"><div className="font-bold text-wk-text">{user.profile.display_name || user.profile.email || shortId(user.profile.user_id)}</div><div className="text-wk-text-muted">{user.profile.email || user.profile.user_id}</div></td><td className="px-4 py-3"><div className="flex flex-wrap gap-1.5">{user.roles.length ? user.roles.map((role) => <span key={role.id} className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-black uppercase ${roleTone(role.role_key)}`}>{ROLE_LABELS[role.role_key] ?? role.role_key}<button onClick={() => handleRevokeRole(user.profile.user_id, role.role_key)} className="ml-1 opacity-70 hover:opacity-100">×</button></span>) : <span className="text-wk-text-faint">No role</span>}</div></td><td className="px-4 py-3"><div className="space-y-1">{user.scopes.slice(0, 3).map((scope) => <div key={scope.id} className="text-[11px] text-wk-text-muted">{scope.scope_type}:{scope.scope_value} {scope.can_publish ? "· publish" : scope.can_edit ? "· edit" : "· view"}</div>)}{user.scopes.length > 3 && <div className="text-[11px] text-wk-text-faint">+{user.scopes.length - 3} more</div>}</div></td><td className="px-4 py-3"><span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase ${user.profile.status === "suspended" ? "bg-wk-danger-soft text-wk-danger" : "bg-wk-success-soft text-wk-success"}`}>{user.profile.status || "active"}</span></td><td className="px-4 py-3"><div className="flex justify-end gap-2"><button onClick={() => { setSelectedUser(user); setScopeRole(user.roles[0]?.role_key ?? "chart_editor_regional"); setModal("scope"); }} className="wk-button wk-button-ghost wk-button-sm">Scope</button><button onClick={() => { setSelectedUser(user); setModal("reset"); }} className="wk-button wk-button-ghost wk-button-sm">Reset</button><button onClick={() => handleSuspend(user)} className="wk-button wk-button-ghost wk-button-sm text-wk-danger" disabled={busy}>Suspend</button></div></td></tr>)}</tbody></table></div>}</WkSurface>
+    <div className="grid gap-6 xl:grid-cols-3"><RecentPanel title="Recent invites" rows={invites.map((i) => ({ id: i.id, top: i.email, meta: `${i.role_key} · ${i.invite_status}`, detail: date(i.created_at) }))} /><RecentPanel title="Password recovery" rows={recoveries.map((r) => ({ id: r.id, top: r.target_email, meta: r.delivery_status, detail: date(r.created_at) }))} /><RecentPanel title="Audit trail" rows={audits.map((a) => ({ id: a.id, top: a.event_type, meta: a.target_table || "audit", detail: a.message || date(a.created_at) }))} /></div>
+    <WkSurface className="p-5"><h2 className="mb-3 text-[14px] font-bold text-wk-text">Role catalogue</h2><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{ROLES.map((role) => <div key={role} className="rounded-lg border border-wk-border p-3"><span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-black uppercase ${roleTone(role)}`}>{ROLE_LABELS[role]}</span><p className="mt-2 text-[11px] leading-5 text-wk-text-muted">{ROLE_DESCRIPTIONS[role]}</p></div>)}</div></WkSurface>
+    {modal === "invite" && <Modal title="Invite / assign user" onClose={() => setModal(null)}><Field label="Email"><input className="wk-input w-full" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} placeholder="person@wakilisha.africa" /></Field><Field label="Display name"><input className="wk-input w-full" value={inviteName} onChange={(e) => setInviteName(e.target.value)} /></Field><Field label="Role"><select className="wk-input w-full" value={inviteRole} onChange={(e) => setInviteRole(e.target.value as UserRole)}>{ADMIN_ROLES.map((role) => <option key={role} value={role}>{ROLE_LABELS[role]}</option>)}</select></Field><div className="grid gap-3 sm:grid-cols-2"><Field label="Scope type"><select className="wk-input w-full" value={inviteScopeType} onChange={(e) => setInviteScopeType(e.target.value)}>{SCOPE_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}</select></Field><Field label="Scope value"><input className="wk-input w-full" value={inviteScopeValue} onChange={(e) => setInviteScopeValue(e.target.value)} placeholder="kenya / top-100 / *" /></Field></div><Checks canEdit={inviteCanEdit} setCanEdit={setInviteCanEdit} canPublish={inviteCanPublish} setCanPublish={setInviteCanPublish} /><button onClick={handleInvite} disabled={busy} className="wk-button wk-button-primary w-full">{busy ? "Sending…" : "Send invite and assign"}</button></Modal>}
+    {modal === "scope" && selectedUser && <Modal title={`Assign scope to ${selectedUser.profile.email || shortId(selectedUser.profile.user_id)}`} onClose={() => setModal(null)}><Field label="Role"><select className="wk-input w-full" value={scopeRole} onChange={(e) => setScopeRole(e.target.value as UserRole)}>{ADMIN_ROLES.map((role) => <option key={role} value={role}>{ROLE_LABELS[role]}</option>)}</select></Field><div className="grid gap-3 sm:grid-cols-2"><Field label="Scope type"><select className="wk-input w-full" value={scopeType} onChange={(e) => setScopeType(e.target.value)}>{SCOPE_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}</select></Field><Field label="Scope value"><input className="wk-input w-full" value={scopeValue} onChange={(e) => setScopeValue(e.target.value)} placeholder="kenya / nigeria / top-100" /></Field></div><Checks canEdit={scopeCanEdit} setCanEdit={setScopeCanEdit} canPublish={scopeCanPublish} setCanPublish={setScopeCanPublish} /><button onClick={handleAddScope} disabled={busy} className="wk-button wk-button-primary w-full">Assign scope</button></Modal>}
+    {modal === "reset" && selectedUser && <Modal title="Send password reset" onClose={() => setModal(null)}><p className="text-[13px] leading-6 text-wk-text-muted">Send a Supabase password reset email to <strong className="text-wk-text">{selectedUser.profile.email || "this user"}</strong>. The action is recorded in recovery events and admin audit.</p><button onClick={handlePasswordReset} disabled={busy || !selectedUser.profile.email} className="wk-button wk-button-primary w-full">{busy ? "Sending…" : "Send password reset"}</button></Modal>}
+  </div>;
 }
+
+function Kpi({ label, value, icon }: { label: string; value: number; icon: any }) { return <WkSurface className="p-4"><div className="flex items-start justify-between"><div><div className="text-[24px] font-black text-wk-text">{value.toLocaleString()}</div><div className="text-[11px] font-bold uppercase tracking-wider text-wk-text-faint">{label}</div></div><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-wk-brand-soft text-wk-brand"><WkIcon name={icon} size={18} /></div></div></WkSurface>; }
+function RecentPanel({ title, rows }: { title: string; rows: Array<{ id: string; top: string; meta: string; detail: string }> }) { return <WkSurface className="overflow-hidden"><div className="border-b border-wk-border p-4 text-[13px] font-bold text-wk-text">{title}</div><div className="divide-y divide-wk-border">{rows.length ? rows.map((row) => <div key={row.id} className="p-3"><div className="flex justify-between gap-3"><div className="truncate text-[12px] font-bold text-wk-text">{row.top}</div><span className="shrink-0 text-[10px] uppercase text-wk-text-faint">{row.meta}</span></div><div className="mt-1 line-clamp-2 text-[11px] text-wk-text-muted">{row.detail}</div></div>) : <div className="p-5 text-center text-[12px] text-wk-text-muted">No rows yet.</div>}</div></WkSurface>; }
+function Modal({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) { return <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/50 p-4"><div className="w-full max-w-lg rounded-2xl border border-wk-border bg-wk-surface p-5 shadow-xl"><div className="mb-4 flex items-center justify-between"><h2 className="text-[16px] font-black text-wk-text">{title}</h2><button onClick={onClose} className="rounded-full p-1 text-wk-text-muted hover:bg-wk-surface-raised"><WkIcon name="X" size={18} /></button></div><div className="space-y-4">{children}</div></div></div>; }
+function Field({ label, children }: { label: string; children: React.ReactNode }) { return <label className="block"><span className="mb-1 block text-[11px] font-black uppercase tracking-wider text-wk-text-faint">{label}</span>{children}</label>; }
+function Checks({ canEdit, setCanEdit, canPublish, setCanPublish }: { canEdit: boolean; setCanEdit: (v: boolean) => void; canPublish: boolean; setCanPublish: (v: boolean) => void }) { return <div className="flex flex-wrap gap-3 text-[12px] text-wk-text-muted"><label className="flex items-center gap-2"><input type="checkbox" checked readOnly /> View</label><label className="flex items-center gap-2"><input type="checkbox" checked={canEdit} onChange={(e) => setCanEdit(e.target.checked)} /> Edit</label><label className="flex items-center gap-2"><input type="checkbox" checked={canPublish} onChange={(e) => setCanPublish(e.target.checked)} /> Publish</label></div>; }
