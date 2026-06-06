@@ -5,7 +5,7 @@ import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { supabase } from "@/lib/supabase";
 import { fetchUserRole, getDefaultRoute, roleCanAccessAdmin } from "@/services/userRoles";
 
-type Mode = "signin" | "checking" | "denied";
+type Mode = "signin" | "checking" | "denied" | "forgot" | "magic";
 
 export default function AdminLoginPage() {
   const navigate = useNavigate();
@@ -16,6 +16,7 @@ export default function AdminLoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
   const [deniedEmail, setDeniedEmail] = useState<string | null>(null);
 
@@ -41,9 +42,14 @@ export default function AdminLoginPage() {
     return () => { alive = false; };
   }, [navigate, next]);
 
+  const clearMessages = () => {
+    setError("");
+    setSuccess("");
+  };
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    setError("");
+    clearMessages();
     setLoading(true);
     const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
     if (signInError || !data.user) {
@@ -62,8 +68,47 @@ export default function AdminLoginPage() {
     navigate(next || getDefaultRoute(role!.role), { replace: true });
   };
 
+  const handlePasswordReset = async (event: React.FormEvent) => {
+    event.preventDefault();
+    clearMessages();
+    if (!email.trim()) {
+      setError("Enter your admin email address.");
+      return;
+    }
+    setLoading(true);
+    const redirectTo = `${window.location.origin}/auth/reset-password`;
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo });
+    setLoading(false);
+    if (resetError) {
+      setError(resetError.message);
+      return;
+    }
+    setSuccess("Password reset email sent. Open the link in your email to set a new password.");
+  };
+
+  const handleMagicLink = async (event: React.FormEvent) => {
+    event.preventDefault();
+    clearMessages();
+    if (!email.trim()) {
+      setError("Enter your admin email address.");
+      return;
+    }
+    setLoading(true);
+    const emailRedirectTo = `${window.location.origin}/admin/login?next=${encodeURIComponent(next)}`;
+    const { error: magicError } = await supabase.auth.signInWithOtp({
+      email: email.trim(),
+      options: { emailRedirectTo, shouldCreateUser: false },
+    });
+    setLoading(false);
+    if (magicError) {
+      setError(magicError.message);
+      return;
+    }
+    setSuccess("Magic link sent. Open it from your email to continue into Admin Studio.");
+  };
+
   const handleGoogle = async () => {
-    setError("");
+    clearMessages();
     setLoading(true);
     const redirectTo = `${window.location.origin}/admin/login?next=${encodeURIComponent(next)}`;
     const { error: oauthError } = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo } });
@@ -76,6 +121,11 @@ export default function AdminLoginPage() {
   const signOutAndPublic = async () => {
     await supabase.auth.signOut();
     navigate("/auth", { replace: true });
+  };
+
+  const backToSignin = () => {
+    clearMessages();
+    setMode("signin");
   };
 
   return (
@@ -95,15 +145,22 @@ export default function AdminLoginPage() {
           <WkSurface className="p-6 sm:p-8">
             <div className="mb-6 text-center">
               <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-wk-brand text-wk-brand-on">
-                <WkIcon name="LockKeyhole" size={26} />
+                <WkIcon name={mode === "forgot" ? "Mail" : mode === "magic" ? "Mail" : "LockKeyhole"} size={26} />
               </div>
-              <h2 className="text-[22px] font-black tracking-tight text-wk-text">Admin login</h2>
-              <p className="mt-1 text-[12px] leading-5 text-wk-text-muted">Use an account with an active WAKILISHA admin/operator role.</p>
+              <h2 className="text-[22px] font-black tracking-tight text-wk-text">
+                {mode === "forgot" ? "Reset admin password" : mode === "magic" ? "Send admin magic link" : "Admin login"}
+              </h2>
+              <p className="mt-1 text-[12px] leading-5 text-wk-text-muted">
+                {mode === "forgot" ? "We will email a secure password reset link." : mode === "magic" ? "Use a one-time email link to sign in without a password." : "Use an account with an active WAKILISHA admin/operator role."}
+              </p>
             </div>
 
             {mode === "checking" && (
               <div className="rounded-xl border border-wk-border bg-wk-surface-raised p-4 text-center text-[13px] text-wk-text-muted">Checking current session…</div>
             )}
+
+            {error && <div className="mb-4 rounded-xl border border-wk-danger/30 bg-wk-danger-soft p-3 text-[12px] text-wk-danger">{error}</div>}
+            {success && <div className="mb-4 rounded-xl border border-wk-success/30 bg-wk-success-soft p-3 text-[12px] text-wk-success">{success}</div>}
 
             {mode === "denied" && (
               <div className="space-y-4">
@@ -121,9 +178,30 @@ export default function AdminLoginPage() {
               </div>
             )}
 
+            {mode === "forgot" && (
+              <form onSubmit={handlePasswordReset} className="space-y-4">
+                <label className="block">
+                  <span className="mb-1 block text-[11px] font-black uppercase tracking-wider text-wk-text-faint">Admin email</span>
+                  <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" required autoComplete="email" className="wk-input w-full" placeholder="admin@wakilisha.africa" />
+                </label>
+                <button type="submit" disabled={loading} className="wk-button wk-button-primary w-full">{loading ? "Sending…" : "Send password reset"}</button>
+                <button type="button" onClick={backToSignin} className="wk-button wk-button-ghost w-full">Back to admin login</button>
+              </form>
+            )}
+
+            {mode === "magic" && (
+              <form onSubmit={handleMagicLink} className="space-y-4">
+                <label className="block">
+                  <span className="mb-1 block text-[11px] font-black uppercase tracking-wider text-wk-text-faint">Admin email</span>
+                  <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" required autoComplete="email" className="wk-input w-full" placeholder="admin@wakilisha.africa" />
+                </label>
+                <button type="submit" disabled={loading} className="wk-button wk-button-primary w-full">{loading ? "Sending…" : "Send magic link"}</button>
+                <button type="button" onClick={backToSignin} className="wk-button wk-button-ghost w-full">Back to admin login</button>
+              </form>
+            )}
+
             {mode === "signin" && (
               <form onSubmit={handleSubmit} className="space-y-4">
-                {error && <div className="rounded-xl border border-wk-danger/30 bg-wk-danger-soft p-3 text-[12px] text-wk-danger">{error}</div>}
                 <label className="block">
                   <span className="mb-1 block text-[11px] font-black uppercase tracking-wider text-wk-text-faint">Admin email</span>
                   <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" required autoComplete="email" className="wk-input w-full" placeholder="admin@wakilisha.africa" />
@@ -132,6 +210,10 @@ export default function AdminLoginPage() {
                   <span className="mb-1 block text-[11px] font-black uppercase tracking-wider text-wk-text-faint">Password</span>
                   <input value={password} onChange={(e) => setPassword(e.target.value)} type="password" required autoComplete="current-password" className="wk-input w-full" placeholder="••••••••" />
                 </label>
+                <div className="flex items-center justify-between gap-3">
+                  <button type="button" onClick={() => { clearMessages(); setMode("forgot"); }} className="text-[12px] font-bold text-wk-text-muted hover:text-wk-brand">Forgot password?</button>
+                  <button type="button" onClick={() => { clearMessages(); setMode("magic"); }} className="text-[12px] font-bold text-wk-text-muted hover:text-wk-brand">Use magic link</button>
+                </div>
                 <button type="submit" disabled={loading} className="wk-button wk-button-primary w-full">{loading ? "Checking access…" : "Enter Admin Studio"}</button>
                 <button type="button" onClick={handleGoogle} disabled={loading} className="wk-button wk-button-ghost w-full">
                   <WkIcon name="Chrome" size={16} /> Continue with Google
