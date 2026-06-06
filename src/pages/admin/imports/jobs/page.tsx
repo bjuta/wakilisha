@@ -80,9 +80,8 @@ export default function AdminImportsJobsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <button onClick={() => navigate("/admin/imports")} className="wk-button wk-button-primary wk-button-sm whitespace-nowrap"><WkIcon name="Link" size={14} /> New Import</button>
           <button onClick={() => void load()} className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap"><WkIcon name="RefreshCw" size={14} /> Refresh</button>
-          <button onClick={() => navigate("/admin/imports/wordpress-connect")} className="wk-button wk-button-primary wk-button-sm whitespace-nowrap"><WkIcon name="Link" size={14} /> Connect WordPress</button>
-          <button onClick={() => navigate("/admin/imports/upload")} className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap"><WkIcon name="Upload" size={14} /> Upload</button>
         </div>
       </div>
 
@@ -102,7 +101,6 @@ export default function AdminImportsJobsPage() {
             <WkIcon name="AlertCircle" size={18} className="text-wk-danger" />
             <div>
               <span className="text-[13px] font-bold text-wk-danger">{totalErrors} errors across all runs</span>
-              <button onClick={() => navigate("/admin/imports/failed")} className="ml-3 text-[12px] font-semibold text-wk-danger underline whitespace-nowrap">View failed records</button>
             </div>
           </div>
         </div>
@@ -205,8 +203,8 @@ export default function AdminImportsJobsPage() {
               <p className="text-[14px] font-bold text-wk-text">No import jobs found</p>
               <p className="mt-1 text-[12px] text-wk-text-muted">Start by connecting a WordPress site or uploading a ZIP export.</p>
               <div className="mt-4 flex items-center justify-center gap-2">
-                <button onClick={() => navigate("/admin/imports/wordpress-connect")} className="wk-button wk-button-primary wk-button-sm whitespace-nowrap"><WkIcon name="Link" size={14} /> Connect WordPress</button>
-                <button onClick={() => navigate("/admin/imports/upload")} className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap"><WkIcon name="Upload" size={14} /> Upload ZIP</button>
+                <button onClick={() => navigate("/admin/imports")} className="wk-button wk-button-primary wk-button-sm whitespace-nowrap"><WkIcon name="Link" size={14} /> New Import</button>
+                <button onClick={() => navigate("/admin/imports/jobs")} className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap"><WkIcon name="RefreshCw" size={14} /> Refresh</button>
               </div>
             </WkSurface>
           )}

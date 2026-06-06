@@ -67,7 +67,7 @@ export const ATTENTION_ITEMS: AttentionItem[] = [
   { id: "att-5", type: "info", title: "Active ingest runs", count: 2, href: "/admin/settings/charts/ingest-runs" },
   { id: "att-6", type: "review", title: "Unresolved entities", count: 34, href: "/admin/review/unresolved" },
   { id: "att-7", type: "warning", title: "Records missing slugs", count: 19, href: "/admin/review/missing-metadata" },
-  { id: "att-8", type: "failed", title: "Failed records", count: 12, href: "/admin/imports/failed" },
+  { id: "att-8", type: "failed", title: "Failed records", count: 12, href: "/admin/imports/jobs" },
 ];
 
 export const RECENT_ACTIVITY: RecentActivityItem[] = [
@@ -83,7 +83,7 @@ export const RECENT_ACTIVITY: RecentActivityItem[] = [
 
 export const QUICK_ACTIONS: QuickAction[] = [
   { label: "Create Article", description: "Write a new editorial piece", icon: "PenLine", href: "/admin/content/articles/new", accent: "brand" },
-  { label: "Upload Import ZIP", description: "Import WordPress export data", icon: "Upload", href: "/admin/imports/upload" },
+  { label: "Import from WordPress", description: "One-time migration from wakilisha.africa", icon: "Upload", href: "/admin/imports" },
   { label: "Review Missing Images", description: "103 records need hero images", icon: "ImageOff", href: "/admin/media/missing" },
   { label: "Open Review Queue", description: "446 items awaiting review", icon: "GitPullRequest", href: "/admin/review/queue" },
   { label: "Create Chart Edition", description: "Publish a new weekly chart", icon: "BarChart3", href: "/admin/settings/charts/ingest" },

@@ -98,8 +98,10 @@ export function totalImported(run?: Pick<IngestionRun, 'imported_counts'> | null
 export type ProcessResult = {
   success: boolean;
   runId: string;
-  stats: { total: number; imported: number; failed: number; skipped: number };
+  stats: { total: number; imported: number; failed: number; skipped: number; drafts: number };
   importedCounts: Record<string, number>;
+  draftCounts: Record<string, number>;
+  reviewFieldsFlagged: number;
   errorCount: number;
   warningCount: number;
   error?: string;
@@ -114,8 +116,10 @@ export async function processImportRun(runId: string, maxItems = 500): Promise<P
     return {
       success: false,
       runId,
-      stats: { total: 0, imported: 0, failed: 0, skipped: 0 },
+      stats: { total: 0, imported: 0, failed: 0, skipped: 0, drafts: 0 },
       importedCounts: {},
+      draftCounts: {},
+      reviewFieldsFlagged: 0,
       errorCount: 0,
       warningCount: 0,
       error: error.message,

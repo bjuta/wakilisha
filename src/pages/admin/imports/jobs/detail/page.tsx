@@ -141,7 +141,7 @@ export default function AdminImportsJobDetailPage() {
     flash("success", "Starting import processor. This may take a while for large imports...");
     const result = await processImportRun(id, 500);
     if (result.success) {
-      flash("success", `Processed ${result.stats.total} items: ${result.stats.imported} imported, ${result.stats.failed} failed, ${result.stats.skipped} skipped.`);
+      flash("success", `Processed ${result.stats.total} items: ${result.stats.imported} imported, ${result.stats.failed} failed, ${result.stats.skipped} skipped, ${result.stats.drafts} drafts preserved.`);
       await load();
       await loadSummary();
     } else {
@@ -624,6 +624,9 @@ function AllItemsTab({ items }: { items: ImportItem[] }) {
 // ---- Overview Tab ----
 function OverviewTab({ run, summary, onProcess, processing }: { run: IngestionRun; summary: ImportRunSummary | null; onProcess: () => void; processing: boolean }) {
   const counts = run.imported_counts ?? {};
+  const manifest = (run.source_manifest ?? {}) as Record<string, unknown>;
+  const reviewItems = (manifest._review_items as Record<string, unknown>) || null;
+  const draftCounts = (manifest._draft_counts as Record<string, number>) || {};
 
   return (
     <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
@@ -646,6 +649,84 @@ function OverviewTab({ run, summary, onProcess, processing }: { run: IngestionRu
             </div>
           )}
         </WkSurface>
+
+        {/* Draft counts */}
+        {Object.keys(draftCounts).length > 0 && (
+          <WkSurface className="p-5">
+            <h3 className="mb-4 flex items-center gap-2 text-[14px] font-bold text-wk-text">
+              <WkIcon name="FileText" size={16} className="text-wk-warning" />
+              Preserved Drafts
+            </h3>
+            <p className="mb-4 text-[12px] text-wk-text-muted">
+              These records were marked as <span className="font-semibold text-wk-warning">draft</span> in WordPress and stayed draft here.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {Object.entries(draftCounts).map(([key, count]) => (
+                <div key={key} className="rounded-lg border border-wk-warning/20 bg-wk-warning-soft p-3">
+                  <div className="text-[18px] font-black text-wk-warning">{Number(count).toLocaleString()}</div>
+                  <div className="text-[11px] font-semibold uppercase tracking-wider text-wk-text-muted">{key}</div>
+                </div>
+              ))}
+            </div>
+          </WkSurface>
+        )}
+
+        {/* Review Flags (metadata that doesn't have UI) */}
+        {reviewItems && (reviewItems.total_fields_flagged as number) > 0 && (
+          <WkSurface className="p-5">
+            <h3 className="mb-3 flex items-center gap-2 text-[14px] font-bold text-wk-text">
+              <WkIcon name="Flag" size={16} className="text-wk-accent" />
+              Import Review Flags
+            </h3>
+            <p className="mb-4 text-[12px] text-wk-text-muted">
+              <span className="font-bold text-wk-text">{(reviewItems.total_fields_flagged as number)} fields</span> were imported into metadata JSONB because they don&apos;t have dedicated UI columns yet. Review these and decide if new columns or admin fields are needed.
+            </p>
+
+            {/* By entity summary */}
+            {reviewItems.by_entity && (
+              <div className="mb-4 flex flex-wrap gap-2">
+                {Object.entries(reviewItems.by_entity as Record<string, number>).map(([table, count]) => (
+                  <span key={table} className="rounded-full border border-wk-accent/20 bg-wk-accent-soft px-3 py-1 text-[11px] font-semibold text-wk-accent">
+                    {table}: {count} fields
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Items list */}
+            <div className="max-h-[400px] overflow-auto space-y-1.5">
+              {Array.isArray(reviewItems.items) && (reviewItems.items as Array<Record<string, unknown>>).slice(0, 50).map((item, i) => (
+                <div key={i} className="flex items-start gap-3 rounded-lg border border-wk-border bg-wk-bg-subtle p-3">
+                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-wk-accent-soft">
+                    <WkIcon name="Flag" size={12} className="text-wk-accent" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                      <span className="text-[11px] font-bold text-wk-text">{item.wp_meta_key as string}</span>
+                      <span className="text-[10px] text-wk-text-muted">→ {item.entity_table as string}.{item.field as string}</span>
+                    </div>
+                    <p className="text-[11px] text-wk-text-muted">{item.suggestion as string}</p>
+                    {item.sample_value && (
+                      <p className="mt-1 text-[10px] text-wk-text-muted/70 truncate max-w-lg">Sample: {(item.sample_value as string).slice(0, 120)}</p>
+                    )}
+                  </div>
+                </div>
+              ))}
+              {(reviewItems.items as Array<unknown> | undefined)?.length && (reviewItems.items as Array<unknown>).length > 50 && (
+                <p className="text-center text-[11px] text-wk-text-muted py-2">Showing 50 of {(reviewItems.items as Array<unknown>).length} flagged fields.</p>
+              )}
+            </div>
+
+            <div className="mt-4 rounded-lg border border-wk-accent/10 bg-wk-accent-soft/50 p-3">
+              <div className="flex items-start gap-2">
+                <WkIcon name="Lightbulb" size={14} className="text-wk-accent shrink-0 mt-0.5" />
+                <div className="text-[11px] text-wk-text-muted">
+                  To resolve: either add database columns in Supabase for these fields and update the admin editor, or keep them in the <code className="rounded bg-wk-border px-1 text-wk-text">metadata</code> JSONB column and build custom display components.
+                </div>
+              </div>
+            </div>
+          </WkSurface>
+        )}
 
         {/* Summary from per-item tracking */}
         {summary && summary.entityBreakdowns.length > 0 && (
@@ -714,7 +795,7 @@ function OverviewTab({ run, summary, onProcess, processing }: { run: IngestionRu
         <WkSurface className="p-5">
           <h3 className="mb-3 text-[14px] font-bold text-wk-text">Quick Actions</h3>
           <div className="space-y-2">
-            {(run.status === "queued" || run.status === "scanned" || run.status === "mapped" || run.status === "planned") && (
+            {(run.status === "queued" || run.status === "scanned" || run.status === "mapped" || run.status === "planned" || run.status === "staged") && (
               <button
                 onClick={onProcess}
                 disabled={processing}

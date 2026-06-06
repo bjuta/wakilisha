@@ -54,12 +54,8 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Imports",
     visible: (r) => r === "administrator",
     items: [
-      { path: "/admin/imports/wizard", label: "Migration Wizard", icon: "Sparkles" },
+      { path: "/admin/imports", label: "WordPress Import", icon: "Download" },
       { path: "/admin/imports/jobs", label: "Import Jobs", icon: "Upload" },
-      { path: "/admin/imports/upload", label: "Upload ZIP", icon: "FileUp" },
-      { path: "/admin/imports/reports", label: "Import Reports", icon: "FileBarChart" },
-      { path: "/admin/imports/staging", label: "Staging Records", icon: "Database" },
-      { path: "/admin/imports/failed", label: "Failed Records", icon: "FileX", badgeKey: "failedImports" },
     ],
   },
   { label: "Settings", visible: (r) => r === "administrator", items: [{ path: "/admin/settings", label: "Settings Hub", icon: "Settings" }, { path: "/admin/settings/integrations", label: "Integrations", icon: "Plug" }, { path: "/admin/settings/frontend-appearance", label: "Appearance", icon: "Palette" }, { path: "/admin/settings/navigation", label: "Navigation", icon: "Compass" }, { path: "/admin/settings/audit", label: "Audit Log", icon: "ClipboardList" }] },

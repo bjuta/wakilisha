@@ -5,25 +5,225 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const TABLE_WRITABLE = new Set([
-  "registry_artists", "registry_tracks", "registry_releases", "registry_labels",
-  "registry_genres", "wk_artists", "wk_tracks", "wk_releases", "wk_labels",
-  "wk_genres", "wk_articles", "wk_guides", "wk_raw_wp_posts",
-  "wk_cms_documents", "wk_media_assets", "wk_wordpress_items",
+const API_PAGE_SIZE = 50;
+const BATCH_SIZE = 100;
+
+// ---- Authoritative CPT Map (from wakilisha-cpt-map.ts) ----
+const CPT_MAP: Record<string, { target_entity: string; canonical_kind: string; ready_policy: string }> = {
+  post: { target_entity: "articles", canonical_kind: "article", ready_policy: "published_only" },
+  page: { target_entity: "pages", canonical_kind: "page", ready_policy: "published_only" },
+  wakilisha_artist: { target_entity: "artists", canonical_kind: "artist", ready_policy: "published_only" },
+  wk_registry_track: { target_entity: "tracks", canonical_kind: "track", ready_policy: "published_only" },
+  wk_registry_release: { target_entity: "releases", canonical_kind: "release", ready_policy: "published_only" },
+  wk_registry_label: { target_entity: "labels", canonical_kind: "label", ready_policy: "published_only" },
+  wk_genre_page: { target_entity: "genres", canonical_kind: "genre", ready_policy: "published_only" },
+  wk_field_guide: { target_entity: "guides", canonical_kind: "guide", ready_policy: "published_only" },
+  wk_chart_series: { target_entity: "chart_series", canonical_kind: "chart_series", ready_policy: "published_only" },
+  wk_chart_edition: { target_entity: "chart_editions", canonical_kind: "chart_edition", ready_policy: "published_only" },
+  wk_top10_surface: { target_entity: "chart_surfaces", canonical_kind: "chart_surface", ready_policy: "needs_review" },
+  wk_magazine_surface: { target_entity: "magazine_surfaces", canonical_kind: "magazine_surface", ready_policy: "needs_review" },
+  wk_methodology: { target_entity: "methodologies", canonical_kind: "methodology", ready_policy: "published_only" },
+  wk_correction_page: { target_entity: "corrections", canonical_kind: "correction", ready_policy: "needs_review" },
+  wk_play_surface: { target_entity: "play_surfaces", canonical_kind: "play_surface", ready_policy: "needs_review" },
+  wk_labels_surface: { target_entity: "label_surfaces", canonical_kind: "label_surface", ready_policy: "needs_review" },
+  wk_settings_surface: { target_entity: "settings_surfaces", canonical_kind: "settings_surface", ready_policy: "needs_review" },
+  wk_profile_surface: { target_entity: "profile_surfaces", canonical_kind: "profile_surface", ready_policy: "needs_review" },
+  wk_genre: { target_entity: "genres", canonical_kind: "genre", ready_policy: "published_only" },
+  wk_artist: { target_entity: "artists", canonical_kind: "artist", ready_policy: "published_only" },
+  wk_track: { target_entity: "tracks", canonical_kind: "track", ready_policy: "published_only" },
+  wk_release: { target_entity: "releases", canonical_kind: "release", ready_policy: "published_only" },
+  wk_label: { target_entity: "labels", canonical_kind: "label", ready_policy: "published_only" },
+  wk_guide: { target_entity: "guides", canonical_kind: "guide", ready_policy: "published_only" },
+  wk_chart: { target_entity: "chart_programs", canonical_kind: "chart_program", ready_policy: "published_only" },
+  wk_media: { target_entity: "media_assets", canonical_kind: "media_asset", ready_policy: "needs_review" },
+  wk_issue: { target_entity: "magazine_issues", canonical_kind: "magazine_issue", ready_policy: "published_only" },
+  attachment: { target_entity: "media_assets", canonical_kind: "media_asset", ready_policy: "needs_review" },
+};
+
+// Post types that commonly contain large amounts of data NOT as individual CPT posts
+// but rather as post metadata / serialized structures — REST API will see low counts
+const KNOWN_AGGREGATE_CPTS = new Set([
+  "wk_registry_track", "wk_track",
+  "wk_registry_release", "wk_release",
+  "wk_registry_label", "wk_label",
 ]);
 
-const API_PAGE_SIZE = 50;
-
 function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 200);
+  return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/, "").slice(0, 200);
 }
 
 function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, "").trim();
+}
+
+function parseDate(value: string): string | null {
+  if (!value) return null;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}
+
+function cptEntry(postType: string) {
+  return CPT_MAP[postType] || null;
+}
+
+function targetEntityForPostType(postType: string): string {
+  return cptEntry(postType)?.target_entity ?? (postType === "post" ? "articles" : postType === "page" ? "pages" : postType === "attachment" ? "media_assets" : "content_entities");
+}
+
+function shouldReady(postType: string, status: string, title: string): boolean {
+  const entry = cptEntry(postType);
+  if (!title || !["publish", "published"].includes(status.toLowerCase())) return false;
+  if (!entry) return postType === "post" || postType === "page";
+  return entry.ready_policy === "published_only";
+}
+
+function mapTargetStatus(postType: string, wpStatus: string, title: string): string {
+  if (shouldReady(postType, wpStatus, title)) return "ready";
+  if (title || cptEntry(postType)) return "needs_review";
+  return "blocked";
+}
+
+function extractFeaturedImage(embedded: Record<string, unknown> | undefined): { url: string; alt: string } | null {
+  if (!embedded || !embedded["wp:featuredmedia"]) return null;
+  const media = (embedded["wp:featuredmedia"] as Array<Record<string, unknown>>)?.[0];
+  if (!media) return null;
+  const sourceUrl = media.source_url as string || "";
+  const altText = (media.alt_text as string) || "";
+  const sizes = media.media_details as Record<string, unknown> | undefined;
+  const large = sizes?.sizes as Record<string, { source_url: string }> | undefined;
+  const largeUrl = large?.large?.source_url || large?.full?.source_url || sourceUrl;
+  return { url: largeUrl || sourceUrl, alt: altText };
+}
+
+function extractTerms(embedded: Record<string, unknown> | undefined): Array<{ taxonomy: string; slug: string; name: string }> {
+  if (!embedded || !embedded["wp:term"]) return [];
+  const terms: Array<{ taxonomy: string; slug: string; name: string }> = [];
+  const termGroups = embedded["wp:term"] as Array<Array<Record<string, unknown>>>;
+  for (const group of termGroups) {
+    for (const term of group) {
+      terms.push({
+        taxonomy: String(term.taxonomy ?? ""),
+        slug: String(term.slug ?? ""),
+        name: String(term.name ?? ""),
+      });
+    }
+  }
+  return terms;
+}
+
+function getTitle(item: Record<string, unknown>): string {
+  if (typeof item.title === "object" && item.title) {
+    return (item.title as Record<string, string>).rendered || "";
+  }
+  return String(item.id ?? "");
+}
+
+function getContent(item: Record<string, unknown>): string {
+  if (typeof item.content === "object" && item.content) {
+    return (item.content as Record<string, string>).rendered || "";
+  }
+  return "";
+}
+
+function getExcerpt(item: Record<string, unknown>): string {
+  if (typeof item.excerpt === "object" && item.excerpt) {
+    return (item.excerpt as Record<string, string>).rendered || "";
+  }
+  return "";
+}
+
+function buildStageRecord(
+  runId: string,
+  item: Record<string, unknown>,
+  postType: string,
+  sourceFile: string,
+): Record<string, unknown> {
+  const wpId = String(item.id ?? "unknown");
+  const wpStatus = String(item.status ?? "publish");
+  const title = getTitle(item);
+  const content = getContent(item);
+  const excerpt = getExcerpt(item);
+  const postName = String(item.slug ?? "");
+  const slug = postName || slugify(title || wpId);
+  const targetEntity = targetEntityForPostType(postType);
+  const targetStatus = mapTargetStatus(postType, wpStatus, title);
+  const entry = cptEntry(postType);
+  const embedded = item._embedded as Record<string, unknown> | undefined;
+  const featuredImage = extractFeaturedImage(embedded);
+  const terms = extractTerms(embedded);
+  const wpMeta = (item.meta as Record<string, unknown>) || {};
+  const date = String(item.date ?? "");
+  const modified = String(item.modified ?? "");
+
+  const warnings: string[] = [];
+  if (!title) warnings.push("Missing title.");
+  if (entry && targetStatus !== "ready") {
+    warnings.push(`WAKILISHA CPT ${postType} mapped to ${targetEntity}; review metadata/relationships before finalization.`);
+  }
+  if (wpStatus !== "publish") {
+    warnings.push(`Post status "${wpStatus}" preserved — will remain draft on promotion.`);
+  }
+
+  const rawRecord = {
+    wp_id: wpId,
+    wp_type: postType,
+    wp_link: String(item.link ?? ""),
+    wp_status: wpStatus,
+    date,
+    modified,
+    title: stripHtml(title),
+    content,
+    excerpt,
+    slug,
+    featured_image: featuredImage,
+    terms,
+    meta: wpMeta,
+  };
+
+  const mappedRecord = {
+    title: stripHtml(title),
+    body: content,
+    excerpt: stripHtml(excerpt).slice(0, 500),
+    slug,
+    source_status: wpStatus,
+    post_type: postType,
+    canonical_kind: entry?.canonical_kind ?? postType,
+    wakilisha_cpt: Boolean(entry),
+    published_at: parseDate(date),
+    modified_at: parseDate(modified),
+    featured_image_url: featuredImage?.url || null,
+    featured_image_alt: featuredImage?.alt || null,
+    terms_count: terms.length,
+    wp_custom_fields_count: Object.keys(wpMeta).length,
+  };
+
+  return {
+    ingestion_run_id: runId,
+    source_kind: "wordpress_rest_api",
+    source_file: sourceFile,
+    source_entity: `wp_api.${postType}`,
+    source_record_id: wpId || null,
+    source_slug: postName || null,
+    target_entity: targetEntity,
+    target_status: targetStatus,
+    target_slug: slug || null,
+    title: stripHtml(title) || null,
+    body: content || null,
+    excerpt: stripHtml(excerpt).slice(0, 500) || null,
+    published_at: parseDate(date),
+    author_name: null,
+    source_url: String(item.link ?? "") || null,
+    raw_record: rawRecord,
+    mapped_record: mappedRecord,
+    mapping_candidate_ids: entry ? [`wakilisha-cpt-${postType}`] : [postType === "post" ? "wp-post" : postType === "page" ? "wp-page" : `wp-${postType}`],
+    warnings,
+    errors: targetStatus === "blocked" ? ["Cannot stage as ready without a title or recognized post type."] : [],
+  };
+}
+
+async function insertBatch(supabase: ReturnType<typeof createClient>, records: Record<string, unknown>[]) {
+  const { error } = await supabase.from("wk_import_staging_records").insert(records);
+  if (error) throw new Error(`Staging insert failed: ${error.message}`);
 }
 
 Deno.serve(async (req: Request) => {
@@ -31,42 +231,33 @@ Deno.serve(async (req: Request) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  const authHeader = req.headers.get("Authorization") ?? "";
-  const jwt = authHeader.replace("Bearer ", "");
-
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
   const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 
   if (!supabaseUrl || !supabaseKey) {
     return new Response(JSON.stringify({ error: "Supabase config missing." }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
   const supabase = createClient(supabaseUrl, supabaseKey);
 
   try {
-    const { runId, batchSize = 50, maxItems = 500 } = await req.json();
-
+    const body = await req.json();
+    const { runId, maxItems = 500 } = body;
     if (!runId) {
       return new Response(JSON.stringify({ error: "runId is required." }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // 1. Fetch the ingestion run
+    // Load the ingestion run
     const { data: run, error: runErr } = await supabase
-      .from("wk_ingestion_runs")
-      .select("*")
-      .eq("id", runId)
-      .maybeSingle();
+      .from("wk_ingestion_runs").select("*").eq("id", runId).maybeSingle();
 
     if (runErr || !run) {
       return new Response(JSON.stringify({ error: "Ingestion run not found." }), {
-        status: 404,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -77,170 +268,265 @@ Deno.serve(async (req: Request) => {
 
     if (!siteUrl) {
       return new Response(JSON.stringify({ error: "No site_url in source_manifest." }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Mark run as running
+    // Mark as staging
     await supabase.from("wk_ingestion_runs").update({
-      status: "running",
-      started_at: new Date().toISOString(),
+      status: "staging", started_at: new Date().toISOString(), errors: [],
     }).eq("id", runId);
 
-    const stats = { total: 0, imported: 0, failed: 0, skipped: 0 };
+    // Clear prior staging for this run
+    await supabase.from("wk_import_staging_records").delete().eq("ingestion_run_id", runId);
+    await supabase.from("wk_import_staging_failures").delete().eq("ingestion_run_id", runId);
+
+    const stats = { total: 0, staged: 0, failed: 0, skipped: 0, drafts: 0 };
     const errors: string[] = [];
     const warnings: string[] = [];
-    const importedCounts: Record<string, number> = {};
+    const entityCounts: Record<string, number> = {};
+    const draftCounts: Record<string, number> = {};
+    const allRecords: Record<string, unknown>[] = [];
+    const allFailures: Record<string, unknown>[] = [];
 
-    // 2. Process each bucket
-    for (const bucket of buckets) {
-      const targetEntity = bucket.target_entity as string;
-      const sourceType = (bucket.source_files as string[])?.[0] || "posts";
+    // Per-post-type diagnostic results
+    const typeDiags: Record<string, {
+      expectedTotal: number;
+      fetchedCount: number;
+      stagedCount: number;
+      draftCount: number;
+      pagesFetched: number;
+      apiOk: boolean;
+      errorMessage?: string;
+      isAggregateCpt: boolean;
+      warning?: string;
+    }> = {};
 
-      if (!TABLE_WRITABLE.has(targetEntity)) {
-        warnings.push(`Table "${targetEntity}" is not in the writable allowlist. Skipping bucket.`);
-        stats.skipped += (bucket.candidate_count as number) || 0;
+    // Determine post types to fetch
+    let typesToFetch: string[] = [];
+    if (buckets.length > 0) {
+      for (const bucket of buckets) {
+        const sourceFiles = bucket.source_files as string[] | undefined;
+        if (sourceFiles && sourceFiles.length > 0) {
+          typesToFetch.push(...sourceFiles);
+        }
+      }
+      typesToFetch = [...new Set(typesToFetch)];
+    } else {
+      const scan = (manifest as Record<string, unknown>).scan as Record<string, unknown> | undefined;
+      const evidence = scan?.evidence as Record<string, unknown> | undefined;
+      const postTypes = evidence?.post_types as Record<string, unknown> | undefined;
+      if (postTypes) {
+        typesToFetch = Object.keys(postTypes).filter((k) => k !== "__error");
+      }
+    }
+
+    if (typesToFetch.length === 0) {
+      typesToFetch = ["posts", "pages"];
+    }
+
+    const fetched: Set<string> = new Set();
+
+    for (const postType of typesToFetch) {
+      if (fetched.has(postType)) continue;
+      const entry = cptEntry(postType);
+      const targetEntity = targetEntityForPostType(postType);
+      const restBase = (manifest as Record<string, unknown>).scan?.evidence?.post_types?.[postType]?.restBase || postType;
+      const isAggregate = KNOWN_AGGREGATE_CPTS.has(postType);
+
+      // Initialize diagnostics
+      typeDiags[postType] = {
+        expectedTotal: 0,
+        fetchedCount: 0,
+        stagedCount: 0,
+        draftCount: 0,
+        pagesFetched: 0,
+        apiOk: false,
+        isAggregateCpt: isAggregate,
+      };
+
+      // Get total count from X-WP-Total header
+      let totalItems = 0;
+      try {
+        const countRes = await fetch(`${siteUrl}/wp-json/wp/v2/${restBase}?per_page=1`, {
+          headers: { "Accept": "application/json", "User-Agent": "Wakilisha/1.0" },
+        });
+        if (countRes.ok) {
+          totalItems = parseInt(countRes.headers.get("X-WP-Total") || "0", 10);
+          typeDiags[postType].expectedTotal = totalItems;
+          typeDiags[postType].apiOk = true;
+        } else {
+          typeDiags[postType].errorMessage = `HTTP ${countRes.status}`;
+        }
+      } catch (err) {
+        typeDiags[postType].errorMessage = err instanceof Error ? err.message : "Connection failed";
+      }
+
+      if (totalItems === 0 && typeDiags[postType].errorMessage) {
+        stats.skipped++;
+        if (isAggregate) {
+          typeDiags[postType].warning = `This post type is known to store data in postmeta, not as individual CPT posts. REST API only sees ${totalItems} items. Use the MySQL direct-connect pipeline (scripts/imports/stage-wordpress-database-records.ts) to import its postmeta data.`;
+        }
         continue;
       }
 
-      // Determine WP REST API endpoint
-      const restBase = (manifest as Record<string, unknown>).scan?.evidence?.post_types?.[sourceType]?.restBase as string || sourceType;
-
-      // Fetch total count first
-      let totalItems = (bucket.candidate_count as number) || 0;
       if (totalItems === 0) {
-        try {
-          const countRes = await fetch(
-            `${siteUrl}/wp-json/wp/v2/${restBase}?per_page=1`,
-            { headers: { "Accept": "application/json", "User-Agent": "Wakilisha-Import/1.0" } }
-          );
-          if (countRes.ok) {
-            const totalHeader = countRes.headers.get("X-WP-Total");
-            totalItems = totalHeader ? parseInt(totalHeader, 10) : 0;
-          }
-        } catch {
-          totalItems = 0;
-        }
+        stats.skipped++;
+        continue;
+      }
+
+      // For aggregate CPTs that return suspiciously low counts, add a warning
+      if (isAggregate && totalItems <= 5) {
+        typeDiags[postType].warning = `REST API only exposes ${totalItems} items for this post type. However, the actual track/release/label data is stored in WordPress postmeta, not as individual CPT posts. The MySQL direct-connect pipeline (scripts/imports/stage-wordpress-database-records.ts) can import postmeta data — the REST API cannot.`;
       }
 
       const limit = Math.min(totalItems, maxItems);
       const pages = Math.ceil(limit / API_PAGE_SIZE);
+      typeDiags[postType].pagesFetched = pages;
 
-      // Fetch and import in pages
       for (let page = 1; page <= pages; page++) {
         try {
           const wpRes = await fetch(
-            `${siteUrl}/wp-json/wp/v2/${restBase}?per_page=${API_PAGE_SIZE}&page=${page}&orderby=date&order=desc`,
-            { headers: { "Accept": "application/json", "User-Agent": "Wakilisha-Import/1.0" } }
+            `${siteUrl}/wp-json/wp/v2/${restBase}?per_page=${API_PAGE_SIZE}&page=${page}&orderby=date&order=desc&_embed`,
+            { headers: { "Accept": "application/json", "User-Agent": "Wakilisha/1.0" } }
           );
 
           if (!wpRes.ok) {
-            const msg = `WP API error for ${restBase} page ${page}: HTTP ${wpRes.status}`;
-            errors.push(msg);
-            stats.failed += API_PAGE_SIZE;
+            allFailures.push({
+              ingestion_run_id: runId,
+              source_file: `wp_api.${postType}`,
+              source_entity: postType,
+              failure_stage: "fetch",
+              message: `HTTP ${wpRes.status} on page ${page}`,
+              raw_record: { postType, page },
+            });
+            stats.failed++;
             continue;
           }
 
           const items = await wpRes.json() as Array<Record<string, unknown>>;
           stats.total += items.length;
+          typeDiags[postType].fetchedCount += items.length;
 
-          // Import each item
           for (const item of items) {
-            const wpId = String(item.id ?? "unknown");
-            try {
-              // Transform WP post to target table row
-              const row = transformForTable(item, targetEntity, sourceType);
+            const wpStatus = String(item.status ?? "publish");
+            const stageRecord = buildStageRecord(runId, item, postType, `wp_api.${postType}`);
 
-              if (!row || Object.keys(row).length === 0) {
-                await supabase.from("legacy_import_records").insert({
-                  job_id: runId,
-                  source_kind: run.source_kind,
-                  legacy_id: wpId,
-                  target_table: targetEntity,
-                  status: "skipped",
-                  raw_payload: item,
-                  error_message: "No transformable fields found for this item.",
-                });
-                stats.skipped++;
-                continue;
-              }
+            allRecords.push(stageRecord);
 
-              // Insert into target table
-              const { data: inserted, error: insertErr } = await supabase
-                .from(targetEntity)
-                .insert(row)
-                .select("id")
-                .single();
+            const targetEnt = stageRecord.target_entity as string;
+            entityCounts[targetEnt] = (entityCounts[targetEnt] || 0) + 1;
 
-              if (insertErr) {
-                // Track failure
-                await supabase.from("legacy_import_records").insert({
-                  job_id: runId,
-                  source_kind: run.source_kind,
-                  legacy_id: wpId,
-                  target_table: targetEntity,
-                  status: "failed",
-                  raw_payload: item,
-                  error_message: insertErr.message,
-                });
-                stats.failed++;
-                if (errors.length < 100) errors.push(`${targetEntity}#${wpId}: ${insertErr.message}`);
-              } else {
-                // Track success
-                await supabase.from("legacy_import_records").insert({
-                  job_id: runId,
-                  source_kind: run.source_kind,
-                  legacy_id: wpId,
-                  target_table: targetEntity,
-                  target_id: inserted?.[0]?.id ?? null,
-                  status: "imported",
-                  raw_payload: item,
-                });
-                stats.imported++;
-                importedCounts[targetEntity] = (importedCounts[targetEntity] || 0) + 1;
-              }
-            } catch (itemErr) {
-              await supabase.from("legacy_import_records").insert({
-                job_id: runId,
-                source_kind: run.source_kind,
-                legacy_id: wpId,
-                target_table: targetEntity,
-                status: "failed",
-                raw_payload: item,
-                error_message: itemErr instanceof Error ? itemErr.message : "Unknown error",
-              });
-              stats.failed++;
+            if (wpStatus !== "publish") {
+              stats.drafts++;
+              draftCounts[targetEnt] = (draftCounts[targetEnt] || 0) + 1;
+              typeDiags[postType].draftCount++;
+            }
+
+            if (stageRecord.target_status === "ready") {
+              stats.staged++;
+              typeDiags[postType].stagedCount++;
             }
           }
         } catch (pageErr) {
-          const msg = `Failed to fetch page ${page} for ${restBase}: ${pageErr instanceof Error ? pageErr.message : "network error"}`;
-          errors.push(msg);
-          stats.failed += API_PAGE_SIZE;
+          const msg = pageErr instanceof Error ? pageErr.message : "network error";
+          allFailures.push({
+            ingestion_run_id: runId,
+            source_file: `wp_api.${postType}`,
+            source_entity: postType,
+            failure_stage: "fetch",
+            message: msg,
+            raw_record: { postType, page },
+          });
+          if (errors.length < 100) errors.push(`Fetch ${postType} page ${page}: ${msg}`);
+          stats.failed++;
         }
+      }
+
+      fetched.add(postType);
+    }
+
+    // Insert staging records in batches
+    for (let i = 0; i < allRecords.length; i += BATCH_SIZE) {
+      const batch = allRecords.slice(i, i + BATCH_SIZE);
+      try {
+        await insertBatch(supabase, batch);
+      } catch (batchErr) {
+        const msg = batchErr instanceof Error ? batchErr.message : "insert error";
+        errors.push(`Batch insert ${i}-${i + batch.length}: ${msg}`);
       }
     }
 
-    // 3. Update the run with final stats
+    // Insert failures
+    if (allFailures.length > 0) {
+      for (let i = 0; i < allFailures.length; i += BATCH_SIZE) {
+        const batch = allFailures.slice(i, i + BATCH_SIZE);
+        try {
+          await supabase.from("wk_import_staging_failures").insert(batch);
+        } catch { /* non-fatal */ }
+      }
+    }
+
+    // Compile aggregate CPT warnings
+    const aggregateWarnings: string[] = [];
+    for (const [pt, diag] of Object.entries(typeDiags)) {
+      if (diag.warning) {
+        aggregateWarnings.push(`[${pt}] ${diag.warning}`);
+      }
+    }
+
+    // Update the run
+    const stagingSummary = {
+      staged_at: new Date().toISOString(),
+      processor: "process-wp-import",
+      version: "2.0.0",
+      records: allRecords.length,
+      failures: allFailures.length,
+      counts_by_target_entity: entityCounts,
+      draft_counts: draftCounts,
+      wakilisha_cpt_map_enabled: true,
+      production_import_enabled: false,
+      type_diagnostics: typeDiags,
+      aggregate_cpt_warnings: aggregateWarnings,
+    };
+
+    const updatedManifest = {
+      ...(manifest as Record<string, unknown>),
+      staging: stagingSummary,
+    };
+
+    const updatedWarnings = Array.from(new Set([
+      ...(run.warnings ?? []),
+      "Records staged via WordPress REST API with WAKILISHA CPT mapping enabled.",
+      allFailures.length > 0 ? `${allFailures.length} staging failure(s) recorded.` : "",
+      stats.drafts > 0 ? `${stats.drafts} draft-status items preserved as draft.` : "",
+      ...aggregateWarnings,
+    ])).filter(Boolean);
+
     await supabase.from("wk_ingestion_runs").update({
-      status: stats.failed > 0 && stats.imported === 0 ? "failed" : "completed",
+      status: "staged",
       finished_at: new Date().toISOString(),
-      imported_counts: importedCounts,
+      imported_counts: entityCounts,
+      source_manifest: updatedManifest,
+      warnings: updatedWarnings,
       errors: errors.slice(0, 200),
-      warnings: [...(run.warnings ?? []), ...warnings],
     }).eq("id", runId);
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        runId,
-        stats: { total: stats.total, imported: stats.imported, failed: stats.failed, skipped: stats.skipped },
-        importedCounts,
-        errorCount: errors.length,
-        warningCount: warnings.length,
-      }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({
+      success: true,
+      runId,
+      stats: {
+        total: stats.total,
+        staged: allRecords.length,
+        ready: stats.staged,
+        drafts: stats.drafts,
+        failed: allFailures.length,
+      },
+      entityCounts,
+      draftCounts,
+      errorCount: errors.length,
+      typeDiagnostics: typeDiags,
+    }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
   } catch (err) {
     return new Response(
@@ -249,144 +535,3 @@ Deno.serve(async (req: Request) => {
     );
   }
 });
-
-// ---- Transform helpers ----
-function transformForTable(item: Record<string, unknown>, targetTable: string, sourceType: string): Record<string, unknown> | null {
-  const title = typeof item.title === "object" && item.title
-    ? (item.title as Record<string, string>).rendered || ""
-    : String(item.id ?? "");
-  const content = typeof item.content === "object" && item.content
-    ? (item.content as Record<string, string>).rendered || ""
-    : "";
-  const excerpt = typeof item.excerpt === "object" && item.excerpt
-    ? (item.excerpt as Record<string, string>).rendered || ""
-    : "";
-  const slug = String(item.slug ?? slugify(stripHtml(title)));
-  const status = String(item.status ?? "publish");
-  const date = String(item.date ?? new Date().toISOString());
-
-  switch (targetTable) {
-    case "wk_raw_wp_posts":
-      return {
-        ingestion_run_id: null,
-        source_file: sourceType,
-        wp_post_id: Number(item.id),
-        wp_post_type: sourceType,
-        wp_status: status,
-        slug,
-        title: stripHtml(title),
-        published_at: date,
-        modified_at: String(item.modified ?? date),
-        content_html: content,
-        excerpt_html: excerpt,
-        raw: item,
-        content_hash: null,
-      };
-
-    case "wk_wordpress_items":
-      return {
-        import_source_id: null,
-        source_file: sourceType,
-        wp_post_id: String(item.id ?? ""),
-        wp_post_type: sourceType,
-        wp_status: status,
-        original_slug: slug,
-        original_title: stripHtml(title),
-        original_permalink: String(item.link ?? ""),
-        original_published_at: date,
-        original_modified_at: String(item.modified ?? date),
-        raw_item: JSON.stringify(item),
-      };
-
-    case "wk_cms_documents":
-      return {
-        document_type: sourceType === "post" ? "article" : sourceType,
-        slug,
-        title: stripHtml(title),
-        status: status === "publish" ? "published" : "draft",
-        published_at: date,
-        body_html: content,
-        excerpt_html: excerpt,
-        source_import_id: String(item.id ?? ""),
-      };
-
-    case "wk_articles":
-      return {
-        title: stripHtml(title),
-        slug,
-        status: status === "publish" ? "published" : "draft",
-        published_at: date,
-        body: content,
-        dek: stripHtml(excerpt).slice(0, 200),
-        legacy_wp_id: String(item.id ?? ""),
-        legacy_wp_type: sourceType,
-      };
-
-    case "wk_artists":
-    case "registry_artists":
-      return {
-        name: stripHtml(title),
-        slug,
-        bio: stripHtml(content).slice(0, 2000) || null,
-        legacy_wp_id: String(item.id ?? ""),
-      };
-
-    case "wk_tracks":
-    case "registry_tracks":
-      return {
-        title: stripHtml(title),
-        slug,
-        legacy_wp_id: String(item.id ?? ""),
-      };
-
-    case "wk_releases":
-    case "registry_releases":
-      return {
-        title: stripHtml(title),
-        slug,
-        description: stripHtml(content).slice(0, 1000) || null,
-        release_date: date,
-        legacy_wp_id: String(item.id ?? ""),
-      };
-
-    case "wk_labels":
-    case "registry_labels":
-      return {
-        name: stripHtml(title),
-        slug,
-        description: stripHtml(content).slice(0, 1000) || null,
-        legacy_wp_id: String(item.id ?? ""),
-      };
-
-    case "wk_genres":
-    case "registry_genres":
-      return {
-        name: stripHtml(title),
-        slug,
-        description: stripHtml(content).slice(0, 1000) || null,
-        legacy_wp_id: String(item.id ?? ""),
-      };
-
-    case "wk_guides":
-      return {
-        title: stripHtml(title),
-        slug,
-        body: content,
-        excerpt: stripHtml(excerpt).slice(0, 300),
-        legacy_wp_id: String(item.id ?? ""),
-        status: status === "publish" ? "published" : "draft",
-      };
-
-    case "wk_media_assets":
-      return {
-        title: stripHtml(title),
-        alt_text: String(item.alt_text ?? ""),
-        source_url: String(item.source_url ?? item.guid?.rendered ?? ""),
-        mime_type: String(item.mime_type ?? ""),
-        legacy_wp_id: String(item.id ?? ""),
-      };
-
-    default:
-      return null;
-  }
-}

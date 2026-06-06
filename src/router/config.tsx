@@ -25,21 +25,15 @@ import AdminMediaLibraryPage from "../pages/admin/media/library/page";
 import AdminMissingImagesPage from "../pages/admin/media/missing/page";
 import AdminBrokenLinksPage from "../pages/admin/media/broken/page";
 import AdminReviewQueuePage from "../pages/admin/review/queue/page";
+import AdminImportsPage from "../pages/admin/imports/page";
 import AdminImportsJobsPage from "../pages/admin/imports/jobs/page";
+import AdminImportsJobDetailPage from "../pages/admin/imports/jobs/detail/page";
 import AdminArticleDetailPage from "../pages/admin/content/articles/detail/page";
 import AdminArtistDetailPage from "../pages/admin/registry/artists/detail/page";
 import AdminTrackDetailPage from "../pages/admin/registry/tracks/detail/page";
 import AdminReleaseDetailPage from "../pages/admin/registry/releases/detail/page";
 import AdminLabelDetailPage from "../pages/admin/registry/labels/detail/page";
 import AdminGenreDetailPage from "../pages/admin/registry/genres/detail/page";
-import AdminImportsJobDetailPage from "../pages/admin/imports/jobs/detail/page";
-import AdminImportsUploadPage from "../pages/admin/imports/upload/real-page";
-import AdminImportsReportsPage from "../pages/admin/imports/reports/page";
-import AdminImportsStagingPage from "../pages/admin/imports/staging/page";
-import AdminImportsFailedPage from "../pages/admin/imports/failed/page";
-import AdminWordPressReactMigrationWizardPage from "../pages/admin/imports/wizard/page";
-import AdminWordPressAuthPage from "../pages/admin/imports/wordpress-auth/page";
-import AdminWordPressConnectWizardPage from "../pages/admin/imports/wordpress-connect/page";
 import AdminRelationshipViewerPage from "../pages/admin/relationships/viewer/page";
 import AdminDuplicateMergePage from "../pages/admin/relationships/duplicates/page";
 import AdminPublishingDashboardPage from "../pages/admin/content/publishing/page";
@@ -211,15 +205,9 @@ const routes: RouteObject[] = [
       { path: "media/missing", element: <AdminMissingImagesPage /> },
       { path: "media/broken", element: <AdminBrokenLinksPage /> },
       { path: "review/queue", element: <AdminReviewQueuePage /> },
-      { path: "imports/wizard", element: <AdminWordPressReactMigrationWizardPage /> },
-      { path: "imports/wordpress-auth", element: <AdminWordPressAuthPage /> },
-      { path: "imports/wordpress-connect", element: <AdminWordPressConnectWizardPage /> },
+      { path: "imports", element: <AdminImportsPage /> },
       { path: "imports/jobs", element: <AdminImportsJobsPage /> },
       { path: "imports/jobs/:id", element: <AdminImportsJobDetailPage /> },
-      { path: "imports/upload", element: <AdminImportsUploadPage /> },
-      { path: "imports/reports", element: <AdminImportsReportsPage /> },
-      { path: "imports/staging", element: <AdminImportsStagingPage /> },
-      { path: "imports/failed", element: <AdminImportsFailedPage /> },
     ],
   },
   { path: "/admin/settings/charts", element: <AdminChartsLayout />, children: [
