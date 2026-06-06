@@ -2,6 +2,7 @@ import { BrowserRouter } from "react-router-dom";
 import { AppRoutes } from "./router";
 import { I18nextProvider } from "react-i18next";
 import i18n from "./i18n";
+import "./index.css";
 import "./design-system/wakilisha.tokens.css";
 import "./design-system/wakilisha.elements.foundation.css";
 import "./design-system/wakilisha.elements.product.css";
@@ -11,6 +12,7 @@ import "./design-system/wakilisha.elements.motion.css";
 import "./pages/admin/design-system/adminDesignSystemLayout.css";
 import { ThemeProvider } from "./components/design-system/theme/ThemeProvider";
 import { PlayerProvider } from "./context/PlayerContext";
+import { RecoveryRedirectGuard } from "./components/auth/RecoveryRedirectGuard";
 
 function App() {
   return (
@@ -18,6 +20,7 @@ function App() {
       <BrowserRouter basename={__BASE_PATH__}>
         <ThemeProvider>
           <PlayerProvider>
+            <RecoveryRedirectGuard />
             <AppRoutes />
           </PlayerProvider>
         </ThemeProvider>
