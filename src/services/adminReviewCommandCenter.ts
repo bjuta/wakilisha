@@ -1,12 +1,14 @@
 import { supabase } from "@/lib/supabase";
 
 export type ReviewWorkstreamKey =
-  | "entity_resolution"
-  | "import_artifacts"
-  | "media_assets"
-  | "postmeta"
-  | "staging"
-  | "promotion_events";
+  | "phase0_artifacts"
+  | "phase1_staging"
+  | "phase2_artists"
+  | "phase3_artist_relationships"
+  | "phase4_entity_relationships"
+  | "phase5_postmeta"
+  | "phase6_media"
+  | "blocked_noise";
 
 export type ReviewWorkstream = {
   key: ReviewWorkstreamKey;
@@ -131,6 +133,22 @@ async function loadSamples<T>(table: string, select: string, orderColumn = "crea
   return (data ?? []) as T[];
 }
 
+function row(summary: StagingSummaryRow[], target: string): StagingSummaryRow {
+  return summary.find((item) => item.target_entity === target) ?? { target_entity: target, ready: 0, needs_review: 0, blocked: 0, total: 0 };
+}
+
+function needs(summary: StagingSummaryRow[], target: string): number {
+  return Number(row(summary, target).needs_review ?? 0);
+}
+
+function ready(summary: StagingSummaryRow[], target: string): number {
+  return Number(row(summary, target).ready ?? 0);
+}
+
+function blocked(summary: StagingSummaryRow[], target: string): number {
+  return Number(row(summary, target).blocked ?? 0);
+}
+
 export async function loadReviewCommandCenter(): Promise<ReviewCommandCenterData> {
   const [
     openDecisions,
@@ -158,60 +176,87 @@ export async function loadReviewCommandCenter(): Promise<ReviewCommandCenterData
     loadStagingSummary(),
   ]);
 
-  const stagingNeedsReview = stagingSummary.reduce((sum, row) => sum + Number(row.needs_review ?? 0), 0);
-  const blockedStaging = stagingSummary.reduce((sum, row) => sum + Number(row.blocked ?? 0), 0);
+  const stagingNeedsReview = stagingSummary.reduce((sum, item) => sum + Number(item.needs_review ?? 0), 0);
+  const blockedStaging = stagingSummary.reduce((sum, item) => sum + Number(item.blocked ?? 0), 0);
+
+  const phase2Artists = needs(stagingSummary, "artists");
+  const phase3ArtistRelationships = ready(stagingSummary, "artist_relationships");
+  const phase4EntityRelationships = needs(stagingSummary, "entity_relationships") + needs(stagingSummary, "chart_entry_links");
+  const phase5Postmeta = needs(stagingSummary, "custom_fields") || unknownFields;
+  const phase6Media = needs(stagingSummary, "media_assets");
+  const blockedNoise = blocked(stagingSummary, "ignored_post_types");
+  const promotionReady = stagingSummary.reduce((sum, item) => sum + Number(item.ready ?? 0), 0);
 
   const workstreams: ReviewWorkstream[] = [
     {
-      key: "entity_resolution",
-      label: "Resolution decisions",
-      description: "Artist merges, relationship endpoints, media candidates, custom fields, and term links waiting for human judgment.",
-      count: openDecisions,
-      severity: openDecisions > 0 ? "danger" : "success",
-      nextAction: "Review open decisions by entity type and close the highest-risk identity or media items first.",
-    },
-    {
-      key: "import_artifacts",
-      label: "Import review artifacts",
-      description: "Preserved migration evidence from relationships, custom fields, media, and unresolved source rows.",
+      key: "phase0_artifacts",
+      label: "Phase 0 — Preserved import artifacts",
+      description: "Raw evidence retained from the migration review layer. Current hard buckets are entity relationships and custom fields.",
       count: reviewArtifacts,
       severity: reviewArtifacts > 0 ? "warning" : "success",
       path: "/admin/imports/review-artifacts",
-      nextAction: "Inspect artifact buckets, confirm what has been resolved, and move unresolved classes into dedicated resolver passes.",
+      nextAction: "Use this as the audit source of truth before adding resolver write actions.",
     },
     {
-      key: "media_assets",
-      label: "Media review",
-      description: "Unresolved or newly operationalized WordPress images that need attachment/role checks.",
-      count: unresolvedMedia,
-      severity: unresolvedMedia > 0 ? "warning" : "success",
-      path: "/admin/media/library",
-      nextAction: "Check unresolved media candidates, then verify hero/profile/artwork/logo roles in the media library.",
-    },
-    {
-      key: "postmeta",
-      label: "Postmeta dictionary",
-      description: "Custom-field keys grouped into media, SEO, editorial, registry, layout junk, sensitive, or unknown.",
-      count: unknownFields,
-      severity: unknownFields > 0 ? "warning" : "success",
-      nextAction: "Approve or reclassify high-frequency unknown fields before applying additional safe metadata.",
-    },
-    {
-      key: "staging",
-      label: "Staging exceptions",
-      description: "Rows still marked needs_review or blocked in wk_import_staging_records.",
-      count: stagingNeedsReview + blockedStaging,
-      severity: blockedStaging > 0 ? "danger" : stagingNeedsReview > 0 ? "warning" : "success",
+      key: "phase1_staging",
+      label: "Phase 1 — Promotion-ready staging records",
+      description: "Rows already classified as ready across tracks, chart entries, artists, release links, terms, labels, genres, and authors.",
+      count: promotionReady,
+      severity: promotionReady > 0 ? "brand" : "neutral",
       path: "/admin/imports/review-artifacts",
-      nextAction: "Start with blocked rows, then work down the highest-volume needs_review target entities.",
+      nextAction: "Verify ready counts against live production tables before the next promotion pass.",
     },
     {
-      key: "promotion_events",
-      label: "Promotion events",
-      description: "Audit trail of records promoted or resolved by Phases 1–7.",
-      count: promotionEventsCount,
-      severity: "neutral",
-      nextAction: "Use the latest promotion events to verify which resolver phases actually changed live operational tables.",
+      key: "phase2_artists",
+      label: "Phase 2 — Artist records needing review",
+      description: "Wakilisha artist rows that could not be safely promoted without human identity/metadata checks.",
+      count: phase2Artists,
+      severity: phase2Artists > 0 ? "danger" : "success",
+      path: "/admin/imports/review-artifacts",
+      nextAction: "Prioritize artist rows by completeness, duplicates, aliases, country/genre confidence, and image availability.",
+    },
+    {
+      key: "phase3_artist_relationships",
+      label: "Phase 3 — Artist-to-artist relationships",
+      description: "Rich artist relationship data that is already promotion-ready, including shared tracks/scores/feature context.",
+      count: phase3ArtistRelationships,
+      severity: phase3ArtistRelationships > 0 ? "brand" : "neutral",
+      path: "/admin/imports/review-artifacts",
+      nextAction: "Validate that the public graph and artist detail pages can actually display this relationship data.",
+    },
+    {
+      key: "phase4_entity_relationships",
+      label: "Phase 4 — WP/entity relationship review",
+      description: "WP term links, entity links, and chart entry links that need mapping policy before promotion.",
+      count: phase4EntityRelationships,
+      severity: phase4EntityRelationships > 0 ? "danger" : "success",
+      path: "/admin/imports/review-artifacts",
+      nextAction: "Split WP term links from chart/entity links, then approve deterministic mappings in batches.",
+    },
+    {
+      key: "phase5_postmeta",
+      label: "Phase 5 — Postmeta/custom-field policy",
+      description: "Custom fields requiring classification into useful metadata, media hints, SEO/editorial fields, sensitive fields, or layout junk.",
+      count: phase5Postmeta,
+      severity: phase5Postmeta > 0 ? "warning" : "success",
+      nextAction: "Classify high-frequency keys first so useful metadata can be promoted while junk stays blocked.",
+    },
+    {
+      key: "phase6_media",
+      label: "Phase 6 — Media assets operationalization",
+      description: "WordPress media URLs and image candidates that need entity attachment, role assignment, and fallback behavior.",
+      count: phase6Media || unresolvedMedia,
+      severity: phase6Media > 0 || unresolvedMedia > 0 ? "warning" : "success",
+      path: "/admin/media/library",
+      nextAction: "Map real WP image URLs to artist, track, release, label, article, and chart surfaces.",
+    },
+    {
+      key: "blocked_noise",
+      label: "Blocked noise — Ignored post types",
+      description: "Legacy WordPress post types intentionally blocked from promotion unless a later product decision says otherwise.",
+      count: blockedNoise,
+      severity: blockedNoise > 0 ? "neutral" : "success",
+      nextAction: "Keep blocked unless a specific UI/product surface needs one of these old post types.",
     },
   ];
 
