@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { WkIcon, type WkIconName } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import {
@@ -24,16 +24,21 @@ const SAMPLE_FILTERS: { key: SampleFilter; label: string }[] = [
 
 export default function AdminImportReviewArtifactsPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [state, setState] = useState<LoadState>("loading");
   const [dashboard, setDashboard] = useState<ReviewArtifactDashboard | null>(null);
   const [error, setError] = useState("");
-  const [sampleFilter, setSampleFilter] = useState<SampleFilter>("all");
+  const [sampleFilter, setSampleFilter] = useState<SampleFilter>((searchParams.get("artifact") as SampleFilter) || "all");
   const [expandedSampleId, setExpandedSampleId] = useState<string | null>(null);
+
+  const targetFilter = searchParams.get("target");
+  const statusFilter = searchParams.get("status");
+  const artifactFilter = searchParams.get("artifact");
 
   useEffect(() => {
     let alive = true;
     setState("loading");
-    loadImportReviewArtifactDashboard()
+    loadImportReviewArtifactDashboard({ target: targetFilter, status: statusFilter, artifactType: artifactFilter })
       .then((data) => {
         if (!alive) return;
         setDashboard(data);
@@ -45,7 +50,7 @@ export default function AdminImportReviewArtifactsPage() {
         setState("error");
       });
     return () => { alive = false; };
-  }, []);
+  }, [targetFilter, statusFilter, artifactFilter]);
 
   const filteredSamples = useMemo(() => {
     const samples = dashboard?.samples ?? [];
@@ -59,6 +64,7 @@ export default function AdminImportReviewArtifactsPage() {
   const customFieldTotal = dashboard?.reviewBuckets.find((bucket) => bucket.key === "custom_fields")?.count ?? 0;
   const mediaStaging = dashboard?.stagingBuckets.find((bucket) => bucket.target_entity === "media_assets")?.total ?? 0;
   const artistNeedsReview = dashboard?.stagingBuckets.find((bucket) => bucket.target_entity === "artists")?.needs_review ?? 0;
+  const hasActiveFilter = Boolean(targetFilter || statusFilter || artifactFilter);
 
   if (state === "loading") {
     return (
@@ -108,6 +114,20 @@ export default function AdminImportReviewArtifactsPage() {
           </button>
         </div>
       </div>
+
+      {hasActiveFilter && (
+        <div className="rounded-xl border border-wk-brand/20 bg-wk-brand-soft p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="text-[13px] font-bold text-wk-text">Filtered drilldown</div>
+              <p className="mt-1 text-[12px] text-wk-text-muted">
+                {targetFilter ? `Target: ${targetFilter}` : "All targets"} · {statusFilter ? `Status: ${statusFilter}` : "All statuses"} {artifactFilter ? `· Artifact: ${artifactFilter}` : ""}
+              </p>
+            </div>
+            <button onClick={() => navigate("/admin/imports/review-artifacts")} className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap">Clear filter</button>
+          </div>
+        </div>
+      )}
 
       <div className="rounded-xl border border-wk-warning/20 bg-wk-warning-soft p-4">
         <div className="flex items-start gap-3">
@@ -257,109 +277,36 @@ export default function AdminImportReviewArtifactsPage() {
   );
 }
 
-function KpiCard({ label, value, icon, tone }: { label: string; value: number; icon: WkIconName; tone: "brand" | "warning" | "danger" | "neutral" }) {
-  const toneClass = tone === "brand" ? "bg-wk-brand-soft text-wk-brand" : tone === "warning" ? "bg-wk-warning-soft text-wk-warning" : tone === "danger" ? "bg-wk-danger-soft text-wk-danger" : "bg-wk-surface-raised text-wk-text-muted";
-  return (
-    <WkSurface className="p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="text-[26px] font-black tracking-tight text-wk-text">{formatCount(value)}</div>
-          <div className="mt-1 text-[11px] font-bold uppercase tracking-wider text-wk-text-faint">{label}</div>
-        </div>
-        <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${toneClass}`}>
-          <WkIcon name={icon} size={19} />
-        </div>
-      </div>
-    </WkSurface>
-  );
+function KpiCard({ label, value, icon, tone }: { label: string; value: number; icon: WkIconName; tone: "brand" | "warning" | "danger" | "neutral" | "success" }) {
+  const cls = tone === "brand" ? "bg-wk-brand-soft text-wk-brand" : tone === "warning" ? "bg-wk-warning-soft text-wk-warning" : tone === "danger" ? "bg-wk-danger-soft text-wk-danger" : tone === "success" ? "bg-wk-success-soft text-wk-success" : "bg-wk-surface-raised text-wk-text-muted";
+  return <WkSurface className="p-4"><div className="flex items-start justify-between"><div><div className="text-[26px] font-black tracking-tight text-wk-text">{formatCount(value)}</div><div className="mt-1 text-[11px] font-bold uppercase tracking-wider text-wk-text-faint">{label}</div></div><div className={`flex h-10 w-10 items-center justify-center rounded-xl ${cls}`}><WkIcon name={icon} size={19} /></div></div></WkSurface>;
 }
 
 function MiniStat({ label, value, detail }: { label: string; value: number; detail: string }) {
-  return (
-    <div className="rounded-xl border border-wk-border bg-wk-surface px-4 py-3">
-      <div className="text-[18px] font-black text-wk-text">{formatCount(value)}</div>
-      <div className="mt-0.5 text-[12px] font-bold text-wk-text">{label}</div>
-      <div className="text-[11px] text-wk-text-muted">{detail}</div>
-    </div>
-  );
+  return <div className="rounded-xl border border-wk-border bg-wk-surface px-4 py-3"><div className="text-[18px] font-black text-wk-text">{formatCount(value)}</div><div className="mt-0.5 text-[12px] font-bold text-wk-text">{label}</div><div className="text-[11px] text-wk-text-muted">{detail}</div></div>;
 }
 
 function SectionHeader({ title, subtitle, icon }: { title: string; subtitle: string; icon: WkIconName }) {
-  return (
-    <div className="border-b border-wk-border p-4">
-      <div className="flex items-center gap-2">
-        <WkIcon name={icon} size={16} className="text-wk-brand" />
-        <h2 className="text-[14px] font-bold text-wk-text">{title}</h2>
-      </div>
-      <p className="mt-1 text-[12px] text-wk-text-muted">{subtitle}</p>
-    </div>
-  );
-}
-
-function StatusPill({ status }: { status: string }) {
-  const cls = status === "preserved" ? "bg-wk-brand-soft text-wk-brand" : status === "empty" ? "bg-wk-surface-raised text-wk-text-muted" : "bg-wk-warning-soft text-wk-warning";
-  return <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wider ${cls}`}>{status.replace("_", " ")}</span>;
-}
-
-function StatusText({ status }: { status: string }) {
-  const cls = status === "finalized" || status === "completed" ? "text-wk-success" : status === "failed" ? "text-wk-danger" : status === "staged" ? "text-wk-warning" : "text-wk-text-muted";
-  return <span className={`shrink-0 text-[11px] font-black uppercase tracking-wider ${cls}`}>{status.replace("_", " ")}</span>;
+  return <div className="border-b border-wk-border p-4"><div className="flex items-center gap-2"><WkIcon name={icon} size={16} className="text-wk-brand" /><h2 className="text-[14px] font-bold text-wk-text">{title}</h2></div><p className="mt-1 text-[12px] text-wk-text-muted">{subtitle}</p></div>;
 }
 
 function StagingRow({ bucket }: { bucket: StagingBucket }) {
-  return (
-    <tr className="hover:bg-wk-surface-raised/60">
-      <td className="px-4 py-3 font-semibold text-wk-text">{bucket.target_entity}</td>
-      <td className="px-4 py-3 text-right text-wk-success">{formatCount(bucket.ready)}</td>
-      <td className="px-4 py-3 text-right text-wk-warning">{formatCount(bucket.needs_review)}</td>
-      <td className="px-4 py-3 text-right text-wk-danger">{formatCount(bucket.blocked)}</td>
-      <td className="px-4 py-3 text-right font-bold text-wk-text">{formatCount(bucket.total)}</td>
-    </tr>
-  );
+  return <tr className="hover:bg-wk-surface-raised/40"><td className="px-4 py-3 font-bold text-wk-text">{bucket.target_entity}</td><td className="px-4 py-3 text-right text-wk-success">{formatCount(bucket.ready)}</td><td className="px-4 py-3 text-right text-wk-warning">{formatCount(bucket.needs_review)}</td><td className="px-4 py-3 text-right text-wk-danger">{formatCount(bucket.blocked)}</td><td className="px-4 py-3 text-right font-bold text-wk-text">{formatCount(bucket.total)}</td></tr>;
 }
 
 function SampleRow({ sample, expanded, onToggle }: { sample: ReviewArtifactSample; expanded: boolean; onToggle: () => void }) {
-  const mappedKeys = Object.keys(sample.mapped_record ?? {}).slice(0, 5);
-  return (
-    <div className="p-4">
-      <button onClick={onToggle} className="flex w-full items-start justify-between gap-3 text-left">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-wk-surface-raised px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-wk-text-muted">{sample.artifact_type}</span>
-            <span className="text-[11px] text-wk-text-faint">{sample.review_status || "needs_review"}</span>
-          </div>
-          <div className="mt-2 truncate text-[13px] font-bold text-wk-text">{sample.title || sample.source_record_id || sample.id}</div>
-          <div className="mt-1 text-[11px] text-wk-text-muted">{sample.source_kind || "unknown"} · {sample.source_record_id || "no source id"}</div>
-          {mappedKeys.length > 0 && <div className="mt-2 text-[11px] text-wk-text-faint">Mapped keys: {mappedKeys.join(", ")}</div>}
-        </div>
-        <WkIcon name={expanded ? "ChevronUp" : "ChevronDown"} size={16} className="mt-1 shrink-0 text-wk-text-muted" />
-      </button>
-      {expanded && (
-        <div className="mt-3 space-y-3 rounded-xl border border-wk-border bg-wk-bg-subtle p-3">
-          {sample.notes && <p className="text-[12px] leading-5 text-wk-text-muted">{sample.notes}</p>}
-          <JsonBlock label="mapped_record" value={sample.mapped_record} />
-          <JsonBlock label="raw_record" value={sample.raw_record} />
-        </div>
-      )}
-    </div>
-  );
+  return <div className="p-4"><button onClick={onToggle} className="w-full text-left"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="truncate text-[13px] font-bold text-wk-text">{sample.title || sample.source_record_id || sample.id}</div><div className="mt-1 text-[11px] text-wk-text-muted">{sample.artifact_type} · {sample.source_kind || "unknown source"}</div></div><StatusText status={sample.review_status || "unknown"} /></div></button>{expanded && <pre className="mt-3 max-h-72 overflow-auto rounded-xl bg-wk-bg p-3 text-[11px] text-wk-text-muted">{JSON.stringify({ raw_record: sample.raw_record, mapped_record: sample.mapped_record, notes: sample.notes }, null, 2)}</pre>}</div>;
 }
 
-function JsonBlock({ label, value }: { label: string; value: Record<string, unknown> | null }) {
-  return (
-    <div>
-      <div className="mb-1 text-[10px] font-black uppercase tracking-wider text-wk-text-faint">{label}</div>
-      <pre className="max-h-56 overflow-auto rounded-lg bg-wk-surface p-3 text-[11px] leading-5 text-wk-text-muted">{JSON.stringify(value ?? {}, null, 2)}</pre>
-    </div>
-  );
+function StatusPill({ status }: { status: string }) {
+  const cls = status === "preserved" ? "bg-wk-warning-soft text-wk-warning" : status === "staged" ? "bg-wk-brand-soft text-wk-brand" : status === "empty" ? "bg-wk-surface-raised text-wk-text-faint" : "bg-wk-danger-soft text-wk-danger";
+  return <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wider ${cls}`}>{status}</span>;
+}
+
+function StatusText({ status }: { status: string }) {
+  return <span className="rounded-full bg-wk-surface-raised px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-wk-text-muted">{status}</span>;
 }
 
 function EmptyState({ title, body }: { title: string; body: string }) {
-  return (
-    <div className="p-8 text-center">
-      <WkIcon name="Inbox" size={24} className="mx-auto mb-3 text-wk-text-faint" />
-      <div className="text-[13px] font-bold text-wk-text">{title}</div>
-      <p className="mx-auto mt-1 max-w-sm text-[12px] leading-5 text-wk-text-muted">{body}</p>
-    </div>
-  );
+  return <div className="p-8 text-center"><div className="text-[13px] font-bold text-wk-text">{title}</div><p className="mt-1 text-[12px] text-wk-text-muted">{body}</p></div>;
 }
