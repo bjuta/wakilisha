@@ -7,6 +7,7 @@ import NotFound from "../pages/NotFound";
 import Home from "../pages/home/page";
 import AdminDesignSystem from "../pages/admin/design-system/page";
 import AdminLoginPage from "../pages/admin/login/page";
+import ResetPasswordPage from "../pages/auth/reset-password/page";
 
 // Author profiles
 import AuthorProfilePage from "../pages/authors/detail/page";
@@ -148,6 +149,7 @@ import AuthPage from "../pages/auth/page";
 
 const routes: RouteObject[] = [
   { path: "/admin/login", element: <AdminLoginPage /> },
+  { path: "/auth/reset-password", element: <ResetPasswordPage /> },
   {
     element: <ResponsiveAppLayout />,
     children: [
