@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { WkIcon } from "@/components/design-system/Icon";
 
 type Choice = "charts" | "artists" | "magazine";
+type AuthMode = "signin" | "signup" | "forgot" | "magic";
 
 const CHOICE_ROUTES: Record<Choice, string> = {
   charts: "/charts",
@@ -14,7 +15,7 @@ const CHOICE_ROUTES: Record<Choice, string> = {
 export default function AuthPage() {
   const navigate = useNavigate();
   const [choice, setChoice] = useState<Choice>("charts");
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [mode, setMode] = useState<AuthMode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -46,10 +47,14 @@ export default function AuthPage() {
     return () => { alive = false; };
   }, []);
 
-  async function handleRecoveryPassword(e: FormEvent) {
-    e.preventDefault();
+  function clearMessages() {
     setError(null);
     setSuccess(null);
+  }
+
+  async function handleRecoveryPassword(e: FormEvent) {
+    e.preventDefault();
+    clearMessages();
     if (password.length < 8) {
       setError("Password must be at least 8 characters.");
       return;
@@ -72,9 +77,51 @@ export default function AuthPage() {
     }
   }
 
+  async function handlePasswordReset(e: FormEvent) {
+    e.preventDefault();
+    clearMessages();
+    if (!email.trim()) {
+      setError("Enter your email address.");
+      return;
+    }
+    setLoading(true);
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: `${window.location.origin}/auth/reset-password`,
+    });
+    setLoading(false);
+    if (resetError) {
+      setError(resetError.message);
+      return;
+    }
+    setSuccess("Password reset email sent. Open the link in your email to set a new password.");
+  }
+
+  async function handleMagicLink(e: FormEvent) {
+    e.preventDefault();
+    clearMessages();
+    if (!email.trim()) {
+      setError("Enter your email address.");
+      return;
+    }
+    setLoading(true);
+    const { error: magicError } = await supabase.auth.signInWithOtp({
+      email: email.trim(),
+      options: {
+        emailRedirectTo: `${window.location.origin}${CHOICE_ROUTES[choice]}`,
+        shouldCreateUser: true,
+      },
+    });
+    setLoading(false);
+    if (magicError) {
+      setError(magicError.message);
+      return;
+    }
+    setSuccess("Magic link sent. Open it from your email to continue.");
+  }
+
   async function handleEmailAuth(e: FormEvent) {
     e.preventDefault();
-    setError(null);
+    clearMessages();
 
     if (!email.trim() || !password.trim()) {
       setError("Email and password are required.");
@@ -114,7 +161,7 @@ export default function AuthPage() {
   }
 
   async function handleGoogleAuth() {
-    setError(null);
+    clearMessages();
     setLoading(true);
     try {
       const { error: googleError } = await supabase.auth.signInWithOAuth({
@@ -130,7 +177,13 @@ export default function AuthPage() {
 
   function toggleMode() {
     setMode((m) => (m === "signin" ? "signup" : "signin"));
-    setError(null);
+    clearMessages();
+  }
+
+  function goToMode(nextMode: AuthMode) {
+    clearMessages();
+    setMode(nextMode);
+    setShowEmailForm(true);
   }
 
   const brandPanel = (
@@ -143,7 +196,7 @@ export default function AuthPage() {
       </div>
       <div className="relative z-10 p-10 md:p-14 pb-14">
         <p className="max-w-[340px] leading-relaxed" style={{ fontFamily: "var(--wk-font-body)", fontSize: "15px", color: "var(--wk-text-soft)" }}>
-          {isRecovery ? "Choose a new password and get back into your account securely." : "Your people are here. Sign in to follow artists, save charts, and keep your cultural graph close."}
+          {isRecovery ? "Choose a new password and get back into your account securely." : mode === "forgot" ? "Reset your public WAKILISHA account password securely." : mode === "magic" ? "Use a one-time email link to continue without a password." : "Your people are here. Sign in to follow artists, save charts, and keep your cultural graph close."}
         </p>
         {!isRecovery && <div className="flex gap-2 mt-8">{(["charts", "artists", "magazine"] as const).map((c) => <button key={c} onClick={() => setChoice(c)} className="px-4 py-2 rounded-full text-[11px] font-bold uppercase tracking-[0.12em] whitespace-nowrap transition-all duration-200 cursor-pointer capitalize" style={{ background: choice === c ? "var(--wk-brand-soft)" : "transparent", border: choice === c ? "1px solid rgba(var(--wk-brand-rgb), 0.35)" : "1px solid var(--wk-border)", color: choice === c ? "var(--wk-brand)" : "var(--wk-text-muted)" }}>{c}</button>)}</div>}
       </div>
@@ -153,6 +206,9 @@ export default function AuthPage() {
   if (!recoveryChecked) {
     return <main className="flex min-h-screen items-center justify-center" style={{ background: "var(--wk-bg)", color: "var(--wk-text)" }}><div className="text-[13px]" style={{ color: "var(--wk-text-muted)" }}>Checking auth link…</div></main>;
   }
+
+  const heading = isRecovery ? "Reset your password" : mode === "forgot" ? "Forgot password?" : mode === "magic" ? "Get a magic link" : mode === "signin" ? "Welcome back" : "Create your account";
+  const subcopy = isRecovery ? "Enter a new password for your WAKILISHA account." : mode === "forgot" ? "Enter your email and we will send a secure reset link." : mode === "magic" ? "Enter your email and we will send a one-time sign-in link." : mode === "signin" ? "Sign in to continue to your cultural graph." : "Join WAKILISHA and connect with African culture.";
 
   return (
     <main className="flex min-h-screen" style={{ background: "var(--wk-bg)" }}>
@@ -164,12 +220,8 @@ export default function AuthPage() {
             <div className="font-black tracking-[-.05em] text-[28px]" style={{ fontFamily: "var(--wk-font-display)", color: "var(--wk-text)" }}>WAKILISHA</div>
           </div>
 
-          <h1 className="font-black tracking-[-.03em] mb-1" style={{ fontFamily: "var(--wk-font-display)", fontSize: "clamp(26px, 2.5vw, 34px)", lineHeight: 1.1, color: "var(--wk-text)" }}>
-            {isRecovery ? "Reset your password" : mode === "signin" ? "Welcome back" : "Create your account"}
-          </h1>
-          <p className="mb-8 leading-relaxed" style={{ fontFamily: "var(--wk-font-body)", fontSize: "14px", color: "var(--wk-text-muted)" }}>
-            {isRecovery ? "Enter a new password for your WAKILISHA account." : mode === "signin" ? "Sign in to continue to your cultural graph." : "Join WAKILISHA and connect with African culture."}
-          </p>
+          <h1 className="font-black tracking-[-.03em] mb-1" style={{ fontFamily: "var(--wk-font-display)", fontSize: "clamp(26px, 2.5vw, 34px)", lineHeight: 1.1, color: "var(--wk-text)" }}>{heading}</h1>
+          <p className="mb-8 leading-relaxed" style={{ fontFamily: "var(--wk-font-body)", fontSize: "14px", color: "var(--wk-text-muted)" }}>{subcopy}</p>
 
           {error && <div className="flex items-center gap-2 px-4 py-3 rounded-xl mb-6 text-[13px] font-medium" style={{ background: "var(--wk-danger-soft)", color: "var(--wk-danger)", fontFamily: "var(--wk-font-ui)" }}><WkIcon name="AlertCircle" size={16} /><span className="flex-1">{error}</span><button onClick={() => setError(null)} className="cursor-pointer hover:opacity-70"><WkIcon name="X" size={14} /></button></div>}
           {success && <div className="flex items-center gap-2 px-4 py-3 rounded-xl mb-6 text-[13px] font-medium" style={{ background: "var(--wk-success-soft)", color: "var(--wk-success)", fontFamily: "var(--wk-font-ui)" }}><WkIcon name="CheckCircle" size={16} /><span className="flex-1">{success}</span></div>}
@@ -189,24 +241,41 @@ export default function AuthPage() {
                 </form>
               )}
             </div>
+          ) : mode === "forgot" ? (
+            <form onSubmit={handlePasswordReset} className="flex flex-col gap-3 mb-6">
+              <input type="email" placeholder="Email address" value={email} onChange={(e) => setEmail(e.target.value)} required className="w-full h-[52px] rounded-[14px] px-5 text-[14px] outline-none transition-colors" style={{ background: "var(--wk-surface-raised)", border: "1px solid var(--wk-border)", color: "var(--wk-text)", fontFamily: "var(--wk-font-ui)" }} />
+              <button type="submit" disabled={loading} className="w-full h-[52px] rounded-[14px] flex items-center justify-center gap-3 font-bold text-[14px] whitespace-nowrap transition-all duration-200 cursor-pointer hover:opacity-90 active:scale-[0.98] disabled:opacity-50" style={{ background: "var(--wk-brand)", color: "var(--wk-brand-on)", fontFamily: "var(--wk-font-ui)" }}>{loading ? "Sending..." : "Send password reset"}</button>
+              <button type="button" onClick={() => { clearMessages(); setMode("signin"); }} className="w-full h-[44px] rounded-[14px] flex items-center justify-center gap-2 font-semibold text-[13px]" style={{ background: "transparent", color: "var(--wk-text-muted)", fontFamily: "var(--wk-font-ui)" }}>Back to login</button>
+            </form>
+          ) : mode === "magic" ? (
+            <form onSubmit={handleMagicLink} className="flex flex-col gap-3 mb-6">
+              <input type="email" placeholder="Email address" value={email} onChange={(e) => setEmail(e.target.value)} required className="w-full h-[52px] rounded-[14px] px-5 text-[14px] outline-none transition-colors" style={{ background: "var(--wk-surface-raised)", border: "1px solid var(--wk-border)", color: "var(--wk-text)", fontFamily: "var(--wk-font-ui)" }} />
+              <button type="submit" disabled={loading} className="w-full h-[52px] rounded-[14px] flex items-center justify-center gap-3 font-bold text-[14px] whitespace-nowrap transition-all duration-200 cursor-pointer hover:opacity-90 active:scale-[0.98] disabled:opacity-50" style={{ background: "var(--wk-brand)", color: "var(--wk-brand-on)", fontFamily: "var(--wk-font-ui)" }}>{loading ? "Sending..." : "Send magic link"}</button>
+              <button type="button" onClick={() => { clearMessages(); setMode("signin"); }} className="w-full h-[44px] rounded-[14px] flex items-center justify-center gap-2 font-semibold text-[13px]" style={{ background: "transparent", color: "var(--wk-text-muted)", fontFamily: "var(--wk-font-ui)" }}>Back to login</button>
+            </form>
           ) : showEmailForm ? (
             <form onSubmit={handleEmailAuth} className="flex flex-col gap-3 mb-6">
               {mode === "signup" && <input type="text" placeholder="Display name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="w-full h-[52px] rounded-[14px] px-5 text-[14px] outline-none transition-colors" style={{ background: "var(--wk-surface-raised)", border: "1px solid var(--wk-border)", color: "var(--wk-text)", fontFamily: "var(--wk-font-ui)" }} />}
               <input type="email" placeholder="Email address" value={email} onChange={(e) => setEmail(e.target.value)} required className="w-full h-[52px] rounded-[14px] px-5 text-[14px] outline-none transition-colors" style={{ background: "var(--wk-surface-raised)", border: "1px solid var(--wk-border)", color: "var(--wk-text)", fontFamily: "var(--wk-font-ui)" }} />
               <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} className="w-full h-[52px] rounded-[14px] px-5 text-[14px] outline-none transition-colors" style={{ background: "var(--wk-surface-raised)", border: "1px solid var(--wk-border)", color: "var(--wk-text)", fontFamily: "var(--wk-font-ui)" }} />
+              <div className="flex items-center justify-between gap-3 px-1">
+                <button type="button" onClick={() => goToMode("forgot")} className="text-[12px] font-bold hover:opacity-80" style={{ color: "var(--wk-text-muted)", fontFamily: "var(--wk-font-ui)" }}>Forgot password?</button>
+                <button type="button" onClick={() => goToMode("magic")} className="text-[12px] font-bold hover:opacity-80" style={{ color: "var(--wk-text-muted)", fontFamily: "var(--wk-font-ui)" }}>Use magic link</button>
+              </div>
               <button type="submit" disabled={loading} className="w-full h-[52px] rounded-[14px] flex items-center justify-center gap-3 font-bold text-[14px] whitespace-nowrap transition-all duration-200 cursor-pointer hover:opacity-90 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed" style={{ background: "var(--wk-brand)", color: "var(--wk-brand-on)", fontFamily: "var(--wk-font-ui)" }}>{loading ? (mode === "signin" ? "Signing in..." : "Creating account...") : mode === "signin" ? <><WkIcon name="LogIn" size={17} /> Sign in with email</> : <><WkIcon name="UserPlus" size={17} /> Create account</>}</button>
-              <button type="button" onClick={() => { setShowEmailForm(false); setError(null); }} className="w-full h-[44px] rounded-[14px] flex items-center justify-center gap-2 font-semibold text-[13px] whitespace-nowrap transition-all duration-200 cursor-pointer hover:opacity-80 active:scale-[0.98]" style={{ background: "transparent", color: "var(--wk-text-muted)", fontFamily: "var(--wk-font-ui)" }}><WkIcon name="ArrowLeft" size={15} /> Back</button>
+              <button type="button" onClick={() => { setShowEmailForm(false); clearMessages(); }} className="w-full h-[44px] rounded-[14px] flex items-center justify-center gap-2 font-semibold text-[13px] whitespace-nowrap transition-all duration-200 cursor-pointer hover:opacity-80 active:scale-[0.98]" style={{ background: "transparent", color: "var(--wk-text-muted)", fontFamily: "var(--wk-font-ui)" }}><WkIcon name="ArrowLeft" size={15} /> Back</button>
             </form>
           ) : (
             <div className="flex flex-col gap-3 mb-6">
               <button onClick={() => setShowEmailForm(true)} disabled={loading} className="w-full h-[52px] rounded-[14px] flex items-center justify-center gap-3 font-bold text-[14px] whitespace-nowrap transition-all duration-200 cursor-pointer hover:opacity-90 active:scale-[0.98]" style={{ background: "var(--wk-brand)", color: "var(--wk-brand-on)", fontFamily: "var(--wk-font-ui)" }}><WkIcon name="Mail" size={17} />Continue with email</button>
+              <button onClick={() => goToMode("magic")} disabled={loading} className="w-full h-[52px] rounded-[14px] flex items-center justify-center gap-3 font-bold text-[14px] whitespace-nowrap transition-all duration-200 cursor-pointer hover:opacity-90 active:scale-[0.98]" style={{ background: "var(--wk-surface-raised)", border: "1px solid var(--wk-border)", color: "var(--wk-text)", fontFamily: "var(--wk-font-ui)" }}><WkIcon name="MailCheck" size={17} />Email me a magic link</button>
               <button onClick={handleGoogleAuth} disabled={loading} className="w-full h-[52px] rounded-[14px] flex items-center justify-center gap-3 font-bold text-[14px] whitespace-nowrap transition-all duration-200 cursor-pointer hover:opacity-90 active:scale-[0.98] disabled:opacity-50" style={{ background: "var(--wk-surface-raised)", border: "1px solid var(--wk-border)", color: "var(--wk-text)", fontFamily: "var(--wk-font-ui)" }}>{loading ? "Loading..." : <><WkIcon name="Chrome" size={17} />Continue with Google</>}</button>
               <div className="flex items-center gap-3 my-1"><span className="flex-1 h-px" style={{ background: "var(--wk-divider)" }} /><span className="text-[11px] font-medium" style={{ fontFamily: "var(--wk-font-ui)", color: "var(--wk-text-faint)" }}>or</span><span className="flex-1 h-px" style={{ background: "var(--wk-divider)" }} /></div>
               <Link to="/" className="w-full h-[52px] rounded-[14px] flex items-center justify-center gap-3 font-bold text-[14px] whitespace-nowrap transition-all duration-200 cursor-pointer hover:opacity-80 active:scale-[0.98] no-underline" style={{ background: "transparent", color: "var(--wk-text-muted)", fontFamily: "var(--wk-font-ui)" }}>Explore without signing in</Link>
             </div>
           )}
 
-          {!isRecovery && <button onClick={toggleMode} className="w-full text-center mb-4 text-[13px] font-semibold cursor-pointer hover:opacity-80 transition-opacity" style={{ fontFamily: "var(--wk-font-ui)", color: "var(--wk-brand)" }}>{mode === "signin" ? "Don't have an account? Sign up" : "Already have an account? Sign in"}</button>}
+          {!isRecovery && !["forgot", "magic"].includes(mode) && <button onClick={toggleMode} className="w-full text-center mb-4 text-[13px] font-semibold cursor-pointer hover:opacity-80 transition-opacity" style={{ fontFamily: "var(--wk-font-ui)", color: "var(--wk-brand)" }}>{mode === "signin" ? "Don't have an account? Sign up" : "Already have an account? Sign in"}</button>}
           <p className="text-center leading-relaxed" style={{ fontFamily: "var(--wk-font-ui)", fontSize: "11px", color: "var(--wk-text-faint)" }}>By continuing, you agree to WAKILISHA&apos;s <a href="#" className="font-semibold hover:underline" style={{ color: "var(--wk-brand)" }}>Terms</a> and <a href="#" className="font-semibold hover:underline" style={{ color: "var(--wk-brand)" }}>Privacy Policy</a>.</p>
         </div>
       </section>
