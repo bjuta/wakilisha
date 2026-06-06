@@ -6,6 +6,7 @@ import { MobileFullPlayer } from "@/components/mobile/MobileFullPlayer";
 import NotFound from "../pages/NotFound";
 import Home from "../pages/home/page";
 import AdminDesignSystem from "../pages/admin/design-system/page";
+import AdminLoginPage from "../pages/admin/login/page";
 
 // Author profiles
 import AuthorProfilePage from "../pages/authors/detail/page";
@@ -146,6 +147,7 @@ import MobileAuthorProfile from "../pages/mobile/authors/detail/page";
 import AuthPage from "../pages/auth/page";
 
 const routes: RouteObject[] = [
+  { path: "/admin/login", element: <AdminLoginPage /> },
   {
     element: <ResponsiveAppLayout />,
     children: [
