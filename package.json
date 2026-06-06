@@ -55,6 +55,7 @@
     "imports:plan-wordpress-staging": "tsx scripts/imports/plan-wordpress-staging.ts",
     "imports:process-wordpress-pipeline": "tsx scripts/imports/process-wordpress-pipeline.ts",
     "imports:process-wordpress-zips": "tsx scripts/imports/process-wordpress-zips.ts",
+    "imports:promote-wordpress-registry": "tsx scripts/imports/promote-wordpress-registry-entities.ts",
     "imports:stage-wordpress-database-records": "tsx scripts/imports/stage-wordpress-database-records.ts",
     "imports:stage-wordpress-records": "tsx scripts/imports/stage-wordpress-records.ts",
     "imports:watch-wordpress-zips": "tsx scripts/imports/process-wordpress-zips.ts --watch",
