@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { WkIcon } from "@/components/design-system/Icon";
+import { WkIcon, type WkIconName } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import {
   formatCount,
@@ -257,7 +257,7 @@ export default function AdminImportReviewArtifactsPage() {
   );
 }
 
-function KpiCard({ label, value, icon, tone }: { label: string; value: number; icon: Parameters<typeof WkIcon>[0]["name"]; tone: "brand" | "warning" | "danger" | "neutral" }) {
+function KpiCard({ label, value, icon, tone }: { label: string; value: number; icon: WkIconName; tone: "brand" | "warning" | "danger" | "neutral" }) {
   const toneClass = tone === "brand" ? "bg-wk-brand-soft text-wk-brand" : tone === "warning" ? "bg-wk-warning-soft text-wk-warning" : tone === "danger" ? "bg-wk-danger-soft text-wk-danger" : "bg-wk-surface-raised text-wk-text-muted";
   return (
     <WkSurface className="p-4">
@@ -284,7 +284,7 @@ function MiniStat({ label, value, detail }: { label: string; value: number; deta
   );
 }
 
-function SectionHeader({ title, subtitle, icon }: { title: string; subtitle: string; icon: Parameters<typeof WkIcon>[0]["name"] }) {
+function SectionHeader({ title, subtitle, icon }: { title: string; subtitle: string; icon: WkIconName }) {
   return (
     <div className="border-b border-wk-border p-4">
       <div className="flex items-center gap-2">
