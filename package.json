@@ -53,6 +53,7 @@
     "imports:connect-wordpress-rest": "tsx scripts/imports/connect-wordpress-rest.ts",
     "imports:discover-wordpress-mappings": "tsx scripts/imports/discover-wordpress-mappings.ts",
     "imports:finalize-wordpress-staging": "tsx scripts/imports/finalize-wordpress-staging.ts",
+    "imports:operationalize-wordpress-media": "tsx scripts/imports/operationalize-wordpress-media.ts",
     "imports:plan-wordpress-staging": "tsx scripts/imports/plan-wordpress-staging.ts",
     "imports:process-wordpress-pipeline": "tsx scripts/imports/process-wordpress-pipeline.ts",
     "imports:process-wordpress-zips": "tsx scripts/imports/process-wordpress-zips.ts",
