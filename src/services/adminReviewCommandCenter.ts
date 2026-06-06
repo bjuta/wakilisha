@@ -105,32 +105,6 @@ export type ReviewCommandCenterData = {
   stagingSummary: StagingSummaryRow[];
 };
 
-const STAGING_TARGETS = [
-  "articles",
-  "pages",
-  "authors",
-  "taxonomy_terms",
-  "artist_taxonomy_terms",
-  "media_assets",
-  "artists",
-  "tracks",
-  "releases",
-  "labels",
-  "genres",
-  "chart_series",
-  "chart_editions",
-  "chart_entries",
-  "track_artists",
-  "release_tracks",
-  "release_labels",
-  "artist_genres",
-  "artist_relationships",
-  "entity_relationships",
-  "chart_entry_links",
-  "custom_fields",
-  "ignored_post_types",
-];
-
 async function exactCount(table: string, filters: Record<string, string | boolean> = {}): Promise<number> {
   let query = supabase.from(table).select("*", { count: "exact", head: true });
   for (const [key, value] of Object.entries(filters)) query = query.eq(key, value);
@@ -139,22 +113,16 @@ async function exactCount(table: string, filters: Record<string, string | boolea
   return count ?? 0;
 }
 
-async function statusCount(targetEntity: string, targetStatus: "ready" | "needs_review" | "blocked"): Promise<number> {
-  return exactCount("wk_import_staging_records", { target_entity: targetEntity, target_status: targetStatus });
-}
-
 async function loadStagingSummary(): Promise<StagingSummaryRow[]> {
-  const rows = await Promise.all(
-    STAGING_TARGETS.map(async (target) => {
-      const [ready, needsReview, blocked] = await Promise.all([
-        statusCount(target, "ready"),
-        statusCount(target, "needs_review"),
-        statusCount(target, "blocked"),
-      ]);
-      return { target_entity: target, ready, needs_review: needsReview, blocked, total: ready + needsReview + blocked };
-    }),
-  );
-  return rows.filter((row) => row.total > 0).sort((a, b) => (b.needs_review + b.blocked) - (a.needs_review + a.blocked));
+  const { data, error } = await supabase
+    .from("wk_import_staging_summary")
+    .select("target_entity, ready, needs_review, blocked, total")
+    .order("needs_review", { ascending: false });
+
+  if (error) return [];
+  return ((data ?? []) as StagingSummaryRow[])
+    .filter((row) => Number(row.total ?? 0) > 0)
+    .sort((a, b) => (Number(b.needs_review ?? 0) + Number(b.blocked ?? 0)) - (Number(a.needs_review ?? 0) + Number(a.blocked ?? 0)));
 }
 
 async function loadSamples<T>(table: string, select: string, orderColumn = "created_at", limit = 12): Promise<T[]> {
@@ -190,8 +158,8 @@ export async function loadReviewCommandCenter(): Promise<ReviewCommandCenterData
     loadStagingSummary(),
   ]);
 
-  const stagingNeedsReview = stagingSummary.reduce((sum, row) => sum + row.needs_review, 0);
-  const blockedStaging = stagingSummary.reduce((sum, row) => sum + row.blocked, 0);
+  const stagingNeedsReview = stagingSummary.reduce((sum, row) => sum + Number(row.needs_review ?? 0), 0);
+  const blockedStaging = stagingSummary.reduce((sum, row) => sum + Number(row.blocked ?? 0), 0);
 
   const workstreams: ReviewWorkstream[] = [
     {
