@@ -28,6 +28,7 @@ import AdminReviewQueuePage from "../pages/admin/review/queue/page";
 import AdminImportsPage from "../pages/admin/imports/page";
 import AdminImportsJobsPage from "../pages/admin/imports/jobs/page";
 import AdminImportsJobDetailPage from "../pages/admin/imports/jobs/detail/page";
+import AdminImportReviewArtifactsPage from "../pages/admin/imports/review-artifacts/page";
 import AdminArticleDetailPage from "../pages/admin/content/articles/detail/page";
 import AdminArtistDetailPage from "../pages/admin/registry/artists/detail/page";
 import AdminTrackDetailPage from "../pages/admin/registry/tracks/detail/page";
@@ -212,6 +213,7 @@ const routes: RouteObject[] = [
       { path: "media/broken", element: <AdminBrokenLinksPage /> },
       { path: "review/queue", element: <AdminReviewQueuePage /> },
       { path: "imports", element: <AdminImportsPage /> },
+      { path: "imports/review-artifacts", element: <AdminImportReviewArtifactsPage /> },
       { path: "imports/jobs", element: <AdminImportsJobsPage /> },
       { path: "imports/jobs/:id", element: <AdminImportsJobDetailPage /> },
     ],
