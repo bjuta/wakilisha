@@ -48,6 +48,7 @@
     "dev:v2": "tsx scripts/dev/start-chart-v2-dev.ts",
     "extract:local": "WAKILISHA_SKIP_DOWNLOAD=1 WAKILISHA_IMPORT_ZIP_PATH=./wakilisha_supabase_import_2026-05-30.zip tsx packages/migration/src/extractZip.ts",
     "extract:zip": "tsx packages/migration/src/extractZip.ts",
+    "imports:classify-wordpress-postmeta": "tsx scripts/imports/classify-wordpress-postmeta.ts",
     "imports:connect-wordpress-database": "tsx scripts/imports/connect-wordpress-database.ts",
     "imports:connect-wordpress-rest": "tsx scripts/imports/connect-wordpress-rest.ts",
     "imports:discover-wordpress-mappings": "tsx scripts/imports/discover-wordpress-mappings.ts",
