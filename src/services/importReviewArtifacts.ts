@@ -29,9 +29,9 @@ export type ReviewArtifactSample = {
   source_kind: string | null;
   source_record_id: string | null;
   review_status: string | null;
-  notes: string | null;
   raw_record: Record<string, unknown> | null;
   mapped_record: Record<string, unknown> | null;
+  notes: string | null;
   created_at?: string | null;
 };
 
@@ -60,6 +60,17 @@ export type ReviewArtifactDashboard = {
   stagingBuckets: StagingBucket[];
   samples: ReviewArtifactSample[];
   latestRuns: ImportRunLite[];
+  activeFilter?: {
+    target?: string;
+    status?: string;
+    artifactType?: string;
+  };
+};
+
+export type ReviewArtifactFilters = {
+  target?: string | null;
+  status?: string | null;
+  artifactType?: string | null;
 };
 
 const REVIEW_BUCKETS: Array<Omit<ReviewArtifactBucket, "count" | "status">> = [
@@ -95,102 +106,111 @@ const REVIEW_BUCKETS: Array<Omit<ReviewArtifactBucket, "count" | "status">> = [
   },
 ];
 
-const STAGING_TARGETS = [
-  "articles",
-  "pages",
-  "authors",
-  "taxonomy_terms",
-  "artist_taxonomy_terms",
-  "media_assets",
-  "artists",
-  "tracks",
-  "releases",
-  "labels",
-  "genres",
-  "chart_series",
-  "chart_editions",
-  "chart_entries",
-  "track_artists",
-  "release_tracks",
-  "release_labels",
-  "artist_genres",
-  "artist_relationships",
-  "entity_relationships",
-  "chart_entry_links",
-  "custom_fields",
-  "ignored_post_types",
-];
-
 function asNumber(value: unknown): number {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
 async function exactCount(table: string, filters: Record<string, string> = {}): Promise<number> {
   let query = supabase.from(table).select("*", { count: "exact", head: true });
-  for (const [key, value] of Object.entries(filters)) {
-    query = query.eq(key, value);
-  }
+  for (const [key, value] of Object.entries(filters)) query = query.eq(key, value);
   const { count, error } = await query;
   if (error) return 0;
   return count ?? 0;
 }
 
-async function artifactTypeCount(artifactType: string): Promise<number> {
-  return exactCount("wk_import_review_artifacts", { artifact_type: artifactType });
+async function loadStagingSummary(): Promise<StagingBucket[]> {
+  const { data, error } = await supabase
+    .from("wk_import_staging_summary")
+    .select("target_entity, ready, needs_review, blocked, total")
+    .order("total", { ascending: false });
+  if (error) return [];
+  return ((data ?? []) as StagingBucket[]).filter((bucket) => asNumber(bucket.total) > 0);
 }
 
-async function stagingStatusCount(targetEntity: string, targetStatus: "ready" | "needs_review" | "blocked"): Promise<number> {
-  return exactCount("wk_import_staging_records", { target_entity: targetEntity, target_status: targetStatus });
+function stagingCount(staging: StagingBucket[], target: string): number {
+  const row = staging.find((bucket) => bucket.target_entity === target);
+  return asNumber(row?.total);
 }
 
-export async function loadImportReviewArtifactDashboard(): Promise<ReviewArtifactDashboard> {
-  const [totalReviewArtifacts, totalStagingRecords, sampleResult, runsResult] = await Promise.all([
+function filteredStaging(staging: StagingBucket[], filters: ReviewArtifactFilters): StagingBucket[] {
+  let rows = staging;
+  if (filters.target) rows = rows.filter((bucket) => bucket.target_entity === filters.target);
+  if (filters.status === "ready") rows = rows.filter((bucket) => asNumber(bucket.ready) > 0);
+  if (filters.status === "needs_review") rows = rows.filter((bucket) => asNumber(bucket.needs_review) > 0);
+  if (filters.status === "blocked") rows = rows.filter((bucket) => asNumber(bucket.blocked) > 0);
+  return rows.sort((a, b) => asNumber(b.total) - asNumber(a.total));
+}
+
+function artifactTypeForTarget(target?: string | null): string | null {
+  if (!target) return null;
+  if (["entity_relationships", "custom_fields"].includes(target)) return target;
+  return null;
+}
+
+async function loadSamples(filters: ReviewArtifactFilters): Promise<ReviewArtifactSample[]> {
+  const artifactType = filters.artifactType || artifactTypeForTarget(filters.target);
+  let query = supabase
+    .from("wk_import_review_artifacts")
+    .select("id, artifact_type, title, source_kind, source_record_id, review_status, notes, raw_record, mapped_record, created_at")
+    .order("created_at", { ascending: false })
+    .limit(50);
+
+  if (artifactType) query = query.eq("artifact_type", artifactType);
+  if (filters.status && ["needs_review", "ready", "blocked"].includes(filters.status)) {
+    const artifactStatus = filters.status === "ready" ? "resolved" : filters.status;
+    if (artifactType) query = query.eq("review_status", artifactStatus);
+  }
+
+  const { data, error } = await query;
+  if (error) return [];
+  return (data ?? []) as ReviewArtifactSample[];
+}
+
+export async function loadImportReviewArtifactDashboard(filters: ReviewArtifactFilters = {}): Promise<ReviewArtifactDashboard> {
+  const activeFilter = {
+    target: filters.target || undefined,
+    status: filters.status || undefined,
+    artifactType: filters.artifactType || undefined,
+  };
+
+  const [totalReviewArtifacts, stagingSummary, sampleResult, runsResult, entityRelationshipArtifacts, customFieldArtifacts] = await Promise.all([
     exactCount("wk_import_review_artifacts"),
-    exactCount("wk_import_staging_records"),
-    supabase
-      .from("wk_import_review_artifacts")
-      .select("id, artifact_type, title, source_kind, source_record_id, review_status, notes, raw_record, mapped_record, created_at")
-      .order("created_at", { ascending: false })
-      .limit(50),
+    loadStagingSummary(),
+    loadSamples(filters),
     supabase
       .from("wk_ingestion_runs")
       .select("id, source_name, source_kind, status, imported_counts, created_at, finished_at")
       .order("created_at", { ascending: false })
       .limit(5),
+    exactCount("wk_import_review_artifacts", { artifact_type: "entity_relationships" }),
+    exactCount("wk_import_review_artifacts", { artifact_type: "custom_fields" }),
   ]);
 
-  const reviewBuckets = await Promise.all(
-    REVIEW_BUCKETS.map(async (bucket) => {
-      const count = await artifactTypeCount(bucket.key);
-      return {
-        ...bucket,
-        count,
-        status: count > 0 ? "preserved" as const : "empty" as const,
-      };
-    }),
-  );
-
-  const stagingBucketsRaw = await Promise.all(
-    STAGING_TARGETS.map(async (target) => {
-      const [ready, needsReview, blocked] = await Promise.all([
-        stagingStatusCount(target, "ready"),
-        stagingStatusCount(target, "needs_review"),
-        stagingStatusCount(target, "blocked"),
-      ]);
-      return { target_entity: target, ready, needs_review: needsReview, blocked, total: ready + needsReview + blocked };
-    }),
-  );
+  const totalStagingRecords = stagingSummary.reduce((sum, bucket) => sum + asNumber(bucket.total), 0);
+  const reviewBuckets = REVIEW_BUCKETS.map((bucket) => {
+    const count = bucket.key === "entity_relationships"
+      ? entityRelationshipArtifacts
+      : bucket.key === "custom_fields"
+      ? customFieldArtifacts
+      : stagingCount(stagingSummary, bucket.key);
+    return {
+      ...bucket,
+      count,
+      status: count > 0 ? (bucket.key === "entity_relationships" || bucket.key === "custom_fields" ? "preserved" as const : "staged" as const) : "empty" as const,
+    };
+  });
 
   return {
     totalReviewArtifacts,
     totalStagingRecords,
     reviewBuckets,
-    stagingBuckets: stagingBucketsRaw.filter((bucket) => bucket.total > 0).sort((a, b) => b.total - a.total),
-    samples: ((sampleResult.data ?? []) as ReviewArtifactSample[]),
+    stagingBuckets: filteredStaging(stagingSummary, filters),
+    samples: sampleResult,
     latestRuns: ((runsResult.data ?? []) as ImportRunLite[]).map((run) => ({
       ...run,
       imported_counts: run.imported_counts && typeof run.imported_counts === "object" ? run.imported_counts : null,
     })),
+    activeFilter,
   };
 }
 
