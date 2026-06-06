@@ -78,6 +78,16 @@ function parsePayload(value: unknown): Row {
   return {};
 }
 
+function payload(value: unknown, key: string): Row {
+  return parsePayload(parsePayload(value)[key]);
+}
+
+function payloadText(value: unknown, key: string): string {
+  const parsed = parsePayload(value);
+  const next = parsed[key];
+  return next === null || next === undefined ? "" : String(next);
+}
+
 function decodeHtml(value: string): string {
   return value
     .replace(/&amp;/g, "&")
@@ -281,8 +291,9 @@ async function getLabelDetail(slug: string): Promise<Record<string, unknown>> {
   if (!row) return { label: null };
   const releases = await q("select id::text, slug, title, release_date::text, release_type, artwork_url from registry_releases where label_id = $1::uuid and status in ('active', 'needs_review', 'draft') order by release_date desc nulls last, title asc limit 60", [s(row, "id")]);
   const metadata = parsePayload(row.metadata);
+  const wordpressMedia = payload(metadata, "wordpress_media");
   return { label: {
-    id: s(row, "id"), slug: s(row, "slug"), name: s(row, "name"), country: maybe(row, "country_code"), logoUrl: String(metadata.logo_url ?? metadata.wordpress_media?.logo_url ?? "") || null,
+    id: s(row, "id"), slug: s(row, "slug"), name: s(row, "name"), country: maybe(row, "country_code"), logoUrl: String(metadata.logo_url ?? wordpressMedia.logo_url ?? "") || null,
     artistCount: 0, releaseCount: releases.length, featuredArtists: [], isFeatured: releases.length > 0, description: s(row, "description") || `${s(row, "name")} appears in the canonical WAKILISHA registry.`,
     releases: releases.map((release) => ({ id: s(release, "id"), slug: s(release, "slug"), title: s(release, "title"), year: s(release, "release_date").slice(0, 4), releaseType: s(release, "release_type"), artworkUrl: s(release, "artwork_url") || "" })),
   } };
@@ -320,7 +331,7 @@ async function getTrackDetail(slug: string): Promise<Record<string, unknown>> {
   const row = rows[0];
   if (!row) return { track: null };
   return { track: {
-    id: s(row, "id"), slug: s(row, "slug"), title: s(row, "title"), normalizedTitle: s(row, "normalized_title"), isrc: maybe(row, "isrc"), duration: n(row, "duration_ms"), explicit: Boolean(row.explicit),
+    id: s(row, "id"), slug: s(row, "slug"), title: s(row, "title"), normalizedTitle: s(row, "normalized_title"), isrc: maybe(row, "isrc"), duration: n(row, "duration_ms"), explicit: row.explicit === true || String(row.explicit).toLowerCase() === "true",
     artworkUrl: s(row, "artwork_url") || s(row, "release_artwork_url") || placeholder("track", s(row, "id")), previewUrl: maybe(row, "preview_url"), metadata: parsePayload(row.metadata),
     release: s(row, "release_slug") ? { slug: s(row, "release_slug"), title: s(row, "release_title") } : null,
   } };
@@ -333,9 +344,10 @@ async function getArticleDetail(slug: string): Promise<Record<string, unknown>> 
     if (row) {
       const raw = parsePayload(row.raw_record);
       const mapped = parsePayload(row.mapped_record);
+      const wpMedia = payload(raw, "wordpress_media");
       const body = s(row, "body") || String(raw.content_html ?? raw.post_content ?? "");
       const excerpt = s(row, "excerpt") || String(raw.excerpt ?? mapped.excerpt ?? "");
-      return { article: { id: s(row, "id"), slug: s(row, "slug"), title: s(row, "title"), section: String(raw.section ?? mapped.section ?? "Article"), dek: excerpt, author: s(row, "author_name") || "WAKILISHA Editorial", date: s(row, "published_at") || "Undated", readingTime: readingTime(excerpt, body), heroUrl: String(raw.wordpress_media?.hero_image_url ?? raw.hero_image_url ?? raw.featured_image_url ?? ""), contentHtml: body, tags: [], categories: [], seo: raw.wordpress_seo_fields ?? {} } };
+      return { article: { id: s(row, "id"), slug: s(row, "slug"), title: s(row, "title"), section: String(raw.section ?? mapped.section ?? "Article"), dek: excerpt, author: s(row, "author_name") || "WAKILISHA Editorial", date: s(row, "published_at") || "Undated", readingTime: readingTime(excerpt, body), heroUrl: String(wpMedia.hero_image_url ?? raw.hero_image_url ?? raw.featured_image_url ?? ""), contentHtml: body, tags: [], categories: [], seo: payloadText(raw, "wordpress_seo_fields") ? parsePayload(raw.wordpress_seo_fields) : {} } };
     }
   }
   return { article: null };
