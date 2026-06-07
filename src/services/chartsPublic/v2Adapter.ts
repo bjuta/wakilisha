@@ -4,7 +4,20 @@ import type {
   ChartFamily,
   TrackChartHistory,
 } from "./types";
-import { PublicWpApiError } from "./wpAdapter";
+
+export class PublicV2ApiError extends Error {
+  status: number;
+  code?: string;
+  retryable: boolean;
+
+  constructor(message: string, status: number, code?: string, retryable = false) {
+    super(message);
+    this.name = "PublicV2ApiError";
+    this.status = status;
+    this.code = code;
+    this.retryable = retryable;
+  }
+}
 
 const RAW_BASE =
   import.meta.env.VITE_WAKILISHA_PUBLIC_API_BASE || "/api/v1";
@@ -111,7 +124,7 @@ async function v2Request<T>(path: string): Promise<T> {
         const text = await response.text();
         if (text) message = text;
       }
-      throw new PublicWpApiError(
+      throw new PublicV2ApiError(
         message,
         response.status,
         code,
@@ -123,34 +136,34 @@ async function v2Request<T>(path: string): Promise<T> {
     return (await response.json()) as T;
   } catch (err) {
     clearTimeout(timeoutId);
-    if (err instanceof PublicWpApiError) throw err;
+    if (err instanceof PublicV2ApiError) throw err;
     if (err instanceof Error && err.name === "AbortError") {
-      throw new PublicWpApiError("Public chart request timed out after 30 seconds", 504, "timeout", true);
+      throw new PublicV2ApiError("Public chart request timed out after 30 seconds", 504, "timeout", true);
     }
     if (err instanceof TypeError) {
-      throw new PublicWpApiError(
+      throw new PublicV2ApiError(
         "Network error: unable to reach WAKILISHA public API.",
         0,
         "network_error",
         true
       );
     }
-    throw new PublicWpApiError(err instanceof Error ? err.message : "Unknown public API error", 500, "unknown", false);
+    throw new PublicV2ApiError(err instanceof Error ? err.message : "Unknown public API error", 500, "unknown", false);
   }
 }
 
 async function v2Get<T>(path: string, retries = 3): Promise<T> {
-  let lastErr: PublicWpApiError | undefined;
+  let lastErr: PublicV2ApiError | undefined;
   for (let i = 0; i < retries; i++) {
     try {
       return await v2Request<T>(path);
     } catch (err) {
-      lastErr = err instanceof PublicWpApiError ? err : undefined;
+      lastErr = err instanceof PublicV2ApiError ? err : undefined;
       if (!lastErr?.retryable || i === retries - 1) throw err;
       await new Promise((resolve) => setTimeout(resolve, 1000 * Math.pow(2, i)));
     }
   }
-  throw lastErr ?? new PublicWpApiError("Unknown public API error after retries", 500, "unknown", false);
+  throw lastErr ?? new PublicV2ApiError("Unknown public API error after retries", 500, "unknown", false);
 }
 
 function unwrap<T>(envelope: ApiEnvelope<T> | T): T {
