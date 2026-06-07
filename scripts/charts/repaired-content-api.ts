@@ -1,5 +1,22 @@
 import pg from "pg";
 
+
+function normalizeLegacyWpMediaUrl(url: string): string {
+  const clean = String(url || "").trim();
+  if (!clean) return "";
+
+  return clean
+    .replace(/^http:\/\/18\.135\.76\.250\/wp-content\/uploads\//i, "https://pgzizndxdyhqmtyywjmt.supabase.co/storage/v1/object/public/article-media/wp-import/")
+    .replace(/^https?:\/\/(?:www\.)?wakilisha\.africa\/wp-content\/uploads\//i, "https://pgzizndxdyhqmtyywjmt.supabase.co/storage/v1/object/public/article-media/wp-import/")
+    .replace(/^https?:\/\/staging\.wakilisha\.africa\/wp-content\/uploads\//i, "https://pgzizndxdyhqmtyywjmt.supabase.co/storage/v1/object/public/article-media/wp-import/")
+    .replace(/^\/wp-content\/uploads\//i, "https://pgzizndxdyhqmtyywjmt.supabase.co/storage/v1/object/public/article-media/wp-import/")
+    .replace(/^\/__legacy-wp-media\//i, "https://pgzizndxdyhqmtyywjmt.supabase.co/storage/v1/object/public/article-media/wp-import/")
+    .replace(/^\/legacy-wp-media\//i, "https://pgzizndxdyhqmtyywjmt.supabase.co/storage/v1/object/public/article-media/wp-import/")
+    .replace(/^http:\/\/wakilisha\.africa/i, "https://wakilisha.africa")
+    .replace(/^http:\/\/www\.wakilisha\.africa/i, "https://wakilisha.africa");
+}
+
+
 type Row = Record<string, unknown>;
 type PublicStory = {
   id: string;
@@ -125,7 +142,7 @@ function cleanDisplayText(value: unknown): string {
   const text = decodeHtml(String(value)).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
   if (!text) return "";
   if (["null", "undefined", "false", "[object object]"].includes(text.toLowerCase())) return "";
-  return text;
+  return normalizeLegacyWpMediaUrl(text);
 }
 
 function normalizeArtworkUrl(url: string): string {
@@ -186,7 +203,7 @@ function parsePayload(value: unknown): Row {
 function firstText(...values: unknown[]): string {
   for (const value of values) {
     const text = cleanDisplayText(value);
-    if (text) return text;
+    if (text) return normalizeLegacyWpMediaUrl(text);
   }
   return "";
 }
@@ -222,7 +239,7 @@ function findImageUrlDeep(value: unknown, depth = 0): string {
 function firstUrl(...values: unknown[]): string {
   for (const value of values) {
     const text = findImageUrlDeep(value);
-    if (text) return text;
+    if (text) return normalizeLegacyWpMediaUrl(text);
   }
   return "";
 }
@@ -324,6 +341,99 @@ function imageUrlFromWpItem(row: Row): string {
 }
 async function buildHeroLookups(): Promise<HeroLookups> {
   const lookups: HeroLookups = emptyLookups();
+
+  if (!(await hasTable("public.wk_media_assets"))) return lookups;
+
+  const rows = await q(`
+    select *
+    from public.wk_media_assets
+    where coalesce(status, 'active') not in ('trash', 'deleted', 'rejected')
+    limit 20000
+  `);
+
+  for (const row of rows) {
+    const raw = parsePayload(row.raw_record);
+    const mapped = parsePayload(row.mapped_record);
+    const meta = parsePayload(row.metadata);
+
+    const url = firstUrl(
+      row.url,
+      row.source_url,
+      row.guid,
+      row.local_url,
+      row.image_url,
+      row.featured_image_url,
+      row.media_url,
+      row.file_url,
+      raw.url,
+      raw.source_url,
+      raw.guid,
+      raw.attachment_url,
+      raw.media_url,
+      mapped.url,
+      mapped.source_url,
+      mapped.guid,
+      meta.url,
+      meta.source_url,
+      meta.guid
+    );
+
+    if (!url || !isLikelyWordPressArticleMediaUrl(url)) continue;
+
+    const keys = [
+      row.id,
+      row.source_record_id,
+      row.source_wp_post_id,
+      row.legacy_wp_post_id,
+      row.entity_slug,
+      row.slug,
+      row.title,
+      row.attached_to_post_id,
+      row.parent_id,
+      row.post_parent,
+
+      raw.ID,
+      raw.id,
+      raw.post_id,
+      raw.attachment_id,
+      raw.attached_to_post_id,
+      raw.parent_id,
+      raw.post_parent,
+      raw.post_title,
+      raw.post_name,
+      raw.guid,
+
+      mapped.ID,
+      mapped.id,
+      mapped.post_id,
+      mapped.attachment_id,
+      mapped.attached_to_post_id,
+      mapped.parent_id,
+      mapped.post_parent,
+      mapped.title,
+      mapped.slug,
+
+      meta.ID,
+      meta.id,
+      meta.post_id,
+      meta.attachment_id,
+      meta.attached_to_post_id,
+      meta.parent_id,
+      meta.post_parent,
+      meta.title,
+      meta.slug,
+    ];
+
+    for (const key of keys) {
+      for (const candidate of keyCandidates(key)) {
+        if (!candidate) continue;
+        lookups.byId.set(candidate, url);
+        lookups.bySlug.set(candidate, url);
+        lookups.byTitle.set(candidate, url);
+      }
+    }
+  }
+
   return lookups;
 }
 function directArticleHeroUrl(row: Row, editablePayload: Row, immutablePayload: Row, seoPayload: Row, rawMeta: Row, sourcePayload: Row): string {

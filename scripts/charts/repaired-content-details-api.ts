@@ -1,5 +1,22 @@
 import pg from "pg";
 
+
+function normalizeLegacyWpMediaUrl(url: string): string {
+  const clean = String(url || "").trim();
+  if (!clean) return "";
+
+  return clean
+    .replace(/^http:\/\/18\.135\.76\.250\/wp-content\/uploads\//i, "https://pgzizndxdyhqmtyywjmt.supabase.co/storage/v1/object/public/article-media/wp-import/")
+    .replace(/^https?:\/\/(?:www\.)?wakilisha\.africa\/wp-content\/uploads\//i, "https://pgzizndxdyhqmtyywjmt.supabase.co/storage/v1/object/public/article-media/wp-import/")
+    .replace(/^https?:\/\/staging\.wakilisha\.africa\/wp-content\/uploads\//i, "https://pgzizndxdyhqmtyywjmt.supabase.co/storage/v1/object/public/article-media/wp-import/")
+    .replace(/^\/wp-content\/uploads\//i, "https://pgzizndxdyhqmtyywjmt.supabase.co/storage/v1/object/public/article-media/wp-import/")
+    .replace(/^\/__legacy-wp-media\//i, "https://pgzizndxdyhqmtyywjmt.supabase.co/storage/v1/object/public/article-media/wp-import/")
+    .replace(/^\/legacy-wp-media\//i, "https://pgzizndxdyhqmtyywjmt.supabase.co/storage/v1/object/public/article-media/wp-import/")
+    .replace(/^http:\/\/wakilisha\.africa/i, "https://wakilisha.africa")
+    .replace(/^http:\/\/www\.wakilisha\.africa/i, "https://wakilisha.africa");
+}
+
+
 type Row = Record<string, unknown>;
 
 let pool: pg.Pool | null = null;
@@ -101,7 +118,7 @@ function cleanText(value: unknown): string {
   if (value === null || value === undefined) return "";
   const text = decodeHtml(String(value)).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
   if (!text || ["null", "undefined", "false", "[object object]"].includes(text.toLowerCase())) return "";
-  return text;
+  return normalizeLegacyWpMediaUrl(text);
 }
 
 function slugify(value: string): string {
@@ -686,6 +703,136 @@ async function getTrackDetail(slug: string, artistSlug = ""): Promise<Record<str
   return { track: null };
 }
 
+
+function looksLikeArticleImageUrl(url: string): boolean {
+  return /\.(jpe?g|png|webp|gif|avif)(\?|#|$)/i.test(url) || /\/wp-content\/uploads\//i.test(url);
+}
+
+function firstArticleUrl(...values: unknown[]): string {
+  const stack = [...values];
+  const seen = new Set<unknown>();
+
+  while (stack.length) {
+    const value = stack.shift();
+    if (value === undefined || value === null || value === "" || seen.has(value)) continue;
+    seen.add(value);
+
+    if (Array.isArray(value)) {
+      stack.unshift(...value);
+      continue;
+    }
+
+    if (typeof value === "object") {
+      const obj = value as Record<string, unknown>;
+      stack.unshift(
+        obj.url,
+        obj.source_url,
+        obj.guid,
+        obj.local_url,
+        obj.image_url,
+        obj.featured_image_url,
+        obj.hero_image_url,
+        obj.thumbnail_url,
+        obj.cover_image_url,
+        obj.media_url,
+        obj.file_url,
+        obj.attachment_url,
+        obj.og_image,
+        obj.twitter_image,
+        obj.raw_record,
+        obj.mapped_record,
+        obj.metadata
+      );
+      continue;
+    }
+
+    const text = String(value).trim();
+    if (!text) continue;
+
+    if (text.startsWith("{") || text.startsWith("[")) {
+      try {
+        stack.unshift(JSON.parse(text));
+        continue;
+      } catch {}
+    }
+
+    const match = text.match(/https?:\/\/[^\s"'<>\\]+/);
+    if (match) {
+      return normalizeLegacyWpMediaUrl(match[0]);
+    }
+  }
+
+  return "";
+}
+
+async function articleHeroLookups(slug: string, row: Row, raw: Row, mapped: Row): Promise<string> {
+  const direct = firstArticleUrl(
+    row.hero_image_url,
+    row.featured_image_url,
+    row.image_url,
+    row.thumbnail_url,
+    row.cover_image_url,
+    row.source_url,
+    row.guid,
+    raw.wordpress_media,
+    raw.hero_image_url,
+    raw.featured_image_url,
+    raw.image_url,
+    raw.thumbnail_url,
+    raw.cover_image_url,
+    raw.og_image,
+    raw.twitter_image,
+    mapped.hero_image_url,
+    mapped.featured_image_url,
+    mapped.image_url,
+    mapped.thumbnail_url,
+    mapped.cover_image_url
+  );
+
+  if (direct) return direct;
+
+  if (!(await hasTable("public.wk_media_assets"))) return "";
+
+  const rows = await q(`
+    select *
+    from public.wk_media_assets
+    where coalesce(status, 'active') not in ('trash', 'deleted', 'rejected')
+      and (
+        entity_slug = $1
+        or slug = $1
+        or source_record_id = $2
+        or source_record_id = $3
+        or raw_record::text ilike '%' || $1 || '%'
+        or mapped_record::text ilike '%' || $1 || '%'
+        or metadata::text ilike '%' || $1 || '%'
+      )
+    limit 50
+  `, [slug, s(row, "id"), String(raw.ID ?? raw.id ?? "")]);
+
+  for (const media of rows) {
+    const mediaRaw = parsePayload(media.raw_record);
+    const mediaMapped = parsePayload(media.mapped_record);
+    const mediaMeta = parsePayload(media.metadata);
+    const url = firstArticleUrl(
+      media.url,
+      media.source_url,
+      media.guid,
+      media.local_url,
+      media.image_url,
+      media.featured_image_url,
+      media.media_url,
+      media.file_url,
+      mediaRaw,
+      mediaMapped,
+      mediaMeta
+    );
+    if (url && looksLikeArticleImageUrl(url)) return url;
+  }
+
+  return "";
+}
+
+
 async function getArticleDetail(slug: string): Promise<Record<string, unknown>> {
   if (await hasTable("wk_content_items")) {
     const rows = await q("select id::text, slug, title, body, excerpt, status, published_at::text, author_name, raw_record, mapped_record from wk_content_items where slug = $1 and content_type in ('article','page') limit 1", [slug]);
@@ -693,10 +840,10 @@ async function getArticleDetail(slug: string): Promise<Record<string, unknown>> 
     if (row) {
       const raw = parsePayload(row.raw_record);
       const mapped = parsePayload(row.mapped_record);
-      const wpMedia = payload(raw, "wordpress_media");
       const body = s(row, "body") || String(raw.content_html ?? raw.post_content ?? "");
       const excerpt = s(row, "excerpt") || String(raw.excerpt ?? mapped.excerpt ?? "");
-      return { article: { id: s(row, "id"), slug: s(row, "slug"), title: s(row, "title"), section: String(raw.section ?? mapped.section ?? "Article"), dek: excerpt, author: s(row, "author_name") || "WAKILISHA Editorial", date: s(row, "published_at") || "Undated", readingTime: readingTime(excerpt, body), heroUrl: String(wpMedia.hero_image_url ?? raw.hero_image_url ?? raw.featured_image_url ?? ""), contentHtml: body, tags: [], categories: [], seo: payloadText(raw, "wordpress_seo_fields") ? parsePayload(raw.wordpress_seo_fields) : {} } };
+      const heroUrl = await articleHeroLookups(slug, row, raw, mapped);
+      return { article: { id: s(row, "id"), slug: s(row, "slug"), title: s(row, "title"), section: String(raw.section ?? mapped.section ?? "Article"), dek: excerpt, author: s(row, "author_name") || "WAKILISHA Editorial", date: s(row, "published_at") || "Undated", readingTime: readingTime(excerpt, body), heroUrl, imageUrl: heroUrl, featuredImageUrl: heroUrl, contentHtml: body, tags: [], categories: [], seo: payloadText(raw, "wordpress_seo_fields") ? parsePayload(raw.wordpress_seo_fields) : {} } };
     }
   }
   return { article: null };

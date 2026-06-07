@@ -33,6 +33,20 @@ export type MagazineArticle = {
 
 export type { RepairedStory };
 
+function articleHeroUrl(article: any): string {
+  return String(
+    article?.heroUrl ||
+    article?.imageUrl ||
+    article?.featuredImageUrl ||
+    article?.featured_image_url ||
+    article?.hero_image_url ||
+    article?.coverImageUrl ||
+    article?.thumbnailUrl ||
+    ""
+  );
+}
+
+
 function storyToArticle(story: RepairedStory): MagazineArticle {
   return {
     id: story.id,
@@ -42,7 +56,7 @@ function storyToArticle(story: RepairedStory): MagazineArticle {
     author: story.author || 'WAKILISHA Editorial',
     date: story.date || 'Undated',
     readingTime: story.readingTime || 3,
-    heroUrl: story.heroUrl,
+    heroUrl: articleHeroUrl(story),
     dek: story.dek || '',
     body: [],
     contentHtml: '',
@@ -74,7 +88,7 @@ export async function getMagazineArticleBySlug(
     author: detail.author,
     date: detail.date,
     readingTime: detail.readingTime,
-    heroUrl: detail.heroUrl,
+    heroUrl: articleHeroUrl(detail),
     dek: detail.dek,
     body: detail.contentHtml ? [detail.contentHtml] : [],
     contentHtml: rewriteWpImageUrls(detail.contentHtml),
