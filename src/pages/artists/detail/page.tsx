@@ -75,7 +75,9 @@ export default function ArtistDetail() {
   const debutYear = releaseYears.length > 0 ? Math.min(...releaseYears) : new Date().getFullYear();
 
   const hasChartEntries = artist.chartEntries.length > 0;
+  const appearances = Array.isArray((artist as any).appearances) ? (artist as any).appearances : [];
   const hasReleases = artist.releases.length > 0;
+  const hasAppearances = appearances.length > 0;
   const hasRelated = artist.relatedArtists.length > 0;
   const hasTopSongs = artist.topSongs.length > 0;
   const hasBio = artist.bio || artist.fullBio;
@@ -121,6 +123,17 @@ export default function ArtistDetail() {
           {/* Discography */}
           {hasReleases && (
             <ArtistDiscography releases={artist.releases} />
+          )}
+
+          {/* Appears On */}
+          {hasAppearances && (
+            <ArtistDiscography
+              releases={appearances}
+              eyebrow="Appears On"
+              title="Features & appearances"
+              emptyTitle="No appearances"
+              emptyDescription="No appearances match the selected filter."
+            />
           )}
 
           {/* Videos */}

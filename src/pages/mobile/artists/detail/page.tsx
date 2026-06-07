@@ -81,7 +81,9 @@ export default function MobileArtistDetail() {
 
   const hasBio = Boolean(artist.bio || artist.fullBio);
   const hasTopSongs = artist.topSongs.length > 0;
+  const appearances = Array.isArray((artist as any).appearances) ? (artist as any).appearances : [];
   const hasReleases = artist.releases.length > 0;
+  const hasAppearances = appearances.length > 0;
   const hasVideos = artist.videos && artist.videos.length > 0;
   const hasChartEntries = artist.chartEntries.length > 0;
   const hasRelated = artist.relatedArtists.length > 0;
@@ -141,6 +143,16 @@ export default function MobileArtistDetail() {
 
           {hasReleases && (
             <ArtistDiscography releases={artist.releases} />
+          )}
+
+          {hasAppearances && (
+            <ArtistDiscography
+              releases={appearances}
+              eyebrow="Appears On"
+              title="Features & appearances"
+              emptyTitle="No appearances"
+              emptyDescription="No appearances match the selected filter."
+            />
           )}
 
           {hasVideos && (

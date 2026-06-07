@@ -181,6 +181,55 @@ async function artistReleases(artistSlug: string, artistName: string): Promise<R
   return rows;
 }
 
+async function artistAppearances(artistSlug: string, artistName: string): Promise<Row[]> {
+  if (!(await hasTable("registry_releases"))) return [];
+
+  const nameNeedle = cleanText(artistName || artistSlug).toLowerCase();
+  const slugNeedle = cleanText(artistSlug).toLowerCase();
+
+  return q(`
+    with release_rows as (
+      select
+        rr.id::text,
+        rr.slug,
+        rr.title,
+        rr.release_type,
+        rr.release_date::text,
+        rr.artwork_url,
+        rr.metadata,
+        coalesce(
+          nullif(rr.metadata->>'artist_name', ''),
+          nullif(rr.metadata->>'artist_display', ''),
+          nullif(rr.metadata->>'artists', ''),
+          ''
+        ) as release_artist_line,
+        rr.metadata->>'source_payload' as source_payload_text
+      from registry_releases rr
+      where rr.status in ('active', 'needs_review', 'draft')
+    ),
+    candidates as (
+      select *
+      from release_rows
+      where
+        lower(coalesce(source_payload_text, metadata::text)) like '%' || $1 || '%'
+        or lower(coalesce(source_payload_text, metadata::text)) like '%' || $2 || '%'
+    )
+    select *
+    from candidates
+    where not (
+      lower(release_artist_line) = $1
+      or lower(release_artist_line) like $1 || ',%'
+      or lower(release_artist_line) like '%, ' || $1 || ',%'
+      or lower(release_artist_line) like '%, ' || $1
+      or lower(release_artist_line) like $1 || ' &%'
+      or lower(release_artist_line) like '%& ' || $1
+      or lower(release_artist_line) like '% & ' || $1 || ' & %'
+    )
+    order by release_date desc nulls last, title asc
+    limit 24
+  `, [nameNeedle, slugNeedle]);
+}
+
 async function artistRelated(artistSlug: string): Promise<Row[]> {
   if (!(await hasTable("registry_artist_relationships"))) return [];
   return q(`
@@ -281,6 +330,7 @@ async function getArtistDetail(slug: string): Promise<Record<string, unknown>> {
   const genres = await artistGenres(s(row, "id"));
   const chartRows = await artistChartEntries(s(row, "slug"));
   const releaseRows = await artistReleases(s(row, "slug"), s(row, "display_name"));
+  const appearanceRows = await artistAppearances(s(row, "slug"), s(row, "display_name"));
   const relatedRows = await artistRelated(s(row, "slug"));
   const image = s(row, "public_image_url") || String(metadata.image_url ?? metadata.profile_image_url ?? "");
 
@@ -312,7 +362,16 @@ async function getArtistDetail(slug: string): Promise<Record<string, unknown>> {
     releases: releaseRows.map((release) => ({
       slug: s(release, "slug"), title: s(release, "title"), releaseType: s(release, "release_type") || "unknown",
       year: s(release, "release_date").slice(0, 4), releaseDate: s(release, "release_date"), trackCount: n(release, "track_count"),
-      artworkUrl: s(release, "artwork_url") || placeholder("release", s(release, "id")), tracks: [],
+      artworkUrl: s(release, "artwork_url") || placeholder("release", s(release, "id")),
+      artistLine: s(release, "release_artist_line"),
+      tracks: [],
+    })),
+    appearances: appearanceRows.map((release) => ({
+      slug: s(release, "slug"), title: s(release, "title"), releaseType: s(release, "release_type") || "unknown",
+      year: s(release, "release_date").slice(0, 4), releaseDate: s(release, "release_date"),
+      artworkUrl: s(release, "artwork_url") || placeholder("release", s(release, "id")),
+      artistLine: s(release, "release_artist_line"),
+      tracks: [],
     })),
     topSongs: chartRows.slice(0, 8).map((entry) => ({ title: s(entry, "title"), artists: s(row, "display_name"), image: s(entry, "artwork_url") || "", duration: "", songUrl: `/tracks/${s(row, "slug")}/${s(entry, "slug") || slugify(s(entry, "title"))}` })),
     relatedArtists: relatedRows.map((related) => ({

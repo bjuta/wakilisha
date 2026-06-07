@@ -20,6 +20,10 @@ interface DiscoRelease {
 
 interface ArtistDiscographyProps {
   releases: DiscoRelease[];
+  eyebrow?: string;
+  title?: string;
+  emptyTitle?: string;
+  emptyDescription?: string;
 }
 
 type Filter = "All" | "Albums" | "EPs";
@@ -124,7 +128,13 @@ function ReleaseCard({
   );
 }
 
-export function ArtistDiscography({ releases }: ArtistDiscographyProps) {
+export function ArtistDiscography({
+  releases,
+  eyebrow = "Discography",
+  title = "Releases",
+  emptyTitle = "No releases",
+  emptyDescription = "{emptyDescription}",
+}: ArtistDiscographyProps) {
   const [filter, setFilter] = useState<Filter>("All");
   const [modalRelease, setModalRelease] = useState<DiscoRelease | null>(null);
   const { ref, revealed } = useScrollReveal<HTMLElement>(0.1);
@@ -157,7 +167,7 @@ export function ArtistDiscography({ releases }: ArtistDiscographyProps) {
       {/* Header */}
       <div className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <div className="wk-eyebrow mb-2">Discography</div>
+          <div className="wk-eyebrow mb-2">{eyebrow}</div>
           <h2 className="text-[clamp(26px,3vw,40px)] font-black leading-[0.92] tracking-[-0.04em] text-[var(--wk-text)]">
             Releases
           </h2>
@@ -186,9 +196,9 @@ export function ArtistDiscography({ releases }: ArtistDiscographyProps) {
       {filtered.length === 0 && (
         <div className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-14 text-center">
           <i className="ri-album-line mb-3 block text-5xl text-[var(--wk-text-faint)]" />
-          <p className="text-[15px] font-semibold text-[var(--wk-text-muted)]">No releases</p>
+          <p className="text-[15px] font-semibold text-[var(--wk-text-muted)]">{emptyTitle}</p>
           <p className="mt-1 text-[13px] text-[var(--wk-text-faint)]">
-            No releases match the selected filter.
+            {emptyDescription}
           </p>
         </div>
       )}
