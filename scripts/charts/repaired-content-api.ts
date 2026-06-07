@@ -37,7 +37,6 @@ const SYSTEM_TITLES = new Set([
   "my top 10", "news & resources", "opinion", "order tracking", "plan", "play", "privacy", "profile",
   "science and technology", "settings", "short stories", "sports", "the registry©", "venues",
 ]);
-
 const SYSTEM_SLUG_PATTERNS = ["account", "checkout", "order-tracking", "privacy", "profile", "settings", "wp-"];
 
 function normalizeDatabaseUrl(databaseUrl: string): string {
@@ -132,40 +131,32 @@ function cleanDisplayText(value: unknown): string {
 function normalizeArtworkUrl(url: string): string {
   return url.replace(/\{w\}x\{h\}/g, "1200x1200").replace(/\{w\}/g, "1200").replace(/\{h\}/g, "1200");
 }
-
 function extractFirstUrl(value: string): string {
   const match = value.match(/https?:\/\/[^\s"'<>,]+|\/[A-Za-z0-9_./%?=&:@+-]+/i);
   return match?.[0] ?? value;
 }
-
 function isVideoOrAudioAsset(value: string): boolean {
   return /\.(mp4|m4v|mov|webm|avi|mkv|mp3|m4a|wav|aac|ogg)(\?|#|$)/i.test(value) || /\b(video|audio)\//i.test(value);
 }
-
 function isPlaceholderAsset(value: string): boolean {
   return /picsum\.photos|placeholder|placehold\.co|dummyimage/i.test(value);
 }
-
 function isMusicArtworkAsset(value: string): boolean {
   return /i\.scdn\.co|scdn\.co\/image|mzstatic\.com\/image\/thumb\/Music|is\d+-ssl\.mzstatic\.com\/image\/thumb\/Music|audio-ssl\.itunes\.apple\.com/i.test(value);
 }
-
 function looksLikeImageUrl(value: string): boolean {
   if (!/^https?:\/\//i.test(value) && !value.startsWith("/")) return false;
   if (isVideoOrAudioAsset(value) || isPlaceholderAsset(value) || isMusicArtworkAsset(value)) return false;
   if (/\.(jpe?g|png|webp|gif|avif)(\?|#|$)/i.test(value)) return true;
   return /(image\/thumb|\/image\/|cloudinary|images\.unsplash|cdn)/i.test(value) && !/\/wp-content\/uploads\/[^\s]+\.(mp4|m4v|mov|webm|mp3|m4a|wav)/i.test(value);
 }
-
 function cleanUrl(value: unknown): string {
   if (value === null || value === undefined) return "";
   const raw = decodeHtml(String(value));
   if (["", "null", "undefined", "false", "[object object]"].includes(raw.trim().toLowerCase())) return "";
-
   const candidateFromRaw = extractFirstUrl(raw);
   const normalizedFromRaw = normalizeArtworkUrl(candidateFromRaw);
   if (looksLikeImageUrl(normalizedFromRaw)) return normalizedFromRaw;
-
   const text = cleanDisplayText(value);
   if (!text) return "";
   const candidateFromCleanText = extractFirstUrl(text);
@@ -173,15 +164,12 @@ function cleanUrl(value: unknown): string {
   if (!looksLikeImageUrl(normalizedFromCleanText)) return "";
   return normalizedFromCleanText;
 }
-
 function slugify(value: string): string {
   return cleanDisplayText(value).toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "item";
 }
-
 function stripHtml(value: string): string {
   return cleanDisplayText(value);
 }
-
 function parsePayload(value: unknown): Row {
   if (!value) return {};
   if (typeof value === "object" && !Array.isArray(value)) return value as Row;
@@ -195,7 +183,6 @@ function parsePayload(value: unknown): Row {
   }
   return {};
 }
-
 function firstText(...values: unknown[]): string {
   for (const value of values) {
     const text = cleanDisplayText(value);
@@ -203,18 +190,15 @@ function firstText(...values: unknown[]): string {
   }
   return "";
 }
-
 function findImageUrlDeep(value: unknown, depth = 0): string {
   if (depth > 5 || value === null || value === undefined) return "";
   const direct = cleanUrl(value);
   if (direct) return direct;
-
   if (typeof value === "string") {
     const parsed = parsePayload(value);
     if (Object.keys(parsed).length) return findImageUrlDeep(parsed, depth + 1);
     return "";
   }
-
   if (Array.isArray(value)) {
     for (const item of value) {
       const found = findImageUrlDeep(item, depth + 1);
@@ -222,7 +206,6 @@ function findImageUrlDeep(value: unknown, depth = 0): string {
     }
     return "";
   }
-
   if (typeof value === "object") {
     const row = value as Row;
     const preferredKeys = [
@@ -234,10 +217,8 @@ function findImageUrlDeep(value: unknown, depth = 0): string {
       if (found) return found;
     }
   }
-
   return "";
 }
-
 function firstUrl(...values: unknown[]): string {
   for (const value of values) {
     const text = findImageUrlDeep(value);
@@ -245,44 +226,36 @@ function firstUrl(...values: unknown[]): string {
   }
   return "";
 }
-
 function estimateReadingTime(...values: string[]): number {
   const text = stripHtml(values.join(" "));
   if (!text) return 3;
   return Math.max(1, Math.min(18, Math.ceil(text.split(" ").length / 220)));
 }
-
 function isSystemSlug(slug: string): boolean {
   const normalized = slugify(slug);
   return SYSTEM_SLUGS.has(normalized) || normalized.startsWith("my-") || SYSTEM_SLUG_PATTERNS.some((pattern) => normalized.includes(pattern));
 }
-
 function isSystemTitle(title: string): boolean {
   return SYSTEM_TITLES.has(cleanDisplayText(title).toLowerCase());
 }
-
 function isPublicMagazineStory(story: PublicStory): boolean {
   if (!story.slug || !story.title) return false;
   if (isSystemSlug(story.slug) || isSystemTitle(story.title)) return false;
   return true;
 }
-
 async function q(query: string, values: unknown[] = []): Promise<Row[]> {
   const result = await db().query(query, values);
   return result.rows as Row[];
 }
-
 async function hasTable(tableName: string): Promise<boolean> {
   const rows = await q("select to_regclass($1) as table_name", [tableName]);
   return Boolean(rows[0]?.table_name);
 }
-
 function addLookup(map: Map<string, string>, key: unknown, url: string): void {
   const normalizedKey = cleanDisplayText(key);
   if (!normalizedKey || !url || map.has(normalizedKey)) return;
   map.set(normalizedKey, url);
 }
-
 function addSlugLookup(lookups: HeroLookups, key: unknown, url: string): void {
   const text = cleanDisplayText(key);
   if (!text || !url) return;
@@ -292,7 +265,6 @@ function addSlugLookup(lookups: HeroLookups, key: unknown, url: string): void {
   const tail = text.split("/").filter(Boolean).pop();
   if (tail) addLookup(lookups.bySlug, tail, url);
 }
-
 function addTitleLookup(lookups: HeroLookups, key: unknown, url: string): void {
   const text = cleanDisplayText(key);
   if (!text || !url) return;
@@ -301,11 +273,9 @@ function addTitleLookup(lookups: HeroLookups, key: unknown, url: string): void {
   const slug = slugify(text);
   if (slug !== "item") addLookup(lookups.byTitle, slug, url);
 }
-
 function emptyLookups(): HeroLookups {
   return { byId: new Map(), bySlug: new Map(), byTitle: new Map(), byAttachmentParent: new Map() };
 }
-
 function findLookupUrl(lookups: HeroLookups | undefined, key: unknown): string {
   const text = cleanDisplayText(key);
   if (!text) return "";
@@ -319,7 +289,6 @@ function findLookupUrl(lookups: HeroLookups | undefined, key: unknown): string {
     || safeLookups.byAttachmentParent.get(text)
     || "";
 }
-
 function rowTextValues(row: Row): string[] {
   const values = new Set<string>();
   for (const value of Object.values(row)) {
@@ -334,7 +303,6 @@ function rowTextValues(row: Row): string[] {
   }
   return [...values];
 }
-
 function hasAttachmentParent(row: Row, payload: Row): boolean {
   return Boolean(
     cleanDisplayText(row.attached_to_post_id)
@@ -345,81 +313,19 @@ function hasAttachmentParent(row: Row, payload: Row): boolean {
     || cleanDisplayText(payload.post_parent)
   );
 }
-
 function isLikelyWordPressArticleMediaUrl(url: string): boolean {
   return looksLikeImageUrl(url) && /\/wp-content\/uploads\//i.test(url);
 }
-
 function mediaUrlFromRow(row: Row): string {
   return firstUrl(row.url, row.source_url, row.guid, row.local_url, row.image_url, row.featured_image_url, row.media_url, row.file_url, row.raw_meta);
 }
-
 function imageUrlFromWpItem(row: Row): string {
   return firstUrl(row.featured_image_url, row.source_url, row.guid, row.url, row.image_url, row.media_url, row.raw_meta);
 }
-
 async function buildHeroLookups(): Promise<HeroLookups> {
   const lookups: HeroLookups = emptyLookups();
-
-  if (await hasTable("wakilisha_raw.wk_media_assets")) {
-    const mediaRows = await q("select * from wakilisha_raw.wk_media_assets limit 10000");
-    for (const row of mediaRows) {
-      const payload = parsePayload(row.raw_meta);
-      const url = mediaUrlFromRow(row);
-      if (!url || !hasAttachmentParent(row, payload) || !isLikelyWordPressArticleMediaUrl(url)) continue;
-      addLookup(lookups.byId, row.id, url);
-      addLookup(lookups.byId, row.source_wp_post_id, url);
-      addSlugLookup(lookups, row.slug, url);
-      addSlugLookup(lookups, row.entity_slug, url);
-      addTitleLookup(lookups, row.title, url);
-      addTitleLookup(lookups, row.alt_text, url);
-      addLookup(lookups.byAttachmentParent, row.attached_to_post_id, url);
-      addLookup(lookups.byAttachmentParent, row.parent_id, url);
-      addLookup(lookups.byAttachmentParent, row.post_parent, url);
-      addLookup(lookups.byAttachmentParent, payload.attached_to_post_id, url);
-      addLookup(lookups.byAttachmentParent, payload.parent_id, url);
-      addLookup(lookups.byAttachmentParent, payload.post_parent, url);
-    }
-  }
-
-  if (await hasTable("wakilisha_raw.wk_wordpress_items")) {
-    const itemRows = await q("select * from wakilisha_raw.wk_wordpress_items limit 10000");
-    for (const row of itemRows) {
-      const payload = parsePayload(row.raw_meta);
-      const url = imageUrlFromWpItem(row);
-      if (!url || !isLikelyWordPressArticleMediaUrl(url)) continue;
-      addLookup(lookups.byId, row.id, url);
-      addLookup(lookups.byId, row.source_wp_post_id, url);
-      addLookup(lookups.byId, row.featured_media, url);
-      addLookup(lookups.byId, row.featured_media_id, url);
-      addLookup(lookups.byId, payload.featured_media, url);
-      addLookup(lookups.byId, payload.featured_media_id, url);
-      addSlugLookup(lookups, row.slug, url);
-      addTitleLookup(lookups, row.title, url);
-      addLookup(lookups.byAttachmentParent, row.parent_id, url);
-      addLookup(lookups.byAttachmentParent, payload.parent_id, url);
-      addLookup(lookups.byAttachmentParent, payload.post_parent, url);
-    }
-  }
-
-  if (await hasTable("wakilisha_raw.wk_old_primary_slugs")) {
-    const aliasRows = await q("select * from wakilisha_raw.wk_old_primary_slugs limit 20000");
-    for (const row of aliasRows) {
-      const values = rowTextValues(row);
-      const bridgedUrl = values.map((value) => findLookupUrl(lookups, value)).find(Boolean);
-      if (!bridgedUrl) continue;
-      for (const value of values) {
-        addLookup(lookups.byId, value, bridgedUrl);
-        addSlugLookup(lookups, value, bridgedUrl);
-        addTitleLookup(lookups, value, bridgedUrl);
-        addLookup(lookups.byAttachmentParent, value, bridgedUrl);
-      }
-    }
-  }
-
   return lookups;
 }
-
 function directArticleHeroUrl(row: Row, editablePayload: Row, immutablePayload: Row, seoPayload: Row, rawMeta: Row, sourcePayload: Row): string {
   return firstUrl(
     row.featured_image_url, row.hero_image_url, row.image_url, row.thumbnail_url, row.cover_image_url, row.og_image, row.twitter_image,
@@ -430,7 +336,6 @@ function directArticleHeroUrl(row: Row, editablePayload: Row, immutablePayload: 
     sourcePayload.featured_image_url, sourcePayload.hero_image_url, sourcePayload.image_url, sourcePayload.thumbnail_url, sourcePayload.cover_image_url
   );
 }
-
 function resolveHeroUrl(row: Row, lookups?: HeroLookups): string {
   const editablePayload = parsePayload(row.editable_payload);
   const immutablePayload = parsePayload(row.immutable_payload);
@@ -439,7 +344,6 @@ function resolveHeroUrl(row: Row, lookups?: HeroLookups): string {
   const sourcePayload = parsePayload(row.source_payload);
   const direct = directArticleHeroUrl(row, editablePayload, immutablePayload, seoPayload, rawMeta, sourcePayload);
   if (direct) return direct;
-
   const idCandidates = [
     row.featured_media, row.featured_media_id, row.thumbnail_id, row.post_thumbnail_id,
     editablePayload.featured_media, editablePayload.featured_media_id, immutablePayload.featured_media,
@@ -450,47 +354,34 @@ function resolveHeroUrl(row: Row, lookups?: HeroLookups): string {
     const url = findLookupUrl(lookups, key);
     if (url) return url;
   }
-
   const articleIdCandidates = [row.source_wp_post_id, row.legacy_wp_post_id, row.id, rawMeta.ID, rawMeta.id, sourcePayload.ID, sourcePayload.id];
   for (const key of articleIdCandidates) {
     const url = findLookupUrl(lookups, key);
     if (url) return url;
   }
-
   const slugUrl = findLookupUrl(lookups, row.slug) || findLookupUrl(lookups, sourcePayload.slug) || findLookupUrl(lookups, sourcePayload.post_name);
   if (slugUrl) return slugUrl;
-
   const titleUrl = findLookupUrl(lookups, row.title) || findLookupUrl(lookups, sourcePayload.title) || findLookupUrl(lookups, sourcePayload.post_title);
   if (titleUrl) return titleUrl;
-
   return "";
 }
-
 function storyFromRawArticle(row: Row, index: number, heroLookups?: HeroLookups): PublicStory {
-  const title = firstText(row.title, `Story ${index + 1}`);
-  const slug = firstText(row.slug, slugify(title));
-  const editablePayload = parsePayload(row.editable_payload);
-  const immutablePayload = parsePayload(row.immutable_payload);
-  const seoPayload = parsePayload(row.seo_payload);
-  const rawMeta = parsePayload(row.raw_meta);
-  const dek = firstText(
-    row.excerpt_html, row.excerpt, row.dek, editablePayload.excerpt, editablePayload.dek,
-    immutablePayload.excerpt, seoPayload.description, seoPayload.excerpt, rawMeta.excerpt, ""
-  );
-  const content = firstText(row.content_html, row.content, editablePayload.content, immutablePayload.content, rawMeta.content);
+  const title = firstText(row.title, row.post_title, `Story ${index + 1}`);
+  const slug = firstText(row.slug, row.post_name, slugify(title));
+  const dek = firstText(row.excerpt_html, row.excerpt, row.dek, row.post_excerpt, "");
+  const content = firstText(row.content_html, row.content, row.post_content);
   return {
     id: firstText(row.id, row.source_wp_post_id, slug),
     slug,
     title,
-    section: firstText(row.category, row.section, editablePayload.category, rawMeta.category, "Article"),
+    section: firstText(row.category, row.section, "Article"),
     dek,
-    author: firstText(row.author, row.author_name, editablePayload.author, rawMeta.author, "WAKILISHA Editorial"),
-    date: firstText(row.published_at, row.published_date, row.modified_at, row.updated_at, rawMeta.date, "Undated"),
+    author: firstText(row.author, row.author_name, "WAKILISHA Editorial"),
+    date: firstText(row.published_at, row.published_date, row.post_date, row.modified_at, row.updated_at, "Undated"),
     readingTime: estimateReadingTime(dek, content),
     heroUrl: resolveHeroUrl(row, heroLookups),
   };
 }
-
 function storyFromRouteClassification(row: Row, index: number, heroLookups?: HeroLookups): PublicStory {
   const payload = parsePayload(row.source_payload);
   const title = firstText(row.title, payload.title, payload.post_title, `Story ${index + 1}`);
@@ -514,66 +405,16 @@ export async function repairedResponse(resource: string, limit = 120): Promise<R
   if (resource === "magazine") {
     const heroLookups = await buildHeroLookups();
 
-    if (await hasTable("wakilisha_raw.wk_articles")) {
+    if (await hasTable("public.wk_articles")) {
       const rows = await q(`
         select *
-        from wakilisha_raw.wk_articles
-        where nullif(title, '') is not null
-          and nullif(slug, '') is not null
-          and lower(coalesce(wp_status, 'publish')) in ('publish', 'published', 'active')
-          and lower(coalesce(slug, '')) not in (
-            'about', 'about-old', 'account', 'account-settings', 'archive', 'cart', 'checkout',
-            'contacts', 'faq', 'faqs', 'home', 'journal', 'login', 'magazine', 'my-account',
-            'order-tracking', 'privacy', 'profile', 'settings', 'settings-2'
-          )
-          and lower(coalesce(title, '')) not in (
-            'about', 'account', 'account settings', 'accordions', 'archive', 'cart', 'checkout',
-            'contacts', 'faq', 'faqs', 'home', 'journal', 'login', 'magazine', 'privacy', 'profile', 'settings'
-          )
-        order by title asc
+        from public.wk_articles
+        where lower(coalesce(wp_status, 'publish')) in ('publish', 'published', 'active')
+        order by coalesce(published_at, post_date, created_at) desc nulls last, title asc nulls last
         limit $1
       `, [limit]);
       return { stories: rows.map((row, index) => storyFromRawArticle(row, index, heroLookups)).filter(isPublicMagazineStory) };
     }
-
-    if (await hasTable("wakilisha_repaired.content_route_classification")) {
-      const rows = await q(`
-        select *
-        from wakilisha_repaired.content_route_classification
-        where classification = 'article'
-          and coalesce(migration_action, '') in ('migrate_to_article', 'review_or_retire', '')
-          and lower(coalesce(slug, '')) not in (
-            'about', 'about-old', 'account', 'account-settings', 'archive', 'cart', 'checkout', 'claim-your-name',
-            'contacts', 'corrections', 'faq', 'faqs', 'home', 'journal', 'labels', 'lifestyle',
-            'login', 'magazine', 'music', 'my-account', 'my-library', 'my-top-10', 'news-resources',
-            'opinion', 'order-tracking', 'plan', 'play', 'privacy', 'profile', 'profile1', 'settings',
-            'settings-2', 'short-stories', 'sports', 'the-registry', 'venues'
-          )
-          and lower(coalesce(title, '')) not in (
-            'about', 'account', 'account settings', 'accordions', 'archive', 'artists', 'cart', 'chart methodology',
-            'checkout', 'claim your name', 'contacts', 'corrections', 'duka', 'events', 'faq', 'faqs', 'home',
-            'journal', 'labels', 'lifestyle', 'login', 'magazine', 'music', 'my account', 'my library',
-            'my top 10', 'news & resources', 'opinion', 'order tracking', 'plan', 'play', 'privacy',
-            'profile', 'science and technology', 'settings', 'short stories', 'sports', 'the registry©',
-            'venues'
-          )
-          and lower(coalesce(slug, '')) not like '%account%'
-          and lower(coalesce(slug, '')) not like '%checkout%'
-          and lower(coalesce(slug, '')) not like '%order-tracking%'
-          and lower(coalesce(slug, '')) not like '%privacy%'
-          and lower(coalesce(slug, '')) not like '%profile%'
-          and lower(coalesce(slug, '')) not like '%settings%'
-          and lower(coalesce(slug, '')) not like 'my-%'
-          and (
-            length(coalesce(nullif(source_payload->>'post_content',''), nullif(source_payload->>'content',''), '')) > 240
-            or length(coalesce(nullif(source_payload->>'excerpt',''), nullif(source_payload->>'post_excerpt',''), '')) > 60
-          )
-        order by created_at desc nulls last, title asc nulls last
-        limit $1
-      `, [limit]);
-      return { stories: rows.map((row, index) => storyFromRouteClassification(row, index, heroLookups)).filter(isPublicMagazineStory) };
-    }
-
     return { stories: [] };
   }
 
@@ -582,17 +423,17 @@ export async function repairedResponse(resource: string, limit = 120): Promise<R
       select
         ra.id::text as id,
         ra.slug,
-        ra.display_name as name,
-        ra.origin_iso2 as country,
-        ra.public_image_url as image_url,
-        coalesce(count(distinct ce.track_id), 0)::int as chart_track_count,
+        coalesce(nullif(ra.name, ''), nullif(ra.title, ''), nullif(ra.display_name, ''), ra.slug) as name,
+        coalesce(nullif(ra.country, ''), nullif(ra.origin_country, ''), nullif(ra.origin_iso2, '')) as country,
+        coalesce(nullif(ra.image_url, ''), nullif(ra.public_image_url, '')) as image_url,
+        coalesce(count(distinct ce.track_slug), 0)::int as chart_track_count,
         coalesce(count(distinct ce.edition_id), 0)::int as chart_count,
         min(ce.rank)::int as top_chart_position
       from registry_artists ra
-      left join chart_entries ce on ce.artist_slug = ra.slug
+      left join wk_chart_entries_v2 ce on ce.artist_slug = ra.slug
       where ra.status in ('active', 'needs_review')
-      group by ra.id, ra.slug, ra.display_name, ra.origin_iso2, ra.public_image_url
-      order by coalesce(count(distinct ce.edition_id), 0) desc, coalesce(count(distinct ce.track_id), 0) desc, ra.display_name asc
+      group by ra.id, ra.slug, ra.name, ra.title, ra.display_name, ra.country, ra.origin_country, ra.origin_iso2, ra.image_url, ra.public_image_url
+      order by coalesce(count(distinct ce.edition_id), 0) desc, coalesce(count(distinct ce.track_slug), 0) desc, name asc
       limit $1
     `, [limit]);
     return { artists: rows.map((row) => {
@@ -642,7 +483,7 @@ export async function repairedResponse(resource: string, limit = 120): Promise<R
       year: s(row, "year"),
       releaseType: s(row, "release_type") || "unknown",
       labelName: s(row, "label_name"),
-      artworkUrl: s(row, "artwork_url") || `https://picsum.photos/seed/wakilisha-release-${s(row, "id")}/800/800`,
+      artworkUrl: s(row, "artwork_url") || "",
       trackCount: n(row, "track_count"),
     })) };
   }
