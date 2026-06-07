@@ -93,7 +93,7 @@ export default function AdminChartsIngestHealth() {
   const probeEndpoint = useCallback(async (path: string, method: string, key: string) => {
     const t0 = Date.now();
     const baseOrigin = typeof window !== "undefined" ? window.location.origin : "";
-    const fullUrl = `${baseOrigin}${path.startsWith("http") ? path.replace(/^https?:\/\/[^/]+/, "") : path.replace("/wp-json/wakilisha/v1", apiBase)}`;
+    const fullUrl = `${baseOrigin}${path.startsWith("http") ? path.replace(/^https?:\/\/[^/]+/, "") : path.replace("/api/v1", apiBase)}`;
     try {
       const res = await fetch(fullUrl, {
         method: "GET",

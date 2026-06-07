@@ -5,7 +5,7 @@
  * Implements all 10 steps from the Sprint 5 brief.
  * 
  * Contract:
- *   POST /wp-json/wakilisha/v2/charts/ingest/runs/:runId/commit
+ *   POST /api/v1/charts/ingest/runs/:runId/commit
  */
 
 import type {
@@ -32,8 +32,8 @@ import type { IngestRun, IngestResolvedRow } from "./ingestStudioTypes";
 // ─── Public API base for V2 verification ───
 const PUBLIC_V2_BASE =
   typeof import.meta !== "undefined" && import.meta.env
-    ? (import.meta.env.VITE_WAKILISHA_WP_V2_API_BASE || "/wp-json/wakilisha/v2")
-    : "/wp-json/wakilisha/v2";
+    ? (import.meta.env.VITE_WAKILISHA_PUBLIC_API_BASE || "/api/v1")
+    : "/api/v1";
 
 // ─── Step 1: Load run (already loaded from store, passed in) ───
 // Validation: run must exist and have correct status
@@ -455,7 +455,7 @@ async function verifyPublicApi(
       ok: true,
       warnings: [
         "Running in mock mode. Public API is served from local mock store, not the live V2 API.",
-        `To verify live: GET /wp-json/wakilisha/v2/charts/${publicSlug}/${editionSlug}`,
+        `To verify live: GET /api/v1/charts/${publicSlug}/${editionSlug}`,
       ],
       errors: [],
     };
@@ -620,7 +620,7 @@ export async function commitIngestRunToV2Edition(
 
   // Mark run as committed in the run metadata store
   const publicUrl = `/charts/${program.publicSlug}/${editionSlug}`;
-  const apiUrl = `/wp-json/wakilisha/v2/charts/${program.publicSlug}/${editionSlug}`;
+  const apiUrl = `/api/v1/charts/${program.publicSlug}/${editionSlug}`;
   markRunCommitted(runId, edition.id, editionSlug, publicUrl);
 
   // Step 10: Verify public API

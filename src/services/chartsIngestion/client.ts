@@ -171,7 +171,6 @@ export function getIngestStudioEndpointGroups(): Record<string, EndpointDefiniti
   };
 }
 
-export { detectProvidersFromUrls, isValidProviderUrl };
 
 export const runDryRun = ingestStudioAdapter.runDryRun;
 export const commitIngestRun = ingestStudioAdapter.commitIngestRun;
@@ -242,3 +241,12 @@ export {
   getDisabledReason,
   ALL_ROLES,
 } from "./roles";
+
+// ─── Auto-restored chart admin barrel exports ───
+export { attachCsvAsSource, createDraftFromCsvCandidates, exportDraftJson, getCsvImportSessions, getDiscoveredCsvSources, normalizeCsvCandidates, validateCsvDraftIntegrity } from "./api";
+export { validateCommitReadiness } from "./commitService";
+export { getIngestRun } from "./ingestStudioMock";
+export { detectProvidersFromUrls, isValidProviderUrl } from "./providerDetection";
+export { clearAllSimulations, getActiveSimulations, getLastErrorMessage, isSimulated, retry, simulate } from "./simulation";
+export { appendJobLog, getStore } from "./store";
+export { getStepStatus } from "./workflow";

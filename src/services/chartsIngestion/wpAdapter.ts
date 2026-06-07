@@ -45,7 +45,7 @@ import {
 // ─── Configuration ───
 const WP_API_BASE =
   import.meta.env.VITE_WAKILISHA_WP_API_BASE ||
-  "/wp-json/wakilisha/v1";
+  "/api/v1";
 
 const WP_NONCE =
   typeof window !== "undefined"
@@ -56,7 +56,7 @@ const WP_NONCE =
 if (import.meta.env.DEV && !import.meta.env.VITE_WAKILISHA_WP_API_BASE) {
   // eslint-disable-next-line no-console
   console.warn(
-    "[wpAdapter] VITE_WAKILISHA_WP_API_BASE is not set. WordPress adapter will use default '/wp-json/wakilisha/v1'"
+    "[wpAdapter] VITE_WAKILISHA_WP_API_BASE is not set. WordPress adapter will use default '/api/v1'"
   );
 }
 
@@ -629,25 +629,25 @@ import type {
 export function getIngestRunsWp(): Promise<IngestRun[]> {
   return wpGet<{ runs: unknown[] }>(`${WP_API_BASE_V2}/charts/ingest/runs`)
     .then((res) => (res.runs || []) as IngestRun[])
-    .catch(() => notImplemented("getIngestRunsWp GET /wp-json/wakilisha/v2/charts/ingest/runs"));
+    .catch(() => notImplemented("getIngestRunsWp GET /api/v1/charts/ingest/runs"));
 }
 
 export function getIngestRunWp(runId: string): Promise<IngestRun | null> {
   return wpGet<{ run: unknown }>(`${WP_API_BASE_V2}/charts/ingest/runs/${runId}`)
     .then((res) => (res.run ?? null) as IngestRun | null)
-    .catch(() => notImplemented("getIngestRunWp GET /wp-json/wakilisha/v2/charts/ingest/runs/{runId}"));
+    .catch(() => notImplemented("getIngestRunWp GET /api/v1/charts/ingest/runs/{runId}"));
 }
 
 export function getIngestKpisWp(): Promise<IngestStudioKpi> {
   return wpGet<{ kpis: IngestStudioKpi }>(`${WP_API_BASE_V2}/charts/ingest/kpis`)
     .then((res) => res.kpis || { editionsThisWeek: 0, canonicalMatchRate: 0, rowsAwaitingReview: 0, averageRunTimeMs: 0 })
-    .catch(() => notImplemented("getIngestKpisWp GET /wp-json/wakilisha/v2/charts/ingest/kpis"));
+    .catch(() => notImplemented("getIngestKpisWp GET /api/v1/charts/ingest/kpis"));
 }
 
 export function getRecentIngestActivityWp(): Promise<RecentIngestActivity[]> {
   return wpGet<{ activity: unknown[] }>(`${WP_API_BASE_V2}/charts/ingest/activity`)
     .then((res) => (res.activity || []) as RecentIngestActivity[])
-    .catch(() => notImplemented("getRecentIngestActivityWp GET /wp-json/wakilisha/v2/charts/ingest/activity"));
+    .catch(() => notImplemented("getRecentIngestActivityWp GET /api/v1/charts/ingest/activity"));
 }
 
 export function runDryRunWp(request: {
@@ -673,7 +673,7 @@ export function runDryRunWp(request: {
     source_urls: request.sourceUrls,
     save_as_recurring_series: request.saveAsRecurringSeries ?? false,
     existing_series_id: request.existingSeriesId ?? null,
-  }).catch(() => notImplemented("runDryRunWp POST /wp-json/wakilisha/v2/charts/ingest/dry-run"));
+  }).catch(() => notImplemented("runDryRunWp POST /api/v1/charts/ingest/dry-run"));
 }
 
 export function commitIngestRunWp(request: {
@@ -684,25 +684,25 @@ export function commitIngestRunWp(request: {
   return wpPost<CommitIngestRunResponse>(`${WP_API_BASE_V2}/charts/ingest/runs/${request.runId}/commit`, {
     publish_immediately: request.publishImmediately ?? false,
     notes: request.notes ?? "",
-  }).catch(() => notImplemented("commitIngestRunWp POST /wp-json/wakilisha/v2/charts/ingest/runs/{runId}/commit"));
+  }).catch(() => notImplemented("commitIngestRunWp POST /api/v1/charts/ingest/runs/{runId}/commit"));
 }
 
 export function cancelIngestRunWp(runId: string): Promise<IngestRun | null> {
   return wpPost<{ run: IngestRun }>(`${WP_API_BASE_V2}/charts/ingest/runs/${runId}/cancel`)
     .then((res) => res.run ?? null)
-    .catch(() => notImplemented("cancelIngestRunWp POST /wp-json/wakilisha/v2/charts/ingest/runs/{runId}/cancel"));
+    .catch(() => notImplemented("cancelIngestRunWp POST /api/v1/charts/ingest/runs/{runId}/cancel"));
 }
 
 export function retryIngestRunWp(runId: string): Promise<IngestRun | null> {
   return wpPost<{ run: IngestRun }>(`${WP_API_BASE_V2}/charts/ingest/runs/${runId}/retry`)
     .then((res) => res.run ?? null)
-    .catch(() => notImplemented("retryIngestRunWp POST /wp-json/wakilisha/v2/charts/ingest/runs/{runId}/retry"));
+    .catch(() => notImplemented("retryIngestRunWp POST /api/v1/charts/ingest/runs/{runId}/retry"));
 }
 
 export function sendGapsToReviewWp(runId: string): Promise<IngestRun | null> {
   return wpPost<{ run: IngestRun }>(`${WP_API_BASE_V2}/charts/ingest/runs/${runId}/send-gaps`)
     .then((res) => res.run ?? null)
-    .catch(() => notImplemented("sendGapsToReviewWp POST /wp-json/wakilisha/v2/charts/ingest/runs/{runId}/send-gaps"));
+    .catch(() => notImplemented("sendGapsToReviewWp POST /api/v1/charts/ingest/runs/{runId}/send-gaps"));
 }
 
 export function getResourceGuardStatusWp(runId: string): Promise<ResourceGuardStatus> {
@@ -715,7 +715,7 @@ export function getResourceGuardStatusWp(runId: string): Promise<ResourceGuardSt
       duplicateRunWarning: null,
       sameEditionDateWarning: null,
     })
-    .catch(() => notImplemented("getResourceGuardStatusWp GET /wp-json/wakilisha/v2/charts/ingest/runs/{runId}/resource-guard"));
+    .catch(() => notImplemented("getResourceGuardStatusWp GET /api/v1/charts/ingest/runs/{runId}/resource-guard"));
 }
 
 export function getIngestHealthWp(): Promise<{
@@ -764,15 +764,15 @@ export function commitStudioStore(_store: unknown): void {
 }
 
 export const INGEST_STUDIO_WP_ENDPOINTS: IngestStudioEndpointDef[] = [
-  { key: "getIngestRuns", method: "GET", path: "/wp-json/wakilisha/v2/charts/ingest/runs", description: "List all provider-based ingest runs", status: "planned", group: "Runs" },
-  { key: "getIngestRun", method: "GET", path: "/wp-json/wakilisha/v2/charts/ingest/runs/{runId}", description: "Get a single ingest run with stages and resolved rows", status: "planned", group: "Runs" },
-  { key: "runDryRun", method: "POST", path: "/wp-json/wakilisha/v2/charts/ingest/dry-run", description: "Create and execute a new dry run from source URLs", status: "planned", group: "Runs" },
-  { key: "commitIngestRun", method: "POST", path: "/wp-json/wakilisha/v2/charts/ingest/runs/{runId}/commit", description: "Commit a dry-run-complete run to a published edition", status: "planned", group: "Runs" },
-  { key: "cancelIngestRun", method: "POST", path: "/wp-json/wakilisha/v2/charts/ingest/runs/{runId}/cancel", description: "Cancel a running or pending ingest run", status: "planned", group: "Runs" },
-  { key: "retryIngestRun", method: "POST", path: "/wp-json/wakilisha/v2/charts/ingest/runs/{runId}/retry", description: "Retry a failed ingest run", status: "planned", group: "Runs" },
-  { key: "sendGapsToReview", method: "POST", path: "/wp-json/wakilisha/v2/charts/ingest/runs/{runId}/send-gaps", description: "Flag gap rows for manual review", status: "planned", group: "Runs" },
-  { key: "getResourceGuard", method: "GET", path: "/wp-json/wakilisha/v2/charts/ingest/runs/{runId}/resource-guard", description: "Get resource guard / budget status for a run", status: "planned", group: "Runs" },
-  { key: "getIngestKpis", method: "GET", path: "/wp-json/wakilisha/v2/charts/ingest/kpis", description: "Dashboard KPIs for the ingest studio", status: "planned", group: "Studio" },
-  { key: "getIngestActivity", method: "GET", path: "/wp-json/wakilisha/v2/charts/ingest/activity", description: "Recent activity feed for the ingest studio", status: "planned", group: "Studio" },
-  { key: "healthCheck", method: "GET", path: "/wp-json/wakilisha/v2/charts/health", description: "Plugin health check — verifies plugin is active and ingestion module is enabled", status: "planned", group: "System" },
+  { key: "getIngestRuns", method: "GET", path: "/api/v1/charts/ingest/runs", description: "List all provider-based ingest runs", status: "planned", group: "Runs" },
+  { key: "getIngestRun", method: "GET", path: "/api/v1/charts/ingest/runs/{runId}", description: "Get a single ingest run with stages and resolved rows", status: "planned", group: "Runs" },
+  { key: "runDryRun", method: "POST", path: "/api/v1/charts/ingest/dry-run", description: "Create and execute a new dry run from source URLs", status: "planned", group: "Runs" },
+  { key: "commitIngestRun", method: "POST", path: "/api/v1/charts/ingest/runs/{runId}/commit", description: "Commit a dry-run-complete run to a published edition", status: "planned", group: "Runs" },
+  { key: "cancelIngestRun", method: "POST", path: "/api/v1/charts/ingest/runs/{runId}/cancel", description: "Cancel a running or pending ingest run", status: "planned", group: "Runs" },
+  { key: "retryIngestRun", method: "POST", path: "/api/v1/charts/ingest/runs/{runId}/retry", description: "Retry a failed ingest run", status: "planned", group: "Runs" },
+  { key: "sendGapsToReview", method: "POST", path: "/api/v1/charts/ingest/runs/{runId}/send-gaps", description: "Flag gap rows for manual review", status: "planned", group: "Runs" },
+  { key: "getResourceGuard", method: "GET", path: "/api/v1/charts/ingest/runs/{runId}/resource-guard", description: "Get resource guard / budget status for a run", status: "planned", group: "Runs" },
+  { key: "getIngestKpis", method: "GET", path: "/api/v1/charts/ingest/kpis", description: "Dashboard KPIs for the ingest studio", status: "planned", group: "Studio" },
+  { key: "getIngestActivity", method: "GET", path: "/api/v1/charts/ingest/activity", description: "Recent activity feed for the ingest studio", status: "planned", group: "Studio" },
+  { key: "healthCheck", method: "GET", path: "/api/v1/health", description: "Plugin health check — verifies plugin is active and ingestion module is enabled", status: "planned", group: "System" },
 ];
