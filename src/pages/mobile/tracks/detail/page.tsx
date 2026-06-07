@@ -201,6 +201,8 @@ function ChartStatsTab({ track }: { track: NonNullable<ReturnType<typeof getTrac
         trackPeak={track.peakPosition ?? 0}
         trackWeeks={track.weeksOnChart ?? 0}
         trackHistory={track.chartHistory}
+        chartAppearances={track.chartAppearances}
+        chartAppearanceCount={track.chartAppearanceCount}
         compact
       />
 

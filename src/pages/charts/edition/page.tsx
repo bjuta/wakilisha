@@ -55,7 +55,16 @@ function useScrollReveal(deps: unknown[] = []) {
 }
 
 export default function ChartEdition() {
-  const { series, edition: editionSlug } = useParams<{ series: string; edition: string }>();
+  const {
+    family,
+    market,
+    series,
+    edition: editionSlug,
+  } = useParams<{ family?: string; market?: string; series?: string; edition?: string }>();
+
+  const chartProgramSlug = family && market && series
+    ? `${family}/${market}/${series}`
+    : series ?? "";
   const navigate = useNavigate();
   const { playTrack } = usePlayer();
 
@@ -82,13 +91,13 @@ export default function ChartEdition() {
   const [showDiagnostics, setShowDiagnostics] = useState(false);
 
   const load = useCallback(async () => {
-    if (!series) {
+    if (!chartProgramSlug) {
       setState({ status: "family_not_found" });
       return;
     }
     setState({ status: "loading" });
     try {
-      const { data: family } = await getChartFamily(series);
+      const { data: family } = await getChartFamily(chartProgramSlug);
       if (!family) {
         setState({ status: "family_not_found" });
         return;
@@ -110,27 +119,27 @@ export default function ChartEdition() {
       let editionMeta: { source: "mock" | "wordpress" | "cache"; fetchedAt: string; isStale: boolean };
 
       if (editionSlug) {
-        const result = await getChartEdition(series, editionSlug);
+        const result = await getChartEdition(chartProgramSlug, editionSlug);
         editionResult = result;
         editionMeta = result.meta;
       } else {
-        const result = await getLatestChartEdition(series);
+        const result = await getLatestChartEdition(chartProgramSlug);
         editionResult = result;
         editionMeta = result.meta;
       }
 
       if (!editionResult.data) {
-        const { data: latestEdition } = await getLatestChartEdition(series);
+        const { data: latestEdition } = await getLatestChartEdition(chartProgramSlug);
         setState({
           status: "edition_not_found",
-          familySlug: series,
+          familySlug: chartProgramSlug,
           familyLabel: family.label,
           latestEditionSlug: latestEdition.data?.slug,
         });
         return;
       }
 
-      const { data: rawEntries } = await getChartEditionEntries(series, editionResult.data.slug);
+      const { data: rawEntries } = await getChartEditionEntries(chartProgramSlug, editionResult.data.slug);
       if (rawEntries.length === 0) {
         setState({ status: "empty" });
         return;
@@ -141,7 +150,7 @@ export default function ChartEdition() {
       const editionVM = toChartEditionViewModel(editionResult.data, family, rawEntries);
 
       // Load all editions for archive and navigation
-      const { data: allEditions } = await getChartEditionsForFamily(series);
+      const { data: allEditions } = await getChartEditionsForFamily(chartProgramSlug);
       const sortedEditions = [...allEditions].sort(
         (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
       );
@@ -157,7 +166,7 @@ export default function ChartEdition() {
       await Promise.all(
         otherArchiveEditions.slice(0, 3).map(async (ed) => {
           try {
-            const { data: edEntries } = await getChartEditionEntries(series, ed.slug);
+            const { data: edEntries } = await getChartEditionEntries(chartProgramSlug, ed.slug);
             entriesMap[ed.slug] = edEntries;
           } catch {
             entriesMap[ed.slug] = [];
@@ -172,13 +181,13 @@ export default function ChartEdition() {
         edition: editionVM,
         entries,
         familyLabel: family.label,
-        familySlug: series,
+        familySlug: chartProgramSlug,
         publicSlug,
         sourceFamilySlug,
         archive,
         meta: editionMeta,
         canonicalized,
-        requestedSlug: series,
+        requestedSlug: chartProgramSlug,
       });
     } catch (err) {
       const isRetryable = err instanceof Error && (err.message.includes("timeout") || err.message.includes("Network error"));
@@ -189,7 +198,7 @@ export default function ChartEdition() {
         retryable: isRetryable,
       });
     }
-  }, [series, editionSlug, navigate]);
+  }, [chartProgramSlug, series, editionSlug, navigate]);
 
   useEffect(() => { load(); setDisplayedCount(20); }, [load]);
   const handleRetry = () => load();

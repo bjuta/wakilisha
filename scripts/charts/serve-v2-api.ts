@@ -175,27 +175,55 @@ async function route(req: http.IncomingMessage, res: http.ServerResponse) {
     }
 
     if (parts.length >= 2 && parts[0] === "charts") {
-      const resolved = await repo.resolveProgramSlug(parts[1]);
-      const program = await repo.getProgram(parts[1]);
-      if (!program) return error(res, 404, "chart_program_not_found", "Chart program not found.", { requestedSlug: parts[1] });
+      const chartParts = parts.slice(1);
+      const isEditionSlug = (value: string) => /-[0-9]{4}-[0-9]{2}-[0-9]{2}(-[0-9]+)?$/.test(value);
+      const toCanonicalProgramSlug = (rawParts: string[], editionSlug?: string) => {
+        const raw = rawParts.join("/");
+        if (raw === "charts" || raw === "charts-kenya") {
+          const seriesSlug = editionSlug ? editionSlug.replace(/-[0-9]{4}-[0-9]{2}-[0-9]{2}(-[0-9]+)?$/, "") : "kenya";
+          return `top-songs/kenya/${seriesSlug}`;
+        }
+        if (rawParts.length === 1 && rawParts[0] !== "top-songs") {
+          return `top-songs/kenya/${rawParts[0]}`;
+        }
+        return raw;
+      };
 
-      if (parts.length === 2) {
-        return json(res, 200, envelope({ program: await toProgram(repo, program) }, resolved));
-      }
+      const last = chartParts[chartParts.length - 1];
 
-      if (parts.length === 3 && parts[2] === "latest") {
+      if (last === "latest") {
+        const programSlug = toCanonicalProgramSlug(chartParts.slice(0, -1));
+        const resolved = await repo.resolveProgramSlug(programSlug);
+        const program = await repo.getProgram(programSlug);
+        if (!program) return error(res, 404, "chart_program_not_found", "Chart program not found.", { requestedSlug: programSlug });
+
         const edition = await repo.getLatestNonEmptyEdition(program);
         if (!edition) return error(res, 404, "chart_edition_not_found", "No non-empty latest edition found.", resolved);
         const entries = await repo.listEntries(program, str(edition, "edition_slug"));
         return json(res, 200, envelope({ program: await toProgram(repo, program), edition: await toEditionSummary(edition), entries: entries.map(toEntry) }, resolved));
       }
 
-      const editionSlug = parts[2];
+      const hasEntriesSuffix = last === "entries";
+      const candidateParts = hasEntriesSuffix ? chartParts.slice(0, -1) : chartParts;
+      const candidateLast = candidateParts[candidateParts.length - 1];
+      const hasEdition = candidateParts.length >= 2 && isEditionSlug(candidateLast);
+
+      const editionSlug = hasEdition ? candidateLast : "";
+      const programSlug = toCanonicalProgramSlug(hasEdition ? candidateParts.slice(0, -1) : candidateParts, editionSlug || undefined);
+
+      const resolved = await repo.resolveProgramSlug(programSlug);
+      const program = await repo.getProgram(programSlug);
+      if (!program) return error(res, 404, "chart_program_not_found", "Chart program not found.", { requestedSlug: programSlug });
+
+      if (!hasEdition) {
+        return json(res, 200, envelope({ program: await toProgram(repo, program) }, resolved));
+      }
+
       const edition = await repo.getEdition(program, editionSlug);
       if (!edition) return error(res, 404, "chart_edition_not_found", "Chart edition not found.", { ...resolved, editionSlug });
       const entries = await repo.listEntries(program, editionSlug);
 
-      if (parts.length === 4 && parts[3] === "entries") {
+      if (hasEntriesSuffix) {
         const limit = Math.min(Number(url.searchParams.get("limit") ?? entries.length) || entries.length, 200);
         const offset = Number(url.searchParams.get("offset") ?? 0) || 0;
         return json(res, 200, envelope({ entries: entries.slice(offset, offset + limit).map(toEntry) }, { ...resolved, editionSlug, count: entries.length, limit, offset }));

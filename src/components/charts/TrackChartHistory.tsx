@@ -5,13 +5,31 @@ import { toChartTrackHistoryViewModel } from "@/services/chartsPublic/viewModels
 import { ChartTrajectory } from "./ChartTrajectory";
 import { WkIcon } from "@/components/design-system/Icon";
 
+interface TrackChartAppearance {
+  editionSlug: string;
+  editionLabel: string;
+  date: string;
+  rank: number;
+  previousRank?: number | null;
+  movement?: string;
+  weeksOnChart?: number;
+}
+
 interface TrackChartHistoryProps {
   trackSlug: string;
   trackRank: number;
   trackPeak: number;
   trackWeeks: number;
   trackHistory?: number[];
+  chartAppearances?: TrackChartAppearance[];
+  chartAppearanceCount?: number;
   compact?: boolean;
+}
+
+
+function chartProgramSlugFromEditionSlug(editionSlug: string): string {
+  const seriesSlug = String(editionSlug || "").replace(/-[0-9]{4}-[0-9]{2}-[0-9]{2}(-[0-9]+)?$/, "");
+  return `top-songs/kenya/${seriesSlug || "kenya"}`;
 }
 
 export function TrackChartHistorySection({
@@ -20,6 +38,8 @@ export function TrackChartHistorySection({
   trackPeak,
   trackWeeks,
   trackHistory,
+  chartAppearances,
+  chartAppearanceCount,
   compact = false,
 }: TrackChartHistoryProps) {
   const [state, setState] = useState<
@@ -35,6 +55,33 @@ export function TrackChartHistorySection({
 
   const load = async () => {
     setState({ status: "loading" });
+
+    if (chartAppearances && chartAppearances.length > 0) {
+      const appearances = chartAppearances.map((appearance, idx) => ({
+        editionSlug: appearance.editionSlug,
+        editionLabel: appearance.editionLabel || appearance.editionSlug,
+        date: appearance.date,
+        rank: Number(appearance.rank || 0),
+        previousRank: appearance.previousRank ?? null,
+        movement: appearance.movement || "same",
+        weeksOnChart: appearance.weeksOnChart ?? idx + 1,
+      }));
+
+      setState({
+        status: "loaded",
+        data: {
+          appearances,
+          peakPosition: trackPeak,
+          totalWeeksOnChart: trackWeeks,
+        } as ReturnType<typeof toChartTrackHistoryViewModel>,
+        meta: {
+          source: "wordpress",
+          fetchedAt: new Date().toISOString(),
+        },
+      });
+      return;
+    }
+
     try {
       const result = await getTrackChartHistory(trackSlug);
       if (!result.data || result.data.appearances.length === 0) {
@@ -60,7 +107,7 @@ export function TrackChartHistorySection({
 
   useEffect(() => {
     load();
-  }, [trackSlug]);
+  }, [trackSlug, chartAppearances, trackPeak, trackWeeks]);
 
   if (state.status === "loading") {
     return (
@@ -133,8 +180,8 @@ export function TrackChartHistorySection({
       <div className="mb-3 flex items-center gap-2 text-[12px] font-black uppercase tracking-wider text-[var(--wk-text-muted)]">
         <WkIcon name="BarChart3" size={14} className="text-[var(--wk-brand)]" />
         Chart history
-        {data.appearances.length > 0 && (
-          <span className="text-[10px] font-bold text-[var(--wk-text-faint)]">· {data.appearances.length} appearances</span>
+        {(chartAppearanceCount || data.appearances.length) > 0 && (
+          <span className="text-[10px] font-bold text-[var(--wk-text-faint)]">· {chartAppearanceCount || data.appearances.length} appearances</span>
         )}
       </div>
 
@@ -166,7 +213,7 @@ export function TrackChartHistorySection({
             return (
               <Link
                 key={appearance.editionSlug}
-                to={`/charts/charts-kenya/${appearance.editionSlug}`}
+                to={`/charts/${chartProgramSlugFromEditionSlug(appearance.editionSlug)}/${appearance.editionSlug}`}
                 className="grid grid-cols-[60px_1fr_80px_60px] gap-2 items-center px-4 py-3 transition-colors hover:bg-[var(--wk-bg)]"
               >
                 <div className="text-[16px] font-black text-[var(--wk-brand)]">#{appearance.rank}</div>

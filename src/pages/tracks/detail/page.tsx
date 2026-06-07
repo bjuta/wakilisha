@@ -441,6 +441,8 @@ function ChartStatsTab({ track }: { track: TrackViewModel }) {
         trackPeak={track.peakPosition ?? 0}
         trackWeeks={track.weeksOnChart ?? 0}
         trackHistory={track.chartHistory}
+        chartAppearances={track.chartAppearances}
+        chartAppearanceCount={track.chartAppearanceCount}
       />
 
       <div className="divide-y divide-[var(--wk-divider)] border-b border-[var(--wk-divider)]">

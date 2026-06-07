@@ -164,7 +164,16 @@ function MoverCard({ entry, direction }: { entry: ChartEntryRowViewModel; direct
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function MobileChartEdition() {
-  const { series, edition: editionSlug } = useParams<{ series: string; edition: string }>();
+  const {
+    family,
+    market,
+    series,
+    edition: editionSlug,
+  } = useParams<{ family?: string; market?: string; series?: string; edition?: string }>();
+
+  const chartProgramSlug = family && market && series
+    ? `${family}/${market}/${series}`
+    : series ?? "";
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState(true);
@@ -185,13 +194,13 @@ export default function MobileChartEdition() {
   const { playTrack } = usePlayer();
 
   const load = useCallback(async () => {
-    if (!series) { setNotFound("family"); setLoading(false); return; }
+    if (!chartProgramSlug) { setNotFound("family"); setLoading(false); return; }
     setLoading(true);
     setError(null);
     setNotFound(null);
     setDisplayedCount(INITIAL_COUNT);
     try {
-      const { data: family } = await getChartFamily(series);
+      const { data: family } = await getChartFamily(chartProgramSlug);
       if (!family) { setNotFound("family"); setLoading(false); return; }
 
       setFamilyLabel(family.label);
@@ -204,11 +213,11 @@ export default function MobileChartEdition() {
       }
 
       const edResult = editionSlug
-        ? await getChartEdition(series, editionSlug)
-        : await getLatestChartEdition(series);
+        ? await getChartEdition(chartProgramSlug, editionSlug)
+        : await getLatestChartEdition(chartProgramSlug);
 
       if (!edResult.data) {
-        const { data: latest } = await getLatestChartEdition(series);
+        const { data: latest } = await getLatestChartEdition(chartProgramSlug);
         setLatestEditionSlug(latest.data?.slug);
         setNotFound("edition");
         setLoading(false);
@@ -216,11 +225,11 @@ export default function MobileChartEdition() {
       }
 
       setMeta(edResult.meta);
-      const { data: rawEntries } = await getChartEditionEntries(series, edResult.data.slug);
+      const { data: rawEntries } = await getChartEditionEntries(chartProgramSlug, edResult.data.slug);
       setEdition(toChartEditionViewModel(edResult.data, family, rawEntries));
       setEntries(rawEntries.map(toChartEntryRowViewModel));
 
-      const { data: allEditions } = await getChartEditionsForFamily(series);
+      const { data: allEditions } = await getChartEditionsForFamily(chartProgramSlug);
       const sorted = [...allEditions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       const archiveEditions = sorted.slice(0, 4);
       const entriesMap: Record<string, import("@/services/chartsPublic/types").ChartEditionEntry[]> = { [edResult.data.slug]: rawEntries };
@@ -229,7 +238,7 @@ export default function MobileChartEdition() {
           .filter((e) => e.slug !== edResult.data!.slug)
           .slice(0, 3)
           .map(async (ed) => {
-            try { const { data: edEntries } = await getChartEditionEntries(series, ed.slug); entriesMap[ed.slug] = edEntries; }
+            try { const { data: edEntries } = await getChartEditionEntries(chartProgramSlug, ed.slug); entriesMap[ed.slug] = edEntries; }
             catch { entriesMap[ed.slug] = []; }
           })
       );
@@ -239,7 +248,7 @@ export default function MobileChartEdition() {
     } finally {
       setLoading(false);
     }
-  }, [series, editionSlug, navigate]);
+  }, [chartProgramSlug, series, editionSlug, navigate]);
 
   useEffect(() => { load(); }, [load]);
 
