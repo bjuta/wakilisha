@@ -2,11 +2,10 @@ import http from "node:http";
 import { URL } from "node:url";
 import {
   createV2Repository,
-  programId,
   type V2Repository,
 } from "./v2-api-repository";
-import { repairedResponse } from "./repaired-content-api";
-import { repairedDetailResponse } from "./repaired-content-details-api";
+import { repairedResponse as publicIndexResponse } from "./repaired-content-api";
+import { repairedDetailResponse as publicDetailResponse } from "./repaired-content-details-api";
 
 type Row = Record<string, unknown>;
 type Entry = {
@@ -109,9 +108,9 @@ function envelope(data: unknown, meta: Record<string, unknown> = {}) {
   return {
     data,
     meta: {
-      apiVersion: "v2",
+      apiVersion: "v1",
       generatedAt: new Date().toISOString(),
-      source: `chart-v2-${repo.kind}-repository`,
+      source: `wakilisha-public-${repo.kind}`,
       repository: repo.kind,
       ...meta,
     },
@@ -138,31 +137,29 @@ async function route(req: http.IncomingMessage, res: http.ServerResponse) {
     if (req.method === "OPTIONS") return json(res, 200, {});
     if (req.method !== "GET") return error(res, 405, "method_not_allowed", "Only GET is supported.");
     const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
-    const prefix = "/wp-json/wakilisha/v2";
+    const prefix = "/api/wakilisha/v1";
     if (!url.pathname.startsWith(prefix)) return error(res, 404, "not_found", "Route not found.");
     const parts = url.pathname.slice(prefix.length).split("/").filter(Boolean).map(decodeURIComponent);
 
-    if (parts.length >= 2 && parts[0] === "repaired") {
-      const limit = Math.min(Number(url.searchParams.get("limit") ?? 120) || 120, 500);
-      if (parts.length > 2) {
-        const data = await repairedDetailResponse(parts[1], parts.slice(2));
-        return json(res, 200, envelope(data, { namespace: "repaired", resource: parts[1], detailPath: parts.slice(2).join("/") }));
-      }
-      const data = await repairedResponse(parts[1], limit);
-      return json(res, 200, envelope(data, { namespace: "repaired", resource: parts[1] }));
-    }
-
-    if (parts.join("/") === "charts/health") {
+    if (parts.length === 0 || parts.join("/") === "health") {
       return json(res, 200, envelope({
         ok: true,
-        plugin: "wakilisha-react-local-v2-api",
-        version: "0.1.0",
-        charts_public: true,
-        charts_v2: true,
+        service: "wakilisha-public-api",
+        version: "v1",
         repository: repo.kind,
         counts: await repo.getCounts(),
         migrationReadiness: await repo.getMigrationReadiness(),
       }));
+    }
+
+    if (["magazine", "artists", "releases", "genres", "labels", "search"].includes(parts[0])) {
+      const limit = Math.min(Number(url.searchParams.get("limit") ?? 120) || 120, 500);
+      if (parts.length > 1) {
+        const data = await publicDetailResponse(parts[0], parts.slice(1));
+        return json(res, 200, envelope(data, { resource: parts[0], detailPath: parts.slice(1).join("/") }));
+      }
+      const data = await publicIndexResponse(parts[0], limit);
+      return json(res, 200, envelope(data, { resource: parts[0], count: limit }));
     }
 
     if (parts.length === 1 && parts[0] === "charts") {
@@ -218,14 +215,14 @@ async function route(req: http.IncomingMessage, res: http.ServerResponse) {
       }, { ...resolved, editionSlug, warnings }));
     }
 
-    if (parts.length === 4 && parts[0] === "tracks" && parts[2] === "chart-history") {
+    if (parts.length === 3 && parts[0] === "tracks" && parts[2] === "chart-history") {
       const history = await repo.getTrackHistory(parts[1]);
       return json(res, 200, envelope({ history }, { trackSlug: parts[1] }));
     }
 
     return error(res, 404, "not_found", "Route not found.");
   } catch (err) {
-    return error(res, 500, "chart_v2_server_error", err instanceof Error ? err.message : "Unknown V2 API server error.");
+    return error(res, 500, "wakilisha_public_api_error", err instanceof Error ? err.message : "Unknown public API server error.");
   }
 }
 
@@ -233,12 +230,11 @@ async function startServer(): Promise<void> {
   if (repo.kind === "database") {
     const dbOk = await repo.testConnection();
     if (!dbOk) {
-      console.error("[WAKILISHA V2 API] Database connection failed. Cannot start.");
-      console.error(`[WAKILISHA V2 API] DATABASE_URL: ${process.env.DATABASE_URL ? "set" : "not set"}`);
-      console.error(`[WAKILISHA V2 API] Check your connection string and network access.`);
+      console.error("[WAKILISHA API] Database connection failed. Cannot start.");
+      console.error(`[WAKILISHA API] DATABASE_URL: ${process.env.DATABASE_URL ? "set" : "not set"}`);
       process.exit(1);
     }
-    console.log("[WAKILISHA V2 API] Database connection verified.");
+    console.log("[WAKILISHA API] Database connection verified.");
   }
 
   const server = http.createServer((req, res) => {
@@ -247,29 +243,23 @@ async function startServer(): Promise<void> {
 
   server.on("error", (err: NodeJS.ErrnoException) => {
     if (err.code === "EADDRINUSE") {
-      console.error(`[WAKILISHA V2 API] Port ${port} is already in use.`);
-      console.error(`  Stop the existing server or use a different port:`);
-      console.error(`  WAKILISHA_V2_API_PORT=${port + 1} npm run charts:v2-local-api`);
+      console.error(`[WAKILISHA API] Port ${port} is already in use.`);
       process.exitCode = 1;
       return;
     }
-    console.error("[WAKILISHA V2 API] Server failed to start:", err.message);
-    if (err.stack) {
-      console.error(err.stack);
-    }
+    console.error("[WAKILISHA API] Server failed to start:", err.message);
+    if (err.stack) console.error(err.stack);
     process.exitCode = 1;
   });
 
   server.listen(port, host, () => {
     const addr = `http://${host ?? "localhost"}:${port}`;
-    console.log(`[WAKILISHA V2 API] Listening on ${addr}/wp-json/wakilisha/v2`);
-    console.log(`[WAKILISHA V2 API] Repository mode: ${repo.kind}`);
-    console.log(`[WAKILISHA V2 API] DATABASE_URL: ${process.env.DATABASE_URL ? "set" : "not set"}`);
-    console.log(`[WAKILISHA V2 API] No database writes. No public JSON mutation.`);
+    console.log(`[WAKILISHA API] Listening on ${addr}/api/wakilisha/v1`);
+    console.log(`[WAKILISHA API] Repository mode: ${repo.kind}`);
   });
 }
 
 startServer().catch((err) => {
-  console.error("[WAKILISHA V2 API] Fatal startup error:", err instanceof Error ? err.message : err);
+  console.error("[WAKILISHA API] Fatal startup error:", err instanceof Error ? err.message : err);
   process.exit(1);
 });
