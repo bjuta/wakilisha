@@ -137,7 +137,7 @@ async function route(req: http.IncomingMessage, res: http.ServerResponse) {
     if (req.method === "OPTIONS") return json(res, 200, {});
     if (req.method !== "GET") return error(res, 405, "method_not_allowed", "Only GET is supported.");
     const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
-    const prefix = "/api/wakilisha/v1";
+    const prefix = "/api/v1";
     if (!url.pathname.startsWith(prefix)) return error(res, 404, "not_found", "Route not found.");
     const parts = url.pathname.slice(prefix.length).split("/").filter(Boolean).map(decodeURIComponent);
 
@@ -254,7 +254,7 @@ async function startServer(): Promise<void> {
 
   server.listen(port, host, () => {
     const addr = `http://${host ?? "localhost"}:${port}`;
-    console.log(`[WAKILISHA API] Listening on ${addr}/api/wakilisha/v1`);
+    console.log(`[WAKILISHA API] Listening on ${addr}/api/v1`);
     console.log(`[WAKILISHA API] Repository mode: ${repo.kind}`);
   });
 }
