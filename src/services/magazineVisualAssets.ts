@@ -32,7 +32,7 @@ export type MagazineVisualAsset = {
 const STORAGE_KEY = 'wakilisha.magazine.visual_assets.v1.fallback';
 const EVENT_NAME = 'wakilisha:magazine-visual-assets-updated';
 const DEFAULT_USER = 'Muiruri Beautah';
-const API_BASE = String(import.meta.env.VITE_WAKILISHA_V2_API_BASE ?? '/__wakilisha-v2-api/wp-json/wakilisha/v2').replace(/\/$/, '');
+const API_BASE = String(import.meta.env.VITE_WAKILISHA_PUBLIC_API_BASE ?? '/api/v1').replace(/\/$/, '');
 const API_PATH = `${API_BASE}/magazine/visual-assets`;
 
 function now() { return new Date().toISOString(); }
@@ -178,40 +178,18 @@ export const magazineVisualAssetStore = {
     writeLocal(readLocal().filter((asset) => asset.status === 'locked'));
     emitChange();
     try { await request(`${API_PATH}/clear-unlocked`, { method: 'DELETE' }); } catch (error) { console.warn('[magazineVisualAssets] API clear failed; local fallback cleared.', error); }
-  },
+  }
 };
 
 export function useMagazineVisualAssets() {
-  const [version, setVersion] = useState(0);
   const [assets, setAssets] = useState<MagazineVisualAsset[]>([]);
+  const [loading, setLoading] = useState(true);
   useEffect(() => {
-    let cancelled = false;
-    magazineVisualAssetStore.list().then((next) => { if (!cancelled) setAssets(next); });
-    return () => { cancelled = true; };
-  }, [version]);
-  useEffect(() => {
-    const handler = () => setVersion((value) => value + 1);
+    let mounted = true;
+    magazineVisualAssetStore.list().then((items) => { if (mounted) { setAssets(items); setLoading(false); } });
+    const handler = () => magazineVisualAssetStore.list().then((items) => mounted && setAssets(items));
     window.addEventListener(EVENT_NAME, handler);
-    window.addEventListener('storage', handler);
-    return () => { window.removeEventListener(EVENT_NAME, handler); window.removeEventListener('storage', handler); };
+    return () => { mounted = false; window.removeEventListener(EVENT_NAME, handler); };
   }, []);
-  return useMemo(() => assets, [assets]);
-}
-
-export function useMagazineVisualAsset(id: string, publicOnly = false) {
-  const [version, setVersion] = useState(0);
-  const [asset, setAsset] = useState<MagazineVisualAsset | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    const loader = publicOnly ? magazineVisualAssetStore.getActiveForPublic(id) : magazineVisualAssetStore.get(id);
-    loader.then((next) => { if (!cancelled) setAsset(next); });
-    return () => { cancelled = true; };
-  }, [id, publicOnly, version]);
-  useEffect(() => {
-    const handler = () => setVersion((value) => value + 1);
-    window.addEventListener(EVENT_NAME, handler);
-    window.addEventListener('storage', handler);
-    return () => { window.removeEventListener(EVENT_NAME, handler); window.removeEventListener('storage', handler); };
-  }, []);
-  return asset;
+  return useMemo(() => ({ assets, loading }), [assets, loading]);
 }
