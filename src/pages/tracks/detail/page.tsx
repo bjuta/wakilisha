@@ -37,8 +37,16 @@ type TrackViewModel = {
 };
 
 function apiToViewModel(api: RepairedTrackDetail): TrackViewModel {
-  const history = api.chartHistory || [];
-  const currentRank = api.currentRank ?? 0;
+  const raw = api as any;
+  const trackData = raw.track ?? raw;
+  const metadata = trackData.metadata ?? {};
+  const artistData = raw.artist ?? {};
+  const releaseData = raw.release ?? trackData.release ?? null;
+  const labelData = raw.label ?? null;
+  const artistName = artistData.name || metadata.artist_name || metadata.artist || "WAKILISHA Registry";
+  const resolvedArtistSlug = artistData.slug || metadata.artistSlug || metadata.artist_slug || "";
+  const history = raw.chartHistory || [];
+  const currentRank = raw.currentRank ?? metadata.topChartPosition ?? 0;
   const prevIdx = history.length > 1 ? 1 : -1;
   const prevRank = prevIdx >= 0 ? history[prevIdx] : 0;
 
@@ -53,37 +61,37 @@ function apiToViewModel(api: RepairedTrackDetail): TrackViewModel {
 
   const primaryGenre = api.genres && api.genres.length > 0 ? api.genres[0].name : "Unknown";
   const primaryGenreSlug = api.genres && api.genres.length > 0 ? api.genres[0].slug : "";
-  const duration = api.track.durationMs ? Math.round(api.track.durationMs / 1000) : 0;
-  const artworkUrl = api.track.artworkUrl || api.release?.artworkUrl || api.artist?.imageUrl || "";
+  const duration = trackData.durationMs ? Math.round(trackData.durationMs / 1000) : (trackData.duration || 0);
+  const artworkUrl = trackData.artworkUrl || releaseData?.artworkUrl || artistData?.imageUrl || "";
 
   return {
-    slug: api.track.slug,
-    title: api.track.title,
-    artist: api.artist.name,
-    artistSlug: api.artist.slug,
+    slug: trackData.slug,
+    title: trackData.title,
+    artist: artistName,
+    artistSlug: resolvedArtistSlug,
     genre: primaryGenre,
     genreSlug: primaryGenreSlug,
-    label: api.label?.name || "Unknown",
-    labelSlug: api.label?.slug || "",
+    label: labelData?.name || metadata.label_name || "Unknown",
+    labelSlug: labelData?.slug || "",
     rank: currentRank,
-    peakPosition: api.peakRank ?? currentRank,
-    weeksOnChart: api.weeksOnChart,
+    peakPosition: raw.peakRank ?? currentRank,
+    weeksOnChart: raw.weeksOnChart ?? metadata.chartCount ?? 0,
     movement,
     movementAmount,
     previousWeek: prevRank > 0 ? prevRank : null,
     artworkUrl,
     duration,
     streamCount: null,
-    releaseYear: api.release?.releaseDate ? api.release.releaseDate.split("-")[0] : "",
+    releaseYear: releaseData?.releaseDate ? releaseData.releaseDate.split("-")[0] : String(metadata.release_date || "").slice(0, 4),
     source: "WAKILISHA Registry",
     isPlayable: false,
-    albumTitle: api.release?.title || "",
+    albumTitle: releaseData?.title || "",
     credits: [],
     chartHistory: history,
     streamingLinks: [],
     lyrics: null,
     lyricsContributor: null,
-    artistImage: api.artist.imageUrl,
+    artistImage: artistData.imageUrl || "",
   };
 }
 
@@ -169,7 +177,7 @@ function StreamingBadge({ platform }: { platform: string }) {
 }
 
 export default function TrackDetail() {
-  const { slug } = useParams<{ slug: string }>();
+  const { artistSlug, slug } = useParams<{ slug: string }>();
   const { playTrack, currentTrack, isPlaying, togglePlay } = usePlayer();
   const [activeTab, setActiveTab] = useState<Tab>("Overview");
   const [copied, setCopied] = useState(false);
@@ -182,7 +190,7 @@ export default function TrackDetail() {
     if (!slug) { setLoading(false); setError("No track slug provided"); return; }
     setLoading(true);
     setError(null);
-    getTrack(slug)
+    getTrack(slug, artistSlug)
       .then((apiData) => {
         if (!alive) return;
         if (!apiData) {
@@ -199,7 +207,7 @@ export default function TrackDetail() {
         setLoading(false);
       });
     return () => { alive = false; };
-  }, [slug]);
+  }, [artistSlug, slug]);
 
   if (loading) {
     return (
@@ -462,7 +470,7 @@ function LyricsTab({ track }: { track: TrackViewModel }) {
   const isThisTrackPlaying = currentTrack?.id === track.slug && isPlaying;
 
   const handleContribute = () => {
-    window.REACT_APP_NAVIGATE?.(`/tracks/${track.slug}/lyrics/contribute`);
+    window.REACT_APP_NAVIGATE?.(artistSlug ? `/tracks/${artistSlug}/${track.slug}/lyrics/contribute` : `/tracks/${track.slug}/lyrics/contribute`);
   };
 
   if (timedLyrics && timedLyrics.lines && timedLyrics.lines.length > 0) {
