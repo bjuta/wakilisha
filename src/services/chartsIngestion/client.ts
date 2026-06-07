@@ -99,6 +99,7 @@ export const RUNTIME_CHART_ENDPOINTS: Record<string, EndpointDefinition> = {
 
 export const WORDPRESS_CHART_ENDPOINTS = RUNTIME_CHART_ENDPOINTS;
 export const WP_API_BASE = "/legacy-import-only/wordpress-runtime-disabled";
+export const API_BASE = "/api/v1";
 
 function withGroup(endpoint: EndpointDefinition, group: string): IngestStudioEndpointDef {
   return { ...endpoint, group };
@@ -132,6 +133,10 @@ export async function testWordPressConnection(): Promise<{ ok: boolean; plugin: 
     charts_ingestion: false,
     version: "legacy-import-only",
   };
+}
+
+export async function testAPIConnection(): Promise<{ ok: boolean; plugin: string; charts_ingestion: boolean; version: string }> {
+  return testWordPressConnection();
 }
 
 function getEndpointStatus(fnName: string): EndpointStatus {
@@ -219,82 +224,3 @@ export {
   getDisabledReason,
   ALL_ROLES,
 } from "./roles";
-export type { SimulationType } from "./simulation";
-export {
-  getActiveSimulations,
-  isSimulated,
-  getLastErrorMessage,
-  simulate,
-  retry,
-  clearSimulation,
-  clearAllSimulations,
-  retrySourceFetch,
-  retryNormalization,
-  retryMatching,
-  retryPublish,
-  retrySnapshotCreation,
-} from "./simulation";
-export {
-  assertIngestJobShape,
-  assertSourceShape,
-  assertCandidateShape,
-  assertIssueShape,
-  assertDraftEntryShape,
-  assertSnapshotShape,
-  assertChartEditionShape,
-  assertChartFamilyShape,
-  assertIngestJobArray,
-  assertSourceArray,
-  assertCandidateArray,
-  assertIssueArray,
-} from "./contracts";
-export {
-  keysToSnakeCase,
-  keysToCamelCase,
-} from "./normalizers";
-export {
-  canFetchSources,
-  canCreateDraft,
-  canPublish,
-  canApproveMatch,
-  canApplyRankOverride,
-  canDeleteSource,
-  getPublishChecklist,
-  getBlockingReasons,
-  getStepStatus,
-  getWorkflowStepIndex,
-  getJobStage,
-  getJobStageIndex,
-} from "./workflow";
-export { getStore, appendJobLog, getJobSummary } from "./store";
-
-export const getIngestRuns = ingestStudioAdapter.getIngestRuns;
-export const getIngestRun = ingestStudioAdapter.getIngestRun;
-export const getIngestKpis = ingestStudioAdapter.getIngestKpis;
-export const getRecentIngestActivity = ingestStudioAdapter.getRecentIngestActivity;
-export const createIngestRun = ingestStudioAdapter.createIngestRun;
-export const updateIngestRun = ingestStudioAdapter.updateIngestRun;
-export const runDryRun = ingestStudioAdapter.runDryRun;
-export const commitIngestRun = ingestStudioAdapter.commitIngestRun;
-export const cancelIngestRun = ingestStudioAdapter.cancelIngestRun;
-export const retryIngestRun = ingestStudioAdapter.retryIngestRun;
-export const sendGapsToReview = ingestStudioAdapter.sendGapsToReview;
-export const getResourceGuardStatus = ingestStudioAdapter.getResourceGuardStatus;
-export const validateRunReadiness = ingestStudioAdapter.validateRunReadiness;
-export const applyRowMatchDecision = ingestStudioAdapter.applyRowMatchDecision;
-export const getStudioStore = ingestStudioAdapter.getStudioStore;
-export const refreshStudioStore = ingestStudioAdapter.refreshStudioStore;
-export const resetStudioStore = ingestStudioAdapter.resetStudioStore;
-export const commitStudioStore = ingestStudioAdapter.commitStudioStore;
-export { detectProviderFromUrl, detectProvidersFromUrls, isValidProviderUrl } from "./providerDetection";
-export * from "./ingestStudioTypes";
-
-export const getDiscoveredCsvSources = adapter.getDiscoveredCsvSources;
-export const getCsvImportSessions = adapter.getCsvImportSessions;
-export const attachCsvAsSource = adapter.attachCsvAsSource;
-export const normalizeCsvCandidates = adapter.normalizeCsvCandidates;
-export const validateCsvDraftIntegrity = adapter.validateCsvDraftIntegrity;
-export const createDraftFromCsvCandidates = adapter.createDraftFromCsvCandidates;
-export const exportDraftJson = adapter.exportDraftJson;
-export type { CsvIntegrityViolation } from "./api";
-export { validateCommitReadiness } from "./commitService";
