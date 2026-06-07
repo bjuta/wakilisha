@@ -27,7 +27,7 @@ function db(): pg.Pool {
     if (explicitHost && explicitUser && explicitPassword && explicitDatabase) {
       pool = new pg.Pool({ host: explicitHost, port: explicitPort, user: explicitUser, password: explicitPassword, database: explicitDatabase, ssl: { rejectUnauthorized: false }, max: 4, connectionTimeoutMillis: 10000, query_timeout: 10000, statement_timeout: 10000 });
     } else {
-      if (!url) throw new Error("DATABASE_URL or explicit PG* env vars are required for repaired detail endpoints.");
+      if (!url) throw new Error("DATABASE_URL or explicit PG* env vars are required for public detail endpoints.");
       pool = new pg.Pool({ connectionString: normalizeDatabaseUrl(url), ssl: { rejectUnauthorized: false }, max: 4, connectionTimeoutMillis: 10000, query_timeout: 10000, statement_timeout: 10000 });
     }
   }
@@ -42,11 +42,6 @@ async function q(query: string, values: unknown[] = []): Promise<Row[]> {
 async function hasTable(tableName: string): Promise<boolean> {
   const rows = await q("select to_regclass($1) as table_name", [tableName]);
   return Boolean(rows[0]?.table_name);
-}
-
-async function hasColumn(tableName: string, columnName: string): Promise<boolean> {
-  const rows = await q("select 1 from information_schema.columns where table_schema = current_schema() and table_name = $1 and column_name = $2", [tableName, columnName]);
-  return rows.length > 0;
 }
 
 function s(row: Row | undefined | null, key: string): string {
@@ -160,36 +155,30 @@ async function artistReleases(artistSlug: string): Promise<Row[]> {
 async function artistRelated(artistId: string): Promise<Row[]> {
   if (!(await hasTable("registry_artist_relationships"))) return [];
   return q(`
-    select ra.slug, ra.display_name as name, ra.public_image_url as image_url, rar.score,
+    select ra.slug, coalesce(ra.name, ra.display_name, ra.slug) as name, coalesce(ra.image_url, ra.public_image_url, '') as image_url, rar.score,
            rar.shared_track_count, rar.shared_chart_track_count, rar.features_them_count, rar.they_feature_count, rar.shared_titles
     from registry_artist_relationships rar
     join registry_artists ra on ra.id = rar.target_artist_id
     where rar.source_artist_id = $1::uuid and coalesce(rar.status, 'active') = 'active'
-    order by rar.score desc nulls last, ra.display_name asc
+    order by rar.score desc nulls last, name asc
     limit 12
   `, [artistId]);
 }
 
 async function artistChartEntries(artistSlug: string): Promise<Row[]> {
-  if (!(await hasTable("chart_entries"))) return [];
-  const hasTrackTitle = await hasColumn("chart_entries", "track_title");
-  const hasTrackSlug = await hasColumn("chart_entries", "track_slug");
-  const hasMovement = await hasColumn("chart_entries", "movement");
-  const hasArtwork = await hasColumn("chart_entries", "artwork_url");
+  if (!(await hasTable("wk_chart_entries_v2"))) return [];
   return q(`
     select
       coalesce(ce.rank, 0)::int as rank,
-      ${hasTrackTitle ? "coalesce(ce.track_title, rt.title, 'Untitled Track')" : "coalesce(rt.title, 'Untitled Track')"} as title,
-      coalesce(ra.display_name, ce.artist_slug, $1) as artist,
-      ${hasTrackSlug ? "coalesce(ce.track_slug, rt.slug, '')" : "coalesce(rt.slug, '')"} as slug,
-      ${hasMovement ? "coalesce(ce.movement, 'same')" : "'same'"} as movement,
+      coalesce(ce.track_title, 'Untitled Track') as title,
+      coalesce(ce.artist_name, $1) as artist,
+      coalesce(ce.track_slug, '') as slug,
+      coalesce(ce.movement, 'same') as movement,
       0::int as movement_amount,
       coalesce(ce.rank, 0)::int as peak_position,
       1::int as weeks_on_chart,
-      ${hasArtwork ? "coalesce(ce.artwork_url, rt.artwork_url, '')" : "coalesce(rt.artwork_url, '')"} as artwork_url
-    from chart_entries ce
-    left join registry_tracks rt on rt.id = ce.track_id
-    left join registry_artists ra on ra.slug = ce.artist_slug
+      coalesce(ce.artwork_url, '') as artwork_url
+    from wk_chart_entries_v2 ce
     where ce.artist_slug = $1
     order by ce.rank asc nulls last
     limit 20
@@ -198,7 +187,7 @@ async function artistChartEntries(artistSlug: string): Promise<Row[]> {
 
 async function getArtistDetail(slug: string): Promise<Record<string, unknown>> {
   const rows = await q(`
-    select id::text, slug, display_name, normalized_name, bio, artist_type, gender, origin_iso2, public_image_url, metadata, status
+    select id::text, slug, coalesce(name, display_name, title, slug) as display_name, normalized_name, bio, artist_type, gender, origin_iso2, coalesce(image_url, public_image_url, '') as public_image_url, metadata, status
     from registry_artists
     where slug = $1 and status in ('active', 'needs_review', 'draft')
     limit 1
@@ -310,11 +299,11 @@ async function getGenreDetail(slug: string): Promise<Record<string, unknown>> {
 async function artistListForGenre(genreId: string): Promise<Row[]> {
   if (!(await hasTable("registry_artist_genres"))) return [];
   return q(`
-    select ra.id::text, ra.slug, ra.display_name as name, ra.public_image_url as image_url
+    select ra.id::text, ra.slug, coalesce(ra.name, ra.display_name, ra.slug) as name, coalesce(ra.image_url, ra.public_image_url, '') as image_url
     from registry_artist_genres rag
     join registry_artists ra on ra.id = rag.artist_id
     where rag.genre_id = $1::uuid and coalesce(rag.status, 'active') = 'active'
-    order by ra.display_name asc
+    order by name asc
     limit 80
   `, [genreId]);
 }
