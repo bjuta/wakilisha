@@ -23,7 +23,7 @@ import {
   getSupabaseTrackChartHistory,
 } from "./supabaseRuntime";
 
-export const PUBLIC_API_BASE = import.meta.env.VITE_WAKILISHA_PUBLIC_API_BASE || "/__wakilisha-v2-api/wp-json/wakilisha/v2";
+export const PUBLIC_API_BASE = import.meta.env.VITE_WAKILISHA_PUBLIC_API_BASE || "/api/v1";
 export const PUBLIC_MODE = "supabase-import" as const;
 export const PUBLIC_API_VERSION = "phase8-import-runtime" as const;
 
