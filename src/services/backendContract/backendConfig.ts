@@ -14,8 +14,8 @@ export type BackendConfig = {
   legacyModeAlias?: "mock" | null;
 };
 
-const DEFAULT_RUNTIME_API_BASE = "/api/wakilisha";
-const DEFAULT_LOCAL_API_BASE = "/__wakilisha-local-api";
+const DEFAULT_RUNTIME_API_BASE = "/api/v1";
+const DEFAULT_LOCAL_API_BASE = "/api/v1";
 
 function readEnv(key: string): string | undefined {
   return (import.meta.env[key] as string | undefined) || undefined;
@@ -65,13 +65,13 @@ function stripTrailingSlash(value: string): string {
 }
 
 function resolveApiBaseUrl(runtimeMode: WakilishaRuntimeMode): string {
-  const explicit = readEnv("VITE_WAKILISHA_API_BASE") || readEnv("VITE_WAKILISHA_BACKEND_API_BASE");
+  const explicit = readEnv("VITE_WAKILISHA_PUBLIC_API_BASE") || readEnv("VITE_WAKILISHA_API_BASE") || readEnv("VITE_WAKILISHA_BACKEND_API_BASE");
   if (explicit) return stripTrailingSlash(explicit);
   return runtimeMode === "local" ? DEFAULT_LOCAL_API_BASE : DEFAULT_RUNTIME_API_BASE;
 }
 
 function resolveV2ApiBaseUrl(apiBaseUrl: string): string {
-  const explicit = readEnv("VITE_WAKILISHA_V2_API_BASE");
+  const explicit = readEnv("VITE_WAKILISHA_PUBLIC_API_BASE");
   return explicit ? stripTrailingSlash(explicit) : apiBaseUrl;
 }
 
@@ -139,9 +139,3 @@ export function getBackendModeWarnings(config: BackendConfig = backendConfig): s
 
   return warnings;
 }
-
-export function getDefaultApiBaseForProvider(_provider: WakilishaBackendProvider): string {
-  return DEFAULT_RUNTIME_API_BASE;
-}
-
-export { DEFAULT_RUNTIME_API_BASE, DEFAULT_LOCAL_API_BASE };
