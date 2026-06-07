@@ -136,19 +136,48 @@ async function artistGenres(artistId: string): Promise<string[]> {
   return rows.map((row) => s(row, "name")).filter(Boolean);
 }
 
-async function artistReleases(artistSlug: string): Promise<Row[]> {
+async function artistReleases(artistSlug: string, artistName: string): Promise<Row[]> {
   if (!(await hasTable("registry_releases"))) return [];
+
+  const needle = cleanText(artistName || artistSlug).toLowerCase();
   const rows = await q(`
-    select rr.id::text, rr.slug, rr.title, rr.release_type, rr.release_date::text, rr.artwork_url, rr.metadata,
-           count(distinct rt.id)::int as track_count
-    from registry_releases rr
-    left join registry_tracks rt on rt.release_id = rr.id
-    where rr.status in ('active', 'needs_review')
-      and (rr.metadata::text ilike $1 or rr.metadata->>'artist_slug' = $2)
-    group by rr.id, rr.slug, rr.title, rr.release_type, rr.release_date, rr.artwork_url, rr.metadata
-    order by rr.release_date desc nulls last, rr.title asc
+    with release_rows as (
+      select
+        rr.id::text,
+        rr.slug,
+        rr.title,
+        rr.release_type,
+        rr.release_date::text,
+        rr.artwork_url,
+        rr.metadata,
+        coalesce(
+          nullif(rr.metadata->>'artist_name', ''),
+          nullif(rr.metadata->>'artist_display', ''),
+          nullif(rr.metadata->>'artists', ''),
+          ''
+        ) as release_artist_line,
+        count(distinct rt.id)::int as track_count
+      from registry_releases rr
+      left join registry_tracks rt on rt.release_id = rr.id
+      where rr.status in ('active', 'needs_review', 'draft')
+      group by rr.id, rr.slug, rr.title, rr.release_type, rr.release_date, rr.artwork_url, rr.metadata
+    )
+    select *
+    from release_rows
+    where
+      lower(release_artist_line) = $1
+      or lower(release_artist_line) like $1 || ',%'
+      or lower(release_artist_line) like '%, ' || $1 || ',%'
+      or lower(release_artist_line) like '%, ' || $1
+      or lower(release_artist_line) like $1 || ' &%'
+      or lower(release_artist_line) like '%& ' || $1
+      or lower(release_artist_line) like '% & ' || $1 || ' & %'
+      or lower(release_artist_line) like $1 || ' feat.%'
+      or lower(release_artist_line) like $1 || ' ft.%'
+    order by release_date desc nulls last, title asc
     limit 24
-  `, [`%${artistSlug}%`, artistSlug]);
+  `, [needle]);
+
   return rows;
 }
 
@@ -198,19 +227,32 @@ async function artistRelated(artistSlug: string): Promise<Row[]> {
 async function artistChartEntries(artistSlug: string): Promise<Row[]> {
   if (!(await hasTable("wk_chart_entries_v2"))) return [];
   return q(`
-    select
-      coalesce(ce.rank, 0)::int as rank,
-      coalesce(ce.track_title, 'Untitled Track') as title,
-      coalesce(ce.artist_name, $1) as artist,
-      coalesce(ce.track_slug, '') as slug,
-      coalesce(ce.movement, 'same') as movement,
-      0::int as movement_amount,
-      coalesce(ce.rank, 0)::int as peak_position,
-      1::int as weeks_on_chart,
-      coalesce(ce.artwork_url, '') as artwork_url
-    from wk_chart_entries_v2 ce
-    where ce.artist_slug = $1
-    order by ce.rank asc nulls last
+    with ranked as (
+      select
+        coalesce(ce.rank, 0)::int as rank,
+        coalesce(ce.track_title, 'Untitled Track') as title,
+        coalesce(ce.artist_name, $1) as artist,
+        coalesce(nullif(ce.track_slug, ''), lower(regexp_replace(coalesce(ce.track_title, 'untitled-track'), '[^a-zA-Z0-9]+', '-', 'g'))) as slug,
+        coalesce(ce.movement, 'same') as movement,
+        0::int as movement_amount,
+        min(coalesce(ce.rank, 0)::int) over (
+          partition by coalesce(nullif(ce.track_slug, ''), lower(regexp_replace(coalesce(ce.track_title, 'untitled-track'), '[^a-zA-Z0-9]+', '-', 'g')))
+        ) as peak_position,
+        count(*) over (
+          partition by coalesce(nullif(ce.track_slug, ''), lower(regexp_replace(coalesce(ce.track_title, 'untitled-track'), '[^a-zA-Z0-9]+', '-', 'g')))
+        )::int as weeks_on_chart,
+        coalesce(ce.artwork_url, '') as artwork_url,
+        row_number() over (
+          partition by coalesce(nullif(ce.track_slug, ''), lower(regexp_replace(coalesce(ce.track_title, 'untitled-track'), '[^a-zA-Z0-9]+', '-', 'g')))
+          order by coalesce(ce.rank, 999999)::int asc
+        ) as rn
+      from wk_chart_entries_v2 ce
+      where ce.artist_slug = $1
+    )
+    select rank, title, artist, slug, movement, movement_amount, peak_position, weeks_on_chart, artwork_url
+    from ranked
+    where rn = 1
+    order by rank asc nulls last, title asc
     limit 20
   `, [artistSlug]);
 }
@@ -238,7 +280,7 @@ async function getArtistDetail(slug: string): Promise<Record<string, unknown>> {
   const metadata = parsePayload(row.metadata);
   const genres = await artistGenres(s(row, "id"));
   const chartRows = await artistChartEntries(s(row, "slug"));
-  const releaseRows = await artistReleases(s(row, "slug"));
+  const releaseRows = await artistReleases(s(row, "slug"), s(row, "display_name"));
   const relatedRows = await artistRelated(s(row, "slug"));
   const image = s(row, "public_image_url") || String(metadata.image_url ?? metadata.profile_image_url ?? "");
 
@@ -255,8 +297,8 @@ async function getArtistDetail(slug: string): Promise<Record<string, unknown>> {
     isChartArtist: chartRows.length > 0,
     isRising: chartRows.some((entry) => n(entry, "rank") > 0 && n(entry, "rank") <= 20),
     topChartPosition: chartRows.length ? Math.min(...chartRows.map((entry) => n(entry, "rank")).filter(Boolean)) : null,
-    bio: s(row, "bio") || `${s(row, "display_name")} is part of the WAKILISHA registry.`,
-    fullBio: s(row, "bio") || `${s(row, "display_name")} is part of the WAKILISHA registry.`,
+    bio: cleanText(s(row, "bio")) || `${s(row, "display_name")} is part of the WAKILISHA registry.`,
+    fullBio: cleanText(s(row, "bio")) || `${s(row, "display_name")} is part of the WAKILISHA registry.`,
     artistType: maybe(row, "artist_type"),
     followerCount: Number(metadata.follower_count ?? metadata.followers ?? 0) || 0,
     popularity: Number(metadata.popularity ?? 0) || 0,
