@@ -152,7 +152,7 @@ async function route(req: http.IncomingMessage, res: http.ServerResponse) {
       }));
     }
 
-    if (["magazine", "artists", "releases", "genres", "labels", "search"].includes(parts[0])) {
+    if (["magazine", "artists", "releases", "genres", "labels", "tracks", "search"].includes(parts[0])) {
       const limit = Math.min(Number(url.searchParams.get("limit") ?? 120) || 120, 500);
       if (parts.length > 1) {
         const data = await publicDetailResponse(parts[0], parts.slice(1));

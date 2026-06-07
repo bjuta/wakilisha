@@ -152,17 +152,47 @@ async function artistReleases(artistSlug: string): Promise<Row[]> {
   return rows;
 }
 
-async function artistRelated(artistId: string): Promise<Row[]> {
+async function artistRelated(artistSlug: string): Promise<Row[]> {
   if (!(await hasTable("registry_artist_relationships"))) return [];
   return q(`
-    select ra.slug, coalesce(ra.display_name, ra.normalized_name, ra.slug) as name, coalesce(to_jsonb(ra)->>'image_url', to_jsonb(ra)->>'public_image_url', '') as image_url, rar.score,
-           rar.shared_track_count, rar.shared_chart_track_count, rar.features_them_count, rar.they_feature_count, rar.shared_titles
-    from registry_artist_relationships rar
-    join registry_artists ra on ra.id = rar.target_artist_id
-    where rar.source_artist_id = $1::uuid and coalesce(rar.status, 'active') = 'active'
-    order by rar.score desc nulls last, name asc
+    with related_slugs as (
+      select
+        case
+          when rar.artist_a_slug = $1 then rar.artist_b_slug
+          when rar.artist_b_slug = $1 then rar.artist_a_slug
+          else null
+        end as related_slug,
+        coalesce(
+          nullif(to_jsonb(rar)->>'score', '')::numeric,
+          nullif(to_jsonb(rar)->>'relationship_score', '')::numeric,
+          nullif(to_jsonb(rar)->>'confidence_score', '')::numeric,
+          0
+        ) as score,
+        coalesce(nullif(to_jsonb(rar)->>'shared_track_count', '')::int, 0) as shared_track_count,
+        coalesce(nullif(to_jsonb(rar)->>'shared_chart_track_count', '')::int, 0) as shared_chart_track_count,
+        coalesce(nullif(to_jsonb(rar)->>'features_them_count', '')::int, 0) as features_them_count,
+        coalesce(nullif(to_jsonb(rar)->>'they_feature_count', '')::int, 0) as they_feature_count,
+        coalesce(to_jsonb(rar)->'shared_titles', '[]'::jsonb) as shared_titles
+      from registry_artist_relationships rar
+      where (rar.artist_a_slug = $1 or rar.artist_b_slug = $1)
+        and coalesce(rar.relationship_status, 'active') = 'active'
+    )
+    select
+      ra.slug,
+      coalesce(ra.display_name, ra.normalized_name, ra.slug) as name,
+      coalesce(to_jsonb(ra)->>'image_url', to_jsonb(ra)->>'public_image_url', '') as image_url,
+      rs.score,
+      rs.shared_track_count,
+      rs.shared_chart_track_count,
+      rs.features_them_count,
+      rs.they_feature_count,
+      rs.shared_titles
+    from related_slugs rs
+    join registry_artists ra on ra.slug = rs.related_slug
+    where rs.related_slug is not null
+    order by rs.score desc nulls last, name asc
     limit 12
-  `, [artistId]);
+  `, [artistSlug]);
 }
 
 async function artistChartEntries(artistSlug: string): Promise<Row[]> {
@@ -209,7 +239,7 @@ async function getArtistDetail(slug: string): Promise<Record<string, unknown>> {
   const genres = await artistGenres(s(row, "id"));
   const chartRows = await artistChartEntries(s(row, "slug"));
   const releaseRows = await artistReleases(s(row, "slug"));
-  const relatedRows = await artistRelated(s(row, "id"));
+  const relatedRows = await artistRelated(s(row, "slug"));
   const image = s(row, "public_image_url") || String(metadata.image_url ?? metadata.profile_image_url ?? "");
 
   return { artist: {
@@ -242,7 +272,7 @@ async function getArtistDetail(slug: string): Promise<Record<string, unknown>> {
       year: s(release, "release_date").slice(0, 4), releaseDate: s(release, "release_date"), trackCount: n(release, "track_count"),
       artworkUrl: s(release, "artwork_url") || placeholder("release", s(release, "id")), tracks: [],
     })),
-    topSongs: chartRows.slice(0, 8).map((entry) => ({ title: s(entry, "title"), artists: s(row, "display_name"), image: s(entry, "artwork_url") || "", duration: "", songUrl: `/tracks/${s(entry, "slug") || slugify(s(entry, "title"))}` })),
+    topSongs: chartRows.slice(0, 8).map((entry) => ({ title: s(entry, "title"), artists: s(row, "display_name"), image: s(entry, "artwork_url") || "", duration: "", songUrl: `/tracks/${s(row, "slug")}/${s(entry, "slug") || slugify(s(entry, "title"))}` })),
     relatedArtists: relatedRows.map((related) => ({
       slug: s(related, "slug"), name: s(related, "name"), imageUrl: s(related, "image_url"), score: n(related, "score"),
       sharedTracksAll: n(related, "shared_track_count"), sharedChartTracks: n(related, "shared_chart_track_count"),
@@ -319,7 +349,7 @@ async function artistListForGenre(genreId: string): Promise<Row[]> {
   `, [genreId]);
 }
 
-async function getTrackDetail(slug: string): Promise<Record<string, unknown>> {
+async function getTrackDetail(slug: string, artistSlug = ""): Promise<Record<string, unknown>> {
   const rows = await q(`
     select rt.id::text, rt.slug, rt.title, rt.normalized_title, rt.isrc, rt.duration_ms, rt.explicit, rt.artwork_url, rt.preview_url, rt.metadata,
            rr.slug as release_slug, rr.title as release_title, rr.artwork_url as release_artwork_url
@@ -328,13 +358,58 @@ async function getTrackDetail(slug: string): Promise<Record<string, unknown>> {
     where rt.slug = $1 and rt.status in ('active', 'needs_review', 'draft')
     limit 1
   `, [slug]);
+
   const row = rows[0];
-  if (!row) return { track: null };
-  return { track: {
-    id: s(row, "id"), slug: s(row, "slug"), title: s(row, "title"), normalizedTitle: s(row, "normalized_title"), isrc: maybe(row, "isrc"), duration: n(row, "duration_ms"), explicit: row.explicit === true || String(row.explicit).toLowerCase() === "true",
-    artworkUrl: s(row, "artwork_url") || s(row, "release_artwork_url") || placeholder("track", s(row, "id")), previewUrl: maybe(row, "preview_url"), metadata: parsePayload(row.metadata),
-    release: s(row, "release_slug") ? { slug: s(row, "release_slug"), title: s(row, "release_title") } : null,
-  } };
+  if (row) {
+    return { track: {
+      id: s(row, "id"), slug: s(row, "slug"), title: s(row, "title"), normalizedTitle: s(row, "normalized_title"), isrc: maybe(row, "isrc"), duration: n(row, "duration_ms"), explicit: row.explicit === true || String(row.explicit).toLowerCase() === "true",
+      artworkUrl: s(row, "artwork_url") || s(row, "release_artwork_url") || placeholder("track", s(row, "id")), previewUrl: maybe(row, "preview_url"), metadata: parsePayload(row.metadata),
+      release: s(row, "release_slug") ? { slug: s(row, "release_slug"), title: s(row, "release_title") } : null,
+    } };
+  }
+
+  if (await hasTable("wk_chart_entries_v2")) {
+    const chartRows = await q(`
+      select
+        coalesce(track_slug, $1) as slug,
+        coalesce(track_title, $1) as title,
+        coalesce(artist_name, '') as artist,
+        coalesce(artist_slug, '') as artist_slug,
+        coalesce(artwork_url, '') as artwork_url,
+        min(rank)::int as top_chart_position,
+        count(distinct edition_id)::int as chart_count
+      from wk_chart_entries_v2
+      where track_slug = $1
+        and ($2 = '' or artist_slug = $2)
+      group by track_slug, track_title, artist_name, artist_slug, artwork_url
+      order by chart_count desc, top_chart_position asc nulls last
+      limit 1
+    `, [slug, artistSlug]);
+    const chart = chartRows[0];
+    if (chart) {
+      return { track: {
+        id: s(chart, "slug"),
+        slug: s(chart, "slug"),
+        title: s(chart, "title"),
+        normalizedTitle: s(chart, "title").toLowerCase(),
+        isrc: null,
+        duration: 0,
+        explicit: false,
+        artworkUrl: s(chart, "artwork_url") || placeholder("track", s(chart, "slug")),
+        previewUrl: null,
+        metadata: {
+          source: "wk_chart_entries_v2",
+          artist: s(chart, "artist"),
+          artistSlug: s(chart, "artist_slug"),
+          chartCount: n(chart, "chart_count"),
+          topChartPosition: n(chart, "top_chart_position"),
+        },
+        release: null,
+      } };
+    }
+  }
+
+  return { track: null };
 }
 
 async function getArticleDetail(slug: string): Promise<Record<string, unknown>> {
@@ -359,6 +434,7 @@ export async function repairedDetailResponse(resource: string, pathParts: string
   if (resource === "labels" && pathParts.length === 1) return getLabelDetail(pathParts[0]);
   if (resource === "genres" && pathParts.length === 1) return getGenreDetail(pathParts[0]);
   if (resource === "tracks" && pathParts.length === 1) return getTrackDetail(pathParts[0]);
+  if (resource === "tracks" && pathParts.length >= 2) return getTrackDetail(pathParts[pathParts.length - 1], pathParts[pathParts.length - 2]);
   if (resource === "magazine" && pathParts.length === 1) return getArticleDetail(pathParts[0]);
   throw Object.assign(new Error("Public entity detail resource not found."), { status: 404 });
 }
