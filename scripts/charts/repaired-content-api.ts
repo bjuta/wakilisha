@@ -410,7 +410,7 @@ export async function repairedResponse(resource: string, limit = 120): Promise<R
         select *
         from public.wk_articles
         where lower(coalesce(wp_status, 'publish')) in ('publish', 'published', 'active')
-        order by coalesce(published_at, post_date, created_at) desc nulls last, title asc nulls last
+        order by published_at desc nulls last, updated_at desc nulls last, title asc nulls last
         limit $1
       `, [limit]);
       return { stories: rows.map((row, index) => storyFromRawArticle(row, index, heroLookups)).filter(isPublicMagazineStory) };
@@ -420,20 +420,40 @@ export async function repairedResponse(resource: string, limit = 120): Promise<R
 
   if (resource === "artists") {
     const rows = await q(`
+      with artist_base as (
+        select
+          ra.id,
+          ra.id::text as id_text,
+          ra.slug,
+          coalesce(nullif(ra.display_name, ''), nullif(ra.normalized_name, ''), ra.slug) as name,
+          coalesce(
+            nullif(to_jsonb(ra)->>'country', ''),
+            nullif(to_jsonb(ra)->>'origin_country', ''),
+            nullif(to_jsonb(ra)->>'origin_iso2', ''),
+            ''
+          ) as country,
+          coalesce(
+            nullif(to_jsonb(ra)->>'image_url', ''),
+            nullif(to_jsonb(ra)->>'public_image_url', ''),
+            nullif(to_jsonb(ra)->>'profile_image_url', ''),
+            ''
+          ) as image_url
+        from registry_artists ra
+        where ra.status in ('active', 'needs_review')
+      )
       select
-        ra.id::text as id,
-        ra.slug,
-        coalesce(nullif(ra.name, ''), nullif(ra.title, ''), nullif(ra.display_name, ''), ra.slug) as name,
-        coalesce(nullif(ra.country, ''), nullif(ra.origin_country, ''), nullif(ra.origin_iso2, '')) as country,
-        coalesce(nullif(ra.image_url, ''), nullif(ra.public_image_url, '')) as image_url,
+        ab.id_text as id,
+        ab.slug,
+        ab.name,
+        ab.country,
+        ab.image_url,
         coalesce(count(distinct ce.track_slug), 0)::int as chart_track_count,
         coalesce(count(distinct ce.edition_id), 0)::int as chart_count,
         min(ce.rank)::int as top_chart_position
-      from registry_artists ra
-      left join wk_chart_entries_v2 ce on ce.artist_slug = ra.slug
-      where ra.status in ('active', 'needs_review')
-      group by ra.id, ra.slug, ra.name, ra.title, ra.display_name, ra.country, ra.origin_country, ra.origin_iso2, ra.image_url, ra.public_image_url
-      order by coalesce(count(distinct ce.edition_id), 0) desc, coalesce(count(distinct ce.track_slug), 0) desc, name asc
+      from artist_base ab
+      left join wk_chart_entries_v2 ce on ce.artist_slug = ab.slug
+      group by ab.id_text, ab.slug, ab.name, ab.country, ab.image_url
+      order by coalesce(count(distinct ce.edition_id), 0) desc, coalesce(count(distinct ce.track_slug), 0) desc, ab.name asc
       limit $1
     `, [limit]);
     return { artists: rows.map((row) => {

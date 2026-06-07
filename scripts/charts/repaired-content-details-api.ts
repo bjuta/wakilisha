@@ -155,7 +155,7 @@ async function artistReleases(artistSlug: string): Promise<Row[]> {
 async function artistRelated(artistId: string): Promise<Row[]> {
   if (!(await hasTable("registry_artist_relationships"))) return [];
   return q(`
-    select ra.slug, coalesce(ra.name, ra.display_name, ra.slug) as name, coalesce(ra.image_url, ra.public_image_url, '') as image_url, rar.score,
+    select ra.slug, coalesce(ra.display_name, ra.normalized_name, ra.slug) as name, coalesce(to_jsonb(ra)->>'image_url', to_jsonb(ra)->>'public_image_url', '') as image_url, rar.score,
            rar.shared_track_count, rar.shared_chart_track_count, rar.features_them_count, rar.they_feature_count, rar.shared_titles
     from registry_artist_relationships rar
     join registry_artists ra on ra.id = rar.target_artist_id
@@ -187,7 +187,18 @@ async function artistChartEntries(artistSlug: string): Promise<Row[]> {
 
 async function getArtistDetail(slug: string): Promise<Record<string, unknown>> {
   const rows = await q(`
-    select id::text, slug, coalesce(name, display_name, title, slug) as display_name, normalized_name, bio, artist_type, gender, origin_iso2, coalesce(image_url, public_image_url, '') as public_image_url, metadata, status
+    select
+      id::text,
+      slug,
+      coalesce(display_name, normalized_name, slug) as display_name,
+      normalized_name,
+      coalesce(to_jsonb(registry_artists)->>'bio', '') as bio,
+      coalesce(to_jsonb(registry_artists)->>'artist_type', '') as artist_type,
+      coalesce(to_jsonb(registry_artists)->>'gender', '') as gender,
+      coalesce(to_jsonb(registry_artists)->>'origin_iso2', '') as origin_iso2,
+      coalesce(to_jsonb(registry_artists)->>'image_url', to_jsonb(registry_artists)->>'public_image_url', '') as public_image_url,
+      coalesce(to_jsonb(registry_artists)->'metadata', '{}'::jsonb) as metadata,
+      status
     from registry_artists
     where slug = $1 and status in ('active', 'needs_review', 'draft')
     limit 1
@@ -299,7 +310,7 @@ async function getGenreDetail(slug: string): Promise<Record<string, unknown>> {
 async function artistListForGenre(genreId: string): Promise<Row[]> {
   if (!(await hasTable("registry_artist_genres"))) return [];
   return q(`
-    select ra.id::text, ra.slug, coalesce(ra.name, ra.display_name, ra.slug) as name, coalesce(ra.image_url, ra.public_image_url, '') as image_url
+    select ra.id::text, ra.slug, coalesce(ra.display_name, ra.normalized_name, ra.slug) as name, coalesce(to_jsonb(ra)->>'image_url', to_jsonb(ra)->>'public_image_url', '') as image_url
     from registry_artist_genres rag
     join registry_artists ra on ra.id = rag.artist_id
     where rag.genre_id = $1::uuid and coalesce(rag.status, 'active') = 'active'
