@@ -21,6 +21,7 @@ import {
 } from "@/services/chartsPublic/viewModels";
 import {
   getLegacyRedirectTarget,
+  normalizeChartProgramSlug,
   isLegacyChartSlug,
   getSourceFamilySlug,
   getCanonicalChartPathFromSlugs,
@@ -171,9 +172,11 @@ export default function MobileChartEdition() {
     edition: editionSlug,
   } = useParams<{ family?: string; market?: string; series?: string; edition?: string }>();
 
-  const chartProgramSlug = family && market && series
+  const rawChartProgramSlug = family && market && series
     ? `${family}/${market}/${series}`
     : series ?? "";
+
+  const chartProgramSlug = normalizeChartProgramSlug(rawChartProgramSlug);
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState(true);
@@ -207,8 +210,8 @@ export default function MobileChartEdition() {
       const familyPublicSlug = family.publicSlug ?? family.slug ?? series;
       setPublicSlug(familyPublicSlug);
 
-      if (isLegacyChartSlug(series)) {
-        const redirectTarget = getLegacyRedirectTarget(series, editionSlug);
+      if (rawChartProgramSlug !== chartProgramSlug || isLegacyChartSlug(series)) {
+        const redirectTarget = getLegacyRedirectTarget(rawChartProgramSlug, editionSlug);
         if (redirectTarget) { navigate(redirectTarget, { replace: true }); return; }
       }
 

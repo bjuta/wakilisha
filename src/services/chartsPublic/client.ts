@@ -14,18 +14,18 @@ import {
 } from "./cache";
 
 import {
-  getSupabaseChartFamilies,
-  getSupabaseChartFamily,
-  getSupabaseChartEditionsForFamily,
-  getSupabaseLatestChartEdition,
-  getSupabaseChartEdition,
-  getSupabaseChartEditionEntries,
-  getSupabaseTrackChartHistory,
-} from "./supabaseRuntime";
+  getV2ChartFamilies,
+  getV2ChartFamily,
+  getV2ChartEditionsForFamily,
+  getV2LatestChartEdition,
+  getV2ChartEdition,
+  getV2ChartEditionEntries,
+  getV2TrackChartHistory,
+} from "./v2Adapter";
 
 export const PUBLIC_API_BASE = import.meta.env.VITE_WAKILISHA_PUBLIC_API_BASE || "/api/v1";
-export const PUBLIC_MODE = "supabase-import" as const;
-export const PUBLIC_API_VERSION = "phase8-import-runtime" as const;
+export const PUBLIC_MODE = "public-api" as const;
+export const PUBLIC_API_VERSION = "v1-public-api" as const;
 
 export class PublicChartsApiError extends Error {
   status: number;
@@ -94,56 +94,57 @@ async function withCache<T>(
 }
 
 export function getChartFamilies(): Promise<ChartResult<ChartFamily[]>> {
-  return withCache("chart_families_supabase_import", async () => ({
-    data: await getSupabaseChartFamilies(),
-    source: "legacy_import",
+  return withCache("chart_families_public_api", async () => ({
+    data: await getV2ChartFamilies(),
+    source: "wordpress",
   }));
 }
 
 export function getChartFamily(familySlug: string): Promise<ChartResult<ChartFamily | null>> {
-  return withCache(`chart_family_supabase_import_${familySlug}`, async () => ({
-    data: await getSupabaseChartFamily(familySlug),
-    source: "legacy_import",
+  return withCache(`chart_family_public_api_${familySlug}`, async () => ({
+    data: await getV2ChartFamily(familySlug),
+    source: "wordpress",
   }));
 }
 
 export function getChartEditionsForFamily(familySlug: string): Promise<ChartResult<ChartEdition[]>> {
-  return withCache(`chart_family_editions_supabase_import_${familySlug}`, async () => ({
-    data: await getSupabaseChartEditionsForFamily(familySlug),
-    source: "legacy_import",
+  return withCache(`chart_family_editions_public_api_${familySlug}`, async () => ({
+    data: await getV2ChartEditionsForFamily(familySlug),
+    source: "wordpress",
   }));
 }
 
 export function getLatestChartEdition(familySlug: string): Promise<ChartResult<ChartEdition | null>> {
-  return withCache(`chart_latest_supabase_import_${familySlug}`, async () => ({
-    data: await getSupabaseLatestChartEdition(familySlug),
-    source: "legacy_import",
+  return withCache(`chart_latest_public_api_${familySlug}`, async () => ({
+    data: await getV2LatestChartEdition(familySlug),
+    source: "wordpress",
   }));
 }
 
 export function getChartEdition(familySlug: string, editionSlug: string): Promise<ChartResult<ChartEdition | null>> {
-  return withCache(`chart_edition_supabase_import_${familySlug}_${editionSlug}`, async () => ({
-    data: await getSupabaseChartEdition(familySlug, editionSlug),
-    source: "legacy_import",
+  return withCache(`chart_edition_public_api_${familySlug}_${editionSlug}`, async () => ({
+    data: await getV2ChartEdition(familySlug, editionSlug),
+    source: "wordpress",
   }));
 }
 
 export function getChartEditionEntries(familySlug: string, editionSlug: string): Promise<ChartResult<ChartEditionEntry[]>> {
-  return withCache(`chart_entries_supabase_import_${familySlug}_${editionSlug}`, async () => ({
-    data: await getSupabaseChartEditionEntries(familySlug, editionSlug),
-    source: "legacy_import",
+  return withCache(`chart_entries_public_api_${familySlug}_${editionSlug}`, async () => ({
+    data: await getV2ChartEditionEntries(familySlug, editionSlug),
+    source: "wordpress",
   }));
 }
 
 export function getTrackChartHistory(trackSlug: string): Promise<ChartResult<TrackChartHistory | null>> {
-  return withCache(`track_history_supabase_import_${trackSlug}`, async () => ({
-    data: await getSupabaseTrackChartHistory(trackSlug),
-    source: "legacy_import",
+  return withCache(`track_history_public_api_${trackSlug}`, async () => ({
+    data: await getV2TrackChartHistory(trackSlug),
+    source: "wordpress",
   }));
 }
 
 export { clearChartCache };
 export type { ChartFamily, ChartEdition, ChartEditionEntry, TrackChartHistory };
+
 export {
   getMockEntriesForEdition,
   getMockLatestEdition,
@@ -151,6 +152,7 @@ export {
   getMockFamily,
   getMockEditionsForFamily,
 } from "./mockData";
+
 export {
   hasCsvPublicChartData,
   getCsvEntriesForEdition,
@@ -160,6 +162,7 @@ export {
   getCsvFamilies,
   getCsvEditionsForFamily,
 } from "./csvData";
+
 export {
   toChartDirectoryViewModel,
   toChartEditionViewModel,

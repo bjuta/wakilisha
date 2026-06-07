@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { getTrackChartHistory } from "@/services/chartsPublic/client";
 import { toChartTrackHistoryViewModel } from "@/services/chartsPublic/viewModels";
-import { ChartTrajectory } from "./ChartTrajectory";
+import { ChartTrajectory, type ChartTrajectoryPoint } from "./ChartTrajectory";
 import { WkIcon } from "@/components/design-system/Icon";
 
 interface TrackChartAppearance {
@@ -13,6 +13,35 @@ interface TrackChartAppearance {
   previousRank?: number | null;
   movement?: string;
   weeksOnChart?: number;
+}
+
+type ChartSeriesMeta = {
+  slug: string;
+  label: string;
+  colorVar: string;
+};
+
+const SERIES_META: Record<string, ChartSeriesMeta> = {
+  rnb: { slug: "rnb", label: "R&B", colorVar: "var(--wk-brand)" },
+  kenya: { slug: "kenya", label: "Top 100", colorVar: "var(--wk-info)" },
+  "2026": { slug: "2026", label: "2026 Releases", colorVar: "var(--wk-success)" },
+  gengetone: { slug: "gengetone", label: "Gengetone", colorVar: "var(--wk-warning)" },
+};
+
+function seriesFromAppearance(appearance: { editionSlug?: string; editionLabel?: string }): ChartSeriesMeta {
+  const editionSlug = String(appearance.editionSlug || "");
+  const editionLabel = String(appearance.editionLabel || "");
+
+  const prefix = editionSlug.split("-2026-")[0] || editionSlug.split("-")[0];
+
+  if (SERIES_META[prefix]) return SERIES_META[prefix];
+
+  if (/r&b|rnb/i.test(editionLabel)) return SERIES_META.rnb;
+  if (/top 100|kenya/i.test(editionLabel)) return SERIES_META.kenya;
+  if (/2026/i.test(editionLabel)) return SERIES_META["2026"];
+  if (/gengetone/i.test(editionLabel)) return SERIES_META.gengetone;
+
+  return { slug: prefix || "other", label: prefix || "Other", colorVar: "var(--wk-text-muted)" };
 }
 
 interface TrackChartHistoryProps {
@@ -84,7 +113,7 @@ export function TrackChartHistorySection({
 
     try {
       const result = await getTrackChartHistory(trackSlug);
-      if (!result.data || result.data.appearances.length === 0) {
+      if (!result.data || !Array.isArray(result.data.appearances) || result.data.appearances.length === 0) {
         setState({ status: "empty" });
         return;
       }
@@ -167,21 +196,49 @@ export function TrackChartHistorySection({
   }
 
   const { data } = state;
-  const historyRanks = data.appearances.map((a) => a.rank);
-  // Merge with local trackHistory if available and longer
-  const combinedHistory = trackHistory && trackHistory.length > historyRanks.length
-    ? trackHistory
-    : historyRanks.length > 0
+  const appearances = Array.isArray(data.appearances) ? data.appearances : [];
+
+  // API appearances are latest-first for the table.
+  // Trajectory charts need oldest-to-current so "current" is the right edge.
+  const chronologicalAppearances = [...appearances].reverse();
+  const trajectoryPoints: ChartTrajectoryPoint[] = chronologicalAppearances
+    .map((appearance, index) => {
+      const series = seriesFromAppearance(appearance);
+      const rank = Number(appearance.rank || 0);
+
+      return {
+        rank,
+        weekLabel: `W${index + 1}`,
+        editionSlug: appearance.editionSlug,
+        editionLabel: appearance.editionLabel,
+        date: appearance.date,
+        seriesSlug: series.slug,
+        seriesLabel: series.label,
+        colorVar: series.colorVar,
+      };
+    })
+    .filter((point) => point.rank > 0);
+
+  const historyRanks = trajectoryPoints.map((point) => point.rank);
+
+  const combinedHistory = historyRanks.length > 0
     ? historyRanks
-    : trackHistory ?? [];
+    : trackHistory && trackHistory.length > 0
+    ? trackHistory
+    : [];
+
+  const latestAppearance = appearances[0] ?? null;
+  const displayedCurrentRank = Number(trackRank || latestAppearance?.rank || 0);
+  const currentRank = displayedCurrentRank;
+  const peakRank = trackPeak || data.peakPosition || (combinedHistory.length ? Math.min(...combinedHistory) : 0);
 
   return (
     <div className={compact ? "px-5 py-4" : "px-4 py-6 lg:px-6 lg:py-8"}>
       <div className="mb-3 flex items-center gap-2 text-[12px] font-black uppercase tracking-wider text-[var(--wk-text-muted)]">
         <WkIcon name="BarChart3" size={14} className="text-[var(--wk-brand)]" />
         Chart history
-        {(chartAppearanceCount || data.appearances.length) > 0 && (
-          <span className="text-[10px] font-bold text-[var(--wk-text-faint)]">· {chartAppearanceCount || data.appearances.length} appearances</span>
+        {(chartAppearanceCount || appearances.length) > 0 && (
+          <span className="text-[10px] font-bold text-[var(--wk-text-faint)]">· {chartAppearanceCount || appearances.length} appearances</span>
         )}
       </div>
 
@@ -190,9 +247,10 @@ export function TrackChartHistorySection({
         <div className="mb-6 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4">
           <ChartTrajectory
             history={combinedHistory}
-            peakPosition={data.peakPosition || trackPeak}
-            currentRank={data.appearances[data.appearances.length - 1]?.rank || trackRank}
-            weeksOnChart={data.totalWeeksOnChart || trackWeeks}
+            points={trajectoryPoints}
+            peakPosition={peakRank}
+            currentRank={displayedCurrentRank}
+            weeksOnChart={trackWeeks || data.totalWeeksOnChart || combinedHistory.length}
             compact={compact}
           />
         </div>
@@ -207,7 +265,7 @@ export function TrackChartHistorySection({
           <div className="text-right">Weeks</div>
         </div>
         <div className="divide-y divide-[var(--wk-divider)]">
-          {data.appearances.map((appearance, idx) => {
+          {appearances.map((appearance, idx) => {
             const prev = idx > 0 ? data.appearances[idx - 1] : null;
             const move = prev ? prev.rank - appearance.rank : 0;
             return (

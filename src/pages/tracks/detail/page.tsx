@@ -6,6 +6,16 @@ import { TrackChartHistorySection } from "@/components/charts/TrackChartHistory"
 import { SyncedLyricsDisplay } from "@/components/lyrics/SyncedLyricsDisplay";
 import { WkIcon } from "@/components/design-system/Icon";
 
+type TrackChartAppearance = {
+  editionSlug?: string;
+  editionLabel?: string;
+  date?: string;
+  rank?: number;
+  previousRank?: number | null;
+  movement?: string;
+  weeksOnChart?: number;
+};
+
 type TrackViewModel = {
   slug: string;
   title: string;
@@ -30,6 +40,8 @@ type TrackViewModel = {
   albumTitle: string;
   credits: Array<{ role: string; name: string }>;
   chartHistory: number[];
+  chartAppearances: TrackChartAppearance[];
+  chartAppearanceCount: number;
   streamingLinks: Array<{ platform: string; url: string }>;
   lyrics: string | null;
   lyricsContributor: { name: string; source?: string } | null;
@@ -46,6 +58,8 @@ function apiToViewModel(api: RepairedTrackDetail): TrackViewModel {
   const artistName = artistData.name || metadata.artist_name || metadata.artist || "WAKILISHA Registry";
   const resolvedArtistSlug = artistData.slug || metadata.artistSlug || metadata.artist_slug || "";
   const history = Array.isArray(raw.chartHistory) ? raw.chartHistory : [];
+  const chartAppearances = Array.isArray(raw.chartAppearances) ? raw.chartAppearances : [];
+  const chartAppearanceCount = Number(raw.chartAppearanceCount ?? chartAppearances.length ?? 0);
   const currentRank = raw.currentRank ?? metadata.topChartPosition ?? 0;
   const prevRank = raw.previousRank ?? (history.length > 1 ? history[history.length - 2] : 0);
 
@@ -90,6 +104,8 @@ function apiToViewModel(api: RepairedTrackDetail): TrackViewModel {
     albumTitle: releaseData?.title || "",
     credits: [],
     chartHistory: history,
+    chartAppearances,
+    chartAppearanceCount,
     streamingLinks: [],
     lyrics: null,
     lyricsContributor: null,

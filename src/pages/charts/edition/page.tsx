@@ -19,6 +19,7 @@ import {
 } from "@/services/chartsPublic/viewModels";
 import {
   getLegacyRedirectTarget,
+  normalizeChartProgramSlug,
   getCanonicalChartPath,
   isLegacyChartSlug,
   getSourceFamilySlug,
@@ -62,9 +63,11 @@ export default function ChartEdition() {
     edition: editionSlug,
   } = useParams<{ family?: string; market?: string; series?: string; edition?: string }>();
 
-  const chartProgramSlug = family && market && series
+  const rawChartProgramSlug = family && market && series
     ? `${family}/${market}/${series}`
     : series ?? "";
+
+  const chartProgramSlug = normalizeChartProgramSlug(rawChartProgramSlug);
   const navigate = useNavigate();
   const { playTrack } = usePlayer();
 
@@ -108,7 +111,7 @@ export default function ChartEdition() {
       const canonicalized = isLegacyChartSlug(series);
 
       if (canonicalized) {
-        const redirectTarget = getLegacyRedirectTarget(series, editionSlug);
+        const redirectTarget = getLegacyRedirectTarget(rawChartProgramSlug, editionSlug);
         if (redirectTarget) {
           navigate(redirectTarget, { replace: true });
           return;
