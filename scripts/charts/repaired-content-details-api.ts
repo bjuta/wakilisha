@@ -1,20 +1,36 @@
 import pg from "pg";
 
+const ARTICLE_MEDIA_BASE = (
+  process.env.WAKILISHA_ARTICLE_MEDIA_BASE ||
+  ARTICLE_MEDIA_BASE
+).replace(/\/?$/, "/");
+
 
 function normalizeLegacyWpMediaUrl(url: string): string {
   const clean = String(url || "").trim();
   if (!clean) return "";
 
   return clean
-    .replace(/^http:\/\/18\.135\.76\.250\/wp-content\/uploads\//i, "https://pgzizndxdyhqmtyywjmt.supabase.co/storage/v1/object/public/article-media/wp-import/")
-    .replace(/^https?:\/\/(?:www\.)?wakilisha\.africa\/wp-content\/uploads\//i, "https://pgzizndxdyhqmtyywjmt.supabase.co/storage/v1/object/public/article-media/wp-import/")
-    .replace(/^https?:\/\/staging\.wakilisha\.africa\/wp-content\/uploads\//i, "https://pgzizndxdyhqmtyywjmt.supabase.co/storage/v1/object/public/article-media/wp-import/")
-    .replace(/^\/wp-content\/uploads\//i, "https://pgzizndxdyhqmtyywjmt.supabase.co/storage/v1/object/public/article-media/wp-import/")
-    .replace(/^\/__legacy-wp-media\//i, "https://pgzizndxdyhqmtyywjmt.supabase.co/storage/v1/object/public/article-media/wp-import/")
-    .replace(/^\/legacy-wp-media\//i, "https://pgzizndxdyhqmtyywjmt.supabase.co/storage/v1/object/public/article-media/wp-import/")
+    .replace(/^http:\/\/18\.135\.76\.250\/wp-content\/uploads\//i, ARTICLE_MEDIA_BASE)
+    .replace(/^https?:\/\/(?:www\.)?wakilisha\.africa\/wp-content\/uploads\//i, ARTICLE_MEDIA_BASE)
+    .replace(/^https?:\/\/staging\.wakilisha\.africa\/wp-content\/uploads\//i, ARTICLE_MEDIA_BASE)
+    .replace(/^\/wp-content\/uploads\//i, ARTICLE_MEDIA_BASE)
+    .replace(/^\/__legacy-wp-media\//i, ARTICLE_MEDIA_BASE)
+    .replace(/^\/legacy-wp-media\//i, ARTICLE_MEDIA_BASE)
     .replace(/^http:\/\/wakilisha\.africa/i, "https://wakilisha.africa")
     .replace(/^http:\/\/www\.wakilisha\.africa/i, "https://wakilisha.africa");
 }
+
+function normalizeLegacyWpMediaHtml(html: string): string {
+  return String(html || "")
+    .replace(/http:\/\/18\.135\.76\.250\/wp-content\/uploads\//gi, ARTICLE_MEDIA_BASE)
+    .replace(/https?:\/\/(?:www\.)?wakilisha\.africa\/wp-content\/uploads\//gi, ARTICLE_MEDIA_BASE)
+    .replace(/https?:\/\/staging\.wakilisha\.africa\/wp-content\/uploads\//gi, ARTICLE_MEDIA_BASE)
+    .replace(/\/wp-content\/uploads\//gi, ARTICLE_MEDIA_BASE)
+    .replace(/\/__legacy-wp-media\//gi, ARTICLE_MEDIA_BASE)
+    .replace(/\/legacy-wp-media\//gi, ARTICLE_MEDIA_BASE);
+}
+
 
 
 type Row = Record<string, unknown>;
@@ -765,6 +781,21 @@ function firstArticleUrl(...values: unknown[]): string {
   return "";
 }
 
+
+function articleField(row: Row, raw: Row, mapped: Row, keys: string[]): string {
+  for (const key of keys) {
+    const direct = cleanText(row[key]);
+    if (direct) return direct;
+
+    const rawValue = cleanText(raw[key]);
+    if (rawValue) return rawValue;
+
+    const mappedValue = cleanText(mapped[key]);
+    if (mappedValue) return mappedValue;
+  }
+  return "";
+}
+
 async function articleHeroLookups(slug: string, row: Row, raw: Row, mapped: Row): Promise<string> {
   const direct = firstArticleUrl(
     row.hero_image_url,
@@ -834,18 +865,115 @@ async function articleHeroLookups(slug: string, row: Row, raw: Row, mapped: Row)
 
 
 async function getArticleDetail(slug: string): Promise<Record<string, unknown>> {
-  if (await hasTable("wk_content_items")) {
-    const rows = await q("select id::text, slug, title, body, excerpt, status, published_at::text, author_name, raw_record, mapped_record from wk_content_items where slug = $1 and content_type in ('article','page') limit 1", [slug]);
-    const row = rows[0];
-    if (row) {
-      const raw = parsePayload(row.raw_record);
-      const mapped = parsePayload(row.mapped_record);
-      const body = s(row, "body") || String(raw.content_html ?? raw.post_content ?? "");
-      const excerpt = s(row, "excerpt") || String(raw.excerpt ?? mapped.excerpt ?? "");
-      const heroUrl = await articleHeroLookups(slug, row, raw, mapped);
-      return { article: { id: s(row, "id"), slug: s(row, "slug"), title: s(row, "title"), section: String(raw.section ?? mapped.section ?? "Article"), dek: excerpt, author: s(row, "author_name") || "WAKILISHA Editorial", date: s(row, "published_at") || "Undated", readingTime: readingTime(excerpt, body), heroUrl, imageUrl: heroUrl, featuredImageUrl: heroUrl, contentHtml: body, tags: [], categories: [], seo: payloadText(raw, "wordpress_seo_fields") ? parsePayload(raw.wordpress_seo_fields) : {} } };
-    }
+  const requestedSlug = cleanText(slug).toLowerCase();
+
+  function articleFromRow(row: Row): Record<string, unknown> {
+    const raw = parsePayload(row.raw_record ?? row.raw_meta ?? row.metadata ?? row.source_payload ?? {});
+    const mapped = parsePayload(row.mapped_record ?? row.editable_payload ?? row.immutable_payload ?? {});
+    const wpMedia = payload(raw, "wordpress_media");
+
+    const resolvedSlug =
+      articleField(row, raw, mapped, ["slug", "post_name", "source_slug", "wp_slug"]) ||
+      requestedSlug;
+
+    const title =
+      articleField(row, raw, mapped, ["title", "post_title", "name"]) ||
+      resolvedSlug;
+
+    const body = normalizeLegacyWpMediaHtml(
+      articleField(row, raw, mapped, ["body", "content_html", "content", "post_content"]) ||
+      String(raw.content_html ?? raw.post_content ?? mapped.content_html ?? mapped.body ?? "")
+    );
+
+    const excerpt =
+      articleField(row, raw, mapped, ["excerpt", "excerpt_html", "dek", "post_excerpt"]) ||
+      "";
+
+    const heroUrl = normalizeLegacyWpMediaUrl(String(
+      wpMedia.hero_image_url ??
+      wpMedia.featured_image_url ??
+      raw.hero_image_url ??
+      raw.featured_image_url ??
+      raw.image_url ??
+      raw.thumbnail_url ??
+      raw.cover_image_url ??
+      mapped.hero_image_url ??
+      mapped.featured_image_url ??
+      mapped.image_url ??
+      mapped.thumbnail_url ??
+      row.hero_image_url ??
+      row.featured_image_url ??
+      row.image_url ??
+      row.thumbnail_url ??
+      row.cover_image_url ??
+      ""
+    ));
+
+    return {
+      article: {
+        id: articleField(row, raw, mapped, ["id", "ID", "source_wp_post_id", "legacy_wp_post_id"]) || resolvedSlug,
+        slug: resolvedSlug,
+        title,
+        section: articleField(row, raw, mapped, ["section", "category", "post_type"]) || "Article",
+        dek: excerpt,
+        author: articleField(row, raw, mapped, ["author_name", "author", "post_author"]) || "WAKILISHA Editorial",
+        date: articleField(row, raw, mapped, ["published_at", "published_date", "post_date", "updated_at", "modified_at"]) || "Undated",
+        readingTime: readingTime(excerpt, body),
+        heroUrl,
+        imageUrl: heroUrl,
+        featuredImageUrl: heroUrl,
+        contentHtml: body,
+        tags: [],
+        categories: [],
+        seo: payloadText(raw, "wordpress_seo_fields") ? parsePayload(raw.wordpress_seo_fields) : {},
+      },
+    };
   }
+
+  if (await hasTable("public.wk_articles")) {
+    const rows = await q(`
+      select *
+      from public.wk_articles a
+      where lower(coalesce(
+        to_jsonb(a)->>'slug',
+        to_jsonb(a)->>'post_name',
+        to_jsonb(a)->>'source_slug',
+        to_jsonb(a)->>'wp_slug',
+        to_jsonb(a)->'raw_record'->>'slug',
+        to_jsonb(a)->'raw_record'->>'post_name',
+        to_jsonb(a)->'raw_meta'->>'slug',
+        to_jsonb(a)->'raw_meta'->>'post_name',
+        to_jsonb(a)->'mapped_record'->>'slug',
+        to_jsonb(a)->'mapped_record'->>'post_name',
+        ''
+      )) = $1
+      limit 1
+    `, [requestedSlug]);
+
+    if (rows[0]) return articleFromRow(rows[0]);
+  }
+
+  if (await hasTable("public.wk_content_items")) {
+    const rows = await q(`
+      select *
+      from public.wk_content_items c
+      where lower(coalesce(
+        to_jsonb(c)->>'slug',
+        to_jsonb(c)->>'post_name',
+        to_jsonb(c)->>'source_slug',
+        to_jsonb(c)->>'wp_slug',
+        to_jsonb(c)->'raw_record'->>'slug',
+        to_jsonb(c)->'raw_record'->>'post_name',
+        to_jsonb(c)->'mapped_record'->>'slug',
+        to_jsonb(c)->'mapped_record'->>'post_name',
+        ''
+      )) = $1
+      limit 1
+    `, [requestedSlug]);
+
+    if (rows[0]) return articleFromRow(rows[0]);
+  }
+
   return { article: null };
 }
 
