@@ -5,8 +5,7 @@ import type {
 } from "./types";
 
 export const PUBLIC_API_BASE =
-  import.meta.env.VITE_WAKILISHA_PUBLIC_API_BASE ||
-  "/__wakilisha-v2-api/wp-json/wakilisha/v2";
+  import.meta.env.VITE_WAKILISHA_PUBLIC_API_BASE || "/api/v1";
 
 export class RepairedApiError extends Error {
   status: number;
@@ -20,7 +19,7 @@ export class RepairedApiError extends Error {
   }
 }
 
-async function fetchRepaired<T>(path: string): Promise<T> {
+async function fetchPublic<T>(path: string): Promise<T> {
   const base = PUBLIC_API_BASE.replace(/\/$/, "");
   const target = `${base}${path.startsWith("/") ? path : `/${path}`}`;
   const response = await fetch(target, {
@@ -29,7 +28,7 @@ async function fetchRepaired<T>(path: string): Promise<T> {
 
   if (!response.ok) {
     throw new RepairedApiError(
-      `Repaired API request failed: ${response.status}`,
+      `Public API request failed: ${response.status}`,
       response.status,
       response.status >= 500
     );
@@ -38,7 +37,7 @@ async function fetchRepaired<T>(path: string): Promise<T> {
   const payload = (await response.json()) as { data?: T };
   if (!payload || !("data" in payload)) {
     throw new RepairedApiError(
-      "Repaired API returned an invalid payload.",
+      "Public API returned an invalid payload.",
       502,
       true
     );
@@ -50,23 +49,23 @@ async function fetchRepaired<T>(path: string): Promise<T> {
 export function getGenre(
   slug: string
 ): Promise<RepairedGenreDetail | null> {
-  return fetchRepaired<RepairedGenreDetail | null>(
-    `/repaired/genres/${encodeURIComponent(slug)}`
+  return fetchPublic<RepairedGenreDetail | null>(
+    `/genres/${encodeURIComponent(slug)}`
   );
 }
 
 export function getLabel(
   slug: string
 ): Promise<RepairedLabelDetail | null> {
-  return fetchRepaired<RepairedLabelDetail | null>(
-    `/repaired/labels/${encodeURIComponent(slug)}`
+  return fetchPublic<RepairedLabelDetail | null>(
+    `/labels/${encodeURIComponent(slug)}`
   );
 }
 
 export function getTrack(
   slug: string
 ): Promise<RepairedTrackDetail | null> {
-  return fetchRepaired<RepairedTrackDetail | null>(
-    `/repaired/tracks/${encodeURIComponent(slug)}`
+  return fetchPublic<RepairedTrackDetail | null>(
+    `/tracks/${encodeURIComponent(slug)}`
   );
 }
