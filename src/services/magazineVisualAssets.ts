@@ -181,6 +181,24 @@ export const magazineVisualAssetStore = {
   }
 };
 
+export function useMagazineVisualAsset(id: string, publicOnly = false) {
+  const [asset, setAsset] = useState<MagazineVisualAsset | null>(null);
+  useEffect(() => {
+    let mounted = true;
+    const load = () => {
+      const request = publicOnly
+        ? magazineVisualAssetStore.getActiveForPublic(id)
+        : magazineVisualAssetStore.get(id);
+      request.then((item) => { if (mounted) setAsset(item); });
+    };
+    load();
+    const handler = () => load();
+    window.addEventListener(EVENT_NAME, handler);
+    return () => { mounted = false; window.removeEventListener(EVENT_NAME, handler); };
+  }, [id, publicOnly]);
+  return asset;
+}
+
 export function useMagazineVisualAssets() {
   const [assets, setAssets] = useState<MagazineVisualAsset[]>([]);
   const [loading, setLoading] = useState(true);
