@@ -13,6 +13,7 @@ import "./pages/admin/design-system/adminDesignSystemLayout.css";
 import { ThemeProvider } from "./components/design-system/theme/ThemeProvider";
 import { PlayerProvider } from "./context/PlayerContext";
 import { RecoveryRedirectGuard } from "./components/auth/RecoveryRedirectGuard";
+import { PageTitle } from "./components/seo/PageTitle";
 
 function App() {
   return (
@@ -21,6 +22,7 @@ function App() {
         <ThemeProvider>
           <PlayerProvider>
             <RecoveryRedirectGuard />
+            <PageTitle />
             <AppRoutes />
           </PlayerProvider>
         </ThemeProvider>
