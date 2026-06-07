@@ -6,26 +6,10 @@ import type {
 } from "./types";
 import { PublicWpApiError } from "./wpAdapter";
 
-// Deterministic base path: never use dynamic host detection.
-// In dev, Vite proxy handles routing to the local API.
-// In prod, the WordPress plugin handles routing.
-// The env var is injected by the dev script or build config.
 const RAW_BASE =
-  import.meta.env.VITE_WAKILISHA_WP_V2_API_BASE || "/wp-json/wakilisha/v2";
+  import.meta.env.VITE_WAKILISHA_PUBLIC_API_BASE || "/api/v1";
 
-// Handle __BASE_PATH__ safely: default to "/" in dev.
-// In dev mode, the Vite proxy is always at the root regardless of basePath.
-// In prod, we respect __BASE_PATH__ for sub-directory WordPress installs.
-const isDev = import.meta.env.DEV;
-const BASE_PATH = isDev
-  ? "/"
-  : typeof __BASE_PATH__ !== "undefined"
-    ? __BASE_PATH__
-    : "/";
-
-// Ensure the base path is prepended to the API base if needed.
-// RAW_BASE already starts with "/", so we strip any trailing slash from BASE_PATH
-// and prepend it to RAW_BASE.
+const BASE_PATH = "/";
 const normalizedBasePath = BASE_PATH.replace(/\/$/, "");
 export const PUBLIC_V2_API_BASE = normalizedBasePath + RAW_BASE;
 
@@ -141,17 +125,17 @@ async function v2Request<T>(path: string): Promise<T> {
     clearTimeout(timeoutId);
     if (err instanceof PublicWpApiError) throw err;
     if (err instanceof Error && err.name === "AbortError") {
-      throw new PublicWpApiError("V2 request timed out after 30 seconds", 504, "timeout", true);
+      throw new PublicWpApiError("Public chart request timed out after 30 seconds", 504, "timeout", true);
     }
     if (err instanceof TypeError) {
       throw new PublicWpApiError(
-        "Network error: unable to reach WAKILISHA Charts V2 API.",
+        "Network error: unable to reach WAKILISHA public API.",
         0,
         "network_error",
         true
       );
     }
-    throw new PublicWpApiError(err instanceof Error ? err.message : "Unknown V2 API error", 500, "unknown", false);
+    throw new PublicWpApiError(err instanceof Error ? err.message : "Unknown public API error", 500, "unknown", false);
   }
 }
 
@@ -166,7 +150,7 @@ async function v2Get<T>(path: string, retries = 3): Promise<T> {
       await new Promise((resolve) => setTimeout(resolve, 1000 * Math.pow(2, i)));
     }
   }
-  throw lastErr ?? new PublicWpApiError("Unknown V2 error after retries", 500, "unknown", false);
+  throw lastErr ?? new PublicWpApiError("Unknown public API error after retries", 500, "unknown", false);
 }
 
 function unwrap<T>(envelope: ApiEnvelope<T> | T): T {
@@ -244,7 +228,7 @@ function toEntry(entry: V2Entry, editionSlug: string): ChartEditionEntry {
     artworkUrl: entry.artworkUrl,
     score: typeof entry.score === "number" ? entry.score : 0,
     entryPayload: {
-      source: "wakilisha-v2-api",
+      source: "wakilisha-public-api",
       sourceEntryId: entry.sourceEntryId ?? entry.id,
     },
   };
@@ -291,5 +275,5 @@ export async function getV2TrackChartHistory(trackSlug: string): Promise<TrackCh
 }
 
 export async function testPublicV2Connection(): Promise<V2Health> {
-  return unwrap<V2Health>(await v2Get<ApiEnvelope<V2Health> | V2Health>("/charts/health"));
+  return unwrap<V2Health>(await v2Get<ApiEnvelope<V2Health> | V2Health>("/health"));
 }
