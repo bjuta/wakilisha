@@ -45,18 +45,20 @@ function apiToViewModel(api: RepairedTrackDetail): TrackViewModel {
   const labelData = raw.label ?? null;
   const artistName = artistData.name || metadata.artist_name || metadata.artist || "WAKILISHA Registry";
   const resolvedArtistSlug = artistData.slug || metadata.artistSlug || metadata.artist_slug || "";
-  const history = raw.chartHistory || [];
+  const history = Array.isArray(raw.chartHistory) ? raw.chartHistory : [];
   const currentRank = raw.currentRank ?? metadata.topChartPosition ?? 0;
-  const prevIdx = history.length > 1 ? 1 : -1;
-  const prevRank = prevIdx >= 0 ? history[prevIdx] : 0;
+  const prevRank = raw.previousRank ?? (history.length > 1 ? history[history.length - 2] : 0);
 
-  let movement: TrackViewModel["movement"] = "same";
-  let movementAmount = 0;
-  if (history.length <= 1) {
-    movement = "new";
-  } else if (currentRank > 0 && prevRank > 0) {
-    if (currentRank < prevRank) { movement = "up"; movementAmount = prevRank - currentRank; }
-    else if (currentRank > prevRank) { movement = "down"; movementAmount = currentRank - prevRank; }
+  const rawMovement = String(raw.movement || "").toLowerCase();
+  let movement: TrackViewModel["movement"] = ["up", "down", "new", "same"].includes(rawMovement)
+    ? (rawMovement as TrackViewModel["movement"])
+    : "same";
+  let movementAmount = Number(raw.movementAmount ?? 0) || 0;
+
+  if (!rawMovement) {
+    if (!prevRank || prevRank <= 0) movement = "new";
+    else if (currentRank > 0 && currentRank < prevRank) { movement = "up"; movementAmount = prevRank - currentRank; }
+    else if (currentRank > 0 && currentRank > prevRank) { movement = "down"; movementAmount = currentRank - prevRank; }
   }
 
   const primaryGenre = api.genres && api.genres.length > 0 ? api.genres[0].name : "Unknown";
@@ -74,8 +76,8 @@ function apiToViewModel(api: RepairedTrackDetail): TrackViewModel {
     label: labelData?.name || metadata.label_name || "Unknown",
     labelSlug: labelData?.slug || "",
     rank: currentRank,
-    peakPosition: raw.peakRank ?? currentRank,
-    weeksOnChart: raw.weeksOnChart ?? metadata.chartCount ?? 0,
+    peakPosition: raw.peakRank ?? metadata.topChartPosition ?? currentRank,
+    weeksOnChart: raw.weeksOnChart ?? metadata.chartCount ?? history.length ?? 0,
     movement,
     movementAmount,
     previousWeek: prevRank > 0 ? prevRank : null,

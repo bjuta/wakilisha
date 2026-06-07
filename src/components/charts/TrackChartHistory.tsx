@@ -166,7 +166,7 @@ export function TrackChartHistorySection({
             return (
               <Link
                 key={appearance.editionSlug}
-                to={`/charts/weekly-top-40/${appearance.editionSlug}`}
+                to={`/charts/charts-kenya/${appearance.editionSlug}`}
                 className="grid grid-cols-[60px_1fr_80px_60px] gap-2 items-center px-4 py-3 transition-colors hover:bg-[var(--wk-bg)]"
               >
                 <div className="text-[16px] font-black text-[var(--wk-brand)]">#{appearance.rank}</div>
@@ -194,7 +194,7 @@ export function TrackChartHistorySection({
           ? "From mock data"
           : state.meta.source === "cache"
           ? "From cache"
-          : "From WordPress API"}
+          : "From WAKILISHA API"}
         {" · "}
         {new Date(state.meta.fetchedAt).toLocaleTimeString()}
       </div>

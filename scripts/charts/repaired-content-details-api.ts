@@ -450,6 +450,134 @@ async function artistListForGenre(genreId: string): Promise<Row[]> {
   `, [genreId]);
 }
 
+async function trackChartStats(trackSlug: string, artistSlug = "", trackTitle = ""): Promise<{
+  currentRank: number;
+  previousRank: number | null;
+  peakRank: number;
+  weeksOnChart: number;
+  chartAppearanceCount?: number;
+  movement: string;
+  movementAmount: number;
+  chartHistory: number[];
+  chartAppearances: Row[];
+}> {
+  if (!(await hasTable("wk_chart_entries_v2"))) {
+    return {
+      currentRank: 0,
+      previousRank: null,
+      peakRank: 0,
+      weeksOnChart: 0,
+      movement: "same",
+      movementAmount: 0,
+      chartHistory: [],
+      chartAppearances: [],
+    };
+  }
+
+  const appearances = await q(`
+    select
+      ce.edition_id::text as edition_id,
+      coalesce(ed.edition_slug, '') as edition_slug,
+      coalesce(ed.edition_label, ed.edition_slug, '') as edition_label,
+      coalesce(ed.edition_date::text, ed.period_start::text, '') as edition_date,
+      coalesce(ce.rank, 0)::int as rank,
+      nullif(ce.previous_rank, 0)::int as previous_rank,
+      coalesce(ce.movement, '') as movement,
+      coalesce(ce.track_slug, $1) as track_slug,
+      coalesce(ce.track_title, $3, $1) as track_title,
+      coalesce(ce.artist_slug, '') as artist_slug,
+      coalesce(ce.artist_name, '') as artist_name,
+      coalesce(ce.artwork_url, '') as artwork_url
+    from wk_chart_entries_v2 ce
+    left join wk_chart_editions_v2 ed
+      on ed.id::text = ce.edition_id::text
+    where (
+      ce.track_slug = $1
+      or lower(ce.track_title) = lower($3)
+      or lower(regexp_replace(coalesce(ce.track_title, ''), '[^a-zA-Z0-9]+', '-', 'g')) = $1
+    )
+    order by
+      case
+        when $2 <> '' and ce.artist_slug = $2 then 0
+        when $2 <> '' and ce.artist_slug like $2 || '-%' then 1
+        when $2 <> '' and lower(ce.artist_name) like '%' || replace($2, '-', ' ') || '%' then 2
+        else 3
+      end,
+      coalesce(ed.edition_date, ed.period_start, ed.period_end) desc nulls last,
+      ed.edition_slug desc
+    limit 120
+  `, [trackSlug, artistSlug, trackTitle]);
+
+  if (!appearances.length) {
+    return {
+      currentRank: 0,
+      previousRank: null,
+      peakRank: 0,
+      weeksOnChart: 0,
+      movement: "same",
+      movementAmount: 0,
+      chartHistory: [],
+      chartAppearances: [],
+    };
+  }
+
+  const latestDate = s(appearances[0], "edition_date");
+  const latestAppearances = appearances.filter((row) => s(row, "edition_date") === latestDate);
+  const latest = latestAppearances
+    .slice()
+    .sort((a, b) => n(a, "rank") - n(b, "rank"))[0] || appearances[0];
+
+  const previous = appearances.find((row) => s(row, "edition_date") < latestDate) ?? null;
+
+  const currentRank = n(latest, "rank");
+  const previousRank = n(latest, "previous_rank") || (previous ? n(previous, "rank") : null);
+
+  const ranks = appearances
+    .map((row) => n(row, "rank"))
+    .filter((rank) => rank > 0);
+
+  const peakRank = ranks.length ? Math.min(...ranks) : 0;
+  const weeksOnChart = new Set(
+    appearances.map((row) => s(row, "edition_date")).filter(Boolean)
+  ).size;
+  const chartAppearanceCount = appearances.length;
+
+  let movement = s(latest, "movement");
+  let movementAmount = 0;
+
+  if (!["up", "down", "new", "same", "re_entry"].includes(movement)) {
+    if (!previousRank || previousRank <= 0) {
+      movement = "new";
+    } else if (currentRank > 0 && currentRank < previousRank) {
+      movement = "up";
+      movementAmount = previousRank - currentRank;
+    } else if (currentRank > 0 && currentRank > previousRank) {
+      movement = "down";
+      movementAmount = currentRank - previousRank;
+    } else {
+      movement = "same";
+    }
+  } else if (previousRank && currentRank > 0) {
+    movementAmount = Math.abs(previousRank - currentRank);
+  }
+
+  return {
+    currentRank,
+    previousRank,
+    peakRank,
+    weeksOnChart,
+    chartAppearanceCount,
+    movement,
+    movementAmount,
+    chartHistory: appearances
+      .slice()
+      .reverse()
+      .map((row) => n(row, "rank"))
+      .filter((rank) => rank > 0),
+    chartAppearances: appearances,
+  };
+}
+
 async function getTrackDetail(slug: string, artistSlug = ""): Promise<Record<string, unknown>> {
   const rows = await q(`
     select rt.id::text, rt.slug, rt.title, rt.normalized_title, rt.isrc, rt.duration_ms, rt.explicit, rt.artwork_url, rt.preview_url, rt.metadata,
@@ -462,11 +590,38 @@ async function getTrackDetail(slug: string, artistSlug = ""): Promise<Record<str
 
   const row = rows[0];
   if (row) {
-    return { track: {
-      id: s(row, "id"), slug: s(row, "slug"), title: s(row, "title"), normalizedTitle: s(row, "normalized_title"), isrc: maybe(row, "isrc"), duration: n(row, "duration_ms"), explicit: row.explicit === true || String(row.explicit).toLowerCase() === "true",
-      artworkUrl: s(row, "artwork_url") || s(row, "release_artwork_url") || placeholder("track", s(row, "id")), previewUrl: maybe(row, "preview_url"), metadata: parsePayload(row.metadata),
-      release: s(row, "release_slug") ? { slug: s(row, "release_slug"), title: s(row, "release_title") } : null,
-    } };
+    const stats = await trackChartStats(s(row, "slug"), artistSlug, s(row, "title"));
+    return {
+      track: {
+        id: s(row, "id"),
+        slug: s(row, "slug"),
+        title: s(row, "title"),
+        normalizedTitle: s(row, "normalized_title"),
+        isrc: maybe(row, "isrc"),
+        duration: n(row, "duration_ms"),
+        explicit: row.explicit === true || String(row.explicit).toLowerCase() === "true",
+        artworkUrl: s(row, "artwork_url") || s(row, "release_artwork_url") || placeholder("track", s(row, "id")),
+        previewUrl: maybe(row, "preview_url"),
+        metadata: parsePayload(row.metadata),
+        release: s(row, "release_slug") ? { slug: s(row, "release_slug"), title: s(row, "release_title") } : null,
+      },
+      currentRank: stats.currentRank,
+      previousRank: stats.previousRank,
+      peakRank: stats.peakRank,
+      weeksOnChart: stats.weeksOnChart,
+      chartAppearanceCount: stats.chartAppearanceCount,
+      movement: stats.movement,
+      movementAmount: stats.movementAmount,
+      chartHistory: stats.chartHistory,
+      chartAppearances: stats.chartAppearances.map((entry) => ({
+        editionSlug: s(entry, "edition_slug"),
+        editionLabel: s(entry, "edition_label"),
+        date: s(entry, "edition_date"),
+        rank: n(entry, "rank"),
+        previousRank: n(entry, "previous_rank") || null,
+        movement: s(entry, "movement"),
+      })),
+    };
   }
 
   if (await hasTable("wk_chart_entries_v2")) {
@@ -488,25 +643,43 @@ async function getTrackDetail(slug: string, artistSlug = ""): Promise<Record<str
     `, [slug, artistSlug]);
     const chart = chartRows[0];
     if (chart) {
-      return { track: {
-        id: s(chart, "slug"),
-        slug: s(chart, "slug"),
-        title: s(chart, "title"),
-        normalizedTitle: s(chart, "title").toLowerCase(),
-        isrc: null,
-        duration: 0,
-        explicit: false,
-        artworkUrl: s(chart, "artwork_url") || placeholder("track", s(chart, "slug")),
-        previewUrl: null,
-        metadata: {
-          source: "wk_chart_entries_v2",
-          artist: s(chart, "artist"),
-          artistSlug: s(chart, "artist_slug"),
-          chartCount: n(chart, "chart_count"),
-          topChartPosition: n(chart, "top_chart_position"),
+      const stats = await trackChartStats(s(chart, "slug"), artistSlug, s(chart, "title"));
+      return {
+        track: {
+          id: s(chart, "slug"),
+          slug: s(chart, "slug"),
+          title: s(chart, "title"),
+          normalizedTitle: s(chart, "title").toLowerCase(),
+          isrc: null,
+          duration: 0,
+          explicit: false,
+          artworkUrl: s(chart, "artwork_url") || placeholder("track", s(chart, "slug")),
+          previewUrl: null,
+          metadata: {
+            source: "wk_chart_entries_v2",
+            artist: s(chart, "artist"),
+            artistSlug: s(chart, "artist_slug"),
+            chartCount: stats.weeksOnChart,
+            topChartPosition: stats.peakRank,
+          },
+          release: null,
         },
-        release: null,
-      } };
+        currentRank: stats.currentRank,
+        previousRank: stats.previousRank,
+        peakRank: stats.peakRank,
+        weeksOnChart: stats.weeksOnChart,
+        movement: stats.movement,
+        movementAmount: stats.movementAmount,
+        chartHistory: stats.chartHistory,
+        chartAppearances: stats.chartAppearances.map((entry) => ({
+          editionSlug: s(entry, "edition_slug"),
+          editionLabel: s(entry, "edition_label"),
+          date: s(entry, "edition_date"),
+          rank: n(entry, "rank"),
+          previousRank: n(entry, "previous_rank") || null,
+          movement: s(entry, "movement"),
+        })),
+      };
     }
   }
 
