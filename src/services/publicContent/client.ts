@@ -160,7 +160,7 @@ export type RepairedArtistDetail = PublicArtistDetail;
 
 const API_BASE =
   (import.meta.env.VITE_WAKILISHA_PUBLIC_API_BASE as string | undefined) ||
-  "/api/wakilisha/v1";
+  "/api/v1";
 
 type Envelope<T> = {
   data: T;
