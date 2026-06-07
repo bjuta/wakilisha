@@ -8,6 +8,10 @@
 
 import * as mockAdapter from "./api";
 import * as ingestStudioMock from "./ingestStudioMock";
+import {
+  detectProvidersFromUrls,
+  isValidProviderUrl,
+} from "./providerDetection";
 
 export type IngestionMode = "local";
 export const CHARTS_INGESTION_MODE: IngestionMode = "local";
@@ -166,6 +170,20 @@ export function getIngestStudioEndpointGroups(): Record<string, EndpointDefiniti
     "Ingest Studio Runtime API": INGEST_STUDIO_WP_ENDPOINTS.map((endpoint) => ({ ...endpoint, status: getEndpointStatus(endpoint.frontendFunction) })),
   };
 }
+
+export { detectProvidersFromUrls, isValidProviderUrl };
+
+export const runDryRun = ingestStudioAdapter.runDryRun;
+export const commitIngestRun = ingestStudioAdapter.commitIngestRun;
+export const cancelIngestRun = ingestStudioAdapter.cancelIngestRun;
+export const retryIngestRun = ingestStudioAdapter.retryIngestRun;
+export const getIngestRuns = ingestStudioAdapter.getIngestRuns;
+export const getIngestKpis = ingestStudioAdapter.getIngestKpis;
+export const getRecentIngestActivity = ingestStudioAdapter.getRecentIngestActivity;
+export const getResourceGuardStatus = ingestStudioAdapter.getResourceGuardStatus;
+export const sendGapsToReview = ingestStudioAdapter.sendGapsToReview;
+export const applyRowMatchDecision = ingestStudioAdapter.applyRowMatchDecision;
+export const validateRunReadiness = ingestStudioAdapter.validateRunReadiness;
 
 export const resetStore = adapter.resetStore;
 export const resetDemo = adapter.resetDemo;
