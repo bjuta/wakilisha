@@ -80,13 +80,18 @@ function parseTagNames(tags: any): string[] {
   }).filter(Boolean);
 }
 
+function normalizePath(raw: string): string {
+  return raw.replace(/^\/repaired(?=\/|$)/, "").replace(/\/$/, "") || "/";
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
   const url = new URL(req.url);
-  const path = url.pathname.replace(/^\/wakilisha-public-api/, "");
+  const rawPath = url.pathname.replace(/^\/wakilisha-public-api/, "");
+  const path = normalizePath(rawPath);
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -95,9 +100,9 @@ Deno.serve(async (req) => {
   try {
     let data: unknown;
 
-    // ARTICLE DETAIL
-    if (path.startsWith("/repaired/magazine/") && path !== "/repaired/magazine" && path !== "/repaired/magazine/") {
-      const slug = path.replace(/^\/repaired\/magazine\//, "").replace(/\/$/, "");
+    // ── ARTICLE DETAIL ──
+    if (path.startsWith("/magazine/") && path !== "/magazine" && path !== "/magazine/") {
+      const slug = path.replace(/^\/magazine\//, "").replace(/\/$/, "");
 
       const { data: article } = await supabase
         .from("wk_articles")
@@ -141,8 +146,8 @@ Deno.serve(async (req) => {
       };
     }
 
-    // MAGAZINE LISTING
-    else if (path === "/repaired/magazine" || path === "/repaired/magazine/") {
+    // ── MAGAZINE LISTING ──
+    else if (path === "/magazine" || path === "/magazine/") {
       const { data: articles } = await supabase
         .from("wk_articles")
         .select("id, slug, title, excerpt, author, published_at, content_html, categories, hero_image_url, seo")
@@ -178,9 +183,9 @@ Deno.serve(async (req) => {
       };
     }
 
-    // ARTIST DETAIL
-    else if (path.startsWith("/repaired/artists/")) {
-      const slug = path.replace(/^\/repaired\/artists\//, "").replace(/\/$/, "");
+    // ── ARTIST DETAIL ──
+    else if (path.startsWith("/artists/")) {
+      const slug = path.replace(/^\/artists\//, "").replace(/\/$/, "");
 
       const { data: artist } = await supabase
         .from("registry_artists")
@@ -342,7 +347,6 @@ Deno.serve(async (req) => {
       // === RELATED ARTISTS — canonical graph first ===
       const relatedArtists: any[] = [];
 
-      // PHASE 1: Try metadata.related_artists (legacy path — rarely populated)
       const metaRelated = meta.related_artists;
       if (Array.isArray(metaRelated) && metaRelated.length > 0) {
         const relatedSlugs: string[] = [];
@@ -383,7 +387,6 @@ Deno.serve(async (req) => {
         }
       }
 
-      // PHASE 2: Query canonical graph artist relationships from staging records
       if (relatedArtists.length === 0) {
         const { data: artistIdRow } = await supabase
           .from("wk_import_staging_records")
@@ -489,7 +492,6 @@ Deno.serve(async (req) => {
         }
       }
 
-      // PHASE 3: Fallback to same-country artists
       if (relatedArtists.length === 0 && artist.origin_iso2) {
         const { data: sameCountry } = await supabase
           .from("registry_artists")
@@ -550,8 +552,8 @@ Deno.serve(async (req) => {
       };
     }
 
-    // ARTISTS LISTING
-    else if (path === "/repaired/artists" || path === "/repaired/artists/") {
+    // ── ARTISTS LISTING ──
+    else if (path === "/artists" || path === "/artists/") {
       const { data: artists } = await supabase
         .from("registry_artists")
         .select("id, slug, display_name, origin_iso2, public_image_url, status, metadata")
@@ -575,9 +577,11 @@ Deno.serve(async (req) => {
       };
     }
 
-    // RELEASE DETAIL
-    else if (path.startsWith("/repaired/releases/")) {
-      const relSlug = path.replace(/^\/repaired\/releases\//, "").replace(/\/$/, "").split("/").pop() || "";
+    // ── RELEASE DETAIL ──
+    else if (path.startsWith("/releases/")) {
+      const relSegments = path.replace(/^\/releases\//, "").split("/").filter(Boolean);
+      const relSlug = relSegments[relSegments.length - 1] || "";
+
       const { data: release } = await supabase
         .from("registry_releases")
         .select("id, slug, title, release_date, release_type, artwork_url, label_id, metadata, status, description")
@@ -636,8 +640,8 @@ Deno.serve(async (req) => {
       };
     }
 
-    // RELEASES LISTING
-    else if (path === "/repaired/releases" || path === "/repaired/releases/") {
+    // ── RELEASES LISTING ──
+    else if (path === "/releases" || path === "/releases/") {
       const { data: releases } = await supabase
         .from("registry_releases")
         .select("id, slug, title, release_date, release_type, artwork_url, label_id, status, description")
@@ -661,9 +665,9 @@ Deno.serve(async (req) => {
       };
     }
 
-    // GENRE DETAIL
-    else if (path.startsWith("/repaired/genres/")) {
-      const gSlug = path.replace(/^\/repaired\/genres\//, "").replace(/\/$/, "");
+    // ── GENRE DETAIL ──
+    else if (path.startsWith("/genres/")) {
+      const gSlug = path.replace(/^\/genres\//, "").replace(/\/$/, "");
       const { data: genre } = await supabase
         .from("registry_genres").select("id, slug, name, description, status")
         .eq("slug", gSlug).eq("status", "active").maybeSingle();
@@ -708,8 +712,8 @@ Deno.serve(async (req) => {
       };
     }
 
-    // GENRES LISTING
-    else if (path === "/repaired/genres" || path === "/repaired/genres/") {
+    // ── GENRES LISTING ──
+    else if (path === "/genres" || path === "/genres/") {
       const { data: genres } = await supabase
         .from("registry_genres").select("id, slug, name, description, status")
         .eq("status", "active").order("name", { ascending: true });
@@ -737,9 +741,9 @@ Deno.serve(async (req) => {
       };
     }
 
-    // LABEL DETAIL
-    else if (path.startsWith("/repaired/labels/")) {
-      const lSlug = path.replace(/^\/repaired\/labels\//, "").replace(/\/$/, "");
+    // ── LABEL DETAIL ──
+    else if (path.startsWith("/labels/")) {
+      const lSlug = path.replace(/^\/labels\//, "").replace(/\/$/, "");
       const { data: label } = await supabase
         .from("registry_labels").select("id, slug, name, description, country_code, status")
         .eq("slug", lSlug).eq("status", "active").maybeSingle();
@@ -786,8 +790,8 @@ Deno.serve(async (req) => {
       };
     }
 
-    // LABELS LISTING
-    else if (path === "/repaired/labels" || path === "/repaired/labels/") {
+    // ── LABELS LISTING ──
+    else if (path === "/labels" || path === "/labels/") {
       const { data: labels } = await supabase
         .from("registry_labels").select("id, slug, name, country_code, description, status")
         .eq("status", "active").order("name", { ascending: true }).limit(500);
@@ -796,9 +800,11 @@ Deno.serve(async (req) => {
       };
     }
 
-    // TRACK DETAIL
-    else if (path.startsWith("/repaired/tracks/")) {
-      const tSlug = path.replace(/^\/repaired\/tracks\//, "").replace(/\/$/, "");
+    // ── TRACK DETAIL ──
+    else if (path.startsWith("/tracks/")) {
+      const tSegments = path.replace(/^\/tracks\//, "").split("/").filter(Boolean);
+      const tSlug = tSegments[tSegments.length - 1] || "";
+
       const { data: track } = await supabase
         .from("registry_tracks").select("id, slug, title, duration_ms, artwork_url, isrc, explicit, track_number, disc_number, release_id, metadata, status")
         .eq("slug", tSlug).maybeSingle();
@@ -840,53 +846,248 @@ Deno.serve(async (req) => {
       };
     }
 
-    // CHARTS
+    // ── CHARTS — list all programs ──
     else if (path === "/charts" || path === "/charts/") {
       const { data: programs } = await supabase
-        .from("chart_programs").select("id, public_slug, label, series_slug, market_slug, default_chart_size, default_period_type, default_methodology_version, status")
-        .eq("status", "active").order("label", { ascending: true });
-      data = { programs: (programs ?? []).map((p: any) => ({ id: String(p.id), publicSlug: String(p.public_slug), publicLabel: String(p.label), shortLabel: String(p.label), sourceFamilySlug: String(p.public_slug), seriesSlug: String(p.series_slug || ""), seriesLabel: String(p.series_slug || ""), marketSlug: String(p.market_slug || ""), marketLabel: String(p.market_slug || ""), periodType: String(p.default_period_type || "weekly"), methodologyVersion: String(p.default_methodology_version || "legacy-import-v1"), eligibilityRulesVersion: "legacy-import-v1", latestEdition: null, archive: [] })) };
+        .from("chart_programs")
+        .select("id, public_slug, label, series_slug, market_slug, default_chart_size, default_period_type, default_methodology_version, status")
+        .eq("status", "active")
+        .order("label", { ascending: true });
+
+      const programsWithEditions = await Promise.all((programs ?? []).map(async (p: any) => {
+        const { data: editions } = await supabase
+          .from("chart_editions")
+          .select("edition_slug, edition_label, edition_date, period_start, period_end, entry_count, status")
+          .eq("program_id", p.id)
+          .eq("status", "published")
+          .order("edition_date", { ascending: false });
+
+        const latestEdition = editions && editions.length > 0
+          ? {
+              id: String(editions[0].edition_slug),
+              slug: String(editions[0].edition_slug),
+              label: String(editions[0].edition_label),
+              date: String(editions[0].edition_date),
+              periodStart: editions[0].period_start || null,
+              periodEnd: editions[0].period_end || null,
+              entryCount: editions[0].entry_count || 0,
+            }
+          : null;
+
+        return {
+          id: String(p.id),
+          publicSlug: String(p.public_slug),
+          publicLabel: String(p.label),
+          shortLabel: String(p.label),
+          sourceFamilySlug: String(p.public_slug),
+          seriesSlug: String(p.series_slug || ""),
+          seriesLabel: String(p.series_slug || ""),
+          marketSlug: String(p.market_slug || ""),
+          marketLabel: String(p.market_slug || ""),
+          periodType: String(p.default_period_type || "weekly"),
+          methodologyVersion: String(p.default_methodology_version || "legacy-import-v1"),
+          eligibilityRulesVersion: "legacy-import-v1",
+          latestEdition,
+          archive: (editions ?? []).map((e: any) => ({
+            id: String(e.edition_slug),
+            slug: String(e.edition_slug),
+            label: String(e.edition_label),
+            date: String(e.edition_date),
+            periodStart: e.period_start || null,
+            periodEnd: e.period_end || null,
+            entryCount: e.entry_count || 0,
+          })),
+        };
+      }));
+
+      data = { programs: programsWithEditions };
     }
 
+    // ── CHARTS — single program, latest edition, or edition entries ──
     else if (path.startsWith("/charts/")) {
       const chartPath = path.replace(/^\/charts\//, "");
       const segments = chartPath.split("/").filter(Boolean);
+
       if (segments.length === 1) {
         const slug = segments[0];
         const { data: program } = await supabase
-          .from("chart_programs").select("id, public_slug, label, series_slug, market_slug, default_chart_size, default_period_type, default_methodology_version, status")
-          .eq("public_slug", slug).eq("status", "active").maybeSingle();
+          .from("chart_programs")
+          .select("id, public_slug, label, series_slug, market_slug, default_chart_size, default_period_type, default_methodology_version, status")
+          .eq("public_slug", slug)
+          .eq("status", "active")
+          .maybeSingle();
+
         if (!program) return jsonResponse({ error: "Not found" }, 404);
+
         const { data: editions } = await supabase
-          .from("chart_editions").select("edition_slug, edition_label, edition_date, period_start, period_end, entry_count, status")
-          .eq("program_id", program.id).eq("status", "published").order("edition_date", { ascending: false });
+          .from("chart_editions")
+          .select("edition_slug, edition_label, edition_date, period_start, period_end, entry_count, status")
+          .eq("program_id", program.id)
+          .eq("status", "published")
+          .order("edition_date", { ascending: false });
+
+        const latestEdition = editions && editions.length > 0
+          ? {
+              id: String(editions[0].edition_slug),
+              slug: String(editions[0].edition_slug),
+              label: String(editions[0].edition_label),
+              date: String(editions[0].edition_date),
+              periodStart: editions[0].period_start || null,
+              periodEnd: editions[0].period_end || null,
+              entryCount: editions[0].entry_count || 0,
+            }
+          : null;
+
         data = {
           program: {
-            id: String(program.id), publicSlug: String(program.public_slug), publicLabel: String(program.label),
-            shortLabel: String(program.label), sourceFamilySlug: String(program.public_slug),
-            seriesSlug: String(program.series_slug || ""), seriesLabel: String(program.series_slug || ""),
-            marketSlug: String(program.market_slug || ""), marketLabel: String(program.market_slug || ""),
+            id: String(program.id),
+            publicSlug: String(program.public_slug),
+            publicLabel: String(program.label),
+            shortLabel: String(program.label),
+            sourceFamilySlug: String(program.public_slug),
+            seriesSlug: String(program.series_slug || ""),
+            seriesLabel: String(program.series_slug || ""),
+            marketSlug: String(program.market_slug || ""),
+            marketLabel: String(program.market_slug || ""),
             periodType: String(program.default_period_type || "weekly"),
             methodologyVersion: String(program.default_methodology_version || "legacy-import-v1"),
             eligibilityRulesVersion: "legacy-import-v1",
-            latestEdition: editions && editions.length > 0 ? { id: String(editions[0].edition_slug), slug: String(editions[0].edition_slug), label: String(editions[0].edition_label), date: String(editions[0].edition_date), periodStart: editions[0].period_start, periodEnd: editions[0].period_end, entryCount: editions[0].entry_count } : null,
-            archive: (editions ?? []).map((e: any) => ({ id: String(e.edition_slug), slug: String(e.edition_slug), label: String(e.edition_label), date: String(e.edition_date), periodStart: e.period_start, periodEnd: e.period_end, entryCount: e.entry_count })),
+            latestEdition,
+            archive: (editions ?? []).map((e: any) => ({
+              id: String(e.edition_slug),
+              slug: String(e.edition_slug),
+              label: String(e.edition_label),
+              date: String(e.edition_date),
+              periodStart: e.period_start || null,
+              periodEnd: e.period_end || null,
+              entryCount: e.entry_count || 0,
+            })),
           },
         };
-      } else {
-        const slug = segments[0];
-        const editionSlug = segments[1];
+      }
+
+      else if (segments.length === 2) {
+        const [slug, second] = segments;
+
         const { data: program } = await supabase
-          .from("chart_programs").select("id, public_slug, label, series_slug, market_slug")
-          .eq("public_slug", slug).eq("status", "active").maybeSingle();
+          .from("chart_programs")
+          .select("id, public_slug, label, series_slug, market_slug, default_chart_size, default_period_type, default_methodology_version, status")
+          .eq("public_slug", slug)
+          .eq("status", "active")
+          .maybeSingle();
+
         if (!program) return jsonResponse({ error: "Not found" }, 404);
-        const { data: edition } = await supabase
-          .from("chart_editions").select("edition_slug, edition_label, edition_date, period_start, period_end, entry_count, status")
-          .eq("program_id", program.id).eq("edition_slug", editionSlug).maybeSingle();
-        data = {
-          edition: edition ? { id: String(edition.edition_slug), slug: String(edition.edition_slug), label: String(edition.edition_label), date: String(edition.edition_date), periodStart: edition.period_start, periodEnd: edition.period_end, entryCount: edition.entry_count } : null,
-          program: { id: String(program.id), publicSlug: String(program.public_slug), publicLabel: String(program.label), seriesSlug: String(program.series_slug || ""), seriesLabel: String(program.series_slug || ""), marketSlug: String(program.market_slug || ""), marketLabel: String(program.market_slug || "") },
+
+        const programVM = {
+          id: String(program.id),
+          publicSlug: String(program.public_slug),
+          publicLabel: String(program.label),
+          seriesSlug: String(program.series_slug || ""),
+          seriesLabel: String(program.series_slug || ""),
+          marketSlug: String(program.market_slug || ""),
+          marketLabel: String(program.market_slug || ""),
         };
+
+        if (second === "latest") {
+          const { data: editions } = await supabase
+            .from("chart_editions")
+            .select("edition_slug, edition_label, edition_date, period_start, period_end, entry_count, status")
+            .eq("program_id", program.id)
+            .eq("status", "published")
+            .order("edition_date", { ascending: false })
+            .limit(1);
+
+          const latestEdition = editions && editions.length > 0
+            ? {
+                id: String(editions[0].edition_slug),
+                slug: String(editions[0].edition_slug),
+                label: String(editions[0].edition_label),
+                date: String(editions[0].edition_date),
+                periodStart: editions[0].period_start || null,
+                periodEnd: editions[0].period_end || null,
+                entryCount: editions[0].entry_count || 0,
+              }
+            : null;
+
+          data = {
+            edition: latestEdition,
+            program: programVM,
+          };
+        } else {
+          const { data: edition } = await supabase
+            .from("chart_editions")
+            .select("edition_slug, edition_label, edition_date, period_start, period_end, entry_count, status")
+            .eq("program_id", program.id)
+            .eq("edition_slug", second)
+            .maybeSingle();
+
+          data = {
+            edition: edition
+              ? {
+                  id: String(edition.edition_slug),
+                  slug: String(edition.edition_slug),
+                  label: String(edition.edition_label),
+                  date: String(edition.edition_date),
+                  periodStart: edition.period_start || null,
+                  periodEnd: edition.period_end || null,
+                  entryCount: edition.entry_count || 0,
+                }
+              : null,
+            program: programVM,
+          };
+        }
+      }
+
+      else if (segments.length === 3 && segments[2] === "entries") {
+        const [slug, editionSlug] = segments;
+
+        const { data: program } = await supabase
+          .from("chart_programs")
+          .select("id, public_slug, label, series_slug, market_slug")
+          .eq("public_slug", slug)
+          .eq("status", "active")
+          .maybeSingle();
+
+        if (!program) return jsonResponse({ error: "Not found" }, 404);
+
+        const { data: edition } = await supabase
+          .from("chart_editions")
+          .select("id, edition_slug, edition_label, edition_date, entry_count, status")
+          .eq("program_id", program.id)
+          .eq("edition_slug", editionSlug)
+          .maybeSingle();
+
+        if (!edition) return jsonResponse({ error: "Edition not found" }, 404);
+
+        const { data: entries } = await supabase
+          .from("chart_entries")
+          .select("id, rank, previous_rank, movement, track_slug, track_title, artist_name, artwork_url, score, source_entry_id")
+          .eq("edition_id", edition.id)
+          .order("rank", { ascending: true })
+          .limit(150);
+
+        const entryList = (entries ?? []).map((e: any) => ({
+          id: String(e.id),
+          rank: Number(e.rank || 0),
+          previousRank: e.previous_rank != null ? Number(e.previous_rank) : null,
+          movement: String(e.movement || "same"),
+          trackSlug: String(e.track_slug || ""),
+          trackTitle: String(e.track_title || ""),
+          artistNames: String(e.artist_name || "").split(",").map((s: string) => s.trim()).filter(Boolean),
+          artistSlugs: String(e.artist_name || "")
+            .split(",")
+            .map((s: string) => s.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+$/, ""))
+            .filter(Boolean),
+          artworkUrl: e.artwork_url || null,
+          score: e.score != null ? Number(e.score) : null,
+          sourceEntryId: String(e.source_entry_id || e.id),
+        }));
+
+        data = { entries: entryList };
+      }
+
+      else {
+        return jsonResponse({ error: "Not found" }, 404);
       }
     }
 

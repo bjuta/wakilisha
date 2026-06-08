@@ -490,7 +490,7 @@ function LyricsTab({ track }: { track: TrackViewModel }) {
   const isThisTrackPlaying = currentTrack?.id === track.slug && isPlaying;
 
   const handleContribute = () => {
-    window.REACT_APP_NAVIGATE?.(artistSlug ? `/tracks/${artistSlug}/${track.slug}/lyrics/contribute` : `/tracks/${track.slug}/lyrics/contribute`);
+    window.REACT_APP_NAVIGATE?.(track.artistSlug ? `/tracks/${track.artistSlug}/${track.slug}/lyrics/contribute` : `/tracks/${track.slug}/lyrics/contribute`);
   };
 
   if (timedLyrics && timedLyrics.lines && timedLyrics.lines.length > 0) {

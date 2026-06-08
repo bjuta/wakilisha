@@ -9,7 +9,7 @@ import {
   saveArtistCollaborationSplit,
   saveArtistReviewDecision,
   searchRegistryArtists,
-  useExistingSplitMember,
+  linkExistingSplitMember,
   splitArtistTitle,
   type ArtistReviewDecision,
   type ArtistReviewRow,
@@ -414,11 +414,11 @@ function SplitPreviewPanel({ rows, onChanged }: { rows: ArtistSplitPromotionPrev
 
   const groupList = Object.values(groups).slice(0, 8);
 
-  async function useExisting(row: ArtistSplitPromotionPreviewRow) {
+  async function handleUseExisting(row: ArtistSplitPromotionPreviewRow) {
     setSavingId(row.id);
     setError("");
     try {
-      await useExistingSplitMember(row);
+      await linkExistingSplitMember(row);
       onChanged();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not update split member.");
@@ -485,7 +485,7 @@ function SplitPreviewPanel({ rows, onChanged }: { rows: ArtistSplitPromotionPrev
                   <div className="mt-3 flex flex-wrap gap-2">
                     <button
                       disabled={savingId === member.id || !member.existing_artist_id || (member.action === "match" && Boolean(member.target_artist_id))}
-                      onClick={() => useExisting(member)}
+                      onClick={() => handleUseExisting(member)}
                       className="wk-button wk-button-primary wk-button-sm disabled:opacity-60"
                     >
                       {savingId === member.id

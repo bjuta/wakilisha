@@ -203,7 +203,7 @@ export async function updateSplitMemberAction(input: {
   return data;
 }
 
-export async function useExistingSplitMember(row: ArtistSplitPromotionPreviewRow) {
+export async function linkExistingSplitMember(row: ArtistSplitPromotionPreviewRow) {
   if (!row.existing_artist_id || !row.existing_artist_slug) {
     throw new Error("No existing artist match is available for this member.");
   }
