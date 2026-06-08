@@ -175,6 +175,8 @@ type MediaIdentity = {
   type: "article" | "artist" | "track" | "release" | "label" | "genre";
 };
 
+type GenericRow = Record<string, unknown>;
+
 type ReleaseShellRow = {
   id: string;
   release_id: string;
@@ -216,6 +218,31 @@ async function safeApiGet<T>(path: string, fallback: T): Promise<T> {
   }
 }
 
+function textValue(row: GenericRow | null | undefined, keys: string[], fallback = ""): string {
+  if (!row) return fallback;
+  for (const key of keys) {
+    const value = row[key];
+    if (value === null || value === undefined || typeof value === "object") continue;
+    const text = String(value).trim();
+    if (text) return text;
+  }
+  return fallback;
+}
+
+function numberValue(row: GenericRow | null | undefined, keys: string[], fallback = 0): number {
+  if (!row) return fallback;
+  for (const key of keys) {
+    const value = row[key];
+    const number = Number(value);
+    if (Number.isFinite(number) && number >= 0) return number;
+  }
+  return fallback;
+}
+
+function uuidFromRow(row: GenericRow, keys: string[]): string {
+  return textValue(row, keys);
+}
+
 function image(url: string | null | undefined, identity: MediaIdentity): string {
   const rewritten = rewriteWpImageUrl(url || "");
   return rewritten || withPlaceholderImage(url || "", identity);
@@ -254,10 +281,73 @@ function releaseTypeFromTrackCount(trackCount: number): string {
   return "Album";
 }
 
-function mapShellToRelease(shell: ReleaseShellRow): PublicReleaseDetail {
+async function getRegistryTracklist(releaseId: string, fallbackArtist: string): Promise<PublicReleaseDetail["tracks"]> {
+  const { data: relationshipRows, error: relationshipError } = await supabase
+    .from("registry_release_tracks")
+    .select("*")
+    .eq("release_id", releaseId);
+
+  if (relationshipError) {
+    console.warn(`WAKILISHA registry release track lookup failed: ${relationshipError.message}`);
+    return [];
+  }
+
+  const relationships = ((relationshipRows || []) as GenericRow[])
+    .map((row, index) => ({
+      row,
+      index,
+      trackId: uuidFromRow(row, ["track_id", "registry_track_id"]),
+      position: numberValue(row, ["track_number", "position", "sort_order", "display_order", "sequence"], index + 1),
+    }))
+    .filter((item) => item.trackId);
+
+  if (!relationships.length) return [];
+
+  const trackIds = Array.from(new Set(relationships.map((item) => item.trackId)));
+  const { data: trackRows, error: trackError } = await supabase
+    .from("registry_tracks")
+    .select("*")
+    .in("id", trackIds);
+
+  if (trackError) {
+    console.warn(`WAKILISHA registry track lookup failed: ${trackError.message}`);
+    return [];
+  }
+
+  const tracksById = new Map(((trackRows || []) as GenericRow[]).map((track) => [textValue(track, ["id"]), track]));
+
+  return relationships
+    .sort((a, b) => a.position - b.position || a.index - b.index)
+    .map((relationship, index) => {
+      const track = tracksById.get(relationship.trackId) || {};
+      const title = textValue(track, ["title", "name", "display_title", "normalized_title", "slug"], `Track ${index + 1}`);
+      const slug = textValue(track, ["slug", "normalized_slug"], relationship.trackId);
+      const artist = textValue(track, ["artist", "artist_name", "primary_artist_name", "artists"], fallbackArtist);
+      const artwork = image(textValue(track, ["artwork_url", "cover_image_url", "image_url", "thumbnail_url"]), {
+        id: relationship.trackId,
+        slug,
+        name: title,
+        type: "track",
+      });
+
+      return {
+        id: relationship.trackId,
+        slug,
+        title,
+        artist,
+        duration: numberValue(track, ["duration", "duration_seconds", "length_seconds"], 0),
+        trackNumber: relationship.position || index + 1,
+        artworkUrl: artwork || generatedReleaseArtwork(title, artist),
+      };
+    });
+}
+
+function mapShellToRelease(shell: ReleaseShellRow, tracks: PublicReleaseDetail["tracks"] = []): PublicReleaseDetail {
   const artist = shell.primary_artist_name || "Unknown artist";
-  const releaseType = releaseTypeFromTrackCount(Number(shell.track_count || 0));
+  const trackCount = tracks.length || Number(shell.track_count || 0);
+  const releaseType = releaseTypeFromTrackCount(trackCount);
   const artworkUrl = generatedReleaseArtwork(shell.title, artist);
+  const totalDuration = tracks.reduce((sum, track) => sum + Number(track.duration || 0), 0) || trackCount * 180;
 
   return {
     id: shell.release_id,
@@ -268,12 +358,12 @@ function mapShellToRelease(shell: ReleaseShellRow): PublicReleaseDetail {
     releaseType,
     labelName: "WAKILISHA Registry",
     artworkUrl,
-    trackCount: Number(shell.track_count || 0),
+    trackCount,
     description: `${shell.title} is a ${releaseType.toLowerCase()} by ${artist}, surfaced from the WAKILISHA canonical registry.`,
     releaseDate: shell.release_date || "",
     labelSlug: "wakilisha-registry",
-    totalDuration: Number(shell.track_count || 0) * 180,
-    tracks: [],
+    totalDuration,
+    tracks,
     metadata: {
       source: "registry_release_shells",
       releaseId: shell.release_id,
@@ -282,6 +372,7 @@ function mapShellToRelease(shell: ReleaseShellRow): PublicReleaseDetail {
       shellRoute: shell.shell_route,
       sourceProvenance: shell.source_provenance || {},
       updatedAt: shell.updated_at,
+      tracklistSource: tracks.length ? "registry_release_tracks" : "shell_only",
     },
   };
 }
@@ -300,7 +391,10 @@ async function getReleaseFromShell(artistSlug: string, releaseSlug: string): Pro
     return null;
   }
 
-  return data ? mapShellToRelease(data as ReleaseShellRow) : null;
+  if (!data) return null;
+  const shell = data as ReleaseShellRow;
+  const tracks = await getRegistryTracklist(shell.release_id, shell.primary_artist_name || "Unknown artist");
+  return mapShellToRelease(shell, tracks);
 }
 
 async function listReleasesFromShells(): Promise<PublicRelease[]> {
