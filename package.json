@@ -79,7 +79,8 @@
     "registry:phase2:review-schema": "tsx scripts/registry/phase2-review-schema.ts",
     "registry:phase3:audit": "tsx scripts/registry/phase3-canonicalization-audit.ts",
     "registry:phase3:write": "tsx scripts/registry/phase3-canonicalization-write.ts",
-    "registry:phase4a:release-shell-audit": "tsx scripts/registry/phase4a-release-shell-readiness-audit.ts"
+    "registry:phase4a:release-shell-audit": "tsx scripts/registry/phase4a-release-shell-readiness-audit.ts",
+    "registry:phase4a:release-shell-dry-run": "tsx scripts/registry/phase4a-release-shell-dry-run.ts"
   },
   "type": "module",
   "version": "0.1.0"
