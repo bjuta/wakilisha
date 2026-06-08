@@ -44,7 +44,7 @@ function firstColumn(table: TableInfo, candidates: string[]): string | null {
 }
 
 function qIdent(value: string): string {
-  return `"${value.replace(/"/g, """" )}"`;
+  return `"${value.replace(/"/g, '""')}"`;
 }
 
 function releaseTextExpr(releases: TableInfo, candidates: string[], fallback: string): string {
