@@ -170,6 +170,14 @@ export type ReviewCommandCenterData = {
 
 const registryReviewSelect = "id, review_key, entity_type, entity_id, review_type, priority, status, title, summary, source_table, source_id, source_payload, candidate_payload, resolution_payload, created_at, updated_at";
 
+function sanitizeSearchTerm(value: string): string {
+  return value
+    .trim()
+    .replace(/[%_,()]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 async function exactCount(table: string, filters: Record<string, string | boolean> = {}): Promise<number> {
   let query = supabase.from(table).select("*", { count: "exact", head: true });
   for (const [key, value] of Object.entries(filters)) query = query.eq(key, value);
@@ -230,8 +238,22 @@ export async function loadRegistryReviewItems(filters: RegistryReviewFilters = {
   if (filters.priority) query = query.eq("priority", filters.priority);
   if (filters.entityType) query = query.eq("entity_type", filters.entityType);
   if (filters.search?.trim()) {
-    const search = filters.search.trim().replace(/[%_]/g, "");
-    query = query.or(`title.ilike.%${search}%,summary.ilike.%${search}%,review_key.ilike.%${search}%`);
+    const search = sanitizeSearchTerm(filters.search);
+    if (search) {
+      query = query.or([
+        `title.ilike.%${search}%`,
+        `summary.ilike.%${search}%`,
+        `review_key.ilike.%${search}%`,
+        `candidate_payload->>artistText.ilike.%${search}%`,
+        `candidate_payload->>artistSlug.ilike.%${search}%`,
+        `candidate_payload->>title.ilike.%${search}%`,
+        `candidate_payload->>trackTitle.ilike.%${search}%`,
+        `candidate_payload->>releaseTitle.ilike.%${search}%`,
+        `source_payload->>title.ilike.%${search}%`,
+        `source_payload->>trackTitle.ilike.%${search}%`,
+        `source_payload->>releaseTitle.ilike.%${search}%`,
+      ].join(","));
+    }
   }
 
   const { data, count, error } = await query.range(offset, offset + limit - 1);
