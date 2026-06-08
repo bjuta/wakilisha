@@ -1,5 +1,6 @@
 import { withPlaceholderImage } from "@/utils/imagePlaceholders";
 import { rewriteWpImageUrl } from "@/services/wpImageRewrite";
+import { supabase } from "@/lib/supabase";
 
 export type PublicStory = {
   id: string;
@@ -174,6 +175,24 @@ type MediaIdentity = {
   type: "article" | "artist" | "track" | "release" | "label" | "genre";
 };
 
+type ReleaseShellRow = {
+  id: string;
+  release_id: string;
+  slug: string;
+  title: string;
+  primary_artist_name: string | null;
+  primary_artist_slug: string | null;
+  release_date: string | null;
+  track_count: number;
+  has_artwork: boolean;
+  readiness: string;
+  missing: string[] | null;
+  shell_route: string | null;
+  source_provenance: Record<string, unknown> | null;
+  status: string;
+  updated_at: string | null;
+};
+
 async function apiGet<T>(path: string): Promise<T> {
   const base = API_BASE.replace(/\/$/, "");
   const url = `${base}${path.startsWith("/") ? path : `/${path}`}`;
@@ -208,6 +227,97 @@ export function slugify(name: string): string {
 
 export function releaseUrl(release: { slug: string; artist: string }): string {
   return `/releases/${slugify(release.artist)}/${release.slug}`;
+}
+
+function yearFromDate(value: string | null | undefined): string {
+  if (!value) return "Unknown year";
+  const year = String(value).match(/\d{4}/)?.[0];
+  return year || "Unknown year";
+}
+
+function releaseTypeFromTrackCount(trackCount: number): string {
+  if (trackCount <= 1) return "Single";
+  if (trackCount <= 6) return "EP";
+  return "Album";
+}
+
+function mapShellToRelease(shell: ReleaseShellRow): PublicReleaseDetail {
+  const artist = shell.primary_artist_name || "Unknown artist";
+  const releaseType = releaseTypeFromTrackCount(Number(shell.track_count || 0));
+  const artworkUrl = image("", { id: shell.release_id, slug: shell.slug, name: shell.title, type: "release" });
+
+  return {
+    id: shell.release_id,
+    slug: shell.slug,
+    title: shell.title,
+    artist,
+    year: yearFromDate(shell.release_date),
+    releaseType,
+    labelName: "WAKILISHA Registry",
+    artworkUrl,
+    trackCount: Number(shell.track_count || 0),
+    description: `${shell.title} is a ${releaseType.toLowerCase()} by ${artist}, surfaced from the WAKILISHA canonical registry.`,
+    releaseDate: shell.release_date || "",
+    labelSlug: "wakilisha-registry",
+    totalDuration: Number(shell.track_count || 0) * 180,
+    tracks: [],
+    metadata: {
+      source: "registry_release_shells",
+      releaseId: shell.release_id,
+      readiness: shell.readiness,
+      missing: shell.missing || [],
+      shellRoute: shell.shell_route,
+      sourceProvenance: shell.source_provenance || {},
+      updatedAt: shell.updated_at,
+    },
+  };
+}
+
+async function getReleaseFromShell(artistSlug: string, releaseSlug: string): Promise<PublicReleaseDetail | null> {
+  const { data, error } = await supabase
+    .from("registry_release_shells")
+    .select("id, release_id, slug, title, primary_artist_name, primary_artist_slug, release_date, track_count, has_artwork, readiness, missing, shell_route, source_provenance, status, updated_at")
+    .eq("status", "ready")
+    .eq("slug", releaseSlug)
+    .eq("primary_artist_slug", artistSlug)
+    .maybeSingle();
+
+  if (error) {
+    console.warn(`WAKILISHA release shell lookup failed: ${error.message}`);
+    return null;
+  }
+
+  return data ? mapShellToRelease(data as ReleaseShellRow) : null;
+}
+
+async function listReleasesFromShells(): Promise<PublicRelease[]> {
+  const { data, error } = await supabase
+    .from("registry_release_shells")
+    .select("id, release_id, slug, title, primary_artist_name, primary_artist_slug, release_date, track_count, has_artwork, readiness, missing, shell_route, source_provenance, status, updated_at")
+    .eq("status", "ready")
+    .order("updated_at", { ascending: false })
+    .limit(500);
+
+  if (error) {
+    console.warn(`WAKILISHA release shell list failed: ${error.message}`);
+    return [];
+  }
+
+  return ((data || []) as ReleaseShellRow[]).map((shell) => {
+    const release = mapShellToRelease(shell);
+    return {
+      id: release.id,
+      slug: release.slug,
+      title: release.title,
+      artist: release.artist,
+      year: release.year,
+      releaseType: release.releaseType,
+      labelName: release.labelName,
+      artworkUrl: release.artworkUrl,
+      trackCount: release.trackCount,
+      description: release.description,
+    };
+  });
 }
 
 export async function listMagazineStories(): Promise<PublicStory[]> {
@@ -267,6 +377,9 @@ export async function getArtist(slug: string): Promise<PublicArtistDetail | null
 }
 
 export async function listReleases(): Promise<PublicRelease[]> {
+  const shellReleases = await listReleasesFromShells();
+  if (shellReleases.length) return shellReleases;
+
   const result = await safeApiGet<{ releases: PublicRelease[] }>("/releases?limit=500", { releases: [] });
   return result.releases.map((release) => ({
     ...release,
@@ -275,6 +388,9 @@ export async function listReleases(): Promise<PublicRelease[]> {
 }
 
 export async function getRelease(artistSlug: string, releaseSlug: string): Promise<PublicReleaseDetail | null> {
+  const shellRelease = await getReleaseFromShell(artistSlug, releaseSlug);
+  if (shellRelease) return shellRelease;
+
   const result = await safeApiGet<{ release: PublicReleaseDetail | null }>(`/releases/${artistSlug}/${releaseSlug}`, { release: null });
   if (!result.release) return null;
   return {
