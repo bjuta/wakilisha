@@ -23,8 +23,19 @@ export default function ReleaseMetadata({
   chartPositions?: number[];
 }) {
   const { ref: sidebarRef, revealed } = useScrollReveal<HTMLDivElement>(0.05);
-  const minutes = Math.round(release.totalDuration / 60);
+  const knownTrackCount = Number(release.trackCount || 0);
+  const knownDurationSeconds = Number(release.totalDuration || 0);
+  const hasKnownDuration = release.tracks.some((track) => Number(track.duration || 0) > 0);
+  const durationLabel = hasKnownDuration ? formatDuration(knownDurationSeconds) : "Not available";
+  const dateLabel = formatReleaseDate(release.releaseDate) || cleanYear(release.year) || "Not available";
+  const hasLabel = isRealLabel(release.labelName);
   const hasChartData = chartTracks && chartTracks.length > 0;
+  const stats = [
+    { value: knownTrackCount || "—", label: knownTrackCount === 1 ? "Track" : "Tracks" },
+    { value: durationLabel, label: hasKnownDuration ? "Runtime" : "Runtime" },
+    { value: cleanYear(release.year) || "—", label: "Year" },
+    ...(hasChartData ? [{ value: chartTracks.length, label: "Chart tracks" }] : []),
+  ];
 
   return (
     <aside ref={sidebarRef} className={`${revealed ? "is-visible" : ""} reveal-up space-y-5 lg:sticky lg:top-[88px] lg:self-start`}>
@@ -35,10 +46,9 @@ export default function ReleaseMetadata({
           Release stats
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <StatCard value={release.trackCount} label="Tracks" />
-          <StatCard value={minutes} label="Minutes" />
-          <StatCard value={release.year} label="Year" />
-          <StatCard value={hasChartData ? chartTracks.length : 0} label="Chart tracks" />
+          {stats.map((stat) => (
+            <StatCard key={stat.label} value={stat.value} label={stat.label} />
+          ))}
         </div>
       </div>
 
@@ -48,11 +58,13 @@ export default function ReleaseMetadata({
           <WkIcon name="Building2" size={13} />
           Label
         </div>
-        <div className="text-[15px] font-extrabold text-[var(--wk-text)]">{release.labelName}</div>
-        <div className="text-[12px] font-semibold text-[var(--wk-text-muted)] mt-1">
-          {release.releaseType} · {release.year}
+        <div className="text-[15px] font-extrabold text-[var(--wk-text)]">
+          {hasLabel ? release.labelName : "Label not available"}
         </div>
-        {release.labelSlug && (
+        <div className="text-[12px] font-semibold text-[var(--wk-text-muted)] mt-1">
+          {release.releaseType} · {dateLabel}
+        </div>
+        {hasLabel && release.labelSlug && release.labelSlug !== "wakilisha-registry" && (
           <Link
             to={`/labels/${release.labelSlug}`}
             className="inline-flex items-center gap-2 mt-4 text-[12px] font-bold text-[var(--wk-brand)] hover:underline"
@@ -61,6 +73,19 @@ export default function ReleaseMetadata({
             <WkIcon name="ArrowUpRight" size={12} />
           </Link>
         )}
+      </div>
+
+      {/* Source quality */}
+      <div className="border border-[var(--wk-border)] rounded-2xl bg-[var(--wk-surface)] p-5">
+        <div className="flex items-center gap-2 mb-4 text-[11px] font-extrabold uppercase tracking-[0.18em] text-[var(--wk-brand)]">
+          <WkIcon name="BadgeCheck" size={13} />
+          Registry status
+        </div>
+        <div className="space-y-2 text-[12px] font-semibold text-[var(--wk-text-muted)]">
+          <QualityRow label="Tracklist" value={release.tracks.length ? "Linked" : "Shell only"} />
+          <QualityRow label="Artwork" value={String(release.metadata?.artworkSource || "Fallback").replaceAll("_", " ")} />
+          <QualityRow label="Release date" value={formatReleaseDate(release.releaseDate) ? "Known" : "Year only"} />
+        </div>
       </div>
 
       {/* Chart performance */}
@@ -107,7 +132,7 @@ export default function ReleaseMetadata({
                 <div className="min-w-0 flex-1">
                   <div className="text-[13px] font-extrabold text-[var(--wk-text)] truncate">{item.title}</div>
                   <div className="text-[11px] font-semibold text-[var(--wk-text-muted)]">
-                    {item.artist} · {item.year}
+                    {item.artist} · {cleanYear(item.year) || "Unknown year"}
                   </div>
                 </div>
                 <WkIcon
@@ -127,10 +152,44 @@ export default function ReleaseMetadata({
 function StatCard({ value, label }: { value: string | number; label: string }) {
   return (
     <div className="border border-[var(--wk-border)] rounded-xl bg-[var(--wk-bg)] p-3.5">
-      <div className="text-[22px] font-black text-[var(--wk-text)] leading-none tracking-[-0.03em]">{value}</div>
+      <div className="text-[20px] font-black text-[var(--wk-text)] leading-none tracking-[-0.03em] break-words">{value}</div>
       <div className="text-[9px] font-extrabold uppercase tracking-[0.14em] text-[var(--wk-text-faint)] mt-1.5">
         {label}
       </div>
     </div>
   );
+}
+
+function QualityRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span>{label}</span>
+      <span className="text-right font-extrabold capitalize text-[var(--wk-text)]">{value}</span>
+    </div>
+  );
+}
+
+function cleanYear(year: string): string {
+  return year && year !== "Unknown year" ? year : "";
+}
+
+function formatDuration(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds <= 0) return "Not available";
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest ? `${hours}h ${rest}m` : `${hours}h`;
+}
+
+function formatReleaseDate(value: string | null | undefined): string {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}
+
+function isRealLabel(label: string): boolean {
+  const normalized = label.trim().toLowerCase();
+  return Boolean(normalized && normalized !== "wakilisha registry" && normalized !== "unknown" && normalized !== "independent");
 }
