@@ -5,6 +5,8 @@ function hasFlag(name: string): boolean {
 }
 
 const writeMode = hasFlag("write");
+const baseTables = ["registry_release_shells", "registry_release_tracks", "registry_tracks", "registry_media_assets"];
+const optionalTables = ["registry_release_labels", "registry_labels"];
 
 async function requireTable(pool: ReturnType<typeof createRegistryPool>, table: string): Promise<void> {
   if (!(await hasTable(pool, `public.${table}`))) {
@@ -12,27 +14,35 @@ async function requireTable(pool: ReturnType<typeof createRegistryPool>, table: 
   }
 }
 
+async function existingOptionalTables(pool: ReturnType<typeof createRegistryPool>): Promise<string[]> {
+  const found: string[] = [];
+  for (const table of optionalTables) {
+    if (await hasTable(pool, `public.${table}`)) found.push(table);
+  }
+  return found;
+}
+
 async function run(): Promise<void> {
   const pool = createRegistryPool();
 
   try {
-    console.log("\nWAKILISHA Phase 4B/4B.2 Public Release Registry Read Policy");
+    console.log("\nWAKILISHA Phase 4B/4B.3 Public Release Registry Read Policy");
     console.log("=".repeat(80));
     console.log(`Mode: ${writeMode ? "WRITE" : "DRY RUN ONLY"}`);
 
-    await requireTable(pool, "registry_release_shells");
-    await requireTable(pool, "registry_release_tracks");
-    await requireTable(pool, "registry_tracks");
-    await requireTable(pool, "registry_media_assets");
+    for (const table of baseTables) await requireTable(pool, table);
+    const labelTables = await existingOptionalTables(pool);
+    const allTables = [...baseTables, ...labelTables];
 
     if (!writeMode) {
       console.log("\nPlanned policy changes");
       console.log("-".repeat(80));
       console.log("Grant SELECT on release-page registry tables to anon and authenticated.");
-      console.log("Create public RLS policies for anon/authenticated reads of ready release shells, their track joins, linked tracks, and active image media.");
-      console.log("Keep non-ready/provisional/blocked shells and their tracklists hidden from public page reads.");
+      console.log("Create public RLS policies for ready release shells, their track joins, linked tracks, active image media, and optional label data.");
+      console.log(`Optional label tables detected: ${labelTables.length ? labelTables.join(", ") : "none"}`);
+      console.log("Keep non-ready/provisional/blocked shells and their derived release page data hidden from public page reads.");
       console.log("\nSafety result");
-      console.table([{ policy_modified: false, shell_rows_modified: 0, track_rows_modified: 0, media_rows_modified: 0, public_rendering_changed: false, write_mode_supported: true }]);
+      console.table([{ policy_modified: false, shell_rows_modified: 0, track_rows_modified: 0, media_rows_modified: 0, label_rows_modified: 0, public_rendering_changed: false, write_mode_supported: true }]);
       console.log("\nDry run complete. To apply public read policies, rerun with --write.");
       return;
     }
@@ -98,23 +108,62 @@ async function run(): Promise<void> {
       $$;
     `);
 
+    if (labelTables.includes("registry_release_labels")) {
+      await pool.query(`
+        grant select on public.registry_release_labels to anon, authenticated;
+        do $$
+        begin
+          drop policy if exists "Public users can read labels for ready registry release shells" on public.registry_release_labels;
+          create policy "Public users can read labels for ready registry release shells"
+          on public.registry_release_labels
+          for select
+          to anon, authenticated
+          using (
+            exists (
+              select 1
+              from public.registry_release_shells shells
+              where shells.release_id = registry_release_labels.release_id
+                and shells.status = 'ready'
+            )
+          );
+        end;
+        $$;
+      `);
+    }
+
+    if (labelTables.includes("registry_labels")) {
+      await pool.query(`
+        grant select on public.registry_labels to anon, authenticated;
+        do $$
+        begin
+          drop policy if exists "Public users can read active registry labels" on public.registry_labels;
+          create policy "Public users can read active registry labels"
+          on public.registry_labels
+          for select
+          to anon, authenticated
+          using (coalesce(status, 'active') in ('active', 'ready', 'published'));
+        end;
+        $$;
+      `);
+    }
+
     const policies = await pool.query(`
       select tablename, policyname, roles, cmd, qual
       from pg_policies
       where schemaname = 'public'
-        and tablename in ('registry_release_shells', 'registry_release_tracks', 'registry_tracks', 'registry_media_assets')
+        and tablename = any($1::text[])
       order by tablename, policyname
-    `);
+    `, [allTables]);
 
     const grants = await pool.query(`
       select table_name, grantee, privilege_type
       from information_schema.role_table_grants
       where table_schema = 'public'
-        and table_name in ('registry_release_shells', 'registry_release_tracks', 'registry_tracks', 'registry_media_assets')
+        and table_name = any($1::text[])
         and grantee in ('anon', 'authenticated')
         and privilege_type = 'SELECT'
       order by table_name, grantee
-    `);
+    `, [allTables]);
 
     console.log("\nApplied public release registry policies");
     console.log("-".repeat(80));
@@ -126,16 +175,16 @@ async function run(): Promise<void> {
 
     console.log("\nSafety result");
     console.log("-".repeat(80));
-    console.table([{ policy_modified: true, shell_rows_modified: 0, track_rows_modified: 0, media_rows_modified: 0, public_rendering_changed: false }]);
+    console.table([{ policy_modified: true, shell_rows_modified: 0, track_rows_modified: 0, media_rows_modified: 0, label_rows_modified: 0, public_rendering_changed: false }]);
 
-    console.log("\nPhase 4B/4B.2 public registry read policy complete.");
+    console.log("\nPhase 4B/4B.3 public registry read policy complete.");
   } finally {
     await pool.end();
   }
 }
 
 run().catch((error) => {
-  console.error("\nPhase 4B/4B.2 public registry read policy failed.");
+  console.error("\nPhase 4B/4B.3 public registry read policy failed.");
   console.error(error);
   process.exitCode = 1;
 });
