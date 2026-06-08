@@ -5,9 +5,11 @@ import { WkSurface } from "@/components/design-system/primitives/Surface";
 import {
   formatReviewCount,
   loadReviewCommandCenter,
+  recordRegistryReviewDecision,
   type FieldDictionaryRow,
   type MediaReviewRow,
   type PromotionEventRow,
+  type RegistryDecisionType,
   type RegistryReviewItemRow,
   type RegistryReviewSummaryRow,
   type ReviewArtifactSample,
@@ -20,6 +22,13 @@ import {
 type LoadState = "loading" | "ready" | "error";
 type Panel = "registry" | "decisions" | "artifacts" | "fields" | "media" | "staging" | "events";
 
+type DecisionState = {
+  decisionType: RegistryDecisionType;
+  notes: string;
+  message: string;
+  submitting: boolean;
+};
+
 const PANEL_BUTTONS: Array<{ key: Panel; label: string; icon: WkIconName }> = [
   { key: "registry", label: "Registry Queue", icon: "GitPullRequest" },
   { key: "decisions", label: "Decisions", icon: "GitPullRequest" },
@@ -30,12 +39,40 @@ const PANEL_BUTTONS: Array<{ key: Panel; label: string; icon: WkIconName }> = [
   { key: "events", label: "Events", icon: "Clock" },
 ];
 
+const DECISION_OPTIONS: Array<{ value: RegistryDecisionType; label: string; help: string }> = [
+  { value: "needs_more_research", label: "Needs more research", help: "Keep unresolved but record why this item cannot be safely resolved yet." },
+  { value: "approve_primary_artist", label: "Approve primary artist", help: "Record that the visible artist credit should become the primary artist relationship later." },
+  { value: "approve_featured_artist_split", label: "Approve featured artist split", help: "Record that the credit needs primary/featured role splitting before canonicalization." },
+  { value: "reject_bad_metadata", label: "Reject bad metadata", help: "Record that the source credit is wrong or not useful for canonical relationships." },
+  { value: "duplicate_or_bad_source", label: "Duplicate or bad source", help: "Record that this item should be ignored or deduplicated later." },
+];
+
 export default function AdminReviewQueuePage() {
   const navigate = useNavigate();
   const [state, setState] = useState<LoadState>("loading");
   const [data, setData] = useState<ReviewCommandCenterData | null>(null);
   const [error, setError] = useState("");
   const [panel, setPanel] = useState<Panel>("registry");
+  const [selectedItem, setSelectedItem] = useState<RegistryReviewItemRow | null>(null);
+  const [decision, setDecision] = useState<DecisionState>({
+    decisionType: "needs_more_research",
+    notes: "",
+    message: "",
+    submitting: false,
+  });
+
+  const reload = () => {
+    setState("loading");
+    loadReviewCommandCenter()
+      .then((result) => {
+        setData(result);
+        setState("ready");
+      })
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : "Could not load review command center.");
+        setState("error");
+      });
+  };
 
   useEffect(() => {
     let alive = true;
@@ -58,6 +95,47 @@ export default function AdminReviewQueuePage() {
     if (!data) return 0;
     return data.totals.registryReviewItems + data.totals.openDecisions + data.totals.reviewArtifacts + data.totals.stagingNeedsReview + data.totals.blockedStaging + data.totals.unknownFields;
   }, [data]);
+
+  const openItem = (item: RegistryReviewItemRow) => {
+    setSelectedItem(item);
+    setDecision({ decisionType: "needs_more_research", notes: "", message: "", submitting: false });
+  };
+
+  const closeItem = () => {
+    if (decision.submitting) return;
+    setSelectedItem(null);
+    setDecision({ decisionType: "needs_more_research", notes: "", message: "", submitting: false });
+  };
+
+  const submitDecision = async () => {
+    if (!selectedItem) return;
+    if (!decision.notes.trim()) {
+      setDecision((current) => ({ ...current, message: "Add a short note before recording the decision." }));
+      return;
+    }
+
+    setDecision((current) => ({ ...current, submitting: true, message: "" }));
+    try {
+      await recordRegistryReviewDecision({
+        item: selectedItem,
+        decisionType: decision.decisionType,
+        notes: decision.notes,
+        resolutionPayload: {
+          reviewedFrom: "admin_review_command_center",
+          phase: "phase2b",
+        },
+      });
+      setSelectedItem(null);
+      setDecision({ decisionType: "needs_more_research", notes: "", message: "Decision recorded.", submitting: false });
+      reload();
+    } catch (err) {
+      setDecision((current) => ({
+        ...current,
+        submitting: false,
+        message: err instanceof Error ? err.message : "Could not record decision.",
+      }));
+    }
+  };
 
   if (state === "loading") {
     return (
@@ -114,7 +192,7 @@ export default function AdminReviewQueuePage() {
           <div>
             <div className="text-[13px] font-bold text-wk-text">Operational, not decorative</div>
             <p className="mt-1 text-[12px] leading-5 text-wk-text-muted">
-              Phase 2B upgrades the existing review system instead of duplicating it. Registry credit issues are visible here for human review, but canonical relationship writes remain disabled until explicit resolver endpoints are added.
+              Phase 2B upgrades the existing review system instead of duplicating it. Decisions are recorded for audit only; canonical relationship mutation remains disabled until Phase 3.
             </p>
           </div>
         </div>
@@ -165,9 +243,19 @@ export default function AdminReviewQueuePage() {
               ))}
             </div>
           </div>
-          <PanelContent panel={panel} data={data} />
+          <PanelContent panel={panel} data={data} onOpenRegistryItem={openItem} />
         </WkSurface>
       </div>
+
+      {selectedItem && (
+        <RegistryDecisionModal
+          item={selectedItem}
+          decision={decision}
+          setDecision={setDecision}
+          onClose={closeItem}
+          onSubmit={submitDecision}
+        />
+      )}
     </div>
   );
 }
@@ -229,8 +317,8 @@ function WorkstreamRow({ stream, onOpen }: { stream: ReviewWorkstream; onOpen: (
   );
 }
 
-function PanelContent({ panel, data }: { panel: Panel; data: ReviewCommandCenterData }) {
-  if (panel === "registry") return <RegistryReviewPanel rows={data.registryReviewItems} summary={data.registryReviewSummary} />;
+function PanelContent({ panel, data, onOpenRegistryItem }: { panel: Panel; data: ReviewCommandCenterData; onOpenRegistryItem: (item: RegistryReviewItemRow) => void }) {
+  if (panel === "registry") return <RegistryReviewPanel rows={data.registryReviewItems} summary={data.registryReviewSummary} onOpen={onOpenRegistryItem} />;
   if (panel === "decisions") return <DecisionRows rows={data.decisionSamples} />;
   if (panel === "artifacts") return <ArtifactRows rows={data.artifactSamples} />;
   if (panel === "fields") return <FieldRows rows={data.fieldDictionary} />;
@@ -239,7 +327,7 @@ function PanelContent({ panel, data }: { panel: Panel; data: ReviewCommandCenter
   return <EventRows rows={data.promotionEvents} />;
 }
 
-function RegistryReviewPanel({ rows, summary }: { rows: RegistryReviewItemRow[]; summary: RegistryReviewSummaryRow[] }) {
+function RegistryReviewPanel({ rows, summary, onOpen }: { rows: RegistryReviewItemRow[]; summary: RegistryReviewSummaryRow[]; onOpen: (item: RegistryReviewItemRow) => void }) {
   if (!rows.length && !summary.length) return <EmptyState title="No registry review items" body="Ambiguous release and track artist credits will appear here after Phase 2A review population runs." />;
 
   return (
@@ -256,13 +344,13 @@ function RegistryReviewPanel({ rows, summary }: { rows: RegistryReviewItemRow[];
         </div>
       </div>
       <div className="divide-y divide-wk-border">
-        {rows.map((row) => <RegistryReviewRow key={row.id} row={row} />)}
+        {rows.map((row) => <RegistryReviewRow key={row.id} row={row} onOpen={() => onOpen(row)} />)}
       </div>
     </div>
   );
 }
 
-function RegistryReviewRow({ row }: { row: RegistryReviewItemRow }) {
+function RegistryReviewRow({ row, onOpen }: { row: RegistryReviewItemRow; onOpen: () => void }) {
   const payload = row.candidate_payload ?? {};
   const artistText = typeof payload.artistText === "string" ? payload.artistText : "";
   const artistSlug = typeof payload.artistSlug === "string" ? payload.artistSlug : "";
@@ -287,12 +375,102 @@ function RegistryReviewRow({ row }: { row: RegistryReviewItemRow }) {
           <div className="mt-2 text-[11px] text-wk-text-faint">Source: {row.source_table || "unknown"}/{row.source_id || row.entity_id || "unknown"}</div>
         </div>
         <div className="flex shrink-0 flex-col gap-2 sm:items-end">
-          <button disabled className="wk-button wk-button-ghost wk-button-sm cursor-not-allowed opacity-60" title="Phase 2B is read-only. Decision writes come next.">
-            Resolve later
+          <button onClick={onOpen} className="wk-button wk-button-ghost wk-button-sm">
+            Open detail <WkIcon name="ArrowRight" size={13} />
           </button>
-          <div className="max-w-[220px] text-right text-[10px] leading-4 text-wk-text-faint">Read-only until canonicalization decision endpoints are added.</div>
+          <div className="max-w-[220px] text-right text-[10px] leading-4 text-wk-text-faint">Records decision only. Canonical writes remain disabled.</div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function RegistryDecisionModal({ item, decision, setDecision, onClose, onSubmit }: { item: RegistryReviewItemRow; decision: DecisionState; setDecision: React.Dispatch<React.SetStateAction<DecisionState>>; onClose: () => void; onSubmit: () => void }) {
+  const candidatePayload = item.candidate_payload ?? {};
+  const sourcePayload = item.source_payload ?? {};
+  const artistText = typeof candidatePayload.artistText === "string" ? candidatePayload.artistText : "";
+  const artistSlug = typeof candidatePayload.artistSlug === "string" ? candidatePayload.artistSlug : "";
+  const selectedOption = DECISION_OPTIONS.find((option) => option.value === decision.decisionType);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4">
+      <div className="max-h-[90vh] w-full max-w-3xl overflow-hidden rounded-2xl border border-wk-border bg-wk-surface shadow-2xl">
+        <div className="border-b border-wk-border p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="text-[11px] font-black uppercase tracking-wider text-wk-brand">Registry review detail</div>
+              <h2 className="mt-1 text-[18px] font-black text-wk-text">{item.title || item.review_key || item.id}</h2>
+              <p className="mt-1 text-[12px] leading-5 text-wk-text-muted">{item.summary || "Resolve this item by recording an auditable decision. Canonical relationship tables are not mutated in Phase 2B."}</p>
+            </div>
+            <button onClick={onClose} className="wk-button wk-button-ghost wk-button-sm">Close</button>
+          </div>
+        </div>
+
+        <div className="max-h-[calc(90vh-170px)] overflow-y-auto p-5">
+          <div className="grid gap-3 md:grid-cols-3">
+            <FieldPill label="Review type" value={humanize(item.review_type || "registry_review")} />
+            <FieldPill label="Priority" value={item.priority || "normal"} />
+            <FieldPill label="Status" value={item.status || "open"} />
+          </div>
+
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            <FieldPill label="Artist text" value={artistText || "Missing"} />
+            <FieldPill label="Artist slug" value={artistSlug || "Missing"} />
+          </div>
+
+          <div className="mt-4 rounded-xl border border-wk-border bg-wk-surface-raised p-4">
+            <div className="text-[11px] font-black uppercase tracking-wider text-wk-text-faint">Source reference</div>
+            <div className="mt-2 text-[12px] text-wk-text">{item.source_table || "unknown"}/{item.source_id || item.entity_id || "unknown"}</div>
+            <div className="mt-1 break-all text-[11px] text-wk-text-faint">{item.review_key || item.id}</div>
+          </div>
+
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <JsonBlock title="Candidate payload" value={candidatePayload} />
+            <JsonBlock title="Source payload" value={sourcePayload} />
+          </div>
+
+          <div className="mt-5 rounded-xl border border-wk-border bg-wk-surface p-4">
+            <label className="block text-[12px] font-bold text-wk-text">Decision</label>
+            <select
+              value={decision.decisionType}
+              onChange={(event) => setDecision((current) => ({ ...current, decisionType: event.target.value as RegistryDecisionType, message: "" }))}
+              className="mt-2 w-full rounded-lg border border-wk-border bg-wk-surface-raised px-3 py-2 text-[13px] text-wk-text"
+            >
+              {DECISION_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+            <p className="mt-1 text-[11px] leading-5 text-wk-text-muted">{selectedOption?.help}</p>
+
+            <label className="mt-4 block text-[12px] font-bold text-wk-text">Decision notes</label>
+            <textarea
+              value={decision.notes}
+              onChange={(event) => setDecision((current) => ({ ...current, notes: event.target.value, message: "" }))}
+              rows={4}
+              className="mt-2 w-full rounded-lg border border-wk-border bg-wk-surface-raised px-3 py-2 text-[13px] text-wk-text"
+              placeholder="Explain what you verified and why this decision is safe."
+            />
+            {decision.message && <p className="mt-2 text-[12px] font-semibold text-wk-warning">{decision.message}</p>}
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-2 border-t border-wk-border p-5 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-[11px] leading-5 text-wk-text-faint">This records a Phase 2B decision only. Phase 3 will decide whether to mutate canonical relationships.</p>
+          <div className="flex gap-2">
+            <button onClick={onClose} disabled={decision.submitting} className="wk-button wk-button-ghost wk-button-sm">Cancel</button>
+            <button onClick={onSubmit} disabled={decision.submitting} className="wk-button wk-button-primary wk-button-sm">
+              {decision.submitting ? "Recording..." : "Record decision"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function JsonBlock({ title, value }: { title: string; value: unknown }) {
+  return (
+    <div className="rounded-xl border border-wk-border bg-wk-surface-raised p-4">
+      <div className="text-[11px] font-black uppercase tracking-wider text-wk-text-faint">{title}</div>
+      <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-words text-[11px] leading-5 text-wk-text-muted">{JSON.stringify(value ?? {}, null, 2)}</pre>
     </div>
   );
 }
