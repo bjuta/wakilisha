@@ -76,6 +76,7 @@
     "registry:phase1:audit": "tsx scripts/registry/phase1-registry-audit.ts",
     "registry:phase1:backfill": "tsx scripts/registry/phase1-shadow-backfill.ts",
     "registry:phase1:schema": "tsx scripts/registry/phase1-shadow-schema.ts",
+    "registry:phase2:populate-review": "tsx scripts/registry/phase2-populate-review-items.ts",
     "registry:phase2:review-schema": "tsx scripts/registry/phase2-review-schema.ts"
   },
   "type": "module",
