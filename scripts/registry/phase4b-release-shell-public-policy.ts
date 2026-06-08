@@ -28,15 +28,9 @@ async function run(): Promise<void> {
     if (!writeMode) {
       console.log("\nPlanned policy changes");
       console.log("-".repeat(80));
-      console.log("Grant SELECT on public.registry_release_shells to anon.");
-      console.log("Grant SELECT on public.registry_release_tracks to anon.");
-      console.log("Grant SELECT on public.registry_tracks to anon.");
-      console.log("Grant SELECT on public.registry_media_assets to anon.");
-      console.log("Create anon RLS policy allowing public shell reads only where status = 'ready'.");
-      console.log("Create anon RLS policy allowing release-track reads only for releases with ready public shells.");
-      console.log("Create anon RLS policy allowing track reads only when linked to a release with a ready public shell.");
-      console.log("Create anon RLS policy allowing active image media assets.");
-      console.log("Keep non-ready/provisional/blocked shells and their tracklists hidden from anonymous public pages.");
+      console.log("Grant SELECT on release-page registry tables to anon and authenticated.");
+      console.log("Create public RLS policies for anon/authenticated reads of ready release shells, their track joins, linked tracks, and active image media.");
+      console.log("Keep non-ready/provisional/blocked shells and their tracklists hidden from public page reads.");
       console.log("\nSafety result");
       console.table([{ policy_modified: false, shell_rows_modified: 0, track_rows_modified: 0, media_rows_modified: 0, public_rendering_changed: false, write_mode_supported: true }]);
       console.log("\nDry run complete. To apply public read policies, rerun with --write.");
@@ -44,79 +38,62 @@ async function run(): Promise<void> {
     }
 
     await pool.query(`
-      grant select on public.registry_release_shells to anon;
-      grant select on public.registry_release_tracks to anon;
-      grant select on public.registry_tracks to anon;
-      grant select on public.registry_media_assets to anon;
+      grant usage on schema public to anon;
+      grant usage on schema public to authenticated;
+
+      grant select on public.registry_release_shells to anon, authenticated;
+      grant select on public.registry_release_tracks to anon, authenticated;
+      grant select on public.registry_tracks to anon, authenticated;
+      grant select on public.registry_media_assets to anon, authenticated;
 
       do $$
       begin
-        if not exists (
-          select 1 from pg_policies
-          where schemaname = 'public'
-            and tablename = 'registry_release_shells'
-            and policyname = 'Anon users can read ready registry release shells'
-        ) then
-          create policy "Anon users can read ready registry release shells"
-          on public.registry_release_shells
-          for select
-          to anon
-          using (status = 'ready');
-        end if;
+        drop policy if exists "Anon users can read ready registry release shells" on public.registry_release_shells;
+        drop policy if exists "Public users can read ready registry release shells" on public.registry_release_shells;
+        create policy "Public users can read ready registry release shells"
+        on public.registry_release_shells
+        for select
+        to anon, authenticated
+        using (status = 'ready');
 
-        if not exists (
-          select 1 from pg_policies
-          where schemaname = 'public'
-            and tablename = 'registry_release_tracks'
-            and policyname = 'Anon users can read tracks for ready registry release shells'
-        ) then
-          create policy "Anon users can read tracks for ready registry release shells"
-          on public.registry_release_tracks
-          for select
-          to anon
-          using (
-            exists (
-              select 1
-              from public.registry_release_shells shells
-              where shells.release_id = registry_release_tracks.release_id
-                and shells.status = 'ready'
-            )
-          );
-        end if;
+        drop policy if exists "Anon users can read tracks for ready registry release shells" on public.registry_release_tracks;
+        drop policy if exists "Public users can read tracks for ready registry release shells" on public.registry_release_tracks;
+        create policy "Public users can read tracks for ready registry release shells"
+        on public.registry_release_tracks
+        for select
+        to anon, authenticated
+        using (
+          exists (
+            select 1
+            from public.registry_release_shells shells
+            where shells.release_id = registry_release_tracks.release_id
+              and shells.status = 'ready'
+          )
+        );
 
-        if not exists (
-          select 1 from pg_policies
-          where schemaname = 'public'
-            and tablename = 'registry_tracks'
-            and policyname = 'Anon users can read tracks linked to ready registry release shells'
-        ) then
-          create policy "Anon users can read tracks linked to ready registry release shells"
-          on public.registry_tracks
-          for select
-          to anon
-          using (
-            exists (
-              select 1
-              from public.registry_release_tracks rt
-              join public.registry_release_shells shells on shells.release_id = rt.release_id
-              where rt.track_id = registry_tracks.id
-                and shells.status = 'ready'
-            )
-          );
-        end if;
+        drop policy if exists "Anon users can read tracks linked to ready registry release shells" on public.registry_tracks;
+        drop policy if exists "Public users can read tracks linked to ready registry release shells" on public.registry_tracks;
+        create policy "Public users can read tracks linked to ready registry release shells"
+        on public.registry_tracks
+        for select
+        to anon, authenticated
+        using (
+          exists (
+            select 1
+            from public.registry_release_tracks rt
+            join public.registry_release_shells shells on shells.release_id = rt.release_id
+            where rt.track_id = registry_tracks.id
+              and shells.status = 'ready'
+          )
+        );
 
-        if not exists (
-          select 1 from pg_policies
-          where schemaname = 'public'
-            and tablename = 'registry_media_assets'
-            and policyname = 'Anon users can read active registry image media assets'
-        ) then
-          create policy "Anon users can read active registry image media assets"
-          on public.registry_media_assets
-          for select
-          to anon
-          using (status = 'active' and media_kind = 'image');
-        end if;
+        drop policy if exists "Anon users can read active registry image media assets" on public.registry_media_assets;
+        drop policy if exists "Public users can read active registry image media assets" on public.registry_media_assets;
+        create policy "Public users can read active registry image media assets"
+        on public.registry_media_assets
+        for select
+        to anon, authenticated
+        using (status = 'active' and media_kind = 'image');
       end;
       $$;
     `);
@@ -129,9 +106,23 @@ async function run(): Promise<void> {
       order by tablename, policyname
     `);
 
+    const grants = await pool.query(`
+      select table_name, grantee, privilege_type
+      from information_schema.role_table_grants
+      where table_schema = 'public'
+        and table_name in ('registry_release_shells', 'registry_release_tracks', 'registry_tracks', 'registry_media_assets')
+        and grantee in ('anon', 'authenticated')
+        and privilege_type = 'SELECT'
+      order by table_name, grantee
+    `);
+
     console.log("\nApplied public release registry policies");
     console.log("-".repeat(80));
     console.table(policies.rows);
+
+    console.log("\nRelease-page SELECT grants");
+    console.log("-".repeat(80));
+    console.table(grants.rows);
 
     console.log("\nSafety result");
     console.log("-".repeat(80));
