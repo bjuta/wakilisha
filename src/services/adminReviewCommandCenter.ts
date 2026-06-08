@@ -114,6 +114,23 @@ export type RegistryReviewSummaryRow = {
   count: number;
 };
 
+export type RegistryReviewFilters = {
+  search?: string;
+  status?: string;
+  reviewType?: string;
+  priority?: string;
+  entityType?: string;
+  offset?: number;
+  limit?: number;
+};
+
+export type RegistryReviewPage = {
+  rows: RegistryReviewItemRow[];
+  total: number;
+  limit: number;
+  offset: number;
+};
+
 export type RegistryDecisionType =
   | "approve_primary_artist"
   | "approve_featured_artist_split"
@@ -150,6 +167,8 @@ export type ReviewCommandCenterData = {
   registryReviewItems: RegistryReviewItemRow[];
   registryReviewSummary: RegistryReviewSummaryRow[];
 };
+
+const registryReviewSelect = "id, review_key, entity_type, entity_id, review_type, priority, status, title, summary, source_table, source_id, source_payload, candidate_payload, resolution_payload, created_at, updated_at";
 
 async function exactCount(table: string, filters: Record<string, string | boolean> = {}): Promise<number> {
   let query = supabase.from(table).select("*", { count: "exact", head: true });
@@ -198,6 +217,29 @@ async function loadRegistryReviewSummary(): Promise<RegistryReviewSummaryRow[]> 
   return [...counts.values()].sort((a, b) => b.count - a.count || a.review_type.localeCompare(b.review_type));
 }
 
+export async function loadRegistryReviewItems(filters: RegistryReviewFilters = {}): Promise<RegistryReviewPage> {
+  const limit = Math.max(1, Math.min(Number(filters.limit ?? 18), 100));
+  const offset = Math.max(0, Number(filters.offset ?? 0));
+  let query = supabase
+    .from("registry_review_items")
+    .select(registryReviewSelect, { count: "exact" })
+    .order("updated_at", { ascending: false });
+
+  if (filters.status) query = query.eq("status", filters.status);
+  if (filters.reviewType) query = query.eq("review_type", filters.reviewType);
+  if (filters.priority) query = query.eq("priority", filters.priority);
+  if (filters.entityType) query = query.eq("entity_type", filters.entityType);
+  if (filters.search?.trim()) {
+    const search = filters.search.trim().replace(/[%_]/g, "");
+    query = query.or(`title.ilike.%${search}%,summary.ilike.%${search}%,review_key.ilike.%${search}%`);
+  }
+
+  const { data, count, error } = await query.range(offset, offset + limit - 1);
+  if (error) throw error;
+
+  return { rows: (data ?? []) as RegistryReviewItemRow[], total: count ?? 0, limit, offset };
+}
+
 function row(summary: StagingSummaryRow[], target: string): StagingSummaryRow {
   return summary.find((item) => item.target_entity === target) ?? { target_entity: target, ready: 0, needs_review: 0, blocked: 0, total: 0 };
 }
@@ -229,7 +271,7 @@ export async function loadReviewCommandCenter(): Promise<ReviewCommandCenterData
     mediaRows,
     promotionEvents,
     stagingSummary,
-    registryReviewItems,
+    registryReviewPage,
     registryReviewSummary,
   ] = await Promise.all([
     exactCount("entity_resolution_decisions", { review_required: true, status: "open" }),
@@ -245,7 +287,7 @@ export async function loadReviewCommandCenter(): Promise<ReviewCommandCenterData
     loadSamples<MediaReviewRow>("wk_media_assets", "id, entity_type, entity_slug, role, url, source, status, updated_at", "updated_at", 10),
     loadSamples<PromotionEventRow>("wk_import_promotion_events", "id, target_table, target_record_id, event_type, message, created_at", "created_at", 10),
     loadStagingSummary(),
-    loadSamples<RegistryReviewItemRow>("registry_review_items", "id, review_key, entity_type, entity_id, review_type, priority, status, title, summary, source_table, source_id, source_payload, candidate_payload, resolution_payload, created_at, updated_at", "updated_at", 18),
+    loadRegistryReviewItems({ limit: 18 }),
     loadRegistryReviewSummary(),
   ]);
 
@@ -261,99 +303,19 @@ export async function loadReviewCommandCenter(): Promise<ReviewCommandCenterData
   const promotionReady = stagingSummary.reduce((sum, item) => sum + Number(item.ready ?? 0), 0);
 
   const workstreams: ReviewWorkstream[] = [
-    {
-      key: "phase2b_registry_review",
-      label: "Phase 2B — Registry credit review queue",
-      description: "Ambiguous and missing release/track artist credits staged from the Phase 1 shadow relationship layer.",
-      count: registryReviewItemsCount,
-      severity: registryReviewItemsCount > 0 ? "danger" : "success",
-      path: "/admin/review/queue",
-      nextAction: "Resolve primary/featured artist roles in the registry panel before canonical relationship writes are enabled.",
-    },
-    {
-      key: "phase0_artifacts",
-      label: "Phase 0 — Preserved import artifacts",
-      description: "Raw evidence retained from the migration review layer. Current hard buckets are entity relationships and custom fields.",
-      count: reviewArtifacts,
-      severity: reviewArtifacts > 0 ? "warning" : "success",
-      path: "/admin/imports/review-artifacts",
-      nextAction: "Use this as the audit source of truth before adding resolver write actions.",
-    },
-    {
-      key: "phase1_staging",
-      label: "Phase 1 — Promotion-ready staging records",
-      description: "Rows already classified as ready across tracks, chart entries, artists, release links, terms, labels, genres, and authors.",
-      count: promotionReady,
-      severity: promotionReady > 0 ? "brand" : "neutral",
-      path: "/admin/imports/review-artifacts",
-      nextAction: "Verify ready counts against live production tables before the next promotion pass.",
-    },
-    {
-      key: "phase2_artists",
-      label: "Phase 2 — Artist records needing review",
-      description: "Wakilisha artist rows that could not be safely promoted without human identity/metadata checks.",
-      count: phase2Artists,
-      severity: phase2Artists > 0 ? "danger" : "success",
-      path: "/admin/imports/review-artifacts",
-      nextAction: "Prioritize artist rows by completeness, duplicates, aliases, country/genre confidence, and image availability.",
-    },
-    {
-      key: "phase3_artist_relationships",
-      label: "Phase 3 — Artist-to-artist relationships",
-      description: "Rich artist relationship data that is already promotion-ready, including shared tracks/scores/feature context.",
-      count: phase3ArtistRelationships,
-      severity: phase3ArtistRelationships > 0 ? "brand" : "neutral",
-      path: "/admin/imports/review-artifacts",
-      nextAction: "Validate that the public graph and artist detail pages can actually display this relationship data.",
-    },
-    {
-      key: "phase4_entity_relationships",
-      label: "Phase 4 — WP/entity relationship review",
-      description: "WP term links, entity links, and chart entry links that need mapping policy before promotion.",
-      count: phase4EntityRelationships,
-      severity: phase4EntityRelationships > 0 ? "danger" : "success",
-      path: "/admin/imports/review-artifacts",
-      nextAction: "Split WP term links from chart/entity links, then approve deterministic mappings in batches.",
-    },
-    {
-      key: "phase5_postmeta",
-      label: "Phase 5 — Postmeta/custom-field policy",
-      description: "Custom fields requiring classification into useful metadata, media hints, SEO/editorial fields, sensitive fields, or layout junk.",
-      count: phase5Postmeta,
-      severity: phase5Postmeta > 0 ? "warning" : "success",
-      nextAction: "Classify high-frequency keys first so useful metadata can be promoted while junk stays blocked.",
-    },
-    {
-      key: "phase6_media",
-      label: "Phase 6 — Media assets operationalization",
-      description: "WordPress media URLs and image candidates that need entity attachment, role assignment, and fallback behavior.",
-      count: phase6Media || unresolvedMedia,
-      severity: phase6Media > 0 || unresolvedMedia > 0 ? "warning" : "success",
-      path: "/admin/media/library",
-      nextAction: "Map real WP image URLs to artist, track, release, label, article, and chart surfaces.",
-    },
-    {
-      key: "blocked_noise",
-      label: "Blocked noise — Ignored post types",
-      description: "Legacy WordPress post types intentionally blocked from promotion unless a later product decision says otherwise.",
-      count: blockedNoise,
-      severity: blockedNoise > 0 ? "neutral" : "success",
-      nextAction: "Keep blocked unless a specific UI/product surface needs one of these old post types.",
-    },
+    { key: "phase2b_registry_review", label: "Phase 2B — Registry credit review queue", description: "Ambiguous and missing release/track artist credits staged from the Phase 1 shadow relationship layer.", count: registryReviewItemsCount, severity: registryReviewItemsCount > 0 ? "danger" : "success", path: "/admin/review/queue", nextAction: "Resolve primary/featured artist roles in the registry panel before canonical relationship writes are enabled." },
+    { key: "phase0_artifacts", label: "Phase 0 — Preserved import artifacts", description: "Raw evidence retained from the migration review layer. Current hard buckets are entity relationships and custom fields.", count: reviewArtifacts, severity: reviewArtifacts > 0 ? "warning" : "success", path: "/admin/imports/review-artifacts", nextAction: "Use this as the audit source of truth before adding resolver write actions." },
+    { key: "phase1_staging", label: "Phase 1 — Promotion-ready staging records", description: "Rows already classified as ready across tracks, chart entries, artists, release links, terms, labels, genres, and authors.", count: promotionReady, severity: promotionReady > 0 ? "brand" : "neutral", path: "/admin/imports/review-artifacts", nextAction: "Verify ready counts against live production tables before the next promotion pass." },
+    { key: "phase2_artists", label: "Phase 2 — Artist records needing review", description: "Wakilisha artist rows that could not be safely promoted without human identity/metadata checks.", count: phase2Artists, severity: phase2Artists > 0 ? "danger" : "success", path: "/admin/imports/review-artifacts", nextAction: "Prioritize artist rows by completeness, duplicates, aliases, country/genre confidence, and image availability." },
+    { key: "phase3_artist_relationships", label: "Phase 3 — Artist-to-artist relationships", description: "Rich artist relationship data that is already promotion-ready, including shared tracks/scores/feature context.", count: phase3ArtistRelationships, severity: phase3ArtistRelationships > 0 ? "brand" : "neutral", path: "/admin/imports/review-artifacts", nextAction: "Validate that the public graph and artist detail pages can actually display this relationship data." },
+    { key: "phase4_entity_relationships", label: "Phase 4 — WP/entity relationship review", description: "WP term links, entity links, and chart entry links that need mapping policy before promotion.", count: phase4EntityRelationships, severity: phase4EntityRelationships > 0 ? "danger" : "success", path: "/admin/imports/review-artifacts", nextAction: "Split WP term links from chart/entity links, then approve deterministic mappings in batches." },
+    { key: "phase5_postmeta", label: "Phase 5 — Postmeta/custom-field policy", description: "Custom fields requiring classification into useful metadata, media hints, SEO/editorial fields, sensitive fields, or layout junk.", count: phase5Postmeta, severity: phase5Postmeta > 0 ? "warning" : "success", nextAction: "Classify high-frequency keys first so useful metadata can be promoted while junk stays blocked." },
+    { key: "phase6_media", label: "Phase 6 — Media assets operationalization", description: "WordPress media URLs and image candidates that need entity attachment, role assignment, and fallback behavior.", count: phase6Media || unresolvedMedia, severity: phase6Media > 0 || unresolvedMedia > 0 ? "warning" : "success", path: "/admin/media/library", nextAction: "Map real WP image URLs to artist, track, release, label, article, and chart surfaces." },
+    { key: "blocked_noise", label: "Blocked noise — Ignored post types", description: "Legacy WordPress post types intentionally blocked from promotion unless a later product decision says otherwise.", count: blockedNoise, severity: blockedNoise > 0 ? "neutral" : "success", nextAction: "Keep blocked unless a specific UI/product surface needs one of these old post types." },
   ];
 
   return {
-    totals: {
-      openDecisions,
-      reviewArtifacts,
-      unresolvedMedia,
-      unknownFields,
-      stagingNeedsReview,
-      blockedStaging,
-      promotionEvents: promotionEventsCount,
-      registryReviewItems: registryReviewItemsCount,
-      highPriorityRegistryReviewItems,
-    },
+    totals: { openDecisions, reviewArtifacts, unresolvedMedia, unknownFields, stagingNeedsReview, blockedStaging, promotionEvents: promotionEventsCount, registryReviewItems: registryReviewItemsCount, highPriorityRegistryReviewItems },
     workstreams,
     decisionSamples,
     artifactSamples,
@@ -361,7 +323,7 @@ export async function loadReviewCommandCenter(): Promise<ReviewCommandCenterData
     mediaRows,
     promotionEvents,
     stagingSummary,
-    registryReviewItems,
+    registryReviewItems: registryReviewPage.rows,
     registryReviewSummary,
   };
 }
@@ -369,54 +331,28 @@ export async function loadReviewCommandCenter(): Promise<ReviewCommandCenterData
 export async function recordRegistryReviewDecision(input: RegistryReviewDecisionInput): Promise<void> {
   const item = input.item;
   const notes = input.notes.trim();
-  const resolutionPayload = {
-    decisionType: input.decisionType,
-    notes,
-    ...(input.resolutionPayload ?? {}),
-  };
-
+  const resolutionPayload = { decisionType: input.decisionType, notes, ...(input.resolutionPayload ?? {}) };
   const { data: userData } = await supabase.auth.getUser();
   const decidedBy = userData.user?.id ?? null;
 
-  const { error: insertError } = await supabase
-    .from("registry_canonicalization_decisions")
-    .insert({
-      review_item_id: item.id,
-      decision_type: input.decisionType,
-      entity_type: item.entity_type || "registry_review_item",
-      entity_id: item.entity_id,
-      before_payload: {
-        reviewKey: item.review_key,
-        reviewType: item.review_type,
-        sourceTable: item.source_table,
-        sourceId: item.source_id,
-        sourcePayload: item.source_payload ?? {},
-        candidatePayload: item.candidate_payload ?? {},
-      },
-      after_payload: resolutionPayload,
-      decision_notes: notes || null,
-      decided_by: decidedBy,
-      status: "recorded",
-      metadata: {
-        phase: "phase2b_admin_review",
-        canonicalEntitiesChanged: false,
-        publicApiChanged: false,
-        publicRenderingChanged: false,
-      },
-    });
-
+  const { error: insertError } = await supabase.from("registry_canonicalization_decisions").insert({
+    review_item_id: item.id,
+    decision_type: input.decisionType,
+    entity_type: item.entity_type || "registry_review_item",
+    entity_id: item.entity_id,
+    before_payload: { reviewKey: item.review_key, reviewType: item.review_type, sourceTable: item.source_table, sourceId: item.source_id, sourcePayload: item.source_payload ?? {}, candidatePayload: item.candidate_payload ?? {} },
+    after_payload: resolutionPayload,
+    decision_notes: notes || null,
+    decided_by: decidedBy,
+    status: "recorded",
+    metadata: { phase: "phase2b_admin_review", canonicalEntitiesChanged: false, publicApiChanged: false, publicRenderingChanged: false },
+  });
   if (insertError) throw insertError;
 
   const { error: updateError } = await supabase
     .from("registry_review_items")
-    .update({
-      status: "resolved",
-      resolution_payload: resolutionPayload,
-      resolved_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    })
+    .update({ status: "resolved", resolution_payload: resolutionPayload, resolved_at: new Date().toISOString(), updated_at: new Date().toISOString() })
     .eq("id", item.id);
-
   if (updateError) throw updateError;
 }
 
