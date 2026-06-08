@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
 import { ShareButton } from "@/components/design-system/share/ShareSheet";
 import type { RepairedReleaseDetail } from "@/services/repairedContent/client";
@@ -12,19 +11,31 @@ export default function ReleaseDetailHero({
   minutes: number;
 }) {
   const [hovered, setHovered] = useState(false);
+  const [artworkFailed, setArtworkFailed] = useState(false);
+
+  useEffect(() => {
+    setArtworkFailed(false);
+  }, [release.artworkUrl]);
+
+  const initial = release.title.trim()[0]?.toUpperCase() || "W";
+  const canUseArtwork = Boolean(release.artworkUrl && !artworkFailed);
 
   return (
     <section className="relative overflow-hidden">
       {/* Ambient blurred background */}
-      <div
-        className="absolute inset-0 opacity-20 scale-110"
-        style={{
-          backgroundImage: `url(${release.artworkUrl})`,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-          filter: "blur(90px) saturate(1.4)",
-        }}
-      />
+      {canUseArtwork ? (
+        <div
+          className="absolute inset-0 opacity-20 scale-110"
+          style={{
+            backgroundImage: `url("${release.artworkUrl}")`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            filter: "blur(90px) saturate(1.4)",
+          }}
+        />
+      ) : (
+        <div className="absolute inset-0 opacity-30 bg-[radial-gradient(circle_at_18%_72%,rgba(16,21,16,0.24),transparent_34%),radial-gradient(circle_at_78%_18%,rgba(133,196,65,0.22),transparent_30%)]" />
+      )}
       {/* Gradient overlay */}
       <div className="absolute inset-0 bg-gradient-to-b from-[var(--wk-bg)]/40 via-[var(--wk-bg)]/70 to-[var(--wk-bg)]" />
 
@@ -33,18 +44,34 @@ export default function ReleaseDetailHero({
         <div className="flex flex-col lg:flex-row gap-8 lg:gap-12 items-start lg:items-end">
           {/* Album cover */}
           <div
-            className="relative flex-shrink-0 w-[280px] md:w-[340px] lg:w-[380px] aspect-square rounded-2xl overflow-hidden border border-[var(--wk-border)]"
+            className="relative flex-shrink-0 w-[280px] md:w-[340px] lg:w-[380px] aspect-square rounded-2xl overflow-hidden border border-[var(--wk-border)] bg-[var(--wk-surface)]"
             style={{ boxShadow: "0 32px 80px rgba(0,0,0,0.28)" }}
             onMouseEnter={() => setHovered(true)}
             onMouseLeave={() => setHovered(false)}
           >
-            <img
-              src={release.artworkUrl}
-              alt={release.title}
-              className="w-full h-full object-cover transition-transform duration-700 ease-out"
-              style={{ transform: hovered ? "scale(1.04)" : "scale(1)" }}
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
+            {canUseArtwork ? (
+              <img
+                src={release.artworkUrl}
+                alt={release.title}
+                className="w-full h-full object-cover transition-transform duration-700 ease-out"
+                style={{ transform: hovered ? "scale(1.04)" : "scale(1)" }}
+                onError={() => setArtworkFailed(true)}
+              />
+            ) : (
+              <div className="relative h-full w-full overflow-hidden bg-[linear-gradient(135deg,#f7f9f1_0%,#dfe8d6_54%,#7fa64a_100%)] p-8 text-[#101510] transition-transform duration-700 ease-out" style={{ transform: hovered ? "scale(1.04)" : "scale(1)" }}>
+                <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-white/25" />
+                <div className="absolute -bottom-20 -left-20 h-64 w-64 rounded-full bg-black/10" />
+                <div className="relative z-10 flex h-full flex-col justify-between">
+                  <div className="text-[13px] font-black uppercase tracking-[0.42em] text-[#30451f]">WAKILISHA</div>
+                  <div>
+                    <div className="mb-10 text-[96px] font-black leading-none tracking-[-0.08em] md:text-[124px]">{initial}</div>
+                    <div className="max-w-[82%] text-[28px] font-black leading-[0.95] tracking-[-0.05em] md:text-[34px]">{release.title}</div>
+                    <div className="mt-4 text-[15px] font-extrabold text-[#30451f]">{release.artist}</div>
+                  </div>
+                </div>
+              </div>
+            )}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
           </div>
 
           {/* Info */}
