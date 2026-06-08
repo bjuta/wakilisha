@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import { useNavigate } from "react-router-dom";
 import { WkIcon, type WkIconName } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
@@ -25,6 +25,10 @@ type Panel = "registry" | "decisions" | "artifacts" | "fields" | "media" | "stag
 type DecisionState = {
   decisionType: RegistryDecisionType;
   notes: string;
+  canonicalPrimaryArtistName: string;
+  canonicalPrimaryArtistSlug: string;
+  featuredArtistNames: string;
+  featuredArtistSlugs: string;
   message: string;
   submitting: boolean;
 };
@@ -41,11 +45,36 @@ const PANEL_BUTTONS: Array<{ key: Panel; label: string; icon: WkIconName }> = [
 
 const DECISION_OPTIONS: Array<{ value: RegistryDecisionType; label: string; help: string }> = [
   { value: "needs_more_research", label: "Needs more research", help: "Keep unresolved but record why this item cannot be safely resolved yet." },
-  { value: "approve_primary_artist", label: "Approve primary artist", help: "Record that the visible artist credit should become the primary artist relationship later." },
-  { value: "approve_featured_artist_split", label: "Approve featured artist split", help: "Record that the credit needs primary/featured role splitting before canonicalization." },
+  { value: "approve_primary_artist", label: "Approve primary artist", help: "Record one verified canonical primary artist name/slug for Phase 3 canonicalization." },
+  { value: "approve_featured_artist_split", label: "Approve featured artist split", help: "Record a verified primary artist plus featured/collaborator credits for a later structured split." },
   { value: "reject_bad_metadata", label: "Reject bad metadata", help: "Record that the source credit is wrong or not useful for canonical relationships." },
   { value: "duplicate_or_bad_source", label: "Duplicate or bad source", help: "Record that this item should be ignored or deduplicated later." },
 ];
+
+function emptyDecisionState(overrides: Partial<DecisionState> = {}): DecisionState {
+  return {
+    decisionType: "needs_more_research",
+    notes: "",
+    canonicalPrimaryArtistName: "",
+    canonicalPrimaryArtistSlug: "",
+    featuredArtistNames: "",
+    featuredArtistSlugs: "",
+    message: "",
+    submitting: false,
+    ...overrides,
+  };
+}
+
+function splitStructuredList(value: string): string[] {
+  return value
+    .split(/[\n,]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function isStructuredDecision(decisionType: RegistryDecisionType): boolean {
+  return decisionType === "approve_primary_artist" || decisionType === "approve_featured_artist_split";
+}
 
 export default function AdminReviewQueuePage() {
   const navigate = useNavigate();
@@ -54,12 +83,7 @@ export default function AdminReviewQueuePage() {
   const [error, setError] = useState("");
   const [panel, setPanel] = useState<Panel>("registry");
   const [selectedItem, setSelectedItem] = useState<RegistryReviewItemRow | null>(null);
-  const [decision, setDecision] = useState<DecisionState>({
-    decisionType: "needs_more_research",
-    notes: "",
-    message: "",
-    submitting: false,
-  });
+  const [decision, setDecision] = useState<DecisionState>(emptyDecisionState());
 
   const reload = () => {
     setState("loading");
@@ -97,20 +121,39 @@ export default function AdminReviewQueuePage() {
   }, [data]);
 
   const openItem = (item: RegistryReviewItemRow) => {
+    const candidate = item.candidate_payload ?? {};
+    const artistText = typeof candidate.artistText === "string" ? candidate.artistText : "";
+    const artistSlug = typeof candidate.artistSlug === "string" ? candidate.artistSlug : "";
     setSelectedItem(item);
-    setDecision({ decisionType: "needs_more_research", notes: "", message: "", submitting: false });
+    setDecision(emptyDecisionState({ canonicalPrimaryArtistName: artistText, canonicalPrimaryArtistSlug: artistSlug }));
   };
 
   const closeItem = () => {
     if (decision.submitting) return;
     setSelectedItem(null);
-    setDecision({ decisionType: "needs_more_research", notes: "", message: "", submitting: false });
+    setDecision(emptyDecisionState());
   };
 
   const submitDecision = async () => {
     if (!selectedItem) return;
-    if (!decision.notes.trim()) {
+    const notes = decision.notes.trim();
+    const primaryName = decision.canonicalPrimaryArtistName.trim();
+    const primarySlug = decision.canonicalPrimaryArtistSlug.trim();
+    const featuredNames = splitStructuredList(decision.featuredArtistNames);
+    const featuredSlugs = splitStructuredList(decision.featuredArtistSlugs);
+
+    if (!notes) {
       setDecision((current) => ({ ...current, message: "Add a short note before recording the decision." }));
+      return;
+    }
+
+    if (isStructuredDecision(decision.decisionType) && !primaryName && !primarySlug) {
+      setDecision((current) => ({ ...current, message: "Add a canonical primary artist name or slug before approving this item." }));
+      return;
+    }
+
+    if (decision.decisionType === "approve_featured_artist_split" && !featuredNames.length && !featuredSlugs.length) {
+      setDecision((current) => ({ ...current, message: "Add at least one featured/collaborator name or slug for a featured split." }));
       return;
     }
 
@@ -119,14 +162,25 @@ export default function AdminReviewQueuePage() {
       await recordRegistryReviewDecision({
         item: selectedItem,
         decisionType: decision.decisionType,
-        notes: decision.notes,
+        notes,
         resolutionPayload: {
           reviewedFrom: "admin_review_command_center",
-          phase: "phase2b",
+          phase: "phase2b_structured_resolution",
+          canonicalPrimaryArtistName: primaryName,
+          canonicalPrimaryArtistSlug: primarySlug,
+          primaryArtistName: primaryName,
+          primaryArtistSlug: primarySlug,
+          artistText: primaryName,
+          artistSlug: primarySlug,
+          featuredArtistNames: featuredNames,
+          featuredArtistSlugs: featuredSlugs,
+          canonicalEntitiesChanged: false,
+          publicApiChanged: false,
+          publicRenderingChanged: false,
         },
       });
       setSelectedItem(null);
-      setDecision({ decisionType: "needs_more_research", notes: "", message: "Decision recorded.", submitting: false });
+      setDecision(emptyDecisionState({ message: "Decision recorded." }));
       reload();
     } catch (err) {
       setDecision((current) => ({
@@ -192,7 +246,7 @@ export default function AdminReviewQueuePage() {
           <div>
             <div className="text-[13px] font-bold text-wk-text">Operational, not decorative</div>
             <p className="mt-1 text-[12px] leading-5 text-wk-text-muted">
-              Phase 2B upgrades the existing review system instead of duplicating it. Decisions are recorded for audit only; canonical relationship mutation remains disabled until Phase 3.
+              Phase 2B.1 records structured resolution fields inside the existing review system. Decisions remain auditable only; canonical relationship mutation stays disabled until Phase 3B.
             </p>
           </div>
         </div>
@@ -378,19 +432,21 @@ function RegistryReviewRow({ row, onOpen }: { row: RegistryReviewItemRow; onOpen
           <button onClick={onOpen} className="wk-button wk-button-ghost wk-button-sm">
             Open detail <WkIcon name="ArrowRight" size={13} />
           </button>
-          <div className="max-w-[220px] text-right text-[10px] leading-4 text-wk-text-faint">Records decision only. Canonical writes remain disabled.</div>
+          <div className="max-w-[220px] text-right text-[10px] leading-4 text-wk-text-faint">Records structured decisions only. Canonical writes remain disabled.</div>
         </div>
       </div>
     </div>
   );
 }
 
-function RegistryDecisionModal({ item, decision, setDecision, onClose, onSubmit }: { item: RegistryReviewItemRow; decision: DecisionState; setDecision: React.Dispatch<React.SetStateAction<DecisionState>>; onClose: () => void; onSubmit: () => void }) {
+function RegistryDecisionModal({ item, decision, setDecision, onClose, onSubmit }: { item: RegistryReviewItemRow; decision: DecisionState; setDecision: Dispatch<SetStateAction<DecisionState>>; onClose: () => void; onSubmit: () => void }) {
   const candidatePayload = item.candidate_payload ?? {};
   const sourcePayload = item.source_payload ?? {};
   const artistText = typeof candidatePayload.artistText === "string" ? candidatePayload.artistText : "";
   const artistSlug = typeof candidatePayload.artistSlug === "string" ? candidatePayload.artistSlug : "";
   const selectedOption = DECISION_OPTIONS.find((option) => option.value === decision.decisionType);
+  const showStructuredFields = isStructuredDecision(decision.decisionType);
+  const showFeaturedFields = decision.decisionType === "approve_featured_artist_split";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4">
@@ -414,8 +470,8 @@ function RegistryDecisionModal({ item, decision, setDecision, onClose, onSubmit 
           </div>
 
           <div className="mt-4 grid gap-3 md:grid-cols-2">
-            <FieldPill label="Artist text" value={artistText || "Missing"} />
-            <FieldPill label="Artist slug" value={artistSlug || "Missing"} />
+            <FieldPill label="Source artist text" value={artistText || "Missing"} />
+            <FieldPill label="Source artist slug" value={artistSlug || "Missing"} />
           </div>
 
           <div className="mt-4 rounded-xl border border-wk-border bg-wk-surface-raised p-4">
@@ -440,6 +496,45 @@ function RegistryDecisionModal({ item, decision, setDecision, onClose, onSubmit 
             </select>
             <p className="mt-1 text-[11px] leading-5 text-wk-text-muted">{selectedOption?.help}</p>
 
+            {showStructuredFields && (
+              <div className="mt-4 rounded-xl border border-wk-border bg-wk-surface-raised p-4">
+                <div className="text-[12px] font-bold text-wk-text">Structured canonical resolution</div>
+                <p className="mt-1 text-[11px] leading-5 text-wk-text-muted">Phase 3A will only treat an approval as actionable when this points to one clean canonical artist.</p>
+                <div className="mt-3 grid gap-3 md:grid-cols-2">
+                  <TextInput
+                    label="Canonical primary artist name"
+                    value={decision.canonicalPrimaryArtistName}
+                    placeholder="e.g. Karun"
+                    onChange={(value) => setDecision((current) => ({ ...current, canonicalPrimaryArtistName: value, message: "" }))}
+                  />
+                  <TextInput
+                    label="Canonical primary artist slug"
+                    value={decision.canonicalPrimaryArtistSlug}
+                    placeholder="e.g. karun"
+                    onChange={(value) => setDecision((current) => ({ ...current, canonicalPrimaryArtistSlug: value, message: "" }))}
+                  />
+                </div>
+                {showFeaturedFields && (
+                  <div className="mt-3 grid gap-3 md:grid-cols-2">
+                    <TextAreaInput
+                      label="Featured/collaborator names"
+                      value={decision.featuredArtistNames}
+                      placeholder="One per line or comma-separated"
+                      rows={3}
+                      onChange={(value) => setDecision((current) => ({ ...current, featuredArtistNames: value, message: "" }))}
+                    />
+                    <TextAreaInput
+                      label="Featured/collaborator slugs"
+                      value={decision.featuredArtistSlugs}
+                      placeholder="One per line or comma-separated"
+                      rows={3}
+                      onChange={(value) => setDecision((current) => ({ ...current, featuredArtistSlugs: value, message: "" }))}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
             <label className="mt-4 block text-[12px] font-bold text-wk-text">Decision notes</label>
             <textarea
               value={decision.notes}
@@ -453,7 +548,7 @@ function RegistryDecisionModal({ item, decision, setDecision, onClose, onSubmit 
         </div>
 
         <div className="flex flex-col gap-2 border-t border-wk-border p-5 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-[11px] leading-5 text-wk-text-faint">This records a Phase 2B decision only. Phase 3 will decide whether to mutate canonical relationships.</p>
+          <p className="text-[11px] leading-5 text-wk-text-faint">This records a structured Phase 2B.1 decision only. Phase 3 will decide whether to mutate canonical relationships.</p>
           <div className="flex gap-2">
             <button onClick={onClose} disabled={decision.submitting} className="wk-button wk-button-ghost wk-button-sm">Cancel</button>
             <button onClick={onSubmit} disabled={decision.submitting} className="wk-button wk-button-primary wk-button-sm">
@@ -463,6 +558,24 @@ function RegistryDecisionModal({ item, decision, setDecision, onClose, onSubmit 
         </div>
       </div>
     </div>
+  );
+}
+
+function TextInput({ label, value, placeholder, onChange }: { label: string; value: string; placeholder?: string; onChange: (value: string) => void }) {
+  return (
+    <label className="block">
+      <span className="text-[11px] font-black uppercase tracking-wider text-wk-text-faint">{label}</span>
+      <input value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="mt-1 w-full rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text" />
+    </label>
+  );
+}
+
+function TextAreaInput({ label, value, placeholder, rows, onChange }: { label: string; value: string; placeholder?: string; rows?: number; onChange: (value: string) => void }) {
+  return (
+    <label className="block">
+      <span className="text-[11px] font-black uppercase tracking-wider text-wk-text-faint">{label}</span>
+      <textarea value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} rows={rows ?? 3} className="mt-1 w-full rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text" />
+    </label>
   );
 }
 
