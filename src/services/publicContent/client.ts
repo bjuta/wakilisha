@@ -195,6 +195,19 @@ type ReleaseShellRow = {
   updated_at: string | null;
 };
 
+type RegistryMediaAsset = {
+  id: string;
+  slug: string;
+  title: string | null;
+  url: string;
+  mime_type: string | null;
+  media_kind: string | null;
+  status: string | null;
+  source_kind: string | null;
+  source_entity: string | null;
+  metadata: Record<string, unknown> | null;
+};
+
 async function apiGet<T>(path: string): Promise<T> {
   const base = API_BASE.replace(/\/$/, "");
   const url = `${base}${path.startsWith("/") ? path : `/${path}`}`;
@@ -281,6 +294,57 @@ function releaseTypeFromTrackCount(trackCount: number): string {
   return "Album";
 }
 
+function mediaCandidates(slug: string, title: string): string[] {
+  const normalizedSlug = slugify(slug || title);
+  const normalizedTitle = slugify(title || slug);
+  return Array.from(new Set([normalizedSlug, normalizedTitle].filter(Boolean)));
+}
+
+function preferMediaAsset(rows: RegistryMediaAsset[]): RegistryMediaAsset | null {
+  const activeImages = rows.filter((asset) => asset.status === "active" && asset.media_kind === "image" && asset.url);
+  if (!activeImages.length) return null;
+  return activeImages.find((asset) => asset.source_kind === "wordpress_database") || activeImages[0];
+}
+
+async function getRegistryMediaBySlugs(slugs: string[]): Promise<Map<string, RegistryMediaAsset>> {
+  const uniqueSlugs = Array.from(new Set(slugs.filter(Boolean)));
+  if (!uniqueSlugs.length) return new Map();
+
+  const { data, error } = await supabase
+    .from("registry_media_assets")
+    .select("id, slug, title, url, mime_type, media_kind, status, source_kind, source_entity, metadata")
+    .eq("status", "active")
+    .eq("media_kind", "image")
+    .in("slug", uniqueSlugs);
+
+  if (error) {
+    console.warn(`WAKILISHA registry media lookup failed: ${error.message}`);
+    return new Map();
+  }
+
+  const grouped = new Map<string, RegistryMediaAsset[]>();
+  for (const asset of (data || []) as RegistryMediaAsset[]) {
+    const list = grouped.get(asset.slug) || [];
+    list.push(asset);
+    grouped.set(asset.slug, list);
+  }
+
+  const selected = new Map<string, RegistryMediaAsset>();
+  for (const [slug, assets] of grouped) {
+    const preferred = preferMediaAsset(assets);
+    if (preferred) selected.set(slug, preferred);
+  }
+  return selected;
+}
+
+function mediaUrlFor(candidates: string[], mediaBySlug: Map<string, RegistryMediaAsset>): string {
+  for (const candidate of candidates) {
+    const asset = mediaBySlug.get(candidate);
+    if (asset?.url) return asset.url;
+  }
+  return "";
+}
+
 async function getRegistryTracklist(releaseId: string, fallbackArtist: string): Promise<PublicReleaseDetail["tracks"]> {
   const { data: relationshipRows, error: relationshipError } = await supabase
     .from("registry_release_tracks")
@@ -315,6 +379,14 @@ async function getRegistryTracklist(releaseId: string, fallbackArtist: string): 
   }
 
   const tracksById = new Map(((trackRows || []) as GenericRow[]).map((track) => [textValue(track, ["id"]), track]));
+  const mediaSlugs: string[] = [];
+  for (const relationship of relationships) {
+    const track = tracksById.get(relationship.trackId) || {};
+    const title = textValue(track, ["title", "name", "display_title", "normalized_title", "slug"], "");
+    const slug = textValue(track, ["slug", "normalized_slug"], relationship.trackId);
+    mediaSlugs.push(...mediaCandidates(slug, title));
+  }
+  const mediaBySlug = await getRegistryMediaBySlugs(mediaSlugs);
 
   return relationships
     .sort((a, b) => a.position - b.position || a.index - b.index)
@@ -323,7 +395,9 @@ async function getRegistryTracklist(releaseId: string, fallbackArtist: string): 
       const title = textValue(track, ["title", "name", "display_title", "normalized_title", "slug"], `Track ${index + 1}`);
       const slug = textValue(track, ["slug", "normalized_slug"], relationship.trackId);
       const artist = textValue(track, ["artist", "artist_name", "primary_artist_name", "artists"], fallbackArtist);
-      const artwork = image(textValue(track, ["artwork_url", "cover_image_url", "image_url", "thumbnail_url"]), {
+      const mediaUrl = mediaUrlFor(mediaCandidates(slug, title), mediaBySlug);
+      const directArtwork = textValue(track, ["artwork_url", "cover_image_url", "image_url", "thumbnail_url"]);
+      const artwork = mediaUrl || image(directArtwork, {
         id: relationship.trackId,
         slug,
         name: title,
@@ -342,11 +416,11 @@ async function getRegistryTracklist(releaseId: string, fallbackArtist: string): 
     });
 }
 
-function mapShellToRelease(shell: ReleaseShellRow, tracks: PublicReleaseDetail["tracks"] = []): PublicReleaseDetail {
+function mapShellToRelease(shell: ReleaseShellRow, tracks: PublicReleaseDetail["tracks"] = [], releaseArtworkUrl = ""): PublicReleaseDetail {
   const artist = shell.primary_artist_name || "Unknown artist";
   const trackCount = tracks.length || Number(shell.track_count || 0);
   const releaseType = releaseTypeFromTrackCount(trackCount);
-  const artworkUrl = generatedReleaseArtwork(shell.title, artist);
+  const artworkUrl = releaseArtworkUrl || tracks.find((track) => !track.artworkUrl.startsWith("data:image/svg+xml"))?.artworkUrl || generatedReleaseArtwork(shell.title, artist);
   const totalDuration = tracks.reduce((sum, track) => sum + Number(track.duration || 0), 0) || trackCount * 180;
 
   return {
@@ -373,6 +447,7 @@ function mapShellToRelease(shell: ReleaseShellRow, tracks: PublicReleaseDetail["
       sourceProvenance: shell.source_provenance || {},
       updatedAt: shell.updated_at,
       tracklistSource: tracks.length ? "registry_release_tracks" : "shell_only",
+      artworkSource: releaseArtworkUrl ? "registry_media_assets" : tracks.some((track) => !track.artworkUrl.startsWith("data:image/svg+xml")) ? "track_registry_media_assets" : "generated_placeholder",
     },
   };
 }
@@ -394,7 +469,9 @@ async function getReleaseFromShell(artistSlug: string, releaseSlug: string): Pro
   if (!data) return null;
   const shell = data as ReleaseShellRow;
   const tracks = await getRegistryTracklist(shell.release_id, shell.primary_artist_name || "Unknown artist");
-  return mapShellToRelease(shell, tracks);
+  const releaseMedia = await getRegistryMediaBySlugs(mediaCandidates(shell.slug, shell.title));
+  const releaseArtworkUrl = mediaUrlFor(mediaCandidates(shell.slug, shell.title), releaseMedia);
+  return mapShellToRelease(shell, tracks, releaseArtworkUrl);
 }
 
 async function listReleasesFromShells(): Promise<PublicRelease[]> {
@@ -410,8 +487,11 @@ async function listReleasesFromShells(): Promise<PublicRelease[]> {
     return [];
   }
 
-  return ((data || []) as ReleaseShellRow[]).map((shell) => {
-    const release = mapShellToRelease(shell);
+  const shells = (data || []) as ReleaseShellRow[];
+  const mediaBySlug = await getRegistryMediaBySlugs(shells.flatMap((shell) => mediaCandidates(shell.slug, shell.title)));
+
+  return shells.map((shell) => {
+    const release = mapShellToRelease(shell, [], mediaUrlFor(mediaCandidates(shell.slug, shell.title), mediaBySlug));
     return {
       id: release.id,
       slug: release.slug,
