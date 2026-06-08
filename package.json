@@ -38,7 +38,6 @@
     "charts:v2-db-readiness": "tsx scripts/charts/check-v2-db-readiness.ts",
     "charts:v2-dev-preflight": "tsx scripts/charts/v2-dev-preflight.ts",
     "charts:v2-execute-plan": "tsx scripts/charts/execute-v2-insert-plan.ts",
-    "charts:v2-live-smoke": "tsx scripts/charts/smoke-v2-live-api.ts",
     "charts:v2-local-api": "tsx scripts/charts/serve-v2-api.ts",
     "charts:v2-plan-inserts": "tsx scripts/charts/plan-v2-inserts.ts",
     "charts:v2-preview": "tsx scripts/charts/migrate-current-json-to-v2.ts",
@@ -73,7 +72,10 @@
     "migration:repair": "tsx packages/migration/src/index.ts repair",
     "migration:routes": "tsx packages/migration/src/index.ts routes",
     "migration:seed": "tsx packages/migration/src/index.ts seed",
-    "preview": "vite preview --host 0.0.0.0"
+    "preview": "vite preview --host 0.0.0.0",
+    "registry:phase1:audit": "tsx scripts/registry/phase1-registry-audit.ts",
+    "registry:phase1:backfill": "tsx scripts/registry/phase1-shadow-backfill.ts",
+    "registry:phase1:schema": "tsx scripts/registry/phase1-shadow-schema.ts"
   },
   "type": "module",
   "version": "0.1.0"
