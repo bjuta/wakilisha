@@ -221,6 +221,19 @@ function image(url: string | null | undefined, identity: MediaIdentity): string 
   return rewritten || withPlaceholderImage(url || "", identity);
 }
 
+function generatedReleaseArtwork(title: string, artist: string): string {
+  const safeTitle = title.replace(/[<&>]/g, "");
+  const safeArtist = artist.replace(/[<&>]/g, "");
+  const initials = safeTitle
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 3)
+    .map((word) => word[0]?.toUpperCase() || "")
+    .join("") || "WK";
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f7f9f1"/><stop offset="0.55" stop-color="#dfe8d6"/><stop offset="1" stop-color="#7fa64a"/></linearGradient></defs><rect width="800" height="800" fill="url(#g)"/><circle cx="640" cy="160" r="220" fill="#ffffff" opacity="0.24"/><circle cx="160" cy="690" r="260" fill="#000000" opacity="0.1"/><text x="64" y="96" font-family="Inter,Arial,sans-serif" font-size="30" font-weight="800" letter-spacing="10" fill="#30451f">WAKILISHA</text><text x="64" y="402" font-family="Inter,Arial,sans-serif" font-size="150" font-weight="900" fill="#101510">${initials}</text><text x="64" y="610" font-family="Inter,Arial,sans-serif" font-size="46" font-weight="900" fill="#101510">${safeTitle}</text><text x="64" y="674" font-family="Inter,Arial,sans-serif" font-size="30" font-weight="700" fill="#30451f">${safeArtist}</text></svg>`;
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+
 export function slugify(name: string): string {
   return name.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
@@ -244,7 +257,7 @@ function releaseTypeFromTrackCount(trackCount: number): string {
 function mapShellToRelease(shell: ReleaseShellRow): PublicReleaseDetail {
   const artist = shell.primary_artist_name || "Unknown artist";
   const releaseType = releaseTypeFromTrackCount(Number(shell.track_count || 0));
-  const artworkUrl = image("", { id: shell.release_id, slug: shell.slug, name: shell.title, type: "release" });
+  const artworkUrl = generatedReleaseArtwork(shell.title, artist);
 
   return {
     id: shell.release_id,
