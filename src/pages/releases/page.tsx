@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Link } from "react-router-dom";
 import { AlbumModal } from "@/components/design-system/releases/AlbumModal";
 import { ShareButton } from "@/components/design-system/share/ShareSheet";
@@ -70,8 +70,8 @@ export default function Releases() {
       .sort((a, b) => sortReleases(a, b, sortKey));
   }, [artistFilter, query, releases, sortKey, typeFilter, yearFilter]);
 
-  const featured = filtered[0] || releases[0];
-  const recentlyAdded = [...releases].sort((a, b) => sortReleases(a, b, "newest")).slice(0, 6);
+  const featuredReleases = useMemo(() => pickFeaturedReleases(filtered.length ? filtered : releases), [filtered, releases]);
+  const recentlyAdded = useMemo(() => [...releases].sort((a, b) => sortReleases(a, b, "newest")).slice(0, 6), [releases]);
   const freshShelf = filtered.slice(0, 8).map((release) => ({ release }));
 
   const catalogStats = {
@@ -85,13 +85,12 @@ export default function Releases() {
   if (loading) {
     return (
       <main className="min-h-screen bg-[var(--wk-bg)]">
-        <section className="album41-hero">
-          <div className="album41-shade" />
-          <div className="album41-inner wk-container-wide">
+        <section className="relative overflow-hidden border-b border-[var(--wk-border)] bg-[var(--wk-bg)]">
+          <div className="wk-container-wide px-4 py-20 md:px-6 lg:py-28">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               <div className="space-y-4">
                 <div className="h-4 w-40 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
-                <div className="h-12 w-3/4 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
+                <div className="h-16 w-3/4 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
                 <div className="h-4 w-1/2 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
                 <div className="h-4 w-2/3 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
                 <div className="flex gap-3 mt-6">
@@ -99,7 +98,7 @@ export default function Releases() {
                   <div className="h-10 w-28 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
                 </div>
               </div>
-              <div className="h-64 rounded-xl bg-[var(--wk-surface-raised)] animate-pulse" />
+              <div className="h-72 rounded-2xl bg-[var(--wk-surface-raised)] animate-pulse" />
             </div>
           </div>
         </section>
@@ -138,59 +137,11 @@ export default function Releases() {
 
   return (
     <main className="min-h-screen bg-[var(--wk-bg)]">
-      <section className="album41-hero">
-        {featured && <HeroAmbient release={featured} />}
-        <div className="album41-shade" />
-        <div className="album41-inner wk-container-wide">
-          {featured && (
-            <>
-              <div className="album41-cover bg-[var(--wk-surface)] border border-[var(--wk-border)]">
-                <ReleaseArtwork release={featured} />
-              </div>
-              <div>
-                <div className="album41-kicker">
-                  <WkIcon name="Album" size={14} /> Releases catalog
-                </div>
-                <h1 className="album41-title">Albums & releases</h1>
-                <div className="album41-artist">
-                  <span>{featured.title}</span>
-                </div>
-                <p className="album41-desc mt-4 max-w-2xl">
-                  Browse registry-backed albums, EPs and singles across the WAKILISHA catalog. Filter by artist, year or format, then open the canonical release page.
-                </p>
-                <div className="album41-meta">
-                  <span>
-                    <WkIcon name="Disc3" size={14} /> {catalogStats.total} releases
-                  </span>
-                  <span>
-                    <WkIcon name="ListFilter" size={14} /> {catalogStats.visible} visible
-                  </span>
-                  <span>
-                    <WkIcon name="Building2" size={14} /> {catalogStats.labelsRepresented} labels
-                  </span>
-                </div>
-                <div className="album41-actions">
-                  <button onClick={() => setModalRelease(featured)} className="wk-button wk-button-lg wk-button-primary">
-                    <WkIcon name="Eye" size={18} /> Preview featured
-                  </button>
-                  <Link to={releaseUrl(featured)} className="wk-button wk-button-lg wk-button-ghost">
-                    <WkIcon name="ArrowUpRight" size={18} /> Full page
-                  </Link>
-                  <ShareButton
-                    item={{
-                      title: "WAKILISHA Releases",
-                      subtitle: `${catalogStats.total} releases`,
-                      description: "Browse albums, EPs, singles and compilations in the WAKILISHA catalog.",
-                      imageUrl: featured.artworkUrl,
-                      type: "album",
-                    }}
-                  />
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-      </section>
+      <FeaturedReleaseCarousel
+        releases={featuredReleases}
+        catalogStats={catalogStats}
+        onPreview={setModalRelease}
+      />
 
       <div className="wk-container-wide px-4 py-10 md:px-6">
         <div className="chart-stats-strip mb-10">
@@ -327,6 +278,165 @@ export default function Releases() {
   );
 }
 
+function FeaturedReleaseCarousel({
+  releases,
+  catalogStats,
+  onPreview,
+}: {
+  releases: Release[];
+  catalogStats: { total: number; visible: number; albums: number; eps: number; labelsRepresented: number };
+  onPreview: (release: Release) => void;
+}) {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const active = releases[activeIndex] || releases[0];
+
+  useEffect(() => {
+    setActiveIndex(0);
+  }, [releases]);
+
+  const scrollTo = (index: number) => {
+    const nextIndex = Math.max(0, Math.min(index, releases.length - 1));
+    setActiveIndex(nextIndex);
+    const scroller = scrollerRef.current;
+    const slide = scroller?.children[nextIndex] as HTMLElement | undefined;
+    slide?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+  };
+
+  if (!active) return null;
+
+  return (
+    <section className="relative min-h-[78vh] overflow-hidden border-b border-[var(--wk-border)] bg-[#0d120a] text-white">
+      <CarouselBackground release={active} />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_12%_20%,rgba(133,196,65,0.32),transparent_34%),linear-gradient(90deg,rgba(0,0,0,0.82)_0%,rgba(0,0,0,0.58)_42%,rgba(0,0,0,0.24)_100%)]" />
+      <div className="relative z-10 flex min-h-[78vh] flex-col justify-end">
+        <div className="wk-container-wide w-full px-4 pb-8 pt-24 md:px-6 lg:pb-12 lg:pt-32">
+          <div className="grid items-end gap-8 lg:grid-cols-[minmax(0,1fr)_420px]">
+            <div className="max-w-4xl">
+              <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-[0.18em] text-white/85 backdrop-blur">
+                <WkIcon name="Sparkles" size={13} /> Releases discovery
+              </div>
+              <h1 className="font-[var(--wk-font-display)] text-[clamp(56px,9vw,128px)] font-black leading-[0.82] tracking-[-0.075em] text-white drop-shadow-2xl">
+                Albums & releases
+              </h1>
+              <p className="mt-6 max-w-2xl text-[17px] font-semibold leading-[1.75] text-white/74 md:text-[19px]">
+                A registry-backed release shelf for albums, EPs and singles across WAKILISHA. Swipe through featured records, then filter the full catalog below.
+              </p>
+              <div className="mt-7 flex flex-wrap items-center gap-3 text-[12px] font-extrabold text-white/82">
+                <span className="inline-flex items-center gap-2 rounded-full border border-white/16 bg-white/10 px-3 py-2 backdrop-blur">
+                  <WkIcon name="Disc3" size={14} /> {catalogStats.total} releases
+                </span>
+                <span className="inline-flex items-center gap-2 rounded-full border border-white/16 bg-white/10 px-3 py-2 backdrop-blur">
+                  <WkIcon name="ListFilter" size={14} /> {catalogStats.visible} visible
+                </span>
+                <span className="inline-flex items-center gap-2 rounded-full border border-white/16 bg-white/10 px-3 py-2 backdrop-blur">
+                  <WkIcon name="Building2" size={14} /> {catalogStats.labelsRepresented} labels
+                </span>
+              </div>
+            </div>
+
+            <div className="rounded-[28px] border border-white/16 bg-black/24 p-4 shadow-2xl backdrop-blur-xl">
+              <div className="aspect-square overflow-hidden rounded-2xl bg-white/10">
+                <ReleaseArtwork release={active} />
+              </div>
+              <div className="mt-4">
+                <div className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-[var(--wk-brand)]">Featured release</div>
+                <h2 className="mt-1 line-clamp-2 text-[30px] font-black leading-[0.95] tracking-[-0.05em] text-white">{active.title}</h2>
+                <div className="mt-3 text-[13px] font-bold text-white/70">
+                  {active.artist} · {yearValue(active.year) || "Unknown year"} · {trackCountLabel(active.trackCount)}
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button onClick={() => onPreview(active)} className="wk-button wk-button-primary">
+                    <WkIcon name="Eye" size={15} /> Preview
+                  </button>
+                  <Link to={releaseUrl(active)} className="wk-button wk-button-ghost border-white/20 bg-white/10 text-white hover:bg-white/16">
+                    <WkIcon name="ArrowUpRight" size={15} /> Open
+                  </Link>
+                  <ShareButton
+                    item={{
+                      title: active.title,
+                      subtitle: active.artist,
+                      description: `${active.releaseType} by ${active.artist} on WAKILISHA`,
+                      imageUrl: active.artworkUrl,
+                      type: "album",
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-10">
+            <div
+              ref={scrollerRef}
+              className="flex snap-x gap-3 overflow-x-auto pb-3 scrollbar-hide"
+              onScroll={(event) => {
+                const scroller = event.currentTarget;
+                const width = scroller.firstElementChild?.clientWidth || 1;
+                const nextIndex = Math.round(scroller.scrollLeft / (width + 12));
+                if (nextIndex !== activeIndex && nextIndex >= 0 && nextIndex < releases.length) setActiveIndex(nextIndex);
+              }}
+            >
+              {releases.map((release, index) => (
+                <button
+                  key={`${release.artist}-${release.slug}`}
+                  onClick={() => scrollTo(index)}
+                  className={`group relative h-28 w-[220px] shrink-0 snap-start overflow-hidden rounded-2xl border text-left transition-all md:w-[260px] ${activeIndex === index ? "border-[var(--wk-brand)] shadow-[0_0_0_1px_var(--wk-brand)]" : "border-white/16 hover:border-white/35"}`}
+                >
+                  <div className="absolute inset-0">
+                    <ReleaseArtwork release={release} />
+                  </div>
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/88 via-black/38 to-transparent" />
+                  <div className="absolute inset-x-0 bottom-0 p-3">
+                    <div className="line-clamp-1 text-[14px] font-black text-white">{release.title}</div>
+                    <div className="line-clamp-1 text-[11px] font-bold text-white/70">{release.artist}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+            <div className="mt-3 flex items-center justify-between gap-4">
+              <div className="flex gap-2">
+                {releases.map((release, index) => (
+                  <button
+                    key={`dot-${release.slug}-${index}`}
+                    aria-label={`Show ${release.title}`}
+                    onClick={() => scrollTo(index)}
+                    className={`h-2 rounded-full transition-all ${activeIndex === index ? "w-8 bg-[var(--wk-brand)]" : "w-2 bg-white/35 hover:bg-white/65"}`}
+                  />
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => scrollTo(activeIndex - 1)} className="rounded-full border border-white/18 bg-white/10 p-2 text-white backdrop-blur hover:bg-white/16" aria-label="Previous featured release">
+                  <WkIcon name="ChevronLeft" size={18} />
+                </button>
+                <button onClick={() => scrollTo(activeIndex + 1)} className="rounded-full border border-white/18 bg-white/10 p-2 text-white backdrop-blur hover:bg-white/16" aria-label="Next featured release">
+                  <WkIcon name="ChevronRight" size={18} />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function CarouselBackground({ release }: { release: Release }) {
+  const [failed, setFailed] = useState(false);
+  if (!release.artworkUrl || failed) {
+    return <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_75%,rgba(133,196,65,0.42),transparent_32%),radial-gradient(circle_at_82%_16%,rgba(255,255,255,0.20),transparent_30%),linear-gradient(135deg,#101510,#1d2f12)]" />;
+  }
+  return (
+    <>
+      <img src={release.artworkUrl} alt="" className="hidden" onError={() => setFailed(true)} />
+      <div
+        className="absolute inset-0 scale-105 bg-cover bg-center opacity-75 blur-[2px]"
+        style={{ backgroundImage: `url("${release.artworkUrl}")` }}
+      />
+    </>
+  );
+}
+
 function FilterSelect({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (value: string) => void }) {
   return (
     <label className="block">
@@ -381,19 +491,6 @@ function ReleaseTile({
         </div>
       </div>
     </div>
-  );
-}
-
-function HeroAmbient({ release }: { release: Release }) {
-  const [failed, setFailed] = useState(false);
-  if (!release.artworkUrl || failed) {
-    return <div className="album41-ambient opacity-30 bg-[radial-gradient(circle_at_20%_80%,rgba(133,196,65,0.22),transparent_32%),radial-gradient(circle_at_82%_22%,rgba(255,255,255,0.16),transparent_30%)]" />;
-  }
-  return (
-    <>
-      <img src={release.artworkUrl} alt="" className="hidden" onError={() => setFailed(true)} />
-      <div className="album41-ambient" style={{ backgroundImage: `url("${release.artworkUrl}")` }} />
-    </>
   );
 }
 
@@ -459,4 +556,10 @@ function trackCountLabel(count: number): string {
 function isRealLabel(label: string): boolean {
   const normalized = label.trim().toLowerCase();
   return Boolean(normalized && normalized !== "wakilisha registry" && normalized !== "unknown" && normalized !== "independent");
+}
+
+function pickFeaturedReleases(releases: Release[]): Release[] {
+  const withArtwork = releases.filter((release) => Boolean(release.artworkUrl) && !release.artworkUrl.startsWith("data:image/svg+xml"));
+  const source = withArtwork.length >= 5 ? withArtwork : releases;
+  return source.slice(0, 10);
 }
