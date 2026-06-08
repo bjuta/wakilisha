@@ -101,7 +101,9 @@ export type RegistryReviewItemRow = {
   summary: string | null;
   source_table: string | null;
   source_id: string | null;
+  source_payload: Record<string, unknown> | null;
   candidate_payload: Record<string, unknown> | null;
+  resolution_payload?: Record<string, unknown> | null;
   created_at: string | null;
   updated_at: string | null;
 };
@@ -110,6 +112,20 @@ export type RegistryReviewSummaryRow = {
   status: string;
   review_type: string;
   count: number;
+};
+
+export type RegistryDecisionType =
+  | "approve_primary_artist"
+  | "approve_featured_artist_split"
+  | "needs_more_research"
+  | "reject_bad_metadata"
+  | "duplicate_or_bad_source";
+
+export type RegistryReviewDecisionInput = {
+  item: RegistryReviewItemRow;
+  decisionType: RegistryDecisionType;
+  notes: string;
+  resolutionPayload?: Record<string, unknown>;
 };
 
 export type ReviewCommandCenterData = {
@@ -229,7 +245,7 @@ export async function loadReviewCommandCenter(): Promise<ReviewCommandCenterData
     loadSamples<MediaReviewRow>("wk_media_assets", "id, entity_type, entity_slug, role, url, source, status, updated_at", "updated_at", 10),
     loadSamples<PromotionEventRow>("wk_import_promotion_events", "id, target_table, target_record_id, event_type, message, created_at", "created_at", 10),
     loadStagingSummary(),
-    loadSamples<RegistryReviewItemRow>("registry_review_items", "id, review_key, entity_type, entity_id, review_type, priority, status, title, summary, source_table, source_id, candidate_payload, created_at, updated_at", "updated_at", 18),
+    loadSamples<RegistryReviewItemRow>("registry_review_items", "id, review_key, entity_type, entity_id, review_type, priority, status, title, summary, source_table, source_id, source_payload, candidate_payload, resolution_payload, created_at, updated_at", "updated_at", 18),
     loadRegistryReviewSummary(),
   ]);
 
@@ -348,6 +364,60 @@ export async function loadReviewCommandCenter(): Promise<ReviewCommandCenterData
     registryReviewItems,
     registryReviewSummary,
   };
+}
+
+export async function recordRegistryReviewDecision(input: RegistryReviewDecisionInput): Promise<void> {
+  const item = input.item;
+  const notes = input.notes.trim();
+  const resolutionPayload = {
+    decisionType: input.decisionType,
+    notes,
+    ...(input.resolutionPayload ?? {}),
+  };
+
+  const { data: userData } = await supabase.auth.getUser();
+  const decidedBy = userData.user?.id ?? null;
+
+  const { error: insertError } = await supabase
+    .from("registry_canonicalization_decisions")
+    .insert({
+      review_item_id: item.id,
+      decision_type: input.decisionType,
+      entity_type: item.entity_type || "registry_review_item",
+      entity_id: item.entity_id,
+      before_payload: {
+        reviewKey: item.review_key,
+        reviewType: item.review_type,
+        sourceTable: item.source_table,
+        sourceId: item.source_id,
+        sourcePayload: item.source_payload ?? {},
+        candidatePayload: item.candidate_payload ?? {},
+      },
+      after_payload: resolutionPayload,
+      decision_notes: notes || null,
+      decided_by: decidedBy,
+      status: "recorded",
+      metadata: {
+        phase: "phase2b_admin_review",
+        canonicalEntitiesChanged: false,
+        publicApiChanged: false,
+        publicRenderingChanged: false,
+      },
+    });
+
+  if (insertError) throw insertError;
+
+  const { error: updateError } = await supabase
+    .from("registry_review_items")
+    .update({
+      status: "resolved",
+      resolution_payload: resolutionPayload,
+      resolved_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", item.id);
+
+  if (updateError) throw updateError;
 }
 
 export function formatReviewCount(value: number | null | undefined): string {
