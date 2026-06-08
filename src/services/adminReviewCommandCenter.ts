@@ -4,6 +4,7 @@ export type ReviewWorkstreamKey =
   | "phase0_artifacts"
   | "phase1_staging"
   | "phase2_artists"
+  | "phase2b_registry_review"
   | "phase3_artist_relationships"
   | "phase4_entity_relationships"
   | "phase5_postmeta"
@@ -88,6 +89,29 @@ export type StagingSummaryRow = {
   total: number;
 };
 
+export type RegistryReviewItemRow = {
+  id: string;
+  review_key: string | null;
+  entity_type: string | null;
+  entity_id: string | null;
+  review_type: string | null;
+  priority: string | null;
+  status: string | null;
+  title: string | null;
+  summary: string | null;
+  source_table: string | null;
+  source_id: string | null;
+  candidate_payload: Record<string, unknown> | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+export type RegistryReviewSummaryRow = {
+  status: string;
+  review_type: string;
+  count: number;
+};
+
 export type ReviewCommandCenterData = {
   totals: {
     openDecisions: number;
@@ -97,6 +121,8 @@ export type ReviewCommandCenterData = {
     stagingNeedsReview: number;
     blockedStaging: number;
     promotionEvents: number;
+    registryReviewItems: number;
+    highPriorityRegistryReviewItems: number;
   };
   workstreams: ReviewWorkstream[];
   decisionSamples: ReviewDecisionSample[];
@@ -105,6 +131,8 @@ export type ReviewCommandCenterData = {
   mediaRows: MediaReviewRow[];
   promotionEvents: PromotionEventRow[];
   stagingSummary: StagingSummaryRow[];
+  registryReviewItems: RegistryReviewItemRow[];
+  registryReviewSummary: RegistryReviewSummaryRow[];
 };
 
 async function exactCount(table: string, filters: Record<string, string | boolean> = {}): Promise<number> {
@@ -133,6 +161,27 @@ async function loadSamples<T>(table: string, select: string, orderColumn = "crea
   return (data ?? []) as T[];
 }
 
+async function loadRegistryReviewSummary(): Promise<RegistryReviewSummaryRow[]> {
+  const { data, error } = await supabase
+    .from("registry_review_items")
+    .select("status, review_type")
+    .order("review_type", { ascending: true });
+
+  if (error) return [];
+
+  const counts = new Map<string, RegistryReviewSummaryRow>();
+  for (const row of (data ?? []) as Array<{ status: string | null; review_type: string | null }>) {
+    const status = row.status || "unknown";
+    const reviewType = row.review_type || "unknown";
+    const key = `${status}::${reviewType}`;
+    const current = counts.get(key) ?? { status, review_type: reviewType, count: 0 };
+    current.count += 1;
+    counts.set(key, current);
+  }
+
+  return [...counts.values()].sort((a, b) => b.count - a.count || a.review_type.localeCompare(b.review_type));
+}
+
 function row(summary: StagingSummaryRow[], target: string): StagingSummaryRow {
   return summary.find((item) => item.target_entity === target) ?? { target_entity: target, ready: 0, needs_review: 0, blocked: 0, total: 0 };
 }
@@ -156,24 +205,32 @@ export async function loadReviewCommandCenter(): Promise<ReviewCommandCenterData
     unresolvedMedia,
     unknownFields,
     promotionEventsCount,
+    registryReviewItemsCount,
+    highPriorityRegistryReviewItems,
     decisionSamples,
     artifactSamples,
     fieldDictionary,
     mediaRows,
     promotionEvents,
     stagingSummary,
+    registryReviewItems,
+    registryReviewSummary,
   ] = await Promise.all([
     exactCount("entity_resolution_decisions", { review_required: true, status: "open" }),
     exactCount("wk_import_review_artifacts"),
     exactCount("entity_resolution_decisions", { entity_type: "media_asset", review_required: true, status: "open" }),
     exactCount("wp_postmeta_field_dictionary", { promotion_policy: "review" }),
     exactCount("wk_import_promotion_events"),
+    exactCount("registry_review_items", { status: "open" }),
+    exactCount("registry_review_items", { status: "open", priority: "high" }),
     loadSamples<ReviewDecisionSample>("entity_resolution_decisions", "id, entity_type, source_title, source_slug, target_title, target_slug, confidence_score, decision, status, review_required, reason, created_at, updated_at", "updated_at", 16),
     loadSamples<ReviewArtifactSample>("wk_import_review_artifacts", "id, artifact_type, title, source_kind, source_record_id, review_status, notes, created_at", "created_at", 10),
     loadSamples<FieldDictionaryRow>("wp_postmeta_field_dictionary", "id, meta_key, field_group, promotion_policy, confidence, occurrence_count, object_count, reason, approved_policy, updated_at", "occurrence_count", 12),
     loadSamples<MediaReviewRow>("wk_media_assets", "id, entity_type, entity_slug, role, url, source, status, updated_at", "updated_at", 10),
     loadSamples<PromotionEventRow>("wk_import_promotion_events", "id, target_table, target_record_id, event_type, message, created_at", "created_at", 10),
     loadStagingSummary(),
+    loadSamples<RegistryReviewItemRow>("registry_review_items", "id, review_key, entity_type, entity_id, review_type, priority, status, title, summary, source_table, source_id, candidate_payload, created_at, updated_at", "updated_at", 18),
+    loadRegistryReviewSummary(),
   ]);
 
   const stagingNeedsReview = stagingSummary.reduce((sum, item) => sum + Number(item.needs_review ?? 0), 0);
@@ -188,6 +245,15 @@ export async function loadReviewCommandCenter(): Promise<ReviewCommandCenterData
   const promotionReady = stagingSummary.reduce((sum, item) => sum + Number(item.ready ?? 0), 0);
 
   const workstreams: ReviewWorkstream[] = [
+    {
+      key: "phase2b_registry_review",
+      label: "Phase 2B — Registry credit review queue",
+      description: "Ambiguous and missing release/track artist credits staged from the Phase 1 shadow relationship layer.",
+      count: registryReviewItemsCount,
+      severity: registryReviewItemsCount > 0 ? "danger" : "success",
+      path: "/admin/review/queue",
+      nextAction: "Resolve primary/featured artist roles in the registry panel before canonical relationship writes are enabled.",
+    },
     {
       key: "phase0_artifacts",
       label: "Phase 0 — Preserved import artifacts",
@@ -261,7 +327,17 @@ export async function loadReviewCommandCenter(): Promise<ReviewCommandCenterData
   ];
 
   return {
-    totals: { openDecisions, reviewArtifacts, unresolvedMedia, unknownFields, stagingNeedsReview, blockedStaging, promotionEvents: promotionEventsCount },
+    totals: {
+      openDecisions,
+      reviewArtifacts,
+      unresolvedMedia,
+      unknownFields,
+      stagingNeedsReview,
+      blockedStaging,
+      promotionEvents: promotionEventsCount,
+      registryReviewItems: registryReviewItemsCount,
+      highPriorityRegistryReviewItems,
+    },
     workstreams,
     decisionSamples,
     artifactSamples,
@@ -269,6 +345,8 @@ export async function loadReviewCommandCenter(): Promise<ReviewCommandCenterData
     mediaRows,
     promotionEvents,
     stagingSummary,
+    registryReviewItems,
+    registryReviewSummary,
   };
 }
 
