@@ -81,7 +81,8 @@
     "registry:phase3:write": "tsx scripts/registry/phase3-canonicalization-write.ts",
     "registry:phase4a:release-shell-audit": "tsx scripts/registry/phase4a-release-shell-readiness-audit.ts",
     "registry:phase4a:release-shell-dry-run": "tsx scripts/registry/phase4a-release-shell-dry-run.ts",
-    "registry:phase4a:release-shell-schema": "tsx scripts/registry/phase4a-release-shell-schema.ts"
+    "registry:phase4a:release-shell-schema": "tsx scripts/registry/phase4a-release-shell-schema.ts",
+    "registry:phase4a:chart-bridge": "tsx scripts/registry/phase4a-chart-ingestion-registry-bridge.ts"
   },
   "type": "module",
   "version": "0.1.0"
