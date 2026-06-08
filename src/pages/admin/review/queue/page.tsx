@@ -8,6 +8,8 @@ import {
   type FieldDictionaryRow,
   type MediaReviewRow,
   type PromotionEventRow,
+  type RegistryReviewItemRow,
+  type RegistryReviewSummaryRow,
   type ReviewArtifactSample,
   type ReviewCommandCenterData,
   type ReviewDecisionSample,
@@ -16,9 +18,10 @@ import {
 } from "@/services/adminReviewCommandCenter";
 
 type LoadState = "loading" | "ready" | "error";
-type Panel = "decisions" | "artifacts" | "fields" | "media" | "staging" | "events";
+type Panel = "registry" | "decisions" | "artifacts" | "fields" | "media" | "staging" | "events";
 
 const PANEL_BUTTONS: Array<{ key: Panel; label: string; icon: WkIconName }> = [
+  { key: "registry", label: "Registry Queue", icon: "GitPullRequest" },
   { key: "decisions", label: "Decisions", icon: "GitPullRequest" },
   { key: "artifacts", label: "Artifacts", icon: "Archive" },
   { key: "fields", label: "Fields", icon: "Braces" },
@@ -32,7 +35,7 @@ export default function AdminReviewQueuePage() {
   const [state, setState] = useState<LoadState>("loading");
   const [data, setData] = useState<ReviewCommandCenterData | null>(null);
   const [error, setError] = useState("");
-  const [panel, setPanel] = useState<Panel>("decisions");
+  const [panel, setPanel] = useState<Panel>("registry");
 
   useEffect(() => {
     let alive = true;
@@ -53,7 +56,7 @@ export default function AdminReviewQueuePage() {
 
   const activeWork = useMemo(() => {
     if (!data) return 0;
-    return data.totals.openDecisions + data.totals.reviewArtifacts + data.totals.stagingNeedsReview + data.totals.blockedStaging + data.totals.unknownFields;
+    return data.totals.registryReviewItems + data.totals.openDecisions + data.totals.reviewArtifacts + data.totals.stagingNeedsReview + data.totals.blockedStaging + data.totals.unknownFields;
   }, [data]);
 
   if (state === "loading") {
@@ -75,7 +78,7 @@ export default function AdminReviewQueuePage() {
           <WkIcon name="AlertCircle" size={28} />
         </div>
         <h2 className="text-[18px] font-bold text-wk-text">Could not load review command center</h2>
-        <p className="mx-auto mt-2 max-w-xl text-[13px] text-wk-text-muted">{error || "Some Phase 0–7 tables may not exist in this environment yet."}</p>
+        <p className="mx-auto mt-2 max-w-xl text-[13px] text-wk-text-muted">{error || "Some review tables may not exist in this environment yet."}</p>
       </div>
     );
   }
@@ -87,14 +90,17 @@ export default function AdminReviewQueuePage() {
           <div className="mb-1 text-[11px] font-black uppercase tracking-wider text-wk-brand">Review</div>
           <h1 className="text-[24px] font-black tracking-tight text-wk-text">Review Command Center</h1>
           <p className="mt-1 max-w-3xl text-[13px] leading-6 text-wk-text-muted">
-            One cockpit for import artifacts, resolver decisions, media candidates, postmeta classification, staging exceptions, and promotion audit events.
+            One cockpit for registry credit review, import artifacts, resolver decisions, media candidates, postmeta classification, staging exceptions, and promotion audit events.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <button onClick={() => setPanel("registry")} className="wk-button wk-button-primary wk-button-sm whitespace-nowrap">
+            <WkIcon name="GitPullRequest" size={14} /> Registry Queue
+          </button>
           <button onClick={() => navigate("/admin/imports/review-artifacts")} className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap">
             <WkIcon name="Archive" size={14} /> Artifacts
           </button>
-          <button onClick={() => navigate("/admin/settings/charts/review-queue")} className="wk-button wk-button-primary wk-button-sm whitespace-nowrap">
+          <button onClick={() => navigate("/admin/settings/charts/review-queue")} className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap">
             <WkIcon name="ArrowRight" size={14} /> Charts Review
           </button>
         </div>
@@ -108,7 +114,7 @@ export default function AdminReviewQueuePage() {
           <div>
             <div className="text-[13px] font-bold text-wk-text">Operational, not decorative</div>
             <p className="mt-1 text-[12px] leading-5 text-wk-text-muted">
-              This page reads the live resolver/audit tables created across Phases 0–7. It does not pretend to resolve records yet; guarded write actions should be added only behind explicit resolver endpoints.
+              Phase 2B upgrades the existing review system instead of duplicating it. Registry credit issues are visible here for human review, but canonical relationship writes remain disabled until explicit resolver endpoints are added.
             </p>
           </div>
         </div>
@@ -116,9 +122,9 @@ export default function AdminReviewQueuePage() {
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard label="Active review load" value={activeWork} icon="Activity" tone={activeWork > 0 ? "danger" : "success"} />
+        <KpiCard label="Registry review items" value={data.totals.registryReviewItems} icon="GitPullRequest" tone={data.totals.registryReviewItems > 0 ? "danger" : "success"} />
+        <KpiCard label="High priority registry" value={data.totals.highPriorityRegistryReviewItems} icon="AlertTriangle" tone={data.totals.highPriorityRegistryReviewItems > 0 ? "warning" : "success"} />
         <KpiCard label="Open decisions" value={data.totals.openDecisions} icon="GitPullRequest" tone={data.totals.openDecisions > 0 ? "danger" : "success"} />
-        <KpiCard label="Artifacts preserved" value={data.totals.reviewArtifacts} icon="Archive" tone="warning" />
-        <KpiCard label="Promotion events" value={data.totals.promotionEvents} icon="Clock" tone="neutral" />
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -130,7 +136,7 @@ export default function AdminReviewQueuePage() {
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
         <WkSurface className="overflow-hidden p-0">
-          <SectionHeader title="Workstreams" subtitle="Prioritized queues created by the import/resolver phases." icon="Layers" />
+          <SectionHeader title="Workstreams" subtitle="Prioritized queues created by import, registry, resolver, and audit phases." icon="Layers" />
           <div className="divide-y divide-wk-border">
             {data.workstreams.map((stream) => <WorkstreamRow key={stream.key} stream={stream} onOpen={(path) => navigate(path)} />)}
           </div>
@@ -201,7 +207,7 @@ function SectionHeader({ title, subtitle, icon }: { title: string; subtitle: str
 }
 
 function WorkstreamRow({ stream, onOpen }: { stream: ReviewWorkstream; onOpen: (path: string) => void }) {
-  const tone = stream.severity === "danger" ? "bg-wk-danger-soft text-wk-danger" : stream.severity === "warning" ? "bg-wk-warning-soft text-wk-warning" : stream.severity === "success" ? "bg-wk-success-soft text-wk-success" : "bg-wk-surface-raised text-wk-text-muted";
+  const tone = stream.severity === "danger" ? "bg-wk-danger-soft text-wk-danger" : stream.severity === "warning" ? "bg-wk-warning-soft text-wk-warning" : stream.severity === "success" ? "bg-wk-success-soft text-wk-success" : stream.severity === "brand" ? "bg-wk-brand-soft text-wk-brand" : "bg-wk-surface-raised text-wk-text-muted";
   return (
     <div className="p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -224,12 +230,71 @@ function WorkstreamRow({ stream, onOpen }: { stream: ReviewWorkstream; onOpen: (
 }
 
 function PanelContent({ panel, data }: { panel: Panel; data: ReviewCommandCenterData }) {
+  if (panel === "registry") return <RegistryReviewPanel rows={data.registryReviewItems} summary={data.registryReviewSummary} />;
   if (panel === "decisions") return <DecisionRows rows={data.decisionSamples} />;
   if (panel === "artifacts") return <ArtifactRows rows={data.artifactSamples} />;
   if (panel === "fields") return <FieldRows rows={data.fieldDictionary} />;
   if (panel === "media") return <MediaRows rows={data.mediaRows} />;
   if (panel === "staging") return <StagingRows rows={data.stagingSummary} />;
   return <EventRows rows={data.promotionEvents} />;
+}
+
+function RegistryReviewPanel({ rows, summary }: { rows: RegistryReviewItemRow[]; summary: RegistryReviewSummaryRow[] }) {
+  if (!rows.length && !summary.length) return <EmptyState title="No registry review items" body="Ambiguous release and track artist credits will appear here after Phase 2A review population runs." />;
+
+  return (
+    <div>
+      <div className="border-b border-wk-border bg-wk-surface-raised/50 p-4">
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+          {summary.slice(0, 6).map((item) => (
+            <div key={`${item.status}-${item.review_type}`} className="rounded-lg border border-wk-border bg-wk-surface px-3 py-2">
+              <div className="text-[15px] font-black text-wk-text">{formatReviewCount(item.count)}</div>
+              <div className="mt-0.5 truncate text-[10px] font-black uppercase tracking-wider text-wk-text-faint">{humanize(item.review_type)}</div>
+              <div className="mt-1 text-[11px] text-wk-text-muted">{item.status}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="divide-y divide-wk-border">
+        {rows.map((row) => <RegistryReviewRow key={row.id} row={row} />)}
+      </div>
+    </div>
+  );
+}
+
+function RegistryReviewRow({ row }: { row: RegistryReviewItemRow }) {
+  const payload = row.candidate_payload ?? {};
+  const artistText = typeof payload.artistText === "string" ? payload.artistText : "";
+  const artistSlug = typeof payload.artistSlug === "string" ? payload.artistSlug : "";
+  const reviewType = row.review_type || "registry_review";
+  const priorityTone = row.priority === "high" ? "bg-wk-warning-soft text-wk-warning" : "bg-wk-surface-raised text-wk-text-muted";
+
+  return (
+    <div className="p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <RowTop left={row.title || row.review_key || row.id} right={humanize(reviewType)} />
+          <div className="mt-2 flex flex-wrap gap-2">
+            <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wider ${priorityTone}`}>{row.priority || "normal"}</span>
+            <span className="rounded-full bg-wk-surface-raised px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-wk-text-muted">{row.status || "open"}</span>
+            <span className="rounded-full bg-wk-surface-raised px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-wk-text-muted">{row.entity_type || "entity"}</span>
+          </div>
+          <p className="mt-2 text-[12px] leading-5 text-wk-text-muted">{row.summary || "Registry item requires human review before canonicalization."}</p>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <FieldPill label="Artist text" value={artistText || "Missing"} />
+            <FieldPill label="Artist slug" value={artistSlug || "Missing"} />
+          </div>
+          <div className="mt-2 text-[11px] text-wk-text-faint">Source: {row.source_table || "unknown"}/{row.source_id || row.entity_id || "unknown"}</div>
+        </div>
+        <div className="flex shrink-0 flex-col gap-2 sm:items-end">
+          <button disabled className="wk-button wk-button-ghost wk-button-sm cursor-not-allowed opacity-60" title="Phase 2B is read-only. Decision writes come next.">
+            Resolve later
+          </button>
+          <div className="max-w-[220px] text-right text-[10px] leading-4 text-wk-text-faint">Read-only until canonicalization decision endpoints are added.</div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function DecisionRows({ rows }: { rows: ReviewDecisionSample[] }) {
@@ -266,6 +331,14 @@ function RowTop({ left, right }: { left: string; right?: string | null }) {
   return <div className="flex items-start justify-between gap-3"><div className="min-w-0 truncate text-[13px] font-bold text-wk-text">{left}</div>{right && <span className="shrink-0 rounded-full bg-wk-surface-raised px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-wk-text-muted">{right}</span>}</div>;
 }
 
+function FieldPill({ label, value }: { label: string; value: string }) {
+  return <div className="rounded-lg border border-wk-border bg-wk-surface-raised px-3 py-2"><div className="text-[10px] font-black uppercase tracking-wider text-wk-text-faint">{label}</div><div className="mt-1 truncate text-[12px] font-semibold text-wk-text">{value}</div></div>;
+}
+
 function EmptyState({ title, body }: { title: string; body: string }) {
   return <div className="p-8 text-center"><WkIcon name="Inbox" size={24} className="mx-auto mb-3 text-wk-text-faint" /><div className="text-[13px] font-bold text-wk-text">{title}</div><p className="mx-auto mt-1 max-w-sm text-[12px] leading-5 text-wk-text-muted">{body}</p></div>;
+}
+
+function humanize(value: string): string {
+  return value.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
 }
