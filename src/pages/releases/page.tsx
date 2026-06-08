@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { AlbumModal } from "@/components/design-system/releases/AlbumModal";
 import { ShareButton } from "@/components/design-system/share/ShareSheet";
@@ -6,14 +6,22 @@ import { WkIcon } from "@/components/design-system/Icon";
 import {
   listReleases,
   listLabels,
+  releaseUrl,
   type RepairedRelease,
   type RepairedLabel,
 } from "@/services/repairedContent/client";
 
 type Release = RepairedRelease;
+type SortKey = "newest" | "updated" | "artist" | "title";
+
+const ALL = "All";
 
 export default function Releases() {
-  const [filter, setFilter] = useState("All");
+  const [typeFilter, setTypeFilter] = useState(ALL);
+  const [yearFilter, setYearFilter] = useState(ALL);
+  const [artistFilter, setArtistFilter] = useState(ALL);
+  const [query, setQuery] = useState("");
+  const [sortKey, setSortKey] = useState<SortKey>("newest");
   const [modalRelease, setModalRelease] = useState<Release | null>(null);
   const [releases, setReleases] = useState<Release[]>([]);
   const [labels, setLabels] = useState<RepairedLabel[]>([]);
@@ -41,56 +49,42 @@ export default function Releases() {
     loadData();
   }, [loadData]);
 
-  const releaseFilters = ["All", ...Array.from(new Set(releases.map((r) => r.releaseType))).filter(Boolean)];
-  const filtered =
-    filter === "All"
-      ? releases
-      : releases.filter((release) => release.releaseType === filter);
+  const releaseTypes = useMemo(() => [ALL, ...uniqueSorted(releases.map((r) => r.releaseType).filter(Boolean))], [releases]);
+  const releaseYears = useMemo(() => [ALL, ...uniqueSorted(releases.map((r) => yearValue(r.year)).filter(Boolean)).sort((a, b) => Number(b) - Number(a))], [releases]);
+  const releaseArtists = useMemo(() => [ALL, ...uniqueSorted(releases.map((r) => r.artist).filter(Boolean)).slice(0, 24)], [releases]);
 
-  const featured = releases[0];
-  const featuredRelease = featured
-    ? {
-        release: featured,
-        headline: `The latest from ${featured.artist}`,
-        blurb: `${featured.title} is a ${featured.releaseType.toLowerCase()} by ${featured.artist}, released in ${featured.year}. Part of the WAKILISHA catalog.`,
-        tag: "Featured release",
-        chartTrack: featured.title,
-        chartPosition: 1,
-        readTime: "4 min",
-      }
-    : null;
+  const filtered = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    return [...releases]
+      .filter((release) => typeFilter === ALL || release.releaseType === typeFilter)
+      .filter((release) => yearFilter === ALL || yearValue(release.year) === yearFilter)
+      .filter((release) => artistFilter === ALL || release.artist === artistFilter)
+      .filter((release) => {
+        if (!normalizedQuery) return true;
+        return [release.title, release.artist, release.labelName, release.releaseType, release.year]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+          .includes(normalizedQuery);
+      })
+      .sort((a, b) => sortReleases(a, b, sortKey));
+  }, [artistFilter, query, releases, sortKey, typeFilter, yearFilter]);
 
-  const newThisWeek = releases.slice(0, 4).map((release) => ({
-    release,
-    tag: "Just dropped",
-    tagColor: "brand" as const,
-  }));
+  const featured = filtered[0] || releases[0];
+  const recentlyAdded = [...releases].sort((a, b) => sortReleases(a, b, "newest")).slice(0, 6);
+  const freshShelf = filtered.slice(0, 8).map((release) => ({ release }));
 
   const catalogStats = {
     total: releases.length,
-    thisWeek: releases.filter((r) => {
-      try {
-        const y = Number(r.year);
-        return y >= 2026;
-      } catch {
-        return false;
-      }
-    }).length,
-    thisMonth: releases.filter((r) => {
-      try {
-        const y = Number(r.year);
-        return y >= 2026;
-      } catch {
-        return false;
-      }
-    }).length,
-    chartConnected: Math.min(releases.length, 6),
+    visible: filtered.length,
+    albums: releases.filter((r) => r.releaseType.toLowerCase() === "album").length,
+    eps: releases.filter((r) => r.releaseType.toLowerCase() === "ep").length,
     labelsRepresented: labels.length,
   };
 
   if (loading) {
     return (
-      <main className="min-h-screen">
+      <main className="min-h-screen bg-[var(--wk-bg)]">
         <section className="album41-hero">
           <div className="album41-shade" />
           <div className="album41-inner wk-container-wide">
@@ -129,7 +123,7 @@ export default function Releases() {
 
   if (error) {
     return (
-      <main className="min-h-screen wk-container px-6 py-20">
+      <main className="min-h-screen wk-container px-6 py-20 bg-[var(--wk-bg)]">
         <div className="max-w-2xl mx-auto rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-8 text-center">
           <WkIcon name="Disc3" size={42} className="mx-auto mb-4 text-[var(--wk-text-faint)]" />
           <h1 className="wk-h-section mb-2">Could not load releases</h1>
@@ -143,17 +137,15 @@ export default function Releases() {
   }
 
   return (
-    <main className="min-h-screen">
+    <main className="min-h-screen bg-[var(--wk-bg)]">
       <section className="album41-hero">
-        {featured && (
-          <div className="album41-ambient" style={{ backgroundImage: `url(${featured.artworkUrl})` }} />
-        )}
+        {featured && <HeroAmbient release={featured} />}
         <div className="album41-shade" />
         <div className="album41-inner wk-container-wide">
           {featured && (
             <>
-              <div className="album41-cover">
-                <img src={featured.artworkUrl} alt={featured.title} className="h-full w-full object-cover" />
+              <div className="album41-cover bg-[var(--wk-surface)] border border-[var(--wk-border)]">
+                <ReleaseArtwork release={featured} />
               </div>
               <div>
                 <div className="album41-kicker">
@@ -161,15 +153,17 @@ export default function Releases() {
                 </div>
                 <h1 className="album41-title">Albums & releases</h1>
                 <div className="album41-artist">
-                  <span>{featuredRelease?.headline}</span>
+                  <span>{featured.title}</span>
                 </div>
-                <p className="album41-desc mt-4 max-w-2xl">{featuredRelease?.blurb}</p>
+                <p className="album41-desc mt-4 max-w-2xl">
+                  Browse registry-backed albums, EPs and singles across the WAKILISHA catalog. Filter by artist, year or format, then open the canonical release page.
+                </p>
                 <div className="album41-meta">
                   <span>
                     <WkIcon name="Disc3" size={14} /> {catalogStats.total} releases
                   </span>
                   <span>
-                    <WkIcon name="BarChart3" size={14} /> {catalogStats.chartConnected} chart-connected
+                    <WkIcon name="ListFilter" size={14} /> {catalogStats.visible} visible
                   </span>
                   <span>
                     <WkIcon name="Building2" size={14} /> {catalogStats.labelsRepresented} labels
@@ -177,9 +171,9 @@ export default function Releases() {
                 </div>
                 <div className="album41-actions">
                   <button onClick={() => setModalRelease(featured)} className="wk-button wk-button-lg wk-button-primary">
-                    <WkIcon name="Play" size={18} /> Preview featured
+                    <WkIcon name="Eye" size={18} /> Preview featured
                   </button>
-                  <Link to={`/releases/${featured.slug}`} className="wk-button wk-button-lg wk-button-ghost">
+                  <Link to={releaseUrl(featured)} className="wk-button wk-button-lg wk-button-ghost">
                     <WkIcon name="ArrowUpRight" size={18} /> Full page
                   </Link>
                   <ShareButton
@@ -200,25 +194,61 @@ export default function Releases() {
 
       <div className="wk-container-wide px-4 py-10 md:px-6">
         <div className="chart-stats-strip mb-10">
-          <Stat value={catalogStats.thisWeek} label="This week" />
-          <Stat value={catalogStats.thisMonth} label="This month" />
-          <Stat value={catalogStats.chartConnected} label="On charts" />
           <Stat value={catalogStats.total} label="Catalog" />
+          <Stat value={catalogStats.visible} label="Visible" />
+          <Stat value={catalogStats.albums} label="Albums" />
+          <Stat value={catalogStats.eps} label="EPs" />
         </div>
 
-        <section>
+        <section className="mb-10 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4 md:p-5">
+          <div className="section-head !mb-4">
+            <div>
+              <div className="section-kicker">Discovery controls</div>
+              <h2 className="section-title">Find releases faster</h2>
+            </div>
+            <p className="section-copy">Filters stay within the design system and only operate on public, ready release shells.</p>
+          </div>
+          <div className="grid gap-3 md:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,0.8fr))]">
+            <label className="block">
+              <span className="sr-only">Search releases</span>
+              <div className="flex items-center gap-2 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2.5">
+                <WkIcon name="Search" size={15} className="text-[var(--wk-text-faint)]" />
+                <input
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Search title, artist, label…"
+                  className="w-full bg-transparent text-[14px] font-semibold text-[var(--wk-text)] outline-none placeholder:text-[var(--wk-text-faint)]"
+                />
+              </div>
+            </label>
+            <FilterSelect label="Type" value={typeFilter} options={releaseTypes} onChange={setTypeFilter} />
+            <FilterSelect label="Year" value={yearFilter} options={releaseYears} onChange={setYearFilter} />
+            <FilterSelect label="Sort" value={sortKey} options={["newest", "updated", "artist", "title"]} onChange={(value) => setSortKey(value as SortKey)} />
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {releaseArtists.map((artist) => (
+              <button
+                key={artist}
+                onClick={() => setArtistFilter(artist)}
+                className={`directory-filter ${artistFilter === artist ? "on" : ""}`}
+              >
+                {artist}
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <section className="mb-12">
           <div className="section-head">
             <div>
-              <div className="section-kicker">New this week</div>
-              <h2 className="section-title">Fresh release shelf</h2>
+              <div className="section-kicker">Curated shelf</div>
+              <h2 className="section-title">Release shelf</h2>
             </div>
-            <p className="section-copy">
-              Album cards open a rich modal first, then allow full navigation.
-            </p>
+            <p className="section-copy">The first row reflects your current filters and sort order.</p>
           </div>
           <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
-            {newThisWeek.map((item) => (
-              <ReleaseTile key={item.release.slug} release={item.release} onPreview={setModalRelease} wide />
+            {freshShelf.slice(0, 8).map((item) => (
+              <ReleaseTile key={`${item.release.artist}-${item.release.slug}`} release={item.release} onPreview={setModalRelease} wide />
             ))}
           </div>
         </section>
@@ -226,30 +256,34 @@ export default function Releases() {
         <section>
           <div className="section-head">
             <div>
-              <div className="section-kicker">Filters</div>
+              <div className="section-kicker">Directory</div>
               <h2 className="section-title">Catalog directory</h2>
             </div>
-            <div className="directory-filters">
-              {releaseFilters.map((item) => (
-                <button
-                  key={item}
-                  onClick={() => setFilter(item)}
-                  className={`directory-filter ${filter === item ? "on" : ""}`}
-                >
-                  {item}
-                </button>
-              ))}
-            </div>
+            <p className="section-copy">
+              Showing {filtered.length} of {releases.length} registry-backed releases.
+            </p>
           </div>
           <div className="artist-directory-grid">
             {filtered.map((release) => (
-              <ReleaseTile key={release.slug} release={release} onPreview={setModalRelease} />
+              <ReleaseTile key={`${release.artist}-${release.slug}`} release={release} onPreview={setModalRelease} />
             ))}
           </div>
           {filtered.length === 0 && (
             <div className="artist-empty">
               <WkIcon name="Disc3" size={32} />
-              <div className="mt-3">No releases match this filter.</div>
+              <div className="mt-3">No releases match these filters.</div>
+              <button
+                onClick={() => {
+                  setQuery("");
+                  setTypeFilter(ALL);
+                  setYearFilter(ALL);
+                  setArtistFilter(ALL);
+                  setSortKey("newest");
+                }}
+                className="wk-button wk-button-sm wk-button-ghost mt-4"
+              >
+                Clear filters
+              </button>
             </div>
           )}
         </section>
@@ -258,14 +292,14 @@ export default function Releases() {
           <div className="pg-block">
             <div className="pg-block-label">Recently added</div>
             <div className="space-y-3">
-              {releases.slice(0, 6).map((release) => (
+              {recentlyAdded.map((release) => (
                 <button
-                  key={release.slug}
+                  key={`${release.artist}-${release.slug}`}
                   onClick={() => setModalRelease(release)}
                   className="artist-list-item w-full px-0 text-left"
                 >
-                  <div className="artist-list-ava artist-list-avatar">
-                    <img src={release.artworkUrl} alt="" className="h-full w-full object-cover" />
+                  <div className="artist-list-ava artist-list-avatar overflow-hidden">
+                    <ReleaseArtwork release={release} />
                   </div>
                   <div>
                     <div className="artist-list-name">{release.title}</div>
@@ -280,9 +314,9 @@ export default function Releases() {
           </div>
           <div className="pg-block">
             <div className="pg-block-label">Data source</div>
-            <h3 className="pg-block-title">Releases are now registry-backed.</h3>
+            <h3 className="pg-block-title">Releases are registry-backed.</h3>
             <p className="pg-block-body">
-              This page hydrates from the canonical WAKILISHA registry through the V2 API.
+              This page is powered by ready release shells, registry artwork fallbacks, and canonical release relationships. Non-ready shells stay out of public discovery.
             </p>
           </div>
         </section>
@@ -290,6 +324,23 @@ export default function Releases() {
 
       <AlbumModal open={Boolean(modalRelease)} release={modalRelease} onClose={() => setModalRelease(null)} />
     </main>
+  );
+}
+
+function FilterSelect({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (value: string) => void }) {
+  return (
+    <label className="block">
+      <span className="mb-1 block text-[10px] font-extrabold uppercase tracking-[0.16em] text-[var(--wk-text-faint)]">{label}</span>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2.5 text-[13px] font-bold text-[var(--wk-text)] outline-none"
+      >
+        {options.map((option) => (
+          <option key={option} value={option}>{optionLabel(option)}</option>
+        ))}
+      </select>
+    </label>
   );
 }
 
@@ -302,31 +353,65 @@ function ReleaseTile({
   onPreview: (release: Release) => void;
   wide?: boolean;
 }) {
+  const label = isRealLabel(release.labelName) ? release.labelName : "Registry shell";
   return (
     <div className={`artist-card ${wide ? "w-[240px] shrink-0" : ""}`}>
       <button
         onClick={() => onPreview(release)}
-        className="artist-card-img block w-full text-left"
+        className="artist-card-img block w-full overflow-hidden text-left bg-[var(--wk-surface)]"
       >
-        <img src={release.artworkUrl} alt={release.title} className="h-full w-full object-cover" />
+        <ReleaseArtwork release={release} />
       </button>
       <div className="artist-card-body">
         <div className="artist-card-name">{release.title}</div>
         <div className="artist-card-meta">
-          {release.artist} · {release.year} · {release.trackCount} tracks
+          {release.artist} · {yearValue(release.year) || "Unknown year"} · {trackCountLabel(release.trackCount)}
         </div>
         <div className="artist-card-tags">
           <span className="tag tag-sm">{release.releaseType}</span>
-          <span className="tag tag-sm">{release.labelName}</span>
+          <span className="tag tag-sm">{label}</span>
         </div>
         <div className="mt-3 flex gap-2">
           <button onClick={() => onPreview(release)} className="wk-button wk-button-sm wk-button-primary">
             <WkIcon name="Eye" size={13} /> Preview
           </button>
-          <Link to={`/releases/${release.slug}`} className="wk-button wk-button-sm wk-button-ghost">
+          <Link to={releaseUrl(release)} className="wk-button wk-button-sm wk-button-ghost">
             <WkIcon name="ArrowUpRight" size={13} /> Open
           </Link>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function HeroAmbient({ release }: { release: Release }) {
+  const [failed, setFailed] = useState(false);
+  if (!release.artworkUrl || failed) {
+    return <div className="album41-ambient opacity-30 bg-[radial-gradient(circle_at_20%_80%,rgba(133,196,65,0.22),transparent_32%),radial-gradient(circle_at_82%_22%,rgba(255,255,255,0.16),transparent_30%)]" />;
+  }
+  return (
+    <>
+      <img src={release.artworkUrl} alt="" className="hidden" onError={() => setFailed(true)} />
+      <div className="album41-ambient" style={{ backgroundImage: `url("${release.artworkUrl}")` }} />
+    </>
+  );
+}
+
+function ReleaseArtwork({ release }: { release: Release }) {
+  const [failed, setFailed] = useState(false);
+  const canUseArtwork = Boolean(release.artworkUrl && !failed);
+  if (canUseArtwork) {
+    return <img src={release.artworkUrl} alt={release.title} className="h-full w-full object-cover" onError={() => setFailed(true)} />;
+  }
+  const initial = release.title.trim()[0]?.toUpperCase() || "W";
+  return (
+    <div className="relative flex h-full w-full flex-col justify-between overflow-hidden bg-[linear-gradient(135deg,#f7f9f1_0%,#dfe8d6_54%,#7fa64a_100%)] p-4 text-[#101510]">
+      <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-white/25" />
+      <div className="absolute -bottom-10 -left-10 h-32 w-32 rounded-full bg-black/10" />
+      <div className="relative z-10 text-[9px] font-black uppercase tracking-[0.28em] text-[#30451f]">WAKILISHA</div>
+      <div className="relative z-10">
+        <div className="mb-2 text-[44px] font-black leading-none tracking-[-0.08em]">{initial}</div>
+        <div className="line-clamp-2 text-[13px] font-black leading-[0.95] tracking-[-0.04em]">{release.title}</div>
       </div>
     </div>
   );
@@ -339,4 +424,39 @@ function Stat({ value, label }: { value: string | number; label: string }) {
       <div className="chart-stat-label">{label}</div>
     </div>
   );
+}
+
+function uniqueSorted(values: string[]): string[] {
+  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b));
+}
+
+function yearValue(value: string): string {
+  if (!value || value === "Unknown year") return "";
+  return value.match(/\d{4}/)?.[0] || "";
+}
+
+function sortReleases(a: Release, b: Release, key: SortKey): number {
+  if (key === "artist") return a.artist.localeCompare(b.artist) || a.title.localeCompare(b.title);
+  if (key === "title") return a.title.localeCompare(b.title) || a.artist.localeCompare(b.artist);
+  const aYear = Number(yearValue(a.year) || 0);
+  const bYear = Number(yearValue(b.year) || 0);
+  return bYear - aYear || a.title.localeCompare(b.title);
+}
+
+function optionLabel(value: string): string {
+  if (value === "newest") return "Newest";
+  if (value === "updated") return "Recently updated";
+  if (value === "artist") return "Artist A-Z";
+  if (value === "title") return "Title A-Z";
+  return value;
+}
+
+function trackCountLabel(count: number): string {
+  if (!count) return "tracks pending";
+  return `${count} track${count === 1 ? "" : "s"}`;
+}
+
+function isRealLabel(label: string): boolean {
+  const normalized = label.trim().toLowerCase();
+  return Boolean(normalized && normalized !== "wakilisha registry" && normalized !== "unknown" && normalized !== "independent");
 }
