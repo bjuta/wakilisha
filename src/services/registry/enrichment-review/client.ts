@@ -57,9 +57,12 @@ export interface ReleaseShellEnrichmentLookupInput {
 
 interface RuntimeApiResponse {
   contexts?: ReleaseShellEnrichmentContext[];
+  data?: {
+    contexts?: ReleaseShellEnrichmentContext[];
+  };
 }
 
-const RUNTIME_API_PATH = "/api/registry/enrichment-review/release-shells";
+const RUNTIME_API_PATH = "/__wakilisha-v2-api/api/v1/registry/enrichment-review/release-shells";
 
 export async function getReleaseShellEnrichmentContexts(
   shells: ReleaseShellEnrichmentLookupInput[],
@@ -85,9 +88,10 @@ async function tryFetchRuntimeContexts(
     if (!response.ok) return null;
 
     const payload = (await response.json()) as RuntimeApiResponse;
-    if (!Array.isArray(payload.contexts)) return null;
+    const contexts = payload.contexts ?? payload.data?.contexts;
+    if (!Array.isArray(contexts)) return null;
 
-    return Object.fromEntries(payload.contexts.map((context) => [context.shellKey, context]));
+    return Object.fromEntries(contexts.map((context) => [context.shellKey, context]));
   } catch {
     return null;
   }
