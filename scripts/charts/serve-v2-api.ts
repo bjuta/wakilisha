@@ -10,6 +10,7 @@ import {
   applyApprovedReleaseShellSuggestions,
   buildReleaseShellEnrichmentContexts,
   createRegistryEnrichmentPool,
+  getReleaseShellCanonicalWriteEvents,
   listReleaseShellEnrichmentContexts,
   type ReleaseShellLookupInput,
 } from "../registry/enrichment-review-runtime-api";
@@ -177,6 +178,30 @@ async function route(req: http.IncomingMessage, res: http.ServerResponse) {
     const parts = url.pathname.slice(prefix.length).split("/").filter(Boolean).map(decodeURIComponent);
 
 
+
+
+    if (
+      parts.length === 5 &&
+      parts[0] === "registry" &&
+      parts[1] === "enrichment-review" &&
+      parts[2] === "release-shells" &&
+      parts[4] === "audit"
+    ) {
+      if (req.method !== "GET") {
+        return error(res, 405, "method_not_allowed", "Only GET is supported for canonical write audit.");
+      }
+
+      const registryEntityId = parts[3];
+      const limit = Math.min(Number(url.searchParams.get("limit") ?? 25) || 25, 100);
+      const events = await getReleaseShellCanonicalWriteEvents(getEnrichmentPool(), registryEntityId, limit);
+
+      return json(res, 200, envelope({ events }, {
+        resource: "registry-enrichment-review",
+        action: "canonical-write-audit",
+        registryEntityId,
+        count: events.length,
+      }));
+    }
 
     if (parts.join("/") === "registry/enrichment-review/release-shells/apply-approved") {
       if (req.method !== "POST") {
