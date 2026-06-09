@@ -4,7 +4,6 @@ import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { AdminTable } from "@/components/design-system/admin/AdminTable";
 import { supabase } from '@/lib/supabase';
-import React, { useEffect, useState } from 'react';
 
 export default function TracksPage() {
   const [tracks, setTracks] = useState([]);
