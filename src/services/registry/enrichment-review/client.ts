@@ -160,6 +160,38 @@ export async function getReleaseShellEnrichmentContexts(
   }
 }
 
+
+export interface ApplyApprovedReleaseShellSuggestionsResult {
+  registryEntityId: string;
+  applied: Array<{ suggestionId: string; fieldName: string; target: string }>;
+  skipped: Array<{ suggestionId: string; fieldName: string; reason: string }>;
+  failed: Array<{ registryEntityId: string; reason: string }>;
+}
+
+export async function applyApprovedReleaseShellSuggestions(
+  registryEntityId: string,
+): Promise<ApplyApprovedReleaseShellSuggestionsResult> {
+  const response = await fetch(`${RUNTIME_API_PATH}/apply-approved`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ registryEntityId }),
+  });
+
+  const payload = (await response.json()) as {
+    data?: ApplyApprovedReleaseShellSuggestionsResult;
+  } & Partial<ApplyApprovedReleaseShellSuggestionsResult>;
+
+  const result = payload.data ?? payload;
+
+  if (!response.ok) {
+    const reason = result.failed?.[0]?.reason ?? "Failed to apply approved suggestions.";
+    throw new Error(reason);
+  }
+
+  return result as ApplyApprovedReleaseShellSuggestionsResult;
+}
+
+
 export function formatConfidence(value: number): string {
   return `${Math.round(normalizeConfidence(value) * 100)}%`;
 }

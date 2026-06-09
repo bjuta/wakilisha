@@ -4,6 +4,7 @@ import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import type { IngestResolvedRow } from "@/services/chartsIngestion/ingestStudioTypes";
 import {
+  applyApprovedReleaseShellSuggestions,
   getLiveReleaseShellReviewRows,
 } from "@/services/registry/enrichment-review/client";
 import {
@@ -16,7 +17,7 @@ import {
 
 interface RegistryReleaseShell extends IngestResolvedRow {
   shellKey: string;
-  sourceSurface: "charts";
+  sourceSurface: "registry";
   sourceRunId: string;
   sourceRunTitle: string;
   sourceEditionDate: string;
@@ -57,6 +58,7 @@ function getStatusPillClass(status: EnrichmentDecisionStatus): string {
   if (status === "approved") return "bg-[var(--wk-success-soft)] text-[var(--wk-success)]";
   if (status === "rejected") return "bg-[var(--wk-danger-soft)] text-[var(--wk-danger)]";
   if (status === "needs_review") return "bg-[var(--wk-warning-soft)] text-[var(--wk-warning)]";
+  if (status === "applied") return "bg-[var(--wk-success-soft)] text-[var(--wk-success)]";
   return "bg-[var(--wk-surface-raised)] text-[var(--wk-text-muted)]";
 }
 
@@ -74,6 +76,7 @@ export default function AdminSettingsRegistryReleaseShells() {
   const [states, setStates] = useState<Record<string, ShellReviewState>>({});
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
   const [suggestionDecisions, setSuggestionDecisions] = useState<Record<string, EnrichmentDecisionStatus>>({});
+  const [applyingShells, setApplyingShells] = useState<Record<string, boolean>>({});
   const [enrichmentByShell, setEnrichmentByShell] = useState<Record<string, ReleaseShellEnrichmentContext>>({});
   const [toast, setToast] = useState<string | null>(null);
 
@@ -135,6 +138,42 @@ export default function AdminSettingsRegistryReleaseShells() {
     setSuggestionDecisions((prev) => ({ ...prev, [suggestion.id]: decision }));
     showToast(`${suggestion.fieldName} suggestion marked ${decision}`);
   };
+
+
+  const applyApprovedSuggestions = async (row: RegistryReleaseShell) => {
+    const registryEntityId = row.releaseShellId ?? row.id;
+    const context = enrichmentByShell[row.shellKey];
+    const approvedSuggestions = context?.suggestions.filter((suggestion) => getSuggestionStatus(suggestion, suggestionDecisions) === "approved") ?? [];
+
+    if (approvedSuggestions.length === 0) {
+      showToast("No approved suggestions to apply.");
+      return;
+    }
+
+    setApplyingShells((prev) => ({ ...prev, [row.shellKey]: true }));
+
+    try {
+      const result = await applyApprovedReleaseShellSuggestions(registryEntityId);
+
+      if (result.applied.length === 0 && result.skipped.length > 0) {
+        showToast(`No canonical fields applied. ${result.skipped.length} suggestion(s) skipped.`);
+        return;
+      }
+
+      setSuggestionDecisions((prev) => ({
+        ...prev,
+        ...Object.fromEntries(result.applied.map((item) => [item.suggestionId, "applied" as EnrichmentDecisionStatus])),
+      }));
+
+      showToast(`Applied ${result.applied.length} approved suggestion(s) to canonical release.`);
+      await load();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Failed to apply approved suggestions.");
+    } finally {
+      setApplyingShells((prev) => ({ ...prev, [row.shellKey]: false }));
+    }
+  };
+
 
   const renderSuggestionCard = (
     suggestion: RegistryEnrichmentSuggestionReviewItem,
@@ -395,7 +434,16 @@ export default function AdminSettingsRegistryReleaseShells() {
                                 <p><span className="font-semibold text-[var(--wk-text)]">Provider observations:</span> {context?.observations.length ?? 0}</p>
                                 <p><span className="font-semibold text-[var(--wk-text)]">Provider entity links:</span> {context?.providerLinks.length ?? 0}</p>
                                 <p><span className="font-semibold text-[var(--wk-text)]">Context source:</span> {context?.dataSource ?? "loading"}</p>
-                                <p><span className="font-semibold text-[var(--wk-text)]">Canonical writes:</span> disabled until controlled runner approval</p>
+                                <div className="flex flex-col gap-2 rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] p-3">
+                                  <p><span className="font-semibold text-[var(--wk-text)]">Canonical writes:</span> controlled apply enabled</p>
+                                  <button
+                                    onClick={() => applyApprovedSuggestions(row)}
+                                    disabled={suggestionGroups.approved.length === 0 || applyingShells[row.shellKey]}
+                                    className="wk-button wk-button-sm wk-button-primary justify-center disabled:cursor-not-allowed disabled:opacity-50"
+                                  >
+                                    {applyingShells[row.shellKey] ? "Applying…" : `Apply approved (${suggestionGroups.approved.length})`}
+                                  </button>
+                                </div>
                               </div>
 
                               {(context?.observations.length ?? 0) > 0 && (

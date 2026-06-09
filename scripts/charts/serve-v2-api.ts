@@ -7,6 +7,7 @@ import {
 import { repairedResponse as publicIndexResponse } from "./repaired-content-api";
 import { repairedDetailResponse as publicDetailResponse } from "./repaired-content-details-api";
 import {
+  applyApprovedReleaseShellSuggestions,
   buildReleaseShellEnrichmentContexts,
   createRegistryEnrichmentPool,
   listReleaseShellEnrichmentContexts,
@@ -175,6 +176,28 @@ async function route(req: http.IncomingMessage, res: http.ServerResponse) {
     if (!url.pathname.startsWith(prefix)) return error(res, 404, "not_found", "Route not found.");
     const parts = url.pathname.slice(prefix.length).split("/").filter(Boolean).map(decodeURIComponent);
 
+
+
+    if (parts.join("/") === "registry/enrichment-review/release-shells/apply-approved") {
+      if (req.method !== "POST") {
+        return error(res, 405, "method_not_allowed", "Only POST is supported for canonical application.");
+      }
+
+      const body = await readJsonBody(req);
+      const registryEntityId = String((body as { registryEntityId?: unknown }).registryEntityId ?? "").trim();
+
+      if (!registryEntityId) {
+        return error(res, 400, "invalid_request", "Expected JSON body with registryEntityId.");
+      }
+
+      const result = await applyApprovedReleaseShellSuggestions(getEnrichmentPool(), registryEntityId);
+      const status = result.failed.length > 0 ? 409 : 200;
+
+      return json(res, status, envelope(result, {
+        resource: "registry-enrichment-review",
+        action: "apply-approved-release-shell-suggestions",
+      }));
+    }
 
     if (parts.join("/") === "registry/enrichment-review/release-shells") {
       if (req.method === "GET") {
