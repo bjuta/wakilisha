@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { getCountryFlagUrl, getCountryLabel } from "@/utils/countries";
 
 export interface ArtistDetailHeroProps {
   name: string;
@@ -8,6 +9,11 @@ export interface ArtistDetailHeroProps {
   isRising?: boolean;
   spotifyUrl?: string;
   artistType?: string | null;
+  country?: string | null;
+  genres?: string[];
+  trackCount?: number;
+  releaseCount?: number;
+  chartEntryCount?: number;
 }
 
 export function ArtistDetailHero({
@@ -18,8 +24,16 @@ export function ArtistDetailHero({
   isRising,
   spotifyUrl,
   artistType,
+  country,
+  genres = [],
+  trackCount = 0,
+  releaseCount = 0,
+  chartEntryCount = 0,
 }: ArtistDetailHeroProps) {
   const avatarSrc = profileImageUrl || imageUrl;
+  const countryFlagUrl = getCountryFlagUrl(country, 40);
+  const countryLabel = getCountryLabel(country);
+  const visibleGenres = genres.slice(0, 3);
 
   return (
     <section className="relative min-h-[420px] md:min-h-[600px] flex items-end overflow-hidden">
@@ -89,6 +103,12 @@ export function ArtistDetailHero({
               {/* ════ MOBILE ONLY: minimal action bar ════
                   Country label + Spotify + Follow + Share — all in one line */}
               <div className="hero-text-reveal hero-text-reveal-d2 flex md:hidden items-center gap-2 flex-wrap">
+                {countryFlagUrl && (
+                  <span className="flex items-center gap-1.5 rounded-full border border-white/30 bg-white/10 px-3.5 py-1.5 text-[12px] font-bold text-white backdrop-blur-sm whitespace-nowrap">
+                    <img src={countryFlagUrl} alt="" className="h-3.5 w-5 rounded-[2px] object-cover" />
+                    {countryLabel}
+                  </span>
+                )}
                 {spotifyUrl && (
                   <a
                     href={spotifyUrl}
@@ -115,6 +135,13 @@ export function ArtistDetailHero({
 
               {/* Badges row */}
               <div className="hero-text-reveal hero-text-reveal-d2 hidden md:flex mb-5 flex-wrap items-center gap-3">
+                {countryFlagUrl && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[11px] font-bold text-white/90 backdrop-blur-sm uppercase tracking-wider">
+                    <img src={countryFlagUrl} alt="" className="h-3.5 w-5 rounded-[2px] object-cover" />
+                    {countryLabel}
+                  </span>
+                )}
+
                 {artistType && (
                   <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[11px] font-bold text-white/90 backdrop-blur-sm uppercase tracking-wider">
                     <i className="ri-mic-line text-[10px]" />
@@ -122,11 +149,29 @@ export function ArtistDetailHero({
                   </span>
                 )}
 
+                {visibleGenres.map((genre) => (
+                  <span key={genre} className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[11px] font-bold text-white/90 backdrop-blur-sm uppercase tracking-wider">
+                    {genre}
+                  </span>
+                ))}
+
                 {isRising && (
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--wk-brand-2)] px-3 py-1.5 text-[11px] font-bold text-[var(--wk-brand-on)] uppercase tracking-wider">
                     <i className="ri-fire-line text-[10px]" />
                     Rising
                   </span>
+                )}
+              </div>
+
+              <div className="hero-text-reveal hero-text-reveal-d3 mb-5 hidden md:flex flex-wrap items-center gap-3 text-[12px] font-bold text-white/70">
+                <span>{trackCount.toLocaleString()} tracks</span>
+                <span className="text-white/35">·</span>
+                <span>{releaseCount.toLocaleString()} releases</span>
+                {chartEntryCount > 0 && (
+                  <>
+                    <span className="text-white/35">·</span>
+                    <span>{chartEntryCount.toLocaleString()} chart entries</span>
+                  </>
                 )}
               </div>
 
