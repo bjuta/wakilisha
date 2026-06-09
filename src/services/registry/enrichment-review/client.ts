@@ -187,12 +187,57 @@ export async function getReleaseShellEnrichmentContexts(
 }
 
 
+
+export interface ApplyApprovedReleaseShellSuggestionPreviewItem {
+  suggestionId: string;
+  fieldName: string;
+  targetPath: string;
+  currentValue: string | null;
+  proposedValue: string;
+  writable: boolean;
+  reason: string | null;
+}
+
+export interface ApplyApprovedReleaseShellSuggestionsPreview {
+  registryEntityId: string;
+  canonicalReleaseExists: boolean;
+  willCreateCanonicalRelease: boolean;
+  writable: ApplyApprovedReleaseShellSuggestionPreviewItem[];
+  skipped: ApplyApprovedReleaseShellSuggestionPreviewItem[];
+}
+
+
 export interface ApplyApprovedReleaseShellSuggestionsResult {
   registryEntityId: string;
   applied: Array<{ suggestionId: string; fieldName: string; target: string }>;
   skipped: Array<{ suggestionId: string; fieldName: string; reason: string }>;
   failed: Array<{ registryEntityId: string; reason: string }>;
 }
+
+
+export async function previewApprovedReleaseShellSuggestions(
+  registryEntityId: string,
+): Promise<ApplyApprovedReleaseShellSuggestionsPreview> {
+  const response = await fetch(`${RUNTIME_API_PATH}/preview-apply`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ registryEntityId }),
+  });
+
+  const payload = (await response.json()) as {
+    data?: ApplyApprovedReleaseShellSuggestionsPreview;
+    message?: string;
+  } & Partial<ApplyApprovedReleaseShellSuggestionsPreview>;
+
+  const preview = payload.data ?? payload;
+
+  if (!response.ok) {
+    throw new Error(payload.message ?? "Failed to preview approved suggestions.");
+  }
+
+  return preview as ApplyApprovedReleaseShellSuggestionsPreview;
+}
+
 
 export async function applyApprovedReleaseShellSuggestions(
   registryEntityId: string,
