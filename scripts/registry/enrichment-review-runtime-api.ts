@@ -197,6 +197,176 @@ export async function buildReleaseShellEnrichmentContexts(
   }));
 }
 
+
+export interface ApplyApprovedReleaseShellSuggestionsResult {
+  registryEntityId: string;
+  applied: Array<{ suggestionId: string; fieldName: string; target: string }>;
+  skipped: Array<{ suggestionId: string; fieldName: string; reason: string }>;
+  failed: Array<{ registryEntityId: string; reason: string }>;
+}
+
+const DIRECT_RELEASE_FIELD_MAP: Record<string, string> = {
+  title: "title",
+  release_title: "title",
+  artwork_url: "artwork_url",
+  release_date: "release_date",
+  release_type: "release_type",
+};
+
+const METADATA_RELEASE_FIELDS = new Set([
+  "artist_display_name",
+  "artist_name",
+  "copyright",
+  "label",
+  "upc",
+  "provider_url",
+  "source_url",
+]);
+
+export async function applyApprovedReleaseShellSuggestions(
+  pool: PgPool,
+  registryEntityId: string,
+): Promise<ApplyApprovedReleaseShellSuggestionsResult> {
+  const cleanRegistryEntityId = String(registryEntityId || "").trim();
+  const result: ApplyApprovedReleaseShellSuggestionsResult = {
+    registryEntityId: cleanRegistryEntityId,
+    applied: [],
+    skipped: [],
+    failed: [],
+  };
+
+  if (!cleanRegistryEntityId) {
+    result.failed.push({ registryEntityId: cleanRegistryEntityId, reason: "Missing registryEntityId." });
+    return result;
+  }
+
+  const client = await pool.connect();
+
+  try {
+    await client.query("begin");
+
+    const releaseCheck = await client.query(
+      `
+        select id::text as id
+        from public.registry_releases
+        where id::text = $1
+        limit 1
+      `,
+      [cleanRegistryEntityId],
+    );
+
+    if (releaseCheck.rowCount === 0) {
+      throw new Error(`No canonical registry_releases row found for ${cleanRegistryEntityId}.`);
+    }
+
+    const suggestions = await client.query(
+      `
+        select
+          id::text as "id",
+          field_name as "fieldName",
+          suggested_value as "suggestedValue"
+        from public.registry_enrichment_suggestions
+        where registry_entity_type = 'release'
+          and registry_entity_id::text = $1
+          and decision_status = 'approved'
+        order by confidence_score desc nulls last, created_at asc
+      `,
+      [cleanRegistryEntityId],
+    );
+
+    for (const suggestion of suggestions.rows) {
+      const suggestionId = String(suggestion.id);
+      const fieldName = String(suggestion.fieldName || "").trim();
+      const suggestedValue = suggestion.suggestedValue === null || suggestion.suggestedValue === undefined
+        ? ""
+        : String(suggestion.suggestedValue);
+
+      const targetColumn = DIRECT_RELEASE_FIELD_MAP[fieldName];
+
+      if (targetColumn) {
+        if (targetColumn === "release_date") {
+          await client.query(
+            `
+              update public.registry_releases
+              set release_date = nullif($2, '')::date
+              where id::text = $1
+            `,
+            [cleanRegistryEntityId, suggestedValue],
+          );
+        } else {
+          await client.query(
+            `
+              update public.registry_releases
+              set ${targetColumn} = $2
+              where id::text = $1
+            `,
+            [cleanRegistryEntityId, suggestedValue],
+          );
+        }
+
+        await client.query(
+          `
+            update public.registry_enrichment_suggestions
+            set decision_status = 'applied'
+            where id::text = $1
+          `,
+          [suggestionId],
+        );
+
+        result.applied.push({ suggestionId, fieldName, target: `registry_releases.${targetColumn}` });
+        continue;
+      }
+
+      if (METADATA_RELEASE_FIELDS.has(fieldName)) {
+        await client.query(
+          `
+            update public.registry_releases
+            set metadata = jsonb_set(
+              coalesce(metadata, '{}'::jsonb),
+              $2::text[],
+              to_jsonb($3::text),
+              true
+            )
+            where id::text = $1
+          `,
+          [cleanRegistryEntityId, [fieldName], suggestedValue],
+        );
+
+        await client.query(
+          `
+            update public.registry_enrichment_suggestions
+            set decision_status = 'applied'
+            where id::text = $1
+          `,
+          [suggestionId],
+        );
+
+        result.applied.push({ suggestionId, fieldName, target: `registry_releases.metadata.${fieldName}` });
+        continue;
+      }
+
+      result.skipped.push({
+        suggestionId,
+        fieldName,
+        reason: "Field is not in the canonical write allowlist.",
+      });
+    }
+
+    await client.query("commit");
+    return result;
+  } catch (err) {
+    await client.query("rollback");
+    result.failed.push({
+      registryEntityId: cleanRegistryEntityId,
+      reason: err instanceof Error ? err.message : "Unknown canonical write failure.",
+    });
+    return result;
+  } finally {
+    client.release();
+  }
+}
+
+
 function groupBy(rows: Row[], key: string): Map<string, Row[]> {
   const grouped = new Map<string, Row[]>();
 
