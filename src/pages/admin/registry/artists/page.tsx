@@ -1,225 +1,210 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { WkIcon } from "@/components/design-system/Icon";
-import { WkSurface } from "@/components/design-system/primitives/Surface";
-import { AdminTable } from "@/components/design-system/admin/AdminTable";
+import React, { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
-interface Artist {
-  slug: string;
-  display_name: string;
-  normalized_name: string;
-  bio: string | null;
-  artist_type: string | null;
-  gender: string | null;
-  origin_iso2: string | null;
-  public_image_url: string | null;
-  status: string;
-  created_at: string;
-  updated_at: string;
+type ArtistRow = {
+  id: string;
+  name?: string | null;
+  country?: string | null;
+  genres?: string | null;
+  profile_image?: string | null;
+  bio?: string | null;
+  status?: string | null;
+  updated_at?: string | null;
+  created_at?: string | null;
+};
+
+type SortMode = "recent" | "name" | "completeness_low" | "completeness_high";
+
+function getCompleteness(artist: ArtistRow): number {
+  const checks = [
+    Boolean(artist.name),
+    Boolean(artist.country),
+    Boolean(artist.genres),
+    Boolean(artist.profile_image),
+    Boolean(artist.bio),
+    Boolean(artist.status),
+  ];
+  return Math.round((checks.filter(Boolean).length / checks.length) * 100);
 }
 
-export default function AdminArtistsPage() {
-  const navigate = useNavigate();
-  const [artists, setArtists] = useState<Artist[]>([]);
+export default function ArtistsPage() {
+  const [artists, setArtists] = useState<ArtistRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [error, setError] = useState<string | null>(null);
+
+  const [query, setQuery] = useState("");
+  const [qualityFilter, setQualityFilter] = useState<"all" | "complete" | "incomplete" | "missing_country" | "missing_genres" | "missing_profile_image">("all");
+  const [sortMode, setSortMode] = useState<SortMode>("recent");
 
   useEffect(() => {
-    async function load() {
-      const { data, error } = await supabase
-        .from("registry_artists")
-        .select("slug, display_name, normalized_name, bio, artist_type, gender, origin_iso2, public_image_url, status, created_at, updated_at")
-        .order("display_name", { ascending: true })
-        .limit(200);
-
-      if (error) {
-        console.error("Error loading artists:", error);
+    async function fetchArtists() {
+      setLoading(true);
+      setError(null);
+      const { data, error: fetchError } = await supabase.from("registry_artists").select("*").limit(250);
+      if (fetchError) {
+        setError(fetchError.message);
+        setArtists([]);
       } else {
         setArtists(data ?? []);
       }
       setLoading(false);
     }
-    load();
+    fetchArtists();
   }, []);
 
-  const filtered = artists.filter((a) => {
-    const matchesSearch =
-      !search ||
-      a.display_name.toLowerCase().includes(search.toLowerCase()) ||
-      a.slug.toLowerCase().includes(search.toLowerCase()) ||
-      a.normalized_name.toLowerCase().includes(search.toLowerCase());
-    const matchesStatus = statusFilter === "all" || a.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  const enrichedArtists = useMemo(() => {
+    return artists.map((a) => ({
+      ...a,
+      completeness: getCompleteness(a),
+      missingFields: [
+        !a.name && "name",
+        !a.country && "country",
+        !a.genres && "genres",
+        !a.profile_image && "profile_image",
+        !a.bio && "bio",
+        !a.status && "status",
+      ].filter(Boolean),
+    }));
+  }, [artists]);
 
-  const statusOptions = ["all", "active", "draft", "needs_review", "archived"];
+  const summary = useMemo(() => {
+    const total = enrichedArtists.length;
+    const complete = enrichedArtists.filter(a => a.completeness >= 85).length;
+    const missingCountry = enrichedArtists.filter(a => !a.country).length;
+    const missingGenres = enrichedArtists.filter(a => !a.genres).length;
+    const missingProfileImage = enrichedArtists.filter(a => !a.profile_image).length;
+    const averageCompleteness = total ? Math.round(enrichedArtists.reduce((sum,a)=>sum+a.completeness,0)/total) : 0;
+    return { total, complete, missingCountry, missingGenres, missingProfileImage, averageCompleteness };
+  }, [enrichedArtists]);
+
+  const visibleArtists = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    let rows = enrichedArtists.filter(a => {
+      const searchable = [a.name,a.country,a.genres,a.status].filter(Boolean).join(" ").toLowerCase();
+      if (normalizedQuery && !searchable.includes(normalizedQuery)) return false;
+      if (qualityFilter==="complete") return a.completeness >= 85;
+      if (qualityFilter==="incomplete") return a.completeness < 85;
+      if (qualityFilter==="missing_country") return !a.country;
+      if (qualityFilter==="missing_genres") return !a.genres;
+      if (qualityFilter==="missing_profile_image") return !a.profile_image;
+      return true;
+    });
+
+    rows = [...rows].sort((a,b)=>{
+      if(sortMode==="name") return (a.name||"").localeCompare(b.name||"");
+      if(sortMode==="completeness_low") return a.completeness-b.completeness;
+      if(sortMode==="completeness_high") return b.completeness-a.completeness;
+      const aTime = new Date(a.updated_at||a.created_at||0).getTime();
+      const bTime = new Date(b.updated_at||b.created_at||0).getTime();
+      return bTime-aTime;
+    });
+    return rows;
+  }, [enrichedArtists, query, qualityFilter, sortMode]);
+
+  if(loading) return <p>Loading artists...</p>;
+  if(error) return <p className="text-red-700">Failed to load artists: {error}</p>;
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <div className="mb-1 text-[11px] font-black uppercase tracking-wider text-wk-brand">Registry</div>
-          <h1 className="text-[22px] font-black tracking-tight text-wk-text">Artists</h1>
-          <p className="mt-1 text-[13px] text-wk-text-muted">
-            {artists.length} artists in registry. {artists.filter((a) => !a.public_image_url).length} missing images.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button className="wk-button wk-button-primary wk-button-sm whitespace-nowrap">
-            <WkIcon name="Plus" size={14} />
-            Add Artist
-          </button>
-        </div>
-      </div>
+    <div className="min-h-screen p-6 bg-[#f7f7f2]">
+      <header className="mb-4">
+        <h1 className="text-3xl font-black">Artist Registry</h1>
+        <p className="text-sm text-[#6f7568] mt-1">Review canonical artist records and monitor metadata completeness.</p>
+      </header>
 
-      {/* Filters */}
-      <WkSurface className="p-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="flex items-center gap-2 rounded-lg border border-wk-border bg-wk-bg-subtle px-3 py-2 flex-1 max-w-md">
-            <WkIcon name="Search" size={14} className="text-wk-text-faint" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search artists by name, slug, or origin..."
-              className="w-full bg-transparent text-[13px] text-wk-text placeholder:text-wk-text-faint outline-none"
-            />
-            {search && (
-              <button onClick={() => setSearch("")} className="text-wk-text-faint hover:text-wk-text">
-                <WkIcon name="X" size={14} />
-              </button>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text outline-none cursor-pointer"
-            >
-              <option value="all">All Status</option>
-              {statusOptions.filter((s) => s !== "all").map((s) => (
-                <option key={s} value={s}>
-                  {s.charAt(0).toUpperCase() + s.slice(1).replace("_", " ")}
-                </option>
-              ))}
-            </select>
-            <span className="text-[12px] text-wk-text-muted whitespace-nowrap">
-              {filtered.length} of {artists.length}
-            </span>
-          </div>
+      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-6 mb-4">
+        <div className="rounded-2xl border bg-white p-4 shadow-sm">
+          <p className="text-xs font-bold uppercase text-[#6f7568]">Loaded</p>
+          <p className="mt-2 text-3xl font-black">{summary.total}</p>
         </div>
-      </WkSurface>
+        <div className="rounded-2xl border bg-white p-4 shadow-sm">
+          <p className="text-xs font-bold uppercase text-[#6f7568]">Avg. completeness</p>
+          <p className="mt-2 text-3xl font-black">{summary.averageCompleteness}%</p>
+        </div>
+        <div className="rounded-2xl border bg-white p-4 shadow-sm">
+          <p className="text-xs font-bold uppercase text-[#6f7568]">Near complete</p>
+          <p className="mt-2 text-3xl font-black">{summary.complete}</p>
+        </div>
+        <div className="rounded-2xl border bg-white p-4 shadow-sm">
+          <p className="text-xs font-bold uppercase text-[#6f7568]">Missing country</p>
+          <p className="mt-2 text-3xl font-black">{summary.missingCountry}</p>
+        </div>
+        <div className="rounded-2xl border bg-white p-4 shadow-sm">
+          <p className="text-xs font-bold uppercase text-[#6f7568]">Missing genres</p>
+          <p className="mt-2 text-3xl font-black">{summary.missingGenres}</p>
+        </div>
+        <div className="rounded-2xl border bg-white p-4 shadow-sm">
+          <p className="text-xs font-bold uppercase text-[#6f7568]">Missing profile image</p>
+          <p className="mt-2 text-3xl font-black">{summary.missingProfileImage}</p>
+        </div>
+      </section>
 
-      {/* Table */}
-      {loading ? (
-        <div className="space-y-3">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="animate-pulse rounded-xl border border-wk-border bg-wk-surface p-4">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-wk-surface-raised" />
-                <div className="flex-1 space-y-2">
-                  <div className="h-4 w-48 rounded bg-wk-surface-raised" />
-                  <div className="h-3 w-32 rounded bg-wk-surface-raised" />
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <AdminTable
-          columns={[
-            {
-              key: "display_name",
-              label: "Artist",
-              render: (row) => (
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-wk-surface-raised">
-                    {row.public_image_url ? (
-                      <img src={row.public_image_url} alt={row.display_name} className="h-full w-full object-cover" />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center text-wk-text-faint">
-                        <WkIcon name="User" size={16} />
-                      </div>
-                    )}
+      <section className="mb-4 flex gap-3">
+        <input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search by name, country, genres, or status" className="flex-1 rounded-2xl border p-3"/>
+        <select value={qualityFilter} onChange={e=>setQualityFilter(e.target.value as any)} className="rounded-2xl border p-3 text-sm">
+          <option value="all">All quality states</option>
+          <option value="complete">Near complete</option>
+          <option value="incomplete">Incomplete</option>
+          <option value="missing_country">Missing country</option>
+          <option value="missing_genres">Missing genres</option>
+          <option value="missing_profile_image">Missing profile image</option>
+        </select>
+        <select value={sortMode} onChange={e=>setSortMode(e.target.value as SortMode)} className="rounded-2xl border p-3 text-sm">
+          <option value="recent">Recently updated</option>
+          <option value="name">Name A-Z</option>
+          <option value="completeness_low">Completeness low-high</option>
+          <option value="completeness_high">Completeness high-low</option>
+        </select>
+      </section>
+
+      <section className="overflow-x-auto rounded-3xl border bg-white shadow-sm">
+        <table className="w-full min-w-[900px] text-left text-sm border-collapse">
+          <thead className="bg-[#f0f2ea] text-xs uppercase text-[#6f7568]">
+            <tr>
+              <th className="px-4 py-3">Name</th>
+              <th className="px-4 py-3">Country</th>
+              <th className="px-4 py-3">Genres</th>
+              <th className="px-4 py-3">Profile Image</th>
+              <th className="px-4 py-3">Bio</th>
+              <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3">Completeness</th>
+              <th className="px-4 py-3">Missing</th>
+            </tr>
+          </thead>
+          <tbody>
+            {visibleArtists.map(artist => (
+              <tr key={artist.id} className="border-t hover:bg-[#fbfbf7]">
+                <td className="px-4 py-4 font-bold">{artist.name || "—"}</td>
+                <td className="px-4 py-4">{artist.country || "—"}</td>
+                <td className="px-4 py-4">{artist.genres || "—"}</td>
+                <td className="px-4 py-4">
+                  {artist.profile_image ? (
+                    <img src={artist.profile_image} alt="" className="h-12 w-12 rounded-xl object-cover" loading="lazy"/>
+                  ) : <span className="text-[#6f7568]">—</span>}
+                </td>
+                <td className="px-4 py-4 max-w-[280px] truncate">{artist.bio || "—"}</td>
+                <td className="px-4 py-4">{artist.status || "unknown"}</td>
+                <td className="px-4 py-4">
+                  <div className="h-2 w-full bg-[#eef1e8] rounded-full">
+                    <div className="h-full rounded-full bg-[#85c441]" style={{width: `${artist.completeness}%`}} />
                   </div>
-                  <div>
-                    <div className="text-[13px] font-semibold text-wk-text">{row.display_name}</div>
-                    <div className="text-[11px] text-wk-text-muted">{row.slug}</div>
-                  </div>
-                </div>
-              ),
-            },
-            {
-              key: "artist_type",
-              label: "Type",
-              width: "100px",
-              render: (row) => (
-                <span className="text-[12px] text-wk-text-muted">{row.artist_type || "—"}</span>
-              ),
-            },
-            {
-              key: "origin_iso2",
-              label: "Origin",
-              width: "80px",
-              render: (row) => (
-                <span className="text-[12px] text-wk-text-muted">{row.origin_iso2 || "—"}</span>
-              ),
-            },
-            {
-              key: "status",
-              label: "Status",
-              width: "100px",
-              render: (row) => <StatusBadge status={row.status} />,
-            },
-            {
-              key: "bio",
-              label: "Bio",
-              width: "200px",
-              render: (row) => (
-                <span className="text-[12px] text-wk-text-muted line-clamp-1">
-                  {row.bio ? row.bio.substring(0, 60) + "..." : "No bio"}
-                </span>
-              ),
-            },
-            {
-              key: "updated_at",
-              label: "Updated",
-              width: "120px",
-              render: (row) => (
-                <span className="text-[12px] text-wk-text-muted">
-                  {new Date(row.updated_at).toLocaleDateString()}
-                </span>
-              ),
-            },
-          ]}
-          rows={filtered}
-          keyField="slug"
-          emptyMessage="No artists found."
-          onRowClick={(row) => navigate(`/admin/registry/artists/${row.slug}`)}
-        />
-      )}
+                  <span className="text-xs">{artist.completeness}%</span>
+                </td>
+                <td className="px-4 py-4">
+                  {artist.missingFields.length === 0 ? (
+                    <span className="rounded-full bg-green-50 px-2 py-1 text-xs font-bold text-green-700">Clean</span>
+                  ) : (
+                    <div className="flex flex-wrap gap-1">
+                      {artist.missingFields.map(f => (
+                        <span key={f} className="rounded-full bg-[#f6f1df] px-2 py-1 text-[11px] font-bold text-[#7b6422]">{f}</span>
+                      ))}
+                    </div>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
     </div>
-  );
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const color =
-    status === "active"
-      ? "bg-wk-success-soft text-wk-success"
-      : status === "draft"
-      ? "bg-wk-warning-soft text-wk-warning"
-      : status === "needs_review"
-      ? "bg-wk-danger-soft text-wk-danger"
-      : status === "archived"
-      ? "bg-wk-surface-raised text-wk-text-muted"
-      : "bg-wk-surface-raised text-wk-text-muted";
-
-  return (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${color}`}>
-      {status.replace("_", " ")}
-    </span>
   );
 }
