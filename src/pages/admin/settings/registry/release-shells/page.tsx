@@ -100,6 +100,8 @@ export default function AdminSettingsRegistryReleaseShells() {
   const [search, setSearch] = useState("");
   const [queueFilter, setQueueFilter] = useState<QueueFilter>("active");
   const [includeResolved, setIncludeResolved] = useState(false);
+  const [selectedShellKeys, setSelectedShellKeys] = useState<Record<string, boolean>>({});
+  const [bulkActionLoading, setBulkActionLoading] = useState(false);
   const [states, setStates] = useState<Record<string, ShellReviewState>>({});
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
   const [suggestionDecisions, setSuggestionDecisions] = useState<Record<string, EnrichmentDecisionStatus>>({});
@@ -168,6 +170,9 @@ export default function AdminSettingsRegistryReleaseShells() {
     ].some((value) => value.toLowerCase().includes(q));
   });
 
+  const selectedRows = filtered.filter((row) => selectedShellKeys[row.shellKey]);
+  const selectedCount = selectedRows.length;
+
   const pendingCount = filtered.filter((row) => {
     const state = states[row.shellKey] ?? "pending";
     return !["approved", "rejected"].includes(state);
@@ -227,6 +232,73 @@ export default function AdminSettingsRegistryReleaseShells() {
     }
   };
 
+
+
+
+  const toggleShellSelection = (row: RegistryReleaseShell) => {
+    setSelectedShellKeys((prev) => ({ ...prev, [row.shellKey]: !prev[row.shellKey] }));
+  };
+
+  const clearSelection = () => {
+    setSelectedShellKeys({});
+  };
+
+  const selectVisibleShells = () => {
+    setSelectedShellKeys((prev) => ({
+      ...prev,
+      ...Object.fromEntries(filtered.map((row) => [row.shellKey, true])),
+    }));
+  };
+
+  const bulkUpdateLifecycle = async (status: "resolved" | "reopened") => {
+    if (selectedRows.length === 0) {
+      showToast("Select at least one shell first.");
+      return;
+    }
+
+    setBulkActionLoading(true);
+
+    let updated = 0;
+    let skipped = 0;
+
+    try {
+      for (const row of selectedRows) {
+        const context = enrichmentByShell[row.shellKey];
+        const auditEvents = auditByShell[row.shellKey] ?? [];
+        const operationalStatus = getShellOperationalStatus(context, auditEvents, suggestionDecisions);
+
+        if (status === "resolved" && operationalStatus === "resolved") {
+          skipped += 1;
+          continue;
+        }
+
+        if (status === "resolved" && (operationalStatus === "blocked" || operationalStatus === "failed_write")) {
+          skipped += 1;
+          continue;
+        }
+
+        if (status === "reopened" && operationalStatus !== "resolved") {
+          skipped += 1;
+          continue;
+        }
+
+        const reason = status === "resolved"
+          ? "Bulk resolved from Release Shells queue."
+          : "Bulk reopened from Release Shells queue.";
+
+        await updateReleaseShellLifecycleStatus(row.releaseShellId ?? row.id, status, reason);
+        updated += 1;
+      }
+
+      clearSelection();
+      showToast(`Bulk ${status}: ${updated} updated, ${skipped} skipped.`);
+      await load();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : `Bulk ${status} failed.`);
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
 
 
   const updateLifecycle = async (row: RegistryReleaseShell, status: "resolved" | "reopened") => {
@@ -454,6 +526,49 @@ export default function AdminSettingsRegistryReleaseShells() {
         </WkSurface>
       </div>
 
+      <WkSurface className="p-3">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="text-[12px] font-bold uppercase tracking-wide text-[var(--wk-text-muted)]">Bulk queue operations</p>
+            <p className="mt-1 text-[12px] text-[var(--wk-text-muted)]">
+              {selectedCount > 0
+                ? `${selectedCount} visible shell(s) selected. Bulk resolve skips blocked, failed-write, and already resolved shells.`
+                : "Select visible shells to resolve or reopen them in batches."}
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={selectVisibleShells}
+              className="wk-button wk-button-sm wk-button-ghost"
+            >
+              Select visible
+            </button>
+            <button
+              onClick={clearSelection}
+              disabled={selectedCount === 0}
+              className="wk-button wk-button-sm wk-button-ghost disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Clear
+            </button>
+            <button
+              onClick={() => bulkUpdateLifecycle("resolved")}
+              disabled={selectedCount === 0 || bulkActionLoading}
+              className="wk-button wk-button-sm wk-button-primary disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {bulkActionLoading ? "Working…" : "Bulk resolve"}
+            </button>
+            <button
+              onClick={() => bulkUpdateLifecycle("reopened")}
+              disabled={selectedCount === 0 || bulkActionLoading}
+              className="wk-button wk-button-sm wk-button-ghost disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Bulk reopen
+            </button>
+          </div>
+        </div>
+      </WkSurface>
+
       <div className="flex flex-wrap gap-2">
         {([
           ["active", "Active", queueSummary.open + queueSummary.reopened + queueSummary.blocked + queueSummary.failed_write],
@@ -502,7 +617,7 @@ export default function AdminSettingsRegistryReleaseShells() {
           <table className="w-full text-left text-[13px]">
             <thead>
               <tr className="border-b border-[var(--wk-border)]">
-                {["", "#", "Release / Track", "Artist", "Registry shell", "Source", "Confidence", "Suggestions", "Review"].map((heading) => (
+                {["Select", "", "#", "Release / Track", "Artist", "Registry shell", "Source", "Confidence", "Suggestions", "Review"].map((heading) => (
                   <th key={heading || "toggle"} className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-[var(--wk-text-muted)]">{heading}</th>
                 ))}
               </tr>
@@ -526,6 +641,15 @@ export default function AdminSettingsRegistryReleaseShells() {
                 return (
                   <Fragment key={row.shellKey}>
                     <tr className="border-b border-[var(--wk-border)]/60 hover:bg-[var(--wk-surface-raised)]/60">
+                      <td className="px-4 py-3">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(selectedShellKeys[row.shellKey])}
+                          onChange={() => toggleShellSelection(row)}
+                          aria-label={`Select ${row.title}`}
+                          className="h-4 w-4 rounded border-[var(--wk-border)]"
+                        />
+                      </td>
                       <td className="px-4 py-3">
                         <button
                           onClick={() => setExpandedRows((prev) => ({ ...prev, [row.shellKey]: !prev[row.shellKey] }))}
@@ -579,7 +703,7 @@ export default function AdminSettingsRegistryReleaseShells() {
 
                     {isExpanded && (
                       <tr className="border-b border-[var(--wk-border)] bg-[var(--wk-surface-raised)]/40">
-                        <td colSpan={9} className="px-4 py-4">
+                        <td colSpan={10} className="px-4 py-4">
                           <div className="grid gap-3 lg:grid-cols-[1.2fr_1fr]">
                             <div className="rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4">
                               <div className="mb-3 flex items-center justify-between">
