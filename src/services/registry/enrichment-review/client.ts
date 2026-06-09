@@ -48,6 +48,23 @@ export interface ReleaseShellEnrichmentContext {
   providerLinks: ProviderEntityLinkReviewItem[];
 }
 
+export interface CanonicalWriteAuditEvent {
+  id: string;
+  registryEntityType: string;
+  registryEntityId: string;
+  sourceSuggestionId: string | null;
+  sourceTable: string;
+  fieldName: string;
+  targetPath: string;
+  beforeValue: unknown;
+  afterValue: unknown;
+  action: string;
+  status: "applied" | "skipped" | "failed" | string;
+  errorMessage: string | null;
+  actor: string;
+  createdAt: string;
+}
+
 export interface ReleaseShellEnrichmentLookupInput {
   shellKey: string;
   registryEntityId: string | null;
@@ -189,6 +206,27 @@ export async function applyApprovedReleaseShellSuggestions(
   }
 
   return result as ApplyApprovedReleaseShellSuggestionsResult;
+}
+
+
+
+export async function getReleaseShellCanonicalWriteAuditEvents(
+  registryEntityId: string,
+): Promise<CanonicalWriteAuditEvent[]> {
+  const response = await fetch(`${RUNTIME_API_PATH}/${encodeURIComponent(registryEntityId)}/audit`, {
+    method: "GET",
+  });
+
+  if (!response.ok) return [];
+
+  const payload = (await response.json()) as {
+    data?: {
+      events?: CanonicalWriteAuditEvent[];
+    };
+    events?: CanonicalWriteAuditEvent[];
+  };
+
+  return payload.data?.events ?? payload.events ?? [];
 }
 
 

@@ -6,10 +6,12 @@ import type { IngestResolvedRow } from "@/services/chartsIngestion/ingestStudioT
 import {
   applyApprovedReleaseShellSuggestions,
   getLiveReleaseShellReviewRows,
+  getReleaseShellCanonicalWriteAuditEvents,
 } from "@/services/registry/enrichment-review/client";
 import {
   formatConfidence,
   getReleaseShellEnrichmentContexts,
+  type CanonicalWriteAuditEvent,
   type EnrichmentDecisionStatus,
   type ReleaseShellEnrichmentContext,
   type RegistryEnrichmentSuggestionReviewItem,
@@ -78,13 +80,22 @@ export default function AdminSettingsRegistryReleaseShells() {
   const [suggestionDecisions, setSuggestionDecisions] = useState<Record<string, EnrichmentDecisionStatus>>({});
   const [applyingShells, setApplyingShells] = useState<Record<string, boolean>>({});
   const [enrichmentByShell, setEnrichmentByShell] = useState<Record<string, ReleaseShellEnrichmentContext>>({});
+  const [auditByShell, setAuditByShell] = useState<Record<string, CanonicalWriteAuditEvent[]>>({});
   const [toast, setToast] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     const { shells: liveShells, contexts } = await getLiveReleaseShellReviewRows();
+    const auditEntries = await Promise.all(
+      liveShells.map(async (shell) => [
+        shell.shellKey,
+        await getReleaseShellCanonicalWriteAuditEvents(shell.releaseShellId ?? shell.id),
+      ] as const),
+    );
+
     setShellRows(liveShells);
     setEnrichmentByShell(contexts);
+    setAuditByShell(Object.fromEntries(auditEntries));
     setLoading(false);
   }, []);
 
@@ -164,6 +175,9 @@ export default function AdminSettingsRegistryReleaseShells() {
         ...prev,
         ...Object.fromEntries(result.applied.map((item) => [item.suggestionId, "applied" as EnrichmentDecisionStatus])),
       }));
+
+      const auditEvents = await getReleaseShellCanonicalWriteAuditEvents(registryEntityId);
+      setAuditByShell((prev) => ({ ...prev, [row.shellKey]: auditEvents }));
 
       showToast(`Applied ${result.applied.length} approved suggestion(s) to canonical release.`);
       await load();
@@ -445,6 +459,38 @@ export default function AdminSettingsRegistryReleaseShells() {
                                   </button>
                                 </div>
                               </div>
+
+                              {auditEvents.length > 0 && (
+                                <div className="mt-4 border-t border-[var(--wk-border)] pt-3">
+                                  <div className="mb-2 flex items-center justify-between">
+                                    <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--wk-text-muted)]">Audit trail</p>
+                                    <span className="text-[10px] font-semibold text-[var(--wk-text-muted)]">{auditEvents.length} event(s)</span>
+                                  </div>
+                                  <div className="space-y-2">
+                                    {auditEvents.slice(0, 5).map((event) => (
+                                      <div key={event.id} className="rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] p-2">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
+                                            event.status === "applied"
+                                              ? "bg-[var(--wk-success-soft)] text-[var(--wk-success)]"
+                                              : event.status === "failed"
+                                                ? "bg-[var(--wk-danger-soft)] text-[var(--wk-danger)]"
+                                                : "bg-[var(--wk-surface-raised)] text-[var(--wk-text-muted)]"
+                                          }`}>
+                                            {event.status}
+                                          </span>
+                                          <span className="text-[11px] font-semibold text-[var(--wk-text)]">{event.fieldName}</span>
+                                        </div>
+                                        <p className="mt-1 text-[10px] text-[var(--wk-text-muted)]">{event.targetPath}</p>
+                                        <p className="text-[10px] text-[var(--wk-text-faint)]">
+                                          {new Date(event.createdAt).toLocaleString()} · {event.actor}
+                                        </p>
+                                        {event.errorMessage && <p className="mt-1 text-[10px] text-[var(--wk-danger)]">{event.errorMessage}</p>}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
 
                               {(context?.observations.length ?? 0) > 0 && (
                                 <div className="mt-4 border-t border-[var(--wk-border)] pt-3">

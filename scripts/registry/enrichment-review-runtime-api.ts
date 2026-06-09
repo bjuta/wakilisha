@@ -198,12 +198,34 @@ export async function buildReleaseShellEnrichmentContexts(
 }
 
 
+
 export interface ApplyApprovedReleaseShellSuggestionsResult {
   registryEntityId: string;
   applied: Array<{ suggestionId: string; fieldName: string; target: string }>;
   skipped: Array<{ suggestionId: string; fieldName: string; reason: string }>;
   failed: Array<{ registryEntityId: string; reason: string }>;
 }
+
+export interface CanonicalWriteAuditEvent {
+  id: string;
+  registryEntityType: string;
+  registryEntityId: string;
+  sourceSuggestionId: string | null;
+  sourceTable: string;
+  fieldName: string;
+  targetPath: string;
+  beforeValue: unknown;
+  afterValue: unknown;
+  action: string;
+  status: string;
+  errorMessage: string | null;
+  actor: string;
+  createdAt: string;
+}
+
+type PgQueryable = {
+  query: PgPool["query"];
+};
 
 const DIRECT_RELEASE_FIELD_MAP: Record<string, string> = {
   title: "title",
@@ -223,6 +245,136 @@ const METADATA_RELEASE_FIELDS = new Set([
   "source_url",
 ]);
 
+async function ensureCanonicalWriteAuditTable(queryable: PgQueryable): Promise<void> {
+  await queryable.query(`
+    create table if not exists public.registry_canonical_write_events (
+      id uuid primary key default gen_random_uuid(),
+      registry_entity_type text not null,
+      registry_entity_id text not null,
+      source_suggestion_id text,
+      source_table text not null default 'registry_enrichment_suggestions',
+      field_name text not null,
+      target_path text not null,
+      before_value jsonb,
+      after_value jsonb,
+      action text not null,
+      status text not null,
+      error_message text,
+      actor text not null default 'system',
+      created_at timestamptz not null default now()
+    )
+  `);
+
+  await queryable.query(`
+    create index if not exists registry_canonical_write_events_entity_idx
+    on public.registry_canonical_write_events (registry_entity_type, registry_entity_id, created_at desc)
+  `);
+
+  await queryable.query(`
+    create index if not exists registry_canonical_write_events_suggestion_idx
+    on public.registry_canonical_write_events (source_suggestion_id)
+  `);
+}
+
+async function insertCanonicalWriteAuditEvent(
+  queryable: PgQueryable,
+  event: {
+    registryEntityType: string;
+    registryEntityId: string;
+    sourceSuggestionId?: string | null;
+    fieldName: string;
+    targetPath: string;
+    beforeValue?: string | null;
+    afterValue?: string | null;
+    action: string;
+    status: "applied" | "skipped" | "failed";
+    errorMessage?: string | null;
+    actor?: string;
+  },
+): Promise<void> {
+  await queryable.query(
+    `
+      insert into public.registry_canonical_write_events (
+        registry_entity_type,
+        registry_entity_id,
+        source_suggestion_id,
+        source_table,
+        field_name,
+        target_path,
+        before_value,
+        after_value,
+        action,
+        status,
+        error_message,
+        actor
+      )
+      values (
+        $1,
+        $2,
+        $3,
+        'registry_enrichment_suggestions',
+        $4,
+        $5,
+        case when $6::text is null then null::jsonb else to_jsonb($6::text) end,
+        case when $7::text is null then null::jsonb else to_jsonb($7::text) end,
+        $8,
+        $9,
+        $10,
+        $11
+      )
+    `,
+    [
+      event.registryEntityType,
+      event.registryEntityId,
+      event.sourceSuggestionId ?? null,
+      event.fieldName,
+      event.targetPath,
+      event.beforeValue ?? null,
+      event.afterValue ?? null,
+      event.action,
+      event.status,
+      event.errorMessage ?? null,
+      event.actor ?? process.env.WAKILISHA_CANONICAL_WRITE_ACTOR ?? "system",
+    ],
+  );
+}
+
+export async function getReleaseShellCanonicalWriteEvents(
+  pool: PgPool,
+  registryEntityId: string,
+  limit = 25,
+): Promise<CanonicalWriteAuditEvent[]> {
+  await ensureCanonicalWriteAuditTable(pool);
+
+  const result = await pool.query(
+    `
+      select
+        id::text as "id",
+        registry_entity_type as "registryEntityType",
+        registry_entity_id as "registryEntityId",
+        source_suggestion_id as "sourceSuggestionId",
+        source_table as "sourceTable",
+        field_name as "fieldName",
+        target_path as "targetPath",
+        before_value as "beforeValue",
+        after_value as "afterValue",
+        action,
+        status,
+        error_message as "errorMessage",
+        actor,
+        created_at as "createdAt"
+      from public.registry_canonical_write_events
+      where registry_entity_type = 'release'
+        and registry_entity_id = $1
+      order by created_at desc
+      limit $2::int
+    `,
+    [String(registryEntityId), Math.max(1, Math.min(limit, 100))],
+  );
+
+  return result.rows as CanonicalWriteAuditEvent[];
+}
+
 export async function applyApprovedReleaseShellSuggestions(
   pool: PgPool,
   registryEntityId: string,
@@ -239,6 +391,8 @@ export async function applyApprovedReleaseShellSuggestions(
     result.failed.push({ registryEntityId: cleanRegistryEntityId, reason: "Missing registryEntityId." });
     return result;
   }
+
+  await ensureCanonicalWriteAuditTable(pool);
 
   const client = await pool.connect();
 
@@ -284,6 +438,12 @@ export async function applyApprovedReleaseShellSuggestions(
       const targetColumn = DIRECT_RELEASE_FIELD_MAP[fieldName];
 
       if (targetColumn) {
+        const beforeResult = await client.query(
+          `select ${targetColumn}::text as "beforeValue" from public.registry_releases where id::text = $1 limit 1`,
+          [cleanRegistryEntityId],
+        );
+        const beforeValue = beforeResult.rows[0]?.beforeValue ?? null;
+
         if (targetColumn === "release_date") {
           await client.query(
             `
@@ -313,11 +473,34 @@ export async function applyApprovedReleaseShellSuggestions(
           [suggestionId],
         );
 
+        await insertCanonicalWriteAuditEvent(client, {
+          registryEntityType: "release",
+          registryEntityId: cleanRegistryEntityId,
+          sourceSuggestionId: suggestionId,
+          fieldName,
+          targetPath: `registry_releases.${targetColumn}`,
+          beforeValue,
+          afterValue: suggestedValue,
+          action: "apply_approved_suggestion",
+          status: "applied",
+        });
+
         result.applied.push({ suggestionId, fieldName, target: `registry_releases.${targetColumn}` });
         continue;
       }
 
       if (METADATA_RELEASE_FIELDS.has(fieldName)) {
+        const beforeResult = await client.query(
+          `
+            select metadata->>$2 as "beforeValue"
+            from public.registry_releases
+            where id::text = $1
+            limit 1
+          `,
+          [cleanRegistryEntityId, fieldName],
+        );
+        const beforeValue = beforeResult.rows[0]?.beforeValue ?? null;
+
         await client.query(
           `
             update public.registry_releases
@@ -341,9 +524,34 @@ export async function applyApprovedReleaseShellSuggestions(
           [suggestionId],
         );
 
+        await insertCanonicalWriteAuditEvent(client, {
+          registryEntityType: "release",
+          registryEntityId: cleanRegistryEntityId,
+          sourceSuggestionId: suggestionId,
+          fieldName,
+          targetPath: `registry_releases.metadata.${fieldName}`,
+          beforeValue,
+          afterValue: suggestedValue,
+          action: "apply_approved_suggestion",
+          status: "applied",
+        });
+
         result.applied.push({ suggestionId, fieldName, target: `registry_releases.metadata.${fieldName}` });
         continue;
       }
+
+      await insertCanonicalWriteAuditEvent(client, {
+        registryEntityType: "release",
+        registryEntityId: cleanRegistryEntityId,
+        sourceSuggestionId: suggestionId,
+        fieldName,
+        targetPath: "unmapped",
+        beforeValue: null,
+        afterValue: suggestedValue,
+        action: "apply_approved_suggestion",
+        status: "skipped",
+        errorMessage: "Field is not in the canonical write allowlist.",
+      });
 
       result.skipped.push({
         suggestionId,
@@ -356,9 +564,29 @@ export async function applyApprovedReleaseShellSuggestions(
     return result;
   } catch (err) {
     await client.query("rollback");
+
+    const reason = err instanceof Error ? err.message : "Unknown canonical write failure.";
+
+    try {
+      await insertCanonicalWriteAuditEvent(pool, {
+        registryEntityType: "release",
+        registryEntityId: cleanRegistryEntityId,
+        sourceSuggestionId: null,
+        fieldName: "canonical_write",
+        targetPath: "registry_releases",
+        beforeValue: null,
+        afterValue: null,
+        action: "apply_approved_suggestion",
+        status: "failed",
+        errorMessage: reason,
+      });
+    } catch {
+      // Avoid masking the original canonical write failure.
+    }
+
     result.failed.push({
       registryEntityId: cleanRegistryEntityId,
-      reason: err instanceof Error ? err.message : "Unknown canonical write failure.",
+      reason,
     });
     return result;
   } finally {
