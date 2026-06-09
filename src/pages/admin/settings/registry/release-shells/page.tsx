@@ -32,6 +32,8 @@ interface RegistryReleaseShell extends IngestResolvedRow {
 type ShellReviewState = "pending" | "reviewing" | "approved" | "rejected";
 type LocalSuggestionDecision = Extract<EnrichmentDecisionStatus, "approved" | "rejected" | "needs_review">;
 type SuggestionLaneKey = "pending" | "needsReview" | "approved" | "rejected" | "other";
+type ShellOperationalStatus = "open" | "resolved" | "reopened" | "blocked" | "failed_write";
+type QueueFilter = "active" | "all" | ShellOperationalStatus;
 
 function getSuggestionStatus(
   suggestion: RegistryEnrichmentSuggestionReviewItem,
@@ -72,6 +74,23 @@ function formatDecisionStatus(status: EnrichmentDecisionStatus): string {
   return status.replace(/_/g, " ");
 }
 
+function getShellOperationalStatus(
+  context: ReleaseShellEnrichmentContext | undefined,
+  auditEvents: CanonicalWriteAuditEvent[],
+  overrides: Record<string, EnrichmentDecisionStatus>,
+): ShellOperationalStatus {
+  if (context?.lifecycle?.status === "resolved") return "resolved";
+  if (auditEvents.some((event) => event.status === "failed")) return "failed_write";
+
+  const suggestions = context?.suggestions ?? [];
+  const suggestionGroups = groupSuggestionsByDecision(suggestions, overrides);
+
+  if (suggestionGroups.needsReview.length > 0) return "blocked";
+  if (context?.lifecycle?.status === "reopened") return "reopened";
+
+  return "open";
+}
+
 export default function AdminSettingsRegistryReleaseShells() {
   const navigate = useNavigate();
 
@@ -79,6 +98,7 @@ export default function AdminSettingsRegistryReleaseShells() {
   const [loading, setLoading] = useState(true);
   const [enrichmentLoading, setEnrichmentLoading] = useState(false);
   const [search, setSearch] = useState("");
+  const [queueFilter, setQueueFilter] = useState<QueueFilter>("active");
   const [includeResolved, setIncludeResolved] = useState(false);
   const [states, setStates] = useState<Record<string, ShellReviewState>>({});
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
@@ -92,7 +112,8 @@ export default function AdminSettingsRegistryReleaseShells() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { shells: liveShells, contexts } = await getLiveReleaseShellReviewRows({ includeResolved });
+    const shouldIncludeResolved = includeResolved || queueFilter === "all" || queueFilter === "resolved";
+    const { shells: liveShells, contexts } = await getLiveReleaseShellReviewRows({ includeResolved: shouldIncludeResolved });
     const auditEntries = await Promise.all(
       liveShells.map(async (shell) => [
         shell.shellKey,
@@ -104,7 +125,7 @@ export default function AdminSettingsRegistryReleaseShells() {
     setEnrichmentByShell(contexts);
     setAuditByShell(Object.fromEntries(auditEntries));
     setLoading(false);
-  }, [includeResolved]);
+  }, [includeResolved, queueFilter]);
 
   useEffect(() => {
     load();
@@ -122,6 +143,18 @@ export default function AdminSettingsRegistryReleaseShells() {
   }, [shells]);
 
   const filtered = shells.filter((row) => {
+    const context = enrichmentByShell[row.shellKey];
+    const auditEvents = auditByShell[row.shellKey] ?? [];
+    const operationalStatus = getShellOperationalStatus(context, auditEvents, suggestionDecisions);
+
+    const matchesFilter = queueFilter === "all"
+      ? true
+      : queueFilter === "active"
+        ? operationalStatus !== "resolved"
+        : operationalStatus === queueFilter;
+
+    if (!matchesFilter) return false;
+
     const q = search.trim().toLowerCase();
     if (!q) return true;
 
@@ -131,6 +164,7 @@ export default function AdminSettingsRegistryReleaseShells() {
       row.releaseShellId ?? "",
       row.sourceRunTitle,
       row.sourceEditionDate,
+      operationalStatus,
     ].some((value) => value.toLowerCase().includes(q));
   });
 
@@ -146,6 +180,16 @@ export default function AdminSettingsRegistryReleaseShells() {
   const approvedSuggestionCount = allSuggestions.filter((suggestion) => getSuggestionStatus(suggestion, suggestionDecisions) === "approved").length;
   const rejectedSuggestionCount = allSuggestions.filter((suggestion) => getSuggestionStatus(suggestion, suggestionDecisions) === "rejected").length;
   const avgConfidence = shells.length > 0 ? Math.round(shells.reduce((sum, row) => sum + row.confidence, 0) / shells.length) : 0;
+  const queueSummary = shells.reduce<Record<ShellOperationalStatus, number>>(
+    (summary, row) => {
+      const context = enrichmentByShell[row.shellKey];
+      const auditEvents = auditByShell[row.shellKey] ?? [];
+      const status = getShellOperationalStatus(context, auditEvents, suggestionDecisions);
+      summary[status] += 1;
+      return summary;
+    },
+    { open: 0, resolved: 0, reopened: 0, blocked: 0, failed_write: 0 },
+  );
 
   const markState = (row: RegistryReleaseShell, state: ShellReviewState) => {
     setStates((prev) => ({ ...prev, [row.shellKey]: state }));
@@ -207,6 +251,11 @@ export default function AdminSettingsRegistryReleaseShells() {
     const context = enrichmentByShell[row.shellKey];
     const approvedSuggestions = context?.suggestions.filter((suggestion) => getSuggestionStatus(suggestion, suggestionDecisions) === "approved") ?? [];
 
+    if (context?.lifecycle?.status === "resolved") {
+      showToast("Resolved shells must be reopened before previewing canonical writes.");
+      return;
+    }
+
     if (approvedSuggestions.length === 0) {
       showToast("No approved suggestions to preview.");
       return;
@@ -238,6 +287,11 @@ export default function AdminSettingsRegistryReleaseShells() {
     const registryEntityId = row.releaseShellId ?? row.id;
     const context = enrichmentByShell[row.shellKey];
     const approvedSuggestions = context?.suggestions.filter((suggestion) => getSuggestionStatus(suggestion, suggestionDecisions) === "approved") ?? [];
+
+    if (context?.lifecycle?.status === "resolved") {
+      showToast("Resolved shells must be reopened before applying canonical writes.");
+      return;
+    }
 
     if (approvedSuggestions.length === 0) {
       showToast("No approved suggestions to apply.");
@@ -365,13 +419,13 @@ export default function AdminSettingsRegistryReleaseShells() {
             <p className="text-[13px] font-bold text-[var(--wk-text)]">Registry-first ownership</p>
             <p className="mt-0.5 text-[12px] text-[var(--wk-text-muted)]">
               This page replaces the chart-owned release-shell mental model. Chart ingestion remains a source surface, while registry pages own the lifecycle.
-              Phase 9B now reads enrichment context through the registry enrichment-review client. Canonical writes remain disabled.
+              Canonical writes are now gated by persisted reviewer decisions, pre-apply preview, audit trails, lifecycle controls, and queue guardrails.
             </p>
           </div>
         </div>
       </WkSurface>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
         <WkSurface className="p-4">
           <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--wk-text-muted)]">Total shells</p>
           <p className="mt-1 text-[26px] font-black text-[var(--wk-text)]">{shells.length}</p>
@@ -386,6 +440,11 @@ export default function AdminSettingsRegistryReleaseShells() {
           {needsReviewSuggestionCount > 0 && <p className="mt-1 text-[11px] font-semibold text-[var(--wk-warning)]">{needsReviewSuggestionCount} needs review</p>}
         </WkSurface>
         <WkSurface className="p-4">
+          <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--wk-text-muted)]">Guardrails</p>
+          <p className="mt-1 text-[26px] font-black text-[var(--wk-text)]">{queueSummary.blocked}/{queueSummary.failed_write}</p>
+          <p className="mt-1 text-[11px] font-semibold text-[var(--wk-text-muted)]">blocked / failed-write</p>
+        </WkSurface>
+        <WkSurface className="p-4">
           <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--wk-text-muted)]">Approved / rejected</p>
           <p className="mt-1 text-[26px] font-black text-[var(--wk-text)]">{approvedSuggestionCount}/{rejectedSuggestionCount}</p>
         </WkSurface>
@@ -393,6 +452,30 @@ export default function AdminSettingsRegistryReleaseShells() {
           <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--wk-text-muted)]">Avg confidence</p>
           <p className="mt-1 text-[26px] font-black text-[var(--wk-text)]">{avgConfidence}%</p>
         </WkSurface>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {([
+          ["active", "Active", queueSummary.open + queueSummary.reopened + queueSummary.blocked + queueSummary.failed_write],
+          ["open", "Open", queueSummary.open],
+          ["reopened", "Reopened", queueSummary.reopened],
+          ["blocked", "Blocked", queueSummary.blocked],
+          ["failed_write", "Failed writes", queueSummary.failed_write],
+          ["resolved", "Resolved", queueSummary.resolved],
+          ["all", "All", shells.length],
+        ] as Array<[QueueFilter, string, number]>).map(([filter, label, count]) => (
+          <button
+            key={filter}
+            onClick={() => setQueueFilter(filter)}
+            className={`rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-wide ${
+              queueFilter === filter
+                ? "border-[var(--wk-brand)] bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]"
+                : "border-[var(--wk-border)] bg-[var(--wk-surface)] text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)]"
+            }`}
+          >
+            {label} · {count}
+          </button>
+        ))}
       </div>
 
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -436,6 +519,7 @@ export default function AdminSettingsRegistryReleaseShells() {
                 const shellSuggestionsComplete = suggestions.length > 0 && suggestionGroups.pending.length === 0 && suggestionGroups.needsReview.length === 0;
                 const auditEvents = auditByShell[row.shellKey] ?? [];
                 const lifecycleStatus = context?.lifecycle?.status ?? "open";
+                const operationalStatus = getShellOperationalStatus(context, auditEvents, suggestionDecisions);
                 const appliedOrSkippedAuditCount = auditEvents.filter((event) => event.status === "applied" || event.status === "skipped").length;
                 const canResolveShell = lifecycleStatus !== "resolved" && suggestions.length > 0 && suggestionGroups.pending.length === 0 && suggestionGroups.needsReview.length === 0 && appliedOrSkippedAuditCount > 0;
 
@@ -551,10 +635,11 @@ export default function AdminSettingsRegistryReleaseShells() {
                                 <p><span className="font-semibold text-[var(--wk-text)]">Context source:</span> {context?.dataSource ?? "loading"}</p>
                                 <div className="flex flex-col gap-2 rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] p-3">
                                   <p><span className="font-semibold text-[var(--wk-text)]">Lifecycle:</span> {lifecycleStatus}</p>
-                                  <p><span className="font-semibold text-[var(--wk-text)]">Canonical writes:</span> controlled apply enabled</p>
+                                  <p><span className="font-semibold text-[var(--wk-text)]">Queue status:</span> {operationalStatus.replace(/_/g, " ")}</p>
+                                  <p><span className="font-semibold text-[var(--wk-text)]">Canonical writes:</span> gated by preview + resolved-shell guardrail</p>
                                   <button
                                     onClick={() => previewApprovedSuggestionsForRow(row)}
-                                    disabled={suggestionGroups.approved.length === 0 || previewingShells[row.shellKey] || applyingShells[row.shellKey]}
+                                    disabled={lifecycleStatus === "resolved" || suggestionGroups.approved.length === 0 || previewingShells[row.shellKey] || applyingShells[row.shellKey]}
                                     className="wk-button wk-button-sm wk-button-primary justify-center disabled:cursor-not-allowed disabled:opacity-50"
                                   >
                                     {previewingShells[row.shellKey] ? "Previewing…" : `Preview apply (${suggestionGroups.approved.length})`}
@@ -627,7 +712,7 @@ export default function AdminSettingsRegistryReleaseShells() {
                                   <div className="mt-3 flex flex-wrap gap-2">
                                     <button
                                       onClick={() => applyApprovedSuggestions(row)}
-                                      disabled={applyPreview.writable.length === 0 || applyingShells[row.shellKey]}
+                                      disabled={lifecycleStatus === "resolved" || applyPreview.writable.length === 0 || applyingShells[row.shellKey]}
                                       className="wk-button wk-button-sm wk-button-primary justify-center disabled:cursor-not-allowed disabled:opacity-50"
                                     >
                                       {applyingShells[row.shellKey] ? "Applying…" : `Confirm apply (${applyPreview.writable.length})`}
