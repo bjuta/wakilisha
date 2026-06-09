@@ -364,6 +364,10 @@ export default function AdminSettingsRegistryReleaseShells() {
                 const suggestionGroups = groupSuggestionsByDecision(suggestions, suggestionDecisions);
                 const completedSuggestionCount = suggestionGroups.approved.length + suggestionGroups.rejected.length;
                 const shellSuggestionsComplete = suggestions.length > 0 && suggestionGroups.pending.length === 0 && suggestionGroups.needsReview.length === 0;
+                const auditEvents = auditByShell[row.shellKey] ?? [];
+                const lifecycleStatus = context?.lifecycle?.status ?? "open";
+                const appliedOrSkippedAuditCount = auditEvents.filter((event) => event.status === "applied" || event.status === "skipped").length;
+                const canResolveShell = lifecycleStatus !== "resolved" && suggestions.length > 0 && suggestionGroups.pending.length === 0 && suggestionGroups.needsReview.length === 0 && appliedOrSkippedAuditCount > 0;
 
                 return (
                   <Fragment key={row.shellKey}>
