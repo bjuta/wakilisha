@@ -49,7 +49,7 @@ function getArgNumber(name: string, fallback: number): number {
 }
 
 function sqlIdentifier(value: string): string {
-  return `"${value.replace(/"/g, """"")}"`;
+  return `"${value.replace(/"/g, "\"\"")}"`;
 }
 
 function firstAvailable(columns: Set<string>, candidates: string[]): string | null {
