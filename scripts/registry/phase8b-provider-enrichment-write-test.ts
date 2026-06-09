@@ -1,7 +1,11 @@
-import { Pool } from 'pg';
+import pg from 'pg';
 import { AppleMusicAdapter } from '../../src/services/registry/provider-adapters/apple-music-adapter';
 import { PostgresProviderEnrichmentWriteStore } from '../../src/services/registry/provider-enrichment/provider-enrichment-write-store';
 import { runPhase8ProviderEnrichment } from './phase8-provider-enrichment-pipeline';
+
+const { Pool } = pg;
+
+type PgPool = InstanceType<typeof Pool>;
 
 function getArg(name: string): string | null {
   const prefix = `--${name}=`;
@@ -34,7 +38,7 @@ async function run(): Promise<void> {
   const adapter = AppleMusicAdapter.fromEnv(storefront);
   const release = await adapter.fetchAlbum(albumIdOrUrl, { storefront });
 
-  let pool: Pool | null = null;
+  let pool: PgPool | null = null;
 
   try {
     const writeStore = write
