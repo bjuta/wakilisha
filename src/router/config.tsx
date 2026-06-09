@@ -21,6 +21,7 @@ import AdminPagesPage from "../pages/admin/content/pages/page";
 import AdminArtistsPage from "../pages/admin/registry/artists/page";
 import AdminTracksPage from "../pages/admin/registry/tracks/page";
 import AdminReleasesPage from "../pages/admin/registry/releases/page";
+import AdminRegistryReleaseShells from "../pages/admin/registry/release-shells/page";
 import AdminLabelsPage from "../pages/admin/registry/labels/page";
 import AdminGenresPage from "../pages/admin/registry/genres/page";
 import AdminMediaLibraryPage from "../pages/admin/media/library/page";
@@ -211,6 +212,7 @@ const routes: RouteObject[] = [
       { path: "registry/tracks", element: <AdminTracksPage /> },
       { path: "registry/tracks/:slug", element: <AdminTrackDetailPage /> },
       { path: "registry/releases", element: <AdminReleasesPage /> },
+      { path: "registry/release-shells", element: <AdminRegistryReleaseShells /> },
       { path: "registry/releases/:slug", element: <AdminReleaseDetailPage /> },
       { path: "registry/labels", element: <AdminLabelsPage /> },
       { path: "registry/labels/:slug", element: <AdminLabelDetailPage /> },
@@ -238,7 +240,7 @@ const routes: RouteObject[] = [
         { path: "public-api-qa", element: <AdminChartsPublicApiQa /> },
         { path: "review-queue", element: <AdminChartsReviewQueue /> },
         { path: "no-match", element: <AdminChartsNoMatch /> },
-        { path: "release-shells", element: <AdminChartsReleaseShells /> },
+        { path: "release-shells", element: <Navigate to="/admin/registry/release-shells" replace /> },
         { path: "canon-gaps", element: <AdminChartsCanonGaps /> },
         { path: "ingest-runs", element: <AdminChartsIngestRuns /> },
         { path: "ingest-runs/:runId", element: <AdminChartsIngestRunDetail /> },
