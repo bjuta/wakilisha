@@ -12,6 +12,7 @@ import {
   createRegistryEnrichmentPool,
   getReleaseShellCanonicalWriteEvents,
   listReleaseShellEnrichmentContexts,
+  previewApprovedReleaseShellSuggestions,
   updateReleaseShellLifecycleStatus,
   type ReleaseShellLookupInput,
 } from "../registry/enrichment-review-runtime-api";
@@ -231,6 +232,27 @@ async function route(req: http.IncomingMessage, res: http.ServerResponse) {
         action: "canonical-write-audit",
         registryEntityId,
         count: events.length,
+      }));
+    }
+
+
+    if (parts.join("/") === "registry/enrichment-review/release-shells/preview-apply") {
+      if (req.method !== "POST") {
+        return error(res, 405, "method_not_allowed", "Only POST is supported for canonical application preview.");
+      }
+
+      const body = await readJsonBody(req);
+      const registryEntityId = String((body as { registryEntityId?: unknown }).registryEntityId ?? "").trim();
+
+      if (!registryEntityId) {
+        return error(res, 400, "invalid_request", "Expected JSON body with registryEntityId.");
+      }
+
+      const preview = await previewApprovedReleaseShellSuggestions(getEnrichmentPool(), registryEntityId);
+
+      return json(res, 200, envelope(preview, {
+        resource: "registry-enrichment-review",
+        action: "preview-apply-approved-release-shell-suggestions",
       }));
     }
 

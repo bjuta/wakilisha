@@ -7,11 +7,13 @@ import {
   applyApprovedReleaseShellSuggestions,
   getLiveReleaseShellReviewRows,
   getReleaseShellCanonicalWriteAuditEvents,
+  previewApprovedReleaseShellSuggestions,
   updateReleaseShellLifecycleStatus,
 } from "@/services/registry/enrichment-review/client";
 import {
   formatConfidence,
   getReleaseShellEnrichmentContexts,
+  type ApplyApprovedReleaseShellSuggestionsPreview,
   type CanonicalWriteAuditEvent,
   type EnrichmentDecisionStatus,
   type ReleaseShellEnrichmentContext,
@@ -81,6 +83,8 @@ export default function AdminSettingsRegistryReleaseShells() {
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
   const [suggestionDecisions, setSuggestionDecisions] = useState<Record<string, EnrichmentDecisionStatus>>({});
   const [applyingShells, setApplyingShells] = useState<Record<string, boolean>>({});
+  const [previewingShells, setPreviewingShells] = useState<Record<string, boolean>>({});
+  const [applyPreviewByShell, setApplyPreviewByShell] = useState<Record<string, ApplyApprovedReleaseShellSuggestionsPreview>>({});
   const [enrichmentByShell, setEnrichmentByShell] = useState<Record<string, ReleaseShellEnrichmentContext>>({});
   const [auditByShell, setAuditByShell] = useState<Record<string, CanonicalWriteAuditEvent[]>>({});
   const [toast, setToast] = useState<string | null>(null);
@@ -170,6 +174,39 @@ export default function AdminSettingsRegistryReleaseShells() {
   };
 
 
+
+  const previewApprovedSuggestionsForRow = async (row: RegistryReleaseShell) => {
+    const registryEntityId = row.releaseShellId ?? row.id;
+    const context = enrichmentByShell[row.shellKey];
+    const approvedSuggestions = context?.suggestions.filter((suggestion) => getSuggestionStatus(suggestion, suggestionDecisions) === "approved") ?? [];
+
+    if (approvedSuggestions.length === 0) {
+      showToast("No approved suggestions to preview.");
+      return;
+    }
+
+    setPreviewingShells((prev) => ({ ...prev, [row.shellKey]: true }));
+
+    try {
+      const preview = await previewApprovedReleaseShellSuggestions(registryEntityId);
+      setApplyPreviewByShell((prev) => ({ ...prev, [row.shellKey]: preview }));
+      showToast(preview.willCreateCanonicalRelease ? "Preview ready: canonical release will be created." : "Preview ready: existing canonical release will be updated.");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Failed to preview approved suggestions.");
+    } finally {
+      setPreviewingShells((prev) => ({ ...prev, [row.shellKey]: false }));
+    }
+  };
+
+  const cancelApplyPreview = (row: RegistryReleaseShell) => {
+    setApplyPreviewByShell((prev) => {
+      const next = { ...prev };
+      delete next[row.shellKey];
+      return next;
+    });
+  };
+
+
   const applyApprovedSuggestions = async (row: RegistryReleaseShell) => {
     const registryEntityId = row.releaseShellId ?? row.id;
     const context = enrichmentByShell[row.shellKey];
@@ -197,6 +234,12 @@ export default function AdminSettingsRegistryReleaseShells() {
 
       const auditEvents = await getReleaseShellCanonicalWriteAuditEvents(registryEntityId);
       setAuditByShell((prev) => ({ ...prev, [row.shellKey]: auditEvents }));
+
+      setApplyPreviewByShell((prev) => {
+        const next = { ...prev };
+        delete next[row.shellKey];
+        return next;
+      });
 
       showToast(`Applied ${result.applied.length} approved suggestion(s) to canonical release.`);
       await load();
@@ -483,11 +526,11 @@ export default function AdminSettingsRegistryReleaseShells() {
                                   <p><span className="font-semibold text-[var(--wk-text)]">Lifecycle:</span> {lifecycleStatus}</p>
                                   <p><span className="font-semibold text-[var(--wk-text)]">Canonical writes:</span> controlled apply enabled</p>
                                   <button
-                                    onClick={() => applyApprovedSuggestions(row)}
-                                    disabled={suggestionGroups.approved.length === 0 || applyingShells[row.shellKey]}
+                                    onClick={() => previewApprovedSuggestionsForRow(row)}
+                                    disabled={suggestionGroups.approved.length === 0 || previewingShells[row.shellKey] || applyingShells[row.shellKey]}
                                     className="wk-button wk-button-sm wk-button-primary justify-center disabled:cursor-not-allowed disabled:opacity-50"
                                   >
-                                    {applyingShells[row.shellKey] ? "Applying…" : `Apply approved (${suggestionGroups.approved.length})`}
+                                    {previewingShells[row.shellKey] ? "Previewing…" : `Preview apply (${suggestionGroups.approved.length})`}
                                   </button>
                                   {lifecycleStatus === "resolved" ? (
                                     <button
@@ -507,6 +550,70 @@ export default function AdminSettingsRegistryReleaseShells() {
                                   )}
                                 </div>
                               </div>
+
+                              {applyPreview && (
+                                <div className="mt-4 rounded-xl border border-[var(--wk-border-strong)] bg-[var(--wk-bg)] p-3">
+                                  <div className="mb-3 flex flex-col gap-1">
+                                    <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--wk-text-muted)]">Pre-apply preview</p>
+                                    <p className="text-[12px] text-[var(--wk-text-muted)]">
+                                      {applyPreview.willCreateCanonicalRelease
+                                        ? "This will create a new canonical registry release, then apply writable approved fields."
+                                        : "This will update the existing canonical registry release."}
+                                    </p>
+                                  </div>
+
+                                  <div className="space-y-2">
+                                    {applyPreview.writable.map((item) => (
+                                      <div key={item.suggestionId} className="rounded-lg border border-[var(--wk-border)] bg-[var(--wk-surface)] p-2">
+                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                          <span className="text-[11px] font-bold text-[var(--wk-text)]">{item.fieldName}</span>
+                                          <span className="text-[10px] font-semibold text-[var(--wk-success)]">will write</span>
+                                        </div>
+                                        <p className="mt-1 text-[10px] text-[var(--wk-text-faint)]">{item.targetPath}</p>
+                                        <div className="mt-2 grid gap-2 text-[11px] md:grid-cols-2">
+                                          <div>
+                                            <p className="font-semibold text-[var(--wk-text-muted)]">Current</p>
+                                            <p className="break-words text-[var(--wk-text)]">{item.currentValue || "empty"}</p>
+                                          </div>
+                                          <div>
+                                            <p className="font-semibold text-[var(--wk-text-muted)]">Proposed</p>
+                                            <p className="break-words text-[var(--wk-text)]">{item.proposedValue || "empty"}</p>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ))}
+
+                                    {applyPreview.skipped.length > 0 && (
+                                      <div className="rounded-lg border border-[var(--wk-border)] bg-[var(--wk-surface)] p-2">
+                                        <p className="text-[11px] font-bold text-[var(--wk-warning)]">Skipped / unmapped</p>
+                                        <div className="mt-2 space-y-1">
+                                          {applyPreview.skipped.map((item) => (
+                                            <p key={item.suggestionId} className="text-[10px] text-[var(--wk-text-muted)]">
+                                              {item.fieldName}: {item.reason ?? "Not writable"}
+                                            </p>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  <div className="mt-3 flex flex-wrap gap-2">
+                                    <button
+                                      onClick={() => applyApprovedSuggestions(row)}
+                                      disabled={applyPreview.writable.length === 0 || applyingShells[row.shellKey]}
+                                      className="wk-button wk-button-sm wk-button-primary justify-center disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                      {applyingShells[row.shellKey] ? "Applying…" : `Confirm apply (${applyPreview.writable.length})`}
+                                    </button>
+                                    <button
+                                      onClick={() => cancelApplyPreview(row)}
+                                      className="wk-button wk-button-sm wk-button-ghost justify-center"
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
 
                               {auditEvents.length > 0 && (
                                 <div className="mt-4 border-t border-[var(--wk-border)] pt-3">

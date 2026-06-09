@@ -326,6 +326,26 @@ export interface ApplyApprovedReleaseShellSuggestionsResult {
   failed: Array<{ registryEntityId: string; reason: string }>;
 }
 
+
+export interface ApplyApprovedReleaseShellSuggestionPreviewItem {
+  suggestionId: string;
+  fieldName: string;
+  targetPath: string;
+  currentValue: string | null;
+  proposedValue: string;
+  writable: boolean;
+  reason: string | null;
+}
+
+export interface ApplyApprovedReleaseShellSuggestionsPreview {
+  registryEntityId: string;
+  canonicalReleaseExists: boolean;
+  willCreateCanonicalRelease: boolean;
+  writable: ApplyApprovedReleaseShellSuggestionPreviewItem[];
+  skipped: ApplyApprovedReleaseShellSuggestionPreviewItem[];
+}
+
+
 export interface CanonicalWriteAuditEvent {
   id: string;
   registryEntityType: string;
@@ -622,6 +642,123 @@ export async function getReleaseShellCanonicalWriteEvents(
 
   return result.rows as CanonicalWriteAuditEvent[];
 }
+
+
+async function readCanonicalReleaseValue(
+  queryable: PgQueryable,
+  registryEntityId: string,
+  fieldName: string,
+  targetColumn: string | undefined,
+): Promise<string | null> {
+  if (targetColumn) {
+    const result = await queryable.query(
+      `select ${targetColumn}::text as "currentValue" from public.registry_releases where id::text = $1 limit 1`,
+      [registryEntityId],
+    );
+
+    return result.rows[0]?.currentValue ?? null;
+  }
+
+  if (METADATA_RELEASE_FIELDS.has(fieldName)) {
+    const result = await queryable.query(
+      `
+        select metadata->>$2 as "currentValue"
+        from public.registry_releases
+        where id::text = $1
+        limit 1
+      `,
+      [registryEntityId, fieldName],
+    );
+
+    return result.rows[0]?.currentValue ?? null;
+  }
+
+  return null;
+}
+
+export async function previewApprovedReleaseShellSuggestions(
+  pool: PgPool,
+  registryEntityId: string,
+): Promise<ApplyApprovedReleaseShellSuggestionsPreview> {
+  const cleanRegistryEntityId = String(registryEntityId || "").trim();
+
+  if (!cleanRegistryEntityId) {
+    throw new Error("Missing registryEntityId.");
+  }
+
+  const releaseCheck = await pool.query(
+    `
+      select id::text as id
+      from public.registry_releases
+      where id::text = $1
+      limit 1
+    `,
+    [cleanRegistryEntityId],
+  );
+
+  const canonicalReleaseExists = (releaseCheck.rowCount ?? 0) > 0;
+
+  const suggestions = await pool.query(
+    `
+      select
+        id::text as "id",
+        field_name as "fieldName",
+        suggested_value as "suggestedValue"
+      from public.registry_enrichment_suggestions
+      where registry_entity_type = 'release'
+        and registry_entity_id::text = $1
+        and decision_status = 'approved'
+      order by confidence_score desc nulls last, created_at asc
+    `,
+    [cleanRegistryEntityId],
+  );
+
+  const writable: ApplyApprovedReleaseShellSuggestionPreviewItem[] = [];
+  const skipped: ApplyApprovedReleaseShellSuggestionPreviewItem[] = [];
+
+  for (const suggestion of suggestions.rows) {
+    const suggestionId = String(suggestion.id);
+    const fieldName = String(suggestion.fieldName || "").trim();
+    const proposedValue = suggestion.suggestedValue === null || suggestion.suggestedValue === undefined
+      ? ""
+      : String(suggestion.suggestedValue);
+
+    const targetColumn = DIRECT_RELEASE_FIELD_MAP[fieldName];
+    const isMetadataField = METADATA_RELEASE_FIELDS.has(fieldName);
+    const isWritable = Boolean(targetColumn || isMetadataField);
+    const targetPath = targetColumn
+      ? `registry_releases.${targetColumn}`
+      : isMetadataField
+        ? `registry_releases.metadata.${fieldName}`
+        : "unmapped";
+
+    const currentValue = canonicalReleaseExists
+      ? await readCanonicalReleaseValue(pool, cleanRegistryEntityId, fieldName, targetColumn)
+      : null;
+
+    const item: ApplyApprovedReleaseShellSuggestionPreviewItem = {
+      suggestionId,
+      fieldName,
+      targetPath,
+      currentValue,
+      proposedValue,
+      writable: isWritable,
+      reason: isWritable ? null : "Field is not in the canonical write allowlist.",
+    };
+
+    if (isWritable) writable.push(item);
+    else skipped.push(item);
+  }
+
+  return {
+    registryEntityId: cleanRegistryEntityId,
+    canonicalReleaseExists,
+    willCreateCanonicalRelease: !canonicalReleaseExists,
+    writable,
+    skipped,
+  };
+}
+
 
 export async function applyApprovedReleaseShellSuggestions(
   pool: PgPool,
