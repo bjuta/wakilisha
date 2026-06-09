@@ -39,10 +39,18 @@ export interface ProviderEntityLinkReviewItem {
   createdAt?: string | null;
 }
 
+export interface ReleaseShellLifecycleSnapshot {
+  status: "open" | "resolved" | "reopened";
+  reason: string | null;
+  actor: string;
+  createdAt: string | null;
+}
+
 export interface ReleaseShellEnrichmentContext {
   shellKey: string;
   registryEntityId: string;
   dataSource: "runtime_api" | "fallback";
+  lifecycle: ReleaseShellLifecycleSnapshot;
   observations: ProviderFieldObservationReviewItem[];
   suggestions: RegistryEnrichmentSuggestionReviewItem[];
   providerLinks: ProviderEntityLinkReviewItem[];
@@ -108,11 +116,12 @@ function extractContexts(payload: RuntimeApiResponse): ReleaseShellEnrichmentCon
   return payload.contexts ?? payload.data?.contexts ?? [];
 }
 
-export async function getLiveReleaseShellReviewRows(): Promise<{
+export async function getLiveReleaseShellReviewRows(options: { includeResolved?: boolean } = {}): Promise<{
   shells: RegistryReleaseShellReviewRow[];
   contexts: Record<string, ReleaseShellEnrichmentContext>;
 }> {
-  const response = await fetch(RUNTIME_API_PATH, { method: "GET" });
+  const query = options.includeResolved ? "?includeResolved=1" : "";
+  const response = await fetch(`${RUNTIME_API_PATH}${query}`, { method: "GET" });
   if (!response.ok) {
     return { shells: [], contexts: {} };
   }
@@ -208,6 +217,37 @@ export async function applyApprovedReleaseShellSuggestions(
   return result as ApplyApprovedReleaseShellSuggestionsResult;
 }
 
+
+
+
+export async function updateReleaseShellLifecycleStatus(
+  registryEntityId: string,
+  status: "resolved" | "reopened",
+  reason = "",
+): Promise<ReleaseShellLifecycleSnapshot> {
+  const response = await fetch(`${RUNTIME_API_PATH}/${encodeURIComponent(registryEntityId)}/lifecycle`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status, reason }),
+  });
+
+  const payload = (await response.json()) as {
+    data?: {
+      lifecycle?: ReleaseShellLifecycleSnapshot;
+    };
+    lifecycle?: ReleaseShellLifecycleSnapshot;
+    message?: string;
+  };
+
+  if (!response.ok) {
+    throw new Error(payload.message ?? "Failed to update release shell lifecycle.");
+  }
+
+  const lifecycle = payload.data?.lifecycle ?? payload.lifecycle;
+  if (!lifecycle) throw new Error("Lifecycle update returned no lifecycle payload.");
+
+  return lifecycle;
+}
 
 
 export async function getReleaseShellCanonicalWriteAuditEvents(

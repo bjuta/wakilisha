@@ -12,10 +12,18 @@ export interface ReleaseShellLookupInput {
   confidenceScore?: number;
 }
 
+export interface ReleaseShellLifecycleSnapshot {
+  status: "open" | "resolved" | "reopened";
+  reason: string | null;
+  actor: string;
+  createdAt: string | null;
+}
+
 export interface ReleaseShellEnrichmentContextResponse {
   shellKey: string;
   registryEntityId: string;
   dataSource: "runtime_api";
+  lifecycle: ReleaseShellLifecycleSnapshot;
   observations: Row[];
   suggestions: Row[];
   providerLinks: Row[];
@@ -69,9 +77,113 @@ export function createRegistryEnrichmentPool(): PgPool {
   });
 }
 
+
+async function ensureReleaseShellLifecycleTable(queryable: PgQueryable): Promise<void> {
+  await queryable.query(`
+    create table if not exists public.registry_release_shell_lifecycle_events (
+      id uuid primary key default gen_random_uuid(),
+      registry_entity_type text not null default 'release',
+      registry_entity_id text not null,
+      status text not null,
+      reason text,
+      actor text not null default 'system',
+      created_at timestamptz not null default now()
+    )
+  `);
+
+  await queryable.query(`
+    create index if not exists registry_release_shell_lifecycle_events_entity_idx
+    on public.registry_release_shell_lifecycle_events (registry_entity_type, registry_entity_id, created_at desc)
+  `);
+}
+
+async function getReleaseShellLifecycleSnapshots(
+  queryable: PgQueryable,
+  registryEntityIds: string[],
+): Promise<Map<string, ReleaseShellLifecycleSnapshot>> {
+  await ensureReleaseShellLifecycleTable(queryable);
+
+  if (registryEntityIds.length === 0) return new Map();
+
+  const result = await queryable.query(
+    `
+      select distinct on (registry_entity_id)
+        registry_entity_id::text as "registryEntityId",
+        status,
+        reason,
+        actor,
+        created_at as "createdAt"
+      from public.registry_release_shell_lifecycle_events
+      where registry_entity_type = 'release'
+        and registry_entity_id::text = any($1::text[])
+      order by registry_entity_id, created_at desc
+    `,
+    [registryEntityIds],
+  );
+
+  return new Map(
+    result.rows.map((row) => [
+      String(row.registryEntityId),
+      {
+        status: String(row.status || "open") as ReleaseShellLifecycleSnapshot["status"],
+        reason: row.reason === null || row.reason === undefined ? null : String(row.reason),
+        actor: String(row.actor || "system"),
+        createdAt: row.createdAt ? String(row.createdAt) : null,
+      },
+    ]),
+  );
+}
+
+export async function updateReleaseShellLifecycleStatus(
+  pool: PgPool,
+  registryEntityId: string,
+  status: "resolved" | "reopened",
+  reason = "",
+): Promise<ReleaseShellLifecycleSnapshot> {
+  const cleanRegistryEntityId = String(registryEntityId || "").trim();
+
+  if (!cleanRegistryEntityId) {
+    throw new Error("Missing registryEntityId.");
+  }
+
+  await ensureReleaseShellLifecycleTable(pool);
+
+  const actor = process.env.WAKILISHA_CANONICAL_WRITE_ACTOR ?? "system";
+
+  const result = await pool.query(
+    `
+      insert into public.registry_release_shell_lifecycle_events (
+        registry_entity_type,
+        registry_entity_id,
+        status,
+        reason,
+        actor
+      )
+      values ('release', $1, $2, nullif($3, ''), $4)
+      returning
+        status,
+        reason,
+        actor,
+        created_at as "createdAt"
+    `,
+    [cleanRegistryEntityId, status, reason, actor],
+  );
+
+  const row = result.rows[0] ?? {};
+
+  return {
+    status: String(row.status || status) as ReleaseShellLifecycleSnapshot["status"],
+    reason: row.reason === null || row.reason === undefined ? null : String(row.reason),
+    actor: String(row.actor || actor),
+    createdAt: row.createdAt ? String(row.createdAt) : null,
+  };
+}
+
+
 export async function listReleaseShellEnrichmentContexts(
   pool: PgPool,
   limit = 50,
+  includeResolved = false,
 ): Promise<ReleaseShellEnrichmentContextResponse[]> {
   const result = await pool.query(
     `
@@ -107,7 +219,8 @@ export async function listReleaseShellEnrichmentContexts(
     confidenceScore: Number(row.confidenceScore ?? 0.8),
   }));
 
-  return buildReleaseShellEnrichmentContexts(pool, shells);
+  const contexts = await buildReleaseShellEnrichmentContexts(pool, shells);
+  return includeResolved ? contexts : contexts.filter((context) => context.lifecycle.status !== "resolved");
 }
 
 export async function buildReleaseShellEnrichmentContexts(
@@ -186,11 +299,18 @@ export async function buildReleaseShellEnrichmentContexts(
   const observationsByEntity = groupBy(observationsResult.rows, "providerItemId");
   const suggestionsByEntity = groupBy(suggestionsResult.rows, "registryEntityId");
   const linksByEntity = groupBy(linksResult.rows, "registryEntityId");
+  const lifecycleByEntity = await getReleaseShellLifecycleSnapshots(pool, registryEntityIds);
 
   return normalized.map((shell) => ({
     shellKey: shell.shellKey,
     registryEntityId: shell.registryEntityId,
     dataSource: "runtime_api" as const,
+    lifecycle: lifecycleByEntity.get(shell.registryEntityId) ?? {
+      status: "open" as const,
+      reason: null,
+      actor: "system",
+      createdAt: null,
+    },
     observations: observationsByEntity.get(shell.registryEntityId) ?? [],
     suggestions: suggestionsByEntity.get(shell.registryEntityId) ?? [],
     providerLinks: linksByEntity.get(shell.registryEntityId) ?? [],

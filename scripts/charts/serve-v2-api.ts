@@ -12,6 +12,7 @@ import {
   createRegistryEnrichmentPool,
   getReleaseShellCanonicalWriteEvents,
   listReleaseShellEnrichmentContexts,
+  updateReleaseShellLifecycleStatus,
   type ReleaseShellLookupInput,
 } from "../registry/enrichment-review-runtime-api";
 
@@ -180,6 +181,36 @@ async function route(req: http.IncomingMessage, res: http.ServerResponse) {
 
 
 
+
+    if (
+      parts.length === 5 &&
+      parts[0] === "registry" &&
+      parts[1] === "enrichment-review" &&
+      parts[2] === "release-shells" &&
+      parts[4] === "lifecycle"
+    ) {
+      if (req.method !== "POST") {
+        return error(res, 405, "method_not_allowed", "Only POST is supported for release shell lifecycle updates.");
+      }
+
+      const registryEntityId = parts[3];
+      const body = await readJsonBody(req);
+      const status = String((body as { status?: unknown }).status ?? "").trim();
+      const reason = String((body as { reason?: unknown }).reason ?? "").trim();
+
+      if (status !== "resolved" && status !== "reopened") {
+        return error(res, 400, "invalid_request", "Expected lifecycle status to be resolved or reopened.");
+      }
+
+      const lifecycle = await updateReleaseShellLifecycleStatus(getEnrichmentPool(), registryEntityId, status, reason);
+
+      return json(res, 200, envelope({ lifecycle }, {
+        resource: "registry-enrichment-review",
+        action: "release-shell-lifecycle",
+        registryEntityId,
+      }));
+    }
+
     if (
       parts.length === 5 &&
       parts[0] === "registry" &&
@@ -227,7 +258,8 @@ async function route(req: http.IncomingMessage, res: http.ServerResponse) {
     if (parts.join("/") === "registry/enrichment-review/release-shells") {
       if (req.method === "GET") {
         const limit = Math.min(Number(url.searchParams.get("limit") ?? 50) || 50, 200);
-        const contexts = await listReleaseShellEnrichmentContexts(getEnrichmentPool(), limit);
+        const includeResolved = url.searchParams.get("includeResolved") === "1";
+        const contexts = await listReleaseShellEnrichmentContexts(getEnrichmentPool(), limit, includeResolved);
         return json(res, 200, envelope({ contexts }, { resource: "registry-enrichment-review", count: contexts.length }));
       }
 
