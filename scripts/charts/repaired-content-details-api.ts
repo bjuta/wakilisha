@@ -1,9 +1,7 @@
 import pg from "pg";
 
-const ARTICLE_MEDIA_BASE = (
-  process.env.WAKILISHA_ARTICLE_MEDIA_BASE ||
-  ARTICLE_MEDIA_BASE
-).replace(/\/?$/, "/");
+const ARTICLE_MEDIA_BASE_FALLBACK = "https://pgzizndxdyhqmtyywjmt.supabase.co/storage/v1/object/public/article-media/wp-import/";
+const ARTICLE_MEDIA_BASE = (process.env.WAKILISHA_ARTICLE_MEDIA_BASE || ARTICLE_MEDIA_BASE_FALLBACK).replace(/\/?$/, "/");
 
 
 function normalizeLegacyWpMediaUrl(url: string): string {
