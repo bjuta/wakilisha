@@ -22,12 +22,44 @@ interface RegistryReleaseShell extends IngestResolvedRow {
 
 type ShellReviewState = "pending" | "reviewing" | "approved" | "rejected";
 type LocalSuggestionDecision = Extract<EnrichmentDecisionStatus, "approved" | "rejected" | "needs_review">;
+type SuggestionLaneKey = "pending" | "needsReview" | "approved" | "rejected" | "other";
 
 function getSuggestionStatus(
   suggestion: RegistryEnrichmentSuggestionReviewItem,
   overrides: Record<string, EnrichmentDecisionStatus>,
 ): EnrichmentDecisionStatus {
   return overrides[suggestion.id] ?? suggestion.decisionStatus;
+}
+
+function groupSuggestionsByDecision(
+  suggestions: RegistryEnrichmentSuggestionReviewItem[],
+  overrides: Record<string, EnrichmentDecisionStatus>,
+): Record<SuggestionLaneKey, RegistryEnrichmentSuggestionReviewItem[]> {
+  return suggestions.reduce<Record<SuggestionLaneKey, RegistryEnrichmentSuggestionReviewItem[]>>(
+    (groups, suggestion) => {
+      const status = getSuggestionStatus(suggestion, overrides);
+
+      if (status === "draft") groups.pending.push(suggestion);
+      else if (status === "needs_review") groups.needsReview.push(suggestion);
+      else if (status === "approved") groups.approved.push(suggestion);
+      else if (status === "rejected") groups.rejected.push(suggestion);
+      else groups.other.push(suggestion);
+
+      return groups;
+    },
+    { pending: [], needsReview: [], approved: [], rejected: [], other: [] },
+  );
+}
+
+function getStatusPillClass(status: EnrichmentDecisionStatus): string {
+  if (status === "approved") return "bg-[var(--wk-success-soft)] text-[var(--wk-success)]";
+  if (status === "rejected") return "bg-[var(--wk-danger-soft)] text-[var(--wk-danger)]";
+  if (status === "needs_review") return "bg-[var(--wk-warning-soft)] text-[var(--wk-warning)]";
+  return "bg-[var(--wk-surface-raised)] text-[var(--wk-text-muted)]";
+}
+
+function formatDecisionStatus(status: EnrichmentDecisionStatus): string {
+  return status.replace(/_/g, " ");
 }
 
 export default function AdminSettingsRegistryReleaseShells() {
@@ -128,6 +160,8 @@ export default function AdminSettingsRegistryReleaseShells() {
 
   const allSuggestions = Object.values(enrichmentByShell).flatMap((context) => context.suggestions);
   const suggestionCount = allSuggestions.length;
+  const pendingSuggestionCount = allSuggestions.filter((suggestion) => getSuggestionStatus(suggestion, suggestionDecisions) === "draft").length;
+  const needsReviewSuggestionCount = allSuggestions.filter((suggestion) => getSuggestionStatus(suggestion, suggestionDecisions) === "needs_review").length;
   const approvedSuggestionCount = allSuggestions.filter((suggestion) => getSuggestionStatus(suggestion, suggestionDecisions) === "approved").length;
   const rejectedSuggestionCount = allSuggestions.filter((suggestion) => getSuggestionStatus(suggestion, suggestionDecisions) === "rejected").length;
   const avgConfidence = shells.length > 0 ? Math.round(shells.reduce((sum, row) => sum + row.confidence, 0) / shells.length) : 0;
@@ -140,6 +174,39 @@ export default function AdminSettingsRegistryReleaseShells() {
   const decideSuggestion = (suggestion: RegistryEnrichmentSuggestionReviewItem, decision: LocalSuggestionDecision) => {
     setSuggestionDecisions((prev) => ({ ...prev, [suggestion.id]: decision }));
     showToast(`${suggestion.fieldName} suggestion marked ${decision}`);
+  };
+
+  const renderSuggestionCard = (
+    suggestion: RegistryEnrichmentSuggestionReviewItem,
+    options: { readOnly?: boolean; allowNeedsReview?: boolean } = {},
+  ) => {
+    const status = getSuggestionStatus(suggestion, suggestionDecisions);
+    const readOnly = options.readOnly ?? false;
+    const allowNeedsReview = options.allowNeedsReview ?? true;
+
+    return (
+      <div key={suggestion.id} className={`rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] p-3 ${readOnly ? "opacity-80" : ""}`}>
+        <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-[13px] font-bold text-[var(--wk-text)]">{suggestion.fieldName}</p>
+              <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${getStatusPillClass(status)}`}>
+                {formatDecisionStatus(status)}
+              </span>
+            </div>
+            <p className="mt-1 text-[12px] text-[var(--wk-text-muted)]">Suggested: <span className="font-semibold text-[var(--wk-text)]">{suggestion.suggestedValue}</span></p>
+            <p className="text-[11px] text-[var(--wk-text-faint)]">Current: {suggestion.currentValue ?? "empty"} · {formatConfidence(suggestion.confidenceScore)}</p>
+          </div>
+          {!readOnly && (
+            <div className="flex flex-wrap gap-1">
+              {status !== "approved" && <button onClick={() => decideSuggestion(suggestion, "approved")} className="rounded px-2 py-1 text-[11px] font-semibold text-[var(--wk-brand)] hover:bg-[var(--wk-brand-soft)]">Approve</button>}
+              {allowNeedsReview && status !== "needs_review" && <button onClick={() => decideSuggestion(suggestion, "needs_review")} className="rounded px-2 py-1 text-[11px] font-semibold text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)]">Needs review</button>}
+              {status !== "rejected" && <button onClick={() => decideSuggestion(suggestion, "rejected")} className="rounded px-2 py-1 text-[11px] font-semibold text-[var(--wk-danger)] hover:bg-[var(--wk-danger-soft)]">Reject</button>}
+            </div>
+          )}
+        </div>
+      </div>
+    );
   };
 
   if (loading) {
@@ -204,8 +271,9 @@ export default function AdminSettingsRegistryReleaseShells() {
           <p className="mt-1 text-[26px] font-black text-[var(--wk-text)]">{pendingCount}</p>
         </WkSurface>
         <WkSurface className="p-4">
-          <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--wk-text-muted)]">Suggestions</p>
-          <p className="mt-1 text-[26px] font-black text-[var(--wk-text)]">{suggestionCount}</p>
+          <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--wk-text-muted)]">Pending suggestions</p>
+          <p className="mt-1 text-[26px] font-black text-[var(--wk-text)]">{pendingSuggestionCount}</p>
+          {needsReviewSuggestionCount > 0 && <p className="mt-1 text-[11px] font-semibold text-[var(--wk-warning)]">{needsReviewSuggestionCount} needs review</p>}
         </WkSurface>
         <WkSurface className="p-4">
           <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--wk-text-muted)]">Approved / rejected</p>
@@ -253,10 +321,9 @@ export default function AdminSettingsRegistryReleaseShells() {
                 const isExpanded = expandedRows[row.shellKey] ?? false;
                 const context = enrichmentByShell[row.shellKey];
                 const suggestions = context?.suggestions ?? [];
-                const pendingSuggestions = suggestions.filter((suggestion) => {
-                  const status = getSuggestionStatus(suggestion, suggestionDecisions);
-                  return status === "draft" || status === "needs_review";
-                }).length;
+                const suggestionGroups = groupSuggestionsByDecision(suggestions, suggestionDecisions);
+                const completedSuggestionCount = suggestionGroups.approved.length + suggestionGroups.rejected.length;
+                const shellSuggestionsComplete = suggestions.length > 0 && suggestionGroups.pending.length === 0 && suggestionGroups.needsReview.length === 0;
 
                 return (
                   <Fragment key={row.shellKey}>
@@ -288,7 +355,15 @@ export default function AdminSettingsRegistryReleaseShells() {
                         </button>
                       </td>
                       <td className="px-4 py-3"><span className="inline-flex rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface-raised)] px-2 py-0.5 text-[11px] font-semibold text-[var(--wk-text-soft)]">{row.confidence}%</span></td>
-                      <td className="px-4 py-3"><span className="inline-flex rounded-full bg-[var(--wk-brand-soft)] px-2 py-0.5 text-[11px] font-semibold text-[var(--wk-brand)]">{pendingSuggestions}/{suggestions.length} pending</span></td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-col gap-1">
+                          <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${shellSuggestionsComplete ? "bg-[var(--wk-success-soft)] text-[var(--wk-success)]" : "bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]"}`}>
+                            {shellSuggestionsComplete ? "Review complete" : `${suggestionGroups.pending.length}/${suggestions.length} pending`}
+                          </span>
+                          {suggestionGroups.needsReview.length > 0 && <span className="text-[10px] font-semibold text-[var(--wk-warning)]">{suggestionGroups.needsReview.length} needs review</span>}
+                          {completedSuggestionCount > 0 && <span className="text-[10px] font-semibold text-[var(--wk-text-muted)]">{completedSuggestionCount} reviewed</span>}
+                        </div>
+                      </td>
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap gap-1">
                           {state === "approved" || state === "rejected" ? (
@@ -310,30 +385,47 @@ export default function AdminSettingsRegistryReleaseShells() {
                           <div className="grid gap-3 lg:grid-cols-[1.2fr_1fr]">
                             <div className="rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4">
                               <div className="mb-3 flex items-center justify-between">
-                                <p className="text-[12px] font-bold uppercase tracking-wide text-[var(--wk-text-muted)]">Enrichment suggestions</p>
+                                <div>
+                                  <p className="text-[12px] font-bold uppercase tracking-wide text-[var(--wk-text-muted)]">Enrichment suggestions</p>
+                                  <p className="mt-1 text-[11px] text-[var(--wk-text-faint)]">Acted-on suggestions move out of the active pending list into their review lanes.</p>
+                                </div>
                                 <span className="text-[11px] font-semibold text-[var(--wk-text-muted)]">{context?.dataSource === "runtime_api" ? "Live staging data" : "Fallback context"}</span>
                               </div>
 
-                              <div className="space-y-2">
-                                {suggestions.map((suggestion) => {
-                                  const status = getSuggestionStatus(suggestion, suggestionDecisions);
-                                  return (
-                                    <div key={suggestion.id} className="rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] p-3">
-                                      <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-                                        <div>
-                                          <p className="text-[13px] font-bold text-[var(--wk-text)]">{suggestion.fieldName}</p>
-                                          <p className="mt-1 text-[12px] text-[var(--wk-text-muted)]">Suggested: <span className="font-semibold text-[var(--wk-text)]">{suggestion.suggestedValue}</span></p>
-                                          <p className="text-[11px] text-[var(--wk-text-faint)]">Current: {suggestion.currentValue ?? "empty"} · {formatConfidence(suggestion.confidenceScore)} · Status: {status}</p>
-                                        </div>
-                                        <div className="flex flex-wrap gap-1">
-                                          <button onClick={() => decideSuggestion(suggestion, "approved")} className="rounded px-2 py-1 text-[11px] font-semibold text-[var(--wk-brand)] hover:bg-[var(--wk-brand-soft)]">Approve</button>
-                                          <button onClick={() => decideSuggestion(suggestion, "needs_review")} className="rounded px-2 py-1 text-[11px] font-semibold text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)]">Needs review</button>
-                                          <button onClick={() => decideSuggestion(suggestion, "rejected")} className="rounded px-2 py-1 text-[11px] font-semibold text-[var(--wk-danger)] hover:bg-[var(--wk-danger-soft)]">Reject</button>
-                                        </div>
-                                      </div>
+                              <div className="space-y-4">
+                                <div>
+                                  <div className="mb-2 flex items-center justify-between">
+                                    <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--wk-text-muted)]">Pending</p>
+                                    <span className="text-[11px] font-semibold text-[var(--wk-text-muted)]">{suggestionGroups.pending.length}</span>
+                                  </div>
+                                  {suggestionGroups.pending.length > 0 ? (
+                                    <div className="space-y-2">{suggestionGroups.pending.map((suggestion) => renderSuggestionCard(suggestion))}</div>
+                                  ) : (
+                                    <p className="rounded-lg border border-dashed border-[var(--wk-border)] px-3 py-3 text-[12px] text-[var(--wk-text-muted)]">No pending suggestions in this shell.</p>
+                                  )}
+                                </div>
+
+                                {suggestionGroups.needsReview.length > 0 && (
+                                  <div className="border-t border-[var(--wk-border)] pt-4">
+                                    <div className="mb-2 flex items-center justify-between">
+                                      <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--wk-warning)]">Needs review</p>
+                                      <span className="text-[11px] font-semibold text-[var(--wk-warning)]">{suggestionGroups.needsReview.length}</span>
                                     </div>
-                                  );
-                                })}
+                                    <div className="space-y-2">{suggestionGroups.needsReview.map((suggestion) => renderSuggestionCard(suggestion, { allowNeedsReview: false }))}</div>
+                                  </div>
+                                )}
+
+                                {(suggestionGroups.approved.length > 0 || suggestionGroups.rejected.length > 0 || suggestionGroups.other.length > 0) && (
+                                  <div className="border-t border-[var(--wk-border)] pt-4">
+                                    <div className="mb-2 flex items-center justify-between">
+                                      <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--wk-text-muted)]">Reviewed</p>
+                                      <span className="text-[11px] font-semibold text-[var(--wk-text-muted)]">{completedSuggestionCount + suggestionGroups.other.length}</span>
+                                    </div>
+                                    <div className="space-y-2">
+                                      {[...suggestionGroups.approved, ...suggestionGroups.rejected, ...suggestionGroups.other].map((suggestion) => renderSuggestionCard(suggestion, { readOnly: true }))}
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             </div>
 
