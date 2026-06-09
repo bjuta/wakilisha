@@ -2,8 +2,10 @@ import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
-import { getIngestRuns } from "@/services/chartsIngestion/client";
-import type { IngestResolvedRow, IngestRun } from "@/services/chartsIngestion/ingestStudioTypes";
+import type { IngestResolvedRow } from "@/services/chartsIngestion/ingestStudioTypes";
+import {
+  getLiveReleaseShellReviewRows,
+} from "@/services/registry/enrichment-review/client";
 import {
   formatConfidence,
   getReleaseShellEnrichmentContexts,
@@ -65,7 +67,7 @@ function formatDecisionStatus(status: EnrichmentDecisionStatus): string {
 export default function AdminSettingsRegistryReleaseShells() {
   const navigate = useNavigate();
 
-  const [runs, setRuns] = useState<IngestRun[]>([]);
+  const [shellRows, setShellRows] = useState<RegistryReleaseShell[]>([]);
   const [loading, setLoading] = useState(true);
   const [enrichmentLoading, setEnrichmentLoading] = useState(false);
   const [search, setSearch] = useState("");
@@ -77,7 +79,9 @@ export default function AdminSettingsRegistryReleaseShells() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    setRuns(await getIngestRuns());
+    const { shells: liveShells, contexts } = await getLiveReleaseShellReviewRows();
+    setShellRows(liveShells);
+    setEnrichmentByShell(contexts);
     setLoading(false);
   }, []);
 
@@ -90,54 +94,10 @@ export default function AdminSettingsRegistryReleaseShells() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  const shells = useMemo<RegistryReleaseShell[]>(() => {
-    return runs.flatMap((run) =>
-      run.rows
-        .filter((row) => row.matchStatus === "shell")
-        .map((row, index) => ({
-          ...row,
-          shellKey: `${run.id}:${row.id}:${row.releaseShellId ?? "no-shell-id"}:${index}`,
-          sourceSurface: "charts" as const,
-          sourceRunId: run.id,
-          sourceRunTitle: run.chartTitle,
-          sourceEditionDate: run.editionDate,
-        })),
-    );
-  }, [runs]);
+  const shells = useMemo<RegistryReleaseShell[]>(() => shellRows, [shellRows]);
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function loadEnrichment() {
-      if (shells.length === 0) {
-        setEnrichmentByShell({});
-        return;
-      }
-
-      setEnrichmentLoading(true);
-
-      const contexts = await getReleaseShellEnrichmentContexts(
-        shells.map((row) => ({
-          shellKey: row.shellKey,
-          registryEntityId: row.releaseShellId ?? row.id,
-          title: row.title,
-          artistDisplayName: row.artistNames.join(", "),
-          sourceSurface: row.sourceSurface,
-          confidenceScore: row.confidence,
-        })),
-      );
-
-      if (!cancelled) {
-        setEnrichmentByShell(contexts);
-        setEnrichmentLoading(false);
-      }
-    }
-
-    loadEnrichment();
-
-    return () => {
-      cancelled = true;
-    };
+    setEnrichmentLoading(false);
   }, [shells]);
 
   const filtered = shells.filter((row) => {
