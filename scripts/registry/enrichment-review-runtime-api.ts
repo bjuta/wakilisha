@@ -69,6 +69,47 @@ export function createRegistryEnrichmentPool(): PgPool {
   });
 }
 
+export async function listReleaseShellEnrichmentContexts(
+  pool: PgPool,
+  limit = 50,
+): Promise<ReleaseShellEnrichmentContextResponse[]> {
+  const result = await pool.query(
+    `
+      select
+        registry_entity_id::text as "registryEntityId",
+        max(created_at) as "createdAt",
+        max(confidence_score)::float as "confidenceScore",
+        coalesce(
+          max(suggested_value) filter (where field_name = 'title'),
+          max(suggested_value) filter (where field_name = 'release_title'),
+          registry_entity_id::text
+        ) as "title",
+        coalesce(
+          max(suggested_value) filter (where field_name = 'artist_display_name'),
+          max(suggested_value) filter (where field_name = 'artist_name'),
+          ''
+        ) as "artistDisplayName"
+      from public.registry_enrichment_suggestions
+      where registry_entity_type = 'release'
+      group by registry_entity_id
+      order by max(created_at) desc
+      limit $1::int
+    `,
+    [Math.max(1, Math.min(limit, 200))],
+  );
+
+  const shells = result.rows.map((row) => ({
+    shellKey: String(row.registryEntityId),
+    registryEntityId: String(row.registryEntityId),
+    title: String(row.title ?? row.registryEntityId ?? "Untitled release"),
+    artistDisplayName: String(row.artistDisplayName ?? ""),
+    sourceSurface: "registry_enrichment",
+    confidenceScore: Number(row.confidenceScore ?? 0.8),
+  }));
+
+  return buildReleaseShellEnrichmentContexts(pool, shells);
+}
+
 export async function buildReleaseShellEnrichmentContexts(
   pool: PgPool,
   shells: ReleaseShellLookupInput[],
@@ -89,7 +130,7 @@ export async function buildReleaseShellEnrichmentContexts(
       `
         select
           id::text as "id",
-          provider_item_id as "providerItemId",
+          provider_item_id::text as "providerItemId",
           entity_type as "entityType",
           field_name as "fieldName",
           field_value as "fieldValue",
@@ -98,7 +139,7 @@ export async function buildReleaseShellEnrichmentContexts(
           source_path as "sourcePath",
           created_at as "createdAt"
         from public.provider_field_observations
-        where provider_item_id = any($1::text[])
+        where provider_item_id::text = any($1::text[])
         order by created_at desc, confidence_score desc, field_name asc
       `,
       [registryEntityIds],
@@ -108,16 +149,16 @@ export async function buildReleaseShellEnrichmentContexts(
         select
           id::text as "id",
           registry_entity_type as "registryEntityType",
-          registry_entity_id as "registryEntityId",
+          registry_entity_id::text as "registryEntityId",
           field_name as "fieldName",
           current_value as "currentValue",
           suggested_value as "suggestedValue",
-          provider_item_id as "providerItemId",
+          provider_item_id::text as "providerItemId",
           confidence_score::float as "confidenceScore",
           decision_status as "decisionStatus",
           created_at as "createdAt"
         from public.registry_enrichment_suggestions
-        where registry_entity_id = any($1::text[])
+        where registry_entity_id::text = any($1::text[])
         order by created_at desc, confidence_score desc, field_name asc
       `,
       [registryEntityIds],
@@ -127,7 +168,7 @@ export async function buildReleaseShellEnrichmentContexts(
         select
           id::text as "id",
           registry_entity_type as "registryEntityType",
-          registry_entity_id as "registryEntityId",
+          registry_entity_id::text as "registryEntityId",
           provider,
           provider_entity_id as "providerEntityId",
           provider_url as "providerUrl",
@@ -135,7 +176,7 @@ export async function buildReleaseShellEnrichmentContexts(
           confidence_score::float as "confidenceScore",
           created_at as "createdAt"
         from public.provider_entity_links
-        where registry_entity_id = any($1::text[])
+        where registry_entity_id::text = any($1::text[])
         order by created_at desc, confidence_score desc, provider asc
       `,
       [registryEntityIds],
