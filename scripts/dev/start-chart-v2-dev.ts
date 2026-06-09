@@ -6,7 +6,7 @@ import { setTimeout } from "node:timers/promises";
 const API_PORT = 4176;
 const API_HOST = "127.0.0.1";
 const API_BASE = `http://${API_HOST}:${API_PORT}`;
-const PROXY_PATH = "/__wakilisha-v2-api/wp-json/wakilisha/v2";
+const PROXY_PATH = "/__wakilisha-v2-api/api/v1";
 const VITE_PORT = 5173;
 
 const G = "\x1b[32m";
@@ -32,7 +32,8 @@ function loadDotEnvLocal(): void {
 
     const value = rawValue
       .trim()
-      .replace(/^['"]|['"]$/g, "");
+      .replace(/^[']|[']$/g, "")
+      .replace(/^["]|["]$/g, "");
     process.env[key] = value;
   }
 }
@@ -77,40 +78,19 @@ async function checkDbConnection(): Promise<boolean> {
   }
 }
 
-async function healthCheck(retries = 40, delayMs = 500): Promise<boolean> {
+async function healthCheckWithData(retries = 20, delayMs = 500): Promise<{ ok: boolean; data: { repository?: string; counts?: Record<string, number> } }> {
   for (let i = 0; i < retries; i++) {
     try {
-      const res = await fetch(`${API_BASE}/wp-json/wakilisha/v2/charts/health`, {
-        signal: AbortSignal.timeout(3000),
-      });
-      if (res.ok) return true;
-    } catch {
-      // ignore while the API boots
-    }
-    await setTimeout(delayMs);
-  }
-  return false;
-}
-
-async function healthCheckWithData(retries = 10, delayMs = 500): Promise<{ ok: boolean; data: { repository?: string; counts?: Record<string, number> } }> {
-  for (let i = 0; i < retries; i++) {
-    try {
-      const res = await fetch(`${API_BASE}/wp-json/wakilisha/v2/charts/health`, {
+      const res = await fetch(`${API_BASE}/api/v1/health`, {
         signal: AbortSignal.timeout(5000),
       });
       if (res.ok) {
         const body = (await res.json()) as { data?: { repository?: string; counts?: Record<string, number> } };
         const data = body.data ?? {};
-        const counts = data.counts ?? {};
-        if (counts.programs !== undefined && counts.programs > 0) {
-          return { ok: true, data };
-        }
-        if (data.repository === "json-local") {
-          return { ok: true, data };
-        }
+        if (data.repository) return { ok: true, data };
       }
     } catch {
-      // ignore
+      // ignore while the API boots
     }
     await setTimeout(delayMs);
   }
@@ -122,7 +102,6 @@ async function main(): Promise<void> {
   console.log("\n  WAKILISHA Chart V2 Dev Environment\n");
   console.log("  " + "=".repeat(50) + "\n");
 
-  // [1/5] Check DATABASE_URL
   log("1/5", "Checking DATABASE_URL...");
   if (!process.env.DATABASE_URL) {
     fail("FAIL", "DATABASE_URL is not set.");
@@ -139,7 +118,6 @@ async function main(): Promise<void> {
   }
   ok("OK", "DATABASE_URL present");
 
-  // [2/5] Check database connection
   log("2/5", "Testing database connection...");
   const dbConnected = await checkDbConnection();
   if (!dbConnected) {
@@ -153,7 +131,6 @@ async function main(): Promise<void> {
   }
   ok("OK", "Database connection established");
 
-  // [3/5] Start API
   log("3/5", `Starting V2 API on port ${API_PORT}...`);
   const apiEnv = {
     ...process.env,
@@ -198,7 +175,6 @@ async function main(): Promise<void> {
     }
   });
 
-  // [4/5] Health check with data validation
   log("4/5", "Waiting for API health check...");
   const { ok: healthy, data } = await healthCheckWithData();
   if (!healthy) {
@@ -214,7 +190,6 @@ async function main(): Promise<void> {
   console.log(`  editions: ${counts.editions ?? "?"}`);
   console.log(`  entries: ${counts.entries ?? "?"}`);
 
-  // [5/5] Start Vite
   log("5/5", `Starting Vite dev server on port ${VITE_PORT}...`);
   const viteEnv = {
     ...process.env,
@@ -241,12 +216,11 @@ async function main(): Promise<void> {
   console.log(`\n  ${"=".repeat(50)}\n`);
   console.log(`  Frontend:      http://localhost:${VITE_PORT}/`);
   console.log(`  Charts:        http://localhost:${VITE_PORT}/charts`);
-  console.log(`  Proxy API:     http://localhost:${VITE_PORT}${PROXY_PATH}/charts/health`);
-  console.log(`  Direct API:    ${API_BASE}/wp-json/wakilisha/v2/charts/health`);
-  console.log(`\n  Quick test:    curl -i http://localhost:${VITE_PORT}${PROXY_PATH}/charts/health`);
+  console.log(`  Proxy API:     http://localhost:${VITE_PORT}${PROXY_PATH}/health`);
+  console.log(`  Direct API:    ${API_BASE}/api/v1/health`);
+  console.log(`\n  Quick test:    curl -i http://localhost:${VITE_PORT}${PROXY_PATH}/health`);
   console.log(`\n  Press Ctrl+C to stop.\n`);
 
-  // Graceful shutdown
   const shutdown = (signal: string): void => {
     console.log(`\n${Y}[${signal}]${RESET} Shutting down...`);
     try {
@@ -279,7 +253,7 @@ async function main(): Promise<void> {
   });
 }
 
-main().catch((err: Error) => {
-  console.error(`${R}[FATAL]${RESET}`, err.message);
+main().catch((err) => {
+  fail("FATAL", err instanceof Error ? err.message : String(err));
   process.exit(1);
 });
