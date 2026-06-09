@@ -89,7 +89,8 @@
     "registry:phase5a:provider-intake-schema": "tsx scripts/registry/phase5a-provider-intake-schema.ts",
     "registry:phase5b:provider-intake": "tsx scripts/registry/phase5b-provider-intake-runner.ts",
     "registry:phase7b:apple-music-adapter-test": "tsx scripts/registry/phase7b-apple-music-adapter-test.ts",
-    "registry:phase7b:apple-music-probe": "tsx scripts/registry/phase7b-apple-music-probe.ts"
+    "registry:phase7b:apple-music-probe": "tsx scripts/registry/phase7b-apple-music-probe.ts",
+    "registry:phase8b:provider-enrichment": "tsx scripts/registry/phase8b-provider-enrichment-write-test.ts"
   },
   "type": "module",
   "version": "0.1.0"
