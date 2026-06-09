@@ -85,7 +85,8 @@
     "registry:phase4a:chart-bridge": "tsx scripts/registry/phase4a-chart-ingestion-registry-bridge.ts",
     "registry:phase4a:release-shell-write": "tsx scripts/registry/phase4a-release-shell-write.ts",
     "registry:phase4b:release-shell-public-policy": "tsx scripts/registry/phase4b-release-shell-public-policy.ts",
-    "registry:phase4a6:chart-provisional-write": "tsx scripts/registry/phase4a6-chart-provisional-registry-writes.ts"
+    "registry:phase4a6:chart-provisional-write": "tsx scripts/registry/phase4a6-chart-provisional-registry-writes.ts",
+    "registry:phase5a:provider-intake-schema": "tsx scripts/registry/phase5a-provider-intake-schema.ts"
   },
   "type": "module",
   "version": "0.1.0"
