@@ -86,7 +86,8 @@
     "registry:phase4a:release-shell-write": "tsx scripts/registry/phase4a-release-shell-write.ts",
     "registry:phase4b:release-shell-public-policy": "tsx scripts/registry/phase4b-release-shell-public-policy.ts",
     "registry:phase4a6:chart-provisional-write": "tsx scripts/registry/phase4a6-chart-provisional-registry-writes.ts",
-    "registry:phase5a:provider-intake-schema": "tsx scripts/registry/phase5a-provider-intake-schema.ts"
+    "registry:phase5a:provider-intake-schema": "tsx scripts/registry/phase5a-provider-intake-schema.ts",
+    "registry:phase5b:provider-intake": "tsx scripts/registry/phase5b-provider-intake-runner.ts"
   },
   "type": "module",
   "version": "0.1.0"
