@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
 type LabelRow = {
@@ -12,6 +12,12 @@ type LabelRow = {
 };
 
 type SortMode = "recent" | "name" | "artist_count_low" | "artist_count_high";
+type QualityFilter = "all" | "complete" | "incomplete" | "missing_country" | "missing_artist_count";
+
+type EnrichedLabel = LabelRow & {
+  completeness: number;
+  missingFields: string[];
+};
 
 function getCompleteness(label: LabelRow): number {
   const checks = [
@@ -23,12 +29,27 @@ function getCompleteness(label: LabelRow): number {
   return Math.round((checks.filter(Boolean).length / checks.length) * 100);
 }
 
+function getMissingFields(label: LabelRow): string[] {
+  const missing: string[] = [];
+  if (!label.name) missing.push("name");
+  if (!label.country) missing.push("country");
+  if (!label.artist_count) missing.push("artist_count");
+  if (!label.status) missing.push("status");
+  return missing;
+}
+
+function completenessTone(value: number): string {
+  if (value >= 85) return "bg-emerald-100 text-emerald-700";
+  if (value >= 60) return "bg-amber-100 text-amber-700";
+  return "bg-red-100 text-red-700";
+}
+
 export default function LabelsPage() {
   const [labels, setLabels] = useState<LabelRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-  const [qualityFilter, setQualityFilter] = useState<"all"|"complete"|"incomplete"|"missing_country"|"missing_artist_count">("all");
+  const [qualityFilter, setQualityFilter] = useState<QualityFilter>("all");
   const [sortMode, setSortMode] = useState<SortMode>("recent");
 
   useEffect(() => {
@@ -46,15 +67,10 @@ export default function LabelsPage() {
     fetchLabels();
   }, []);
 
-  const enrichedLabels = useMemo(() => labels.map(l => ({
+  const enrichedLabels = useMemo<EnrichedLabel[]>(() => labels.map(l => ({
     ...l,
     completeness: getCompleteness(l),
-    missingFields: [
-      !l.name && "name",
-      !l.country && "country",
-      !l.artist_count && "artist_count",
-      !l.status && "status"
-    ].filter(Boolean)
+    missingFields: getMissingFields(l)
   })), [labels]);
 
   const summary = useMemo(() => {
@@ -67,18 +83,16 @@ export default function LabelsPage() {
   }, [enrichedLabels]);
 
   const visibleLabels = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-    let rows = enrichedLabels.filter(l => {
-      const searchable = [l.name,l.country,l.status].filter(Boolean).join(" ").toLowerCase();
-      if (normalizedQuery && !searchable.includes(normalizedQuery)) return false;
-      if (qualityFilter==="complete") return l.completeness >= 85;
-      if (qualityFilter==="incomplete") return l.completeness < 85;
-      if (qualityFilter==="missing_country") return !l.country;
-      if (qualityFilter==="missing_artist_count") return !l.artist_count;
+    const q = query.trim().toLowerCase();
+    return enrichedLabels.filter(l => {
+      const searchable = [l.name, l.country, l.status].filter(Boolean).join(" ").toLowerCase();
+      if(q && !searchable.includes(q)) return false;
+      if(qualityFilter === "complete") return l.completeness >= 85;
+      if(qualityFilter === "incomplete") return l.completeness < 85;
+      if(qualityFilter === "missing_country") return !l.country;
+      if(qualityFilter === "missing_artist_count") return !l.artist_count;
       return true;
-    });
-
-    rows = [...rows].sort((a,b)=>{
+    }).sort((a,b)=>{
       if(sortMode==="name") return (a.name||"").localeCompare(b.name||"");
       if(sortMode==="artist_count_low") return (a.artist_count||0)-(b.artist_count||0);
       if(sortMode==="artist_count_high") return (b.artist_count||0)-(a.artist_count||0);
@@ -86,46 +100,18 @@ export default function LabelsPage() {
       const bTime = new Date(b.updated_at||b.created_at||0).getTime();
       return bTime - aTime;
     });
-
-    return rows;
   }, [enrichedLabels, query, qualityFilter, sortMode]);
 
-  if(loading) return <p>Loading labels...</p>;
-  if(error) return <p className="text-red-700">Failed to load labels: {error}</p>;
-
   return (
-    <div className="min-h-screen p-6 bg-[#f7f7f2]">
+    <div className="min-h-screen bg-[#f7f7f2] px-5 py-6 text-[#171712]">
       <header className="mb-4">
         <h1 className="text-3xl font-black">Label Registry</h1>
-        <p className="text-sm text-[#6f7568] mt-1">Review canonical label records, artist roster counts, and metadata completeness.</p>
+        <p className="text-sm text-[#6f7568] mt-1">View label metadata, completeness, and artist roster counts.</p>
       </header>
-
-      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-5 mb-4">
-        <div className="rounded-2xl border bg-white p-4 shadow-sm">
-          <p className="text-xs font-bold uppercase text-[#6f7568]">Loaded</p>
-          <p className="mt-2 text-3xl font-black">{summary.total}</p>
-        </div>
-        <div className="rounded-2xl border bg-white p-4 shadow-sm">
-          <p className="text-xs font-bold uppercase text-[#6f7568]">Avg. completeness</p>
-          <p className="mt-2 text-3xl font-black">{summary.averageCompleteness}%</p>
-        </div>
-        <div className="rounded-2xl border bg-white p-4 shadow-sm">
-          <p className="text-xs font-bold uppercase text-[#6f7568]">Near complete</p>
-          <p className="mt-2 text-3xl font-black">{summary.complete}</p>
-        </div>
-        <div className="rounded-2xl border bg-white p-4 shadow-sm">
-          <p className="text-xs font-bold uppercase text-[#6f7568]">Missing country</p>
-          <p className="mt-2 text-3xl font-black">{summary.missingCountry}</p>
-        </div>
-        <div className="rounded-2xl border bg-white p-4 shadow-sm">
-          <p className="text-xs font-bold uppercase text-[#6f7568]">Missing artist count</p>
-          <p className="mt-2 text-3xl font-black">{summary.missingArtistCount}</p>
-        </div>
-      </section>
 
       <section className="mb-4 flex gap-3">
         <input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search by name, country, or status" className="flex-1 rounded-2xl border p-3"/>
-        <select value={qualityFilter} onChange={e=>setQualityFilter(e.target.value as any)} className="rounded-2xl border p-3 text-sm">
+        <select value={qualityFilter} onChange={e=>setQualityFilter(e.target.value as QualityFilter)} className="rounded-2xl border p-3 text-sm">
           <option value="all">All quality states</option>
           <option value="complete">Near complete</option>
           <option value="incomplete">Incomplete</option>
@@ -140,41 +126,32 @@ export default function LabelsPage() {
         </select>
       </section>
 
-      <section className="overflow-x-auto rounded-3xl border bg-white shadow-sm">
-        <table className="w-full min-w-[800px] text-left text-sm border-collapse">
-          <thead className="bg-[#f0f2ea] text-xs uppercase text-[#6f7568]">
+      <section className="overflow-x-auto rounded-2xl border bg-white shadow-sm">
+        <table className="w-full min-w-[900px] text-left text-sm border-collapse">
+          <thead className="bg-[#fbfcf8] text-[11px] font-black uppercase tracking-wide text-[#71796b]">
             <tr>
-              <th className="px-4 py-3">Name</th>
-              <th className="px-4 py-3">Country</th>
-              <th className="px-4 py-3">Artist Count</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Completeness</th>
-              <th className="px-4 py-3">Missing</th>
+              <th className="px-5 py-4">Name</th>
+              <th className="px-5 py-4">Country</th>
+              <th className="px-5 py-4">Artists</th>
+              <th className="px-5 py-4">Status</th>
+              <th className="px-5 py-4">Completeness</th>
+              <th className="px-5 py-4">Missing</th>
             </tr>
           </thead>
           <tbody>
-            {visibleLabels.map(label => (
-              <tr key={label.id} className="border-t hover:bg-[#fbfbf7]">
-                <td className="px-4 py-4 font-bold">{label.name || "—"}</td>
-                <td className="px-4 py-4">{label.country || "—"}</td>
-                <td className="px-4 py-4">{label.artist_count ?? "—"}</td>
-                <td className="px-4 py-4">{label.status || "unknown"}</td>
-                <td className="px-4 py-4">
-                  <div className="h-2 w-full bg-[#eef1e8] rounded-full">
-                    <div className="h-full rounded-full bg-[#85c441]" style={{width: `${label.completeness}%`}} />
-                  </div>
-                  <span className="text-xs">{label.completeness}%</span>
+            {visibleLabels.map(l => (
+              <tr key={l.id} className="border-b hover:bg-[#fbfcf8]">
+                <td className="px-5 py-4 font-bold">{l.name||"—"}</td>
+                <td className="px-5 py-4">{l.country||"—"}</td>
+                <td className="px-5 py-4">{l.artist_count ?? "—"}</td>
+                <td className="px-5 py-4">{l.status||"unknown"}</td>
+                <td className="px-5 py-4">
+                  <span className={`rounded-full px-2.5 py-1 text-[11px] font-black ${completenessTone(l.completeness)}`}>
+                    {l.completeness}%
+                  </span>
                 </td>
-                <td className="px-4 py-4">
-                  {label.missingFields.length === 0 ? (
-                    <span className="rounded-full bg-green-50 px-2 py-1 text-xs font-bold text-green-700">Clean</span>
-                  ) : (
-                    <div className="flex flex-wrap gap-1">
-                      {label.missingFields.map(f => (
-                        <span key={f} className="rounded-full bg-[#f6f1df] px-2 py-1 text-[11px] font-bold text-[#7b6422]">{f}</span>
-                      ))}
-                    </div>
-                  )}
+                <td className="px-5 py-4">
+                  {l.missingFields.length === 0 ? <span className="text-emerald-700 font-bold">Clean</span> : <span>{l.missingFields.join(", ")}</span>}
                 </td>
               </tr>
             ))}
