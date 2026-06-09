@@ -76,7 +76,7 @@ export class PostgresProviderEnrichmentWriteStore implements ProviderEnrichmentW
               provider_item_id,
               confidence_score,
               decision_status
-            ) values ($1, $2::uuid, $3, $4, $5, $6, $7, $8)
+            ) values ($1, $2, $3, $4, $5, $6, $7, $8)
           `,
           [
             suggestion.registryEntityType,
@@ -113,7 +113,7 @@ export class PostgresProviderEnrichmentWriteStore implements ProviderEnrichmentW
               provider_url,
               match_status,
               confidence_score
-            ) values ($1, $2::uuid, $3, $4, $5, $6, $7)
+            ) values ($1, $2, $3, $4, $5, $6, $7)
           `,
           [
             link.registryEntityType,
