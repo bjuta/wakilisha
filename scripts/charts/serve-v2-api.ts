@@ -6,6 +6,11 @@ import {
 } from "./v2-api-repository";
 import { repairedResponse as publicIndexResponse } from "./repaired-content-api";
 import { repairedDetailResponse as publicDetailResponse } from "./repaired-content-details-api";
+import {
+  buildReleaseShellEnrichmentContexts,
+  createRegistryEnrichmentPool,
+  type ReleaseShellLookupInput,
+} from "../registry/enrichment-review-runtime-api";
 
 type Row = Record<string, unknown>;
 type Entry = {
@@ -24,6 +29,7 @@ type Entry = {
 const port = Number(process.env.WAKILISHA_V2_API_PORT ?? 4176);
 const host = process.env.WAKILISHA_V2_API_HOST;
 const repo = createV2Repository();
+let enrichmentPool: ReturnType<typeof createRegistryEnrichmentPool> | null = null;
 
 function str(row: Row | undefined | null, key: string): string {
   return String(row?.[key] ?? "");
@@ -122,7 +128,7 @@ function json(res: http.ServerResponse, status: number, body: unknown) {
     "content-type": "application/json; charset=utf-8",
     "cache-control": "public, max-age=60, stale-while-revalidate=300",
     "access-control-allow-origin": "*",
-    "access-control-allow-methods": "GET, OPTIONS",
+    "access-control-allow-methods": "GET, POST, OPTIONS",
     "access-control-allow-headers": "Content-Type, Accept",
   });
   res.end(JSON.stringify(body, null, 2));
@@ -132,14 +138,56 @@ function error(res: http.ServerResponse, status: number, code: string, message: 
   json(res, status, { code, message, status, meta });
 }
 
+function getEnrichmentPool(): ReturnType<typeof createRegistryEnrichmentPool> {
+  enrichmentPool ??= createRegistryEnrichmentPool();
+  return enrichmentPool;
+}
+
+async function readJsonBody(req: http.IncomingMessage): Promise<unknown> {
+  const chunks: Buffer[] = [];
+  let size = 0;
+
+  for await (const chunk of req) {
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    size += buffer.length;
+    if (size > 1_000_000) throw new Error("Request body is too large.");
+    chunks.push(buffer);
+  }
+
+  const raw = Buffer.concat(chunks).toString("utf8").trim();
+  if (!raw) return {};
+  return JSON.parse(raw) as unknown;
+}
+
+function isReleaseShellLookupInput(value: unknown): value is ReleaseShellLookupInput {
+  if (!value || typeof value !== "object") return false;
+  const row = value as Record<string, unknown>;
+  return typeof row.shellKey === "string";
+}
+
 async function route(req: http.IncomingMessage, res: http.ServerResponse) {
   try {
     if (req.method === "OPTIONS") return json(res, 200, {});
-    if (req.method !== "GET") return error(res, 405, "method_not_allowed", "Only GET is supported.");
+
     const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
     const prefix = "/api/v1";
     if (!url.pathname.startsWith(prefix)) return error(res, 404, "not_found", "Route not found.");
     const parts = url.pathname.slice(prefix.length).split("/").filter(Boolean).map(decodeURIComponent);
+
+    if (parts.join("/") === "registry/enrichment-review/release-shells") {
+      if (req.method !== "POST") return error(res, 405, "method_not_allowed", "Only POST is supported for registry enrichment review.");
+
+      const body = await readJsonBody(req);
+      const shells = (body as { shells?: unknown }).shells;
+      if (!Array.isArray(shells) || !shells.every(isReleaseShellLookupInput)) {
+        return error(res, 400, "invalid_request", "Expected JSON body with shells: ReleaseShellLookupInput[].");
+      }
+
+      const contexts = await buildReleaseShellEnrichmentContexts(getEnrichmentPool(), shells);
+      return json(res, 200, envelope({ contexts }, { resource: "registry-enrichment-review", count: contexts.length }));
+    }
+
+    if (req.method !== "GET") return error(res, 405, "method_not_allowed", "Only GET is supported.");
 
     if (parts.length === 0 || parts.join("/") === "health") {
       return json(res, 200, envelope({
@@ -230,7 +278,7 @@ async function route(req: http.IncomingMessage, res: http.ServerResponse) {
       }
 
       const methodology = await repo.getMethodology(str(program, "default_methodology_version"));
-      const eligibilityRules = await repo.getEligibilityRules(str(program, "default_eligibility_rules_version"));
+      const eligibilityRules = await repo.getEligibilityRules(str(program, "default_eligibility_version"));
       const sourceCoverage = await repo.listSourceCoverage(str(edition, "id"));
       const warnings = entries.length === 0 ? ["This edition has no chart entries and is marked for content QA review."] : [];
       return json(res, 200, envelope({
