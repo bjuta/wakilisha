@@ -215,6 +215,42 @@ export interface ApplyApprovedReleaseShellSuggestionsResult {
 }
 
 
+
+export interface UpdateReleaseShellSuggestionDecisionResult {
+  suggestionId: string;
+  registryEntityId: string;
+  decisionStatus: Extract<EnrichmentDecisionStatus, "approved" | "rejected" | "needs_review">;
+}
+
+export async function updateReleaseShellSuggestionDecision(
+  suggestionId: string,
+  decisionStatus: Extract<EnrichmentDecisionStatus, "approved" | "rejected" | "needs_review">,
+): Promise<UpdateReleaseShellSuggestionDecisionResult> {
+  const response = await fetch(`${RUNTIME_API_PATH}/suggestions/${encodeURIComponent(suggestionId)}/decision`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ decisionStatus }),
+  });
+
+  const payload = (await response.json()) as {
+    data?: {
+      decision?: UpdateReleaseShellSuggestionDecisionResult;
+    };
+    decision?: UpdateReleaseShellSuggestionDecisionResult;
+    message?: string;
+  };
+
+  if (!response.ok) {
+    throw new Error(payload.message ?? "Failed to persist suggestion decision.");
+  }
+
+  const decision = payload.data?.decision ?? payload.decision;
+  if (!decision) throw new Error("Decision update returned no decision payload.");
+
+  return decision;
+}
+
+
 export async function previewApprovedReleaseShellSuggestions(
   registryEntityId: string,
 ): Promise<ApplyApprovedReleaseShellSuggestionsPreview> {

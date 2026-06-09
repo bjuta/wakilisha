@@ -9,6 +9,7 @@ import {
   getReleaseShellCanonicalWriteAuditEvents,
   previewApprovedReleaseShellSuggestions,
   updateReleaseShellLifecycleStatus,
+  updateReleaseShellSuggestionDecision,
 } from "@/services/registry/enrichment-review/client";
 import {
   formatConfidence,
@@ -151,9 +152,35 @@ export default function AdminSettingsRegistryReleaseShells() {
     showToast(`Release shell "${row.title}" marked ${state}`);
   };
 
-  const decideSuggestion = (suggestion: RegistryEnrichmentSuggestionReviewItem, decision: LocalSuggestionDecision) => {
-    setSuggestionDecisions((prev) => ({ ...prev, [suggestion.id]: decision }));
-    showToast(`${suggestion.fieldName} suggestion marked ${decision}`);
+  const decideSuggestion = async (suggestion: RegistryEnrichmentSuggestionReviewItem, decision: LocalSuggestionDecision) => {
+    try {
+      const persisted = await updateReleaseShellSuggestionDecision(suggestion.id, decision);
+
+      setSuggestionDecisions((prev) => ({ ...prev, [suggestion.id]: persisted.decisionStatus }));
+      setEnrichmentByShell((prev) => {
+        const next = { ...prev };
+
+        for (const [shellKey, context] of Object.entries(next)) {
+          if (!context.suggestions.some((item) => item.id === suggestion.id)) continue;
+
+          next[shellKey] = {
+            ...context,
+            suggestions: context.suggestions.map((item) =>
+              item.id === suggestion.id
+                ? { ...item, decisionStatus: persisted.decisionStatus }
+                : item,
+            ),
+          };
+        }
+
+        return next;
+      });
+
+      setApplyPreviewByShell({});
+      showToast(`${suggestion.fieldName} suggestion saved as ${decision}`);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Failed to save suggestion decision.");
+    }
   };
 
 

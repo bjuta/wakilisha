@@ -676,6 +676,50 @@ async function readCanonicalReleaseValue(
   return null;
 }
 
+
+export interface UpdateReleaseShellSuggestionDecisionResult {
+  suggestionId: string;
+  registryEntityId: string;
+  decisionStatus: "approved" | "rejected" | "needs_review";
+}
+
+export async function updateReleaseShellSuggestionDecision(
+  pool: PgPool,
+  suggestionId: string,
+  decisionStatus: "approved" | "rejected" | "needs_review",
+): Promise<UpdateReleaseShellSuggestionDecisionResult> {
+  const cleanSuggestionId = String(suggestionId || "").trim();
+
+  if (!cleanSuggestionId) {
+    throw new Error("Missing suggestionId.");
+  }
+
+  if (!["approved", "rejected", "needs_review"].includes(decisionStatus)) {
+    throw new Error("Invalid decision status.");
+  }
+
+  const result = await pool.query(
+    `
+      update public.registry_enrichment_suggestions
+      set decision_status = $2
+      where id::text = $1
+        and registry_entity_type = 'release'
+      returning
+        id::text as "suggestionId",
+        registry_entity_id::text as "registryEntityId",
+        decision_status as "decisionStatus"
+    `,
+    [cleanSuggestionId, decisionStatus],
+  );
+
+  if ((result.rowCount ?? 0) === 0) {
+    throw new Error(`No release enrichment suggestion found for ${cleanSuggestionId}.`);
+  }
+
+  return result.rows[0] as UpdateReleaseShellSuggestionDecisionResult;
+}
+
+
 export async function previewApprovedReleaseShellSuggestions(
   pool: PgPool,
   registryEntityId: string,

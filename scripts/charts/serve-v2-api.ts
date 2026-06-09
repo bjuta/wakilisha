@@ -14,6 +14,7 @@ import {
   listReleaseShellEnrichmentContexts,
   previewApprovedReleaseShellSuggestions,
   updateReleaseShellLifecycleStatus,
+  updateReleaseShellSuggestionDecision,
   type ReleaseShellLookupInput,
 } from "../registry/enrichment-review-runtime-api";
 
@@ -235,6 +236,40 @@ async function route(req: http.IncomingMessage, res: http.ServerResponse) {
       }));
     }
 
+
+
+    if (
+      parts.length === 6 &&
+      parts[0] === "registry" &&
+      parts[1] === "enrichment-review" &&
+      parts[2] === "release-shells" &&
+      parts[3] === "suggestions" &&
+      parts[5] === "decision"
+    ) {
+      if (req.method !== "POST") {
+        return error(res, 405, "method_not_allowed", "Only POST is supported for suggestion decisions.");
+      }
+
+      const suggestionId = parts[4];
+      const body = await readJsonBody(req);
+      const decisionStatus = String((body as { decisionStatus?: unknown }).decisionStatus ?? "").trim();
+
+      if (decisionStatus !== "approved" && decisionStatus !== "rejected" && decisionStatus !== "needs_review") {
+        return error(res, 400, "invalid_request", "Expected decisionStatus to be approved, rejected, or needs_review.");
+      }
+
+      const decision = await updateReleaseShellSuggestionDecision(
+        getEnrichmentPool(),
+        suggestionId,
+        decisionStatus,
+      );
+
+      return json(res, 200, envelope({ decision }, {
+        resource: "registry-enrichment-review",
+        action: "release-shell-suggestion-decision",
+        suggestionId,
+      }));
+    }
 
     if (parts.join("/") === "registry/enrichment-review/release-shells/preview-apply") {
       if (req.method !== "POST") {
