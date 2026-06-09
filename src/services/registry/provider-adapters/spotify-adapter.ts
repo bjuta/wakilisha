@@ -1,23 +1,24 @@
 // Phase 7A: Spotify Adapter Skeleton
 
 /**
- * This adapter fetches release, track, and artist data from the Spotify API.
+ * This adapter will fetch release, track, and artist data from the Spotify API.
  * It outputs normalized provider payloads compatible with the registry.
- * 
+ *
  * Responsibilities:
- * - Authenticate with Spotify API (client credentials or OAuth)
- * - Fetch album / track / artist metadata
- * - Normalize API responses into `NormalizedProviderRelease` shape
- * - Respect provider attribution and usage rules
- * - Optional caching for rate limiting
+ * - Authenticate with Spotify API using client credentials or OAuth.
+ * - Fetch album, track, and artist metadata.
+ * - Normalize API responses into the NormalizedProviderRelease shape.
+ * - Respect provider attribution and usage rules.
+ * - Support optional caching/rate limiting in a later implementation pass.
+ *
+ * This file intentionally contains no credentials and performs no canonical registry writes.
  */
 
-import fetch from 'node-fetch';
-import { NormalizedProviderRelease } from '../../types/registry/normalized-provider-payload';
+import type { NormalizedProviderRelease } from '../../../types/registry/normalized-provider-payload';
 
 export class SpotifyAdapter {
-  private clientId: string;
-  private clientSecret: string;
+  private readonly clientId: string;
+  private readonly clientSecret: string;
   private token: string | null = null;
 
   constructor(clientId: string, clientSecret: string) {
@@ -26,28 +27,39 @@ export class SpotifyAdapter {
   }
 
   async authenticate(): Promise<void> {
-    // TODO: Implement OAuth client credentials flow to get token
+    // TODO: Implement Spotify OAuth client credentials flow.
+    // Use the built-in Node/Vite fetch implementation when this becomes active.
+    void this.clientId;
+    void this.clientSecret;
+    this.token = null;
   }
 
-  async fetchAlbum(albumId: string, market: string = 'US'): Promise<NormalizedProviderRelease> {
-    // TODO: Call Spotify API /albums/{id} endpoint
-    // Map API fields into NormalizedProviderRelease
+  async fetchAlbum(albumId: string, market = 'US'): Promise<NormalizedProviderRelease> {
+    // TODO: Call Spotify API /albums/{id} endpoint and map to NormalizedProviderRelease.
+    void albumId;
+    void market;
     return {} as NormalizedProviderRelease;
   }
 
-  async fetchTrack(trackId: string, market: string = 'US'): Promise<NormalizedProviderRelease> {
-    // TODO: Call Spotify API /tracks/{id} endpoint
+  async fetchTrack(trackId: string, market = 'US'): Promise<NormalizedProviderRelease> {
+    // TODO: Call Spotify API /tracks/{id} endpoint and map to NormalizedProviderRelease.
+    void trackId;
+    void market;
     return {} as NormalizedProviderRelease;
   }
 
   async fetchArtist(artistId: string): Promise<NormalizedProviderRelease> {
-    // TODO: Call Spotify API /artists/{id} endpoint
+    // TODO: Call Spotify API /artists/{id} endpoint and map available artist context.
+    void artistId;
     return {} as NormalizedProviderRelease;
   }
 
-  async search(query: string, type: 'album' | 'track' | 'artist', market: string = 'US') {
-    // TODO: Call /search endpoint
-    // Return normalized candidates
-    return [] as NormalizedProviderRelease[];
+  async search(query: string, type: 'album' | 'track' | 'artist', market = 'US'): Promise<NormalizedProviderRelease[]> {
+    // TODO: Call Spotify API /search endpoint and return normalized candidates.
+    void query;
+    void type;
+    void market;
+    void this.token;
+    return [];
   }
 }
