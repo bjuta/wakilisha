@@ -459,6 +459,134 @@ async function insertCanonicalWriteAuditEvent(
   );
 }
 
+
+function slugifyReleaseValue(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/['"]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 96) || "release";
+}
+
+function getSuggestionTextValue(suggestions: Row[], fieldNames: string[], fallback = ""): string {
+  for (const fieldName of fieldNames) {
+    const match = suggestions.find((suggestion) => String(suggestion.fieldName ?? "") === fieldName);
+    if (match?.suggestedValue !== undefined && match.suggestedValue !== null && String(match.suggestedValue).trim()) {
+      return String(match.suggestedValue).trim();
+    }
+  }
+
+  return fallback;
+}
+
+async function getRegistryReleaseColumns(queryable: PgQueryable): Promise<Set<string>> {
+  const result = await queryable.query(
+    `
+      select column_name as "columnName"
+      from information_schema.columns
+      where table_schema = 'public'
+        and table_name = 'registry_releases'
+    `,
+  );
+
+  return new Set(result.rows.map((row) => String(row.columnName)));
+}
+
+async function ensureCanonicalRegistryReleaseRow(
+  queryable: PgQueryable,
+  registryEntityId: string,
+  suggestions: Row[],
+): Promise<boolean> {
+  const releaseCheck = await queryable.query(
+    `
+      select id::text as id
+      from public.registry_releases
+      where id::text = $1
+      limit 1
+    `,
+    [registryEntityId],
+  );
+
+  if ((releaseCheck.rowCount ?? 0) > 0) return false;
+
+  const columns = await getRegistryReleaseColumns(queryable);
+  const title = getSuggestionTextValue(suggestions, ["title", "release_title"], `Release ${registryEntityId}`);
+  const slug = `${slugifyReleaseValue(title)}-${slugifyReleaseValue(registryEntityId)}`;
+  const metadata: Record<string, string> = {};
+
+  for (const fieldName of METADATA_RELEASE_FIELDS) {
+    const value = getSuggestionTextValue(suggestions, [fieldName]);
+    if (value) metadata[fieldName] = value;
+  }
+
+  const values: Record<string, unknown> = {};
+
+  if (columns.has("id")) values.id = registryEntityId;
+  if (columns.has("title")) values.title = title;
+  if (columns.has("release_title")) values.release_title = title;
+  if (columns.has("slug")) values.slug = slug;
+  if (columns.has("release_slug")) values.release_slug = slug;
+  if (columns.has("canonical_slug")) values.canonical_slug = slug;
+  if (columns.has("artwork_url")) values.artwork_url = getSuggestionTextValue(suggestions, ["artwork_url"]);
+  if (columns.has("release_type")) values.release_type = getSuggestionTextValue(suggestions, ["release_type"], "single");
+  if (columns.has("artist_display_name")) values.artist_display_name = getSuggestionTextValue(suggestions, ["artist_display_name", "artist_name"]);
+  if (columns.has("label_name")) values.label_name = getSuggestionTextValue(suggestions, ["label", "label_name"]);
+  if (columns.has("upc")) values.upc = getSuggestionTextValue(suggestions, ["upc"]);
+  if (columns.has("source")) values.source = "release_shell_review";
+  if (columns.has("status")) values.status = "draft";
+  if (columns.has("lifecycle_status")) values.lifecycle_status = "open";
+
+  const releaseDate = getSuggestionTextValue(suggestions, ["release_date"]);
+  if (columns.has("release_date") && releaseDate) values.release_date = releaseDate;
+
+  if (columns.has("metadata")) {
+    values.metadata = JSON.stringify({
+      ...metadata,
+      auto_provisioned_from: "release_shell_review",
+      registry_entity_id: registryEntityId,
+    });
+  }
+
+  if (!values.id) {
+    throw new Error("registry_releases.id column is required for auto-provisioning.");
+  }
+
+  const insertColumns = Object.keys(values);
+  const params = Object.values(values);
+  const placeholders = insertColumns.map((column, index) => {
+    const position = `$${index + 1}`;
+    if (column === "metadata") return `${position}::jsonb`;
+    if (column === "release_date") return `nullif(${position}::text, '')::date`;
+    return position;
+  });
+
+  await queryable.query(
+    `
+      insert into public.registry_releases (${insertColumns.map((column) => `"${column}"`).join(", ")})
+      values (${placeholders.join(", ")})
+      on conflict (id) do nothing
+    `,
+    params,
+  );
+
+  await insertCanonicalWriteAuditEvent(queryable, {
+    registryEntityType: "release",
+    registryEntityId,
+    sourceSuggestionId: null,
+    fieldName: "canonical_release",
+    targetPath: "registry_releases",
+    beforeValue: null,
+    afterValue: registryEntityId,
+    action: "canonical_release_created",
+    status: "applied",
+  });
+
+  return true;
+}
+
+
 export async function getReleaseShellCanonicalWriteEvents(
   pool: PgPool,
   registryEntityId: string,
@@ -519,20 +647,6 @@ export async function applyApprovedReleaseShellSuggestions(
   try {
     await client.query("begin");
 
-    const releaseCheck = await client.query(
-      `
-        select id::text as id
-        from public.registry_releases
-        where id::text = $1
-        limit 1
-      `,
-      [cleanRegistryEntityId],
-    );
-
-    if (releaseCheck.rowCount === 0) {
-      throw new Error(`No canonical registry_releases row found for ${cleanRegistryEntityId}.`);
-    }
-
     const suggestions = await client.query(
       `
         select
@@ -547,6 +661,8 @@ export async function applyApprovedReleaseShellSuggestions(
       `,
       [cleanRegistryEntityId],
     );
+
+    await ensureCanonicalRegistryReleaseRow(client, cleanRegistryEntityId, suggestions.rows);
 
     for (const suggestion of suggestions.rows) {
       const suggestionId = String(suggestion.id);
