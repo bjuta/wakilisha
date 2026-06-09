@@ -7,6 +7,7 @@ import {
   applyApprovedReleaseShellSuggestions,
   getLiveReleaseShellReviewRows,
   getReleaseShellCanonicalWriteAuditEvents,
+  updateReleaseShellLifecycleStatus,
 } from "@/services/registry/enrichment-review/client";
 import {
   formatConfidence,
@@ -75,6 +76,7 @@ export default function AdminSettingsRegistryReleaseShells() {
   const [loading, setLoading] = useState(true);
   const [enrichmentLoading, setEnrichmentLoading] = useState(false);
   const [search, setSearch] = useState("");
+  const [includeResolved, setIncludeResolved] = useState(false);
   const [states, setStates] = useState<Record<string, ShellReviewState>>({});
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
   const [suggestionDecisions, setSuggestionDecisions] = useState<Record<string, EnrichmentDecisionStatus>>({});
@@ -85,7 +87,7 @@ export default function AdminSettingsRegistryReleaseShells() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { shells: liveShells, contexts } = await getLiveReleaseShellReviewRows();
+    const { shells: liveShells, contexts } = await getLiveReleaseShellReviewRows({ includeResolved });
     const auditEntries = await Promise.all(
       liveShells.map(async (shell) => [
         shell.shellKey,
@@ -97,7 +99,7 @@ export default function AdminSettingsRegistryReleaseShells() {
     setEnrichmentByShell(contexts);
     setAuditByShell(Object.fromEntries(auditEntries));
     setLoading(false);
-  }, []);
+  }, [includeResolved]);
 
   useEffect(() => {
     load();
@@ -148,6 +150,23 @@ export default function AdminSettingsRegistryReleaseShells() {
   const decideSuggestion = (suggestion: RegistryEnrichmentSuggestionReviewItem, decision: LocalSuggestionDecision) => {
     setSuggestionDecisions((prev) => ({ ...prev, [suggestion.id]: decision }));
     showToast(`${suggestion.fieldName} suggestion marked ${decision}`);
+  };
+
+
+
+  const updateLifecycle = async (row: RegistryReleaseShell, status: "resolved" | "reopened") => {
+    const registryEntityId = row.releaseShellId ?? row.id;
+    const reason = status === "resolved"
+      ? "All reviewed canonical suggestions have been applied or intentionally skipped."
+      : "Shell reopened for additional registry review.";
+
+    try {
+      await updateReleaseShellLifecycleStatus(registryEntityId, status, reason);
+      showToast(`Release shell ${status}.`);
+      await load();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : `Failed to mark shell ${status}.`);
+    }
   };
 
 
@@ -253,10 +272,18 @@ export default function AdminSettingsRegistryReleaseShells() {
           </p>
         </div>
 
-        <button onClick={load} className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap">
-          <WkIcon name="RefreshCcw" size={14} />
-          Refresh
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setIncludeResolved((value) => !value)}
+            className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap"
+          >
+            {includeResolved ? "Hide resolved" : "Show resolved"}
+          </button>
+          <button onClick={load} className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap">
+            <WkIcon name="RefreshCcw" size={14} />
+            Refresh
+          </button>
+        </div>
       </div>
 
       <WkSurface className="border-l-4 border-[var(--wk-brand)] p-4">
@@ -370,8 +397,8 @@ export default function AdminSettingsRegistryReleaseShells() {
                       <td className="px-4 py-3"><span className="inline-flex rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface-raised)] px-2 py-0.5 text-[11px] font-semibold text-[var(--wk-text-soft)]">{row.confidence}%</span></td>
                       <td className="px-4 py-3">
                         <div className="flex flex-col gap-1">
-                          <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${shellSuggestionsComplete ? "bg-[var(--wk-success-soft)] text-[var(--wk-success)]" : "bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]"}`}>
-                            {shellSuggestionsComplete ? "Review complete" : `${suggestionGroups.pending.length}/${suggestions.length} pending`}
+                          <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${lifecycleStatus === "resolved" ? "bg-[var(--wk-success-soft)] text-[var(--wk-success)]" : shellSuggestionsComplete ? "bg-[var(--wk-success-soft)] text-[var(--wk-success)]" : "bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]"}`}>
+                            {lifecycleStatus === "resolved" ? "Resolved" : shellSuggestionsComplete ? "Review complete" : `${suggestionGroups.pending.length}/${suggestions.length} pending`}
                           </span>
                           {suggestionGroups.needsReview.length > 0 && <span className="text-[10px] font-semibold text-[var(--wk-warning)]">{suggestionGroups.needsReview.length} needs review</span>}
                           {completedSuggestionCount > 0 && <span className="text-[10px] font-semibold text-[var(--wk-text-muted)]">{completedSuggestionCount} reviewed</span>}
@@ -449,6 +476,7 @@ export default function AdminSettingsRegistryReleaseShells() {
                                 <p><span className="font-semibold text-[var(--wk-text)]">Provider entity links:</span> {context?.providerLinks.length ?? 0}</p>
                                 <p><span className="font-semibold text-[var(--wk-text)]">Context source:</span> {context?.dataSource ?? "loading"}</p>
                                 <div className="flex flex-col gap-2 rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] p-3">
+                                  <p><span className="font-semibold text-[var(--wk-text)]">Lifecycle:</span> {lifecycleStatus}</p>
                                   <p><span className="font-semibold text-[var(--wk-text)]">Canonical writes:</span> controlled apply enabled</p>
                                   <button
                                     onClick={() => applyApprovedSuggestions(row)}
@@ -457,6 +485,22 @@ export default function AdminSettingsRegistryReleaseShells() {
                                   >
                                     {applyingShells[row.shellKey] ? "Applying…" : `Apply approved (${suggestionGroups.approved.length})`}
                                   </button>
+                                  {lifecycleStatus === "resolved" ? (
+                                    <button
+                                      onClick={() => updateLifecycle(row, "reopened")}
+                                      className="wk-button wk-button-sm wk-button-ghost justify-center"
+                                    >
+                                      Reopen shell
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={() => updateLifecycle(row, "resolved")}
+                                      disabled={!canResolveShell}
+                                      className="wk-button wk-button-sm wk-button-ghost justify-center disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                      Resolve shell
+                                    </button>
+                                  )}
                                 </div>
                               </div>
 
