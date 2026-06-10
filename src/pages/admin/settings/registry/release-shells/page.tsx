@@ -787,19 +787,19 @@ export default function AdminSettingsRegistryReleaseShells() {
                                 </div>
                               </div>
 
-                              {applyPreview && (
+                              {applyPreviewByShell[row.shellKey] && (
                                 <div className="mt-4 rounded-xl border border-[var(--wk-border-strong)] bg-[var(--wk-bg)] p-3">
                                   <div className="mb-3 flex flex-col gap-1">
                                     <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--wk-text-muted)]">Pre-apply preview</p>
                                     <p className="text-[12px] text-[var(--wk-text-muted)]">
-                                      {applyPreview.willCreateCanonicalRelease
+                                      {applyPreviewByShell[row.shellKey].willCreateCanonicalRelease
                                         ? "This will create a new canonical registry release, then apply writable approved fields."
                                         : "This will update the existing canonical registry release."}
                                     </p>
                                   </div>
 
                                   <div className="space-y-2">
-                                    {applyPreview.writable.map((item) => (
+                                    {applyPreviewByShell[row.shellKey].writable.map((item) => (
                                       <div key={item.suggestionId} className="rounded-lg border border-[var(--wk-border)] bg-[var(--wk-surface)] p-2">
                                         <div className="flex flex-wrap items-center justify-between gap-2">
                                           <span className="text-[11px] font-bold text-[var(--wk-text)]">{item.fieldName}</span>
@@ -819,11 +819,11 @@ export default function AdminSettingsRegistryReleaseShells() {
                                       </div>
                                     ))}
 
-                                    {applyPreview.skipped.length > 0 && (
+                                    {applyPreviewByShell[row.shellKey].skipped.length > 0 && (
                                       <div className="rounded-lg border border-[var(--wk-border)] bg-[var(--wk-surface)] p-2">
                                         <p className="text-[11px] font-bold text-[var(--wk-warning)]">Skipped / unmapped</p>
                                         <div className="mt-2 space-y-1">
-                                          {applyPreview.skipped.map((item) => (
+                                          {applyPreviewByShell[row.shellKey].skipped.map((item) => (
                                             <p key={item.suggestionId} className="text-[10px] text-[var(--wk-text-muted)]">
                                               {item.fieldName}: {item.reason ?? "Not writable"}
                                             </p>
@@ -836,10 +836,10 @@ export default function AdminSettingsRegistryReleaseShells() {
                                   <div className="mt-3 flex flex-wrap gap-2">
                                     <button
                                       onClick={() => applyApprovedSuggestions(row)}
-                                      disabled={lifecycleStatus === "resolved" || applyPreview.writable.length === 0 || applyingShells[row.shellKey]}
+                                      disabled={lifecycleStatus === "resolved" || applyPreviewByShell[row.shellKey].writable.length === 0 || applyingShells[row.shellKey]}
                                       className="wk-button wk-button-sm wk-button-primary justify-center disabled:cursor-not-allowed disabled:opacity-50"
                                     >
-                                      {applyingShells[row.shellKey] ? "Applying…" : `Confirm apply (${applyPreview.writable.length})`}
+                                      {applyingShells[row.shellKey] ? "Applying…" : `Confirm apply (${applyPreviewByShell[row.shellKey].writable.length})`}
                                     </button>
                                     <button
                                       onClick={() => cancelApplyPreview(row)}

@@ -103,7 +103,9 @@ export class AppleMusicAdapter {
   }
 
   static fromEnv(storefront = 'ke'): AppleMusicAdapter {
-    const developerToken = process.env.APPLE_MUSIC_DEVELOPER_TOKEN;
+    const developerToken = typeof import.meta !== 'undefined' && import.meta.env?.APPLE_MUSIC_DEVELOPER_TOKEN
+      ? String(import.meta.env.APPLE_MUSIC_DEVELOPER_TOKEN)
+      : '';
     if (!developerToken) {
       throw new AppleMusicAdapterError('APPLE_MUSIC_DEVELOPER_TOKEN is required.');
     }

@@ -1,397 +1,403 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { WkIcon } from "@/components/design-system/Icon";
-import { WkSurface } from "@/components/design-system/primitives/Surface";
-import { AdminTable } from "@/components/design-system/admin/AdminTable";
-import { supabase } from "@/lib/supabase";
+import { useEffect, useMemo, useState, useCallback } from "react";
+import { type RegistryEntityProfile } from "@/services/registry/admin/types";
+import { getEntitySchema } from "@/services/registry/admin/entitySchemas";
+import { calculateCompleteness, completenessTone, completenessLabel } from "@/services/registry/admin/completeness";
+import { getRegistryEntityList } from "@/services/registry/admin/client";
+import RegistryEntityEditorDrawer from "@/components/admin/registry/RegistryEntityEditorDrawer";
 
-interface Release extends Record<string, unknown> {
-  slug: string;
-  title: string;
-  normalized_title: string;
-  release_type: string | null;
-  release_date: string | null;
-  label_id: string | null;
-  artwork_url: string | null;
-  status: string;
-  description: string | null;
-  created_at: string;
-  updated_at: string;
+const schema = getEntitySchema("release");
+
+type SortMode = "recent" | "title" | "completeness_low" | "completeness_high";
+
+type QualityFilter =
+  | "all"
+  | "complete"
+  | "incomplete"
+  | "missing_artwork"
+  | "missing_date"
+  | "missing_description"
+  | "missing_type"
+  | "blocked";
+
+interface EnrichedRelease extends RegistryEntityProfile {
+  _quality: ReturnType<typeof calculateCompleteness>;
+  _displayTitle: string;
 }
 
-type QualityFilter = "all" | "missing_artwork" | "missing_date" | "missing_description" | "missing_type" | "needs_review" | "recently_updated";
-type SortMode = "title_asc" | "updated_desc" | "updated_asc" | "release_date_desc" | "release_date_asc" | "completeness_asc" | "completeness_desc";
+function formatDate(value: string | null | undefined): string {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(date);
+}
 
-const statusOptions = ["all", "active", "draft", "needs_review", "archived"];
-const qualityOptions: Array<{ value: QualityFilter; label: string }> = [
-  { value: "all", label: "All quality states" },
-  { value: "missing_artwork", label: "Missing artwork" },
-  { value: "missing_date", label: "Missing release date" },
-  { value: "missing_description", label: "Missing description" },
-  { value: "missing_type", label: "Missing type" },
-  { value: "needs_review", label: "Needs review" },
-  { value: "recently_updated", label: "Recently updated" },
-];
-
-const sortOptions: Array<{ value: SortMode; label: string }> = [
-  { value: "title_asc", label: "Title A-Z" },
-  { value: "updated_desc", label: "Recently updated" },
-  { value: "updated_asc", label: "Oldest updated" },
-  { value: "release_date_desc", label: "Release date newest" },
-  { value: "release_date_asc", label: "Release date oldest" },
-  { value: "completeness_asc", label: "Completeness lowest" },
-  { value: "completeness_desc", label: "Completeness highest" },
-];
-
-export default function AdminReleasesPage() {
-  const navigate = useNavigate();
-  const [releases, setReleases] = useState<Release[]>([]);
+export default function ReleasesPage() {
+  const [releases, setReleases] = useState<RegistryEntityProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [qualityFilter, setQualityFilter] = useState<QualityFilter>("all");
-  const [sortMode, setSortMode] = useState<SortMode>("updated_desc");
+  const [toast, setToast] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
+  const [query, setQuery] = useState("");
+  const [qualityFilter, setQualityFilter] = useState<QualityFilter>("all");
+  const [sortMode, setSortMode] = useState<SortMode>("recent");
+
+  const [selectedRelease, setSelectedRelease] = useState<EnrichedRelease | null>(null);
+
+  const showToast = useCallback((message: string) => {
+    setToast(message);
+    setTimeout(() => setToast(null), 3000);
+  }, []);
+
+  async function fetchReleases() {
     setLoading(true);
     setError(null);
 
-    const { data, error: loadError } = await supabase
-      .from("registry_releases")
-      .select("slug, title, normalized_title, release_type, release_date, label_id, artwork_url, status, description, created_at, updated_at")
-      .order("updated_at", { ascending: false })
-      .limit(500);
+    const { data, error: fetchError } = await getRegistryEntityList("release", { limit: 250 });
 
-    if (loadError) {
-      console.error("Error loading releases:", loadError);
-      setError(loadError.message);
+    if (fetchError) {
+      setError(fetchError);
       setReleases([]);
     } else {
-      setReleases(data ?? []);
+      setReleases(data);
     }
 
     setLoading(false);
-  }, []);
+  }
 
   useEffect(() => {
-    load();
-  }, [load]);
+    fetchReleases();
+  }, []);
 
-  const summary = useMemo(() => {
-    const recentCutoff = Date.now() - 1000 * 60 * 60 * 24 * 14;
-
-    return releases.reduce(
-      (acc, release) => {
-        acc.total += 1;
-        acc.byStatus[release.status] = (acc.byStatus[release.status] ?? 0) + 1;
-        if (!release.artwork_url) acc.missingArtwork += 1;
-        if (!release.release_date) acc.missingDate += 1;
-        if (!release.description) acc.missingDescription += 1;
-        if (!release.release_type) acc.missingType += 1;
-        if (release.updated_at && new Date(release.updated_at).getTime() >= recentCutoff) acc.recentlyUpdated += 1;
-        acc.completenessTotal += getCompletenessScore(release);
-        return acc;
-      },
-      {
-        total: 0,
-        byStatus: {} as Record<string, number>,
-        missingArtwork: 0,
-        missingDate: 0,
-        missingDescription: 0,
-        missingType: 0,
-        recentlyUpdated: 0,
-        completenessTotal: 0,
-      },
-    );
+  const enrichedReleases = useMemo<EnrichedRelease[]>(() => {
+    return releases.map((release) => ({
+      ...release,
+      _quality: calculateCompleteness(release, schema),
+      _displayTitle: String(release.title ?? release.slug ?? release.id ?? "Untitled release"),
+    }));
   }, [releases]);
 
-  const averageCompleteness = summary.total > 0 ? Math.round(summary.completenessTotal / summary.total) : 0;
+  const summary = useMemo(() => {
+    const total = enrichedReleases.length;
+    const complete = enrichedReleases.filter((r) => r._quality.completeness >= 85).length;
+    const missingArtwork = enrichedReleases.filter((r) => !r.artwork_url).length;
+    const missingDate = enrichedReleases.filter((r) => !r.release_date).length;
+    const missingDescription = enrichedReleases.filter((r) => !r.description).length;
+    const missingType = enrichedReleases.filter((r) => !r.release_type).length;
+    const blocked = enrichedReleases.filter((r) => r._quality.state === "blocked").length;
+    const averageCompleteness = total
+      ? Math.round(enrichedReleases.reduce((sum, r) => sum + r._quality.completeness, 0) / total)
+      : 0;
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    const recentCutoff = Date.now() - 1000 * 60 * 60 * 24 * 14;
+    return { total, complete, missingArtwork, missingDate, missingDescription, missingType, blocked, averageCompleteness };
+  }, [enrichedReleases]);
 
-    return releases
-      .filter((release) => {
-        const matchesSearch = !q || [
-          release.title,
-          release.slug,
-          release.normalized_title,
-          release.release_type ?? "",
-          release.status,
-          release.description ?? "",
-        ].some((value) => String(value).toLowerCase().includes(q));
+  const visibleReleases = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
 
-        if (!matchesSearch) return false;
-        if (statusFilter !== "all" && release.status !== statusFilter) return false;
+    let rows = enrichedReleases.filter((release) => {
+      const searchable = [
+        release._displayTitle,
+        release.slug,
+        release.release_type,
+        release.status,
+        release.upc,
+        release.description,
+        release.id,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
 
-        if (qualityFilter === "missing_artwork") return !release.artwork_url;
-        if (qualityFilter === "missing_date") return !release.release_date;
-        if (qualityFilter === "missing_description") return !release.description;
-        if (qualityFilter === "missing_type") return !release.release_type;
-        if (qualityFilter === "needs_review") return release.status === "needs_review";
-        if (qualityFilter === "recently_updated") return release.updated_at && new Date(release.updated_at).getTime() >= recentCutoff;
+      if (normalizedQuery && !searchable.includes(normalizedQuery)) return false;
 
-        return true;
-      })
-      .sort((a, b) => sortReleases(a, b, sortMode));
-  }, [qualityFilter, releases, search, sortMode, statusFilter]);
+      if (qualityFilter === "complete") return release._quality.completeness >= 85;
+      if (qualityFilter === "incomplete") return release._quality.completeness < 85;
+      if (qualityFilter === "missing_artwork") return !release.artwork_url;
+      if (qualityFilter === "missing_date") return !release.release_date;
+      if (qualityFilter === "missing_description") return !release.description;
+      if (qualityFilter === "missing_type") return !release.release_type;
+      if (qualityFilter === "blocked") return release._quality.state === "blocked";
+
+      return true;
+    });
+
+    rows = [...rows].sort((a, b) => {
+      if (sortMode === "title") return a._displayTitle.localeCompare(b._displayTitle);
+      if (sortMode === "completeness_low") return a._quality.completeness - b._quality.completeness;
+      if (sortMode === "completeness_high") return b._quality.completeness - a._quality.completeness;
+
+      const aTime = new Date(String(a.updated_at || a.created_at || 0)).getTime();
+      const bTime = new Date(String(b.updated_at || b.created_at || 0)).getTime();
+      return bTime - aTime;
+    });
+
+    return rows;
+  }, [enrichedReleases, query, qualityFilter, sortMode]);
+
+  function openRelease(release: EnrichedRelease) {
+    setSelectedRelease(release);
+  }
+
+  function closeEditor() {
+    setSelectedRelease(null);
+  }
+
+  function handleSaved(updatedEntity: Record<string, unknown>) {
+    setReleases((prev) =>
+      prev.map((release) =>
+        release.id === updatedEntity.id ? (updatedEntity as RegistryEntityProfile) : release,
+      ),
+    );
+    showToast(`Saved ${String(updatedEntity.title ?? "release")}`);
+  }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <div className="mb-1 text-[11px] font-black uppercase tracking-wider text-wk-brand">Registry</div>
-          <h1 className="text-[22px] font-black tracking-tight text-wk-text">Releases</h1>
-          <p className="mt-1 max-w-3xl text-[13px] text-wk-text-muted">
-            Canonical release records flowing into WAKILISHA. Use this console to spot missing metadata, triage low-completeness records, and open releases that need registry work.
-          </p>
+    <div className="min-h-screen bg-[#f7f7f2] px-5 py-6 text-[#171712]">
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-50 rounded-2xl border border-[#dfe4d8] bg-white px-4 py-3 text-sm font-bold text-[#171712] shadow-xl">
+          {toast}
         </div>
-        <button onClick={load} className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap">
-          <WkIcon name="RefreshCcw" size={14} />
-          Refresh
-        </button>
-      </div>
+      )}
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-        <MetricCard label="Total releases" value={summary.total} helper={`${filtered.length} visible`} />
-        <MetricCard label="Avg completeness" value={`${averageCompleteness}%`} helper="based on loaded fields" tone={averageCompleteness < 70 ? "warning" : "success"} />
-        <MetricCard label="Needs review" value={summary.byStatus.needs_review ?? 0} helper="status flagged" tone={(summary.byStatus.needs_review ?? 0) > 0 ? "danger" : "muted"} />
-        <MetricCard label="Missing artwork" value={summary.missingArtwork} helper="visual gaps" tone={summary.missingArtwork > 0 ? "warning" : "success"} />
-        <MetricCard label="Missing dates" value={summary.missingDate} helper="timeline gaps" tone={summary.missingDate > 0 ? "warning" : "success"} />
-        <MetricCard label="Recently updated" value={summary.recentlyUpdated} helper="last 14 days" />
-      </div>
-
-      <WkSurface className="p-4">
-        <div className="grid gap-3 xl:grid-cols-[minmax(260px,1fr)_auto] xl:items-center">
-          <div className="flex items-center gap-2 rounded-lg border border-wk-border bg-wk-bg-subtle px-3 py-2">
-            <WkIcon name="Search" size={14} className="text-wk-text-faint" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search releases by title, slug, type, status, or description..."
-              className="w-full bg-transparent text-[13px] text-wk-text placeholder:text-wk-text-faint outline-none"
-            />
-            {search && (
-              <button onClick={() => setSearch("")} className="text-wk-text-faint hover:text-wk-text" aria-label="Clear search">
-                <WkIcon name="X" size={14} />
-              </button>
-            )}
+      <div className="mx-auto max-w-7xl">
+        <header className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p className="mb-2 text-[11px] font-black uppercase tracking-[0.18em] text-[#5f8f2f]">
+              Registry
+            </p>
+            <h1 className="text-3xl font-black tracking-tight">Releases</h1>
+            <p className="mt-2 max-w-2xl text-sm text-[#697062]">
+              Review, search, open, edit, and save canonical release records idempotently.
+            </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text outline-none"
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={fetchReleases}
+              className="rounded-2xl border border-[#dfe4d8] bg-white px-4 py-3 text-sm font-black text-[#171712] shadow-sm transition hover:border-[#85c441]"
             >
-              <option value="all">All status</option>
-              {statusOptions.filter((status) => status !== "all").map((status) => (
-                <option key={status} value={status}>{formatLabel(status)}</option>
-              ))}
-            </select>
+              Refresh
+            </button>
+
+            <div className="rounded-2xl border border-[#dfe4d8] bg-white px-4 py-3 text-sm text-[#5d6557] shadow-sm">
+              <span className="font-black text-[#171712]">{visibleReleases.length}</span> shown ·{" "}
+              <span className="font-black text-[#171712]">{summary.total}</span> loaded
+            </div>
+          </div>
+        </header>
+
+        <section className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+          {[
+            ["Loaded", summary.total],
+            ["Avg. completeness", `${summary.averageCompleteness}%`],
+            ["Near complete", summary.complete],
+            ["Missing artwork", summary.missingArtwork],
+            ["Missing dates", summary.missingDate],
+            ["Missing type", summary.missingType],
+          ].map(([label, value]) => (
+            <div
+              key={label}
+              className="rounded-2xl border border-[#dfe4d8] bg-white p-4 shadow-sm"
+            >
+              <p className="text-[11px] font-black uppercase tracking-wide text-[#71796b]">
+                {label}
+              </p>
+              <p className="mt-2 text-2xl font-black text-[#171712]">{value}</p>
+            </div>
+          ))}
+        </section>
+
+        <section className="mb-4 rounded-2xl border border-[#dfe4d8] bg-white p-3 shadow-sm">
+          <div className="grid gap-3 lg:grid-cols-[1fr_220px_220px]">
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search releases by title, UPC, type, slug, or status..."
+              className="h-11 w-full rounded-xl border border-[#dfe4d8] bg-[#f8f9f4] px-4 text-sm outline-none transition focus:border-[#85c441] focus:bg-white"
+            />
 
             <select
               value={qualityFilter}
-              onChange={(e) => setQualityFilter(e.target.value as QualityFilter)}
-              className="rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text outline-none"
+              onChange={(event) => setQualityFilter(event.target.value as QualityFilter)}
+              className="h-11 rounded-xl border border-[#dfe4d8] bg-[#f8f9f4] px-3 text-sm outline-none transition focus:border-[#85c441] focus:bg-white"
             >
-              {qualityOptions.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
+              <option value="all">All quality states</option>
+              <option value="complete">Near complete</option>
+              <option value="incomplete">Incomplete</option>
+              <option value="missing_artwork">Missing artwork</option>
+              <option value="missing_date">Missing date</option>
+              <option value="missing_description">Missing description</option>
+              <option value="missing_type">Missing type</option>
+              <option value="blocked">Blocked</option>
             </select>
 
             <select
               value={sortMode}
-              onChange={(e) => setSortMode(e.target.value as SortMode)}
-              className="rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text outline-none"
+              onChange={(event) => setSortMode(event.target.value as SortMode)}
+              className="h-11 rounded-xl border border-[#dfe4d8] bg-[#f8f9f4] px-3 text-sm outline-none transition focus:border-[#85c441] focus:bg-white"
             >
-              {sortOptions.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
+              <option value="recent">Recently updated</option>
+              <option value="title">Title A-Z</option>
+              <option value="completeness_low">Completeness low-high</option>
+              <option value="completeness_high">Completeness high-low</option>
             </select>
           </div>
-        </div>
+        </section>
 
-        <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-semibold text-wk-text-muted">
-          <span>{filtered.length} of {releases.length} loaded releases visible</span>
-          {statusFilter !== "all" && <button onClick={() => setStatusFilter("all")} className="text-wk-brand hover:underline">Clear status</button>}
-          {qualityFilter !== "all" && <button onClick={() => setQualityFilter("all")} className="text-wk-brand hover:underline">Clear quality</button>}
-          {search && <button onClick={() => setSearch("")} className="text-wk-brand hover:underline">Clear search</button>}
-        </div>
-      </WkSurface>
+        {error && (
+          <section className="mb-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
+            <p className="font-bold">Could not load registry releases</p>
+            <p className="mt-1 text-xs">{error}</p>
+            <button
+              onClick={fetchReleases}
+              className="mt-2 rounded-xl border border-red-300 bg-white px-3 py-1.5 text-xs font-bold text-red-700 hover:bg-red-100"
+            >
+              Retry
+            </button>
+          </section>
+        )}
 
-      {error && (
-        <WkSurface className="border-l-4 border-wk-danger p-4">
-          <p className="text-[13px] font-bold text-wk-danger">Could not load releases</p>
-          <p className="mt-1 text-[12px] text-wk-text-muted">{error}</p>
-        </WkSurface>
-      )}
-
-      {loading ? (
-        <div className="space-y-3">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="animate-pulse rounded-xl border border-wk-border bg-wk-surface p-4">
-              <div className="flex items-center gap-3">
-                <div className="h-12 w-12 rounded-xl bg-wk-surface-raised" />
-                <div className="flex-1 space-y-2">
-                  <div className="h-4 w-56 rounded bg-wk-surface-raised" />
-                  <div className="h-3 w-40 rounded bg-wk-surface-raised" />
-                </div>
-              </div>
+        <section className="overflow-hidden rounded-2xl border border-[#dfe4d8] bg-white shadow-sm">
+          {loading ? (
+            <div className="p-8 text-sm text-[#697062]">Loading registry releases…</div>
+          ) : visibleReleases.length === 0 ? (
+            <div className="p-8 text-sm text-[#697062]">
+              {query || qualityFilter !== "all"
+                ? "No releases match the current filters."
+                : "No live registry releases found."}
             </div>
-          ))}
-        </div>
-      ) : (
-        <AdminTable
-          columns={[
-            {
-              key: "title",
-              label: "Release",
-              render: (row) => (
-                <div className="flex min-w-[280px] items-center gap-3">
-                  <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-wk-surface-raised ring-1 ring-wk-border">
-                    {row.artwork_url ? (
-                      <img src={row.artwork_url} alt={row.title} className="h-full w-full object-cover" />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center text-wk-text-faint">
-                        <WkIcon name="Disc" size={18} />
-                      </div>
-                    )}
-                  </div>
-                  <div className="min-w-0">
-                    <div className="truncate text-[13px] font-bold text-wk-text">{row.title}</div>
-                    <div className="truncate font-mono text-[11px] text-wk-text-muted">{row.slug}</div>
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      {!row.artwork_url && <IssuePill label="No artwork" />}
-                      {!row.release_date && <IssuePill label="No date" />}
-                      {!row.release_type && <IssuePill label="No type" />}
-                    </div>
-                  </div>
-                </div>
-              ),
-            },
-            { key: "release_type", label: "Type", width: "110px", render: (row) => <TypeBadge value={row.release_type} /> },
-            { key: "release_date", label: "Release date", width: "130px", render: (row) => <DateCell value={row.release_date} missingLabel="Missing date" /> },
-            { key: "status", label: "Status", width: "120px", render: (row) => <StatusBadge status={row.status} /> },
-            { key: "quality", label: "Quality", width: "150px", render: (row) => <CompletenessBadge score={getCompletenessScore(row)} /> },
-            {
-              key: "description",
-              label: "Registry notes",
-              width: "260px",
-              render: (row) => (
-                <span className="line-clamp-2 text-[12px] text-wk-text-muted">
-                  {row.description ? row.description : "No description captured"}
-                </span>
-              ),
-            },
-            { key: "updated_at", label: "Updated", width: "130px", render: (row) => <DateCell value={row.updated_at} /> },
-          ]}
-          rows={filtered}
-          keyField="slug"
-          emptyMessage={getEmptyMessage(search, statusFilter, qualityFilter)}
-          onRowClick={(row) => navigate(`/admin/registry/releases/${row.slug}`)}
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[1080px] border-collapse text-left text-sm">
+                <thead>
+                  <tr className="border-b border-[#e8ece2] bg-[#fbfcf8] text-[11px] font-black uppercase tracking-wide text-[#71796b]">
+                    <th className="w-[30%] px-5 py-4">Release</th>
+                    <th className="w-[12%] px-5 py-4">Type</th>
+                    <th className="w-[12%] px-5 py-4">Date</th>
+                    <th className="w-[10%] px-5 py-4">UPC</th>
+                    <th className="w-[10%] px-5 py-4">Status</th>
+                    <th className="w-[14%] px-5 py-4">Quality</th>
+                    <th className="w-[12%] px-5 py-4">Edit</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {visibleReleases.map((release) => (
+                    <tr
+                      key={release.id}
+                      onClick={() => openRelease(release)}
+                      className="cursor-pointer border-b border-[#eef1ea] align-middle last:border-b-0 hover:bg-[#fbfcf8]"
+                    >
+                      <td className="px-5 py-4">
+                        <div className="flex items-center gap-3">
+                          {release.artwork_url ? (
+                            <img
+                              src={String(release.artwork_url)}
+                              alt=""
+                              className="h-11 w-11 flex-none rounded-xl object-cover"
+                              loading="lazy"
+                            />
+                          ) : (
+                            <div className="flex h-11 w-11 flex-none items-center justify-center rounded-xl bg-[#f0f3ec] text-xs font-black text-[#8a9283]">
+                              R
+                            </div>
+                          )}
+
+                          <div className="min-w-0">
+                            <p className="truncate font-black text-[#171712]">
+                              {release._displayTitle}
+                            </p>
+                            <p className="mt-1 truncate text-xs text-[#858c7e]">
+                              {String(release.slug || release.id)}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+
+                      <td className="px-5 py-4">
+                        <span className="text-[#2d3329]">
+                          {String(release.release_type || "—")}
+                        </span>
+                      </td>
+
+                      <td className="px-5 py-4 text-[#5d6557]">
+                        {formatDate(String(release.release_date))}
+                      </td>
+
+                      <td className="px-5 py-4">
+                        {release.upc ? (
+                          <span className="font-mono text-xs text-[#2d3329]">{String(release.upc)}</span>
+                        ) : (
+                          <span className="text-[#9aa292]">—</span>
+                        )}
+                      </td>
+
+                      <td className="px-5 py-4">
+                        <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-black uppercase tracking-wide text-emerald-700">
+                          {String(release.status || "unknown")}
+                        </span>
+                      </td>
+
+                      <td className="px-5 py-4">
+                        <div className="flex items-center gap-3">
+                          <span
+                            className={`rounded-full px-2.5 py-1 text-[11px] font-black ${completenessTone(
+                              release._quality.completeness,
+                            )}`}
+                          >
+                            {release._quality.completeness}%
+                          </span>
+                          <span className="text-[11px] font-bold text-[#8a9283]">
+                            {completenessLabel(release._quality.state)}
+                          </span>
+                        </div>
+                        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#eef1e8]">
+                          <div
+                            className="h-full rounded-full bg-[#85c441]"
+                            style={{ width: `${release._quality.completeness}%` }}
+                          />
+                        </div>
+                        {release._quality.missingFields.length > 0 && (
+                          <p className="mt-1 text-[10px] text-[#8a9283]">
+                            Missing: {release._quality.missingFields.join(", ")}
+                          </p>
+                        )}
+                      </td>
+
+                      <td className="px-5 py-4">
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            openRelease(release);
+                          }}
+                          className="rounded-xl border border-[#dfe4d8] bg-white px-3 py-2 text-xs font-black text-[#171712] transition hover:border-[#85c441]"
+                        >
+                          Open
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      </div>
+
+      {selectedRelease && (
+        <RegistryEntityEditorDrawer
+          entityType="release"
+          entity={selectedRelease}
+          schema={schema}
+          onClose={closeEditor}
+          onSaved={handleSaved}
         />
       )}
     </div>
   );
-}
-
-function MetricCard({ label, value, helper, tone = "muted" }: { label: string; value: number | string; helper: string; tone?: "success" | "warning" | "danger" | "muted" }) {
-  const toneClass = tone === "success" ? "text-wk-success" : tone === "warning" ? "text-wk-warning" : tone === "danger" ? "text-wk-danger" : "text-wk-text";
-  return (
-    <WkSurface className="p-4">
-      <p className="text-[11px] font-bold uppercase tracking-wide text-wk-text-muted">{label}</p>
-      <p className={`mt-1 text-[26px] font-black ${toneClass}`}>{value}</p>
-      <p className="mt-1 text-[11px] font-semibold text-wk-text-muted">{helper}</p>
-    </WkSurface>
-  );
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const color =
-    status === "active" ? "bg-wk-success-soft text-wk-success" :
-    status === "draft" ? "bg-wk-warning-soft text-wk-warning" :
-    status === "needs_review" ? "bg-wk-danger-soft text-wk-danger" :
-    "bg-wk-surface-raised text-wk-text-muted";
-  return (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${color}`}>
-      {formatLabel(status)}
-    </span>
-  );
-}
-
-function TypeBadge({ value }: { value: string | null }) {
-  if (!value) return <span className="text-[12px] font-semibold text-wk-warning">Missing</span>;
-  return <span className="inline-flex rounded-full bg-wk-surface-raised px-2 py-0.5 text-[10px] font-bold uppercase text-wk-text-muted">{formatLabel(value)}</span>;
-}
-
-function DateCell({ value, missingLabel = "—" }: { value: string | null; missingLabel?: string }) {
-  if (!value) return <span className="text-[12px] font-semibold text-wk-warning">{missingLabel}</span>;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return <span className="text-[12px] text-wk-text-muted">{value}</span>;
-  return <span className="text-[12px] text-wk-text-muted">{date.toLocaleDateString()}</span>;
-}
-
-function IssuePill({ label }: { label: string }) {
-  return <span className="rounded-full bg-wk-warning-soft px-2 py-0.5 text-[10px] font-bold uppercase text-wk-warning">{label}</span>;
-}
-
-function CompletenessBadge({ score }: { score: number }) {
-  const tone = score >= 85 ? "bg-wk-success-soft text-wk-success" : score >= 60 ? "bg-wk-warning-soft text-wk-warning" : "bg-wk-danger-soft text-wk-danger";
-  return (
-    <div className="min-w-[120px]">
-      <div className="mb-1 flex items-center justify-between gap-2">
-        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${tone}`}>{score}%</span>
-        <span className="text-[10px] font-semibold text-wk-text-muted">complete</span>
-      </div>
-      <div className="h-1.5 overflow-hidden rounded-full bg-wk-surface-raised">
-        <div className="h-full rounded-full bg-wk-brand" style={{ width: `${score}%` }} />
-      </div>
-    </div>
-  );
-}
-
-function getCompletenessScore(release: Release): number {
-  const checks = [
-    Boolean(release.title),
-    Boolean(release.slug),
-    Boolean(release.release_type),
-    Boolean(release.release_date),
-    Boolean(release.artwork_url),
-    Boolean(release.description),
-    Boolean(release.status),
-  ];
-
-  return Math.round((checks.filter(Boolean).length / checks.length) * 100);
-}
-
-function sortReleases(a: Release, b: Release, mode: SortMode): number {
-  if (mode === "updated_desc") return toTime(b.updated_at) - toTime(a.updated_at);
-  if (mode === "updated_asc") return toTime(a.updated_at) - toTime(b.updated_at);
-  if (mode === "release_date_desc") return toTime(b.release_date) - toTime(a.release_date);
-  if (mode === "release_date_asc") return toTime(a.release_date) - toTime(b.release_date);
-  if (mode === "completeness_asc") return getCompletenessScore(a) - getCompletenessScore(b);
-  if (mode === "completeness_desc") return getCompletenessScore(b) - getCompletenessScore(a);
-  return a.title.localeCompare(b.title);
-}
-
-function toTime(value: string | null): number {
-  if (!value) return 0;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? 0 : date.getTime();
-}
-
-function formatLabel(value: string): string {
-  return value.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
-}
-
-function getEmptyMessage(search: string, statusFilter: string, qualityFilter: QualityFilter): string {
-  if (search || statusFilter !== "all" || qualityFilter !== "all") {
-    return "No releases match the current search and filters.";
-  }
-
-  return "No releases found in the registry.";
 }

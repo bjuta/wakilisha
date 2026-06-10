@@ -1,0 +1,231 @@
+import { supabase } from "@/lib/supabase";
+import {
+  type RegistryEntityType,
+  type RegistrySaveResult,
+  type RegistryEntityProfile,
+  type RegistryEntitySchema,
+} from "./types";
+import { getEntitySchema } from "./entitySchemas";
+import { normalizeForSave, normalizeForCompare, validateField } from "./fieldNormalization";
+
+export async function getRegistryEntityList(
+  entityType: RegistryEntityType,
+  options?: {
+    limit?: number;
+    orderBy?: string;
+    ascending?: boolean;
+  },
+): Promise<{ data: RegistryEntityProfile[]; error: string | null }> {
+  const schema = getEntitySchema(entityType);
+  const limit = options?.limit ?? 250;
+  const orderBy = options?.orderBy ?? "updated_at";
+  const ascending = options?.ascending ?? false;
+
+  const { data, error } = await supabase
+    .from(schema.table)
+    .select("*")
+    .order(orderBy, { ascending, nullsFirst: false })
+    .limit(limit);
+
+  if (error) {
+    return { data: [], error: error.message };
+  }
+
+  return { data: (data ?? []) as RegistryEntityProfile[], error: null };
+}
+
+export async function getRegistryEntityProfile(
+  entityType: RegistryEntityType,
+  entityId: string,
+): Promise<{ data: RegistryEntityProfile | null; error: string | null }> {
+  const schema = getEntitySchema(entityType);
+
+  const { data, error } = await supabase
+    .from(schema.table)
+    .select("*")
+    .eq(schema.idField, entityId)
+    .maybeSingle();
+
+  if (error) {
+    return { data: null, error: error.message };
+  }
+
+  return { data: data as RegistryEntityProfile | null, error: null };
+}
+
+export function buildChangesPayload(
+  original: Record<string, unknown>,
+  draft: Record<string, unknown>,
+  schema: RegistryEntitySchema,
+): {
+  changes: Record<string, unknown>;
+  savedFields: Array<{ key: string; label: string; previousValue: unknown; nextValue: unknown }>;
+  skippedFields: Array<{ key: string; label: string; reason: string }>;
+  validationErrors: Array<{ key: string; label: string; message: string }>;
+} {
+  const changes: Record<string, unknown> = {};
+  const savedFields: Array<{ key: string; label: string; previousValue: unknown; nextValue: unknown }> = [];
+  const skippedFields: Array<{ key: string; label: string; reason: string }> = [];
+  const validationErrors: Array<{ key: string; label: string; message: string }> = [];
+
+  const writableFields = schema.editableFields.filter((f) => f.access === "editable");
+
+  for (const field of writableFields) {
+    const originalValue = normalizeForCompare(original[field.key], field);
+    const draftValue = normalizeForCompare(draft[field.key], field);
+
+    const validationError = validateField(draft[field.key], field);
+    if (validationError) {
+      validationErrors.push({ key: field.key, label: field.label, message: validationError });
+      continue;
+    }
+
+    if (!deepEqual(originalValue, draftValue)) {
+      const nextValue = normalizeForSave(draft[field.key], field);
+      changes[field.key] = nextValue;
+      savedFields.push({
+        key: field.key,
+        label: field.label,
+        previousValue: original[field.key],
+        nextValue,
+      });
+    }
+  }
+
+  // Detect unsupported fields in draft that aren't in schema
+  const schemaKeys = new Set([...schema.editableFields.map((f) => f.key), ...schema.readonlyFields.map((f) => f.key)]);
+  for (const key of Object.keys(draft)) {
+    if (!schemaKeys.has(key)) {
+      skippedFields.push({ key, label: key, reason: "Field is not supported by this entity schema" });
+    }
+  }
+
+  return { changes, savedFields, skippedFields, validationErrors };
+}
+
+export async function saveRegistryEntityPatch(
+  entityType: RegistryEntityType,
+  entityId: string,
+  patch: Record<string, unknown>,
+  schemaOverride?: RegistryEntitySchema,
+): Promise<RegistrySaveResult> {
+  const schema = schemaOverride ?? getEntitySchema(entityType);
+
+  // Validate patch keys against schema
+  const validKeys = schema.editableFields.filter((f) => f.access === "editable").map((f) => f.key);
+  const safePatch: Record<string, unknown> = {};
+  const skippedFields: Array<{ key: string; label: string; reason: string }> = [];
+  const rejectedFields: Array<{ key: string; label: string; reason: string }> = [];
+
+  for (const [key, value] of Object.entries(patch)) {
+    if (!validKeys.includes(key)) {
+      const fieldDef = schema.readonlyFields.find((f) => f.key === key);
+      skippedFields.push({
+        key,
+        label: fieldDef?.label ?? key,
+        reason: "Field is not editable or does not exist in schema",
+      });
+      continue;
+    }
+
+    const fieldDef = schema.editableFields.find((f) => f.key === key);
+    if (fieldDef) {
+      const validationError = validateField(value, fieldDef);
+      if (validationError) {
+        rejectedFields.push({ key, label: fieldDef.label, reason: validationError });
+        continue;
+      }
+      safePatch[key] = normalizeForSave(value, fieldDef);
+    }
+  }
+
+  if (Object.keys(safePatch).length === 0) {
+    return {
+      ok: true,
+      entityType,
+      entityId,
+      savedFields: [],
+      skippedFields,
+      rejectedFields,
+      warnings: skippedFields.length > 0 ? [`${skippedFields.length} unsupported field(s) were not saved`] : [],
+    };
+  }
+
+  // Add updated_at
+  safePatch.updated_at = new Date().toISOString();
+
+  const { data, error } = await supabase
+    .from(schema.table)
+    .update(safePatch)
+    .eq(schema.idField, entityId)
+    .select("*")
+    .single();
+
+  if (error) {
+    const message = error.message ?? "Unknown error";
+    let errorCode = "save_failed";
+
+    if (message.toLowerCase().includes("duplicate")) {
+      errorCode = "duplicate_key";
+    } else if (message.toLowerCase().includes("foreign key")) {
+      errorCode = "foreign_key_violation";
+    } else if (message.toLowerCase().includes("not null")) {
+      errorCode = "required_field_missing";
+    }
+
+    return {
+      ok: false,
+      entityType,
+      entityId,
+      savedFields: [],
+      skippedFields,
+      rejectedFields,
+      warnings: [],
+      errorCode,
+      message,
+    };
+  }
+
+  const savedFields = Object.entries(safePatch)
+    .filter(([key]) => key !== "updated_at")
+    .map(([key]) => {
+      const fieldDef = schema.editableFields.find((f) => f.key === key);
+      return {
+        key,
+        label: fieldDef?.label ?? key,
+        previousValue: null,
+        nextValue: safePatch[key],
+      };
+    });
+
+  return {
+    ok: true,
+    entityType,
+    entityId,
+    savedFields,
+    skippedFields,
+    rejectedFields,
+    warnings: skippedFields.length > 0 ? [`${skippedFields.length} unsupported field(s) were not saved`] : [],
+    updatedEntity: data as Record<string, unknown>,
+  };
+}
+
+function deepEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (a === null || b === null) return a === b;
+  if (typeof a !== typeof b) return false;
+
+  if (Array.isArray(a) && Array.isArray(b)) {
+    if (a.length !== b.length) return false;
+    return a.every((item, index) => deepEqual(item, b[index]));
+  }
+
+  if (typeof a === "object" && typeof b === "object") {
+    const keysA = Object.keys(a as Record<string, unknown>);
+    const keysB = Object.keys(b as Record<string, unknown>);
+    if (keysA.length !== keysB.length) return false;
+    return keysA.every((key) => deepEqual((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key]));
+  }
+
+  return false;
+}
