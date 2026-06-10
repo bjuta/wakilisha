@@ -1,4 +1,5 @@
 import { useMemo, useState, useCallback, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   type RegistryEntityType,
   type RegistryEntitySchema,
@@ -82,9 +83,10 @@ export default function RegistryEntityEditorDrawer({
   const [draft, setDraft] = useState<Record<string, unknown>>(() => ({ ...entity }));
   const [saving, setSaving] = useState(false);
   const [saveResult, setSaveResult] = useState<RegistrySaveResult | null>(null);
-  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>();
   const [showSystemFields, setShowSystemFields] = useState(false);
   const drawerRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
 
   // Trap focus and handle Escape
   useEffect(() => {
@@ -169,6 +171,11 @@ export default function RegistryEntityEditorDrawer({
     setValidationErrors({});
   }
 
+  function handleGenerateNewSlug() {
+    const nextSlug = normalizeSlug(displayName) + "-" + Date.now().toString().slice(-4);
+    updateField("slug", nextSlug);
+  }
+
   const updatedAt = entity.updated_at
     ? new Intl.DateTimeFormat("en-GB", {
         day: "2-digit",
@@ -188,7 +195,9 @@ export default function RegistryEntityEditorDrawer({
         ? "ri-history-fill"
         : saveResult.errorCode === "permission_denied"
           ? "ri-shield-user-fill"
-          : "ri-close-circle-fill"
+          : saveResult.errorCode === "duplicate_key"
+            ? "ri-error-warning-fill"
+            : "ri-close-circle-fill"
     : null;
 
   const getResultColors = () => {
@@ -200,6 +209,9 @@ export default function RegistryEntityEditorDrawer({
     }
     if (saveResult.errorCode === "stale_update") {
       return "border-orange-300 bg-orange-50 text-orange-800";
+    }
+    if (saveResult.errorCode === "duplicate_key") {
+      return "border-red-300 bg-red-50 text-red-800";
     }
     return "border-red-300 bg-red-50 text-red-800";
   };
@@ -340,11 +352,13 @@ export default function RegistryEntityEditorDrawer({
                           : "No changes to save"
                         : saveResult.errorCode === "stale_update"
                           ? "Someone else edited this record"
-                          : saveResult.errorCode === "not_authenticated"
-                            ? "Session expired"
-                            : saveResult.errorCode === "permission_denied"
-                              ? "Permission denied"
-                              : "Save failed"}
+                          : saveResult.errorCode === "duplicate_key"
+                            ? "Duplicate key conflict"
+                            : saveResult.errorCode === "not_authenticated"
+                              ? "Session expired"
+                              : saveResult.errorCode === "permission_denied"
+                                ? "Permission denied"
+                                : "Save failed"}
                     </p>
                     {saveResult.savedFields.length > 0 && (
                       <p className="mt-1 text-xs opacity-80">
@@ -378,13 +392,63 @@ export default function RegistryEntityEditorDrawer({
                         )}
                       </div>
                     )}
-                    {saveResult.message && !saveResult.ok && saveResult.errorCode !== "stale_update" && (
-                      <p className="mt-1 text-xs opacity-80">{saveResult.message}</p>
-                    )}
                     {saveResult.errorCode === "duplicate_key" && (
-                      <p className="mt-1 text-xs opacity-80">
-                        A record with this unique value already exists (e.g. duplicate slug or ISRC).
-                      </p>
+                      <div className="mt-2">
+                        <p className="text-xs opacity-80">
+                          {saveResult.duplicateField && saveResult.duplicateValue
+                            ? `"${saveResult.duplicateValue}" is already used by another ${entityType}.`
+                            : "A unique value conflict occurred."}
+                        </p>
+                        {saveResult.conflictingEntity && (
+                          <div className="mt-2 rounded-xl border border-red-200 bg-white px-3 py-2.5">
+                            <p className="text-[11px] font-bold text-[#71796b]">
+                              Conflicting {entityType}
+                            </p>
+                            <p className="text-sm font-bold text-[#171712]">
+                              {String(saveResult.conflictingEntity.title ?? "Unknown")}
+                            </p>
+                            {saveResult.conflictingEntity.slug && (
+                              <p className="text-xs font-mono text-[#858c7e]">
+                                {String(saveResult.conflictingEntity.slug)}
+                              </p>
+                            )}
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const slug = saveResult.conflictingEntity?.slug;
+                                  if (slug) {
+                                    navigate(`/admin/registry/${entityType}s/${slug}`);
+                                  }
+                                }}
+                                className="inline-flex items-center gap-1 rounded-lg border border-[#dfe4d8] bg-white px-3 py-1.5 text-xs font-bold text-[#171712] hover:border-[#85c441] transition-colors"
+                              >
+                                <i className="ri-external-link-line" />
+                                View existing
+                              </button>
+                              <button
+                                type="button"
+                                onClick={handleGenerateNewSlug}
+                                className="inline-flex items-center gap-1 rounded-lg border border-[#dfe4d8] bg-white px-3 py-1.5 text-xs font-bold text-[#171712] hover:border-[#85c441] transition-colors"
+                              >
+                                <i className="ri-sparkling-line" />
+                                Generate new slug
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setSaveResult(null)}
+                                className="inline-flex items-center gap-1 rounded-lg border border-[#dfe4d8] bg-white px-3 py-1.5 text-xs font-bold text-[#71796b] hover:border-[#85c441] transition-colors"
+                              >
+                                <i className="ri-pencil-line" />
+                                Keep editing
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {saveResult.message && !saveResult.ok && saveResult.errorCode !== "stale_update" && saveResult.errorCode !== "duplicate_key" && (
+                      <p className="mt-1 text-xs opacity-80">{saveResult.message}</p>
                     )}
                   </div>
                 </div>
@@ -407,7 +471,6 @@ export default function RegistryEntityEditorDrawer({
                     </legend>
 
                     <div className="space-y-4">
-                      {/* Short fields: two columns on desktop */}
                       {shortFields.length > 0 && (
                         <div className="grid gap-4 sm:grid-cols-2">
                           {shortFields.map((field) => (
@@ -418,13 +481,12 @@ export default function RegistryEntityEditorDrawer({
                               onChange={(v) => updateField(field.key, v)}
                               displayName={displayName}
                               isDirty={dirtyFields.includes(field.key)}
-                              error={validationErrors[field.key]}
+                              error={validationErrors[field.key] || (saveResult?.errorCode === "duplicate_key" && saveResult?.duplicateField === field.key ? "Already in use" : undefined)}
                             />
                           ))}
                         </div>
                       )}
 
-                      {/* Long fields: full width */}
                       {longFields.map((field) => (
                         <FieldCard
                           key={field.key}
@@ -433,7 +495,7 @@ export default function RegistryEntityEditorDrawer({
                           onChange={(v) => updateField(field.key, v)}
                           displayName={displayName}
                           isDirty={dirtyFields.includes(field.key)}
-                          error={validationErrors[field.key]}
+                          error={validationErrors[field.key] || (saveResult?.errorCode === "duplicate_key" && saveResult?.duplicateField === field.key ? "Already in use" : undefined)}
                         />
                       ))}
                     </div>

@@ -1,671 +1,795 @@
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
-import { AdminTable } from "@/components/design-system/admin/AdminTable";
 import { supabase } from "@/lib/supabase";
 
 interface MediaAsset {
   id: string;
-  entity_type: string;
-  entity_slug: string;
-  role: string;
-  url: string;
-  alt_text: string | null;
-  source: string;
+  slug: string | null;
+  title: string | null;
+  url: string | null;
+  mime_type: string | null;
+  media_kind: string | null;
+  status: string | null;
+  source_kind: string | null;
+  source_entity: string | null;
+  source_record_id: string | null;
+  source_staging_record_id: string | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string | null;
+  updated_at: string | null;
 }
 
-interface BucketItem {
-  name: string;
-  id: string | null;
-  path: string;
-  isFolder: boolean;
-  publicUrl?: string;
-}
+const PAGE_SIZE = 60;
 
-const CMS_BUCKET = "cms-media";
-const PAGE_SIZE = 50;
+const ENTITY_ROUTES: Record<string, string> = {
+  artist: "/artists",
+  release: "/releases",
+  article: "/magazine",
+  label: "/labels",
+  genre: "/genres",
+  track: "/tracks",
+};
+
+function guessEntityType(asset: MediaAsset): string {
+  if (asset.source_entity) {
+    if (asset.source_entity.includes("artist")) return "artist";
+    if (asset.source_entity.includes("release")) return "release";
+    if (asset.source_entity.includes("post")) return "article";
+    if (asset.source_entity.includes("chart")) return "chart";
+  }
+  if (asset.title?.toLowerCase().includes("artwork")) return "release";
+  if (asset.title?.toLowerCase().includes("photo")) return "artist";
+  return "media";
+}
 
 export default function AdminMediaLibraryPage() {
-  const [media, setMedia] = useState<MediaAsset[]>([]);
+  const [assets, setAssets] = useState<MediaAsset[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [total, setTotal] = useState(0);
+
   const [search, setSearch] = useState("");
-  const [roleFilter, setRoleFilter] = useState("all");
-  const [sourceFilter, setSourceFilter] = useState("all");
-  const [uploading, setUploading] = useState(false);
-  const [previewing, setPreviewing] = useState<MediaAsset | null>(null);
-  const [copied, setCopied] = useState(false);
-  const [deleting, setDeleting] = useState<string | null>(null);
+  const [mediaKindFilter, setMediaKindFilter] = useState("all");
+  const [sourceKindFilter, setSourceKindFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [missingAltOnly, setMissingAltOnly] = useState(false);
+
   const [page, setPage] = useState(0);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedAsset, setSelectedAsset] = useState<MediaAsset | null>(null);
+  const [editingAlt, setEditingAlt] = useState("");
+  const [savingAlt, setSavingAlt] = useState(false);
+  const [editingStatus, setEditingStatus] = useState("");
+  const [savingStatus, setSavingStatus] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [toast, setToast] = useState<{ type: "success" | "error"; msg: string } | null>(null);
 
-  // Migrated images tab state
-  const [activeTab, setActiveTab] = useState<"assets" | "migrated">("assets");
-  const [bucketPath, setBucketPath] = useState("wp-import");
-  const [bucketItems, setBucketItems] = useState<BucketItem[]>([]);
-  const [bucketLoading, setBucketLoading] = useState(false);
-  const [selectedBucketItem, setSelectedBucketItem] = useState<BucketItem | null>(null);
+  const [bulkSelected, setBulkSelected] = useState<Set<string>>(new Set());
+  const [bulkAction, setBulkAction] = useState("set_status_active");
+  const [bulkRunning, setBulkRunning] = useState(false);
 
-  const load = useCallback(async () => {
+  const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
+
+  const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showToast = (type: "success" | "error", msg: string) => {
+    setToast({ type, msg });
+    setTimeout(() => setToast(null), 3500);
+  };
+
+  const fetchAssets = useCallback(async (opts?: {
+    searchQ?: string;
+    kind?: string;
+    source?: string;
+    stat?: string;
+    missingAlt?: boolean;
+    pg?: number;
+  }) => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("wk_media_assets")
-      .select("id, entity_type, entity_slug, role, url, alt_text, source")
-      .limit(500);
+    setLoadError(null);
+    try {
+      const sq = opts?.searchQ ?? search;
+      const kind = opts?.kind ?? mediaKindFilter;
+      const src = opts?.source ?? sourceKindFilter;
+      const stat = opts?.stat ?? statusFilter;
+      const noAlt = opts?.missingAlt ?? missingAltOnly;
+      const pg = opts?.pg ?? page;
 
-    if (error) {
-      console.error("Error loading media:", error);
-    } else {
-      setMedia(data ?? []);
+      let query = supabase
+        .from("registry_media_assets")
+        .select("id, slug, title, url, mime_type, media_kind, status, source_kind, source_entity, source_record_id, source_staging_record_id, metadata, created_at, updated_at", { count: "exact" });
+
+      if (sq) {
+        query = query.or(`title.ilike.%${sq}%,slug.ilike.%${sq}%,url.ilike.%${sq}%,source_record_id.ilike.%${sq}%`);
+      }
+      if (kind !== "all") query = query.eq("media_kind", kind);
+      if (src !== "all") query = query.eq("source_kind", src);
+      if (stat !== "all") query = query.eq("status", stat);
+      if (noAlt) query = query.or("metadata.is.null,metadata->>alt_text.is.null");
+
+      query = query
+        .order("created_at", { ascending: false })
+        .range(pg * PAGE_SIZE, (pg + 1) * PAGE_SIZE - 1);
+
+      const { data, error, count } = await query;
+      if (error) throw error;
+      setAssets((data ?? []) as MediaAsset[]);
+      setTotal(count ?? 0);
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : "Failed to load media assets.");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  }, []);
+  }, [search, mediaKindFilter, sourceKindFilter, statusFilter, missingAltOnly, page]);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    fetchAssets();
+  }, [fetchAssets]);
 
-  const loadBucket = useCallback(async () => {
-    setBucketLoading(true);
-    const { data, error } = await supabase.storage.from("article-media").list(bucketPath);
+  const handleSearch = (q: string) => {
+    setSearch(q);
+    setPage(0);
+    if (searchTimeout.current) clearTimeout(searchTimeout.current);
+  };
 
-    if (error) {
-      console.error("Error loading bucket:", error);
-      setBucketItems([]);
-    } else {
-      const items: BucketItem[] = (data ?? []).map((item) => {
-        const isFolder = !item.id;
-        const path = bucketPath ? `${bucketPath}/${item.name}` : item.name;
-        let publicUrl: string | undefined;
-        if (!isFolder) {
-          const { data: urlData } = supabase.storage.from("article-media").getPublicUrl(path);
-          publicUrl = urlData.publicUrl;
-        }
-        return { name: item.name, id: item.id ?? null, path, isFolder, publicUrl };
-      });
-      setBucketItems(items);
+  const handleFilterChange = (type: string, value: string) => {
+    setPage(0);
+    if (type === "kind") setMediaKindFilter(value);
+    if (type === "source") setSourceKindFilter(value);
+    if (type === "status") setStatusFilter(value);
+  };
+
+  const openDrawer = (asset: MediaAsset) => {
+    setSelectedAsset(asset);
+    setEditingAlt(
+      typeof asset.metadata?.alt_text === "string" ? asset.metadata.alt_text : (asset.title ?? ""),
+    );
+    setEditingStatus(asset.status ?? "active");
+  };
+
+  const handleSaveAlt = async () => {
+    if (!selectedAsset) return;
+    setSavingAlt(true);
+    try {
+      const newMeta = { ...(selectedAsset.metadata ?? {}), alt_text: editingAlt };
+      const { error } = await supabase
+        .from("registry_media_assets")
+        .update({ metadata: newMeta, updated_at: new Date().toISOString() })
+        .eq("id", selectedAsset.id);
+      if (error) throw error;
+      setSelectedAsset((prev) => prev ? { ...prev, metadata: newMeta } : prev);
+      setAssets((prev) => prev.map((a) => a.id === selectedAsset.id ? { ...a, metadata: newMeta } : a));
+      showToast("success", "Alt text saved.");
+    } catch (err) {
+      showToast("error", err instanceof Error ? err.message : "Save failed.");
+    } finally {
+      setSavingAlt(false);
     }
-    setBucketLoading(false);
-  }, [bucketPath]);
+  };
 
-  useEffect(() => {
-    if (activeTab !== "migrated") return;
-    loadBucket();
-  }, [activeTab, bucketPath, loadBucket]);
-
-  const handleUpload = useCallback(async (files: FileList | null) => {
-    if (!files || files.length === 0) return;
-    setUploading(true);
-
-    let success = 0;
-    let failed = 0;
-
-    for (const file of files) {
-      const path = `cms/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
-      const { error: uploadError } = await supabase.storage
-        .from(CMS_BUCKET)
-        .upload(path, file, {
-          contentType: file.type,
-        });
-
-      if (uploadError) {
-        console.error("Upload error:", uploadError);
-        failed++;
-        continue;
-      }
-
-      const { data: publicData } = supabase.storage.from(CMS_BUCKET).getPublicUrl(path);
-
-      const { error: insertError } = await supabase
-        .from("wk_media_assets")
-        .insert({
-          entity_type: "cms",
-          entity_slug: "upload",
-          role: "upload",
-          url: publicData.publicUrl,
-          source: "manual_upload",
-        });
-
-      if (insertError) {
-        console.error("Insert error:", insertError);
-        failed++;
-      } else {
-        success++;
-      }
+  const handleSaveStatus = async () => {
+    if (!selectedAsset) return;
+    setSavingStatus(true);
+    try {
+      const { error } = await supabase
+        .from("registry_media_assets")
+        .update({ status: editingStatus, updated_at: new Date().toISOString() })
+        .eq("id", selectedAsset.id);
+      if (error) throw error;
+      setSelectedAsset((prev) => prev ? { ...prev, status: editingStatus } : prev);
+      setAssets((prev) => prev.map((a) => a.id === selectedAsset.id ? { ...a, status: editingStatus } : a));
+      showToast("success", "Status updated.");
+    } catch (err) {
+      showToast("error", err instanceof Error ? err.message : "Update failed.");
+    } finally {
+      setSavingStatus(false);
     }
+  };
 
-    setUploading(false);
-    if (success > 0) {
-      await load();
-    }
-    console.log(`Upload complete: ${success} succeeded, ${failed} failed`);
-  }, [load]);
-
-  const handleDelete = useCallback(async (asset: MediaAsset) => {
-    setDeleting(asset.id);
-
-    const url = new URL(asset.url);
-    const pathMatch = url.pathname.match(/\/cms-media\/(.+)$/);
-    const path = pathMatch ? pathMatch[1] : null;
-
-    if (path) {
-      const { error: removeError } = await supabase.storage.from(CMS_BUCKET).remove([path]);
-      if (removeError) {
-        console.error("Storage delete error:", removeError);
-      }
-    }
-
-    const { error: deleteError } = await supabase
-      .from("wk_media_assets")
-      .delete()
-      .eq("id", asset.id);
-
-    if (deleteError) {
-      console.error("DB delete error:", deleteError);
-    }
-
-    setDeleting(null);
-    await load();
-  }, [load]);
-
-  const handleCopy = useCallback(async (url: string) => {
+  const handleCopy = async (url: string) => {
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      console.error("Failed to copy URL");
+      showToast("error", "Failed to copy URL.");
     }
-  }, []);
+  };
 
-  const filtered = media.filter((m) => {
-    const matchesSearch =
-      !search ||
-      m.entity_slug.toLowerCase().includes(search.toLowerCase()) ||
-      m.role.toLowerCase().includes(search.toLowerCase()) ||
-      (m.alt_text?.toLowerCase().includes(search.toLowerCase()) ?? false);
-    const matchesRole = roleFilter === "all" || m.role === roleFilter;
-    const matchesSource = sourceFilter === "all" || m.source === sourceFilter;
-    return matchesSearch && matchesRole && matchesSource;
-  });
+  const toggleBulk = (id: string) => {
+    setBulkSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
-  const paged = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const selectAll = () => {
+    setBulkSelected(new Set(assets.map((a) => a.id)));
+  };
 
-  const roles = ["all", "hero", "artwork", "artist_photo", "label_logo", "inline"];
-  const sources = Array.from(new Set(media.map((m) => m.source))).sort();
+  const clearBulk = () => setBulkSelected(new Set());
+
+  const handleBulkAction = async () => {
+    if (bulkSelected.size === 0) return;
+    setBulkRunning(true);
+    try {
+      const ids = Array.from(bulkSelected);
+      if (bulkAction.startsWith("set_status_")) {
+        const newStatus = bulkAction.replace("set_status_", "");
+        const { error } = await supabase
+          .from("registry_media_assets")
+          .update({ status: newStatus, updated_at: new Date().toISOString() })
+          .in("id", ids);
+        if (error) throw error;
+        showToast("success", `Set ${ids.length} assets to ${newStatus}.`);
+      }
+      clearBulk();
+      fetchAssets();
+    } catch (err) {
+      showToast("error", err instanceof Error ? err.message : "Bulk action failed.");
+    } finally {
+      setBulkRunning(false);
+    }
+  };
+
+  const totalPages = Math.ceil(total / PAGE_SIZE);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <div className="mb-1 text-[11px] font-black uppercase tracking-wider text-wk-brand">
-            Media
-          </div>
-          <h1 className="text-[22px] font-black tracking-tight text-wk-text">
-            Media Library
-          </h1>
+          <div className="mb-1 text-[11px] font-black uppercase tracking-wider text-wk-brand">Media</div>
+          <h1 className="text-[22px] font-black tracking-tight text-wk-text">Media Library</h1>
           <p className="mt-1 text-[13px] text-wk-text-muted">
-            {activeTab === "assets" ? `${media.length} media assets` : "Migrated WordPress images"} in the library.
+            {total.toLocaleString()} assets in registry_media_assets — real data, no mock entries.
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex items-center rounded-lg border border-wk-border bg-wk-bg-subtle p-0.5">
+          {/* View mode toggle */}
+          <div className="flex items-center rounded-lg border border-wk-border bg-wk-bg p-0.5">
             <button
-              onClick={() => setActiveTab("assets")}
-              className={`rounded-md px-3 py-1.5 text-[12px] font-semibold transition-all ${
-                activeTab === "assets"
-                  ? "bg-wk-surface text-wk-text"
-                  : "text-wk-text-muted hover:text-wk-text"
-              }`}
+              onClick={() => setViewMode("grid")}
+              className={`flex h-7 w-7 items-center justify-center rounded-md transition-all ${viewMode === "grid" ? "bg-wk-surface text-wk-brand" : "text-wk-text-muted hover:text-wk-text"}`}
             >
-              Media Assets
+              <WkIcon name="LayoutGrid" size={14} />
             </button>
             <button
-              onClick={() => setActiveTab("migrated")}
-              className={`rounded-md px-3 py-1.5 text-[12px] font-semibold transition-all ${
-                activeTab === "migrated"
-                  ? "bg-wk-surface text-wk-text"
-                  : "text-wk-text-muted hover:text-wk-text"
-              }`}
+              onClick={() => setViewMode("table")}
+              className={`flex h-7 w-7 items-center justify-center rounded-md transition-all ${viewMode === "table" ? "bg-wk-surface text-wk-brand" : "text-wk-text-muted hover:text-wk-text"}`}
             >
-              Migrated Images
+              <WkIcon name="List" size={14} />
             </button>
           </div>
-          {activeTab === "assets" && (
-            <>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                multiple
-                className="hidden"
-                onChange={(e) => handleUpload(e.target.files)}
-              />
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
-                className="wk-button wk-button-primary wk-button-sm whitespace-nowrap disabled:opacity-50"
-              >
-                <WkIcon
-                  name={uploading ? "Loader2" : "Upload"}
-                  size={14}
-                  className={uploading ? "animate-spin" : ""}
-                />
-                {uploading ? "Uploading..." : "Upload"}
-              </button>
-            </>
-          )}
+          <button onClick={() => fetchAssets()} className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap">
+            <WkIcon name="RefreshCw" size={14} />
+            Refresh
+          </button>
         </div>
       </div>
 
-      {/* Media Assets Tab */}
-      {activeTab === "assets" && (
-        <>
-          {/* Filters */}
-          <WkSurface className="p-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <div className="flex items-center gap-2 rounded-lg border border-wk-border bg-wk-bg-subtle px-3 py-2 flex-1 max-w-md">
-                <WkIcon name="Search" size={14} className="text-wk-text-faint" />
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => {
-                    setSearch(e.target.value);
-                    setPage(0);
-                  }}
-                  placeholder="Search media by entity or role..."
-                  className="w-full bg-transparent text-[13px] text-wk-text placeholder:text-wk-text-faint outline-none"
-                />
-                {search && (
-                  <button
-                    onClick={() => {
-                      setSearch("");
-                      setPage(0);
-                    }}
-                    className="text-wk-text-faint hover:text-wk-text"
-                  >
-                    <WkIcon name="X" size={14} />
-                  </button>
-                )}
-              </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <select
-                  value={roleFilter}
-                  onChange={(e) => {
-                    setRoleFilter(e.target.value);
-                    setPage(0);
-                  }}
-                  className="rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text outline-none cursor-pointer"
-                >
-                  <option value="all">All Roles</option>
-                  {roles
-                    .filter((r) => r !== "all")
-                    .map((r) => (
-                      <option key={r} value={r}>
-                        {r.charAt(0).toUpperCase() + r.slice(1).replace("_", " ")}
-                      </option>
-                    ))}
-                </select>
-                <select
-                  value={sourceFilter}
-                  onChange={(e) => {
-                    setSourceFilter(e.target.value);
-                    setPage(0);
-                  }}
-                  className="rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text outline-none cursor-pointer"
-                >
-                  <option value="all">All Sources</option>
-                  {sources.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
-                <span className="text-[12px] text-wk-text-muted whitespace-nowrap">
-                  {filtered.length} of {media.length}
-                </span>
-              </div>
-            </div>
-          </WkSurface>
-
-          {/* Table */}
-          {loading ? (
-            <div className="space-y-3">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="animate-pulse rounded-xl border border-wk-border bg-wk-surface p-4"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-lg bg-wk-surface-raised" />
-                    <div className="flex-1 space-y-2">
-                      <div className="h-4 w-48 rounded bg-wk-surface-raised" />
-                      <div className="h-3 w-32 rounded bg-wk-surface-raised" />
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <>
-              <AdminTable
-                columns={[
-                  {
-                    key: "url",
-                    label: "Preview",
-                    width: "60px",
-                    render: (row) => (
-                      <button
-                        onClick={() => setPreviewing(row)}
-                        className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-wk-surface-raised hover:ring-2 hover:ring-wk-brand cursor-pointer"
-                      >
-                        {row.url ? (
-                          <img
-                            src={row.url}
-                            alt={row.alt_text || ""}
-                            className="h-full w-full object-cover"
-                            loading="lazy"
-                          />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center text-wk-text-faint">
-                            <WkIcon name="Image" size={16} />
-                          </div>
-                        )}
-                      </button>
-                    ),
-                  },
-                  {
-                    key: "entity_slug",
-                    label: "Entity",
-                    render: (row) => (
-                      <div>
-                        <div className="text-[13px] font-semibold text-wk-text">
-                          {row.entity_slug}
-                        </div>
-                        <div className="text-[11px] text-wk-text-muted">
-                          {row.entity_type}
-                        </div>
-                      </div>
-                    ),
-                  },
-                  {
-                    key: "role",
-                    label: "Role",
-                    width: "100px",
-                    render: (row) => (
-                      <span className="wk-tag text-[10px]">{row.role}</span>
-                    ),
-                  },
-                  {
-                    key: "source",
-                    label: "Source",
-                    width: "100px",
-                    render: (row) => (
-                      <span className="text-[12px] text-wk-text-muted">
-                        {row.source}
-                      </span>
-                    ),
-                  },
-                  {
-                    key: "alt_text",
-                    label: "Alt Text",
-                    width: "200px",
-                    render: (row) => (
-                      <span className="text-[12px] text-wk-text-muted">
-                        {row.alt_text || "—"}
-                      </span>
-                    ),
-                  },
-                  {
-                    key: "actions",
-                    label: "",
-                    width: "120px",
-                    render: (row) => (
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => handleCopy(row.url)}
-                          className="rounded-md p-1.5 text-wk-text-muted hover:bg-wk-surface-raised hover:text-wk-brand"
-                          title="Copy URL"
-                        >
-                          <WkIcon name={copied ? "Check" : "Copy"} size={14} />
-                        </button>
-                        <button
-                          onClick={() => setPreviewing(row)}
-                          className="rounded-md p-1.5 text-wk-text-muted hover:bg-wk-surface-raised hover:text-wk-brand"
-                          title="Preview"
-                        >
-                          <WkIcon name="Eye" size={14} />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(row)}
-                          disabled={deleting === row.id}
-                          className="rounded-md p-1.5 text-wk-text-muted hover:bg-wk-surface-raised hover:text-rose-600 disabled:opacity-50"
-                          title="Delete"
-                        >
-                          <WkIcon
-                            name={deleting === row.id ? "Loader2" : "Trash2"}
-                            size={14}
-                            className={deleting === row.id ? "animate-spin" : ""}
-                          />
-                        </button>
-                      </div>
-                    ),
-                  },
-                ]}
-                rows={paged}
-                keyField="id"
-                emptyMessage="No media assets found."
-              />
-
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between rounded-lg border border-wk-border bg-wk-surface px-4 py-3">
-                  <span className="text-[12px] text-wk-text-muted">
-                    Page {page + 1} of {totalPages} ({filtered.length} total)
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setPage((p) => Math.max(0, p - 1))}
-                      disabled={page === 0}
-                      className="rounded-md border border-wk-border px-3 py-1.5 text-[12px] font-semibold text-wk-text hover:bg-wk-surface-raised disabled:opacity-50"
-                    >
-                      Previous
-                    </button>
-                    <button
-                      onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-                      disabled={page >= totalPages - 1}
-                      className="rounded-md border border-wk-border px-3 py-1.5 text-[12px] font-semibold text-wk-text hover:bg-wk-surface-raised disabled:opacity-50"
-                    >
-                      Next
-                    </button>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-        </>
-      )}
-
-      {/* Migrated Images Tab */}
-      {activeTab === "migrated" && (
-        <WkSurface className="p-4">
-          {/* Breadcrumb */}
-          <div className="flex items-center gap-1 mb-4 text-[12px] text-wk-text-muted">
-            <button
-              onClick={() => setBucketPath("wp-import")}
-              className="rounded-md px-2 py-1 hover:bg-wk-surface-raised text-wk-brand font-semibold"
-            >
-              wp-import
-            </button>
-            {bucketPath !== "wp-import" && (
-              <>
-                <WkIcon name="ChevronRight" size={12} />
-                <span className="font-mono">{bucketPath.replace("wp-import/", "")}</span>
-                <button
-                  onClick={() => {
-                    const parts = bucketPath.split("/");
-                    if (parts.length > 1) {
-                      setBucketPath(parts.slice(0, -1).join("/"));
-                    } else {
-                      setBucketPath("wp-import");
-                    }
-                    setSelectedBucketItem(null);
-                  }}
-                  className="ml-2 rounded-md px-2 py-1 text-[11px] hover:bg-wk-surface-raised text-wk-text-muted"
-                >
-                  <WkIcon name="ArrowUp" size={12} />
-                  Up
-                </button>
-              </>
+      {/* Search + Filters */}
+      <WkSurface className="p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center flex-wrap">
+          <div className="flex items-center gap-2 rounded-lg border border-wk-border bg-wk-bg px-3 py-2 flex-1 min-w-[200px]">
+            <WkIcon name="Search" size={14} className="text-wk-text-faint shrink-0" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => handleSearch(e.target.value)}
+              placeholder="Search by title, slug, URL, or source ID…"
+              className="w-full bg-transparent text-[13px] text-wk-text placeholder:text-wk-text-faint outline-none"
+            />
+            {search && (
+              <button onClick={() => handleSearch("")} className="shrink-0 text-wk-text-faint hover:text-wk-text">
+                <WkIcon name="X" size={14} />
+              </button>
             )}
           </div>
+          <div className="flex flex-wrap gap-2">
+            <select
+              value={mediaKindFilter}
+              onChange={(e) => handleFilterChange("kind", e.target.value)}
+              className="rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text outline-none cursor-pointer"
+            >
+              <option value="all">All types</option>
+              <option value="image">Image</option>
+              <option value="external_artist_image_postmeta">Artist photo (external)</option>
+              <option value="external_chart_entry_artwork">Chart artwork (external)</option>
+            </select>
+            <select
+              value={sourceKindFilter}
+              onChange={(e) => handleFilterChange("source", e.target.value)}
+              className="rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text outline-none cursor-pointer"
+            >
+              <option value="all">All sources</option>
+              <option value="wordpress_database">WordPress</option>
+              <option value="external_artist_image_postmeta">Artist postmeta</option>
+              <option value="external_chart_entry_artwork">Chart artwork</option>
+            </select>
+            <select
+              value={statusFilter}
+              onChange={(e) => handleFilterChange("status", e.target.value)}
+              className="rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text outline-none cursor-pointer"
+            >
+              <option value="all">All statuses</option>
+              <option value="active">Active</option>
+              <option value="archived">Archived</option>
+              <option value="needs_review">Needs review</option>
+              <option value="rejected">Rejected</option>
+            </select>
+            <label className="flex items-center gap-2 rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text cursor-pointer whitespace-nowrap">
+              <input
+                type="checkbox"
+                checked={missingAltOnly}
+                onChange={(e) => {
+                  setMissingAltOnly(e.target.checked);
+                  setPage(0);
+                }}
+                className="rounded"
+              />
+              Missing alt text
+            </label>
+          </div>
+        </div>
+      </WkSurface>
 
-          {bucketLoading ? (
-            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-4">
-              {Array.from({ length: 12 }).map((_, i) => (
-                <div key={i} className="aspect-square animate-pulse rounded-lg bg-wk-surface-raised" />
-              ))}
-            </div>
-          ) : bucketItems.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-wk-text-muted">
+      {/* Bulk actions bar */}
+      {bulkSelected.size > 0 && (
+        <div className="flex items-center gap-3 rounded-xl border border-wk-brand/20 bg-wk-brand-soft px-4 py-3">
+          <span className="text-[13px] font-bold text-wk-brand">{bulkSelected.size} selected</span>
+          <select
+            value={bulkAction}
+            onChange={(e) => setBulkAction(e.target.value)}
+            className="rounded-lg border border-wk-border bg-wk-surface px-3 py-1.5 text-[12px] text-wk-text outline-none cursor-pointer"
+          >
+            <option value="set_status_active">Set status: Active</option>
+            <option value="set_status_archived">Set status: Archived</option>
+            <option value="set_status_needs_review">Set status: Needs review</option>
+          </select>
+          <button
+            onClick={handleBulkAction}
+            disabled={bulkRunning}
+            className="wk-button wk-button-primary wk-button-sm whitespace-nowrap"
+          >
+            {bulkRunning ? <><WkIcon name="Loader2" size={13} className="animate-spin inline mr-1" /> Running…</> : "Apply"}
+          </button>
+          <button onClick={selectAll} className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap">Select all</button>
+          <button onClick={clearBulk} className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap">Clear</button>
+        </div>
+      )}
+
+      {/* Load error */}
+      {loadError && (
+        <div className="flex flex-col items-center justify-center py-12 gap-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-wk-danger-soft text-wk-danger">
+            <WkIcon name="AlertTriangle" size={22} />
+          </div>
+          <p className="text-[14px] font-bold text-wk-text">Failed to load media assets</p>
+          <p className="text-[13px] text-wk-text-muted">{loadError}</p>
+          <button onClick={() => fetchAssets()} className="wk-button wk-button-primary wk-button-sm">
+            <WkIcon name="RefreshCw" size={14} /> Retry
+          </button>
+        </div>
+      )}
+
+      {/* Loading */}
+      {loading && !loadError && (
+        <div className={viewMode === "grid" ? "grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3" : "space-y-2"}>
+          {Array.from({ length: 18 }).map((_, i) => (
+            <div key={i} className={`animate-pulse rounded-xl bg-wk-surface-raised ${viewMode === "grid" ? "aspect-square" : "h-14"}`} />
+          ))}
+        </div>
+      )}
+
+      {/* Grid view */}
+      {!loading && !loadError && viewMode === "grid" && (
+        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
+          {assets.length === 0 ? (
+            <div className="col-span-full flex flex-col items-center justify-center py-20 text-wk-text-muted">
               <WkIcon name="Image" size={40} className="mb-3 text-wk-text-faint" />
-              <p className="text-[14px] font-semibold">No images in this folder</p>
-              <p className="text-[12px] mt-1">This folder may be empty or the migration is still in progress.</p>
+              <p className="text-[14px] font-semibold">No media assets found</p>
+              <p className="text-[12px] mt-1">Try adjusting your search or filters.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-4">
-              {bucketItems.map((item) => (
-                <button
-                  key={item.path}
-                  onClick={() => {
-                    if (item.isFolder) {
-                      setBucketPath(item.path);
-                      setSelectedBucketItem(null);
-                    } else {
-                      setSelectedBucketItem(item);
-                    }
-                  }}
-                  className={`group relative aspect-square overflow-hidden rounded-lg border bg-wk-surface-raised transition-all text-left ${
-                    item.isFolder
-                      ? "border-wk-border hover:border-wk-border-2"
-                      : selectedBucketItem?.path === item.path
-                      ? "ring-2 ring-wk-brand border-wk-brand"
-                      : "border-wk-border hover:border-wk-border-2"
-                  }`}
+            assets.map((asset) => (
+              <div
+                key={asset.id}
+                className={`group relative aspect-square overflow-hidden rounded-xl border cursor-pointer transition-all ${
+                  bulkSelected.has(asset.id)
+                    ? "ring-2 ring-wk-brand border-wk-brand"
+                    : "border-wk-border hover:border-wk-border-2"
+                }`}
+                onClick={() => openDrawer(asset)}
+              >
+                {/* Bulk select checkbox */}
+                <div
+                  className="absolute top-1.5 left-1.5 z-10"
+                  onClick={(e) => { e.stopPropagation(); toggleBulk(asset.id); }}
                 >
-                  {item.isFolder ? (
-                    <div className="flex h-full flex-col items-center justify-center gap-2 text-wk-text-muted">
-                      <WkIcon name="Folder" size={32} />
-                      <span className="text-[11px] font-semibold truncate max-w-full px-2">{item.name}</span>
-                    </div>
-                  ) : (
-                    <>
-                      <img
-                        src={item.publicUrl}
-                        alt={item.name}
-                        className="h-full w-full object-cover"
-                        loading="lazy"
-                        onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-                      />
-                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
-                        <p className="text-[10px] font-semibold text-white truncate">{item.name}</p>
-                      </div>
-                    </>
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* Selected item details */}
-          {selectedBucketItem && !selectedBucketItem.isFolder && (
-            <div className="mt-6 rounded-lg border border-wk-border bg-wk-bg-subtle p-4">
-              <div className="flex items-start gap-4">
-                <div className="h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-wk-surface-raised">
-                  <img
-                    src={selectedBucketItem.publicUrl}
-                    alt={selectedBucketItem.name}
-                    className="h-full w-full object-cover"
-                  />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[13px] font-semibold text-wk-text truncate">{selectedBucketItem.name}</p>
-                  <p className="text-[11px] font-mono text-wk-text-muted mt-1 break-all">{selectedBucketItem.publicUrl}</p>
-                  <div className="mt-3 flex items-center gap-2">
-                    <button
-                      onClick={() => selectedBucketItem.publicUrl && handleCopy(selectedBucketItem.publicUrl)}
-                      className="inline-flex items-center gap-1.5 rounded-md border border-wk-border px-3 py-1.5 text-[12px] font-semibold text-wk-text hover:bg-wk-surface-raised"
-                    >
-                      <WkIcon name={copied ? "Check" : "Copy"} size={13} />
-                      {copied ? "Copied" : "Copy URL"}
-                    </button>
-                    <a
-                      href={selectedBucketItem.publicUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 rounded-md border border-wk-border px-3 py-1.5 text-[12px] font-semibold text-wk-text hover:bg-wk-surface-raised"
-                    >
-                      <WkIcon name="ExternalLink" size={13} />
-                      Open
-                    </a>
+                  <div className={`h-5 w-5 rounded-md border-2 flex items-center justify-center transition-all ${
+                    bulkSelected.has(asset.id)
+                      ? "border-wk-brand bg-wk-brand"
+                      : "border-white/80 bg-black/30 opacity-0 group-hover:opacity-100"
+                  }`}>
+                    {bulkSelected.has(asset.id) && <WkIcon name="Check" size={11} className="text-white" />}
                   </div>
                 </div>
+
+                {asset.url ? (
+                  <img
+                    src={asset.url}
+                    alt={String(asset.metadata?.alt_text ?? asset.title ?? "")}
+                    className="h-full w-full object-cover object-top"
+                    loading="lazy"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = "none";
+                    }}
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center bg-wk-surface-raised text-wk-text-faint">
+                    <WkIcon name="Image" size={24} />
+                  </div>
+                )}
+
+                {/* Status badge */}
+                {asset.status && asset.status !== "active" && (
+                  <div className="absolute top-1.5 right-1.5">
+                    <span className="inline-flex rounded-full bg-wk-warning px-1.5 py-0.5 text-[8px] font-black text-white uppercase">
+                      {asset.status}
+                    </span>
+                  </div>
+                )}
+
+                {/* Hover overlay */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2">
+                  <p className="text-[10px] font-semibold text-white truncate">
+                    {asset.title || asset.slug || asset.id.slice(0, 8)}
+                  </p>
+                </div>
               </div>
-            </div>
+            ))
           )}
+        </div>
+      )}
+
+      {/* Table view */}
+      {!loading && !loadError && viewMode === "table" && (
+        <WkSurface className="overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-[12px]">
+              <thead className="border-b border-wk-border bg-wk-surface-raised text-[10px] uppercase tracking-wider text-wk-text-faint">
+                <tr>
+                  <th className="px-3 py-3 w-8">
+                    <input
+                      type="checkbox"
+                      checked={bulkSelected.size === assets.length && assets.length > 0}
+                      onChange={(e) => e.target.checked ? selectAll() : clearBulk()}
+                      className="rounded"
+                    />
+                  </th>
+                  <th className="px-3 py-3 w-14">Image</th>
+                  <th className="px-3 py-3">Title / Slug</th>
+                  <th className="px-3 py-3">Type</th>
+                  <th className="px-3 py-3">Source</th>
+                  <th className="px-3 py-3">Status</th>
+                  <th className="px-3 py-3">Record ID</th>
+                  <th className="px-3 py-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-wk-border">
+                {assets.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="px-4 py-10 text-center text-wk-text-muted">
+                      No media assets found.
+                    </td>
+                  </tr>
+                ) : (
+                  assets.map((asset) => (
+                    <tr key={asset.id} className="hover:bg-wk-surface-raised">
+                      <td className="px-3 py-3">
+                        <input
+                          type="checkbox"
+                          checked={bulkSelected.has(asset.id)}
+                          onChange={() => toggleBulk(asset.id)}
+                          className="rounded"
+                        />
+                      </td>
+                      <td className="px-3 py-3">
+                        <button onClick={() => openDrawer(asset)} className="cursor-pointer">
+                          <div className="h-10 w-10 overflow-hidden rounded-lg bg-wk-surface-raised">
+                            {asset.url ? (
+                              <img
+                                src={asset.url}
+                                alt={String(asset.metadata?.alt_text ?? "")}
+                                className="h-full w-full object-cover object-top"
+                                loading="lazy"
+                                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                              />
+                            ) : (
+                              <div className="flex h-full w-full items-center justify-center text-wk-text-faint">
+                                <WkIcon name="Image" size={14} />
+                              </div>
+                            )}
+                          </div>
+                        </button>
+                      </td>
+                      <td className="px-3 py-3">
+                        <button onClick={() => openDrawer(asset)} className="text-left cursor-pointer hover:text-wk-brand">
+                          <div className="font-semibold text-wk-text truncate max-w-[200px]">
+                            {asset.title || "(no title)"}
+                          </div>
+                          <div className="text-wk-text-faint font-mono text-[10px] truncate max-w-[200px]">
+                            {asset.slug}
+                          </div>
+                        </button>
+                      </td>
+                      <td className="px-3 py-3">
+                        <span className="rounded-full bg-wk-surface-raised px-2 py-0.5 text-[10px] font-bold text-wk-text-muted">
+                          {asset.media_kind ?? "—"}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 text-wk-text-muted">
+                        {asset.source_kind ?? "—"}
+                      </td>
+                      <td className="px-3 py-3">
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase ${
+                          asset.status === "active"
+                            ? "bg-wk-success-soft text-wk-success"
+                            : asset.status === "needs_review"
+                            ? "bg-wk-warning-soft text-wk-warning"
+                            : "bg-wk-surface-raised text-wk-text-muted"
+                        }`}>
+                          {asset.status ?? "—"}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 font-mono text-wk-text-faint text-[10px]">
+                        {asset.source_record_id?.slice(0, 12) ?? "—"}
+                      </td>
+                      <td className="px-3 py-3">
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={() => asset.url && handleCopy(asset.url)}
+                            className="rounded-md p-1.5 text-wk-text-muted hover:bg-wk-surface-raised hover:text-wk-brand cursor-pointer"
+                            title="Copy URL"
+                          >
+                            <WkIcon name={copied ? "Check" : "Copy"} size={13} />
+                          </button>
+                          <button
+                            onClick={() => openDrawer(asset)}
+                            className="rounded-md p-1.5 text-wk-text-muted hover:bg-wk-surface-raised hover:text-wk-brand cursor-pointer"
+                            title="Open drawer"
+                          >
+                            <WkIcon name="PanelRight" size={13} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </WkSurface>
       )}
 
-      {/* Preview Modal */}
-      {previewing && (
+      {/* Pagination */}
+      {!loading && !loadError && totalPages > 1 && (
+        <div className="flex items-center justify-between rounded-lg border border-wk-border bg-wk-surface px-4 py-3">
+          <span className="text-[12px] text-wk-text-muted">
+            Page {page + 1} of {totalPages} · {total.toLocaleString()} total
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={page === 0}
+              className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap disabled:opacity-50"
+            >
+              Previous
+            </button>
+            {/* Page number buttons */}
+            {Array.from({ length: Math.min(5, totalPages) }).map((_, i) => {
+              const pg = Math.max(0, Math.min(page - 2 + i, totalPages - 1));
+              return (
+                <button
+                  key={pg}
+                  onClick={() => setPage(pg)}
+                  className={`h-8 w-8 rounded-md text-[12px] font-bold whitespace-nowrap ${
+                    pg === page
+                      ? "bg-wk-brand text-wk-brand-on"
+                      : "border border-wk-border text-wk-text hover:bg-wk-surface-raised"
+                  }`}
+                >
+                  {pg + 1}
+                </button>
+              );
+            })}
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+              disabled={page >= totalPages - 1}
+              className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap disabled:opacity-50"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Preview / Edit Drawer */}
+      {selectedAsset && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
-          onClick={() => setPreviewing(null)}
+          className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-sm"
+          onClick={() => setSelectedAsset(null)}
         >
-          <div
-            className="relative max-h-[90vh] max-w-[90vw] rounded-2xl border border-wk-border bg-wk-surface p-4 shadow-2xl"
+          <aside
+            className="relative flex h-full w-full max-w-md flex-col bg-wk-surface shadow-2xl overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            <button
-              onClick={() => setPreviewing(null)}
-              className="absolute right-3 top-3 z-10 rounded-full bg-black/50 p-1.5 text-white hover:bg-black/70"
-            >
-              <WkIcon name="X" size={16} />
-            </button>
-            <img
-              src={previewing.url}
-              alt={previewing.alt_text || previewing.entity_slug}
-              className="max-h-[80vh] max-w-[85vw] rounded-xl object-contain"
-            />
-            <div className="mt-3 flex items-center justify-between gap-4">
+            {/* Drawer header */}
+            <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-wk-border bg-wk-surface px-5 py-4">
               <div>
-                <p className="text-[13px] font-semibold text-wk-text">
-                  {previewing.entity_slug}
-                </p>
-                <p className="text-[11px] text-wk-text-muted">
-                  {previewing.entity_type} / {previewing.role} / {previewing.source}
+                <p className="text-[11px] font-black uppercase tracking-wider text-wk-text-faint">Media Asset</p>
+                <p className="text-[14px] font-black text-wk-text truncate max-w-[260px]">
+                  {selectedAsset.title || selectedAsset.slug || selectedAsset.id.slice(0, 12)}
                 </p>
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => handleCopy(previewing.url)}
-                  className="rounded-md border border-wk-border px-3 py-1.5 text-[12px] font-semibold text-wk-text hover:bg-wk-surface-raised"
-                >
-                  <WkIcon name={copied ? "Check" : "Copy"} size={14} />
-                  {copied ? "Copied" : "Copy URL"}
-                </button>
-                <a
-                  href={previewing.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="rounded-md border border-wk-border px-3 py-1.5 text-[12px] font-semibold text-wk-text hover:bg-wk-surface-raised"
-                >
-                  <WkIcon name="ExternalLink" size={14} />
-                </a>
+              <button
+                onClick={() => setSelectedAsset(null)}
+                className="flex h-8 w-8 items-center justify-center rounded-xl border border-wk-border text-wk-text-muted hover:border-wk-brand hover:text-wk-text cursor-pointer"
+              >
+                <WkIcon name="X" size={15} />
+              </button>
+            </div>
+
+            <div className="flex-1 p-5 space-y-5">
+              {/* Large preview */}
+              {selectedAsset.url && (
+                <div className="aspect-video w-full overflow-hidden rounded-xl border border-wk-border bg-wk-surface-raised">
+                  <img
+                    src={selectedAsset.url}
+                    alt={String(selectedAsset.metadata?.alt_text ?? selectedAsset.title ?? "")}
+                    className="h-full w-full object-contain"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                  />
+                </div>
+              )}
+
+              {/* URL */}
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-wk-text-faint mb-1">URL</p>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 min-w-0 rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-[11px] font-mono text-wk-text-soft break-all">
+                    {selectedAsset.url || "—"}
+                  </code>
+                  {selectedAsset.url && (
+                    <button
+                      onClick={() => handleCopy(selectedAsset.url!)}
+                      className="shrink-0 flex items-center gap-1 rounded-lg border border-wk-border px-3 py-2 text-[11px] font-bold text-wk-text hover:bg-wk-surface-raised cursor-pointer whitespace-nowrap"
+                    >
+                      <WkIcon name={copied ? "Check" : "Copy"} size={13} />
+                      {copied ? "Copied" : "Copy"}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Alt text editor */}
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-wk-text-faint mb-1">Alt Text</p>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={editingAlt}
+                    onChange={(e) => setEditingAlt(e.target.value)}
+                    placeholder="Describe the image for accessibility…"
+                    className="flex-1 rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-[13px] text-wk-text outline-none focus:border-wk-brand"
+                  />
+                  <button
+                    onClick={handleSaveAlt}
+                    disabled={savingAlt}
+                    className="shrink-0 wk-button wk-button-primary wk-button-sm whitespace-nowrap"
+                  >
+                    {savingAlt ? <><WkIcon name="Loader2" size={13} className="animate-spin inline mr-1" />Saving</> : "Save"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Status editor */}
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-wk-text-faint mb-1">Status</p>
+                <div className="flex gap-2">
+                  <select
+                    value={editingStatus}
+                    onChange={(e) => setEditingStatus(e.target.value)}
+                    className="flex-1 rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-[13px] text-wk-text outline-none focus:border-wk-brand cursor-pointer"
+                  >
+                    <option value="active">Active</option>
+                    <option value="archived">Archived</option>
+                    <option value="needs_review">Needs review</option>
+                    <option value="rejected">Rejected</option>
+                  </select>
+                  <button
+                    onClick={handleSaveStatus}
+                    disabled={savingStatus}
+                    className="shrink-0 wk-button wk-button-primary wk-button-sm whitespace-nowrap"
+                  >
+                    {savingStatus ? "Saving…" : "Save"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Metadata */}
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-wk-text-faint mb-2">Details</p>
+                <div className="space-y-1.5">
+                  {[
+                    { label: "ID", value: selectedAsset.id },
+                    { label: "Slug", value: selectedAsset.slug },
+                    { label: "Type", value: selectedAsset.media_kind },
+                    { label: "MIME", value: selectedAsset.mime_type },
+                    { label: "Source kind", value: selectedAsset.source_kind },
+                    { label: "Source entity", value: selectedAsset.source_entity },
+                    { label: "Source record ID", value: selectedAsset.source_record_id },
+                    { label: "Staging record ID", value: selectedAsset.source_staging_record_id },
+                    { label: "Created", value: selectedAsset.created_at ? new Date(selectedAsset.created_at).toLocaleString() : null },
+                    { label: "Updated", value: selectedAsset.updated_at ? new Date(selectedAsset.updated_at).toLocaleString() : null },
+                  ].map(({ label, value }) => (
+                    <div key={label} className="flex items-start justify-between gap-3">
+                      <span className="text-[11px] text-wk-text-faint shrink-0">{label}</span>
+                      <span className="text-[11px] text-wk-text-soft font-mono text-right break-all max-w-[240px]">
+                        {value ?? "—"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Usage / linked entity */}
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-wk-text-faint mb-2">Linked entity</p>
+                <div className="rounded-lg border border-wk-border bg-wk-bg p-3">
+                  {selectedAsset.source_entity ? (
+                    <div>
+                      <p className="text-[12px] font-bold text-wk-text">{selectedAsset.source_entity}</p>
+                      <p className="text-[11px] text-wk-text-muted mt-0.5">
+                        Entity type inferred from source: {guessEntityType(selectedAsset)}
+                      </p>
+                      {ENTITY_ROUTES[guessEntityType(selectedAsset)] && (
+                        <a
+                          href={`${ENTITY_ROUTES[guessEntityType(selectedAsset)]}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-2 inline-flex items-center gap-1 text-[11px] text-wk-brand hover:underline"
+                        >
+                          <WkIcon name="ExternalLink" size={11} />
+                          Browse {guessEntityType(selectedAsset)} pages
+                        </a>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-[12px] text-wk-text-muted">
+                      <WkIcon name="AlertTriangle" size={13} className="inline mr-1 text-wk-warning" />
+                      Linked entity not found — needs repair
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
+          </aside>
+        </div>
+      )}
+
+      {/* Toast */}
+      {toast && (
+        <div className={`fixed bottom-6 right-6 z-[999] flex items-center gap-2 rounded-xl border px-4 py-3 text-[13px] font-semibold shadow-lg ${
+          toast.type === "success"
+            ? "border-wk-success/20 bg-wk-success-soft text-wk-success"
+            : "border-wk-danger/20 bg-wk-danger-soft text-wk-danger"
+        }`}>
+          <WkIcon name={toast.type === "success" ? "CheckCircle2" : "XCircle"} size={16} />
+          {toast.msg}
         </div>
       )}
     </div>

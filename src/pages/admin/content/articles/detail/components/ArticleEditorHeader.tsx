@@ -16,6 +16,8 @@ interface Props {
   onPreview: () => void;
   userCanPublish?: boolean;
   userCanEditOthers?: boolean;
+  isAdmin?: boolean;
+  articleOwner?: string | null;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -42,6 +44,8 @@ export function ArticleEditorHeader({
   onPreview,
   userCanPublish = true,
   userCanEditOthers = true,
+  isAdmin = false,
+  articleOwner = null,
 }: Props) {
   const navigate = useNavigate();
   const statusColor = status ? (STATUS_COLORS[status] ?? STATUS_COLORS.draft) : STATUS_COLORS.draft;
@@ -78,8 +82,22 @@ export function ArticleEditorHeader({
               Unsaved
             </span>
           )}
+          {isAdmin && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-wk-brand-soft px-2.5 py-0.5 text-[10px] font-bold text-wk-brand">
+              <WkIcon name="Shield" size={10} />
+              Admin
+            </span>
+          )}
         </div>
-        <p className="mt-1 text-[12px] text-wk-text-faint font-mono">{slug}</p>
+        <div className="mt-1 flex items-center gap-2 text-[12px] text-wk-text-faint">
+          <span className="font-mono">{slug}</span>
+          {isAdmin && articleOwner && (
+            <>
+              <span className="text-wk-border">|</span>
+              <span>Owner: {articleOwner}</span>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Right: action buttons */}

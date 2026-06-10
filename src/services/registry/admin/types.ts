@@ -57,6 +57,12 @@ export interface RegistrySaveResult {
   message?: string;
   /** Set when stale_update: the current server-side entity state */
   currentEntity?: Record<string, unknown>;
+  /** Set when duplicate_key: the field that caused the conflict */
+  duplicateField?: string | null;
+  /** Set when duplicate_key: the value that caused the conflict */
+  duplicateValue?: string | null;
+  /** Set when duplicate_key: the conflicting entity */
+  conflictingEntity?: Record<string, unknown> | null;
 }
 
 export interface RegistryEntityProfile {

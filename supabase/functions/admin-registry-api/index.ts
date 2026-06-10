@@ -61,7 +61,6 @@ async function userCanManageRegistry(
 
   const roleKeys = data.map((r: { role_key: string }) => r.role_key);
 
-  // Administrators always pass
   if (roleKeys.includes("administrator")) return true;
 
   const { data: caps } = await adminClient
@@ -107,7 +106,6 @@ Deno.serve(async (req) => {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-  // ── Auth ──
   const authHeader = req.headers.get("Authorization");
   if (!authHeader) {
     return jsonResponse({
@@ -133,7 +131,6 @@ Deno.serve(async (req) => {
 
   const adminClient = createClient(supabaseUrl, supabaseKey);
 
-  // ── Permission guard ──
   const canManage = await userCanManageRegistry(adminClient, user.id);
   if (!canManage) {
     return jsonResponse({
@@ -149,7 +146,6 @@ Deno.serve(async (req) => {
   const segments = rawPath.split("/").filter(Boolean);
 
   try {
-    // ── GET /entities?entityType=… ──
     if (req.method === "GET" && segments[0] === "entities" && segments.length === 1) {
       const entityType = url.searchParams.get("entityType") ?? "";
       if (!entityType || !VALID_ENTITY_TYPES.includes(entityType)) {
@@ -182,7 +178,6 @@ Deno.serve(async (req) => {
       return jsonResponse({ ok: true, data: data ?? [] });
     }
 
-    // ── GET /entities/:entityType/:entityId ──
     if (req.method === "GET" && segments[0] === "entities" && segments.length === 3) {
       const entityType = segments[1];
       const entityId = segments[2];
@@ -221,7 +216,6 @@ Deno.serve(async (req) => {
       return jsonResponse({ ok: true, data });
     }
 
-    // ── PATCH /entities/:entityType/:entityId ──
     if (req.method === "PATCH" && segments[0] === "entities" && segments.length === 3) {
       const entityType = segments[1];
       const entityId = segments[2];
@@ -276,7 +270,6 @@ Deno.serve(async (req) => {
 
       const table = TABLE_MAP[entityType];
 
-      // Fetch current entity state
       const { data: currentEntity } = await adminClient
         .from(table)
         .select("*")
@@ -291,7 +284,6 @@ Deno.serve(async (req) => {
         }, 404);
       }
 
-      // ── Stale-update detection ──
       if (expectedUpdatedAt) {
         const currentUpdatedAt = String(currentEntity.updated_at ?? "");
         if (currentUpdatedAt && currentUpdatedAt !== expectedUpdatedAt) {
@@ -310,7 +302,6 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Snapshot before-value
       const beforeSnapshot: Record<string, unknown> = {};
       for (const key of Object.keys(safePatch)) {
         beforeSnapshot[key] = currentEntity[key] ?? null;
@@ -328,12 +319,48 @@ Deno.serve(async (req) => {
       if (error) {
         const message = error.message ?? "Unknown error";
         let errorCode = "save_failed";
+        let conflictingEntity: Record<string, unknown> | null = null;
+        let duplicateField: string | null = null;
+        let duplicateValue: string | null = null;
 
-        if (message.toLowerCase().includes("duplicate")) {
+        const msgLower = message.toLowerCase();
+        if (msgLower.includes("duplicate key value violates unique constraint")) {
           errorCode = "duplicate_key";
-        } else if (message.toLowerCase().includes("foreign key")) {
+          const valueMatch = message.match(/Key \(([^)]+)\)=\(([^)]+)\)/);
+          if (valueMatch) {
+            duplicateField = valueMatch[1];
+            duplicateValue = valueMatch[2];
+          }
+          if (!duplicateField) {
+            const match = message.match(/unique constraint \"([^\"]+)\"/);
+            if (match) {
+              const parts = match[1].split("_");
+              if (parts.length >= 3) {
+                duplicateField = parts[parts.length - 2];
+              }
+            }
+          }
+          if (duplicateField && duplicateValue && duplicateField !== "id") {
+            const { data: conflict } = await adminClient
+              .from(table)
+              .select("id, title, slug, name, display_name, status")
+              .eq(duplicateField, duplicateValue)
+              .neq("id", entityId)
+              .limit(1)
+              .maybeSingle();
+            if (conflict) {
+              const displayName = conflict.title || conflict.name || conflict.display_name || conflict.slug || conflict.id;
+              conflictingEntity = {
+                id: conflict.id,
+                title: displayName,
+                slug: conflict.slug,
+                status: conflict.status,
+              };
+            }
+          }
+        } else if (msgLower.includes("foreign key")) {
           errorCode = "foreign_key_violation";
-        } else if (message.toLowerCase().includes("not null")) {
+        } else if (msgLower.includes("not null")) {
           errorCode = "required_field_missing";
         }
 
@@ -347,10 +374,12 @@ Deno.serve(async (req) => {
           warnings: [],
           errorCode,
           message,
+          conflictingEntity,
+          duplicateField,
+          duplicateValue,
         }, 409);
       }
 
-      // ── Write audit log (non-blocking) ──
       writeAuditLog(adminClient, {
         actorId: user.id,
         actorLabel,

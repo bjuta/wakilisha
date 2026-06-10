@@ -167,13 +167,20 @@ export function MobileAppLayout() {
   const location = useLocation();
   const { currentTrack, isFullPlayerOpen } = usePlayer();
   const showMiniPlayer = !!currentTrack && location.pathname !== "/auth";
-  const bottomPadding = showMiniPlayer ? 148 : 88;
+  // Base nav height 64px + safe-area (approximated as 34px max for iPhone notch models)
+  // With miniplayer: add another 64px (60px player + 4px gap)
+  const bottomPadding = showMiniPlayer
+    ? "calc(64px + max(env(safe-area-inset-bottom), 8px) + 64px + 16px)"
+    : "calc(64px + max(env(safe-area-inset-bottom), 8px) + 8px)";
 
   useScrollLock(isFullPlayerOpen);
 
   return (
     <div className="wk-app-shell min-h-screen flex flex-col">
-      <main className="flex-1 overflow-y-auto overflow-x-hidden" style={{ paddingBottom: bottomPadding }}>
+      <main
+        className="flex-1 overflow-y-auto overflow-x-hidden"
+        style={{ paddingBottom: bottomPadding }}
+      >
         <Outlet />
       </main>
       <MobileMiniPlayer />
@@ -182,7 +189,7 @@ export function MobileAppLayout() {
         <div
           data-scroll-lock="container"
           className="fixed inset-0 z-[90] overflow-y-auto bg-[var(--wk-bg)]"
-          style={{ animation: "slideUp 0.35s cubic-bezier(.16,1,.3,1)" }}
+          style={{ minHeight: "100dvh", animation: "slideUp 0.35s cubic-bezier(.16,1,.3,1)" }}
         >
           <MobileFullPlayer />
         </div>

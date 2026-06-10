@@ -131,6 +131,34 @@ export async function attachProviderResultToShell(
   return (payload.data ?? payload) as CreateReleaseShellResult;
 }
 
+export async function backfillExistingRelease(
+  input: IntakeCreateInput & { targetRegistryEntityId: string },
+): Promise<CreateReleaseShellResult> {
+  const response = await fetch(`${INTAKE_API_BASE}/release-shells/intake/backfill`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      ...input,
+      mode: "backfill_existing_release",
+    }),
+  });
+
+  if (!isJsonContentType(response)) {
+    throw apiUnavailableError();
+  }
+
+  const payload = (await response.json()) as {
+    data?: CreateReleaseShellResult;
+    message?: string;
+  } & Partial<CreateReleaseShellResult>;
+
+  if (!response.ok) {
+    throw new Error(payload.message ?? "Failed to backfill existing release from provider result.");
+  }
+
+  return (payload.data ?? payload) as CreateReleaseShellResult;
+}
+
 export type ProviderConnectionTestResult = {
   provider: string;
   storefront: string;

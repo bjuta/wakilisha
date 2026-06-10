@@ -74,6 +74,7 @@ export default function ArticleDetailPage() {
 
   const userCanPublish = adminUser.can("publish_articles");
   const userCanEditOthers = adminUser.can("edit_others_articles");
+  const isAdmin = adminUser.role === "administrator" || adminUser.can("admin_god_mode");
 
   const [article, setArticle] = useState<ArticleRecord | null>(null);
   const [loading, setLoading] = useState(true);
@@ -143,7 +144,8 @@ export default function ArticleDetailPage() {
       setHeroImageUrl(rewriteWpImageUrl(data.hero_image_url ?? ""));
 
       // Check ownership: writers/authors can only edit their own articles
-      if (!userCanEditOthers) {
+      // Administrator bypasses all ownership gates
+      if (!isAdmin && !userCanEditOthers) {
         const articleAuthor = (data.author ?? "").toLowerCase();
         const currentUserName = adminUser.name?.toLowerCase() ?? "";
         if (articleAuthor && currentUserName && articleAuthor !== currentUserName && !articleAuthor.includes(currentUserName)) {
@@ -585,7 +587,9 @@ export default function ArticleDetailPage() {
         onDelete={() => setShowDeleteConfirm(true)}
         onPreview={handlePreview}
         userCanPublish={userCanPublish}
-        userCanEditOthers={userCanEditOthers}
+        userCanEditOthers={userCanEditOthers || isAdmin}
+        isAdmin={isAdmin}
+        articleOwner={article.author}
       />
 
       {/* Keyboard hint */}

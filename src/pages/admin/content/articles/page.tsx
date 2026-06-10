@@ -102,9 +102,15 @@ export default function AdminArticlesPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button className="wk-button wk-button-primary wk-button-sm whitespace-nowrap">
+          <button
+            onClick={() => navigate("/admin/content/articles/new")}
+            className="wk-button wk-button-primary wk-button-sm whitespace-nowrap"
+            title="Create a new article (coming soon)"
+            disabled
+          >
             <WkIcon name="Plus" size={14} />
             New Article
+            <span className="ml-1 rounded-full bg-wk-brand-on/20 px-1.5 py-0.5 text-[8px] uppercase font-black">soon</span>
           </button>
         </div>
       </div>

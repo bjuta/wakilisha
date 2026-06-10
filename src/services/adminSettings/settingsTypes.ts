@@ -342,8 +342,52 @@ export interface MaintenanceSettings { debugMode: boolean; lastIntegrityCheck: s
 export const DEFAULT_MAINTENANCE_SETTINGS: MaintenanceSettings = { debugMode: false, lastIntegrityCheck: null, lastDuplicateScan: null, lastOrphanedScan: null, lastSnapshotIntegrityCheck: null };
 
 /* ──────── Navigation Settings ──────── */
-export interface NavigationSettings { adminNavCollapsed: boolean; publicNavItems: { label: string; path: string; visible: boolean; order: number }[]; shareConfig: { enabled: boolean; platforms: string[] } }
-export const DEFAULT_NAVIGATION_SETTINGS: NavigationSettings = { adminNavCollapsed: false, publicNavItems: [{ label: "Home", path: "/", visible: true, order: 1 }, { label: "Charts", path: "/charts", visible: true, order: 2 }, { label: "Artists", path: "/artists", visible: true, order: 3 }, { label: "Magazine", path: "/magazine", visible: true, order: 4 }], shareConfig: { enabled: true, platforms: ["x", "facebook", "whatsapp"] } };
+export interface SharePlatform {
+  id: string;
+  label: string;
+  icon: string;
+  enabled: boolean;
+  template?: string;
+}
+
+export interface NavigationSettings {
+  adminNavCollapsed: boolean;
+  publicNavItems: { label: string; path: string; visible: boolean; order: number }[];
+  shareConfig: {
+    enabled: boolean;
+    platforms: string[];
+    sharePlatforms?: SharePlatform[];
+  };
+}
+
+export const DEFAULT_SHARE_PLATFORMS: SharePlatform[] = [
+  { id: "copy_link", label: "Copy Link", icon: "ri-link", enabled: true },
+  { id: "native_share", label: "Native Share", icon: "ri-share-line", enabled: true },
+  { id: "whatsapp", label: "WhatsApp", icon: "ri-whatsapp-line", enabled: true, template: "Check out {title} on WAKILISHA: {url}" },
+  { id: "x", label: "X (Twitter)", icon: "ri-twitter-x-line", enabled: true, template: "{title} {url} via @wakilisha" },
+  { id: "facebook", label: "Facebook", icon: "ri-facebook-line", enabled: false },
+  { id: "threads", label: "Threads", icon: "ri-threads-line", enabled: false, template: "{title} {url}" },
+  { id: "linkedin", label: "LinkedIn", icon: "ri-linkedin-box-line", enabled: false },
+  { id: "telegram", label: "Telegram", icon: "ri-telegram-line", enabled: true, template: "{title}: {url}" },
+  { id: "email", label: "Email", icon: "ri-mail-line", enabled: false, template: "I thought you&apos;d enjoy: {title} {url}" },
+  { id: "instagram", label: "Instagram", icon: "ri-instagram-line", enabled: false },
+  { id: "tiktok", label: "TikTok", icon: "ri-tiktok-line", enabled: false },
+];
+
+export const DEFAULT_NAVIGATION_SETTINGS: NavigationSettings = {
+  adminNavCollapsed: false,
+  publicNavItems: [
+    { label: "Home", path: "/", visible: true, order: 1 },
+    { label: "Charts", path: "/charts", visible: true, order: 2 },
+    { label: "Artists", path: "/artists", visible: true, order: 3 },
+    { label: "Magazine", path: "/magazine", visible: true, order: 4 },
+  ],
+  shareConfig: {
+    enabled: true,
+    platforms: ["copy_link", "whatsapp", "x"],
+    sharePlatforms: DEFAULT_SHARE_PLATFORMS,
+  },
+};
 
 export interface AuditEvent { id: string; timestamp: string; actor: string; domain: AdminSettingsDomain; action: string; details: string; severity: "info" | "warning" | "critical"; }
 export interface SettingsSaveResult { ok: boolean; message?: string; error?: string; code?: string; }

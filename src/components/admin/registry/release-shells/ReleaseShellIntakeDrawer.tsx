@@ -12,6 +12,7 @@ import {
   inspectProviderEntity,
   createReleaseShellFromProvider,
   attachProviderResultToShell,
+  backfillExistingRelease,
   testProviderConnection,
 } from "@/services/registry/provider-intake/client";
 import { ProviderSearchResults } from "./ProviderSearchResults";
@@ -197,6 +198,31 @@ export function ReleaseShellIntakeDrawer({ onClose, onShellCreated }: ReleaseShe
       setScreen("done");
     } catch (err) {
       setSearchError(err instanceof Error ? err.message : "Failed to attach provider result to shell.");
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleBackfillRelease = async (targetRegistryEntityId: string) => {
+    const source = inspectSourceResult;
+    if (!source) return;
+
+    setCreating(true);
+    try {
+      const response = await backfillExistingRelease({
+        provider: source.provider,
+        providerEntityType: source.providerEntityType,
+        providerEntityId: source.providerEntityId,
+        storefrontOrMarket: storefront,
+        mode: "backfill_existing_release",
+        idempotencyKey: `${source.provider}:${source.providerEntityType}:${source.providerEntityId}:${storefront}:backfill:${targetRegistryEntityId}`,
+        selectedTrackIds,
+        targetRegistryEntityId,
+      });
+      setCreateResult(response);
+      setScreen("done");
+    } catch (err) {
+      setSearchError(err instanceof Error ? err.message : "Failed to backfill release.");
     } finally {
       setCreating(false);
     }
@@ -411,6 +437,7 @@ export function ReleaseShellIntakeDrawer({ onClose, onShellCreated }: ReleaseShe
                   inspected={inspectedResult}
                   onCreateShell={() => handleCreateShell()}
                   onAttachToShell={handleAttachToShell}
+                  onBackfillRelease={handleBackfillRelease}
                   onBack={() => setScreen("search")}
                   isCreating={creating}
                   selectedTrackIds={selectedTrackIds}

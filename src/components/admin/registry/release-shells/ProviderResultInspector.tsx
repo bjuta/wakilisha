@@ -6,6 +6,7 @@ interface ProviderResultInspectorProps {
   inspected: ProviderInspectResponse;
   onCreateShell: () => void;
   onAttachToShell: (shellId: string) => void;
+  onBackfillRelease: (targetId: string) => void;
   onBack: () => void;
   isCreating: boolean;
   selectedTrackIds: string[];
@@ -124,6 +125,7 @@ export function ProviderResultInspector({
   inspected,
   onCreateShell,
   onAttachToShell,
+  onBackfillRelease,
   onBack,
   isCreating,
   selectedTrackIds,
@@ -132,12 +134,15 @@ export function ProviderResultInspector({
   onDeselectAllTracks,
 }: ProviderResultInspectorProps) {
   const [activeTab, setActiveTab] = useState<InspectorTab>("overview");
+  const [backfillTargetId, setBackfillTargetId] = useState("");
+  const [showBackfillInput, setShowBackfillInput] = useState(false);
   const result = inspected.result;
   const isRelease = result.providerEntityType === "release";
   const isArtist = result.providerEntityType === "artist";
   const tracks = inspected.detail.tracks;
   const artists = inspected.detail.artists;
   const hasExistingShell = inspected.existingShellMatches.length > 0;
+  const registryReleaseMatches = inspected.possibleRegistryMatches.releases;
 
   const tabs: Array<{ id: InspectorTab; label: string; count?: number }> = [
     { id: "overview", label: "Overview" },
@@ -388,27 +393,123 @@ export function ProviderResultInspector({
             </p>
           </div>
         ) : (
-          <div className="flex flex-wrap gap-2">
-            {!hasExistingShell && (
-              <button
-                onClick={onCreateShell}
-                disabled={isCreating}
-                className="flex items-center gap-2 rounded-xl bg-[#5f8f2f] px-4 py-2.5 text-[12px] font-bold text-white hover:bg-[#4d7526] disabled:opacity-50 whitespace-nowrap"
-              >
-                {isCreating ? (
-                  <><WkIcon name="Loader2" size={14} className="animate-spin" /> Creating shell…</>
-                ) : (
-                  <><WkIcon name="Plus" size={14} /> Create release shell</>
+          <div className="space-y-3">
+            {/* Mode 1: Create new release shell */}
+            <div className="rounded-xl border border-[#dfe4d8] bg-white p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[12px] font-black text-[#171712]">Create new release shell</p>
+                  <p className="text-[11px] text-[#697062] mt-0.5">Use when this provider result is not already in WAKILISHA.</p>
+                </div>
+                {!hasExistingShell && (
+                  <button
+                    onClick={onCreateShell}
+                    disabled={isCreating}
+                    className="shrink-0 flex items-center gap-1.5 rounded-xl bg-[#5f8f2f] px-3 py-1.5 text-[11px] font-bold text-white hover:bg-[#4d7526] disabled:opacity-50 whitespace-nowrap"
+                  >
+                    {isCreating ? <><WkIcon name="Loader2" size={12} className="animate-spin" /> Creating…</> : <><WkIcon name="Plus" size={12} /> Create shell</>}
+                  </button>
                 )}
-              </button>
-            )}
-
-            {hasExistingShell && (
-              <div className="rounded-xl border border-[#dfe4d8] bg-white px-4 py-2.5 text-[12px] text-[#697062]">
-                <WkIcon name="Info" size={13} className="inline mr-1.5 text-amber-600" />
-                This provider {isRelease ? "release" : "track"} is already staged. Attach to the existing shell above instead.
+                {hasExistingShell && (
+                  <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-200 px-2 py-1 text-[10px] font-bold text-amber-700">
+                    <WkIcon name="AlertTriangle" size={10} /> Shell exists
+                  </span>
+                )}
               </div>
-            )}
+            </div>
+
+            {/* Mode 2: Backfill existing registry release */}
+            <div className="rounded-xl border border-[#dfe4d8] bg-white p-3">
+              <div className="mb-2">
+                <p className="text-[12px] font-black text-[#171712]">Backfill existing registry release</p>
+                <p className="text-[11px] text-[#697062] mt-0.5">Use when WAKILISHA already has this release but needs richer provider data (UPC, description, etc.).</p>
+              </div>
+              {registryReleaseMatches.length > 0 && (
+                <div className="mb-2 space-y-1.5">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-[#97a290] mb-1">Possible WAKILISHA matches</p>
+                  {registryReleaseMatches.map((match) => (
+                    <div key={match.registryEntityId} className="flex items-center justify-between gap-2 rounded-lg border border-[#dfe4d8] bg-[#fbfcf8] px-3 py-2">
+                      <div className="min-w-0">
+                        <p className="text-[12px] font-bold text-[#171712] truncate">{match.title}</p>
+                        <p className="text-[10px] text-[#697062]">
+                          Registry release · {Math.round(match.matchScore * 100)}% match · <span className="font-mono">{match.registryEntityId.slice(0, 12)}…</span>
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => onBackfillRelease(match.registryEntityId)}
+                        disabled={isCreating}
+                        className="shrink-0 rounded-xl border border-[#5f8f2f] bg-[#f0f7e8] px-3 py-1.5 text-[11px] font-bold text-[#5f8f2f] hover:bg-[#5f8f2f] hover:text-white disabled:opacity-50 whitespace-nowrap"
+                      >
+                        Backfill this release
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {showBackfillInput ? (
+                <div className="flex gap-2 mt-2">
+                  <input
+                    type="text"
+                    value={backfillTargetId}
+                    onChange={(e) => setBackfillTargetId(e.target.value)}
+                    placeholder="Paste registry release ID (UUID)…"
+                    className="flex-1 rounded-xl border border-[#dfe4d8] bg-[#fbfcf8] px-3 py-1.5 text-[12px] font-mono outline-none focus:border-[#85c441]"
+                  />
+                  <button
+                    onClick={() => { if (backfillTargetId.trim()) { onBackfillRelease(backfillTargetId.trim()); setShowBackfillInput(false); } }}
+                    disabled={!backfillTargetId.trim() || isCreating}
+                    className="rounded-xl bg-[#5f8f2f] px-3 py-1.5 text-[11px] font-bold text-white hover:bg-[#4d7526] disabled:opacity-50 whitespace-nowrap"
+                  >
+                    Backfill
+                  </button>
+                  <button
+                    onClick={() => setShowBackfillInput(false)}
+                    className="rounded-xl border border-[#dfe4d8] px-3 py-1.5 text-[11px] font-bold text-[#71796b] hover:border-[#85c441] whitespace-nowrap"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowBackfillInput(true)}
+                  className="mt-1 text-[11px] font-bold text-[#5f8f2f] hover:underline"
+                >
+                  Enter release ID manually…
+                </button>
+              )}
+            </div>
+
+            {/* Mode 3: Attach to existing release shell */}
+            <div className="rounded-xl border border-[#dfe4d8] bg-white p-3">
+              <div className="mb-2">
+                <p className="text-[12px] font-black text-[#171712]">Attach to existing release shell</p>
+                <p className="text-[11px] text-[#697062] mt-0.5">Use when a review shell already exists and you want to add more provider data.</p>
+              </div>
+              {inspected.existingShellMatches.length > 0 && (
+                <div className="space-y-1.5">
+                  {inspected.existingShellMatches.map((shell) => (
+                    <div key={shell.registryEntityId} className="flex items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                      <div className="min-w-0">
+                        <p className="text-[12px] font-bold text-[#171712] truncate">{shell.title}</p>
+                        <p className="text-[10px] text-[#697062]">
+                          Shell · {shell.status} · <span className="font-mono">{shell.registryEntityId.slice(0, 12)}…</span>
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => onAttachToShell(shell.registryEntityId)}
+                        disabled={isCreating}
+                        className="shrink-0 rounded-xl border border-amber-300 bg-white px-3 py-1.5 text-[11px] font-bold text-amber-800 hover:bg-amber-100 disabled:opacity-50 whitespace-nowrap"
+                      >
+                        Attach
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {inspected.existingShellMatches.length === 0 && (
+                <p className="text-[11px] text-[#b8bfb2]">No existing shells found for this provider result.</p>
+              )}
+            </div>
           </div>
         )}
       </div>

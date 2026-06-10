@@ -85,6 +85,7 @@ import AdminSettingsMaintenance from "../pages/admin/settings/maintenance/page";
 import AdminSettingsNavigation from "../pages/admin/settings/navigation/page";
 import AdminSettingsAudit from "../pages/admin/settings/audit/page";
 import AdminSettingsSiteIdentity from "../pages/admin/settings/site-identity/page";
+import AdminSettingsDesignSystem from "../pages/admin/settings/design-system/page";
 
 // Charts
 import ChartsDirectory from "../pages/charts/directory/page";
@@ -256,6 +257,7 @@ const routes: RouteObject[] = [
         { index: true, element: <AdminSettingsHub /> },
         { path: "chart-defaults", element: <AdminSettingsChartDefaults /> },
         { path: "chart-defaults/market-scopes", element: <AdminSettingsChartDefaultsMarketScopes /> },
+        { path: "design-system", element: <AdminSettingsDesignSystem /> },
         { path: "integrations", element: <AdminSettingsIntegrations /> },
         { path: "gsc-data", element: <AdminSettingsGscData /> },
         { path: "frontend-appearance", element: <AdminSettingsFrontendAppearance /> },

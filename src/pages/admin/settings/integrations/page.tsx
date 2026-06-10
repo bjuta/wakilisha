@@ -228,19 +228,55 @@ export default function AdminSettingsIntegrations() {
               </div>
 
               <div className="mb-4 grid gap-4 md:grid-cols-2">
-                {schema.fields.map((field) => (
-                  <ProviderField
-                    key={field.key}
-                    providerKey={provider.key}
-                    field={field}
-                    value={values[field.key] ?? getDefaultFieldValue(field)}
-                    error={errors[field.key]}
-                    showSecret={!!showSecrets[`${provider.key}.${field.key}`]}
-                    onToggleSecret={() => setShowSecrets((prev) => ({ ...prev, [`${provider.key}.${field.key}`]: !prev[`${provider.key}.${field.key}`] }))}
-                    onChange={(value) => updateField(provider.key, field.key, value)}
-                  />
-                ))}
+                {schema.fields.map((field) => {
+                  // Apple Music: hide developer token field - it's generated server-side
+                  if (provider.key === "apple_music" && field.key === "developerToken") return null;
+                  return (
+                    <ProviderField
+                      key={field.key}
+                      providerKey={provider.key}
+                      field={field}
+                      value={values[field.key] ?? getDefaultFieldValue(field)}
+                      error={errors[field.key]}
+                      showSecret={!!showSecrets[`${provider.key}.${field.key}`]}
+                      onToggleSecret={() => setShowSecrets((prev) => ({ ...prev, [`${provider.key}.${field.key}`]: !prev[`${provider.key}.${field.key}`] }))}
+                      onChange={(value) => updateField(provider.key, field.key, value)}
+                    />
+                  );
+                })}
               </div>
+
+              {/* Apple Music credential status panel */}
+              {provider.key === "apple_music" && (
+                <div className="mb-4 rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] p-4">
+                  <div className="mb-2 flex items-center gap-2">
+                    <WkIcon name="KeyRound" size={14} className="text-[var(--wk-text-muted)]" />
+                    <span className="text-[12px] font-bold text-[var(--wk-text)]">Credential status</span>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-3 text-[11px]">
+                    {[
+                      { label: "Team ID", present: !!values.teamId },
+                      { label: "Key ID", present: !!values.keyId },
+                      { label: ".p8 Private Key", present: !!values.privateKeyFile },
+                    ].map((item) => (
+                      <div key={item.label} className={`flex items-center gap-2 rounded-md px-2.5 py-2 ${item.present ? "bg-[var(--wk-success-soft)] text-[var(--wk-success)]" : "bg-[var(--wk-surface-raised)] text-[var(--wk-text-muted)]"}`}>
+                        <WkIcon name={item.present ? "CheckCircle2" : "Circle"} size={12} />
+                        {item.label}: {item.present ? "Uploaded" : "Missing"}
+                      </div>
+                    ))}
+                  </div>
+                  {!values.privateKeyFile && (
+                    <p className="mt-2 text-[11px] text-[var(--wk-warning)]">
+                      The .p8 private key must be stored server-side. Never paste it into localStorage or client code. The developer token is generated server-side from this key.
+                    </p>
+                  )}
+                  {values.teamId && values.keyId && values.privateKeyFile && (
+                    <p className="mt-2 text-[11px] text-[var(--wk-success)]">
+                      All credentials provided. The developer token will be generated server-side when you test the connection.
+                    </p>
+                  )}
+                </div>
+              )}
 
               {result && (
                 <div className={`mb-4 rounded-lg p-3 text-[12px] ${result.ok ? "bg-[var(--wk-success-soft)] text-[var(--wk-success)]" : "bg-[var(--wk-danger-soft)] text-[var(--wk-danger)]"}`}>

@@ -123,12 +123,14 @@ export type IntakeSearchInput = {
   limit?: number;
 };
 
+export type ProviderIntakeMode = "create_shell" | "attach_to_shell" | "backfill_existing_release";
+
 export type IntakeCreateInput = {
   provider: string;
   providerEntityType: ProviderEntityType;
   providerEntityId: string;
   storefrontOrMarket: string | null;
-  mode: "create_shell" | "attach";
+  mode: ProviderIntakeMode;
   targetRegistryEntityId?: string;
   idempotencyKey: string;
   selectedTrackIds?: string[];
