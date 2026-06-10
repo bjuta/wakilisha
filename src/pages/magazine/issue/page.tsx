@@ -26,8 +26,9 @@ const LOGO_DARK = "/assets/logos/wakilisha-logo-dark.svg";
 const LOGO_LIGHT = "/assets/logos/wakilisha-logo-light.svg";
 
 /* ── Scroll reveal hook ── */
-function useScrollReveal() {
+function useScrollReveal(ready: boolean) {
   useEffect(() => {
+    if (!ready) return;
     const observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
@@ -41,7 +42,7 @@ function useScrollReveal() {
     const els = document.querySelectorAll(".mag-reveal");
     els.forEach((el) => observer.observe(el));
     return () => observer.disconnect();
-  }, []);
+  }, [ready]);
 }
 
 /* ── Reading progress bar ── */
@@ -749,7 +750,7 @@ export default function MagazineIssuePage() {
   const { articles, loading, error } = useMagazineArticles();
   const { content: siteContent } = useSiteContent();
 
-  useScrollReveal();
+  useScrollReveal(!loading);
 
   if (loading) return <SkeletonMagazinePage />;
   if (error) return <MagazineIssueError message={error} />;
