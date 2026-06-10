@@ -1,4 +1,4 @@
-export type SettingsFieldType = "text" | "secret" | "secretTextarea" | "url" | "number" | "select" | "toggle";
+export type SettingsFieldType = "text" | "secret" | "secretTextarea" | "secretFile" | "url" | "number" | "select" | "toggle";
 export type SettingsFieldValue = string | boolean | number;
 
 export type SettingsField = {
@@ -53,7 +53,7 @@ export const PROVIDER_CREDENTIAL_SCHEMAS: ProviderCredentialSchema[] = [
     fields: [
       { key: "teamId", label: "Apple Team ID", type: "text", required: true, envVar: "APPLE_MUSIC_TEAM_ID", helpText: "Your Apple Developer Team ID (10-character alphanumeric)." },
       { key: "keyId", label: "Apple Key ID", type: "text", required: true, envVar: "APPLE_MUSIC_KEY_ID", helpText: "The Key ID from your Apple Music Key in the Developer Portal." },
-      { key: "privateKeyFile", label: "Apple .p8 Private Key", type: "secretTextarea", required: true, secret: true, envVar: "APPLE_MUSIC_PRIVATE_KEY", helpText: "Paste the full contents of your .p8 file. This key is stored server-side and never exposed to the browser in production." },
+      { key: "privateKeyFile", label: "Apple .p8 Private Key", type: "secretFile", required: true, secret: true, envVar: "APPLE_MUSIC_PRIVATE_KEY", helpText: "Upload your .p8 private key file. The key is sent to a secure server endpoint and never stored in browser storage." },
       { key: "serviceId", label: "Apple Service ID", type: "text", envVar: "APPLE_MUSIC_SERVICE_ID" },
       { key: "defaultStorefront", label: "Default Apple Storefront", type: "select", required: true, envVar: "APPLE_MUSIC_STOREFRONT", defaultValue: "ke", options: STOREFRONT_OPTIONS },
       { key: "tokenTtl", label: "Token TTL (hours)", type: "number", envVar: "APPLE_MUSIC_TOKEN_TTL", defaultValue: 24, validation: { min: 1, max: 168 }, helpText: "How long the server-generated developer token is valid (max 6 months). Default: 24 hours." },

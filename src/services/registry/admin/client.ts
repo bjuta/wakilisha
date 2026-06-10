@@ -198,7 +198,7 @@ export async function saveRegistryEntityPatch(
       body: JSON.stringify(payload),
     });
 
-    const result: RegistrySaveResult & { error?: string; errorCode?: string; message?: string } = await res.json();
+    const result: RegistrySaveResult & { error?: string; errorCode?: string; message?: string; duplicateField?: string | null; duplicateValue?: string | null; conflictingEntity?: Record<string, unknown> | null; currentEntity?: Record<string, unknown> } = await res.json();
 
     if (!result.ok) {
       return {
@@ -211,6 +211,10 @@ export async function saveRegistryEntityPatch(
         warnings: [],
         errorCode: result.errorCode ?? "save_failed",
         message: result.message ?? result.error ?? "Save failed",
+        duplicateField: result.duplicateField ?? null,
+        duplicateValue: result.duplicateValue ?? null,
+        conflictingEntity: result.conflictingEntity ?? null,
+        currentEntity: result.currentEntity,
       };
     }
 

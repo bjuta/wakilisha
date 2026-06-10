@@ -331,7 +331,121 @@ function ProviderField({ providerKey, field, value, error, showSecret, onToggleS
 }) {
   const id = `${providerKey}-${field.key}`;
   const isSecret = field.type === "secret" || field.type === "secretTextarea";
-  const wrapperClass = field.type === "secretTextarea" ? "md:col-span-2" : "";
+  const isSecretFile = field.type === "secretFile";
+  const wrapperClass = field.type === "secretTextarea" || field.type === "secretFile" ? "md:col-span-2" : "";
+
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(
+    typeof value === "string" && value.startsWith("uploaded:") ? value.replace("uploaded:", "") : null
+  );
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file extension
+    if (!file.name.endsWith(".p8") && !file.name.endsWith(".key")) {
+      setUploadError("Only .p8 or .key files are accepted.");
+      return;
+    }
+
+    setUploading(true);
+    setUploadError(null);
+
+    try {
+      const { data: { session } } = await (await import("@/lib/supabase")).supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) throw new Error("Not authenticated.");
+
+      const formData = new FormData();
+      formData.append("p8_file", file);
+
+      const supabaseUrl = import.meta.env.VITE_PUBLIC_SUPABASE_URL as string;
+      const res = await fetch(`${supabaseUrl}/functions/v1/upload-apple-music-key`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+
+      const result = await res.json();
+      if (!result.ok) throw new Error(result.error || "Upload failed.");
+
+      setUploadedFileName(file.name);
+      onChange(`uploaded:${file.name}`);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : "Upload failed.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleClearFile = () => {
+    setUploadedFileName(null);
+    setUploadError(null);
+    onChange("");
+  };
+
+  if (isSecretFile) {
+    return (
+      <div className={wrapperClass}>
+        <label htmlFor={id} className="mb-1.5 block text-[12px] font-semibold text-[var(--wk-text-muted)]">
+          {field.label}{field.required ? " *" : ""}
+        </label>
+
+        {uploadedFileName ? (
+          <div className="flex items-center gap-3 rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-4 py-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--wk-success-soft)] text-[var(--wk-success)]">
+              <WkIcon name="CheckCircle2" size={18} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[13px] font-semibold text-[var(--wk-text)] truncate">{uploadedFileName}</p>
+              <p className="text-[11px] text-[var(--wk-success)]">Uploaded and stored securely in server-side secrets.</p>
+            </div>
+            <button
+              type="button"
+              onClick={handleClearFile}
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--wk-border)] text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-danger)]"
+              title="Remove uploaded key"
+            >
+              <WkIcon name="Trash2" size={13} />
+            </button>
+          </div>
+        ) : (
+          <div>
+            <label
+              htmlFor={id}
+              className="flex cursor-pointer flex-col items-center gap-3 rounded-lg border-2 border-dashed border-[var(--wk-border)] bg-[var(--wk-bg)] px-6 py-6 hover:border-[var(--wk-brand)] hover:bg-[var(--wk-brand)]/5 transition-colors"
+            >
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--wk-surface-raised)] text-[var(--wk-text-muted)]">
+                <WkIcon name={uploading ? "Loader2" : "Upload"} size={18} className={uploading ? "animate-spin" : ""} />
+              </div>
+              <div className="text-center">
+                <p className="text-[13px] font-semibold text-[var(--wk-text)]">
+                  {uploading ? "Uploading..." : "Click to upload .p8 file"}
+                </p>
+                <p className="mt-1 text-[11px] text-[var(--wk-text-faint)]">
+                  Select your Apple Music .p8 private key file. It is sent directly to a secure backend and never stored in the browser.
+                </p>
+              </div>
+              <input
+                id={id}
+                type="file"
+                accept=".p8,.key"
+                onChange={handleFileUpload}
+                disabled={uploading}
+                className="hidden"
+              />
+            </label>
+          </div>
+        )}
+
+        {uploadError && <p className="mt-1 text-[11px] font-semibold text-[var(--wk-danger)]">{uploadError}</p>}
+        {field.helpText && <p className="mt-1 text-[11px] text-[var(--wk-text-faint)]">{field.helpText}</p>}
+        {error && <p className="mt-1 text-[11px] font-semibold text-[var(--wk-danger)]">{error}</p>}
+      </div>
+    );
+  }
 
   return (
     <div className={wrapperClass}>

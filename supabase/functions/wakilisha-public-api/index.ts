@@ -85,6 +85,42 @@ function normalizePath(raw: string): string {
   return withoutPrefix.replace(/\/$/, "") || "/";
 }
 
+// ── WordPress author ID → real display name mapping ──
+// Built from wk_import_staging_records (mysql.users) — maps WP post_author ID to real byline name
+const WP_AUTHOR_MAP: Record<string, string> = {
+  "1": "Wakilisha Staff",
+  "37": "Muiruri Beautah",
+  "38": "Shalom Kendi Mbae",
+  "39": "Michael Mburu",
+  "40": "Kambura Matiri",
+  "41": "Kiuta Faith",
+  "42": "gatwiri_c",
+  "43": "Mary Gathoni",
+  "44": "Timothy Muiruri",
+  "47": "Sarah Wambi",
+  "48": "Frank Njugi",
+  "52": "Victor Muia",
+  "54": "Hafare Segelan",
+  "179": "Wangari Karume",
+};
+
+/** Resolve the real author name: if the stored author is "Wakilisha", try raw_meta→post_author → WP_AUTHOR_MAP */
+function resolveAuthor(article: Record<string, unknown>): string {
+  const storedAuthor = String(article.author || "").trim();
+  // If it already has a real name (not the default placeholder), use it
+  if (storedAuthor && storedAuthor !== "Wakilisha") return storedAuthor;
+
+  // Try to resolve from WordPress author ID in raw_meta
+  const rawMeta = (article.raw_meta || {}) as Record<string, unknown>;
+  const wpAuthorId = rawMeta.post_author ? String(rawMeta.post_author) : "";
+  if (wpAuthorId && WP_AUTHOR_MAP[wpAuthorId]) {
+    return WP_AUTHOR_MAP[wpAuthorId];
+  }
+
+  // Fallback
+  return "Wakilisha Staff";
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders });
@@ -107,7 +143,7 @@ Deno.serve(async (req) => {
       const limit = limitParam ? Math.min(parseInt(limitParam, 10) || 50, 500) : 200;
 
       const [articleResult, artistResult, releaseResult, chartResult] = await Promise.all([
-        supabase.from("wk_articles").select("id, slug, title, excerpt, author, published_at, content_html, categories, tags, hero_image_url, seo").eq("wp_status", "publish").order("published_at", { ascending: false }).limit(limit),
+        supabase.from("wk_articles").select("id, slug, title, excerpt, author, published_at, content_html, categories, tags, hero_image_url, seo, raw_meta").eq("wp_status", "publish").order("published_at", { ascending: false }).limit(limit),
         supabase.from("registry_artists").select("id, slug, display_name, origin_iso2, public_image_url, metadata, status").eq("status", "active").order("display_name", { ascending: true }).limit(50),
         supabase.from("registry_releases").select("id, slug, title, release_date, release_type, artwork_url, label_id, description, status").in("status", ["active", "draft"]).order("release_date", { ascending: false }).limit(30),
         supabase.from("chart_entries").select("rank, track_title, track_slug, artist_name, artwork_url, edition_id").order("rank", { ascending: true }).limit(20),
@@ -125,7 +161,7 @@ Deno.serve(async (req) => {
         return {
           contentType: "article" as const,
           id: String(a.id), slug: String(a.slug), title: String(a.title),
-          section, dek, author: String(a.author || "Wakilisha"),
+          section, dek, author: resolveAuthor(a),
           date: a.published_at ? String(a.published_at).split("T")[0] : "",
           readingTime: Math.max(1, Math.ceil(contentText.length / 1500)),
           heroUrl, tags: tagNames,
@@ -266,7 +302,7 @@ Deno.serve(async (req) => {
 
       const { data: article } = await supabase
         .from("wk_articles")
-        .select("id, slug, title, excerpt, content_html, author, published_at, modified_at, categories, tags, hero_image_url, seo, wp_status")
+        .select("id, slug, title, excerpt, content_html, author, published_at, modified_at, categories, tags, hero_image_url, seo, wp_status, raw_meta")
         .eq("slug", slug)
         .maybeSingle();
 
@@ -294,7 +330,7 @@ Deno.serve(async (req) => {
           title: String(article.title),
           section,
           dek,
-          author: String(article.author || "Wakilisha"),
+          author: resolveAuthor(article),
           date: article.published_at ? String(article.published_at).split("T")[0] : "",
           readingTime: Math.max(1, Math.ceil(contentText.length / 1500)),
           heroUrl,
@@ -313,7 +349,7 @@ Deno.serve(async (req) => {
 
       const { data: articles } = await supabase
         .from("wk_articles")
-        .select("id, slug, title, excerpt, author, published_at, content_html, categories, tags, hero_image_url, seo")
+        .select("id, slug, title, excerpt, author, published_at, content_html, categories, tags, hero_image_url, seo, raw_meta")
         .eq("wp_status", "publish")
         .order("published_at", { ascending: false })
         .limit(limit);
@@ -338,7 +374,7 @@ Deno.serve(async (req) => {
             title: String(a.title),
             section,
             dek,
-            author: String(a.author || "Wakilisha"),
+            author: resolveAuthor(a),
             date: a.published_at ? String(a.published_at).split("T")[0] : "",
             readingTime: Math.max(1, Math.ceil(contentText.length / 1500)),
             heroUrl,

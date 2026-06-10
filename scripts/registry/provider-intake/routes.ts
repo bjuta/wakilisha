@@ -286,6 +286,111 @@ export async function handleAttachToShell(
   }
 }
 
+// ── Backfill Existing Release ─────────────────────────────────────────────
+
+export async function handleBackfillExistingRelease(
+  pool: PgPool,
+  body: unknown,
+  actor?: string,
+): Promise<unknown> {
+  const input = body as Partial<CreateReleaseShellInput> & {
+    targetRegistryEntityId?: string;
+    selectedTrackIds?: string[];
+  };
+
+  const provider = String(input.provider ?? "").trim();
+  const entityType = (input.providerEntityType ?? "release") as "artist" | "release" | "track";
+  const entityId = String(input.providerEntityId ?? "").trim();
+  const storefront = input.storefrontOrMarket ?? "ke";
+  const targetId = String(input.targetRegistryEntityId ?? "").trim();
+  const selectedTrackIds = input.selectedTrackIds ?? [];
+
+  if (!provider || !entityId || !targetId) {
+    throw new Error("Missing provider, providerEntityId, or targetRegistryEntityId.");
+  }
+
+  // Verify that the target release exists in registry_releases
+  const targetCheck = await pool.query(
+    `select id, title, slug from public.registry_releases where id = $1 limit 1`,
+    [targetId],
+  );
+
+  if ((targetCheck.rowCount ?? 0) === 0) {
+    throw new Error(`Target release not found in registry_releases: ${targetId}`);
+  }
+
+  // Record intake run start
+  const effectiveActor = actor ?? process.env.WAKILISHA_CANONICAL_WRITE_ACTOR ?? "system";
+  const runId = await recordProviderIntakeRunStart(pool, {
+    idempotencyKey: `${provider}:${entityType}:${entityId}:backfill:${targetId}`,
+    provider,
+    providerEntityType: entityType,
+    providerEntityId: entityId,
+    storefrontOrMarket: storefront,
+    mode: "backfill_existing_release",
+    actor: effectiveActor,
+    targetRegistryEntityId: targetId,
+  });
+
+  try {
+    const adapter = AppleMusicAdapter.fromEnv(storefront);
+    const inspected = await adapter.inspect({
+      provider,
+      providerEntityType: entityType,
+      providerEntityId: entityId,
+      storefrontOrMarket: storefront,
+    });
+
+    // Filter tracks if specific track IDs were selected
+    const allTracks = inspected.detail.tracks;
+    const filteredTracks = selectedTrackIds.length > 0
+      ? allTracks.filter((t) => selectedTrackIds.includes(t.providerEntityId))
+      : allTracks;
+
+    const createInput: CreateReleaseShellInput = {
+      provider,
+      providerEntityType: entityType,
+      providerEntityId: entityId,
+      storefrontOrMarket: storefront,
+      selectedEntities: {
+        release: true,
+        artists: inspected.detail.artists.map((a) => a.providerEntityId),
+        tracks: filteredTracks.map((t) => t.providerEntityId),
+      },
+      mode: "backfill_existing_release",
+      idempotencyKey: `${provider}:${entityType}:${entityId}:backfill:${targetId}`,
+      targetRegistryEntityId: targetId,
+      actor: effectiveActor,
+    };
+
+    // Use the existing shell creation pipeline, but targeting the real registry release
+    const result = await createReleaseShellFromProviderResult(pool, createInput, {
+      result: inspected.result,
+      detail: { tracks: filteredTracks, artists: inspected.detail.artists },
+    });
+
+    await recordProviderIntakeRunComplete(pool, runId, {
+      shellKey: result.shell.shellKey,
+      registryEntityId: result.shell.registryEntityId,
+      shellStatus: result.shell.status,
+      observationCount: result.writes.providerFieldObservations,
+      suggestionCount: result.writes.registryEnrichmentSuggestions,
+      linkCount: result.writes.providerEntityLinks,
+      lifecycleEventCount: result.writes.lifecycleEvents,
+      skippedCount: result.skipped.length,
+      trackCount: filteredTracks.length,
+      artistCount: inspected.detail.artists.length,
+      targetReleaseId: targetId,
+    });
+
+    return result;
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : "Unknown error during release backfill.";
+    await recordProviderIntakeRunFailed(pool, runId, errorMessage).catch(() => {});
+    throw err;
+  }
+}
+
 // ── Provider Connection Test ─────────────────────────────────────────────
 
 export async function handleTestProviderConnection(

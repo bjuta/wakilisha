@@ -119,7 +119,7 @@ export type CreateReleaseShellInput = {
     artists: string[];
     tracks: string[];
   };
-  mode: "create_shell" | "attach";
+  mode: "create_shell" | "attach" | "backfill_existing_release";
   targetRegistryEntityId?: string;
   idempotencyKey: string;
   actor?: string;

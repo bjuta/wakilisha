@@ -49,6 +49,18 @@ import AdminUsersPage from "../pages/admin/users/page";
 import AdminMagazineVisualsPage from "../pages/admin/magazine/visuals/page";
 import AdminMagazineIssuesPage from "../pages/admin/magazine/issues/page";
 
+// Section-level admin guards
+import {
+  AdminContentLayout,
+  AdminUsersLayout,
+  AdminMagazineLayout,
+  AdminRegistryLayout,
+  AdminMediaLayout,
+  AdminReviewLayout,
+  AdminImportsLayout,
+  AdminRelationshipsLayout,
+} from "@/components/admin/AdminSectionLayouts";
+
 // Admin Charts Ingestion Studio
 import { AdminChartsLayout } from "../pages/admin/charts/AdminChartsLayout";
 import AdminChartsDashboard from "../pages/admin/charts/dashboard/page";
@@ -200,40 +212,88 @@ const routes: RouteObject[] = [
     element: <AdminShell />,
     children: [
       { index: true, element: <AdminDashboardPage /> },
-      { path: "content/articles", element: <AdminArticlesPage /> },
-      { path: "content/articles/:slug", element: <AdminArticleDetailPage /> },
-      { path: "content/guides", element: <AdminGuidesPage /> },
-      { path: "content/pages", element: <AdminPagesPage /> },
-      { path: "content/publishing", element: <AdminPublishingDashboardPage /> },
-      { path: "content/archive", element: <AdminContentArchivePage /> },
-      { path: "content/migration", element: <AdminMediaMigrationPage /> },
-      { path: "content/lyrics", element: <AdminLyricsPage /> },
-      { path: "users", element: <AdminUsersPage /> },
-      { path: "magazine/visuals", element: <AdminMagazineVisualsPage /> },
-      { path: "magazine/issues", element: <AdminMagazineIssuesPage /> },
-      { path: "registry", element: <AdminRegistryOverview /> },
-      { path: "registry/artists", element: <AdminArtistsPage /> },
-      { path: "registry/artists/:slug", element: <AdminArtistDetailPage /> },
-      { path: "registry/tracks", element: <AdminTracksPage /> },
-      { path: "registry/tracks/:slug", element: <AdminTrackDetailPage /> },
-      { path: "registry/releases", element: <AdminReleasesPage /> },
-      { path: "registry/release-shells", element: <AdminRegistryReleaseShells /> },
-      { path: "registry/release-shells/intake", element: <AdminRegistryReleaseShells /> },
-      { path: "registry/releases/:slug", element: <AdminReleaseDetailPage /> },
-      { path: "registry/labels", element: <AdminLabelsPage /> },
-      { path: "registry/labels/:slug", element: <AdminLabelDetailPage /> },
-      { path: "registry/genres", element: <AdminGenresPage /> },
-      { path: "registry/genres/:slug", element: <AdminGenreDetailPage /> },
-      { path: "relationships/viewer", element: <AdminRelationshipViewerPage /> },
-      { path: "relationships/duplicates", element: <AdminDuplicateMergePage /> },
-      { path: "media/library", element: <AdminMediaLibraryPage /> },
-      { path: "media/missing", element: <AdminMissingImagesPage /> },
-      { path: "media/broken", element: <AdminBrokenLinksPage /> },
-      { path: "review/queue", element: <AdminReviewQueuePage /> },
-      { path: "imports", element: <AdminImportsPage /> },
-      { path: "imports/review-artifacts", element: <AdminImportReviewArtifactsPage /> },
-      { path: "imports/jobs", element: <AdminImportsJobsPage /> },
-      { path: "imports/jobs/:id", element: <AdminImportsJobDetailPage /> },
+      {
+        path: "content",
+        element: <AdminContentLayout />,
+        children: [
+          { path: "articles", element: <AdminArticlesPage /> },
+          { path: "articles/:slug", element: <AdminArticleDetailPage /> },
+          { path: "guides", element: <AdminGuidesPage /> },
+          { path: "pages", element: <AdminPagesPage /> },
+          { path: "publishing", element: <AdminPublishingDashboardPage /> },
+          { path: "archive", element: <AdminContentArchivePage /> },
+          { path: "migration", element: <AdminMediaMigrationPage /> },
+          { path: "lyrics", element: <AdminLyricsPage /> },
+        ],
+      },
+      {
+        path: "users",
+        element: <AdminUsersLayout />,
+        children: [
+          { index: true, element: <AdminUsersPage /> },
+        ],
+      },
+      {
+        path: "magazine",
+        element: <AdminMagazineLayout />,
+        children: [
+          { path: "visuals", element: <AdminMagazineVisualsPage /> },
+          { path: "issues", element: <AdminMagazineIssuesPage /> },
+        ],
+      },
+      {
+        path: "registry",
+        element: <AdminRegistryLayout />,
+        children: [
+          { index: true, element: <AdminRegistryOverview /> },
+          { path: "artists", element: <AdminArtistsPage /> },
+          { path: "artists/:slug", element: <AdminArtistDetailPage /> },
+          { path: "tracks", element: <AdminTracksPage /> },
+          { path: "tracks/:slug", element: <AdminTrackDetailPage /> },
+          { path: "releases", element: <AdminReleasesPage /> },
+          { path: "release-shells", element: <AdminRegistryReleaseShells /> },
+          { path: "release-shells/intake", element: <AdminRegistryReleaseShells /> },
+          { path: "releases/:slug", element: <AdminReleaseDetailPage /> },
+          { path: "labels", element: <AdminLabelsPage /> },
+          { path: "labels/:slug", element: <AdminLabelDetailPage /> },
+          { path: "genres", element: <AdminGenresPage /> },
+          { path: "genres/:slug", element: <AdminGenreDetailPage /> },
+        ],
+      },
+      {
+        path: "relationships",
+        element: <AdminRelationshipsLayout />,
+        children: [
+          { path: "viewer", element: <AdminRelationshipViewerPage /> },
+          { path: "duplicates", element: <AdminDuplicateMergePage /> },
+        ],
+      },
+      {
+        path: "media",
+        element: <AdminMediaLayout />,
+        children: [
+          { path: "library", element: <AdminMediaLibraryPage /> },
+          { path: "missing", element: <AdminMissingImagesPage /> },
+          { path: "broken", element: <AdminBrokenLinksPage /> },
+        ],
+      },
+      {
+        path: "review",
+        element: <AdminReviewLayout />,
+        children: [
+          { path: "queue", element: <AdminReviewQueuePage /> },
+        ],
+      },
+      {
+        path: "imports",
+        element: <AdminImportsLayout />,
+        children: [
+          { index: true, element: <AdminImportsPage /> },
+          { path: "review-artifacts", element: <AdminImportReviewArtifactsPage /> },
+          { path: "jobs", element: <AdminImportsJobsPage /> },
+          { path: "jobs/:id", element: <AdminImportsJobDetailPage /> },
+        ],
+      },
       { path: "charts", element: <AdminChartsLayout />, children: [
         { index: true, element: <AdminChartsDashboard /> },
         { path: "dashboard", element: <AdminChartsDashboard /> },

@@ -436,3 +436,61 @@ Phase 1 is a pure database/scripts task — no frontend changes. It unblocks ric
 - `src/services/magazineArticles.ts` — Added `useSiteContent()` hook
 - `src/pages/admin/content/articles/detail/components/ArticleMetaPanel.tsx` — Slug editor, focus keyword, SEO analyzer, internal links
 - `src/pages/admin/content/articles/detail/page.tsx` — Slug change handler, link insertion handler, content passthrough to analyzer
+
+## Strict Approval Fixes — June 2026 ✅
+
+Following a rigorous audit against the briefs, the following fixes were applied to close gaps between frontend, backend, and UX state.
+
+### Fix 1: Registry Conflict Client Passthrough
+**Problem:** The frontend client (`saveRegistryEntityPatch`) dropped `duplicateField`, `duplicateValue`, and `conflictingEntity` when `result.ok` was false, so the drawer never received structured conflict data even though the backend returned it.
+
+**Fix:** Updated type casting on the parsed response to include `duplicateField`, `duplicateValue`, `conflictingEntity`, and `currentEntity`. These fields are now preserved through the failed result path so the drawer can show the conflict card with "View existing", "Generate new slug", "Keep editing" actions.
+
+**File:** `src/services/registry/admin/client.ts`
+
+### Fix 2: Article Admin God-Mode Permissions
+**Problem:** Admin bypass existed, but lower-role users were auto-redirected after 2 seconds with a toast. Save/autosave/delete/hero/slug actions had no centralized permission gating. Delete button was always rendered.
+
+**Fix:**
+- Created central `articlePermissions` object with `canView`, `canEdit`, `canDelete`, `canPublish`, `canAutosave`, and `reason`
+- Lower-role users now get a **read-only view** — all content is visible but inputs are disabled, plus a "Read-only" badge in the header
+- All action handlers (`handleSaveDraft`, `handlePublish`, `handleUnpublish`, `handleDelete`, `handleSaveHeroImage`, `autosaveRevision`, `handleSlugChange`) gated with permission check
+- Cmd+S shortcut gated with `articlePermissions.canEdit`
+- Content editor fields receive `readOnly` prop with disabled styling
+- ArticleEditorHeader delete/save buttons conditionally rendered based on permissions
+- Header receives full `permissions` object and shows "Read-only" badge
+
+**Files:** `src/pages/admin/content/articles/detail/page.tsx`, `src/pages/admin/content/articles/detail/components/ArticleEditorHeader.tsx`, `src/pages/admin/content/articles/detail/components/ArticleContentEditor.tsx`
+
+### Fix 3: Release-Shell Backfill Backend Route
+**Problem:** Frontend client (`client.ts`) called `POST /release-shells/intake/backfill` but no such route existed. Server only handled `create` and `attach`.
+
+**Fix:**
+- Added `"backfill_existing_release"` to `CreateReleaseShellInput.mode` union type
+- Created `handleBackfillExistingRelease()` handler in `routes.ts` — verifies target release exists in `registry_releases`, inspects provider data, writes observations/suggestions/links pointing at the existing release entity
+- Added `POST /api/v1/registry/release-shells/intake/backfill` route in `serve-registry-admin-api.ts` with `manage_registry` auth check
+- Updated `ProviderIntakeRunRecord.mode` to include `"backfill_existing_release"`
+- Frontend client already calls the correct endpoint — now the backend handles it
+
+**Files:** `scripts/registry/provider-intake/types.ts`, `scripts/registry/provider-intake/routes.ts`, `scripts/registry/provider-intake/staging-writes.ts`, `scripts/registry/serve-registry-admin-api.ts`
+
+### Fix 4: Apple Music Secure .p8 Key Upload
+**Problem:** Private key was a `secretTextarea` stored in localStorage — violating the brief's requirement for secure upload away from browser storage.
+
+**Fix:**
+- Deployed Supabase Edge Function `upload-apple-music-key` — accepts multipart file upload, validates .p8 format (BEGIN/END PRIVATE KEY headers, length check), stores in `admin_settings_secrets` table via service_role
+- Created `admin_settings_secrets` table with row-level security (service_role only)
+- Added `secretFile` field type to `SettingsFieldType` union
+- Changed Apple Music private key field from `secretTextarea` to `secretFile`
+- Updated integrations page `ProviderField` component: shows drag-and-drop file upload UI, uploads via fetch to edge function with JWT auth, shows uploaded status with file name and "Remove" button
+- Key is NEVER stored in localStorage — the value stored is a marker string `uploaded:filename`
+
+**Files:** `supabase/functions/upload-apple-music-key/index.ts` (deployed), `src/services/adminSettings/providerCredentialSchema.ts`, `src/pages/admin/settings/integrations/page.tsx`
+
+### Items Verified as Already Complete
+- **Mobile bottom nav safe-area**: CSS in `wakilisha-mobile-ch53-75.css` uses `env(safe-area-inset-bottom)` across `.phn-nav`, `.phn-miniplayer`, `.fp-controls`, `.fp-action-sheet`, `.fp-topbar`. CSS is imported via `src/index.css`.
+- **Media Library**: Full page exists at `/admin/media/library` querying `registry_media_assets` (7,346 real assets) with grid/table views, search, filters, status management, alt text editing, bulk actions, and preview drawer.
+- **Magazine Issue Production**: Tables (`wk_magazine_issues`, `wk_magazine_issue_sections`, `wk_magazine_issue_entities`) exist with RLS, admin page at `/admin/magazine/issues` has full 6-step wizard, public endpoint serves published issues.
+- **Design System settings route**: Error boundary shim exists at `/admin/settings/design-system`.
+- **Share config platform toggles**: Platform toggle cards with template validation exist in navigation settings.
+- **Access Console invite flow**: Failed-load blocked state and controlled scope inputs exist.

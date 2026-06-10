@@ -18,6 +18,7 @@
  *   POST /api/v1/registry/provider-search/inspect
  *   POST /api/v1/registry/release-shells/intake/create
  *   POST /api/v1/registry/release-shells/intake/attach
+ *   POST /api/v1/registry/release-shells/intake/backfill
  */
 
 import http from "node:http";
@@ -44,6 +45,7 @@ import {
   handleProviderInspect,
   handleCreateReleaseShell,
   handleAttachToShell,
+  handleBackfillExistingRelease,
   handleTestProviderConnection,
 } from "./provider-intake/routes";
 
@@ -214,6 +216,31 @@ async function route(req: http.IncomingMessage, res: http.ServerResponse): Promi
     } catch (attachErr) {
       const message = attachErr instanceof Error ? attachErr.message : "Shell attach failed.";
       err(res, 500, "intake_attach_failed", message);
+    }
+    return;
+  }
+
+  // POST /api/v1/registry/release-shells/intake/backfill
+  if (parts[0] === "registry" && parts[1] === "release-shells" && parts[2] === "intake" && parts[3] === "backfill") {
+    if (req.method !== "POST") { err(res, 405, "method_not_allowed", "Only POST supported."); return; }
+
+    let adminUser: AuthorizedAdmin;
+    try {
+      adminUser = await requireAuth(req, "manage_registry");
+    } catch (authErr: unknown) {
+      const status = (authErr as { status?: number }).status ?? 403;
+      const message = authErr instanceof Error ? authErr.message : "Forbidden";
+      err(res, status, "unauthorized", message);
+      return;
+    }
+
+    try {
+      const body = await readBody(req);
+      const response = await handleBackfillExistingRelease(getPool(), body, adminUser.userId);
+      ok(res, response, { source: "provider_intake" });
+    } catch (backfillErr) {
+      const message = backfillErr instanceof Error ? backfillErr.message : "Release backfill failed.";
+      err(res, 500, "intake_backfill_failed", message);
     }
     return;
   }

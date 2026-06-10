@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { supabase } from "@/lib/supabase";
@@ -76,9 +76,30 @@ export default function ArticleDetailPage() {
   const userCanEditOthers = adminUser.can("edit_others_articles");
   const isAdmin = adminUser.role === "administrator" || adminUser.can("admin_god_mode");
 
+  // ── State: MUST be declared before articlePermissions (which reads `article`) ──
   const [article, setArticle] = useState<ArticleRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+
+  // ── Central permission object (reactive via useMemo) ──
+  const articlePermissions = useMemo(() => {
+    const articleAuthor = (article?.author ?? "").toLowerCase();
+    const currentUserName = adminUser.name?.toLowerCase() ?? "";
+    const isOwner = !articleAuthor || !currentUserName
+      ? true
+      : articleAuthor === currentUserName || articleAuthor.includes(currentUserName) || currentUserName.includes(articleAuthor);
+
+    const canView = true; // Everyone authenticated can view
+    const canEdit = isAdmin || isOwner || userCanEditOthers;
+    const canDelete = isAdmin || (isOwner && userCanEditOthers);
+    const canPublish = isAdmin || (isOwner && userCanPublish);
+    const canAutosave = canEdit;
+    const reason = !canEdit
+      ? "You can only edit your own articles. This article is owned by " + (article?.author || "another author") + "."
+      : null;
+
+    return { canView, canEdit, canDelete, canPublish, canAutosave, reason };
+  }, [article, adminUser, isAdmin, userCanEditOthers, userCanPublish]);
 
   // Editable draft state
   const [draft, setDraft] = useState<Draft>({
@@ -143,19 +164,7 @@ export default function ArticleDetailPage() {
       setArticle({ ...data, title: decodeHtmlEntities(data.title ?? "") });
       setHeroImageUrl(rewriteWpImageUrl(data.hero_image_url ?? ""));
 
-      // Check ownership: writers/authors can only edit their own articles
-      // Administrator bypasses all ownership gates
-      if (!isAdmin && !userCanEditOthers) {
-        const articleAuthor = (data.author ?? "").toLowerCase();
-        const currentUserName = adminUser.name?.toLowerCase() ?? "";
-        if (articleAuthor && currentUserName && articleAuthor !== currentUserName && !articleAuthor.includes(currentUserName)) {
-          addToast("error", "You can only edit your own articles.");
-          setTimeout(() => navigate("/admin/content/articles"), 2000);
-          setLoading(false);
-          return;
-        }
-      }
-
+      // Set draft state — content is always visible, editing is gated by articlePermissions
       setDraft({
         title: decodeHtmlEntities(data.title ?? ""),
         excerpt: decodeHtmlEntities(data.excerpt ?? ""),
@@ -210,6 +219,7 @@ export default function ArticleDetailPage() {
 
   /* ─── Autosave ─── */
   async function autosaveRevision(currentDraft: Draft) {
+    if (!articlePermissions.canAutosave) return;
     const currentArticle = stateRef.current.article;
     if (!currentArticle) return;
 
@@ -373,6 +383,7 @@ export default function ArticleDetailPage() {
   }
 
   async function handleSaveDraft() {
+    if (!articlePermissions.canEdit) { addToast("error", articlePermissions.reason ?? "Permission denied."); return; }
     setIsSaving(true);
     const ok = await saveToSupabase({ wp_status: "draft" });
     setIsSaving(false);
@@ -380,6 +391,7 @@ export default function ArticleDetailPage() {
   }
 
   async function handlePublish() {
+    if (!articlePermissions.canPublish) { addToast("error", "You do not have permission to publish articles."); return; }
     setIsPublishing(true);
     const publishDate = draft.publishedAt || new Date().toISOString();
     const ok = await saveToSupabase({
@@ -394,6 +406,7 @@ export default function ArticleDetailPage() {
   }
 
   async function handleUnpublish() {
+    if (!articlePermissions.canPublish) { addToast("error", "You do not have permission to unpublish."); return; }
     setIsSaving(true);
     const ok = await saveToSupabase({ wp_status: "draft" });
     setIsSaving(false);
@@ -401,6 +414,7 @@ export default function ArticleDetailPage() {
   }
 
   async function handleDelete() {
+    if (!articlePermissions.canDelete) { addToast("error", "You do not have permission to delete this article."); return; }
     if (!article) return;
     const { error } = await supabase
       .from("wk_articles")
@@ -417,6 +431,7 @@ export default function ArticleDetailPage() {
   }
 
   async function handleSaveHeroImage(url: string) {
+    if (!articlePermissions.canEdit) { addToast("error", articlePermissions.reason ?? "Permission denied."); return; }
     if (!article) return;
     setIsSavingHero(true);
     try {
@@ -480,6 +495,7 @@ export default function ArticleDetailPage() {
   }
 
   async function handleSlugChange(newSlug: string): Promise<boolean> {
+    if (!articlePermissions.canEdit) { addToast("error", articlePermissions.reason ?? "Permission denied."); return false; }
     if (!article || !slug) return false;
     // Check for slug collision
     const { data: existing } = await supabase
@@ -530,7 +546,7 @@ export default function ArticleDetailPage() {
     function handleKeyDown(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === "s") {
         e.preventDefault();
-        handleSaveDraft();
+        if (articlePermissions.canEdit) handleSaveDraft();
       }
     }
     window.addEventListener("keydown", handleKeyDown);
@@ -586,10 +602,11 @@ export default function ArticleDetailPage() {
         onUnpublish={handleUnpublish}
         onDelete={() => setShowDeleteConfirm(true)}
         onPreview={handlePreview}
-        userCanPublish={userCanPublish}
-        userCanEditOthers={userCanEditOthers || isAdmin}
+        userCanPublish={articlePermissions.canPublish}
+        userCanEditOthers={articlePermissions.canEdit}
         isAdmin={isAdmin}
         articleOwner={article.author}
+        permissions={articlePermissions}
       />
 
       {/* Keyboard hint */}
@@ -606,9 +623,10 @@ export default function ArticleDetailPage() {
             title={draft.title}
             excerpt={draft.excerpt}
             content={draft.content}
-            onTitleChange={(v) => patchDraft({ title: v })}
-            onExcerptChange={(v) => patchDraft({ excerpt: v })}
-            onContentChange={(v) => patchDraft({ content: v })}
+            onTitleChange={(v) => articlePermissions.canEdit && patchDraft({ title: v })}
+            onExcerptChange={(v) => articlePermissions.canEdit && patchDraft({ excerpt: v })}
+            onContentChange={(v) => articlePermissions.canEdit && patchDraft({ content: v })}
+            readOnly={!articlePermissions.canEdit}
           />
         </div>
 

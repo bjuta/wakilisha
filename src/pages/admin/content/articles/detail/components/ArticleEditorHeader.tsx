@@ -18,6 +18,12 @@ interface Props {
   userCanEditOthers?: boolean;
   isAdmin?: boolean;
   articleOwner?: string | null;
+  permissions?: {
+    canEdit: boolean;
+    canDelete: boolean;
+    canPublish: boolean;
+    reason: string | null;
+  };
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -46,6 +52,7 @@ export function ArticleEditorHeader({
   userCanEditOthers = true,
   isAdmin = false,
   articleOwner = null,
+  permissions,
 }: Props) {
   const navigate = useNavigate();
   const statusColor = status ? (STATUS_COLORS[status] ?? STATUS_COLORS.draft) : STATUS_COLORS.draft;
@@ -86,6 +93,12 @@ export function ArticleEditorHeader({
             <span className="inline-flex items-center gap-1 rounded-full bg-wk-brand-soft px-2.5 py-0.5 text-[10px] font-bold text-wk-brand">
               <WkIcon name="Shield" size={10} />
               Admin
+            </span>
+          )}
+          {permissions && !permissions.canEdit && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-wk-warning-soft px-2.5 py-0.5 text-[10px] font-bold text-wk-warning">
+              <WkIcon name="Eye" size={10} />
+              Read-only
             </span>
           )}
         </div>
@@ -137,17 +150,20 @@ export function ArticleEditorHeader({
         )}
 
         {/* Delete */}
+        {(!permissions || permissions.canDelete) && (
         <button
           onClick={onDelete}
           className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap text-wk-danger hover:bg-wk-danger-soft hover:border-wk-danger/20"
         >
           <WkIcon name="Trash2" size={14} />
         </button>
+        )}
 
         {/* Divider */}
         <div className="h-6 w-px bg-wk-border" />
 
         {/* Save Draft */}
+        {(!permissions || permissions.canEdit) && (
         <button
           onClick={onSaveDraft}
           disabled={isSaving || isPublishing}
@@ -165,6 +181,7 @@ export function ArticleEditorHeader({
             </>
           )}
         </button>
+        )}
 
         {/* Publish / Unpublish / Submit */}
         {isPublished ? (

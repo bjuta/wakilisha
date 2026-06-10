@@ -10,6 +10,7 @@ interface Props {
   onTitleChange: (v: string) => void;
   onExcerptChange: (v: string) => void;
   onContentChange: (v: string) => void;
+  readOnly?: boolean;
 }
 
 export function ArticleContentEditor({
@@ -19,6 +20,7 @@ export function ArticleContentEditor({
   onTitleChange,
   onExcerptChange,
   onContentChange,
+  readOnly = false,
 }: Props) {
   const [showFindReplace, setShowFindReplace] = useState(false);
   const [findText, setFindText] = useState("");
@@ -50,8 +52,9 @@ export function ArticleContentEditor({
           type="text"
           value={title}
           onChange={(e) => onTitleChange(e.target.value)}
+          disabled={readOnly}
           placeholder="Article title..."
-          className="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg-subtle)] px-4 py-3 text-[18px] font-bold text-[var(--wk-text)] placeholder:text-[var(--wk-text-faint)] outline-none focus:border-[var(--wk-brand)] transition-colors"
+          className="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg-subtle)] px-4 py-3 text-[18px] font-bold text-[var(--wk-text)] placeholder:text-[var(--wk-text-faint)] outline-none focus:border-[var(--wk-brand)] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
         />
       </WkSurface>
 
@@ -66,10 +69,11 @@ export function ArticleContentEditor({
         <textarea
           value={excerpt}
           onChange={(e) => onExcerptChange(e.target.value)}
+          disabled={readOnly}
           placeholder="Short summary shown in article cards and SEO descriptions..."
           rows={3}
           maxLength={500}
-          className="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg-subtle)] px-4 py-3 text-[13px] text-[var(--wk-text)] placeholder:text-[var(--wk-text-faint)] outline-none focus:border-[var(--wk-brand)] resize-none transition-colors"
+          className="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg-subtle)] px-4 py-3 text-[13px] text-[var(--wk-text)] placeholder:text-[var(--wk-text-faint)] outline-none focus:border-[var(--wk-brand)] resize-none transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
         />
       </WkSurface>
 

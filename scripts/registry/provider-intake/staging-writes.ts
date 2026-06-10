@@ -409,7 +409,7 @@ export interface ProviderIntakeRunRecord {
   providerEntityType: string;
   providerEntityId: string;
   storefrontOrMarket: string | null;
-  mode: "create_shell" | "attach";
+  mode: "create_shell" | "attach" | "backfill_existing_release";
   actor: string | null;
   targetRegistryEntityId?: string | null;
 }
