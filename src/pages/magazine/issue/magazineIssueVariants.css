@@ -1,7 +1,9 @@
+/* ═══════════════════════ SPREAD VARIANTS — MOOD-AWARE ═══════════════════════
+   These shouldn't be uniform. Each variant responds to its parent mood's tokens. */
+
+/* ── Full-bleed image ── */
 .mag-fullbleed {
-  min-height: min(980px, 96svh);
-  color: #fff;
-  background: #050605;
+  min-height: min(860px, 92svh);
   isolation: isolate;
 }
 .mag-fullbleed img {
@@ -10,120 +12,132 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  filter: saturate(.92) contrast(1.08);
+  filter: saturate(.9) contrast(1.06);
 }
 .mag-fullbleed-shade {
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(0,0,0,.18), rgba(0,0,0,.78)), radial-gradient(70% 80% at 10% 85%, color-mix(in srgb, var(--section-accent) 34%, transparent), transparent 62%);
   z-index: 1;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--mag-bg) 20%, transparent), color-mix(in srgb, var(--mag-bg) 78%, transparent)),
+              radial-gradient(65% 75% at 8% 82%, color-mix(in srgb, var(--section-accent, var(--mag-accent)) 28%, transparent), transparent 60%);
 }
 .mag-fullbleed-copy {
   position: relative;
   z-index: 2;
   min-height: inherit;
-  padding: clamp(30px, 6vw, 68px);
+  padding: clamp(28px, 5vw, 62px);
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  max-width: 760px;
+  max-width: 720px;
 }
-.mag-fullbleed-copy .magazine-meta { color: var(--section-accent); margin-bottom: 18px; }
+.mag-fullbleed-copy .magazine-meta {
+  color: var(--section-accent, var(--mag-accent-hi));
+  margin-bottom: 16px;
+}
 .mag-fullbleed-copy h2 {
   font-family: var(--mag-display);
   font-weight: 300;
-  font-size: clamp(54px, 10vw, 124px);
+  font-size: clamp(48px, 9vw, 116px);
   line-height: .86;
   letter-spacing: -.045em;
-  color: #fff;
 }
 .mag-fullbleed-copy p {
-  margin-top: 20px;
-  max-width: 52ch;
+  margin-top: 18px;
+  max-width: 50ch;
   font-family: var(--mag-display);
   font-style: italic;
-  font-size: clamp(18px, 2.4vw, 24px);
+  font-size: clamp(17px, 2.2vw, 22px);
   line-height: 1.36;
-  color: rgba(255,255,255,.88);
+  color: var(--mag-text-soft);
 }
+
+/* Fullbleed: caption-bottom variant */
 .mag-fullbleed-caption-bottom .mag-fullbleed-copy {
   max-width: none;
   justify-content: space-between;
 }
 .mag-fullbleed-caption-bottom .mag-fullbleed-copy h2 {
-  max-width: 8ch;
+  max-width: 9ch;
 }
 .mag-fullbleed-caption-bottom .mag-fullbleed-copy p {
   align-self: flex-end;
-  max-width: 38ch;
-  background: rgba(0,0,0,.72);
-  border-left: 3px solid var(--section-accent);
-  padding: 18px 20px;
-  backdrop-filter: blur(14px);
+  max-width: 36ch;
+  background: color-mix(in srgb, var(--mag-bg) 75%, transparent);
+  border-left: 3px solid var(--section-accent, var(--mag-accent));
+  padding: 16px 18px;
+  backdrop-filter: blur(12px);
+  border-radius: 0 6px 6px 0;
 }
+
+/* Fullbleed: quiet variant — one strong image, minimal text */
 .mag-fullbleed-quiet-image .mag-fullbleed-shade {
-  background: linear-gradient(90deg, rgba(0,0,0,.9), rgba(0,0,0,.48) 48%, rgba(0,0,0,.82));
+  background: linear-gradient(90deg, color-mix(in srgb, var(--mag-bg) 88%, transparent), color-mix(in srgb, var(--mag-bg) 42%, transparent), color-mix(in srgb, var(--mag-bg) 80%, transparent));
 }
 .mag-fullbleed-quiet-image .mag-fullbleed-copy {
   justify-content: center;
 }
 .mag-fullbleed-quiet-image .mag-fullbleed-copy h2 {
-  font-size: clamp(40px, 7vw, 88px);
+  font-size: clamp(36px, 6vw, 80px);
 }
 
+/* ── Quote-only spread ── */
 .mag-quote-only {
-  min-height: min(860px, 92svh);
+  min-height: min(780px, 88svh);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: clamp(30px, 6vw, 70px);
-  background: var(--section-accent);
-  color: #081006;
+  padding: clamp(28px, 5vw, 62px);
+  background: var(--section-accent, var(--mag-accent));
 }
 .mag-quote-only::before {
   content: '';
   position: absolute;
-  inset: 28px;
-  border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+  inset: 24px;
+  border: 1px solid color-mix(in srgb, var(--mag-bg) 16%, transparent);
   pointer-events: none;
 }
 .mag-quote-inner {
-  max-width: 900px;
+  max-width: 860px;
   text-align: center;
 }
 .mag-quote-inner .magazine-meta {
-  color: color-mix(in srgb, currentColor 78%, transparent);
-  margin-bottom: 26px;
+  color: color-mix(in srgb, var(--mag-bg) 70%, transparent);
+  margin-bottom: 24px;
 }
 .mag-quote-inner blockquote {
   font-family: var(--mag-display);
   font-weight: 300;
   font-style: italic;
-  font-size: clamp(42px, 8.5vw, 116px);
+  font-size: clamp(38px, 7.5vw, 108px);
   line-height: .96;
   letter-spacing: -.04em;
 }
 .mag-quote-inner a {
   display: inline-flex;
-  margin-top: 28px;
+  margin-top: 26px;
   font-family: var(--mag-mono);
   text-transform: uppercase;
   letter-spacing: .16em;
   font-size: 10px;
   border-bottom: 1px solid currentColor;
   padding-bottom: 5px;
+  transition: opacity 0.2s;
 }
+.mag-quote-inner a:hover { opacity: .7; }
+
+/* Quote: white variant */
 .mag-quote-white {
   background: #fff;
-  color: #0c0d0a;
 }
+.mag-quote-white blockquote { color: #0c0d0a; }
 .mag-quote-white .magazine-meta,
-.mag-quote-white a { color: color-mix(in srgb, var(--section-accent) 70%, #0c0d0a); }
+.mag-quote-white a { color: color-mix(in srgb, var(--section-accent, var(--mag-accent)) 70%, #0c0d0a); }
 
+/* ── Color interlude ── */
 .mag-color-interlude {
-  min-height: 720px;
-  background: var(--section-accent);
-  color: #081006;
+  min-height: 640px;
+  background: var(--section-accent, var(--mag-accent));
   display: flex;
   align-items: stretch;
 }
@@ -131,252 +145,127 @@
   content: '';
   position: absolute;
   inset: 0;
-  background: radial-gradient(70% 80% at 80% 20%, rgba(255,255,255,.26), transparent 62%), radial-gradient(60% 90% at 10% 100%, rgba(0,0,0,.16), transparent 65%);
+  background:
+    radial-gradient(65% 75% at 78% 18%, rgba(255,255,255,.22), transparent 60%),
+    radial-gradient(55% 85% at 8% 95%, rgba(0,0,0,.14), transparent 62%);
   pointer-events: none;
 }
 .mag-color-interlude-inner {
   position: relative;
   z-index: 1;
   width: 100%;
-  padding: clamp(34px, 6vw, 72px);
+  padding: clamp(30px, 5vw, 66px);
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
 }
 .mag-color-interlude .magazine-meta {
-  color: color-mix(in srgb, currentColor 78%, transparent);
-  margin-bottom: 18px;
+  color: color-mix(in srgb, var(--mag-bg) 70%, transparent);
+  margin-bottom: 16px;
 }
 .mag-color-interlude h2 {
-  max-width: 9ch;
+  max-width: 10ch;
   font-family: var(--mag-display);
   font-weight: 300;
-  font-size: clamp(70px, 16vw, 190px);
+  font-size: clamp(64px, 15vw, 180px);
   line-height: .78;
   letter-spacing: -.055em;
 }
 .mag-color-interlude h2 em {
   color: #fff;
-  text-shadow: 0 1px 16px rgba(0,0,0,.22);
+  text-shadow: 0 1px 14px rgba(0,0,0,.18);
 }
 .mag-color-interlude p {
-  max-width: 48ch;
-  margin-top: 24px;
+  max-width: 46ch;
+  margin-top: 20px;
   font-family: var(--mag-display);
   font-style: italic;
-  font-size: clamp(19px, 2.4vw, 25px);
-  line-height: 1.35;
+  font-size: clamp(18px, 2.2vw, 24px);
+  line-height: 1.34;
 }
 .mag-color-interlude a {
-  margin-top: 28px;
+  margin-top: 24px;
   width: fit-content;
   border: 1px solid currentColor;
   border-radius: 999px;
-  padding: 11px 16px;
+  padding: 10px 15px;
   font-weight: 800;
   font-size: 13px;
+  transition: opacity 0.2s;
 }
+.mag-color-interlude a:hover { opacity: .7; }
 
+/* ── Section paper variant ── */
 .mag-section-paper {
-  background: #fff;
-  color: #0c0d0a;
+  background: var(--mag-surface);
 }
 .mag-section-paper::before {
-  background: radial-gradient(60% 60% at 26% 24%, color-mix(in srgb, var(--section-accent) 18%, transparent), transparent 62%), linear-gradient(180deg, #fff, color-mix(in srgb, var(--section-accent) 10%, #fff));
+  background:
+    radial-gradient(55% 55% at 24% 22%, color-mix(in srgb, var(--section-accent, var(--mag-accent)) 14%, transparent), transparent 60%),
+    linear-gradient(180deg, var(--mag-surface), color-mix(in srgb, var(--section-accent, var(--mag-accent)) 6%, var(--mag-surface)));
 }
-.mag-section-paper .mag-section-title { color: #0c0d0a; }
-.mag-section-paper .mag-section-title em { color: var(--section-accent); }
-.mag-section-paper .mag-section-deck { color: #3f4138; }
-.mag-section-paper .mag-rail { color: #4a4d43; }
+.mag-section-paper .mag-section-title { color: var(--mag-text); }
+.mag-section-paper .mag-section-deck { color: var(--mag-text-soft); }
 
-.mag-article-list-paper .mag-article-list {
-  background: #fff;
-  color: #0c0d0a;
-}
-.mag-article-list-paper .mag-rail { color: #4a4d43; }
-.mag-article-list-paper .mag-article-card {
-  background: #f7f8f3;
-  border-color: rgba(12,13,10,.14);
-  color: #0c0d0a;
-}
-.mag-article-list-paper .mag-article-card h4 { color: #0c0d0a; }
-.mag-article-list-paper .mag-article-card p { color: #3f4138; }
-
-/* Contrast guardrails: expressive treatment is allowed, unreadable text is not. */
-.magazine-spread.dark {
-  background-color: #050605;
-}
-.magazine-spread.dark,
-.magazine-spread.dark p,
-.magazine-spread.dark a,
-.magazine-spread.dark h1,
-.magazine-spread.dark h2,
-.magazine-spread.dark h3,
-.magazine-spread.dark h4 {
-  text-shadow: 0 1px 18px rgba(0,0,0,.38);
-}
-.magazine-spread.paper {
-  background: #fff !important;
-  color: #0c0d0a !important;
-}
-.magazine-spread.paper p,
-.magazine-spread.paper a,
-.magazine-spread.paper h1,
-.magazine-spread.paper h2,
-.magazine-spread.paper h3,
-.magazine-spread.paper h4,
-.magazine-spread.paper .mag-toc-line,
-.magazine-spread.paper .magazine-meta {
-  text-shadow: none !important;
-}
-.magazine-spread.paper p,
-.magazine-spread.paper .mag-toc-line,
-.magazine-spread.paper .mag-guide-body p {
-  color: #2b2d27 !important;
-}
-.magazine-spread.paper h1,
-.magazine-spread.paper h2,
-.magazine-spread.paper h3,
-.magazine-spread.paper h4,
-.magazine-spread.paper b {
-  color: #080908 !important;
-}
-.magazine-spread.paper .magazine-meta,
-.magazine-spread.paper .mag-toc-line .pg {
-  color: #4f5349 !important;
-}
-.magazine-spread.paper .mag-seal,
-.magazine-spread.paper em,
-.magazine-spread.paper .mag-toc-page,
-.magazine-spread.paper .mag-note-label,
-.magazine-spread.paper .mag-editor-role {
-  color: var(--mag-green-deep) !important;
-}
-
-.mag-feature-open {
-  position: relative;
-  overflow: hidden;
-  background: #050605;
-}
+/* ═══════════════════════ FEATURE OPEN SHADE ═══════════════════════ */
 .mag-feature-open::after {
   content: '';
   position: absolute;
   inset: 0;
   z-index: 1;
-  background: linear-gradient(180deg, rgba(0,0,0,.04), rgba(0,0,0,.34)), linear-gradient(90deg, rgba(0,0,0,.8), rgba(0,0,0,.24), rgba(0,0,0,.78));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--mag-bg) 5%, transparent), color-mix(in srgb, var(--mag-bg) 35%, transparent)),
+              linear-gradient(90deg, color-mix(in srgb, var(--mag-bg) 78%, transparent), color-mix(in srgb, var(--mag-bg) 22%, transparent), color-mix(in srgb, var(--mag-bg) 76%, transparent));
   pointer-events: none;
 }
 .mag-feature-content {
-  position: relative;
   z-index: 3 !important;
 }
 .mag-feature-body {
   position: relative;
   z-index: 4;
-  background: #050605;
 }
+
 .mag-feature-body::before {
   content: '';
   position: absolute;
   inset: 0;
   z-index: -1;
-  background: linear-gradient(90deg, rgba(0,0,0,.35), rgba(0,0,0,.78));
+  background: linear-gradient(90deg, color-mix(in srgb, var(--mag-bg) 32%, transparent), color-mix(in srgb, var(--mag-bg) 74%, transparent));
 }
-.mag-copy p {
-  color: #d9d8d1 !important;
-}
-.mag-side-card {
-  background: #10140f !important;
-  border-color: rgba(255,255,255,.18) !important;
-}
-.mag-side-card p,
-.mag-side-item p {
-  color: #b6b4ac !important;
-}
-.mag-side-item a {
-  color: #fff !important;
-}
-.mag-type-field,
-.mag-signal-board,
-.mag-paper-file,
-.mag-archive-board {
+
+.mag-type-field, .mag-signal-board, .mag-paper-file, .mag-archive-board {
   z-index: 0;
   pointer-events: none;
 }
 .mag-type-field {
-  opacity: .07 !important;
-  color: #fff !important;
+  opacity: .08 !important;
+  color: var(--mag-accent) !important;
   mix-blend-mode: normal;
 }
-.mag-archive-board {
-  opacity: .22 !important;
-}
-.mag-paper-file {
-  opacity: .2 !important;
-}
-.mag-map-bg,
-.mag-route,
-.mag-feature-photo,
-.mag-feature-photo-shade {
+.mag-archive-board { opacity: .24 !important; }
+.mag-paper-file { opacity: .22 !important; }
+
+.mag-map-bg, .mag-route, .mag-feature-photo, .mag-feature-photo-shade {
   z-index: 0;
 }
 .mag-feature-photo-shade {
   z-index: 1;
-  background: linear-gradient(90deg, rgba(0,0,0,.92), rgba(0,0,0,.54), rgba(0,0,0,.88)) !important;
-}
-.mag-feature-title,
-.mag-section-title,
-.mag-cover-title,
-.mag-signal-head h2,
-.mag-back-title,
-.mag-reviews-title {
-  color: #fff;
-}
-.mag-feature-deck,
-.mag-section-deck,
-.mag-signal-text,
-.mag-partner p,
-.mag-back p {
-  color: #d4d2ca !important;
-}
-.mag-chart-row p,
-.mag-chart-row .rank {
-  color: #a9a79f !important;
-}
-.mag-chart-row h4 {
-  color: #f4f3ed !important;
-}
-.mag-finding p {
-  color: #d0cec7 !important;
 }
 
-.mag-section.dark::after,
-.magazine-spread.dark .mag-signal::before,
-.magazine-spread.dark .mag-article-list::before,
-.magazine-spread.dark .mag-reviews::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: rgba(0,0,0,.18);
-  z-index: 0;
-}
-.mag-section-inner,
-.mag-signal,
-.mag-article-list,
-.mag-reviews,
-.mag-partner,
-.mag-back {
-  position: relative;
-  z-index: 1;
-}
-
+/* ═══════════════════════ RESPONSIVE ═══════════════════════ */
 @media (max-width: 860px) {
-  .mag-fullbleed,
-  .mag-quote-only,
-  .mag-color-interlude { min-height: 82svh; }
-  .mag-fullbleed-copy,
-  .mag-color-interlude-inner { padding: 28px; }
-  .mag-quote-only::before { inset: 16px; }
-  .mag-quote-inner blockquote { font-size: clamp(38px, 13vw, 74px); }
+  .mag-fullbleed, .mag-quote-only, .mag-color-interlude {
+    min-height: 78svh;
+  }
+  .mag-fullbleed-copy, .mag-color-interlude-inner {
+    padding: 26px;
+  }
+  .mag-quote-only::before { inset: 14px; }
+  .mag-quote-inner blockquote {
+    font-size: clamp(32px, 11vw, 64px);
+  }
+  .mag-fullbleed-caption-bottom .mag-fullbleed-copy p {
+    align-self: stretch;
+    max-width: none;
+  }
 }

@@ -18,6 +18,7 @@ import AdminDashboardPage from "../pages/admin/dashboard/page";
 import AdminArticlesPage from "../pages/admin/content/articles/page";
 import AdminGuidesPage from "../pages/admin/content/guides/page";
 import AdminPagesPage from "../pages/admin/content/pages/page";
+import AdminRegistryOverview from "../pages/admin/registry/page";
 import AdminArtistsPage from "../pages/admin/registry/artists/page";
 import AdminTracksPage from "../pages/admin/registry/tracks/page";
 import AdminReleasesPage from "../pages/admin/registry/releases/page";
@@ -207,12 +208,14 @@ const routes: RouteObject[] = [
       { path: "content/lyrics", element: <AdminLyricsPage /> },
       { path: "users", element: <AdminUsersPage /> },
       { path: "magazine/visuals", element: <AdminMagazineVisualsPage /> },
+      { path: "registry", element: <AdminRegistryOverview /> },
       { path: "registry/artists", element: <AdminArtistsPage /> },
       { path: "registry/artists/:slug", element: <AdminArtistDetailPage /> },
       { path: "registry/tracks", element: <AdminTracksPage /> },
       { path: "registry/tracks/:slug", element: <AdminTrackDetailPage /> },
       { path: "registry/releases", element: <AdminReleasesPage /> },
       { path: "registry/release-shells", element: <AdminRegistryReleaseShells /> },
+      { path: "registry/release-shells/intake", element: <AdminRegistryReleaseShells /> },
       { path: "registry/releases/:slug", element: <AdminReleaseDetailPage /> },
       { path: "registry/labels", element: <AdminLabelsPage /> },
       { path: "registry/labels/:slug", element: <AdminLabelDetailPage /> },
@@ -256,6 +259,7 @@ const routes: RouteObject[] = [
         { path: "frontend-appearance", element: <AdminSettingsFrontendAppearance /> },
         { path: "player-playback", element: <AdminSettingsPlayerPlayback /> },
         { path: "registry", element: <AdminSettingsRegistry /> },
+        { path: "registry/release-shells", element: <Navigate to="/admin/registry/release-shells" replace /> },
         { path: "airplay", element: <AdminSettingsAirplay /> },
         { path: "audience", element: <AdminSettingsAudience /> },
         { path: "email-briefings", element: <AdminSettingsEmailBriefings /> },

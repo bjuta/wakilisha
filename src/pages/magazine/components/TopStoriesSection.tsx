@@ -125,7 +125,13 @@ export function TopStoriesSection({ stories }: TopStoriesSectionProps) {
                   </p>
                 )}
                 <div className="flex items-center gap-2 text-[11px] text-[var(--wk-text-faint)] mt-1">
-                  <span className="font-semibold">{story.author}</span>
+                  <Link
+                    to={`/authors/${getAuthorMeta(story.author).slug}`}
+                    className="font-semibold hover:text-[var(--wk-brand)] transition-colors"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {story.author}
+                  </Link>
                   <span>·</span>
                   <span>{story.readingTime} min read</span>
                 </div>

@@ -107,7 +107,13 @@ export function MagazineCard({ story, variant = "standard", rank }: MagazineCard
             </p>
           )}
           <div className="flex items-center gap-2 text-[11px] text-[var(--wk-text-faint)] mt-auto pt-1">
-            <span className="font-semibold">{story.author}</span>
+            <Link
+              to={authorUrl}
+              className="font-semibold hover:text-[var(--wk-brand)] transition-colors"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {story.author}
+            </Link>
             <span className="text-[var(--wk-border-strong)]">·</span>
             <span>{story.readingTime} min</span>
           </div>
@@ -136,7 +142,13 @@ export function MagazineCard({ story, variant = "standard", rank }: MagazineCard
             {story.title}
           </h4>
           <div className="flex items-center gap-1.5 text-[10px] text-[var(--wk-text-faint)]">
-            <span className="font-semibold">{story.author}</span>
+            <Link
+              to={authorUrl}
+              className="font-semibold hover:text-[var(--wk-brand)] transition-colors"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {story.author}
+            </Link>
             <span className="text-[var(--wk-border-strong)]">·</span>
             <span>{story.readingTime} min</span>
           </div>
@@ -185,7 +197,13 @@ export function MagazineCard({ story, variant = "standard", rank }: MagazineCard
           </p>
         )}
         <div className="flex items-center gap-2 text-[11px] text-[var(--wk-text-faint)] mt-auto pt-1">
-          <span className="font-semibold">{story.author}</span>
+          <Link
+            to={authorUrl}
+            className="font-semibold hover:text-[var(--wk-brand)] transition-colors"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {story.author}
+          </Link>
           <span className="text-[var(--wk-border-strong)]">·</span>
           <span>{story.readingTime} min</span>
         </div>

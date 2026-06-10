@@ -17,6 +17,7 @@ interface Article {
   created_at: string;
   categories: unknown[] | null;
   tags: unknown[] | null;
+  hero_image_url: string | null;
 }
 
 /* ─── Helpers ─── */
@@ -39,6 +40,7 @@ export default function AdminArticlesPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [heroFilter, setHeroFilter] = useState<string>("all");
 
   const canEditOthers = adminUser.can("edit_others_articles");
 
@@ -46,7 +48,7 @@ export default function AdminArticlesPage() {
     async function load() {
       const { data, error } = await supabase
         .from("wk_articles")
-        .select("slug, title, excerpt, author, published_at, wp_status, created_at, categories, tags")
+        .select("slug, title, excerpt, author, published_at, wp_status, created_at, categories, tags, hero_image_url")
         .order("created_at", { ascending: false })
         .limit(200);
 
@@ -76,7 +78,11 @@ export default function AdminArticlesPage() {
       (a.slug?.toLowerCase().includes(search.toLowerCase()) ?? false) ||
       (a.author?.toLowerCase().includes(search.toLowerCase()) ?? false);
     const matchesStatus = statusFilter === "all" || a.wp_status === statusFilter;
-    return matchesSearch && matchesStatus;
+    const matchesHero =
+      heroFilter === "all" ||
+      (heroFilter === "missing" && (!a.hero_image_url || a.hero_image_url === "")) ||
+      (heroFilter === "has" && a.hero_image_url && a.hero_image_url !== "");
+    return matchesSearch && matchesStatus && matchesHero;
   });
 
   const statusOptions = ["all", "publish", "draft", "pending", "future", "private"];
@@ -133,6 +139,15 @@ export default function AdminArticlesPage() {
                   {s.charAt(0).toUpperCase() + s.slice(1)}
                 </option>
               ))}
+            </select>
+            <select
+              value={heroFilter}
+              onChange={(e) => setHeroFilter(e.target.value)}
+              className="rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text outline-none cursor-pointer"
+            >
+              <option value="all">All Images</option>
+              <option value="has">Has hero image</option>
+              <option value="missing">No hero image</option>
             </select>
             <span className="text-[12px] text-wk-text-muted whitespace-nowrap">
               {filtered.length} of {articles.length}

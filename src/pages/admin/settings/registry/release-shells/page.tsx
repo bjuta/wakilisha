@@ -10,10 +10,7 @@ import {
   previewApprovedReleaseShellSuggestions,
   updateReleaseShellLifecycleStatus,
   updateReleaseShellSuggestionDecision,
-} from "@/services/registry/enrichment-review/client";
-import {
   formatConfidence,
-  getReleaseShellEnrichmentContexts,
   type ApplyApprovedReleaseShellSuggestionsPreview,
   type CanonicalWriteAuditEvent,
   type EnrichmentDecisionStatus,
@@ -29,7 +26,9 @@ interface RegistryReleaseShell extends IngestResolvedRow {
   sourceEditionDate: string;
 }
 
-type ShellReviewState = "pending" | "reviewing" | "approved" | "rejected";
+// Removed: ShellReviewState — local-only UI state that confused admins into thinking
+// they approved a shell when nothing meaningful was persisted.
+
 type LocalSuggestionDecision = Extract<EnrichmentDecisionStatus, "approved" | "rejected" | "needs_review">;
 type SuggestionLaneKey = "pending" | "needsReview" | "approved" | "rejected" | "other";
 type ShellOperationalStatus = "open" | "resolved" | "reopened" | "blocked" | "failed_write";
@@ -96,13 +95,12 @@ export default function AdminSettingsRegistryReleaseShells() {
 
   const [shellRows, setShellRows] = useState<RegistryReleaseShell[]>([]);
   const [loading, setLoading] = useState(true);
-  const [enrichmentLoading, setEnrichmentLoading] = useState(false);
+  const [enrichmentLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [queueFilter, setQueueFilter] = useState<QueueFilter>("active");
   const [includeResolved, setIncludeResolved] = useState(false);
   const [selectedShellKeys, setSelectedShellKeys] = useState<Record<string, boolean>>({});
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
-  const [states, setStates] = useState<Record<string, ShellReviewState>>({});
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
   const [suggestionDecisions, setSuggestionDecisions] = useState<Record<string, EnrichmentDecisionStatus>>({});
   const [applyingShells, setApplyingShells] = useState<Record<string, boolean>>({});
@@ -140,9 +138,8 @@ export default function AdminSettingsRegistryReleaseShells() {
 
   const shells = useMemo<RegistryReleaseShell[]>(() => shellRows, [shellRows]);
 
-  useEffect(() => {
-    setEnrichmentLoading(false);
-  }, [shells]);
+  // enrichmentLoading is kept for display but the effect is a no-op now
+  useEffect(() => { /* loading state managed by load() */ }, [shells]);
 
   const filtered = shells.filter((row) => {
     const context = enrichmentByShell[row.shellKey];
@@ -173,13 +170,7 @@ export default function AdminSettingsRegistryReleaseShells() {
   const selectedRows = filtered.filter((row) => selectedShellKeys[row.shellKey]);
   const selectedCount = selectedRows.length;
 
-  const pendingCount = filtered.filter((row) => {
-    const state = states[row.shellKey] ?? "pending";
-    return !["approved", "rejected"].includes(state);
-  }).length;
-
   const allSuggestions = Object.values(enrichmentByShell).flatMap((context) => context.suggestions);
-  const suggestionCount = allSuggestions.length;
   const pendingSuggestionCount = allSuggestions.filter((suggestion) => getSuggestionStatus(suggestion, suggestionDecisions) === "draft").length;
   const needsReviewSuggestionCount = allSuggestions.filter((suggestion) => getSuggestionStatus(suggestion, suggestionDecisions) === "needs_review").length;
   const approvedSuggestionCount = allSuggestions.filter((suggestion) => getSuggestionStatus(suggestion, suggestionDecisions) === "approved").length;
@@ -196,10 +187,9 @@ export default function AdminSettingsRegistryReleaseShells() {
     { open: 0, resolved: 0, reopened: 0, blocked: 0, failed_write: 0 },
   );
 
-  const markState = (row: RegistryReleaseShell, state: ShellReviewState) => {
-    setStates((prev) => ({ ...prev, [row.shellKey]: state }));
-    showToast(`Release shell "${row.title}" marked ${state}`);
-  };
+  // Removed: markState — local-only shell approval state was not a valid product action.
+  // Suggestion-level decisions persist via updateReleaseShellSuggestionDecision.
+  // Shell lifecycle is controlled via updateReleaseShellLifecycleStatus.
 
   const decideSuggestion = async (suggestion: RegistryEnrichmentSuggestionReviewItem, decision: LocalSuggestionDecision) => {
     try {
@@ -231,9 +221,6 @@ export default function AdminSettingsRegistryReleaseShells() {
       showToast(err instanceof Error ? err.message : "Failed to save suggestion decision.");
     }
   };
-
-
-
 
   const toggleShellSelection = (row: RegistryReleaseShell) => {
     setSelectedShellKeys((prev) => ({ ...prev, [row.shellKey]: !prev[row.shellKey] }));
@@ -300,7 +287,6 @@ export default function AdminSettingsRegistryReleaseShells() {
     }
   };
 
-
   const updateLifecycle = async (row: RegistryReleaseShell, status: "resolved" | "reopened") => {
     const registryEntityId = row.releaseShellId ?? row.id;
     const reason = status === "resolved"
@@ -315,8 +301,6 @@ export default function AdminSettingsRegistryReleaseShells() {
       showToast(err instanceof Error ? err.message : `Failed to mark shell ${status}.`);
     }
   };
-
-
 
   const previewApprovedSuggestionsForRow = async (row: RegistryReleaseShell) => {
     const registryEntityId = row.releaseShellId ?? row.id;
@@ -353,7 +337,6 @@ export default function AdminSettingsRegistryReleaseShells() {
       return next;
     });
   };
-
 
   const applyApprovedSuggestions = async (row: RegistryReleaseShell) => {
     const registryEntityId = row.releaseShellId ?? row.id;
@@ -402,7 +385,6 @@ export default function AdminSettingsRegistryReleaseShells() {
       setApplyingShells((prev) => ({ ...prev, [row.shellKey]: false }));
     }
   };
-
 
   const renderSuggestionCard = (
     suggestion: RegistryEnrichmentSuggestionReviewItem,
@@ -504,7 +486,12 @@ export default function AdminSettingsRegistryReleaseShells() {
         </WkSurface>
         <WkSurface className="p-4">
           <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--wk-text-muted)]">Pending review</p>
-          <p className="mt-1 text-[26px] font-black text-[var(--wk-text)]">{pendingCount}</p>
+          <p className="mt-1 text-[26px] font-black text-[var(--wk-text)]">{filtered.filter((row) => {
+            const context = enrichmentByShell[row.shellKey];
+            const auditEvents = auditByShell[row.shellKey] ?? [];
+            const status = getShellOperationalStatus(context, auditEvents, suggestionDecisions);
+            return status !== "resolved";
+          }).length}</p>
         </WkSurface>
         <WkSurface className="p-4">
           <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--wk-text-muted)]">Pending suggestions</p>
@@ -608,7 +595,7 @@ export default function AdminSettingsRegistryReleaseShells() {
         <div className="flex flex-wrap gap-2">
           {enrichmentLoading && <span className="inline-flex items-center gap-2 text-[12px] font-semibold text-[var(--wk-text-muted)]"><WkIcon name="Loader" size={13} className="animate-spin" /> Loading enrichment</span>}
           <button onClick={() => navigate("/admin/registry/releases")} className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap">Registry Releases</button>
-          <button onClick={() => navigate("/admin/charts/release-shells")} className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap">Legacy chart view</button>
+          <button onClick={() => navigate("/admin/registry/release-shells")} className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap">Canonical Review</button>
         </div>
       </div>
 
@@ -625,7 +612,6 @@ export default function AdminSettingsRegistryReleaseShells() {
 
             <tbody>
               {filtered.map((row) => {
-                const state = states[row.shellKey] ?? "pending";
                 const isExpanded = expandedRows[row.shellKey] ?? false;
                 const context = enrichmentByShell[row.shellKey];
                 const suggestions = context?.suggestions ?? [];
@@ -687,17 +673,11 @@ export default function AdminSettingsRegistryReleaseShells() {
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex flex-wrap gap-1">
-                          {state === "approved" || state === "rejected" ? (
-                            <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${state === "approved" ? "bg-[var(--wk-success-soft)] text-[var(--wk-success)]" : "bg-[var(--wk-danger-soft)] text-[var(--wk-danger)]"}`}>{state}</span>
-                          ) : (
-                            <>
-                              <button onClick={() => markState(row, "reviewing")} className="rounded px-2 py-1 text-[11px] font-semibold text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)]">Review</button>
-                              <button onClick={() => markState(row, "approved")} className="rounded px-2 py-1 text-[11px] font-semibold text-[var(--wk-brand)] hover:bg-[var(--wk-brand-soft)]">Approve shell</button>
-                              <button onClick={() => markState(row, "rejected")} className="rounded px-2 py-1 text-[11px] font-semibold text-[var(--wk-danger)] hover:bg-[var(--wk-danger-soft)]">Reject</button>
-                            </>
-                          )}
-                        </div>
+                        {/* Removed: fake local-only "Approve shell" / "Reject" / "Review" buttons.
+                            Shell lifecycle is controlled via persisted lifecycle actions, not local UI state. */}
+                        <span className="inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold bg-[var(--wk-surface-raised)] text-[var(--wk-text-muted)]">
+                          {operationalStatus.replace(/_/g, " ")}
+                        </span>
                       </td>
                     </tr>
 
@@ -711,7 +691,9 @@ export default function AdminSettingsRegistryReleaseShells() {
                                   <p className="text-[12px] font-bold uppercase tracking-wide text-[var(--wk-text-muted)]">Enrichment suggestions</p>
                                   <p className="mt-1 text-[11px] text-[var(--wk-text-faint)]">Acted-on suggestions move out of the active pending list into their review lanes.</p>
                                 </div>
-                                <span className="text-[11px] font-semibold text-[var(--wk-text-muted)]">{context?.dataSource === "runtime_api" ? "Live staging data" : "Fallback context"}</span>
+                                <span className="text-[11px] font-semibold text-[var(--wk-text-muted)]">
+                                  {context?.dataSource === "runtime_api" ? "Live staging data" : "No live staging context found for this shell."}
+                                </span>
                               </div>
 
                               <div className="space-y-4">

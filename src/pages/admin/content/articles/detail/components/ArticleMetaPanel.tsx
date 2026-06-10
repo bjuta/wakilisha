@@ -4,7 +4,10 @@ import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { MediaPickerButton } from "@/components/admin/MediaPickerButton";
 import { ArticlePublishTimeline } from "./ArticlePublishTimeline";
 import { ArticleSeoPreview } from "./ArticleSeoPreview";
+import { ArticleSeoAnalyzer } from "./ArticleSeoAnalyzer";
+import { ArticleInternalLinks } from "./ArticleInternalLinks";
 import { ArticleRevisionHistory } from "./ArticleRevisionHistory";
+import { fetchAllAuthors, type AuthorRow } from "@/services/authorProfiles";
 
 interface SeoMeta {
   title?: string;
@@ -38,6 +41,8 @@ interface Props {
   onTagsChange: (v: string[]) => void;
   onPublishedAtChange: (v: string) => void;
   onSeoChange: (v: SeoMeta) => void;
+  onSlugChange?: (newSlug: string) => Promise<boolean>;
+  onInsertLink?: (url: string) => void;
   onRestoreDraft?: (payload: {
     title: string;
     excerpt: string;
@@ -76,16 +81,49 @@ export function ArticleMetaPanel({
   onTagsChange,
   onPublishedAtChange,
   onSeoChange,
+  onSlugChange,
+  onInsertLink,
   onRestoreDraft,
 }: Props) {
   const [newCategory, setNewCategory] = useState("");
   const [newTag, setNewTag] = useState("");
   const [seoOpen, setSeoOpen] = useState(false);
+  const [seoAnalyzerOpen, setSeoAnalyzerOpen] = useState(false);
   const [timelineOpen, setTimelineOpen] = useState(false);
   const [seoPreviewOpen, setSeoPreviewOpen] = useState(false);
   const [revisionsOpen, setRevisionsOpen] = useState(false);
   const [heroUrlInput, setHeroUrlInput] = useState(heroImageUrl);
   const [heroPreviewError, setHeroPreviewError] = useState(false);
+  const [slugEditOpen, setSlugEditOpen] = useState(false);
+  const [editedSlug, setEditedSlug] = useState(slug);
+  const [isSavingSlug, setIsSavingSlug] = useState(false);
+
+  // Author dropdown from wk_authors
+  const [authorList, setAuthorList] = useState<AuthorRow[]>([]);
+  const [authorDropdownOpen, setAuthorDropdownOpen] = useState(false);
+  const [authorSearch, setAuthorSearch] = useState("");
+
+  useEffect(() => {
+    fetchAllAuthors().then(setAuthorList);
+  }, []);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!authorDropdownOpen) return;
+    function handleClick(e: MouseEvent) {
+      const target = e.target as HTMLElement;
+      if (!target.closest(".author-dropdown-container")) {
+        setAuthorDropdownOpen(false);
+        setAuthorSearch("");
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [authorDropdownOpen]);
+
+  const filteredAuthors = authorSearch.trim()
+    ? authorList.filter((a) => a.name.toLowerCase().includes(authorSearch.toLowerCase()))
+    : authorList;
 
   // Sync heroUrlInput when heroImageUrl prop changes
   useEffect(() => {
@@ -216,7 +254,48 @@ export function ArticleMetaPanel({
           Record Info
         </h3>
         <div className="space-y-2">
-          <InfoRow label="Slug" value={slug} mono />
+          {/* Editable Slug */}
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-semibold text-wk-text-faint">Slug</span>
+              <button
+                onClick={() => { setSlugEditOpen(!slugEditOpen); setEditedSlug(slug); }}
+                className="text-[11px] font-semibold text-wk-brand hover:underline cursor-pointer"
+              >
+                {slugEditOpen ? "Cancel" : "Edit"}
+              </button>
+            </div>
+            {slugEditOpen ? (
+              <div className="mt-1.5 flex gap-2">
+                <input
+                  type="text"
+                  value={editedSlug}
+                  onChange={(e) => setEditedSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, ""))}
+                  className="flex-1 rounded-md border border-wk-border bg-wk-bg-subtle px-2 py-1.5 text-[11px] font-mono text-wk-text outline-none focus:border-wk-brand"
+                />
+                <button
+                  onClick={async () => {
+                    if (!editedSlug.trim() || editedSlug === slug) { setSlugEditOpen(false); return; }
+                    setIsSavingSlug(true);
+                    const ok = await onSlugChange?.(editedSlug);
+                    setIsSavingSlug(false);
+                    if (ok) setSlugEditOpen(false);
+                  }}
+                  disabled={isSavingSlug || !editedSlug.trim() || editedSlug === slug}
+                  className="flex items-center gap-1 rounded-md border border-wk-brand bg-wk-brand-soft px-2.5 py-1.5 text-[11px] font-semibold text-wk-brand hover:bg-wk-brand hover:text-wk-brand-on disabled:opacity-40 transition-colors whitespace-nowrap"
+                >
+                  {isSavingSlug ? (
+                    <i className="ri-loader-4-line animate-spin text-[12px]" />
+                  ) : (
+                    <WkIcon name="Save" size={11} />
+                  )}
+                  Save
+                </button>
+              </div>
+            ) : (
+              <span className="text-[11px] text-wk-text-soft font-mono truncate block" title={slug}>{slug}</span>
+            )}
+          </div>
           <InfoRow label="WP Status" value={wpStatus ?? "—"} />
           <InfoRow label="Created" value={createdAt ? new Date(createdAt).toLocaleString() : "—"} />
           <InfoRow
@@ -228,16 +307,121 @@ export function ArticleMetaPanel({
 
       {/* Author */}
       <WkSurface className="p-4">
-        <h3 className="text-[11px] font-bold uppercase tracking-wider text-wk-text-muted mb-3">
+        <h3 className="text-[11px] font-bold uppercase tracking-wider text-wk-text-muted mb-3 flex items-center gap-1.5">
+          <WkIcon name="User" size={12} className="text-wk-text-faint" />
           Author
+          {authorList.length > 0 && (
+            <span className="text-[10px] font-normal text-wk-text-faint ml-auto">{authorList.length} in registry</span>
+          )}
         </h3>
-        <input
-          type="text"
-          value={author}
-          onChange={(e) => onAuthorChange(e.target.value)}
-          placeholder="Author name…"
-          className="w-full rounded-lg border border-wk-border bg-wk-bg-subtle px-3 py-2 text-[13px] text-wk-text placeholder:text-wk-text-faint outline-none focus:border-wk-brand transition-colors"
-        />
+
+        <div className="author-dropdown-container relative">
+          {/* Current selection / search input */}
+          <div className="relative">
+            <input
+              type="text"
+              value={authorDropdownOpen ? authorSearch : author}
+              onChange={(e) => {
+                if (authorDropdownOpen) {
+                  setAuthorSearch(e.target.value);
+                } else {
+                  onAuthorChange(e.target.value);
+                }
+              }}
+              onFocus={() => {
+                setAuthorDropdownOpen(true);
+                setAuthorSearch("");
+              }}
+              placeholder="Search or type author name…"
+              className="w-full rounded-lg border border-wk-border bg-wk-bg-subtle px-3 py-2 text-[13px] text-wk-text placeholder:text-wk-text-faint outline-none focus:border-wk-brand transition-colors"
+            />
+            <button
+              onClick={() => {
+                setAuthorDropdownOpen(!authorDropdownOpen);
+                setAuthorSearch("");
+              }}
+              className="absolute right-2 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-md hover:bg-wk-surface-raised transition-colors cursor-pointer"
+            >
+              <WkIcon name={authorDropdownOpen ? "ChevronUp" : "ChevronDown"} size={13} className="text-wk-text-faint" />
+            </button>
+          </div>
+
+          {/* Selected author badge when not from dropdown */}
+          {author && !authorList.some((a) => a.name === author) && !authorDropdownOpen && (
+            <p className="mt-1.5 text-[10px] text-wk-text-faint flex items-center gap-1">
+              <WkIcon name="Info" size={10} />
+              Custom byline (not in author registry)
+            </p>
+          )}
+
+          {/* Dropdown */}
+          {authorDropdownOpen && (
+            <div className="absolute z-30 left-0 right-0 top-full mt-1 max-h-[240px] overflow-y-auto rounded-lg border border-wk-border bg-wk-surface shadow-lg">
+              {/* Custom / free-text option */}
+              {authorSearch.trim() && !filteredAuthors.some((a) => a.name.toLowerCase() === authorSearch.trim().toLowerCase()) && (
+                <button
+                  onClick={() => {
+                    onAuthorChange(authorSearch.trim());
+                    setAuthorDropdownOpen(false);
+                    setAuthorSearch("");
+                  }}
+                  className="flex w-full items-center gap-3 px-3 py-2.5 text-[13px] text-wk-text hover:bg-wk-surface-raised transition-colors text-left border-b border-wk-border cursor-pointer"
+                >
+                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-wk-surface-raised text-wk-text-muted shrink-0">
+                    <WkIcon name="Pencil" size={12} />
+                  </div>
+                  <div>
+                    <span className="font-semibold">Use &quot;{authorSearch.trim()}&quot;</span>
+                    <span className="block text-[10px] text-wk-text-faint">Custom byline (not in registry)</span>
+                  </div>
+                </button>
+              )}
+
+              {filteredAuthors.length === 0 ? (
+                <div className="px-3 py-4 text-center text-[12px] text-wk-text-faint">
+                  {authorList.length === 0 ? "Loading authors…" : "No authors match your search."}
+                </div>
+              ) : (
+                filteredAuthors.map((a) => (
+                  <button
+                    key={a.id}
+                    onClick={() => {
+                      onAuthorChange(a.name);
+                      setAuthorDropdownOpen(false);
+                      setAuthorSearch("");
+                    }}
+                    className={`flex w-full items-center gap-3 px-3 py-2.5 text-[13px] text-left hover:bg-wk-surface-raised transition-colors cursor-pointer ${
+                      a.name === author ? "bg-wk-brand-soft" : ""
+                    }`}
+                  >
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-wk-brand text-[10px] font-black text-wk-brand-on shrink-0">
+                      {a.name
+                        .split(" ")
+                        .map((n) => n[0])
+                        .join("")
+                        .slice(0, 2)
+                        .toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <span className={`font-semibold ${a.name === author ? "text-wk-brand" : "text-wk-text"}`}>
+                        {a.name}
+                      </span>
+                      <span className="block text-[10px] text-wk-text-faint">
+                        /{a.slug}
+                        {a.source_kind && ` · ${a.source_kind.replace("_", " ")}`}
+                      </span>
+                    </div>
+                    {a.name === author && (
+                      <div className="flex h-5 w-5 items-center justify-center">
+                        <WkIcon name="Check" size={13} className="text-wk-brand" />
+                      </div>
+                    )}
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+        </div>
       </WkSurface>
 
       {/* Publish Date */}
@@ -347,6 +531,15 @@ export function ArticleMetaPanel({
         </div>
       </WkSurface>
 
+      {/* Internal Link Suggestions */}
+      <ArticleInternalLinks
+        content={(seo as Record<string, unknown>)._content as string || ""}
+        currentSlug={slug}
+        categories={categories}
+        tags={tags}
+        onInsertLink={onInsertLink}
+      />
+
       {/* SEO Panel */}
       <WkSurface className="overflow-hidden">
         <button
@@ -368,6 +561,21 @@ export function ArticleMetaPanel({
 
         {seoOpen && (
           <div className="border-t border-wk-border px-4 py-4 space-y-3">
+            <div>
+              <label className="block text-[11px] font-bold text-wk-text-muted mb-1.5">
+                Focus Keyword
+              </label>
+              <input
+                type="text"
+                value={(seo.focusKeyword as string) ?? ""}
+                onChange={(e) => onSeoChange({ ...seo, focusKeyword: e.target.value })}
+                placeholder="Primary keyword to optimize for…"
+                className="w-full rounded-lg border border-wk-border bg-wk-bg-subtle px-3 py-2 text-[12px] text-wk-text placeholder:text-wk-text-faint outline-none focus:border-wk-brand transition-colors"
+              />
+              <p className="mt-1 text-[10px] text-wk-text-faint">
+                Used to analyze keyword placement across title, headings, content, URL, and meta.
+              </p>
+            </div>
             <div>
               <label className="block text-[11px] font-bold text-wk-text-muted mb-1.5">
                 SEO Title
@@ -412,6 +620,32 @@ export function ArticleMetaPanel({
                 className="w-full rounded-lg border border-wk-border bg-wk-bg-subtle px-3 py-2 text-[12px] text-wk-text placeholder:text-wk-text-faint outline-none focus:border-wk-brand transition-colors"
               />
             </div>
+
+            <button
+              onClick={() => setSeoAnalyzerOpen(!seoAnalyzerOpen)}
+              className="flex w-full items-center justify-between rounded-lg border border-wk-border bg-wk-bg-subtle px-3 py-2 text-[12px] font-semibold text-wk-brand hover:bg-wk-brand-soft transition-colors cursor-pointer"
+            >
+              <span className="flex items-center gap-1.5">
+                <WkIcon name="BarChart" size={13} />
+                {seoAnalyzerOpen ? "Hide" : "Run"} Full SEO Analysis
+              </span>
+              <WkIcon name={seoAnalyzerOpen ? "ChevronUp" : "ChevronDown"} size={13} />
+            </button>
+
+            {seoAnalyzerOpen && (
+              <div className="pt-2">
+                <ArticleSeoAnalyzer
+                  title={title}
+                  content={(seo as Record<string, unknown>)._content as string || ""}
+                  excerpt={excerpt}
+                  slug={slug}
+                  seoTitle={(seo.title as string) || title}
+                  seoDescription={(seo.description as string) || excerpt}
+                  seoKeywords={(seo.keywords as string) || ""}
+                  focusKeyword={(seo.focusKeyword as string) || ""}
+                />
+              </div>
+            )}
           </div>
         )}
       </WkSurface>

@@ -322,6 +322,11 @@ export default function ArticleDetailPage() {
     addToast("success", "Version restored. Remember to save!");
   }, []);
 
+  function handleInsertLink(html: string) {
+    setDraft((prev) => ({ ...prev, content: prev.content + "\n\n" + html }));
+    setIsDirty(true);
+  }
+
   /* ─── Save helpers ─── */
   async function saveToSupabase(extraFields: Partial<ArticleRecord> = {}) {
     if (!article) return false;
@@ -472,6 +477,40 @@ export default function ArticleDetailPage() {
     }
   }
 
+  async function handleSlugChange(newSlug: string): Promise<boolean> {
+    if (!article || !slug) return false;
+    // Check for slug collision
+    const { data: existing } = await supabase
+      .from("wk_articles")
+      .select("id")
+      .eq("slug", newSlug)
+      .neq("id", article.id)
+      .maybeSingle();
+
+    if (existing) {
+      addToast("error", `Slug "${newSlug}" is already taken.`);
+      return false;
+    }
+
+    const { error } = await supabase
+      .from("wk_articles")
+      .update({ slug: newSlug })
+      .eq("id", article.id);
+
+    if (error) {
+      addToast("error", `Failed to update slug: ${error.message}`);
+      return false;
+    }
+
+    addToast("success", "Slug updated. Reloading…");
+    setTimeout(() => navigate(`/admin/content/articles/${newSlug}`), 800);
+    return true;
+  }
+
+  // ════════════════════════════════════════════
+  // Store content in seo object as _content for the SEO analyzer
+  const seoWithContent = { ...draft.seo, _content: draft.content };
+
   /* ─── Unsaved changes warning ─── */
   useEffect(() => {
     function handleBeforeUnload(e: BeforeUnloadEvent) {
@@ -576,7 +615,7 @@ export default function ArticleDetailPage() {
             categories={draft.categories}
             tags={draft.tags}
             publishedAt={draft.publishedAt}
-            seo={draft.seo}
+            seo={seoWithContent}
             slug={article.slug}
             wpStatus={article.wp_status}
             createdAt={article.created_at}
@@ -597,6 +636,8 @@ export default function ArticleDetailPage() {
             onPublishedAtChange={(v) => patchDraft({ publishedAt: v })}
             onSeoChange={(v) => patchDraft({ seo: v })}
             onRestoreDraft={handleRestoreDraft}
+            onSlugChange={handleSlugChange}
+            onInsertLink={handleInsertLink}
           />
         </div>
       </div>

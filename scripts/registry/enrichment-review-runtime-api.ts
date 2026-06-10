@@ -1,6 +1,8 @@
 import pg from "pg";
 
 type PgPool = InstanceType<typeof pg.Pool>;
+export type { PgPool };
+
 type Row = Record<string, unknown>;
 
 export interface ReleaseShellLookupInput {
@@ -139,6 +141,7 @@ export async function updateReleaseShellLifecycleStatus(
   registryEntityId: string,
   status: "resolved" | "reopened",
   reason = "",
+  actor?: string,
 ): Promise<ReleaseShellLifecycleSnapshot> {
   const cleanRegistryEntityId = String(registryEntityId || "").trim();
 
@@ -148,7 +151,58 @@ export async function updateReleaseShellLifecycleStatus(
 
   await ensureReleaseShellLifecycleTable(pool);
 
-  const actor = process.env.WAKILISHA_CANONICAL_WRITE_ACTOR ?? "system";
+  // ── State machine validation ──────────────────────────────────────────────
+  const currentSnapshot = await pool.query(
+    `
+      select distinct on (registry_entity_id)
+        status,
+        actor
+      from public.registry_release_shell_lifecycle_events
+      where registry_entity_type = 'release'
+        and registry_entity_id::text = $1
+      order by registry_entity_id, created_at desc
+    `,
+    [cleanRegistryEntityId],
+  );
+
+  const currentStatus = (currentSnapshot.rows[0]?.status ?? "open") as string;
+
+  if (status === "resolved") {
+    // Can only resolve from "open" or "reopened" (not from already-resolved)
+    if (currentStatus === "resolved") {
+      throw new Error(`Cannot resolve shell ${cleanRegistryEntityId}: already in "resolved" status.`);
+    }
+
+    // Defense-in-depth: require at least one applied canonical write event
+    const writeCheck = await pool.query(
+      `
+        select 1
+        from public.registry_canonical_write_events
+        where registry_entity_type = 'release'
+          and registry_entity_id = $1
+          and status = 'applied'
+        limit 1
+      `,
+      [cleanRegistryEntityId],
+    );
+
+    if ((writeCheck.rowCount ?? 0) === 0) {
+      throw new Error(
+        `Cannot resolve shell ${cleanRegistryEntityId}: no canonical write events have been applied. Apply at least one field before resolving.`,
+      );
+    }
+  }
+
+  if (status === "reopened") {
+    // Can only reopen from "resolved"
+    if (currentStatus !== "resolved") {
+      throw new Error(
+        `Cannot reopen shell ${cleanRegistryEntityId}: current status is "${currentStatus}", only "resolved" shells can be reopened.`,
+      );
+    }
+  }
+
+  const effectiveActor = actor ?? process.env.WAKILISHA_CANONICAL_WRITE_ACTOR ?? "system";
 
   const result = await pool.query(
     `
@@ -166,7 +220,7 @@ export async function updateReleaseShellLifecycleStatus(
         actor,
         created_at as "createdAt"
     `,
-    [cleanRegistryEntityId, status, reason, actor],
+    [cleanRegistryEntityId, status, reason, effectiveActor],
   );
 
   const row = result.rows[0] ?? {};
@@ -174,7 +228,7 @@ export async function updateReleaseShellLifecycleStatus(
   return {
     status: String(row.status || status) as ReleaseShellLifecycleSnapshot["status"],
     reason: row.reason === null || row.reason === undefined ? null : String(row.reason),
-    actor: String(row.actor || actor),
+    actor: String(row.actor || effectiveActor),
     createdAt: row.createdAt ? String(row.createdAt) : null,
   };
 }
@@ -518,6 +572,7 @@ async function ensureCanonicalRegistryReleaseRow(
   queryable: PgQueryable,
   registryEntityId: string,
   suggestions: Row[],
+  actor?: string,
 ): Promise<boolean> {
   const releaseCheck = await queryable.query(
     `
@@ -807,6 +862,7 @@ export async function previewApprovedReleaseShellSuggestions(
 export async function applyApprovedReleaseShellSuggestions(
   pool: PgPool,
   registryEntityId: string,
+  actor?: string,
 ): Promise<ApplyApprovedReleaseShellSuggestionsResult> {
   const cleanRegistryEntityId = String(registryEntityId || "").trim();
   const result: ApplyApprovedReleaseShellSuggestionsResult = {
@@ -820,6 +876,30 @@ export async function applyApprovedReleaseShellSuggestions(
     result.failed.push({ registryEntityId: cleanRegistryEntityId, reason: "Missing registryEntityId." });
     return result;
   }
+
+  // ── State machine validation ──────────────────────────────────────────────
+  // Prevent canonical writes on resolved shells (defense-in-depth; UI also gates this)
+  const lifecycleCheck = await pool.query(
+    `
+      select distinct on (registry_entity_id)
+        status
+      from public.registry_release_shell_lifecycle_events
+      where registry_entity_type = 'release'
+        and registry_entity_id::text = $1
+      order by registry_entity_id, created_at desc
+    `,
+    [cleanRegistryEntityId],
+  );
+
+  if (lifecycleCheck.rows[0]?.status === "resolved") {
+    result.failed.push({
+      registryEntityId: cleanRegistryEntityId,
+      reason: `Shell ${cleanRegistryEntityId} is resolved. Reopen it before applying new canonical writes.`,
+    });
+    return result;
+  }
+
+  const effectiveActor = actor ?? process.env.WAKILISHA_CANONICAL_WRITE_ACTOR ?? "system";
 
   await ensureCanonicalWriteAuditTable(pool);
 
@@ -843,7 +923,7 @@ export async function applyApprovedReleaseShellSuggestions(
       [cleanRegistryEntityId],
     );
 
-    await ensureCanonicalRegistryReleaseRow(client, cleanRegistryEntityId, suggestions.rows);
+    await ensureCanonicalRegistryReleaseRow(client, cleanRegistryEntityId, suggestions.rows, effectiveActor);
 
     for (const suggestion of suggestions.rows) {
       const suggestionId = String(suggestion.id);
@@ -900,6 +980,7 @@ export async function applyApprovedReleaseShellSuggestions(
           afterValue: suggestedValue,
           action: "apply_approved_suggestion",
           status: "applied",
+          actor: effectiveActor,
         });
 
         result.applied.push({ suggestionId, fieldName, target: `registry_releases.${targetColumn}` });
@@ -968,6 +1049,7 @@ export async function applyApprovedReleaseShellSuggestions(
         action: "apply_approved_suggestion",
         status: "skipped",
         errorMessage: "Field is not in the canonical write allowlist.",
+        actor: effectiveActor,
       });
 
       result.skipped.push({

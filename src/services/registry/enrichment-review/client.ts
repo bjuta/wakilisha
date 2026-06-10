@@ -126,6 +126,11 @@ export async function getLiveReleaseShellReviewRows(options: { includeResolved?:
     return { shells: [], contexts: {} };
   }
 
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) {
+    return { shells: [], contexts: {} };
+  }
+
   const payload = (await response.json()) as RuntimeApiResponse;
   const contexts = extractContexts(payload);
 
@@ -175,6 +180,9 @@ export async function getReleaseShellEnrichmentContexts(
     });
 
     if (!response.ok) return {};
+
+    const contentType = response.headers.get("content-type") ?? "";
+    if (!contentType.includes("application/json")) return {};
 
     const payload = (await response.json()) as RuntimeApiResponse;
     const contexts = extractContexts(payload);
@@ -232,6 +240,11 @@ export async function updateReleaseShellSuggestionDecision(
     body: JSON.stringify({ decisionStatus }),
   });
 
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) {
+    throw new Error("API is unavailable right now. Check that the registry admin server is running.");
+  }
+
   const payload = (await response.json()) as {
     data?: {
       decision?: UpdateReleaseShellSuggestionDecisionResult;
@@ -260,6 +273,11 @@ export async function previewApprovedReleaseShellSuggestions(
     body: JSON.stringify({ registryEntityId }),
   });
 
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) {
+    throw new Error("API is unavailable right now. Check that the registry admin server is running.");
+  }
+
   const payload = (await response.json()) as {
     data?: ApplyApprovedReleaseShellSuggestionsPreview;
     message?: string;
@@ -283,6 +301,11 @@ export async function applyApprovedReleaseShellSuggestions(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ registryEntityId }),
   });
+
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) {
+    throw new Error("API is unavailable right now. Check that the registry admin server is running.");
+  }
 
   const payload = (await response.json()) as {
     data?: ApplyApprovedReleaseShellSuggestionsResult;
@@ -312,6 +335,11 @@ export async function updateReleaseShellLifecycleStatus(
     body: JSON.stringify({ status, reason }),
   });
 
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) {
+    throw new Error("API is unavailable right now. Check that the registry admin server is running.");
+  }
+
   const payload = (await response.json()) as {
     data?: {
       lifecycle?: ReleaseShellLifecycleSnapshot;
@@ -339,6 +367,9 @@ export async function getReleaseShellCanonicalWriteAuditEvents(
   });
 
   if (!response.ok) return [];
+
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) return [];
 
   const payload = (await response.json()) as {
     data?: {

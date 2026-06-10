@@ -245,10 +245,112 @@ export const releaseSchema: RegistryEntitySchema = {
   ],
 };
 
+export const labelSchema: RegistryEntitySchema = {
+  entityType: "label",
+  table: "registry_labels",
+  idField: "id",
+  displayNameField: "name",
+  searchFields: ["name", "slug", "country_code", "description", "status"],
+  qualityFields: ["name", "slug", "country_code", "description", "status"],
+  editableFields: [
+    {
+      key: "name",
+      label: "Label name",
+      type: "text",
+      access: "editable",
+      required: true,
+      normalizer: "trim",
+    },
+    {
+      key: "slug",
+      label: "Slug",
+      type: "slug",
+      access: "editable",
+      required: true,
+      normalizer: "slug",
+    },
+    {
+      key: "country_code",
+      label: "Country code",
+      type: "text",
+      access: "editable",
+      normalizer: "uppercase",
+      helpText: "Two-letter ISO code, e.g. KE.",
+    },
+    {
+      key: "description",
+      label: "Description",
+      type: "textarea",
+      access: "editable",
+    },
+    {
+      key: "status",
+      label: "Status",
+      type: "select",
+      access: "editable",
+      options: ["active", "draft", "needs_review", "archived"],
+    },
+  ],
+  readonlyFields: [
+    { key: "id", label: "Registry ID", type: "text", access: "readonly" },
+    { key: "normalized_name", label: "Normalized name", type: "text", access: "readonly" },
+    { key: "created_at", label: "Created", type: "date", access: "readonly" },
+    { key: "updated_at", label: "Updated", type: "date", access: "readonly" },
+  ],
+};
+
+export const genreSchema: RegistryEntitySchema = {
+  entityType: "genre",
+  table: "registry_genres",
+  idField: "id",
+  displayNameField: "name",
+  searchFields: ["name", "slug", "description", "status"],
+  qualityFields: ["name", "slug", "description", "status"],
+  editableFields: [
+    {
+      key: "name",
+      label: "Genre name",
+      type: "text",
+      access: "editable",
+      required: true,
+      normalizer: "trim",
+    },
+    {
+      key: "slug",
+      label: "Slug",
+      type: "slug",
+      access: "editable",
+      required: true,
+      normalizer: "slug",
+    },
+    {
+      key: "description",
+      label: "Description",
+      type: "textarea",
+      access: "editable",
+    },
+    {
+      key: "status",
+      label: "Status",
+      type: "select",
+      access: "editable",
+      options: ["active", "draft", "needs_review", "archived"],
+    },
+  ],
+  readonlyFields: [
+    { key: "id", label: "Registry ID", type: "text", access: "readonly" },
+    { key: "parent_genre_id", label: "Parent genre ID", type: "text", access: "readonly" },
+    { key: "created_at", label: "Created", type: "date", access: "readonly" },
+    { key: "updated_at", label: "Updated", type: "date", access: "readonly" },
+  ],
+};
+
 const schemasByType: Record<RegistryEntityType, RegistryEntitySchema> = {
   artist: artistSchema,
   track: trackSchema,
   release: releaseSchema,
+  label: labelSchema,
+  genre: genreSchema,
 };
 
 export function getEntitySchema(entityType: RegistryEntityType): RegistryEntitySchema {

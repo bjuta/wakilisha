@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { listMagazineStories, getArticle, type RepairedStory } from '@/services/repairedContent/client';
 import { rewriteWpImageUrls } from '@/services/wpImageRewrite';
+import { fetchAllSiteContent, type SiteContentResponse, type MagazineSiteArtist, type MagazineSiteRelease } from '@/services/magazineSiteContent';
 
 export type MediaAsset = {
   id: string;
@@ -135,7 +136,31 @@ export async function createPreviewNonce(): Promise<string> {
 export async function getArticlesByAuthor(authorSlug: string): Promise<MagazineArticle[]> {
   const normalizedTarget = authorSlug.toLowerCase().replace(/[\s_-]+/g, '-');
   const articles = await listMagazineArticles();
-  return articles.filter((article) => article.author.trim().toLowerCase().replace(/[\s_-]+/g, '-') === normalizedTarget);
+
+  // Try exact slug match first
+  let matches = articles.filter((article) => article.author.trim().toLowerCase().replace(/[\s_-]+/g, '-') === normalizedTarget);
+  if (matches.length > 0) return matches;
+
+  // Try matching by wk_authors.name — fetch authors and check
+  try {
+    const { fetchAuthorBySlug } = await import('@/services/authorProfiles');
+    const dbAuthor = await fetchAuthorBySlug(normalizedTarget);
+    if (dbAuthor) {
+      const dbName = dbAuthor.name.trim().toLowerCase();
+      matches = articles.filter((article) => {
+        const articleAuthor = article.author.trim().toLowerCase().replace(/[\s_-]+/g, '-');
+        const articleAuthorRaw = article.author.trim().toLowerCase();
+        return articleAuthor === normalizedTarget ||
+               articleAuthorRaw === dbName ||
+               articleAuthorRaw.includes(dbName);
+      });
+      if (matches.length > 0) return matches;
+    }
+  } catch {
+    // Silently fall through — return no matches
+  }
+
+  return [];
 }
 
 export function useMagazineArticles() {
@@ -200,4 +225,31 @@ export function useMagazineArticle(slug: string | undefined, previewNonce?: stri
   }, [slug, previewNonce]);
 
   return { article, loading, error };
+}
+
+export function useSiteContent() {
+  const [content, setContent] = useState<SiteContentResponse>({ articles: [], artists: [], releases: [], chartHighlights: [] });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    fetchAllSiteContent()
+      .then((data) => {
+        setContent(data);
+        setLoading(false);
+      })
+      .catch((err) => {
+        setContent({ articles: [], artists: [], releases: [], chartHighlights: [] });
+        setError(err instanceof Error ? err.message : 'Failed to load site content');
+        setLoading(false);
+      });
+  }, []);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  return { content, loading, error, refresh };
 }

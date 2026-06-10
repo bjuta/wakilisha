@@ -1,4 +1,5 @@
 import type { MagazineArticle } from '@/services/magazineArticles';
+import { supabase } from '@/lib/supabase';
 
 /* ─── Types ─── */
 
@@ -15,6 +16,118 @@ export type AuthorProfile = {
   socialLinks: { label: string; url: string; icon: string }[];
   joinedDate: string;
 };
+
+/* ─── Real author data from Supabase ─── */
+
+export type AuthorRow = {
+  id: string;
+  slug: string;
+  name: string;
+  email: string | null;
+  url: string | null;
+  source_kind: string | null;
+};
+
+let cachedAuthors: AuthorRow[] | null = null;
+let cacheTimestamp = 0;
+const CACHE_TTL = 5 * 60 * 1000; // 5 min
+
+export async function fetchAllAuthors(): Promise<AuthorRow[]> {
+  if (cachedAuthors && Date.now() - cacheTimestamp < CACHE_TTL) return cachedAuthors;
+
+  const { data, error } = await supabase
+    .from("wk_authors")
+    .select("id, slug, name, email, url, source_kind");
+
+  if (error || !data) {
+    console.warn("Failed to fetch authors from wk_authors:", error?.message);
+    return cachedAuthors ?? [];
+  }
+
+  cachedAuthors = data as AuthorRow[];
+  cacheTimestamp = Date.now();
+  return cachedAuthors;
+}
+
+export async function fetchAuthorBySlug(slug: string): Promise<AuthorRow | null> {
+  const authors = await fetchAllAuthors();
+  return authors.find((a) => a.slug === slug) ?? null;
+}
+
+/** Build a display name from the wk_authors name field */
+function authorDisplayName(row: AuthorRow): string {
+  const raw = row.name.trim();
+  // If the name contains underscores or looks like a slug, prettify it
+  if (raw.includes("_") || raw === raw.toLowerCase() && !raw.includes(" ")) {
+    return raw
+      .split(/[_\s]+/)
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+      .join(" ");
+  }
+  return raw;
+}
+
+/** Build a bio from available fields */
+function authorBio(row: AuthorRow): string {
+  if (row.source_kind === "wordpress_database") {
+    return `${authorDisplayName(row)} is a contributor to WAKILISHA Magazine, covering East African music and culture.`;
+  }
+  return `${authorDisplayName(row)} is a WAKILISHA contributor.`;
+}
+
+/** Resolve author metadata: first check wk_authors, then fall back to hardcoded map */
+export async function resolveAuthorMeta(rawSlug: string): Promise<{
+  slug: string;
+  displayName: string;
+  role: string;
+  bio: string;
+  avatarUrl: string;
+  coverUrl: string;
+  location: string;
+  areas: string[];
+  socialLinks: { label: string; url: string; icon: string }[];
+  joinedDate: string;
+  source: "database" | "hardcoded";
+}> {
+  const slug = rawSlug.trim().toLowerCase().replace(/\s+/g, "-");
+  const dbAuthor = await fetchAuthorBySlug(slug);
+  const hardcoded = AUTHOR_META[slug];
+
+  if (dbAuthor) {
+    // Merge DB data with hardcoded fallbacks
+    const meta = hardcoded ?? {
+      displayName: authorDisplayName(dbAuthor),
+      role: "Contributor",
+      bio: authorBio(dbAuthor),
+      avatarSeq: 99,
+      coverSeq: 199,
+      location: "",
+      areas: [],
+      socialLinks: [],
+      joinedDate: "",
+    };
+
+    return {
+      slug,
+      displayName: dbAuthor.name !== meta.displayName ? authorDisplayName(dbAuthor) : meta.displayName,
+      role: meta.role,
+      bio: meta.bio,
+      avatarUrl: `https://readdy.ai/api/search-image?query=Professional%20portrait%20photograph%20of%20African%20music%20journalist%2C%20editorial%20style%2C%20warm%20natural%20lighting%2C%20Nairobi%20creative%20scene%2C%20clean%20simple%20background%20with%20earth%20tones%2C%20confident%20expression%2C%20professional%20headshot%20composition&width=480&height=480&seq=author-av-${meta.avatarSeq}&orientation=squarish`,
+      coverUrl: `https://readdy.ai/api/search-image?query=Abstract%20African%20music%20culture%20landscape%2C%20artistic%20gradient%20with%20warm%20amber%20and%20deep%20green%20tones%2C%20Nairobi%20skyline%20silhouette%20at%20dusk%2C%20editorial%20atmosphere%2C%20modern%20minimal%20banner%20composition%2C%20no%20text%20no%20logos%2C%20cinematic%20wide%20aspect&width=1600&height=400&seq=author-cv-${meta.coverSeq}&orientation=landscape`,
+      location: meta.location,
+      areas: meta.areas,
+      socialLinks: meta.socialLinks,
+      joinedDate: meta.joinedDate,
+      source: "database" as const,
+    };
+  }
+
+  // Fall back to hardcoded
+  return {
+    ...getAuthorMeta(slug),
+    source: "hardcoded" as const,
+  };
+}
 
 /* ─── Author display-name map ─── */
 

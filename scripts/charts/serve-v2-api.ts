@@ -18,6 +18,14 @@ import {
   type ReleaseShellLookupInput,
 } from "../registry/enrichment-review-runtime-api";
 
+// ── NOTE ─────────────────────────────────────────────────────────────────────
+// Registry enrichment-review routes are also served by the dedicated
+// scripts/registry/serve-registry-admin-api.ts server (port 4177).
+// The routes below are maintained here for backward-compatibility with the
+// /__wakilisha-v2-api vite proxy. New development should use the registry
+// admin API server directly.
+// ─────────────────────────────────────────────────────────────────────────────
+
 type Row = Record<string, unknown>;
 type Entry = {
   id: string;

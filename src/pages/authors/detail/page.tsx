@@ -2,9 +2,10 @@ import { useEffect, useState, useMemo, useRef } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { WkIcon } from '@/components/design-system/Icon';
 import { getArticlesByAuthor, type MagazineArticle } from '@/services/magazineArticles';
-import { getAuthorMeta, getVerticalColor } from '@/services/authorProfiles';
+import { getAuthorMeta, getVerticalColor, resolveAuthorMeta, type AuthorRow } from '@/services/authorProfiles';
 
 type SortMode = 'latest' | 'oldest' | 'longest';
+type AuthorMetaResolved = Awaited<ReturnType<typeof resolveAuthorMeta>>;
 
 const BATCH_SIZE = 8;
 const LOAD_MORE = 6;
@@ -25,11 +26,14 @@ export default function AuthorProfilePage() {
   const [sortMode, setSortMode] = useState<SortMode>('latest');
   const [visibleCount, setVisibleCount] = useState(BATCH_SIZE);
   const [sortOpen, setSortOpen] = useState(false);
+  const [authorMetaResolved, setAuthorMetaResolved] = useState<AuthorMetaResolved | null>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const sortWrapRef = useRef<HTMLDivElement>(null);
 
   const normalizedSlug = (slug || '').toLowerCase().replace(/[\s_-]+/g, '-');
-  const authorMeta = getAuthorMeta(normalizedSlug);
+  // Fallback meta while real data loads
+  const fallbackMeta = getAuthorMeta(normalizedSlug);
+  const authorMeta = authorMetaResolved ?? fallbackMeta;
   const firstName = authorMeta.displayName.split(' ')[0];
 
   useEffect(() => {
@@ -42,6 +46,16 @@ export default function AuthorProfilePage() {
     let alive = true;
     setLoading(true);
     setError(null);
+
+    // Fetch real author meta from wk_authors
+    resolveAuthorMeta(normalizedSlug)
+      .then((resolved) => {
+        if (!alive) return;
+        setAuthorMetaResolved(resolved);
+      })
+      .catch(() => {
+        // Silent fallback — getAuthorMeta will handle it
+      });
 
     getArticlesByAuthor(normalizedSlug)
       .then((items) => {

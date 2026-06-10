@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { WkTag } from "@/components/design-system/primitives/Tag";
+import { getAuthorMeta } from "@/services/authorProfiles";
 
 export interface StoryCardProps {
   slug: string;
@@ -9,6 +10,7 @@ export interface StoryCardProps {
   readingTime?: number;
   heroUrl?: string;
   dek?: string;
+  author?: string;
   isFeatured?: boolean;
 }
 
@@ -20,8 +22,11 @@ export function StoryCard({
   readingTime,
   heroUrl,
   dek,
+  author,
   isFeatured = false,
 }: StoryCardProps) {
+  const authorUrl = author ? `/authors/${getAuthorMeta(author).slug}` : null;
+
   if (isFeatured) {
     return (
       <Link
@@ -47,6 +52,18 @@ export function StoryCard({
           <h2 className="wk-h-section mb-2">{title}</h2>
           {dek && <p className="wk-copy mb-3">{dek}</p>}
           <div className="flex items-center gap-2 text-[12px] text-[var(--wk-text-faint)]">
+            {author && authorUrl && (
+              <>
+                <Link
+                  to={authorUrl}
+                  className="font-semibold hover:text-[var(--wk-brand)] transition-colors"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {author}
+                </Link>
+                <span>·</span>
+              </>
+            )}
             {date && <span>{date}</span>}
             {readingTime && <span>· {readingTime} min read</span>}
           </div>
@@ -73,6 +90,18 @@ export function StoryCard({
         {section && <WkTag variant="brand">{section}</WkTag>}
         <h3 className="mt-1 line-clamp-2 text-[13px] font-bold text-[var(--wk-text)]">{title}</h3>
         <div className="mt-1 flex items-center gap-2 text-[11px] text-[var(--wk-text-faint)]">
+          {author && authorUrl && (
+            <>
+              <Link
+                to={authorUrl}
+                className="font-semibold hover:text-[var(--wk-brand)] transition-colors"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {author}
+              </Link>
+              <span>·</span>
+            </>
+          )}
           {date && <span>{date}</span>}
           {readingTime && <span>· {readingTime} min read</span>}
         </div>

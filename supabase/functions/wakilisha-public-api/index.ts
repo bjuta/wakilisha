@@ -81,7 +81,9 @@ function parseTagNames(tags: any): string[] {
 }
 
 function normalizePath(raw: string): string {
-  return raw.replace(/^\/repaired(?=\/|$)/, "").replace(/\/$/, "") || "/";
+  // Strip Supabase function prefix: /functions/v1/wakilisha-public-api OR /wakilisha-public-api
+  const withoutPrefix = raw.replace(/^(\/functions\/v1)?\/wakilisha-public-api/, "");
+  return withoutPrefix.replace(/\/$/, "") || "/";
 }
 
 Deno.serve(async (req) => {
@@ -90,7 +92,7 @@ Deno.serve(async (req) => {
   }
 
   const url = new URL(req.url);
-  const rawPath = url.pathname.replace(/^\/wakilisha-public-api/, "");
+  const rawPath = url.pathname;
   const path = normalizePath(rawPath);
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -148,12 +150,15 @@ Deno.serve(async (req) => {
 
     // ── MAGAZINE LISTING ──
     else if (path === "/magazine" || path === "/magazine/") {
+      const limitParam = url.searchParams.get("limit");
+      const limit = limitParam ? Math.min(parseInt(limitParam, 10) || 50, 500) : 500;
+
       const { data: articles } = await supabase
         .from("wk_articles")
-        .select("id, slug, title, excerpt, author, published_at, content_html, categories, hero_image_url, seo")
+        .select("id, slug, title, excerpt, author, published_at, content_html, categories, tags, hero_image_url, seo")
         .eq("wp_status", "publish")
         .order("published_at", { ascending: false })
-        .limit(50);
+        .limit(limit);
 
       data = {
         stories: (articles ?? []).map((a: any) => {
@@ -162,6 +167,7 @@ Deno.serve(async (req) => {
           const contentText = stripHtml(String(a.content_html || ""));
           const seoMeta = (a.seo || {}) as Record<string, unknown>;
           const dek = a.excerpt ? String(a.excerpt) : (seoMeta.yoast_metadesc ? String(seoMeta.yoast_metadesc) : (contentText ? contentText.substring(0, 140) + "..." : ""));
+          const tagNames = parseTagNames(a.tags);
 
           let heroUrl = String(a.hero_image_url || "");
           if (!heroUrl && a.content_html) {
@@ -178,6 +184,7 @@ Deno.serve(async (req) => {
             date: a.published_at ? String(a.published_at).split("T")[0] : "",
             readingTime: Math.max(1, Math.ceil(contentText.length / 1500)),
             heroUrl,
+            tags: tagNames,
           };
         }),
       };
@@ -344,7 +351,6 @@ Deno.serve(async (req) => {
         };
       });
 
-      // === RELATED ARTISTS — canonical graph first ===
       const relatedArtists: any[] = [];
 
       const metaRelated = meta.related_artists;
@@ -725,7 +731,7 @@ Deno.serve(async (req) => {
       for (const r of (artistGenreAll ?? [])) {
         const mr = (r.mapped_record || {}) as Record<string, unknown>;
         const gs = String(mr.genre_slug || "");
-        const artistName = String(mr.artist_slug || "").replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+        const artistName = String(mr.artist_slug || "").replace(/-/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase());
         if (gs) {
           genreArtistCounts.set(gs, (genreArtistCounts.get(gs) || 0) + 1);
           const existing = genreRepresentatives.get(gs) || [];
@@ -1089,6 +1095,74 @@ Deno.serve(async (req) => {
       else {
         return jsonResponse({ error: "Not found" }, 404);
       }
+    }
+
+    // ── MAGAZINE SITE CONTENT AGGREGATION ──
+    else if (path === "/magazine/site-content" || path === "/magazine/site-content/") {
+      const limitParam = url.searchParams.get("limit");
+      const limit = limitParam ? Math.min(parseInt(limitParam, 10) || 50, 500) : 200;
+
+      // Fetch articles, artists, releases, tracks, and chart highlights
+      const [articleResult, artistResult, releaseResult, chartResult] = await Promise.all([
+        supabase.from("wk_articles").select("id, slug, title, excerpt, author, published_at, content_html, categories, tags, hero_image_url, seo").eq("wp_status", "publish").order("published_at", { ascending: false }).limit(limit),
+        supabase.from("registry_artists").select("id, slug, display_name, origin_iso2, public_image_url, metadata, status").eq("status", "active").order("display_name", { ascending: true }).limit(50),
+        supabase.from("registry_releases").select("id, slug, title, release_date, release_type, artwork_url, label_id, description, status").in("status", ["active", "draft"]).order("release_date", { ascending: false }).limit(30),
+        supabase.from("chart_entries").select("rank, track_title, track_slug, artist_name, artwork_url, edition_id").order("rank", { ascending: true }).limit(20),
+      ]);
+
+      const articles = (articleResult.data ?? []).map((a: any) => {
+        const catNames = parseCategoryNames(a.categories);
+        const section = catNames.length > 0 ? catNames[0] : "Music";
+        const contentText = stripHtml(String(a.content_html || ""));
+        const seoMeta = (a.seo || {}) as Record<string, unknown>;
+        const dek = a.excerpt ? String(a.excerpt) : (seoMeta.yoast_metadesc ? String(seoMeta.yoast_metadesc) : (contentText ? contentText.substring(0, 140) + "..." : ""));
+        const tagNames = parseTagNames(a.tags);
+        let heroUrl = String(a.hero_image_url || "");
+        if (!heroUrl && a.content_html) heroUrl = extractFirstImgSrc(String(a.content_html));
+        return {
+          contentType: "article" as const,
+          id: String(a.id), slug: String(a.slug), title: String(a.title),
+          section, dek, author: String(a.author || "Wakilisha"),
+          date: a.published_at ? String(a.published_at).split("T")[0] : "",
+          readingTime: Math.max(1, Math.ceil(contentText.length / 1500)),
+          heroUrl, tags: tagNames,
+        };
+      });
+
+      const artists = (artistResult.data ?? []).map((a: any) => {
+        const meta = (a.metadata || {}) as Record<string, unknown>;
+        const genresArr = meta.genres;
+        const artistGenres: string[] = Array.isArray(genresArr) ? genresArr.map(String) : [];
+        return {
+          contentType: "artist" as const,
+          id: String(a.id), slug: String(a.slug), title: String(a.display_name),
+          section: artistGenres[0] || "Artist", dek: artistGenres.slice(0, 3).join(" / ") || "Artist in the registry",
+          author: "", date: "", readingTime: 0,
+          heroUrl: String(a.public_image_url || ""), tags: artistGenres,
+          originIso2: a.origin_iso2 || null,
+        };
+      });
+
+      const releases = (releaseResult.data ?? []).map((r: any) => ({
+        contentType: "release" as const,
+        id: String(r.id), slug: String(r.slug), title: String(r.title),
+        section: String(r.release_type || "Release"), dek: r.description || "",
+        author: "", date: r.release_date ? String(r.release_date).split("T")[0] : "",
+        readingTime: 0, heroUrl: String(r.artwork_url || ""), tags: [],
+        releaseType: String(r.release_type || "album"),
+      }));
+
+      const chartHighlights = (chartResult.data ?? []).map((c: any) => ({
+        contentType: "chart_entry" as const,
+        id: String(c.track_slug || c.edition_id), slug: String(c.track_slug || ""),
+        title: String(c.track_title || ""),
+        section: "Chart Entry", dek: `#${c.rank} · ${c.artist_name || ""}`,
+        author: String(c.artist_name || ""), date: "", readingTime: 0,
+        heroUrl: String(c.artwork_url || ""), tags: [],
+        rank: Number(c.rank), artistName: String(c.artist_name || ""),
+      }));
+
+      data = { articles, artists, releases, chartHighlights };
     }
 
     else {

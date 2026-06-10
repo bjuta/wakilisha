@@ -33,9 +33,11 @@ const NAV_GROUPS: NavGroup[] = [
     { path: "/admin/settings/charts/snapshots", label: "Snapshots", icon: "Camera", requiredCapability: "view_charts_admin" },
   ] },
   { label: "Registry", visible: (can) => can("view_registry"), items: [
+    { path: "/admin/registry", label: "Overview", icon: "LayoutDashboard", requiredCapability: "view_registry" },
     { path: "/admin/registry/artists", label: "Artists", icon: "Mic2", requiredCapability: "view_registry" },
     { path: "/admin/registry/tracks", label: "Tracks", icon: "Music", requiredCapability: "view_registry" },
     { path: "/admin/registry/releases", label: "Releases", icon: "Disc", requiredCapability: "view_registry" },
+    { path: "/admin/registry/release-shells", label: "Release Shells", icon: "GitBranch", requiredCapability: "view_registry" },
     { path: "/admin/registry/labels", label: "Labels", icon: "Building2", requiredCapability: "view_registry" },
     { path: "/admin/registry/genres", label: "Genres", icon: "Tags", requiredCapability: "view_registry" },
   ] },

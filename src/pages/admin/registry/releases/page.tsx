@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
+import { supabase } from "@/lib/supabase";
 import { type RegistryEntityProfile } from "@/services/registry/admin/types";
 import { getEntitySchema } from "@/services/registry/admin/entitySchemas";
 import { calculateCompleteness, completenessTone, completenessLabel } from "@/services/registry/admin/completeness";
@@ -17,6 +19,7 @@ type QualityFilter =
   | "missing_date"
   | "missing_description"
   | "missing_type"
+  | "missing_label"
   | "blocked";
 
 interface EnrichedRelease extends RegistryEntityProfile {
@@ -36,14 +39,21 @@ function formatDate(value: string | null | undefined): string {
 }
 
 export default function ReleasesPage() {
+  const [searchParams] = useSearchParams();
+  const urlFilter = searchParams.get("filter");
+
   const [releases, setReleases] = useState<RegistryEntityProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
   const [query, setQuery] = useState("");
-  const [qualityFilter, setQualityFilter] = useState<QualityFilter>("all");
+  const [qualityFilter, setQualityFilter] = useState<QualityFilter>(
+    (urlFilter as QualityFilter) || "all"
+  );
   const [sortMode, setSortMode] = useState<SortMode>("recent");
+
+  const [labelSlugs, setLabelSlugs] = useState<Set<string>>(new Set());
 
   const [selectedRelease, setSelectedRelease] = useState<EnrichedRelease | null>(null);
 
@@ -72,6 +82,19 @@ export default function ReleasesPage() {
     fetchReleases();
   }, []);
 
+  useEffect(() => {
+    if (qualityFilter === "missing_label") {
+      supabase
+        .from("registry_entity_relationships")
+        .select("source_slug")
+        .eq("relationship_type", "release_label")
+        .eq("source_entity_type", "releases")
+        .then(({ data }) => {
+          setLabelSlugs(new Set((data ?? []).map((r) => r.source_slug).filter(Boolean)));
+        });
+    }
+  }, [qualityFilter]);
+
   const enrichedReleases = useMemo<EnrichedRelease[]>(() => {
     return releases.map((release) => ({
       ...release,
@@ -85,14 +108,12 @@ export default function ReleasesPage() {
     const complete = enrichedReleases.filter((r) => r._quality.completeness >= 85).length;
     const missingArtwork = enrichedReleases.filter((r) => !r.artwork_url).length;
     const missingDate = enrichedReleases.filter((r) => !r.release_date).length;
-    const missingDescription = enrichedReleases.filter((r) => !r.description).length;
-    const missingType = enrichedReleases.filter((r) => !r.release_type).length;
     const blocked = enrichedReleases.filter((r) => r._quality.state === "blocked").length;
     const averageCompleteness = total
       ? Math.round(enrichedReleases.reduce((sum, r) => sum + r._quality.completeness, 0) / total)
       : 0;
 
-    return { total, complete, missingArtwork, missingDate, missingDescription, missingType, blocked, averageCompleteness };
+    return { total, complete, missingArtwork, missingDate, blocked, averageCompleteness };
   }, [enrichedReleases]);
 
   const visibleReleases = useMemo(() => {
@@ -120,6 +141,7 @@ export default function ReleasesPage() {
       if (qualityFilter === "missing_date") return !release.release_date;
       if (qualityFilter === "missing_description") return !release.description;
       if (qualityFilter === "missing_type") return !release.release_type;
+      if (qualityFilter === "missing_label") return !labelSlugs.has(String(release.slug));
       if (qualityFilter === "blocked") return release._quality.state === "blocked";
 
       return true;
@@ -136,7 +158,7 @@ export default function ReleasesPage() {
     });
 
     return rows;
-  }, [enrichedReleases, query, qualityFilter, sortMode]);
+  }, [enrichedReleases, query, qualityFilter, sortMode, labelSlugs]);
 
   function openRelease(release: EnrichedRelease) {
     setSelectedRelease(release);
@@ -197,7 +219,7 @@ export default function ReleasesPage() {
             ["Near complete", summary.complete],
             ["Missing artwork", summary.missingArtwork],
             ["Missing dates", summary.missingDate],
-            ["Missing type", summary.missingType],
+            ["Blocked", summary.blocked],
           ].map(([label, value]) => (
             <div
               key={label}
@@ -232,6 +254,7 @@ export default function ReleasesPage() {
               <option value="missing_date">Missing date</option>
               <option value="missing_description">Missing description</option>
               <option value="missing_type">Missing type</option>
+              <option value="missing_label">Missing label</option>
               <option value="blocked">Blocked</option>
             </select>
 
@@ -272,16 +295,17 @@ export default function ReleasesPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[1080px] border-collapse text-left text-sm">
+              <table className="w-full min-w-[1160px] border-collapse text-left text-sm">
                 <thead>
                   <tr className="border-b border-[#e8ece2] bg-[#fbfcf8] text-[11px] font-black uppercase tracking-wide text-[#71796b]">
-                    <th className="w-[30%] px-5 py-4">Release</th>
-                    <th className="w-[12%] px-5 py-4">Type</th>
-                    <th className="w-[12%] px-5 py-4">Date</th>
+                    <th className="w-[28%] px-5 py-4">Release</th>
+                    <th className="w-[10%] px-5 py-4">Type</th>
+                    <th className="w-[10%] px-5 py-4">Date</th>
                     <th className="w-[10%] px-5 py-4">UPC</th>
-                    <th className="w-[10%] px-5 py-4">Status</th>
+                    <th className="w-[8%] px-5 py-4">Status</th>
+                    <th className="w-[10%] px-5 py-4">Updated</th>
                     <th className="w-[14%] px-5 py-4">Quality</th>
-                    <th className="w-[12%] px-5 py-4">Edit</th>
+                    <th className="w-[10%] px-5 py-4">Edit</th>
                   </tr>
                 </thead>
 
@@ -340,6 +364,10 @@ export default function ReleasesPage() {
                         <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-black uppercase tracking-wide text-emerald-700">
                           {String(release.status || "unknown")}
                         </span>
+                      </td>
+
+                      <td className="px-5 py-4 text-[#5d6557]">
+                        {formatDate(String(release.updated_at || release.created_at))}
                       </td>
 
                       <td className="px-5 py-4">

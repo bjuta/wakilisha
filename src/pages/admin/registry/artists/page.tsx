@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { type RegistryEntityProfile } from "@/services/registry/admin/types";
 import { getEntitySchema } from "@/services/registry/admin/entitySchemas";
@@ -17,6 +18,7 @@ type QualityFilter =
   | "missing_country"
   | "missing_image"
   | "missing_bio"
+  | "missing_genre"
   | "blocked";
 
 interface EnrichedArtist extends RegistryEntityProfile {
@@ -50,14 +52,21 @@ function getDisplayCountry(artist: RegistryEntityProfile): string {
 }
 
 export default function ArtistsPage() {
+  const [searchParams] = useSearchParams();
+  const urlFilter = searchParams.get("filter");
+
   const [artists, setArtists] = useState<RegistryEntityProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
   const [query, setQuery] = useState("");
-  const [qualityFilter, setQualityFilter] = useState<QualityFilter>("all");
+  const [qualityFilter, setQualityFilter] = useState<QualityFilter>(
+    (urlFilter as QualityFilter) || "all"
+  );
   const [sortMode, setSortMode] = useState<SortMode>("recent");
+
+  const [genreSlugs, setGenreSlugs] = useState<Set<string>>(new Set());
 
   const [selectedArtist, setSelectedArtist] = useState<EnrichedArtist | null>(null);
 
@@ -85,6 +94,19 @@ export default function ArtistsPage() {
   useEffect(() => {
     fetchArtists();
   }, []);
+
+  useEffect(() => {
+    if (qualityFilter === "missing_genre") {
+      supabase
+        .from("registry_entity_relationships")
+        .select("source_slug")
+        .eq("relationship_type", "artist_genre")
+        .eq("source_entity_type", "artists")
+        .then(({ data }) => {
+          setGenreSlugs(new Set((data ?? []).map((r) => r.source_slug).filter(Boolean)));
+        });
+    }
+  }, [qualityFilter]);
 
   const enrichedArtists = useMemo<EnrichedArtist[]>(() => {
     return artists.map((artist) => ({
@@ -132,6 +154,7 @@ export default function ArtistsPage() {
       if (qualityFilter === "missing_country") return !artist._displayCountry;
       if (qualityFilter === "missing_image") return !artist._displayImage;
       if (qualityFilter === "missing_bio") return !artist.bio;
+      if (qualityFilter === "missing_genre") return !genreSlugs.has(String(artist.slug));
       if (qualityFilter === "blocked") return artist._quality.state === "blocked";
 
       return true;
@@ -148,7 +171,7 @@ export default function ArtistsPage() {
     });
 
     return rows;
-  }, [enrichedArtists, query, qualityFilter, sortMode]);
+  }, [enrichedArtists, query, qualityFilter, sortMode, genreSlugs]);
 
   function openArtist(artist: EnrichedArtist) {
     setSelectedArtist(artist);
@@ -243,6 +266,7 @@ export default function ArtistsPage() {
               <option value="missing_country">Missing country</option>
               <option value="missing_image">Missing image</option>
               <option value="missing_bio">Missing bio</option>
+              <option value="missing_genre">Missing genre</option>
               <option value="blocked">Blocked</option>
             </select>
 

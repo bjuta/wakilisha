@@ -336,3 +336,64 @@ Phase 1 is a pure database/scripts task — no frontend changes. It unblocks ric
 - `registry_audit_log` — populated on every write (id, actor_id, actor_label, action, entity_type, entity_id, before_value JSONB, after_value JSONB, metadata JSONB, created_at)
 - `user_role_assignments` — checked for caller's active roles
 - `role_capabilities` — checked for `manage_registry` capability
+
+## Magazine: Dynamic Digital Rebuild ✅ COMPLETE (June 2026)
+
+**What was done:** Complete CSS and interaction overhaul of the magazine issue pages and issues landing page. Removed the uniform dark/PDF-like aesthetic and rebuilt around a mood-driven design system where each of 6 issue moods (night, paper, travel, signal, archive, image) receives a complete color palette via CSS custom properties — not just accent tweaks.
+
+**Key changes:**
+
+1. **Mood-driven design tokens** (`magazineIssue.css`): Each mood defines `--mag-bg`, `--mag-surface`, `--mag-surface-raised`, `--mag-text`, `--mag-text-soft`, `--mag-text-muted`, `--mag-accent`, `--mag-accent-hi`, `--mag-accent-deep`, `--mag-rule`, `--mag-rule-strong`, `--mag-card-bg`, `--mag-card-border`, and `--mag-overlay`. Dark moods get ink-on-dark palettes; light moods (paper, archive) get cream-and-ink palettes.
+
+2. **Scroll-driven interactivity**: All spreads use `IntersectionObserver`-based reveal animations (`mag-reveal` class). Added a fixed reading progress bar and a sticky mini-header that appears after scrolling past the cover.
+
+3. **Dynamic cover backgrounds**: Each mood now produces a fundamentally different cover background — radial glows for night, grids for signal, ocean gradients for travel, warm amber for archive, cream-to-ink for paper, forest green-black for image. Not just green-on-dark.
+
+4. **Issues landing page redesign**: Mood-aware issue cards with ambient accent glows, hover previews showing the featured article, search/filter bar, and a "Show all issues" toggle. Each card uses the issue's computed mood palette.
+
+5. **Spread variants made mood-aware**: Full-bleed images, quote pages, color interludes, section openers — all now pull colors from the parent mood's tokens via `var(--section-accent)` and `var(--mag-bg)` instead of hardcoded dark values.
+
+6. **Logo switching**: Light moods (paper, archive) use the light logo variant instead of dark, keeping the logo legible.
+
+**Files modified:**
+- `src/pages/magazine/issue/magazineIssue.css` — Complete rewrite with mood-driven tokens
+- `src/pages/magazine/issue/magazineIssueVariants.css` — Rewrite with mood-aware variants
+- `src/pages/magazine/issue/page.tsx` — Added ReadingProgress, StickyHeader, useScrollReveal, mood-propagation to all spreads
+- `src/pages/magazine/issues/page.tsx` — Complete redesign with IssueCard component using MOOD_GRADIENTS map, hover previews, improved search
+
+**Constants preserved:** Seal, logo (switchable dark/light), Fraunces + DM Sans + DM Mono type system, editorial NLG pipeline (buildIssueEditorialSystem), visual director (buildMagazineVisualBrief).
+
+## Content Pipeline: Article SEO & Aggregation ✅ COMPLETE (June 2026)
+
+**Problem:** Magazine issue pages were blank because the Supabase edge function path normalization was broken — it only stripped `/wakilisha-public-api` but Supabase routes through `/functions/v1/wakilisha-public-api`, so every API call returned 404. Additionally, the magazine only aggregated from single-source articles (wk_articles) and the admin article editor lacked Yoast-style SEO analysis.
+
+**What was done:**
+
+1. **Edge function path fix** (`wakilisha-public-api`): Fixed `normalizePath()` to handle both path formats — `(/functions/v1)?/wakilisha-public-api` — so all API endpoints work regardless of how Supabase routes the request. Magazine listing limit increased from 50→500, respect query param `limit`.
+
+2. **Site content aggregation endpoint** (`/magazine/site-content`): New API endpoint that returns articles, artists, releases, and chart highlights in a single response. Magazine issues can now pull from the full site content registry, not just articles.
+
+3. **Frontend aggregation service** (`magazineSiteContent.ts`): Typed client for the aggregation endpoint with `useSiteContent()` hook, section grouping utilities, and helpers for top artists, latest releases, and chart highlights.
+
+4. **Yoast-style SEO Analyzer** (`ArticleSeoAnalyzer.tsx`): Full SEO analysis with three check categories:
+   - **Keyword analysis** (7 checks): Focus keyword presence in title, first paragraph, SEO title, meta description, URL slug, headings, and keyword density (0.5–3%)
+   - **Readability** (4 checks): Flesch reading ease score, paragraph length, sentence length, transition words
+   - **Technical SEO** (5 checks): Heading structure, image alt text, word count (300+ min), SEO title length (30–60), meta description length (120–160), internal links
+   - Overall score with color-coded progress bar, word/heading/readability stats
+
+5. **Slug editor** (`ArticleMetaPanel.tsx`): Editable URL slug with collision detection — checks for existing slugs before saving, auto-navigates to new URL on success.
+
+6. **Internal link suggestions** (`ArticleInternalLinks.tsx`): Analyzes article content to find linkable phrases, searches across articles, artists, and releases for matches. Shows match type badges, match reasons, and one-click copy/insert buttons. Links can be inserted directly into the editor.
+
+7. **Focus keyword field**: Added to SEO metadata panel — used by the analyzer for all keyword checks.
+
+**Files created:**
+- `src/services/magazineSiteContent.ts` — Site content aggregation types + client
+- `src/pages/admin/content/articles/detail/components/ArticleSeoAnalyzer.tsx` — Yoast-style SEO analysis
+- `src/pages/admin/content/articles/detail/components/ArticleInternalLinks.tsx` — Internal link suggestions
+
+**Files modified:**
+- `supabase/functions/wakilisha-public-api/index.ts` — Path fix, limit increase, `/magazine/site-content` endpoint
+- `src/services/magazineArticles.ts` — Added `useSiteContent()` hook
+- `src/pages/admin/content/articles/detail/components/ArticleMetaPanel.tsx` — Slug editor, focus keyword, SEO analyzer, internal links
+- `src/pages/admin/content/articles/detail/page.tsx` — Slug change handler, link insertion handler, content passthrough to analyzer

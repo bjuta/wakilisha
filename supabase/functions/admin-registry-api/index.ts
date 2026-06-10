@@ -18,6 +18,8 @@ const TABLE_MAP: Record<string, string> = {
   artist: "registry_artists",
   track: "registry_tracks",
   release: "registry_releases",
+  label: "registry_labels",
+  genre: "registry_genres",
 };
 
 // ── Server-side editable field whitelist per entity type ──
@@ -33,6 +35,12 @@ const EDITABLE_FIELDS: Record<string, string[]> = {
   release: [
     "title", "slug", "release_type", "release_date", "upc",
     "artwork_url", "description", "status",
+  ],
+  label: [
+    "name", "slug", "country_code", "description", "status",
+  ],
+  genre: [
+    "name", "slug", "description", "status",
   ],
 };
 

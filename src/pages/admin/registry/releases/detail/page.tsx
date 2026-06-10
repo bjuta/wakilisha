@@ -1,8 +1,10 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { supabase } from "@/lib/supabase";
+import { useRelatedEntities } from "@/hooks/useRelatedEntities";
+import type { ResolvedRelation } from "@/hooks/useRelatedEntities";
 
 interface ReleaseRecord {
   id: string;
@@ -175,6 +177,16 @@ export default function ReleaseDetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft, release]);
 
+  const { relations, loading: relLoading } = useRelatedEntities("release", slug);
+  const groupedRelations = useMemo(() => {
+    const groups: Record<string, ResolvedRelation[]> = {};
+    for (const r of relations) {
+      if (!groups[r.entity_type]) groups[r.entity_type] = [];
+      groups[r.entity_type].push(r);
+    }
+    return groups;
+  }, [relations]);
+
   if (loading) {
     return (
       <div className="space-y-5 animate-pulse">
@@ -319,6 +331,12 @@ export default function ReleaseDetailPage() {
               <InfoRow label="Modified" value={new Date(release.updated_at).toLocaleString()} />
             </div>
           </WkSurface>
+
+          <RelatedPanel
+            grouped={groupedRelations}
+            loading={relLoading}
+            entityLabel="release"
+          />
         </div>
       </div>
 
@@ -365,5 +383,109 @@ function InfoRow({ label, value, mono }: { label: string; value: string; mono?: 
       <span className="text-[11px] font-semibold text-wk-text-faint shrink-0">{label}</span>
       <span className={`text-right text-[11px] text-wk-text-soft truncate max-w-[160px] ${mono ? "font-mono" : ""}`} title={value}>{value}</span>
     </div>
+  );
+}
+
+/* ─── Related Entities Panel ─── */
+
+const ENTITY_LABELS: Record<string, string> = {
+  artist: "Artists",
+  track: "Tracks",
+  release: "Releases",
+  genre: "Genres",
+  label: "Labels",
+};
+
+const ENTITY_ICONS: Record<string, string> = {
+  artist: "UserVoice",
+  track: "Music",
+  release: "Album",
+  genre: "PriceTag3",
+  label: "Building",
+};
+
+function RelatedPanel({
+  grouped,
+  loading,
+  entityLabel,
+}: {
+  grouped: Record<string, ResolvedRelation[]>;
+  loading: boolean;
+  entityLabel: string;
+}) {
+  const navigate = useNavigate();
+  const types = Object.keys(grouped);
+
+  if (loading) {
+    return (
+      <WkSurface className="p-4">
+        <h3 className="text-[11px] font-bold uppercase tracking-wider text-wk-text-muted mb-3">Related</h3>
+        <div className="space-y-2 animate-pulse">
+          <div className="h-5 w-full rounded bg-wk-surface-raised" />
+          <div className="h-5 w-3/4 rounded bg-wk-surface-raised" />
+          <div className="h-5 w-1/2 rounded bg-wk-surface-raised" />
+        </div>
+      </WkSurface>
+    );
+  }
+
+  if (types.length === 0) {
+    return (
+      <WkSurface className="p-4">
+        <h3 className="text-[11px] font-bold uppercase tracking-wider text-wk-text-muted mb-2">Related</h3>
+        <p className="text-[11px] text-wk-text-faint italic">
+          No linked {entityLabel}s, tracks, releases, genres, or labels yet.
+        </p>
+      </WkSurface>
+    );
+  }
+
+  return (
+    <WkSurface className="p-4">
+      <h3 className="text-[11px] font-bold uppercase tracking-wider text-wk-text-muted mb-3">
+        Related
+      </h3>
+      <div className="space-y-3">
+        {types.map((type) => {
+          const items = grouped[type];
+          const label = ENTITY_LABELS[type] || type;
+          const icon = ENTITY_ICONS[type] || "Link";
+          return (
+            <div key={type}>
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <WkIcon name={icon} size={11} className="text-wk-text-faint" />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-wk-text-muted">
+                  {label}
+                </span>
+                <span className="inline-flex items-center justify-center h-4 min-w-[16px] px-1 rounded-full text-[9px] font-bold bg-wk-surface-raised text-wk-text-faint">
+                  {items.length}
+                </span>
+              </div>
+              <div className="space-y-1">
+                {items.slice(0, 8).map((rel, i) => (
+                  <button
+                    key={`${rel.entity_type}-${rel.slug}-${i}`}
+                    onClick={() => navigate(`/admin/registry/${rel.entity_type}s/${rel.slug}`)}
+                    className="w-full text-left flex items-center gap-2 rounded-md px-2 py-1.5 text-[12px] text-wk-text hover:bg-wk-surface-raised transition-colors group cursor-pointer"
+                  >
+                    <span className="truncate flex-1 font-medium group-hover:text-wk-brand transition-colors">
+                      {rel.display_name}
+                    </span>
+                    <span className="text-[10px] text-wk-text-faint shrink-0 uppercase font-mono tracking-tight">
+                      {rel.relationship_type.replace(/_/g, " ")}
+                    </span>
+                  </button>
+                ))}
+                {items.length > 8 && (
+                  <p className="text-[10px] text-wk-text-faint px-2">
+                    +{items.length - 8} more
+                  </p>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </WkSurface>
   );
 }

@@ -1,4 +1,4 @@
-export type RegistryEntityType = "artist" | "track" | "release";
+export type RegistryEntityType = "artist" | "track" | "release" | "label" | "genre";
 
 export type RegistryFieldType =
   | "text"

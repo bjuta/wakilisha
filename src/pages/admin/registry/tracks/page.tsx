@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
+import { supabase } from "@/lib/supabase";
 import { type RegistryEntityProfile } from "@/services/registry/admin/types";
 import { getEntitySchema } from "@/services/registry/admin/entitySchemas";
 import { calculateCompleteness, completenessTone, completenessLabel } from "@/services/registry/admin/completeness";
@@ -16,6 +18,8 @@ type QualityFilter =
   | "missing_isrc"
   | "missing_artwork"
   | "missing_duration"
+  | "missing_artist"
+  | "missing_release"
   | "blocked";
 
 interface EnrichedTrack extends RegistryEntityProfile {
@@ -43,14 +47,22 @@ function formatDuration(ms: number | null | undefined): string {
 }
 
 export default function TracksPage() {
+  const [searchParams] = useSearchParams();
+  const urlFilter = searchParams.get("filter");
+
   const [tracks, setTracks] = useState<RegistryEntityProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
   const [query, setQuery] = useState("");
-  const [qualityFilter, setQualityFilter] = useState<QualityFilter>("all");
+  const [qualityFilter, setQualityFilter] = useState<QualityFilter>(
+    (urlFilter as QualityFilter) || "all"
+  );
   const [sortMode, setSortMode] = useState<SortMode>("recent");
+
+  const [artistSlugs, setArtistSlugs] = useState<Set<string>>(new Set());
+  const [releaseSlugs, setReleaseSlugs] = useState<Set<string>>(new Set());
 
   const [selectedTrack, setSelectedTrack] = useState<EnrichedTrack | null>(null);
 
@@ -79,6 +91,32 @@ export default function TracksPage() {
     fetchTracks();
   }, []);
 
+  useEffect(() => {
+    if (qualityFilter === "missing_artist") {
+      supabase
+        .from("registry_entity_relationships")
+        .select("target_slug")
+        .eq("relationship_type", "artist_track")
+        .eq("target_entity_type", "tracks")
+        .then(({ data }) => {
+          setArtistSlugs(new Set((data ?? []).map((r) => r.target_slug).filter(Boolean)));
+        });
+    }
+  }, [qualityFilter]);
+
+  useEffect(() => {
+    if (qualityFilter === "missing_release") {
+      supabase
+        .from("registry_entity_relationships")
+        .select("source_slug")
+        .eq("relationship_type", "track_release")
+        .eq("source_entity_type", "tracks")
+        .then(({ data }) => {
+          setReleaseSlugs(new Set((data ?? []).map((r) => r.source_slug).filter(Boolean)));
+        });
+    }
+  }, [qualityFilter]);
+
   const enrichedTracks = useMemo<EnrichedTrack[]>(() => {
     return tracks.map((track) => ({
       ...track,
@@ -93,13 +131,12 @@ export default function TracksPage() {
     const complete = enrichedTracks.filter((t) => t._quality.completeness >= 85).length;
     const missingIsrc = enrichedTracks.filter((t) => !t.isrc).length;
     const missingArtwork = enrichedTracks.filter((t) => !t.artwork_url).length;
-    const missingDuration = enrichedTracks.filter((t) => !t.duration_ms).length;
     const blocked = enrichedTracks.filter((t) => t._quality.state === "blocked").length;
     const averageCompleteness = total
       ? Math.round(enrichedTracks.reduce((sum, t) => sum + t._quality.completeness, 0) / total)
       : 0;
 
-    return { total, complete, missingIsrc, missingArtwork, missingDuration, blocked, averageCompleteness };
+    return { total, complete, missingIsrc, missingArtwork, blocked, averageCompleteness };
   }, [enrichedTracks]);
 
   const visibleTracks = useMemo(() => {
@@ -124,6 +161,8 @@ export default function TracksPage() {
       if (qualityFilter === "missing_isrc") return !track.isrc;
       if (qualityFilter === "missing_artwork") return !track.artwork_url;
       if (qualityFilter === "missing_duration") return !track.duration_ms;
+      if (qualityFilter === "missing_artist") return !artistSlugs.has(String(track.slug));
+      if (qualityFilter === "missing_release") return !releaseSlugs.has(String(track.slug));
       if (qualityFilter === "blocked") return track._quality.state === "blocked";
 
       return true;
@@ -140,7 +179,7 @@ export default function TracksPage() {
     });
 
     return rows;
-  }, [enrichedTracks, query, qualityFilter, sortMode]);
+  }, [enrichedTracks, query, qualityFilter, sortMode, artistSlugs, releaseSlugs]);
 
   function openTrack(track: EnrichedTrack) {
     setSelectedTrack(track);
@@ -201,7 +240,7 @@ export default function TracksPage() {
             ["Near complete", summary.complete],
             ["Missing ISRC", summary.missingIsrc],
             ["Missing artwork", summary.missingArtwork],
-            ["Missing duration", summary.missingDuration],
+            ["Blocked", summary.blocked],
           ].map(([label, value]) => (
             <div
               key={label}
@@ -235,6 +274,8 @@ export default function TracksPage() {
               <option value="missing_isrc">Missing ISRC</option>
               <option value="missing_artwork">Missing artwork</option>
               <option value="missing_duration">Missing duration</option>
+              <option value="missing_artist">Missing artist</option>
+              <option value="missing_release">Missing release</option>
               <option value="blocked">Blocked</option>
             </select>
 
