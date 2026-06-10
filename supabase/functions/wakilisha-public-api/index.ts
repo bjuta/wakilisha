@@ -81,7 +81,6 @@ function parseTagNames(tags: any): string[] {
 }
 
 function normalizePath(raw: string): string {
-  // Strip Supabase function prefix: /functions/v1/wakilisha-public-api OR /wakilisha-public-api
   const withoutPrefix = raw.replace(/^(\/functions\/v1)?\/wakilisha-public-api/, "");
   return withoutPrefix.replace(/\/$/, "") || "/";
 }
@@ -103,7 +102,6 @@ Deno.serve(async (req) => {
     let data: unknown;
 
     // ── MAGAZINE SITE CONTENT AGGREGATION ──
-    // MUST be checked BEFORE the generic article detail route below
     if (path === "/magazine/site-content" || path === "/magazine/site-content/") {
       const limitParam = url.searchParams.get("limit");
       const limit = limitParam ? Math.min(parseInt(limitParam, 10) || 50, 500) : 200;
@@ -168,6 +166,98 @@ Deno.serve(async (req) => {
       }));
 
       data = { articles, artists, releases, chartHighlights };
+    }
+
+    // ── MAGAZINE PUBLIC ISSUE ──
+    else if (path.startsWith("/magazine/public/issues/")) {
+      const issueSlug = path.replace(/^\/magazine\/public\/issues\//, "").replace(/\/$/, "");
+
+      const { data: issue } = await supabase
+        .from("wk_magazine_issues")
+        .select("*")
+        .eq("slug", issueSlug)
+        .eq("status", "published")
+        .maybeSingle();
+
+      if (!issue) return jsonResponse({ data: null, meta: { reason: "not_found_or_not_published" } }, 404);
+
+      const { data: sections } = await supabase
+        .from("wk_magazine_issue_sections")
+        .select("*")
+        .eq("issue_id", String(issue.id))
+        .order("sort_order", { ascending: true });
+
+      const { data: entities } = await supabase
+        .from("wk_magazine_issue_entities")
+        .select("*")
+        .eq("issue_id", String(issue.id))
+        .order("sort_order", { ascending: true });
+
+      const visualAssetIds = (sections ?? [])
+        .map((s: any) => s.visual_asset_id)
+        .filter(Boolean) as string[];
+
+      let visualAssets: any[] = [];
+      if (visualAssetIds.length > 0) {
+        const { data: visuals } = await supabase
+          .from("wk_magazine_visual_assets")
+          .select("*")
+          .in("id", visualAssetIds)
+          .in("status", ["approved", "locked"]);
+        visualAssets = visuals ?? [];
+      }
+
+      data = {
+        issue: {
+          id: String(issue.id),
+          slug: String(issue.slug),
+          title: String(issue.title),
+          dek: issue.dek || null,
+          status: String(issue.status),
+          timeframeStart: issue.timeframe_start || null,
+          timeframeEnd: issue.timeframe_end || null,
+          issueType: String(issue.issue_type),
+          visualFamily: issue.visual_family || null,
+          treatment: issue.treatment || null,
+          palette: issue.palette || null,
+          contrastMode: issue.contrast_mode || null,
+          createdBy: String(issue.created_by),
+          publishedAt: issue.published_at || null,
+        },
+        sections: (sections ?? []).map((s: any) => ({
+          id: String(s.id),
+          spreadId: String(s.spread_id),
+          sectionType: String(s.section_type),
+          title: String(s.title),
+          deck: s.deck || null,
+          body: s.body || null,
+          layout: String(s.layout),
+          sortOrder: Number(s.sort_order),
+          status: String(s.status),
+          visualAssetId: s.visual_asset_id || null,
+        })),
+        entities: (entities ?? []).map((e: any) => ({
+          id: String(e.id),
+          sectionId: e.section_id || null,
+          entityType: String(e.entity_type),
+          entityId: String(e.entity_id),
+          role: String(e.role),
+          selectionState: String(e.selection_state),
+          sortOrder: Number(e.sort_order),
+          sourceReason: e.source_reason || null,
+        })),
+        visualAssets: visualAssets.map((v: any) => ({
+          id: String(v.id),
+          spreadId: String(v.spread_id),
+          visualFamily: String(v.visual_family),
+          visualType: String(v.visual_type),
+          editorialIntent: String(v.editorial_intent),
+          treatment: String(v.treatment),
+          palette: String(v.palette),
+          contrastMode: String(v.contrast_mode),
+          status: String(v.status),
+        })),
+      };
     }
 
     // ── ARTICLE DETAIL ──

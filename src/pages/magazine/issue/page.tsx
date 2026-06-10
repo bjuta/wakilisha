@@ -26,6 +26,19 @@ import "./magazineIssueVariants.css";
 import "./magazineImmersive.css";
 import "@/magazine-art-director/schools.css";
 
+// ── Published issue check via public API ──
+const PUBLIC_API_BASE = String(import.meta.env.VITE_WAKILISHA_PUBLIC_API_BASE ?? '/api/v1').replace(/\/$/, '');
+
+async function fetchPublishedIssue(slug: string): Promise<{ data: Record<string, unknown> } | null> {
+  try {
+    const response = await fetch(`${PUBLIC_API_BASE}/magazine/public/issues/${encodeURIComponent(slug)}`);
+    if (!response.ok) return null;
+    return response.json();
+  } catch {
+    return null;
+  }
+}
+
 const LOGO_DARK = "/assets/logos/wakilisha-logo-dark.svg";
 const LOGO_LIGHT = "/assets/logos/wakilisha-logo-light.svg";
 
@@ -1160,8 +1173,24 @@ export default function MagazineIssuePage() {
   const { theme, toggle: toggleTheme } = useTheme();
 
   const [spreadIds, setSpreadIds] = useState<string[]>([]);
+  const [publishedIssueData, setPublishedIssueData] = useState<Record<string, unknown> | null | undefined>(undefined);
+  const [checkingPublished, setCheckingPublished] = useState(true);
 
-  useScrollReveal(!loading);
+  // Check for published DB issue first
+  useEffect(() => {
+    if (!issueKey) { setCheckingPublished(false); return; }
+    let cancelled = false;
+    fetchPublishedIssue(issueKey).then((result) => {
+      if (cancelled) return;
+      setPublishedIssueData(result?.data ?? null);
+      setCheckingPublished(false);
+    }).catch(() => {
+      if (!cancelled) { setPublishedIssueData(null); setCheckingPublished(false); }
+    });
+    return () => { cancelled = true; };
+  }, [issueKey]);
+
+  useScrollReveal(!loading && !checkingPublished);
 
   const { activeIndex, visible } = useProgressRail(spreadIds);
 
@@ -1201,8 +1230,31 @@ export default function MagazineIssuePage() {
     return () => { /* leave font loaded */ };
   }, [brief.primarySchool]);
 
-  if (loading) return <SkeletonMagazinePage />;
+  // Show loading while checking published status
+  if (loading || checkingPublished) return <SkeletonMagazinePage />;
   if (error) return <MagazineIssueError message={error} />;
+
+  // If we checked the API and found NO published issue, show unavailable
+  if (publishedIssueData === null) {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-[var(--wk-bg)]">
+        <div className="text-center px-6 max-w-lg">
+          <p style={{ fontFamily: 'var(--mag-display)', fontSize: 'clamp(28px, 5vw, 48px)', fontWeight: 700, lineHeight: 1.1, letterSpacing: '-0.03em', color: 'var(--mag-text)' }}>
+            Issue unavailable
+          </p>
+          <p className="mt-4 text-[15px] text-[var(--wk-text-muted)] leading-relaxed">
+            This issue has not been published. Magazine issues are produced through the admin production workflow and must be explicitly published before they appear here.
+          </p>
+          <Link
+            to="/magazine/issues"
+            className="inline-flex items-center gap-2 mt-6 text-[13px] font-bold text-[var(--wk-brand)] hover:underline whitespace-nowrap"
+          >
+            Browse published issues
+          </Link>
+        </div>
+      </main>
+    );
+  }
 
   const issues = buildMagazineIssues(articles);
   const issue = resolveIssueByKey(issues, issueKey);

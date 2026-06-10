@@ -339,6 +339,45 @@ Phase 1 is a pure database/scripts task — no frontend changes. It unblocks ric
 
 ## Magazine: Dynamic Digital Rebuild ✅ COMPLETE (June 2026)
 
+## Magazine: Issue Production System ✅ COMPLETE (June 2026)
+
+**What was built:** A human-in-the-loop magazine issue production layer that sits on top of the existing `wk_magazine_visual_assets` infrastructure and obeys the data-repair-first architecture.
+
+### Database Tables
+
+- **`wk_magazine_issues`** — Magazine issue records with status lifecycle: draft → generated → approved → published → locked → archived / failed_generation. Fields: id, slug, title, dek, status, timeframe_start, timeframe_end, issue_type, visual_family, treatment, palette, contrast_mode, created_by, generated_by, approved_by, published_by, and timestamps for each transition.
+- **`wk_magazine_issue_sections`** — Issue spreads/sections linked to issues via FK. Fields: id, issue_id, spread_id, section_type, title, deck, body, layout, sort_order, status, visual_asset_id (links to wk_magazine_visual_assets).
+- **`wk_magazine_issue_entities`** — Entity selections per issue. Fields: id, issue_id, section_id, entity_type (article/artist/track/release/label/genre/chart/chart_entry/media_asset/guide), entity_id, role, selection_state (selected/pinned/excluded), sort_order, source_reason.
+
+### Public API
+
+- **`GET /magazine/public/issues/:slug`** — Returns published issue with sections, entities, and approved/locked visual assets. 404 if not found or not published. Added to `wakilisha-public-api` edge function.
+
+### Frontend Service
+
+- **`src/services/magazineIssueProduction.ts`** — Full CRUD service:
+  - `listIssues()`, `getIssue(id)`, `createIssue()`, `updateIssue()`, `deleteIssue()`
+  - `discoverCandidates()` — pulls from repaired graph sources (wk_articles, registry_artists, registry_releases, registry_tracks, registry_labels, registry_genres, chart_programs, guides) — never from flat imported tables
+  - `generateIssue()` — creates sections + entities from admin selections
+  - `approveIssue()`, `publishIssue()`, `lockIssue()`, `archiveIssue()`
+  - `validatePublishReadiness()` — checks sections, entities, slug uniqueness
+  - Controlled option lists: VISUAL_FAMILIES, TREATMENTS, PALETTES, CONTRAST_MODES
+
+### Admin UI
+
+- **`/admin/magazine/issues`** — Full production workflow page:
+  - Issues list with status badges, stats strip (drafts/generated/approved/published/total)
+  - **Produce New Issue** drawer with 6-step wizard: Setup → Discover → Select → Visual Direction → Generate → Review
+  - Candidate discovery grouped by entity type (Articles, Artists, Releases, Tracks, Labels, Genres, Charts, Guides)
+  - Visual direction panel with controlled options (visual_family, treatment, palette, contrast_mode)
+  - Issue detail view with sections, entities, and publish validation
+  - Status action buttons: Approve, Publish, Lock, Archive, Delete
+  - Visit link for published issues
+
+### Public Page Update
+
+- **`/magazine/issue/:slug`** — Now checks the public API first. If a published DB issue exists, renders it. If not (or if not published), shows "Issue unavailable — This issue has not been published." No auto-materialization from article ranges.
+
 **What was done:** Complete CSS and interaction overhaul of the magazine issue pages and issues landing page. Removed the uniform dark/PDF-like aesthetic and rebuilt around a mood-driven design system where each of 6 issue moods (night, paper, travel, signal, archive, image) receives a complete color palette via CSS custom properties — not just accent tweaks.
 
 **Key changes:**
