@@ -8,6 +8,19 @@ import {
 import { getEntitySchema } from "./entitySchemas";
 import { normalizeForSave, normalizeForCompare, validateField } from "./fieldNormalization";
 
+const supabaseUrl = import.meta.env.VITE_PUBLIC_SUPABASE_URL as string;
+const API_BASE = `${supabaseUrl}/functions/v1/admin-registry-api`;
+
+async function getAuthHeaders(): Promise<Record<string, string> | null> {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  if (!token) return null;
+  return {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${token}`,
+  };
+}
+
 export async function getRegistryEntityList(
   entityType: RegistryEntityType,
   options?: {
@@ -16,41 +29,47 @@ export async function getRegistryEntityList(
     ascending?: boolean;
   },
 ): Promise<{ data: RegistryEntityProfile[]; error: string | null }> {
-  const schema = getEntitySchema(entityType);
+  const headers = await getAuthHeaders();
+  if (!headers) return { data: [], error: "Not authenticated" };
+
   const limit = options?.limit ?? 250;
   const orderBy = options?.orderBy ?? "updated_at";
   const ascending = options?.ascending ?? false;
 
-  const { data, error } = await supabase
-    .from(schema.table)
-    .select("*")
-    .order(orderBy, { ascending, nullsFirst: false })
-    .limit(limit);
+  const params = new URLSearchParams({
+    entityType,
+    limit: String(limit),
+    orderBy,
+    ascending: String(ascending),
+  });
 
-  if (error) {
-    return { data: [], error: error.message };
+  try {
+    const res = await fetch(`${API_BASE}/entities?${params}`, { headers });
+    const json = await res.json();
+
+    if (!json.ok) return { data: [], error: json.error ?? "Request failed" };
+    return { data: (json.data ?? []) as RegistryEntityProfile[], error: null };
+  } catch (err) {
+    return { data: [], error: err instanceof Error ? err.message : "Network error" };
   }
-
-  return { data: (data ?? []) as RegistryEntityProfile[], error: null };
 }
 
 export async function getRegistryEntityProfile(
   entityType: RegistryEntityType,
   entityId: string,
 ): Promise<{ data: RegistryEntityProfile | null; error: string | null }> {
-  const schema = getEntitySchema(entityType);
+  const headers = await getAuthHeaders();
+  if (!headers) return { data: null, error: "Not authenticated" };
 
-  const { data, error } = await supabase
-    .from(schema.table)
-    .select("*")
-    .eq(schema.idField, entityId)
-    .maybeSingle();
+  try {
+    const res = await fetch(`${API_BASE}/entities/${entityType}/${entityId}`, { headers });
+    const json = await res.json();
 
-  if (error) {
-    return { data: null, error: error.message };
+    if (!json.ok) return { data: null, error: json.error ?? "Request failed" };
+    return { data: json.data as RegistryEntityProfile | null, error: null };
+  } catch (err) {
+    return { data: null, error: err instanceof Error ? err.message : "Network error" };
   }
-
-  return { data: data as RegistryEntityProfile | null, error: null };
 }
 
 export function buildChangesPayload(
@@ -107,8 +126,24 @@ export async function saveRegistryEntityPatch(
   entityType: RegistryEntityType,
   entityId: string,
   patch: Record<string, unknown>,
+  expectedUpdatedAt?: string,
   schemaOverride?: RegistryEntitySchema,
 ): Promise<RegistrySaveResult> {
+  const headers = await getAuthHeaders();
+  if (!headers) {
+    return {
+      ok: false,
+      entityType,
+      entityId,
+      savedFields: [],
+      skippedFields: [],
+      rejectedFields: [],
+      warnings: [],
+      errorCode: "not_authenticated",
+      message: "Not authenticated",
+    };
+  }
+
   const schema = schemaOverride ?? getEntitySchema(entityType);
 
   // Validate patch keys against schema
@@ -151,28 +186,40 @@ export async function saveRegistryEntityPatch(
     };
   }
 
-  // Add updated_at
-  safePatch.updated_at = new Date().toISOString();
-
-  const { data, error } = await supabase
-    .from(schema.table)
-    .update(safePatch)
-    .eq(schema.idField, entityId)
-    .select("*")
-    .single();
-
-  if (error) {
-    const message = error.message ?? "Unknown error";
-    let errorCode = "save_failed";
-
-    if (message.toLowerCase().includes("duplicate")) {
-      errorCode = "duplicate_key";
-    } else if (message.toLowerCase().includes("foreign key")) {
-      errorCode = "foreign_key_violation";
-    } else if (message.toLowerCase().includes("not null")) {
-      errorCode = "required_field_missing";
+  try {
+    const payload: Record<string, unknown> = { ...safePatch };
+    if (expectedUpdatedAt) {
+      payload._expected_updated_at = expectedUpdatedAt;
     }
 
+    const res = await fetch(`${API_BASE}/entities/${entityType}/${entityId}`, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify(payload),
+    });
+
+    const result: RegistrySaveResult & { error?: string; errorCode?: string; message?: string } = await res.json();
+
+    if (!result.ok) {
+      return {
+        ok: false,
+        entityType,
+        entityId,
+        savedFields: [],
+        skippedFields,
+        rejectedFields,
+        warnings: [],
+        errorCode: result.errorCode ?? "save_failed",
+        message: result.message ?? result.error ?? "Save failed",
+      };
+    }
+
+    return {
+      ...result,
+      skippedFields: [...skippedFields, ...(result.skippedFields ?? [])],
+      rejectedFields,
+    };
+  } catch (err) {
     return {
       ok: false,
       entityType,
@@ -181,33 +228,10 @@ export async function saveRegistryEntityPatch(
       skippedFields,
       rejectedFields,
       warnings: [],
-      errorCode,
-      message,
+      errorCode: "network_error",
+      message: err instanceof Error ? err.message : "Network error",
     };
   }
-
-  const savedFields = Object.entries(safePatch)
-    .filter(([key]) => key !== "updated_at")
-    .map(([key]) => {
-      const fieldDef = schema.editableFields.find((f) => f.key === key);
-      return {
-        key,
-        label: fieldDef?.label ?? key,
-        previousValue: null,
-        nextValue: safePatch[key],
-      };
-    });
-
-  return {
-    ok: true,
-    entityType,
-    entityId,
-    savedFields,
-    skippedFields,
-    rejectedFields,
-    warnings: skippedFields.length > 0 ? [`${skippedFields.length} unsupported field(s) were not saved`] : [],
-    updatedEntity: data as Record<string, unknown>,
-  };
 }
 
 function deepEqual(a: unknown, b: unknown): boolean {

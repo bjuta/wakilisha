@@ -30,7 +30,7 @@ export default function RegistryEntityEditorDrawer({
   const [draft, setDraft] = useState<Record<string, unknown>>(() => ({ ...entity }));
   const [saving, setSaving] = useState(false);
   const [saveResult, setSaveResult] = useState<RegistrySaveResult | null>(null);
-  const [validationErrors, setValidationErrors] = useState<Record<string, string>>();
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
   const displayName = String(entity[schema.displayNameField] ?? "Untitled");
   const quality = useMemo(() => calculateCompleteness(entity, schema), [entity, schema]);
@@ -81,7 +81,12 @@ export default function RegistryEntityEditorDrawer({
     setSaveResult(null);
 
     const { changes } = buildChangesPayload(entity, draft, schema);
-    const result = await saveRegistryEntityPatch(entityType, String(entity[schema.idField]), changes);
+    const result = await saveRegistryEntityPatch(
+      entityType,
+      String(entity[schema.idField]),
+      changes,
+      String(entity.updated_at ?? ""),
+    );
 
     setSaveResult(result);
     setSaving(false);
@@ -173,15 +178,23 @@ export default function RegistryEntityEditorDrawer({
                   ? saveResult.warnings.length > 0
                     ? "border-amber-200 bg-amber-50"
                     : "border-emerald-200 bg-emerald-50"
-                  : "border-red-200 bg-red-50"
+                  : saveResult.errorCode === "stale_update"
+                    ? "border-orange-300 bg-orange-50"
+                    : "border-red-200 bg-red-50"
               }`}
             >
-              <p className={`text-sm font-bold ${saveResult.ok ? "text-emerald-800" : "text-red-800"}`}>
+              <p className={`text-sm font-bold ${saveResult.ok ? "text-emerald-800" : saveResult.errorCode === "stale_update" ? "text-orange-800" : "text-red-800"}`}>
                 {saveResult.ok
                   ? saveResult.savedFields.length > 0
                     ? `Saved ${displayName}`
                     : "No changes to save"
-                  : "Save failed"}
+                  : saveResult.errorCode === "stale_update"
+                    ? "Someone else edited this record"
+                    : saveResult.errorCode === "not_authenticated"
+                      ? "Session expired"
+                      : saveResult.errorCode === "permission_denied"
+                        ? "Permission denied"
+                        : "Save failed"}
               </p>
               {saveResult.savedFields.length > 0 && (
                 <p className="mt-1 text-xs text-emerald-700">
@@ -191,8 +204,34 @@ export default function RegistryEntityEditorDrawer({
               {saveResult.warnings.length > 0 && (
                 <p className="mt-1 text-xs text-amber-700">{saveResult.warnings.join(" ")}</p>
               )}
-              {saveResult.message && !saveResult.ok && (
+              {saveResult.errorCode === "stale_update" && (
+                <div className="mt-2">
+                  <p className="text-xs text-orange-700">
+                    This record was modified by another user since you loaded it. Your changes cannot be saved to avoid overwriting their work.
+                  </p>
+                  {saveResult.currentEntity && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDraft({ ...saveResult.currentEntity! });
+                        setSaveResult(null);
+                        setValidationErrors({});
+                        onSaved(saveResult.currentEntity!);
+                      }}
+                      className="mt-2 inline-block rounded-xl border border-orange-300 bg-white px-4 py-2 text-xs font-black text-orange-800 hover:border-orange-400"
+                    >
+                      Load latest version
+                    </button>
+                  )}
+                </div>
+              )}
+              {saveResult.message && !saveResult.ok && saveResult.errorCode !== "stale_update" && (
                 <p className="mt-1 text-xs text-red-700">{saveResult.message}</p>
+              )}
+              {saveResult.errorCode === "duplicate_key" && (
+                <p className="mt-1 text-xs text-red-700">
+                  A record with this unique value already exists (e.g. duplicate slug or ISRC).
+                </p>
               )}
             </div>
           )}
@@ -330,11 +369,11 @@ function FieldInput({
       <label className="flex items-center gap-2">
         <input
           type="checkbox"
-          checked={!!value}
+          checked={Boolean(value)}
           onChange={(e) => onChange(e.target.checked)}
           className="h-5 w-5 rounded border-[#dfe4d8] accent-[#85c441]"
         />
-        <span className="text-sm text-[#2d3329]">{!!value ? "Yes" : "No"}</span>
+        <span className="text-sm text-[#2d3329]">{value ? "Yes" : "No"}</span>
       </label>
     );
   }

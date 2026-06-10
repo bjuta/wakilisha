@@ -293,3 +293,46 @@ Phase 1 is a pure database/scripts task — no frontend changes. It unblocks ric
 - **API is serverless** — Supabase Edge Function (`wakilisha-public-api`) handles all requests
 - **Image placeholders** — `Chapter19FallbackImage` component handles missing artwork with gradient placeholders
 - **Design system** — All pages must use WAKILISHA CSS custom properties (`var(--wk-*)`) and follow existing design patterns
+
+## Phase C: Backend Admin Registry API ✅ COMPLETE
+
+**Edge Function:** `admin-registry-api` deployed at `/functions/v1/admin-registry-api`
+
+**Endpoints:**
+- `GET /entities?entityType=artist|track|release&limit=&orderBy=&ascending=` — list entities
+- `GET /entities/:entityType/:entityId` — single entity profile
+- `PATCH /entities/:entityType/:entityId` — update entity fields
+
+**Security:**
+- JWT verification on every request (admin-only)
+- Server-side editable field whitelist per entity type
+- Uses service_role key for DB operations
+- Frontend never writes directly to canonical tables
+
+**Frontend (`client.ts`):**
+- All three data functions (`getRegistryEntityList`, `getRegistryEntityProfile`, `saveRegistryEntityPatch`) now route through the Edge Function instead of direct Supabase calls
+- `buildChangesPayload` remains pure frontend logic (no DB access)
+- Frontend validation + normalization still runs before sending to the API
+
+## Phase G: Audit Trail & Permissions ✅ COMPLETE
+
+**What was built:**
+
+1. **Permission guard in Edge Function** — Every PATCH verifies the caller has `manage_registry` capability via `user_role_assignments` → `role_capabilities`. Only `administrator` and `registry_editor` roles pass. Returns 403 with `permission_denied` error code otherwise.
+
+2. **Audit trail (`registry_audit_log`)** — On every successful PATCH, the Edge Function snapshots the entity's pre-update state (`before_value`) and writes it alongside the applied patch (`after_value`) into `registry_audit_log`. Includes actor_id, actor_label (email), action ("update"), entity_type, entity_id, and metadata (changed_fields list). Audit writes are non-blocking (fire-and-forget with error logging).
+
+3. **Stale-update detection** — Client sends `_expected_updated_at` with every PATCH (the `updated_at` value it last read). The Edge Function compares this against the current DB value before writing. If they differ, the update is rejected with HTTP 409 + errorCode `stale_update` + the current server-side entity state. The drawer shows a clear "Someone else edited this record" message with a "Load latest version" button.
+
+4. **Duplicate slug handling** — DB unique constraints are caught and surfaced with errorCode `duplicate_key` and a human-friendly message in the drawer.
+
+**Files modified:**
+- `supabase/functions/admin-registry-api/index.ts` — Permission check, audit writes, stale detection, error code taxonomy
+- `src/services/registry/admin/client.ts` — `saveRegistryEntityPatch` accepts `expectedUpdatedAt` parameter, passes `_expected_updated_at` in payload
+- `src/services/registry/admin/types.ts` — Added `currentEntity` field to `RegistrySaveResult` for stale-update recovery
+- `src/components/admin/registry/RegistryEntityEditorDrawer.tsx` — Passes `entity.updated_at` on save, handles stale_update (orange card + Load latest), permission_denied, duplicate_key, and not_authenticated errors with distinct UI
+
+**Database tables used:**
+- `registry_audit_log` — populated on every write (id, actor_id, actor_label, action, entity_type, entity_id, before_value JSONB, after_value JSONB, metadata JSONB, created_at)
+- `user_role_assignments` — checked for caller's active roles
+- `role_capabilities` — checked for `manage_registry` capability

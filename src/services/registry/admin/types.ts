@@ -55,6 +55,8 @@ export interface RegistrySaveResult {
   updatedEntity?: Record<string, unknown>;
   errorCode?: string;
   message?: string;
+  /** Set when stale_update: the current server-side entity state */
+  currentEntity?: Record<string, unknown>;
 }
 
 export interface RegistryEntityProfile {
