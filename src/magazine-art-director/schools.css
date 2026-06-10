@@ -1,0 +1,1127 @@
+
+
+/* ─────────────────────────────────────────────────────────────────────────
+   1. SWISS / INTERNATIONAL TYPOGRAPHIC STYLE
+   Grid-disciplined. Whitespace as design. Single accent only.
+   ───────────────────────────────────────────────────────────────────────── */
+
+
+
+/* ── SWISS (Light) ── */
+.mag-school-swiss.mag-mode-light {
+  --mag-display: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --mag-body: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --mag-mono: 'DM Mono', 'Courier New', monospace;
+  --mag-bg: #F5F3EE;
+  --mag-surface: #EDEBE4;
+  --mag-surface-raised: #E4E2D8;
+  --mag-text: #0C0C0A;
+  --mag-text-soft: #3A3A34;
+  --mag-text-muted: #6E6D64;
+  --mag-accent: #D41C14;
+  --mag-accent-hi: #F02A20;
+  --mag-accent-deep: #8C100C;
+  --mag-rule: rgba(12,12,10,.08);
+  --mag-rule-strong: rgba(12,12,10,.18);
+  --mag-rule-ink: rgba(12,12,10,.12);
+  --mag-card-bg: #EDEBE4;
+  --mag-card-border: rgba(12,12,10,.10);
+}
+
+/* ── SWISS (Dark) ── */
+.mag-school-swiss.mag-mode-dark {
+  --mag-display: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --mag-body: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --mag-mono: 'DM Mono', 'Courier New', monospace;
+  --mag-bg: #0A0A08;
+  --mag-surface: #141410;
+  --mag-surface-raised: #1E1E18;
+  --mag-text: #F0EEE8;
+  --mag-text-soft: #C8C6BC;
+  --mag-text-muted: #7A7870;
+  --mag-accent: #E83028;
+  --mag-accent-hi: #FF3C34;
+  --mag-accent-deep: #A81810;
+  --mag-rule: rgba(240,238,232,.08);
+  --mag-rule-strong: rgba(240,238,232,.20);
+  --mag-rule-ink: rgba(240,238,232,.05);
+  --mag-card-bg: #141410;
+  --mag-card-border: rgba(240,238,232,.09);
+}
+
+/* ── Swiss typographic discipline ── */
+.mag-school-swiss .mag-cover-title,
+.mag-school-swiss .mag-toc-title,
+.mag-school-swiss .mag-section-title,
+.mag-school-swiss .mag-feature-title {
+  font-weight: 300;
+  letter-spacing: -0.03em;
+  font-style: normal;
+}
+
+.mag-school-swiss .mag-cover-title em,
+.mag-school-swiss .mag-section-title em,
+.mag-school-swiss .mag-feature-title em {
+  font-style: normal;
+  font-weight: 700;
+  color: var(--mag-accent);
+}
+
+.mag-school-swiss .magazine-spread {
+  border-radius: 0;
+}
+
+.mag-school-swiss .mag-cover {
+  background: var(--mag-bg);
+  border-bottom: 3px solid var(--mag-accent);
+}
+
+.mag-school-swiss.mag-mode-light .mag-cover {
+  background: linear-gradient(to bottom, #F5F3EE 0%, #EDEBE4 100%);
+}
+
+.mag-school-swiss.mag-mode-dark .mag-cover {
+  background: #0A0A08;
+}
+
+/* Swiss column rules */
+.mag-school-swiss .mag-note,
+.mag-school-swiss .mag-signal,
+.mag-school-swiss .mag-feature-body {
+  border-left: 1px solid var(--mag-rule-strong);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   2. MODERNIST POSTER
+   Theatrical scale. Single public argument per spread. Bold.
+   ───────────────────────────────────────────────────────────────────────── */
+
+.mag-school-modernist_poster.mag-mode-light {
+  --mag-display: 'Space Grotesk', 'Helvetica Neue', Arial, sans-serif;
+  --mag-body: 'Space Grotesk', 'Helvetica Neue', Arial, sans-serif;
+  --mag-mono: 'Space Mono', 'Courier New', monospace;
+  --mag-bg: #F8F4EE;
+  --mag-surface: #EEE8DC;
+  --mag-surface-raised: #E4DCCC;
+  --mag-text: #0E0A04;
+  --mag-text-soft: #38300A;
+  --mag-text-muted: #6A5E3C;
+  --mag-accent: #E8302A;
+  --mag-accent-hi: #FF3C34;
+  --mag-accent-deep: #9C1C14;
+  --mag-rule: rgba(14,10,4,.08);
+  --mag-rule-strong: rgba(14,10,4,.22);
+  --mag-rule-ink: rgba(14,10,4,.12);
+  --mag-card-bg: #EEE8DC;
+  --mag-card-border: rgba(14,10,4,.10);
+}
+
+.mag-school-modernist_poster.mag-mode-dark {
+  --mag-display: 'Space Grotesk', 'Helvetica Neue', Arial, sans-serif;
+  --mag-body: 'Space Grotesk', 'Helvetica Neue', Arial, sans-serif;
+  --mag-mono: 'Space Mono', 'Courier New', monospace;
+  --mag-bg: #08060C;
+  --mag-surface: #120E1A;
+  --mag-surface-raised: #1C1826;
+  --mag-text: #F4F0F8;
+  --mag-text-soft: #C4C0CC;
+  --mag-text-muted: #7C7888;
+  --mag-accent: #FF3C34;
+  --mag-accent-hi: #FF5E58;
+  --mag-accent-deep: #C41C14;
+  --mag-rule: rgba(244,240,248,.07);
+  --mag-rule-strong: rgba(244,240,248,.18);
+  --mag-rule-ink: rgba(244,240,248,.05);
+  --mag-card-bg: #120E1A;
+  --mag-card-border: rgba(244,240,248,.08);
+}
+
+.mag-school-modernist_poster .mag-cover-title {
+  font-size: clamp(72px, 16vw, 200px) !important;
+  font-weight: 700 !important;
+  line-height: 0.78 !important;
+  letter-spacing: -0.05em !important;
+}
+
+.mag-school-modernist_poster .mag-feature-title {
+  font-size: clamp(60px, 12vw, 160px) !important;
+  font-weight: 700 !important;
+  line-height: 0.8 !important;
+}
+
+.mag-school-modernist_poster .mag-section-title {
+  font-weight: 900 !important;
+  font-size: clamp(64px, 14vw, 180px) !important;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   3. MEMPHIS POSTMODERN
+   Colour clashes are the point. Pattern is content. Stage sets.
+   ───────────────────────────────────────────────────────────────────────── */
+
+.mag-school-memphis_postmodern.mag-mode-light {
+  --mag-display: 'Bricolage Grotesque', 'Arial Black', sans-serif;
+  --mag-body: 'DM Sans', 'Helvetica Neue', Arial, sans-serif;
+  --mag-mono: 'DM Mono', 'Courier New', monospace;
+  --mag-bg: #FAFAF0;
+  --mag-surface: #F4F0E0;
+  --mag-surface-raised: #EAE4CC;
+  --mag-text: #1A0A18;
+  --mag-text-soft: #4A2040;
+  --mag-text-muted: #7A5070;
+  --mag-accent: #FF6B35;
+  --mag-accent-hi: #FF8C5A;
+  --mag-accent-deep: #CC3800;
+  --mag-rule: rgba(26,10,24,.07);
+  --mag-rule-strong: rgba(26,10,24,.18);
+  --mag-rule-ink: rgba(26,10,24,.10);
+  --mag-card-bg: #F4F0E0;
+  --mag-card-border: rgba(26,10,24,.10);
+}
+
+.mag-school-memphis_postmodern.mag-mode-dark {
+  --mag-display: 'Bricolage Grotesque', 'Arial Black', sans-serif;
+  --mag-body: 'DM Sans', 'Helvetica Neue', Arial, sans-serif;
+  --mag-mono: 'DM Mono', 'Courier New', monospace;
+  --mag-bg: #0C0814;
+  --mag-surface: #181020;
+  --mag-surface-raised: #24182E;
+  --mag-text: #FAF0FC;
+  --mag-text-soft: #D0C0DC;
+  --mag-text-muted: #907898;
+  --mag-accent: #FF6B35;
+  --mag-accent-hi: #FF9060;
+  --mag-accent-deep: #CC3800;
+  --mag-rule: rgba(250,240,252,.07);
+  --mag-rule-strong: rgba(250,240,252,.20);
+  --mag-rule-ink: rgba(250,240,252,.05);
+  --mag-card-bg: #181020;
+  --mag-card-border: rgba(250,240,252,.09);
+}
+
+/* Memphis covers get geometric pattern backgrounds */
+.mag-school-memphis_postmodern .mag-cover {
+  background:
+    repeating-linear-gradient(45deg, color-mix(in srgb, var(--mag-accent) 8%, transparent) 0, color-mix(in srgb, var(--mag-accent) 8%, transparent) 2px, transparent 0, transparent 50%),
+    repeating-linear-gradient(-45deg, color-mix(in srgb, #FF1493 8%, transparent) 0, color-mix(in srgb, #FF1493 8%, transparent) 2px, transparent 0, transparent 50%),
+    var(--mag-bg);
+  background-size: 28px 28px, 28px 28px;
+}
+
+.mag-school-memphis_postmodern .mag-cover-title {
+  font-weight: 800 !important;
+  letter-spacing: -0.02em !important;
+}
+
+.mag-school-memphis_postmodern .mag-color-interlude {
+  background:
+    repeating-linear-gradient(0deg, color-mix(in srgb, #fff 10%, transparent) 0, transparent 2px, transparent 40px),
+    var(--mag-accent);
+}
+
+.mag-school-memphis_postmodern .mag-section {
+  background:
+    radial-gradient(circle at 20% 80%, color-mix(in srgb, #FFD700 20%, transparent), transparent 40%),
+    radial-gradient(circle at 80% 20%, color-mix(in srgb, #FF1493 15%, transparent), transparent 40%),
+    var(--mag-bg);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   4. LUXURY FASHION EDITORIAL
+   Image sovereign. Couture typography. Whitespace = price signal.
+   ───────────────────────────────────────────────────────────────────────── */
+
+.mag-school-luxury_fashion_editorial.mag-mode-light {
+  --mag-display: 'Cormorant Garamond', 'Didot', Georgia, serif;
+  --mag-body: 'Cormorant Garamond', Georgia, serif;
+  --mag-mono: 'DM Mono', 'Courier New', monospace;
+  --mag-bg: #FAF7F2;
+  --mag-surface: #F2EDE4;
+  --mag-surface-raised: #E8DED0;
+  --mag-text: #180C04;
+  --mag-text-soft: #4A3428;
+  --mag-text-muted: #907060;
+  --mag-accent: #C8A96E;
+  --mag-accent-hi: #DEC090;
+  --mag-accent-deep: #8A6A30;
+  --mag-rule: rgba(24,12,4,.06);
+  --mag-rule-strong: rgba(24,12,4,.14);
+  --mag-rule-ink: rgba(24,12,4,.08);
+  --mag-card-bg: #F2EDE4;
+  --mag-card-border: rgba(24,12,4,.08);
+}
+
+.mag-school-luxury_fashion_editorial.mag-mode-dark {
+  --mag-display: 'Cormorant Garamond', 'Didot', Georgia, serif;
+  --mag-body: 'Cormorant Garamond', Georgia, serif;
+  --mag-mono: 'DM Mono', 'Courier New', monospace;
+  --mag-bg: #0C0804;
+  --mag-surface: #180E08;
+  --mag-surface-raised: #221610;
+  --mag-text: #FAF0E8;
+  --mag-text-soft: #D0BCA8;
+  --mag-text-muted: #907870;
+  --mag-accent: #C8A96E;
+  --mag-accent-hi: #DEC090;
+  --mag-accent-deep: #8A6A30;
+  --mag-rule: rgba(250,240,232,.06);
+  --mag-rule-strong: rgba(250,240,232,.16);
+  --mag-rule-ink: rgba(250,240,232,.05);
+  --mag-card-bg: #180E08;
+  --mag-card-border: rgba(250,240,232,.07);
+}
+
+.mag-school-luxury_fashion_editorial .mag-cover-title {
+  font-size: clamp(64px, 14vw, 180px) !important;
+  font-weight: 300 !important;
+  font-style: italic !important;
+  letter-spacing: -0.04em !important;
+}
+
+.mag-school-luxury_fashion_editorial .mag-feature-title,
+.mag-school-luxury_fashion_editorial .mag-section-title,
+.mag-school-luxury_fashion_editorial .mag-toc-title {
+  font-style: italic;
+  font-weight: 300;
+}
+
+.mag-school-luxury_fashion_editorial .mag-cover {
+  background: var(--mag-bg);
+}
+
+/* Extra large whitespace on luxury covers */
+.mag-school-luxury_fashion_editorial .mag-cover-center {
+  gap: clamp(24px, 5vw, 56px);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   5. JAPANESE MINIMAL
+   Emptiness is the primary field. Quiet. Natural. Slow the reader.
+   ───────────────────────────────────────────────────────────────────────── */
+
+.mag-school-japanese_minimal.mag-mode-light {
+  --mag-display: 'Noto Sans', 'Helvetica Neue', Arial, sans-serif;
+  --mag-body: 'Noto Sans', 'Helvetica Neue', Arial, sans-serif;
+  --mag-mono: 'DM Mono', 'Courier New', monospace;
+  --mag-bg: #F8F6F2;
+  --mag-surface: #F0EDE6;
+  --mag-surface-raised: #E6E0D6;
+  --mag-text: #1A1814;
+  --mag-text-soft: #4A4640;
+  --mag-text-muted: #888480;
+  --mag-accent: #5C7A5C;
+  --mag-accent-hi: #7A9A7A;
+  --mag-accent-deep: #3A5A3A;
+  --mag-rule: rgba(26,24,20,.06);
+  --mag-rule-strong: rgba(26,24,20,.14);
+  --mag-rule-ink: rgba(26,24,20,.08);
+  --mag-card-bg: #F0EDE6;
+  --mag-card-border: rgba(26,24,20,.07);
+}
+
+.mag-school-japanese_minimal.mag-mode-dark {
+  --mag-display: 'Noto Sans', 'Helvetica Neue', Arial, sans-serif;
+  --mag-body: 'Noto Sans', 'Helvetica Neue', Arial, sans-serif;
+  --mag-mono: 'DM Mono', 'Courier New', monospace;
+  --mag-bg: #0C0E0A;
+  --mag-surface: #141610;
+  --mag-surface-raised: #1C2018;
+  --mag-text: #F0EEE8;
+  --mag-text-soft: #C4C0B4;
+  --mag-text-muted: #7A7870;
+  --mag-accent: #7A9A7A;
+  --mag-accent-hi: #98B898;
+  --mag-accent-deep: #4A6A4A;
+  --mag-rule: rgba(240,238,232,.06);
+  --mag-rule-strong: rgba(240,238,232,.14);
+  --mag-rule-ink: rgba(240,238,232,.05);
+  --mag-card-bg: #141610;
+  --mag-card-border: rgba(240,238,232,.07);
+}
+
+.mag-school-japanese_minimal .mag-cover-title {
+  font-weight: 300 !important;
+  letter-spacing: 0.08em !important;
+  font-style: normal !important;
+}
+
+.mag-school-japanese_minimal .mag-cover {
+  background: var(--mag-bg);
+}
+
+/* Minimal cover: massive negative space */
+.mag-school-japanese_minimal .mag-cover-center {
+  align-items: flex-start;
+  text-align: left;
+  padding-left: 10%;
+}
+
+.mag-school-japanese_minimal .mag-cover-foot {
+  border-top: 1px solid var(--mag-rule-strong);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   6. INFORMATION DESIGN
+   Data structure IS design. Numbers are first-class. Clarity is moral.
+   ───────────────────────────────────────────────────────────────────────── */
+
+.mag-school-information_design.mag-mode-light {
+  --mag-display: 'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif;
+  --mag-body: 'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif;
+  --mag-mono: 'IBM Plex Mono', 'Courier New', monospace;
+  --mag-bg: #F4F6FA;
+  --mag-surface: #EBF0F8;
+  --mag-surface-raised: #DCE8F4;
+  --mag-text: #04100E;
+  --mag-text-soft: #1A3040;
+  --mag-text-muted: #507090;
+  --mag-accent: #1E7BC4;
+  --mag-accent-hi: #3294DC;
+  --mag-accent-deep: #0C4C88;
+  --mag-rule: rgba(4,16,14,.08);
+  --mag-rule-strong: rgba(4,16,14,.20);
+  --mag-rule-ink: rgba(4,16,14,.10);
+  --mag-card-bg: #EBF0F8;
+  --mag-card-border: rgba(4,16,14,.09);
+}
+
+.mag-school-information_design.mag-mode-dark {
+  --mag-display: 'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif;
+  --mag-body: 'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif;
+  --mag-mono: 'IBM Plex Mono', 'Courier New', monospace;
+  --mag-bg: #020E18;
+  --mag-surface: #081622;
+  --mag-surface-raised: #102030;
+  --mag-text: #EEF4FA;
+  --mag-text-soft: #C0D0DC;
+  --mag-text-muted: #7090A8;
+  --mag-accent: #3294DC;
+  --mag-accent-hi: #50AAEE;
+  --mag-accent-deep: #1A60A8;
+  --mag-rule: rgba(238,244,250,.07);
+  --mag-rule-strong: rgba(238,244,250,.18);
+  --mag-rule-ink: rgba(238,244,250,.05);
+  --mag-card-bg: #081622;
+  --mag-card-border: rgba(238,244,250,.08);
+}
+
+/* Info design: grid lines as explicit structural element */
+.mag-school-information_design .magazine-spread {
+  background-image:
+    linear-gradient(var(--mag-rule) 1px, transparent 1px),
+    linear-gradient(90deg, var(--mag-rule) 1px, transparent 1px);
+  background-size: 80px 80px;
+}
+
+.mag-school-information_design .mag-cover-title {
+  font-size: clamp(48px, 10vw, 120px) !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.02em !important;
+  font-style: normal !important;
+}
+
+/* Big number treatment */
+.mag-school-information_design .mag-signal-big {
+  font-size: 120px !important;
+  font-weight: 700;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   7. FOLK VERNACULAR
+   Place is source. Warm earthy energy. Dense, situated, irregular.
+   ───────────────────────────────────────────────────────────────────────── */
+
+.mag-school-folk_vernacular.mag-mode-light {
+  --mag-display: 'Fraunces', Georgia, 'Times New Roman', serif;
+  --mag-body: 'Libre Baskerville', Georgia, serif;
+  --mag-mono: 'DM Mono', 'Courier New', monospace;
+  --mag-bg: #FBF4E8;
+  --mag-surface: #F2E8D0;
+  --mag-surface-raised: #E8D8B4;
+  --mag-text: #1C0C04;
+  --mag-text-soft: #4A2808;
+  --mag-text-muted: #885C3A;
+  --mag-accent: #D4832A;
+  --mag-accent-hi: #ECA040;
+  --mag-accent-deep: #8A4C08;
+  --mag-rule: rgba(28,12,4,.07);
+  --mag-rule-strong: rgba(28,12,4,.20);
+  --mag-rule-ink: rgba(28,12,4,.10);
+  --mag-card-bg: #F2E8D0;
+  --mag-card-border: rgba(28,12,4,.09);
+}
+
+.mag-school-folk_vernacular.mag-mode-dark {
+  --mag-display: 'Fraunces', Georgia, 'Times New Roman', serif;
+  --mag-body: 'Fraunces', Georgia, serif;
+  --mag-mono: 'DM Mono', 'Courier New', monospace;
+  --mag-bg: #0E0804;
+  --mag-surface: #1A1008;
+  --mag-surface-raised: #281A0E;
+  --mag-text: #FAF0DC;
+  --mag-text-soft: #D4BCA0;
+  --mag-text-muted: #907060;
+  --mag-accent: #ECA040;
+  --mag-accent-hi: #FFBA60;
+  --mag-accent-deep: #A86010;
+  --mag-rule: rgba(250,240,220,.07);
+  --mag-rule-strong: rgba(250,240,220,.18);
+  --mag-rule-ink: rgba(250,240,220,.05);
+  --mag-card-bg: #1A1008;
+  --mag-card-border: rgba(250,240,220,.08);
+}
+
+.mag-school-folk_vernacular .mag-cover-title {
+  font-weight: 700 !important;
+  font-style: italic !important;
+}
+
+/* Folk covers get warm texture overlays */
+.mag-school-folk_vernacular .mag-cover {
+  background:
+    radial-gradient(ellipse at 30% 70%, color-mix(in srgb, var(--mag-accent) 22%, transparent), transparent 55%),
+    radial-gradient(ellipse at 75% 25%, color-mix(in srgb, #C83030 14%, transparent), transparent 50%),
+    var(--mag-bg);
+}
+
+.mag-school-folk_vernacular .mag-section {
+  background:
+    repeating-linear-gradient(30deg, color-mix(in srgb, var(--mag-accent-deep) 4%, transparent) 0, transparent 2px, transparent 30px),
+    var(--mag-bg);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   8. EDITORIAL MAGAZINE
+   Pacing is design. Dramatic hierarchy. Authored images. Drop caps.
+   ───────────────────────────────────────────────────────────────────────── */
+
+.mag-school-editorial_magazine.mag-mode-light {
+  --mag-display: 'Playfair Display', Georgia, serif;
+  --mag-body: 'DM Serif Display', Georgia, serif;
+  --mag-mono: 'DM Mono', 'Courier New', monospace;
+  --mag-bg: #FAF7F0;
+  --mag-surface: #F2EDE0;
+  --mag-surface-raised: #E8E0CC;
+  --mag-text: #140C04;
+  --mag-text-soft: #443A28;
+  --mag-text-muted: #807060;
+  --mag-accent: #C4883A;
+  --mag-accent-hi: #DCA04E;
+  --mag-accent-deep: #8A5A14;
+  --mag-rule: rgba(20,12,4,.07);
+  --mag-rule-strong: rgba(20,12,4,.18);
+  --mag-rule-ink: rgba(20,12,4,.09);
+  --mag-card-bg: #F2EDE0;
+  --mag-card-border: rgba(20,12,4,.08);
+}
+
+.mag-school-editorial_magazine.mag-mode-dark {
+  --mag-display: 'Playfair Display', Georgia, serif;
+  --mag-body: 'DM Serif Display', Georgia, serif;
+  --mag-mono: 'DM Mono', 'Courier New', monospace;
+  --mag-bg: #0A0804;
+  --mag-surface: #160E08;
+  --mag-surface-raised: #20180C;
+  --mag-text: #FAF0E4;
+  --mag-text-soft: #D0BCA4;
+  --mag-text-muted: #907868;
+  --mag-accent: #DCA04E;
+  --mag-accent-hi: #F0B870;
+  --mag-accent-deep: #9A6820;
+  --mag-rule: rgba(250,240,228,.07);
+  --mag-rule-strong: rgba(250,240,228,.18);
+  --mag-rule-ink: rgba(250,240,228,.05);
+  --mag-card-bg: #160E08;
+  --mag-card-border: rgba(250,240,228,.08);
+}
+
+/* Editorial: larger drop caps */
+.mag-school-editorial_magazine .mag-copy p:first-child::first-letter {
+  font-size: 80px !important;
+  line-height: 0.65 !important;
+  color: var(--mag-accent-hi) !important;
+}
+
+/* Editorial pull quotes stronger */
+.mag-school-editorial_magazine .mag-pull {
+  font-size: clamp(26px, 3.5vw, 38px) !important;
+  border-left-width: 4px !important;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   9. BRUTALIST WEB
+   Structure visible. Default-as-material. Crude and loud.
+   ───────────────────────────────────────────────────────────────────────── */
+
+.mag-school-brutalist_web.mag-mode-light {
+  --mag-display: 'Space Grotesk', 'Arial Black', Arial, sans-serif;
+  --mag-body: 'Space Grotesk', Arial, sans-serif;
+  --mag-mono: 'Space Mono', 'Courier New', monospace;
+  --mag-bg: #F4F4F0;
+  --mag-surface: #E8E8E0;
+  --mag-surface-raised: #D8D8CC;
+  --mag-text: #060606;
+  --mag-text-soft: #282820;
+  --mag-text-muted: #5A5A50;
+  --mag-accent: #F5E642;
+  --mag-accent-hi: #FFEE66;
+  --mag-accent-deep: #C4B818;
+  --mag-rule: rgba(6,6,6,.10);
+  --mag-rule-strong: rgba(6,6,6,.28);
+  --mag-rule-ink: rgba(6,6,6,.15);
+  --mag-card-bg: #E8E8E0;
+  --mag-card-border: rgba(6,6,6,.16);
+}
+
+.mag-school-brutalist_web.mag-mode-dark {
+  --mag-display: 'Space Grotesk', 'Arial Black', Arial, sans-serif;
+  --mag-body: 'Space Grotesk', Arial, sans-serif;
+  --mag-mono: 'Space Mono', 'Courier New', monospace;
+  --mag-bg: #060606;
+  --mag-surface: #0E0E0A;
+  --mag-surface-raised: #181810;
+  --mag-text: #F4F4F0;
+  --mag-text-soft: #C8C8C0;
+  --mag-text-muted: #7C7C70;
+  --mag-accent: #F5E642;
+  --mag-accent-hi: #FFEE66;
+  --mag-accent-deep: #C4B818;
+  --mag-rule: rgba(244,244,240,.09);
+  --mag-rule-strong: rgba(244,244,240,.25);
+  --mag-rule-ink: rgba(244,244,240,.07);
+  --mag-card-bg: #0E0E0A;
+  --mag-card-border: rgba(244,244,240,.12);
+}
+
+/* Brutalist: thick visible borders */
+.mag-school-brutalist_web .magazine-spread {
+  border: 2px solid var(--mag-rule-strong);
+  border-radius: 0 !important;
+}
+
+.mag-school-brutalist_web .mag-cover {
+  border-bottom: 4px solid var(--mag-accent);
+  background: var(--mag-bg);
+}
+
+.mag-school-brutalist_web .mag-cover-title {
+  font-size: clamp(72px, 16vw, 200px) !important;
+  font-weight: 900 !important;
+  letter-spacing: -0.04em !important;
+  text-transform: uppercase !important;
+  line-height: 0.78 !important;
+}
+
+.mag-school-brutalist_web .mag-feature-title {
+  font-weight: 900 !important;
+  text-transform: uppercase !important;
+}
+
+.mag-school-brutalist_web .magazine-meta {
+  font-family: var(--mag-mono) !important;
+}
+
+/* Brutalist corners and frames */
+.mag-school-brutalist_web .mag-article-card {
+  border: 2px solid var(--mag-text) !important;
+  border-radius: 0 !important;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   10. BAUHAUS
+   Geometric primitives. Primary colour blocks. Diagonal energy.
+   ───────────────────────────────────────────────────────────────────────── */
+
+.mag-school-bauhaus.mag-mode-light {
+  --mag-display: 'Raleway', 'Futura', 'Century Gothic', Arial, sans-serif;
+  --mag-body: 'Raleway', 'Futura', 'Century Gothic', Arial, sans-serif;
+  --mag-mono: 'DM Mono', 'Courier New', monospace;
+  --mag-bg: #F5F4EE;
+  --mag-surface: #ECEAE0;
+  --mag-surface-raised: #E0DED0;
+  --mag-text: #0A0806;
+  --mag-text-soft: #38300A;
+  --mag-text-muted: #6A6040;
+  --mag-accent: #E83030;
+  --mag-accent-hi: #FF4040;
+  --mag-accent-deep: #A81818;
+  --mag-rule: rgba(10,8,6,.08);
+  --mag-rule-strong: rgba(10,8,6,.22);
+  --mag-rule-ink: rgba(10,8,6,.11);
+  --mag-card-bg: #ECEAE0;
+  --mag-card-border: rgba(10,8,6,.10);
+}
+
+.mag-school-bauhaus.mag-mode-dark {
+  --mag-display: 'Raleway', 'Futura', 'Century Gothic', Arial, sans-serif;
+  --mag-body: 'Raleway', 'Futura', 'Century Gothic', Arial, sans-serif;
+  --mag-mono: 'DM Mono', 'Courier New', monospace;
+  --mag-bg: #060408;
+  --mag-surface: #100C14;
+  --mag-surface-raised: #1C1820;
+  --mag-text: #F4F2EC;
+  --mag-text-soft: #C8C4BC;
+  --mag-text-muted: #7A7870;
+  --mag-accent: #FF4040;
+  --mag-accent-hi: #FF6060;
+  --mag-accent-deep: #C81818;
+  --mag-rule: rgba(244,242,236,.08);
+  --mag-rule-strong: rgba(244,242,236,.22);
+  --mag-rule-ink: rgba(244,242,236,.05);
+  --mag-card-bg: #100C14;
+  --mag-card-border: rgba(244,242,236,.09);
+}
+
+/* Bauhaus: geometric primary-colour blocks on covers */
+.mag-school-bauhaus .mag-cover {
+  background: var(--mag-bg);
+  position: relative;
+}
+
+.mag-school-bauhaus .mag-cover::before {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 38%;
+  height: 42%;
+  background: var(--mag-accent);
+  clip-path: polygon(100% 0, 100% 100%, 0 100%);
+  z-index: 0;
+}
+
+.mag-school-bauhaus .mag-cover::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 24%;
+  height: 30%;
+  background: #2860C0;
+  z-index: 0;
+}
+
+.mag-school-bauhaus .mag-cover-inner {
+  position: relative;
+  z-index: 2;
+}
+
+.mag-school-bauhaus .mag-cover-title {
+  font-weight: 300 !important;
+  font-style: normal !important;
+  letter-spacing: -0.02em !important;
+}
+
+.mag-school-bauhaus .mag-section {
+  background: var(--mag-bg);
+}
+
+.mag-school-bauhaus .mag-section::before {
+  background:
+    radial-gradient(circle at 80% 20%, color-mix(in srgb, #2860C0 18%, transparent), transparent 45%),
+    radial-gradient(circle at 20% 80%, color-mix(in srgb, var(--mag-accent) 22%, transparent), transparent 50%),
+    radial-gradient(circle at 50% 50%, color-mix(in srgb, #F5C800 10%, transparent), transparent 60%);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   SHARED SCHOOL UTILITIES
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* Light mode base class */
+.mag-mode-light {
+  color-scheme: light;
+}
+
+/* Dark mode base class */
+.mag-mode-dark {
+  color-scheme: dark;
+}
+
+/* ── Quirky text treatments by school ── */
+.mag-school-memphis_postmodern .mag-toc-title,
+.mag-school-bauhaus .mag-toc-title {
+  color: var(--mag-text);
+}
+
+.mag-school-memphis_postmodern .mag-toc-title em {
+  color: #FF1493;
+}
+
+.mag-school-bauhaus .mag-toc-title em {
+  color: #2860C0;
+}
+
+.mag-school-brutalist_web .mag-toc-title {
+  text-transform: uppercase;
+  font-weight: 900;
+}
+
+.mag-school-brutalist_web .mag-toc-title em {
+  color: var(--mag-accent);
+  font-style: normal;
+}
+
+/* ── Photo essay / split screen (editorial magazine) ── */
+.mag-spread-photo-essay {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-height: 100vh;
+}
+
+.mag-spread-photo-essay img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.mag-spread-split-screen {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-height: 100vh;
+}
+
+.mag-spread-split-screen-text {
+  padding: clamp(40px, 6vw, 80px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background: var(--mag-surface);
+}
+
+/* ── Number monument (info design, bauhaus) ── */
+.mag-spread-number-monument {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.mag-number-monument-bg {
+  position: absolute;
+  font-family: var(--mag-display);
+  font-size: clamp(200px, 38vw, 480px);
+  font-weight: 900;
+  line-height: 0.7;
+  color: transparent;
+  -webkit-text-stroke: 1px color-mix(in srgb, var(--mag-accent) 20%, transparent);
+  pointer-events: none;
+  user-select: none;
+}
+
+.mag-number-monument-content {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  max-width: 600px;
+  padding: 40px;
+}
+
+/* ── Grid manifesto (swiss, brutalist) ── */
+.mag-spread-grid-manifesto {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  grid-template-rows: repeat(6, 1fr);
+  gap: 1px;
+  background: var(--mag-rule-strong);
+}
+
+.mag-grid-manifesto-cell {
+  background: var(--mag-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  font-family: var(--mag-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--mag-text-muted);
+}
+
+.mag-grid-manifesto-cell.featured {
+  grid-column: span 3;
+  grid-row: span 2;
+  background: var(--mag-accent);
+  color: var(--mag-bg);
+  font-size: 32px;
+  font-family: var(--mag-display);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+/* ── Typographic poster (modernist, bauhaus, memphis) ── */
+.mag-spread-typographic-poster {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: clamp(40px, 6vw, 80px);
+  position: relative;
+  overflow: hidden;
+  background: var(--mag-bg);
+}
+
+.mag-typographic-poster-headline {
+  font-family: var(--mag-display);
+  font-size: clamp(80px, 18vw, 240px);
+  font-weight: 900;
+  line-height: 0.78;
+  letter-spacing: -0.05em;
+  position: relative;
+  z-index: 2;
+  max-width: 90%;
+}
+
+.mag-typographic-poster-sub {
+  font-family: var(--mag-mono);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--mag-text-muted);
+  margin-top: 24px;
+  position: relative;
+  z-index: 2;
+}
+
+.mag-typographic-poster-giant-bg {
+  position: absolute;
+  font-family: var(--mag-display);
+  font-size: clamp(300px, 60vw, 800px);
+  font-weight: 900;
+  line-height: 0.7;
+  color: var(--mag-accent);
+  opacity: 0.06;
+  right: -10%;
+  top: -10%;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* ── Archive wall (folk vernacular) ── */
+.mag-spread-archive-wall {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 2px;
+  background: var(--mag-text);
+}
+
+.mag-archive-wall-cell {
+  overflow: hidden;
+  position: relative;
+  background: var(--mag-surface);
+}
+
+.mag-archive-wall-cell img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: sepia(0.3) saturate(0.8);
+  transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mag-archive-wall-cell:hover img {
+  transform: scale(1.06);
+}
+
+.mag-archive-wall-caption {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 12px;
+  background: linear-gradient(transparent, rgba(0,0,0,.7));
+  font-family: var(--mag-mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #F0EDE0;
+}
+
+/* ── Pattern field (memphis, folk) ── */
+.mag-spread-pattern-field {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.mag-pattern-field-bg {
+  position: absolute;
+  inset: 0;
+  background:
+    repeating-conic-gradient(var(--mag-accent) 0 10deg, transparent 10deg 20deg),
+    var(--mag-bg);
+  opacity: 0.12;
+}
+
+.mag-pattern-field-content {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  max-width: 700px;
+  padding: 60px;
+}
+
+/* ── Texture interlude (memphis, folk) ── */
+.mag-spread-texture-interlude {
+  min-height: 60vh;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mag-texture-interlude-inner {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  padding: 60px;
+}
+
+.mag-texture-interlude::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    repeating-linear-gradient(0deg, color-mix(in srgb, var(--mag-accent) 6%, transparent) 0, transparent 1px, transparent 40px),
+    repeating-linear-gradient(90deg, color-mix(in srgb, var(--mag-accent) 4%, transparent) 0, transparent 1px, transparent 60px);
+}
+
+/* ── Type specimen (brutalist) ── */
+.mag-spread-type-specimen {
+  min-height: 100vh;
+  padding: clamp(40px, 6vw, 80px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background: var(--mag-bg);
+}
+
+.mag-type-specimen-row {
+  display: flex;
+  align-items: baseline;
+  gap: 24px;
+  border-bottom: 1px solid var(--mag-rule-strong);
+  padding: 16px 0;
+}
+
+.mag-type-specimen-size {
+  font-family: var(--mag-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  color: var(--mag-text-muted);
+  width: 60px;
+  flex-shrink: 0;
+}
+
+.mag-type-specimen-sample {
+  font-family: var(--mag-display);
+  color: var(--mag-text);
+  line-height: 0.9;
+}
+
+/* ── Data visualization (information design) ── */
+.mag-spread-data-viz {
+  min-height: 100vh;
+  padding: clamp(40px, 6vw, 80px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background: var(--mag-surface);
+}
+
+.mag-data-chart {
+  width: 100%;
+  background: var(--mag-bg);
+  border: 1px solid var(--mag-rule-strong);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.mag-data-chart-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--mag-rule);
+  font-family: var(--mag-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--mag-text-muted);
+  display: flex;
+  justify-content: space-between;
+}
+
+.mag-data-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--mag-rule);
+}
+
+.mag-data-bar-label {
+  font-family: var(--mag-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--mag-text-muted);
+  width: 140px;
+  flex-shrink: 0;
+}
+
+.mag-data-bar-track {
+  flex: 1;
+  height: 8px;
+  background: var(--mag-rule);
+  border-radius: 0;
+  overflow: hidden;
+}
+
+.mag-data-bar-fill {
+  height: 100%;
+  background: var(--mag-accent);
+  transform-origin: left;
+  animation: mag-bar-grow 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes mag-bar-grow {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+.mag-data-bar-value {
+  font-family: var(--mag-mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--mag-text);
+  width: 40px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* ── Responsive fixes for all school spreads ── */
+@media (max-width: 860px) {
+  .mag-spread-photo-essay,
+  .mag-spread-split-screen,
+  .mag-spread-archive-wall {
+    grid-template-columns: 1fr;
+  }
+
+  .mag-spread-grid-manifesto {
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: auto;
+  }
+
+  .mag-typographic-poster-headline {
+    font-size: clamp(60px, 18vw, 120px);
+  }
+}

@@ -3,7 +3,7 @@ import { ArtistCard } from "@/components/design-system/registry/ArtistCard";
 import { ReleaseCard } from "@/components/design-system/registry/ReleaseCard";
 import type { MagazineSiteArtist, MagazineSiteRelease, MagazineSiteChartEntry } from "@/services/magazineSiteContent";
 
-/* ── Section accent map for inline styling ── */
+/* ── Section accent map ── */
 const SECTION_ACCENT: Record<string, string> = {
   Music: "#84C241",
   Film: "#D6766A",
