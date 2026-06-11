@@ -3,40 +3,17 @@ import { useNavigate } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { AdminTable } from "@/components/design-system/admin/AdminTable";
-import { supabase } from "@/lib/supabase";
-import { decodeHtmlEntities } from "@/utils/decodeHtmlEntities";
 import { useAdminUser } from "@/hooks/useAdminUser";
-
-interface Article {
-  slug: string;
-  title: string | null;
-  excerpt: string | null;
-  author: string | null;
-  published_at: string | null;
-  wp_status: string | null;
-  created_at: string;
-  categories: unknown[] | null;
-  tags: unknown[] | null;
-  hero_image_url: string | null;
-}
-
-/* ─── Helpers ─── */
-
-function normalizeTaxonomyTerms(raw: unknown): string[] {
-  if (!Array.isArray(raw)) return [];
-  return raw.map((item) => {
-    if (typeof item === "string") return item;
-    if (typeof item === "object" && item !== null && "name" in item) {
-      return String((item as Record<string, unknown>).name ?? "");
-    }
-    return String(item);
-  }).filter(Boolean);
-}
+import {
+  fetchArticlesForAdminList,
+  type AdminArticleListItem,
+} from "@/services/articles/articleAdminService";
+import { normalizeTaxonomyTerms, processText } from "@/services/articles/contentPipeline";
 
 export default function AdminArticlesPage() {
   const navigate = useNavigate();
   const adminUser = useAdminUser();
-  const [articles, setArticles] = useState<Article[]>([]);
+  const [articles, setArticles] = useState<AdminArticleListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -46,17 +23,9 @@ export default function AdminArticlesPage() {
 
   useEffect(() => {
     async function load() {
-      const { data, error } = await supabase
-        .from("wk_articles")
-        .select("slug, title, excerpt, author, published_at, wp_status, created_at, categories, tags, hero_image_url")
-        .order("created_at", { ascending: false })
-        .limit(200);
-
-      if (error) {
-        console.error("Error loading articles:", error);
-      } else {
-        setArticles(data ?? []);
-      }
+      setLoading(true);
+      const data = await fetchArticlesForAdminList(200);
+      setArticles(data);
       setLoading(false);
     }
     load();
@@ -77,11 +46,11 @@ export default function AdminArticlesPage() {
       (a.title?.toLowerCase().includes(search.toLowerCase()) ?? false) ||
       (a.slug?.toLowerCase().includes(search.toLowerCase()) ?? false) ||
       (a.author?.toLowerCase().includes(search.toLowerCase()) ?? false);
-    const matchesStatus = statusFilter === "all" || a.wp_status === statusFilter;
+    const matchesStatus = statusFilter === "all" || a.wpStatus === statusFilter;
     const matchesHero =
       heroFilter === "all" ||
-      (heroFilter === "missing" && (!a.hero_image_url || a.hero_image_url === "")) ||
-      (heroFilter === "has" && a.hero_image_url && a.hero_image_url !== "");
+      (heroFilter === "missing" && (!a.heroImageUrl || a.heroImageUrl === "")) ||
+      (heroFilter === "has" && a.heroImageUrl && a.heroImageUrl !== "");
     return matchesSearch && matchesStatus && matchesHero;
   });
 
@@ -95,7 +64,8 @@ export default function AdminArticlesPage() {
           <div className="mb-1 text-[11px] font-black uppercase tracking-wider text-wk-brand">Content</div>
           <h1 className="text-[22px] font-black tracking-tight text-wk-text">Articles</h1>
           <p className="mt-1 text-[13px] text-wk-text-muted">
-            {articles.length} articles imported. {articles.filter((a) => !a.title || !a.excerpt).length} need review.
+            {articles.length} articles loaded.{" "}
+            {articles.filter((a) => !a.title || !a.excerpt).length} need review.
             {!canEditOthers && (
               <span className="ml-1 text-wk-brand">Showing {adminUser.name}&apos;s articles.</span>
             )}
@@ -103,14 +73,18 @@ export default function AdminArticlesPage() {
         </div>
         <div className="flex items-center gap-2">
           <button
+            onClick={() => navigate("/admin/content/articles/trash")}
+            className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap text-wk-text-muted hover:text-wk-danger"
+          >
+            <WkIcon name="Trash2" size={14} />
+            Trash
+          </button>
+          <button
             onClick={() => navigate("/admin/content/articles/new")}
             className="wk-button wk-button-primary wk-button-sm whitespace-nowrap"
-            title="Create a new article (coming soon)"
-            disabled
           >
             <WkIcon name="Plus" size={14} />
             New Article
-            <span className="ml-1 rounded-full bg-wk-brand-on/20 px-1.5 py-0.5 text-[8px] uppercase font-black">soon</span>
           </button>
         </div>
       </div>
@@ -140,11 +114,13 @@ export default function AdminArticlesPage() {
               className="rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text outline-none cursor-pointer"
             >
               <option value="all">All Status</option>
-              {statusOptions.filter((s) => s !== "all").map((s) => (
-                <option key={s} value={s}>
-                  {s.charAt(0).toUpperCase() + s.slice(1)}
-                </option>
-              ))}
+              {statusOptions
+                .filter((s) => s !== "all")
+                .map((s) => (
+                  <option key={s} value={s}>
+                    {s.charAt(0).toUpperCase() + s.slice(1)}
+                  </option>
+                ))}
             </select>
             <select
               value={heroFilter}
@@ -180,35 +156,37 @@ export default function AdminArticlesPage() {
               label: "Title",
               render: (row) => (
                 <div>
-                  <div className="text-[13px] font-semibold text-wk-text">{row.title ? decodeHtmlEntities(row.title) : "(Untitled)"}</div>
+                  <div className="text-[13px] font-semibold text-wk-text">
+                    {row.title || "(Untitled)"}
+                  </div>
                   <div className="text-[11px] text-wk-text-muted">{row.slug}</div>
                 </div>
               ),
             },
             { key: "author", label: "Author", width: "140px" },
             {
-              key: "wp_status",
+              key: "wpStatus",
               label: "Status",
               width: "100px",
-              render: (row) => <StatusBadge status={row.wp_status} />,
+              render: (row) => <StatusBadge status={row.wpStatus} />,
             },
             {
-              key: "published_at",
+              key: "publishedAt",
               label: "Published",
               width: "140px",
               render: (row) => (
                 <span className="text-[12px] text-wk-text-muted">
-                  {row.published_at ? new Date(row.published_at).toLocaleDateString() : "—"}
+                  {row.publishedAt ? new Date(row.publishedAt).toLocaleDateString() : "—"}
                 </span>
               ),
             },
             {
-              key: "created_at",
+              key: "createdAt",
               label: "Created",
               width: "140px",
               render: (row) => (
                 <span className="text-[12px] text-wk-text-muted">
-                  {new Date(row.created_at).toLocaleDateString()}
+                  {new Date(row.createdAt).toLocaleDateString()}
                 </span>
               ),
             },
@@ -217,12 +195,14 @@ export default function AdminArticlesPage() {
               label: "Categories",
               width: "160px",
               render: (row) => {
-                const cats = normalizeTaxonomyTerms(row.categories);
+                const cats = row.categories;
                 return (
                   <div className="flex flex-wrap gap-1">
                     {cats.length > 0 ? (
                       cats.slice(0, 3).map((cat) => (
-                        <span key={cat} className="wk-tag text-[10px]">{cat}</span>
+                        <span key={cat} className="wk-tag text-[10px]">
+                          {cat}
+                        </span>
                       ))
                     ) : (
                       <span className="text-[11px] text-wk-text-faint">None</span>
@@ -249,15 +229,17 @@ function StatusBadge({ status }: { status: string | null }) {
     status === "publish"
       ? "bg-wk-success-soft text-wk-success"
       : status === "draft"
-      ? "bg-wk-warning-soft text-wk-warning"
-      : status === "pending"
-      ? "bg-wk-info-soft text-wk-info"
-      : status === "private"
-      ? "bg-wk-surface-raised text-wk-text-muted"
-      : "bg-wk-surface-raised text-wk-text-muted";
+        ? "bg-wk-warning-soft text-wk-warning"
+        : status === "pending"
+          ? "bg-wk-info-soft text-wk-info"
+          : status === "private"
+            ? "bg-wk-surface-raised text-wk-text-muted"
+            : "bg-wk-surface-raised text-wk-text-muted";
 
   return (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${color}`}>
+    <span
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${color}`}
+    >
       {status}
     </span>
   );

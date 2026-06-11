@@ -10,7 +10,7 @@ import { ProviderHealthPanel } from "./ProviderHealthPanel";
 import { ResourceGuardPanel } from "./ResourceGuardPanel";
 import { RunCard } from "./RunCard";
 
-const ADMIN_CHARTS_BASE = "/admin/settings/charts";
+const ADMIN_CHARTS_BASE = "/admin/charts";
 
 type IngestSidebarProps = {
   activeRun?: IngestRun;

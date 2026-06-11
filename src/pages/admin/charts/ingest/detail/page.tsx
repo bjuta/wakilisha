@@ -179,7 +179,7 @@ export default function AdminChartsIngestDetail() {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-2">
-          <button onClick={() => navigate("/admin/settings/charts/ingest")} className="text-[var(--wk-text-muted)] hover:text-[var(--wk-text)]">
+          <button onClick={() => navigate("/admin/charts/ingest")} className="text-[var(--wk-text-muted)] hover:text-[var(--wk-text)]">
             <i className="ri-arrow-left-line" />
           </button>
           <h1 className="text-[20px] font-bold text-[var(--wk-text)]">Job not found</h1>
@@ -220,7 +220,7 @@ export default function AdminChartsIngestDetail() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => navigate("/admin/settings/charts/ingest")}
+            onClick={() => navigate("/admin/charts/ingest")}
             className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]"
           >
             <i className="ri-arrow-left-line" />

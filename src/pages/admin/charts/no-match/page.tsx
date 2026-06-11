@@ -241,7 +241,7 @@ export default function AdminChartsNoMatch() {
                     <td className="px-4 py-3 text-wk-warning text-[11px]">{row.warnings?.join("; ") || "—"}</td>
                     <td className="px-4 py-3">
                       <button
-                        onClick={() => navigate(`/admin/settings/charts/ingest-runs/${row.runId}`)}
+                        onClick={() => navigate(`/admin/charts/ingest-runs/${row.runId}`)}
                         className="text-[11px] font-semibold text-wk-brand hover:underline cursor-pointer"
                       >
                         {row.editionDate}

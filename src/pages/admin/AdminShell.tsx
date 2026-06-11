@@ -21,16 +21,16 @@ const NAV_GROUPS: NavGroup[] = [
     { path: "/admin/content/archive", label: "Archive", icon: "Archive", requiredCapability: "view_archive" },
     { path: "/admin/content/migration", label: "Media Migration", icon: "HardDriveDownload", requiredCapability: "view_media_migration" },
     { path: "/admin/content/collections", label: "Collections", icon: "Library", disabled: true },
-    { path: "/admin/content/categories", label: "Categories", icon: "FolderTree", disabled: true },
-    { path: "/admin/content/tags", label: "Tags", icon: "Tags", disabled: true },
+    { path: "/admin/content/categories", label: "Categories", icon: "FolderTree", requiredCapability: "manage_categories" },
+    { path: "/admin/content/tags", label: "Tags", icon: "Tags", requiredCapability: "manage_tags" },
   ] },
   { label: "Charts", visible: (can) => can("view_charts_admin"), items: [
-    { path: "/admin/settings/charts/dashboard", label: "Dashboard", icon: "LayoutDashboard", requiredCapability: "view_charts_admin" },
-    { path: "/admin/settings/charts/families", label: "Chart Families", icon: "FolderTree", requiredCapability: "manage_charts" },
-    { path: "/admin/settings/charts/ingest", label: "Ingest Studio", icon: "Database", requiredCapability: "manage_ingest" },
-    { path: "/admin/settings/charts/ingest-runs", label: "Ingest Runs", icon: "ListChecks", requiredCapability: "view_charts_admin" },
-    { path: "/admin/settings/charts/editions", label: "Editions", icon: "Layers", requiredCapability: "manage_charts" },
-    { path: "/admin/settings/charts/snapshots", label: "Snapshots", icon: "Camera", requiredCapability: "view_charts_admin" },
+    { path: "/admin/charts/dashboard", label: "Dashboard", icon: "LayoutDashboard", requiredCapability: "view_charts_admin" },
+    { path: "/admin/charts/families", label: "Chart Families", icon: "FolderTree", requiredCapability: "manage_charts" },
+    { path: "/admin/charts/ingest", label: "Ingest Studio", icon: "Database", requiredCapability: "manage_ingest" },
+    { path: "/admin/charts/ingest-runs", label: "Ingest Runs", icon: "ListChecks", requiredCapability: "view_charts_admin" },
+    { path: "/admin/charts/editions", label: "Editions", icon: "Layers", requiredCapability: "manage_charts" },
+    { path: "/admin/charts/snapshots", label: "Snapshots", icon: "Camera", requiredCapability: "view_charts_admin" },
   ] },
   { label: "Registry", visible: (can) => can("view_registry"), items: [
     { path: "/admin/registry", label: "Overview", icon: "LayoutDashboard", requiredCapability: "view_registry" },
@@ -95,7 +95,7 @@ function UserProfileDropdown({ user, collapsed }: { user: ReturnType<typeof useA
 export function AdminShell() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { resolvedTheme, setMode } = useTheme();
+  const { theme: resolvedTheme, setTheme: setMode } = useTheme();
   const counts = useAdminBadgeCounts();
   const user = useAdminUser();
   const [collapsed, setCollapsed] = useState(() => { if (typeof window === "undefined") return false; return window.localStorage.getItem("wk-admin-sidebar-collapsed") === "true"; });

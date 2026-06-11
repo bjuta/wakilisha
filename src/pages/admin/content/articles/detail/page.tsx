@@ -1,34 +1,29 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
-import { supabase } from "@/lib/supabase";
-import { rewriteWpImageUrl, rewriteWpImageUrls } from "@/services/wpImageRewrite";
-import { decodeHtmlEntities } from "@/utils/decodeHtmlEntities";
-import { createPreviewNonce } from "@/services/magazineArticles";
 import { ArticleEditorHeader } from "./components/ArticleEditorHeader";
 import { ArticleContentEditor } from "./components/ArticleContentEditor";
 import { ArticleMetaPanel } from "./components/ArticleMetaPanel";
+import { ArticlePreviewModal } from "./components/ArticlePreviewModal";
+import { ArticlePublishChecklist } from "./components/ArticlePublishChecklist";
 import { useAdminUser } from "@/hooks/useAdminUser";
+import {
+  fetchArticleForAdmin,
+  saveArticle,
+  createRevision,
+  getLatestRevision,
+  pruneRevisions,
+  saveHeroToMediaLibrary,
+  checkSlugCollision,
+  insertSlugRedirect,
+  trashArticle,
+  generatePreviewNonce,
+  type AdminArticleDetail,
+  type ArticleSavePayload,
+} from "@/services/articles/articleAdminService";
+import { processArticleContent } from "@/services/articles/contentPipeline";
 
-/* ─── Types ─── */
-
-interface ArticleRecord {
-  id: string;
-  slug: string;
-  title: string | null;
-  excerpt: string | null;
-  content_html: string | null;
-  author: string | null;
-  published_at: string | null;
-  modified_at: string | null;
-  categories: string[] | null;
-  tags: string[] | null;
-  seo: Record<string, unknown> | null;
-  wp_status: string | null;
-  hero_image_url: string | null;
-  created_at: string;
-  updated_at: string | null;
-}
+/* ─── Draft state (UI-layer only) ─── */
 
 interface Draft {
   title: string;
@@ -40,6 +35,8 @@ interface Draft {
   publishedAt: string;
   seo: { title?: string; description?: string; keywords?: string };
 }
+
+/* ─── Recovery payload ─── */
 
 interface RecoveryPayload {
   title: string;
@@ -76,32 +73,38 @@ export default function ArticleDetailPage() {
   const userCanEditOthers = adminUser.can("edit_others_articles");
   const isAdmin = adminUser.role === "administrator" || adminUser.can("admin_god_mode");
 
-  // ── State: MUST be declared before articlePermissions (which reads `article`) ──
-  const [article, setArticle] = useState<ArticleRecord | null>(null);
+  // ── State ──
+  const [article, setArticle] = useState<AdminArticleDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
 
-  // ── Central permission object (reactive via useMemo) ──
+  // ── Central permission object ──
   const articlePermissions = useMemo(() => {
     const articleAuthor = (article?.author ?? "").toLowerCase();
     const currentUserName = adminUser.name?.toLowerCase() ?? "";
-    const isOwner = !articleAuthor || !currentUserName
-      ? true
-      : articleAuthor === currentUserName || articleAuthor.includes(currentUserName) || currentUserName.includes(articleAuthor);
+    const isOwner =
+      !articleAuthor || !currentUserName
+        ? true
+        : articleAuthor === currentUserName ||
+          articleAuthor.includes(currentUserName) ||
+          currentUserName.includes(articleAuthor);
 
-    const canView = true; // Everyone authenticated can view
+    const canView = true;
     const canEdit = isAdmin || isOwner || userCanEditOthers;
     const canDelete = isAdmin || (isOwner && userCanEditOthers);
     const canPublish = isAdmin || (isOwner && userCanPublish);
     const canAutosave = canEdit;
     const reason = !canEdit
-      ? "You can only edit your own articles. This article is owned by " + (article?.author || "another author") + "."
+      ? "You can only edit your own articles. This article is owned by " +
+        (article?.author || "another author") +
+        "."
       : null;
 
     return { canView, canEdit, canDelete, canPublish, canAutosave, reason };
   }, [article, adminUser, isAdmin, userCanEditOthers, userCanPublish]);
 
-  // Editable draft state
+  // ── Draft state ──
   const [draft, setDraft] = useState<Draft>({
     title: "",
     excerpt: "",
@@ -113,18 +116,25 @@ export default function ArticleDetailPage() {
     seo: {},
   });
 
-  const [heroImageUrl, setHeroImageUrl] = useState<string>("");
-  const [isSavingHero, setIsSavingHero] = useState(false);
-
   const [isDirty, setIsDirty] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
-  const [isPreviewing, setIsPreviewing] = useState(false);
   const [isAutosaving, setIsAutosaving] = useState(false);
+  const [isSavingHero, setIsSavingHero] = useState(false);
   const [lastAutosavedAt, setLastAutosavedAt] = useState<string | null>(null);
   const [toasts, setToasts] = useState<ToastMsg[]>([]);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showRecovery, setShowRecovery] = useState<RecoveryPayload | null>(null);
+  const [showPublishChecklist, setShowPublishChecklist] = useState(false);
+
+  // ── Conflict detection state ──
+  const [showConflict, setShowConflict] = useState(false);
+  const [conflictError, setConflictError] = useState<string>("");
+  const [pendingConflictPayload, setPendingConflictPayload] = useState<Partial<ArticleSavePayload> | null>(null);
+
+  // ── Preview nonce state ──
+  const [previewNonce, setPreviewNonce] = useState<string | null>(null);
+  const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
 
   // Refs for stable access in interval callbacks
   const stateRef = useRef({
@@ -137,82 +147,84 @@ export default function ArticleDetailPage() {
   });
   stateRef.current = { isDirty, isSaving, isPublishing, isAutosaving, draft, article };
 
+  // Ref for optimistic locking
+  const articleUpdatedAtRef = useRef<string | null>(null);
+  // Ref for autosave dedup
+  const lastAutosavedContentRef = useRef<string | null>(null);
+
   /* ─── Load article ─── */
   useEffect(() => {
     if (!slug) return;
 
+    let alive = true;
+
     async function load() {
       setLoading(true);
-      const { data, error } = await supabase
-        .from("wk_articles")
-        .select("id, slug, title, excerpt, content_html, author, published_at, modified_at, categories, tags, seo, wp_status, hero_image_url, created_at, updated_at")
-        .eq("slug", slug)
-        .maybeSingle();
+      try {
+        const data = await fetchArticleForAdmin(slug);
 
-      if (error) {
+        if (!alive) return;
+
+        if (!data) {
+          setNotFound(true);
+          setLoading(false);
+          return;
+        }
+
+        articleUpdatedAtRef.current = data.updatedAt ?? null;
+        setArticle(data);
+        setPreviewNonce(data.previewNonce ?? null);
+
+        setDraft({
+          title: data.title,
+          excerpt: data.excerpt,
+          content: data.contentHtml,
+          author: data.author,
+          categories: data.categories,
+          tags: data.tags,
+          publishedAt: data.publishedAt,
+          seo: data.seo,
+        });
+        setIsDirty(false);
+        setLoading(false);
+
+        // Check for recovery
+        await checkForRecovery(data.id, data.updatedAt);
+      } catch (err) {
+        if (!alive) return;
         addToast("error", "Failed to load article.");
         setLoading(false);
-        return;
       }
-
-      if (!data) {
-        setNotFound(true);
-        setLoading(false);
-        return;
-      }
-
-      setArticle({ ...data, title: decodeHtmlEntities(data.title ?? "") });
-      setHeroImageUrl(rewriteWpImageUrl(data.hero_image_url ?? ""));
-
-      // Set draft state — content is always visible, editing is gated by articlePermissions
-      setDraft({
-        title: decodeHtmlEntities(data.title ?? ""),
-        excerpt: decodeHtmlEntities(data.excerpt ?? ""),
-        content: rewriteWpImageUrls(data.content_html ?? ""),
-        author: decodeHtmlEntities(data.author ?? ""),
-        categories: normalizeTaxonomyTerms(data.categories).map((c) => decodeHtmlEntities(c)),
-        tags: normalizeTaxonomyTerms(data.tags).map((t) => decodeHtmlEntities(t)),
-        publishedAt: data.published_at ?? "",
-        seo: (data.seo as { title?: string; description?: string; keywords?: string }) ?? {},
-      });
-      setIsDirty(false);
-      setLoading(false);
-
-      // Check for recovery: is there an autosave newer than the article's updated_at?
-      await checkForRecovery(data.id, data.updated_at);
     }
 
     load();
+
+    return () => {
+      alive = false;
+    };
   }, [slug]);
 
   /* ─── Recovery check ─── */
   async function checkForRecovery(articleId: string, articleUpdatedAt: string | null) {
-    const { data } = await supabase
-      .from("wk_article_revisions")
-      .select("id, revision_number, created_at, title, excerpt, content_html, author, categories, tags, seo, wp_status, published_at")
-      .eq("article_id", articleId)
-      .order("revision_number", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const rev = await getLatestRevision(articleId);
+    if (!rev) return;
 
-    if (!data) return;
-
-    const autosaveTime = new Date(data.created_at);
+    const autosaveTime = new Date(rev.createdAt);
     const articleTime = articleUpdatedAt ? new Date(articleUpdatedAt) : new Date(0);
 
     if (autosaveTime > articleTime) {
       setShowRecovery({
-        title: decodeHtmlEntities(data.title || ""),
-        excerpt: decodeHtmlEntities(data.excerpt || ""),
-        content: data.content_html || "",
-        author: decodeHtmlEntities(data.author || ""),
-        categories: normalizeTaxonomyTerms(data.categories).map((c) => decodeHtmlEntities(c)),
-        tags: normalizeTaxonomyTerms(data.tags).map((t) => decodeHtmlEntities(t)),
-        seo: (data.seo as Record<string, unknown>) || {},
-        publishedAt: data.published_at || "",
-        wpStatus: data.wp_status,
-        revisionNumber: data.revision_number,
-        createdAt: data.created_at,
+        title: rev.title,
+        excerpt: rev.excerpt,
+        content: rev.contentHtml,
+        author: rev.author,
+        categories: rev.categories,
+        tags: rev.tags,
+        seo: rev.seo,
+        publishedAt: rev.publishedAt,
+        wpStatus: rev.wpStatus,
+        revisionNumber: rev.revisionNumber,
+        createdAt: rev.createdAt,
       });
     }
   }
@@ -223,60 +235,32 @@ export default function ArticleDetailPage() {
     const currentArticle = stateRef.current.article;
     if (!currentArticle) return;
 
+    const fingerprint = currentDraft.content + currentDraft.title + currentDraft.excerpt;
+    if (fingerprint === lastAutosavedContentRef.current) return;
+
     setIsAutosaving(true);
 
     try {
-      // Get next revision number
-      const { data: maxRev } = await supabase
-        .from("wk_article_revisions")
-        .select("revision_number")
-        .eq("article_id", currentArticle.id)
-        .order("revision_number", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      const nextRevNumber = (maxRev?.revision_number ?? 0) + 1;
-
-      const { error } = await supabase
-        .from("wk_article_revisions")
-        .insert({
-          article_id: currentArticle.id,
-          revision_number: nextRevNumber,
-          title: currentDraft.title || null,
-          excerpt: currentDraft.excerpt || null,
-          content_html: currentDraft.content || null,
-          author: currentDraft.author || null,
-          categories: currentDraft.categories,
-          tags: currentDraft.tags,
-          seo: currentDraft.seo,
-          published_at: currentDraft.publishedAt || null,
-          wp_status: currentArticle.wp_status,
-          created_by: "autosave",
-        });
-
-      if (error) {
-        console.error("Autosave failed:", error);
-        return;
-      }
+      await createRevision({
+        articleId: currentArticle.id,
+        revisionNumber: 0, // computed by service
+        title: currentDraft.title || null,
+        excerpt: currentDraft.excerpt || null,
+        contentHtml: currentDraft.content || null,
+        author: currentDraft.author || null,
+        categories: currentDraft.categories,
+        tags: currentDraft.tags,
+        seo: currentDraft.seo,
+        publishedAt: currentDraft.publishedAt || null,
+        wpStatus: currentArticle.wpStatus,
+        createdBy: "autosave",
+      });
 
       const now = new Date().toISOString();
       setLastAutosavedAt(now);
+      lastAutosavedContentRef.current = fingerprint;
 
-      // Cleanup: keep only last 20 revisions
-      const { data: oldRevisions } = await supabase
-        .from("wk_article_revisions")
-        .select("id, revision_number")
-        .eq("article_id", currentArticle.id)
-        .order("revision_number", { ascending: false });
-
-      if (oldRevisions && oldRevisions.length > 20) {
-        const toDelete = oldRevisions.slice(20);
-        const ids = toDelete.map((r) => r.id);
-        await supabase
-          .from("wk_article_revisions")
-          .delete()
-          .in("id", ids);
-      }
+      await pruneRevisions(currentArticle.id);
     } catch (err) {
       console.error("Autosave error:", err);
     } finally {
@@ -287,9 +271,10 @@ export default function ArticleDetailPage() {
   // 10-second autosave interval
   useEffect(() => {
     const interval = setInterval(() => {
-      const { isDirty, isSaving, isPublishing, isAutosaving, draft } = stateRef.current;
-      if (isDirty && !isSaving && !isPublishing && !isAutosaving) {
-        autosaveRevision(draft);
+      const { isDirty: dirty, isSaving: saving, isPublishing: publishing, isAutosaving: autosaving, draft: d } =
+        stateRef.current;
+      if (dirty && !saving && !publishing && !autosaving) {
+        autosaveRevision(d);
       }
     }, 10000);
     return () => clearInterval(interval);
@@ -309,30 +294,33 @@ export default function ArticleDetailPage() {
   }, []);
 
   /* ─── Restore draft ─── */
-  const handleRestoreDraft = useCallback((payload: {
-    title: string;
-    excerpt: string;
-    content: string;
-    author: string;
-    categories: string[];
-    tags: string[];
-    seo: Record<string, unknown>;
-    publishedAt: string;
-    wpStatus: string | null;
-  }) => {
-    setDraft({
-      title: payload.title,
-      excerpt: payload.excerpt,
-      content: payload.content,
-      author: payload.author,
-      categories: payload.categories,
-      tags: payload.tags,
-      publishedAt: payload.publishedAt,
-      seo: payload.seo as { title?: string; description?: string; keywords?: string },
-    });
-    setIsDirty(true);
-    addToast("success", "Version restored. Remember to save!");
-  }, []);
+  const handleRestoreDraft = useCallback(
+    (payload: {
+      title: string;
+      excerpt: string;
+      content: string;
+      author: string;
+      categories: string[];
+      tags: string[];
+      seo: Record<string, unknown>;
+      publishedAt: string;
+      wpStatus: string | null;
+    }) => {
+      setDraft({
+        title: payload.title,
+        excerpt: payload.excerpt,
+        content: payload.content,
+        author: payload.author,
+        categories: payload.categories,
+        tags: payload.tags,
+        publishedAt: payload.publishedAt,
+        seo: payload.seo as { title?: string; description?: string; keywords?: string },
+      });
+      setIsDirty(true);
+      addToast("success", "Version restored. Remember to save!");
+    },
+    []
+  );
 
   function handleInsertLink(html: string) {
     setDraft((prev) => ({ ...prev, content: prev.content + "\n\n" + html }));
@@ -340,41 +328,73 @@ export default function ArticleDetailPage() {
   }
 
   /* ─── Save helpers ─── */
-  async function saveToSupabase(extraFields: Partial<ArticleRecord> = {}) {
-    if (!article) return false;
 
-    const payload = {
+  function buildSavePayload(extraFields: Partial<ArticleSavePayload> = {}): ArticleSavePayload {
+    return {
       title: draft.title || null,
       excerpt: draft.excerpt || null,
       content_html: draft.content || null,
       author: draft.author || null,
-      categories: draft.categories,
-      tags: draft.tags,
+      categories: JSON.stringify(draft.categories),
+      tags: JSON.stringify(draft.tags),
       published_at: draft.publishedAt || null,
       seo: draft.seo,
-      updated_at: new Date().toISOString(),
       ...extraFields,
     };
+  }
 
-    const { error } = await supabase
-      .from("wk_articles")
-      .update(payload)
-      .eq("id", article.id);
+  async function saveToSupabase(extraFields: Partial<ArticleSavePayload> = {}, forceOverwrite = false): Promise<boolean> {
+    if (!article) return false;
 
-    if (error) {
-      addToast("error", `Save failed: ${error.message}`);
+    const payload = buildSavePayload(extraFields);
+    const lockTimestamp = forceOverwrite ? null : articleUpdatedAtRef.current;
+    const result = await saveArticle(article.id, payload, lockTimestamp);
+
+    if (!result.ok) {
+      if (result.errorCode === "stale_update" && !forceOverwrite) {
+        // Show conflict dialog
+        setConflictError(result.error ?? "This article was modified by someone else while you were editing.");
+        setPendingConflictPayload(extraFields);
+        setShowConflict(true);
+        return false;
+      }
+      addToast("error", result.error ?? "Save failed.");
       return false;
     }
 
+    // Create revision snapshot
+    const newStatus = (extraFields.wp_status as string | undefined) ?? article.wpStatus;
+    await createRevision({
+      articleId: article.id,
+      revisionNumber: 0,
+      title: draft.title || null,
+      excerpt: draft.excerpt || null,
+      contentHtml: draft.content || null,
+      author: draft.author || null,
+      categories: draft.categories,
+      tags: draft.tags,
+      seo: draft.seo,
+      publishedAt: draft.publishedAt || null,
+      wpStatus: newStatus ?? null,
+      createdBy: "manual_save",
+    });
+
+    // Update optimistic lock
+    articleUpdatedAtRef.current = new Date().toISOString();
+
     // Refresh local article state
-    const newStatus = (extraFields.wp_status as string | undefined) ?? article.wp_status;
     setArticle((prev) =>
       prev
         ? {
             ...prev,
-            ...payload,
-            wp_status: newStatus ?? prev.wp_status,
-            published_at: payload.published_at ?? prev.published_at,
+            title: draft.title,
+            excerpt: draft.excerpt,
+            contentHtml: draft.content,
+            author: draft.author,
+            categories: draft.categories,
+            tags: draft.tags,
+            publishedAt: payload.published_at ?? prev.publishedAt,
+            wpStatus: newStatus ?? prev.wpStatus,
           }
         : prev
     );
@@ -382,8 +402,57 @@ export default function ArticleDetailPage() {
     return true;
   }
 
+  /** Force overwrite after conflict — reloads the article first then saves. */
+  async function handleConflictOverwrite() {
+    if (!article || !slug) return;
+    setShowConflict(false);
+
+    // Reload the latest server state to get a fresh updated_at
+    const freshData = await fetchArticleForAdmin(slug);
+    if (freshData) {
+      articleUpdatedAtRef.current = freshData.updatedAt ?? null;
+    }
+
+    // Force save with null lock
+    const extraFields = pendingConflictPayload ?? {};
+    setIsSaving(true);
+    const ok = await saveToSupabase(extraFields, true);
+    setIsSaving(false);
+    if (ok) {
+      addToast("success", "Changes saved (overwrote newer version).");
+    }
+  }
+
+  /** Discard changes — reload the latest article from the server. */
+  async function handleConflictDiscard() {
+    if (!slug) return;
+    setShowConflict(false);
+
+    const freshData = await fetchArticleForAdmin(slug);
+    if (freshData) {
+      articleUpdatedAtRef.current = freshData.updatedAt ?? null;
+      setArticle(freshData);
+      setPreviewNonce(freshData.previewNonce ?? null);
+      setDraft({
+        title: freshData.title,
+        excerpt: freshData.excerpt,
+        content: freshData.contentHtml,
+        author: freshData.author,
+        categories: freshData.categories,
+        tags: freshData.tags,
+        publishedAt: freshData.publishedAt,
+        seo: freshData.seo,
+      });
+      setIsDirty(false);
+      addToast("info", "Reloaded the latest version from the server.");
+    }
+  }
+
   async function handleSaveDraft() {
-    if (!articlePermissions.canEdit) { addToast("error", articlePermissions.reason ?? "Permission denied."); return; }
+    if (!articlePermissions.canEdit) {
+      addToast("error", articlePermissions.reason ?? "Permission denied.");
+      return;
+    }
     setIsSaving(true);
     const ok = await saveToSupabase({ wp_status: "draft" });
     setIsSaving(false);
@@ -391,38 +460,90 @@ export default function ArticleDetailPage() {
   }
 
   async function handlePublish() {
-    if (!articlePermissions.canPublish) { addToast("error", "You do not have permission to publish articles."); return; }
+    if (!articlePermissions.canPublish) {
+      addToast("error", "You do not have permission to publish articles.");
+      return;
+    }
+    setShowPublishChecklist(true);
+  }
+
+  async function handlePublishConfirm() {
+    setShowPublishChecklist(false);
+    if (!articlePermissions.canPublish) {
+      addToast("error", "You do not have permission to publish articles.");
+      return;
+    }
     setIsPublishing(true);
+    const isScheduled = draft.publishedAt && new Date(draft.publishedAt) > new Date();
     const publishDate = draft.publishedAt || new Date().toISOString();
     const ok = await saveToSupabase({
-      wp_status: "publish",
+      wp_status: isScheduled ? "future" : "publish",
       published_at: publishDate,
     });
     setIsPublishing(false);
     if (ok) {
       setDraft((prev) => ({ ...prev, publishedAt: publishDate }));
-      addToast("success", "Article published!");
+      if (isScheduled) {
+        addToast("info", `Article scheduled for ${new Date(publishDate).toLocaleString()}.`);
+      } else {
+        addToast("success", "Article published!");
+      }
     }
   }
 
   async function handleUnpublish() {
-    if (!articlePermissions.canPublish) { addToast("error", "You do not have permission to unpublish."); return; }
+    if (!articlePermissions.canPublish) {
+      addToast("error", "You do not have permission to unpublish.");
+      return;
+    }
     setIsSaving(true);
     const ok = await saveToSupabase({ wp_status: "draft" });
     setIsSaving(false);
     if (ok) addToast("info", "Article unpublished — saved as draft.");
   }
 
-  async function handleDelete() {
-    if (!articlePermissions.canDelete) { addToast("error", "You do not have permission to delete this article."); return; }
-    if (!article) return;
-    const { error } = await supabase
-      .from("wk_articles")
-      .update({ wp_status: "trash" })
-      .eq("id", article.id);
+  async function handleStatusChange(newStatus: string) {
+    if (!articlePermissions.canEdit) {
+      addToast("error", articlePermissions.reason ?? "Permission denied.");
+      return;
+    }
 
-    if (error) {
-      addToast("error", "Failed to trash article.");
+    if (newStatus === "publish" && !articlePermissions.canPublish) {
+      addToast("error", "You do not have permission to publish articles.");
+      return;
+    }
+
+    setIsSaving(true);
+    const ok = await saveToSupabase({ wp_status: newStatus });
+    setIsSaving(false);
+
+    if (ok) {
+      const labels: Record<string, string> = { publish: "Published", pending: "Pending Review", draft: "Draft" };
+      addToast("success", `Status changed to ${labels[newStatus] || newStatus}.`);
+    }
+  }
+
+  async function handleSubmitForReview() {
+    if (!articlePermissions.canEdit) {
+      addToast("error", articlePermissions.reason ?? "Permission denied.");
+      return;
+    }
+    setIsSaving(true);
+    const ok = await saveToSupabase({ wp_status: "pending" });
+    setIsSaving(false);
+    if (ok) addToast("success", "Submitted for review.");
+  }
+
+  async function handleDelete() {
+    if (!articlePermissions.canDelete) {
+      addToast("error", "You do not have permission to delete this article.");
+      return;
+    }
+    if (!article) return;
+
+    const result = await trashArticle(article.id);
+    if (!result.ok) {
+      addToast("error", result.error ?? "Failed to trash article.");
       return;
     }
 
@@ -431,99 +552,86 @@ export default function ArticleDetailPage() {
   }
 
   async function handleSaveHeroImage(url: string) {
-    if (!articlePermissions.canEdit) { addToast("error", articlePermissions.reason ?? "Permission denied."); return; }
+    if (!articlePermissions.canEdit) {
+      addToast("error", articlePermissions.reason ?? "Permission denied.");
+      return;
+    }
     if (!article) return;
     setIsSavingHero(true);
     try {
-      const { error } = await supabase
-        .from("wk_articles")
-        .update({ hero_image_url: url || null })
-        .eq("id", article.id);
+      const result = await saveArticle(article.id, { hero_image_url: url || null }, articleUpdatedAtRef.current);
 
-      if (error) {
-        addToast("error", `Hero image save failed: ${error.message}`);
+      if (!result.ok) {
+        addToast("error", result.error ?? "Hero image save failed.");
         return;
       }
 
-      // Persist to media library too
-      const { data: existing } = await supabase
-        .from("wk_media_assets")
-        .select("id")
-        .eq("entity_type", "article")
-        .eq("entity_slug", article.slug)
-        .eq("role", "hero")
-        .maybeSingle();
+      articleUpdatedAtRef.current = new Date().toISOString();
 
       if (url) {
-        if (existing && typeof existing === "object" && "id" in existing) {
-          await supabase
-            .from("wk_media_assets")
-            .update({ url, alt_text: draft.title, source: "editor_upload" })
-            .eq("id", (existing as { id: string }).id);
-        } else {
-          await supabase.from("wk_media_assets").insert({
-            entity_type: "article",
-            entity_slug: article.slug,
-            role: "hero",
-            url,
-            alt_text: draft.title,
-            source: "editor_upload",
-          });
-        }
+        await saveHeroToMediaLibrary(article.slug, draft.title, url);
       }
 
-      setHeroImageUrl(url);
-      setArticle((prev) => prev ? { ...prev, hero_image_url: url || null } : prev);
+      setArticle((prev) => (prev ? { ...prev, heroImageUrl: url || "" } : prev));
       addToast("success", url ? "Hero image saved to media library." : "Hero image removed.");
     } finally {
       setIsSavingHero(false);
     }
   }
 
-  async function handlePreview() {
+  function handlePreview() {
     if (!article) return;
-    setIsPreviewing(true);
-    try {
-      const nonce = await createPreviewNonce(article.slug);
-      window.open(`/magazine/${article.slug}?preview=${nonce}`, "_blank");
-      addToast("success", "Preview opened in new tab.");
-    } catch (err) {
-      addToast("error", "Failed to generate preview link.");
-    } finally {
-      setIsPreviewing(false);
-    }
+    setShowPreview(true);
+    addToast("info", "Preview mode — scroll down to see the full article.");
   }
 
   async function handleSlugChange(newSlug: string): Promise<boolean> {
-    if (!articlePermissions.canEdit) { addToast("error", articlePermissions.reason ?? "Permission denied."); return false; }
+    if (!articlePermissions.canEdit) {
+      addToast("error", articlePermissions.reason ?? "Permission denied.");
+      return false;
+    }
     if (!article || !slug) return false;
-    // Check for slug collision
-    const { data: existing } = await supabase
-      .from("wk_articles")
-      .select("id")
-      .eq("slug", newSlug)
-      .neq("id", article.id)
-      .maybeSingle();
 
-    if (existing) {
+    const collision = await checkSlugCollision(newSlug, article.id);
+    if (collision) {
       addToast("error", `Slug "${newSlug}" is already taken.`);
       return false;
     }
 
-    const { error } = await supabase
-      .from("wk_articles")
-      .update({ slug: newSlug })
-      .eq("id", article.id);
+    const result = await saveArticle(article.id, { slug: newSlug }, articleUpdatedAtRef.current);
 
-    if (error) {
-      addToast("error", `Failed to update slug: ${error.message}`);
+    if (!result.ok) {
+      addToast("error", result.error ?? "Failed to update slug.");
       return false;
     }
+
+    await insertSlugRedirect(slug, newSlug, adminUser.name || "system");
 
     addToast("success", "Slug updated. Reloading…");
     setTimeout(() => navigate(`/admin/content/articles/${newSlug}`), 800);
     return true;
   }
+
+  /** Generate a shareable preview link for this article. */
+  async function handleGeneratePreviewLink() {
+    if (!article) return;
+    setIsGeneratingPreview(true);
+    try {
+      const nonce = await generatePreviewNonce(article.id);
+      if (nonce) {
+        setPreviewNonce(nonce);
+        addToast("success", "Preview link generated!");
+      } else {
+        addToast("error", "Failed to generate preview link.");
+      }
+    } finally {
+      setIsGeneratingPreview(false);
+    }
+  }
+
+  const previewUrl = previewNonce
+    ? `${window.location.origin}/preview/${previewNonce}`
+    : null;
 
   // ════════════════════════════════════════════
   // Store content in seo object as _content for the SEO analyzer
@@ -592,16 +700,17 @@ export default function ArticleDetailPage() {
       <ArticleEditorHeader
         slug={article.slug}
         title={draft.title}
-        status={article.wp_status}
+        status={article.wpStatus}
         isDirty={isDirty}
         isSaving={isSaving}
         isPublishing={isPublishing}
-        isPreviewing={isPreviewing}
+        isPreviewing={false}
         onSaveDraft={handleSaveDraft}
         onPublish={handlePublish}
         onUnpublish={handleUnpublish}
         onDelete={() => setShowDeleteConfirm(true)}
         onPreview={handlePreview}
+        onSubmitForReview={handleSubmitForReview}
         userCanPublish={articlePermissions.canPublish}
         userCanEditOthers={articlePermissions.canEdit}
         isAdmin={isAdmin}
@@ -612,7 +721,10 @@ export default function ArticleDetailPage() {
       {/* Keyboard hint */}
       <div className="flex items-center gap-2 text-[11px] text-[var(--wk-text-faint)]">
         <WkIcon name="Command" size={11} />
-        <span>+S to save · Auto-saves every 10s · Last auto-saved: {lastAutosavedAt ? new Date(lastAutosavedAt).toLocaleTimeString() : "—"}</span>
+        <span>
+          +S to save · Auto-saves every 10s · Last auto-saved:{" "}
+          {lastAutosavedAt ? new Date(lastAutosavedAt).toLocaleTimeString() : "—"}
+        </span>
       </div>
 
       {/* Editor layout: content left, meta right */}
@@ -639,9 +751,9 @@ export default function ArticleDetailPage() {
             publishedAt={draft.publishedAt}
             seo={seoWithContent}
             slug={article.slug}
-            wpStatus={article.wp_status}
-            createdAt={article.created_at}
-            updatedAt={article.updated_at}
+            wpStatus={article.wpStatus}
+            createdAt={article.createdAt}
+            updatedAt={article.updatedAt}
             articleId={article.id}
             title={draft.title}
             excerpt={draft.excerpt}
@@ -649,7 +761,7 @@ export default function ArticleDetailPage() {
             isSaving={isSaving}
             isPublishing={isPublishing}
             lastAutosavedAt={lastAutosavedAt}
-            heroImageUrl={heroImageUrl}
+            heroImageUrl={article.heroImageUrl}
             isSavingHero={isSavingHero}
             onHeroImageSave={handleSaveHeroImage}
             onAuthorChange={(v) => patchDraft({ author: v })}
@@ -660,9 +772,92 @@ export default function ArticleDetailPage() {
             onRestoreDraft={handleRestoreDraft}
             onSlugChange={handleSlugChange}
             onInsertLink={handleInsertLink}
+            onSaveDraft={handleSaveDraft}
+            onPublish={handlePublish}
+            onUnpublish={handleUnpublish}
+            onDelete={() => setShowDeleteConfirm(true)}
+            onStatusChange={handleStatusChange}
+            previewUrl={previewUrl}
+            isGeneratingPreview={isGeneratingPreview}
+            onGeneratePreviewLink={handleGeneratePreviewLink}
           />
         </div>
       </div>
+
+      {/* Preview Modal */}
+      {showPreview && (
+        <ArticlePreviewModal
+          title={draft.title}
+          excerpt={draft.excerpt}
+          content={draft.content}
+          author={draft.author}
+          heroImageUrl={article.heroImageUrl}
+          publishedAt={draft.publishedAt}
+          tags={draft.tags}
+          categories={draft.categories}
+          onClose={() => setShowPreview(false)}
+        />
+      )}
+
+      {/* Publish Checklist Modal */}
+      {showPublishChecklist && (
+        <ArticlePublishChecklist
+          title={draft.title}
+          content={draft.content}
+          excerpt={draft.excerpt}
+          heroImageUrl={article.heroImageUrl}
+          seoTitle={(draft.seo?.title as string) || ""}
+          seoDescription={(draft.seo?.description as string) || ""}
+          publishedAt={draft.publishedAt}
+          categories={draft.categories}
+          onClose={() => setShowPublishChecklist(false)}
+          onPublishAnyway={handlePublishConfirm}
+          isPublishing={isPublishing}
+        />
+      )}
+
+      {/* ══════════════════════════════════
+          CONFLICT DETECTION MODAL
+          ══════════════════════════════════ */}
+      {showConflict && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="w-full max-w-md mx-4 rounded-2xl border border-wk-warning/30 bg-wk-surface p-6 shadow-lg">
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-wk-warning-soft text-wk-warning">
+              <WkIcon name="AlertTriangle" size={22} />
+            </div>
+            <h3 className="text-[16px] font-bold text-wk-text mb-2">Editing Conflict Detected</h3>
+            <p className="text-[13px] text-wk-text-muted mb-4">
+              {conflictError}
+            </p>
+            <p className="text-[12px] text-wk-text-soft bg-wk-bg-subtle rounded-lg px-3 py-2 mb-5 border border-wk-border/50">
+              <strong>What happened:</strong> The article was modified on the server after you opened this page.
+              If you save now, you might overwrite someone else&apos;s changes.
+            </p>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={handleConflictDiscard}
+                className="wk-button wk-button-secondary wk-button-sm w-full whitespace-nowrap"
+              >
+                <WkIcon name="RotateCcw" size={14} />
+                Discard My Changes &amp; Reload Latest
+              </button>
+              <button
+                onClick={handleConflictOverwrite}
+                className="wk-button wk-button-sm w-full whitespace-nowrap bg-wk-warning text-wk-brand-on hover:opacity-90 border border-wk-warning"
+              >
+                <WkIcon name="Save" size={14} />
+                Overwrite Anyway (Force Save)
+              </button>
+              <button
+                onClick={() => setShowConflict(false)}
+                className="text-[12px] text-wk-text-faint hover:text-wk-text transition-colors py-1 cursor-pointer"
+              >
+                Cancel — Keep Editing
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Recovery Modal */}
       {showRecovery && (
@@ -671,7 +866,9 @@ export default function ArticleDetailPage() {
             <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--wk-info-soft)] text-[var(--wk-info)]">
               <WkIcon name="Save" size={22} />
             </div>
-            <h3 className="text-[16px] font-bold text-[var(--wk-text)] mb-2">Unsaved Auto-saved Changes Found</h3>
+            <h3 className="text-[16px] font-bold text-[var(--wk-text)] mb-2">
+              Unsaved Auto-saved Changes Found
+            </h3>
             <p className="text-[13px] text-[var(--wk-text-muted)] mb-1">
               An auto-saved version (v{showRecovery.revisionNumber}) from{" "}
               {new Date(showRecovery.createdAt).toLocaleString()} is newer than the last manual save.
@@ -722,8 +919,8 @@ export default function ArticleDetailPage() {
             </div>
             <h3 className="text-[16px] font-bold text-[var(--wk-text)] mb-2">Move to Trash?</h3>
             <p className="text-[13px] text-[var(--wk-text-muted)] mb-5">
-              This will set the article status to &quot;trash&quot;. You can restore it later from
-              the database if needed.
+              This will set the article status to &quot;trash&quot;. You can restore it later from the
+              database if needed.
             </p>
             <div className="flex gap-3">
               <button
@@ -755,17 +952,13 @@ export default function ArticleDetailPage() {
               toast.type === "success"
                 ? "border-[var(--wk-success)]/20 bg-[var(--wk-success-soft)] text-[var(--wk-success)]"
                 : toast.type === "error"
-                ? "border-[var(--wk-danger)]/20 bg-[var(--wk-danger-soft)] text-[var(--wk-danger)]"
-                : "border-[var(--wk-info)]/20 bg-[var(--wk-info-soft)] text-[var(--wk-info)]"
+                  ? "border-[var(--wk-danger)]/20 bg-[var(--wk-danger-soft)] text-[var(--wk-danger)]"
+                  : "border-[var(--wk-info)]/20 bg-[var(--wk-info-soft)] text-[var(--wk-info)]"
             }`}
           >
             <WkIcon
               name={
-                toast.type === "success"
-                  ? "CheckCircle2"
-                  : toast.type === "error"
-                  ? "XCircle"
-                  : "Info"
+                toast.type === "success" ? "CheckCircle2" : toast.type === "error" ? "XCircle" : "Info"
               }
               size={16}
             />
@@ -775,17 +968,4 @@ export default function ArticleDetailPage() {
       </div>
     </div>
   );
-}
-
-/* ─── Helper: normalize WordPress taxonomy objects to strings ─── */
-
-function normalizeTaxonomyTerms(raw: unknown): string[] {
-  if (!Array.isArray(raw)) return [];
-  return raw.map((item) => {
-    if (typeof item === "string") return item;
-    if (typeof item === "object" && item !== null && "name" in item) {
-      return String((item as Record<string, unknown>).name ?? "");
-    }
-    return String(item);
-  }).filter(Boolean);
 }

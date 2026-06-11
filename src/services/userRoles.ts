@@ -204,7 +204,7 @@ export function getNavVisibility(role: UserRole): NavVisibility {
 
 export function getDefaultRoute(role: UserRole): string {
   if (userCan(role, "manage_users") || userCan(role, "view_dashboard")) return "/admin";
-  if (userCan(role, "view_charts_admin")) return "/admin/settings/charts/dashboard";
+  if (userCan(role, "view_charts_admin")) return "/admin/charts/dashboard";
   if (userCan(role, "view_registry")) return "/admin/registry/artists";
   if (userCan(role, "view_review_queue")) return "/admin/review/queue";
   if (userCan(role, "edit_own_articles")) return "/admin/content/articles";

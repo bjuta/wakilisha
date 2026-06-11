@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { useEffect, useState, useRef, useMemo } from "react";
+import { Link, useParams, useSearchParams, useNavigate } from "react-router-dom";
 import {
   useMagazineArticle,
   useMagazineArticles,
@@ -11,6 +11,10 @@ import { WkIcon } from "@/components/design-system/Icon";
 import { ArticleFloatHeader } from "./components/ArticleFloatHeader";
 import { ArticleRelated } from "./components/ArticleRelated";
 import { SkeletonArticlePage } from "@/components/skeletons/Skeletons";
+import {
+  checkArticleScheduling,
+  lookupSlugRedirect,
+} from "@/services/articles/articleAdminService";
 
 /* ─── Inline media gallery ─── */
 function InlineMediaGallery({ assets }: { assets: MediaAsset[] }) {
@@ -86,15 +90,24 @@ export default function ArticlePage() {
   const { slug } = useParams<{ slug: string }>();
   const [searchParams] = useSearchParams();
   const previewNonce = searchParams.get("preview");
+  const navigate = useNavigate();
 
   const { article, loading: articleLoading, error: articleError } = useMagazineArticle(slug, previewNonce);
   const { articles: allArticles } = useMagazineArticles();
 
   const [related, setRelated] = useState<MagazineArticle[]>([]);
   const [relatedLoading, setRelatedLoading] = useState(true);
-  const [progress, setProgress] = useState(0);
   const [scrolled, setScrolled] = useState(false);
   const [copyDone, setCopyDone] = useState(false);
+  const progressBarRef = useRef<HTMLDivElement>(null);
+  const lastScrollState = useRef(false);
+
+  // Memoize contentHtml so React never touches the embed iframes on re-render
+  const stableContentHtml = useMemo(() => article?.contentHtml ?? '', [article?.contentHtml]);
+
+  const [isScheduled, setIsScheduled] = useState(false);
+  const [scheduledDate, setScheduledDate] = useState<string | null>(null);
+  const [checkingRedirect, setCheckingRedirect] = useState(false);
 
   useEffect(() => {
     if (!article) return;
@@ -113,16 +126,68 @@ export default function ArticlePage() {
     return () => { alive = false; };
   }, [article, allArticles]);
 
+  // Check if article is scheduled (future publish date)
   useEffect(() => {
+    if (!slug) return;
+    let alive = true;
+    checkArticleScheduling(slug)
+      .then((result) => {
+        if (!alive || !result) return;
+        if (result.isScheduled && result.scheduledDate) {
+          setIsScheduled(true);
+          setScheduledDate(result.scheduledDate);
+        }
+      })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [slug]);
+
+  // Check for slug redirects when article not found
+  useEffect(() => {
+    if (articleLoading || article || !slug) return;
+    let alive = true;
+    setCheckingRedirect(true);
+    lookupSlugRedirect(slug)
+      .then((newSlug) => {
+        if (!alive) return;
+        if (newSlug) {
+          navigate(`/magazine/${newSlug}`, { replace: true });
+        }
+        setCheckingRedirect(false);
+      })
+      .catch(() => {
+        if (alive) setCheckingRedirect(false);
+      });
+    return () => { alive = false; };
+  }, [slug, articleLoading, article, navigate]);
+
+  useEffect(() => {
+    let rafId: number | null = null;
     const onScroll = () => {
-      const doc = document.documentElement;
-      const max = doc.scrollHeight - window.innerHeight;
-      setProgress(max > 0 ? window.scrollY / max : 0);
-      setScrolled(window.scrollY > window.innerHeight * 0.55);
+      if (rafId !== null) return;
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        const doc = document.documentElement;
+        const max = doc.scrollHeight - window.innerHeight;
+        // Update progress bar via ref — zero re-renders
+        if (progressBarRef.current) {
+          const pct = max > 0 ? window.scrollY / max : 0;
+          (progressBarRef.current.firstChild as HTMLElement).style.transform = `scaleX(${pct})`;
+        }
+        // Only call setScrolled when the threshold actually crosses
+        const nowScrolled = window.scrollY > window.innerHeight * 0.55;
+        if (nowScrolled !== lastScrollState.current) {
+          lastScrollState.current = nowScrolled;
+          setScrolled(nowScrolled);
+        }
+      });
     };
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (rafId !== null) cancelAnimationFrame(rafId);
+    };
   }, []);
 
   const handleNavCopy = () => {
@@ -134,6 +199,17 @@ export default function ArticlePage() {
   /* Loading / error states */
   if (articleLoading) {
     return <SkeletonArticlePage />;
+  }
+
+  if (checkingRedirect) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="flex items-center gap-3 text-[var(--wk-text-muted)]">
+          <i className="ri-loader-4-line animate-spin text-[20px]" />
+          <span className="text-[14px]">Checking for updated link…</span>
+        </div>
+      </div>
+    );
   }
 
   if (articleError) {
@@ -158,11 +234,45 @@ export default function ArticlePage() {
     );
   }
 
+  /* ─── Scheduled article (coming soon) ─── */
+  if (isScheduled) {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-[var(--wk-bg)]">
+        <div className="text-center max-w-md mx-auto px-6">
+          <div className="flex h-16 w-16 items-center justify-center mx-auto mb-5 rounded-2xl bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]">
+            <WkIcon name="CalendarClock" size={28} />
+          </div>
+          <h1 className="text-[22px] font-black text-[var(--wk-text)] mb-2">Coming Soon</h1>
+          <p className="text-[14px] text-[var(--wk-text-muted)] mb-1">
+            This article is scheduled and will be published on:
+          </p>
+          <p className="text-[16px] font-bold text-[var(--wk-brand)] mb-5">
+            {scheduledDate ? new Date(scheduledDate).toLocaleDateString("en-US", {
+              weekday: "long",
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+            }) : "soon"}
+          </p>
+          <Link
+            to="/magazine"
+            className="inline-flex items-center gap-2 rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] px-5 py-2.5 text-[13px] font-bold text-[var(--wk-text-soft)] hover:border-[var(--wk-brand)] hover:text-[var(--wk-brand)] transition-all whitespace-nowrap"
+          >
+            <WkIcon name="ArrowLeft" size={14} />
+            Back to Magazine
+          </Link>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-[var(--wk-bg)]">
-      {/* Reading progress */}
-      <div className="article-progress">
-        <span style={{ transform: `scaleX(${progress})` }} />
+      {/* Reading progress — driven by ref, zero re-renders */}
+      <div className="article-progress" ref={progressBarRef}>
+        <span style={{ transform: "scaleX(0)" }} />
       </div>
 
       {/* Sticky mini-header — slides in after scroll */}
@@ -258,27 +368,52 @@ export default function ArticlePage() {
         <article className="max-w-[740px] mx-auto px-6 lg:px-8 pb-12">
           <div
             className="article-content-v2"
-            dangerouslySetInnerHTML={{ __html: article.contentHtml }}
+            dangerouslySetInnerHTML={{ __html: stableContentHtml }}
           />
           <InlineMediaGallery assets={article.mediaAssets} />
         </article>
 
-        {/* Tags + bottom share */}
+        {/* Tags + Categories */}
         <div className="max-w-[740px] mx-auto px-6 lg:px-8 pb-16">
+          {article.categories?.length > 0 && (
+            <div className="mb-6">
+              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--wk-text-faint)] mb-3">
+                Categories
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {article.categories.map((cat) => {
+                  const catSlug = cat.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+                  return (
+                    <Link
+                      key={cat}
+                      to={`/categories/${catSlug}`}
+                      className="px-3 py-1.5 rounded-full border border-[var(--wk-border)] text-[11px] font-semibold text-[var(--wk-text-soft)] hover:border-[var(--wk-brand)] hover:text-[var(--wk-brand)] cursor-pointer transition-all"
+                    >
+                      {cat}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           {article.tags?.length > 0 && (
             <div className="mb-8">
               <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--wk-text-faint)] mb-3">
                 Topics
               </p>
               <div className="flex flex-wrap gap-2">
-                {article.tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="px-3 py-1.5 rounded-full border border-[var(--wk-border)] text-[11px] font-semibold text-[var(--wk-text-soft)] hover:border-[var(--wk-brand)] hover:text-[var(--wk-brand)] cursor-pointer transition-all"
-                  >
-                    {tag}
-                  </span>
-                ))}
+                {article.tags.map((tag) => {
+                  const tagSlug = tag.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+                  return (
+                    <Link
+                      key={tag}
+                      to={`/tags/${tagSlug}`}
+                      className="px-3 py-1.5 rounded-full border border-[var(--wk-border)] text-[11px] font-semibold text-[var(--wk-text-soft)] hover:border-[var(--wk-brand)] hover:text-[var(--wk-brand)] cursor-pointer transition-all"
+                    >
+                      {tag}
+                    </Link>
+                  );
+                })}
               </div>
             </div>
           )}

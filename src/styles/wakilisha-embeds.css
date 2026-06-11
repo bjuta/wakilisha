@@ -1,0 +1,152 @@
+/* ─── Rich Media Embeds — Article Content ─── */
+
+/* Shared embed figure wrapper */
+.article-content-v2 .wk-embed,
+.article-content-v2-mobile .wk-embed {
+  margin: 40px 0;
+  border-radius: var(--wk-r-4);
+  overflow: hidden;
+  background: var(--wk-surface-raised, #0d0d0d);
+}
+
+/* 16:9 aspect-ratio container for video embeds */
+.wk-embed__ratio {
+  position: relative;
+  width: 100%;
+}
+
+.wk-embed__ratio--16x9 {
+  padding-top: 56.25%;
+}
+
+.wk-embed__ratio iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+/* Spotify & SoundCloud — no ratio wrapper needed */
+.wk-embed--spotify,
+.wk-embed--soundcloud {
+  background: transparent;
+}
+
+.wk-embed--spotify iframe,
+.wk-embed--soundcloud iframe {
+  border-radius: var(--wk-r-3);
+}
+
+/* Apple Music */
+.wk-embed--applemusic {
+  background: transparent;
+}
+
+.wk-embed--applemusic iframe {
+  border-radius: var(--wk-r-3);
+}
+
+/* ─── Internal Entity Link Cards ─── */
+
+.wk-entity-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  margin: 24px 0;
+  border-radius: var(--wk-r-4);
+  border: 1px solid var(--wk-border);
+  background: var(--wk-surface);
+  text-decoration: none !important;
+  transition: all 0.25s var(--wk-ease-snap);
+  cursor: pointer;
+}
+
+.wk-entity-link:hover {
+  border-color: var(--wk-brand);
+  transform: translateY(-2px);
+}
+
+.wk-entity-link__badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font: 800 9px / 1 var(--wk-font-ui);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+/* Color each entity type differently */
+.wk-entity-link--track .wk-entity-link__badge {
+  background: color-mix(in srgb, var(--wk-brand) 12%, transparent);
+  color: var(--wk-brand);
+}
+
+.wk-entity-link--artist .wk-entity-link__badge {
+  background: color-mix(in srgb, var(--wk-accent-500, #d97706) 14%, transparent);
+  color: var(--wk-accent-500, #d97706);
+}
+
+.wk-entity-link--release .wk-entity-link__badge {
+  background: color-mix(in srgb, var(--wk-secondary-500, #059669) 14%, transparent);
+  color: var(--wk-secondary-500, #059669);
+}
+
+.wk-entity-link--genre .wk-entity-link__badge {
+  background: color-mix(in srgb, var(--wk-text-muted) 12%, transparent);
+  color: var(--wk-text-muted);
+}
+
+.wk-entity-link--label .wk-entity-link__badge {
+  background: color-mix(in srgb, var(--wk-text-muted) 12%, transparent);
+  color: var(--wk-text-muted);
+}
+
+.wk-entity-link--chart .wk-entity-link__badge {
+  background: color-mix(in srgb, var(--wk-brand) 12%, transparent);
+  color: var(--wk-brand);
+}
+
+.wk-entity-link--article .wk-entity-link__badge {
+  background: color-mix(in srgb, var(--wk-brand) 12%, transparent);
+  color: var(--wk-brand);
+}
+
+.wk-entity-link__text {
+  font: 600 14px / 1.4 var(--wk-font-body);
+  color: var(--wk-text);
+  flex: 1;
+  min-width: 0;
+}
+
+.wk-entity-link__arrow {
+  display: flex;
+  align-items: center;
+  color: var(--wk-text-faint);
+  font-size: 16px;
+  flex-shrink: 0;
+  transition: transform 0.25s var(--wk-ease-snap), color 0.25s var(--wk-ease-standard);
+}
+
+.wk-entity-link:hover .wk-entity-link__arrow {
+  transform: translateX(4px);
+  color: var(--wk-brand);
+}
+
+/* Compact variant for mobile */
+@media (max-width: 640px) {
+  .wk-entity-link {
+    padding: 14px 16px;
+    gap: 10px;
+  }
+  .wk-entity-link__text {
+    font-size: 13px;
+  }
+  .article-content-v2 .wk-embed,
+  .article-content-v2-mobile .wk-embed {
+    margin: 28px 0;
+  }
+}

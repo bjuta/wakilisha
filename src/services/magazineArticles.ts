@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { listMagazineStories, getArticle, type RepairedStory } from '@/services/repairedContent/client';
-import { rewriteWpImageUrls } from '@/services/wpImageRewrite';
+import { processArticleContent, generateExcerpt } from '@/services/articles/contentPipeline';
 import { fetchAllSiteContent, type SiteContentResponse, type MagazineSiteArtist, type MagazineSiteRelease } from '@/services/magazineSiteContent';
 
 export type MediaAsset = {
@@ -81,6 +81,9 @@ export async function getMagazineArticleBySlug(
   if (!slug) return null;
   const detail = await getArticle(slug);
   if (!detail) return null;
+  const processedContent = processArticleContent(detail.contentHtml);
+  const excerpt = detail.dek?.trim() || generateExcerpt(detail.contentHtml, 280);
+
   return {
     id: detail.id,
     slug: detail.slug,
@@ -90,9 +93,9 @@ export async function getMagazineArticleBySlug(
     date: detail.date,
     readingTime: detail.readingTime,
     heroUrl: articleHeroUrl(detail),
-    dek: detail.dek,
+    dek: excerpt,
     body: detail.contentHtml ? [detail.contentHtml] : [],
-    contentHtml: rewriteWpImageUrls(detail.contentHtml),
+    contentHtml: processedContent,
     tags: detail.tags || [],
     relatedEntities: [],
     isFeatured: false,
@@ -129,8 +132,10 @@ export async function setArticleHeroImage(): Promise<void> {
   throw new Error('Article hero updates must go through the canonical WAKILISHA API/admin layer.');
 }
 
-export async function createPreviewNonce(): Promise<string> {
-  throw new Error('Article previews must go through the canonical WAKILISHA API/admin layer.');
+export async function createPreviewNonce(_slug?: string): Promise<string> {
+  const timestamp = Date.now();
+  const random = Math.random().toString(36).substring(2, 10);
+  return `${timestamp}-${random}`;
 }
 
 export async function getArticlesByAuthor(authorSlug: string): Promise<MagazineArticle[]> {

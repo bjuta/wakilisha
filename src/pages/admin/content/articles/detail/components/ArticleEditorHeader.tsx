@@ -14,6 +14,7 @@ interface Props {
   onUnpublish: () => void;
   onDelete: () => void;
   onPreview: () => void;
+  onSubmitForReview: () => void;
   userCanPublish?: boolean;
   userCanEditOthers?: boolean;
   isAdmin?: boolean;
@@ -48,6 +49,7 @@ export function ArticleEditorHeader({
   onUnpublish,
   onDelete,
   onPreview,
+  onSubmitForReview,
   userCanPublish = true,
   userCanEditOthers = true,
   isAdmin = false,
@@ -57,6 +59,7 @@ export function ArticleEditorHeader({
   const navigate = useNavigate();
   const statusColor = status ? (STATUS_COLORS[status] ?? STATUS_COLORS.draft) : STATUS_COLORS.draft;
   const isPublished = status === "publish";
+  const isFuture = status === "future";
 
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -187,14 +190,32 @@ export function ArticleEditorHeader({
         {isPublished ? (
           userCanPublish ? (
             <button
-              onClick={onUnpublish}
+              onClick={onPublish}
               disabled={isSaving || isPublishing}
-              className="wk-button wk-button-secondary wk-button-sm whitespace-nowrap"
+              className="wk-button wk-button-primary wk-button-sm whitespace-nowrap"
             >
-              <WkIcon name="EyeOff" size={14} />
-              Unpublish
+              {isPublishing ? (
+                <>
+                  <WkIcon name="Loader2" size={14} className="animate-spin" />
+                  Updating…
+                </>
+              ) : (
+                <>
+                  <WkIcon name="RefreshCw" size={14} />
+                  Update
+                </>
+              )}
             </button>
           ) : null
+        ) : isFuture ? (
+          <button
+            onClick={onUnpublish}
+            disabled={isSaving || isPublishing}
+            className="wk-button wk-button-secondary wk-button-sm whitespace-nowrap"
+          >
+            <WkIcon name="EyeOff" size={14} />
+            Unschedule
+          </button>
         ) : userCanPublish ? (
           <button
             onClick={onPublish}
@@ -215,7 +236,7 @@ export function ArticleEditorHeader({
           </button>
         ) : (
           <button
-            onClick={onSaveDraft}
+            onClick={onSubmitForReview}
             disabled={isSaving}
             className="wk-button wk-button-secondary wk-button-sm whitespace-nowrap"
           >

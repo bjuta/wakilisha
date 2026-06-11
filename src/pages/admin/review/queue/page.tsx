@@ -257,7 +257,7 @@ export default function AdminReviewQueuePage() {
         <div className="flex flex-wrap items-center gap-2">
           <button onClick={() => setPanel("registry")} className="wk-button wk-button-primary wk-button-sm whitespace-nowrap"><WkIcon name="GitPullRequest" size={14} /> Registry Queue</button>
           <button onClick={() => navigate("/admin/imports/review-artifacts")} className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap"><WkIcon name="Archive" size={14} /> Artifacts</button>
-          <button onClick={() => navigate("/admin/settings/charts/review-queue")} className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap"><WkIcon name="ArrowRight" size={14} /> Charts Review</button>
+          <button onClick={() => navigate("/admin/charts/review-queue")} className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap"><WkIcon name="ArrowRight" size={14} /> Charts Review</button>
         </div>
       </div>
 

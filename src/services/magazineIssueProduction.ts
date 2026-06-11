@@ -194,29 +194,21 @@ export const magazineIssueProduction = {
     brief_id?: string;
   }): Promise<MagazineIssue> {
     const id = `issue-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    const now = new Date().toISOString();
 
     const { data, error } = await supabase
-      .from("wk_magazine_issues")
-      .insert({
-        id,
-        slug: params.slug,
-        title: params.title,
-        dek: params.dek ?? null,
-        status: "draft",
-        timeframe_start: params.timeframe_start ?? null,
-        timeframe_end: params.timeframe_end ?? null,
-        issue_type: params.issue_type ?? "standard",
-        brief_id: params.brief_id ?? null,
-        created_by: "Admin",
-        created_at: now,
-        updated_at: now,
-      })
-      .select()
-      .single();
+      .rpc("create_magazine_issue", {
+        p_id: id,
+        p_slug: params.slug,
+        p_title: params.title,
+        p_dek: params.dek ?? null,
+        p_timeframe_start: params.timeframe_start ?? "",
+        p_timeframe_end: params.timeframe_end ?? "",
+        p_issue_type: params.issue_type ?? "standard",
+        p_brief_id: params.brief_id ?? "",
+      });
 
     if (error) throw error;
-    return data;
+    return data as unknown as MagazineIssue;
   },
 
   async updateIssue(id: string, updates: Partial<MagazineIssue>): Promise<MagazineIssue> {

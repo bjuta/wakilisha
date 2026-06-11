@@ -78,14 +78,14 @@ export default function AdminDashboardPage() {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => navigate("/admin/settings/charts/ingest")}
+            onClick={() => navigate("/admin/charts/ingest")}
             className="wk-button wk-button-primary wk-button-sm whitespace-nowrap"
           >
             <WkIcon name="Plus" size={14} />
             New Ingest
           </button>
           <button
-            onClick={() => navigate("/admin/settings/charts/ingest-health")}
+            onClick={() => navigate("/admin/charts/ingest-health")}
             className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap"
           >
             <WkIcon name="HeartPulse" size={14} />

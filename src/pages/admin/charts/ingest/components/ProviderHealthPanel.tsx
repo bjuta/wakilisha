@@ -115,7 +115,7 @@ export function ProviderHealthPanel() {
       )}
 
       <button
-        onClick={() => navigate("/admin/settings/charts/ingest-health")}
+        onClick={() => navigate("/admin/charts/ingest-health")}
         className="mt-3 w-full text-[11px] font-semibold text-wk-brand hover:underline text-left"
       >
         <i className="ri-external-link-line mr-1" />Full API Health &amp; Endpoint Map

@@ -36,7 +36,7 @@ import { IngestSidebar } from "./components/IngestSidebar";
 import { IngestStatusStack } from "./components/IngestStatusStack";
 import { Stepper, type IngestStudioStep } from "./components/Stepper";
 
-const ADMIN_CHARTS_BASE = "/admin/settings/charts";
+const ADMIN_CHARTS_BASE = "/admin/charts";
 
 function toBackendCommitResponse(result: any): BackendCommitResponse {
   return {

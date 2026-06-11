@@ -1,4 +1,10 @@
 import { useEffect, useRef, useState, useCallback } from "react";
+import { useEditor, EditorContent } from "@tiptap/react";
+import StarterKit from "@tiptap/starter-kit";
+import Underline from "@tiptap/extension-underline";
+import LinkExtension from "@tiptap/extension-link";
+import ImageExtension from "@tiptap/extension-image";
+import Placeholder from "@tiptap/extension-placeholder";
 import { WkIcon } from "@/components/design-system/Icon";
 import { MediaPickerModal } from "@/components/admin/MediaPickerModal";
 
@@ -10,7 +16,7 @@ interface ToolbarButton {
   command: string;
   icon: string;
   label: string;
-  value?: string;
+  level?: number;
   isBlock?: boolean;
 }
 
@@ -28,26 +34,26 @@ const TEXT_FORMAT: ToolbarButton[] = [
   { command: "bold", icon: "Bold", label: "Bold" },
   { command: "italic", icon: "Italic", label: "Italic" },
   { command: "underline", icon: "Underline", label: "Underline" },
-  { command: "strikeThrough", icon: "Strikethrough", label: "Strikethrough" },
+  { command: "strike", icon: "Strikethrough", label: "Strikethrough" },
 ];
 
 const HEADINGS: ToolbarButton[] = [
-  { command: "formatBlock", icon: "Heading1", label: "Heading 1", value: "H1" },
-  { command: "formatBlock", icon: "Heading2", label: "Heading 2", value: "H2" },
-  { command: "formatBlock", icon: "Heading3", label: "Heading 3", value: "H3" },
-  { command: "formatBlock", icon: "Type", label: "Paragraph", value: "P" },
+  { command: "heading", icon: "Heading1", label: "Heading 1", level: 1 },
+  { command: "heading", icon: "Heading2", label: "Heading 2", level: 2 },
+  { command: "heading", icon: "Heading3", label: "Heading 3", level: 3 },
+  { command: "paragraph", icon: "Type", label: "Paragraph" },
 ];
 
 const LISTS: ToolbarButton[] = [
-  { command: "insertUnorderedList", icon: "List", label: "Bullet List" },
-  { command: "insertOrderedList", icon: "ListOrdered", label: "Numbered List" },
-  { command: "outdent", icon: "Outdent", label: "Outdent" },
-  { command: "indent", icon: "Indent", label: "Indent" },
+  { command: "bulletList", icon: "List", label: "Bullet List" },
+  { command: "orderedList", icon: "ListOrdered", label: "Numbered List" },
+  { command: "liftListItem", icon: "Outdent", label: "Outdent" },
+  { command: "sinkListItem", icon: "Indent", label: "Indent" },
 ];
 
 const INSERT: ToolbarButton[] = [
-  { command: "insertHorizontalRule", icon: "Minus", label: "Horizontal Rule" },
-  { command: "insertHTML", icon: "Code", label: "Code Block", isBlock: true },
+  { command: "horizontalRule", icon: "Minus", label: "Horizontal Rule" },
+  { command: "codeBlock", icon: "Code", label: "Code Block", isBlock: true },
   { command: "blockquote", icon: "Quote", label: "Blockquote", isBlock: true },
 ];
 
@@ -62,7 +68,6 @@ interface Props {
 
 export function RichTextEditor({ value, onChange, placeholder, minHeight = 500 }: Props) {
   const [viewMode, setViewMode] = useState<ViewMode>("visual");
-  const [activeCommands, setActiveCommands] = useState<Set<string>>(new Set());
   const [linkPopup, setLinkPopup] = useState<LinkPopupState>({
     visible: false,
     url: "",
@@ -72,270 +77,260 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 500 }
   });
   const [imagePickerOpen, setImagePickerOpen] = useState(false);
 
-  const editorRef = useRef<HTMLDivElement>(null);
   const htmlRef = useRef<HTMLTextAreaElement>(null);
-  const linkPopupRef = useRef<HTMLDivElement>(null);
   const isInternalUpdate = useRef(false);
+  const toolbarRef = useRef<HTMLDivElement>(null);
 
-  /* ─── Sync HTML → Editor ─── */
+  /* ─── TipTap Editor ─── */
+
+  const editor = useEditor({
+    extensions: [
+      StarterKit.configure({
+        heading: {
+          levels: [1, 2, 3],
+        },
+      }),
+      Underline,
+      LinkExtension.configure({
+        openOnClick: false,
+        HTMLAttributes: {
+          rel: "noopener noreferrer",
+          target: "_blank",
+          class: "wk-rich-link",
+        },
+      }),
+      ImageExtension.configure({
+        HTMLAttributes: {
+          class: "wk-rich-image",
+        },
+      }),
+      Placeholder.configure({
+        placeholder: placeholder || "Start writing your article...",
+      }),
+    ],
+    content: value || "",
+    editorProps: {
+      attributes: {
+        class:
+          "prose prose-sm max-w-none outline-none focus:outline-none min-h-[var(--editor-min-h)]",
+      },
+      handleKeyDown: (_view, event) => {
+        if ((event.metaKey || event.ctrlKey) && event.key === "k") {
+          event.preventDefault();
+          handleLinkButton();
+          return true;
+        }
+        return false;
+      },
+    },
+    onUpdate: ({ editor: ed }) => {
+      isInternalUpdate.current = true;
+      onChange(ed.getHTML());
+    },
+  });
+
+  /* ─── Sync external value changes into editor ─── */
+
   useEffect(() => {
-    if (!editorRef.current) return;
+    if (!editor) return;
     if (isInternalUpdate.current) {
       isInternalUpdate.current = false;
       return;
     }
-    const editor = editorRef.current;
-    if (editor.innerHTML !== value) {
-      editor.innerHTML = value || "";
+    const currentHTML = editor.getHTML();
+    // Only update if the value actually differs (avoid unnecessary re-renders)
+    if (currentHTML !== value) {
+      editor.commands.setContent(value || "", false);
     }
-  }, [value]);
+  }, [value, editor]);
 
-  /* ─── Content change handler ─── */
-  const handleEditorChange = useCallback(() => {
-    if (!editorRef.current) return;
-    const html = editorRef.current.innerHTML;
-    isInternalUpdate.current = true;
-    onChange(html);
-  }, [onChange]);
+  /* ─── Toolbar command dispatcher ─── */
 
-  /* ─── Track active commands on selection change ─── */
-  const updateActiveCommands = useCallback(() => {
-    const active = new Set<string>();
-    if (typeof document !== "undefined") {
-      try {
-        [
-          "bold",
-          "italic",
-          "underline",
-          "strikeThrough",
-          "insertUnorderedList",
-          "insertOrderedList",
-        ].forEach((cmd) => {
-          if (document.queryCommandState(cmd)) {
-            active.add(cmd);
-          }
-        });
-        const blockValue = document.queryCommandValue("formatBlock");
-        if (blockValue) {
-          active.add(`formatBlock:${blockValue.toUpperCase()}`);
-        }
-      } catch {
-        // ignore
-      }
-    }
-    setActiveCommands(active);
-  }, []);
-
-  useEffect(() => {
-    const handleSelectionChange = () => {
-      if (document.activeElement === editorRef.current) {
-        updateActiveCommands();
-      }
-    };
-    document.addEventListener("selectionchange", handleSelectionChange);
-    return () => document.removeEventListener("selectionchange", handleSelectionChange);
-  }, [updateActiveCommands]);
-
-  /* ─── Toolbar action ─── */
   const execCommand = useCallback(
-    (command: string, value?: string, isBlock?: boolean) => {
-      if (!editorRef.current) return;
-      editorRef.current.focus();
+    (btn: ToolbarButton) => {
+      if (!editor) return;
+      editor.commands.focus();
 
-      if (command === "insertHTML" && isBlock) {
-        // Insert code block
-        const code = "<pre><code>// your code here</code></pre>";
-        document.execCommand("insertHTML", false, code);
-      } else if (command === "blockquote") {
-        const selection = window.getSelection();
-        if (!selection || selection.rangeCount === 0) return;
-        const range = selection.getRangeAt(0);
-        const blockquote = document.createElement("blockquote");
-        try {
-          blockquote.appendChild(range.extractContents());
-          range.insertNode(blockquote);
-          // Move cursor after blockquote
-          const newRange = document.createRange();
-          newRange.setStartAfter(blockquote);
-          newRange.collapse(true);
-          selection.removeAllRanges();
-          selection.addRange(newRange);
-        } catch {
-          document.execCommand("formatBlock", false, "blockquote");
-        }
-      } else if (command === "insertHTML") {
-        document.execCommand("insertHTML", false, value || "");
-      } else {
-        document.execCommand(command, false, value);
+      switch (btn.command) {
+        case "bold":
+          editor.chain().focus().toggleBold().run();
+          break;
+        case "italic":
+          editor.chain().focus().toggleItalic().run();
+          break;
+        case "underline":
+          editor.chain().focus().toggleUnderline().run();
+          break;
+        case "strike":
+          editor.chain().focus().toggleStrike().run();
+          break;
+        case "heading":
+          editor.chain().focus().toggleHeading({ level: btn.level as 1 | 2 | 3 }).run();
+          break;
+        case "paragraph":
+          editor.chain().focus().setParagraph().run();
+          break;
+        case "bulletList":
+          editor.chain().focus().toggleBulletList().run();
+          break;
+        case "orderedList":
+          editor.chain().focus().toggleOrderedList().run();
+          break;
+        case "liftListItem":
+          editor.chain().focus().liftListItem("listItem").run();
+          break;
+        case "sinkListItem":
+          editor.chain().focus().sinkListItem("listItem").run();
+          break;
+        case "horizontalRule":
+          editor.chain().focus().setHorizontalRule().run();
+          break;
+        case "codeBlock":
+          editor.chain().focus().toggleCodeBlock().run();
+          break;
+        case "blockquote":
+          editor.chain().focus().toggleBlockquote().run();
+          break;
+        case "undo":
+          editor.chain().focus().undo().run();
+          break;
+        case "redo":
+          editor.chain().focus().redo().run();
+          break;
+        case "clearMarks":
+          editor.chain().focus().unsetAllMarks().clearNodes().run();
+          break;
+        default:
+          break;
       }
-
-      handleEditorChange();
-      setTimeout(updateActiveCommands, 0);
     },
-    [handleEditorChange, updateActiveCommands]
+    [editor]
+  );
+
+  /* ─── Active state check ─── */
+
+  const isActive = useCallback(
+    (btn: ToolbarButton): boolean => {
+      if (!editor) return false;
+      switch (btn.command) {
+        case "bold":
+          return editor.isActive("bold");
+        case "italic":
+          return editor.isActive("italic");
+        case "underline":
+          return editor.isActive("underline");
+        case "strike":
+          return editor.isActive("strike");
+        case "heading":
+          return editor.isActive("heading", { level: btn.level });
+        case "paragraph":
+          return editor.isActive("paragraph");
+        case "bulletList":
+          return editor.isActive("bulletList");
+        case "orderedList":
+          return editor.isActive("orderedList");
+        case "codeBlock":
+          return editor.isActive("codeBlock");
+        case "blockquote":
+          return editor.isActive("blockquote");
+        default:
+          return false;
+      }
+    },
+    [editor]
   );
 
   /* ─── Image insertion ─── */
-  const handleInsertImage = useCallback((url: string) => {
-    if (!editorRef.current || !url) return;
-    editorRef.current.focus();
 
-    const selection = window.getSelection();
-    if (selection && selection.rangeCount > 0) {
-      const range = selection.getRangeAt(0);
-      const img = document.createElement("img");
-      img.src = url;
-      img.alt = "";
-      img.style.maxWidth = "100%";
-      img.style.borderRadius = "8px";
-      img.style.margin = "16px 0";
-      img.style.display = "block";
-      range.deleteContents();
-      range.insertNode(img);
-
-      // Move cursor after image
-      const newRange = document.createRange();
-      newRange.setStartAfter(img);
-      newRange.collapse(true);
-      selection.removeAllRanges();
-      selection.addRange(newRange);
-    } else {
-      document.execCommand("insertHTML", false, `<img src="${url}" alt="" style="max-width:100%;border-radius:8px;margin:16px 0;display:block;" />`);
-    }
-
-    setImagePickerOpen(false);
-    handleEditorChange();
-  }, [handleEditorChange]);
+  const handleInsertImage = useCallback(
+    (url: string) => {
+      if (!editor || !url) return;
+      editor.chain().focus().setImage({ src: url, alt: "" }).run();
+      setImagePickerOpen(false);
+    },
+    [editor]
+  );
 
   /* ─── Link handling ─── */
+
   const handleLinkButton = useCallback(() => {
-    const selection = window.getSelection();
-    if (!selection || selection.rangeCount === 0) return;
+    if (!editor) return;
 
-    const selectedText = selection.toString();
-    const range = selection.getRangeAt(0);
-    const rect = range.getBoundingClientRect();
+    const previousUrl = editor.getAttributes("link").href as string | undefined;
+    const { from, to } = editor.state.selection;
+    const selectedText = editor.state.doc.textBetween(from, to, " ");
 
-    // Check if we're inside an existing link
-    let currentLink: HTMLAnchorElement | null = null;
-    let node = selection.anchorNode as Node | null;
-    while (node && node !== editorRef.current) {
-      if (node instanceof HTMLAnchorElement) {
-        currentLink = node;
-        break;
-      }
-      node = node.parentNode;
-    }
+    // Get position for popup placement
+    const editorDom = editor.view.dom;
+    const editorRect = editorDom.getBoundingClientRect();
+    const toolbarRect = toolbarRef.current?.getBoundingClientRect();
+
+    // Use selection coordinates if available, otherwise fall back to editor center
+    const coords = editor.view.coordsAtPos(from);
+    const popupX = coords ? coords.left : editorRect.left + editorRect.width / 2;
+    const popupY = coords ? coords.top - 60 : (toolbarRect?.bottom ?? editorRect.top) + 8;
 
     setLinkPopup({
       visible: true,
-      url: currentLink ? currentLink.href : "",
-      text: selectedText || (currentLink ? currentLink.textContent || "" : ""),
-      x: rect.left + rect.width / 2,
-      y: rect.top - 60,
+      url: previousUrl || "",
+      text: selectedText || "",
+      x: popupX,
+      y: popupY,
     });
-  }, []);
+  }, [editor]);
 
   const insertLink = useCallback(() => {
-    if (!editorRef.current || !linkPopup.url) return;
-    editorRef.current.focus();
+    if (!editor || !linkPopup.url) return;
 
-    const selection = window.getSelection();
-    if (selection && selection.rangeCount > 0) {
-      const range = selection.getRangeAt(0);
+    const displayText = linkPopup.text || linkPopup.url;
 
-      // Remove existing link if inside one
-      let node = selection.anchorNode as Node | null;
-      while (node && node !== editorRef.current) {
-        if (node instanceof HTMLAnchorElement) {
-          const parent = node.parentNode;
-          if (parent) {
-            while (node.firstChild) {
-              parent.insertBefore(node.firstChild, node);
-            }
-            parent.removeChild(node);
-          }
-          break;
-        }
-        node = node.parentNode;
-      }
+    // If there's selected text, we extend the mark range and set the link
+    const { from, to } = editor.state.selection;
+    const hasSelection = from !== to;
 
-      // Restore selection
-      selection.removeAllRanges();
-      selection.addRange(range);
+    if (hasSelection) {
+      editor
+        .chain()
+        .focus()
+        .extendMarkRange("link")
+        .setLink({ href: linkPopup.url })
+        .run();
+    } else {
+      // No selection — insert link text then set link on it
+      editor
+        .chain()
+        .focus()
+        .insertContent(displayText)
+        .command(({ tr, state }) => {
+          const pos = state.selection.from;
+          tr.insertText(displayText, pos - displayText.length);
+          return true;
+        })
+        .run();
 
-      // Create and insert new link
-      const link = document.createElement("a");
-      link.href = linkPopup.url;
-      link.textContent = linkPopup.text || linkPopup.url;
-      link.target = "_blank";
-      link.rel = "noopener noreferrer";
-      link.style.color = "var(--wk-brand)";
-      link.style.textDecoration = "underline";
-      range.deleteContents();
-      range.insertNode(link);
-
-      // Move cursor after link
-      const newRange = document.createRange();
-      newRange.setStartAfter(link);
-      newRange.collapse(true);
-      selection.removeAllRanges();
-      selection.addRange(newRange);
+      // Now set link on the inserted text
+      editor
+        .chain()
+        .focus()
+        .setTextSelection({
+          from: editor.state.selection.from - displayText.length,
+          to: editor.state.selection.from,
+        })
+        .setLink({ href: linkPopup.url })
+        .setTextSelection(editor.state.selection.from)
+        .run();
     }
 
     setLinkPopup((prev) => ({ ...prev, visible: false }));
-    handleEditorChange();
-  }, [linkPopup, handleEditorChange]);
+  }, [editor, linkPopup]);
 
   const unlink = useCallback(() => {
-    document.execCommand("unlink", false);
-    handleEditorChange();
-  }, [handleEditorChange]);
-
-  /* ─── Keyboard shortcuts ─── */
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "b") {
-        e.preventDefault();
-        execCommand("bold");
-      } else if ((e.metaKey || e.ctrlKey) && e.key === "i") {
-        e.preventDefault();
-        execCommand("italic");
-      } else if ((e.metaKey || e.ctrlKey) && e.key === "u") {
-        e.preventDefault();
-        execCommand("underline");
-      } else if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-        e.preventDefault();
-        handleLinkButton();
-      } else if (e.key === "Tab") {
-        e.preventDefault();
-        document.execCommand(e.shiftKey ? "outdent" : "indent", false);
-        handleEditorChange();
-      }
-    },
-    [execCommand, handleLinkButton, handleEditorChange]
-  );
-
-  /* ─── Paste handler (strip styles, keep basic formatting) ─── */
-  const handlePaste = useCallback(
-    (e: React.ClipboardEvent) => {
-      e.preventDefault();
-      const text = e.clipboardData.getData("text/plain");
-      const html = e.clipboardData.getData("text/html");
-
-      if (html) {
-        // Clean pasted HTML
-        const cleanHtml = sanitizePasteHtml(html);
-        document.execCommand("insertHTML", false, cleanHtml);
-      } else {
-        document.execCommand("insertText", false, text);
-      }
-      handleEditorChange();
-    },
-    [handleEditorChange]
-  );
+    if (!editor) return;
+    editor.chain().focus().unsetLink().run();
+  }, [editor]);
 
   /* ─── HTML textarea change ─── */
+
   const handleHtmlChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
       onChange(e.target.value);
@@ -343,15 +338,8 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 500 }
     [onChange]
   );
 
-  /* ─── Toolbar active state helpers ─── */
-  const isActive = (btn: ToolbarButton): boolean => {
-    if (btn.command === "formatBlock" && btn.value) {
-      return activeCommands.has(`formatBlock:${btn.value}`);
-    }
-    return activeCommands.has(btn.command);
-  };
-
   /* ─── View buttons ─── */
+
   const VIEW_BUTTONS: { mode: ViewMode; icon: string; label: string }[] = [
     { mode: "visual", icon: "PenTool", label: "Visual" },
     { mode: "html", icon: "Code2", label: "HTML" },
@@ -361,12 +349,105 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 500 }
 
   const showEditor = viewMode === "visual" || viewMode === "split";
   const showHtml = viewMode === "html" || viewMode === "split";
-  const showPreview = viewMode === "preview" || viewMode === "split";
+  const showPreview = viewMode === "preview";
+
+  /* ─── Compute editor min height ─── */
+
+  const editorMinHeight = viewMode === "split" ? 600 : minHeight;
 
   return (
     <div className="relative">
+      {/* TipTap ProseMirror base styles */}
+      <style>{`
+        .ProseMirror {
+          outline: none !important;
+          min-height: ${editorMinHeight}px;
+          padding: 20px;
+          font-family: var(--wk-font-body, Georgia, serif);
+          font-size: 15px;
+          line-height: 1.75;
+          color: var(--wk-text);
+          background: var(--wk-bg-subtle);
+        }
+        .ProseMirror p {
+          margin-bottom: 1em;
+        }
+        .ProseMirror p.is-editor-empty:first-child::before {
+          content: attr(data-placeholder);
+          float: left;
+          color: var(--wk-text-faint);
+          pointer-events: none;
+          height: 0;
+          font-size: 14px;
+        }
+        .ProseMirror h1 { font-size: 22px; font-weight: 900; margin-top: 1.5em; margin-bottom: 0.75em; }
+        .ProseMirror h2 { font-size: 18px; font-weight: 700; margin-top: 1.25em; margin-bottom: 0.5em; }
+        .ProseMirror h3 { font-size: 15px; font-weight: 700; margin-top: 1em; margin-bottom: 0.5em; }
+        .ProseMirror ul { list-style: disc; padding-left: 1.5em; margin-bottom: 1em; }
+        .ProseMirror ol { list-style: decimal; padding-left: 1.5em; margin-bottom: 1em; }
+        .ProseMirror li { margin-bottom: 0.25em; }
+        .ProseMirror blockquote {
+          border-left: 4px solid var(--wk-brand);
+          padding-left: 1em;
+          font-style: italic;
+          color: var(--wk-text-muted);
+          margin: 1em 0;
+        }
+        .ProseMirror code {
+          border-radius: 4px;
+          background: var(--wk-bg-subtle);
+          padding: 0.15em 0.4em;
+          font-family: 'JetBrains Mono', monospace;
+          font-size: 12px;
+        }
+        .ProseMirror pre {
+          overflow-x: auto;
+          border-radius: 8px;
+          background: var(--wk-bg-subtle);
+          padding: 1em;
+          margin: 1em 0;
+        }
+        .ProseMirror pre code {
+          background: transparent;
+          padding: 0;
+        }
+        .ProseMirror img {
+          max-width: 100%;
+          border-radius: 8px;
+          margin: 16px 0;
+          display: block;
+        }
+        .ProseMirror hr {
+          margin: 1.5em 0;
+          border: none;
+          border-top: 1px solid var(--wk-border);
+        }
+        .ProseMirror a {
+          color: var(--wk-brand);
+          text-decoration: underline;
+        }
+        .ProseMirror strong { color: var(--wk-text); font-weight: 700; }
+        .ProseMirror table { width: 100%; margin: 1em 0; border-collapse: collapse; }
+        .ProseMirror th {
+          border: 1px solid var(--wk-border);
+          padding: 0.5em 0.75em;
+          text-align: left;
+          font-size: 12px;
+          font-weight: 700;
+          background: var(--wk-surface-raised);
+        }
+        .ProseMirror td {
+          border: 1px solid var(--wk-border);
+          padding: 0.5em 0.75em;
+          font-size: 13px;
+        }
+      `}</style>
+
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-[var(--wk-border)] px-4 py-3 bg-[var(--wk-surface)]">
+      <div
+        ref={toolbarRef}
+        className="flex flex-wrap items-center gap-2 border-b border-[var(--wk-border)] px-4 py-3 bg-[var(--wk-surface)] sticky top-0 z-10"
+      >
         {/* View Switcher */}
         <div className="flex items-center gap-1 rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg-subtle)] p-1 mr-2">
           {VIEW_BUTTONS.map((btn) => (
@@ -395,7 +476,7 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 500 }
             icon={btn.icon}
             label={btn.label}
             active={isActive(btn)}
-            onClick={() => execCommand(btn.command)}
+            onClick={() => execCommand(btn)}
           />
         ))}
 
@@ -403,7 +484,7 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 500 }
         <ToolbarBtn
           icon="Link"
           label="Link"
-          active={false}
+          active={editor?.isActive("link") ?? false}
           onClick={handleLinkButton}
         />
         <ToolbarBtn
@@ -418,11 +499,11 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 500 }
         {/* Headings */}
         {HEADINGS.map((btn) => (
           <ToolbarBtn
-            key={`${btn.command}-${btn.value}`}
+            key={`${btn.command}-${btn.level ?? "p"}`}
             icon={btn.icon}
             label={btn.label}
             active={isActive(btn)}
-            onClick={() => execCommand(btn.command, btn.value)}
+            onClick={() => execCommand(btn)}
           />
         ))}
 
@@ -435,7 +516,7 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 500 }
             icon={btn.icon}
             label={btn.label}
             active={isActive(btn)}
-            onClick={() => execCommand(btn.command)}
+            onClick={() => execCommand(btn)}
           />
         ))}
 
@@ -447,8 +528,8 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 500 }
             key={btn.command}
             icon={btn.icon}
             label={btn.label}
-            active={false}
-            onClick={() => execCommand(btn.command, btn.value, btn.isBlock)}
+            active={isActive(btn)}
+            onClick={() => execCommand(btn)}
           />
         ))}
 
@@ -467,30 +548,29 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 500 }
           icon="Undo2"
           label="Undo"
           active={false}
-          onClick={() => execCommand("undo")}
+          onClick={() => execCommand({ command: "undo", icon: "", label: "" })}
         />
         <ToolbarBtn
           icon="Redo2"
           label="Redo"
           active={false}
-          onClick={() => execCommand("redo")}
+          onClick={() => execCommand({ command: "redo", icon: "", label: "" })}
         />
 
         <ToolbarBtn
           icon="RemoveFormatting"
           label="Clear"
           active={false}
-          onClick={() => execCommand("removeFormat")}
+          onClick={() => execCommand({ command: "clearMarks", icon: "", label: "" })}
         />
       </div>
 
       {/* Link Popup */}
       {linkPopup.visible && (
         <div
-          ref={linkPopupRef}
           className="fixed z-[60] rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] shadow-lg p-4 w-80"
           style={{
-            left: Math.min(linkPopup.x, window.innerWidth - 340),
+            left: Math.min(Math.max(linkPopup.x - 160, 8), window.innerWidth - 340),
             top: Math.max(linkPopup.y, 10),
           }}
         >
@@ -547,14 +627,14 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 500 }
             <div className="flex gap-2">
               <button
                 onClick={() => setLinkPopup((prev) => ({ ...prev, visible: false }))}
-                className="wk-button wk-button-soft wk-button-sm flex-1"
+                className="wk-button wk-button-soft wk-button-sm flex-1 whitespace-nowrap"
               >
                 Cancel
               </button>
               <button
                 onClick={insertLink}
                 disabled={!linkPopup.url}
-                className="wk-button wk-button-primary wk-button-sm flex-1"
+                className="wk-button wk-button-primary wk-button-sm flex-1 whitespace-nowrap"
               >
                 Insert
               </button>
@@ -579,42 +659,20 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 500 }
       >
         {/* Visual Editor */}
         {showEditor && (
-          <div className={viewMode === "split" ? "min-h-[600px]" : ""}>
-            <div
-              ref={editorRef}
-              contentEditable
-              onInput={handleEditorChange}
-              onKeyDown={handleKeyDown}
-              onPaste={handlePaste}
-              onClick={() => updateActiveCommands()}
-              className="w-full bg-[var(--wk-bg-subtle)] px-5 py-4 text-[15px] leading-relaxed text-[var(--wk-text)] outline-none"
-              style={{
-                minHeight: viewMode === "split" ? "600px" : `${minHeight}px`,
-                fontFamily: "var(--wk-font-body)",
-              }}
-              data-placeholder={placeholder}
-              dangerouslySetInnerHTML={
-                value ? undefined : { __html: `<p><br></p>` }
-              }
-              suppressContentEditableWarning
-            />
-            {!value && (
-              <div className="absolute pointer-events-none text-[var(--wk-text-faint)] text-[14px] px-5 mt-[-500px]" style={{ marginTop: "-520px" }}>
-                {placeholder || "Start writing your article..."}
-              </div>
-            )}
+          <div className={viewMode === "split" ? "" : ""}>
+            <EditorContent editor={editor} />
           </div>
         )}
 
         {/* HTML Editor */}
         {showHtml && (
-          <div className={viewMode === "split" ? "min-h-[600px]" : ""}>
+          <div className={viewMode === "split" ? "" : ""}>
             <textarea
               ref={htmlRef}
               value={value}
               onChange={handleHtmlChange}
               placeholder="Paste or type HTML content here..."
-              className={`w-full bg-[var(--wk-bg-subtle)] px-5 py-4 font-mono text-[12px] leading-relaxed text-[var(--wk-text)] outline-none resize-none border-0`}
+              className="w-full bg-[var(--wk-bg-subtle)] px-5 py-4 font-mono text-[12px] leading-relaxed text-[var(--wk-text)] outline-none resize-none border-0"
               style={{
                 minHeight: viewMode === "split" ? "600px" : `${minHeight}px`,
               }}
@@ -625,18 +683,15 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 500 }
         {/* Preview */}
         {showPreview && (
           <div
-            className={`prose prose-sm max-w-none px-6 py-5 ${
-              viewMode === "split" ? "h-[600px] overflow-y-auto" : ""
-            }`}
+            className="px-6 py-5"
             style={{
-              fontFamily: "var(--wk-font-body)",
-              minHeight: viewMode === "split" ? undefined : `${minHeight}px`,
+              minHeight: `${minHeight}px`,
             }}
           >
             {value ? (
               <ArticlePreview html={value} />
             ) : (
-              <div className="flex h-full items-center justify-center">
+              <div className="flex h-full items-center justify-center min-h-[300px]">
                 <p className="text-[13px] text-[var(--wk-text-faint)]">No content to preview</p>
               </div>
             )}
@@ -662,9 +717,10 @@ function ToolbarBtn({
 }) {
   return (
     <button
+      type="button"
       onClick={onClick}
       title={label}
-      className={`flex items-center justify-center w-8 h-8 rounded-md text-[13px] transition-all ${
+      className={`flex items-center justify-center w-8 h-8 rounded-md text-[13px] transition-all whitespace-nowrap ${
         active
           ? "bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]"
           : "text-[var(--wk-text-muted)] hover:bg-[var(--wk-bg-subtle)] hover:text-[var(--wk-text)]"
@@ -702,84 +758,4 @@ function ArticlePreview({ html }: { html: string }) {
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );
-}
-
-/* ─── Paste HTML Sanitizer ─── */
-
-function sanitizePasteHtml(html: string): string {
-  const allowedTags = [
-    "P",
-    "BR",
-    "STRONG",
-    "B",
-    "EM",
-    "I",
-    "U",
-    "STRIKE",
-    "S",
-    "A",
-    "H1",
-    "H2",
-    "H3",
-    "H4",
-    "H5",
-    "H6",
-    "UL",
-    "OL",
-    "LI",
-    "BLOCKQUOTE",
-    "PRE",
-    "CODE",
-    "HR",
-    "TABLE",
-    "THEAD",
-    "TBODY",
-    "TR",
-    "TH",
-    "TD",
-    "IMG",
-    "SPAN",
-    "DIV",
-  ];
-
-  const allowedAttrs = ["href", "src", "alt", "title", "target"];
-
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(html, "text/html");
-  const body = doc.body;
-
-  function cleanNode(node: Node): Node | null {
-    if (node.nodeType === Node.TEXT_NODE) {
-      return node.cloneNode(true);
-    }
-    if (node.nodeType === Node.ELEMENT_NODE) {
-      const el = node as Element;
-      const tag = el.tagName.toUpperCase();
-      if (!allowedTags.includes(tag)) {
-        // Replace with text content
-        const text = document.createTextNode(el.textContent || "");
-        return text;
-      }
-      const newEl = document.createElement(tag.toLowerCase());
-      allowedAttrs.forEach((attr) => {
-        if (el.hasAttribute(attr)) {
-          newEl.setAttribute(attr, el.getAttribute(attr) || "");
-        }
-      });
-      Array.from(el.childNodes).forEach((child) => {
-        const cleaned = cleanNode(child);
-        if (cleaned) newEl.appendChild(cleaned);
-      });
-      return newEl;
-    }
-    return null;
-  }
-
-  const container = document.createElement("div");
-  Array.from(body.childNodes).forEach((child) => {
-    const cleaned = cleanNode(child);
-    if (cleaned) container.appendChild(cleaned);
-  });
-
-  return container.innerHTML;
 }

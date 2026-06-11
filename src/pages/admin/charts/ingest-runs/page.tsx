@@ -119,7 +119,7 @@ export default function AdminChartsIngestRuns() {
         title="Ingest Runs"
         description="Provider-based ingestion runs — Spotify and Apple Music playlist pipelines"
       >
-        <button onClick={() => navigate("/admin/settings/charts/ingest")} className="wk-button wk-button-primary wk-button-sm whitespace-nowrap">
+        <button onClick={() => navigate("/admin/charts/ingest")} className="wk-button wk-button-primary wk-button-sm whitespace-nowrap">
           <i className="ri-add-line" />
           New Run
         </button>
@@ -287,7 +287,7 @@ export default function AdminChartsIngestRuns() {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1">
                         <button
-                          onClick={() => navigate(`/admin/settings/charts/ingest-runs/${run.id}`)}
+                          onClick={() => navigate(`/admin/charts/ingest-runs/${run.id}`)}
                           className="rounded px-2 py-1 text-[11px] font-semibold text-wk-brand hover:bg-wk-brand-soft transition-colors whitespace-nowrap"
                         >
                           View
@@ -347,7 +347,7 @@ export default function AdminChartsIngestRuns() {
                 icon="Database"
                 title="No ingest runs yet"
                 description="Start a new provider-based run in the Ingest Studio. Runs will appear here once created."
-                action={{ label: "Open Ingest Studio", onClick: () => navigate("/admin/settings/charts/ingest"), icon: "Plus" }}
+                action={{ label: "Open Ingest Studio", onClick: () => navigate("/admin/charts/ingest"), icon: "Plus" }}
               />
             ) : (
               <div>

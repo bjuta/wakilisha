@@ -34,6 +34,7 @@ import AdminImportsJobsPage from "../pages/admin/imports/jobs/page";
 import AdminImportsJobDetailPage from "../pages/admin/imports/jobs/detail/page";
 import AdminImportReviewArtifactsPage from "../pages/admin/imports/review-artifacts/page";
 import AdminArticleDetailPage from "../pages/admin/content/articles/detail/page";
+import AdminNewArticlePage from "../pages/admin/content/articles/new/page";
 import AdminArtistDetailPage from "../pages/admin/registry/artists/detail/page";
 import AdminTrackDetailPage from "../pages/admin/registry/tracks/detail/page";
 import AdminReleaseDetailPage from "../pages/admin/registry/releases/detail/page";
@@ -48,6 +49,9 @@ import AdminLyricsPage from "../pages/admin/content/lyrics/page";
 import AdminUsersPage from "../pages/admin/users/page";
 import AdminMagazineVisualsPage from "../pages/admin/magazine/visuals/page";
 import AdminMagazineIssuesPage from "../pages/admin/magazine/issues/page";
+import AdminTrashPage from "../pages/admin/content/articles/trash/page";
+import AdminCategoriesPage from "../pages/admin/content/categories/page";
+import AdminTagsPage from "../pages/admin/content/tags/page";
 
 // Section-level admin guards
 import {
@@ -79,6 +83,8 @@ import AdminChartsIngestRuns from "../pages/admin/charts/ingest-runs/page";
 import AdminChartsIngestRunDetail from "../pages/admin/charts/ingest-run-detail/page";
 import AdminChartsLegacyIngestJobs from "../pages/admin/charts/ingest-jobs/page";
 import AdminChartsIngestHealth from "../pages/admin/charts/ingest-health/page";
+import AdminChartsScoringRuns from "../pages/admin/charts/scoring-runs/page";
+import AdminChartsEditionDetail from "../pages/admin/charts/edition-detail/page";
 
 // Admin Settings
 import { AdminSettingsLayout } from "../pages/admin/settings/AdminSettingsLayout";
@@ -116,6 +122,7 @@ import Labels from "../pages/labels/page";
 import LabelDetail from "../pages/labels/detail/page";
 import Magazine from "../pages/magazine/page";
 import ArticlePage from "../pages/magazine/article/page";
+import PreviewPage from "../pages/preview/page";
 import MagazineIssuePage from "../pages/magazine/issue/page";
 import AllIssuesPage from "../pages/magazine/issues/page";
 import TrackDetail from "../pages/tracks/detail/page";
@@ -164,6 +171,12 @@ import MobileProfile from "../pages/mobile/profile/page";
 import MobileAuthorProfile from "../pages/mobile/authors/detail/page";
 import AuthPage from "../pages/auth/page";
 
+// Public taxonomy archive pages
+import CategoriesIndex from "../pages/categories/page";
+import CategoryDetail from "../pages/categories/detail/page";
+import TagsIndex from "../pages/tags/page";
+import TagDetail from "../pages/tags/detail/page";
+
 const routes: RouteObject[] = [
   { path: "/admin/login", element: <AdminLoginPage /> },
   { path: "/auth/reset-password", element: <ResetPasswordPage /> },
@@ -193,6 +206,11 @@ const routes: RouteObject[] = [
       { path: "/magazine/issues/:issueKey", element: <ResponsivePage mobile={<MobileMagazineIssuePage />} desktop={<MagazineIssuePage />} /> },
       { path: "/magazine/issue/:issueKey", element: <ResponsivePage mobile={<MobileMagazineIssuePage />} desktop={<MagazineIssuePage />} /> },
       { path: "/magazine/:slug", element: <ResponsivePage mobile={<MobileArticlePage />} desktop={<ArticlePage />} /> },
+      { path: "/preview/:nonce", element: <PreviewPage /> },
+      { path: "/categories", element: <ResponsivePage mobile={<CategoriesIndex />} desktop={<CategoriesIndex />} /> },
+      { path: "/categories/:slug", element: <ResponsivePage mobile={<CategoryDetail />} desktop={<CategoryDetail />} /> },
+      { path: "/tags", element: <ResponsivePage mobile={<TagsIndex />} desktop={<TagsIndex />} /> },
+      { path: "/tags/:slug", element: <ResponsivePage mobile={<TagDetail />} desktop={<TagDetail />} /> },
       { path: "/guides", element: <ResponsivePage mobile={<MobileGuides />} desktop={<GuidesPage />} /> },
       { path: "/film", element: <ResponsivePage mobile={<MobileFilm />} desktop={<FilmPage />} /> },
       { path: "/fashion", element: <ResponsivePage mobile={<MobileFashion />} desktop={<FashionPage />} /> },
@@ -217,13 +235,17 @@ const routes: RouteObject[] = [
         element: <AdminContentLayout />,
         children: [
           { path: "articles", element: <AdminArticlesPage /> },
+          { path: "articles/new", element: <AdminNewArticlePage /> },
           { path: "articles/:slug", element: <AdminArticleDetailPage /> },
+          { path: "articles/trash", element: <AdminTrashPage /> },
           { path: "guides", element: <AdminGuidesPage /> },
           { path: "pages", element: <AdminPagesPage /> },
           { path: "publishing", element: <AdminPublishingDashboardPage /> },
           { path: "archive", element: <AdminContentArchivePage /> },
           { path: "migration", element: <AdminMediaMigrationPage /> },
           { path: "lyrics", element: <AdminLyricsPage /> },
+          { path: "categories", element: <AdminCategoriesPage /> },
+          { path: "tags", element: <AdminTagsPage /> },
         ],
       },
       {
@@ -312,6 +334,8 @@ const routes: RouteObject[] = [
         { path: "ingest-runs/:runId", element: <AdminChartsIngestRunDetail /> },
         { path: "ingest-jobs", element: <AdminChartsLegacyIngestJobs /> },
         { path: "ingest-health", element: <AdminChartsIngestHealth /> },
+        { path: "scoring-runs", element: <AdminChartsScoringRuns /> },
+        { path: "editions/:editionId", element: <AdminChartsEditionDetail /> },
       ] },
       { path: "settings", element: <AdminSettingsLayout />, children: [
         { index: true, element: <AdminSettingsHub /> },

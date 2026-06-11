@@ -209,10 +209,10 @@ export default function AdminSettingsChartDefaults() {
       <WkSurface className="p-4 border-l-4 border-[var(--wk-brand)]">
         <h3 className="text-[13px] font-bold text-[var(--wk-text)] mb-2">Feeds</h3>
         <div className="flex flex-wrap gap-2">
-          <LinkButton label="Ingest Studio" path="/admin/settings/charts/ingest" navigate={navigate} />
-          <LinkButton label="Ingest Runs" path="/admin/settings/charts/ingest-runs" navigate={navigate} />
-          <LinkButton label="Editions" path="/admin/settings/charts/editions" navigate={navigate} />
-          <LinkButton label="Public API QA" path="/admin/settings/charts/public-api-qa" navigate={navigate} />
+          <LinkButton label="Ingest Studio" path="/admin/charts/ingest" navigate={navigate} />
+          <LinkButton label="Ingest Runs" path="/admin/charts/ingest-runs" navigate={navigate} />
+          <LinkButton label="Editions" path="/admin/charts/editions" navigate={navigate} />
+          <LinkButton label="Public API QA" path="/admin/charts/public-api-qa" navigate={navigate} />
         </div>
       </WkSurface>
     </div>

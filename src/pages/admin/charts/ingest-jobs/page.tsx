@@ -66,14 +66,14 @@ export default function AdminChartsLegacyIngestJobs() {
             These are Sprint 1 CSV-based jobs retained for historical visibility.
             New provider-based runs live under{" "}
             <button
-              onClick={() => navigate("/admin/settings/charts/ingest-runs")}
+              onClick={() => navigate("/admin/charts/ingest-runs")}
               className="font-semibold text-wk-brand underline hover:no-underline"
             >
               Ingest Runs
             </button>
             {" "}and{" "}
             <button
-              onClick={() => navigate("/admin/settings/charts/ingest")}
+              onClick={() => navigate("/admin/charts/ingest")}
               className="font-semibold text-wk-brand underline hover:no-underline"
             >
               Ingest Studio
@@ -88,7 +88,7 @@ export default function AdminChartsLegacyIngestJobs() {
         description="CSV-based ingestion jobs from the Sprint 1 pipeline. Historical reference only."
       >
         <button
-          onClick={() => navigate("/admin/settings/charts/ingest")}
+          onClick={() => navigate("/admin/charts/ingest")}
           className="wk-button wk-button-primary wk-button-sm whitespace-nowrap"
         >
           <i className="ri-add-line" />
@@ -128,7 +128,7 @@ export default function AdminChartsLegacyIngestJobs() {
                 {copiedId === selectedJob.id ? "Copied" : "Copy ID"}
               </button>
               <button
-                onClick={() => navigate("/admin/settings/charts/ingest")}
+                onClick={() => navigate("/admin/charts/ingest")}
                 className="wk-button wk-button-primary wk-button-sm whitespace-nowrap"
               >
                 <i className="ri-add-line" />
@@ -167,7 +167,7 @@ export default function AdminChartsLegacyIngestJobs() {
             </p>
             <div className="mt-3 flex gap-2">
               <button
-                onClick={() => navigate(`/admin/settings/charts/ingest-jobs/${selectedJob.id}`)}
+                onClick={() => navigate(`/admin/charts/ingest-jobs/${selectedJob.id}`)}
                 className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap"
               >
                 <i className="ri-external-link-line" /> Open Job Wizard
@@ -237,7 +237,7 @@ export default function AdminChartsLegacyIngestJobs() {
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1">
                       <button
-                        onClick={() => navigate(`/admin/settings/charts/ingest-jobs/${job.id}`)}
+                        onClick={() => navigate(`/admin/charts/ingest-jobs/${job.id}`)}
                         className="rounded px-2 py-1 text-[11px] font-semibold text-wk-brand hover:bg-wk-brand-soft transition-colors whitespace-nowrap"
                       >
                         Open
