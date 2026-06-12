@@ -109,42 +109,44 @@ function makeRawEvidence(): RawEvidenceRecord[] {
 
 function makePreviousEdition(): PreviousEditionEntry[] {
   return [
-    { normalized_key: 'hallelujah (washwash)::khaligraph jones, bensoul', position: 1 },
+    // Keys MUST match what build_normalized_key produces:
+    // normalize_title strips brackets, lead_artist_key extracts primary artist via comma/feat split
+    { normalized_key: 'hallelujah::khaligraph jones', position: 1 },
     { normalized_key: 'nakam sai::sauti sol', position: 2 },
     { normalized_key: 'kwikwi::wakadinali', position: 3 },
-    { normalized_key: 'miondoko::boutross, breeder lw', position: 4 },
+    { normalized_key: 'miondoko::boutross', position: 4 },
     { normalized_key: 'angela::boutross', position: 5 },
-    { normalized_key: 'dance ya kudance::mejja, exray', position: 6 },
-    { normalized_key: 'kuna kuna::vic west, fathermoh', position: 7 },
-    { normalized_key: 'mukuchu::gody tennor, tipsy gee', position: 8 },
-    { normalized_key: 'dera::zzero sufuri, mbuzi gang', position: 9 },
+    { normalized_key: 'dance ya kudance::mejja', position: 6 },
+    { normalized_key: 'kuna kuna::vic west', position: 7 },
+    { normalized_key: 'mukuchu::gody tennor', position: 8 },
+    { normalized_key: 'dera::zzero sufuri', position: 9 },
     { normalized_key: 'nishike::bien', position: 10 },
-    { normalized_key: 'true love::bien, aaron rimbui', position: 11 },
-    { normalized_key: 'siko fiti::matata, boutross', position: 12 },
+    { normalized_key: 'true love::bien', position: 11 },
+    { normalized_key: 'siko fiti::matata', position: 12 },
     { normalized_key: 'ma aqaan::sharma boy', position: 13 },
-    { normalized_key: 'wanani::bahati, prince indah', position: 14 },
+    { normalized_key: 'wanani::bahati', position: 14 },
     { normalized_key: 'sonona::sauti sol', position: 15 },
-    { normalized_key: 'sonona remix::sauti sol, burna boy', position: 16 },
-    { normalized_key: 'wabebe::mbuzi gang, fathermoh', position: 17 },
+    { normalized_key: 'sonona remix::sauti sol', position: 16 },
+    { normalized_key: 'wabebe::mbuzi gang', position: 17 },
     { normalized_key: 'inauma::bensoul', position: 18 },
-    { normalized_key: 'kaskie vibaya::fathermoh, joefes', position: 19 },
+    { normalized_key: 'kaskie vibaya::fathermoh', position: 19 },
     { normalized_key: 'wale wale::diamond platnumz', position: 20 },
-    { normalized_key: 'buda::tipsy gee, fathermoh', position: 21 },
+    { normalized_key: 'buda::tipsy gee', position: 21 },
     { normalized_key: 'mungu mkuu::evelyn wanjiru', position: 22 },
     { normalized_key: 'sugar::zuchu', position: 23 },
-    { normalized_key: 'champez::matata, stella mwangi', position: 24 },
+    { normalized_key: 'champez::matata', position: 24 },
     { normalized_key: 'mazishi::sauti sol', position: 25 },
     { normalized_key: 'tic tac::nadia mukami', position: 26 },
     { normalized_key: 'amor::otile brown', position: 27 },
     { normalized_key: 'tamba::wakadinali', position: 28 },
-    { normalized_key: 'angela remix::boutross, nadia mukami', position: 29 },
-    { normalized_key: 'rhumba japan::bien, breeder lw', position: 30 },
+    { normalized_key: 'angela remix::boutross', position: 29 },
+    { normalized_key: 'rhumba japan::bien', position: 30 },
     // ── Tracks that fell off (for re-entry testing) ──
-    { normalized_key: 'melanin::patoranking, sauti sol', position: 31 },
+    { normalized_key: 'melanin::patoranking', position: 31 },
     { normalized_key: 'mucamo::wakadinali', position: 32 },
     { normalized_key: 'furaha::nyashinski', position: 33 },
     { normalized_key: 'vile inafaa::khaligraph jones', position: 34 },
-    { normalized_key: 'nairobi::bensoul, sauti sol', position: 35 },
+    { normalized_key: 'nairobi::bensoul', position: 35 },
     { normalized_key: 'liar::willy paul', position: 36 },
     { normalized_key: 'hello::nyashinski', position: 37 },
     { normalized_key: 'milele::nikita kering', position: 38 },
@@ -360,9 +362,9 @@ describe('Gate A — Full Pipeline Integration', () => {
     });
 
     it('tracks in previous edition at same rank get "same"', () => {
-      // "Hallelujah (Washwash)" was #1 previously, should be #1 again or moved
+      // "Hallelujah (Washwash)" was #1 previously — now key is "hallelujah::khaligraph jones"
       const hallelujah = result.scoredRows.find(
-        (r) => r.normalized_key === 'hallelujah (washwash)::khaligraph jones, bensoul',
+        (r) => r.normalized_key === 'hallelujah::khaligraph jones',
       );
       if (hallelujah && hallelujah.rank === 1) {
         expect(hallelujah.movement).toBe('same');

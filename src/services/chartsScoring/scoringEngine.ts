@@ -243,13 +243,13 @@ export function carryForwardBonus(
 /**
  * ACRCloud-derived radio airplay evidence blended into the chart.
  *
- * FORMULA:
+ * FORMULA (scoring policy 1.0.1):
  *   ln(1 + W) × 4.25 + station_bonus + detection_bonus
  *
  * WHERE:
  *   W = Σ weighted_score across all qualifying stations
- *   station_bonus  = station_count × 2.0
- *   detection_bonus = detection_count × 0.5
+ *   station_bonus  = min(6, (station_count − 1) × 1.5)
+ *   detection_bonus = min(4, ⌊detection_count / 3⌋)
  *
  * CAP: airplay_max_score (default 24)
  *
@@ -660,8 +660,8 @@ export function verifyGateC(): GateCResult {
   const actualTotal2dp = round2(breakdown.total_score);
   const expectedTotal2dp = 102.85;
   // With Bible-correct recency (45d→12 pts) and airplay formula (§5.3):
-  // 48 + 6 + 2 + 12 + 15 + 0 + ln(37)×4.25 + 1.5 + 3.0 = 102.8523...
-  const expectedTotal4dp = 102.8523;
+  // 48 + 6 + 2 + 12 + 15 + 0 + ln(37)×4.25 + 1.5 + 3.0 = 102.8464...
+  const expectedTotal4dp = 102.8464;
   const actualTotal4dp = round4(breakdown.total_score);
 
   return {

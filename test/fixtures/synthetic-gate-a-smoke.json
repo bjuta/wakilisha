@@ -119,7 +119,7 @@
     }
   ],
   "previous_edition": [
-    { "normalized_key": "hallelujah washwash::khaligraph jones", "position": 1 },
+    { "normalized_key": "hallelujah::khaligraph jones", "position": 1 },
     { "normalized_key": "nakam sai::sauti sol", "position": 2 },
     { "normalized_key": "kwikwi::wakadinali", "position": 3 },
     { "normalized_key": "miondoko::boutross", "position": 4 },
@@ -154,14 +154,14 @@
   ],
   "expected_positions": [
     { "rank": 1, "normalized_key": "nakam sai::sauti sol", "track_title": "Nakam Sai", "artist_name": "Sauti Sol" },
-    { "rank": 2, "normalized_key": "sonona remix::sauti sol", "track_title": "Sonona Remix", "artist_name": "Sauti Sol, Burna Boy" },
-    { "rank": 3, "normalized_key": "hallelujah washwash::khaligraph jones", "track_title": "Hallelujah (Washwash)", "artist_name": "Khaligraph Jones, Bensoul" },
+    { "rank": 2, "normalized_key": "hallelujah::khaligraph jones", "track_title": "Hallelujah (Washwash)", "artist_name": "Khaligraph Jones, Bensoul" },
+    { "rank": 3, "normalized_key": "sonona remix::sauti sol", "track_title": "Sonona Remix", "artist_name": "Sauti Sol, Burna Boy" },
     { "rank": 4, "normalized_key": "wale wale::diamond platnumz", "track_title": "Wale Wale", "artist_name": "Diamond Platnumz" },
-    { "rank": 5, "normalized_key": "kuna kuna::vic west", "track_title": "Kuna Kuna", "artist_name": "Vic West, Fathermoh" },
-    { "rank": 6, "normalized_key": "sugar::zuchu", "track_title": "Sugar", "artist_name": "Zuchu" },
-    { "rank": 7, "normalized_key": "kwikwi::wakadinali", "track_title": "Kwikwi", "artist_name": "Wakadinali" },
-    { "rank": 8, "normalized_key": "miondoko::boutross", "track_title": "Miondoko", "artist_name": "Boutross, Breeder LW" },
-    { "rank": 9, "normalized_key": "angela::boutross", "track_title": "Angela", "artist_name": "Boutross" },
-    { "rank": 10, "normalized_key": "dance ya kudance::mejja", "track_title": "Dance Ya Kudance", "artist_name": "Mejja, Exray" }
+    { "rank": 5, "normalized_key": "kwikwi::wakadinali", "track_title": "Kwikwi", "artist_name": "Wakadinali" },
+    { "rank": 6, "normalized_key": "miondoko::boutross", "track_title": "Miondoko", "artist_name": "Boutross, Breeder LW" },
+    { "rank": 7, "normalized_key": "angela::boutross", "track_title": "Angela", "artist_name": "Boutross" },
+    { "rank": 8, "normalized_key": "dance ya kudance::mejja", "track_title": "Dance Ya Kudance", "artist_name": "Mejja, Exray" },
+    { "rank": 9, "normalized_key": "kuna kuna::vic west", "track_title": "Kuna Kuna", "artist_name": "Vic West, Fathermoh" },
+    { "rank": 10, "normalized_key": "sugar::zuchu", "track_title": "Sugar", "artist_name": "Zuchu" }
   ]
 }

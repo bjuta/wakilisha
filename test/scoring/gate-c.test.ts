@@ -151,11 +151,8 @@ describe('Gate C — Worked Example', () => {
   it('airplay score formula: W=36, 2 stations, 9 detections produces correct value', () => {
     const ctx = makeAirplayContext({ W: 36, station_count: 2, detection_count: 9 });
     const score = airplayScore(ctx, AIRPLAY_CONFIG);
-    // Engine formula: ln(37)×4.25 + 2×2.0 + 9×0.5 = 15.3463 + 4.0 + 4.5 = 23.8463
-    // But capped at 24 → actual result ≈ 23.8463
-    expect(score).toBeGreaterThan(0);
-    expect(score).toBeLessThanOrEqual(24);
-    // The gate-C total relies on this being ≈ 23.85, so verify it rounds right
+    // §5.3 formula: ln(37)×4.25 + min(6,(2-1)×1.5) + min(4,⌊9/3⌋) = 15.3464 + 1.5 + 3.0 = 19.8464
+    expect(score).toBe(19.8464);
     const engineTotal = 48 + 6 + 2 + (recencyScore('2026-04-27', EDITION_DATE)) + 15 + 0 + score;
     const total2dp = Math.round(engineTotal * 100) / 100;
     expect(total2dp).toBe(102.85);
