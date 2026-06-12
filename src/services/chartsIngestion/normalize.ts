@@ -1,12 +1,25 @@
 /**
- * Normalization Layer
- * Converts NormalizedChartRow (from provider fetch) to IngestResolvedRow (frontend contract).
- * Applies provisional match status, confidence scoring, warning generation,
- * and rich metadata normalization for registry-ready ingestion.
+ * Normalization Layer — Ingest Pipeline
+ *
+ * This module is a THIN WRAPPER around the canonical normalization engine
+ * (src/services/chartsScoring/normalize.ts — Bible §3). It applies the
+ * production-grade title/artist identity key generation and then enriches
+ * each row with rich metadata for registry-ready ingestion.
+ *
+ * The hash-based mock match-status logic has been removed. Identity keys
+ * are now pure, deterministic, and byte-for-byte reproducible.
+ *
+ * PR 2 — Normalization Module Port (2026-06-11)
  */
 
 import type { NormalizedChartRow, IngestResolvedRow, MatchStatus } from "./ingestStudioTypes";
 import { enrichRawWithRichMetadata } from "./richMetadataNormalize";
+import {
+  build_normalized_key,
+  lead_artist_key,
+  normalize_title,
+  normalize_artist,
+} from "@/services/chartsScoring/normalize";
 
 export type NormalizeResult = {
   resolvedRows: IngestResolvedRow[];
@@ -24,30 +37,7 @@ export type NormalizeResult = {
   };
 };
 
-function computeMatchStatus(row: NormalizedChartRow): { status: MatchStatus; confidence: number; warnings: string[] } {
-  const warnings: string[] = [];
-  if (!row.artworkUrl) warnings.push("Missing artwork URL from provider");
-  if (!row.previewUrl) warnings.push("No preview URL available from provider");
-  if (!row.externalUrl) warnings.push("No external URL from provider");
-
-  const raw = row.raw as Record<string, unknown> | undefined;
-  const popularity = typeof raw?.popularity === "number" ? raw.popularity : 50;
-  let hash = 0;
-  const seed = row.providerTrackId || row.trackTitle || "unknown";
-  for (let i = 0; i < seed.length; i++) {
-    hash = ((hash << 5) - hash) + seed.charCodeAt(i);
-    hash = hash & hash;
-  }
-  const normalizedHash = Math.abs(hash) % 100;
-
-  if (popularity > 85 && normalizedHash > 20) return { status: "canonical", confidence: 90 + (normalizedHash % 10), warnings };
-  if (popularity > 70 && normalizedHash > 35) return { status: "canonical", confidence: 75 + (normalizedHash % 15), warnings };
-  if (popularity > 60 && normalizedHash > 50) return { status: "shell", confidence: 60 + (normalizedHash % 20), warnings: [...warnings, "Low confidence — release shell created"] };
-  if (normalizedHash > 70) return { status: "no_match", confidence: 0, warnings: [...warnings, "No canonical match found — needs review"] };
-  if (normalizedHash > 55) return { status: "needs_review", confidence: 40 + (normalizedHash % 15), warnings: [...warnings, "Ambiguous match — multiple possible canonical tracks"] };
-  if (normalizedHash > 40) return { status: "duplicate_candidate", confidence: 30 + (normalizedHash % 15), warnings: [...warnings, "Possible duplicate of existing canonical track"] };
-  return { status: "canonical", confidence: 70 + (normalizedHash % 25), warnings };
-}
+// ── Row ID generation ─────────────────────────────────────────────────────────
 
 function generateResolvedRowId(row: NormalizedChartRow, index: number): string {
   const provider = row.sourceProvider === "spotify" ? "sp" : "am";
@@ -55,7 +45,12 @@ function generateResolvedRowId(row: NormalizedChartRow, index: number): string {
   return `row-${provider}-${trackId}`;
 }
 
-function generateCanonicalIds(row: NormalizedChartRow, status: MatchStatus): {
+// ── Canonical ID generation ───────────────────────────────────────────────────
+
+function generateCanonicalIds(
+  row: NormalizedChartRow,
+  status: MatchStatus,
+): {
   canonicalTrackId: string | null;
   canonicalReleaseId: string | null;
   canonicalArtistIds: string[];
@@ -64,7 +59,9 @@ function generateCanonicalIds(row: NormalizedChartRow, status: MatchStatus): {
   if (status === "canonical") {
     return {
       canonicalTrackId: row.providerTrackId ? `wk-${row.providerTrackId}` : null,
-      canonicalReleaseId: row.providerReleaseId ? `wk-${row.providerReleaseId}` : null,
+      canonicalReleaseId: row.providerReleaseId
+        ? `wk-${row.providerReleaseId}`
+        : null,
       canonicalArtistIds: (row.providerArtistIds ?? []).map((id) => `wk-${id}`),
       releaseShellId: null,
     };
@@ -74,21 +71,54 @@ function generateCanonicalIds(row: NormalizedChartRow, status: MatchStatus): {
       canonicalTrackId: null,
       canonicalReleaseId: null,
       canonicalArtistIds: [],
-      releaseShellId: row.providerReleaseId ? `shell-${row.providerReleaseId}` : `shell-${row.providerTrackId ?? "unknown"}`,
+      releaseShellId: row.providerReleaseId
+        ? `shell-${row.providerReleaseId}`
+        : `shell-${row.providerTrackId ?? "unknown"}`,
     };
   }
-  return { canonicalTrackId: null, canonicalReleaseId: null, canonicalArtistIds: [], releaseShellId: null };
+  return {
+    canonicalTrackId: null,
+    canonicalReleaseId: null,
+    canonicalArtistIds: [],
+    releaseShellId: null,
+  };
 }
 
+// ── Rich metadata helpers ─────────────────────────────────────────────────────
+
 function hasRichMetadata(raw: unknown): boolean {
-  return Boolean(raw && typeof raw === "object" && "richMetadata" in raw);
+  return Boolean(
+    raw && typeof raw === "object" && "richMetadata" in raw,
+  );
 }
 
 function hasArtistCredits(raw: unknown): boolean {
-  return Boolean(raw && typeof raw === "object" && "artistCredits" in raw && Array.isArray((raw as Record<string, unknown>).artistCredits));
+  return Boolean(
+    raw &&
+      typeof raw === "object" &&
+      "artistCredits" in raw &&
+      Array.isArray((raw as Record<string, unknown>).artistCredits),
+  );
 }
 
-export function normalizeToResolvedRows(rows: NormalizedChartRow[]): NormalizeResult {
+// ── Core normalization entry point ────────────────────────────────────────────
+
+/**
+ * Normalize a batch of provider-fetched rows into ingest-resolved rows.
+ *
+ * Each row receives:
+ *  - normalized_key  (Bible §3: "{normalized_title}::{lead_artist_key}")
+ *  - lead_artist_key (Bible §3: primary artist extracted & normalized)
+ *  - Rich metadata (ISRC, UPC, release date, artist credits, etc.)
+ *  - Default matchStatus of "needs_review" (canonical matching is deferred
+ *    to the backend pipeline — canonicalMatch.ts / canonical_match stage)
+ *
+ * This function is PURE and deterministic — same input always produces
+ * the same normalized_key for every row.
+ */
+export function normalizeToResolvedRows(
+  rows: NormalizedChartRow[],
+): NormalizeResult {
   const resolvedRows: IngestResolvedRow[] = [];
   let canonicalMatches = 0;
   let shells = 0;
@@ -101,18 +131,34 @@ export function normalizeToResolvedRows(rows: NormalizedChartRow[]): NormalizeRe
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
-    const { status, confidence, warnings } = computeMatchStatus(row);
-    const canonicalIds = generateCanonicalIds(row, status);
-    const richRaw = enrichRawWithRichMetadata(row);
 
-    if (status === "canonical") canonicalMatches++;
-    if (status === "shell") shells++;
-    if (status === "no_match") gaps++;
-    if (status === "duplicate_candidate") duplicateCandidates++;
-    if (status === "needs_review") needsReview++;
+    // ── Build identity keys using the canonical scoring engine ──
+    const title = row.trackTitle || row.releaseTitle || "Unknown";
+    const artistLine = row.artistNames.join(", ");
+    const normalizedKey = build_normalized_key(title, artistLine);
+    const leadKey = lead_artist_key(artistLine);
+    const normalizedTitle = normalize_title(title);
+    const normalizedArtist = normalize_artist(artistLine);
+
+    // ── Warnings for missing provider data ──
+    const warnings: string[] = [];
+    if (!row.artworkUrl) warnings.push("Missing artwork URL from provider");
+    if (!row.previewUrl) warnings.push("No preview URL available from provider");
+    if (!row.externalUrl) warnings.push("No external URL from provider");
+
+    // ── Default match status: defer to backend pipeline ──
+    // The canonical_match stage (canonicalMatch.ts / backend) handles
+    // actual entity resolution. Here we set a sensible default.
+    const status: MatchStatus = "needs_review";
+
+    // ── Enrich with rich metadata ──
+    const richRaw = enrichRawWithRichMetadata(row);
+    const canonicalIds = generateCanonicalIds(row, status);
+
+    // Counters
+    needsReview++;
     if (hasRichMetadata(richRaw)) richMetadataRows++;
     if (hasArtistCredits(richRaw)) artistCreditRows++;
-
     allWarnings.push(...warnings);
 
     const resolved: IngestResolvedRow = {
@@ -126,18 +172,25 @@ export function normalizeToResolvedRows(rows: NormalizedChartRow[]): NormalizeRe
       artistNames: row.artistNames,
       artworkUrl: row.artworkUrl,
       matchStatus: status,
-      confidence,
+      confidence: 50, // neutral — actual confidence assigned by canonical_match stage
       canonicalTrackId: canonicalIds.canonicalTrackId,
       canonicalReleaseId: canonicalIds.canonicalReleaseId,
       canonicalArtistIds: canonicalIds.canonicalArtistIds,
       releaseShellId: canonicalIds.releaseShellId,
       warnings: warnings.length > 0 ? warnings : undefined,
+      // ── Bible §3 identity keys ──
+      normalized_key: normalizedKey,
+      lead_artist_key: leadKey,
       raw: {
         ...richRaw,
         canonicalTrackId: canonicalIds.canonicalTrackId,
         canonicalReleaseId: canonicalIds.canonicalReleaseId,
         canonicalArtistIds: canonicalIds.canonicalArtistIds,
         releaseShellId: canonicalIds.releaseShellId,
+        normalized_key: normalizedKey,
+        lead_artist_key: leadKey,
+        normalized_title: normalizedTitle,
+        normalized_artist: normalizedArtist,
       },
     };
 
@@ -164,14 +217,40 @@ export function normalizeToResolvedRows(rows: NormalizedChartRow[]): NormalizeRe
   };
 }
 
-export function mergeNormalizedRows(rows: NormalizedChartRow[]): NormalizedChartRow[] {
-  const seen = new Set<string>();
+// ── Deduplication ─────────────────────────────────────────────────────────────
+
+/**
+ * Deduplicate normalized rows by identity.
+ *
+ * Priority order:
+ *  1. providerTrackId (most reliable — provider-assigned unique ID)
+ *  2. normalized_key (Bible §3 composite key from title + lead artist)
+ *
+ * When duplicates are found, the FIRST occurrence is kept.
+ */
+export function mergeNormalizedRows(
+  rows: NormalizedChartRow[],
+): NormalizedChartRow[] {
+  const seenProviderIds = new Set<string>();
+  const seenKeys = new Set<string>();
   const result: NormalizedChartRow[] = [];
+
   for (const row of rows) {
-    const key = row.providerTrackId || `${row.trackTitle ?? ""}:${row.artistNames.join("|")}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
+    // Check by provider track ID first (strongest signal)
+    if (row.providerTrackId) {
+      if (seenProviderIds.has(row.providerTrackId)) continue;
+      seenProviderIds.add(row.providerTrackId);
+    }
+
+    // Check by normalized key (composite identity)
+    const title = row.trackTitle || row.releaseTitle || "Unknown";
+    const artistLine = row.artistNames.join(", ");
+    const key = build_normalized_key(title, artistLine);
+    if (key && seenKeys.has(key)) continue;
+    if (key) seenKeys.add(key);
+
     result.push(row);
   }
+
   return result;
 }

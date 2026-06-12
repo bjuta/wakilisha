@@ -81,6 +81,7 @@ export type BackendMatchDecisionRequest = {
   rowId: string;
   action: string;
   canonicalTrackId?: string;
+  note?: string;
 };
 
 export type RuntimeBackendAdapter = {

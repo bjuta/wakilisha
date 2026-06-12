@@ -126,3 +126,83 @@ export function getProviderCredentialTemplateFromSchema(schema: ProviderCredenti
     .map((envVar) => `${envVar}=your_value_here`)
     .join("\n");
 }
+
+// ──── Server sync — pushes credentials to admin_settings_secrets table ────
+// The chart-ingest-api edge function reads from Deno.env first, then falls
+// back to admin_settings_secrets. This bridges the admin UI → edge function gap.
+
+export type ServerSyncResult = {
+  ok: boolean;
+  message: string;
+  savedKeys: string[];
+  errors?: string[];
+};
+
+export async function syncProviderCredentialsToServer(
+  providerKey: string,
+  values: ProviderCredentialValues,
+): Promise<ServerSyncResult> {
+  const schema = getProviderCredentialSchema(providerKey);
+  if (!schema) return { ok: false, message: `Unknown provider: ${providerKey}`, savedKeys: [] };
+
+  const credentials: Record<string, string> = {};
+  for (const field of schema.fields) {
+    if (field.envVar) {
+      const val = values[field.key] ?? getDefaultFieldValue(field);
+      const strVal = typeof val === "boolean" || typeof val === "number" ? String(val) : val;
+      if (strVal && String(strVal).trim()) {
+        credentials[field.envVar] = String(strVal).trim();
+      }
+    }
+  }
+
+  if (Object.keys(credentials).length === 0) {
+    return { ok: false, message: "No credential values to sync.", savedKeys: [] };
+  }
+
+  try {
+    const { supabase } = await import("@/lib/supabase");
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    if (!token) return { ok: false, message: "Not authenticated. Please log in again.", savedKeys: [] };
+
+    const supabaseUrl = import.meta.env.VITE_PUBLIC_SUPABASE_URL as string;
+    const res = await fetch(`${supabaseUrl}/functions/v1/admin-save-credentials`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ action: "save", provider: providerKey, credentials }),
+    });
+
+    const result = await res.json() as ServerSyncResult;
+    if (!res.ok || !result.ok) {
+      return { ok: false, message: result.message || `Server sync failed (${res.status})`, savedKeys: result.savedKeys || [], errors: result.errors };
+    }
+    return result;
+  } catch (err) {
+    return { ok: false, message: err instanceof Error ? err.message : "Network error during server sync", savedKeys: [] };
+  }
+}
+
+export async function clearProviderCredentialsFromServer(providerKey: string): Promise<ServerSyncResult> {
+  const envVars = getProviderEnvVars(providerKey);
+  if (envVars.length === 0) return { ok: false, message: `No env vars for provider: ${providerKey}`, savedKeys: [] };
+
+  try {
+    const { supabase } = await import("@/lib/supabase");
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    if (!token) return { ok: false, message: "Not authenticated. Please log in again.", savedKeys: [] };
+
+    const supabaseUrl = import.meta.env.VITE_PUBLIC_SUPABASE_URL as string;
+    const res = await fetch(`${supabaseUrl}/functions/v1/admin-save-credentials`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ action: "clear", provider: providerKey, envVars }),
+    });
+
+    const result = await res.json() as ServerSyncResult;
+    return result;
+  } catch (err) {
+    return { ok: false, message: err instanceof Error ? err.message : "Network error during server clear", savedKeys: [] };
+  }
+}

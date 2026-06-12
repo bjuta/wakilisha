@@ -7,25 +7,28 @@
  */
 
 import * as mockAdapter from "./api";
-import * as ingestStudioMock from "./ingestStudioMock";
+import * as productionAdapter from "./productionAdapter";
 import {
   detectProvidersFromUrls,
   isValidProviderUrl,
 } from "./providerDetection";
 
-export type IngestionMode = "local";
-export const CHARTS_INGESTION_MODE: IngestionMode = "local";
+export type IngestionMode = "local" | "production";
+
+/**
+ * PRODUCTION RULE: The ingest pipeline must always use the production adapter
+ * (Supabase-backed). The local/mock adapter is only available in DEV mode
+ * for development scaffolding. It must never be used for production ingestion.
+ */
+export const CHARTS_INGESTION_MODE: IngestionMode = import.meta.env.DEV ? "local" : "production";
 
 export function getIngestionMode(): IngestionMode {
   return CHARTS_INGESTION_MODE;
 }
 
 export function setIngestionMode(_mode: IngestionMode): void {
-  try {
-    localStorage.setItem("wkcharts_ingestion_mode", "local");
-  } catch {
-    // ignore
-  }
+  // No-op in production — mode is determined by build environment
+  // In DEV, mode is always "local" to indicate mock scaffolding is available
 }
 
 if (import.meta.env.DEV) {
@@ -37,7 +40,8 @@ if (import.meta.env.DEV) {
 }
 
 const adapter = mockAdapter;
-const ingestStudioAdapter = ingestStudioMock;
+// Production adapter — DB-backed, no localStorage dependency
+const ingestStudioAdapter = productionAdapter;
 
 export type EndpointStatus = "not_configured" | "planned" | "local" | "ready" | "deprecated";
 
@@ -145,8 +149,10 @@ export async function testAPIConnection(): Promise<{ ok: boolean; plugin: string
 
 function getEndpointStatus(fnName: string): EndpointStatus {
   const cleanName = fnName.replace(/\([^)]*\)/g, "").trim();
-  const allExports = [adapter, ingestStudioAdapter];
+  const allExports = [adapter, productionAdapter];
   const hasFunction = allExports.some((candidate) => typeof (candidate as Record<string, unknown>)[cleanName] === "function");
+  // Production adapter functions are live DB-backed ("ready"), local mock is "local"
+  if (typeof (productionAdapter as Record<string, unknown>)[cleanName] === "function") return "ready";
   if (hasFunction) return "local";
   return "planned";
 }
@@ -183,6 +189,15 @@ export const getResourceGuardStatus = ingestStudioAdapter.getResourceGuardStatus
 export const sendGapsToReview = ingestStudioAdapter.sendGapsToReview;
 export const applyRowMatchDecision = ingestStudioAdapter.applyRowMatchDecision;
 export const validateRunReadiness = ingestStudioAdapter.validateRunReadiness;
+export const getReviewIssues = ingestStudioAdapter.getReviewIssues;
+export const getMatchesForRun = ingestStudioAdapter.getMatchesForRun;
+export const normalizeRun = ingestStudioAdapter.normalizeRun;
+export const getNormalizedRows = ingestStudioAdapter.getNormalizedRows;
+export const sourceFetch = ingestStudioAdapter.sourceFetch;
+export const runEligibility = ingestStudioAdapter.runEligibility;
+export const runScoring = ingestStudioAdapter.runScoring;
+export const runShortlist = ingestStudioAdapter.runShortlist;
+export const resetPipeline = ingestStudioAdapter.resetPipeline;
 
 export const resetStore = adapter.resetStore;
 export const resetDemo = adapter.resetDemo;
@@ -212,7 +227,6 @@ export const approveCandidateMatch = adapter.approveCandidateMatch;
 export const rejectCandidateMatch = adapter.rejectCandidateMatch;
 export const rematchCandidate = adapter.rematchCandidate;
 export const markAsNewEntity = adapter.markAsNewEntity;
-export const getReviewIssues = adapter.getReviewIssues;
 export const resolveReviewIssue = adapter.resolveReviewIssue;
 export const reopenIssue = adapter.reopenIssue;
 export const applyRankOverride = adapter.applyRankOverride;
@@ -245,7 +259,7 @@ export {
 // ─── Auto-restored chart admin barrel exports ───
 export { attachCsvAsSource, createDraftFromCsvCandidates, exportDraftJson, getCsvImportSessions, getDiscoveredCsvSources, normalizeCsvCandidates, validateCsvDraftIntegrity } from "./api";
 export { validateCommitReadiness } from "./commitService";
-export { getIngestRun } from "./ingestStudioMock";
+export { getIngestRun, runPreflightCheck as preflight, validateRunReadinessAsync } from "./productionAdapter";
 export { detectProvidersFromUrls, isValidProviderUrl } from "./providerDetection";
 export { clearAllSimulations, getActiveSimulations, getLastErrorMessage, isSimulated, retry, simulate } from "./simulation";
 export { appendJobLog, getStore } from "./store";

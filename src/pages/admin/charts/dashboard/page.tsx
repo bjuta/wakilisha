@@ -140,7 +140,7 @@ export default function AdminChartsDashboard() {
           <div className="flex flex-wrap gap-2">
             {failedJobs.length > 0 && (
               <button
-                onClick={() => navigate("/admin/charts/ingest-jobs")}
+                onClick={() => navigate("/admin/charts/ingest-runs")}
                 className="inline-flex items-center gap-1.5 rounded-md border border-wk-danger/20 bg-wk-danger-soft px-3 py-1.5 text-[12px] font-semibold text-wk-danger transition-colors hover:bg-wk-danger/20 whitespace-nowrap"
               >
                 <WkIcon name="AlertCircle" size={14} />
@@ -276,32 +276,12 @@ export default function AdminChartsDashboard() {
             <div className="mb-4 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <WkIcon name="History" size={16} className="text-wk-text-muted" />
-                <h2 className="text-[14px] font-bold text-wk-text">Legacy Active Jobs</h2>
+                <h2 className="text-[14px] font-bold text-wk-text">Legacy Jobs (Archived)</h2>
               </div>
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-wk-text-faint">Legacy</span>
             </div>
-            {activeJobs.length === 0 ? (
-              <div className="py-4 text-center text-[12px] text-wk-text-muted">
-                No active legacy jobs. Provider-based runs are the new standard.
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {activeJobs.map((job) => (
-                  <button
-                    key={job.id}
-                    onClick={() => navigate(`/admin/charts/ingest-jobs/${job.id}`)}
-                    className="flex w-full items-center gap-3 rounded-lg border border-wk-border p-3 text-left transition-all hover:bg-wk-surface-raised"
-                  >
-                    <AdminChartsStatusBadge status={job.status} size="sm" />
-                    <span className="truncate text-[12px] font-semibold text-wk-text">
-                      {job.chartFamily?.label ?? job.chartFamilyId}
-                    </span>
-                    <span className="text-[11px] text-wk-text-muted">{job.editionDate}</span>
-                    <span className="ml-auto text-[11px] text-wk-text-faint">{job.createdBy}</span>
-                  </button>
-                ))}
-              </div>
-            )}
+            <div className="py-4 text-center text-[12px] text-wk-text-muted">
+              Legacy CSV ingest jobs have been retired. All active ingestion uses provider-based runs.
+            </div>
           </WkSurface>
         </div>
 
@@ -335,7 +315,7 @@ export default function AdminChartsDashboard() {
                     <div className="mt-1 text-[11px] text-wk-text">{job.errorMessage}</div>
                     <div className="mt-2 flex gap-2">
                       <button
-                        onClick={() => navigate(`/admin/charts/ingest-jobs/${job.id}`)}
+                        onClick={() => navigate("/admin/charts/ingest-runs")}
                         className="wk-button wk-button-sm wk-button-ghost"
                       >
                         View

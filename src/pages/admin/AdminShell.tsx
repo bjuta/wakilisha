@@ -8,7 +8,7 @@ import { supabase } from "@/lib/supabase";
 import { ROLE_LABELS, roleCanAccessAdmin, type Capability } from "@/services/userRoles";
 import type { WkIconName } from "@/components/design-system/Icon";
 
-interface NavItem { path: string; label: string; icon: WkIconName; badgeKey?: string; disabled?: boolean; requiredCapability?: Capability; }
+interface NavItem { path: string; label: string; icon: WkIconName; badgeKey?: string; disabled?: boolean; requiredCapability?: Capability; separatorLabel?: string; }
 interface NavGroup { label: string; items: NavItem[]; visible: (can: (capability: Capability) => boolean) => boolean; }
 
 const NAV_GROUPS: NavGroup[] = [
@@ -19,8 +19,6 @@ const NAV_GROUPS: NavGroup[] = [
     { path: "/admin/content/pages", label: "Pages", icon: "Layout", requiredCapability: "edit_pages" },
     { path: "/admin/content/publishing", label: "Publishing", icon: "Globe", requiredCapability: "view_publishing_dashboard" },
     { path: "/admin/content/archive", label: "Archive", icon: "Archive", requiredCapability: "view_archive" },
-    { path: "/admin/content/migration", label: "Media Migration", icon: "HardDriveDownload", requiredCapability: "view_media_migration" },
-    { path: "/admin/content/collections", label: "Collections", icon: "Library", disabled: true },
     { path: "/admin/content/categories", label: "Categories", icon: "FolderTree", requiredCapability: "manage_categories" },
     { path: "/admin/content/tags", label: "Tags", icon: "Tags", requiredCapability: "manage_tags" },
   ] },
@@ -41,20 +39,37 @@ const NAV_GROUPS: NavGroup[] = [
     { path: "/admin/registry/labels", label: "Labels", icon: "Building2", requiredCapability: "view_registry" },
     { path: "/admin/registry/genres", label: "Genres", icon: "Tags", requiredCapability: "view_registry" },
   ] },
-  { label: "Commerce", visible: () => false, items: [{ path: "/admin/commerce/products", label: "Products", icon: "ShoppingBag", disabled: true }] },
   { label: "Media", visible: (can) => can("manage_media_library"), items: [
     { path: "/admin/media/library", label: "Media Library", icon: "Image", requiredCapability: "manage_media_library" },
     { path: "/admin/media/missing", label: "Missing Images", icon: "ImageOff", badgeKey: "missingImages", requiredCapability: "view_missing_images" },
-    { path: "/admin/media/orphaned", label: "Orphaned Media", icon: "Unlink", disabled: true },
     { path: "/admin/media/broken", label: "Broken Links", icon: "LinkBreak", badgeKey: "brokenLinks", requiredCapability: "view_broken_links" },
   ] },
-  { label: "Relationships", visible: (can) => can("view_relationships"), items: [
+  { label: "Data & Imports", visible: (can) => can("view_review_queue") || can("view_relationships") || can("view_imports"), items: [
+    { path: "/admin/review/queue", label: "Review Queue", icon: "GitPullRequest", badgeKey: "reviewQueue", requiredCapability: "view_review_queue" },
     { path: "/admin/relationships/viewer", label: "Entity Relationships", icon: "Network", requiredCapability: "view_relationships" },
     { path: "/admin/relationships/duplicates", label: "Duplicate Merge", icon: "Copy", requiredCapability: "manage_relationships" },
+    { path: "", label: "", icon: "Minus", separatorLabel: "Historical" },
+    { path: "/admin/imports", label: "WordPress Import", icon: "Download", requiredCapability: "view_imports" },
+    { path: "/admin/imports/jobs", label: "Import Jobs", icon: "Upload", requiredCapability: "view_imports" },
+    { path: "/admin/imports/review-artifacts", label: "Review Artifacts", icon: "Archive", requiredCapability: "view_imports" },
   ] },
-  { label: "Review", visible: (can) => can("view_review_queue"), items: [{ path: "/admin/review/queue", label: "Review Queue", icon: "GitPullRequest", badgeKey: "reviewQueue", requiredCapability: "view_review_queue" }] },
-  { label: "Imports", visible: (can) => can("view_imports"), items: [{ path: "/admin/imports", label: "WordPress Import", icon: "Download", requiredCapability: "view_imports" }, { path: "/admin/imports/jobs", label: "Import Jobs", icon: "Upload", requiredCapability: "view_imports" }] },
-  { label: "Settings", visible: (can) => can("view_settings"), items: [{ path: "/admin/settings", label: "Settings Hub", icon: "Settings", requiredCapability: "view_settings" }, { path: "/admin/settings/integrations", label: "Integrations", icon: "Plug", requiredCapability: "manage_integrations" }, { path: "/admin/settings/frontend-appearance", label: "Appearance", icon: "Palette", requiredCapability: "manage_appearance" }, { path: "/admin/settings/navigation", label: "Navigation", icon: "Compass", requiredCapability: "manage_appearance" }, { path: "/admin/settings/audit", label: "Audit Log", icon: "ClipboardList", requiredCapability: "view_settings" }] },
+  { label: "Settings", visible: (can) => can("view_settings"), items: [
+    { path: "/admin/settings", label: "Settings Hub", icon: "Settings", requiredCapability: "view_settings" },
+    { path: "/admin/settings/site-identity", label: "Site Identity", icon: "Fingerprint", requiredCapability: "view_settings" },
+    { path: "/admin/settings/chart-defaults", label: "Chart Defaults", icon: "BarChart3", requiredCapability: "view_settings" },
+    { path: "/admin/settings/design-system", label: "Design System", icon: "Palette", requiredCapability: "view_settings" },
+    { path: "/admin/settings/integrations", label: "Integrations", icon: "Plug", requiredCapability: "manage_integrations" },
+    { path: "/admin/settings/gsc-data", label: "GSC Data", icon: "Globe", requiredCapability: "view_settings" },
+    { path: "/admin/settings/frontend-appearance", label: "Appearance", icon: "Palette", requiredCapability: "manage_appearance" },
+    { path: "/admin/settings/player-playback", label: "Player & Playback", icon: "Play", requiredCapability: "view_settings" },
+    { path: "/admin/settings/registry", label: "Registry Settings", icon: "Database", requiredCapability: "view_settings" },
+    { path: "/admin/settings/airplay", label: "Airplay", icon: "Radio", requiredCapability: "view_settings" },
+    { path: "/admin/settings/audience", label: "Audience", icon: "Users", requiredCapability: "view_settings" },
+    { path: "/admin/settings/email-briefings", label: "Email & Briefings", icon: "Mail", requiredCapability: "view_settings" },
+    { path: "/admin/settings/maintenance", label: "Maintenance", icon: "Wrench", requiredCapability: "view_settings" },
+    { path: "/admin/settings/navigation", label: "Navigation", icon: "Compass", requiredCapability: "manage_appearance" },
+    { path: "/admin/settings/audit", label: "Audit Log", icon: "ClipboardList", requiredCapability: "view_settings" },
+  ] },
   { label: "Users", visible: (can) => can("manage_users"), items: [{ path: "/admin/users", label: "Manage Users", icon: "Users", requiredCapability: "manage_users" }] },
 ];
 
@@ -126,7 +141,12 @@ export function AdminShell() {
         </div>
         {collapsed && <button onClick={() => setCollapsed(false)} className="mx-auto mt-3 rounded p-1 text-wk-text-faint hover:bg-wk-surface-raised hover:text-wk-text"><WkIcon name="PanelLeftOpen" size={16} /></button>}
         <nav className="flex-1 overflow-y-auto px-3 py-4">
-          {visibleGroups.map((group) => group.items.length > 0 && <div key={group.label} className="mb-5"><div className={`mb-2 px-3 text-[10px] font-black uppercase tracking-wider text-wk-text-faint ${collapsed ? "sr-only" : ""}`}>{group.label}</div><div className="space-y-1">{group.items.map((item) => <SidebarLink key={item.path} item={item} active={location.pathname === item.path || (item.path !== "/admin" && location.pathname.startsWith(item.path))} collapsed={collapsed} badge={item.badgeKey ? getNavBadge(item.badgeKey, counts) : undefined} onClick={() => navigate(item.path)} />)}</div></div>)}
+          {visibleGroups.map((group) => group.items.length > 0 && <div key={group.label} className="mb-5"><div className={`mb-2 px-3 text-[10px] font-black uppercase tracking-wider text-wk-text-faint ${collapsed ? "sr-only" : ""}`}>{group.label}</div><div className="space-y-1">{group.items.map((item) => {
+            if (item.separatorLabel) {
+              return <div key={item.separatorLabel} className={`px-3 pt-3 pb-1 text-[9px] font-black uppercase tracking-widest text-wk-text-faint/50 ${collapsed ? "sr-only" : ""}`}>{item.separatorLabel}</div>;
+            }
+            return <SidebarLink key={item.path} item={item} active={location.pathname === item.path || (item.path !== "/admin" && location.pathname.startsWith(item.path))} collapsed={collapsed} badge={item.badgeKey ? getNavBadge(item.badgeKey, counts) : undefined} onClick={() => navigate(item.path)} />;
+          })}</div></div>)}
         </nav>
         <div className="border-t border-wk-border p-3"><UserProfileDropdown user={user} collapsed={collapsed} /><button onClick={() => setMode(resolvedTheme === "dark" ? "light" : "dark")} className="mt-2 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-[12px] font-semibold text-wk-text-muted hover:bg-wk-surface-raised hover:text-wk-text"><WkIcon name={resolvedTheme === "dark" ? "Sun" : "Moon"} size={15} />{!collapsed && <span>{resolvedTheme === "dark" ? "Light mode" : "Dark mode"}</span>}</button></div>
       </aside>

@@ -5,7 +5,6 @@ import { ResponsivePage } from "@/components/mobile/ResponsivePage";
 import { MobileFullPlayer } from "@/components/mobile/MobileFullPlayer";
 import NotFound from "../pages/NotFound";
 import Home from "../pages/home/page";
-import AdminDesignSystem from "../pages/admin/design-system/page";
 import AdminLoginPage from "../pages/admin/login/page";
 import ResetPasswordPage from "../pages/auth/reset-password/page";
 
@@ -44,7 +43,6 @@ import AdminRelationshipViewerPage from "../pages/admin/relationships/viewer/pag
 import AdminDuplicateMergePage from "../pages/admin/relationships/duplicates/page";
 import AdminPublishingDashboardPage from "../pages/admin/content/publishing/page";
 import AdminContentArchivePage from "../pages/admin/content/archive/page";
-import AdminMediaMigrationPage from "../pages/admin/content/migration/page";
 import AdminLyricsPage from "../pages/admin/content/lyrics/page";
 import AdminUsersPage from "../pages/admin/users/page";
 import AdminMagazineVisualsPage from "../pages/admin/magazine/visuals/page";
@@ -81,10 +79,9 @@ import AdminChartsReleaseShells from "../pages/admin/charts/release-shells/page"
 import AdminChartsCanonGaps from "../pages/admin/charts/canon-gaps/page";
 import AdminChartsIngestRuns from "../pages/admin/charts/ingest-runs/page";
 import AdminChartsIngestRunDetail from "../pages/admin/charts/ingest-run-detail/page";
-import AdminChartsLegacyIngestJobs from "../pages/admin/charts/ingest-jobs/page";
-import AdminChartsIngestHealth from "../pages/admin/charts/ingest-health/page";
 import AdminChartsScoringRuns from "../pages/admin/charts/scoring-runs/page";
 import AdminChartsEditionDetail from "../pages/admin/charts/edition-detail/page";
+import AdminChartsIngestHealth from "../pages/admin/charts/ingest-health/page";
 
 // Admin Settings
 import { AdminSettingsLayout } from "../pages/admin/settings/AdminSettingsLayout";
@@ -242,7 +239,6 @@ const routes: RouteObject[] = [
           { path: "pages", element: <AdminPagesPage /> },
           { path: "publishing", element: <AdminPublishingDashboardPage /> },
           { path: "archive", element: <AdminContentArchivePage /> },
-          { path: "migration", element: <AdminMediaMigrationPage /> },
           { path: "lyrics", element: <AdminLyricsPage /> },
           { path: "categories", element: <AdminCategoriesPage /> },
           { path: "tags", element: <AdminTagsPage /> },
@@ -332,7 +328,6 @@ const routes: RouteObject[] = [
         { path: "canon-gaps", element: <AdminChartsCanonGaps /> },
         { path: "ingest-runs", element: <AdminChartsIngestRuns /> },
         { path: "ingest-runs/:runId", element: <AdminChartsIngestRunDetail /> },
-        { path: "ingest-jobs", element: <AdminChartsLegacyIngestJobs /> },
         { path: "ingest-health", element: <AdminChartsIngestHealth /> },
         { path: "scoring-runs", element: <AdminChartsScoringRuns /> },
         { path: "editions/:editionId", element: <AdminChartsEditionDetail /> },

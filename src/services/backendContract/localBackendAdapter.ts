@@ -34,7 +34,7 @@ import {
   sendGapsToReview,
   applyRowMatchDecision,
   getIngestKpis,
-} from "../chartsIngestion/ingestStudioMock";
+} from "../chartsIngestion/productionAdapter";
 import { V2_PROGRAMS } from "../chartsIngestion/v2Programs";
 import {
   getAllV2Editions,
@@ -430,7 +430,7 @@ export const localBackendAdapter: RuntimeBackendAdapter = {
 
     async applyMatchDecision(payload: BackendMatchDecisionRequest): Promise<BackendResult<BackendIngestRun | null>> {
       try {
-        const run = await applyRowMatchDecision(payload.runId, payload.rowId, payload.action, payload.canonicalTrackId);
+        const run = await applyRowMatchDecision(payload.runId, payload.rowId, payload.action, payload.canonicalTrackId, payload.note);
         return backendOk(run ? toBackendRun(run) : null, localMeta());
       } catch (error) {
         return safeLocalFail<BackendIngestRun | null>(error, null);

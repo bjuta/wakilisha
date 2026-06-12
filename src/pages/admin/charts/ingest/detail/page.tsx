@@ -18,6 +18,7 @@ import {
   getJobSummaryApi,
   getJobLogs,
   resetDemo,
+  resetPipeline,
   getSnapshots,
   getEditionsApi,
   getCurrentRole,
@@ -94,6 +95,7 @@ export default function AdminChartsIngestDetail() {
   const [activePhase, setActivePhase] = useState(0);
   const [loading, setLoading] = useState(true);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [showPipelineResetConfirm, setShowPipelineResetConfirm] = useState(false);
   const [showContract, setShowContract] = useState(false);
   const [showTimeline, setShowTimeline] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "error" | "warning" | "success" } | null>(null);
@@ -150,6 +152,21 @@ export default function AdminChartsIngestDetail() {
     setToast({ message, type });
     setTimeout(() => setToast(null), 4000);
   }, []);
+
+  const handlePipelineReset = useCallback(async () => {
+    if (!jobId) return;
+    setShowPipelineResetConfirm(false);
+    try {
+      await resetPipeline(jobId);
+      showToast("Pipeline reset — all stages cleared, run back to draft", "success");
+      await loadData();
+    } catch (err) {
+      showToast(
+        err instanceof Error ? err.message : "Pipeline reset failed",
+        "error"
+      );
+    }
+  }, [jobId, loadData, showToast]);
 
   const handleRoleChange = (newRole: UserRole) => {
     setCurrentRole(newRole);
@@ -310,6 +327,48 @@ export default function AdminChartsIngestDetail() {
             <i className="ri-code-box-line" />
             API Contract
           </button>
+          {job.id !== "demo-job-001" && job.status !== "published" && job.status !== "committed" && job.status !== "committing" && (
+            <>
+              <button
+                onClick={() => setShowPipelineResetConfirm(true)}
+                className="wk-button wk-button-sm wk-button-ghost whitespace-nowrap text-[var(--wk-danger)] hover:bg-[var(--wk-danger-soft)]"
+                disabled={isReadOnly}
+                title={isReadOnly ? "Read-only mode" : "Reset pipeline — clear all stages and return to draft"}
+              >
+                <i className="ri-rewind-line" />
+                Reset Pipeline
+              </button>
+              {showPipelineResetConfirm && (
+                <div className="absolute right-0 top-12 z-50 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4 shadow-lg w-80">
+                  <div className="flex items-center gap-2">
+                    <i className="ri-error-warning-line text-[var(--wk-warning)] text-lg" />
+                    <div className="text-[13px] font-bold text-[var(--wk-text)]">Reset Pipeline?</div>
+                  </div>
+                  <div className="mt-2 text-[11px] text-[var(--wk-text-muted)] leading-relaxed">
+                    This will clear <strong>all</strong> stage results — raw rows, normalized rows, candidates, matches, review issues, scores, and exclusions. The run will be reset to <strong>draft</strong> status.
+                  </div>
+                  <div className="mt-2 text-[11px] text-[var(--wk-warning)] font-semibold">
+                    This cannot be undone.
+                  </div>
+                  <div className="mt-3 flex items-center gap-2 justify-end">
+                    <button
+                      onClick={() => setShowPipelineResetConfirm(false)}
+                      className="wk-button wk-button-sm wk-button-ghost whitespace-nowrap"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handlePipelineReset}
+                      className="wk-button wk-button-sm wk-button-danger whitespace-nowrap"
+                    >
+                      <i className="ri-rewind-line" />
+                      Reset Pipeline
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
           {job.id === "demo-job-001" && (
             <>
               <button

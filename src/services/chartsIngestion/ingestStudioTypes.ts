@@ -19,15 +19,25 @@ export type IngestRunStatus =
   | "draft"
   | "queued"
   | "running"
+  | "preflight_passed"
+  | "fetching"
+  | "normalizing"
+  | "scoring"
+  | "reviewing"
+  | "commit_pending"
   | "dry_run_complete"
   | "ready_to_commit"
   | "committing"
   | "committed"
+  | "needs_review"
+  | "publishing"
+  | "published"
+  | "source_fetch_failed"
   | "failed"
-  | "cancelled"
-  | "needs_review";
+  | "cancelled";
 
 export type IngestStage =
+  // ── Original UI stages (kept for backward-compat) ──
   | "validate"
   | "provider_detection"
   | "resource_guard"
@@ -38,7 +48,20 @@ export type IngestStage =
   | "eligibility_execution"
   | "methodology_scoring"
   | "enrichment"
-  | "snapshot_commit";
+  | "snapshot_commit"
+  // ── Full 21-stage DB pipeline (production backend) ──
+  | "raw_persist"
+  | "dedupe"
+  | "release_candidate_build"
+  | "airplay_evidence"
+  | "airplay_rescue"
+  | "carry_forward"
+  | "anti_gaming"
+  | "shortlist"
+  | "review_gate"
+  | "commit_validate"
+  | "commit_write"
+  | "public_verify";
 
 export type IngestStageStatus = {
   stage: IngestStage;
@@ -110,6 +133,10 @@ export type IngestResolvedRow = {
   methodologyScore?: ChartMethodologyScoreBreakdown | null;
   excludedRowId?: string | null;
   raw?: unknown;
+  /** Bible §3 identity key: "{normalized_title}::{lead_artist_key}" */
+  normalized_key: string;
+  /** Bible §3 lead artist key (primary artist, normalized) */
+  lead_artist_key: string;
 };
 
 export type IngestRunSummary = {

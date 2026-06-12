@@ -9,6 +9,8 @@ import {
   getProviderCredentialTemplate,
   getProviderEnvVarStatus,
   setApiMode,
+  testAcrcloudHealth,
+  type AcrcloudHealthResult,
 } from "@/services/adminSettings/providerHealthService";
 import { type IntegrationSettings, type ProviderTestResult } from "@/services/adminSettings/settingsTypes";
 import {
@@ -22,6 +24,9 @@ import {
   readProviderCredentialValues,
   saveProviderCredentialValues,
   type ProviderCredentialValues,
+  syncProviderCredentialsToServer,
+  clearProviderCredentialsFromServer,
+  type ServerSyncResult,
 } from "@/services/adminSettings/providerCredentialStore";
 
 type ProviderFormState = Record<string, ProviderCredentialValues>;
@@ -49,6 +54,12 @@ export default function AdminSettingsIntegrations() {
   const [showTemplate, setShowTemplate] = useState<string | null>(null);
   const [formValues, setFormValues] = useState<ProviderFormState>(() => makeInitialFormState(getIntegrationSettings()));
   const [formErrors, setFormErrors] = useState<ProviderFormErrors>({});
+  const [syncing, setSyncing] = useState<Record<string, boolean>>({});
+  const [syncResults, setSyncResults] = useState<Record<string, ServerSyncResult>>({});
+
+  // ACRCloud detection test state
+  const [acrTesting, setAcrTesting] = useState(false);
+  const [acrHealthResult, setAcrHealthResult] = useState<AcrcloudHealthResult | null>(null);
 
   const providerSchemas = useMemo(
     () => new Map(settings.providers.map((provider) => [provider.key, getProviderCredentialSchema(provider.key)])),
@@ -104,7 +115,7 @@ export default function AdminSettingsIntegrations() {
     }));
   };
 
-  const handleSaveProvider = (providerKey: string) => {
+  const handleSaveProvider = async (providerKey: string) => {
     const schema = providerSchemas.get(providerKey);
     if (!schema) return;
     const values = formValues[providerKey] ?? {};
@@ -112,6 +123,7 @@ export default function AdminSettingsIntegrations() {
     setFormErrors((prev) => ({ ...prev, [providerKey]: errors }));
     if (Object.keys(errors).length > 0) return;
 
+    // Save locally
     const status = saveProviderCredentialValues(providerKey, values);
     const updatedProviders = settings.providers.map((provider) =>
       provider.key === providerKey ? { ...provider, connected: status.configured, lastTested: null, health: "unknown" as const } : provider
@@ -119,20 +131,51 @@ export default function AdminSettingsIntegrations() {
     const next = { ...settings, providers: updatedProviders };
     saveDomainSettings("integrations", next);
     setSettings(next);
+
+    // Sync to server (so chart-ingest-api can read from admin_settings_secrets)
+    setSyncing((prev) => ({ ...prev, [providerKey]: true }));
+    const sr = await syncProviderCredentialsToServer(providerKey, values);
+    setSyncResults((prev) => ({ ...prev, [providerKey]: sr }));
+    setSyncing((prev) => ({ ...prev, [providerKey]: false }));
+
     setTestResults((prev) => ({
       ...prev,
       [providerKey]: {
         ok: status.configured,
         latencyMs: 0,
-        message: status.configured
-          ? `${schema.title} settings saved. Test the connection to verify backend access.`
-          : `${schema.title} saved with missing required fields: ${status.missingRequiredVars.join(", ")}.`,
+        message: sr.ok
+          ? `${schema.title} saved locally and synced to server. The chart ingest pipeline will use these credentials on the next run.`
+          : `${schema.title} saved locally but server sync failed: ${sr.message}. Credentials may not be available to the ingest pipeline.`,
       } as ProviderTestResult,
     }));
   };
 
-  const handleClearProvider = (providerKey: string) => {
+  const handleAcrDetectionTest = async () => {
+    setAcrTesting(true);
+    setAcrHealthResult(null);
+    const result = await testAcrcloudHealth();
+    setAcrHealthResult(result);
+    setAcrTesting(false);
+
+    // Also update the provider health status
+    if (result.ok) {
+      const updatedProviders = settings.providers.map((p) =>
+        p.key === "acrcloud"
+          ? { ...p, connected: true, lastTested: new Date().toISOString(), health: "healthy" as const }
+          : p
+      );
+      const next = { ...settings, providers: updatedProviders };
+      saveDomainSettings("integrations", next);
+      setSettings(next);
+    }
+  };
+
+  const handleClearProvider = async (providerKey: string) => {
     clearProviderCredentials(providerKey);
+    setSyncing((prev) => ({ ...prev, [providerKey]: true }));
+    const sr = await clearProviderCredentialsFromServer(providerKey);
+    setSyncResults((prev) => ({ ...prev, [providerKey]: sr }));
+    setSyncing((prev) => ({ ...prev, [providerKey]: false }));
     refreshSettings();
   };
 
@@ -290,14 +333,79 @@ export default function AdminSettingsIntegrations() {
                 </div>
               )}
 
+              {syncResults[provider.key] && (
+                <div className={`mb-4 rounded-lg p-3 text-[12px] ${syncResults[provider.key].ok ? "bg-[var(--wk-success-soft)] text-[var(--wk-success)]" : "bg-[var(--wk-warning-soft)] text-[var(--wk-warning)]"}`}>
+                  <div className="flex items-center gap-2 font-semibold">
+                    <WkIcon name={syncResults[provider.key].ok ? "Database" : "AlertTriangle"} size={14} />
+                    Server sync
+                  </div>
+                  <div className="mt-1">{syncResults[provider.key].message}</div>
+                </div>
+              )}
+
+              {/* ACRCloud Detection Test Panel */}
+              {provider.key === "acrcloud" && (
+                <div className="mb-4 rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] p-4">
+                  <div className="mb-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--wk-accent-100)] text-[var(--wk-accent-500)]">
+                        <WkIcon name="Radio" size={16} />
+                      </div>
+                      <div>
+                        <p className="text-[13px] font-bold text-[var(--wk-text)]">ACRCloud Detection Test</p>
+                        <p className="text-[11px] text-[var(--wk-text-muted)]">Verifies ACR_HOST + ACR_ACCESS_KEY + ACR_ACCESS_SECRET against the live ACRCloud API with HMAC-SHA1 signing.</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleAcrDetectionTest}
+                      disabled={acrTesting}
+                      className="wk-button wk-button-primary wk-button-sm flex items-center gap-1.5 whitespace-nowrap"
+                    >
+                      <WkIcon name={acrTesting ? "Loader" : "Activity"} size={14} className={acrTesting ? "animate-spin" : ""} />
+                      {acrTesting ? "Testing..." : "Run Detection Test"}
+                    </button>
+                  </div>
+
+                  {acrHealthResult && (
+                    <div className={`rounded-lg p-3 text-[12px] ${
+                      acrHealthResult.ok
+                        ? "bg-[var(--wk-success-soft)] text-[var(--wk-success)]"
+                        : "bg-[var(--wk-danger-soft)] text-[var(--wk-danger)]"
+                    }`}>
+                      <div className="flex items-center gap-2 font-semibold">
+                        <WkIcon name={acrHealthResult.ok ? "CheckCircle" : "XCircle"} size={14} />
+                        {acrHealthResult.ok ? "ACRCloud API verified" : "ACRCloud detection failed"}
+                        {acrHealthResult.latencyMs > 0 && (
+                          <span className="ml-auto text-[11px]">{acrHealthResult.latencyMs}ms</span>
+                        )}
+                      </div>
+                      <div className="mt-1">{acrHealthResult.message}</div>
+                      {acrHealthResult.details?.host && (
+                        <div className="mt-1 text-[11px] opacity-75">
+                          Host: {acrHealthResult.details.host}
+                          {acrHealthResult.details.status !== undefined && (
+                            <span> &middot; Status: {acrHealthResult.details.status}</span>
+                          )}
+                        </div>
+                      )}
+                      {acrHealthResult.missingVars && acrHealthResult.missingVars.length > 0 && (
+                        <div className="mt-1 text-[11px] font-semibold">
+                          Missing: {acrHealthResult.missingVars.join(", ")}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="flex flex-wrap gap-2">
                 <button onClick={() => handleTest(provider.key)} disabled={testing[provider.key]} className="wk-button wk-button-primary wk-button-sm flex items-center gap-1.5">
                   <WkIcon name={testing[provider.key] ? "Loader" : "Activity"} size={14} />
                   {testing[provider.key] ? "Testing..." : "Test Connection"}
                 </button>
-                <button onClick={() => handleSaveProvider(provider.key)} className="wk-button wk-button-primary wk-button-sm flex items-center gap-1.5">
-                  <WkIcon name="Save" size={14} />
-                  Save {schema.title}
+                <button onClick={() => handleSaveProvider(provider.key)} disabled={syncing[provider.key]} className="wk-button wk-button-primary wk-button-sm flex items-center gap-1.5">
+                  <WkIcon name={syncing[provider.key] ? "Loader" : "Save"} size={14} className={syncing[provider.key] ? "animate-spin" : ""} />
+                  {syncing[provider.key] ? "Syncing..." : `Save ${schema.title}`}
                 </button>
                 <button onClick={() => handleClearProvider(provider.key)} className="wk-button wk-button-ghost wk-button-sm">Clear</button>
                 <button onClick={() => setShowTemplate(showTemplate === provider.key ? null : provider.key)} className="wk-button wk-button-ghost wk-button-sm flex items-center gap-1.5">

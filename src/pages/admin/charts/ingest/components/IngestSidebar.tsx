@@ -2,7 +2,7 @@ import { WkSurface } from "@/components/design-system/primitives/Surface";
 import type { ChartEligibilityProfile } from "@/services/chartsEligibility/eligibilityTypes";
 import type { IngestRun, RecentIngestActivity, ResourceGuardStatus } from "@/services/chartsIngestion/ingestStudioTypes";
 import type { StoredChartMarketScope } from "@/services/chartsMarkets/marketScopeStore";
-import { AlertCircle, FolderPlus, GitPullRequest, History, XCircle } from "lucide-react";
+import { AlertCircle, FolderPlus, GitPullRequest, XCircle } from "lucide-react";
 import { ActivityItem } from "./ActivityItem";
 import { NavButton } from "./NavButton";
 import { PipelinePanel } from "./PipelinePanel";
@@ -86,7 +86,6 @@ export function IngestSidebar({
           <NavButton icon={XCircle} label="No-match Releases" path={`${ADMIN_CHARTS_BASE}/no-match`} />
           <NavButton icon={FolderPlus} label="Release Shells" path={`${ADMIN_CHARTS_BASE}/release-shells`} />
           <NavButton icon={AlertCircle} label="Canon Gaps" path={`${ADMIN_CHARTS_BASE}/canon-gaps`} />
-          <NavButton icon={History} label="Legacy Ingest Jobs" path={`${ADMIN_CHARTS_BASE}/ingest-jobs`} />
         </div>
       </WkSurface>
     </div>

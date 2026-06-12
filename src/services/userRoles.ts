@@ -195,11 +195,11 @@ export async function removeUserRole(userId: string, role?: UserRole): Promise<b
   return !legacy.error;
 }
 
-export interface NavVisibility { showDashboard: boolean; showContent: boolean; showArticles: boolean; showGuides: boolean; showPages: boolean; showPublishing: boolean; showArchive: boolean; showCharts: boolean; showRegistry: boolean; showCommerce: boolean; showMedia: boolean; showRelationships: boolean; showReview: boolean; showImports: boolean; showSettings: boolean; showMediaMigration: boolean; showUsers: boolean; }
+export interface NavVisibility { showDashboard: boolean; showContent: boolean; showArticles: boolean; showGuides: boolean; showPages: boolean; showPublishing: boolean; showArchive: boolean; showCharts: boolean; showRegistry: boolean; showCommerce: boolean; showMedia: boolean; showRelationships: boolean; showReview: boolean; showImports: boolean; showSettings: boolean; showUsers: boolean; }
 
 export function getNavVisibility(role: UserRole): NavVisibility {
   const can = (c: Capability) => userCan(role, c);
-  return { showDashboard: can("view_dashboard"), showContent: can("edit_own_articles"), showArticles: can("edit_own_articles"), showGuides: can("edit_guides"), showPages: can("edit_pages"), showPublishing: can("view_publishing_dashboard"), showArchive: can("view_archive"), showCharts: can("view_charts_admin"), showRegistry: can("view_registry"), showCommerce: false, showMedia: can("manage_media_library"), showRelationships: can("view_relationships"), showReview: can("view_review_queue"), showImports: can("view_imports"), showSettings: can("view_settings"), showMediaMigration: can("view_media_migration"), showUsers: can("manage_users") };
+  return { showDashboard: can("view_dashboard"), showContent: can("edit_own_articles"), showArticles: can("edit_own_articles"), showGuides: can("edit_guides"), showPages: can("edit_pages"), showPublishing: can("view_publishing_dashboard"), showArchive: can("view_archive"), showCharts: can("view_charts_admin"), showRegistry: can("view_registry"), showCommerce: false, showMedia: can("manage_media_library"), showRelationships: can("view_relationships"), showReview: can("view_review_queue"), showImports: can("view_imports"), showSettings: can("view_settings"), showUsers: can("manage_users") };
 }
 
 export function getDefaultRoute(role: UserRole): string {

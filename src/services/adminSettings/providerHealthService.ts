@@ -30,6 +30,64 @@ export async function testProviderConnection(provider: IntegrationProvider): Pro
   };
 }
 
+// ═══════════════════════════════════════════════════════════
+// ACRCloud Detection Test — calls admin-save-credentials
+// edge function which signs and hits the real ACRCloud API.
+// ═══════════════════════════════════════════════════════════
+export type AcrcloudHealthResult = {
+  ok: boolean;
+  latencyMs: number;
+  message: string;
+  details?: {
+    status?: number;
+    host?: string;
+    containers?: unknown;
+    body?: string;
+  };
+  error?: string;
+  code?: string;
+  missingVars?: string[];
+};
+
+export async function testAcrcloudHealth(): Promise<AcrcloudHealthResult> {
+  try {
+    const { supabase } = await import("@/lib/supabase");
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    if (!token) {
+      return { ok: false, latencyMs: 0, message: "Not authenticated. Please log in again.", error: "no_token" };
+    }
+
+    const supabaseUrl = import.meta.env.VITE_PUBLIC_SUPABASE_URL as string;
+    const res = await fetch(`${supabaseUrl}/functions/v1/admin-save-credentials`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ action: "health_check", provider: "acrcloud" }),
+    });
+
+    const result = await res.json() as AcrcloudHealthResult;
+
+    pushAuditEvent({
+      domain: "integrations",
+      action: "acrcloud_health_check",
+      details: `ACRCloud health check: ${result.ok ? "PASS" : "FAIL"} — ${result.message}`,
+      severity: result.ok ? "info" : "warning",
+    });
+
+    return result;
+  } catch (err) {
+    return {
+      ok: false,
+      latencyMs: 0,
+      message: err instanceof Error ? err.message : "Network error during ACRCloud health check",
+      error: "network_error",
+    };
+  }
+}
+
 export async function testAllProviders(): Promise<Record<string, ProviderTestResult>> {
   const settings = loadSettings().integrations;
   const results: Record<string, ProviderTestResult> = {};

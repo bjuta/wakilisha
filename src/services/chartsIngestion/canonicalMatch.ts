@@ -6,6 +6,7 @@
  */
 
 import type { NormalizedChartRow, IngestResolvedRow, MatchStatus } from "./ingestStudioTypes";
+import { build_normalized_key, lead_artist_key } from "@/services/chartsScoring/normalize";
 
 // ─── Registry Types ───
 export interface CanonicalTrack {
@@ -320,6 +321,11 @@ export function runCanonicalMatch(rows: NormalizedChartRow[], registry?: Canonic
       canonicalArtistIds: [],
       releaseShellId: assignment.releaseShellId,
       warnings: assignment.warnings.length > 0 ? assignment.warnings : undefined,
+      normalized_key: build_normalized_key(
+        row.trackTitle || row.releaseTitle || "Unknown",
+        row.artistNames.join(", "),
+      ),
+      lead_artist_key: lead_artist_key(row.artistNames.join(", ")),
       raw: row.raw,
     };
 

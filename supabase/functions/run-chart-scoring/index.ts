@@ -5,6 +5,9 @@
  * Accepts: { program_id, edition_date }
  * Does: fetch config → fetch evidence → run pipeline → write results
  * Returns: { edition_id, summary }
+ *
+ * v2: Reads airplay evidence from airplay_evidence_weekly (populated by chart-ingest-api run_airplay_detection).
+ *     Column mapping: source_id→station_id, total_played_duration_seconds→total_played_duration.
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
@@ -508,7 +511,6 @@ function evaluateEligibility(
   const warnings: string[] = [];
   let hardExcluded = false;
 
-  // Airplay candidate minimums
   if (row.airplay_candidate_only) {
     if (!config.airplay_enabled) { reasons.push("airplay disabled"); hardExcluded = true; }
     else if (!airplayContext) { reasons.push("no airplay context"); hardExcluded = true; }
@@ -520,13 +522,11 @@ function evaluateEligibility(
     }
   }
 
-  // Minimum sources (non-airplay, non-carry-forward only)
   if (!row.airplay_candidate_only && !row.carry_forward_only) {
     if (row.source_count < (config.streaming_min_sources ?? 1))
       { reasons.push(`source_count ${row.source_count} < min`); hardExcluded = true; }
   }
 
-  // Release date warning
   if (!row.release_date && !row.carry_forward_only && !row.airplay_candidate_only)
     warnings.push("missing release_date");
 
@@ -618,14 +618,11 @@ function runFullPipeline(
   config: ScoringConfig,
   editionDate: string,
 ): PipelineResult {
-  // Stage 1: Build input rows
   let inputRows = buildScoringInputRows(rawEvidence);
 
-  // Stage 2: Airplay contexts
   const rescueMode: AirplayRescueMode = config.airplay_rescue_mode ?? "allow_rescue";
   const airplayContexts = buildAirplayContextMap(airplayBuckets, rescueMode);
 
-  // Stage 3: Airplay rescue
   let rescueCount = 0;
   if (config.airplay_enabled && rescueMode === "allow_rescue") {
     const rescues = identifyAirplayRescueCandidates(airplayContexts, inputRows, rescueMode);
@@ -633,20 +630,16 @@ function runFullPipeline(
     rescueCount = rescues.length;
   }
 
-  // Stage 4: Carry-forward merge
   const merged = carryForwardMerge(inputRows, previousEdition, prevMeta);
   const cfCount = merged.filter((r) => r.carry_forward_only).length;
 
-  // Stage 5: Eligibility
   const eligible: ScoringInputRow[] = [];
-  const excludedCount = 0;
   for (const row of merged) {
     const ctx = airplayContexts.get(row.normalized_key) ?? null;
     const outcome = evaluateEligibility(row, ctx, config);
     if (outcome.status !== "excluded") eligible.push(row);
   }
 
-  // Stage 6-7: Score
   const provisionals = eligible.map((row) => {
     const ctx = airplayContexts.get(row.normalized_key) ?? null;
     const bd = scoreEvidenceRow(row, previousEdition, ctx, config, editionDate);
@@ -656,11 +649,9 @@ function runFullPipeline(
   const finalized = applyAntiGamingAndFinalize(provisionals, config);
   finalized.sort((a, b) => b.final_total - a.final_total);
 
-  // Stage 8: Shortlist
   const chartSize = config.chart_size ?? 20;
   const shortlist = finalized.slice(0, chartSize);
 
-  // Stage 9: Build scored rows
   const eligibleMap = new Map(eligible.map((r) => [r.normalized_key, r]));
   const prevMap = new Map(previousEdition.map((p) => [p.normalized_key, p.position]));
 
@@ -686,6 +677,17 @@ function runFullPipeline(
         overflow_index: scored.overflow_index,
         stale_carry_forward_demoted: false,
       },
+      airplay_detail: ctx ? {
+        normalized_key: ctx.normalized_key,
+        canonical_track_id: ctx.canonical_track_id,
+        W: ctx.W,
+        station_count: ctx.station_count,
+        detection_count: ctx.detection_count,
+        total_duration_seconds: ctx.total_duration_seconds,
+        last_detected_at: ctx.last_detected_at,
+        matched_by: ctx.matched_by,
+        rescue_mode: ctx.rescue_mode,
+      } : null,
       eligibility: { status: "eligible", warnings: [], reasons: [] },
       source_urls_seen: orig?.source_urls_seen ?? [],
       inputs: {
@@ -834,8 +836,6 @@ Deno.serve(async (req: Request) => {
 
     try {
       // ═══ 3. FETCH STAGING EVIDENCE ═══
-      // Evidence comes from wk_import_staging_records with target_entity = scoring_evidence
-      // or from the most recent ingestion run for this program
       const { data: stagingRows, error: stagingErr } = await supabase
         .from("wk_import_staging_records")
         .select("title, raw_record, mapped_record, source_url, target_slug")
@@ -847,24 +847,24 @@ Deno.serve(async (req: Request) => {
       if (stagingErr) throw new Error(`Staging fetch failed: ${stagingErr.message}`);
 
       // ═══ 4. FETCH AIRPLAY EVIDENCE ═══
+      // v2: Reads from airplay_evidence_weekly (populated by chart-ingest-api run_airplay_detection).
+      // Column mapping: source_id→station_id, total_played_duration_seconds→total_played_duration.
       let airplayBuckets: AirplayEvidenceBucket[] = [];
       if (config.airplay_enabled) {
-        const weekStart = editionDate; // simplified: use edition date as reference
         const { data: airplayRows, error: airplayErr } = await supabase
-          .from("wk_chart_airplay_evidence")
+          .from("airplay_evidence_weekly")
           .select("*")
-          .gte("week_start", weekStart)
-          .lte("week_start", weekStart);
+          .eq("edition_date", editionDate);
 
         if (!airplayErr && airplayRows) {
           airplayBuckets = airplayRows.map((r: Record<string, unknown>) => ({
             canonical_track_id: String(r.canonical_track_id ?? ""),
             normalized_key: String(r.normalized_key ?? ""),
-            station_id: String(r.station_id ?? ""),
+            station_id: String(r.source_id ?? ""),
             station_weight: Number(r.station_weight ?? 1),
             week_start: String(r.week_start ?? ""),
             detection_count: Number(r.detection_count ?? 0),
-            total_played_duration: Number(r.total_played_duration ?? 0),
+            total_played_duration: Number(r.total_played_duration_seconds ?? 0),
             weighted_score: Number(r.weighted_score ?? 0),
           }));
         }
@@ -924,9 +924,6 @@ Deno.serve(async (req: Request) => {
       const editionSlug = `${program.public_slug ?? "chart"}-${editionDate}`;
       const editionLabel = `${program.public_label ?? "Chart"} — ${editionDate}`;
 
-      const periodStart = editionDate;
-      const periodEnd = editionDate; // weekly = same date
-
       const { data: edition, error: editionErr } = await supabase
         .from("wk_chart_editions_v2")
         .upsert({
@@ -934,8 +931,8 @@ Deno.serve(async (req: Request) => {
           edition_slug: editionSlug,
           edition_label: editionLabel,
           edition_date: editionDate,
-          period_start: periodStart,
-          period_end: periodEnd,
+          period_start: editionDate,
+          period_end: editionDate,
           entry_count: result.scoredRows.length,
           status: "draft",
           methodology_version: METHODOLOGY_VERSION,
@@ -956,7 +953,6 @@ Deno.serve(async (req: Request) => {
       if (editionErr || !edition) throw new Error(`Edition upsert failed: ${editionErr?.message}`);
 
       // ═══ 9. WRITE ENTRIES ═══
-      // Delete existing entries for this edition first
       await supabase.from("wk_chart_entries_v2").delete().eq("edition_id", edition.id);
 
       const entryRows = result.scoredRows.map((row) => ({
@@ -1009,7 +1005,6 @@ Deno.serve(async (req: Request) => {
         airplay_rescue_mode: row.airplay_rescue_mode,
       }));
 
-      // Insert in batches
       const BATCH = 50;
       for (let i = 0; i < entryRows.length; i += BATCH) {
         const batch = entryRows.slice(i, i + BATCH);
@@ -1041,7 +1036,6 @@ Deno.serve(async (req: Request) => {
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     } catch (pipelineErr) {
-      // Mark run as failed
       const errMsg = pipelineErr instanceof Error ? pipelineErr.message : "Unknown pipeline error";
       await supabase.from("wk_chart_scoring_runs").update({
         status: "failed",

@@ -242,14 +242,6 @@ export default function AdminChartsEditions() {
                         <WkIcon name="Database" size={11} />
                         Run
                       </button>
-                    ) : edition.ingestJobId ? (
-                      <button
-                        onClick={() => navigate(`/admin/charts/ingest-jobs/${edition.ingestJobId}`)}
-                        className="inline-flex items-center gap-1 text-[11px] font-semibold text-wk-text-muted hover:underline whitespace-nowrap"
-                      >
-                        <WkIcon name="History" size={11} />
-                        Legacy
-                      </button>
                     ) : (
                       <span className="flex items-center gap-1 text-[11px] text-wk-text-faint">
                         <WkIcon name="Globe" size={11} />

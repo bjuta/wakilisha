@@ -8,6 +8,11 @@ import {
   sendGapsToReview,
   commitIngestRun,
   validateCommitReadiness,
+  sourceFetch,
+  normalizeRun,
+  runEligibility,
+  runScoring,
+  runShortlist,
 } from "@/services/chartsIngestion/client";
 import { SkeletonBlock } from "@/components/skeletons/Skeletons";
 import type { CommitIngestRunResponse } from "@/services/chartsIngestion/commitTypes";
@@ -44,12 +49,81 @@ function stageName(stage: string): string {
     provider_detection: "Provider Detection",
     resource_guard: "Resource Guard",
     source_fetch: "Source Fetch",
+    raw_persist: "Raw Persist",
     normalize: "Normalize",
+    dedupe: "Deduplication",
+    release_candidate_build: "Candidate Build",
     canonical_match: "Canonical Match",
+    entity_resolution: "Entity Resolution",
+    eligibility_execution: "Eligibility",
+    airplay_evidence: "Airplay Evidence",
+    airplay_rescue: "Airplay Rescue",
+    carry_forward: "Carry Forward",
+    methodology_scoring: "Scoring",
+    anti_gaming: "Anti-Gaming",
+    shortlist: "Shortlist",
+    review_gate: "Review Gate",
+    commit_validate: "Commit Validate",
+    commit_write: "Commit Write",
+    public_verify: "Public Verify",
     enrichment: "Enrichment",
     snapshot_commit: "Snapshot / Commit",
   };
   return names[stage] || stage;
+}
+
+// Stage triggers — only these stages can be manually invoked
+const STAGE_TRIGGERS: Record<string, (runId: string) => Promise<unknown>> = {
+  source_fetch: sourceFetch,
+  normalize: normalizeRun,
+  eligibility_execution: runEligibility,
+  methodology_scoring: runScoring,
+  shortlist: runShortlist,
+};
+
+// Ordered chain of triggerable stages (for gating — each unlocks the next)
+const TRIGGER_CHAIN = [
+  "source_fetch",
+  "normalize",
+  "eligibility_execution",
+  "methodology_scoring",
+  "shortlist",
+];
+
+function isStageTriggerable(stageName: string): boolean {
+  return stageName in STAGE_TRIGGERS;
+}
+
+function canTriggerStage(
+  stageName: string,
+  stages: IngestStageStatus[],
+  runStatus: string,
+): boolean {
+  // Must be a triggerable stage
+  if (!(stageName in STAGE_TRIGGERS)) return false;
+
+  const stage = stages.find((s) => s.stage === stageName);
+  if (!stage) return false;
+
+  // Only trigger idle stages
+  if (stage.status !== "idle") return false;
+
+  // Run must be in a state that allows pipeline execution
+  const allowedStatuses = new Set(["draft", "queued", "running", "preflight_passed", "dry_run_complete"]);
+  if (!allowedStatuses.has(runStatus)) return false;
+
+  // Check if the previous stage in the trigger chain is done
+  const chainIndex = TRIGGER_CHAIN.indexOf(stageName);
+  if (chainIndex === 0) {
+    // First stage in chain — check that earlier setup stages are done
+    // For source_fetch, we just need the run to exist (which it does)
+    return true;
+  }
+
+  // Need the previous triggerable stage to be done
+  const prevStageName = TRIGGER_CHAIN[chainIndex - 1];
+  const prevStage = stages.find((s) => s.stage === prevStageName);
+  return prevStage?.status === "done";
 }
 
 function RunStatusBadge({ status }: { status: string }) {
@@ -79,6 +153,7 @@ export default function AdminChartsIngestRunDetail() {
   const [isPolling, setIsPolling] = useState(false);
   const [commitResult, setCommitResult] = useState<CommitIngestRunResponse | null>(null);
   const [commitError, setCommitError] = useState<string | null>(null);
+  const [stageLoading, setStageLoading] = useState<string | null>(null);
 
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -179,6 +254,35 @@ export default function AdminChartsIngestRunDetail() {
       setRun(r);
     } finally {
       setActionLoading(null);
+    }
+  }
+
+  async function handleRunStage(stage: string) {
+    if (!runId) return;
+    const trigger = STAGE_TRIGGERS[stage];
+    if (!trigger) return;
+
+    setStageLoading(stage);
+    try {
+      await trigger(runId);
+      // Immediately fetch the updated run so the stage status refreshes
+      const updated = await getIngestRun(runId);
+      setRun(updated);
+      if (updated && !TERMINAL_STATUSES.has(updated.status)) {
+        startPolling(updated);
+      }
+    } catch (err) {
+      // Fetch run anyway to show any error state captured by the edge function
+      try {
+        const updated = await getIngestRun(runId);
+        setRun(updated);
+      } catch {
+        // ignore — at least the error message from the trigger call is visible
+      }
+      // eslint-disable-next-line no-console
+      console.error(`[ingest-run-detail] Stage ${stage} failed:`, err);
+    } finally {
+      setStageLoading(null);
     }
   }
 
@@ -388,12 +492,34 @@ export default function AdminChartsIngestRunDetail() {
           {run.stages.map((stage, i) => (
             <div key={stage.stage} className="flex items-start gap-3">
               <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${stageStatusColor(stage.status)}`}>
-                {stage.status === "done" ? <WkIcon name="Check" size={14} /> : <span>{i + 1}</span>}
+                {stage.status === "done" ? <WkIcon name="Check" size={14} /> : stage.status === "running" ? <WkIcon name="Loader" size={14} className="animate-spin" /> : <span>{i + 1}</span>}
               </div>
               <div className="flex-1 pt-0.5">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <span className="text-[13px] font-semibold text-wk-text">{stageName(stage.stage)}</span>
-                  <span className={`text-[11px] font-semibold ${
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-[13px] font-semibold text-wk-text">{stageName(stage.stage)}</span>
+                    {canTriggerStage(stage.stage, run.stages, run.status) && (
+                      <button
+                        onClick={() => handleRunStage(stage.stage)}
+                        disabled={stageLoading === stage.stage}
+                        className="inline-flex items-center gap-1 rounded-md bg-wk-brand/10 border border-wk-brand/20 px-2 py-0.5 text-[10px] font-bold text-wk-brand hover:bg-wk-brand/20 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                        title={`Run ${stageName(stage.stage)}`}
+                      >
+                        {stageLoading === stage.stage ? (
+                          <>
+                            <WkIcon name="Loader" size={10} className="animate-spin" />
+                            Running
+                          </>
+                        ) : (
+                          <>
+                            <WkIcon name="Play" size={10} />
+                            Run
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                  <span className={`text-[11px] font-semibold shrink-0 ${
                     stage.status === "done" ? "text-wk-success" :
                     stage.status === "running" ? "text-wk-info" :
                     stage.status === "failed" ? "text-wk-danger" :
