@@ -33,11 +33,11 @@ import { DEFAULT_SCORING_CONFIG } from '@/services/chartsScoring/scoringTypes';
 describe('P4 — Carry-Forward Decay (No Zombie Records)', () => {
   // ── P4a: Maximum stale score ───────────────────────────────────────────────
 
-  it('P4a: stale CF row at position ≥ 12, release > 365d, no airplay scores exactly 12', () => {
-    // For any position from 12 to 50, with a very old release date
+  it('P4a: stale CF row at position ≥ 15, release > 365d, no airplay scores exactly 12', () => {
+    // For any position from 15 to 50, with a very old release date
     fc.assert(
       fc.property(
-        fc.integer({ min: 12, max: 50 }), // position ≥ 12
+        fc.integer({ min: 15, max: 50 }), // position ≥ 15 (where cont floor = 4)
         (position) => {
           // Release date 400 days ago (>365 → recency = 0)
           const staleReleaseDate = (() => {
@@ -56,14 +56,14 @@ describe('P4 — Carry-Forward Decay (No Zombie Records)', () => {
           // Total stale CF score
           const staleTotal = cont + carry + rec;
 
-          // At position ≥ 12:
-          //   cont = max(4, 18 - min(14, pos-1))  → 4 once pos ≥ 15, 5 at 14, etc.
+          // At position ≥ 15:
+          //   cont = max(4, 18 - min(14, pos-1))  → 4 once pos ≥ 15
           //   carry = max(8, 18 - min(10, pos-1)) → 8 once pos ≥ 12
           expect(staleTotal).toBeLessThanOrEqual(12 + 1e-9);
           expect(staleTotal).toBeGreaterThanOrEqual(12 - 1e-9); // exactly 12 at pos ≥ 15
         },
       ),
-      { numRuns: 39 }, // 39 distinct integer positions
+      { numRuns: 36 }, // 36 distinct integer positions (15–50)
     );
   });
 
@@ -153,7 +153,7 @@ describe('P4 — Carry-Forward Decay (No Zombie Records)', () => {
   it('P4c.2: stale CF total is always < fresh single-source total across all positions ≥ 15', () => {
     fc.assert(
       fc.property(
-        fc.integer({ min: 15, max: 50 }), // position ≥ 15
+        fc.integer({ min: 15, max: 50 }), // position ≥ 15 (where cont floor = 4)
         (position) => {
           const staleReleaseDate = (() => {
             const d = new Date(EDITION_DATE);

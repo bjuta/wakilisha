@@ -549,8 +549,8 @@ export function runFullPipeline(
     scoredRows,
     excluded.length,
     totalInput,
-    carryForwardCount,
-    airplayRescueCount,
+    scoredRows.filter((r) => r.carry_forward_only).length,
+    scoredRows.filter((r) => r.airplay_candidate_only).length,
     previousEdition,
     chartSize,
   );

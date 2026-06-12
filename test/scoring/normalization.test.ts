@@ -61,7 +61,7 @@ describe('§3 — normalize_title()', () => {
 
   it('handles East African chart entries', () => {
     expect(normalize_title('7 Days (Radio Edit)')).toBe('7 days');
-    expect(normalize_title('Buga (Lo Lo Lo) [Bonus Track]')).toBe('buga lo lo lo');
+    expect(normalize_title('Buga (Lo Lo Lo) [Bonus Track]')).toBe('buga');
     expect(normalize_title('ON FIRE!!! (feat. Mr Eazi)')).toMatch(/on fire/);
   });
 
@@ -156,7 +156,7 @@ describe('§3 — lead_artist_key()', () => {
 describe('§3 — build_normalized_key()', () => {
   it('produces the canonical {title}::{lead_artist} format', () => {
     const key = build_normalized_key('Buga (Lo Lo Lo)', 'Kizz Daniel feat. Tekno');
-    expect(key).toMatch(/^buga lo lo lo::kizz daniel$/);
+    expect(key).toMatch(/^buga::kizz daniel$/);
   });
 
   it('returns empty string when title or artist normalizes to empty', () => {
@@ -191,9 +191,9 @@ describe('§3 — build_normalized_key()', () => {
   });
 
   it('handles East African chart entry examples', () => {
-    // "Buga (Lo Lo Lo)" + "Kizz Daniel feat. Tekno" → "buga lo lo lo::kizz daniel"
+    // "Buga (Lo Lo Lo)" + "Kizz Daniel feat. Tekno" → "buga::kizz daniel"
     expect(build_normalized_key('Buga (Lo Lo Lo)', 'Kizz Daniel feat. Tekno')).toBe(
-      'buga lo lo lo::kizz daniel',
+      'buga::kizz daniel',
     );
   });
 });

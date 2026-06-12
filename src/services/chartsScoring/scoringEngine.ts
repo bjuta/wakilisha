@@ -750,6 +750,10 @@ export function scoreBatch(
 
   const finalized = applyAntiGamingAndFinalize(provisionals, config);
 
-  // Sort by final total descending (deterministic — §2 spec)
-  return finalized.sort((a, b) => b.final_total - a.final_total);
+  // Sort by final total descending, then by normalized_key for stable tie-breaking
+  return finalized.sort((a, b) => {
+    const diff = b.final_total - a.final_total;
+    if (diff !== 0) return diff;
+    return a.normalized_key.localeCompare(b.normalized_key);
+  });
 }
