@@ -259,10 +259,10 @@ async function loadEditions(
   const params: (number | string)[] = [];
 
   if (editionDate) {
-    query = `SELECT id, title, slug, status, edition_date, chart_id, week_number, year, entry_count FROM ${tbl(prefix, 'wkcharts_editions')} WHERE chart_id = ? AND edition_date = ? AND status = 'publish' ORDER BY edition_date DESC`;
+    query = `SELECT id, title, slug, status, edition_date, chart_id, week_number, year, entry_count FROM ${tbl(prefix, 'wkcharts_editions')} WHERE chart_id = ? AND edition_date = ? AND status = 'published' ORDER BY edition_date DESC`;
     params.push(chartId, editionDate);
   } else if (lastN) {
-    query = `SELECT id, title, slug, status, edition_date, chart_id, week_number, year, entry_count FROM ${tbl(prefix, 'wkcharts_editions')} WHERE chart_id = ? AND status = 'publish' ORDER BY edition_date DESC LIMIT ?`;
+    query = `SELECT id, title, slug, status, edition_date, chart_id, week_number, year, entry_count FROM ${tbl(prefix, 'wkcharts_editions')} WHERE chart_id = ? AND status = 'published' ORDER BY edition_date DESC LIMIT ?`;
     params.push(chartId, lastN);
   } else {
     fatal('Either --edition-date or --last is required');
@@ -441,7 +441,7 @@ async function loadPreviousEditionEntries(
 ): Promise<PreviousEditionEntry[]> {
   // Find the most recent published edition before the current one
   const [rows] = await db.query(
-    `SELECT id, edition_date FROM ${tbl(prefix, 'wkcharts_editions')} WHERE chart_id = ? AND status = 'publish' AND edition_date < ? ORDER BY edition_date DESC LIMIT 1`,
+    `SELECT id, edition_date FROM ${tbl(prefix, 'wkcharts_editions')} WHERE chart_id = ? AND status = 'published' AND edition_date < ? ORDER BY edition_date DESC LIMIT 1`,
     [chartId, currentEditionDate],
   );
   const prevEds = rows as WordPressRow[];

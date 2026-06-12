@@ -96,10 +96,10 @@ async function loadEditions(db, chartSlug) {
   let params;
 
   if (EDITION_DATE) {
-    query = `SELECT id, chart_slug, chart_title, chart_size, provider, source_url, edition_date, status, ingest_summary, methodology_version, source_policy_version, eligibility_policy_version, scoring_policy_version, policy_snapshot FROM ${tbl('wkcharts_editions')} WHERE chart_slug = ? AND edition_date = ? AND status = 'publish' ORDER BY edition_date DESC`;
+    query = `SELECT id, chart_slug, chart_title, chart_size, provider, source_url, edition_date, status, ingest_summary, methodology_version, source_policy_version, eligibility_policy_version, scoring_policy_version, policy_snapshot FROM ${tbl('wkcharts_editions')} WHERE chart_slug = ? AND edition_date = ? AND status = 'published' ORDER BY edition_date DESC`;
     params = [chartSlug, EDITION_DATE];
   } else if (LAST_N) {
-    query = `SELECT id, chart_slug, chart_title, chart_size, provider, source_url, edition_date, status, ingest_summary, methodology_version, source_policy_version, eligibility_policy_version, scoring_policy_version, policy_snapshot FROM ${tbl('wkcharts_editions')} WHERE chart_slug = ? AND status = 'publish' ORDER BY edition_date DESC LIMIT ?`;
+    query = `SELECT id, chart_slug, chart_title, chart_size, provider, source_url, edition_date, status, ingest_summary, methodology_version, source_policy_version, eligibility_policy_version, scoring_policy_version, policy_snapshot FROM ${tbl('wkcharts_editions')} WHERE chart_slug = ? AND status = 'published' ORDER BY edition_date DESC LIMIT ?`;
     params = [chartSlug, LAST_N];
   } else {
     process.stderr.write('[wp-fixture] FATAL: Either --edition-date or --last is required\n');
@@ -220,7 +220,7 @@ async function loadTrackSourcesByTrackIds(db, trackIds) {
 
 async function loadPreviousEditionEntries(db, chartSlug, currentEditionDate) {
   var [rows] = await db.query(
-    `SELECT id, edition_date FROM ${tbl('wkcharts_editions')} WHERE chart_slug = ? AND status = 'publish' AND edition_date < ? ORDER BY edition_date DESC LIMIT 1`,
+    `SELECT id, edition_date FROM ${tbl('wkcharts_editions')} WHERE chart_slug = ? AND status = 'published' AND edition_date < ? ORDER BY edition_date DESC LIMIT 1`,
     [chartSlug, currentEditionDate],
   );
   if (!rows.length) {
