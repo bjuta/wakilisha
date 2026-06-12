@@ -546,127 +546,68 @@ All four items from the audit's remaining security horizon are now complete:
 
 ---
 
-## WordPress Historical Chart Import — Legacy Edition Migration 🔴 NOT YET IMPORTED (June 2026)
+## WordPress Historical Chart Import — Clean Pipeline Architecture 🔴 PENDING (June 2026)
 
-### Current State
+### Architecture Decision (June 12, 2026)
 
-**v2 tables are EMPTY** — all 7 `wk_chart_*_v2` tables have 0 rows. The migration preview was built from CSV exports, not the live WP MySQL database. The actual WP schema must be discovered and verified before import.
+The old staging→finalize pipeline is **deprecated for charts**. Chart data must flow cleanly from WordPress directly into the v2 chart tables with registry canonicalization and publish-first semantics. No staging middleman.
 
-### Import Architecture
+### Core Principles
 
-**What changed from the original plan:**
-- Instead of running the old `import-wordpress-charts-to-v2.ts` directly (which assumes the WP schema matches expectations), we now have two new scripts:
-  1. **`scripts/charts/discover-wp-chart-schema.mjs`** — Comprehensive schema discovery only. Dumps all table structures, sample rows, URL patterns, FK integrity checks. No writes.
-  2. **`scripts/charts/smart-wp-chart-import.mjs`** — All-in-one: discovery → mapping analysis → validation → import. Shows every mapping decision before writing.
+1. **Direct import, no staging** — Chart data goes WP → cleaned/mapped → `wk_chart_*_v2` tables. The `wk_import_staging_records` table is NOT used for chart data.
+2. **Registry owns the data, charts are a customer** — Tracks/artists/releases are looked up in `registry_tracks`, `registry_artists`, `registry_releases` during import. `canonical_track_id`, `canonical_release_id`, `canonical_artist_id` are populated where matches exist.
+3. **Publish-first, enrich-later** — Missing registry data NEVER blocks chart publication. Charts go live immediately. Tracks without registry matches are still published with available metadata. Enrichment happens afterward through release shells.
+4. **No review queue for charts** — Charts always publish. Individual tracks can be flagged for enrichment through the release shells infrastructure, but charts themselves never sit in review.
+5. **Rich metadata at import time** — ISRC, Spotify ID, Apple Music ID, YouTube ID, source URLs, and all available track metadata imported fully. This minimizes future enrichment needs.
+6. **Verified market mapping** — Only Kenya has been published. Market assignment must be explicit and verified. No auto-inference that could create phantom markets.
+7. **Scoring integrity** — All 102.85 scoring property tests must pass after import.
 
-### Step 1: Schema Discovery (run on WP Lightsail server)
+### Registry Canonicalization During Import
 
-```bash
-# Run the discovery script to see the actual WP schema
-node scripts/charts/discover-wp-chart-schema.mjs > wp-chart-schema-report.json 2>wp-chart-discovery.log
-```
+For every chart entry during import:
+1. **Look up track** in `registry_tracks` by ISRC first, then by slug match on normalized title
+2. **Look up artist** in `registry_artists` by slug match
+3. **Look up release** in `registry_releases` by release date + artist match
+4. **If matched**: populate `canonical_track_id`, `canonical_release_id`, `canonical_artist_id`
+5. **If NOT matched**: leave canonical fields null, publish anyway, flag for future enrichment
 
-This outputs a JSON report with:
-- All `wkcharts_*` table schemas (columns, types, keys, indexes)
-- Sample rows from every table
-- Old URL patterns and how they'd map to new architecture
-- FK integrity (orphan tracks, orphan artists, etc.)
-- Distinct values (all chart slugs, markets, statuses, providers)
+### Market Mapping (Verified)
 
-### Step 2: Review Mapping
+Only Kenya has published charts. The mapping is explicit:
 
-```bash
-# Smart import in preview mode — shows exactly what will happen
-DATABASE_URL="postgresql://..." \
-node scripts/charts/smart-wp-chart-import.mjs > wp-chart-preview.json 2>wp-chart-import.log
-```
-
-This outputs:
-- Chart slug → new series+market mapping for every chart
-- Mapping source (known_csv_mapping vs auto_inferred) with confidence level
-- Any discrepancies found (empty editions, orphan tracks, date mismatches)
-- Full sample of editions, entries, and aliases that would be created
-
-### Step 3: Import
-
-```bash
-# After reviewing the preview, commit to Supabase
-WAKILISHA_CHART_IMPORT_COMMIT=1 DATABASE_URL="postgresql://..." \
-node scripts/charts/smart-wp-chart-import.mjs > wp-chart-import-result.json 2>wp-chart-import.log
-```
-
-Writes to:
-- `wk_chart_series_v2` — series definitions
-- `wk_chart_markets_v2` — market definitions (Kenya, Nigeria, etc.)
-- `wk_chart_programs_v2` — chart programs (series+market combinations)
-- `wk_chart_editions_v2` — all legacy editions with metadata snapshots
-- `wk_chart_entries_v2` — all ranked entries with source payloads
-- `wk_chart_source_coverage_v2` — source coverage per edition
-- `wk_chart_slug_aliases_v2` — old→new URL redirects
-
-### Source Architecture (Old WordPress)
-
-Expected tables from `bitnami_wordpress` (to be verified by discovery):
-
-| MySQL Table | Expected Rows | Purpose |
-|---|---|---|
-| `wp_wkcharts_charts` | 0* | Chart program definitions |
-| `wp_wkcharts_editions` | ~63 | All published chart editions |
-| `wp_wkcharts_edition_items` | ~3,844 | Ranked track entries per edition |
-| `wp_wkcharts_tracks` | ~5,705 | Track registry with Spotify/Apple Music IDs, ISRCs |
-| `wp_wkcharts_artists` | ~1,245 | Artist registry |
-| `wp_wkcharts_track_artists` | ~6,959 | Track ↔ artist relationships |
-| `wp_wkcharts_track_sources` | ~1,377 | Source provider URLs per track |
-| `wp_wkcharts_ingest_runs` | ~146 | Old ingest settings and policies |
-| `wp_wkcharts_releases` | 0 | Release data (empty) |
-
-\* If `wp_wkcharts_charts` is empty, charts are inferred from `wp_posts` with `post_type = 'wk_chart_series'`.
-
-### URL Normalization
-
-Old format: `https://wakilisha.africa/charts/2026/ke/2026-05-18/`
-
-New format: `https://wakilisha.africa/charts/{series}/{market}/{date}`
-
-Example mapping: `2026` → series `2026-releases`, market `kenya` → new URL `charts/2026-releases/kenya/2026-05-18`
-
-All old slug patterns are stored in `wk_chart_slug_aliases_v2` for 301 redirect support.
-
-### Known Mapping (from CSV preview)
-
-| Old Slug | Series | Market | New Public Slug |
+| Old WP Slug | Series | Market | Status |
 |---|---|---|---|
-| `2026` | 2026-releases | kenya | `2026-releases/kenya` |
-| `gengetone` | gengetone | kenya | `gengetone/kenya` |
-| `kenya` | top-songs | kenya | `top-songs/kenya` |
-| `rnb` | rnb | kenya | `rnb/kenya` |
+| `2026` | 2026-releases | kenya | ✅ Published |
+| `gengetone` | gengetone | kenya | ✅ Published |
+| `kenya` | top-songs | kenya | ✅ Published |
+| `rnb` | rnb | kenya | ✅ Published |
 
-⚠️ **The discovery step may reveal additional chart slugs not in this mapping.** Unknown slugs will be auto-inferred using keyword pattern matching on slug + name.
+Any chart slug that doesn't match a known mapping is flagged for review but still imported with `missing_policy: "review"` — it publishes.
 
-### What Gets Preserved as Metadata
+⚠️ **No gengetone in Nigeria.** The market inference must never assign Nigeria to gengetone or any chart that doesn't have explicit Nigeria evidence.
 
-Each legacy edition gets a `rule_set_snapshot` in `wk_chart_editions_v2` containing:
-- `old_edition_id` — original MySQL row ID
-- `old_chart_id` + `old_chart_slug` — original chart identity
-- `week_number`, `year` — original temporal metadata
-- `ingest_run_id` + `ingest_run_status` — the old ingest run record
-- Source policy, scoring policy, eligibility policy from old ingest run
-- `migrated_at` — ISO timestamp of import
+### Clean Import Pipeline
 
-Each entry has a `source_payload` containing:
-- Original track metadata (ISRC, Spotify ID, Apple Music ID, YouTube ID)
-- Source provider URLs from `wkcharts_track_sources`
-- `weeks_on_chart`, `peak_position`, `is_new_entry`, `is_re_entry`
-- All track source provider records
+**Edge Function:** `clean-wp-chart-import` (new)
+- Accepts WP MySQL credentials
+- Discovers chart tables and data
+- Maps to correct series/market using verified mapping
+- Runs registry canonicalization pass (non-blocking lookup)
+- Inserts directly into `wk_chart_series_v2`, `wk_chart_markets_v2`, `wk_chart_programs_v2`, `wk_chart_editions_v2`, `wk_chart_entries_v2`, `wk_chart_source_coverage_v2`, `wk_chart_slug_aliases_v2`
+- All editions get `status: "published"` immediately
+- Returns import summary with canonicalization stats
 
-### Post-Import State
+### What Gets Deprecated
 
-After the import:
-- Programs in `wk_chart_programs_v2` will be populated with programs discovered from WP data (ON CONFLICT DO NOTHING — no overwrites)
-- The existing CSV-based JSON fallback for chart pages remains as-is until API parity is proven
-- Chart Ingestion Studio can be used to ingest new editions for these programs
-- `wk_chart_slug_aliases_v2` enables 301 redirects from old URLs
+- ~~`finalize-wp-staging`~~ — No longer used for chart data. Retained for non-chart entity staging→production.
+- ~~Staging chart records in `wk_import_staging_records`~~ — Chart data no longer touches this table.
+- ~~`wk_chart_editions_v2.override_mode = "metadata_and_matching_only"`~~ — Editions publish with full commitment, not override mode.
 
-### Edge Function for API-driven import
+### Post-Import Verification
 
-`supabase/functions/import-wp-charts-v2` — Alternative import path. Accepts pre-extracted chart JSON and upserts into v2 tables. Used when the WP data has already been extracted elsewhere.
+After import, the full scoring test suite must pass:
+```bash
+npx vitest run test/scoring/
+```
+
+Target: 100% pass rate across all 11 test files (Gate A pipeline, P1-P5 property tests, anti-gaming, normalization, golden-file migration, gate-c).

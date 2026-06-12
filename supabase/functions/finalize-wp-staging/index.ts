@@ -1,38 +1,14 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "jsr:@supabase/supabase-js";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-async function chunkedInsert(
-  supabase: ReturnType<typeof createClient>,
-  runId: string,
-  label: string,
-  rpcName: string,
-  chunkSize: number
-): Promise<number> {
-  let total = 0;
-  let cursor: string | null = null;
-  let num = 0;
-  console.log(`${label} (chunk=${chunkSize})...`);
-  while (true) {
-    num++;
-    const { data, error } = await supabase.rpc(rpcName, {
-      p_run_id: runId, p_limit: chunkSize, p_min_id: cursor,
-    });
-    if (error) throw new Error(`${label} chunk ${num}: ${error.message}`);
-    if (!data || data.last_id === null) break;
-    const n = data.count ?? 0;
-    total += n;
-    if (num % 10 === 0) {
-      console.log(`  -> ${label} chunk ${num}: +${n} (total ${total})`);
-    }
-    cursor = data.last_id;
-    if (n === 0 && total === 0) break;
-  }
-  console.log(`  -> ${label} done: ${total} (${num} chunks)`);
-  return total;
+function slugify(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 }
 
 Deno.serve(async (req: Request) => {
@@ -40,158 +16,259 @@ Deno.serve(async (req: Request) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-  const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+  const supabaseClient = createClient(
+    Deno.env.get("SUPABASE_URL") ?? "",
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+    {}
+  );
 
-  if (!supabaseUrl || !supabaseKey) {
-    return new Response(JSON.stringify({ error: "Supabase config missing." }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+  const url = new URL(req.url);
+  const programId = url.searchParams.get("program_id");
+
+  if (!programId) {
+    return new Response(JSON.stringify({ error: "Missing program_id parameter" }), {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
-  const supabase = createClient(supabaseUrl, supabaseKey);
-
   try {
-    const body = await req.json();
-    const { runId, step } = body;
-    if (!runId) {
-      return new Response(JSON.stringify({ error: "runId is required." }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const { data: runData, error: runErr } = await supabase
-      .from("wk_ingestion_runs")
-      .select("id,status")
-      .eq("id", runId)
+    // 1. Look up the program
+    const { data: program, error: progErr } = await supabaseClient
+      .from("wk_chart_programs_v2")
+      .select("id, series_slug, market_slug, public_slug")
+      .eq("id", programId)
       .single();
 
-    if (runErr || !runData) {
-      return new Response(JSON.stringify({ error: "Run not found" }), {
-        status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const requestedStep = (step ?? "all") as string;
-
-    // ===== REVIEW-ONLY =====
-    if (requestedStep === "review") {
-      if (runData.status !== "finalized" && runData.status !== "staged") {
-        return new Response(JSON.stringify({ error: `Run must be finalized or staged. Current: ${runData.status}` }), {
-          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      // Entity relationships — chunked via v8 (single CTE, no OFFSET)
-      const cRel = await chunkedInsert(supabase, runId, "ER", "finalize_step_ers_chunk_v8", 500);
-
-      // Custom fields — also chunked now (was the hidden monster at 20K rows)
-      const cCf = await chunkedInsert(supabase, runId, "CF", "finalize_step_cf_chunk", 500);
-
-      const cReview = cRel + cCf;
-      await supabase.rpc("finalize_step_complete", {
-        p_run_id: runId, p_content: 0, p_authors: 0, p_tax: 0, p_media: 0, p_entities: 0, p_review: cReview, p_errors: [],
-      });
-
-      return new Response(JSON.stringify({ success: true, review_artifacts: cReview, entity_relationships: cRel, custom_fields: cCf }), {
+    if (progErr || !program) {
+      return new Response(JSON.stringify({ error: "Program not found", detail: progErr?.message }), {
+        status: 404,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // ===== ENTITIES-ONLY =====
-    if (requestedStep === "entities") {
-      if (runData.status !== "staged" && runData.status !== "finalizing") {
-        return new Response(JSON.stringify({ error: `Run must be staged. Current: ${runData.status}` }), {
-          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (runData.status === "staged") {
-        await supabase.from("wk_ingestion_runs").update({ status: "finalizing", errors: [] }).eq("id", runId);
-      }
+    const chartSlug = program.series_slug;
+    const marketSlug = program.market_slug;
 
-      const allErrors: string[] = [];
-      let cEntities = 0;
+    console.log(`Finalizing program: ${programId} (chart_slug=${chartSlug}, market=${marketSlug})`);
 
-      console.log("Entities-only: Wakilisha entities (chunk=2000)...");
-      let lastId: string | null = null;
-      let chunkNum = 0;
-      while (true) {
-        chunkNum++;
-        const { data: chunk, error: chunkErr } = await supabase.rpc("finalize_step_entities_chunk", {
-          p_run_id: runId, p_limit: 2000, p_min_id: lastId,
-        });
-        if (chunkErr) throw new Error(`Entity chunk ${chunkNum} failed: ${chunkErr.message}`);
-        if (!chunk || chunk.last_id === null) break;
-        const n = chunk.count ?? 0;
-        cEntities += n;
-        console.log(`  -> chunk ${chunkNum}: ${n} rows (last_id ${lastId?.slice(0,8)} -> ${chunk.last_id?.slice(0,8)})`);
-        lastId = chunk.last_id;
-      }
-      console.log(`  -> wakilisha_entities total: ${cEntities}`);
+    // 2. Find edition staging records for this chart_slug
+    const { data: editionStaging, error: edErr } = await supabaseClient
+      .from("wk_import_staging_records")
+      .select("id, source_record_id, target_slug, raw_record, mapped_record")
+      .eq("target_entity", "chart_editions")
+      .eq("raw_record->>chart_slug", chartSlug);
 
-      await supabase.rpc("finalize_step_complete", {
-        p_run_id: runId, p_content: 0, p_authors: 0, p_tax: 0, p_media: 0, p_entities: cEntities, p_review: 0, p_errors: allErrors,
-      });
+    if (edErr) throw new Error(`Failed to fetch edition staging: ${edErr.message}`);
 
-      return new Response(JSON.stringify({ success: true, wakilisha_entities: cEntities }), {
+    if (!editionStaging || editionStaging.length === 0) {
+      return new Response(JSON.stringify({
+        message: "No edition staging records found for this program",
+        program_id: programId,
+        chart_slug: chartSlug,
+        editions_promoted: 0,
+        entries_promoted: 0
+      }), {
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // ===== ALL (phase 1: content + entities) =====
-    if (runData.status !== "staged") {
-      return new Response(JSON.stringify({ error: `Run must be staged. Current: ${runData.status}` }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    console.log(`Found ${editionStaging.length} edition staging records`);
+
+    const wpEditionIdStrs = editionStaging.map((e: { target_slug: string }) => e.target_slug);
+
+    // 3. Find entry staging records for these editions
+    const { data: entryStaging, error: entryErr } = await supabaseClient
+      .from("wk_import_staging_records")
+      .select("id, source_record_id, target_slug, raw_record, mapped_record")
+      .eq("target_entity", "chart_entries")
+      .in("mapped_record->>edition_id", wpEditionIdStrs);
+
+    if (entryErr) throw new Error(`Failed to fetch entry staging: ${entryErr.message}`);
+
+    const entries = entryStaging ?? [];
+    console.log(`Found ${entries.length} entry staging records`);
+
+    const entriesByWpEdition = new Map<string, number>();
+    for (const entry of entries) {
+      const wpEdId = String((entry.mapped_record as Record<string, unknown>).edition_id ?? "");
+      entriesByWpEdition.set(wpEdId, (entriesByWpEdition.get(wpEdId) ?? 0) + 1);
+    }
+
+    // 4. Create V2 editions
+    const editionMap: Array<{
+      v2_id: string;
+      staging_id: string;
+      wp_edition_id: number;
+      edition_date: string;
+    }> = [];
+
+    for (const ed of editionStaging) {
+      const raw = ed.raw_record as Record<string, unknown>;
+      const editionDateRaw = raw.edition_date;
+      if (!editionDateRaw) {
+        console.warn(`Skipping edition staging ${ed.id}: no edition_date`);
+        continue;
+      }
+      const editionDate = String(editionDateRaw).split("T")[0];
+      const dateFormatted = editionDate.replace(/-/g, "_");
+      const editionId = `edition_${chartSlug}_${marketSlug}_${dateFormatted}`;
+      const chartTitle = raw.chart_title ? String(raw.chart_title) : "Chart Edition";
+      const chartSize = raw.chart_size ? parseInt(String(raw.chart_size)) : 100;
+      const ingestSummary = typeof raw.ingest_summary === "string"
+        ? JSON.parse(raw.ingest_summary)
+        : (raw.ingest_summary || {});
+      const policyVersions = ingestSummary.policy_versions || {};
+      const entryCount = entriesByWpEdition.get(ed.target_slug) ?? 0;
+
+      const { error: insertErr } = await supabaseClient
+        .from("wk_chart_editions_v2")
+        .upsert({
+          id: editionId,
+          program_id: programId,
+          edition_slug: `${chartSlug}/${marketSlug}/${dateFormatted}`,
+          edition_label: chartTitle,
+          edition_date: editionDate,
+          period_start: editionDate,
+          period_end: editionDate,
+          entry_count: entryCount,
+          status: "published",
+          methodology_version: policyVersions.methodology_version || "1.0",
+          source_policy_version: policyVersions.source_policy_version || "1.0",
+          eligibility_policy_version: policyVersions.eligibility_policy_version || "1.0",
+          scoring_policy_version: policyVersions.scoring_policy_version || "1.0",
+          chart_size: chartSize,
+          override_mode: "metadata_and_matching_only",
+          published_at: raw.published_at || new Date().toISOString(),
+        }, { onConflict: "id", ignoreDuplicates: false });
+
+      if (insertErr) {
+        console.error(`Failed to insert edition ${editionId}: ${insertErr.message}`);
+        throw new Error(`Failed to insert edition ${editionId}: ${insertErr.message}`);
+      }
+
+      editionMap.push({
+        v2_id: editionId,
+        staging_id: ed.id,
+        wp_edition_id: parseInt(ed.target_slug),
+        edition_date: editionDate,
       });
     }
 
-    await supabase.from("wk_ingestion_runs").update({ status: "finalizing", errors: [] }).eq("id", runId);
-    let allErrors: string[] = [];
-    let cContent = 0, cAuthors = 0, cTax = 0, cEntities = 0;
+    console.log(`Created ${editionMap.length} V2 editions`);
 
-    console.log("Step 1: Content, authors, taxonomy...");
-    const { data: r1, error: e1 } = await supabase.rpc("finalize_step_content", { p_run_id: runId });
-    if (e1) throw new Error(`Step 1 failed: ${e1.message}`);
-    cContent = r1.content_items ?? 0;
-    cAuthors = r1.authors ?? 0;
-    cTax = r1.taxonomy_terms ?? 0;
-    if (r1.errors?.length) allErrors.push(...r1.errors);
-    console.log(`  -> content:${cContent} authors:${cAuthors} taxonomy:${cTax}`);
-
-    console.log("Step 2: Media assets — SKIPPED");
-
-    console.log("Step 3: Wakilisha entities (cursor-chunked)...");
-    let lastId: string | null = null;
-    let chunkNum = 0;
-    while (true) {
-      chunkNum++;
-      const { data: chunk, error: chunkErr } = await supabase.rpc("finalize_step_entities_chunk", {
-        p_run_id: runId, p_limit: 2000, p_min_id: lastId,
-      });
-      if (chunkErr) throw new Error(`Entity chunk ${chunkNum} failed: ${chunkErr.message}`);
-      if (!chunk || chunk.last_id === null) break;
-      const n = chunk.count ?? 0;
-      cEntities += n;
-      console.log(`  -> chunk ${chunkNum}: ${n} rows (last_id ${lastId?.slice(0,8)} -> ${chunk.last_id?.slice(0,8)})`);
-      lastId = chunk.last_id;
+    const wpToV2Edition = new Map<number, string>();
+    for (const m of editionMap) {
+      wpToV2Edition.set(m.wp_edition_id, m.v2_id);
     }
-    console.log(`  -> wakilisha_entities total: ${cEntities}`);
 
-    console.log("Marking run finalized...");
-    const { data: result, error: e5 } = await supabase.rpc("finalize_step_complete", {
-      p_run_id: runId, p_content: cContent, p_authors: cAuthors, p_tax: cTax,
-      p_media: 0, p_entities: cEntities, p_review: 0, p_errors: allErrors,
-    });
-    if (e5) throw new Error(`Complete step failed: ${e5.message}`);
+    // 5. Create V2 entries
+    let entriesPromoted = 0;
+    const promotedEntryStagingIds: string[] = [];
 
-    return new Response(JSON.stringify(result), {
+    for (const entry of entries) {
+      const mapped = entry.mapped_record as Record<string, unknown>;
+      const raw = entry.raw_record as Record<string, unknown>;
+      const wpEditionId = mapped.edition_id ? parseInt(String(mapped.edition_id)) : null;
+      if (!wpEditionId || !wpToV2Edition.has(wpEditionId)) {
+        console.warn(`Entry ${entry.id}: no valid edition_id=${wpEditionId}, skipping`);
+        continue;
+      }
+
+      const v2EditionId = wpToV2Edition.get(wpEditionId)!;
+      const trackTitle = raw.title ? String(raw.title) : "Unknown Track";
+      const artistName = raw.artist_name ? String(raw.artist_name) : "Unknown Artist";
+      const rank = raw.position ? parseInt(String(raw.position)) : 0;
+      const previousRank = raw.previous_position != null ? parseInt(String(raw.previous_position)) : undefined;
+      const trackSlug = slugify(trackTitle);
+      const artistSlug = slugify(artistName);
+      const normalizedKey = `${trackSlug}--${artistSlug}`;
+      const entryId = `entry_${wpEditionId}_${rank}`;
+      const score = raw.score ? parseFloat(String(raw.score)) : 0;
+
+      let movement = "new";
+      if (previousRank) {
+        movement = previousRank > rank ? "up" : previousRank < rank ? "down" : "same";
+      }
+
+      let sourcePayload = raw.source_payload;
+      if (typeof sourcePayload === "string") {
+        try { sourcePayload = JSON.parse(sourcePayload); } catch { sourcePayload = {}; }
+      }
+
+      const { error: insertEntryErr } = await supabaseClient
+        .from("wk_chart_entries_v2")
+        .upsert({
+          id: entryId,
+          edition_id: v2EditionId,
+          rank: rank,
+          previous_rank: previousRank ?? null,
+          movement: movement,
+          track_slug: trackSlug,
+          track_title: trackTitle,
+          artist_slug: artistSlug,
+          artist_name: artistName,
+          artwork_url: raw.artwork_url ? String(raw.artwork_url) : null,
+          normalized_key: normalizedKey,
+          source_count: raw.source_count ? parseInt(String(raw.source_count)) : 1,
+          occurrence_count: 1,
+          release_date: raw.release_date ? String(raw.release_date) : null,
+          source_score: score,
+          total_score: score,
+          source_payload: sourcePayload || {},
+          methodology_version: "1.0",
+          eligibility_policy_version: "1.0",
+          scoring_policy_version: "1.0",
+          continuity_locked: raw.continuity_locked === 1 || raw.continuity_locked === "1",
+          carry_forward_only: raw.carry_forward_only === 1 || raw.carry_forward_only === "1",
+        }, { onConflict: "id", ignoreDuplicates: false });
+
+      if (insertEntryErr) {
+        console.error(`Failed to insert entry ${entryId}: ${insertEntryErr.message}`);
+        continue;
+      }
+
+      promotedEntryStagingIds.push(entry.id);
+      entriesPromoted++;
+    }
+
+    // 6. Delete promoted staging records
+    const editionStagingIds = editionMap.map((m) => m.staging_id);
+    const allPromotedIds = [...editionStagingIds, ...promotedEntryStagingIds];
+
+    if (allPromotedIds.length > 0) {
+      for (let i = 0; i < allPromotedIds.length; i += 1000) {
+        const batch = allPromotedIds.slice(i, i + 1000);
+        const { error: delErr } = await supabaseClient
+          .from("wk_import_staging_records")
+          .delete()
+          .in("id", batch);
+
+        if (delErr) {
+          console.error(`Failed to delete staging batch: ${delErr.message}`);
+        }
+      }
+      console.log(`Deleted ${allPromotedIds.length} staging records`);
+    }
+
+    return new Response(JSON.stringify({
+      message: "Program finalized successfully",
+      program_id: programId,
+      chart_slug: chartSlug,
+      editions_promoted: editionMap.length,
+      entries_promoted: entriesPromoted,
+      staging_deleted: allPromotedIds.length,
+    }), {
+      status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
 
   } catch (err) {
-    return new Response(
-      JSON.stringify({ error: err instanceof Error ? err.message : "Internal error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    console.error("Unexpected error:", err);
+    return new Response(JSON.stringify({ error: err.message }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });
