@@ -27,7 +27,7 @@ const KPI_TO_TABLE: Record<string, string> = {
   "Chart Families": "chart_series",
   "Chart Editions": "chart_editions",
   "Chart Entries": "chart_entries",
-  "Media Assets": "wk_media_assets",
+  "Media Assets": "registry_media_assets",
   "Import Jobs": "wk_ingestion_runs",
   "Review Queue": "wk_review_queue",
 };
@@ -47,7 +47,7 @@ export default function AdminDashboardPage() {
         "registry_genres",
         "wk_articles",
         "wk_guides",
-        "wk_media_assets",
+        "registry_media_assets",
         "wk_ingestion_runs",
         "chart_editions",
         "chart_entries",

@@ -187,12 +187,17 @@ export default function AdminMissingImagesPage() {
       }
 
       // Create media asset record
-      const { error: insertError } = await supabase.from("wk_media_assets").insert({
-        entity_type: uploadTarget.entity_type,
-        entity_slug: uploadTarget.entity_slug,
-        role: uploadTarget.missing_role,
+      const mediaSlug = `${uploadTarget.entity_type}-${uploadTarget.entity_slug}-${uploadTarget.missing_role}`;
+      const { error: insertError } = await supabase.from("registry_media_assets").insert({
+        slug: mediaSlug,
+        title: uploadTarget.title,
         url: publicUrl,
-        source: "manual_upload",
+        media_kind: "image",
+        status: "active",
+        source_kind: "manual_upload",
+        source_entity: uploadTarget.entity_type,
+        source_record_id: uploadTarget.entity_slug,
+        metadata: { role: uploadTarget.missing_role },
       });
 
       if (insertError) {

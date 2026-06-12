@@ -30,20 +30,29 @@ export default function AdminBrokenLinksPage() {
   const load = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
-      .from("wk_media_assets")
-      .select("id, entity_type, entity_slug, url, role, source")
+      .from("registry_media_assets")
+      .select("id, slug, url, source_kind, source_entity, source_record_id, metadata")
+      .eq("media_kind", "image")
       .limit(500);
 
     if (error) {
       console.error("Error loading media assets:", error);
     } else {
-      const mapped: MediaLink[] = (data ?? []).map((item) => ({
+      const mapped: MediaLink[] = (data ?? []).map((item: {
+        id: string;
+        slug: string;
+        url: string;
+        source_kind: string | null;
+        source_entity: string | null;
+        source_record_id: string | null;
+        metadata: Record<string, unknown> | null;
+      }) => ({
         id: item.id,
-        entity_type: item.entity_type,
-        entity_slug: item.entity_slug,
+        entity_type: item.source_entity ?? "unknown",
+        entity_slug: item.source_record_id ?? item.slug,
         url: item.url,
-        role: item.role,
-        source: item.source,
+        role: (item.metadata?.role as string) ?? item.source_kind ?? "unknown",
+        source: item.source_kind ?? "unknown",
         status: "ok" as const,
         last_checked: "Never",
       }));

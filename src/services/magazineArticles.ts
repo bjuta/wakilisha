@@ -146,7 +146,7 @@ export async function getArticlesByAuthor(authorSlug: string): Promise<MagazineA
   let matches = articles.filter((article) => article.author.trim().toLowerCase().replace(/[\s_-]+/g, '-') === normalizedTarget);
   if (matches.length > 0) return matches;
 
-  // Try matching by wk_authors.name — fetch authors and check
+  // Try matching by registry_authors.name — fetch authors and check
   try {
     const { fetchAuthorBySlug } = await import('@/services/authorProfiles');
     const dbAuthor = await fetchAuthorBySlug(normalizedTarget);

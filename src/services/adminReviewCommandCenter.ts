@@ -63,12 +63,12 @@ export type FieldDictionaryRow = {
 
 export type MediaReviewRow = {
   id: string;
-  entity_type: string | null;
-  entity_slug: string | null;
-  role: string | null;
+  source_entity: string | null;
+  source_record_id: string | null;
   url: string | null;
-  source: string | null;
+  source_kind: string | null;
   status: string | null;
+  metadata: Record<string, unknown> | null;
   updated_at: string | null;
 };
 
@@ -306,7 +306,7 @@ export async function loadReviewCommandCenter(): Promise<ReviewCommandCenterData
     loadSamples<ReviewDecisionSample>("entity_resolution_decisions", "id, entity_type, source_title, source_slug, target_title, target_slug, confidence_score, decision, status, review_required, reason, created_at, updated_at", "updated_at", 16),
     loadSamples<ReviewArtifactSample>("wk_import_review_artifacts", "id, artifact_type, title, source_kind, source_record_id, review_status, notes, created_at", "created_at", 10),
     loadSamples<FieldDictionaryRow>("wp_postmeta_field_dictionary", "id, meta_key, field_group, promotion_policy, confidence, occurrence_count, object_count, reason, approved_policy, updated_at", "occurrence_count", 12),
-    loadSamples<MediaReviewRow>("wk_media_assets", "id, entity_type, entity_slug, role, url, source, status, updated_at", "updated_at", 10),
+    loadSamples<MediaReviewRow>("registry_media_assets", "id, source_entity, source_record_id, url, source_kind, status, metadata, updated_at", "updated_at", 10),
     loadSamples<PromotionEventRow>("wk_import_promotion_events", "id, target_table, target_record_id, event_type, message, created_at", "created_at", 10),
     loadStagingSummary(),
     loadRegistryReviewItems({ limit: 18 }),

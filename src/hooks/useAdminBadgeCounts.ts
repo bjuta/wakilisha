@@ -31,7 +31,7 @@ export function useAdminBadgeCounts(): BadgeCounts {
           .select("*", { count: "exact", head: true })
           .or("hero_image_url.is.null,wp_status.neq.publish"),
         supabase
-          .from("wk_media_assets")
+          .from("registry_media_assets")
           .select("*", { count: "exact", head: true }),
         supabase
           .from("entity_resolution_decisions")

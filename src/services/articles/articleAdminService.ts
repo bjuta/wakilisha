@@ -448,30 +448,42 @@ export async function saveHeroToMediaLibrary(
   articleTitle: string,
   imageUrl: string
 ): Promise<void> {
-  const { data: existing } = await supabase
-    .from("wk_media_assets")
-    .select("id")
-    .eq("entity_type", "article")
-    .eq("entity_slug", articleSlug)
-    .eq("role", "hero")
-    .maybeSingle();
+  const mediaSlug = `article-${articleSlug}-hero`;
 
-  if (imageUrl) {
-    if (existing && typeof existing === "object" && "id" in existing) {
-      await supabase
-        .from("wk_media_assets")
-        .update({ url: imageUrl, alt_text: articleTitle, source: "editor_upload" })
-        .eq("id", (existing as { id: string }).id);
-    } else {
-      await supabase.from("wk_media_assets").insert({
-        entity_type: "article",
-        entity_slug: articleSlug,
-        role: "hero",
-        url: imageUrl,
-        alt_text: articleTitle,
-        source: "editor_upload",
-      });
+  try {
+    const { data: existing } = await supabase
+      .from("registry_media_assets")
+      .select("id")
+      .eq("slug", mediaSlug)
+      .maybeSingle();
+
+    if (imageUrl) {
+      if (existing) {
+        await supabase
+          .from("registry_media_assets")
+          .update({
+            url: imageUrl,
+            title: articleTitle,
+            metadata: { alt_text: articleTitle, role: "hero" },
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", existing.id);
+      } else {
+        await supabase.from("registry_media_assets").insert({
+          slug: mediaSlug,
+          title: articleTitle,
+          url: imageUrl,
+          media_kind: "image",
+          status: "active",
+          source_kind: "editor_upload",
+          source_entity: "article",
+          source_record_id: articleSlug,
+          metadata: { alt_text: articleTitle, role: "hero" },
+        });
+      }
     }
+  } catch (err) {
+    console.error("Failed to save hero to media library:", err);
   }
 }
 

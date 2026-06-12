@@ -28,7 +28,7 @@ CREATE INDEX IF NOT EXISTS idx_wk_content_items_type ON wk_content_items(content
 CREATE INDEX IF NOT EXISTS idx_wk_content_items_run ON wk_content_items(source_ingestion_run_id);
 CREATE INDEX IF NOT EXISTS idx_wk_content_items_status ON wk_content_items(status);
 
-CREATE TABLE IF NOT EXISTS wk_authors (
+CREATE TABLE IF NOT EXISTS registry_authors (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   slug text NOT NULL UNIQUE,
   name text NOT NULL,
@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS wk_authors (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_wk_authors_run ON wk_authors(source_ingestion_run_id);
+CREATE INDEX IF NOT EXISTS idx_registry_authors_run ON registry_authors(source_ingestion_run_id);
 
 CREATE TABLE IF NOT EXISTS wk_taxonomy_terms (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -156,8 +156,8 @@ $$ LANGUAGE plpgsql;
 DROP TRIGGER IF EXISTS trg_wk_content_items_touch_updated_at ON wk_content_items;
 CREATE TRIGGER trg_wk_content_items_touch_updated_at BEFORE UPDATE ON wk_content_items FOR EACH ROW EXECUTE FUNCTION wk_promotion_touch_updated_at();
 
-DROP TRIGGER IF EXISTS trg_wk_authors_touch_updated_at ON wk_authors;
-CREATE TRIGGER trg_wk_authors_touch_updated_at BEFORE UPDATE ON wk_authors FOR EACH ROW EXECUTE FUNCTION wk_promotion_touch_updated_at();
+DROP TRIGGER IF EXISTS trg_registry_authors_touch_updated_at ON registry_authors;
+CREATE TRIGGER trg_registry_authors_touch_updated_at BEFORE UPDATE ON registry_authors FOR EACH ROW EXECUTE FUNCTION wk_promotion_touch_updated_at();
 
 DROP TRIGGER IF EXISTS trg_wk_taxonomy_terms_touch_updated_at ON wk_taxonomy_terms;
 CREATE TRIGGER trg_wk_taxonomy_terms_touch_updated_at BEFORE UPDATE ON wk_taxonomy_terms FOR EACH ROW EXECUTE FUNCTION wk_promotion_touch_updated_at();

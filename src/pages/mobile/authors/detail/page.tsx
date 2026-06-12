@@ -45,7 +45,7 @@ export default function MobileAuthorProfile() {
     setLoading(true);
     setError(null);
 
-    // Fetch real author meta from wk_authors
+    // Fetch real author meta from registry_authors
     resolveAuthorMeta(normalizedSlug)
       .then((resolved) => {
         if (!alive) return;

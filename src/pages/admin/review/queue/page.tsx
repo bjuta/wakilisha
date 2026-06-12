@@ -440,7 +440,10 @@ function FieldRows({ rows }: { rows: FieldDictionaryRow[] }) {
 
 function MediaRows({ rows }: { rows: MediaReviewRow[] }) {
   if (!rows.length) return <EmptyState title="No media rows" body="Run Phase 6 to operationalize WordPress media assets." />;
-  return <div className="divide-y divide-wk-border">{rows.map((row) => <div key={row.id} className="p-4"><RowTop left={`${row.entity_type || "entity"}/${row.entity_slug || "unattached"}`} right={row.role || "media"} /><p className="mt-1 truncate text-[12px] text-wk-text-muted">{row.url || "No URL"}</p><p className="mt-2 text-[12px] text-wk-text-faint">{row.source || "source"} · {row.status || "status"}</p></div>)}</div>;
+  return <div className="divide-y divide-wk-border">{rows.map((row) => {
+    const role = (row.metadata?.role as string) || "media";
+    return <div key={row.id} className="p-4"><RowTop left={`${row.source_entity || "entity"}/${row.source_record_id || "unattached"}`} right={role} /><p className="mt-1 truncate text-[12px] text-wk-text-muted">{row.url || "No URL"}</p><p className="mt-2 text-[12px] text-wk-text-faint">{row.source_kind || "source"} · {row.status || "status"}</p></div>;
+  })}</div>;
 }
 
 function StagingRows({ rows }: { rows: StagingSummaryRow[] }) {

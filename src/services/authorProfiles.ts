@@ -36,11 +36,11 @@ export async function fetchAllAuthors(): Promise<AuthorRow[]> {
   if (cachedAuthors && Date.now() - cacheTimestamp < CACHE_TTL) return cachedAuthors;
 
   const { data, error } = await supabase
-    .from("wk_authors")
+    .from("registry_authors")
     .select("id, slug, name, email, url, source_kind");
 
   if (error || !data) {
-    console.warn("Failed to fetch authors from wk_authors:", error?.message);
+    console.warn("Failed to fetch authors from registry_authors:", error?.message);
     return cachedAuthors ?? [];
   }
 
@@ -54,7 +54,7 @@ export async function fetchAuthorBySlug(slug: string): Promise<AuthorRow | null>
   return authors.find((a) => a.slug === slug) ?? null;
 }
 
-/** Build a display name from the wk_authors name field */
+/** Build a display name from the registry_authors name field */
 function authorDisplayName(row: AuthorRow): string {
   const raw = row.name.trim();
   // If the name contains underscores or looks like a slug, prettify it
@@ -75,7 +75,7 @@ function authorBio(row: AuthorRow): string {
   return `${authorDisplayName(row)} is a WAKILISHA contributor.`;
 }
 
-/** Resolve author metadata: first check wk_authors, then fall back to hardcoded map */
+/** Resolve author metadata: first check registry_authors, then fall back to hardcoded map */
 export async function resolveAuthorMeta(rawSlug: string): Promise<{
   slug: string;
   displayName: string;

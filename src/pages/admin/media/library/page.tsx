@@ -22,25 +22,124 @@ interface MediaAsset {
 
 const PAGE_SIZE = 60;
 
-const ENTITY_ROUTES: Record<string, string> = {
-  artist: "/artists",
-  release: "/releases",
-  article: "/magazine",
-  label: "/labels",
-  genre: "/genres",
-  track: "/tracks",
-};
+function FieldRow({
+  label,
+  value,
+  mono,
+  long,
+  copyable,
+  onCopy,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+  long?: boolean;
+  copyable?: boolean;
+  onCopy?: () => void;
+}) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="text-[10px] font-semibold text-wk-text-faint uppercase tracking-wider">{label}</span>
+      <div className="flex items-start gap-1.5 group">
+        <span
+          className={`text-[12px] text-wk-text ${mono ? "font-mono" : ""} ${long ? "break-all" : "truncate"}`}
+          title={long ? undefined : (value.length > 60 ? value : undefined)}
+        >
+          {value}
+        </span>
+        {copyable && onCopy && (
+          <button
+            onClick={onCopy}
+            className="shrink-0 mt-0.5 rounded p-0.5 text-wk-text-faint hover:text-wk-brand hover:bg-wk-brand-soft opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
+            title="Copy"
+          >
+            <i className="ri-file-copy-line text-[11px]" />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
 
-function guessEntityType(asset: MediaAsset): string {
-  if (asset.source_entity) {
-    if (asset.source_entity.includes("artist")) return "artist";
-    if (asset.source_entity.includes("release")) return "release";
-    if (asset.source_entity.includes("post")) return "article";
-    if (asset.source_entity.includes("chart")) return "chart";
-  }
-  if (asset.title?.toLowerCase().includes("artwork")) return "release";
-  if (asset.title?.toLowerCase().includes("photo")) return "artist";
-  return "media";
+function MetadataBlock({ data }: { data: Record<string, unknown> }) {
+  const [expanded, setExpanded] = useState(false);
+  const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
+
+  const toggleKey = (k: string) => {
+    setExpandedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(k)) next.delete(k);
+      else next.add(k);
+      return next;
+    });
+  };
+
+  const entries = Object.entries(data);
+  const displayEntries = expanded ? entries : entries.slice(0, 4);
+
+  const renderValue = (value: unknown): string => {
+    if (value === null) return "null";
+    if (value === undefined) return "undefined";
+    if (typeof value === "string") return value;
+    if (typeof value === "number" || typeof value === "boolean") return String(value);
+    return JSON.stringify(value);
+  };
+
+  const isExpandable = (value: unknown): boolean => {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+  };
+
+  return (
+    <div className="space-y-1.5">
+      {displayEntries.map(([key, value]) => {
+        const expandable = isExpandable(value);
+        const isOpen = expandedKeys.has(key);
+        return (
+          <div key={key} className="rounded-lg border border-wk-border bg-wk-surface overflow-hidden">
+            <div
+              className={`flex items-center justify-between px-3 py-1.5 ${expandable ? "cursor-pointer hover:bg-wk-surface-raised transition-all" : ""}`}
+              onClick={() => expandable && toggleKey(key)}
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-[11px] font-semibold text-wk-text-soft shrink-0">{key}</span>
+                {!expandable && (
+                  <span className="text-[11px] text-wk-text-muted font-mono truncate">
+                    {typeof value === "string" && value.length > 80 ? value.slice(0, 80) + "…" : renderValue(value)}
+                  </span>
+                )}
+              </div>
+              {expandable && (
+                <i className={`ri-arrow-down-s-line text-[12px] text-wk-text-faint shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+              )}
+            </div>
+            {expandable && isOpen && (
+              <div className="border-t border-wk-border px-3 py-2 bg-wk-bg-subtle">
+                <pre className="text-[10px] text-wk-text-muted font-mono leading-relaxed whitespace-pre-wrap break-all">
+                  {JSON.stringify(value, null, 2)}
+                </pre>
+              </div>
+            )}
+          </div>
+        );
+      })}
+      {entries.length > 4 && !expanded && (
+        <button
+          onClick={() => setExpanded(true)}
+          className="w-full rounded-lg border border-wk-border bg-wk-surface px-3 py-1.5 text-[11px] font-semibold text-wk-text-muted hover:text-wk-text hover:bg-wk-surface-raised transition-all cursor-pointer"
+        >
+          Show all {entries.length} fields…
+        </button>
+      )}
+      {expanded && entries.length > 4 && (
+        <button
+          onClick={() => setExpanded(false)}
+          className="w-full rounded-lg border border-wk-border bg-wk-surface px-3 py-1.5 text-[11px] font-semibold text-wk-text-muted hover:text-wk-text hover:bg-wk-surface-raised transition-all cursor-pointer"
+        >
+          Show less
+        </button>
+      )}
+    </div>
+  );
 }
 
 export default function AdminMediaLibraryPage() {
@@ -617,167 +716,212 @@ export default function AdminMediaLibraryPage() {
         </div>
       )}
 
-      {/* Preview / Edit Drawer */}
+      {/* Preview / Edit Modal */}
       {selectedAsset && (
         <div
-          className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 md:p-6"
           onClick={() => setSelectedAsset(null)}
         >
-          <aside
-            className="relative flex h-full w-full max-w-md flex-col bg-wk-surface shadow-2xl overflow-y-auto"
+          <div
+            className="relative flex h-[80vh] w-full max-w-[1280px] flex-col rounded-2xl border border-wk-border bg-wk-bg shadow-2xl overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Drawer header */}
-            <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-wk-border bg-wk-surface px-5 py-4">
-              <div>
-                <p className="text-[11px] font-black uppercase tracking-wider text-wk-text-faint">Media Asset</p>
-                <p className="text-[14px] font-black text-wk-text truncate max-w-[260px]">
-                  {selectedAsset.title || selectedAsset.slug || selectedAsset.id.slice(0, 12)}
-                </p>
+            {/* Top bar */}
+            <div className="flex items-center justify-between gap-4 px-5 py-3 shrink-0 border-b border-wk-border">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-wk-surface-raised text-wk-text-muted shrink-0">
+                  <i className="ri-image-line text-[14px]" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[14px] font-bold text-wk-text truncate max-w-[400px]">
+                    {selectedAsset.title || selectedAsset.slug || selectedAsset.id.slice(0, 12)}
+                  </p>
+                  <p className="text-[11px] text-wk-text-muted font-mono truncate max-w-[400px]">
+                    {selectedAsset.slug || "—"}
+                  </p>
+                </div>
               </div>
-              <button
-                onClick={() => setSelectedAsset(null)}
-                className="flex h-8 w-8 items-center justify-center rounded-xl border border-wk-border text-wk-text-muted hover:border-wk-brand hover:text-wk-text cursor-pointer"
-              >
-                <WkIcon name="X" size={15} />
-              </button>
+              <div className="flex items-center gap-2 shrink-0">
+                {selectedAsset.url && (
+                  <>
+                    <button
+                      onClick={() => { selectedAsset.url && handleCopy(selectedAsset.url); }}
+                      className="flex items-center gap-1.5 rounded-lg border border-wk-border px-3 py-1.5 text-[11px] font-semibold text-wk-text-soft hover:text-wk-text hover:border-wk-border-2 hover:bg-wk-surface-raised transition-all cursor-pointer whitespace-nowrap"
+                    >
+                      <i className={copied ? "ri-check-line text-[12px]" : "ri-file-copy-line text-[12px]"} />
+                      {copied ? "Copied" : "Copy URL"}
+                    </button>
+                    <a
+                      href={selectedAsset.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 rounded-lg border border-wk-border px-3 py-1.5 text-[11px] font-semibold text-wk-text-soft hover:text-wk-text hover:border-wk-border-2 hover:bg-wk-surface-raised transition-all cursor-pointer whitespace-nowrap"
+                    >
+                      <i className="ri-external-link-line text-[12px]" />
+                      Open
+                    </a>
+                  </>
+                )}
+                <button
+                  onClick={() => setSelectedAsset(null)}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-wk-text-muted hover:text-wk-text hover:bg-wk-surface-raised transition-all cursor-pointer"
+                >
+                  <i className="ri-close-line text-[18px]" />
+                </button>
+              </div>
             </div>
 
-            <div className="flex-1 p-5 space-y-5">
-              {/* Large preview */}
-              {selectedAsset.url && (
-                <div className="aspect-video w-full overflow-hidden rounded-xl border border-wk-border bg-wk-surface-raised">
+            {/* Body: split layout — image left (2/3), details right (1/3) */}
+            <div className="flex-1 flex min-h-0">
+              {/* Left: image preview — fills full height, image is top-aligned */}
+              <div className="flex-[2] min-w-0 flex items-start bg-wk-surface-raised p-4">
+                {selectedAsset.url ? (
                   <img
                     src={selectedAsset.url}
                     alt={String(selectedAsset.metadata?.alt_text ?? selectedAsset.title ?? "")}
-                    className="h-full w-full object-contain"
+                    className="h-full w-full object-contain rounded-lg"
                     onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
                   />
-                </div>
-              )}
-
-              {/* URL */}
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-wk-text-faint mb-1">URL</p>
-                <div className="flex items-center gap-2">
-                  <code className="flex-1 min-w-0 rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-[11px] font-mono text-wk-text-soft break-all">
-                    {selectedAsset.url || "—"}
-                  </code>
-                  {selectedAsset.url && (
-                    <button
-                      onClick={() => handleCopy(selectedAsset.url!)}
-                      className="shrink-0 flex items-center gap-1 rounded-lg border border-wk-border px-3 py-2 text-[11px] font-bold text-wk-text hover:bg-wk-surface-raised cursor-pointer whitespace-nowrap"
-                    >
-                      <WkIcon name={copied ? "Check" : "Copy"} size={13} />
-                      {copied ? "Copied" : "Copy"}
-                    </button>
-                  )}
-                </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-3 text-wk-text-faint">
+                    <i className="ri-image-line text-[56px]" />
+                    <p className="text-[13px] font-medium">No preview available</p>
+                  </div>
+                )}
               </div>
 
-              {/* Alt text editor */}
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-wk-text-faint mb-1">Alt Text</p>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={editingAlt}
-                    onChange={(e) => setEditingAlt(e.target.value)}
-                    placeholder="Describe the image for accessibility…"
-                    className="flex-1 rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-[13px] text-wk-text outline-none focus:border-wk-brand"
-                  />
-                  <button
-                    onClick={handleSaveAlt}
-                    disabled={savingAlt}
-                    className="shrink-0 wk-button wk-button-primary wk-button-sm whitespace-nowrap"
-                  >
-                    {savingAlt ? <><WkIcon name="Loader2" size={13} className="animate-spin inline mr-1" />Saving</> : "Save"}
-                  </button>
-                </div>
-              </div>
+              {/* Right: details panel — fills full height, scrolls independently */}
+              <div className="flex-[1] min-w-0 border-l border-wk-border flex flex-col">
+                <div className="flex-1 overflow-y-auto">
+                  <div className="p-5 space-y-5 pb-4">
 
-              {/* Status editor */}
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-wk-text-faint mb-1">Status</p>
-                <div className="flex gap-2">
-                  <select
-                    value={editingStatus}
-                    onChange={(e) => setEditingStatus(e.target.value)}
-                    className="flex-1 rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-[13px] text-wk-text outline-none focus:border-wk-brand cursor-pointer"
-                  >
-                    <option value="active">Active</option>
-                    <option value="archived">Archived</option>
-                    <option value="needs_review">Needs review</option>
-                    <option value="rejected">Rejected</option>
-                  </select>
-                  <button
-                    onClick={handleSaveStatus}
-                    disabled={savingStatus}
-                    className="shrink-0 wk-button wk-button-primary wk-button-sm whitespace-nowrap"
-                  >
-                    {savingStatus ? "Saving…" : "Save"}
-                  </button>
-                </div>
-              </div>
+                    {/* Section: Editable controls */}
+                    <section>
+                      <h4 className="text-[10px] font-black uppercase tracking-wider text-wk-text-faint mb-3">Quick Actions</h4>
+                      <div className="space-y-3">
+                        {/* Alt text */}
+                        <div>
+                          <label className="block text-[11px] font-semibold text-wk-text-soft mb-1.5">Alt Text</label>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              value={editingAlt}
+                              onChange={(e) => setEditingAlt(e.target.value)}
+                              placeholder="Describe the image for accessibility…"
+                              className="flex-1 rounded-lg border border-wk-border bg-wk-surface px-3 py-1.5 text-[12px] text-wk-text placeholder:text-wk-text-faint outline-none focus:border-wk-brand/50 focus:ring-1 focus:ring-wk-brand/20 transition-all"
+                            />
+                            <button
+                              onClick={handleSaveAlt}
+                              disabled={savingAlt}
+                              className="shrink-0 flex items-center gap-1.5 rounded-lg bg-wk-brand px-3 py-1.5 text-[11px] font-bold text-wk-brand-on hover:opacity-90 disabled:opacity-40 transition-all cursor-pointer whitespace-nowrap"
+                            >
+                              {savingAlt ? (
+                                <><i className="ri-loader-2-line text-[12px] animate-spin" /> Saving</>
+                              ) : (
+                                "Save"
+                              )}
+                            </button>
+                          </div>
+                        </div>
 
-              {/* Metadata */}
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-wk-text-faint mb-2">Details</p>
-                <div className="space-y-1.5">
-                  {[
-                    { label: "ID", value: selectedAsset.id },
-                    { label: "Slug", value: selectedAsset.slug },
-                    { label: "Type", value: selectedAsset.media_kind },
-                    { label: "MIME", value: selectedAsset.mime_type },
-                    { label: "Source kind", value: selectedAsset.source_kind },
-                    { label: "Source entity", value: selectedAsset.source_entity },
-                    { label: "Source record ID", value: selectedAsset.source_record_id },
-                    { label: "Staging record ID", value: selectedAsset.source_staging_record_id },
-                    { label: "Created", value: selectedAsset.created_at ? new Date(selectedAsset.created_at).toLocaleString() : null },
-                    { label: "Updated", value: selectedAsset.updated_at ? new Date(selectedAsset.updated_at).toLocaleString() : null },
-                  ].map(({ label, value }) => (
-                    <div key={label} className="flex items-start justify-between gap-3">
-                      <span className="text-[11px] text-wk-text-faint shrink-0">{label}</span>
-                      <span className="text-[11px] text-wk-text-soft font-mono text-right break-all max-w-[240px]">
-                        {value ?? "—"}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
+                        {/* Status */}
+                        <div>
+                          <label className="block text-[11px] font-semibold text-wk-text-soft mb-1.5">Status</label>
+                          <div className="flex gap-2">
+                            <select
+                              value={editingStatus}
+                              onChange={(e) => setEditingStatus(e.target.value)}
+                              className="flex-1 rounded-lg border border-wk-border bg-wk-surface px-3 py-1.5 text-[12px] text-wk-text outline-none focus:border-wk-brand/50 cursor-pointer"
+                            >
+                              <option value="active">Active</option>
+                              <option value="archived">Archived</option>
+                              <option value="needs_review">Needs review</option>
+                              <option value="rejected">Rejected</option>
+                            </select>
+                            <button
+                              onClick={handleSaveStatus}
+                              disabled={savingStatus}
+                              className="shrink-0 flex items-center gap-1.5 rounded-lg border border-wk-border bg-wk-surface px-3 py-1.5 text-[11px] font-bold text-wk-text-soft hover:text-wk-text hover:bg-wk-surface-raised disabled:opacity-40 transition-all cursor-pointer whitespace-nowrap"
+                            >
+                              {savingStatus ? "Saving…" : "Save"}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </section>
 
-              {/* Usage / linked entity */}
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-wk-text-faint mb-2">Linked entity</p>
-                <div className="rounded-lg border border-wk-border bg-wk-bg p-3">
-                  {selectedAsset.source_entity ? (
-                    <div>
-                      <p className="text-[12px] font-bold text-wk-text">{selectedAsset.source_entity}</p>
-                      <p className="text-[11px] text-wk-text-muted mt-0.5">
-                        Entity type inferred from source: {guessEntityType(selectedAsset)}
-                      </p>
-                      {ENTITY_ROUTES[guessEntityType(selectedAsset)] && (
-                        <a
-                          href={`${ENTITY_ROUTES[guessEntityType(selectedAsset)]}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="mt-2 inline-flex items-center gap-1 text-[11px] text-wk-brand hover:underline"
-                        >
-                          <WkIcon name="ExternalLink" size={11} />
-                          Browse {guessEntityType(selectedAsset)} pages
-                        </a>
-                      )}
-                    </div>
-                  ) : (
-                    <p className="text-[12px] text-wk-text-muted">
-                      <WkIcon name="AlertTriangle" size={13} className="inline mr-1 text-wk-warning" />
-                      Linked entity not found — needs repair
-                    </p>
-                  )}
+                    {/* Section: Identification */}
+                    <section>
+                      <h4 className="text-[10px] font-black uppercase tracking-wider text-wk-text-faint mb-3">Identification</h4>
+                      <div className="space-y-2">
+                        <FieldRow label="ID" value={selectedAsset.id} mono long />
+                        <FieldRow label="Slug" value={selectedAsset.slug || "—"} mono />
+                        <FieldRow label="Title" value={selectedAsset.title || "—"} />
+                      </div>
+                    </section>
+
+                    {/* Section: File Info */}
+                    <section>
+                      <h4 className="text-[10px] font-black uppercase tracking-wider text-wk-text-faint mb-3">File</h4>
+                      <div className="space-y-2">
+                        <FieldRow label="URL" value={selectedAsset.url || "—"} mono long copyable onCopy={() => { selectedAsset.url && handleCopy(selectedAsset.url); }} />
+                        <FieldRow label="MIME Type" value={selectedAsset.mime_type || "—"} mono />
+                        <FieldRow label="Media Kind" value={selectedAsset.media_kind || "—"} />
+                      </div>
+                    </section>
+
+                    {/* Section: Source */}
+                    <section>
+                      <h4 className="text-[10px] font-black uppercase tracking-wider text-wk-text-faint mb-3">Source</h4>
+                      <div className="space-y-2">
+                        <FieldRow label="Source Kind" value={selectedAsset.source_kind || "—"} />
+                        <FieldRow label="Source Entity" value={selectedAsset.source_entity || "—"} mono />
+                        <FieldRow label="Source Record ID" value={selectedAsset.source_record_id || "—"} mono />
+                        {selectedAsset.source_staging_record_id && (
+                          <FieldRow label="Staging Record ID" value={selectedAsset.source_staging_record_id} mono />
+                        )}
+                      </div>
+                    </section>
+
+                    {/* Section: Timestamps */}
+                    <section>
+                      <h4 className="text-[10px] font-black uppercase tracking-wider text-wk-text-faint mb-3">Timestamps</h4>
+                      <div className="space-y-2">
+                        <FieldRow
+                          label="Created"
+                          value={selectedAsset.created_at
+                            ? new Date(selectedAsset.created_at).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })
+                            : "—"}
+                        />
+                        <FieldRow
+                          label="Updated"
+                          value={selectedAsset.updated_at
+                            ? new Date(selectedAsset.updated_at).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })
+                            : "—"}
+                        />
+                      </div>
+                    </section>
+
+                    {/* Section: Metadata */}
+                    {selectedAsset.metadata && Object.keys(selectedAsset.metadata).length > 0 && (
+                      <section>
+                        <h4 className="text-[10px] font-black uppercase tracking-wider text-wk-text-faint mb-3">
+                          Metadata
+                          <span className="ml-2 text-wk-text-faint font-normal normal-case tracking-normal">
+                            ({Object.keys(selectedAsset.metadata).length} fields)
+                          </span>
+                        </h4>
+                        <MetadataBlock data={selectedAsset.metadata} />
+                      </section>
+                    )}
+
+                  </div>
                 </div>
+
+
               </div>
             </div>
-          </aside>
+          </div>
         </div>
       )}
 

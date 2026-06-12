@@ -91,11 +91,11 @@ async function finalizeContent(pool: Pool, runId: string): Promise<number> {
 }
 
 async function finalizeAuthors(pool: Pool, runId: string): Promise<number> {
-  const result = await pool.query(`insert into wk_authors (slug, name, email, url, source_kind, source_ingestion_run_id, source_staging_record_id, source_record_id, raw_record, mapped_record)
+  const result = await pool.query(`insert into registry_authors (slug, name, email, url, source_kind, source_ingestion_run_id, source_staging_record_id, source_record_id, raw_record, mapped_record)
     select target_slug, title, mapped_record->>'email', mapped_record->>'url', source_kind, ingestion_run_id, id, source_record_id, raw_record, mapped_record
     from wk_import_staging_records where ingestion_run_id = $1 and target_status = 'ready' and target_entity = 'authors' and target_slug is not null and title is not null
     on conflict (source_staging_record_id) do update set name = excluded.name, email = excluded.email, url = excluded.url, updated_at = now()`, [runId]);
-  await insertPromotionEvent(pool, runId, "wk_authors", "authors", "Finalized ready author records.");
+  await insertPromotionEvent(pool, runId, "registry_authors", "authors", "Finalized ready author records.");
   return result.rowCount ?? 0;
 }
 

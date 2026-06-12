@@ -4,12 +4,15 @@ import { supabase } from "@/lib/supabase";
 
 interface MediaAssetRow {
   id: string;
-  entity_type: string;
-  entity_slug: string;
-  role: string;
+  slug: string;
+  title: string | null;
   url: string;
-  alt_text: string | null;
-  source: string;
+  media_kind: string | null;
+  status: string | null;
+  source_kind: string | null;
+  source_entity: string | null;
+  source_record_id: string | null;
+  metadata: Record<string, unknown> | null;
 }
 
 interface BucketItem {
@@ -55,10 +58,13 @@ export function MediaPickerModal({ open, onClose, onSelect, title = "Select Medi
   const loadAssets = useCallback(async () => {
     setAssetsLoading(true);
     const { data, error } = await supabase
-      .from("wk_media_assets")
-      .select("id, entity_type, entity_slug, role, url, alt_text, source")
+      .from("registry_media_assets")
+      .select("id, slug, title, url, media_kind, status, source_kind, source_entity, source_record_id, metadata")
+      .eq("media_kind", "image")
+      .neq("status", "rejected")
+      .order("created_at", { ascending: false })
       .limit(500);
-    if (!error) setMediaAssets(data ?? []);
+    if (!error) setMediaAssets((data ?? []) as MediaAssetRow[]);
     setAssetsLoading(false);
   }, []);
 
@@ -121,9 +127,11 @@ export function MediaPickerModal({ open, onClose, onSelect, title = "Select Medi
     if (!assetSearch) return true;
     const q = assetSearch.toLowerCase();
     return (
-      m.entity_slug.toLowerCase().includes(q) ||
-      m.role.toLowerCase().includes(q) ||
-      (m.alt_text?.toLowerCase().includes(q) ?? false)
+      (m.slug?.toLowerCase().includes(q) ?? false) ||
+      (m.title?.toLowerCase().includes(q) ?? false) ||
+      (m.source_entity?.toLowerCase().includes(q) ?? false) ||
+      (m.source_record_id?.toLowerCase().includes(q) ?? false) ||
+      (String(m.metadata?.alt_text || "").toLowerCase().includes(q))
     );
   });
 
@@ -151,7 +159,7 @@ export function MediaPickerModal({ open, onClose, onSelect, title = "Select Medi
       ref={modalRef}
       className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4"
     >
-      <div className="flex h-[85vh] w-full max-w-[960px] flex-col rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] shadow-2xl overflow-hidden">
+      <div className="flex h-[90vh] w-full max-w-[1100px] flex-col rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] shadow-2xl overflow-hidden">
 
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[var(--wk-border)] px-5 py-3.5 shrink-0">
@@ -197,7 +205,7 @@ export function MediaPickerModal({ open, onClose, onSelect, title = "Select Medi
                     type="text"
                     value={assetSearch}
                     onChange={(e) => setAssetSearch(e.target.value)}
-                    placeholder="Search by entity, role, or alt text…"
+                    placeholder="Search by title, slug, entity, or alt text…"
                     className="w-full bg-transparent text-[13px] text-[var(--wk-text)] placeholder:text-[var(--wk-text-faint)] outline-none"
                   />
                   {assetSearch && (
@@ -229,10 +237,10 @@ export function MediaPickerModal({ open, onClose, onSelect, title = "Select Medi
                             : "border-[var(--wk-border)] hover:border-[var(--wk-border-2)]"
                         }`}
                       >
-                        <img src={asset.url} alt={asset.alt_text || ""} className="h-full w-full object-cover" loading="lazy"
+                        <img src={asset.url} alt={(asset.metadata?.alt_text as string) || asset.title || ""} className="h-full w-full object-cover" loading="lazy"
                           onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
                         <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <p className="text-[10px] font-semibold text-white truncate">{asset.role}</p>
+                          <p className="text-[10px] font-semibold text-white truncate">{(asset.metadata?.role as string) || asset.source_entity || asset.source_kind || ""}</p>
                         </div>
                         {selectedUrl === asset.url && (
                           <div className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-[var(--wk-brand)]">
@@ -455,7 +463,7 @@ export function MediaPickerModal({ open, onClose, onSelect, title = "Select Medi
           </div>
 
           {/* Right: Preview + Actions */}
-          <div className="w-[260px] shrink-0 border-l border-[var(--wk-border)] bg-[var(--wk-bg)] p-4 flex flex-col">
+          <div className="w-[300px] shrink-0 border-l border-[var(--wk-border)] bg-[var(--wk-bg)] p-4 flex flex-col">
             <div className="flex-1 overflow-y-auto">
               <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--wk-text-muted)] mb-3">Preview</p>
               {selectedUrl ? (
@@ -464,8 +472,7 @@ export function MediaPickerModal({ open, onClose, onSelect, title = "Select Medi
                     <img
                       src={selectedUrl}
                       alt="Preview"
-                      className="w-full object-contain"
-                      style={{ maxHeight: 180 }}
+                      className="w-full"
                       onError={() => setPreviewError(true)}
                     />
                   </div>
@@ -479,7 +486,7 @@ export function MediaPickerModal({ open, onClose, onSelect, title = "Select Medi
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center py-10 text-[var(--wk-text-muted)]">
-                  <WkIcon name="Image" size={28} className="mb-2 text-[var(--wk-text-faint)]" />
+                  <WkIcon name="Image" size={36} className="mb-2 text-[var(--wk-text-faint)]" />
                   <p className="text-[12px] text-center">Select an image<br />to preview it here</p>
                 </div>
               )}
