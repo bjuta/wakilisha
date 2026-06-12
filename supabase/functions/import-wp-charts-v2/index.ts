@@ -14,29 +14,65 @@ function safeId(prefix: string, v: string): string {
   return (prefix + "_" + safeSlug(v)).replace(/-+/g, "_").slice(0, 64);
 }
 
-function inferMarket(slug: string): string {
-  if (slug.includes("ke") || slug.includes("kenya") || slug.includes("nairobi")) return "kenya";
-  if (slug.includes("ng") || slug.includes("nigeria") || slug.includes("lagos")) return "nigeria";
-  if (slug.includes("za") || slug.includes("south-africa") || slug.includes("johannesburg")) return "south-africa";
-  if (slug.includes("gh") || slug.includes("ghana") || slug.includes("accra")) return "ghana";
-  if (slug.includes("tz") || slug.includes("tanzania") || slug.includes("dar")) return "tanzania";
-  if (slug.includes("ug") || slug.includes("uganda") || slug.includes("kampala")) return "uganda";
+const COUNTRY_PATTERNS: Array<{ market: string; iso: string; tz: string; re: RegExp }> = [
+  { market: "kenya", iso: "KE", tz: "Africa/Nairobi", re: /\b(kenya[n]?|nairobi|ke)\b/i },
+  { market: "nigeria", iso: "NG", tz: "Africa/Lagos", re: /\b(nigeria[n]?|lagos)\b/i },
+  { market: "south-africa", iso: "ZA", tz: "Africa/Johannesburg", re: /\b(south[\s-]?africa|johannesburg|za)\b/i },
+  { market: "ghana", iso: "GH", tz: null, re: /\b(ghana(?:ian)?|accra)\b/i },
+  { market: "tanzania", iso: "TZ", tz: null, re: /\b(tanzania[n]?|dar\s*es\s*salaam)\b/i },
+  { market: "uganda", iso: "UG", tz: null, re: /\b(uganda[n]?|kampala)\b/i },
+];
+
+function inferMarket(slug: string, name: string): string {
+  const haystack = (name + " " + slug).toLowerCase();
+  // Check full country names and city names first (word-boundary, no false positives)
+  for (const cp of COUNTRY_PATTERNS) {
+    if (cp.re.test(haystack)) return cp.market;
+  }
+  // Fallback: check 2-letter ISO codes only as standalone tokens
+  if (/\b(?:ke)\b/.test(slug.toLowerCase())) return "kenya";
+  if (/\b(?:ng)\b/.test(slug.toLowerCase())) return "nigeria";
+  if (/\b(?:za)\b/.test(slug.toLowerCase())) return "south-africa";
+  if (/\b(?:gh)\b/.test(slug.toLowerCase())) return "ghana";
+  if (/\b(?:tz)\b/.test(slug.toLowerCase())) return "tanzania";
+  if (/\b(?:ug)\b/.test(slug.toLowerCase())) return "uganda";
   return "kenya";
 }
 
-function inferSeries(slug: string): string {
+function inferSeries(slug: string, _name: string): string {
   const s = slug.toLowerCase();
-  if (s.includes("rnb") || s.includes("r&b")) return "rnb";
-  if (s.includes("gengetone")) return "gengetone";
-  if (s.includes("gospel")) return "gospel";
-  if (s.includes("afrobeats")) return "afrobeats";
-  if (s.includes("hiphop") || s.includes("hip-hop") || s.includes("rap")) return "hiphop";
-  if (s.includes("reggae") || s.includes("dancehall")) return "reggae";
-  if (s.includes("2026")) return "2026";
-  if (s.includes("2025")) return "2025";
-  if (s.includes("new")) return "new-releases";
-  if (s.includes("top")) return "top-songs";
+  // Only match full genre words, not substrings
+  if (/\b(?:rnb|r[\s&]*b)\b/.test(s)) return "rnb";
+  if (/\bgengetone\b/.test(s)) return "gengetone";
+  if (/\bgospel\b/.test(s)) return "gospel";
+  if (/\bafrobeats?\b/.test(s)) return "afrobeats";
+  if (/\b(?:hip[\s-]*hop|rap)\b/.test(s)) return "hiphop";
+  if (/\b(?:reggae|dancehall)\b/.test(s)) return "reggae";
+  if (/\b(?:bongo|flava)\b/.test(s)) return "bongo-flava";
+  if (/\b(?:gqom|amapiano)\b/.test(s)) return s;
+  // Year-based slugs
+  if (/^\d{4}$/.test(s)) return s;
+  if (/^(20\d{2})/.test(s)) return s.match(/^(20\d{2})/)![1];
+  // Descriptive
+  if (/\bnew[\s-]?releases?\b/.test(s)) return "new-releases";
+  if (/\b(?:top|hot|trending)\b/.test(s)) return "top-songs";
+  // If slug is a country/region name, fall back to "top-songs"
+  if (/\b(?:kenya|nigeria|ghana|tanzania|uganda|south[\s-]?africa|africa|east[\s-]?africa)\b/.test(s)) return "top-songs";
   return s;
+}
+
+function makeMarketRecord(market: string) {
+  const label = market.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  let iso: string | null = null;
+  let tz: string | null = null;
+  for (const cp of COUNTRY_PATTERNS) {
+    if (cp.market === market) { iso = cp.iso; tz = cp.tz; break; }
+  }
+  return {
+    market_slug: market, market_label: label,
+    market_type: "country", country_code: iso,
+    timezone: tz, default_language: "en",
+  };
 }
 
 serve(async (req: Request) => {
@@ -56,6 +92,16 @@ serve(async (req: Request) => {
     if (action === "ping") {
       const { data } = await supabase.from("wk_chart_programs_v2").select("id").limit(1);
       return new Response(JSON.stringify({ ok: true, tables_exist: data !== null }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    if (action === "clean") {
+      const tbls = ["wk_chart_entries_v2", "wk_chart_editions_v2", "wk_chart_source_coverage_v2", "wk_chart_slug_aliases_v2", "wk_chart_programs_v2", "wk_chart_series_v2", "wk_chart_markets_v2", "wk_chart_eligibility_rules_v2", "wk_chart_methodologies_v2"];
+      const errs: string[] = [];
+      for (const t of tbls) {
+        const { error } = await supabase.from(t).delete().neq("id", "__never_matches__");
+        if (error) errs.push(t + ": " + error.message);
+      }
+      return new Response(JSON.stringify({ success: errs.length === 0, cleaned: tbls.length, errors: errs.length > 0 ? errs : undefined }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     if (action === "import") {
@@ -85,8 +131,8 @@ serve(async (req: Request) => {
       const aliases: Record<string, unknown>[] = [];
 
       for (const chart of charts) {
-        const market = inferMarket(chart.slug);
-        const series = inferSeries(chart.slug);
+        const market = inferMarket(chart.slug, chart.name);
+        const series = inferSeries(chart.slug, chart.name);
         const pubSlug = series + "/" + market;
         const progId = safeId("program", pubSlug);
 
@@ -94,17 +140,11 @@ serve(async (req: Request) => {
           seriesSet.set(series, { series_slug: series, series_label: series.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) });
         }
         if (!marketsSet.has(market)) {
-          marketsSet.set(market, {
-            market_slug: market, market_label: market.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
-            market_type: "country",
-            country_code: market === "kenya" ? "KE" : market === "nigeria" ? "NG" : market === "south-africa" ? "ZA" : market === "ghana" ? "GH" : market === "tanzania" ? "TZ" : market === "uganda" ? "UG" : null,
-            timezone: market === "kenya" ? "Africa/Nairobi" : market === "nigeria" ? "Africa/Lagos" : market === "south-africa" ? "Africa/Johannesburg" : null,
-            default_language: "en",
-          });
+          marketsSet.set(market, makeMarketRecord(market));
         }
         programs.push({
           id: progId, series_slug: series, market_slug: market, public_slug: pubSlug,
-          public_label: chart.name || series.replace(/-/g, " ") + " \u00b7 " + market.replace(/-/g, " "),
+          public_label: chart.name || series.replace(/-/g, " ") + " · " + market.replace(/-/g, " "),
           short_label: chart.name || series, source_family_slug: chart.slug || series,
           default_period_type: "weekly", default_methodology_version: "legacy-import-v1",
           default_eligibility_rules_version: "legacy-import-v1", chart_size: 20,
@@ -122,7 +162,7 @@ serve(async (req: Request) => {
           const edId = safeId("edition", pubSlug + "_" + ed.edition_date);
           editions.push({
             id: edId, program_id: progId, edition_slug: ed.edition_date,
-            edition_label: ed.title || pubSlug + " \u00b7 " + ed.edition_date,
+            edition_label: ed.title || pubSlug + " · " + ed.edition_date,
             edition_date: ed.edition_date, period_start: ed.edition_date, period_end: ed.edition_date,
             status: ed.status === "published" ? "published" : "draft",
             entry_count: ed.items.length, chart_size: 20,
