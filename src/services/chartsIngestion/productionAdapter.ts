@@ -528,6 +528,24 @@ export async function runEligibility(runId: string): Promise<{
   return invokeApi("run_eligibility", { runId });
 }
 
+/** Trigger run_carry_forward: reads previous edition entries, identifies tracks
+ *  with NO fresh evidence this week, and creates synthetic carry_forward_only
+ *  candidates in chart_ingest_candidates. Must run BEFORE scoring so
+ *  carry-forward-only tracks participate in scoring with the §4.6 bonus. */
+export async function runCarryForward(runId: string): Promise<{
+  ok: boolean;
+  runId: string;
+  stage: string;
+  carryForwardCount: number;
+  freshEvidenceCount: number;
+  previousEntryCount: number;
+  skippedExistingCount: number;
+  previousEditionFound: boolean;
+  durationMs: number;
+}> {
+  return invokeApi("run_carry_forward", { runId });
+}
+
 /** Trigger run_scoring: scores all candidates and writes to chart_ingest_candidate_scores. */
 export async function runScoring(runId: string): Promise<{
   ok: boolean;

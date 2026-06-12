@@ -1,0 +1,167 @@
+{
+  "_provenance": "Synthetic fixture — generated for CI Gate A smoke test. NOT a real chart edition. Do not present as live data.",
+  "_generated_at": "2026-06-11T00:00:00Z",
+  "_generator": "scripts/charts/export-edition-fixture.ts (synthetic mode)",
+  "edition_date": "2026-06-11",
+  "chart_program": "top-songs-kenya",
+  "chart_size": 10,
+  "methodology_notes": "Scoring policy 1.0.1 — all §11.1-11.4 corrections applied",
+  "scoring_policy_version": "1.0.1",
+  "corrections_applied": ["§11.1 min_stations enforced", "§11.2 per-detection duration", "§11.3 pre-sort overflow", "§11.4 weight coercion"],
+  "source_evidence": [
+    {
+      "track_title": "Nakam Sai",
+      "artist_name": "Sauti Sol",
+      "source_urls": [
+        "https://spotify.com/playlist/kenya-top-50",
+        "https://music.apple.com/playlist/ke-top-100",
+        "https://youtube.com/playlist/kenya-trending"
+      ],
+      "release_date": "2026-06-01",
+      "occurrence_count": 3
+    },
+    {
+      "track_title": "Sonona Remix",
+      "artist_name": "Sauti Sol, Burna Boy",
+      "source_urls": [
+        "https://spotify.com/playlist/kenya-top-50",
+        "https://music.apple.com/playlist/ke-top-100",
+        "https://youtube.com/playlist/kenya-trending",
+        "https://deezer.com/playlist/ke-hot"
+      ],
+      "release_date": "2026-05-20",
+      "occurrence_count": 5
+    },
+    {
+      "track_title": "Hallelujah (Washwash)",
+      "artist_name": "Khaligraph Jones, Bensoul",
+      "source_urls": [
+        "https://spotify.com/playlist/kenya-top-50",
+        "https://music.apple.com/playlist/ke-top-100",
+        "https://youtube.com/playlist/kenya-trending"
+      ],
+      "release_date": "2026-05-25",
+      "occurrence_count": 4
+    },
+    {
+      "track_title": "Kuna Kuna",
+      "artist_name": "Vic West, Fathermoh",
+      "source_urls": [
+        "https://spotify.com/playlist/kenya-top-50",
+        "https://music.apple.com/playlist/ke-top-100"
+      ],
+      "release_date": "2026-06-05",
+      "occurrence_count": 2
+    },
+    {
+      "track_title": "Wale Wale",
+      "artist_name": "Diamond Platnumz",
+      "source_urls": [
+        "https://spotify.com/playlist/kenya-top-50",
+        "https://music.apple.com/playlist/ke-top-100",
+        "https://youtube.com/playlist/kenya-trending"
+      ],
+      "release_date": "2026-05-18",
+      "occurrence_count": 4
+    },
+    {
+      "track_title": "Sugar",
+      "artist_name": "Zuchu",
+      "source_urls": [
+        "https://spotify.com/playlist/kenya-top-50",
+        "https://music.apple.com/playlist/ke-top-100"
+      ],
+      "release_date": "2026-06-03",
+      "occurrence_count": 2
+    },
+    {
+      "track_title": "Kwikwi",
+      "artist_name": "Wakadinali",
+      "source_urls": [
+        "https://spotify.com/playlist/kenya-top-50",
+        "https://music.apple.com/playlist/ke-top-100",
+        "https://youtube.com/playlist/kenya-trending"
+      ],
+      "release_date": "2026-05-10",
+      "occurrence_count": 3
+    },
+    {
+      "track_title": "Miondoko",
+      "artist_name": "Boutross, Breeder LW",
+      "source_urls": [
+        "https://spotify.com/playlist/kenya-top-50",
+        "https://music.apple.com/playlist/ke-top-100",
+        "https://youtube.com/playlist/kenya-trending"
+      ],
+      "release_date": "2026-04-15",
+      "occurrence_count": 3
+    },
+    {
+      "track_title": "Angela",
+      "artist_name": "Boutross",
+      "source_urls": [
+        "https://spotify.com/playlist/kenya-top-50",
+        "https://music.apple.com/playlist/ke-top-100",
+        "https://deezer.com/playlist/ke-hot"
+      ],
+      "release_date": "2026-03-01",
+      "occurrence_count": 3
+    },
+    {
+      "track_title": "Dance Ya Kudance",
+      "artist_name": "Mejja, Exray",
+      "source_urls": [
+        "https://spotify.com/playlist/kenya-top-50",
+        "https://youtube.com/playlist/kenya-trending"
+      ],
+      "release_date": "2026-05-20",
+      "occurrence_count": 2
+    }
+  ],
+  "previous_edition": [
+    { "normalized_key": "hallelujah washwash::khaligraph jones", "position": 1 },
+    { "normalized_key": "nakam sai::sauti sol", "position": 2 },
+    { "normalized_key": "kwikwi::wakadinali", "position": 3 },
+    { "normalized_key": "miondoko::boutross", "position": 4 },
+    { "normalized_key": "angela::boutross", "position": 5 },
+    { "normalized_key": "dance ya kudance::mejja", "position": 6 },
+    { "normalized_key": "kuna kuna::vic west", "position": 7 },
+    { "normalized_key": "wale wale::diamond platnumz", "position": 8 },
+    { "normalized_key": "sugar::zuchu", "position": 9 },
+    { "normalized_key": "sonona remix::sauti sol", "position": 10 }
+  ],
+  "airplay_detections": [
+    {
+      "canonical_track_id": "ct-nakam-001",
+      "normalized_key": "nakam sai::sauti sol",
+      "station_id": "stn-homeboyz",
+      "station_weight": 1.0,
+      "week_start": "2026-06-08",
+      "detection_count": 9,
+      "total_played_duration": 1620,
+      "weighted_score": 36.0
+    },
+    {
+      "canonical_track_id": "ct-nakam-001",
+      "normalized_key": "nakam sai::sauti sol",
+      "station_id": "stn-nation-fm",
+      "station_weight": 1.5,
+      "week_start": "2026-06-08",
+      "detection_count": 6,
+      "total_played_duration": 1080,
+      "weighted_score": 27.0
+    }
+  ],
+  "expected_positions": [
+    { "rank": 1, "normalized_key": "nakam sai::sauti sol", "track_title": "Nakam Sai", "artist_name": "Sauti Sol" },
+    { "rank": 2, "normalized_key": "sonona remix::sauti sol", "track_title": "Sonona Remix", "artist_name": "Sauti Sol, Burna Boy" },
+    { "rank": 3, "normalized_key": "hallelujah washwash::khaligraph jones", "track_title": "Hallelujah (Washwash)", "artist_name": "Khaligraph Jones, Bensoul" },
+    { "rank": 4, "normalized_key": "wale wale::diamond platnumz", "track_title": "Wale Wale", "artist_name": "Diamond Platnumz" },
+    { "rank": 5, "normalized_key": "kuna kuna::vic west", "track_title": "Kuna Kuna", "artist_name": "Vic West, Fathermoh" },
+    { "rank": 6, "normalized_key": "sugar::zuchu", "track_title": "Sugar", "artist_name": "Zuchu" },
+    { "rank": 7, "normalized_key": "kwikwi::wakadinali", "track_title": "Kwikwi", "artist_name": "Wakadinali" },
+    { "rank": 8, "normalized_key": "miondoko::boutross", "track_title": "Miondoko", "artist_name": "Boutross, Breeder LW" },
+    { "rank": 9, "normalized_key": "angela::boutross", "track_title": "Angela", "artist_name": "Boutross" },
+    { "rank": 10, "normalized_key": "dance ya kudance::mejja", "track_title": "Dance Ya Kudance", "artist_name": "Mejja, Exray" }
+  ]
+}

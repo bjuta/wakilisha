@@ -40,6 +40,45 @@ function FlagChip({ label, active, color }: { label: string; active: boolean; co
   );
 }
 
+function CompactScoreChip({ label, value, cap }: { label: string; value: number; cap: number }) {
+  const fillPct = cap > 0 ? Math.min((value / cap) * 100, 100) : 0;
+  return (
+    <div className="relative flex flex-col items-center rounded-md border border-wk-border px-1.5 py-1 text-center min-w-[36px]" title={`${label}: ${value.toFixed(4)} (cap ${cap})`}>
+      <div className="absolute inset-x-0 bottom-0 h-0.5 rounded-b-md overflow-hidden">
+        <div className="h-full bg-wk-brand/40 transition-all" style={{ width: `${fillPct}%` }} />
+      </div>
+      <span className="text-[8px] font-bold uppercase tracking-widest text-wk-text-faint">{label}</span>
+      <span className="text-[11px] font-black tabular-nums leading-none text-wk-text">{value.toFixed(1)}</span>
+    </div>
+  );
+}
+
+function InvariantBadge({ entry }: { entry: WkChartEntryV2Row }) {
+  const computed =
+    entry.source_score +
+    entry.cross_source_bonus +
+    entry.overlap_bonus +
+    entry.recency_score +
+    entry.continuity_score +
+    entry.carry_forward_bonus +
+    entry.airplay_score -
+    entry.anti_gaming_penalty;
+  const epsilon = 0.001;
+  const passes = Math.abs(computed - entry.total_score) <= epsilon;
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-bold ${
+        passes ? "bg-wk-success-soft text-wk-success" : "bg-wk-danger-soft text-wk-danger"
+      }`}
+      title={`Computed: ${computed.toFixed(4)} | Stored: ${entry.total_score.toFixed(4)}`}
+    >
+      <WkIcon name={passes ? "CheckCircle2" : "AlertTriangle"} size={9} />
+      {passes ? "✓" : `Δ${(computed - entry.total_score).toFixed(2)}`}
+    </span>
+  );
+}
+
 function EligibilitySection({ entry }: { entry: WkChartEntryV2Row }) {
   const status = entry.eligibility_status ?? "eligible";
   const warnings = entry.eligibility_warnings ?? [];
@@ -301,9 +340,7 @@ export function EntryAuditTable({ entries, loading }: EntryAuditTableProps) {
               <th className="px-3 py-2.5 text-[9px] font-bold uppercase tracking-widest text-wk-text-faint w-10">#</th>
               <th className="px-3 py-2.5 text-[9px] font-bold uppercase tracking-widest text-wk-text-faint">Track / Artist</th>
               <th className="px-3 py-2.5 text-[9px] font-bold uppercase tracking-widest text-wk-text-faint text-right">Total</th>
-              <th className="px-3 py-2.5 text-[9px] font-bold uppercase tracking-widest text-wk-text-faint text-right hidden sm:table-cell">Src</th>
-              <th className="px-3 py-2.5 text-[9px] font-bold uppercase tracking-widest text-wk-text-faint text-right hidden sm:table-cell">Air</th>
-              <th className="px-3 py-2.5 text-[9px] font-bold uppercase tracking-widest text-wk-text-faint text-right hidden sm:table-cell">CF</th>
+              <th className="px-3 py-2.5 text-[9px] font-bold uppercase tracking-widest text-wk-text-faint text-center hidden md:table-cell">Audit</th>
               <th className="px-3 py-2.5 text-[9px] font-bold uppercase tracking-widest text-wk-text-faint text-center hidden md:table-cell">Move</th>
               <th className="px-3 py-2.5 text-[9px] font-bold uppercase tracking-widest text-wk-text-faint text-center hidden md:table-cell">Flags</th>
               <th className="px-3 py-2.5 w-8" />
@@ -333,30 +370,43 @@ export function EntryAuditTable({ entries, loading }: EntryAuditTableProps) {
                     <td className="px-3 py-3">
                       <div className="font-semibold text-wk-text truncate max-w-[240px]">{entry.track_title ?? "—"}</div>
                       <div className="text-[11px] text-wk-text-muted truncate max-w-[240px]">{entry.artist_name ?? "—"}</div>
+                      {/* Compact inline score chips */}
+                      <div className="mt-1.5 flex flex-wrap gap-1">
+                        <CompactScoreChip label="SRC" value={entry.source_score} cap={72} />
+                        <CompactScoreChip label="CROSS" value={entry.cross_source_bonus} cap={24} />
+                        <CompactScoreChip label="OVL" value={entry.overlap_bonus} cap={10} />
+                        <CompactScoreChip label="REC" value={entry.recency_score} cap={18} />
+                        <CompactScoreChip label="CONT" value={entry.continuity_score} cap={18} />
+                        <CompactScoreChip label="CF" value={entry.carry_forward_bonus} cap={18} />
+                        <CompactScoreChip label="AIR" value={entry.airplay_score} cap={24} />
+                        {entry.anti_gaming_penalty > 0 && (
+                          <div className="relative flex flex-col items-center rounded-md border border-wk-danger/30 px-1.5 py-1 text-center min-w-[36px] bg-wk-danger-soft" title={`Anti-gaming penalty: -${entry.anti_gaming_penalty.toFixed(4)}`}>
+                            <span className="text-[8px] font-bold uppercase tracking-widest text-wk-danger">PEN</span>
+                            <span className="text-[11px] font-black tabular-nums leading-none text-wk-danger">-{entry.anti_gaming_penalty.toFixed(1)}</span>
+                          </div>
+                        )}
+                      </div>
                     </td>
 
-                    {/* Total score */}
+                    {/* Total score + invariant */}
                     <td className="px-3 py-3 text-right">
-                      <span className="text-[14px] font-black tabular-nums text-wk-brand">{entry.total_score.toFixed(2)}</span>
+                      <div className="flex flex-col items-end gap-1">
+                        <span className="text-[14px] font-black tabular-nums text-wk-brand">{entry.total_score.toFixed(2)}</span>
+                        <InvariantBadge entry={entry} />
+                      </div>
                     </td>
 
-                    {/* Source score */}
-                    <td className="px-3 py-3 text-right hidden sm:table-cell">
-                      <span className="text-[11px] tabular-nums text-wk-text-muted">{entry.source_score.toFixed(1)}</span>
-                    </td>
-
-                    {/* Airplay score */}
-                    <td className="px-3 py-3 text-right hidden sm:table-cell">
-                      <span className={`text-[11px] tabular-nums ${entry.airplay_score > 0 ? "text-wk-brand font-semibold" : "text-wk-text-faint"}`}>
-                        {entry.airplay_score > 0 ? entry.airplay_score.toFixed(1) : "—"}
-                      </span>
-                    </td>
-
-                    {/* CF bonus */}
-                    <td className="px-3 py-3 text-right hidden sm:table-cell">
-                      <span className={`text-[11px] tabular-nums ${entry.carry_forward_bonus > 0 ? "text-wk-warning font-semibold" : "text-wk-text-faint"}`}>
-                        {entry.carry_forward_bonus > 0 ? entry.carry_forward_bonus.toFixed(1) : "—"}
-                      </span>
+                    {/* Audit */}
+                    <td className="px-3 py-3 text-center hidden md:table-cell">
+                      <div className="flex flex-col items-center gap-1">
+                        <span className="text-[10px] text-wk-text-muted">{entry.source_count} src</span>
+                        <span className={`text-[10px] tabular-nums ${entry.airplay_score > 0 ? "text-wk-brand font-semibold" : "text-wk-text-faint"}`}>
+                          {entry.airplay_score > 0 ? `air ${entry.airplay_score.toFixed(1)}` : "—"}
+                        </span>
+                        {entry.carry_forward_bonus > 0 && (
+                          <span className="text-[10px] text-wk-warning font-semibold">cf {entry.carry_forward_bonus.toFixed(1)}</span>
+                        )}
+                      </div>
                     </td>
 
                     {/* Movement */}
@@ -405,7 +455,7 @@ export function EntryAuditTable({ entries, loading }: EntryAuditTableProps) {
                   </tr>
                   {isExpanded && (
                     <tr key={`${entry.id}-detail`} className="bg-wk-bg-subtle">
-                      <td colSpan={9} className="p-0">
+                      <td colSpan={7} className="p-0">
                         <EntryDetailPanel entry={entry} />
                       </td>
                     </tr>

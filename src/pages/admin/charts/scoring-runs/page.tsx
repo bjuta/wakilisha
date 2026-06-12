@@ -6,6 +6,9 @@ import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { AdminChartsPageHeader } from "../components/AdminChartsPageHeader";
 import { AdminChartsStatusBadge } from "../components/AdminChartsStatusBadge";
 import { AdminChartsLoadingState } from "../components/AdminChartsLoadingState";
+import { AuditSurfacePanel } from "../edition-detail/components/AuditSurfacePanel";
+import { ScoreBreakdownChips } from "../edition-detail/components/ScoreBreakdownChips";
+import type { WkChartEntryV2Row } from "@/services/chartsScoring/scoringTypes";
 
 interface ChartProgram {
   id: string;
@@ -46,18 +49,6 @@ interface EditionPreview {
   status: string;
 }
 
-interface EntryPreview {
-  rank: number;
-  track_title: string;
-  artist_name: string;
-  total_score: number;
-  movement: string | null;
-  previous_rank: number | null;
-  source_score: number;
-  airplay_score: number;
-  carry_forward_bonus: number;
-}
-
 function formatDateTime(iso: string | null): string {
   if (!iso) return "—";
   const d = new Date(iso);
@@ -92,7 +83,7 @@ export default function AdminScoringRunsPage() {
   // Expanded state
   const [expandedRunId, setExpandedRunId] = useState<string | null>(null);
   const [editionPreview, setEditionPreview] = useState<EditionPreview | null>(null);
-  const [entriesPreview, setEntriesPreview] = useState<EntryPreview[]>([]);
+  const [entriesPreview, setEntriesPreview] = useState<WkChartEntryV2Row[]>([]);
   const [loadingPreview, setLoadingPreview] = useState(false);
 
   // ── Load programs + runs ──
@@ -176,13 +167,13 @@ export default function AdminScoringRunsPage() {
       // Fetch entries
       const { data: entriesData, error: entriesErr } = await supabase
         .from("wk_chart_entries_v2")
-        .select("rank, track_title, artist_name, total_score, movement, previous_rank, source_score, airplay_score, carry_forward_bonus")
+        .select("*")
         .eq("edition_id", edition.id)
         .order("rank", { ascending: true })
         .limit(30);
 
       if (!entriesErr && entriesData) {
-        setEntriesPreview(entriesData as EntryPreview[]);
+        setEntriesPreview(entriesData as WkChartEntryV2Row[]);
       }
     } catch {
       // ignore
@@ -330,9 +321,13 @@ export default function AdminScoringRunsPage() {
                                 </div>
                               </div>
 
-                              {/* Top entries */}
+                              {/* Top entries with audit chips */}
                               {entriesPreview.length > 0 && (
-                                <div className="space-y-1">
+                                <div className="space-y-3">
+                                  {/* Aggregate audit panel */}
+                                  <AuditSurfacePanel entries={entriesPreview} />
+
+                                  {/* Entry rows with inline score chips */}
                                   <div className="text-[11px] font-semibold text-wk-text-muted uppercase tracking-wider">Top Entries</div>
                                   <div className="rounded-lg border border-wk-border overflow-hidden">
                                     <table className="w-full text-left">
@@ -340,52 +335,79 @@ export default function AdminScoringRunsPage() {
                                         <tr className="border-b border-wk-border bg-wk-bg-subtle">
                                           <th className="px-3 py-2 text-[10px] font-bold text-wk-text-muted uppercase">#</th>
                                           <th className="px-3 py-2 text-[10px] font-bold text-wk-text-muted uppercase">Track</th>
-                                          <th className="px-3 py-2 text-[10px] font-bold text-wk-text-muted uppercase">Score</th>
-                                          <th className="px-3 py-2 text-[10px] font-bold text-wk-text-muted uppercase">Movement</th>
+                                          <th className="px-3 py-2 text-[10px] font-bold text-wk-text-muted uppercase hidden md:table-cell">Score Components</th>
+                                          <th className="px-3 py-2 text-[10px] font-bold text-wk-text-muted uppercase">Total</th>
+                                          <th className="px-3 py-2 text-[10px] font-bold text-wk-text-muted uppercase">Move</th>
                                         </tr>
                                       </thead>
                                       <tbody>
-                                        {entriesPreview.slice(0, 10).map((entry) => (
-                                          <tr key={entry.rank} className="border-b border-wk-border last:border-0 hover:bg-wk-surface-raised transition-colors">
-                                            <td className="px-3 py-2 text-[12px] font-bold text-wk-text">{entry.rank}</td>
-                                            <td className="px-3 py-2">
-                                              <div className="text-[12px] font-semibold text-wk-text truncate max-w-[200px]">{entry.track_title}</div>
-                                              <div className="text-[10px] text-wk-text-muted truncate max-w-[200px]">{entry.artist_name}</div>
-                                            </td>
-                                            <td className="px-3 py-2">
-                                              <div className="text-[12px] font-bold text-wk-brand tabular-nums">{entry.total_score.toFixed(1)}</div>
-                                              <div className="text-[9px] text-wk-text-faint flex gap-1">
-                                                <span title="Source score">S:{entry.source_score.toFixed(1)}</span>
-                                                {entry.airplay_score > 0 && <span title="Airplay">A:{entry.airplay_score.toFixed(1)}</span>}
-                                                {entry.carry_forward_bonus > 0 && <span title="Carry-forward">C:{entry.carry_forward_bonus.toFixed(1)}</span>}
-                                              </div>
-                                            </td>
-                                            <td className="px-3 py-2">
-                                              {entry.movement === "new" && (
-                                                <span className="inline-flex items-center gap-1 rounded-full bg-wk-success-soft px-2 py-0.5 text-[10px] font-bold text-wk-success">NEW</span>
-                                              )}
-                                              {entry.movement === "reentry" && (
-                                                <span className="inline-flex items-center gap-1 rounded-full bg-wk-info-soft px-2 py-0.5 text-[10px] font-bold text-wk-info">RE</span>
-                                              )}
-                                              {entry.movement === "up" && (
-                                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-wk-success">
-                                                  <WkIcon name="ArrowUp" size={12} />{entry.previous_rank !== null ? entry.previous_rank - entry.rank : ""}
-                                                </span>
-                                              )}
-                                              {entry.movement === "down" && (
-                                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-wk-danger">
-                                                  <WkIcon name="ArrowDown" size={12} />{entry.previous_rank !== null ? entry.rank - entry.previous_rank : ""}
-                                                </span>
-                                              )}
-                                              {entry.movement === "same" && (
-                                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-wk-text-muted">
-                                                  <WkIcon name="Minus" size={12} />
-                                                </span>
-                                              )}
-                                              {!entry.movement && <span className="text-[10px] text-wk-text-faint">—</span>}
-                                            </td>
-                                          </tr>
-                                        ))}
+                                        {entriesPreview.slice(0, 10).map((entry) => {
+                                          const invariantCheck =
+                                            entry.source_score + entry.cross_source_bonus + entry.overlap_bonus +
+                                            entry.recency_score + entry.continuity_score + entry.carry_forward_bonus +
+                                            entry.airplay_score - entry.anti_gaming_penalty;
+                                          const invariantPass = Math.abs(invariantCheck - entry.total_score) <= 0.001;
+                                          return (
+                                            <tr key={entry.rank} className="border-b border-wk-border last:border-0 hover:bg-wk-surface-raised transition-colors">
+                                              <td className="px-3 py-2 text-[12px] font-bold text-wk-text">{entry.rank}</td>
+                                              <td className="px-3 py-2">
+                                                <div className="text-[12px] font-semibold text-wk-text truncate max-w-[180px]">{entry.track_title}</div>
+                                                <div className="text-[10px] text-wk-text-muted truncate max-w-[180px]">{entry.artist_name}</div>
+                                              </td>
+                                              <td className="px-3 py-2 hidden md:table-cell">
+                                                <ScoreBreakdownChips
+                                                  sourceScore={entry.source_score}
+                                                  crossSourceBonus={entry.cross_source_bonus}
+                                                  overlapBonus={entry.overlap_bonus}
+                                                  recencyScore={entry.recency_score}
+                                                  continuityScore={entry.continuity_score}
+                                                  carryForwardBonus={entry.carry_forward_bonus}
+                                                  airplayScore={entry.airplay_score}
+                                                  antiGamingPenalty={entry.anti_gaming_penalty}
+                                                  totalScore={entry.total_score}
+                                                  showInvariantCheck={false}
+                                                />
+                                              </td>
+                                              <td className="px-3 py-2">
+                                                <div className="flex items-center gap-1.5">
+                                                  <span className="text-[13px] font-black tabular-nums text-wk-brand">{entry.total_score.toFixed(1)}</span>
+                                                  <span
+                                                    className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-bold ${
+                                                      invariantPass ? "bg-wk-success-soft text-wk-success" : "bg-wk-danger-soft text-wk-danger"
+                                                    }`}
+                                                    title={invariantPass ? "Sum ✓" : `Δ${(invariantCheck - entry.total_score).toFixed(2)}`}
+                                                  >
+                                                    {invariantPass ? "✓" : "!"}
+                                                  </span>
+                                                </div>
+                                              </td>
+                                              <td className="px-3 py-2">
+                                                {entry.movement === "new" && (
+                                                  <span className="inline-flex items-center gap-1 rounded-full bg-wk-success-soft px-2 py-0.5 text-[10px] font-bold text-wk-success">NEW</span>
+                                                )}
+                                                {entry.movement === "reentry" && (
+                                                  <span className="inline-flex items-center gap-1 rounded-full bg-wk-info-soft px-2 py-0.5 text-[10px] font-bold text-wk-info">RE</span>
+                                                )}
+                                                {entry.movement === "up" && entry.previous_rank !== null && (
+                                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-wk-success">
+                                                    <WkIcon name="ArrowUp" size={12} />{entry.previous_rank - entry.rank}
+                                                  </span>
+                                                )}
+                                                {entry.movement === "down" && entry.previous_rank !== null && (
+                                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-wk-danger">
+                                                    <WkIcon name="ArrowDown" size={12} />{entry.rank - entry.previous_rank}
+                                                  </span>
+                                                )}
+                                                {entry.movement === "same" && (
+                                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-wk-text-muted">
+                                                    <WkIcon name="Minus" size={12} />
+                                                  </span>
+                                                )}
+                                                {!entry.movement && <span className="text-[10px] text-wk-text-faint">—</span>}
+                                              </td>
+                                            </tr>
+                                          );
+                                        })}
                                       </tbody>
                                     </table>
                                   </div>

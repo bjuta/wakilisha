@@ -9,6 +9,7 @@ import { AdminChartsLoadingState } from "../components/AdminChartsLoadingState";
 import { PolicySnapshotPanel } from "./components/PolicySnapshotPanel";
 import { ExclusionSummaryPanel } from "./components/ExclusionSummaryPanel";
 import { EntryAuditTable } from "./components/EntryAuditTable";
+import { AuditSurfacePanel } from "./components/AuditSurfacePanel";
 import type { WkChartEditionV2Row, WkChartEntryV2Row, ScoringConfig } from "@/services/chartsScoring/scoringTypes";
 
 interface ChartProgramBasic {
@@ -261,6 +262,11 @@ export default function AdminChartsEditionDetailPage() {
           <span className="font-mono text-[11px] bg-wk-danger-soft text-wk-danger px-1.5 py-0.5 rounded border border-wk-danger/20">Mismatch</span> flag.
         </div>
       </div>
+
+      {/* Aggregate audit surface */}
+      {!loadingEntries && entries.length > 0 && (
+        <AuditSurfacePanel entries={entries} />
+      )}
 
       {/* Per-entry audit table */}
       <div className="space-y-3">

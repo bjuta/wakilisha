@@ -5,7 +5,7 @@
  *   3 Mapping Studio    → 4 Validation & Repair → 5 Normalized Candidates
  *   6 Ranking Integrity → 7 Draft Builder → 8 Snapshot Preview
  */
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import {
@@ -17,7 +17,6 @@ import {
   getDraftEntries,
   getJobSummaryApi,
   getJobLogs,
-  resetDemo,
   resetPipeline,
   getSnapshots,
   getEditionsApi,
@@ -26,7 +25,6 @@ import {
   getRoleLabel,
   ALL_ROLES,
   hasCapability,
-  getDisabledReason,
   getDiscoveredCsvSources,
   getCsvImportSessions,
 } from "@/services/chartsIngestion/client";
@@ -45,7 +43,6 @@ import { DraftBuilder } from "./components/DraftBuilder";
 import { SnapshotPreview } from "./components/SnapshotPreview";
 import { Timeline } from "./components/Timeline";
 import { ApiContractDrawer } from "./components/ApiContractDrawer";
-import { SimulationPanel } from "./components/SimulationPanel";
 
 const STATUS_COLORS: Record<string, string> = {
   draft: "bg-[var(--wk-text-faint)]/10 text-[var(--wk-text-faint)]",
@@ -77,6 +74,9 @@ const PHASES = [
   { id: "snapshot", label: "Snapshot Preview", icon: "ri-lock-2-line" },
 ];
 
+const POLLING_INTERVAL_MS = 3000;
+const TERMINAL_STATUSES = new Set(["published", "failed", "cancelled"]);
+
 export default function AdminChartsIngestDetail() {
   const { jobId } = useParams<{ jobId: string }>();
   const navigate = useNavigate();
@@ -94,7 +94,6 @@ export default function AdminChartsIngestDetail() {
   const [summary, setSummary] = useState<ReturnType<typeof getJobSummaryApi> | null>(null);
   const [activePhase, setActivePhase] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showPipelineResetConfirm, setShowPipelineResetConfirm] = useState(false);
   const [showContract, setShowContract] = useState(false);
   const [showTimeline, setShowTimeline] = useState(false);
@@ -103,6 +102,49 @@ export default function AdminChartsIngestDetail() {
   const [importSessions, setImportSessions] = useState<CsvImportSession[]>([]);
   const [selectedCsv, setSelectedCsv] = useState<DiscoveredCsvSource | null>(null);
   const [selectedEditionId, setSelectedEditionId] = useState<string | null>(null);
+  const [isPolling, setIsPolling] = useState(false);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  function startPolling(currentJob: IngestJob) {
+    if (TERMINAL_STATUSES.has(currentJob.status)) return;
+    if (pollingRef.current) return;
+    setIsPolling(true);
+    pollingRef.current = setInterval(async () => {
+      if (!jobId) return;
+      try {
+        const j = await getIngestJob(jobId);
+        if (j && TERMINAL_STATUSES.has(j.status)) stopPolling();
+        if (j) {
+          setJob(j);
+          // Also refresh dependent data
+          const [s, c, m, i, d, sum] = await Promise.all([
+            getSources(jobId),
+            getCandidates(jobId),
+            getMatches(jobId),
+            getReviewIssues(jobId),
+            getDraftEntries(jobId),
+            getJobSummaryApi(jobId),
+          ]);
+          setSources(s);
+          setCandidates(c);
+          setMatches(m);
+          setIssues(i);
+          setDraftEntries(d);
+          setSummary(sum);
+        }
+      } catch {
+        stopPolling();
+      }
+    }, POLLING_INTERVAL_MS);
+  }
+
+  function stopPolling() {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+    setIsPolling(false);
+  }
 
   const loadData = useCallback(async () => {
     if (!jobId) return;
@@ -117,7 +159,7 @@ export default function AdminChartsIngestDetail() {
       getJobLogs(jobId),
       getSnapshots(),
       getEditionsApi(),
-      getDiscoveredCsvSources(),
+      getDiscoveredCsvSources(jobId),
       getCsvImportSessions(jobId),
     ]);
     setJob(j);
@@ -133,20 +175,24 @@ export default function AdminChartsIngestDetail() {
     setDiscoveredCsvs(csvs);
     setImportSessions(sessions);
     setLoading(false);
+    if (j) startPolling(j);
   }, [jobId]);
 
   useEffect(() => {
     loadData();
+    return () => stopPolling();
   }, [loadData]);
+
+  // Re-sync polling on status changes
+  useEffect(() => {
+    if (!job) return;
+    if (TERMINAL_STATUSES.has(job.status)) stopPolling();
+    else startPolling(job);
+  }, [job?.status]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleUpdate = useCallback(() => {
     loadData();
   }, [loadData]);
-
-  const handleReset = useCallback(() => {
-    resetDemo();
-    window.location.reload();
-  }, []);
 
   const showToast = useCallback((message: string, type: "error" | "warning" | "success" = "error") => {
     setToast({ message, type });
@@ -200,6 +246,16 @@ export default function AdminChartsIngestDetail() {
             <i className="ri-arrow-left-line" />
           </button>
           <h1 className="text-[20px] font-bold text-[var(--wk-text)]">Job not found</h1>
+        </div>
+        <div className="rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-6 text-center">
+          <i className="ri-database-2-line text-[var(--wk-text-faint)] text-3xl mb-3 block" />
+          <p className="text-[14px] text-[var(--wk-text-muted)]">This ingestion job does not exist in the database.</p>
+          <button
+            onClick={() => navigate("/admin/charts/ingest")}
+            className="mt-4 wk-button wk-button-primary"
+          >
+            Back to Ingest Studio
+          </button>
         </div>
       </div>
     );
@@ -271,6 +327,14 @@ export default function AdminChartsIngestDetail() {
                   <span className="text-[var(--wk-brand)]">{importSessions.length} CSV import(s)</span>
                 </>
               )}
+              {isPolling && (
+                <>
+                  <span>·</span>
+                  <span className="flex items-center gap-1 text-[11px] font-semibold text-[var(--wk-info)]">
+                    <span className="h-1.5 w-1.5 rounded-full bg-[var(--wk-info)] animate-pulse" />Live
+                  </span>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -327,7 +391,7 @@ export default function AdminChartsIngestDetail() {
             <i className="ri-code-box-line" />
             API Contract
           </button>
-          {job.id !== "demo-job-001" && job.status !== "published" && job.status !== "committed" && job.status !== "committing" && (
+          {job.status !== "published" && job.status !== "committed" && job.status !== "committing" && (
             <>
               <button
                 onClick={() => setShowPipelineResetConfirm(true)}
@@ -369,33 +433,6 @@ export default function AdminChartsIngestDetail() {
               )}
             </>
           )}
-          {job.id === "demo-job-001" && (
-            <>
-              <button
-                onClick={() => setShowResetConfirm(true)}
-                className="wk-button wk-button-ghost whitespace-nowrap"
-                disabled={isReadOnly}
-                title={isReadOnly ? "Read-only mode" : ""}
-              >
-                <i className="ri-restart-line" />
-                Reset Demo
-              </button>
-              {showResetConfirm && (
-                <div className="absolute right-0 top-12 z-50 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4 shadow-lg">
-                  <div className="text-[13px] font-bold text-[var(--wk-text)]">Reset Demo Job?</div>
-                  <div className="mt-1 text-[11px] text-[var(--wk-text-muted)]">All changes will be reverted.</div>
-                  <div className="mt-3 flex items-center gap-2">
-                    <button onClick={handleReset} className="wk-button wk-button-sm wk-button-danger">
-                      Reset
-                    </button>
-                    <button onClick={() => setShowResetConfirm(false)} className="wk-button wk-button-sm wk-button-ghost">
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
           {isPublishable && !hasBlockingIssues && (
             <button
               onClick={() => setActivePhase(8)}
@@ -429,11 +466,6 @@ export default function AdminChartsIngestDetail() {
           importSessions={importSessions}
         />
       </WkSurface>
-
-      {/* Simulation Panel (demo only) */}
-      {job.id === "demo-job-001" && hasCapability(role, "simulate_failures") && (
-        <SimulationPanel jobId={job.id} onUpdate={handleUpdate} />
-      )}
 
       {/* Timeline (collapsible) */}
       {showTimeline && <Timeline logs={logs} jobId={job.id} />}

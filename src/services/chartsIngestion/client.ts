@@ -2,45 +2,31 @@
  * Chart Ingestion Client Adapter
  * Single boundary between the React app and the chart ingestion backend.
  *
- * Runtime WordPress ingestion support has been removed. WordPress is only allowed
- * as a legacy import source, not as the active ingestion/publishing backend.
+ * All mock paths have been removed. Both the legacy ingest-studio UI and the
+ * new production pipeline now call real Supabase tables via their respective
+ * adapters.
  */
 
-import * as mockAdapter from "./api";
+import * as realLegacyAdapter from "./realLegacyAdapter";
 import * as productionAdapter from "./productionAdapter";
 import {
   detectProvidersFromUrls,
   isValidProviderUrl,
 } from "./providerDetection";
 
-export type IngestionMode = "local" | "production";
+export type IngestionMode = "production";
 
-/**
- * PRODUCTION RULE: The ingest pipeline must always use the production adapter
- * (Supabase-backed). The local/mock adapter is only available in DEV mode
- * for development scaffolding. It must never be used for production ingestion.
- */
-export const CHARTS_INGESTION_MODE: IngestionMode = import.meta.env.DEV ? "local" : "production";
+export const CHARTS_INGESTION_MODE: IngestionMode = "production";
 
 export function getIngestionMode(): IngestionMode {
   return CHARTS_INGESTION_MODE;
 }
 
 export function setIngestionMode(_mode: IngestionMode): void {
-  // No-op in production — mode is determined by build environment
-  // In DEV, mode is always "local" to indicate mock scaffolding is available
+  // No-op — mode is always production
 }
 
-if (import.meta.env.DEV) {
-  const oldMode = (import.meta.env.VITE_CHARTS_INGESTION_MODE as string | undefined)?.trim().toLowerCase();
-  if (oldMode === "wordpress") {
-    // eslint-disable-next-line no-console
-    console.warn("[chartsIngestion/client] WordPress ingestion mode is ignored. WordPress is legacy-import only.");
-  }
-}
-
-const adapter = mockAdapter;
-// Production adapter — DB-backed, no localStorage dependency
+const adapter = realLegacyAdapter;
 const ingestStudioAdapter = productionAdapter;
 
 export type EndpointStatus = "not_configured" | "planned" | "local" | "ready" | "deprecated";
@@ -69,10 +55,10 @@ export const RUNTIME_CHART_ENDPOINTS: Record<string, EndpointDefinition> = {
     frontendFunction: "getChartFamilies()",
     method: "GET",
     path: "/api/charts/families",
-    status: "planned",
-    tables: ["chart_programs", "chart_series", "chart_markets"],
+    status: "ready",
+    tables: ["chart_programs", "wk_chart_programs_v2"],
     expectedResponse: ["id", "familyKey", "label", "defaultChartSize", "editionFrequency"],
-    description: "Retrieve all chart programs/families from the new runtime backend.",
+    description: "Retrieve all chart programs/families from the runtime backend.",
     payloadExample: {},
     responseExample: { families: [{ id: "top-songs-kenya", label: "Top Songs Kenya", defaultChartSize: 100 }] },
     capabilities: ["read_wakilisha_charts"],
@@ -82,10 +68,10 @@ export const RUNTIME_CHART_ENDPOINTS: Record<string, EndpointDefinition> = {
     frontendFunction: "runDryRun(request)",
     method: "POST",
     path: "/api/charts/ingest/dry-run",
-    status: "planned",
-    tables: ["chart_ingest_runs", "chart_ingest_rows", "chart_ingest_row_intelligence"],
+    status: "ready",
+    tables: ["chart_ingest_runs", "chart_ingest_run_sources", "chart_ingest_candidates"],
     expectedResponse: ["runId", "status", "stages", "summary", "rows"],
-    description: "Execute a provider-backed chart dry run in the new runtime backend.",
+    description: "Execute a provider-backed chart dry run in the runtime backend.",
     payloadExample: { chartTitle: "Top Songs Kenya", sourceUrls: [], marketScopeId: "scope_kenya" },
     responseExample: { runId: "run-001", status: "dry_run_complete" },
     capabilities: ["create_wakilisha_charts"],
@@ -95,10 +81,10 @@ export const RUNTIME_CHART_ENDPOINTS: Record<string, EndpointDefinition> = {
     frontendFunction: "commitIngestRun(request)",
     method: "POST",
     path: "/api/charts/ingest/runs/{runId}/commit",
-    status: "planned",
-    tables: ["chart_editions", "chart_entries", "chart_snapshots", "chart_audit_events"],
+    status: "ready",
+    tables: ["chart_editions", "chart_entries", "chart_ingest_runs"],
     expectedResponse: ["runId", "editionId", "status", "integrity"],
-    description: "Commit a dry run into a real edition, snapshot, and audit trail.",
+    description: "Commit a dry run into a real edition and audit trail.",
     payloadExample: { runId: "run-001", publishImmediately: false },
     responseExample: { runId: "run-001", editionId: "ed-001", status: "committed" },
     capabilities: ["publish_wakilisha_charts"],
@@ -120,7 +106,7 @@ export const INGEST_STUDIO_WP_ENDPOINTS: IngestStudioEndpointDef[] = [
       frontendFunction: "getIngestRuns()",
       method: "GET",
       path: "/api/charts/ingest/runs",
-      status: "planned",
+      status: "ready",
       tables: ["chart_ingest_runs"],
       expectedResponse: ["runs"],
       description: "List all provider-based ingest runs.",
@@ -151,9 +137,8 @@ function getEndpointStatus(fnName: string): EndpointStatus {
   const cleanName = fnName.replace(/\([^)]*\)/g, "").trim();
   const allExports = [adapter, productionAdapter];
   const hasFunction = allExports.some((candidate) => typeof (candidate as Record<string, unknown>)[cleanName] === "function");
-  // Production adapter functions are live DB-backed ("ready"), local mock is "local"
   if (typeof (productionAdapter as Record<string, unknown>)[cleanName] === "function") return "ready";
-  if (hasFunction) return "local";
+  if (hasFunction) return "ready";
   return "planned";
 }
 
@@ -177,6 +162,9 @@ export function getIngestStudioEndpointGroups(): Record<string, EndpointDefiniti
   };
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// Production pipeline (new 21-stage ingest run system)
+// ═══════════════════════════════════════════════════════════════════════════════
 
 export const runDryRun = ingestStudioAdapter.runDryRun;
 export const commitIngestRun = ingestStudioAdapter.commitIngestRun;
@@ -195,9 +183,14 @@ export const normalizeRun = ingestStudioAdapter.normalizeRun;
 export const getNormalizedRows = ingestStudioAdapter.getNormalizedRows;
 export const sourceFetch = ingestStudioAdapter.sourceFetch;
 export const runEligibility = ingestStudioAdapter.runEligibility;
+export const runCarryForward = ingestStudioAdapter.runCarryForward;
 export const runScoring = ingestStudioAdapter.runScoring;
 export const runShortlist = ingestStudioAdapter.runShortlist;
 export const resetPipeline = ingestStudioAdapter.resetPipeline;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Legacy ingest studio (9-phase UI) — now backed by real DB tables
+// ═══════════════════════════════════════════════════════════════════════════════
 
 export const resetStore = adapter.resetStore;
 export const resetDemo = adapter.resetDemo;
@@ -243,6 +236,8 @@ export const getDashboardKpisApi = adapter.getDashboardKpisApi;
 export const getJobSummaryApi = adapter.getJobSummaryApi;
 export const getDemoJobId = adapter.getDemoJobId;
 export const searchCanonicalTracks = adapter.searchCanonicalTracks;
+export const getDiscoveredCsvSources = adapter.getDiscoveredCsvSources;
+export const getCsvImportSessions = adapter.getCsvImportSessions;
 
 export type { UserRole } from "./roles";
 export {
@@ -257,10 +252,30 @@ export {
 } from "./roles";
 
 // ─── Auto-restored chart admin barrel exports ───
-export { attachCsvAsSource, createDraftFromCsvCandidates, exportDraftJson, getCsvImportSessions, getDiscoveredCsvSources, normalizeCsvCandidates, validateCsvDraftIntegrity } from "./api";
 export { validateCommitReadiness } from "./commitService";
 export { getIngestRun, runPreflightCheck as preflight, validateRunReadinessAsync } from "./productionAdapter";
 export { detectProvidersFromUrls, isValidProviderUrl } from "./providerDetection";
 export { clearAllSimulations, getActiveSimulations, getLastErrorMessage, isSimulated, retry, simulate } from "./simulation";
-export { appendJobLog, getStore } from "./store";
 export { getStepStatus } from "./workflow";
+
+// ─── CSV operations — now backed by real adapter via chart-ingest-api edge function ───
+export { attachCsvAsSource, normalizeCsvCandidates, csvUpload } from "./realLegacyAdapter";
+// CSV functions that still process data client-side (validation, draft generation, JSON export)
+export { validateCsvDraftIntegrity, createDraftFromCsvCandidates, exportDraftJson } from "./api";
+export { appendJobLog, getStore } from "./store";
+
+// ─── Re-export from contracts for runtime shape validation ───
+export {
+  assertIngestJobShape,
+  assertSourceShape,
+  assertCandidateShape,
+  assertIssueShape,
+  assertDraftEntryShape,
+  assertSnapshotShape,
+  assertChartEditionShape,
+  assertChartFamilyShape,
+  assertIngestJobArray,
+  assertSourceArray,
+  assertCandidateArray,
+  assertIssueArray,
+} from "./contracts";
