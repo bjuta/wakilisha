@@ -138,11 +138,13 @@ describe('Gate C — Worked Example', () => {
     expect(carryForwardBonus(11, 1.0, true)).toBe(8); // floor
     expect(carryForwardBonus(1, 1.0, false)).toBe(0); // not carry-forward
 
-    // recency — engine-specific buckets
-    expect(recencyScore('2026-06-11', EDITION_DATE)).toBe(18); // 0 days → ≤7
-    expect(recencyScore('2026-06-04', EDITION_DATE)).toBe(18); // 7 days → ≤7
-    expect(recencyScore('2026-06-01', EDITION_DATE)).toBe(12); // 10 days → ≤30
-    expect(recencyScore('2026-05-13', EDITION_DATE)).toBe(8);  // 29 days → ≤90 (was 29 not 31?)
+    // recency — engine-specific buckets (§4.4: ≤30→18, 31-90→12, 91-180→8, 181-365→4, >365→0)
+    expect(recencyScore('2026-06-11', EDITION_DATE)).toBe(18); // 0 days → ≤30
+    expect(recencyScore('2026-06-04', EDITION_DATE)).toBe(18); // 7 days → ≤30
+    expect(recencyScore('2026-06-01', EDITION_DATE)).toBe(18); // 10 days → ≤30
+    expect(recencyScore('2026-05-13', EDITION_DATE)).toBe(18); // 29 days → ≤30
+    expect(recencyScore('2026-05-11', EDITION_DATE)).toBe(12); // 31 days → 31-90 bucket
+    expect(recencyScore('2026-03-12', EDITION_DATE)).toBe(8);  // 91 days → 91-180 bucket
     expect(recencyScore(null, EDITION_DATE)).toBe(0);          // missing
   });
 

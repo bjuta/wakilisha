@@ -21,7 +21,7 @@
  *   A13 — Exclusion: below-min-source rows excluded with reasons
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import {
   runFullPipeline,
   buildScoringInputRows,
