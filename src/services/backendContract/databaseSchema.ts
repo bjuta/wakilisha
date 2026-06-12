@@ -1,11 +1,11 @@
 export const WAKILISHA_RUNTIME_TABLES = {
   chartOntology: [
-    "chart_series",
-    "chart_markets",
-    "chart_programs",
+    "wk_chart_series_v2",
+    "wk_chart_markets_v2",
+    "wk_chart_programs_v2",
     "chart_eligibility_profiles",
     "chart_market_scopes",
-    "chart_slug_aliases",
+    "wk_chart_slug_aliases_v2",
   ],
   registry: [
     "registry_artists",
@@ -20,15 +20,22 @@ export const WAKILISHA_RUNTIME_TABLES = {
   ],
   ingestion: [
     "chart_ingest_runs",
-    "chart_ingest_sources",
-    "chart_ingest_rows",
-    "chart_ingest_excluded_rows",
+    "chart_ingest_run_sources",
+    "chart_ingest_raw_rows",
+    "chart_ingest_normalized_rows",
+    "chart_ingest_candidates",
+    "chart_ingest_candidate_scores",
+    "chart_ingest_matches",
+    "chart_ingest_exclusions",
+    "chart_ingest_review_issues",
+    "chart_ingest_stage_events",
+    "chart_ingest_audit_events",
   ],
   publishing: [
-    "chart_editions",
-    "chart_entries",
+    "wk_chart_editions_v2",
+    "wk_chart_entries_v2",
     "chart_snapshots",
-    "chart_source_coverage",
+    "wk_chart_source_coverage_v2",
     "chart_audit_events",
   ],
   admin: [
@@ -42,26 +49,24 @@ export const WAKILISHA_RUNTIME_TABLES = {
   ],
 } as const;
 
-export const WAKILISHA_V2_COMPATIBILITY_VIEWS = [
-  "wk_chart_series_v2",
-  "wk_chart_markets_v2",
-  "wk_chart_programs_v2",
-  "wk_chart_editions_v2",
-  "wk_chart_entries_v2",
-  "wk_chart_source_coverage_v2",
-  "wk_chart_slug_aliases_v2",
-  "wk_chart_methodologies_v2",
-  "wk_chart_eligibility_rules_v2",
+export const WAKILISHA_DEPRECATED_TABLES = [
+  "wk_chart_series",
+  "wk_chart_markets",
+  "wk_chart_programs",
+  "wk_chart_editions",
+  "chart_entries",
+  "chart_source_coverage",
+  "chart_slug_aliases",
 ] as const;
 
 export type WakilishaRuntimeTableGroup = keyof typeof WAKILISHA_RUNTIME_TABLES;
 export type WakilishaRuntimeTable = (typeof WAKILISHA_RUNTIME_TABLES)[WakilishaRuntimeTableGroup][number];
-export type WakilishaV2CompatibilityView = (typeof WAKILISHA_V2_COMPATIBILITY_VIEWS)[number];
+export type WakilishaDeprecatedTable = (typeof WAKILISHA_DEPRECATED_TABLES)[number];
 
 export function listRuntimeTables(): string[] {
   return Object.values(WAKILISHA_RUNTIME_TABLES).flat();
 }
 
 export function listRuntimeSchemaObjects(): string[] {
-  return [...listRuntimeTables(), ...WAKILISHA_V2_COMPATIBILITY_VIEWS];
+  return [...listRuntimeTables()];
 }

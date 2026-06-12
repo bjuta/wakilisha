@@ -41,34 +41,9 @@ export interface CanonicalRegistry {
 
 // ─── Mock Registry ───
 // In production this would be fetched from the backend registry DB.
-// For the hardening pass, use a realistic seeded registry.
-const MOCK_CANONICAL_TRACKS: CanonicalTrack[] = [
-  { id: "wk-track-001", isrc: "NGA0H2400001", title: "Love Me JeJe", artistNames: ["Tems"], providerIds: { spotify: "spotify:track:tems001", apple: "apple:track:tems001" } },
-  { id: "wk-track-002", isrc: "USUM72012345", title: "Ojuelegba", artistNames: ["WizKid"], providerIds: { spotify: "spotify:track:wiz001", apple: "apple:track:wiz001" } },
-  { id: "wk-track-003", isrc: "USUM72012346", title: "Last Last", artistNames: ["Burna Boy"], providerIds: { spotify: "spotify:track:ng002", apple: "apple:track:ng002" } },
-  { id: "wk-track-004", title: "Essence", artistNames: ["WizKid", "Tems"], providerIds: { spotify: "spotify:track:ng001", apple: "apple:track:ng001" } },
-  { id: "wk-track-005", title: "Rush", artistNames: ["Ayra Starr"], providerIds: { spotify: "spotify:track:ng004", apple: "apple:track:ng004" } },
-  { id: "wk-track-006", title: "Calm Down", artistNames: ["Rema"], providerIds: { spotify: "spotify:track:ng005", apple: "apple:track:ng005" } },
-  { id: "wk-track-007", title: "Soso", artistNames: ["Omah Lay"], providerIds: { spotify: "spotify:track:ng006", apple: "apple:track:ng006" } },
-  { id: "wk-track-008", title: "Peru", artistNames: ["Fireboy DML"], providerIds: { spotify: "spotify:track:ng007", apple: "apple:track:ng007" } },
-  { id: "wk-track-009", title: "Buga", artistNames: ["Kizz Daniel", "Tekno"], providerIds: { spotify: "spotify:track:ng009", apple: "apple:track:ng009" } },
-  { id: "wk-track-010", title: "Terminator", artistNames: ["King Promise"], providerIds: { spotify: "spotify:track:pan006", apple: "apple:track:pan006" } },
-  { id: "wk-track-011", title: "Ameno Amapiano", artistNames: ["Goya Menor", "Nektunez"], providerIds: { spotify: "spotify:track:pan007", apple: "apple:track:pan007" } },
-  { id: "wk-track-012", title: "Water", artistNames: ["Tyla"], providerIds: { spotify: "spotify:track:za004", apple: "apple:track:za004" } },
-  { id: "wk-track-013", title: "Jerusalema", artistNames: ["Master KG", "Nomcebo Zikode"], providerIds: { spotify: "spotify:track:za001", apple: "apple:track:za001" } },
-  { id: "wk-track-014", title: "Gwagwalada", artistNames: ["Bnxn", "Kizz Daniel", "Seyi Vibez"], providerIds: { spotify: "spotify:track:pan005", apple: "apple:track:pan005" } },
-  { id: "wk-track-015", title: "Soweto", artistNames: ["Victony", "Tempoe"], providerIds: { spotify: "spotify:track:pan004", apple: "apple:track:pan004" } },
-  { id: "wk-track-016", title: "Suzanna", artistNames: ["Sauti Sol"], providerIds: { spotify: "spotify:track:ken001", apple: "apple:track:ken001" } },
-  { id: "wk-track-017", title: "Finesse", artistNames: ["Pheelz", "Bnxn"], providerIds: { spotify: "spotify:track:pan009", apple: "apple:track:pan009" } },
-  { id: "wk-track-018", title: "Joha", artistNames: ["Asake"], providerIds: { spotify: "spotify:track:ng008", apple: "apple:track:ng008" } },
-  { id: "wk-track-019", title: "Unavailable", artistNames: ["Davido", "Musa Keys"], providerIds: { spotify: "spotify:track:ng003", apple: "apple:track:ng003" } },
-  { id: "wk-track-020", title: "Touch It", artistNames: ["KiDi"], providerIds: { spotify: "spotify:track:gh004", apple: "apple:track:gh004" } },
-  { id: "wk-track-021", title: "Forever", artistNames: ["Gyakie"], providerIds: { spotify: "spotify:track:gh006", apple: "apple:track:gh006" } },
-  { id: "wk-track-022", title: "Sugarcane", artistNames: ["Camidoh"], providerIds: { spotify: "spotify:track:gh007", apple: "apple:track:gh007" } },
-  { id: "wk-track-023", title: "Kainama", artistNames: ["Harmonize"], providerIds: { spotify: "spotify:track:tz003", apple: "apple:track:tz003" } },
-  { id: "wk-track-024", title: "Yatapita", artistNames: ["Diamond Platnumz"], providerIds: { spotify: "spotify:track:tz001", apple: "apple:track:tz001" } },
-  { id: "wk-track-025", title: "Good For That", artistNames: ["Cassper Nyovest"], providerIds: { spotify: "spotify:track:za005", apple: "apple:track:za005" } },
-];
+// No hardcoded fallback — if no registry is provided, the pipeline
+// returns honest no_match results.
+const MOCK_CANONICAL_TRACKS: CanonicalTrack[] = [];
 
 export function getCanonicalRegistry(): CanonicalRegistry {
   return {

@@ -165,7 +165,7 @@ function sortEditions(a: EditionLookup, b: EditionLookup): number {
 }
 
 async function loadEditionLookups(): Promise<EditionLookup[]> {
-  const { data, error } = await supabase.from("chart_editions").select("*").limit(500);
+  const { data, error } = await supabase.from("wk_chart_editions_v2").select("*").limit(500);
   if (error) throw new Error(error.message);
 
   return ((data || []) as DbRow[])
@@ -183,7 +183,7 @@ export async function getSupabaseChartFamilies(): Promise<ChartFamily[]> {
     if (!latestByFamily.has(lookup.familySlug)) latestByFamily.set(lookup.familySlug, lookup.edition);
   }
 
-  const { data, error } = await supabase.from("chart_series").select("*").limit(100);
+  const { data, error } = await supabase.from("wk_chart_series_v2").select("*").limit(100);
   if (!error && data && data.length > 0) {
     return (data as DbRow[]).map((row) => {
       const slug = familySlugFromRow(row);
@@ -226,7 +226,7 @@ export async function getSupabaseChartEditionEntries(_familySlug: string, editio
   const edition = await getSupabaseChartEdition(_familySlug, editionSlug);
   const editionId = edition?.id || editionSlug;
   const { data, error } = await supabase
-    .from("chart_entries")
+    .from("wk_chart_entries_v2")
     .select("*")
     .eq("edition_id", editionId)
     .order("rank", { ascending: true })
@@ -238,7 +238,7 @@ export async function getSupabaseChartEditionEntries(_familySlug: string, editio
 
 export async function getSupabaseTrackChartHistory(trackSlug: string): Promise<TrackChartHistory | null> {
   const { data, error } = await supabase
-    .from("chart_entries")
+    .from("wk_chart_entries_v2")
     .select("*")
     .eq("track_slug", trackSlug)
     .order("created_at", { ascending: false })

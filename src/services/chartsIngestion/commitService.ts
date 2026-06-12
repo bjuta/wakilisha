@@ -17,6 +17,7 @@ import type {
   V2Entry,
   V2SourceCoverage,
   V2AuditEvent,
+  V2Program,
   PublishReadinessChecklist,
 } from "./commitTypes";
 import { CommitError } from "./commitTypes";
@@ -50,7 +51,7 @@ function assertRunExists(run: IngestRun | null): asserts run is IngestRun {
 
 // ─── Step 2: Validate readiness ───
 
-function buildReadinessChecklist(run: IngestRun): PublishReadinessChecklist {
+async function buildReadinessChecklist(run: IngestRun): Promise<PublishReadinessChecklist> {
   const failedStages = run.stages.filter((s) => s.status === "failed");
   const fetchStage = run.stages.find((s) => s.stage === "source_fetch");
   const canonicalStage = run.stages.find((s) => s.stage === "canonical_match");
@@ -62,7 +63,7 @@ function buildReadinessChecklist(run: IngestRun): PublishReadinessChecklist {
   );
 
   const programId = run.existingSeriesId || "";
-  const programResolved = !!(programId && resolveV2Program(programId));
+  const programResolved = !!(programId && (await resolveV2Program(programId)));
 
   return {
     dryRunCompleted:
@@ -83,10 +84,10 @@ function buildReadinessChecklist(run: IngestRun): PublishReadinessChecklist {
   };
 }
 
-export function validateCommitReadiness(run: IngestRun): CommitValidationResult {
+export async function validateCommitReadiness(run: IngestRun): Promise<CommitValidationResult> {
   const errors: CommitError[] = [];
   const warnings: string[] = [];
-  const checklist = buildReadinessChecklist(run);
+  const checklist = await buildReadinessChecklist(run);
 
   if (!checklist.dryRunCompleted) {
     errors.push(
@@ -222,9 +223,9 @@ export function validateCommitReadiness(run: IngestRun): CommitValidationResult 
 
 // ─── Step 3: Resolve V2 program ───
 
-function resolveProgram(run: IngestRun) {
+async function resolveProgram(run: IngestRun) {
   const programId = run.existingSeriesId || run.chartSlug || "";
-  const program = resolveV2Program(programId);
+  const program = await resolveV2Program(programId);
   if (!program) {
     throw new CommitError(
       "program_not_found",
@@ -268,7 +269,7 @@ function buildEditionId(publicSlug: string, editionSlug: string): string {
 
 function buildEdition(
   run: IngestRun,
-  program: ReturnType<typeof resolveV2Program>,
+  program: V2Program,
   editionSlug: string,
   editionLabel: string,
   publishImmediately: boolean,
@@ -343,7 +344,7 @@ function buildEntries(editionId: string, rows: IngestResolvedRow[]): V2Entry[] {
 function buildSourceCoverage(
   editionId: string,
   run: IngestRun,
-  program: ReturnType<typeof resolveV2Program>
+  program: V2Program
 ): V2SourceCoverage[] {
   const fetchStage = run.stages.find((s) => s.stage === "source_fetch");
   const canonicalStage = run.stages.find((s) => s.stage === "canonical_match");
@@ -403,7 +404,7 @@ function buildSnapshotPlaceholder(): {
 
 function buildAuditEvent(
   run: IngestRun,
-  program: ReturnType<typeof resolveV2Program>,
+  program: V2Program,
   edition: V2Edition
 ): V2AuditEvent {
   return {
@@ -517,7 +518,7 @@ export async function commitIngestRunToV2Edition(
   }
 
   // Step 2: Validate readiness
-  const validation = validateCommitReadiness(run);
+  const validation = await validateCommitReadiness(run);
   if (!validation.canCommit) {
     const primaryError = validation.errors[0];
     if (primaryError) throw primaryError;
@@ -531,7 +532,7 @@ export async function commitIngestRunToV2Edition(
   const warnings: string[] = [...validation.warnings];
 
   // Step 3: Resolve program
-  const program = resolveProgram(run);
+  const program = await resolveProgram(run);
 
   // Step 4: Check for duplicate editions
   // Compute edition slug from edition date (e.g. "2026-05-30")
@@ -656,5 +657,5 @@ export async function commitIngestRunToV2Edition(
   };
 }
 
-export { validateCommitReadiness as checkCommitReadiness, buildReadinessChecklist };
+export { validateCommitReadiness as checkCommitReadiness, buildReadinessChecklist, resolveProgram, resolveV2Program };
 export type { CommitReadyIngestRun, CommitIngestRunRequest, CommitIngestRunResponse };

@@ -146,14 +146,6 @@ export { clearChartCache };
 export type { ChartFamily, ChartEdition, ChartEditionEntry, TrackChartHistory };
 
 export {
-  getMockEntriesForEdition,
-  getMockLatestEdition,
-  getMockEdition,
-  getMockFamily,
-  getMockEditionsForFamily,
-} from "./mockData";
-
-export {
   hasCsvPublicChartData,
   getCsvEntriesForEdition,
   getCsvLatestEdition,

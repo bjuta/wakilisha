@@ -25,15 +25,26 @@ export default function AdminPagesPage() {
   useEffect(() => {
     async function load() {
       const { data, error } = await supabase
-        .from("wk_page_surfaces")
-        .select("slug, title, document_type, wp_status, created_at, updated_at")
+        .from("wk_articles")
+        .select("slug, title, raw_meta, wp_status, created_at, updated_at")
         .order("created_at", { ascending: false })
         .limit(200);
 
       if (error) {
         console.error("Error loading pages:", error);
       } else {
-        setPages(data ?? []);
+        const surfaces: PageSurface[] = (data ?? []).map((row: Record<string, unknown>) => {
+          const rawMeta = row.raw_meta as Record<string, unknown> | null;
+          return {
+            slug: row.slug as string,
+            title: row.title as string | null,
+            document_type: (rawMeta?.post_type as string) ?? null,
+            wp_status: row.wp_status as string | null,
+            created_at: row.created_at as string,
+            updated_at: row.updated_at as string,
+          };
+        });
+        setPages(surfaces);
       }
       setLoading(false);
     }

@@ -27,11 +27,11 @@ import AdminGenresPage from "../pages/admin/registry/genres/page";
 import AdminMediaLibraryPage from "../pages/admin/media/library/page";
 import AdminMissingImagesPage from "../pages/admin/media/missing/page";
 import AdminBrokenLinksPage from "../pages/admin/media/broken/page";
+import AdminMediaMigratePage from "../pages/admin/media/migrate/page";
 import AdminReviewQueuePage from "../pages/admin/review/queue/page";
 import AdminImportsPage from "../pages/admin/imports/page";
 import AdminImportsJobsPage from "../pages/admin/imports/jobs/page";
 import AdminImportsJobDetailPage from "../pages/admin/imports/jobs/detail/page";
-import AdminImportReviewArtifactsPage from "../pages/admin/imports/review-artifacts/page";
 import AdminArticleDetailPage from "../pages/admin/content/articles/detail/page";
 import AdminNewArticlePage from "../pages/admin/content/articles/new/page";
 import AdminArtistDetailPage from "../pages/admin/registry/artists/detail/page";
@@ -39,6 +39,8 @@ import AdminTrackDetailPage from "../pages/admin/registry/tracks/detail/page";
 import AdminReleaseDetailPage from "../pages/admin/registry/releases/detail/page";
 import AdminLabelDetailPage from "../pages/admin/registry/labels/detail/page";
 import AdminGenreDetailPage from "../pages/admin/registry/genres/detail/page";
+import AdminAuthorsPage from "../pages/admin/registry/authors/page";
+import AdminAuthorDetailPage from "../pages/admin/registry/authors/detail/page";
 import AdminRelationshipViewerPage from "../pages/admin/relationships/viewer/page";
 import AdminDuplicateMergePage from "../pages/admin/relationships/duplicates/page";
 import AdminPublishingDashboardPage from "../pages/admin/content/publishing/page";
@@ -188,8 +190,8 @@ const routes: RouteObject[] = [
       { path: "/charts/:series/:edition", element: <ResponsivePage mobile={<MobileChartEdition />} desktop={<ChartEdition />} /> },
       { path: "/artists", element: <ResponsivePage mobile={<MobileArtists />} desktop={<Artists />} /> },
       { path: "/artists/:slug", element: <ResponsivePage mobile={<MobileArtistDetail />} desktop={<ArtistDetail />} /> },
-      { path: "/tracks/:artistSlug/:slug", element: <TrackDetail /> },
-      { path: "/tracks/:slug", element: <TrackDetail /> },
+      { path: "/tracks/:artistSlug/:slug", element: <ResponsivePage mobile={<MobileTrackDetail />} desktop={<TrackDetail />} /> },
+      { path: "/tracks/:slug", element: <ResponsivePage mobile={<MobileTrackDetail />} desktop={<TrackDetail />} /> },
       { path: "/tracks/:artistSlug/:slug/lyrics/contribute", element: <LyricContribution /> },
       { path: "/tracks/:slug/lyrics/contribute", element: <LyricContribution /> },
       { path: "/releases", element: <ResponsivePage mobile={<Releases />} desktop={<Releases />} /> },
@@ -276,6 +278,8 @@ const routes: RouteObject[] = [
           { path: "labels/:slug", element: <AdminLabelDetailPage /> },
           { path: "genres", element: <AdminGenresPage /> },
           { path: "genres/:slug", element: <AdminGenreDetailPage /> },
+          { path: "authors", element: <AdminAuthorsPage /> },
+          { path: "authors/:slug", element: <AdminAuthorDetailPage /> },
         ],
       },
       {
@@ -293,6 +297,7 @@ const routes: RouteObject[] = [
           { path: "library", element: <AdminMediaLibraryPage /> },
           { path: "missing", element: <AdminMissingImagesPage /> },
           { path: "broken", element: <AdminBrokenLinksPage /> },
+          { path: "migrate", element: <AdminMediaMigratePage /> },
         ],
       },
       {
@@ -307,7 +312,6 @@ const routes: RouteObject[] = [
         element: <AdminImportsLayout />,
         children: [
           { index: true, element: <AdminImportsPage /> },
-          { path: "review-artifacts", element: <AdminImportReviewArtifactsPage /> },
           { path: "jobs", element: <AdminImportsJobsPage /> },
           { path: "jobs/:id", element: <AdminImportsJobDetailPage /> },
         ],

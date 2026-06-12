@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo, useRef } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { WkIcon } from '@/components/design-system/Icon';
 import { getArticlesByAuthor, type MagazineArticle } from '@/services/magazineArticles';
-import { getAuthorMeta, getVerticalColor, resolveAuthorMeta } from '@/services/authorProfiles';
+import { getAuthorMeta, getVerticalColor, resolveAuthorMeta, type AuthorMeta } from '@/services/authorProfiles';
 
 type SortMode = 'latest' | 'oldest' | 'longest';
 type AuthorMetaResolved = Awaited<ReturnType<typeof resolveAuthorMeta>>;
@@ -27,6 +27,7 @@ export default function MobileAuthorProfile() {
   const [sortMode, setSortMode] = useState<SortMode>('latest');
   const [visibleCount, setVisibleCount] = useState(BATCH_SIZE);
   const [authorMetaResolved, setAuthorMetaResolved] = useState<AuthorMetaResolved | null>(null);
+  const [avatarFailed, setAvatarFailed] = useState(false);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
   const normalizedSlug = (slug || '').toLowerCase().replace(/[\s_-]+/g, '-');
@@ -44,6 +45,7 @@ export default function MobileAuthorProfile() {
     let alive = true;
     setLoading(true);
     setError(null);
+    setAvatarFailed(false);
 
     // Fetch real author meta from registry_authors
     resolveAuthorMeta(normalizedSlug)
@@ -250,9 +252,10 @@ export default function MobileAuthorProfile() {
         {/* Portrait */}
         <div className="w-[140px] h-[175px] rounded-2xl overflow-hidden bg-[var(--wk-surface-raised)] mb-5 relative">
           <img
-            src={authorMeta.avatarUrl}
+            src={avatarFailed ? fallbackMeta.avatarUrl : authorMeta.avatarUrl}
             alt={authorMeta.displayName}
             className="w-full h-full object-cover"
+            onError={() => setAvatarFailed(true)}
           />
           <div className="absolute bottom-2.5 right-2.5 w-7 h-7 rounded-lg bg-[var(--wk-brand)] text-[var(--wk-brand-on)] flex items-center justify-center border-2 border-[var(--wk-bg)]">
             <WkIcon name="PenLine" size={11} />

@@ -1,35 +1,51 @@
-const DOMAINS = ["Music", "Guides", "Film", "Style", "Food", "Language", "Places", "Movement"];
+const ITEMS = [
+  { text: "The Weekly Top 40", accent: "var(--wk-brand)" },
+  { text: "Artist Profiles", accent: "var(--wk-v-music)" },
+  { text: "Genre Maps", accent: "var(--wk-v-intel)" },
+  { text: "Magazine Stories", accent: "var(--wk-v-film)" },
+  { text: "Cultural Guides", accent: "var(--wk-v-places)" },
+  { text: "Label Directory", accent: "var(--wk-v-food)" },
+  { text: "Release Archives", accent: "var(--wk-v-fashion)" },
+  { text: "Chart History", accent: "var(--wk-brand)" },
+  { text: "Artist Discographies", accent: "var(--wk-v-music)" },
+  { text: "Scene Reports", accent: "var(--wk-v-film)" },
+];
 
 export function HomeMarquee() {
   return (
     <div
-      className="border-y border-[var(--wk-divider)] py-4 overflow-hidden"
-      style={{ maskImage: "linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent)" }}
+      className="border-y border-[var(--wk-divider)] py-4 overflow-hidden select-none"
+      style={{ maskImage: "linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent)" }}
     >
       <div
         className="flex w-max"
-        style={{ animation: "wkMarquee 34s linear infinite" }}
+        style={{ animation: "wkMarqueeV2 38s linear infinite" }}
       >
         {[0, 1].flatMap((k) =>
-          DOMAINS.map((domain, i) => (
+          ITEMS.map((item, i) => (
             <span
               key={`${k}-${i}`}
-              className="inline-flex items-center gap-3 px-8"
+              className="inline-flex items-center gap-3 px-7"
               style={{
                 fontWeight: 700,
-                fontSize: "clamp(1.1rem,1.8vw,1.35rem)",
+                fontSize: "clamp(0.95rem,1.5vw,1.15rem)",
                 letterSpacing: "-0.01em",
-                color: i < 2 ? "var(--wk-text)" : "var(--wk-text-faint)",
+                color: "var(--wk-text-soft)",
               }}
             >
-              {domain}
-              <span style={{ color: "var(--wk-brand)", fontSize: "0.9em" }}>✳</span>
+              {item.text}
+              <span
+                className="text-[0.85em]"
+                style={{ color: item.accent }}
+              >
+                ✳
+              </span>
             </span>
           ))
         )}
       </div>
       <style>{`
-        @keyframes wkMarquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+        @keyframes wkMarqueeV2 { from { transform: translateX(0); } to { transform: translateX(-50%); } }
       `}</style>
     </div>
   );

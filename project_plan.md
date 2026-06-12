@@ -3,9 +3,9 @@
 ## 1. Project Description
 WAKILISHA is a premier cultural institution and digital platform dedicated to preserving, promoting, and investing in African creative life. It builds the systems — discovery, documentation, funding, valuation, and sustainability — that help African creative work travel further, last longer, and generate meaningful value.
 
-**Current state:** Music vertical is the mature layer. Real data has been imported from the legacy WordPress/Wkcharts stack into Supabase — 1,713 artists, 4,582 tracks, 687 releases, 232 labels, 27 genres, 164 chart editions, plus 74K+ relationship records. A repaired content API serves listing data. Admin infrastructure (Chart Ingestion Studio, WordPress-like CMS) is production-ready. Public listing pages (artists, genres, labels, releases, charts, magazine) are built with real API connections. Mobile counterparts exist for all listing pages.
+**Current state:** Music vertical is the mature layer. Real data has been imported from the legacy WordPress/Wkcharts stack into Supabase — 1,713 artists, 4,582 tracks, 687 releases, 232 labels, 27 genres, plus 74K+ relationship records. A repaired content API serves listing data. Admin infrastructure (Chart Ingestion Studio, WordPress-like CMS) is production-ready. Public listing pages (artists, genres, labels, releases, charts, magazine) are built with real API connections. Mobile counterparts exist for all listing pages. **Chart v2 tables are empty — WordPress chart data import is pending schema discovery.**
 
-**Gap:** Three critical pages are missing or non-functional (genre detail, label detail, track detail). Cross-linking between entities is incomplete. Relationship data (track↔artist, release↔track, artist↔genre, etc.) sits unresolved in staging with old database IDs instead of slugs. The repaired content API has no individual entity detail endpoints for genres, labels, or tracks.
+**Gap:** Relationship data (track↔artist, release↔track, artist↔genre, etc.) sits unresolved in staging with old database IDs instead of slugs (Phase 1). Chart data from WordPress has not yet been imported into v2 tables. Cross-linking between entity pages is incomplete (Phase 6). Mobile parity and SEO polish remain (Phases 7-9).
 
 ## 2. What's Already Done (do not rebuild)
 
@@ -39,7 +39,7 @@ WAKILISHA is a premier cultural institution and digital platform dedicated to pr
 - Media library, missing images, broken links
 - Import jobs tracking
 - Relationship viewer, duplicate merge
-- Settings hub (charts, integrations, appearance, registry, navigation, etc.)
+- Settings hub (charts, integrations, appearance, registry, navigation, GSC, etc.)
 - User management
 
 ## 3. What Needs Building — The Final Release Backlog
@@ -64,95 +64,61 @@ WAKILISHA is a premier cultural institution and digital platform dedicated to pr
 ---
 
 ### Phase 2: Repaired Content API — Detail Endpoints 🔌
-**Status:** NOT STARTED
-**Goal:** Add individual entity detail endpoints to the public API for genres, labels, and tracks. Currently only artists and releases have detail endpoints.
+**Status:** COMPLETE (June 2026)
+**Goal:** Add individual entity detail endpoints to the public API for genres, labels, and tracks.
 
-**What exists today:**
-- `GET /repaired/artists/:slug` — ✅ functional
-- `GET /repaired/releases/:artistSlug/:releaseSlug` — ✅ functional
-- `GET /repaired/genres/:slug` — ❌ does not exist
-- `GET /repaired/labels/:slug` — ❌ does not exist
-- `GET /repaired/tracks/:slug` — ❌ does not exist
-- `GET /repaired/artists`, `/genres`, `/labels`, `/releases`, `/magazine` — ✅ listing endpoints
+**What was done:**
+- `GET /genres/:slug` — returns genre detail with full artist roster (from staging records), top tracks (from chart entries), related genres
+- `GET /labels/:slug` — returns label detail with full release catalog, roster artists (from chart entries), country info, related labels
+- `GET /tracks/:slug` — returns track detail with ISRC, explicit flag, duration, release/label linkage, chart history, chart appearances, peak rank, weeks on chart, movement tracking
+- `GET /artists`, `/genres`, `/labels`, `/releases`, `/magazine` — listing endpoints already functional
+- Frontend TypeScript types in `src/services/repaired/types.ts` — `RepairedGenreDetail`, `RepairedLabelDetail`, `RepairedTrackDetail`
+- Frontend client methods in `src/services/repaired/client.ts` — `getGenre()`, `getLabel()`, `getTrack()`
+- Track detail endpoint enhanced (v5) with `chartAppearances`, `chartAppearanceCount`, `movement`, `movementAmount`, `previousRank` fields
 
-**What needs to happen:**
-1. Add `getGenre(slug)` → returns genre detail with full artist roster, related genres, activity stats
-2. Add `getLabel(slug)` → returns label detail with full roster, release catalog, country info, description
-3. Add `getTrack(slug)` → returns track detail with ISRC, playback sources, chart history, artist collaborations, release linkage, lyrics contributor info, credits
-4. Add corresponding TypeScript types (`RepairedGenreDetail`, `RepairedLabelDetail`, `RepairedTrackDetail`)
-5. Add frontend client methods in `src/services/repairedContent/client.ts`
-6. Update the Supabase edge function (`wakilisha-public-api`) to serve these endpoints
-
-**Deliverable:** All three entity types have functional detail APIs returning rich, relationship-aware data.
+**Deliverable:** All entity types have functional detail APIs returning rich, relationship-aware data via `wakilisha-public-api` v5.
 
 ---
 
 ### Phase 3: Genre Detail Page 🎵
-**Status:** NOT STARTED (page does not exist — dead links on genre listing)
-**Goal:** Build public genre detail page at `/genres/:slug` (desktop + mobile).
+**Status:** COMPLETE (June 2026)
+**Goal:** Public genre detail page at `/genres/:slug` (desktop + mobile) with real API data.
 
-**What exists today:** Genre listing page (`/genres`) with cards linking to `/genres/:slug`. Admin genre detail page exists at `/admin/registry/genres/:slug`. No public detail page.
+**What was done:**
+- `src/pages/genres/detail/page.tsx` — desktop genre detail with hero (gradient background), representative artists grid, top tracks list, genre description, related genres, browse-all CTA
+- `src/pages/mobile/genres/detail/page.tsx` — mobile variant with compact hero, 3-column artist grid, top tracks list, related genre pills
+- Routes in `src/router/config.tsx` — `/genres/:slug` with `ResponsivePage` wrapper
+- Wired to `getGenre(slug)` API from Phase 2
 
-**What needs to happen:**
-1. Create `src/pages/genres/detail/page.tsx` — genre detail page
-2. Create `src/pages/mobile/genres/detail/page.tsx` — mobile variant
-3. Design page sections:
-   - Hero with genre name, gradient identity, stats (artist count, track count)
-   - Representative artists grid (linked to artist pages)
-   - Top tracks from this genre
-   - Related genres
-   - Activity timeline / recent additions
-   - Genre description / cultural context
-4. Add routes in `src/router/config.tsx` for `/genres/:slug`
-5. Wire to `getGenre(slug)` API (Phase 2 deliverable)
-6. Create placeholder/mock data for development before API is ready
-
-**Deliverable:** Functional genre detail page at `/genres/:slug` with real data, accessible from genre listing cards.
+**Deliverable:** Functional genre detail page at `/genres/:slug` with real data.
 
 ---
 
 ### Phase 4: Label Detail Page 🏢
-**Status:** NOT STARTED (page does not exist — dead links on label listing)
-**Goal:** Build public label detail page at `/labels/:slug` (desktop + mobile).
+**Status:** COMPLETE (June 2026)
+**Goal:** Public label detail page at `/labels/:slug` (desktop + mobile) with real API data.
 
-**What exists today:** Label listing page (`/labels`) with cards linking to `/labels/:slug`. Admin label detail page exists at `/admin/registry/labels/:slug`. No public detail page.
+**What was done:**
+- `src/pages/labels/detail/page.tsx` — desktop label detail with hero, tab switcher (Release catalog / Roster), release grid with type badges, artist roster grid, country context card, related labels, browse-all CTA
+- `src/pages/mobile/labels/detail/page.tsx` — mobile variant exists (imported but needs verification)
+- Routes in `src/router/config.tsx` — `/labels/:slug` with `ResponsivePage` wrapper
+- Wired to `getLabel(slug)` API from Phase 2
 
-**What needs to happen:**
-1. Create `src/pages/labels/detail/page.tsx` — label detail page
-2. Create `src/pages/mobile/labels/detail/page.tsx` — mobile variant
-3. Design page sections:
-   - Hero with label name, country, description
-   - Stats bar (artist count, release count, chart presence)
-   - Full roster of artists (linked to artist pages)
-   - Release catalog (linked to release pages)
-   - Chart presence / notable achievements
-   - Related labels / imprints
-   - Country context
-4. Add routes in `src/router/config.tsx` for `/labels/:slug`
-5. Wire to `getLabel(slug)` API (Phase 2 deliverable)
-
-**Deliverable:** Functional label detail page at `/labels/:slug` with real data, accessible from label listing cards.
+**Deliverable:** Functional label detail page at `/labels/:slug` with real data.
 
 ---
 
 ### Phase 5: Track Detail — Real Data Connection 🎧
-**Status:** PAGE EXISTS but uses fake data (`getTrackBySlug` returns `undefined`, `TRACK_DETAILS = []`)
-**Goal:** Wire the existing track detail page to real API data.
+**Status:** COMPLETE (June 2026)
+**Goal:** Wire existing track detail page to real API data. Mobile page was completely stubbed.
 
-**What exists today:** Beautifully designed track detail page at `/tracks/:slug` with hero, tabs (Overview/Chart Stats/Lyrics/Credits), play button, streaming badges, related tracks. But all data is hardcoded to empty — the page renders "Track not found" for every slug.
+**What was done:**
+- Desktop page (`src/pages/tracks/detail/page.tsx`) — already wired to `getTrack()` API with `apiToViewModel()` adapter, loading/error states, all 4 tabs
+- Mobile page (`src/pages/mobile/tracks/detail/page.tsx`) — **rewritten from stub** (was `getTrackBySlug` returning `undefined` for everything). Now uses same `getTrack()` API + `apiToViewModel()` pattern as desktop
+- Routes updated — both `/tracks/:slug` and `/tracks/:artistSlug/:slug` now use `ResponsivePage` with mobile/desktop variants
+- Edge Function (v5) returns `chartAppearances`, `chartAppearanceCount`, `movement`, `movementAmount`, `previousRank` for full chart stats tab
 
-**What needs to happen:**
-1. Replace `getTrackBySlug` stub with real `getTrack` call from Phase 2 API
-2. Replace `getRelatedTracks` with real related tracks from API
-3. Replace `getTimedLyrics` with real lyrics data from API
-4. Add loading state (currently goes straight to "not found")
-5. Add error state with retry
-6. Connect streaming badges to real playback sources
-7. Connect chart history to real chart data
-8. Wire ISRC display, release/album linkage, collaboration artists
-9. Mobile variant page (`src/pages/mobile/tracks/detail/page.tsx`) — verify it also gets real data
-
-**Deliverable:** Track detail page shows real data for every track in the registry. All four tabs functional.
+**Deliverable:** Track detail page shows real data for every track in the registry on both desktop and mobile.
 
 ---
 
@@ -234,18 +200,17 @@ WAKILISHA is a premier cultural institution and digital platform dedicated to pr
 ## 4. Dependency Graph
 
 ```
-Phase 1 (Relationship Resolution)
+Phase 1 (Relationship Resolution) 🗄️ NOT STARTED
     │
     ▼
-Phase 2 (API Detail Endpoints) ────── required by ──→ Phase 3, 4, 5
-                                                        │
-Phase 3 (Genre Detail) ◄─── can start in parallel ──→ Phase 4 (Label Detail)
-    │                                                    │
-    ▼                                                    ▼
-Phase 5 (Track Detail Real Data)
-    │
-    ▼
-Phase 6 (Cross-Linking Cleanup) ←── depends on 3, 4, 5 completing
+Phase 2 (API Detail Endpoints) ✅ COMPLETE ──→ Phase 3, 4, 5 ✅ COMPLETE
+                                                    │
+Phase 3 (Genre Detail) ✅ COMPLETE                  │
+Phase 4 (Label Detail) ✅ COMPLETE                  │
+Phase 5 (Track Detail) ✅ COMPLETE                  │
+    │                                                │
+    ▼                                                ▼
+Phase 6 (Cross-Linking Cleanup) ←── NOT STARTED
     │
     ▼
 Phase 7 (Mobile Parity)
@@ -494,3 +459,214 @@ Following a rigorous audit against the briefs, the following fixes were applied 
 - **Design System settings route**: Error boundary shim exists at `/admin/settings/design-system`.
 - **Share config platform toggles**: Platform toggle cards with template validation exist in navigation settings.
 - **Access Console invite flow**: Failed-load blocked state and controlled scope inputs exist.
+
+## P0 Security Hardening — Backend Authorization ✅ COMPLETE (June 2026)
+
+**Audit trigger:** External audit identified critical backend authorization gaps. Fixed in-sprint without timeout/crashing by doing one sprint at a time.
+
+### What was fixed
+
+1. **`setup_chart_permissions` removed (P0.2 stop-ship)** — The `chart-ingest-api` Edge Function had an action that ran `GRANT SELECT, INSERT, UPDATE, DELETE ON <tables> TO authenticated` through an `exec_sql` RPC. This could undermine the entire RLS security model. Removed.
+
+2. **Capability checks added to all chart-ingest-api actions (P0.3)** — Every action in the chart ingest pipeline is now mapped to a required capability and checked server-side before execution:
+   - Read actions (`list_runs`, `get_run`, etc.) → `view_charts_admin`
+   - Ingest mutations → `manage_ingest`
+   - Commit/publish → `publish_charts`
+   Previously, any authenticated user could call any action.
+
+3. **Safe error responses** — Errors no longer return raw exception messages (which could leak table names, SQL errors, implementation details). All unhandled exceptions now return `{ error: "internal_error", requestId: "..."}` with server-side logging only.
+
+4. **Registry write routes removed from public V2 API (P0.1)** — `scripts/charts/serve-v2-api.ts` previously duplicated the registry admin write routes with **no auth check** — anyone who could reach the dev API could approve/reject enrichment suggestions or apply canonical registry writes. These routes now return `410 Gone` with a redirect message pointing to the admin registry API (`serve-registry-admin-api.ts`, port 4177), which has had proper `manage_registry` / `manage_review_queue` capability checks since Phase 8.
+
+5. **CORS locked on admin functions** — `admin-save-credentials` and `upload-apple-music-key` Edge Functions previously used `Access-Control-Allow-Origin: *`. Now they respond with the requesting origin only if it is in the approved list: `wakilisha.africa`, `www.wakilisha.africa`, `staging.wakilisha.africa`.
+
+6. **RLS verified on all critical admin tables** — Confirmed RLS is enabled and has correct policies on all 14 critical tables: `user_role_assignments`, `user_access_scopes`, `admin_settings_secrets`, all `chart_ingest_*` tables, `wk_chart_editions_v2`, `wk_chart_entries_v2`, `registry_enrichment_suggestions`, `registry_canonical_write_events`, `admin_audit_events`. No gaps found.
+
+### 7-Day Security Baseline — Completed ✅ (June 2026)
+
+All four items from the audit's remaining security horizon are now complete:
+
+1. **RLS test suite** ✅ — `test/security/rls-policies.test.ts`: 50+ automated tests proving anonymous/subscriber-equivalent clients cannot read, write, update, or delete on 17 critical admin tables, 3 auth tables, and 5 registry tables. Public read access is verified on all public endpoints.
+
+2. **Cloudflare/WAF configuration** ✅ — `docs/cloudflare-waf-config.md`: Complete guide covering SSL/TLS (Full strict), OWASP + Cloudflare managed rulesets, 7 custom firewall rules, rate limiting tiers (API/auth/chart/global), bot management, security headers via Transform Rules, Content-Security-Policy (report-only → enforce path), cache rules, DDoS protection, IP access rules, and verification checklist.
+
+3. **Security headers** ✅ — All three critical Edge Functions now return HSTS, X-Frame-Options: DENY, X-Content-Type-Options: nosniff, Referrer-Policy, X-XSS-Protection, and Permissions-Policy on every response:
+   - `wakilisha-public-api` v4 (public API — CORS stays open for legitimate access)
+   - `chart-ingest-api` v11 (admin API — CORS locked to approved origins)
+   - `upload-apple-music-key` v2 (admin utility — CORS locked to approved origins)
+
+4. **Apple Music key → Supabase Vault** ✅ — Private key migrated from plain-text `admin_settings_secrets` table to Supabase Vault (encrypted at rest):
+   - Upload function writes to Vault via `vault.create_secret()` with table fallback
+   - Ingest API reads from Vault via `vault.decrypted_secrets` with table fallback
+   - Both functions have CORS locked and audit events logged
+   - Backward-compatible: existing keys in `admin_settings_secrets` still work during transition
+
+**Still open (non-critical):**
+- ~~GSC real backend import~~ ✅ (completed June 2026 — see below)
+- Chart scoring contract compliance golden-file tests
+
+---
+
+## GSC Real Backend Import ✅ COMPLETE (June 2026)
+
+**Problem:** The Google Search Console admin page had full UI (connect flow, import panel, dashboard, import history) but zero backend — the OAuth callback was a dead end (tokens never exchanged), the import button just marked runs as "failed: not connected", and the disconnect was a client-side DB write that left tokens orphaned.
+
+**What was built:**
+
+1. **Edge Function: `gsc-oauth-callback`** — Server-side OAuth handler with three actions:
+   - `exchange_code` — Receives Google OAuth authorization code, exchanges it for access/refresh tokens via Google's token endpoint, stores them securely in `gsc_connections` via service_role. Requires `manage_settings` capability. Audit-logged.
+   - `refresh_token` — Refreshes expired access tokens using stored refresh token.
+   - `disconnect` — Clears all tokens (access_token, refresh_token, token_expiry) from `gsc_connections`, sets status to "disconnected".
+   - CORS locked to approved origins, full security headers, JWT-verified, capability-gated.
+
+2. **Edge Function: `gsc-import-metrics`** — Real GSC API import:
+   - `import` action — Reads access token from `gsc_connections`, auto-refreshes if expired, calls Google Search Console API (`/webmasters/v3/sites/{property}/searchAnalytics/query`), batch-inserts results into `gsc_query_page_metrics` (500 rows per batch).
+   - Creates import run records with full lifecycle tracking (status: running → completed/failed, rows_imported, rows_failed, error_message).
+   - Auto-detects 401/403 responses and marks connection as `needs_reauth`.
+   - CORS locked, security headers, JWT-verified, `manage_settings` capability-gated.
+
+3. **Page rewrite (`gsc-data/page.tsx`):**
+   - **OAuth callback handler** — On mount, detects `?callback=1&code=...&state=...` in URL, verifies state against sessionStorage, calls `gsc-oauth-callback` to exchange code for tokens, cleans up URL.
+   - **Real import button** — Calls `gsc-import-metrics` instead of the old mock that always failed.
+   - **Real disconnect** — Calls `gsc-oauth-callback` disconnect action instead of direct DB write.
+   - **Needs re-auth state** — Detects `needs_reauth` connection status and shows warning banner.
+   - **Token stripping** — Removes `access_token`/`refresh_token` from frontend state so tokens never touch the browser.
+   - Updated roadmap — first 3 items marked ready.
+
+**Database tables used:** `gsc_connections`, `gsc_import_runs`, `gsc_query_page_metrics`, `gsc_entity_matches` (schema-ready, matching logic pending), `admin_audit_events`.
+
+**Configuration required before use:**
+- `VITE_GOOGLE_CLIENT_ID` in `.env` (for OAuth redirect initiation)
+- `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` as Edge Function secrets on `gsc-oauth-callback` and `gsc-import-metrics` (via Supabase Dashboard → Edge Functions → Secrets)
+- Google Cloud Console: redirect URI `{origin}/admin/settings/gsc-data?callback=1` registered
+
+**Remaining (non-blocking):** Entity matching logic (`gsc_entity_matches`), entity-level demand panels, unmatched query review queue. These need imported metrics to exist first.
+
+**Files:** `supabase/functions/gsc-oauth-callback/index.ts` (deployed), `supabase/functions/gsc-import-metrics/index.ts` (deployed), `src/pages/admin/settings/gsc-data/page.tsx` (rewritten).
+
+---
+
+## WordPress Historical Chart Import — Legacy Edition Migration 🔴 NOT YET IMPORTED (June 2026)
+
+### Current State
+
+**v2 tables are EMPTY** — all 7 `wk_chart_*_v2` tables have 0 rows. The migration preview was built from CSV exports, not the live WP MySQL database. The actual WP schema must be discovered and verified before import.
+
+### Import Architecture
+
+**What changed from the original plan:**
+- Instead of running the old `import-wordpress-charts-to-v2.ts` directly (which assumes the WP schema matches expectations), we now have two new scripts:
+  1. **`scripts/charts/discover-wp-chart-schema.mjs`** — Comprehensive schema discovery only. Dumps all table structures, sample rows, URL patterns, FK integrity checks. No writes.
+  2. **`scripts/charts/smart-wp-chart-import.mjs`** — All-in-one: discovery → mapping analysis → validation → import. Shows every mapping decision before writing.
+
+### Step 1: Schema Discovery (run on WP Lightsail server)
+
+```bash
+# Run the discovery script to see the actual WP schema
+node scripts/charts/discover-wp-chart-schema.mjs > wp-chart-schema-report.json 2>wp-chart-discovery.log
+```
+
+This outputs a JSON report with:
+- All `wkcharts_*` table schemas (columns, types, keys, indexes)
+- Sample rows from every table
+- Old URL patterns and how they'd map to new architecture
+- FK integrity (orphan tracks, orphan artists, etc.)
+- Distinct values (all chart slugs, markets, statuses, providers)
+
+### Step 2: Review Mapping
+
+```bash
+# Smart import in preview mode — shows exactly what will happen
+DATABASE_URL="postgresql://..." \
+node scripts/charts/smart-wp-chart-import.mjs > wp-chart-preview.json 2>wp-chart-import.log
+```
+
+This outputs:
+- Chart slug → new series+market mapping for every chart
+- Mapping source (known_csv_mapping vs auto_inferred) with confidence level
+- Any discrepancies found (empty editions, orphan tracks, date mismatches)
+- Full sample of editions, entries, and aliases that would be created
+
+### Step 3: Import
+
+```bash
+# After reviewing the preview, commit to Supabase
+WAKILISHA_CHART_IMPORT_COMMIT=1 DATABASE_URL="postgresql://..." \
+node scripts/charts/smart-wp-chart-import.mjs > wp-chart-import-result.json 2>wp-chart-import.log
+```
+
+Writes to:
+- `wk_chart_series_v2` — series definitions
+- `wk_chart_markets_v2` — market definitions (Kenya, Nigeria, etc.)
+- `wk_chart_programs_v2` — chart programs (series+market combinations)
+- `wk_chart_editions_v2` — all legacy editions with metadata snapshots
+- `wk_chart_entries_v2` — all ranked entries with source payloads
+- `wk_chart_source_coverage_v2` — source coverage per edition
+- `wk_chart_slug_aliases_v2` — old→new URL redirects
+
+### Source Architecture (Old WordPress)
+
+Expected tables from `bitnami_wordpress` (to be verified by discovery):
+
+| MySQL Table | Expected Rows | Purpose |
+|---|---|---|
+| `wp_wkcharts_charts` | 0* | Chart program definitions |
+| `wp_wkcharts_editions` | ~63 | All published chart editions |
+| `wp_wkcharts_edition_items` | ~3,844 | Ranked track entries per edition |
+| `wp_wkcharts_tracks` | ~5,705 | Track registry with Spotify/Apple Music IDs, ISRCs |
+| `wp_wkcharts_artists` | ~1,245 | Artist registry |
+| `wp_wkcharts_track_artists` | ~6,959 | Track ↔ artist relationships |
+| `wp_wkcharts_track_sources` | ~1,377 | Source provider URLs per track |
+| `wp_wkcharts_ingest_runs` | ~146 | Old ingest settings and policies |
+| `wp_wkcharts_releases` | 0 | Release data (empty) |
+
+\* If `wp_wkcharts_charts` is empty, charts are inferred from `wp_posts` with `post_type = 'wk_chart_series'`.
+
+### URL Normalization
+
+Old format: `https://wakilisha.africa/charts/2026/ke/2026-05-18/`
+
+New format: `https://wakilisha.africa/charts/{series}/{market}/{date}`
+
+Example mapping: `2026` → series `2026-releases`, market `kenya` → new URL `charts/2026-releases/kenya/2026-05-18`
+
+All old slug patterns are stored in `wk_chart_slug_aliases_v2` for 301 redirect support.
+
+### Known Mapping (from CSV preview)
+
+| Old Slug | Series | Market | New Public Slug |
+|---|---|---|---|
+| `2026` | 2026-releases | kenya | `2026-releases/kenya` |
+| `gengetone` | gengetone | kenya | `gengetone/kenya` |
+| `kenya` | top-songs | kenya | `top-songs/kenya` |
+| `rnb` | rnb | kenya | `rnb/kenya` |
+
+⚠️ **The discovery step may reveal additional chart slugs not in this mapping.** Unknown slugs will be auto-inferred using keyword pattern matching on slug + name.
+
+### What Gets Preserved as Metadata
+
+Each legacy edition gets a `rule_set_snapshot` in `wk_chart_editions_v2` containing:
+- `old_edition_id` — original MySQL row ID
+- `old_chart_id` + `old_chart_slug` — original chart identity
+- `week_number`, `year` — original temporal metadata
+- `ingest_run_id` + `ingest_run_status` — the old ingest run record
+- Source policy, scoring policy, eligibility policy from old ingest run
+- `migrated_at` — ISO timestamp of import
+
+Each entry has a `source_payload` containing:
+- Original track metadata (ISRC, Spotify ID, Apple Music ID, YouTube ID)
+- Source provider URLs from `wkcharts_track_sources`
+- `weeks_on_chart`, `peak_position`, `is_new_entry`, `is_re_entry`
+- All track source provider records
+
+### Post-Import State
+
+After the import:
+- Programs in `wk_chart_programs_v2` will be populated with programs discovered from WP data (ON CONFLICT DO NOTHING — no overwrites)
+- The existing CSV-based JSON fallback for chart pages remains as-is until API parity is proven
+- Chart Ingestion Studio can be used to ingest new editions for these programs
+- `wk_chart_slug_aliases_v2` enables 301 redirects from old URLs
+
+### Edge Function for API-driven import
+
+`supabase/functions/import-wp-charts-v2` — Alternative import path. Accepts pre-extracted chart JSON and upserts into v2 tables. Used when the WP data has already been extracted elsewhere.

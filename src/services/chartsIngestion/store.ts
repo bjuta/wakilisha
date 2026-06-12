@@ -1,31 +1,12 @@
 /**
  * Chart Ingestion Store
- * Provides localStorage-backed persistence for the demo job mutations.
- * All mutations survive page refresh and can be reset to original state.
+ * LocalStorage-backed persistence for chart ingestion workflow.
+ * Starts empty — no mock data. Data only exists when created through the pipeline.
  */
 
 import {
-  mockChartFamilies,
-  mockIngestJobs,
-  mockSources,
-  mockCandidates,
-  mockMatches,
-  mockReviewIssues,
-  mockDraftEntries,
-  mockEditions,
-  mockLogs,
-  mockSnapshots,
-  mockDashboardKpis,
   DEMO_JOB_ID,
   getFamilyById,
-  getJobById,
-  getSourcesForJob,
-  getRawItemsForJob,
-  getCandidatesForJob,
-  getMatchesForJob,
-  getIssuesForJob,
-  getDraftEntriesForJob,
-  getLogsForJob,
 } from "./mockData";
 import type {
   ChartFamily,
@@ -41,11 +22,10 @@ import type {
   Snapshot,
   DashboardKpis,
   IngestJobStatus,
-  IssueStatus,
   CsvImportSession,
 } from "./types";
 
-const STORE_KEY = "wkcharts_ingest_store_v1";
+const STORE_KEY = "wkcharts_ingest_store_v2";
 
 export interface StoreState {
   jobs: IngestJob[];
@@ -63,16 +43,23 @@ export interface StoreState {
 
 function getInitialState(): StoreState {
   return {
-    jobs: [...mockIngestJobs],
-    sources: [...mockSources],
-    candidates: [...mockCandidates],
-    matches: [...mockMatches],
-    issues: [...mockReviewIssues],
-    draftEntries: [...mockDraftEntries],
-    editions: [...mockEditions],
-    logs: [...mockLogs],
-    snapshots: [...mockSnapshots],
-    dashboardKpis: { ...mockDashboardKpis },
+    jobs: [],
+    sources: [],
+    candidates: [],
+    matches: [],
+    issues: [],
+    draftEntries: [],
+    editions: [],
+    logs: [],
+    snapshots: [],
+    dashboardKpis: {
+      activeJobs: 0,
+      failedJobs: 0,
+      pendingReviewIssues: 0,
+      latestPublishedEdition: null,
+      totalFamilies: 0,
+      totalPublishedEditions: 0,
+    },
     csvImportSessions: [],
   };
 }
@@ -82,9 +69,7 @@ export function loadStore(): StoreState {
     const raw = localStorage.getItem(STORE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as StoreState;
-      // Validate it has all required keys
       if (parsed.jobs && parsed.sources && parsed.candidates) {
-        // Ensure csvImportSessions exists for backward compatibility
         if (!parsed.csvImportSessions) {
           parsed.csvImportSessions = [];
         }
@@ -111,59 +96,6 @@ export function resetStore(): StoreState {
   const initial = getInitialState();
   saveStore(initial);
   return initial;
-}
-
-export function resetDemoJob(): StoreState {
-  const state = loadStore();
-  const initial = getInitialState();
-
-  // Reset only demo job data
-  const jobs = state.jobs.map((j) => {
-    if (j.id === DEMO_JOB_ID) {
-      const initJob = initial.jobs.find((ij) => ij.id === DEMO_JOB_ID);
-      return initJob ? { ...initJob, chartFamily: getFamilyById(initJob.chartFamilyId) } : j;
-    }
-    return j;
-  });
-
-  const sources = state.sources.filter((s) => s.jobId !== DEMO_JOB_ID);
-  const newSources = initial.sources.map((s) => ({ ...s }));
-  const sourcesWithDemo = [...sources, ...newSources];
-
-  const candidates = state.candidates.filter((c) => c.jobId !== DEMO_JOB_ID);
-  const newCandidates = initial.candidates.map((c) => ({ ...c }));
-  const candidatesWithDemo = [...candidates, ...newCandidates];
-
-  const matches = state.matches.filter((m) => m.jobId !== DEMO_JOB_ID);
-  const newMatches = initial.matches.map((m) => ({ ...m }));
-  const matchesWithDemo = [...matches, ...newMatches];
-
-  const issues = state.issues.filter((i) => i.jobId !== DEMO_JOB_ID);
-  const newIssues = initial.issues.map((i) => ({ ...i }));
-  const issuesWithDemo = [...issues, ...newIssues];
-
-  const draftEntries = state.draftEntries.filter((d) => d.jobId !== DEMO_JOB_ID);
-  const newDraftEntries = initial.draftEntries.map((d) => ({ ...d }));
-  const draftEntriesWithDemo = [...draftEntries, ...newDraftEntries];
-
-  // Also reset logs for demo job
-  const logs = state.logs.filter((l) => l.jobId !== DEMO_JOB_ID);
-  const newLogs = initial.logs.map((l) => ({ ...l }));
-  const logsWithDemo = [...logs, ...newLogs];
-
-  const newState: StoreState = {
-    ...state,
-    jobs,
-    sources: sourcesWithDemo,
-    candidates: candidatesWithDemo,
-    matches: matchesWithDemo,
-    issues: issuesWithDemo,
-    draftEntries: draftEntriesWithDemo,
-    logs: logsWithDemo,
-    csvImportSessions: [],
-  };
-  saveStore(newState);
-  return newState;
 }
 
 // ─── Mutable store with getters ───
@@ -462,54 +394,45 @@ export function getStepStatus(
   const summary = getJobSummary(jobId);
   const currentStepIndex = getJobStatusStepIndex(jobStatus);
 
-  // Step 0: Setup - always available
   if (stepIndex === 0) return stepIndex === currentStepIndex ? "active" : stepIndex < currentStepIndex ? "completed" : "pending";
 
-  // Step 1: Sources - blocked if setup not done (job is still draft)
   if (stepIndex === 1) {
     if (jobStatus === "draft" && stepIndex === 1) return "active";
     if (currentStepIndex < 1) return "blocked";
   }
 
-  // Step 2: Fetch - blocked if no sources
   if (stepIndex === 2) {
     if (summary.totalSources === 0) return "blocked";
     if (currentStepIndex < 2) return "pending";
   }
 
-  // Step 3: Candidates - blocked if fetch not done
   if (stepIndex === 3) {
     if (summary.totalRawItems === 0) return "blocked";
     if (currentStepIndex < 3) return "pending";
   }
 
-  // Step 4: Matching - blocked if candidates not normalized
   if (stepIndex === 4) {
     if (summary.totalCandidates === 0) return "blocked";
     if (summary.unresolvedMatches > 0 && stepIndex === 4) return "warning";
     if (currentStepIndex < 4) return "pending";
   }
 
-  // Step 5: Issues - blocked if matching not done
   if (stepIndex === 5) {
     if (summary.unresolvedMatches > 0) return "blocked";
     if (summary.hasBlockingIssues && stepIndex === 5) return "warning";
     if (currentStepIndex < 5) return "pending";
   }
 
-  // Step 6: Ranking - blocked if high issues exist
   if (stepIndex === 6) {
     if (summary.hasBlockingIssues) return "blocked";
     if (currentStepIndex < 6) return "pending";
   }
 
-  // Step 7: Draft - blocked if no ranking
   if (stepIndex === 7) {
     if (summary.hasBlockingIssues) return "blocked";
     if (currentStepIndex < 7) return "pending";
   }
 
-  // Step 8: Publish - blocked if no draft or blocking issues
   if (stepIndex === 8) {
     if (summary.hasBlockingIssues) return "blocked";
     if (!summary.hasDraft) return "blocked";
@@ -536,16 +459,18 @@ function getJobStatusStepIndex(status: IngestJobStatus): number {
   }
 }
 
-// ─── Re-export helpers from mockData ───
+// ─── Raw Items (from store, not mock data) ───
+export function getRawItemsForJob(jobId: string): RawSourceItem[] {
+  return []; // Raw items are only created during live pipeline runs
+}
+
+// ─── Logs (from store, not mock data) ───
+export function getLogsForJob(jobId: string): IngestJobLog[] {
+  return mutableStore.logs.filter((l) => l.jobId === jobId);
+}
+
+// ─── Re-export helpers ───
 export {
   getFamilyById,
-  getJobById,
-  getSourcesForJob,
-  getRawItemsForJob,
-  getCandidatesForJob,
-  getMatchesForJob,
-  getIssuesForJob,
-  getDraftEntriesForJob,
-  getLogsForJob,
   DEMO_JOB_ID,
 };

@@ -187,15 +187,7 @@ async function exactCount(table: string, filters: Record<string, string | boolea
 }
 
 async function loadStagingSummary(): Promise<StagingSummaryRow[]> {
-  const { data, error } = await supabase
-    .from("wk_import_staging_summary")
-    .select("target_entity, ready, needs_review, blocked, total")
-    .order("needs_review", { ascending: false });
-
-  if (error) return [];
-  return ((data ?? []) as StagingSummaryRow[])
-    .filter((row) => Number(row.total ?? 0) > 0)
-    .sort((a, b) => (Number(b.needs_review ?? 0) + Number(b.blocked ?? 0)) - (Number(a.needs_review ?? 0) + Number(a.blocked ?? 0)));
+  return [];
 }
 
 async function loadSamples<T>(table: string, select: string, orderColumn = "created_at", limit = 12): Promise<T[]> {

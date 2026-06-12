@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { WkIcon } from "@/components/design-system/Icon";
 import type { IngestRun } from "@/services/chartsIngestion/ingestStudioTypes";
 import { validateCommitReadiness } from "@/services/chartsIngestion/commitService";
+import type { CommitValidationResult } from "@/services/chartsIngestion/commitTypes";
 import { resolveV2Program } from "@/services/chartsIngestion/v2Programs";
 
 interface PublishChecklistProps {
@@ -21,7 +22,7 @@ interface ChecklistItem {
   blocking?: boolean;
 }
 
-function buildChecklist(run: IngestRun): ChecklistItem[] {
+async function buildChecklist(run: IngestRun): Promise<ChecklistItem[]> {
   const failedStages = run.stages.filter((s) => s.status === "failed");
   const fetchStage = run.stages.find((s) => s.stage === "source_fetch");
   const canonicalStage = run.stages.find((s) => s.stage === "canonical_match");
@@ -32,7 +33,7 @@ function buildChecklist(run: IngestRun): ChecklistItem[] {
   const matchRate = run.summary.matchRate ?? 0;
 
   const programId = run.existingSeriesId || "";
-  const program = resolveV2Program(programId);
+  const program = await resolveV2Program(programId);
 
   return [
     {
@@ -164,15 +165,32 @@ export function PublishChecklist({
   commitError,
 }: PublishChecklistProps) {
   const navigate = useNavigate();
-  const checklist = buildChecklist(run);
+  const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
+  const [validation, setValidation] = useState<CommitValidationResult | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      const [cl, val] = await Promise.all([
+        buildChecklist(run),
+        validateCommitReadiness(run),
+      ]);
+      if (!cancelled) {
+        setChecklist(cl);
+        setValidation(val);
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+  }, [run]);
+
   const required = checklist.filter((c) => c.required && c.blocking);
   const passCount = checklist.filter((c) => c.pass).length;
   const requiredFail = required.filter((c) => !c.pass);
   const allRequiredPass = requiredFail.length === 0;
 
   // Also run the full validation to get specific error messages
-  const validation = validateCommitReadiness(run);
-  const canCommit = validation.canCommit;
+  const canCommit = validation?.canCommit;
 
   return (
     <WkSurface className="p-4">
@@ -249,7 +267,7 @@ export function PublishChecklist({
       </div>
 
       {/* Validation errors from service */}
-      {!canCommit && validation.errors.length > 0 && (
+      {!canCommit && validation?.errors.length > 0 && (
         <div className="mb-3 rounded-lg border border-wk-danger/20 bg-wk-danger-soft p-3">
           <p className="text-[12px] font-bold text-wk-danger mb-1.5">
             <i className="ri-lock-line mr-1" />
@@ -268,7 +286,7 @@ export function PublishChecklist({
       )}
 
       {/* Warnings */}
-      {canCommit && validation.warnings.length > 0 && (
+      {canCommit && validation?.warnings.length > 0 && (
         <div className="mb-3 rounded-lg border border-wk-warning/20 bg-wk-warning-soft p-3">
           <p className="text-[11px] font-bold text-wk-warning mb-1">
             <i className="ri-alert-line mr-1" />
@@ -308,7 +326,7 @@ export function PublishChecklist({
           }`}
           title={
             !canCommit
-              ? `Commit blocked: ${validation.errors[0]?.message || "resolve required checks"}`
+              ? `Commit blocked: ${validation?.errors[0]?.message || "resolve required checks"}`
               : "Commit this edition to V2"
           }
         >

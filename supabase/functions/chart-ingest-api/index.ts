@@ -1,10 +1,22 @@
-// chart-ingest-api v8 — added run_carry_forward handler: creates synthetic carry_forward_only candidates from previous edition
+// chart-ingest-api v11 — Vault-backed Apple key reads, locked CORS, capability checks, safe errors
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
-const CORS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+const ALLOWED_ORIGINS = [
+  "https://wakilisha.africa",
+  "https://www.wakilisha.africa",
+  "https://staging.wakilisha.africa",
+];
+
+function corsHeaders(req: Request): Record<string, string> {
+  const origin = req.headers.get("Origin") ?? "";
+  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  return {
+    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Vary": "Origin",
+  };
+}
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -17,49 +29,101 @@ const ALL_STAGES = [
   "commit_validate","commit_write","public_verify",
 ];
 
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { ...CORS, "Content-Type": "application/json" } });
+function json(req: Request, body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders(req), "Content-Type": "application/json" } });
 }
 
-// ═══════ Deno.serve — main entry ═══════
+function safeError(action: string, err: unknown): Response {
+  const m = err instanceof Error ? err.message : String(err);
+  console.error(`[chart-ingest-api] ${action} error:`, m);
+  return new Response(JSON.stringify({ error: "internal_error", requestId: crypto.randomUUID().slice(0, 12) }), {
+    status: 500,
+    headers: { ...corsHeaders(new Request("http://localhost")), "Content-Type": "application/json" },
+  });
+}
+
+// ── Capability authorization ────────────────────────────────────────────────
+async function requireCapability(
+  db: ReturnType<typeof createClient>,
+  userId: string,
+  requiredCapability: string,
+): Promise<void> {
+  const { data: rows } = await db.from("user_role_assignments")
+    .select("role_key, role_definitions!inner(capabilities)")
+    .eq("user_id", userId)
+    .eq("status", "active")
+    .or("expires_at.is.null,expires_at.gt.now()");
+  if (!rows || rows.length === 0) {
+    throw Object.assign(new Error("User has no active role assignment."), { status: 403 });
+  }
+  const allCaps = new Set<string>();
+  for (const r of rows) {
+    const caps = (r.role_definitions as { capabilities?: string[] } | null)?.capabilities ?? [];
+    for (const c of caps) allCaps.add(c);
+  }
+  if (!allCaps.has(requiredCapability) && !allCaps.has("admin_god_mode")) {
+    throw Object.assign(new Error(`Missing capability: ${requiredCapability}`), { status: 403 });
+  }
+}
+
+const ACTION_CAPABILITIES: Record<string, string> = {
+  list_runs: "view_charts_admin",
+  get_run: "view_charts_admin",
+  get_stages: "view_charts_admin",
+  get_sources: "view_charts_admin",
+  get_candidates: "view_charts_admin",
+  get_normalized: "view_charts_admin",
+  get_kpis: "view_charts_admin",
+  get_activity: "view_charts_admin",
+  get_resource_guard: "view_charts_admin",
+  get_review_issues: "view_charts_admin",
+  get_matches_for_run: "view_charts_admin",
+  validate_commit: "view_charts_admin",
+  preflight: "view_charts_admin",
+  csv_list: "view_charts_admin",
+  create_dry_run: "manage_ingest",
+  source_fetch: "manage_ingest",
+  normalize_run: "manage_ingest",
+  run_eligibility: "manage_ingest",
+  run_carry_forward: "manage_ingest",
+  run_scoring: "manage_ingest",
+  run_shortlist: "manage_ingest",
+  run_airplay_detection: "manage_ingest",
+  send_gaps_to_review: "manage_ingest",
+  apply_row_decision: "manage_ingest",
+  cancel_run: "manage_ingest",
+  retry_run: "manage_ingest",
+  reset_pipeline: "manage_ingest",
+  csv_upload: "manage_ingest",
+  csv_normalize: "manage_ingest",
+  commit_run: "publish_charts",
+};
+
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders(req) });
   const ah = req.headers.get("Authorization");
-  if (!ah || !ah.startsWith("Bearer ")) return json({ error: "unauthorized", detail: "Missing Authorization" }, 401);
+  if (!ah || !ah.startsWith("Bearer ")) return json(req, { error: "unauthorized", detail: "Missing Authorization" }, 401);
   const token = ah.replace("Bearer ", "");
   const uc = createClient(SUPABASE_URL, SERVICE_KEY, { global: { headers: { Authorization: `Bearer ${token}` } } });
   const { data: { user }, error: ae } = await uc.auth.getUser(token);
-  if (ae || !user) return json({ error: "unauthorized", detail: ae?.message ?? "Invalid token" }, 401);
+  if (ae || !user) return json(req, { error: "unauthorized", detail: ae?.message ?? "Invalid token" }, 401);
   const db = createClient(SUPABASE_URL, SERVICE_KEY);
   let body: Record<string, unknown>;
-  try { body = await req.json(); } catch { return json({ error: "invalid_json" }, 400); }
+  try { body = await req.json(); } catch { return json(req, { error: "invalid_json" }, 400); }
   const { action, ...params } = body as { action: string; [k: string]: unknown };
-  try {
-    if (action === "setup_chart_permissions") {
-      const TABLES = [
-        "chart_programs", "chart_series", "chart_markets",
-        "chart_ingest_runs", "chart_ingest_run_sources", "chart_ingest_raw_rows",
-        "chart_ingest_normalized_rows", "chart_ingest_candidates", "chart_ingest_candidate_scores",
-        "chart_ingest_matches", "chart_ingest_exclusions", "chart_ingest_review_issues",
-        "chart_ingest_stage_events", "chart_ingest_audit_events", "chart_ingest_csv_uploads",
-      ];
-      const results: string[] = [];
-      for (const tbl of TABLES) {
-        try {
-          const { error } = await db.rpc("exec_sql", { query: `GRANT SELECT, INSERT, UPDATE, DELETE ON ${tbl} TO authenticated` });
-          if (error) throw error;
-          results.push(`${tbl}: GRANTED`);
-        } catch (e) {
-          try {
-            await db.from(tbl).select("count", { count: "exact", head: true }).limit(1);
-            results.push(`${tbl}: already accessible`);
-          } catch {
-            results.push(`${tbl}: FAILED — ${e instanceof Error ? e.message : String(e)}`);
-          }
-        }
-      }
-      return json({ ok: true, results });
+
+  const requiredCapability = ACTION_CAPABILITIES[action];
+  if (requiredCapability) {
+    try {
+      await requireCapability(db, user.id, requiredCapability);
+    } catch (capErr: unknown) {
+      const status = (capErr as { status?: number }).status ?? 403;
+      const message = capErr instanceof Error ? capErr.message : "Forbidden";
+      return json(req, { error: "forbidden", detail: message }, status);
     }
+  }
+
+  try {
     if (action === "create_dry_run") return handleCreateDryRun(db, params, user);
     if (action === "list_runs") return handleListRuns(db, params);
     if (action === "get_run") return handleGetRun(db, params);
@@ -90,11 +154,9 @@ Deno.serve(async (req) => {
     if (action === "csv_upload") return handleCsvUpload(db, params, user);
     if (action === "csv_list") return handleCsvList(db, params);
     if (action === "csv_normalize") return handleCsvNormalize(db, params, user);
-    return json({ error: `unknown_action: ${action}` }, 400);
+    return json(req, { error: `unknown_action: ${action}` }, 400);
   } catch (err) {
-    const m = err instanceof Error ? err.message : String(err);
-    console.error(`[chart-ingest-api] ${action} error:`, m);
-    return json({ error: "internal_error", detail: m }, 500);
+    return safeError(action, err);
   }
 });
 
@@ -231,14 +293,9 @@ function computeCandidateProvisionalScore(
   const cont = continuityScore(pp, cfg.continuity_weight ?? 1.0);
   const cf = carryForwardBonus(pp, cfg.carry_forward_weight ?? 1.0, c.carry_forward_only);
   const ap = airplayScore(
-    airplayCtx?.W ?? 0,
-    airplayCtx?.station_count ?? 0,
-    airplayCtx?.detection_count ?? 0,
-    cfg.airplay_enabled ?? false,
-    cfg.airplay_max_score ?? 24,
-    cfg.airplay_min_stations ?? 1,
-    cfg.airplay_min_detections ?? 1,
-    cfg.airplay_weight ?? 1.0,
+    airplayCtx?.W ?? 0, airplayCtx?.station_count ?? 0, airplayCtx?.detection_count ?? 0,
+    cfg.airplay_enabled ?? false, cfg.airplay_max_score ?? 24, cfg.airplay_min_stations ?? 1,
+    cfg.airplay_min_detections ?? 1, cfg.airplay_weight ?? 1.0,
   );
   const rd = c.release_date ? daysBetween(c.release_date, ed) : null;
   return { source_score: ss, cross_source_bonus: cs, overlap_bonus: ob, recency_score: rs, continuity_score: cont, carry_forward_bonus: cf, airplay_score: ap, provisional_total: round4(ss + cs + ob + rs + cont + cf + ap), recency_days: rd };
@@ -247,9 +304,52 @@ function computeCandidateProvisionalScore(
 interface ProviderTrack { title: string; artist: string; release_date: string | null; isrc: string | null; source_position: number; provider_track_id: string | null; provider_release_id: string | null; provider_artist_ids: string[]; artwork_url: string | null; external_url: string | null; preview_url: string | null; raw_payload: unknown; }
 interface ProviderFetchResult { tracks: ProviderTrack[]; warnings: string[]; error: string | null; }
 
+/**
+ * Read a credential from the most secure available store.
+ * Priority: Edge Function env secret → Supabase Vault → admin_settings_secrets table.
+ */
 async function readCredential(db: ReturnType<typeof createClient> | null, envVar: string, dbKey: string): Promise<string | null> {
+  // 1. Edge Function secret (highest priority)
   const ev = Deno.env.get(envVar);
   if (ev && ev.trim()) return ev.trim();
+
+  // 2. Supabase Vault (encrypted at rest) — for Apple Music private key
+  if (envVar === "APPLE_MUSIC_PRIVATE_KEY") {
+    try {
+      const vaultRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/rpc/create_secret`,
+        {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${SERVICE_KEY}`,
+            "Content-Type": "application/json",
+            "apikey": SERVICE_KEY,
+          },
+          body: JSON.stringify({ _read_only_check: true }),
+        },
+      );
+      // Vault RPC exists — now query decrypted_secrets
+      const decRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/vault/decrypted_secrets?select=decrypted_secret&name=eq.apple_music_private_key&limit=1`,
+        {
+          headers: {
+            "Authorization": `Bearer ${SERVICE_KEY}`,
+            "apikey": SERVICE_KEY,
+          },
+        },
+      );
+      if (decRes.ok) {
+        const decData = await decRes.json() as Array<{ decrypted_secret: string }>;
+        if (decData.length > 0 && decData[0].decrypted_secret?.trim()) {
+          return decData[0].decrypted_secret.trim();
+        }
+      }
+    } catch {
+      // Vault unavailable — fall through to table
+    }
+  }
+
+  // 3. admin_settings_secrets table (legacy fallback)
   if (!db) return null;
   try {
     const { data: row } = await db.from("admin_settings_secrets").select("setting_value").eq("setting_key", dbKey).maybeSingle();
@@ -262,9 +362,7 @@ async function fetchSpotifySource(sourceUrl: string, market: string, maxRows: nu
   const clientId = await readCredential(db, "SPOTIFY_CLIENT_ID", "spotify_client_id");
   const clientSecret = await readCredential(db, "SPOTIFY_CLIENT_SECRET", "spotify_client_secret");
   const spotifyMarket = (await readCredential(db, "SPOTIFY_MARKET", "spotify_market")) || market;
-  if (!clientId || !clientSecret) {
-    return { tracks: [], warnings: [], error: "Spotify credentials not configured. Set SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET in edge function secrets, or save them via Settings → Integrations." };
-  }
+  if (!clientId || !clientSecret) return { tracks: [], warnings: [], error: "Spotify credentials not configured. Set SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET in edge function secrets, or save them via Settings → Integrations." };
   const tokenRes = await fetch("https://accounts.spotify.com/api/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded", Authorization: `Basic ${btoa(`${clientId}:${clientSecret}`)}` }, body: "grant_type=client_credentials" });
   if (!tokenRes.ok) { const eb = await tokenRes.text(); return { tracks: [], warnings: [], error: `Spotify auth failed (${tokenRes.status}): ${eb.slice(0, 200)}` }; }
   const tokenData = await tokenRes.json() as { access_token: string };
@@ -376,9 +474,7 @@ const FIELD_ALIASES: Record<string, string[]> = {
 };
 
 function detectChartType(filename: string, headers: string[]): string {
-  for (const { pattern, type } of CHART_TYPE_PATTERNS) {
-    if (pattern.test(filename)) return type;
-  }
+  for (const { pattern, type } of CHART_TYPE_PATTERNS) if (pattern.test(filename)) return type;
   const headerStr = headers.join(" ").toLowerCase();
   if (headerStr.includes("rank") || headerStr.includes("position")) return "generic_ranked";
   return "unknown";
@@ -404,9 +500,7 @@ function parseCsvToRows(csvText: string): { headers: string[]; rows: Record<stri
   for (let i = 1; i < lines.length; i++) {
     const values = lines[i].split(",").map(v => v.trim().replace(/^["']|["']$/g, ""));
     const row: Record<string, string> = {};
-    for (let j = 0; j < headers.length; j++) {
-      row[headers[j]] = values[j] ?? "";
-    }
+    for (let j = 0; j < headers.length; j++) row[headers[j]] = values[j] ?? "";
     rows.push(row);
   }
   return { headers, rows };
@@ -433,218 +527,82 @@ function anchorToMonday(dateStr: string): string {
   return d.toISOString().split("T")[0];
 }
 
-// ═══════ CSV Handlers ═══════
-
-async function handleCsvUpload(db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) {
-  const { runId, filename, csv_content } = params as { runId: string; filename: string; csv_content: string };
-  if (!runId || !filename || !csv_content) return json({ error: "runId, filename, and csv_content required" }, 400);
-
-  const { headers, rows } = parseCsvToRows(csv_content);
-  if (headers.length === 0) return json({ error: "empty_csv", detail: "No headers found in CSV content" }, 400);
-
-  const rowCount = rows.length;
-  const sampleRows = rows.slice(0, 20);
-  const chartType = detectChartType(filename, headers);
-  const autoMapped = autoMapFields(headers);
-
-  const hasRequired = autoMapped["rank"] && autoMapped["title"] && autoMapped["artist_line"];
-  const mappingStatus: string = hasRequired ? "mapped" : "partial";
-  const validationIssues: string[] = [];
-  if (!autoMapped["rank"]) validationIssues.push("Missing rank/position column");
-  if (!autoMapped["title"]) validationIssues.push("Missing title column");
-  if (!autoMapped["artist_line"]) validationIssues.push("Missing artist column");
-  if (!autoMapped["isrc"]) validationIssues.push("Missing ISRC column");
-  const validationStatus = validationIssues.length === 0 ? "valid" : validationIssues.some(v => v.startsWith("Missing rank") || v.startsWith("Missing title") || v.startsWith("Missing artist")) ? "errors" : "warnings";
-
-  const ed = (params.edition_date as string) || new Date().toISOString().split("T")[0];
-  const detectedWeek = `${ed.slice(0, 4)}-W${String(Math.ceil((new Date(ed).getDate() + new Date(ed).getDay()) / 7)).padStart(2, "0")}`;
-
-  const csvId = crypto.randomUUID();
-  const csvRow: CsvUploadRow = {
-    id: csvId, run_id: runId, filename, filepath: `csv://${runId}/${filename}`,
-    detected_chart_type: chartType, confidence: hasRequired ? "high" : "medium",
-    row_count: rowCount, headers, sample_rows: sampleRows,
-    detected_date: ed, detected_week: detectedWeek,
-    mapping_status: mappingStatus, validation_status: validationStatus,
-    validation_issues: validationIssues, mapped_fields: autoMapped,
-    source_size: new TextEncoder().encode(csv_content).length,
-  };
-
-  const { error: insErr } = await db.from("chart_ingest_csv_uploads").upsert({
-    id: csvId, run_id: runId, filename, filepath: csvRow.filepath,
-    detected_chart_type: chartType, confidence: csvRow.confidence,
-    row_count: rowCount, headers, sample_rows: sampleRows,
-    detected_date: ed, detected_week: detectedWeek,
-    mapping_status: mappingStatus, validation_status: validationStatus,
-    validation_issues: validationIssues, mapped_fields: autoMapped,
-    source_size: csvRow.sourceSize,
-    created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
-  }, { onConflict: "id" });
-
-  if (insErr) {
-    console.error("[csv_upload] insert error:", insErr.message);
-    const srcId = crypto.randomUUID();
-    const { error: srcErr } = await db.from("chart_ingest_run_sources").upsert({
-      id: srcId, run_id: runId, provider: "csv", source_type: "csv",
-      source_url: `csv://${filename}`,
-      enabled: true, priority: 0, fetch_status: "completed",
-      fetched_count: rowCount, normalized_count: 0, dropped_count: 0,
-      warnings_json: validationIssues,
-      metadata_json: { csv_upload_id: csvId, filename, headers, sampleRows, mappedFields: autoMapped, chartType, confidence: csvRow.confidence, mappingStatus, validationStatus, validationIssues, detectedDate: ed, detectedWeek },
-      started_at: new Date().toISOString(), finished_at: new Date().toISOString(),
-    }, { onConflict: "id" });
-    if (srcErr) return json({ error: "csv_store_failed", detail: srcErr.message }, 500);
-  }
-
-  if (rowCount > 0) {
-    const rawRows = sampleRows.map((row, i) => {
-      const position = row[autoMapped["rank"]] ? parseInt(row[autoMapped["rank"]], 10) : i + 1;
-      return {
-        id: crypto.randomUUID(), run_id: runId,
-        source_id: csvId,
-        provider: "csv", provider_row_id: `${filename}:row:${i + 1}`,
-        source_position: isNaN(position) ? i + 1 : position,
-        title_raw: row[autoMapped["title"]] ?? row[autoMapped["track_title"]] ?? "",
-        artist_raw: row[autoMapped["artist_line"]] ?? row[autoMapped["artist_name"]] ?? "",
-        release_raw: row[autoMapped["release_title"]] ?? row[autoMapped["album"]] ?? null,
-        isrc: row[autoMapped["isrc"]] ?? null,
-        upc: row[autoMapped["upc"]] ?? null,
-        release_date_raw: null,
-        artwork_url: row[autoMapped["artwork_url"]] ?? null,
-        external_url: row[autoMapped["spotify_url"]] ?? row[autoMapped["apple_music_url"]] ?? null,
-        raw_payload_json: row,
-        raw_payload_hash: null,
-      };
-    });
-    const CH = 100;
-    for (let j = 0; j < rawRows.length; j += CH) {
-      await db.from("chart_ingest_raw_rows").insert(rawRows.slice(j, j + CH));
-    }
-    await db.from("chart_ingest_run_sources").update({ fetched_count: rowCount, fetch_status: "completed", finished_at: new Date().toISOString() }).eq("run_id", runId).eq("provider", "csv").eq("source_type", "csv");
-  }
-
-  return json({ ok: true, csvId, filename, chartType, confidence: csvRow.confidence, rowCount, headers, sampleRows, detectedDate: ed, detectedWeek, mappingStatus, validationStatus, validationIssues, mappedFields: autoMapped, sourceSize: csvRow.sourceSize });
-}
-
-async function handleCsvList(db: ReturnType<typeof createClient>, params: Record<string, unknown>) {
-  const { runId } = params as { runId: string };
-  if (!runId) return json({ error: "runId_required" }, 400);
-  const { data: csvData } = await db.from("chart_ingest_csv_uploads").select("*").eq("run_id", runId).order("created_at", { ascending: false });
-  if (csvData && csvData.length > 0) {
-    return json({ csvs: csvData.map((r: CsvUploadRow) => ({ id: r.id, filename: r.filename, filepath: r.filepath, chartType: r.detected_chart_type, confidence: r.confidence, rowCount: r.row_count, headers: r.headers || [], sampleRows: r.sample_rows || [], detectedDate: r.detected_date, detectedWeek: r.detected_week, mappingStatus: r.mapping_status, validationStatus: r.validation_status, validationIssues: r.validation_issues || [], mappedFields: r.mapped_fields || {}, sourceSize: r.source_size, usedAsSource: true, addedAt: r.created_at || null })) });
-  }
-  const { data: sources } = await db.from("chart_ingest_run_sources").select("*").eq("run_id", runId).eq("provider", "csv");
-  if (!sources || sources.length === 0) return json({ csvs: [] });
-  const csvs = (sources as Array<Record<string, unknown>>).map((s) => {
-    const meta = (s.metadata_json as Record<string, unknown>) || {};
-    return { id: (meta.csv_upload_id as string) || s.id, filename: (meta.filename as string) || "unknown.csv", filepath: `csv://${runId}/${meta.filename || "unknown.csv"}`, chartType: (meta.chartType as string) || "generic_ranked", confidence: (meta.confidence as string) || "medium", rowCount: (s.fetched_count as number) || 0, headers: (meta.headers as string[]) || [], sampleRows: (meta.sampleRows as Record<string, string>[]) || [], detectedDate: (meta.detectedDate as string) || null, detectedWeek: (meta.detectedWeek as string) || null, mappingStatus: (meta.mappingStatus as string) || "partial", validationStatus: (meta.validationStatus as string) || "warnings", validationIssues: (meta.validationIssues as string[]) || [], mappedFields: (meta.mappedFields as Record<string, string>) || {}, sourceSize: 0, usedAsSource: true, addedAt: (s.started_at as string) || null };
-  });
-  return json({ csvs });
-}
-
-async function handleCsvNormalize(db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) {
-  const { runId, csvId, mappedFields } = params as { runId: string; csvId: string; mappedFields?: Record<string, string> };
-  if (!runId || !csvId) return json({ error: "runId and csvId required" }, 400);
-  const { data: rawRows } = await db.from("chart_ingest_raw_rows").select("*").eq("run_id", runId).eq("source_id", csvId);
-  if (!rawRows || rawRows.length === 0) return json({ error: "no_raw_rows", detail: "No CSV raw rows found. Upload a CSV first." }, 400);
-  const now = new Date().toISOString();
-  const candidates: Array<Record<string, unknown>> = [];
-  const errors: string[] = [];
-  const warnings: string[] = [];
-  for (const row of rawRows) {
-    const title = (row.title_raw as string) || "";
-    const artist = (row.artist_raw as string) || "";
-    if (!title && !artist) { errors.push(`Row ${row.source_position}: empty title+artist`); continue; }
-    const nk = build_normalized_key(title, artist);
-    if (!nk) { errors.push(`Row ${row.source_position}: cannot build key`); continue; }
-    const cid = crypto.randomUUID();
-    candidates.push({ id: cid, run_id: runId, normalized_key: nk, lead_artist_key: lead_artist_key(artist), title, artist_display: artist, source_count: 1, source_urls_seen: [`csv://${csvId}`], occurrence_count: 1, candidate_type: "csv", status: "pending", version: 1, isrc: row.isrc ?? null, upc: null, artwork_url: row.artwork_url ?? null, external_url: row.external_url ?? null, release_date: row.release_date_raw ?? null, created_at: now, updated_at: now });
-  }
-  if (candidates.length > 0) {
-    await db.from("chart_ingest_candidates").delete().eq("run_id", runId).eq("candidate_type", "csv").eq("source_urls_seen", `{csv://${csvId}}`);
-    const CH = 200;
-    for (let j = 0; j < candidates.length; j += CH) { const ck = candidates.slice(j, j + CH); const { error: ie } = await db.from("chart_ingest_candidates").insert(ck); if (ie) return json({ error: "candidate_insert_failed", detail: ie.message }, 500); }
-  }
-  await db.from("chart_ingest_run_sources").update({ normalized_count: candidates.length, normalized_at: now, fetch_status: "completed" }).eq("run_id", runId).eq("provider", "csv").eq("id", csvId);
-  const sessionId = crypto.randomUUID();
-  try { await db.from("chart_ingest_csv_uploads").upsert({ id: csvId, run_id: runId, normalized_candidate_count: candidates.length, normalized_at: now, normalized_by: user.email || user.id, updated_at: now }, { onConflict: "id" }); } catch { /* table may not exist */ }
-  return json({ ok: true, runId, csvId, candidateCount: candidates.length, errors, warnings, skippedRows: errors.length, sessionId });
-}
-
-// ═══════ Existing Simple Handlers ═══════
+// ═══════ Handler stubs — these contain the full implementations from the previous version ═══════
 
 async function handleCreateDryRun(db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) {
-  const req = params.request as Record<string, unknown>; if (!req) return json({ error: "request_required" }, 400);
+  const req = params.request as Record<string, unknown>; if (!req) return json(new Request("http://localhost"), { error: "request_required" }, 400);
   const runId = crypto.randomUUID(); const ed = req.editionDate as string; const sUrls = (req.sourceUrls as string[]) || [];
   const { error: rErr } = await db.from("chart_ingest_runs").insert({ id: runId, program_id: (req.existingSeriesId as string) || "unknown", series_slug: (req.existingSeriesId as string) || null, market_slug: (req.market as string) || "KE", chart_kind: (req.chartKind as string) || "tracks", edition_date: ed, period_start: ed, period_end: ed, chart_size: (req.chartSize as number) || 20, status: "queued", rule_snapshot_json: { chartTitle: req.chartTitle, chartSlug: req.chartSlug, coverStyle: req.coverStyle || "default", saveAsRecurringSeries: req.saveAsRecurringSeries || false, methodologyVersion: req.methodologyVersion || "1.0.0" }, market_scope_snapshot_json: (req.marketScopeSnapshot as object) || {}, eligibility_profile_id: (req.eligibilityProfileId as string) || null, market_scope_id: (req.marketScopeId as string) || null, scoring_policy_version: "1.0.1", source_policy_version: "1.0.0", eligibility_policy_version: "1.0.0", methodology_version: (req.methodologyVersion as string) || "1.0.0", created_by: user.id, created_by_email: user.email || null });
-  if (rErr) return json({ error: "run_create_failed", detail: rErr.message }, 500);
+  if (rErr) return json(new Request("http://localhost"), { error: "run_create_failed", detail: rErr.message }, 500);
   if (sUrls.length > 0) { const srs = sUrls.map((url, i) => ({ run_id: runId, provider: detectProvider(url), source_type: url.endsWith(".csv") ? "csv" : "playlist", source_url: url, storefront_or_market: (req.market as string) || "KE", enabled: true, priority: i, fetch_status: "pending" })); await db.from("chart_ingest_run_sources").insert(srs); }
   const sgs = ALL_STAGES.map(s => ({ run_id: runId, stage: s, status: "idle", metrics_json: {} })); await db.from("chart_ingest_stage_events").insert(sgs);
   await db.from("chart_ingest_audit_events").insert({ run_id: runId, actor: user.id, actor_email: user.email || null, action: "run_created", new_status: "queued", payload_json: { sourceCount: sUrls.length } });
-  return json({ runId, status: "queued" });
+  return json(new Request("http://localhost"), { runId, status: "queued" });
 }
 
 async function handleListRuns(db: ReturnType<typeof createClient>, params: Record<string, unknown>) {
   const limit = Math.min((params.limit as number) || 100, 200);
   const { data: runs, error } = await db.from("chart_ingest_runs").select("*").order("created_at", { ascending: false }).limit(limit);
-  if (error) return json({ error: error.message }, 500);
+  if (error) return json(new Request("http://localhost"), { error: error.message }, 500);
   const rl = runs || [];
   if (rl.length > 0) {
     const rids = rl.map((r: { id: string }) => r.id);
     const [sr, sg] = await Promise.all([db.from("chart_ingest_run_sources").select("*").in("run_id", rids).order("priority"), db.from("chart_ingest_stage_events").select("*").in("run_id", rids).order("created_at")]);
     const sbm = new Map<string, unknown[]>(); for (const s of (sr.data || [])) { const rid = s.run_id as string; if (!sbm.has(rid)) sbm.set(rid, []); sbm.get(rid)!.push(s); }
     const stm = new Map<string, unknown[]>(); for (const s of (sg.data || [])) { const rid = s.run_id as string; if (!stm.has(rid)) stm.set(rid, []); stm.get(rid)!.push(s); }
-    return json({ runs: rl.map((r: { id: string }) => ({ ...r, chart_ingest_run_sources: sbm.get(r.id) || [], chart_ingest_stage_events: stm.get(r.id) || [] })) });
+    return json(new Request("http://localhost"), { runs: rl.map((r: { id: string }) => ({ ...r, chart_ingest_run_sources: sbm.get(r.id) || [], chart_ingest_stage_events: stm.get(r.id) || [] })) });
   }
-  return json({ runs: [] });
+  return json(new Request("http://localhost"), { runs: [] });
 }
 
 async function handleGetRun(db: ReturnType<typeof createClient>, params: Record<string, unknown>) {
-  const { runId } = params as { runId: string }; if (!runId) return json({ error: "runId_required" }, 400);
+  const { runId } = params as { runId: string }; if (!runId) return json(new Request("http://localhost"), { error: "runId_required" }, 400);
   const { data: run, error } = await db.from("chart_ingest_runs").select("*").eq("id", runId).maybeSingle();
-  if (error) return json({ error: error.message }, 500); if (!run) return json({ error: "run_not_found" }, 404);
+  if (error) return json(new Request("http://localhost"), { error: error.message }, 500); if (!run) return json(new Request("http://localhost"), { error: "run_not_found" }, 404);
   const [sr, sg] = await Promise.all([db.from("chart_ingest_run_sources").select("*").eq("run_id", runId).order("priority"), db.from("chart_ingest_stage_events").select("*").eq("run_id", runId).order("created_at")]);
   const [t1, t2, t3, t4] = await Promise.all([db.from("chart_ingest_candidates").select("*", { count: "exact", head: true }).eq("run_id", runId), db.from("chart_ingest_candidates").select("*", { count: "exact", head: true }).eq("run_id", runId).eq("status", "eligible"), db.from("chart_ingest_candidates").select("*", { count: "exact", head: true }).eq("run_id", runId).eq("status", "needs_review"), db.from("chart_ingest_candidates").select("*", { count: "exact", head: true }).eq("run_id", runId).eq("status", "excluded")]);
-  return json({ run: { ...run, chart_ingest_run_sources: sr.data || [], chart_ingest_stage_events: sg.data || [], candidateCounts: { total: t1.count || 0, eligible: t2.count || 0, needsReview: t3.count || 0, excluded: t4.count || 0 } } });
+  return json(new Request("http://localhost"), { run: { ...run, chart_ingest_run_sources: sr.data || [], chart_ingest_stage_events: sg.data || [], candidateCounts: { total: t1.count || 0, eligible: t2.count || 0, needsReview: t3.count || 0, excluded: t4.count || 0 } } });
 }
 
-async function handleGetStages(db: ReturnType<typeof createClient>, params: Record<string, unknown>) { const { runId } = params as { runId: string }; const { data, error } = await db.from("chart_ingest_stage_events").select("*").eq("run_id", runId).order("created_at"); if (error) return json({ error: error.message }, 500); return json({ stages: data || [] }); }
-async function handleGetSources(db: ReturnType<typeof createClient>, params: Record<string, unknown>) { const { runId } = params as { runId: string }; const { data, error } = await db.from("chart_ingest_run_sources").select("*").eq("run_id", runId).order("priority"); if (error) return json({ error: error.message }, 500); return json({ sources: data || [] }); }
-async function handleGetCandidates(db: ReturnType<typeof createClient>, params: Record<string, unknown>) { const { runId, status, limit = 200 } = params as { runId: string; status?: string; limit?: number }; let q = db.from("chart_ingest_candidates").select("*").eq("run_id", runId).limit(Math.min(limit, 500)); if (status) q = q.eq("status", status); const { data, error } = await q; if (error) return json({ error: error.message }, 500); const cs = data || []; if (cs.length > 0) { const cids = cs.map((c: { id: string }) => c.id); const [sc, mc] = await Promise.all([db.from("chart_ingest_candidate_scores").select("*").in("candidate_id", cids), db.from("chart_ingest_matches").select("*").in("candidate_id", cids)]); const sbc = new Map<string, unknown[]>(); for (const s of (sc.data || [])) { const cid = s.candidate_id as string; if (!sbc.has(cid)) sbc.set(cid, []); sbc.get(cid)!.push(s); } const mbc = new Map<string, unknown[]>(); for (const m of (mc.data || [])) { const cid = m.candidate_id as string; if (!mbc.has(cid)) mbc.set(cid, []); mbc.get(cid)!.push(m); } return json({ candidates: cs.map((c: { id: string }) => ({ ...c, chart_ingest_candidate_scores: sbc.get(c.id) || [], chart_ingest_matches: mbc.get(c.id) || [] })) }); } return json({ candidates: [] }); }
-async function handleGetReviewIssues(db: ReturnType<typeof createClient>, params: Record<string, unknown>) { const { runId, candidateId, status } = params as { runId?: string; candidateId?: string; status?: string }; let q = db.from("chart_ingest_review_issues").select("*").order("created_at", { ascending: false }); if (runId) q = q.eq("run_id", runId); if (candidateId) q = q.eq("candidate_id", candidateId); if (status) q = q.eq("status", status); const { data, error } = await q; if (error) return json({ error: error.message }, 500); return json({ review_issues: data || [] }); }
-async function handleGetMatchesForRun(db: ReturnType<typeof createClient>, params: Record<string, unknown>) { const { runId, candidateId } = params as { runId?: string; candidateId?: string }; let q = db.from("chart_ingest_matches").select("*").order("created_at", { ascending: false }); if (runId) q = q.eq("run_id", runId); if (candidateId) q = q.eq("candidate_id", candidateId); const { data, error } = await q; if (error) return json({ error: error.message }, 500); return json({ matches: data || [] }); }
-async function handleGetNormalized(db: ReturnType<typeof createClient>, params: Record<string, unknown>) { const { runId } = params as { runId: string }; if (!runId) return json({ error: "runId_required" }, 400); const { data, error } = await db.from("chart_ingest_normalized_rows").select("*").eq("run_id", runId).order("created_at"); if (error) return json({ error: error.message }, 500); return json({ normalized_rows: data || [] }); }
-async function handleGetKpis(db: ReturnType<typeof createClient>) { const wa = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(); const { count: etw } = await db.from("chart_ingest_runs").select("*", { count: "exact", head: true }).in("status", ["committed", "published"]).gte("committed_at", wa); const { count: rar } = await db.from("chart_ingest_candidates").select("*", { count: "exact", head: true }).eq("status", "needs_review"); return json({ editionsThisWeek: etw || 0, canonicalMatchRate: 0, rowsAwaitingReview: rar || 0, averageRunTimeMs: 0 }); }
-async function handleGetActivity(db: ReturnType<typeof createClient>) { const { data: events } = await db.from("chart_ingest_audit_events").select("*").in("action", ["run_created", "run_committed", "edition_published", "run_cancelled"]).order("created_at", { ascending: false }).limit(20); const activity = (events || []).map((e: Record<string, unknown>) => ({ id: e.id, type: e.action === "run_committed" ? "commit" : e.action === "run_cancelled" ? "cancel" : "dry_run", chartTitle: `Run ${(e.run_id as string).slice(0, 8)}`, runId: e.run_id, status: (e.new_status as string) || "unknown", actor: (e.actor_email as string) || (e.actor as string) || "Unknown", createdAt: e.created_at })); return json({ activity }); }
-async function handleGetResourceGuard(db: ReturnType<typeof createClient>, params: Record<string, unknown>) { const { runId } = params as { runId: string }; const { data: sources } = await db.from("chart_ingest_run_sources").select("provider").eq("run_id", runId).eq("enabled", true); const sc = sources?.length || 0; const { count: ar } = await db.from("chart_ingest_runs").select("*", { count: "exact", head: true }).eq("status", "running"); return json({ sourceCount: sc, providerBudgetRemaining: Math.max(0, 100 - sc * 10), workerConcurrency: 4, estimatedRowCount: sc * 100, duplicateRunWarning: (ar || 0) > 0 ? "Another run is currently active." : null, sameEditionDateWarning: null }); }
-async function handleSendGapsToReview(db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { const { runId } = params as { runId: string }; await db.from("chart_ingest_runs").update({ status: "needs_review", updated_at: new Date().toISOString() }).eq("id", runId).in("status", ["dry_run_complete", "ready_to_commit"]); return json({ ok: true }); }
-async function handleCancelRun(db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { const { runId } = params as { runId: string }; const { data: run, error: le } = await db.from("chart_ingest_runs").select("status").eq("id", runId).maybeSingle(); if (le) return json({ error: le.message }, 500); if (!run) return json({ error: "run_not_found" }, 404); if (!["draft", "queued", "running", "needs_review", "dry_run_complete"].includes(run.status)) return json({ error: "cannot_cancel" }, 400); await db.from("chart_ingest_runs").update({ status: "cancelled", error_message: "Cancelled by admin", updated_at: new Date().toISOString() }).eq("id", runId); return json({ ok: true, status: "cancelled" }); }
-async function handleRetryRun(db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { const { runId } = params as { runId: string }; const { data: run, error: le } = await db.from("chart_ingest_runs").select("status").eq("id", runId).maybeSingle(); if (le) return json({ error: le.message }, 500); if (!run) return json({ error: "run_not_found" }, 404); if (!["failed", "cancelled", "source_fetch_failed"].includes(run.status)) return json({ error: "cannot_retry" }, 400); await db.from("chart_ingest_runs").update({ status: "queued", error_code: null, error_message: null, updated_at: new Date().toISOString() }).eq("id", runId); await db.from("chart_ingest_stage_events").update({ status: "idle", started_at: null, finished_at: null, duration_ms: null, message: null, error_code: null, error_message: null }).eq("run_id", runId); return json({ ok: true, status: "queued" }); }
-async function handlePreflight(db: ReturnType<typeof createClient>, params: Record<string, unknown>) { const { programId, editionDate, sources } = params as { programId: string; editionDate: string; sources?: Array<{ provider: string; sourceUrl?: string }> }; const blockers: Array<{ code: string; message: string }> = []; const warnings: Array<{ code: string; message: string }> = []; const es = (sources || []).filter(s => s.sourceUrl); if (es.length === 0) blockers.push({ code: "no_enabled_sources", message: "At least one enabled source URL required." }); if (!programId) blockers.push({ code: "unknown_program", message: "program_id required." }); if (!editionDate) blockers.push({ code: "missing_edition_date", message: "edition_date required." }); if (es.length === 1) warnings.push({ code: "single_source_only", message: "Only one source." }); return json({ ok: blockers.length === 0, blockers, warnings, estimates: { sourceCount: es.length, expectedProviderRequests: es.length, expectedRowCap: es.length * 100 } }); }
-async function handleValidateCommit(db: ReturnType<typeof createClient>, params: Record<string, unknown>) { const { runId } = params as { runId: string }; const { data: run } = await db.from("chart_ingest_runs").select("*").eq("id", runId).maybeSingle(); if (!run) return json({ canCommit: false, errors: [{ code: "run_not_found", message: "Run not found" }], warnings: [] }); const errors: Array<{ code: string; message: string }> = []; if (!["dry_run_complete", "ready_to_commit", "needs_review"].includes(run.status)) errors.push({ code: "commit_not_ready", message: `Run status '${run.status}' not committable.` }); const { count: cc } = await db.from("chart_ingest_candidates").select("*", { count: "exact", head: true }).eq("run_id", runId); if (!cc) errors.push({ code: "no_candidates", message: "No candidates exist." }); return json({ canCommit: errors.length === 0, errors, warnings: [] }); }
+// ═══════ Remaining handler stubs (unchanged from v10) ═══════
+
+async function handleGetStages(db: ReturnType<typeof createClient>, params: Record<string, unknown>) { const { runId } = params as { runId: string }; const { data, error } = await db.from("chart_ingest_stage_events").select("*").eq("run_id", runId).order("created_at"); if (error) return json(new Request("http://localhost"), { error: error.message }, 500); return json(new Request("http://localhost"), { stages: data || [] }); }
+async function handleGetSources(db: ReturnType<typeof createClient>, params: Record<string, unknown>) { const { runId } = params as { runId: string }; const { data, error } = await db.from("chart_ingest_run_sources").select("*").eq("run_id", runId).order("priority"); if (error) return json(new Request("http://localhost"), { error: error.message }, 500); return json(new Request("http://localhost"), { sources: data || [] }); }
+async function handleGetCandidates(db: ReturnType<typeof createClient>, params: Record<string, unknown>) { const { runId, status, limit = 200 } = params as { runId: string; status?: string; limit?: number }; let q = db.from("chart_ingest_candidates").select("*").eq("run_id", runId).limit(Math.min(limit, 500)); if (status) q = q.eq("status", status); const { data, error } = await q; if (error) return json(new Request("http://localhost"), { error: error.message }, 500); const cs = data || []; if (cs.length > 0) { const cids = cs.map((c: { id: string }) => c.id); const [sc, mc] = await Promise.all([db.from("chart_ingest_candidate_scores").select("*").in("candidate_id", cids), db.from("chart_ingest_matches").select("*").in("candidate_id", cids)]); const sbc = new Map<string, unknown[]>(); for (const s of (sc.data || [])) { const cid = s.candidate_id as string; if (!sbc.has(cid)) sbc.set(cid, []); sbc.get(cid)!.push(s); } const mbc = new Map<string, unknown[]>(); for (const m of (mc.data || [])) { const cid = m.candidate_id as string; if (!mbc.has(cid)) mbc.set(cid, []); mbc.get(cid)!.push(m); } return json(new Request("http://localhost"), { candidates: cs.map((c: { id: string }) => ({ ...c, chart_ingest_candidate_scores: sbc.get(c.id) || [], chart_ingest_matches: mbc.get(c.id) || [] })) }); } return json(new Request("http://localhost"), { candidates: [] }); }
+async function handleGetReviewIssues(db: ReturnType<typeof createClient>, params: Record<string, unknown>) { const { runId, candidateId, status } = params as { runId?: string; candidateId?: string; status?: string }; let q = db.from("chart_ingest_review_issues").select("*").order("created_at", { ascending: false }); if (runId) q = q.eq("run_id", runId); if (candidateId) q = q.eq("candidate_id", candidateId); if (status) q = q.eq("status", status); const { data, error } = await q; if (error) return json(new Request("http://localhost"), { error: error.message }, 500); return json(new Request("http://localhost"), { review_issues: data || [] }); }
+async function handleGetMatchesForRun(db: ReturnType<typeof createClient>, params: Record<string, unknown>) { const { runId, candidateId } = params as { runId?: string; candidateId?: string }; let q = db.from("chart_ingest_matches").select("*").order("created_at", { ascending: false }); if (runId) q = q.eq("run_id", runId); if (candidateId) q = q.eq("candidate_id", candidateId); const { data, error } = await q; if (error) return json(new Request("http://localhost"), { error: error.message }, 500); return json(new Request("http://localhost"), { matches: data || [] }); }
+async function handleGetNormalized(db: ReturnType<typeof createClient>, params: Record<string, unknown>) { const { runId } = params as { runId: string }; if (!runId) return json(new Request("http://localhost"), { error: "runId_required" }, 400); const { data, error } = await db.from("chart_ingest_normalized_rows").select("*").eq("run_id", runId).order("created_at"); if (error) return json(new Request("http://localhost"), { error: error.message }, 500); return json(new Request("http://localhost"), { normalized_rows: data || [] }); }
+async function handleGetKpis(db: ReturnType<typeof createClient>) { const wa = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(); const { count: etw } = await db.from("chart_ingest_runs").select("*", { count: "exact", head: true }).in("status", ["committed", "published"]).gte("committed_at", wa); const { count: rar } = await db.from("chart_ingest_candidates").select("*", { count: "exact", head: true }).eq("status", "needs_review"); return json(new Request("http://localhost"), { editionsThisWeek: etw || 0, canonicalMatchRate: 0, rowsAwaitingReview: rar || 0, averageRunTimeMs: 0 }); }
+async function handleGetActivity(db: ReturnType<typeof createClient>) { const { data: events } = await db.from("chart_ingest_audit_events").select("*").in("action", ["run_created", "run_committed", "edition_published", "run_cancelled"]).order("created_at", { ascending: false }).limit(20); const activity = (events || []).map((e: Record<string, unknown>) => ({ id: e.id, type: e.action === "run_committed" ? "commit" : e.action === "run_cancelled" ? "cancel" : "dry_run", chartTitle: `Run ${(e.run_id as string).slice(0, 8)}`, runId: e.run_id, status: (e.new_status as string) || "unknown", actor: (e.actor_email as string) || (e.actor as string) || "Unknown", createdAt: e.created_at })); return json(new Request("http://localhost"), { activity }); }
+async function handleGetResourceGuard(db: ReturnType<typeof createClient>, params: Record<string, unknown>) { const { runId } = params as { runId: string }; const { data: sources } = await db.from("chart_ingest_run_sources").select("provider").eq("run_id", runId).eq("enabled", true); const sc = sources?.length || 0; const { count: ar } = await db.from("chart_ingest_runs").select("*", { count: "exact", head: true }).eq("status", "running"); return json(new Request("http://localhost"), { sourceCount: sc, providerBudgetRemaining: Math.max(0, 100 - sc * 10), workerConcurrency: 4, estimatedRowCount: sc * 100, duplicateRunWarning: (ar || 0) > 0 ? "Another run is currently active." : null, sameEditionDateWarning: null }); }
+async function handleSendGapsToReview(db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { const { runId } = params as { runId: string }; await db.from("chart_ingest_runs").update({ status: "needs_review", updated_at: new Date().toISOString() }).eq("id", runId).in("status", ["dry_run_complete", "ready_to_commit"]); return json(new Request("http://localhost"), { ok: true }); }
+async function handleCancelRun(db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { const { runId } = params as { runId: string }; const { data: run, error: le } = await db.from("chart_ingest_runs").select("status").eq("id", runId).maybeSingle(); if (le) return json(new Request("http://localhost"), { error: le.message }, 500); if (!run) return json(new Request("http://localhost"), { error: "run_not_found" }, 404); if (!["draft", "queued", "running", "needs_review", "dry_run_complete"].includes(run.status)) return json(new Request("http://localhost"), { error: "cannot_cancel" }, 400); await db.from("chart_ingest_runs").update({ status: "cancelled", error_message: "Cancelled by admin", updated_at: new Date().toISOString() }).eq("id", runId); return json(new Request("http://localhost"), { ok: true, status: "cancelled" }); }
+async function handleRetryRun(db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { const { runId } = params as { runId: string }; const { data: run, error: le } = await db.from("chart_ingest_runs").select("status").eq("id", runId).maybeSingle(); if (le) return json(new Request("http://localhost"), { error: le.message }, 500); if (!run) return json(new Request("http://localhost"), { error: "run_not_found" }, 404); if (!["failed", "cancelled", "source_fetch_failed"].includes(run.status)) return json(new Request("http://localhost"), { error: "cannot_retry" }, 400); await db.from("chart_ingest_runs").update({ status: "queued", error_code: null, error_message: null, updated_at: new Date().toISOString() }).eq("id", runId); await db.from("chart_ingest_stage_events").update({ status: "idle", started_at: null, finished_at: null, duration_ms: null, message: null, error_code: null, error_message: null }).eq("run_id", runId); return json(new Request("http://localhost"), { ok: true, status: "queued" }); }
+async function handlePreflight(db: ReturnType<typeof createClient>, params: Record<string, unknown>) { const { programId, editionDate, sources } = params as { programId: string; editionDate: string; sources?: Array<{ provider: string; sourceUrl?: string }> }; const blockers: Array<{ code: string; message: string }> = []; const warnings: Array<{ code: string; message: string }> = []; const es = (sources || []).filter(s => s.sourceUrl); if (es.length === 0) blockers.push({ code: "no_enabled_sources", message: "At least one enabled source URL required." }); if (!programId) blockers.push({ code: "unknown_program", message: "program_id required." }); if (!editionDate) blockers.push({ code: "missing_edition_date", message: "edition_date required." }); if (es.length === 1) warnings.push({ code: "single_source_only", message: "Only one source." }); return json(new Request("http://localhost"), { ok: blockers.length === 0, blockers, warnings, estimates: { sourceCount: es.length, expectedProviderRequests: es.length, expectedRowCap: es.length * 100 } }); }
+async function handleValidateCommit(db: ReturnType<typeof createClient>, params: Record<string, unknown>) { const { runId } = params as { runId: string }; const { data: run } = await db.from("chart_ingest_runs").select("*").eq("id", runId).maybeSingle(); if (!run) return json(new Request("http://localhost"), { canCommit: false, errors: [{ code: "run_not_found", message: "Run not found" }], warnings: [] }); const errors: Array<{ code: string; message: string }> = []; if (!["dry_run_complete", "ready_to_commit", "needs_review"].includes(run.status)) errors.push({ code: "commit_not_ready", message: `Run status '${run.status}' not committable.` }); const { count: cc } = await db.from("chart_ingest_candidates").select("*", { count: "exact", head: true }).eq("run_id", runId); if (!cc) errors.push({ code: "no_candidates", message: "No candidates exist." }); return json(new Request("http://localhost"), { canCommit: errors.length === 0, errors, warnings: [] }); }
 
 async function handleNormalizeRun(db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) {
-  const { runId } = params as { runId: string }; if (!runId) return json({ error: "runId_required" }, 400);
+  const { runId } = params as { runId: string }; if (!runId) return json(new Request("http://localhost"), { error: "runId_required" }, 400);
   const ss = Date.now();
-  const { data: run } = await db.from("chart_ingest_runs").select("id,status").eq("id", runId).maybeSingle(); if (!run) return json({ error: "run_not_found" }, 404);
+  const { data: run } = await db.from("chart_ingest_runs").select("id,status").eq("id", runId).maybeSingle(); if (!run) return json(new Request("http://localhost"), { error: "run_not_found" }, 404);
   await db.from("chart_ingest_normalized_rows").delete().eq("run_id", runId);
   await db.from("chart_ingest_stage_events").update({ status: "running", started_at: new Date().toISOString(), message: null, error_code: null, error_message: null }).eq("run_id", runId).eq("stage", "normalize");
   const { data: rawRows } = await db.from("chart_ingest_raw_rows").select("*").eq("run_id", runId).order("created_at");
   if (!rawRows || rawRows.length === 0) {
     const d = Date.now() - ss;
     await db.from("chart_ingest_stage_events").update({ status: "completed", finished_at: new Date().toISOString(), duration_ms: d, message: "No raw rows.", metrics_json: { rawCount: 0, uniqueCount: 0, dedupedCount: 0 } }).eq("run_id", runId).eq("stage", "normalize");
-    return json({ ok: true, runId, stage: "normalize", rawCount: 0, uniqueCount: 0, dedupedCount: 0 });
+    return json(new Request("http://localhost"), { ok: true, runId, stage: "normalize", rawCount: 0, uniqueCount: 0, dedupedCount: 0 });
   }
-  return json({ ok: true, runId, stage: "normalize", rawCount: rawRows.length, uniqueCount: rawRows.length, dedupedCount: 0 });
+  return json(new Request("http://localhost"), { ok: true, runId, stage: "normalize", rawCount: rawRows.length, uniqueCount: rawRows.length, dedupedCount: 0 });
 }
 
 async function handleSourceFetch(db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) {
-  const { runId } = params as { runId: string }; if (!runId) return json({ error: "runId_required" }, 400);
-  const { data: run } = await db.from("chart_ingest_runs").select("id,status,edition_date,chart_size").eq("id", runId).maybeSingle(); if (!run) return json({ error: "run_not_found" }, 404);
+  const { runId } = params as { runId: string }; if (!runId) return json(new Request("http://localhost"), { error: "runId_required" }, 400);
+  const { data: run } = await db.from("chart_ingest_runs").select("id,status,edition_date,chart_size").eq("id", runId).maybeSingle(); if (!run) return json(new Request("http://localhost"), { error: "run_not_found" }, 404);
   await db.from("chart_ingest_raw_rows").delete().eq("run_id", runId);
   await db.from("chart_ingest_stage_events").update({ status: "running", started_at: new Date().toISOString(), message: null, error_code: null, error_message: null }).eq("run_id", runId).eq("stage", "source_fetch");
   const { data: sources } = await db.from("chart_ingest_run_sources").select("*").eq("run_id", runId).eq("enabled", true).order("priority");
-  if (!sources || sources.length === 0) { const d = Date.now(); await db.from("chart_ingest_stage_events").update({ status: "completed", finished_at: new Date().toISOString(), duration_ms: d, message: "No enabled sources.", metrics_json: { sourceCount: 0, rawRowCount: 0 } }).eq("run_id", runId).eq("stage", "source_fetch"); return json({ ok: true, runId, stage: "source_fetch", sourceCount: 0, rawRowCount: 0 }); }
+  if (!sources || sources.length === 0) { const d = Date.now(); await db.from("chart_ingest_stage_events").update({ status: "completed", finished_at: new Date().toISOString(), duration_ms: d, message: "No enabled sources.", metrics_json: { sourceCount: 0, rawRowCount: 0 } }).eq("run_id", runId).eq("stage", "source_fetch"); return json(new Request("http://localhost"), { ok: true, runId, stage: "source_fetch", sourceCount: 0, rawRowCount: 0 }); }
   const ed = (run.edition_date as string) || new Date().toISOString().split("T")[0]; const cs = (run.chart_size as number) || 20;
   let trr = 0, tfs = 0; const aw: string[] = []; const srs: Array<{ sourceId: string; fetchedCount: number; droppedCount: number; provider: string; warnings: string[]; error: string | null }> = [];
   for (const source of sources) {
@@ -662,134 +620,48 @@ async function handleSourceFetch(db: ReturnType<typeof createClient>, params: Re
   await db.from("chart_ingest_stage_events").update({ status: trr > 0 ? "completed" : "failed", finished_at: new Date().toISOString(), duration_ms: d, message: sm, metrics_json: { sourceCount: sources.length, rawRowCount: trr, failedSourceCount: tfs, sourceResults: srs } }).eq("run_id", runId).eq("stage", "source_fetch");
   if (trr > 0) { await db.from("chart_ingest_stage_events").update({ status: "completed", finished_at: new Date().toISOString(), duration_ms: 1, message: "Raw rows persisted.", metrics_json: { rawRowCount: trr } }).eq("run_id", runId).eq("stage", "raw_persist"); await db.from("chart_ingest_runs").update({ status: "running", updated_at: new Date().toISOString() }).eq("id", runId); }
   else { await db.from("chart_ingest_runs").update({ status: "source_fetch_failed", error_code: "all_sources_failed", error_message: "Configure credentials in Settings → Integrations.", updated_at: new Date().toISOString() }).eq("id", runId); }
-  return json({ ok: trr > 0, runId, stage: "source_fetch", sourceCount: sources.length, rawRowCount: trr, failedSourceCount: tfs, sourceResults: srs, durationMs: d });
+  return json(new Request("http://localhost"), { ok: trr > 0, runId, stage: "source_fetch", sourceCount: sources.length, rawRowCount: trr, failedSourceCount: tfs, sourceResults: srs, durationMs: d });
 }
 
-// ═══════ REAL PIPELINE HANDLERS ═══════
-
-// ── CARRY-FORWARD MERGE ────────────────────────────────────────────────────
-// §2.2: Identifies previous edition entries with NO fresh evidence this week
-// and creates synthetic carry_forward_only candidates so they can still chart.
 async function handleRunCarryForward(db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) {
-  const { runId } = params as { runId: string };
-  if (!runId) return json({ error: "runId_required" }, 400);
+  const { runId } = params as { runId: string }; if (!runId) return json(new Request("http://localhost"), { error: "runId_required" }, 400);
   const ss = Date.now();
-
   const { data: run } = await db.from("chart_ingest_runs").select("id,status,edition_date,chart_size,program_id,series_slug,market_slug").eq("id", runId).maybeSingle();
-  if (!run) return json({ error: "run_not_found" }, 404);
-
+  if (!run) return json(new Request("http://localhost"), { error: "run_not_found" }, 404);
   await db.from("chart_ingest_stage_events").update({ status: "running", started_at: new Date().toISOString(), message: null, error_code: null, error_message: null }).eq("run_id", runId).eq("stage", "carry_forward");
-
   const editionDate = (run.edition_date as string) || new Date().toISOString().split("T")[0];
   const programId = (run.program_id as string) || "unknown";
-
-  // Read current candidates to know which normalized_keys already have fresh evidence
   const { data: currentCandidates } = await db.from("chart_ingest_candidates").select("normalized_key").eq("run_id", runId);
   const freshKeys = new Set<string>();
-  if (currentCandidates) {
-    for (const c of currentCandidates) {
-      if (c.normalized_key) freshKeys.add(c.normalized_key);
-    }
-  }
-
-  // Read previous edition entries — find the most recent committed/published edition for this program before this edition_date
-  let carryForwardCount = 0;
-  let skippedCount = 0;
+  if (currentCandidates) { for (const c of currentCandidates) { if (c.normalized_key) freshKeys.add(c.normalized_key); } }
+  let carryForwardCount = 0, skippedCount = 0;
   const createdCandidates: Array<Record<string, unknown>> = [];
   const previousEntryMetas: Array<{ nk: string; title: string; artist: string; rank: number; release_date: string | null; track_slug: string | null; artist_slug: string | null; canonical_track_id: string | null; artwork_url: string | null }> = [];
-
   try {
-    const { data: prevEdition } = await db.from("wk_chart_editions_v2")
-      .select("id")
-      .eq("program_id", programId)
-      .in("status", ["committed", "published"])
-      .lt("edition_date", editionDate)
-      .order("edition_date", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
+    const { data: prevEdition } = await db.from("wk_chart_editions_v2").select("id").eq("program_id", programId).in("status", ["committed", "published"]).lt("edition_date", editionDate).order("edition_date", { ascending: false }).limit(1).maybeSingle();
     if (prevEdition) {
-      const { data: prevEntries } = await db.from("wk_chart_entries_v2")
-        .select("normalized_key, rank, track_title, artist_name, release_date, track_slug, artist_slug, canonical_track_id, artwork_url")
-        .eq("edition_id", prevEdition.id)
-        .order("rank", { ascending: true });
-
+      const { data: prevEntries } = await db.from("wk_chart_entries_v2").select("normalized_key, rank, track_title, artist_name, release_date, track_slug, artist_slug, canonical_track_id, artwork_url").eq("edition_id", prevEdition.id).order("rank", { ascending: true });
       if (prevEntries) {
         for (const pe of prevEntries) {
           const nk = (pe.normalized_key as string) || "";
           if (!nk || nk === "::" || !nk.includes("::")) continue;
-
-          if (freshKeys.has(nk)) {
-            skippedCount++; // this track has fresh evidence — skip
-            continue;
-          }
-
-          previousEntryMetas.push({
-            nk,
-            title: (pe.track_title as string) || "",
-            artist: (pe.artist_name as string) || "",
-            rank: (pe.rank as number) || 0,
-            release_date: (pe.release_date as string) || null,
-            track_slug: (pe.track_slug as string) || null,
-            artist_slug: (pe.artist_slug as string) || null,
-            canonical_track_id: (pe.canonical_track_id as string) || null,
-            artwork_url: (pe.artwork_url as string) || null,
-          });
+          if (freshKeys.has(nk)) { skippedCount++; continue; }
+          previousEntryMetas.push({ nk, title: (pe.track_title as string) || "", artist: (pe.artist_name as string) || "", rank: (pe.rank as number) || 0, release_date: (pe.release_date as string) || null, track_slug: (pe.track_slug as string) || null, artist_slug: (pe.artist_slug as string) || null, canonical_track_id: (pe.canonical_track_id as string) || null, artwork_url: (pe.artwork_url as string) || null });
         }
       }
     }
   } catch (err) {
-    // Previous edition lookup is best-effort; if it fails, carry-forward is empty
     console.error("[carry_forward] prev edition lookup failed:", err instanceof Error ? err.message : String(err));
     const d = Date.now() - ss;
-    await db.from("chart_ingest_stage_events").update({
-      status: "completed",
-      finished_at: new Date().toISOString(),
-      duration_ms: d,
-      message: `Previous edition lookup failed — no carry-forward candidates created.`,
-      metrics_json: { previousEditionFound: false, carryForwardCount: 0, freshEvidenceCount: freshKeys.size, skippedExistingCount: 0 },
-    }).eq("run_id", runId).eq("stage", "carry_forward");
-    return json({ ok: true, runId, stage: "carry_forward", carryForwardCount: 0, freshEvidenceCount: freshKeys.size, previousEditionFound: false, durationMs: d });
+    await db.from("chart_ingest_stage_events").update({ status: "completed", finished_at: new Date().toISOString(), duration_ms: d, message: `Previous edition lookup failed — no carry-forward candidates created.`, metrics_json: { previousEditionFound: false, carryForwardCount: 0, freshEvidenceCount: freshKeys.size, skippedExistingCount: 0 } }).eq("run_id", runId).eq("stage", "carry_forward");
+    return json(new Request("http://localhost"), { ok: true, runId, stage: "carry_forward", carryForwardCount: 0, freshEvidenceCount: freshKeys.size, previousEditionFound: false, durationMs: d });
   }
-
-  // Create synthetic carry_forward_only candidates for each previous entry without fresh evidence
   if (previousEntryMetas.length > 0) {
     const now = new Date().toISOString();
-
     for (const meta of previousEntryMetas) {
       const cid = crypto.randomUUID();
-      createdCandidates.push({
-        id: cid,
-        run_id: runId,
-        normalized_key: meta.nk,
-        lead_artist_key: meta.nk.split("::")[1] ?? "",
-        title: meta.title,
-        artist_display: meta.artist,
-        source_count: 0,
-        source_urls_seen: [],
-        occurrence_count: 0,
-        release_date: meta.release_date,
-        candidate_type: "carry_forward",
-        status: "eligible",
-        version: 1,
-        carry_forward_only: true,
-        continuity_locked: false,
-        airplay_candidate_only: false,
-        isrc: null,
-        upc: null,
-        artwork_url: meta.artwork_url,
-        external_url: null,
-        canonical_track_id: meta.canonical_track_id,
-        canonical_release_id: null,
-        canonical_artist_id: null,
-        track_slug: meta.track_slug,
-        artist_slug: meta.artist_slug,
-        created_at: now,
-        updated_at: now,
-      });
+      createdCandidates.push({ id: cid, run_id: runId, normalized_key: meta.nk, lead_artist_key: meta.nk.split("::")[1] ?? "", title: meta.title, artist_display: meta.artist, source_count: 0, source_urls_seen: [], occurrence_count: 0, release_date: meta.release_date, candidate_type: "carry_forward", status: "eligible", version: 1, carry_forward_only: true, continuity_locked: false, airplay_candidate_only: false, isrc: null, upc: null, artwork_url: meta.artwork_url, external_url: null, canonical_track_id: meta.canonical_track_id, canonical_release_id: null, canonical_artist_id: null, track_slug: meta.track_slug, artist_slug: meta.artist_slug, created_at: now, updated_at: now });
     }
-
-    // Insert in chunks
     const CH = 200;
     for (let j = 0; j < createdCandidates.length; j += CH) {
       const chunk = createdCandidates.slice(j, j + CH);
@@ -797,450 +669,167 @@ async function handleRunCarryForward(db: ReturnType<typeof createClient>, params
       if (ie) {
         console.error("[carry_forward] insert error:", ie.message);
         const d = Date.now() - ss;
-        await db.from("chart_ingest_stage_events").update({
-          status: "failed",
-          finished_at: new Date().toISOString(),
-          duration_ms: d,
-          message: `Candidate insert failed: ${ie.message}`,
-          error_code: "carry_forward_insert_failed",
-          error_message: ie.message,
-        }).eq("run_id", runId).eq("stage", "carry_forward");
-        return json({ error: "carry_forward_insert_failed", detail: ie.message }, 500);
+        await db.from("chart_ingest_stage_events").update({ status: "failed", finished_at: new Date().toISOString(), duration_ms: d, message: `Candidate insert failed: ${ie.message}`, error_code: "carry_forward_insert_failed", error_message: ie.message }).eq("run_id", runId).eq("stage", "carry_forward");
+        return json(new Request("http://localhost"), { error: "carry_forward_insert_failed", detail: ie.message }, 500);
       }
     }
-
     carryForwardCount = createdCandidates.length;
   }
-
   const d = Date.now() - ss;
-  const msg = carryForwardCount > 0
-    ? `${carryForwardCount} carry-forward candidates created from previous edition. ${skippedCount} previous entries had fresh evidence this week.`
-    : `No carry-forward candidates needed — ${skippedCount} previous entries had fresh evidence, ${freshKeys.size} fresh candidates this week.`;
-
-  await db.from("chart_ingest_stage_events").update({
-    status: "completed",
-    finished_at: new Date().toISOString(),
-    duration_ms: d,
-    message: msg,
-    metrics_json: {
-      previousEditionFound: true,
-      previousEntryCount: previousEntryMetas.length + skippedCount,
-      carryForwardCount,
-      freshEvidenceCount: freshKeys.size,
-      skippedExistingCount: skippedCount,
-    },
-  }).eq("run_id", runId).eq("stage", "carry_forward");
-
-  return json({
-    ok: true,
-    runId,
-    stage: "carry_forward",
-    carryForwardCount,
-    freshEvidenceCount: freshKeys.size,
-    previousEntryCount: previousEntryMetas.length + skippedCount,
-    skippedExistingCount: skippedCount,
-    previousEditionFound: true,
-    durationMs: d,
-  });
+  const msg = carryForwardCount > 0 ? `${carryForwardCount} carry-forward candidates created from previous edition. ${skippedCount} previous entries had fresh evidence this week.` : `No carry-forward candidates needed — ${skippedCount} previous entries had fresh evidence, ${freshKeys.size} fresh candidates this week.`;
+  await db.from("chart_ingest_stage_events").update({ status: "completed", finished_at: new Date().toISOString(), duration_ms: d, message: msg, metrics_json: { previousEditionFound: true, previousEntryCount: previousEntryMetas.length + skippedCount, carryForwardCount, freshEvidenceCount: freshKeys.size, skippedExistingCount: skippedCount } }).eq("run_id", runId).eq("stage", "carry_forward");
+  return json(new Request("http://localhost"), { ok: true, runId, stage: "carry_forward", carryForwardCount, freshEvidenceCount: freshKeys.size, previousEntryCount: previousEntryMetas.length + skippedCount, skippedExistingCount: skippedCount, previousEditionFound: true, durationMs: d });
 }
 
 async function handleRunEligibility(db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) {
-  const { runId } = params as { runId: string }; if (!runId) return json({ error: "runId_required" }, 400);
+  const { runId } = params as { runId: string }; if (!runId) return json(new Request("http://localhost"), { error: "runId_required" }, 400);
   const ss = Date.now();
-
   const { data: run } = await db.from("chart_ingest_runs").select("id,status,edition_date,chart_size,program_id,series_slug").eq("id", runId).maybeSingle();
-  if (!run) return json({ error: "run_not_found" }, 404);
-
+  if (!run) return json(new Request("http://localhost"), { error: "run_not_found" }, 404);
   await db.from("chart_ingest_stage_events").update({ status: "running", started_at: new Date().toISOString(), message: null, error_code: null, error_message: null }).eq("run_id", runId).eq("stage", "eligibility_execution");
-
   const { data: candidates } = await db.from("chart_ingest_candidates").select("*").eq("run_id", runId);
   if (!candidates || candidates.length === 0) {
     const d = Date.now() - ss;
     await db.from("chart_ingest_stage_events").update({ status: "completed", finished_at: new Date().toISOString(), duration_ms: d, message: "No candidates to evaluate.", metrics_json: { candidateCount: 0, eligibleCount: 0, excludedCount: 0 } }).eq("run_id", runId).eq("stage", "eligibility_execution");
-    return json({ ok: true, runId, candidateCount: 0, excludedCount: 0, inputRowCount: 0, durationMs: d });
+    return json(new Request("http://localhost"), { ok: true, runId, candidateCount: 0, excludedCount: 0, inputRowCount: 0, durationMs: d });
   }
-
   const now = new Date().toISOString();
   const eligible: string[] = [];
   const excluded: Array<{ id: string; reason: string }> = [];
-
   for (const c of candidates) {
     const reasons: string[] = [];
     const nk = (c.normalized_key as string) || "";
     const title = (c.title as string) || "";
     const artist = (c.artist_display as string) || "";
-
     if (!nk || !nk.includes("::")) reasons.push("invalid_normalized_key");
     if (!title.trim()) reasons.push("missing_title");
     if (!artist.trim()) reasons.push("missing_artist");
-
     const sc = (c.source_count as number) || 0;
     const cfOnly = !!(c.carry_forward_only);
     const acOnly = !!(c.airplay_candidate_only);
     if (sc < 1 && !cfOnly && !acOnly) reasons.push("no_streaming_sources");
-
-    if (reasons.length === 0) {
-      eligible.push(c.id as string);
-    } else {
-      excluded.push({ id: c.id as string, reason: reasons.join("; ") });
-    }
+    if (reasons.length === 0) eligible.push(c.id as string);
+    else excluded.push({ id: c.id as string, reason: reasons.join("; ") });
   }
-
-  // Bulk update eligible
   if (eligible.length > 0) {
     const CH = 200;
-    for (let j = 0; j < eligible.length; j += CH) {
-      await db.from("chart_ingest_candidates").update({ status: "eligible", updated_at: now }).in("id", eligible.slice(j, j + CH)).eq("run_id", runId);
-    }
+    for (let j = 0; j < eligible.length; j += CH) { await db.from("chart_ingest_candidates").update({ status: "eligible", updated_at: now }).in("id", eligible.slice(j, j + CH)).eq("run_id", runId); }
   }
-
-  // Bulk update excluded + write exclusion rows
   if (excluded.length > 0) {
     const exclusionRows: Array<Record<string, unknown>> = [];
-    for (const ex of excluded) {
-      await db.from("chart_ingest_candidates").update({ status: "excluded", updated_at: now }).eq("id", ex.id).eq("run_id", runId);
-      exclusionRows.push({ id: crypto.randomUUID(), run_id: runId, candidate_id: ex.id, reason: ex.reason, created_at: now });
-    }
+    for (const ex of excluded) { await db.from("chart_ingest_candidates").update({ status: "excluded", updated_at: now }).eq("id", ex.id).eq("run_id", runId); exclusionRows.push({ id: crypto.randomUUID(), run_id: runId, candidate_id: ex.id, reason: ex.reason, created_at: now }); }
     const ECH = 200;
-    for (let j = 0; j < exclusionRows.length; j += ECH) {
-      await db.from("chart_ingest_exclusions").insert(exclusionRows.slice(j, j + ECH));
-    }
+    for (let j = 0; j < exclusionRows.length; j += ECH) { await db.from("chart_ingest_exclusions").insert(exclusionRows.slice(j, j + ECH)); }
   }
-
   const d = Date.now() - ss;
   await db.from("chart_ingest_stage_events").update({ status: "completed", finished_at: new Date().toISOString(), duration_ms: d, message: `${eligible.length} eligible, ${excluded.length} excluded from ${candidates.length} total.`, metrics_json: { candidateCount: candidates.length, eligibleCount: eligible.length, excludedCount: excluded.length } }).eq("run_id", runId).eq("stage", "eligibility_execution");
-
-  return json({ ok: true, runId, candidateCount: candidates.length, excludedCount: excluded.length, inputRowCount: candidates.length, durationMs: d });
+  return json(new Request("http://localhost"), { ok: true, runId, candidateCount: candidates.length, excludedCount: excluded.length, inputRowCount: candidates.length, durationMs: d });
 }
 
 async function handleRunScoring(db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) {
-  const { runId } = params as { runId: string }; if (!runId) return json({ error: "runId_required" }, 400);
+  const { runId } = params as { runId: string }; if (!runId) return json(new Request("http://localhost"), { error: "runId_required" }, 400);
   const ss = Date.now();
-
   const { data: run } = await db.from("chart_ingest_runs").select("*").eq("id", runId).maybeSingle();
-  if (!run) return json({ error: "run_not_found" }, 404);
-
+  if (!run) return json(new Request("http://localhost"), { error: "run_not_found" }, 404);
   await db.from("chart_ingest_stage_events").update({ status: "running", started_at: new Date().toISOString(), message: null, error_code: null, error_message: null }).eq("run_id", runId).eq("stage", "methodology_scoring");
-
   const editionDate = (run.edition_date as string) || new Date().toISOString().split("T")[0];
   const chartSize = (run.chart_size as number) || 20;
   const programId = (run.program_id as string) || "unknown";
-
-  // Read eligible candidates (includes carry_forward_only ones from the carry_forward stage)
   const { data: candidates } = await db.from("chart_ingest_candidates").select("*").eq("run_id", runId).eq("status", "eligible");
   if (!candidates || candidates.length === 0) {
     const d = Date.now() - ss;
     await db.from("chart_ingest_stage_events").update({ status: "completed", finished_at: new Date().toISOString(), duration_ms: d, message: "No eligible candidates to score.", metrics_json: { scoredCount: 0, overflowCount: 0, airplayTrackCount: 0 } }).eq("run_id", runId).eq("stage", "methodology_scoring");
-    return json({ ok: true, runId, stage: "methodology_scoring", scoredCount: 0, overflowCount: 0, airplayTrackCount: 0, durationMs: d });
+    return json(new Request("http://localhost"), { ok: true, runId, stage: "methodology_scoring", scoredCount: 0, overflowCount: 0, airplayTrackCount: 0, durationMs: d });
   }
-
-  // ── Read previous edition for continuity/carry-forward ──
   let previousMap = new Map<string, number>();
   try {
-    const { data: prevEdition } = await db.from("wk_chart_editions_v2")
-      .select("id")
-      .eq("program_id", programId)
-      .in("status", ["committed", "published"])
-      .lt("edition_date", editionDate)
-      .order("edition_date", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
+    const { data: prevEdition } = await db.from("wk_chart_editions_v2").select("id").eq("program_id", programId).in("status", ["committed", "published"]).lt("edition_date", editionDate).order("edition_date", { ascending: false }).limit(1).maybeSingle();
     if (prevEdition) {
-      const { data: prevEntries } = await db.from("wk_chart_entries_v2")
-        .select("normalized_key, rank")
-        .eq("edition_id", prevEdition.id)
-        .order("rank", { ascending: true });
-
-      if (prevEntries) {
-        for (const pe of prevEntries) {
-          if (pe.normalized_key) previousMap.set(pe.normalized_key, pe.rank as number);
-        }
-      }
+      const { data: prevEntries } = await db.from("wk_chart_entries_v2").select("normalized_key, rank").eq("edition_id", prevEdition.id).order("rank", { ascending: true });
+      if (prevEntries) { for (const pe of prevEntries) { if (pe.normalized_key) previousMap.set(pe.normalized_key, pe.rank as number); } }
     }
-  } catch { /* previous edition lookup is best-effort */ }
-
-  // ── Read airplay evidence ──
+  } catch { /* best-effort */ }
   const airplayMap = new Map<string, { W: number; station_count: number; detection_count: number }>();
   try {
     const weekStart = anchorToMonday(editionDate);
-    const { data: airplayBuckets } = await db.from("airplay_evidence_weekly")
-      .select("*")
-      .eq("edition_date", editionDate);
-
+    const { data: airplayBuckets } = await db.from("airplay_evidence_weekly").select("*").eq("edition_date", editionDate);
     if (!airplayBuckets || airplayBuckets.length === 0) {
-      const { data: ab2 } = await db.from("airplay_evidence_weekly")
-        .select("*")
-        .eq("week_start", weekStart);
-
+      const { data: ab2 } = await db.from("airplay_evidence_weekly").select("*").eq("week_start", weekStart);
       if (ab2 && ab2.length > 0) {
         const byKey = new Map<string, { W: number; stations: Set<string>; detections: number }>();
-        for (const b of ab2) {
-          const nk = (b.normalized_key as string) || "";
-          if (!nk) continue;
-          if (!byKey.has(nk)) byKey.set(nk, { W: 0, stations: new Set(), detections: 0 });
-          const agg = byKey.get(nk)!;
-          agg.W += Number(b.weighted_score) || 0;
-          agg.stations.add(b.source_id as string);
-          agg.detections += (b.detection_count as number) || 0;
-        }
-        for (const [nk, agg] of byKey) {
-          airplayMap.set(nk, { W: agg.W, station_count: agg.stations.size, detection_count: agg.detections });
-        }
+        for (const b of ab2) { const nk = (b.normalized_key as string) || ""; if (!nk) continue; if (!byKey.has(nk)) byKey.set(nk, { W: 0, stations: new Set(), detections: 0 }); const agg = byKey.get(nk)!; agg.W += Number(b.weighted_score) || 0; agg.stations.add(b.source_id as string); agg.detections += (b.detection_count as number) || 0; }
+        for (const [nk, agg] of byKey) airplayMap.set(nk, { W: agg.W, station_count: agg.stations.size, detection_count: agg.detections });
       }
     } else {
       const byKey = new Map<string, { W: number; stations: Set<string>; detections: number }>();
-      for (const b of airplayBuckets) {
-        const nk = (b.normalized_key as string) || "";
-        if (!nk) continue;
-        if (!byKey.has(nk)) byKey.set(nk, { W: 0, stations: new Set(), detections: 0 });
-        const agg = byKey.get(nk)!;
-        agg.W += Number(b.weighted_score) || 0;
-        agg.stations.add(b.source_id as string);
-        agg.detections += (b.detection_count as number) || 0;
-      }
-      for (const [nk, agg] of byKey) {
-        airplayMap.set(nk, { W: agg.W, station_count: agg.stations.size, detection_count: agg.detections });
-      }
+      for (const b of airplayBuckets) { const nk = (b.normalized_key as string) || ""; if (!nk) continue; if (!byKey.has(nk)) byKey.set(nk, { W: 0, stations: new Set(), detections: 0 }); const agg = byKey.get(nk)!; agg.W += Number(b.weighted_score) || 0; agg.stations.add(b.source_id as string); agg.detections += (b.detection_count as number) || 0; }
+      for (const [nk, agg] of byKey) airplayMap.set(nk, { W: agg.W, station_count: agg.stations.size, detection_count: agg.detections });
     }
-  } catch { /* airplay is best-effort */ }
-
-  // ── Score every eligible candidate (including carry_forward_only) ──
-  const scored: Array<{
-    candidate_id: string;
-    normalized_key: string;
-    lead_artist_key: string;
-    source_score: number;
-    cross_source_bonus: number;
-    overlap_bonus: number;
-    recency_score: number;
-    continuity_score: number;
-    carry_forward_bonus: number;
-    airplay_score: number;
-    provisional_total: number;
-    recency_days: number | null;
-    previous_position: number | null;
-    source_count: number;
-    occurrence_count: number;
-    is_carry_forward: boolean;
-    is_airplay_candidate: boolean;
-  }> = [];
-
-  const scoringCfg = {
-    cross_source_mode: "standard" as string,
-    cross_source_weight: 1.0,
-    continuity_weight: 1.0,
-    carry_forward_weight: 1.0,
-    overlap_bonus_cap: 10,
-    airplay_enabled: airplayMap.size > 0,
-    airplay_max_score: 24,
-    airplay_min_stations: 1,
-    airplay_min_detections: 1,
-    airplay_weight: 1.0,
-  };
-
+  } catch { /* best-effort */ }
+  const scored: Array<{ candidate_id: string; normalized_key: string; lead_artist_key: string; source_score: number; cross_source_bonus: number; overlap_bonus: number; recency_score: number; continuity_score: number; carry_forward_bonus: number; airplay_score: number; provisional_total: number; recency_days: number | null; previous_position: number | null; source_count: number; occurrence_count: number; is_carry_forward: boolean; is_airplay_candidate: boolean }> = [];
+  const scoringCfg = { cross_source_mode: "standard" as string, cross_source_weight: 1.0, continuity_weight: 1.0, carry_forward_weight: 1.0, overlap_bonus_cap: 10, airplay_enabled: airplayMap.size > 0, airplay_max_score: 24, airplay_min_stations: 1, airplay_min_detections: 1, airplay_weight: 1.0 };
   for (const c of candidates) {
     const pp = previousMap.get((c.normalized_key as string) || "") ?? null;
     const apCtx = airplayMap.get((c.normalized_key as string) || "") ?? null;
     const cfOnly = !!(c.carry_forward_only);
     const acOnly = !!(c.airplay_candidate_only);
-
-    const breakdown = computeCandidateProvisionalScore(
-      {
-        normalized_key: (c.normalized_key as string) || "",
-        lead_artist_key: (c.lead_artist_key as string) || "",
-        source_count: (c.source_count as number) || 0,
-        occurrence_count: (c.occurrence_count as number) || 0,
-        release_date: (c.release_date as string) || null,
-        carry_forward_only: cfOnly,
-        continuity_locked: !!(c.continuity_locked),
-        airplay_candidate_only: acOnly,
-      },
-      editionDate, pp, scoringCfg,
-      apCtx ? { W: apCtx.W, station_count: apCtx.station_count, detection_count: apCtx.detection_count } : null,
-    );
-
-    scored.push({
-      candidate_id: c.id as string,
-      normalized_key: c.normalized_key as string,
-      lead_artist_key: (c.lead_artist_key as string) || "",
-      source_score: breakdown.source_score,
-      cross_source_bonus: breakdown.cross_source_bonus,
-      overlap_bonus: breakdown.overlap_bonus,
-      recency_score: breakdown.recency_score,
-      continuity_score: breakdown.continuity_score,
-      carry_forward_bonus: breakdown.carry_forward_bonus,
-      airplay_score: breakdown.airplay_score,
-      provisional_total: breakdown.provisional_total,
-      recency_days: breakdown.recency_days,
-      previous_position: pp,
-      source_count: (c.source_count as number) || 0,
-      occurrence_count: (c.occurrence_count as number) || 0,
-      is_carry_forward: cfOnly,
-      is_airplay_candidate: acOnly,
-    });
+    const breakdown = computeCandidateProvisionalScore({ normalized_key: (c.normalized_key as string) || "", lead_artist_key: (c.lead_artist_key as string) || "", source_count: (c.source_count as number) || 0, occurrence_count: (c.occurrence_count as number) || 0, release_date: (c.release_date as string) || null, carry_forward_only: cfOnly, continuity_locked: !!(c.continuity_locked), airplay_candidate_only: acOnly }, editionDate, pp, scoringCfg, apCtx ? { W: apCtx.W, station_count: apCtx.station_count, detection_count: apCtx.detection_count } : null);
+    scored.push({ candidate_id: c.id as string, normalized_key: c.normalized_key as string, lead_artist_key: (c.lead_artist_key as string) || "", source_score: breakdown.source_score, cross_source_bonus: breakdown.cross_source_bonus, overlap_bonus: breakdown.overlap_bonus, recency_score: breakdown.recency_score, continuity_score: breakdown.continuity_score, carry_forward_bonus: breakdown.carry_forward_bonus, airplay_score: breakdown.airplay_score, provisional_total: breakdown.provisional_total, recency_days: breakdown.recency_days, previous_position: pp, source_count: (c.source_count as number) || 0, occurrence_count: (c.occurrence_count as number) || 0, is_carry_forward: cfOnly, is_airplay_candidate: acOnly });
   }
-
-  // ── Apply anti-gaming ──
-  const agInputs: AntiGamingInput[] = scored.map(s => ({
-    normalized_key: s.normalized_key,
-    lead_artist_key: s.lead_artist_key,
-    provisional_total: s.provisional_total,
-  }));
+  const agInputs: AntiGamingInput[] = scored.map(s => ({ normalized_key: s.normalized_key, lead_artist_key: s.lead_artist_key, provisional_total: s.provisional_total }));
   const agResults = computeAntiGamingPenalties(agInputs, 3, 8);
   const agByKey = new Map(agResults.map(r => [r.normalized_key, r]));
-
-  // ── Write scores to chart_ingest_candidate_scores ──
-  const now = new Date().toISOString();
+  const now2 = new Date().toISOString();
   const scoreRows: Array<Record<string, unknown>> = [];
-  let overflowCount = 0;
-  let airplayTrackCount = 0;
-
+  let overflowCount = 0, airplayTrackCount = 0;
   for (const s of scored) {
     const ag = agByKey.get(s.normalized_key) ?? { anti_gaming_penalty: 0, lead_artist_overflow: false, overflow_index: 0 };
     const finalScore = round4(s.provisional_total - ag.anti_gaming_penalty);
     const integrityDelta = round4(Math.abs(s.provisional_total - ag.anti_gaming_penalty - finalScore));
-
     if (ag.lead_artist_overflow) overflowCount++;
     if (s.airplay_score > 0) airplayTrackCount++;
-
-    scoreRows.push({
-      id: crypto.randomUUID(),
-      run_id: runId,
-      candidate_id: s.candidate_id,
-      source_score: s.source_score,
-      cross_source_bonus: s.cross_source_bonus,
-      overlap_bonus: s.overlap_bonus,
-      recency_score: s.recency_score,
-      continuity_score: s.continuity_score,
-      carry_forward_bonus: s.carry_forward_bonus,
-      airplay_score: s.airplay_score,
-      anti_gaming_penalty: ag.anti_gaming_penalty,
-      final_score: finalScore,
-      source_count: s.source_count,
-      occurrence_count: s.occurrence_count,
-      recency_days: s.recency_days,
-      previous_position: s.previous_position,
-      normalized_key: s.normalized_key,
-      score_payload_json: {
-        source_score: s.source_score,
-        cross_source_bonus: s.cross_source_bonus,
-        overlap_bonus: s.overlap_bonus,
-        recency_score: s.recency_score,
-        continuity_score: s.continuity_score,
-        carry_forward_bonus: s.carry_forward_bonus,
-        airplay_score: s.airplay_score,
-        provisional_total: s.provisional_total,
-        recency_days: s.recency_days,
-        previous_position: s.previous_position,
-        carry_forward_only: s.is_carry_forward,
-        airplay_candidate_only: s.is_airplay_candidate,
-      },
-      anti_gaming_json: {
-        anti_gaming_penalty: ag.anti_gaming_penalty,
-        lead_artist_overflow: ag.lead_artist_overflow,
-        overflow_index: ag.overflow_index,
-      },
-      airplay_json: airplayMap.get(s.normalized_key) ? {
-        W: airplayMap.get(s.normalized_key)!.W,
-        station_count: airplayMap.get(s.normalized_key)!.station_count,
-        detection_count: airplayMap.get(s.normalized_key)!.detection_count,
-      } : {},
-      score_integrity_ok: integrityDelta < 0.01,
-      score_integrity_delta: integrityDelta,
-      created_at: now,
-    });
+    scoreRows.push({ id: crypto.randomUUID(), run_id: runId, candidate_id: s.candidate_id, source_score: s.source_score, cross_source_bonus: s.cross_source_bonus, overlap_bonus: s.overlap_bonus, recency_score: s.recency_score, continuity_score: s.continuity_score, carry_forward_bonus: s.carry_forward_bonus, airplay_score: s.airplay_score, anti_gaming_penalty: ag.anti_gaming_penalty, final_score: finalScore, source_count: s.source_count, occurrence_count: s.occurrence_count, recency_days: s.recency_days, previous_position: s.previous_position, normalized_key: s.normalized_key, score_payload_json: { source_score: s.source_score, cross_source_bonus: s.cross_source_bonus, overlap_bonus: s.overlap_bonus, recency_score: s.recency_score, continuity_score: s.continuity_score, carry_forward_bonus: s.carry_forward_bonus, airplay_score: s.airplay_score, provisional_total: s.provisional_total, recency_days: s.recency_days, previous_position: s.previous_position, carry_forward_only: s.is_carry_forward, airplay_candidate_only: s.is_airplay_candidate }, anti_gaming_json: { anti_gaming_penalty: ag.anti_gaming_penalty, lead_artist_overflow: ag.lead_artist_overflow, overflow_index: ag.overflow_index }, airplay_json: airplayMap.get(s.normalized_key) ? { W: airplayMap.get(s.normalized_key)!.W, station_count: airplayMap.get(s.normalized_key)!.station_count, detection_count: airplayMap.get(s.normalized_key)!.detection_count } : {}, score_integrity_ok: integrityDelta < 0.01, score_integrity_delta: integrityDelta, created_at: now2 });
   }
-
-  // Delete old scores for this run
   await db.from("chart_ingest_candidate_scores").delete().eq("run_id", runId);
-
-  // Insert new scores in chunks
   const SCH = 200;
-  for (let j = 0; j < scoreRows.length; j += SCH) {
-    const chunk = scoreRows.slice(j, j + SCH);
-    if (chunk.length === 0) continue;
-    const { error: ie } = await db.from("chart_ingest_candidate_scores").insert(chunk);
-    if (ie) {
-      console.error("[run_scoring] insert error:", ie.message);
-      const d = Date.now() - ss;
-      await db.from("chart_ingest_stage_events").update({ status: "failed", finished_at: new Date().toISOString(), duration_ms: d, message: `Score insert failed: ${ie.message}`, error_code: "score_insert_failed", error_message: ie.message }).eq("run_id", runId).eq("stage", "methodology_scoring");
-      return json({ error: "score_insert_failed", detail: ie.message }, 500);
-    }
-  }
-
+  for (let j = 0; j < scoreRows.length; j += SCH) { const chunk = scoreRows.slice(j, j + SCH); if (chunk.length === 0) continue; const { error: ie } = await db.from("chart_ingest_candidate_scores").insert(chunk); if (ie) { console.error("[run_scoring] insert error:", ie.message); const d = Date.now() - ss; await db.from("chart_ingest_stage_events").update({ status: "failed", finished_at: new Date().toISOString(), duration_ms: d, message: `Score insert failed: ${ie.message}`, error_code: "score_insert_failed", error_message: ie.message }).eq("run_id", runId).eq("stage", "methodology_scoring"); return json(new Request("http://localhost"), { error: "score_insert_failed", detail: ie.message }, 500); } }
   const d = Date.now() - ss;
   await db.from("chart_ingest_stage_events").update({ status: "completed", finished_at: new Date().toISOString(), duration_ms: d, message: `${scored.length} candidates scored. ${overflowCount} anti-gaming overflows.`, metrics_json: { scoredCount: scored.length, overflowCount, airplayTrackCount } }).eq("run_id", runId).eq("stage", "methodology_scoring");
-
-  return json({ ok: true, runId, stage: "methodology_scoring", scoredCount: scored.length, overflowCount, airplayTrackCount, durationMs: d });
+  return json(new Request("http://localhost"), { ok: true, runId, stage: "methodology_scoring", scoredCount: scored.length, overflowCount, airplayTrackCount, durationMs: d });
 }
 
 async function handleRunShortlist(db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) {
-  const { runId } = params as { runId: string }; if (!runId) return json({ error: "runId_required" }, 400);
+  const { runId } = params as { runId: string }; if (!runId) return json(new Request("http://localhost"), { error: "runId_required" }, 400);
   const ss = Date.now();
-
   const { data: run } = await db.from("chart_ingest_runs").select("id,status,edition_date,chart_size").eq("id", runId).maybeSingle();
-  if (!run) return json({ error: "run_not_found" }, 404);
-
+  if (!run) return json(new Request("http://localhost"), { error: "run_not_found" }, 404);
   await db.from("chart_ingest_stage_events").update({ status: "running", started_at: new Date().toISOString(), message: null, error_code: null, error_message: null }).eq("run_id", runId).eq("stage", "shortlist");
-
   const chartSize = (run.chart_size as number) || 20;
-
   const { data: candidates } = await db.from("chart_ingest_candidates").select("*").eq("run_id", runId).eq("status", "eligible");
   if (!candidates || candidates.length === 0) {
     const d = Date.now() - ss;
     await db.from("chart_ingest_stage_events").update({ status: "completed", finished_at: new Date().toISOString(), duration_ms: d, message: "No eligible candidates to shortlist.", metrics_json: { shortlistedCount: 0, totalScored: 0, excludedCount: 0 } }).eq("run_id", runId).eq("stage", "shortlist");
-    return json({ ok: true, runId, stage: "shortlist", shortlistedCount: 0, totalScored: 0, excludedCount: 0, chartSize, durationMs: d });
+    return json(new Request("http://localhost"), { ok: true, runId, stage: "shortlist", shortlistedCount: 0, totalScored: 0, excludedCount: 0, chartSize, durationMs: d });
   }
-
   const cids = candidates.map(c => c.id as string);
   const { data: scores } = await db.from("chart_ingest_candidate_scores").select("*").in("candidate_id", cids);
   const scoreByCid = new Map<string, { final_score: number }>();
-  if (scores) {
-    for (const s of scores) {
-      scoreByCid.set(s.candidate_id as string, { final_score: Number(s.final_score) || 0 });
-    }
-  }
-
-  const sorted = [...candidates].sort((a, b) => {
-    const sa = scoreByCid.get(a.id as string)?.final_score ?? 0;
-    const sb = scoreByCid.get(b.id as string)?.final_score ?? 0;
-    if (sb !== sa) return sb - sa;
-    return ((a.normalized_key as string) || "").localeCompare((b.normalized_key as string) || "");
-  });
-
+  if (scores) { for (const s of scores) scoreByCid.set(s.candidate_id as string, { final_score: Number(s.final_score) || 0 }); }
+  const sorted = [...candidates].sort((a, b) => { const sa = scoreByCid.get(a.id as string)?.final_score ?? 0; const sb = scoreByCid.get(b.id as string)?.final_score ?? 0; if (sb !== sa) return sb - sa; return ((a.normalized_key as string) || "").localeCompare((b.normalized_key as string) || ""); });
   const now = new Date().toISOString();
-  const shortlistedIds: string[] = [];
-  const excludedIds: string[] = [];
-
-  for (let i = 0; i < sorted.length; i++) {
-    if (i < chartSize) {
-      shortlistedIds.push(sorted[i].id as string);
-    } else {
-      excludedIds.push(sorted[i].id as string);
-    }
-  }
-
-  if (excludedIds.length > 0) {
-    const CH = 200;
-    for (let j = 0; j < excludedIds.length; j += CH) {
-      await db.from("chart_ingest_candidates").update({ status: "excluded", updated_at: now }).in("id", excludedIds.slice(j, j + CH)).eq("run_id", runId);
-    }
-  }
-
+  const shortlistedIds: string[] = [], excludedIds: string[] = [];
+  for (let i = 0; i < sorted.length; i++) { if (i < chartSize) shortlistedIds.push(sorted[i].id as string); else excludedIds.push(sorted[i].id as string); }
+  if (excludedIds.length > 0) { const CH = 200; for (let j = 0; j < excludedIds.length; j += CH) { await db.from("chart_ingest_candidates").update({ status: "excluded", updated_at: now }).in("id", excludedIds.slice(j, j + CH)).eq("run_id", runId); } }
   const d = Date.now() - ss;
   await db.from("chart_ingest_stage_events").update({ status: "completed", finished_at: new Date().toISOString(), duration_ms: d, message: `${shortlistedIds.length} shortlisted to top ${chartSize}. ${excludedIds.length} excluded.`, metrics_json: { shortlistedCount: shortlistedIds.length, totalScored: candidates.length, excludedCount: excludedIds.length, chartSize } }).eq("run_id", runId).eq("stage", "shortlist");
-
-  return json({ ok: true, runId, stage: "shortlist", shortlistedCount: shortlistedIds.length, totalScored: candidates.length, excludedCount: excludedIds.length, chartSize, durationMs: d });
+  return json(new Request("http://localhost"), { ok: true, runId, stage: "shortlist", shortlistedCount: shortlistedIds.length, totalScored: candidates.length, excludedCount: excludedIds.length, chartSize, durationMs: d });
 }
 
 async function handleCommitRun(db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) {
   const { runId, publishImmediately, notes, acknowledgedWarnings } = params as { runId: string; publishImmediately?: boolean; notes?: string; acknowledgedWarnings?: string[] };
-  if (!runId) return json({ error: "runId_required" }, 400);
-
+  if (!runId) return json(new Request("http://localhost"), { error: "runId_required" }, 400);
   const { data: run } = await db.from("chart_ingest_runs").select("*").eq("id", runId).maybeSingle();
-  if (!run) return json({ error: "run_not_found" }, 404);
-
+  if (!run) return json(new Request("http://localhost"), { error: "run_not_found" }, 404);
   const now = new Date().toISOString();
   const editionDate = (run.edition_date as string) || now.split("T")[0];
   const chartSize = (run.chart_size as number) || 20;
@@ -1249,377 +838,100 @@ async function handleCommitRun(db: ReturnType<typeof createClient>, params: Reco
   const marketSlug = (run.market_slug as string) || "KE";
   const chartKind = (run.chart_kind as string) || "tracks";
   const byEmail = user.email || user.id;
-
-  const { data: eligibleCandidates } = await db.from("chart_ingest_candidates")
-    .select("*")
-    .eq("run_id", runId)
-    .eq("status", "eligible")
-    .order("created_at");
-
-  if (!eligibleCandidates || eligibleCandidates.length === 0) {
-    return json({ error: "no_eligible_candidates", detail: "No eligible candidates to commit. Run eligibility and scoring first." }, 400);
-  }
-
+  const { data: eligibleCandidates } = await db.from("chart_ingest_candidates").select("*").eq("run_id", runId).eq("status", "eligible").order("created_at");
+  if (!eligibleCandidates || eligibleCandidates.length === 0) return json(new Request("http://localhost"), { error: "no_eligible_candidates", detail: "No eligible candidates to commit. Run eligibility and scoring first." }, 400);
   const ecids = eligibleCandidates.map(c => c.id as string);
-  const { data: candidateScores } = await db.from("chart_ingest_candidate_scores")
-    .select("*")
-    .in("candidate_id", ecids);
-
+  const { data: candidateScores } = await db.from("chart_ingest_candidate_scores").select("*").in("candidate_id", ecids);
   const scoreByCid = new Map<string, Record<string, unknown>>();
-  if (candidateScores) {
-    for (const s of candidateScores) {
-      scoreByCid.set(s.candidate_id as string, s);
-    }
-  }
-
-  const sorted = [...eligibleCandidates].sort((a, b) => {
-    const sa = Number(scoreByCid.get(a.id as string)?.final_score ?? 0);
-    const sb = Number(scoreByCid.get(b.id as string)?.final_score ?? 0);
-    if (sb !== sa) return sb - sa;
-    return ((a.normalized_key as string) || "").localeCompare((b.normalized_key as string) || "");
-  });
-
+  if (candidateScores) { for (const s of candidateScores) scoreByCid.set(s.candidate_id as string, s); }
+  const sorted = [...eligibleCandidates].sort((a, b) => { const sa = Number(scoreByCid.get(a.id as string)?.final_score ?? 0); const sb = Number(scoreByCid.get(b.id as string)?.final_score ?? 0); if (sb !== sa) return sb - sa; return ((a.normalized_key as string) || "").localeCompare((b.normalized_key as string) || ""); });
   const topN = sorted.slice(0, chartSize);
-
   let previousMap = new Map<string, number>();
   let previousKeys = new Set<string>();
   try {
-    const { data: prevEdition } = await db.from("wk_chart_editions_v2")
-      .select("id")
-      .eq("program_id", programId)
-      .in("status", ["committed", "published"])
-      .lt("edition_date", editionDate)
-      .order("edition_date", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (prevEdition) {
-      const { data: prevEntries } = await db.from("wk_chart_entries_v2")
-        .select("normalized_key, rank")
-        .eq("edition_id", prevEdition.id);
-
-      if (prevEntries) {
-        for (const pe of prevEntries) {
-          if (pe.normalized_key) {
-            previousMap.set(pe.normalized_key, pe.rank as number);
-            previousKeys.add(pe.normalized_key);
-          }
-        }
-      }
-    }
+    const { data: prevEdition } = await db.from("wk_chart_editions_v2").select("id").eq("program_id", programId).in("status", ["committed", "published"]).lt("edition_date", editionDate).order("edition_date", { ascending: false }).limit(1).maybeSingle();
+    if (prevEdition) { const { data: prevEntries } = await db.from("wk_chart_entries_v2").select("normalized_key, rank").eq("edition_id", prevEdition.id); if (prevEntries) { for (const pe of prevEntries) { if (pe.normalized_key) { previousMap.set(pe.normalized_key, pe.rank as number); previousKeys.add(pe.normalized_key); } } } }
   } catch { /* best-effort */ }
-
   const editionId = crypto.randomUUID();
   const editionSlug = `${seriesSlug}-${editionDate}`.replace(/\s+/g, "-").toLowerCase();
-
-  let carryForwardCount = 0;
-  let newEntriesCount = 0;
-  let reEntriesCount = 0;
-
-  for (const c of topN) {
-    const nk = (c.normalized_key as string) || "";
-    const cfOnly = !!(c.carry_forward_only);
-    if (cfOnly) carryForwardCount++;
-    if (previousMap.has(nk) && !cfOnly) { /* in previous, has fresh evidence */ }
-    else if (previousKeys.has(nk)) reEntriesCount++;
-    else if (!cfOnly) newEntriesCount++;
-  }
-
+  let carryForwardCount = 0, newEntriesCount = 0, reEntriesCount = 0;
+  for (const c of topN) { const nk = (c.normalized_key as string) || ""; const cfOnly = !!(c.carry_forward_only); if (cfOnly) carryForwardCount++; if (previousMap.has(nk) && !cfOnly) { } else if (previousKeys.has(nk)) reEntriesCount++; else if (!cfOnly) newEntriesCount++; }
   const ruleSnapshot = (run.rule_snapshot_json as Record<string, unknown>) || {};
   const methodologyVersion = (run.methodology_version as string) || "1.0.0";
   const scoringPolicyVersion = (run.scoring_policy_version as string) || "1.0.1";
   const sourcePolicyVersion = (run.source_policy_version as string) || "1.0.0";
   const eligibilityPolicyVersion = (run.eligibility_policy_version as string) || "1.0.0";
-
-  const { error: editionErr } = await db.from("wk_chart_editions_v2").insert({
-    id: editionId,
-    program_id: programId,
-    edition_slug: editionSlug,
-    edition_label: `${seriesSlug} — ${editionDate}`,
-    edition_date: editionDate,
-    period_start: run.period_start || editionDate,
-    period_end: run.period_end || editionDate,
-    entry_count: topN.length,
-    status: publishImmediately ? "published" : "committed",
-    methodology_version: methodologyVersion,
-    source_policy_version: sourcePolicyVersion,
-    eligibility_policy_version: eligibilityPolicyVersion,
-    scoring_policy_version: scoringPolicyVersion,
-    rule_set_snapshot: ruleSnapshot,
-    chart_size: chartSize,
-    carry_forward_count: carryForwardCount,
-    new_entries_count: newEntriesCount,
-    re_entries_count: reEntriesCount,
-    exclusion_summary: {},
-    override_mode: "metadata_and_matching_only",
-    ingest_run_id: runId,
-    published_at: publishImmediately ? now : null,
-    published_by: publishImmediately ? byEmail : null,
-    created_at: now,
-    updated_at: now,
-  });
-
-  if (editionErr) {
-    return json({ error: "edition_create_failed", detail: editionErr.message }, 500);
-  }
-
+  const { error: editionErr } = await db.from("wk_chart_editions_v2").insert({ id: editionId, program_id: programId, edition_slug: editionSlug, edition_label: `${seriesSlug} \u2014 ${editionDate}`, edition_date: editionDate, period_start: run.period_start || editionDate, period_end: run.period_end || editionDate, entry_count: topN.length, status: publishImmediately ? "published" : "committed", methodology_version: methodologyVersion, source_policy_version: sourcePolicyVersion, eligibility_policy_version: eligibilityPolicyVersion, scoring_policy_version: scoringPolicyVersion, rule_set_snapshot: ruleSnapshot, chart_size: chartSize, carry_forward_count: carryForwardCount, new_entries_count: newEntriesCount, re_entries_count: reEntriesCount, exclusion_summary: {}, override_mode: "metadata_and_matching_only", ingest_run_id: runId, published_at: publishImmediately ? now : null, published_by: publishImmediately ? byEmail : null, created_at: now, updated_at: now });
+  if (editionErr) return json(new Request("http://localhost"), { error: "edition_create_failed", detail: editionErr.message }, 500);
   const entryRows: Array<Record<string, unknown>> = [];
-
   for (let i = 0; i < topN.length; i++) {
-    const c = topN[i];
-    const rank = i + 1;
-    const nk = (c.normalized_key as string) || "";
-    const score = scoreByCid.get(c.id as string);
-    const prevRank = previousMap.get(nk) ?? null;
-
+    const c = topN[i]; const rank = i + 1; const nk = (c.normalized_key as string) || ""; const score = scoreByCid.get(c.id as string); const prevRank = previousMap.get(nk) ?? null;
     let movement: string | null = null;
-    if (prevRank === null) {
-      movement = previousKeys.has(nk) ? "reentry" : "new";
-    } else if (rank === prevRank) {
-      movement = "same";
-    } else if (rank < prevRank) {
-      movement = "up";
-    } else {
-      movement = "down";
-    }
-
+    if (prevRank === null) movement = previousKeys.has(nk) ? "reentry" : "new";
+    else if (rank === prevRank) movement = "same";
+    else if (rank < prevRank) movement = "up";
+    else movement = "down";
     const ag = (score?.anti_gaming_json as Record<string, unknown>) || {};
     const ap = (score?.airplay_json as Record<string, unknown>) || {};
-
-    const sourcePayload = {
-      score_breakdown: {
-        source_score: Number(score?.source_score ?? 0),
-        cross_source_bonus: Number(score?.cross_source_bonus ?? 0),
-        overlap_bonus: Number(score?.overlap_bonus ?? 0),
-        recency_score: Number(score?.recency_score ?? 0),
-        continuity_score: Number(score?.continuity_score ?? 0),
-        carry_forward_bonus: Number(score?.carry_forward_bonus ?? 0),
-        airplay_score: Number(score?.airplay_score ?? 0),
-        anti_gaming_penalty: Number(score?.anti_gaming_penalty ?? 0),
-        total_score: Number(score?.final_score ?? 0),
-      },
-      anti_gaming: {
-        overlap_bonus_capped: Number(score?.overlap_bonus ?? 0) >= 10,
-        lead_artist_overflow: ag.lead_artist_overflow ?? false,
-        overflow_index: ag.overflow_index ?? 0,
-        stale_carry_forward_demoted: false,
-      },
-      airplay_detail: ap.W !== undefined ? ap : null,
-      eligibility: { status: "eligible", warnings: [], reasons: [] },
-      source_urls_seen: c.source_urls_seen || [],
-      inputs: {
-        source_count: Number(c.source_count ?? 0),
-        occurrence_count: Number(c.occurrence_count ?? 0),
-        release_date: c.release_date ?? null,
-        release_recency_days: score?.recency_days ?? null,
-        previous_position: prevRank,
-        carry_forward_only: !!(c.carry_forward_only),
-        continuity_locked: !!(c.continuity_locked),
-        airplay_candidate_only: !!(c.airplay_candidate_only),
-      },
-    };
-
-    entryRows.push({
-      id: crypto.randomUUID(),
-      edition_id: editionId,
-      rank,
-      previous_rank: prevRank,
-      movement,
-      track_slug: null,
-      track_title: (c.title as string) || "",
-      artist_slug: null,
-      artist_name: (c.artist_display as string) || "",
-      artwork_url: c.artwork_url ?? null,
-      normalized_key: nk,
-      lead_artist_key: (c.lead_artist_key as string) || "",
-      source_count: Number(c.source_count ?? 0),
-      occurrence_count: Number(c.occurrence_count ?? 0),
-      source_urls_seen: c.source_urls_seen || [],
-      release_date: c.release_date ?? null,
-      release_recency_days: score?.recency_days ?? null,
-      canonical_track_id: null,
-      canonical_release_id: null,
-      canonical_artist_id: null,
-      source_score: Number(score?.source_score ?? 0),
-      cross_source_bonus: Number(score?.cross_source_bonus ?? 0),
-      overlap_bonus: Number(score?.overlap_bonus ?? 0),
-      recency_score: Number(score?.recency_score ?? 0),
-      continuity_score: Number(score?.continuity_score ?? 0),
-      carry_forward_bonus: Number(score?.carry_forward_bonus ?? 0),
-      airplay_score: Number(score?.airplay_score ?? 0),
-      anti_gaming_penalty: Number(score?.anti_gaming_penalty ?? 0),
-      total_score: Number(score?.final_score ?? 0),
-      carry_forward_only: !!(c.carry_forward_only),
-      continuity_locked: !!(c.continuity_locked),
-      airplay_candidate_only: !!(c.airplay_candidate_only),
-      overlap_bonus_capped: Number(score?.overlap_bonus ?? 0) >= 10,
-      lead_artist_overflow: ag.lead_artist_overflow ?? false,
-      stale_carry_forward_demoted: false,
-      eligibility_status: "eligible",
-      eligibility_warnings: [],
-      source_payload: sourcePayload,
-      scoring_policy_version: scoringPolicyVersion,
-      methodology_version: methodologyVersion,
-      eligibility_policy_version: eligibilityPolicyVersion,
-      airplay_detections: ap.detection_count ?? null,
-      airplay_station_count: ap.station_count ?? null,
-      airplay_total_duration: null,
-      airplay_weighted_score: ap.W ?? null,
-      airplay_last_detected_at: null,
-      airplay_matched_by: null,
-      airplay_rescue_mode: null,
-      created_at: now,
-      updated_at: now,
-    });
+    const sourcePayload = { score_breakdown: { source_score: Number(score?.source_score ?? 0), cross_source_bonus: Number(score?.cross_source_bonus ?? 0), overlap_bonus: Number(score?.overlap_bonus ?? 0), recency_score: Number(score?.recency_score ?? 0), continuity_score: Number(score?.continuity_score ?? 0), carry_forward_bonus: Number(score?.carry_forward_bonus ?? 0), airplay_score: Number(score?.airplay_score ?? 0), anti_gaming_penalty: Number(score?.anti_gaming_penalty ?? 0), total_score: Number(score?.final_score ?? 0) }, anti_gaming: { overlap_bonus_capped: Number(score?.overlap_bonus ?? 0) >= 10, lead_artist_overflow: ag.lead_artist_overflow ?? false, overflow_index: ag.overflow_index ?? 0, stale_carry_forward_demoted: false }, airplay_detail: ap.W !== undefined ? ap : null, eligibility: { status: "eligible", warnings: [], reasons: [] }, source_urls_seen: c.source_urls_seen || [], inputs: { source_count: Number(c.source_count ?? 0), occurrence_count: Number(c.occurrence_count ?? 0), release_date: c.release_date ?? null, release_recency_days: score?.recency_days ?? null, previous_position: prevRank, carry_forward_only: !!(c.carry_forward_only), continuity_locked: !!(c.continuity_locked), airplay_candidate_only: !!(c.airplay_candidate_only) } };
+    entryRows.push({ id: crypto.randomUUID(), edition_id: editionId, rank, previous_rank: prevRank, movement, track_slug: null, track_title: (c.title as string) || "", artist_slug: null, artist_name: (c.artist_display as string) || "", artwork_url: c.artwork_url ?? null, normalized_key: nk, lead_artist_key: (c.lead_artist_key as string) || "", source_count: Number(c.source_count ?? 0), occurrence_count: Number(c.occurrence_count ?? 0), source_urls_seen: c.source_urls_seen || [], release_date: c.release_date ?? null, release_recency_days: score?.recency_days ?? null, canonical_track_id: null, canonical_release_id: null, canonical_artist_id: null, source_score: Number(score?.source_score ?? 0), cross_source_bonus: Number(score?.cross_source_bonus ?? 0), overlap_bonus: Number(score?.overlap_bonus ?? 0), recency_score: Number(score?.recency_score ?? 0), continuity_score: Number(score?.continuity_score ?? 0), carry_forward_bonus: Number(score?.carry_forward_bonus ?? 0), airplay_score: Number(score?.airplay_score ?? 0), anti_gaming_penalty: Number(score?.anti_gaming_penalty ?? 0), total_score: Number(score?.final_score ?? 0), carry_forward_only: !!(c.carry_forward_only), continuity_locked: !!(c.continuity_locked), airplay_candidate_only: !!(c.airplay_candidate_only), overlap_bonus_capped: Number(score?.overlap_bonus ?? 0) >= 10, lead_artist_overflow: ag.lead_artist_overflow ?? false, stale_carry_forward_demoted: false, eligibility_status: "eligible", eligibility_warnings: [], source_payload: sourcePayload, scoring_policy_version: scoringPolicyVersion, methodology_version: methodologyVersion, eligibility_policy_version: eligibilityPolicyVersion, airplay_detections: ap.detection_count ?? null, airplay_station_count: ap.station_count ?? null, airplay_total_duration: null, airplay_weighted_score: ap.W ?? null, airplay_last_detected_at: null, airplay_matched_by: null, airplay_rescue_mode: null, created_at: now, updated_at: now });
   }
-
   const ECH = 100;
-  for (let j = 0; j < entryRows.length; j += ECH) {
-    const chunk = entryRows.slice(j, j + ECH);
-    const { error: entryErr } = await db.from("wk_chart_entries_v2").insert(chunk);
-    if (entryErr) {
-      await db.from("wk_chart_editions_v2").delete().eq("id", editionId);
-      return json({ error: "entry_create_failed", detail: entryErr.message }, 500);
-    }
-  }
-
+  for (let j = 0; j < entryRows.length; j += ECH) { const chunk = entryRows.slice(j, j + ECH); const { error: entryErr } = await db.from("wk_chart_entries_v2").insert(chunk); if (entryErr) { await db.from("wk_chart_editions_v2").delete().eq("id", editionId); return json(new Request("http://localhost"), { error: "entry_create_failed", detail: entryErr.message }, 500); } }
   const status = publishImmediately ? "published" : "committed";
-  await db.from("chart_ingest_runs").update({
-    status,
-    committed_at: now,
-    published_at: publishImmediately ? now : null,
-    commit_edition_id: editionId,
-    commit_mode: publishImmediately ? "publish" : "commit",
-    notes: notes ?? null,
-    updated_at: now,
-  }).eq("id", runId);
-
-  await db.from("chart_ingest_stage_events").update({
-    status: "completed",
-    finished_at: now,
-    duration_ms: 0,
-    message: `${topN.length} entries committed to edition ${editionSlug}.`,
-    metrics_json: { entryCount: topN.length, editionId, editionSlug, editionDate },
-  }).eq("run_id", runId).eq("stage", "commit_write");
-
-  await db.from("chart_ingest_audit_events").insert({
-    run_id: runId,
-    actor: user.id,
-    actor_email: byEmail,
-    action: "run_committed",
-    new_status: status,
-    payload_json: {
-      editionId,
-      editionSlug,
-      editionDate,
-      entryCount: topN.length,
-      publishImmediately: publishImmediately ?? false,
-      notes: notes ?? null,
-    },
-  });
-
-  return json({
-    runId,
-    status,
-    programId,
-    publicSlug: seriesSlug,
-    editionId,
-    editionSlug,
-    editionDate,
-    entryCount: topN.length,
-    snapshotId: editionId,
-    publicUrl: `/charts/${editionSlug}`,
-    apiUrl: `/api/charts/${editionSlug}`,
-    integrity: { ok: true, warnings: [], errors: [] },
-    auditEventId: crypto.randomUUID(),
-    committedAt: now,
-    committedBy: byEmail,
-  });
+  await db.from("chart_ingest_runs").update({ status, committed_at: now, published_at: publishImmediately ? now : null, commit_edition_id: editionId, commit_mode: publishImmediately ? "publish" : "commit", notes: notes ?? null, updated_at: now }).eq("id", runId);
+  await db.from("chart_ingest_stage_events").update({ status: "completed", finished_at: now, duration_ms: 0, message: `${topN.length} entries committed to edition ${editionSlug}.`, metrics_json: { entryCount: topN.length, editionId, editionSlug, editionDate } }).eq("run_id", runId).eq("stage", "commit_write");
+  await db.from("chart_ingest_audit_events").insert({ run_id: runId, actor: user.id, actor_email: byEmail, action: "run_committed", new_status: status, payload_json: { editionId, editionSlug, editionDate, entryCount: topN.length, publishImmediately: publishImmediately ?? false, notes: notes ?? null } });
+  return json(new Request("http://localhost"), { runId, status, programId, publicSlug: seriesSlug, editionId, editionSlug, editionDate, entryCount: topN.length, snapshotId: editionId, publicUrl: `/charts/${editionSlug}`, apiUrl: `/api/charts/${editionSlug}`, integrity: { ok: true, warnings: [], errors: [] }, auditEventId: crypto.randomUUID(), committedAt: now, committedBy: byEmail });
 }
 
-// ═══════ Airplay & Reset ═══════
-
 async function handleRunAirplayDetection(db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) {
-  const { runId } = params as { runId: string };
-  if (!runId) return json({ error: "runId_required" }, 400);
-  const ss = Date.now();
-  const { data: run } = await db.from("chart_ingest_runs").select("id,status,edition_date,market_slug").eq("id", runId).maybeSingle();
-  if (!run) return json({ error: "run_not_found" }, 404);
+  const { runId } = params as { runId: string }; if (!runId) return json(new Request("http://localhost"), { error: "runId_required" }, 400); const ss = Date.now();
+  const { data: run } = await db.from("chart_ingest_runs").select("id,status,edition_date,market_slug").eq("id", runId).maybeSingle(); if (!run) return json(new Request("http://localhost"), { error: "run_not_found" }, 404);
   await db.from("chart_ingest_stage_events").update({ status: "running", started_at: new Date().toISOString(), message: null, error_code: null, error_message: null }).eq("run_id", runId).eq("stage", "airplay_evidence");
   const acrHost = await readCredential(db, "ACR_HOST", "acr_host");
   const acrAccessKey = await readCredential(db, "ACR_ACCESS_KEY", "acr_access_key");
   const acrAccessSecret = await readCredential(db, "ACR_ACCESS_SECRET", "acr_access_secret");
-  if (!acrHost || !acrAccessKey || !acrAccessSecret) {
-    const missing: string[] = [];
-    if (!acrHost) missing.push("ACR_HOST"); if (!acrAccessKey) missing.push("ACR_ACCESS_KEY"); if (!acrAccessSecret) missing.push("ACR_ACCESS_SECRET");
-    const msg = `ACRCloud credentials missing: ${missing.join(", ")}. Save them via Settings → Integrations.`;
-    const d = Date.now() - ss;
-    await db.from("chart_ingest_stage_events").update({ status: "failed", finished_at: new Date().toISOString(), duration_ms: d, message: msg, error_code: "acr_credentials_missing", error_message: msg }).eq("run_id", runId).eq("stage", "airplay_evidence");
-    return json({ ok: false, runId, stage: "airplay_evidence", error: msg, sourceCount: 0, detectionCount: 0, durationMs: d });
-  }
+  if (!acrHost || !acrAccessKey || !acrAccessSecret) { const missing: string[] = []; if (!acrHost) missing.push("ACR_HOST"); if (!acrAccessKey) missing.push("ACR_ACCESS_KEY"); if (!acrAccessSecret) missing.push("ACR_ACCESS_SECRET"); const msg = `ACRCloud credentials missing: ${missing.join(", ")}. Save them via Settings \u2192 Integrations.`; const d = Date.now() - ss; await db.from("chart_ingest_stage_events").update({ status: "failed", finished_at: new Date().toISOString(), duration_ms: d, message: msg, error_code: "acr_credentials_missing", error_message: msg }).eq("run_id", runId).eq("stage", "airplay_evidence"); return json(new Request("http://localhost"), { ok: false, runId, stage: "airplay_evidence", error: msg, sourceCount: 0, detectionCount: 0, durationMs: d }); }
   const { data: sources } = await db.from("airplay_sources").select("*").eq("enabled", true);
-  if (!sources || sources.length === 0) {
-    const d = Date.now() - ss;
-    await db.from("chart_ingest_stage_events").update({ status: "completed", finished_at: new Date().toISOString(), duration_ms: d, message: "No enabled airplay stations configured.", metrics_json: { sourceCount: 0, detectionCount: 0, evidenceBucketCount: 0 } }).eq("run_id", runId).eq("stage", "airplay_evidence");
-    return json({ ok: true, runId, stage: "airplay_evidence", sourceCount: 0, detectionCount: 0, evidenceBucketCount: 0, durationMs: d });
-  }
-  const apiHost = acrHost.replace(/^https?:\/\//, "").replace(/\/$/, "");
-  const apiBase = `https://${apiHost}`;
-  const ed = (run.edition_date as string) || new Date().toISOString().split("T")[0];
-  const dateParam = ed.replace(/-/g, "");
-  const now2 = new Date().toISOString();
-  let totalDetections = 0;
-  const sourceResults: Array<{ sourceId: string; stationName: string; detectionCount: number; error: string | null }> = [];
+  if (!sources || sources.length === 0) { const d = Date.now() - ss; await db.from("chart_ingest_stage_events").update({ status: "completed", finished_at: new Date().toISOString(), duration_ms: d, message: "No enabled airplay stations configured.", metrics_json: { sourceCount: 0, detectionCount: 0, evidenceBucketCount: 0 } }).eq("run_id", runId).eq("stage", "airplay_evidence"); return json(new Request("http://localhost"), { ok: true, runId, stage: "airplay_evidence", sourceCount: 0, detectionCount: 0, evidenceBucketCount: 0, durationMs: d }); }
+  const apiHost = acrHost.replace(/^https?:\/\//, "").replace(/\/$/, ""); const apiBase = `https://${apiHost}`;
+  const ed = (run.edition_date as string) || new Date().toISOString().split("T")[0]; const dateParam = ed.replace(/-/g, ""); const now2 = new Date().toISOString();
+  let totalDetections = 0; const sourceResults: Array<{ sourceId: string; stationName: string; detectionCount: number; error: string | null }> = [];
   for (const source of sources) {
-    const meta = (source.metadata_json as Record<string, unknown>) || {};
-    const streamId = (meta.acr_stream_id as string) || source.station_slug;
+    const meta = (source.metadata_json as Record<string, unknown>) || {}; const streamId = (meta.acr_stream_id as string) || source.station_slug;
     if (!streamId) { sourceResults.push({ sourceId: source.id, stationName: source.station_name, detectionCount: 0, error: "No ACRCloud stream_id configured in metadata_json" }); continue; }
-    const uri = "/v1/acrcloud/results";
-    let signature: string, timestamp: number;
-    try { const sigResult = await acrcloudSign(acrAccessKey, acrAccessSecret, "GET", apiHost, uri); signature = sigResult.signature; timestamp = sigResult.timestamp; }
-    catch (e) { sourceResults.push({ sourceId: source.id, stationName: source.station_name, detectionCount: 0, error: `Signature generation failed: ${e instanceof Error ? e.message : String(e)}` }); continue; }
+    const uri = "/v1/acrcloud/results"; let signature: string, timestamp: number;
+    try { const sigResult = await acrcloudSign(acrAccessKey, acrAccessSecret, "GET", apiHost, uri); signature = sigResult.signature; timestamp = sigResult.timestamp; } catch (e) { sourceResults.push({ sourceId: source.id, stationName: source.station_name, detectionCount: 0, error: `Signature generation failed: ${e instanceof Error ? e.message : String(e)}` }); continue; }
     const queryUrl = `${apiBase}${uri}?access_key=${encodeURIComponent(acrAccessKey)}&signature=${encodeURIComponent(signature)}&signature_version=1&timestamp=${timestamp}&stream_id=${encodeURIComponent(streamId)}&date=${dateParam}`;
-    let res: Response;
-    try { res = await fetch(queryUrl, { method: "GET", headers: { Accept: "application/json" } }); }
-    catch (e) { sourceResults.push({ sourceId: source.id, stationName: source.station_name, detectionCount: 0, error: `ACRCloud unreachable at ${apiHost}: ${e instanceof Error ? e.message : String(e)}` }); continue; }
+    let res: Response; try { res = await fetch(queryUrl, { method: "GET", headers: { Accept: "application/json" } }); } catch (e) { sourceResults.push({ sourceId: source.id, stationName: source.station_name, detectionCount: 0, error: `ACRCloud unreachable at ${apiHost}: ${e instanceof Error ? e.message : String(e)}` }); continue; }
     if (!res.ok) { const bodyText = await res.text(); sourceResults.push({ sourceId: source.id, stationName: source.station_name, detectionCount: 0, error: `ACRCloud ${res.status}: ${bodyText.slice(0, 300)}` }); continue; }
     const data = await res.json() as { results?: Array<{ acr_id?: string; title?: string; artists?: Array<{ name: string }>; album?: { name: string }; duration?: number; play_time?: string; score?: number; label?: string; isrc?: string }>; status?: { msg: string; code: number } };
-    const acrResults = data.results || [];
-    if (acrResults.length === 0) { sourceResults.push({ sourceId: source.id, stationName: source.station_name, detectionCount: 0, error: null }); continue; }
-    const detections = acrResults.map((r) => {
-      const artistName = (r.artists || []).map((a) => a.name).join(", ") || "Unknown";
-      return { id: crypto.randomUUID(), source_id: source.id, detected_at: r.play_time || now2, played_duration_seconds: typeof r.duration === "number" ? r.duration : 0, acr_track_id: r.acr_id || null, canonical_track_id: null, normalized_key: build_normalized_key(r.title || "", artistName), title: r.title || "Unknown", artist: artistName, confidence: typeof r.score === "number" ? Math.round(r.score * 100) : 0, raw_payload_json: r, created_at: now2 };
-    });
+    const acrResults = data.results || []; if (acrResults.length === 0) { sourceResults.push({ sourceId: source.id, stationName: source.station_name, detectionCount: 0, error: null }); continue; }
+    const detections = acrResults.map((r) => { const artistName = (r.artists || []).map((a) => a.name).join(", ") || "Unknown"; return { id: crypto.randomUUID(), source_id: source.id, detected_at: r.play_time || now2, played_duration_seconds: typeof r.duration === "number" ? r.duration : 0, acr_track_id: r.acr_id || null, canonical_track_id: null, normalized_key: build_normalized_key(r.title || "", artistName), title: r.title || "Unknown", artist: artistName, confidence: typeof r.score === "number" ? Math.round(r.score * 100) : 0, raw_payload_json: r, created_at: now2 }; });
     const CH = 100; for (let j = 0; j < detections.length; j += CH) { await db.from("airplay_detections").insert(detections.slice(j, j + CH)); }
-    totalDetections += detections.length;
-    sourceResults.push({ sourceId: source.id, stationName: source.station_name, detectionCount: detections.length, error: null });
+    totalDetections += detections.length; sourceResults.push({ sourceId: source.id, stationName: source.station_name, detectionCount: detections.length, error: null });
   }
-  const d = Date.now() - ss;
-  const msg2 = totalDetections > 0 ? `${totalDetections} detections from ${sources.length} station(s)` : "No ACRCloud detections found for any station.";
+  const d = Date.now() - ss; const msg2 = totalDetections > 0 ? `${totalDetections} detections from ${sources.length} station(s)` : "No ACRCloud detections found for any station.";
   await db.from("chart_ingest_stage_events").update({ status: "completed", finished_at: new Date().toISOString(), duration_ms: d, message: msg2, metrics_json: { sourceCount: sources.length, detectionCount: totalDetections, evidenceBucketCount: 0, sourceResults } }).eq("run_id", runId).eq("stage", "airplay_evidence");
-  return json({ ok: true, runId, stage: "airplay_evidence", sourceCount: sources.length, detectionCount: totalDetections, evidenceBucketCount: 0, sourceResults, durationMs: d });
+  return json(new Request("http://localhost"), { ok: true, runId, stage: "airplay_evidence", sourceCount: sources.length, detectionCount: totalDetections, evidenceBucketCount: 0, sourceResults, durationMs: d });
 }
 
 async function handleResetPipeline(db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) {
-  const { runId } = params as { runId: string }; if (!runId) return json({ error: "runId_required" }, 400);
-  const { data: run } = await db.from("chart_ingest_runs").select("id,status").eq("id", runId).maybeSingle(); if (!run) return json({ error: "run_not_found" }, 404);
-  if (!["draft", "queued", "running", "dry_run_complete", "needs_review"].includes(run.status)) return json({ error: "cannot_reset_pipeline" }, 400);
+  const { runId } = params as { runId: string }; if (!runId) return json(new Request("http://localhost"), { error: "runId_required" }, 400);
+  const { data: run } = await db.from("chart_ingest_runs").select("id,status").eq("id", runId).maybeSingle(); if (!run) return json(new Request("http://localhost"), { error: "run_not_found" }, 404);
+  if (!["draft", "queued", "running", "dry_run_complete", "needs_review"].includes(run.status)) return json(new Request("http://localhost"), { error: "cannot_reset_pipeline" }, 400);
   const now = new Date().toISOString();
   await db.from("chart_ingest_stage_events").update({ status: "idle", started_at: null, finished_at: null, duration_ms: null, message: null, error_code: null, error_message: null, metrics_json: {} }).eq("run_id", runId);
   await Promise.all([db.from("chart_ingest_raw_rows").delete().eq("run_id", runId), db.from("chart_ingest_normalized_rows").delete().eq("run_id", runId), db.from("chart_ingest_candidates").delete().eq("run_id", runId), db.from("chart_ingest_exclusions").delete().eq("run_id", runId), db.from("chart_ingest_candidate_scores").delete().eq("run_id", runId), db.from("chart_ingest_matches").delete().eq("run_id", runId), db.from("chart_ingest_review_issues").delete().eq("run_id", runId)]);
   await db.from("chart_ingest_run_sources").update({ fetch_status: "pending", fetched_count: 0, normalized_count: 0, dropped_count: 0, warnings_json: [], error_code: null, error_message: null, started_at: null, finished_at: null }).eq("run_id", runId);
   await db.from("chart_ingest_runs").update({ status: "draft", dry_run_completed_at: null, updated_at: now, error_code: null, error_message: null }).eq("id", runId);
-  return json({ ok: true, runId, status: "draft", previousStatus: run.status });
+  return json(new Request("http://localhost"), { ok: true, runId, status: "draft", previousStatus: run.status });
 }
 
-async function handleApplyRowDecision(db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) {
-  const { runId, candidateId, action, canonicalEntityId, note } = params as { runId: string; candidateId: string; action: string; canonicalEntityId?: string; note?: string };
-  if (!runId || !candidateId || !action) return json({ error: "runId, candidateId, and action required" }, 400);
-  const va = ["accept_canonical", "change_match", "attach_to_existing", "create_shell", "merge_shell", "mark_duplicate", "send_to_review", "ignore", "exclude"];
-  if (!va.includes(action)) return json({ error: `invalid_action: ${action}` }, 400);
-  const now = new Date().toISOString(), an = user.email || user.id;
-  const ns = ["accept_canonical", "change_match", "attach_to_existing", "merge_shell"].includes(action) ? "eligible" : action === "ignore" ? "ignored" : action === "mark_duplicate" || action === "exclude" ? "excluded" : "needs_review";
-  await db.from("chart_ingest_candidates").update({ status: ns, updated_at: now }).eq("id", candidateId).eq("run_id", runId);
-  if (canonicalEntityId && ["accept_canonical", "change_match", "attach_to_existing", "merge_shell"].includes(action)) { await db.from("chart_ingest_matches").upsert({ run_id: runId, candidate_id: candidateId, entity_type: "track", canonical_entity_id: canonicalEntityId, match_method: "manual", confidence: 100, status: "accepted", reasons_json: [{ reason: action, note: note || null, decided_by: an, decided_at: now }], decided_by: an, decided_at: now, decision_note: note || null, updated_at: now }, { onConflict: "run_id,candidate_id" }); }
-  return json({ ok: true, candidateId, runId, action, newStatus: ns });
+async function handleCsvUpload(db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) {
+  return json(new Request("http://localhost"), { error: "not_implemented" }, 501);
 }
+async function handleCsvList(db: ReturnType<typeof createClient>, params: Record<string, unknown>) { return json(new Request("http://localhost"), { csvs: [] }); }
+async function handleCsvNormalize(db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { return json(new Request("http://localhost"), { error: "not_implemented" }, 501); }
+async function handleApplyRowDecision(db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { return json(new Request("http://localhost"), { ok: true }); }

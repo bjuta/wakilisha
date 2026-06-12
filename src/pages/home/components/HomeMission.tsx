@@ -1,56 +1,93 @@
 const PILLARS = [
-  { k: "01", t: "Discover", d: "Make African creative work easy to find. A registry and charts that surface what's happening, not what an algorithm decides should trend." },
-  { k: "02", t: "Document", d: "Build archives that outlast the moment. Names, scenes, lyrics and lineage recorded so culture becomes harder to erase." },
-  { k: "03", t: "Fund & Value", d: "Connect creativity with capital, audiences and institutions — turning cultural value into visibility, participation and opportunity." },
-  { k: "04", t: "Sustain", d: "Stand up the long-term structures — partnerships, experiences, commercial models — that let creatives thrive on their own terms." },
+  {
+    k: "01",
+    t: "Discover",
+    d: "Make African creative work easy to find. A registry and charts that surface what's happening, not what an algorithm decides should trend.",
+    color: "var(--wk-brand)",
+  },
+  {
+    k: "02",
+    t: "Document",
+    d: "Build archives that outlast the moment. Names, scenes, lyrics and lineage recorded so culture becomes harder to erase.",
+    color: "var(--wk-v-intel)",
+  },
+  {
+    k: "03",
+    t: "Fund & Value",
+    d: "Connect creativity with capital, audiences and institutions — turning cultural value into visibility, participation and opportunity.",
+    color: "var(--wk-v-food)",
+  },
+  {
+    k: "04",
+    t: "Sustain",
+    d: "Stand up the long-term structures — partnerships, experiences, commercial models — that let creatives thrive on their own terms.",
+    color: "var(--wk-v-places)",
+  },
 ];
 
 const STATS = [
-  { n: "8", l: "cultural domains mapped" },
-  { n: "2", l: "live today: Music & Guides" },
-  { n: "7yr", l: "building how culture travels" },
-  { n: "∞", l: "harder to erase" },
+  { n: "8", l: "cultural domains", sub: "mapped and connected" },
+  { n: "2", l: "live today", sub: "Music & Guides" },
+  { n: "7yr", l: "building", sub: "how culture travels" },
+  { n: "∞", l: "harder", sub: "to erase" },
 ];
 
 export function HomeMission() {
   return (
     <section
-      className="border-t border-[var(--wk-divider)]"
-      style={{ background: "var(--wk-bg-subtle)", padding: "80px clamp(20px,4vw,40px) 80px" }}
+      className="py-16 md:py-24 border-t border-[var(--wk-divider)]"
+      style={{ background: "var(--wk-bg)" }}
     >
-      <div style={{ maxWidth: 1180, margin: "0 auto" }}>
+      <div style={{ maxWidth: 1180, margin: "0 auto", padding: "0 clamp(20px,4vw,40px)" }}>
 
-        {/* Section header */}
-        <div className="mb-12 max-w-[540px]">
+        {/* Header */}
+        <div className="mb-12 max-w-[600px]">
           <div
-            className="mb-4 text-[var(--wk-brand)]"
-            style={{ fontFamily: "var(--wk-font-mono, monospace)", fontSize: ".72rem", letterSpacing: ".14em", textTransform: "uppercase", fontWeight: 600 }}
+            className="mb-3 text-[var(--wk-brand)]"
+            style={{ fontFamily: "var(--wk-font-mono, monospace)", fontSize: ".7rem", letterSpacing: ".15em", textTransform: "uppercase", fontWeight: 600 }}
           >
-            The mission
+            <span className="inline-flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--wk-brand)]" />
+              The mission
+            </span>
           </div>
           <h2
-            className="font-bold tracking-[-0.025em] text-[var(--wk-text)] mb-4"
-            style={{ fontSize: "clamp(1.7rem,3.2vw,2.4rem)", lineHeight: 1.05 }}
+            className="font-black tracking-[-0.03em] text-[var(--wk-text)] mb-4"
+            style={{ fontSize: "clamp(1.7rem,3.3vw,2.5rem)", lineHeight: 1.05 }}
           >
             Four verbs. One commitment.
           </h2>
-          <p className="text-[var(--wk-text-muted)] text-[15px] leading-relaxed">
-            WAKILISHA exists to build structures that help African creative work travel further, last longer, and generate meaningful value.
+          <p className="text-[14px] leading-relaxed text-[var(--wk-text-muted)]">
+            WAKILISHA exists to build structures that help African creative work
+            travel further, last longer, and generate meaningful value for the people
+            behind it.
           </p>
         </div>
 
         {/* Pillars */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-14">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-14">
           {PILLARS.map((p) => (
             <div
               key={p.k}
-              className="rounded-2xl border border-[var(--wk-border)] p-6 transition-all duration-300 hover:border-[var(--wk-border-2)]"
+              className="group relative rounded-2xl border border-[var(--wk-border)] p-6 transition-all duration-300 hover:border-[var(--wk-border-2)] hover:-translate-y-0.5"
               style={{ background: "var(--wk-surface)" }}
             >
+              {/* Accent top line */}
+              <div
+                className="absolute top-0 left-6 right-6 h-[2px] rounded-full origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-400"
+                style={{ backgroundColor: p.color }}
+              />
+
               <div className="flex items-start gap-4">
                 <span
-                  className="shrink-0 mt-0.5 tabular-nums font-bold text-[var(--wk-brand)]"
-                  style={{ fontFamily: "var(--wk-font-mono, monospace)", fontSize: ".72rem", letterSpacing: ".1em", textTransform: "uppercase" }}
+                  className="shrink-0 mt-0.5 tabular-nums font-black"
+                  style={{
+                    fontFamily: "var(--wk-font-mono, monospace)",
+                    fontSize: ".7rem",
+                    letterSpacing: ".1em",
+                    textTransform: "uppercase",
+                    color: p.color,
+                  }}
                 >
                   {p.k}
                 </span>
@@ -63,25 +100,29 @@ export function HomeMission() {
           ))}
         </div>
 
-        {/* Stats bar */}
-        <div
-          className="grid grid-cols-2 md:grid-cols-4 overflow-hidden rounded-2xl border border-[var(--wk-border)]"
-          style={{ gap: 1, background: "var(--wk-border)" }}
-        >
-          {STATS.map((s) => (
+        {/* Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-px overflow-hidden rounded-2xl" style={{ background: "var(--wk-border)" }}>
+          {STATS.map((s, i) => (
             <div
               key={s.l}
-              className="flex flex-col items-center justify-center py-9 px-4 text-center"
+              className="flex flex-col items-center justify-center py-10 px-4 text-center relative overflow-hidden group"
               style={{ background: "var(--wk-surface)" }}
             >
               <div
-                className="font-black text-[var(--wk-text)] tabular-nums leading-none mb-2.5"
-                style={{ fontSize: "clamp(2rem,3.8vw,3rem)", letterSpacing: "-0.04em" }}
+                className="font-black tabular-nums leading-none mb-2 transition-colors duration-300"
+                style={{
+                  fontSize: "clamp(2rem,3.8vw,3rem)",
+                  letterSpacing: "-0.04em",
+                  color: i === 0 ? "var(--wk-brand)" : i === 1 ? "var(--wk-v-intel)" : i === 2 ? "var(--wk-v-food)" : "var(--wk-v-places)",
+                }}
               >
                 {s.n}
               </div>
-              <div className="text-[12px] text-[var(--wk-text-muted)] leading-snug max-w-[12ch] text-center">
+              <div className="text-[13px] font-bold text-[var(--wk-text)] leading-snug mb-0.5">
                 {s.l}
+              </div>
+              <div className="text-[11px] text-[var(--wk-text-muted)] leading-snug">
+                {s.sub}
               </div>
             </div>
           ))}

@@ -515,16 +515,16 @@ export async function stageWordPressDatabase(credentials: WpDbCredentials, runId
 
 export async function getExistingEntityCounts(): Promise<Record<string, number>> {
   const tables: Record<string, string> = {
-    tracks: "wk_tracks",
-    artists: "wk_artists",
-    releases: "wk_releases",
-    labels: "wk_labels",
-    genres: "wk_genres",
+    tracks: "registry_tracks",
+    artists: "registry_artists",
+    releases: "registry_releases",
+    labels: "registry_labels",
+    genres: "registry_genres",
     articles: "wk_articles",
-    pages: "wk_page_surfaces",
+    pages: "wk_guides",
     guides: "wk_guides",
-    chart_series: "wk_chart_series",
-    chart_editions: "wk_chart_editions",
+    chart_series: "wk_chart_series_v2",
+    chart_editions: "wk_chart_editions_v2",
   };
 
   const counts: Record<string, number> = {};

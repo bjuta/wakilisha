@@ -12,7 +12,7 @@ interface ArchivedItem {
   id: string;
   slug: string;
   title: string | null;
-  type: "article" | "guide" | "page" | "document";
+  type: "article" | "guide";
   status: string | null;
   wpStatus: string | null;
   originalStatus: string | null;
@@ -41,11 +41,9 @@ export default function AdminContentArchivePage() {
 
   useEffect(() => {
     async function load() {
-      const [articlesRes, guidesRes, pagesRes, docsRes] = await Promise.all([
+      const [articlesRes, guidesRes] = await Promise.all([
         supabase.from("wk_articles").select("id, slug, title, wp_status, author, created_at, updated_at").eq("wp_status", "trash").order("created_at", { ascending: false }).limit(100),
         supabase.from("wk_guides").select("id, slug, title, wp_status, created_at, updated_at").eq("wp_status", "trash").order("created_at", { ascending: false }).limit(50),
-        supabase.from("wk_page_surfaces").select("id, slug, title, wp_status, document_type, created_at, updated_at").eq("wp_status", "trash").order("created_at", { ascending: false }).limit(50),
-        supabase.from("wk_cms_documents").select("id, slug, title, status, editorial_state, created_at, updated_at").eq("status", "trash").order("created_at", { ascending: false }).limit(100),
       ]);
 
       const merged: ArchivedItem[] = [];
@@ -78,34 +76,6 @@ export default function AdminContentArchivePage() {
           createdAt: g.created_at,
         })));
       }
-      if (pagesRes.data) {
-        merged.push(...pagesRes.data.map((p) => ({
-          id: p.id ?? p.slug,
-          slug: p.slug,
-          title: p.title,
-          type: "page" as const,
-          status: p.wp_status,
-          wpStatus: p.wp_status,
-          originalStatus: "publish",
-          author: null,
-          trashedAt: p.updated_at,
-          createdAt: p.created_at,
-        })));
-      }
-      if (docsRes.data) {
-        merged.push(...docsRes.data.map((d) => ({
-          id: d.id,
-          slug: d.slug,
-          title: d.title,
-          type: "document" as const,
-          status: d.status,
-          wpStatus: null,
-          originalStatus: "publish",
-          author: null,
-          trashedAt: d.updated_at,
-          createdAt: d.created_at,
-        })));
-      }
 
       setItems(merged);
       setLoading(false);
@@ -124,8 +94,6 @@ export default function AdminContentArchivePage() {
     const tableMap: Record<string, string> = {
       article: "wk_articles",
       guide: "wk_guides",
-      page: "wk_page_surfaces",
-      document: "wk_cms_documents",
     };
     const table = tableMap[item.type];
     if (!table) {
@@ -134,7 +102,7 @@ export default function AdminContentArchivePage() {
       return;
     }
 
-    const statusField = item.type === "document" ? "status" : "wp_status";
+    const statusField = "wp_status";
     const newStatus = item.originalStatus || "draft";
 
     const { error } = await supabase.from(table).update({ [statusField]: newStatus }).eq("id", item.id);
@@ -159,8 +127,6 @@ export default function AdminContentArchivePage() {
     { value: "all", label: "All Types" },
     { value: "article", label: "Articles" },
     { value: "guide", label: "Guides" },
-    { value: "page", label: "Pages" },
-    { value: "document", label: "Documents" },
   ];
 
   return (

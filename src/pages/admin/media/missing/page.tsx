@@ -30,6 +30,7 @@ const CMS_BUCKET = "cms-media";
 export default function AdminMissingImagesPage() {
   const navigate = useNavigate();
   const [items, setItems] = useState<MissingImage[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [filterType, setFilterType] = useState<string>("all");
@@ -43,17 +44,30 @@ export default function AdminMissingImagesPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
+
+    const [{ count: artistCount }, { count: articleCount }] = await Promise.all([
+      supabase
+        .from("registry_artists")
+        .select("*", { count: "exact", head: true })
+        .is("public_image_url", null),
+      supabase
+        .from("wk_articles")
+        .select("*", { count: "exact", head: true })
+        .or("hero_image_url.is.null,wp_status.neq.publish"),
+    ]);
+
+    setTotalCount((artistCount ?? 0) + (articleCount ?? 0));
+
     const { data: dbItems } = await supabase
       .from("registry_artists")
       .select("slug, display_name as title, artist_type")
       .is("public_image_url", null)
-      .limit(50);
+      .limit(3000);
 
     const { data: articles } = await supabase
       .from("wk_articles")
       .select("slug, title")
-      .not("wp_status", "eq", "publish")
-      .limit(50);
+      .or("hero_image_url.is.null,wp_status.neq.publish");
 
     const mapped: MissingImage[] = [
       ...(dbItems ?? []).map((a: ArtistRow) => ({
@@ -99,7 +113,7 @@ export default function AdminMissingImagesPage() {
   });
 
   const stats = {
-    total: items.length,
+    total: totalCount,
     pending: items.filter((i) => i.status === "pending").length,
     in_progress: items.filter((i) => i.status === "in_progress").length,
     resolved: items.filter((i) => i.status === "resolved").length,

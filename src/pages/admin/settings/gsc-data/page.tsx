@@ -20,6 +20,8 @@ interface GscImportRun {
   date_range_end: string | null;
   rows_imported: number | null;
   rows_matched: number | null;
+  rows_failed: number | null;
+  error_message: string | null;
   started_at: string | null;
   completed_at: string | null;
 }
@@ -37,6 +39,23 @@ interface GscMetricSummary {
 type GscScreen = "connect" | "dashboard";
 
 const OAUTH_SCOPES = "https://www.googleapis.com/auth/webmasters.readonly";
+const SUPABASE_URL = import.meta.env.VITE_PUBLIC_SUPABASE_URL as string;
+
+async function callEdgeFunction(name: string, body: Record<string, unknown>): Promise<{ ok: boolean; [key: string]: unknown }> {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  if (!token) throw new Error("Not authenticated.");
+
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  return res.json() as Promise<{ ok: boolean; [key: string]: unknown }>;
+}
 
 export default function AdminSettingsGscData() {
   const [connection, setConnection] = useState<GscConnection | null>(null);
@@ -61,6 +80,10 @@ export default function AdminSettingsGscData() {
   });
   const [importDateEnd, setImportDateEnd] = useState(() => new Date().toISOString().slice(0, 10));
   const [importError, setImportError] = useState<string | null>(null);
+  const [importResult, setImportResult] = useState<string | null>(null);
+
+  // OAuth callback processing state
+  const [processingOAuth, setProcessingOAuth] = useState(false);
 
   const [toast, setToast] = useState<{ type: "success" | "error"; msg: string } | null>(null);
   const showToast = (type: "success" | "error", msg: string) => {
@@ -83,6 +106,13 @@ export default function AdminSettingsGscData() {
 
       const conn = connRes.data as GscConnection | null;
       setConnection(conn);
+
+      // Don't include access_token/refresh_token in frontend state
+      if (conn) {
+        const { access_token, refresh_token, ...safeConn } = conn as GscConnection & { access_token?: string; refresh_token?: string };
+        setConnection(safeConn as GscConnection);
+      }
+
       setImportRuns((runsRes.data ?? []) as GscImportRun[]);
       setTopQueries((metricsRes.data ?? []).map((m) => ({ ...m, matched_entity_type: null, matched_entity_slug: null })) as GscMetricSummary[]);
       setScreen(conn?.status === "connected" ? "dashboard" : "connect");
@@ -94,8 +124,58 @@ export default function AdminSettingsGscData() {
   }, []);
 
   useEffect(() => {
+    // Check for OAuth callback
+    const params = new URLSearchParams(window.location.search);
+    const isCallback = params.get("callback") === "1";
+    const code = params.get("code");
+    const state = params.get("state");
+
+    if (isCallback && code && state) {
+      // Verify state matches what we stored
+      const savedState = sessionStorage.getItem("gsc_oauth_state");
+      if (savedState !== state) {
+        setLoadError("OAuth state mismatch. Please try connecting again.");
+        window.history.replaceState({}, "", "/admin/settings/gsc-data");
+        loadData();
+        return;
+      }
+
+      // Exchange code for tokens via Edge Function
+      const exchangeCode = async () => {
+        setProcessingOAuth(true);
+        try {
+          const redirectUri = `${window.location.origin}/admin/settings/gsc-data?callback=1`;
+          const result = await callEdgeFunction("gsc-oauth-callback", {
+            action: "exchange_code",
+            code,
+            redirectUri,
+            connectionId: state,
+          });
+
+          // Clean up URL and session storage
+          sessionStorage.removeItem("gsc_oauth_state");
+          window.history.replaceState({}, "", "/admin/settings/gsc-data");
+
+          if (result.ok) {
+            showToast("success", "Google Search Console connected successfully!");
+          } else {
+            showToast("error", `OAuth failed: ${result.error || "Unknown error"}`);
+          }
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : "OAuth callback failed";
+          setLoadError(msg);
+          window.history.replaceState({}, "", "/admin/settings/gsc-data");
+        } finally {
+          setProcessingOAuth(false);
+        }
+      };
+
+      exchangeCode();
+    }
+
     loadData();
-  }, [loadData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleConnect = async () => {
     if (!propertyUrl.trim()) {
@@ -105,7 +185,6 @@ export default function AdminSettingsGscData() {
     setConnecting(true);
     setConnectError(null);
     try {
-      // Save connection record as pending
       const { data, error } = await supabase
         .from("gsc_connections")
         .upsert({
@@ -121,7 +200,6 @@ export default function AdminSettingsGscData() {
       if (error) throw error;
       setConnection(data as GscConnection);
 
-      // Initiate OAuth flow
       const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
       if (!clientId) {
         showToast("error", "VITE_GOOGLE_CLIENT_ID env var is not set. Add your Google OAuth client ID to connect.");
@@ -129,7 +207,7 @@ export default function AdminSettingsGscData() {
         return;
       }
 
-      const state = data.id; // use connection ID as state for CSRF
+      const state = data.id;
       const redirectUri = `${window.location.origin}/admin/settings/gsc-data?callback=1`;
       const authUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
       authUrl.searchParams.set("client_id", clientId);
@@ -140,7 +218,6 @@ export default function AdminSettingsGscData() {
       authUrl.searchParams.set("prompt", "consent");
       authUrl.searchParams.set("state", state);
 
-      // Save state to detect callback
       sessionStorage.setItem("gsc_oauth_state", state);
       window.location.href = authUrl.toString();
     } catch (err) {
@@ -154,15 +231,20 @@ export default function AdminSettingsGscData() {
     if (!connection) return;
     if (!confirm("Disconnect Google Search Console? Import history and metrics will be preserved.")) return;
     try {
-      await supabase
-        .from("gsc_connections")
-        .update({ status: "disconnected", disconnected_at: new Date().toISOString() })
-        .eq("id", connection.id);
-      setConnection((prev) => prev ? { ...prev, status: "disconnected" } : prev);
-      setScreen("connect");
-      showToast("success", "Disconnected GSC.");
+      const result = await callEdgeFunction("gsc-oauth-callback", {
+        action: "disconnect",
+        connectionId: connection.id,
+      });
+
+      if (result.ok) {
+        setConnection((prev) => prev ? { ...prev, status: "disconnected" } : prev);
+        setScreen("connect");
+        showToast("success", "Disconnected GSC. Tokens have been cleared.");
+      } else {
+        showToast("error", `Disconnect failed: ${result.error || "Unknown error"}`);
+      }
     } catch (err) {
-      showToast("error", "Disconnect failed.");
+      showToast("error", err instanceof Error ? err.message : "Disconnect failed.");
     }
   };
 
@@ -173,35 +255,23 @@ export default function AdminSettingsGscData() {
     }
     setImportRunning(true);
     setImportError(null);
+    setImportResult(null);
     try {
-      // Create import run record
-      const { data: run, error: runError } = await supabase
-        .from("gsc_import_runs")
-        .insert({
-          connection_id: connection.id,
-          status: "running",
-          date_range_start: importDateStart,
-          date_range_end: importDateEnd,
-          started_at: new Date().toISOString(),
-        })
-        .select()
-        .single();
+      const result = await callEdgeFunction("gsc-import-metrics", {
+        action: "import",
+        connectionId: connection.id,
+        dateRangeStart: importDateStart,
+        dateRangeEnd: importDateEnd,
+        rowLimit: 5000,
+      });
 
-      if (runError) throw runError;
-
-      // In production: call edge function to import from GSC API
-      // For now: mark as failed_no_token if no access_token
-      const { error: updateError } = await supabase
-        .from("gsc_import_runs")
-        .update({
-          status: "failed",
-          error_message: "GSC OAuth not completed. Connect via Google OAuth to enable real data import.",
-          completed_at: new Date().toISOString(),
-        })
-        .eq("id", run.id);
-
-      if (updateError) throw updateError;
-      showToast("error", "Connect via OAuth first to import real GSC data.");
+      if (result.ok) {
+        const imported = result.rowsImported as number ?? 0;
+        setImportResult(`Import successful! ${imported.toLocaleString()} rows imported from Google Search Console.`);
+        showToast("success", `Imported ${imported.toLocaleString()} query metrics.`);
+      } else {
+        setImportError(`Import failed: ${result.error || "Unknown error"}`);
+      }
       await loadData();
     } catch (err) {
       setImportError(err instanceof Error ? err.message : "Import failed.");
@@ -210,11 +280,17 @@ export default function AdminSettingsGscData() {
     }
   };
 
-  if (loading) {
+  if (loading || processingOAuth) {
     return (
       <div className="space-y-4 animate-pulse">
         <div className="h-8 w-64 rounded-lg bg-[var(--wk-surface-raised)]" />
         <div className="h-40 rounded-xl bg-[var(--wk-surface-raised)]" />
+        {processingOAuth && (
+          <div className="flex items-center justify-center gap-3 py-8">
+            <WkIcon name="Loader2" size={20} className="animate-spin text-[var(--wk-brand)]" />
+            <span className="text-[14px] text-[var(--wk-text)]">Completing Google OAuth…</span>
+          </div>
+        )}
       </div>
     );
   }
@@ -249,13 +325,17 @@ export default function AdminSettingsGscData() {
             <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${
               connection?.status === "connected"
                 ? "bg-[var(--wk-success-soft)] text-[var(--wk-success)]"
+                : connection?.status === "needs_reauth"
+                ? "bg-[var(--wk-warning-soft)] text-[var(--wk-warning)]"
                 : "bg-[var(--wk-surface-raised)] text-[var(--wk-text-muted)]"
             }`}>
               <WkIcon name="Globe" size={18} />
             </div>
             <div>
               <p className="text-[14px] font-bold text-[var(--wk-text)]">
-                {connection?.status === "connected" ? "Connected" : connection?.status === "pending" ? "Awaiting OAuth" : "Not connected"}
+                {connection?.status === "connected" ? "Connected" :
+                 connection?.status === "needs_reauth" ? "Needs Re-Authorization" :
+                 connection?.status === "pending" ? "Awaiting OAuth" : "Not connected"}
               </p>
               <p className="text-[12px] text-[var(--wk-text-muted)]">
                 {connection?.property_url || "No property configured"}
@@ -264,7 +344,7 @@ export default function AdminSettingsGscData() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {connection?.status === "connected" && (
+            {(connection?.status === "connected" || connection?.status === "needs_reauth") && (
               <button onClick={handleDisconnect} className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap text-[var(--wk-danger)]">
                 Disconnect
               </button>
@@ -281,7 +361,7 @@ export default function AdminSettingsGscData() {
         <WkSurface className="p-5">
           <h2 className="text-[15px] font-bold text-[var(--wk-text)] mb-1">Connect Google Search Console</h2>
           <p className="text-[12px] text-[var(--wk-text-muted)] mb-5">
-            Enter your GSC property URL and authorize via Google OAuth. WAKILISHA never stores passwords — only the OAuth access token.
+            Enter your GSC property URL and authorize via Google OAuth. Tokens are exchanged server-side and stored securely — never in the browser.
           </p>
 
           <div className="space-y-4 max-w-lg">
@@ -324,11 +404,15 @@ export default function AdminSettingsGscData() {
               <ul className="space-y-1 text-[11px] text-[var(--wk-text-muted)]">
                 <li className="flex items-start gap-1.5">
                   <WkIcon name={import.meta.env.VITE_GOOGLE_CLIENT_ID ? "Check" : "AlertCircle"} size={12} className={`mt-0.5 shrink-0 ${import.meta.env.VITE_GOOGLE_CLIENT_ID ? "text-[var(--wk-success)]" : "text-[var(--wk-warning)]"}`} />
-                  VITE_GOOGLE_CLIENT_ID env var: {import.meta.env.VITE_GOOGLE_CLIENT_ID ? "Set" : "Not set — required for OAuth"}
+                  VITE_GOOGLE_CLIENT_ID env var: {import.meta.env.VITE_GOOGLE_CLIENT_ID ? "Set" : "Not set — required for OAuth redirect"}
                 </li>
                 <li className="flex items-start gap-1.5">
                   <WkIcon name="Info" size={12} className="mt-0.5 shrink-0 text-[var(--wk-text-faint)]" />
-                  Redirect URI must be registered: {window.location.origin}/admin/settings/gsc-data?callback=1
+                  GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET must be set as Edge Function secrets on gsc-oauth-callback
+                </li>
+                <li className="flex items-start gap-1.5">
+                  <WkIcon name="Info" size={12} className="mt-0.5 shrink-0 text-[var(--wk-text-faint)]" />
+                  Redirect URI must be registered in Google Cloud Console: {window.location.origin}/admin/settings/gsc-data?callback=1
                 </li>
                 <li className="flex items-start gap-1.5">
                   <WkIcon name="Info" size={12} className="mt-0.5 shrink-0 text-[var(--wk-text-faint)]" />
@@ -353,8 +437,20 @@ export default function AdminSettingsGscData() {
       )}
 
       {/* Dashboard screen */}
-      {screen === "dashboard" && connection?.status === "connected" && (
+      {(screen === "dashboard" || connection?.status === "needs_reauth") && (
         <>
+          {connection?.status === "needs_reauth" && (
+            <div className="rounded-xl border border-[var(--wk-warning)]/20 bg-[var(--wk-warning-soft)] p-4 text-[13px] text-[var(--wk-warning)]">
+              <div className="flex items-center gap-2 font-bold mb-1">
+                <WkIcon name="AlertTriangle" size={16} />
+                Access token expired or revoked
+              </div>
+              <p className="text-[12px]">
+                Google returned a 401/403 error on the last import attempt. Reconnect via OAuth to refresh your credentials.
+              </p>
+            </div>
+          )}
+
           {/* Import panel */}
           <WkSurface className="p-5">
             <h2 className="text-[14px] font-bold text-[var(--wk-text)] mb-4">Import query data</h2>
@@ -383,7 +479,7 @@ export default function AdminSettingsGscData() {
               </div>
               <button
                 onClick={handleImport}
-                disabled={importRunning}
+                disabled={importRunning || connection?.status !== "connected"}
                 className="wk-button wk-button-primary wk-button-sm whitespace-nowrap disabled:opacity-50"
               >
                 {importRunning ? (
@@ -395,6 +491,9 @@ export default function AdminSettingsGscData() {
             </div>
             {importError && (
               <p className="mt-2 text-[12px] text-[var(--wk-danger)]">{importError}</p>
+            )}
+            {importResult && (
+              <p className="mt-2 text-[12px] text-[var(--wk-success)]">{importResult}</p>
             )}
           </WkSurface>
 
@@ -471,9 +570,13 @@ export default function AdminSettingsGscData() {
                       {run.date_range_start} → {run.date_range_end}
                     </p>
                     <p className="text-[11px] text-[var(--wk-text-muted)]">
-                      {run.rows_imported?.toLocaleString()} rows · {run.rows_matched?.toLocaleString()} matched
+                      {run.rows_imported?.toLocaleString() ?? 0} rows · {run.rows_matched?.toLocaleString() ?? 0} matched
+                      {run.rows_failed ? ` · ${run.rows_failed.toLocaleString()} failed` : ""}
                       {run.started_at && ` · ${new Date(run.started_at).toLocaleString()}`}
                     </p>
+                    {run.error_message && (
+                      <p className="text-[11px] text-[var(--wk-danger)] mt-0.5">{run.error_message}</p>
+                    )}
                   </div>
                 </div>
                 <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase ${
@@ -497,9 +600,9 @@ export default function AdminSettingsGscData() {
         </h2>
         <div className="space-y-2">
           {[
-            { label: "OAuth connection", status: "ready", note: "Tables and connection flow implemented" },
-            { label: "Property selection dropdown (real GSC properties)", status: "requires-oauth", note: "Requires VITE_GOOGLE_CLIENT_ID + server-side OAuth exchange" },
-            { label: "Import query/page metrics", status: "requires-oauth", note: "Requires access_token from OAuth" },
+            { label: "OAuth connection", status: "ready", note: "Server-side token exchange via gsc-oauth-callback Edge Function" },
+            { label: "Property selection & import", status: "ready", note: "Real GSC API import via gsc-import-metrics Edge Function" },
+            { label: "Query/page metrics", status: "ready", note: "Auto-refresh on token expiry, batch insert, audit logging" },
             { label: "Artist/track/release matching", status: "schema-ready", note: "gsc_entity_matches table ready, matching logic pending" },
             { label: "Entity-level demand panels", status: "pending", note: "Will surface on artist/track admin pages after data exists" },
             { label: "Unmatched query review queue", status: "pending", note: "Requires imported metrics" },

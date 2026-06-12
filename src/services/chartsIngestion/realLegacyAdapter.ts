@@ -223,11 +223,11 @@ async function mapDbRunToJob(dbRun: Record<string, unknown>): Promise<IngestJob>
 
   const editionSlug = dbRun.commit_edition_id
     ? await supabase
-        .from("chart_editions")
-        .select("slug")
+        .from("wk_chart_editions_v2")
+        .select("edition_slug")
         .eq("id", dbRun.commit_edition_id as string)
         .maybeSingle()
-        .then((r) => (r.data?.slug as string) ?? null)
+        .then((r) => (r.data?.edition_slug as string) ?? null)
     : null;
 
   return {
@@ -1045,7 +1045,7 @@ export async function getDraftEntries(jobId: string): Promise<DraftEntry[]> {
   if (!editionId) return [];
 
   const { data, error } = await supabase
-    .from("chart_entries")
+    .from("wk_chart_entries_v2")
     .select("*")
     .eq("edition_id", editionId)
     .order("rank", { ascending: true });
@@ -1066,7 +1066,7 @@ export async function getDraftEntries(jobId: string): Promise<DraftEntry[]> {
       previousRank: row.previous_rank ?? null,
       peakPosition: row.rank,
       weeksOnChart: null,
-      score: Number(row.score ?? 0),
+      score: Number(row.total_score ?? 0),
       entryPayload: {},
       locked: false,
       sourceType: "streaming",
@@ -1080,7 +1080,7 @@ export async function getDraftEntries(jobId: string): Promise<DraftEntry[]> {
 
 export async function getEditionsApi(): Promise<ChartEdition[]> {
   const { data, error } = await supabase
-    .from("chart_editions")
+    .from("wk_chart_editions_v2")
     .select("*")
     .order("created_at", { ascending: false });
 
@@ -1091,19 +1091,19 @@ export async function getEditionsApi(): Promise<ChartEdition[]> {
 
   return (data ?? []).map((row) => ({
     id: row.id,
-    familyId: row.family_id ?? "",
-    slug: row.slug ?? "",
-    label: row.label ?? row.slug ?? "",
-    date: row.date ?? "",
+    familyId: row.program_id ?? "",
+    slug: row.edition_slug ?? "",
+    label: row.edition_label ?? row.edition_slug ?? "",
+    date: row.edition_date ?? "",
     periodStart: row.period_start ?? "",
     periodEnd: row.period_end ?? "",
     status: (row.status as ChartEdition["status"]) ?? "draft",
-    ingestJobId: row.ingest_job_id ?? null,
+    ingestJobId: row.ingest_run_id ?? null,
     publishedAt: row.published_at ? String(row.published_at) : null,
     publishedBy: row.published_by ?? null,
     entryCount: row.entry_count ?? 0,
-    newEntries: row.new_entries ?? 0,
-    reEntries: row.re_entries ?? 0,
+    newEntries: row.new_entries_count ?? 0,
+    reEntries: row.re_entries_count ?? 0,
   }));
 }
 
@@ -1140,7 +1140,7 @@ export async function getSnapshots(): Promise<Snapshot[]> {
 export async function getDashboardKpisApi(): Promise<DashboardKpis> {
   const [runs, editions, issues] = await Promise.all([
     supabase.from("chart_ingest_runs").select("status"),
-    supabase.from("chart_editions").select("status"),
+    supabase.from("wk_chart_editions_v2").select("status"),
     supabase.from("chart_ingest_review_issues").select("status").eq("status", "open"),
   ]);
 

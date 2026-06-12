@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo, useRef } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { WkIcon } from '@/components/design-system/Icon';
 import { getArticlesByAuthor, type MagazineArticle } from '@/services/magazineArticles';
-import { getAuthorMeta, getVerticalColor, resolveAuthorMeta, type AuthorRow } from '@/services/authorProfiles';
+import { getAuthorMeta, getVerticalColor, resolveAuthorMeta, type AuthorRow, type AuthorMeta } from '@/services/authorProfiles';
 
 type SortMode = 'latest' | 'oldest' | 'longest';
 type AuthorMetaResolved = Awaited<ReturnType<typeof resolveAuthorMeta>>;
@@ -27,6 +27,7 @@ export default function AuthorProfilePage() {
   const [visibleCount, setVisibleCount] = useState(BATCH_SIZE);
   const [sortOpen, setSortOpen] = useState(false);
   const [authorMetaResolved, setAuthorMetaResolved] = useState<AuthorMetaResolved | null>(null);
+  const [avatarFailed, setAvatarFailed] = useState(false);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const sortWrapRef = useRef<HTMLDivElement>(null);
 
@@ -46,6 +47,7 @@ export default function AuthorProfilePage() {
     let alive = true;
     setLoading(true);
     setError(null);
+    setAvatarFailed(false);
 
     // Fetch real author meta from registry_authors
     resolveAuthorMeta(normalizedSlug)
@@ -360,9 +362,10 @@ export default function AuthorProfilePage() {
           {/* Portrait */}
           <div className="author-profile-hero-portrait">
             <img
-              src={authorMeta.avatarUrl}
+              src={avatarFailed ? fallbackMeta.avatarUrl : authorMeta.avatarUrl}
               alt={authorMeta.displayName}
               className="w-full h-full object-cover"
+              onError={() => setAvatarFailed(true)}
             />
             <div className="author-profile-hero-portrait-badge">
               <WkIcon name="PenLine" size={12} />

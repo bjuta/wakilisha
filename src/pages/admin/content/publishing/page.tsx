@@ -12,7 +12,7 @@ interface ContentItem {
   id: string;
   slug: string;
   title: string | null;
-  type: "article" | "guide" | "page" | "document";
+  type: "article" | "guide";
   status: string | null;
   wpStatus: string | null;
   editorialState: string | null;
@@ -33,11 +33,9 @@ export default function AdminPublishingDashboardPage() {
 
   useEffect(() => {
     async function load() {
-      const [articlesRes, guidesRes, pagesRes, docsRes] = await Promise.all([
+      const [articlesRes, guidesRes] = await Promise.all([
         supabase.from("wk_articles").select("id, slug, title, wp_status, author, published_at, modified_at, created_at").order("created_at", { ascending: false }).limit(100),
         supabase.from("wk_guides").select("id, slug, title, wp_status, created_at, updated_at").order("created_at", { ascending: false }).limit(50),
-        supabase.from("wk_page_surfaces").select("id, slug, title, wp_status, document_type, created_at, updated_at").order("created_at", { ascending: false }).limit(50),
-        supabase.from("wk_cms_documents").select("id, slug, title, status, editorial_state, published_at, modified_at, created_at").order("created_at", { ascending: false }).limit(100),
       ]);
 
       const merged: ContentItem[] = [];
@@ -70,36 +68,6 @@ export default function AdminPublishingDashboardPage() {
           publishedAt: null,
           modifiedAt: g.updated_at,
           createdAt: g.created_at,
-        })));
-      }
-      if (pagesRes.data) {
-        merged.push(...pagesRes.data.map((p) => ({
-          id: p.id ?? p.slug,
-          slug: p.slug,
-          title: p.title,
-          type: "page" as const,
-          status: p.wp_status,
-          wpStatus: p.wp_status,
-          editorialState: null,
-          author: null,
-          publishedAt: null,
-          modifiedAt: p.updated_at,
-          createdAt: p.created_at,
-        })));
-      }
-      if (docsRes.data) {
-        merged.push(...docsRes.data.map((d) => ({
-          id: d.id,
-          slug: d.slug,
-          title: d.title,
-          type: "document" as const,
-          status: d.status,
-          wpStatus: null,
-          editorialState: d.editorial_state,
-          author: null,
-          publishedAt: d.published_at,
-          modifiedAt: d.modified_at,
-          createdAt: d.created_at,
         })));
       }
 
@@ -141,14 +109,11 @@ export default function AdminPublishingDashboardPage() {
     { value: "all", label: "All Types" },
     { value: "article", label: "Articles" },
     { value: "guide", label: "Guides" },
-    { value: "page", label: "Pages" },
-    { value: "document", label: "Documents" },
   ];
 
   function getRoute(item: ContentItem) {
     if (item.type === "article") return `/admin/content/articles/${item.slug}`;
     if (item.type === "guide") return `/admin/content/guides/${item.slug}`;
-    if (item.type === "page") return `/admin/content/pages/${item.slug}`;
     return `/admin/content/articles/${item.slug}`;
   }
 

@@ -52,7 +52,6 @@ import {
   addSnapshot,
   addEdition,
   resetStore as resetStoreInternal,
-  resetDemoJob,
   getRawItemsForJob,
   getLogsForJob,
   appendJobLog,
@@ -68,7 +67,7 @@ export function resetStore(): void {
   resetStoreInternal();
 }
 export function resetDemo(): void {
-  resetDemoJob();
+  resetStoreInternal();
 }
 export function refreshStore(): void {
   // no-op in mock; real store reload happens via loadStore

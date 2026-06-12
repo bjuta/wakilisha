@@ -5,7 +5,6 @@
  */
 
 import type { NormalizedChartRow } from "./ingestStudioTypes";
-import { generateMockProviderRows, getMockProviderError } from "./mockTracks";
 
 // ─── Spotify API Types ───
 interface SpotifyPlaylistTrack {
@@ -150,25 +149,13 @@ export async function fetchFromSpotify(
   // Check if credentials are available
   const token = await getSpotifyAccessToken();
   if (!token) {
-    const mockError = getMockProviderError(sourceUrl, "spotify");
-    if (mockError) {
-      return {
-        success: false,
-        normalizedRows: [],
-        error: `Spotify credentials not configured. Set VITE_SPOTIFY_CLIENT_ID and VITE_SPOTIFY_CLIENT_SECRET in .env.local. Also: ${mockError}`,
-        rawPayload: { credentialError: true, sourceUrl },
-        warnings: ["Spotify client credentials not available — mock data used"],
-        metrics: { fetchedCount: 0, normalizedCount: 0, droppedCount: 0, durationMs: Math.round(performance.now() - start) },
-      };
-    }
-    // No credentials — use realistic mock
-    const mockRows = generateMockProviderRows(sourceUrl, market, maxRows, "spotify");
     return {
-      success: true,
-      normalizedRows: mockRows,
-      rawPayload: { mock: true, sourceUrl, count: mockRows.length },
-      warnings: ["Spotify client credentials not available — mock data used for development. Set VITE_SPOTIFY_CLIENT_ID and VITE_SPOTIFY_CLIENT_SECRET to fetch real data."],
-      metrics: { fetchedCount: mockRows.length, normalizedCount: mockRows.length, droppedCount: 0, durationMs: Math.round(performance.now() - start) },
+      success: false,
+      normalizedRows: [],
+      error: "Spotify credentials not configured. Set VITE_SPOTIFY_CLIENT_ID and VITE_SPOTIFY_CLIENT_SECRET in .env.local.",
+      rawPayload: { credentialError: true, sourceUrl },
+      warnings: ["Spotify client credentials not available — no data fetched"],
+      metrics: { fetchedCount: 0, normalizedCount: 0, droppedCount: 0, durationMs: Math.round(performance.now() - start) },
     };
   }
 

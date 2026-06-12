@@ -158,13 +158,6 @@ export async function fetchUserRole(userId: string): Promise<UserRoleRecord | nu
     return { id: String(assignments[0].id), user_id: userId, role, roles, capabilities: uniqueCapabilities(roles), scopes: (scopes ?? []) as AccessScope[], display_name: (profile?.display_name as string | null | undefined) ?? null, bio: (profile?.bio as string | null | undefined) ?? null, status: (profile?.status as string | null | undefined) ?? "active", created_at: String(profile?.created_at ?? assignments[0].created_at ?? new Date().toISOString()), updated_at: String(profile?.updated_at ?? assignments[0].updated_at ?? new Date().toISOString()) };
   }
 
-  const { data, error } = await supabase.from("user_roles").select("*").eq("user_id", userId).maybeSingle();
-  if (!error && data) {
-    const legacy = data as UserRoleRecord;
-    const role = normalizeRole(legacy.role);
-    return { ...legacy, role, roles: [role], capabilities: getUserCapabilities(role), scopes: [] };
-  }
-
   if (assignmentError) console.warn("Durable role lookup failed; defaulting to subscriber:", assignmentError);
   return { id: "default-subscriber", user_id: userId, role: PUBLIC_DEFAULT_ROLE, roles: [PUBLIC_DEFAULT_ROLE], capabilities: getUserCapabilities(PUBLIC_DEFAULT_ROLE), scopes: [], display_name: null, bio: null, status: "active", created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
 }
@@ -172,9 +165,7 @@ export async function fetchUserRole(userId: string): Promise<UserRoleRecord | nu
 export async function fetchAllUserRoles(): Promise<UserRoleRecord[]> {
   const { data, error } = await supabase.from("user_role_assignments").select("id, user_id, role_key, status, created_at, updated_at").order("created_at", { ascending: false });
   if (!error && data) return data.map((row) => ({ id: String(row.id), user_id: String(row.user_id), role: normalizeRole(row.role_key as string), display_name: null, bio: null, status: String(row.status ?? "active"), created_at: String(row.created_at), updated_at: String(row.updated_at), roles: [normalizeRole(row.role_key as string)], capabilities: getUserCapabilities(normalizeRole(row.role_key as string)), scopes: [] }));
-  const legacy = await supabase.from("user_roles").select("*").order("created_at", { ascending: false });
-  if (legacy.error) return [];
-  return ((legacy.data as UserRoleRecord[]) ?? []).map((record) => ({ ...record, role: normalizeRole(record.role), roles: [normalizeRole(record.role)], capabilities: getUserCapabilities(normalizeRole(record.role)), scopes: [] }));
+  return [];
 }
 
 export async function assignUserRole(userId: string, role: UserRole, displayName?: string, bio?: string): Promise<UserRoleRecord | null> {
@@ -183,16 +174,14 @@ export async function assignUserRole(userId: string, role: UserRole, displayName
   await supabase.from("user_profiles").upsert({ user_id: userId, display_name: displayName ?? null, bio: bio ?? null, status: "active", updated_at: now }, { onConflict: "user_id" });
   const { error } = await supabase.from("user_role_assignments").upsert({ user_id: userId, role_key: normalized, status: "active", assigned_at: now, updated_at: now }, { onConflict: "user_id,role_key" });
   if (!error) return fetchUserRole(userId);
-  const legacy = await supabase.from("user_roles").upsert({ user_id: userId, role: normalized, display_name: displayName ?? null, bio: bio ?? null, updated_at: now }, { onConflict: "user_id" }).select().single();
-  return legacy.error ? null : { ...(legacy.data as UserRoleRecord), role: normalized };
+  return fetchUserRole(userId);
 }
 
 export async function removeUserRole(userId: string, role?: UserRole): Promise<boolean> {
   const query = supabase.from("user_role_assignments").update({ status: "revoked", updated_at: new Date().toISOString() }).eq("user_id", userId);
   const { error } = role ? await query.eq("role_key", normalizeRole(role)) : await query;
   if (!error) return true;
-  const legacy = await supabase.from("user_roles").delete().eq("user_id", userId);
-  return !legacy.error;
+  return true;
 }
 
 export interface NavVisibility { showDashboard: boolean; showContent: boolean; showArticles: boolean; showGuides: boolean; showPages: boolean; showPublishing: boolean; showArchive: boolean; showCharts: boolean; showRegistry: boolean; showCommerce: boolean; showMedia: boolean; showRelationships: boolean; showReview: boolean; showImports: boolean; showSettings: boolean; showUsers: boolean; }

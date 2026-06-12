@@ -35,7 +35,8 @@ import {
   applyRowMatchDecision,
   getIngestKpis,
 } from "../chartsIngestion/productionAdapter";
-import { V2_PROGRAMS } from "../chartsIngestion/v2Programs";
+import { supabase } from "@/lib/supabase";
+import { loadV2Programs } from "../chartsIngestion/v2Programs";
 import {
   getAllV2Editions,
   getV2EditionBySlug,
@@ -192,7 +193,7 @@ export const localBackendAdapter: RuntimeBackendAdapter = {
   charts: {
     async getPrograms(): Promise<BackendResult<BackendChartProgram[]>> {
       try {
-        return backendOk(V2_PROGRAMS.map((program) => ({ ...program, status: "active" as const })), localMeta());
+        return backendOk((await loadV2Programs()).map((program) => ({ ...program, status: "active" as const })), localMeta());
       } catch (error) {
         return safeLocalFail<BackendChartProgram[]>(error, []);
       }

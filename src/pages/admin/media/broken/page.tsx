@@ -20,6 +20,7 @@ const LINKS_PER_PAGE = 50;
 export default function AdminBrokenLinksPage() {
   const navigate = useNavigate();
   const [links, setLinks] = useState<MediaLink[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -29,11 +30,22 @@ export default function AdminBrokenLinksPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
+
+    const { count } = await supabase
+      .from("registry_media_assets")
+      .select("*", { count: "exact", head: true })
+      .eq("media_kind", "image");
+
+    setTotalCount(count ?? 0);
+
+    const from = page * LINKS_PER_PAGE;
+    const to = from + LINKS_PER_PAGE - 1;
     const { data, error } = await supabase
       .from("registry_media_assets")
       .select("id, slug, url, source_kind, source_entity, source_record_id, metadata")
       .eq("media_kind", "image")
-      .limit(500);
+      .order("id", { ascending: true })
+      .range(from, to);
 
     if (error) {
       console.error("Error loading media assets:", error);
@@ -59,7 +71,7 @@ export default function AdminBrokenLinksPage() {
       setLinks(mapped);
     }
     setLoading(false);
-  }, []);
+  }, [page]);
 
   useEffect(() => {
     load();
@@ -113,11 +125,10 @@ export default function AdminBrokenLinksPage() {
     return true;
   });
 
-  const paged = filtered.slice(page * LINKS_PER_PAGE, (page + 1) * LINKS_PER_PAGE);
-  const totalPages = Math.ceil(filtered.length / LINKS_PER_PAGE);
+  const totalPages = Math.ceil(totalCount / LINKS_PER_PAGE);
 
   const stats = {
-    total: links.length,
+    total: totalCount,
     ok: links.filter((l) => l.status === "ok").length,
     warning: links.filter((l) => l.status === "warning").length,
     broken: links.filter((l) => l.status === "broken").length,
@@ -140,6 +151,15 @@ export default function AdminBrokenLinksPage() {
     }
   };
 
+  const handleRefresh = () => {
+    setPage(0);
+    load();
+  };
+
+  const handlePageChange = (newPage: number) => {
+    setPage(newPage);
+  };
+
   return (
     <div className="space-y-6">
       {toast && (
@@ -153,12 +173,12 @@ export default function AdminBrokenLinksPage() {
           <div className="mb-1 text-[11px] font-black uppercase tracking-wider text-wk-brand">Media</div>
           <h1 className="text-[22px] font-black tracking-tight text-wk-text">Media Link Monitor</h1>
           <p className="mt-1 text-[13px] text-wk-text-muted">
-            {stats.ok} ok, {stats.broken} potentially broken.
+            {totalCount.toLocaleString()} image assets tracked. Check individual links to find broken ones.
           </p>
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={load}
+            onClick={handleRefresh}
             className="wk-button wk-button-primary wk-button-sm whitespace-nowrap"
           >
             <WkIcon name="RefreshCw" size={14} />
@@ -170,7 +190,7 @@ export default function AdminBrokenLinksPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
-          { label: "Total", value: stats.total, icon: "Link", color: "text-wk-brand" },
+          { label: "Total", value: stats.total.toLocaleString(), icon: "Link", color: "text-wk-brand" },
           { label: "OK", value: stats.ok, icon: "CheckCircle2", color: "text-emerald-600" },
           { label: "Warning", value: stats.warning, icon: "AlertTriangle", color: "text-amber-600" },
           { label: "Broken", value: stats.broken, icon: "LinkBreak", color: "text-rose-600" },
@@ -319,7 +339,7 @@ export default function AdminBrokenLinksPage() {
                 ),
               },
             ]}
-            rows={paged}
+            rows={filtered}
             keyField="id"
             emptyMessage="No media links found."
           />
@@ -328,18 +348,18 @@ export default function AdminBrokenLinksPage() {
           {totalPages > 1 && (
             <div className="flex items-center justify-between rounded-lg border border-wk-border bg-wk-surface px-4 py-3">
               <span className="text-[12px] text-wk-text-muted">
-                Page {page + 1} of {totalPages} ({filtered.length} total)
+                Page {page + 1} of {totalPages} ({totalCount.toLocaleString()} total)
               </span>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => setPage((p) => Math.max(0, p - 1))}
+                  onClick={() => handlePageChange(Math.max(0, page - 1))}
                   disabled={page === 0}
                   className="rounded-md border border-wk-border px-3 py-1.5 text-[12px] font-semibold text-wk-text hover:bg-wk-surface-raised disabled:opacity-50"
                 >
                   Previous
                 </button>
                 <button
-                  onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                  onClick={() => handlePageChange(Math.min(totalPages - 1, page + 1))}
                   disabled={page >= totalPages - 1}
                   className="rounded-md border border-wk-border px-3 py-1.5 text-[12px] font-semibold text-wk-text hover:bg-wk-surface-raised disabled:opacity-50"
                 >

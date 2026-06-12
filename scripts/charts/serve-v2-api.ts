@@ -7,23 +7,23 @@ import {
 import { repairedResponse as publicIndexResponse } from "./repaired-content-api";
 import { repairedDetailResponse as publicDetailResponse } from "./repaired-content-details-api";
 import {
-  applyApprovedReleaseShellSuggestions,
   buildReleaseShellEnrichmentContexts,
   createRegistryEnrichmentPool,
   getReleaseShellCanonicalWriteEvents,
   listReleaseShellEnrichmentContexts,
-  previewApprovedReleaseShellSuggestions,
-  updateReleaseShellLifecycleStatus,
-  updateReleaseShellSuggestionDecision,
   type ReleaseShellLookupInput,
 } from "../registry/enrichment-review-runtime-api";
+// Note: applyApprovedReleaseShellSuggestions, previewApprovedReleaseShellSuggestions,
+// updateReleaseShellLifecycleStatus, updateReleaseShellSuggestionDecision
+// have been intentionally removed from this public API server.
+// All registry write operations go through serve-registry-admin-api.ts (port 4177).
 
 // ── NOTE ─────────────────────────────────────────────────────────────────────
-// Registry enrichment-review routes are also served by the dedicated
-// scripts/registry/serve-registry-admin-api.ts server (port 4177).
-// The routes below are maintained here for backward-compatibility with the
-// /__wakilisha-v2-api vite proxy. New development should use the registry
-// admin API server directly.
+// Registry enrichment-review WRITE routes have been removed from this server.
+// This server is read-only (public chart/content API).
+// All registry write operations must go through the dedicated admin registry
+// API server (scripts/registry/serve-registry-admin-api.ts, port 4177) which
+// enforces Supabase JWT + capability checks per route.
 // ─────────────────────────────────────────────────────────────────────────────
 
 type Row = Record<string, unknown>;
@@ -199,26 +199,8 @@ async function route(req: http.IncomingMessage, res: http.ServerResponse) {
       parts[2] === "release-shells" &&
       parts[4] === "lifecycle"
     ) {
-      if (req.method !== "POST") {
-        return error(res, 405, "method_not_allowed", "Only POST is supported for release shell lifecycle updates.");
-      }
-
-      const registryEntityId = parts[3];
-      const body = await readJsonBody(req);
-      const status = String((body as { status?: unknown }).status ?? "").trim();
-      const reason = String((body as { reason?: unknown }).reason ?? "").trim();
-
-      if (status !== "resolved" && status !== "reopened") {
-        return error(res, 400, "invalid_request", "Expected lifecycle status to be resolved or reopened.");
-      }
-
-      const lifecycle = await updateReleaseShellLifecycleStatus(getEnrichmentPool(), registryEntityId, status, reason);
-
-      return json(res, 200, envelope({ lifecycle }, {
-        resource: "registry-enrichment-review",
-        action: "release-shell-lifecycle",
-        registryEntityId,
-      }));
+      // ⛔ P0 Security: write routes removed from public API — use admin registry API on port 4177
+      return error(res, 410, "gone", "Registry write routes have been removed from the public API. Use the admin registry API.");
     }
 
     if (
@@ -258,66 +240,18 @@ async function route(req: http.IncomingMessage, res: http.ServerResponse) {
         return error(res, 405, "method_not_allowed", "Only POST is supported for suggestion decisions.");
       }
 
-      const suggestionId = parts[4];
-      const body = await readJsonBody(req);
-      const decisionStatus = String((body as { decisionStatus?: unknown }).decisionStatus ?? "").trim();
-
-      if (decisionStatus !== "approved" && decisionStatus !== "rejected" && decisionStatus !== "needs_review") {
-        return error(res, 400, "invalid_request", "Expected decisionStatus to be approved, rejected, or needs_review.");
-      }
-
-      const decision = await updateReleaseShellSuggestionDecision(
-        getEnrichmentPool(),
-        suggestionId,
-        decisionStatus,
-      );
-
-      return json(res, 200, envelope({ decision }, {
-        resource: "registry-enrichment-review",
-        action: "release-shell-suggestion-decision",
-        suggestionId,
-      }));
+      // ⛔ P0 Security: suggestion decision writes removed from public API — use admin registry API on port 4177
+      return error(res, 410, "gone", "Registry write routes have been removed from the public API. Use the admin registry API.");
     }
 
     if (parts.join("/") === "registry/enrichment-review/release-shells/preview-apply") {
-      if (req.method !== "POST") {
-        return error(res, 405, "method_not_allowed", "Only POST is supported for canonical application preview.");
-      }
-
-      const body = await readJsonBody(req);
-      const registryEntityId = String((body as { registryEntityId?: unknown }).registryEntityId ?? "").trim();
-
-      if (!registryEntityId) {
-        return error(res, 400, "invalid_request", "Expected JSON body with registryEntityId.");
-      }
-
-      const preview = await previewApprovedReleaseShellSuggestions(getEnrichmentPool(), registryEntityId);
-
-      return json(res, 200, envelope(preview, {
-        resource: "registry-enrichment-review",
-        action: "preview-apply-approved-release-shell-suggestions",
-      }));
+      // ⛔ P0 Security: preview-apply removed from public API — use admin registry API on port 4177
+      return error(res, 410, "gone", "Registry write routes have been removed from the public API. Use the admin registry API.");
     }
 
     if (parts.join("/") === "registry/enrichment-review/release-shells/apply-approved") {
-      if (req.method !== "POST") {
-        return error(res, 405, "method_not_allowed", "Only POST is supported for canonical application.");
-      }
-
-      const body = await readJsonBody(req);
-      const registryEntityId = String((body as { registryEntityId?: unknown }).registryEntityId ?? "").trim();
-
-      if (!registryEntityId) {
-        return error(res, 400, "invalid_request", "Expected JSON body with registryEntityId.");
-      }
-
-      const result = await applyApprovedReleaseShellSuggestions(getEnrichmentPool(), registryEntityId);
-      const status = result.failed.length > 0 ? 409 : 200;
-
-      return json(res, status, envelope(result, {
-        resource: "registry-enrichment-review",
-        action: "apply-approved-release-shell-suggestions",
-      }));
+      // ⛔ P0 Security: apply-approved removed from public API — use admin registry API on port 4177
+      return error(res, 410, "gone", "Registry write routes have been removed from the public API. Use the admin registry API.");
     }
 
     if (parts.join("/") === "registry/enrichment-review/release-shells") {

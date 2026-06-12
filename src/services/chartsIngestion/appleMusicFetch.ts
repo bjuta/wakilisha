@@ -5,7 +5,6 @@
  */
 
 import type { NormalizedChartRow } from "./ingestStudioTypes";
-import { generateMockProviderRows, getMockProviderError } from "./mockTracks";
 
 // ─── Apple Music API Types ───
 interface AppleMusicSong {
@@ -197,24 +196,13 @@ export async function fetchFromAppleMusic(
   // Check if developer token is available
   const devToken = APPLE_MUSIC_DEV_TOKEN;
   if (!devToken) {
-    const mockError = getMockProviderError(sourceUrl, "apple_music");
-    if (mockError) {
-      return {
-        success: false,
-        normalizedRows: [],
-        error: `Apple Music developer token not configured. Set VITE_APPLE_MUSIC_DEVELOPER_TOKEN in .env.local. Also: ${mockError}`,
-        rawPayload: { credentialError: true, sourceUrl },
-        warnings: ["Apple Music developer token not available — mock data used"],
-        metrics: { fetchedCount: 0, normalizedCount: 0, droppedCount: 0, durationMs: Math.round(performance.now() - start) },
-      };
-    }
-    const mockRows = generateMockProviderRows(sourceUrl, market, maxRows, "apple_music");
     return {
-      success: true,
-      normalizedRows: mockRows,
-      rawPayload: { mock: true, sourceUrl, count: mockRows.length },
-      warnings: ["Apple Music developer token not available — mock data used for development. Set VITE_APPLE_MUSIC_DEVELOPER_TOKEN to fetch real data."],
-      metrics: { fetchedCount: mockRows.length, normalizedCount: mockRows.length, droppedCount: 0, durationMs: Math.round(performance.now() - start) },
+      success: false,
+      normalizedRows: [],
+      error: "Apple Music developer token not configured. Set VITE_APPLE_MUSIC_DEVELOPER_TOKEN in .env.local.",
+      rawPayload: { credentialError: true, sourceUrl },
+      warnings: ["Apple Music developer token not available — no data fetched"],
+      metrics: { fetchedCount: 0, normalizedCount: 0, droppedCount: 0, durationMs: Math.round(performance.now() - start) },
     };
   }
 

@@ -43,6 +43,7 @@ const NAV_GROUPS: NavGroup[] = [
     { path: "/admin/media/library", label: "Media Library", icon: "Image", requiredCapability: "manage_media_library" },
     { path: "/admin/media/missing", label: "Missing Images", icon: "ImageOff", badgeKey: "missingImages", requiredCapability: "view_missing_images" },
     { path: "/admin/media/broken", label: "Broken Links", icon: "LinkBreak", badgeKey: "brokenLinks", requiredCapability: "view_broken_links" },
+    { path: "/admin/media/migrate", label: "Migrate Images", icon: "Download", requiredCapability: "manage_media_library" },
   ] },
   { label: "Data & Imports", visible: (can) => can("view_review_queue") || can("view_relationships") || can("view_imports"), items: [
     { path: "/admin/review/queue", label: "Review Queue", icon: "GitPullRequest", badgeKey: "reviewQueue", requiredCapability: "view_review_queue" },

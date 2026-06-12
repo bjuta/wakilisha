@@ -9,7 +9,7 @@ import { decodeHtmlEntities } from "@/utils/decodeHtmlEntities";
 interface Guide {
   slug: string;
   title: string | null;
-  content_html: string | null;
+  content: string | null;
   wp_status: string | null;
   created_at: string;
   updated_at: string;
@@ -26,7 +26,7 @@ export default function AdminGuidesPage() {
     async function load() {
       const { data, error } = await supabase
         .from("wk_guides")
-        .select("slug, title, content_html, wp_status, created_at, updated_at")
+        .select("slug, title, content, wp_status, created_at, updated_at")
         .order("created_at", { ascending: false })
         .limit(200);
 
