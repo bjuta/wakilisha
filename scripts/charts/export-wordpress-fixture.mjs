@@ -43,6 +43,15 @@ function slugify(value) {
     .replace(/\s+/g, ' ');
 }
 
+function isoDate(value) {
+  // mysql2 returns DATE columns as JS Date objects — normalize to YYYY-MM-DD
+  if (value instanceof Date && !isNaN(value)) {
+    return value.toISOString().slice(0, 10);
+  }
+  var s = String(value ?? '').trim();
+  return s.slice(0, 10) || s;
+}
+
 function normalizedKey(trackTitle, artistName) {
   return `${slugify(trackTitle)}::${slugify(artistName)}`;
 }
@@ -120,7 +129,7 @@ async function loadEditions(db, chartSlug) {
       chart_size: r.chart_size != null ? Number(r.chart_size) : null,
       provider: clean(r.provider),
       source_url: r.source_url ? clean(r.source_url) : null,
-      edition_date: clean(r.edition_date),
+      edition_date: isoDate(r.edition_date),
       status: clean(r.status),
       ingest_summary: r.ingest_summary ? (typeof r.ingest_summary === 'string' ? r.ingest_summary : clean(r.ingest_summary)) : null,
       methodology_version: clean(r.methodology_version),
@@ -229,7 +238,7 @@ async function loadPreviousEditionEntries(db, chartSlug, currentEditionDate) {
   }
 
   var prevEditionId = Number(rows[0].id);
-  var prevEditionDate = clean(rows[0].edition_date);
+  var prevEditionDate = isoDate(rows[0].edition_date);
   var prevItems = await loadEditionItems(db, prevEditionId);
 
   var entries = [];

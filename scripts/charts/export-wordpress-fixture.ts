@@ -70,6 +70,15 @@ function slugify(value: string): string {
     .replace(/\s+/g, ' ');
 }
 
+function isoDate(value: unknown): string {
+  // mysql2 returns DATE columns as JS Date objects — normalize to YYYY-MM-DD
+  if (value instanceof Date && !isNaN(value.getTime())) {
+    return value.toISOString().slice(0, 10);
+  }
+  const s = String(value ?? '').trim();
+  return s.slice(0, 10) || s;
+}
+
 function normalizedKey(trackTitle: string, artistName: string): string {
   return `${slugify(trackTitle)}::${slugify(artistName)}`;
 }
@@ -274,7 +283,7 @@ async function loadEditions(
     title: clean(r.title),
     slug: clean(r.slug),
     status: clean(r.status),
-    edition_date: clean(r.edition_date),
+    edition_date: isoDate(r.edition_date),
     chart_id: Number(r.chart_id),
     week_number: r.week_number != null ? Number(r.week_number) : null,
     year: r.year != null ? Number(r.year) : null,
