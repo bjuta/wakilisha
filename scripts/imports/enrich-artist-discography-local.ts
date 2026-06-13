@@ -270,13 +270,28 @@ async function main() {
       console.log(`[enrich] DEBUG targetNames: ${JSON.stringify(targetNames)}`);
 
       // Show a sample of shell_artist names and shell artist_name_raw values
-      const saNames = [...new Set(wpShellArtists.map(sa => clean(sa.artist_name)))].slice(0, 20);
-      console.log(`[enrich] DEBUG sample shell_artists.artist_name (${saNames.length} unique of ${wpShellArtists.length}):`);
+      const saNames = [...new Set(wpShellArtists.map(sa => clean(sa.artist_name)))].filter(Boolean);
+      console.log(`[enrich] DEBUG all unique shell_artists.artist_name (${saNames.length}):`);
       saNames.forEach(n => console.log(`[enrich] DEBUG   "${n}"`));
 
-      const rawNames = [...new Set(wpShells.map(s => clean(s.artist_name_raw)))].filter(Boolean).slice(0, 20);
-      console.log(`[enrich] DEBUG sample shells.artist_name_raw (${rawNames.length} unique of ${wpShells.length}):`);
+      const rawNames = [...new Set(wpShells.map(s => clean(s.artist_name_raw)))].filter(Boolean);
+      console.log(`[enrich] DEBUG all unique shells.artist_name_raw (${rawNames.length}):`);
       rawNames.forEach(n => console.log(`[enrich] DEBUG   "${n}"`));
+
+      // Token search: check each token in the target name individually
+      const tokens = slugName.split(" ").filter(t => t.length > 1);
+      console.log(`[enrich] DEBUG token search for tokens: ${JSON.stringify(tokens)}`);
+      for (const tok of tokens) {
+        const saHits = wpShellArtists.filter(sa => clean(sa.artist_name).toLowerCase().includes(tok));
+        const shHits = wpShells.filter(s => clean(s.artist_name_raw).toLowerCase().includes(tok));
+        console.log(`[enrich] DEBUG   token "${tok}": ${saHits.length} shell_artists, ${shHits.length} shells`);
+        if (saHits.length > 0) {
+          saHits.slice(0, 5).forEach(sa => console.log(`[enrich] DEBUG     sa: shell_id=${sa.shell_id} artist_name="${clean(sa.artist_name)}"`));
+        }
+        if (shHits.length > 0) {
+          shHits.slice(0, 5).forEach(s => console.log(`[enrich] DEBUG     sh: id=${s.id} artist_name_raw="${clean(s.artist_name_raw)}"`));
+        }
+      }
 
       // Also show shell_artists with matching post_id approach
       if (targetArtist) {
