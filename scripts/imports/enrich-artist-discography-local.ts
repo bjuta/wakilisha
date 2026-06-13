@@ -41,7 +41,7 @@ const DATABASE_URL = required(process.env.DATABASE_URL, "DATABASE_URL");
 // ── Utils ──────────────────────────────────────────────────────────────────
 function clean(v: unknown): string { return String(v ?? "").trim(); }
 function slugify(s: string): string {
-  return s.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 160);
+  return s.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+/g, "").slice(0, 160);
 }
 function parseDate(v: unknown): string | null {
   if (!v) return null; const s = String(v).trim();
