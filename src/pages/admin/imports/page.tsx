@@ -22,6 +22,7 @@ import {
   createDatabaseRun,
 } from "@/services/wordpressConnectService";
 import { uploadZipAndCreateIngestionRun } from "@/services/migrationImportJobs";
+import { supabase } from "@/lib/supabase";
 
 type ImportMethod = "wordpress" | "database" | "zip";
 
@@ -35,6 +36,198 @@ const STEPS: { id: WizardStep; number: string; label: string; sub: string }[] = 
   { id: "finalize", number: "4", label: "Finalize", sub: "Publish" },
   { id: "complete", number: "✓", label: "Done", sub: "Summary" },
 ];
+
+// ═══════════════════════════════════════════
+// Discography Enrichment Panel
+// ═══════════════════════════════════════════
+
+type EnrichStats = {
+  wp_artists: number;
+  wp_releases: number;
+  wp_tracks: number;
+  wp_track_artists: number;
+  wp_release_shell_artists: number;
+  wp_release_shell_tracks: number;
+  artists_enriched: number;
+  releases_upserted: number;
+  tracks_upserted: number;
+  release_artists_upserted: number;
+  release_tracks_upserted: number;
+  errors: number;
+  skipped_no_registry_match: number;
+};
+
+function DiscographyEnrichmentPanel() {
+  const [host, setHost] = useState("127.0.0.1");
+  const [port, setPort] = useState(3306);
+  const [user, setUser] = useState("bn_wordpress");
+  const [password, setPassword] = useState("");
+  const [database, setDatabase] = useState("bitnami_wordpress");
+  const [prefix, setPrefix] = useState("wp_");
+  const [running, setRunning] = useState(false);
+  const [commit, setCommit] = useState(false);
+  const [result, setResult] = useState<{ success: boolean; stats?: EnrichStats; log?: string[]; error?: string } | null>(null);
+
+  const handleRun = useCallback(async () => {
+    setRunning(true);
+    setResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("enrich-artist-discography", {
+        body: { credentials: { host, port, user, password, database, prefix }, commit },
+      });
+      if (error) { setResult({ success: false, error: error.message }); return; }
+      setResult(data as { success: boolean; stats?: EnrichStats; log?: string[]; error?: string });
+    } catch (err) {
+      setResult({ success: false, error: err instanceof Error ? err.message : "Unknown error" });
+    } finally {
+      setRunning(false);
+    }
+  }, [host, port, user, password, database, prefix, commit]);
+
+  return (
+    <WkSurface className="p-6 mt-8 border-2 border-primary-200">
+      <div className="flex items-start gap-4 mb-5">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-100">
+          <i className="ri-music-2-line text-xl text-primary-600" />
+        </div>
+        <div>
+          <h2 className="text-[16px] font-black text-wk-text">Enrich Artist Discographies from WordPress</h2>
+          <p className="mt-1 text-[12px] text-wk-text-muted leading-5 max-w-2xl">
+            Connects to WordPress MySQL database, reads <strong>wp_wkcharts_release_shells</strong>, <strong>wp_wkcharts_tracks</strong>, and artist/track relationships, then populates <code className="text-[11px] font-mono bg-wk-bg-subtle px-1 rounded">registry_releases</code>, <code className="text-[11px] font-mono bg-wk-bg-subtle px-1 rounded">registry_tracks</code>, <code className="text-[11px] font-mono bg-wk-bg-subtle px-1 rounded">registry_release_artists</code>, and <code className="text-[11px] font-mono bg-wk-bg-subtle px-1 rounded">registry_release_tracks</code>.
+            Artist public profiles will automatically serve the richer discography once this runs.
+          </p>
+        </div>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <label className="block">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-wk-text-muted">Host</span>
+          <input type="text" value={host} onChange={(e) => setHost(e.target.value)}
+            className="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg-subtle px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand"
+            placeholder="127.0.0.1" />
+        </label>
+        <label className="block">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-wk-text-muted">Port</span>
+          <input type="number" value={port} onChange={(e) => setPort(Number(e.target.value))}
+            className="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg-subtle px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand" />
+        </label>
+        <label className="block">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-wk-text-muted">Table Prefix</span>
+          <input type="text" value={prefix} onChange={(e) => setPrefix(e.target.value)}
+            className="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg-subtle px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand" />
+        </label>
+        <label className="block">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-wk-text-muted">User</span>
+          <input type="text" value={user} onChange={(e) => setUser(e.target.value)}
+            className="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg-subtle px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand" />
+        </label>
+        <label className="block">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-wk-text-muted">Password</span>
+          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
+            className="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg-subtle px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand" />
+        </label>
+        <label className="block">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-wk-text-muted">Database</span>
+          <input type="text" value={database} onChange={(e) => setDatabase(e.target.value)}
+            className="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg-subtle px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand" />
+        </label>
+      </div>
+
+      <div className="mt-5 flex flex-wrap items-center gap-4">
+        <label className="flex items-center gap-2.5 cursor-pointer">
+          <input type="checkbox" checked={commit} onChange={(e) => setCommit(e.target.checked)}
+            className="h-4 w-4 accent-primary-500 cursor-pointer" />
+          <span className="text-[13px] font-semibold text-wk-text">Commit changes to database</span>
+          {!commit && (
+            <span className="rounded-full border border-wk-warning/30 bg-wk-warning-soft/50 px-2 py-0.5 text-[10px] font-bold text-wk-warning">
+              Dry Run
+            </span>
+          )}
+          {commit && (
+            <span className="rounded-full border border-wk-danger/30 bg-wk-danger-soft/50 px-2 py-0.5 text-[10px] font-bold text-wk-danger">
+              WRITES TO DB
+            </span>
+          )}
+        </label>
+        <button
+          onClick={handleRun}
+          disabled={running || !host || !user || !password || !database}
+          className="inline-flex items-center gap-2 rounded-xl bg-primary-500 px-5 py-2.5 text-[13px] font-bold text-white whitespace-nowrap hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          {running ? (
+            <><i className="ri-loader-4-line animate-spin" /> {commit ? "Running enrichment..." : "Running dry run..."}</>
+          ) : (
+            <><i className="ri-play-circle-line" /> {commit ? "Run Enrichment" : "Preview (dry run)"}</>
+          )}
+        </button>
+      </div>
+
+      {result && (
+        <div className={`mt-5 rounded-xl border p-5 ${result.success ? "border-wk-success/20 bg-wk-success-soft" : "border-wk-danger/20 bg-wk-danger-soft"}`}>
+          <div className="flex items-center gap-2 mb-3">
+            <WkIcon name={result.success ? "CheckCircle2" : "XCircle"} size={18} className={result.success ? "text-wk-success" : "text-wk-danger"} />
+            <span className={`text-[14px] font-black ${result.success ? "text-wk-text" : "text-wk-danger"}`}>
+              {result.success ? (commit ? "Enrichment complete" : "Dry run complete — no changes written") : "Enrichment failed"}
+            </span>
+          </div>
+          {result.error && <p className="text-[12px] text-wk-danger mb-3">{result.error}</p>}
+          {result.stats && (
+            <div className="grid gap-2 grid-cols-2 sm:grid-cols-4 mb-3">
+              {[
+                { label: "WP Artists", value: result.stats.wp_artists },
+                { label: "WP Releases", value: result.stats.wp_releases },
+                { label: "WP Tracks", value: result.stats.wp_tracks },
+                { label: "Artists Enriched", value: result.stats.artists_enriched },
+                { label: "Releases", value: result.stats.releases_upserted },
+                { label: "Tracks", value: result.stats.tracks_upserted },
+                { label: "Release-Artists", value: result.stats.release_artists_upserted },
+                { label: "Release-Tracks", value: result.stats.release_tracks_upserted },
+                { label: "No Match", value: result.stats.skipped_no_registry_match },
+                { label: "Errors", value: result.stats.errors },
+              ].map((s) => (
+                <div key={s.label} className="rounded-lg border border-white/30 bg-white/40 p-2.5">
+                  <div className={`text-[17px] font-black ${s.label === "Errors" && s.value > 0 ? "text-wk-danger" : "text-wk-text"}`}>{s.value.toLocaleString()}</div>
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-wk-text-muted">{s.label}</div>
+                </div>
+              ))}
+            </div>
+          )}
+          {result.log && result.log.length > 0 && (
+            <details className="mt-2">
+              <summary className="cursor-pointer text-[12px] font-bold text-wk-text-muted">View log ({result.log.length} lines)</summary>
+              <div className="mt-2 max-h-48 overflow-auto rounded-lg border border-wk-border bg-wk-bg-subtle p-3">
+                {result.log.map((line, i) => (
+                  <div key={i} className="text-[11px] font-mono text-wk-text-muted leading-5">{line}</div>
+                ))}
+              </div>
+            </details>
+          )}
+          {result.success && !commit && (
+            <div className="mt-3 rounded-lg border border-wk-warning/30 bg-wk-warning-soft/50 p-3">
+              <p className="text-[12px] font-semibold text-wk-text">
+                This was a dry run. Check the stats above, then tick <strong>"Commit changes"</strong> and run again to write to the database.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="mt-4 rounded-lg border border-wk-warning/20 bg-wk-warning-soft/30 p-3">
+        <div className="flex items-start gap-2">
+          <WkIcon name="AlertCircle" size={14} className="text-wk-warning shrink-0 mt-0.5" />
+          <p className="text-[11px] leading-5 text-wk-text-muted">
+            <strong>Note:</strong> The WordPress MySQL database is on <code className="font-mono bg-wk-bg-subtle px-1 rounded">localhost</code> of your Lightsail server.
+            Supabase Edge Functions cannot reach localhost directly. For this to work, you need either:
+            (a) an SSH tunnel exposing MySQL on a public IP,
+            (b) a direct connection string from within the same network, or
+            (c) run the CLI script <code className="font-mono bg-wk-bg-subtle px-1 rounded">stage-wordpress-database-records.ts</code> directly on the WP server instead.
+            The credentials shown are the WP database credentials from your server.
+          </p>
+        </div>
+      </div>
+    </WkSurface>
+  );
+}
 
 export default function AdminImportsPage() {
   const navigate = useNavigate();
@@ -425,6 +618,9 @@ export default function AdminImportsPage() {
       {step === "zip-done" && zipRun && (
         <ZipDoneStep zipRun={zipRun} zipFile={zipFile} />
       )}
+
+      {/* Discography enrichment — always visible */}
+      <DiscographyEnrichmentPanel />
     </div>
   );
 }

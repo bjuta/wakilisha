@@ -651,6 +651,47 @@ This means:
 
 ---
 
+## Artist Discography Enrichment from WordPress ✅ COMPLETE (June 2026)
+
+### Problem
+
+Artist public profiles were serving discography from `metadata.studio_albums` / `metadata.eps_compilations` — JSON blobs in `registry_artists.metadata` populated during the initial WP import. These blobs had incomplete data: no proper track counts, no ISRC linkage, missing artwork for some releases, and no relationship to `registry_tracks` or `registry_releases`.
+
+The WordPress database has richer, properly structured discography data in:
+- `wp_wkcharts_release_shells` (97 release shells)
+- `wp_wkcharts_release_shell_artists` (582 artist-release links)
+- `wp_wkcharts_release_shell_tracks` (668 track-release links)
+- `wp_wkcharts_tracks` (5,705 tracks)
+- `wp_wkcharts_track_artists` (6,959 track-artist links)
+
+### What Was Built
+
+1. **Edge Function: `enrich-artist-discography`** — Connects to WP MySQL, reads release shells, tracks, and relationship tables, then:
+   - Enriches `registry_artists` bio/image for artists missing those fields
+   - Creates/upserts `registry_releases` from `wp_wkcharts_release_shells`
+   - Creates/upserts `registry_tracks` from `wp_wkcharts_tracks` (ISRC dedup, no duplicates)
+   - Populates `registry_release_artists` from `wp_wkcharts_release_shell_artists`
+   - Populates `registry_release_tracks` from `wp_wkcharts_release_shell_tracks`
+   - Supports dry-run mode (pass `commit: false`) and commit mode (`commit: true`)
+
+2. **`wakilisha-public-api` v16** — Artist detail endpoint now queries `registry_release_artists` → `registry_releases` → `registry_release_tracks` → `registry_tracks` for discography. Falls back to `metadata.studio_albums` / `metadata.eps_compilations` only if no relational data exists. Release detail endpoint also updated to use `registry_release_tracks` join first.
+
+3. **Admin UI trigger** (`/admin/imports`) — `DiscographyEnrichmentPanel` component added at the bottom of the imports page. Accepts WP MySQL credentials, runs dry-run preview showing expected stats, then allows committing. Shows enrichment stats breakdown (WP artists/releases/tracks fetched, registry rows created, errors).
+
+### Architecture Note
+
+The WP MySQL database is on `localhost` of the Lightsail instance — Supabase Edge Functions cannot reach `127.0.0.1` directly. Running this requires either:
+- An SSH tunnel exposing MySQL on a public IP
+- Running the existing CLI script `stage-wordpress-database-records.ts` on the WP server (preferred)
+- The enrichment edge function from within the same VPC if WP is on the same network
+
+### Files
+- `supabase/functions/enrich-artist-discography/index.ts` — New Edge Function (deployed)
+- `supabase/functions/wakilisha-public-api/index.ts` — Updated to v16 with registry-first discography
+- `src/pages/admin/imports/page.tsx` — Added `DiscographyEnrichmentPanel` component
+
+---
+
 ## Normalization Hardening ✅ COMPLETE (June 2026)
 
 ### What We Learned from the Backfill (v1 → v13)
