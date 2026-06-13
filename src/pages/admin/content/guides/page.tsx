@@ -150,7 +150,7 @@ export default function AdminGuidesPage() {
           rows={filtered}
           keyField="slug"
           emptyMessage="No guides found."
-          onRowClick={(row) => navigate(`/admin/content/guides/${row.slug}`)}
+          onRowClick={(row) => navigate(`/admin/content/guides/${row.slug}/edit`)}
         />
       )}
     </div>

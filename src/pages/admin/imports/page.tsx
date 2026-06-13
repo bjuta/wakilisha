@@ -64,6 +64,7 @@ function DiscographyEnrichmentPanel() {
   const [password, setPassword] = useState("");
   const [database, setDatabase] = useState("bitnami_wordpress");
   const [prefix, setPrefix] = useState("wp_");
+  const [artistSlugFilter, setArtistSlugFilter] = useState("");
   const [running, setRunning] = useState(false);
   const [commit, setCommit] = useState(false);
   const [result, setResult] = useState<{ success: boolean; stats?: EnrichStats; log?: string[]; error?: string } | null>(null);
@@ -72,9 +73,9 @@ function DiscographyEnrichmentPanel() {
     setRunning(true);
     setResult(null);
     try {
-      const { data, error } = await supabase.functions.invoke("enrich-artist-discography", {
-        body: { credentials: { host, port, user, password, database, prefix }, commit },
-      });
+      const body: Record<string, unknown> = { credentials: { host, port, user, password, database, prefix }, commit };
+      if (artistSlugFilter.trim()) body.artistSlugFilter = artistSlugFilter.trim();
+      const { data, error } = await supabase.functions.invoke("enrich-artist-discography", { body });
       if (error) { setResult({ success: false, error: error.message }); return; }
       setResult(data as { success: boolean; stats?: EnrichStats; log?: string[]; error?: string });
     } catch (err) {
@@ -82,7 +83,7 @@ function DiscographyEnrichmentPanel() {
     } finally {
       setRunning(false);
     }
-  }, [host, port, user, password, database, prefix, commit]);
+  }, [host, port, user, password, database, prefix, artistSlugFilter, commit]);
 
   return (
     <WkSurface className="p-6 mt-8 border-2 border-primary-200">
@@ -130,6 +131,12 @@ function DiscographyEnrichmentPanel() {
           <span className="text-[11px] font-bold uppercase tracking-wider text-wk-text-muted">Database</span>
           <input type="text" value={database} onChange={(e) => setDatabase(e.target.value)}
             className="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg-subtle px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand" />
+        </label>
+        <label className="block">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-wk-text-muted">Artist Slug Filter (optional)</span>
+          <input type="text" value={artistSlugFilter} onChange={(e) => setArtistSlugFilter(e.target.value)}
+            className="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg-subtle px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand"
+            placeholder="4mr-frank-white" />
         </label>
       </div>
 

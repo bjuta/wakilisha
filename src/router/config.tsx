@@ -16,6 +16,7 @@ import { AdminShell } from "../pages/admin/AdminShell";
 import AdminDashboardPage from "../pages/admin/dashboard/page";
 import AdminArticlesPage from "../pages/admin/content/articles/page";
 import AdminGuidesPage from "../pages/admin/content/guides/page";
+import AdminGuideDetailPage from "../pages/admin/content/guides/detail/page";
 import AdminPagesPage from "../pages/admin/content/pages/page";
 import AdminRegistryOverview from "../pages/admin/registry/page";
 import AdminArtistsPage from "../pages/admin/registry/artists/page";
@@ -134,7 +135,7 @@ import Search from "../pages/search/page";
 
 // Guides
 import GuidesPage from "../pages/guides/page";
-import MobileGuides from "../pages/mobile/guides/page";
+import GuideDetailPage from "../pages/guides/detail/page";
 
 // Vertical pages
 import FilmPage from "../pages/film/page";
@@ -210,7 +211,8 @@ const routes: RouteObject[] = [
       { path: "/categories/:slug", element: <ResponsivePage mobile={<CategoryDetail />} desktop={<CategoryDetail />} /> },
       { path: "/tags", element: <ResponsivePage mobile={<TagsIndex />} desktop={<TagsIndex />} /> },
       { path: "/tags/:slug", element: <ResponsivePage mobile={<TagDetail />} desktop={<TagDetail />} /> },
-      { path: "/guides", element: <ResponsivePage mobile={<MobileGuides />} desktop={<GuidesPage />} /> },
+      { path: "/guides/:slug", element: <ResponsivePage mobile={<GuideDetailPage />} desktop={<GuideDetailPage />} /> },
+      { path: "/guides", element: <ResponsivePage mobile={<GuidesPage />} desktop={<GuidesPage />} /> },
       { path: "/film", element: <ResponsivePage mobile={<MobileFilm />} desktop={<FilmPage />} /> },
       { path: "/fashion", element: <ResponsivePage mobile={<MobileFashion />} desktop={<FashionPage />} /> },
       { path: "/food", element: <ResponsivePage mobile={<MobileFood />} desktop={<FoodPage />} /> },
@@ -238,6 +240,7 @@ const routes: RouteObject[] = [
           { path: "articles/:slug", element: <AdminArticleDetailPage /> },
           { path: "articles/trash", element: <AdminTrashPage /> },
           { path: "guides", element: <AdminGuidesPage /> },
+          { path: "guides/:slug/edit", element: <AdminGuideDetailPage /> },
           { path: "pages", element: <AdminPagesPage /> },
           { path: "publishing", element: <AdminPublishingDashboardPage /> },
           { path: "archive", element: <AdminContentArchivePage /> },

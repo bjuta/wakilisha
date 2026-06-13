@@ -1,0 +1,181 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+
+const FULL_GUIDE_DATA = {
+  hero: {
+    hero_image: "https://wakilisha.africa/wp-content/plugins/wakilisha-v2.0.201-cpt-cleanup/assets/guides/in-minor-keys/p21-img1.webp",
+    issue_badge: "Issue 001 · May 2026",
+    title: "In Minor Keys",
+    curator_label: "Curator · Venice Biennale Arte 2026",
+    curator_name: "Koyo Kouoh | In Minor Keys",
+    event_date: "9 May to 22 November 2026 · Venice, Italy",
+    locations: "Giardini · Arsenale · Locations across Venice",
+    buttons: [
+      { label: "Download Free Guide", url: "#download", variant: "primary" },
+      { label: "Explore Preview", url: "#inside", variant: "secondary" },
+    ],
+    stats: [
+      { number: "110", label: "Artists in Main Exhibition" },
+      { number: "13", label: "African National Pavilions" },
+      { number: "4", label: "African Schools" },
+      { number: "1", label: "African Curator" },
+    ],
+  },
+  quote: {
+    quote: "In our myths, in our songs, that is where the seeds are. It is not possible to constantly hone on the crisis. You have to have the love and you have to have the magic, that is also life.",
+    attribution: "Toni Morrison, 1977, cited by Koyo Kouoh in her curatorial text",
+  },
+  context: {
+    eyebrow: "How to read the exhibition",
+    title: "Not a checklist.",
+    title_italic: "A score.",
+    label: "Minor keys",
+    columns: [
+      { title: "Undercurrents", body: "Kouoh's exhibition is not organised like a rigid map. It moves through motifs: shrines, procession, schools, oases, rest and enchantment." },
+      { title: "Dakar as source", body: "The curatorial team describes the decisive work as happening under a mango tree at RAW Material Company, Kouoh's Dakar institution." },
+      { title: "Schools as infrastructure", body: "The Schools are artist-centred institutions where knowledge is gathered, shared and regenerated outside the commercial market." },
+      { title: "Slow looking", body: "The guide treats Venice as a listening route. The point is not to see everything, but to find the frequencies that carry African presence." },
+    ],
+  },
+  preview: {
+    eyebrow: "Inside the guide",
+    title: "Six ways into",
+    title_italic: "Venice",
+    label: "24 pages",
+    cards: [
+      { number: "01", label: "The Curator", title: "Koyo Kouoh", description: "The vision, structure and moral intelligence behind In Minor Keys.", image: "https://wakilisha.africa/wp-content/plugins/wakilisha-v2.0.201-cpt-cleanup/assets/guides/in-minor-keys/p05-img1.webp", size: "large" },
+      { number: "02", label: "Main Exhibition", title: "African and diaspora artists", description: "First routes into the artists, materials and questions.", image: "https://wakilisha.africa/wp-content/plugins/wakilisha-v2.0.201-cpt-cleanup/assets/guides/in-minor-keys/p07-img1.webp" },
+      { number: "03", label: "Pavilions", title: "13 African nations", description: "Country, curator, artists, venue and first reason to pay attention.", image: "https://wakilisha.africa/wp-content/plugins/wakilisha-v2.0.201-cpt-cleanup/assets/guides/in-minor-keys/p15-img1.webp" },
+      { number: "04", label: "Kenya", title: "No pavilion. Serious presence.", description: "Wangechi Mutu, Kaloki Nyamai and NCAI.", image: "https://wakilisha.africa/wp-content/plugins/wakilisha-v2.0.201-cpt-cleanup/assets/guides/in-minor-keys/p16-img1.webp" },
+      { number: "05", label: "Schools / Route / Undercurrents", title: "Schools, routes and undercurrents", description: "Institutions, oases, procession and slow looking beneath the main map.", image: "https://wakilisha.africa/wp-content/plugins/wakilisha-v2.0.201-cpt-cleanup/assets/guides/in-minor-keys/p17-img3.webp" },
+      { number: "06", label: "Practical info", title: "Dates, tickets and routes", description: "Start here before planning your route.", image: "https://wakilisha.africa/wp-content/plugins/wakilisha-v2.0.201-cpt-cleanup/assets/guides/in-minor-keys/p21-img1.webp" },
+    ],
+  },
+  curator: {
+    eyebrow: "01 | The Curator",
+    title: "Koyo",
+    title_italic: "Kouoh",
+    image: "https://wakilisha.africa/wp-content/plugins/wakilisha-v2.0.201-cpt-cleanup/assets/guides/in-minor-keys/p19-img1.webp",
+    bio: "Kouoh had already shaped the theoretical framework, artist list, catalogue authors, graphic identity and exhibition architecture before her death in May 2025. That makes In Minor Keys less a posthumous tribute than a final transmission carried forward by her chosen team.",
+    timeline: [
+      { year: "2008", event: "Founded RAW Material Company, Dakar" },
+      { year: "2020", event: "Executive Director and Chief Curator, Zeitz MOCAA" },
+      { year: "2024", event: "Appointed Artistic Director, Venice Biennale Arte" },
+      { year: "2026", event: "In Minor Keys opens through her relational geography of artists, schools and encounters" },
+    ],
+  },
+  artists: {
+    eyebrow: "Main exhibition",
+    title: "Meet the",
+    title_italic: "field",
+    label: "Drag to explore",
+    artists: [
+      { name: "Wangechi Mutu", origin: "Kenya", location: "New York and Nairobi", image: "https://wakilisha.africa/wp-content/plugins/wakilisha-v2.0.201-cpt-cleanup/assets/guides/in-minor-keys/p07-img1.webp" },
+      { name: "Kaloki Nyamai", origin: "Kenya", location: "Nairobi", image: "https://wakilisha.africa/wp-content/plugins/wakilisha-v2.0.201-cpt-cleanup/assets/guides/in-minor-keys/p17-img2.webp" },
+      { name: "Issa Samb", origin: "Senegal", location: "Dakar", image: "https://wakilisha.africa/wp-content/plugins/wakilisha-v2.0.201-cpt-cleanup/assets/guides/in-minor-keys/p08-img1.webp" },
+      { name: "Beverly Buchanan", origin: "USA", location: "Fuquay, NC", image: "https://wakilisha.africa/wp-content/plugins/wakilisha-v2.0.201-cpt-cleanup/assets/guides/in-minor-keys/p08-img2.webp" },
+      { name: "Nairobi Contemporary Art Institute", origin: "Kenya", location: "Nairobi", image: "https://wakilisha.africa/wp-content/plugins/wakilisha-v2.0.201-cpt-cleanup/assets/guides/in-minor-keys/p17-img3.webp" },
+      { name: "Nairobi as memory, material and argument", origin: "Kenya", location: "Field note", image: "https://wakilisha.africa/wp-content/plugins/wakilisha-v2.0.201-cpt-cleanup/assets/guides/in-minor-keys/p18-img1.webp" },
+      { name: "Practical routes through the city", origin: "Venice", location: "Visitor guide", image: "https://wakilisha.africa/wp-content/plugins/wakilisha-v2.0.201-cpt-cleanup/assets/guides/in-minor-keys/p21-img1.webp" },
+    ],
+  },
+  pavilions: {
+    eyebrow: "03 | African Pavilions",
+    title: "National presences,",
+    title_italic: "mapped",
+    label: "13 pavilions",
+    pavilions: [
+      { number: "01", country: "Cameroon", title: "NZENDA: The Path Home", type: "Pavilion", venue: "Palazzo Canal, Dorsoduro 3121", route: "Dorsoduro", flag: "CM", commissioner: "Guy Martial Ndongo Mendougan, Ministry of Art and Culture", curator: "Beya Gille Gacha", exhibitors: "Beya Gille Gacha, Jail Time Records, Sylvie Njobati, Bienvenue Fotso, Zora Snake and Neals Niat", context: "Cameroon's pavilion frames national presence as a return route. The title points to home as path, memory and responsibility, not simply nostalgia.", why: "Follow this pavilion for belonging and return. It is useful for visitors who want to understand how a country can speak through many cultural forms at once.", how_to_read: "Read through homecoming, ancestral memory and contemporary Cameroonian cultural practice." },
+      { number: "02", country: "Congo, Dem. Rep. of", title: "Simba Moto! Seize the Fire!", type: "Pavilion", venue: "Antico Refettorio, Scuola Grande di San Marco", route: "Castello / San Marco route", flag: "CD", commissioner: "Cindy Makiana", curator: "Nadia Yala Kisukidi", exhibitors: "Sammy Baloji, Arlette Bashizi, Patrick Bongoy, Damso, Gosette Lubondo, Nelson Makengo, Aime Mpane, Leonard Pongo and Geraldine Tobe", context: "The DRC pavilion is one of the strongest ensemble routes in the African map. It brings together art, image-making, music, philosophy and popular culture around fire as force, danger, memory and political energy.", why: "This pavilion matters because Congolese cultural intelligence is not reduced to mining or trauma. It appears as philosophy, image, sound, public memory and contemporary power.", how_to_read: "Read through fire, extraction histories, urban image cultures and Congolese intellectual life." },
+      { number: "03", country: "Egypt", title: "Silence Pavilion: Between the Tangible and the Intangible", type: "Pavilion", venue: "Giardini", route: "Giardini", flag: "EG", commissioner: "Ministero della Cultura Egiziano, Accademia d'Egitto a Roma", curator: "Armen Agop", exhibitors: "Armen Agop", context: "Egypt's pavilion is a focused solo presentation by Armen Agop. Its language sits close to the exhibition's wider concern with quiet force: silence, restraint, presence and what sculpture can hold without explanation.", why: "The pavilion gives silence a physical form inside the Giardini. It is a counterweight to spectacle and a reminder that presence can be made through restraint.", how_to_read: "Read through sculptural stillness, silence, presence and absence." },
+      { number: "04", country: "Ethiopia", title: "Shapes of Silence", type: "Pavilion", venue: "Palazzo Bollani, Castello 3647", route: "Castello", flag: "ET", commissioner: "Ambassador Demitu Hambisa Bonsa", curator: "Abebaw Ayalew", exhibitors: "Tegene Kunbi", context: "Ethiopia continues its Venice presence through Tegene Kunbi and a pavilion built around silence as form. The focus is less on noise and more on committed continuity, a national voice returning to the exhibition with a clear formal register.", why: "It matters because continued presence is cultural infrastructure. A pavilion does not only announce a country; it helps sustain an international reading of its artists over time.", how_to_read: "Read through continuity, formal restraint and the discipline of staying present." },
+      { number: "05", country: "Equatorial Guinea", title: "The Forest / The Undergrowth", type: "Debut", venue: "Palazzo Dona dalle Rose, Cannaregio 5038 / 5101", route: "Cannaregio", flag: "GQ", commissioner: "Paulo Speller", curator: "Joan Abello Juanpere", exhibitors: "Fernando Nguema Madja with an international ensemble", context: "Equatorial Guinea appears for the first time at the Biennale Arte. The pavilion's forest and undergrowth language gives the debut an ecological and symbolic frame.", why: "First appearances matter. This debut turns visibility into an ecological question, placing forest, identity and hidden cultural ground inside Venice.", how_to_read: "Read through forest, emergence, rootedness and first national visibility." },
+      { number: "06", country: "Guinea", title: "Le Son de l'Art: l'Echo de la Matiere", type: "Debut", venue: "Isola di San Servolo", route: "San Servolo", flag: "GN", commissioner: "Bilia Bah", curator: "Carlo Stragapede", exhibitors: "Bella Bah, Rougui Barry, Fatoumata Kouyate, Pepe Michel Ange Lama, Papa Youssoupha Seck, Sekou Oumar Thiam and a larger ensemble", context: "Guinea's first pavilion is staged on San Servolo with sound and matter as its central invitations. The title asks visitors to think of art as something that resonates physically.", why: "This debut expands the African route beyond the usual Venice paths. To find it, visitors have to follow resonance across the lagoon.", how_to_read: "Read through sound, material memory, island routing and Guinean voice." },
+      { number: "07", country: "Morocco", title: "Asetta", type: "Pavilion", venue: "Arsenale", route: "Arsenale", flag: "MA", commissioner: "Mohamed Benyaacoub", curator: "Meriem Berrada", exhibitors: "Amina Agueznay", context: "Morocco centres Amina Agueznay and the language of weaving. The pavilion brings textile traditions into the Arsenale as structure, method and thought.", why: "The pavilion matters because it treats textile as a way of thinking. Weaving is not decoration here; it is architecture, memory and conceptual form.", how_to_read: "Read through textile, craft intelligence, North African material histories and conceptual weaving." },
+      { number: "08", country: "Senegal", title: "WURUS", type: "Pavilion", venue: "Palazzo Navagero, Riva degli Schiavoni 4145", route: "Riva degli Schiavoni", flag: "SN", commissioner: "Oumar Sall", curator: "Massamba Mbaye", exhibitors: "Caroline Gueye", context: "Senegal's pavilion sits close to the intellectual weather of this edition. Dakar is not just a location in Kouoh's biography; it is where RAW Material Company shaped a model for art, knowledge and society.", why: "This pavilion matters because national presence and Kouoh's Dakar lineage meet here. It gives visitors another way to trace the African infrastructure behind the exhibition.", how_to_read: "Read through Dakar, RAW Material Company, artistic inheritance and Senegalese cultural presence." },
+      { number: "09", country: "Sierra Leone", title: "Mondi Presenti / Worlds of Today", type: "Debut", venue: "Liceo Guggenheim, Sestiere Dorsoduro 2613", route: "Dorsoduro", flag: "SL", commissioner: "Fatima Maada Bio", curator: "Sandro Orlandi Stagl and Willy Montini", exhibitors: "Hawa-Jane Bangura, Ayesha Feisal, Hickmatu Bintu Leigh, Abu Bakarr Mansaray and a wider international ensemble", context: "Sierra Leone enters with its first national pavilion and a title that places the present in plural. The artists and wider ensemble stage the debut as more than arrival.", why: "This pavilion matters because a debut can open institutional doors. It gives Sierra Leonean artists and cultural workers a new international point of reference.", how_to_read: "Read through first presence, contemporary worlds and cultural ambition." },
+      { number: "10", country: "Somalia", title: "Saddexleey", type: "Debut", venue: "Palazzo Caboto, Via Giuseppe Garibaldi 1645, Castello", route: "Castello", flag: "SO", commissioner: "Abdirahman Yusuf Mohamud, Office of the Prime Minister", curator: "Mohamed Mire and Fabio Scrivanti", exhibitors: "Ayan Farah, Asmaa Jama and Warsan Shire", context: "Somalia's debut pavilion gathers Ayan Farah, Asmaa Jama and Warsan Shire under Saddexleey. The route is especially legible through language, poetry, material memory and diaspora experience.", why: "This is a landmark debut because Somali cultural presence enters Venice through artists whose practices already move across image, textile, poetry, language and memory.", how_to_read: "Read through Somali language, diaspora memory, poetry and material presence." },
+      { number: "11", country: "Tanzania", title: "Minor Frequencies: The Inner Life of a Nation", type: "Pavilion", venue: "Gervasuti Foundation, Palazzo Canova and Supernova, Cannaregio", route: "Cannaregio", flag: "TZ", commissioner: "Leah Elias Kihimbi, Ministry of Information, Culture, Arts and Sports", curator: "Lorna Benedict Mashiba and Martina Cavallarin", exhibitors: "Amani Abeid, Valerie Asiimwe Amani and a large ensemble", context: "Tanzania's pavilion directly answers In Minor Keys. The title turns the country into an inner listening field: a place of small signals, layered memory and frequencies that do not need to shout.", why: "It matters because the pavilion does not sit beside the main exhibition's theme. It speaks back to it in its own frequency.", how_to_read: "Read through inner life, listening, quiet force and national interiority." },
+      { number: "12", country: "Uganda", title: "Kampala", type: "Pavilion", venue: "Palazzo Navagero Gallery, Riva degli Schiavoni 4147", route: "Riva degli Schiavoni", flag: "UG", commissioner: "Acaye Kerunen Elizabeth", curator: "Taga Francis Nuwagaba", exhibitors: "Joseph Ntensibe, Lilian Marie Nabulime, Ronex Ahimbisibwe, Lakwena Maciver, Sheila Nakitende, Stacey Gillian Abe and Aloka Mark Trevor", context: "Uganda uses Kampala as place, symbol and starting point. The pavilion gathers artists across generations and practices, turning the capital city into a cultural argument.", why: "This pavilion matters because it lets a city carry national cultural meaning. Kampala becomes a way to read origin, scene, imagination and contemporary Ugandan practice.", how_to_read: "Read through city as archive, Kampala as scene and Uganda's contemporary visual language." },
+      { number: "13", country: "Zimbabwe", title: "Second Nature | Manyonga", type: "Pavilion", venue: "Santa Maria della Pieta, Castello 3701", route: "Castello", flag: "ZW", commissioner: "Raphael Chikukwa, National Gallery of Zimbabwe", curator: "Fadzai Veronica Muchemwa", exhibitors: "Gideon Gomo, Eva Raath, Felix Shumba, Franklyn Dzingai and Pardon Mapondera", context: "Zimbabwe's pavilion brings together artists through local language, cosmology and layered visions of experience. Manyonga gives the title a rooted texture.", why: "It matters because it refuses a flat national story. The pavilion carries Zimbabwean experience through language, cosmology, material practice and multiple visual registers.", how_to_read: "Read through language, cosmology, manyonga, place and layered Zimbabwean memory." },
+    ],
+    field_note: "Do not treat the African pavilions as a side route. They are one of the clearest ways to read how nations, artists and cultural institutions choose to speak when the world is watching.",
+  },
+  focus: {
+    number: "04",
+    eyebrow: "04 | A WAKILISHA focus",
+    title: "Kenya at",
+    title_italic: "Venice",
+    description: "No national pavilion. Still a serious Kenyan presence through Wangechi Mutu, Kaloki Nyamai and Nairobi Contemporary Art Institute. Kenya enters through image, material and institution: Mutu wilds the Central Pavilion facade with plants and insect homes, Nyamai carries sisal into painting, and NCAI appears as one of the Schools.",
+    cards: [
+      { number: "01", label: "Living architecture", title: "Wangechi Mutu", description: "Plants and insect homes gradually wild the Central Pavilion facade.", image: "https://wakilisha.africa/wp-content/plugins/wakilisha-v2.0.201-cpt-cleanup/assets/guides/in-minor-keys/p17-img1.webp" },
+      { number: "02", label: "Sisal as history", title: "Kaloki Nyamai", description: "Sisal enters painting as Kenyan material memory and place.", image: "https://wakilisha.africa/wp-content/plugins/wakilisha-v2.0.201-cpt-cleanup/assets/guides/in-minor-keys/p17-img2.webp" },
+      { number: "03", label: "Institutional voice", title: "NCAI", description: "Nairobi appears as one of the Schools, not as an afterthought.", image: "https://wakilisha.africa/wp-content/plugins/wakilisha-v2.0.201-cpt-cleanup/assets/guides/in-minor-keys/p17-img3.webp" },
+    ],
+    note: "This is not a distant story. Nairobi enters Venice as memory, material, image and argument.",
+  },
+  sample: {
+    eyebrow: "Read a sample",
+    title: "Open the",
+    title_italic: "guide",
+    label: "Swipe or scroll",
+    pages: [
+      { image: "https://wakilisha.africa/wp-content/plugins/wakilisha-v2.0.201-cpt-cleanup/assets/guides/in-minor-keys/sample-pages/page-01.webp", alt: "Sample page 1" },
+      { image: "https://wakilisha.africa/wp-content/plugins/wakilisha-v2.0.201-cpt-cleanup/assets/guides/in-minor-keys/sample-pages/page-02.webp", alt: "Sample page 2" },
+      { image: "https://wakilisha.africa/wp-content/plugins/wakilisha-v2.0.201-cpt-cleanup/assets/guides/in-minor-keys/sample-pages/page-03.webp", alt: "Sample page 3" },
+      { image: "https://wakilisha.africa/wp-content/plugins/wakilisha-v2.0.201-cpt-cleanup/assets/guides/in-minor-keys/sample-pages/page-05.webp", alt: "Sample page 4" },
+      { image: "https://wakilisha.africa/wp-content/plugins/wakilisha-v2.0.201-cpt-cleanup/assets/guides/in-minor-keys/sample-pages/page-09.webp", alt: "Sample page 5" },
+      { image: "https://wakilisha.africa/wp-content/plugins/wakilisha-v2.0.201-cpt-cleanup/assets/guides/in-minor-keys/sample-pages/page-13.webp", alt: "Sample page 6" },
+      { image: "https://wakilisha.africa/wp-content/plugins/wakilisha-v2.0.201-cpt-cleanup/assets/guides/in-minor-keys/sample-pages/page-17.webp", alt: "Sample page 7" },
+      { image: "https://wakilisha.africa/wp-content/plugins/wakilisha-v2.0.201-cpt-cleanup/assets/guides/in-minor-keys/sample-pages/page-21.webp", alt: "Sample page 8" },
+      { image: "https://wakilisha.africa/wp-content/plugins/wakilisha-v2.0.201-cpt-cleanup/assets/guides/in-minor-keys/sample-pages/page-22.webp", alt: "Sample page 9" },
+      { image: "https://wakilisha.africa/wp-content/plugins/wakilisha-v2.0.201-cpt-cleanup/assets/guides/in-minor-keys/sample-pages/page-23.webp", alt: "Sample page 10" },
+    ],
+  },
+  download: {
+    eyebrow: "Free PDF",
+    title: "Get the full",
+    title_italic: "24-page guide",
+    description: "Download the complete field guide. We will send the PDF straight to your inbox.",
+    features: [
+      "13 African national pavilions mapped with clearer context",
+      "African and diaspora artists read through motifs, not only names",
+      "Kenya focus with Wangechi Mutu, Kaloki Nyamai and NCAI",
+      "Schools, shrines, procession, oases and rest as route markers",
+      "Dates, venues, tickets and visitor basics",
+    ],
+  },
+};
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "POST", "Access-Control-Allow-Headers": "authorization, content-type" } });
+  }
+
+  const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+  const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    return new Response(JSON.stringify({ error: "Missing env vars" }), { status: 500, headers: { "Content-Type": "application/json" } });
+  }
+
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+  // Build sections array from the full data
+  const sections = Object.entries(FULL_GUIDE_DATA).map(([key, data]) => ({
+    key,
+    title: key === "hero" ? "Hero" : key === "quote" ? "Quote" : key === "context" ? "How to read the exhibition" : key === "preview" ? "Inside the guide" : key === "curator" ? "The Curator" : key === "artists" ? "Artists" : key === "pavilions" ? "Pavilions" : key === "focus" ? "Kenya at Venice" : key === "sample" ? "Sample Pages" : key === "download" ? "Download" : key,
+    data,
+  }));
+
+  const { data, error } = await supabase
+    .from("guide_pages")
+    .update({ sections, content_html: "In Minor Keys is a WAKILISHA field guide to Biennale Arte 2026.", content_text: "In Minor Keys is a WAKILISHA field guide to Biennale Arte 2026.", updated_at: new Date().toISOString() })
+    .eq("slug", "in-minor-keys")
+    .select();
+
+  if (error) {
+    return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
+  }
+
+  return new Response(JSON.stringify({ success: true, sections_count: sections.length, data }), { status: 200, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
+});

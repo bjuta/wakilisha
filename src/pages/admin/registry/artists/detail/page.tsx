@@ -5,6 +5,7 @@ import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { supabase } from "@/lib/supabase";
 import { useRelatedEntities } from "@/hooks/useRelatedEntities";
 import type { ResolvedRelation } from "@/hooks/useRelatedEntities";
+import { DiscographyPanel } from "./components/DiscographyPanel";
 
 /* ─── Types ─── */
 interface ArtistRecord {
@@ -412,6 +413,9 @@ export default function ArtistDetailPage() {
               </div>
             )}
           </WkSurface>
+
+          {/* Discography — from registry_release_artists */}
+          <DiscographyPanel artistSlug={artist.slug} />
         </div>
 
         {/* Sidebar */}

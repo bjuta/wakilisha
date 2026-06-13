@@ -25,6 +25,7 @@ function normalizeDbUrl(url: string) { try { const u = new URL(url); u.searchPar
 
 const COMMIT = hasFlag("--commit");
 const LIMIT = arg("--limit") ? Number(arg("--limit")) : 0;
+const ARTIST_SLUG = arg("--artist") ?? undefined;
 
 const WP = {
   host: arg("--host") ?? process.env.WP_DB_HOST ?? "localhost",
@@ -139,6 +140,7 @@ async function main() {
   console.log("═══════════════════════════════════════════════════════");
   console.log(`  Mode:       ${COMMIT ? "COMMIT" : "DRY RUN"}`);
   console.log(`  WP MySQL:   ${WP.user}@${WP.socket ? `socket:${WP.socket}` : `${WP.host}:${WP.port}`}/${WP.database}`);
+  if (ARTIST_SLUG) console.log(`  Artist:     ${ARTIST_SLUG}`);
   if (LIMIT > 0) console.log(`  Limit:      ${LIMIT} artists`);
   console.log("═══════════════════════════════════════════════════════\n");
 
@@ -168,6 +170,9 @@ async function main() {
     // 2. Load WP artists
     // ════════════════════════════════════════════════════════════════════
     let wpAQuery = `SELECT id, post_id, slug, display_name, normalized_name, country_iso2, artist_type, apple_artist_id, spotify_artist_id, image_url, status_flags FROM ${t(WP.prefix, "wkcharts_artists")}`;
+    const wpWhere: string[] = [];
+    if (ARTIST_SLUG) wpWhere.push(`slug = '${ARTIST_SLUG.replace(/'/g, "\\'")}'`);
+    if (wpWhere.length > 0) wpAQuery += ` WHERE ${wpWhere.join(" AND ")}`;
     if (LIMIT > 0) wpAQuery += ` LIMIT ${LIMIT}`;
     const [wpARows] = await wp.query(wpAQuery);
     const wpArtists = wpARows as Record<string,unknown>[];
@@ -228,6 +233,15 @@ async function main() {
     // 4. Load WP release shells
     // ════════════════════════════════════════════════════════════════════
     let shellQ = `SELECT id, shell_uuid, status, artist_post_id, artist_name_raw, title_raw, title_normalized, release_type_guess, release_date, artwork_url FROM ${t(WP.prefix, "wkcharts_release_shells")} WHERE status != 'ignored'`;
+    if (ARTIST_SLUG) {
+      // Filter shells to only those linked to the target artist (via artist_post_id → wp_artists.post_id → slug)
+      const targetPostIds = [...wpPostIdToSlug.entries()].filter(([,s]) => s === ARTIST_SLUG).map(([pid]) => pid);
+      if (targetPostIds.length > 0) {
+        shellQ += ` AND artist_post_id IN (${targetPostIds.join(", ")})`;
+      } else {
+        shellQ += ` AND 1=0`; // No matching artist, skip all shells
+      }
+    }
     if (LIMIT > 0) shellQ += ` LIMIT ${LIMIT * 10}`;
     const [shellRows] = await wp.query(shellQ);
     const wpShells = shellRows as Record<string,unknown>[];

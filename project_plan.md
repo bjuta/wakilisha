@@ -715,3 +715,43 @@ Three separate normalize functions across 4 files, all producing different outpu
 5. `test/scoring/normalization.test.ts` — 20+ new edge cases, property-based fuzz tests, fixed false positive
 
 Policy bumped 1.0.1 → 1.0.2. Remaining hardening: golden-file tests, Gate A regression, P4 carry-forward decay, backfill CI byte-for-byte verification.
+
+## Guides: CMS-Driven Architecture ✅ IMPLEMENTED (June 2026)
+
+### Problem
+
+The 3 published guides ("In Minor Keys", "Dakar Biennale 2026", "The Day Reading Changed") were hardcoded in TypeScript — separate data files per guide, separate component sets per guide, and a hardcoded `SUPPORTED_SLUGS` array in the detail page. Adding a new guide or editing an existing one required code changes.
+
+### Architecture
+
+**Section Type System** (`src/pages/guides/detail/sectionTypes.ts`): 21 unified section types — `hero`, `hero_dossier`, `hero_literary`, `quote`, `context_columns`, `numbered_chapters`, `preview_mosaic`, `curator_profile`, `pavilions_grid`, `focus_cards`, `sample_pages`, `download_form`, `numbered_list`, `discipline_grid`, `watchlist`, `timeline`, `follow_form`, `share_bar`, `prose_article`, `next_chapter`, `page_footer`, `artists_grid`. Each type has a standardized data shape with snake_case/camelCase alias support for backward compatibility with imported data.
+
+**Universal Renderers** (`src/pages/guides/detail/sections/`): One component per section type. Each is purely data-driven — reads from a `data` prop, no hardcoded content. Handles all 3 guide variants through the same component.
+
+**Section Router** (`GuideSectionRenderer.tsx`): Maps `section.type` to the correct component. Passes variant hints for hero types and special props (fontSize) for prose_article.
+
+**Data Service** (`src/services/guidePages.ts`): Three functions:
+- `fetchGuidePage(slug)` — returns a single published guide from `guide_pages` table
+- `fetchPublishedGuides()` — returns all published guides for the listing page
+- `updateGuideSections(slug, sections)` — updates sections (admin use)
+
+**Database**: All guide content lives in `guide_pages.sections` (JSONB). Each guide is an ordered array of `{ key, title, type, data }` objects.
+
+**Frontend Pages**:
+- `src/pages/guides/detail/page.tsx` — Loads guide by slug from DB, renders all sections via `GuideSectionRenderer`. Loading, error, and empty states. Used for both desktop and mobile.
+- `src/pages/guides/page.tsx` — Fetches published guides from DB, renders as featured cards with format-based color mapping.
+
+### What Changed
+
+| Before | After |
+|--------|-------|
+| 3 separate data files (data.ts, dakarData.ts, readingData.ts) | 1 `guide_pages` table with sections JSONB |
+| 25+ siloed section components with hardcoded imports | 21 universal data-driven renderers |
+| Hardcoded `SUPPORTED_SLUGS` array | Dynamic — any published guide in DB renders |
+| Separate desktop and mobile detail components | Same `GuideDetailPage` for both |
+| Hardcoded guide listing data | `fetchPublishedGuides()` from DB |
+
+### Remaining
+
+- **Admin editor** — CRUD sections, reorder, preview, publish. The `updateGuideSections()` service function exists and is ready for the admin UI.
+- **Old hardcoded files** — `data.ts`, `dakarData.ts`, `readingData.ts`, and the old siloed section components in `src/pages/guides/detail/components/` are now unused by the rendering path but retained for reference during admin editor build-out.

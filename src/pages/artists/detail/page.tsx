@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { WkButton } from "@/components/design-system/primitives/Button";
-import { getArtist, type RepairedArtistDetail } from "@/services/repairedContent/client";
+import { getArtist, getArtistDiscographyFromRegistry, type RepairedArtistDetail, type RegistryDiscographyRelease } from "@/services/repairedContent/client";
 import { ArtistDetailHero } from "./components/ArtistDetailHero";
 import { ArtistChartSection } from "./components/ArtistChartSection";
 import { ArtistDiscography } from "./components/ArtistDiscography";
@@ -9,6 +9,38 @@ import { RelatedArtistsShelf } from "./components/RelatedArtistsShelf";
 import { ArtistTopSongs } from "./components/ArtistTopSongs";
 import { ArtistBioSection } from "./components/ArtistBioSection";
 import { ArtistVideos } from "./components/ArtistVideos";
+
+function mergeDiscography(
+  apiReleases: RepairedArtistDetail["releases"],
+  registryReleases: RegistryDiscographyRelease[]
+): RepairedArtistDetail["releases"] {
+  if (!registryReleases.length) return apiReleases;
+
+  const registryBySlug = new Map(
+    registryReleases.map((r) => [r.slug, r])
+  );
+
+  // Start with registry releases (authoritative), then add any API-only ones
+  const merged = registryReleases.map((rr) => ({
+    slug: rr.slug,
+    title: rr.title,
+    releaseType: rr.releaseType,
+    year: rr.year,
+    releaseDate: rr.releaseDate,
+    trackCount: rr.trackCount,
+    artworkUrl: rr.artworkUrl,
+    tracks: rr.tracks,
+  }));
+
+  // Append API releases that don't exist in registry
+  for (const apiRel of apiReleases) {
+    if (!registryBySlug.has(apiRel.slug)) {
+      merged.push(apiRel);
+    }
+  }
+
+  return merged;
+}
 
 export default function ArtistDetail() {
   const { slug } = useParams<{ slug: string }>();
@@ -25,13 +57,21 @@ export default function ArtistDetail() {
     }
     setStatus("loading");
     setError(null);
-    getArtist(slug)
-      .then((data) => {
+
+    Promise.all([
+      getArtist(slug),
+      getArtistDiscographyFromRegistry(slug).catch(() => [] as RegistryDiscographyRelease[]),
+    ])
+      .then(([data, registryDiscography]) => {
         if (!alive) return;
         if (!data) {
           setStatus("error");
           setError("Artist not found in the registry.");
           return;
+        }
+        // Registry is the lord — merge its discography as authoritative
+        if (registryDiscography.length > 0) {
+          data.releases = mergeDiscography(data.releases, registryDiscography);
         }
         setArtist(data);
         setStatus("ready");
