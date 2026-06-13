@@ -12,10 +12,10 @@
  * DRY RUN by default — pass --commit to actually write.
  *
  * USAGE (on the WordPress server):
- *   DATABASE_URL="postgresql://postgres.pgzizndxdyhqmtyywjmt:VHK5QOIIs38ydwSh@aws-1-eu-west-2.pooler.supabase.com:5432/postgres" \
+ *   DATABASE_URL="postgresql://..." \
  *   WP_DB_HOST=127.0.0.1 WP_DB_PORT=3306 WP_DB_USER=bn_wordpress \
- *   WP_DB_PASSWORD="2364074f..." WP_DB_NAME=bitnami_wordpress WP_DB_PREFIX=wp_ \
- *   npx tsx scripts/imports/enrich-artist-discography-local.ts
+ *   WP_DB_PASSWORD="..." WP_DB_NAME=bitnami_wordpress WP_DB_PREFIX=wp_ \
+ *   npx tsx enrich-artist-discography-local.ts
  *
  * OPTIONS:
  *   --commit       Actually write to Supabase (default is dry run)
@@ -37,7 +37,7 @@ function hasFlag(name: string) {
   return process.argv.includes(name);
 }
 function required(value: string | undefined, label: string) {
-  if (!value) throw new Error(`${label} is required. Use --${label.toLowerCase().replace(/ /g, "-")} or env var.`);
+  if (!value) throw new Error(`${label} is required. Use env var or CLI flag.`);
   return value;
 }
 function normalizeDatabaseUrl(url: string) {
@@ -135,19 +135,13 @@ function info(msg: string) {
   log.push(msg);
   console.log(`[enrich] ${msg}`);
 }
-
-function warn(msg: string) {
-  log.push(`WARN: ${msg}`);
-  console.warn(`[enrich] WARN: ${msg}`);
-}
-
 function err(msg: string) {
   log.push(`ERROR: ${msg}`);
   console.error(`[enrich] ERROR: ${msg}`);
   stats.errors++;
 }
 
-// ── Batch upsert helpers ────────────────────────────────────────────────────
+// ── Batch helpers ───────────────────────────────────────────────────────────
 
 const BATCH = 200;
 
@@ -166,7 +160,7 @@ async function batchUpsert(
     const values: unknown[] = [];
     const paramGroups = batch.map((row, idx) => {
       const base = idx * columns.length;
-      columns.forEach((col, j) => {
+      columns.forEach((col) => {
         values.push(row[col] ?? null);
       });
       return `(${columns.map((_, j) => `$${base + j + 1}`).join(", ")})`;
@@ -205,7 +199,7 @@ async function batchInsert(
     const values: unknown[] = [];
     const paramGroups = batch.map((row, idx) => {
       const base = idx * columns.length;
-      columns.forEach((col, j) => {
+      columns.forEach((col) => {
         values.push(row[col] ?? null);
       });
       return `(${columns.map((_, j) => `$${base + j + 1}`).join(", ")})`;
@@ -229,14 +223,13 @@ async function main() {
   console.log("═══════════════════════════════════════════════════════");
   console.log("  Wakilisha Artist Discography Enrichment (LOCAL)");
   console.log("═══════════════════════════════════════════════════════");
-  console.log(`  Mode:       ${COMMIT ? "COMMIT (will write to Supabase)" : "DRY RUN (preview only)"}`);
+  console.log(`  Mode:       ${COMMIT ? "COMMIT" : "DRY RUN"}`);
   console.log(`  WP MySQL:   ${WP.user}@${WP.host}:${WP.port}/${WP.database}`);
   console.log(`  Supabase:   ${new URL(normalizeDatabaseUrl(DATABASE_URL)).host}`);
-  if (ARTIST_SLUG_FILTER) console.log(`  Filter:     artist slug "${ARTIST_SLUG_FILTER}"`);
+  if (ARTIST_SLUG_FILTER) console.log(`  Filter:     ${ARTIST_SLUG_FILTER}`);
   if (LIMIT > 0) console.log(`  Limit:      ${LIMIT} artists`);
   console.log("═══════════════════════════════════════════════════════\n");
 
-  // ── Connect to WordPress MySQL ────────────────────────────────────────────
   const wp = await mysql.createConnection({
     host: WP.host,
     port: WP.port,
@@ -246,9 +239,8 @@ async function main() {
     connectTimeout: 20000,
   });
   await wp.ping();
-  info(`Connected to WordPress MySQL at ${WP.host}/${WP.database}`);
+  info(`Connected to WordPress MySQL`);
 
-  // ── Connect to Supabase PG ────────────────────────────────────────────────
   const pool = new pg.Pool({
     connectionString: normalizeDatabaseUrl(DATABASE_URL),
     ssl: { rejectUnauthorized: false },
@@ -256,10 +248,9 @@ async function main() {
   });
 
   try {
-    // ── 1. Load all registry artists → slug→row map ───────────────────────
+    // ── 1. Load registry artists ───────────────────────────────────────
     const artistRes = await pool.query(
-      `SELECT id, slug, display_name, public_image_url, bio, metadata
-       FROM registry_artists`
+      `SELECT id, slug, display_name, public_image_url, bio, metadata FROM registry_artists`
     );
     const registryArtistBySlug = new Map<string, {
       id: string; slug: string; display_name: string;
@@ -271,7 +262,7 @@ async function main() {
     }
     info(`Registry artists loaded: ${registryArtistBySlug.size}`);
 
-    // ── 2. Load wp_wkcharts_artists ──────────────────────────────────────
+    // ── 2. Load WP artists ─────────────────────────────────────────────
     let wpArtistQuery = `SELECT id, name, slug, bio, image_url, origin, artist_type, spotify_id, apple_music_id, website, status FROM ${table(WP.prefix, "wkcharts_artists")}`;
     if (ARTIST_SLUG_FILTER) {
       wpArtistQuery += ` WHERE slug = '${ARTIST_SLUG_FILTER.replace(/'/g, "\\'")}'`;
@@ -281,9 +272,8 @@ async function main() {
     const [wpArtistRows] = await wp.query(wpArtistQuery);
     const wpArtists = wpArtistRows as Record<string, unknown>[];
     stats.wp_artists = wpArtists.length;
-    info(`WP wkcharts_artists fetched: ${wpArtists.length}`);
+    info(`WP artists fetched: ${wpArtists.length}`);
 
-    // Build WP artist id → slug map
     const wpArtistIdToSlug = new Map<number, string>();
     for (const wa of wpArtists) {
       const id = Number(wa.id);
@@ -291,26 +281,19 @@ async function main() {
       wpArtistIdToSlug.set(id, slug);
     }
 
-    // ── 3. Enrich registry_artists ───────────────────────────────────────
+    // ── 3. Enrich registry artists ─────────────────────────────────────
     if (COMMIT) {
       let enrichedCount = 0;
       for (const wa of wpArtists) {
         const wpSlug = clean(wa.slug) || slugify(clean(wa.name));
         const registryArtist = registryArtistBySlug.get(wpSlug);
-        if (!registryArtist) {
-          stats.skipped_no_registry_match++;
-          continue;
-        }
+        if (!registryArtist) { stats.skipped_no_registry_match++; continue; }
 
         const patch: Record<string, unknown> = {};
         const wpImage = clean(wa.image_url);
-        if (wpImage && !registryArtist.public_image_url) {
-          patch.public_image_url = wpImage;
-        }
+        if (wpImage && !registryArtist.public_image_url) patch.public_image_url = wpImage;
         const wpBio = clean(wa.bio);
-        if (wpBio && !registryArtist.bio) {
-          patch.bio = wpBio;
-        }
+        if (wpBio && !registryArtist.bio) patch.bio = wpBio;
 
         const existingMeta = (registryArtist.metadata || {}) as Record<string, unknown>;
         const metaPatch: Record<string, unknown> = {};
@@ -320,28 +303,22 @@ async function main() {
         if (clean(wa.origin) && !existingMeta.country) metaPatch.country = clean(wa.origin);
         if (clean(wa.website) && !existingMeta.website) metaPatch.website = clean(wa.website);
 
-        if (Object.keys(metaPatch).length > 0) {
-          patch.metadata = { ...existingMeta, ...metaPatch };
-        }
+        if (Object.keys(metaPatch).length > 0) patch.metadata = { ...existingMeta, ...metaPatch };
 
         if (Object.keys(patch).length > 0) {
-          await pool.query(
-            `UPDATE registry_artists SET ${Object.keys(patch).map((k, i) => `"${k}" = $${i + 2}`).join(", ")} WHERE id = $1`,
-            [registryArtist.id, ...Object.values(patch)],
-          );
+          const setClause = Object.keys(patch).map((k, i) => `"${k}" = $${i + 2}`).join(", ");
+          await pool.query(`UPDATE registry_artists SET ${setClause} WHERE id = $1`, [registryArtist.id, ...Object.values(patch)]);
           enrichedCount++;
         }
       }
       stats.artists_enriched = enrichedCount;
       info(`Artists enriched: ${enrichedCount}`);
     } else {
-      // Dry run: just count
       for (const wa of wpArtists) {
         const wpSlug = clean(wa.slug) || slugify(clean(wa.name));
         const ra = registryArtistBySlug.get(wpSlug);
         if (!ra) { stats.skipped_no_registry_match++; continue; }
-        if ((clean(wa.image_url) && !ra.public_image_url) ||
-            (clean(wa.bio) && !ra.bio) ||
+        if ((clean(wa.image_url) && !ra.public_image_url) || (clean(wa.bio) && !ra.bio) ||
             (clean(wa.spotify_id) && !(ra.metadata as Record<string, unknown>)?.spotify_artist_id) ||
             (clean(wa.apple_music_id) && !(ra.metadata as Record<string, unknown>)?.apple_music_id) ||
             (clean(wa.artist_type) && !(ra.metadata as Record<string, unknown>)?.artist_type) ||
@@ -353,64 +330,61 @@ async function main() {
       info(`Artists that would be enriched: ${stats.artists_enriched} (dry run)`);
     }
 
-    // ── 4. Load wp_wkcharts_release_shells ───────────────────────────────
+    // ── 4. Load release shells ───────────────────────────────────────────
     const [shellRows] = await wp.query(
       `SELECT id, title, slug, type, release_date, cover_url, status FROM ${table(WP.prefix, "wkcharts_release_shells")}`
     );
     const wpShells = shellRows as Record<string, unknown>[];
     stats.wp_releases = wpShells.length;
-    info(`WP wkcharts_release_shells fetched: ${wpShells.length}`);
+    info(`WP release shells fetched: ${wpShells.length}`);
 
-    // ── 5. Load wp_wkcharts_release_shell_artists ────────────────────────
+    // ── 5. Load shell-artist links ───────────────────────────────────────
     const [shellArtistRows] = await wp.query(
       `SELECT id, release_shell_id, artist_id, role, is_primary FROM ${table(WP.prefix, "wkcharts_release_shell_artists")}`
     );
     const wpShellArtists = shellArtistRows as Record<string, unknown>[];
     stats.wp_release_shell_artists = wpShellArtists.length;
-    info(`WP wkcharts_release_shell_artists fetched: ${wpShellArtists.length}`);
+    info(`WP shell-artist links fetched: ${wpShellArtists.length}`);
 
-    // ── 6. Load wp_wkcharts_release_shell_tracks ─────────────────────────
+    // ── 6. Load shell-track links ──────────────────────────────────────────
     const [shellTrackRows] = await wp.query(
       `SELECT id, release_shell_id, track_id, track_number, disc_number FROM ${table(WP.prefix, "wkcharts_release_shell_tracks")}`
     );
     const wpShellTracks = shellTrackRows as Record<string, unknown>[];
     stats.wp_release_shell_tracks = wpShellTracks.length;
-    info(`WP wkcharts_release_shell_tracks fetched: ${wpShellTracks.length}`);
+    info(`WP shell-track links fetched: ${wpShellTracks.length}`);
 
-    // ── 7. Load wp_wkcharts_tracks ───────────────────────────────────────
+    // ── 7. Load tracks ───────────────────────────────────────────────────
     const [trackRows] = await wp.query(
       `SELECT id, title, slug, isrc, duration, explicit, track_number, spotify_id, apple_music_id, youtube_id, artwork_url, status FROM ${table(WP.prefix, "wkcharts_tracks")}`
     );
     const wpTracks = trackRows as Record<string, unknown>[];
     stats.wp_tracks = wpTracks.length;
-    info(`WP wkcharts_tracks fetched: ${wpTracks.length}`);
+    info(`WP tracks fetched: ${wpTracks.length}`);
 
-    // ── 8. Load wp_wkcharts_track_artists ────────────────────────────────
+    // ── 8. Load track-artist links ─────────────────────────────────────────
     const [trackArtistRows] = await wp.query(
       `SELECT id, track_id, artist_id, role, is_primary FROM ${table(WP.prefix, "wkcharts_track_artists")}`
     );
     const wpTrackArtists = trackArtistRows as Record<string, unknown>[];
     stats.wp_track_artists = wpTrackArtists.length;
-    info(`WP wkcharts_track_artists fetched: ${wpTrackArtists.length}`);
+    info(`WP track-artist links fetched: ${wpTrackArtists.length}`);
 
-    // ── Build lookup maps ──────────────────────────────────────────────────
+    // ── Build maps ───────────────────────────────────────────────────────
     const shellArtistsMap = new Map<number, Record<string, unknown>[]>();
     for (const sa of wpShellArtists) {
       const sid = Number(sa.release_shell_id);
       if (!shellArtistsMap.has(sid)) shellArtistsMap.set(sid, []);
       shellArtistsMap.get(sid)!.push(sa);
     }
-
     const shellTracksMap = new Map<number, Record<string, unknown>[]>();
     for (const st of wpShellTracks) {
       const sid = Number(st.release_shell_id);
       if (!shellTracksMap.has(sid)) shellTracksMap.set(sid, []);
       shellTracksMap.get(sid)!.push(st);
     }
-
     const wpTrackById = new Map<number, Record<string, unknown>>();
     for (const t of wpTracks) wpTrackById.set(Number(t.id), t);
-
     const trackArtistsMap = new Map<number, Record<string, unknown>[]>();
     for (const ta of wpTrackArtists) {
       const tid = Number(ta.track_id);
@@ -418,7 +392,7 @@ async function main() {
       trackArtistsMap.get(tid)!.push(ta);
     }
 
-    // ── 9. Load existing registry releases ────────────────────────────────
+    // ── 9. Load existing releases ───────────────────────────────────────
     const existingReleaseRes = await pool.query(`SELECT id, slug FROM registry_releases`);
     const existingReleaseBySlug = new Map<string, string>();
     for (const r of existingReleaseRes.rows) {
@@ -426,7 +400,7 @@ async function main() {
     }
     const existingReleaseSlugs = new Set(existingReleaseBySlug.keys());
 
-    // ── 10. Load existing registry tracks ─────────────────────────────────
+    // ── 10. Load existing tracks ─────────────────────────────────────────
     const existingTrackRes = await pool.query(`SELECT id, slug, isrc FROM registry_tracks`);
     const existingTrackByIsrc = new Map<string, string>();
     const existingTrackBySlug = new Map<string, string>();
@@ -436,7 +410,7 @@ async function main() {
     }
     const existingTrackSlugs = new Set(existingTrackBySlug.keys());
 
-    // ── 11. Process releases + tracks + links ──────────────────────────────
+    // ── 11. Process releases + tracks ────────────────────────────────────
     const seenReleaseSlugs = new Set(existingReleaseSlugs);
     const seenTrackSlugs = new Set(existingTrackSlugs);
 
@@ -458,7 +432,6 @@ async function main() {
       const artworkUrl = clean(shell.cover_url);
       const releaseId = crypto.randomUUID();
 
-      // Only create release row if slug doesn't already exist in registry
       if (!existingReleaseBySlug.has(rawSlug)) {
         shellIdToRegistryReleaseId.set(shellId, releaseId);
         releaseRows.push({
@@ -473,7 +446,6 @@ async function main() {
           metadata: JSON.stringify({ wp_shell_id: shellId, source: "wkcharts_release_shells" }),
         });
       } else {
-        // Link to existing release
         shellIdToRegistryReleaseId.set(shellId, existingReleaseBySlug.get(rawSlug)!);
       }
 
@@ -558,7 +530,6 @@ async function main() {
           trackId = wpTrackIdToRegistryId.get(wpTrackId)!;
         }
 
-        // Release-track link
         releaseTrackRows.push({
           id: crypto.randomUUID(),
           release_id: releaseId,
@@ -573,7 +544,7 @@ async function main() {
       }
     }
 
-    // ── 12. Standalone tracks (not in any release shell) ──────────────────
+    // ── 12. Standalone tracks ────────────────────────────────────────────
     const shellTrackWpIds = new Set<number>();
     for (const [, tracks] of shellTracksMap) {
       for (const st of tracks) shellTrackWpIds.add(Number(st.track_id));
@@ -630,7 +601,7 @@ async function main() {
     }
     stats.standalone_tracks_added = standaloneAdded;
 
-    // ── 13. Track-artist links ────────────────────────────────────────────
+    // ── 13. Track-artist links ───────────────────────────────────────────
     const trackArtistRows: Record<string, unknown>[] = [];
     for (const ta of wpTrackArtists) {
       const wpTrackId = Number(ta.track_id);
@@ -670,28 +641,23 @@ async function main() {
     info(`Tracks to upsert: ${trackRows.length}`);
     info(`Release-artist links: ${releaseArtistRows.length}`);
     info(`Release-track links: ${releaseTrackRows.length}`);
-    info(`Standalone tracks (not in release shell): ${standaloneAdded}`);
+    info(`Standalone tracks: ${standaloneAdded}`);
     info(`Track-artist links: ${trackArtistRows.length}`);
 
-    // ── 14. COMMIT to Supabase ─────────────────────────────────────────────
+    // ── 14. COMMIT ───────────────────────────────────────────────────────
     if (COMMIT) {
       console.log("\n── Writing to Supabase ──");
 
-      // Releases
       if (releaseRows.length > 0) {
         info(`Inserting ${releaseRows.length} releases...`);
         await batchUpsert(pool, "registry_releases", releaseRows, "slug");
         info(`Releases done.`);
       }
-
-      // Tracks
       if (trackRows.length > 0) {
         info(`Inserting ${trackRows.length} tracks...`);
         await batchUpsert(pool, "registry_tracks", trackRows, "slug");
         info(`Tracks done.`);
       }
-
-      // Release artists — delete WP-sourced links for these releases first
       if (releaseArtistRows.length > 0) {
         const releaseIds = [...new Set(releaseArtistRows.map((r) => String(r.release_id)))];
         for (let i = 0; i < releaseIds.length; i += 200) {
@@ -704,8 +670,6 @@ async function main() {
         await batchInsert(pool, "registry_release_artists", releaseArtistRows);
         info(`Release-artist links done.`);
       }
-
-      // Release tracks
       if (releaseTrackRows.length > 0) {
         const releaseIds = [...new Set(releaseTrackRows.map((r) => String(r.release_id)))];
         for (let i = 0; i < releaseIds.length; i += 200) {
@@ -718,8 +682,6 @@ async function main() {
         await batchInsert(pool, "registry_release_tracks", releaseTrackRows);
         info(`Release-track links done.`);
       }
-
-      // Track artists
       if (trackArtistRows.length > 0) {
         const trackIds = [...new Set(trackArtistRows.map((r) => String(r.track_id)))];
         for (let i = 0; i < trackIds.length; i += 200) {
@@ -739,7 +701,7 @@ async function main() {
       console.log("  Pass --commit to write to Supabase.");
     }
 
-    // ── 15. Summary ────────────────────────────────────────────────────────
+    // ── 15. Summary ──────────────────────────────────────────────────────
     console.log("\n═══════════════════════════════════════════════════════");
     console.log("  SUMMARY");
     console.log("═══════════════════════════════════════════════════════");
@@ -766,7 +728,6 @@ async function main() {
       console.log("\n  Errors encountered:");
       for (const e of errorLines) console.log(`    ${e}`);
     }
-
   } finally {
     await wp.end();
     await pool.end();
