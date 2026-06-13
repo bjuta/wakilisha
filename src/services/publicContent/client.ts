@@ -1,3 +1,4 @@
+import { deepDecode } from "@/utils/decodeHtmlEntities";
 import { withPlaceholderImage } from "@/utils/imagePlaceholders";
 import { rewriteWpImageUrl } from "@/services/wpImageRewrite";
 import { supabase } from "@/lib/supabase";
@@ -9,6 +10,7 @@ export type PublicStory = {
   section: string;
   dek: string;
   author: string;
+  authorSlug?: string;
   date: string;
   readingTime: number;
   heroUrl: string;
@@ -219,7 +221,8 @@ async function apiGet<T>(path: string): Promise<T> {
   }
 
   const payload = (await response.json()) as Envelope<T> | T;
-  return payload && typeof payload === "object" && "data" in payload ? (payload as Envelope<T>).data : (payload as T);
+  const raw = payload && typeof payload === "object" && "data" in payload ? (payload as Envelope<T>).data : (payload as T);
+  return deepDecode(raw);
 }
 
 async function safeApiGet<T>(path: string, fallback: T): Promise<T> {
@@ -322,8 +325,10 @@ async function getRegistryMediaBySlugs(slugs: string[]): Promise<Map<string, Reg
     return new Map();
   }
 
+  const decoded = deepDecode((data || []) as RegistryMediaAsset[]);
+
   const grouped = new Map<string, RegistryMediaAsset[]>();
-  for (const asset of (data || []) as RegistryMediaAsset[]) {
+  for (const asset of decoded) {
     const list = grouped.get(asset.slug) || [];
     list.push(asset);
     grouped.set(asset.slug, list);
@@ -356,7 +361,7 @@ async function getRegistryTracklist(releaseId: string, fallbackArtist: string): 
     return [];
   }
 
-  const relationships = ((relationshipRows || []) as GenericRow[])
+  const relationships = deepDecode(((relationshipRows || []) as GenericRow[]))
     .map((row, index) => ({
       row,
       index,
@@ -378,7 +383,7 @@ async function getRegistryTracklist(releaseId: string, fallbackArtist: string): 
     return [];
   }
 
-  const tracksById = new Map(((trackRows || []) as GenericRow[]).map((track) => [textValue(track, ["id"]), track]));
+  const tracksById = new Map(deepDecode(((trackRows || []) as GenericRow[])).map((track) => [textValue(track, ["id"]), track]));
   const mediaSlugs: string[] = [];
   for (const relationship of relationships) {
     const track = tracksById.get(relationship.trackId) || {};
@@ -467,7 +472,7 @@ async function getReleaseFromShell(artistSlug: string, releaseSlug: string): Pro
   }
 
   if (!data) return null;
-  const shell = data as ReleaseShellRow;
+  const shell = deepDecode(data as ReleaseShellRow);
   const tracks = await getRegistryTracklist(shell.release_id, shell.primary_artist_name || "Unknown artist");
   const releaseMedia = await getRegistryMediaBySlugs(mediaCandidates(shell.slug, shell.title));
   const releaseArtworkUrl = mediaUrlFor(mediaCandidates(shell.slug, shell.title), releaseMedia);
@@ -487,7 +492,7 @@ async function listReleasesFromShells(): Promise<PublicRelease[]> {
     return [];
   }
 
-  const shells = (data || []) as ReleaseShellRow[];
+  const shells = deepDecode((data || []) as ReleaseShellRow[]);
   const mediaBySlug = await getRegistryMediaBySlugs(shells.flatMap((shell) => mediaCandidates(shell.slug, shell.title)));
 
   return shells.map((shell) => {

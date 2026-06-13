@@ -1,3 +1,4 @@
+import { deepDecode } from "@/utils/decodeHtmlEntities";
 import { supabase } from "@/lib/supabase";
 import type { ChartEdition, ChartEditionEntry, ChartFamily, TrackChartHistory } from "./types";
 
@@ -168,7 +169,7 @@ async function loadEditionLookups(): Promise<EditionLookup[]> {
   const { data, error } = await supabase.from("wk_chart_editions_v2").select("*").limit(500);
   if (error) throw new Error(error.message);
 
-  return ((data || []) as DbRow[])
+  return deepDecode(((data || []) as DbRow[]))
     .map((row) => {
       const familySlug = editionFamilySlug(row, "charts");
       return { edition: toEdition(row, familySlug), raw: row, familySlug };
@@ -185,7 +186,7 @@ export async function getSupabaseChartFamilies(): Promise<ChartFamily[]> {
 
   const { data, error } = await supabase.from("wk_chart_series_v2").select("*").limit(100);
   if (!error && data && data.length > 0) {
-    return (data as DbRow[]).map((row) => {
+    return deepDecode((data as DbRow[])).map((row) => {
       const slug = familySlugFromRow(row);
       return toFamily(row, latestByFamily.get(slug) ?? null);
     });
@@ -233,7 +234,7 @@ export async function getSupabaseChartEditionEntries(_familySlug: string, editio
     .limit(150);
 
   if (error) throw new Error(error.message);
-  return ((data || []) as DbRow[]).map((row) => toEntry(row, editionId));
+  return deepDecode(((data || []) as DbRow[])).map((row) => toEntry(row, editionId));
 }
 
 export async function getSupabaseTrackChartHistory(trackSlug: string): Promise<TrackChartHistory | null> {
@@ -245,7 +246,7 @@ export async function getSupabaseTrackChartHistory(trackSlug: string): Promise<T
     .limit(100);
 
   if (error) throw new Error(error.message);
-  const rows = ((data || []) as DbRow[]).map((row) => toEntry(row, asString(row.edition_id)));
+  const rows = deepDecode(((data || []) as DbRow[])).map((row) => toEntry(row, asString(row.edition_id)));
   if (rows.length === 0) return null;
 
   return {

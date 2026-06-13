@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { getAuthorMeta } from "@/services/authorProfiles";
 import type { MagazineArticle } from "@/services/magazineArticles";
+import { Chapter19FallbackImage } from "@/components/media/Chapter19FallbackImage";
 
 interface MagazineCardProps {
   story: MagazineArticle;
@@ -33,11 +34,19 @@ export function MagazineCard({ story, variant = "standard", rank }: MagazineCard
         className="group relative overflow-hidden rounded-2xl bg-[#0a0a0a] flex flex-col h-full"
         style={{ minHeight: "clamp(340px, 42vw, 480px)" }}
       >
-        <img
-          src={story.heroUrl}
-          alt={story.title}
-          className="absolute inset-0 w-full h-full object-cover object-top opacity-90 transition-transform duration-700 group-hover:scale-105"
-        />
+        {story.heroUrl ? (
+          <img
+            src={story.heroUrl}
+            alt={story.title}
+            className="absolute inset-0 w-full h-full object-cover object-top opacity-90 transition-transform duration-700 group-hover:scale-105"
+          />
+        ) : (
+          <Chapter19FallbackImage
+            id={story.id}
+            slug={story.slug}
+            name={story.title}
+          />
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/10" />
 
         {rank !== undefined && (
@@ -88,11 +97,20 @@ export function MagazineCard({ story, variant = "standard", rank }: MagazineCard
         className="group flex flex-col sm:flex-row gap-4 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4 hover:border-[var(--wk-border-strong)] hover:bg-[var(--wk-surface-raised)] transition-all duration-300"
       >
         <div className="sm:w-[45%] shrink-0 aspect-[16/10] sm:aspect-auto sm:h-full rounded-lg overflow-hidden bg-[var(--wk-surface-raised)]">
-          <img
-            src={story.heroUrl}
-            alt=""
-            className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
-          />
+          {story.heroUrl ? (
+            <img
+              src={story.heroUrl}
+              alt=""
+              className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
+            />
+          ) : (
+            <Chapter19FallbackImage
+              id={story.id}
+              slug={story.slug}
+              name={story.title}
+              className="rounded-lg"
+            />
+          )}
         </div>
         <div className="flex flex-col gap-2 min-w-0 flex-1 justify-center py-0.5">
           <span className="text-[9px] font-black uppercase tracking-[0.16em] text-[var(--wk-brand)]">
@@ -154,11 +172,19 @@ export function MagazineCard({ story, variant = "standard", rank }: MagazineCard
           </div>
         </div>
         <div className="w-16 h-16 shrink-0 rounded-lg overflow-hidden bg-[var(--wk-surface-raised)]">
-          <img
-            src={story.heroUrl}
-            alt=""
-            className="w-full h-full object-cover object-top transition-transform duration-400 group-hover:scale-110"
-          />
+          {story.heroUrl ? (
+            <img
+              src={story.heroUrl}
+              alt=""
+              className="w-full h-full object-cover object-top transition-transform duration-400 group-hover:scale-110"
+            />
+          ) : (
+            <Chapter19FallbackImage
+              id={story.id}
+              slug={story.slug}
+              name={story.title}
+            />
+          )}
         </div>
       </Link>
     );
@@ -171,11 +197,19 @@ export function MagazineCard({ story, variant = "standard", rank }: MagazineCard
       className="group flex flex-col rounded-xl overflow-hidden border border-[var(--wk-border)] bg-[var(--wk-surface)] hover:border-[var(--wk-border-strong)] hover:-translate-y-0.5 transition-all duration-300 h-full"
     >
       <div className="aspect-[16/10] overflow-hidden bg-[var(--wk-surface-raised)]">
-        <img
-          src={story.heroUrl}
-          alt=""
-          className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
-        />
+        {story.heroUrl ? (
+          <img
+            src={story.heroUrl}
+            alt=""
+            className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
+          />
+        ) : (
+          <Chapter19FallbackImage
+            id={story.id}
+            slug={story.slug}
+            name={story.title}
+          />
+        )}
       </div>
       <div className="p-4 lg:p-5 flex flex-col gap-2 flex-1">
         <div className="flex items-center gap-2">

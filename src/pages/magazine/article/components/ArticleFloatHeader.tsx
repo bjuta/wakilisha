@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
-import { getAuthorMeta } from "@/services/authorProfiles";
+import { getAuthorMeta, resolveAuthorMeta, type AuthorMeta } from "@/services/authorProfiles";
 import type { MagazineArticle } from "@/services/magazineArticles";
 
 const SECTION_COLORS: Record<string, string> = {
@@ -27,6 +27,20 @@ interface ArticleFloatHeaderProps {
 
 export function ArticleFloatHeader({ article }: ArticleFloatHeaderProps) {
   const [copyDone, setCopyDone] = useState(false);
+  const [authorMeta, setAuthorMeta] = useState<AuthorMeta | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    resolveAuthorMeta(article.author)
+      .then((resolved) => {
+        if (!alive) return;
+        setAuthorMeta(resolved);
+      })
+      .catch(() => {
+        // Fallback to synchronous generated meta
+      });
+    return () => { alive = false; };
+  }, [article.author]);
 
   const handleCopy = () => {
     navigator.clipboard?.writeText(window.location.href);
@@ -36,8 +50,10 @@ export function ArticleFloatHeader({ article }: ArticleFloatHeaderProps) {
 
   const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(article.title)}&url=${encodeURIComponent(typeof window !== "undefined" ? window.location.href : "")}`;
   const waUrl = `https://wa.me/?text=${encodeURIComponent(`${article.title} ${typeof window !== "undefined" ? window.location.href : ""}`)}`;
-  const authorMeta = getAuthorMeta(article.author);
-  const initials = article.author.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
+
+  // Use resolved author meta when available, fall back to synchronous generation
+  const meta = authorMeta ?? getAuthorMeta(article.author);
+  const initials = meta.displayName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
 
   return (
     <div className="max-w-[740px] mx-auto px-6 lg:px-8 pt-12 pb-8">
@@ -85,17 +101,17 @@ export function ArticleFloatHeader({ article }: ArticleFloatHeaderProps) {
         {/* Author */}
         <div className="flex items-center gap-3">
           <Link
-            to={`/authors/${authorMeta.slug}`}
+            to={`/authors/${meta.slug}`}
             className="w-11 h-11 rounded-full bg-[var(--wk-brand)] flex items-center justify-center text-[13px] font-black text-[var(--wk-brand-on)] hover:opacity-80 transition-opacity shrink-0"
           >
             {initials}
           </Link>
           <div>
             <Link
-              to={`/authors/${authorMeta.slug}`}
+              to={`/authors/${meta.slug}`}
               className="text-[14px] font-bold text-[var(--wk-text)] hover:text-[var(--wk-brand)] transition-colors block leading-tight"
             >
-              {article.author}
+              {meta.displayName}
             </Link>
             <span className="text-[12px] text-[var(--wk-text-muted)]">{article.date}</span>
           </div>

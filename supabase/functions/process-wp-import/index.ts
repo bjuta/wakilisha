@@ -8,7 +8,6 @@ const corsHeaders = {
 const API_PAGE_SIZE = 50;
 const BATCH_SIZE = 100;
 
-// ---- Authoritative CPT Map (from wakilisha-cpt-map.ts) ----
 const CPT_MAP: Record<string, { target_entity: string; canonical_kind: string; ready_policy: string }> = {
   post: { target_entity: "articles", canonical_kind: "article", ready_policy: "published_only" },
   page: { target_entity: "pages", canonical_kind: "page", ready_policy: "published_only" },
@@ -40,13 +39,42 @@ const CPT_MAP: Record<string, { target_entity: string; canonical_kind: string; r
   attachment: { target_entity: "media_assets", canonical_kind: "media_asset", ready_policy: "needs_review" },
 };
 
-// Post types that commonly contain large amounts of data NOT as individual CPT posts
-// but rather as post metadata / serialized structures — REST API will see low counts
 const KNOWN_AGGREGATE_CPTS = new Set([
   "wk_registry_track", "wk_track",
   "wk_registry_release", "wk_release",
   "wk_registry_label", "wk_label",
 ]);
+
+function decodeVcRawHtml(encoded: string): string {
+  try {
+    const raw = atob(encoded.trim());
+    const decoded = decodeURIComponent(raw);
+    if (/^\s*\[/.test(decoded)) return "";
+    return decoded;
+  } catch {
+    return "";
+  }
+}
+
+function sanitizeVcShortcodes(html: string): string {
+  if (!html || typeof html !== "string") return html;
+  let result = html;
+  result = result.replace(/\[vc_raw_html\]([\s\S]*?)\[\/vc_raw_html\]/gi, (_: string, encoded: string) => decodeVcRawHtml(encoded));
+  result = result.replace(/\[vc_[^\]]*?\/\]/gi, "");
+  result = result.replace(/\[vc_[^\]]*?\]/gi, "");
+  result = result.replace(/\[\/vc_[^\]]*?\]/gi, "");
+  result = result.replace(/\[uncode_[^\]]*?\][\s\S]*?\[\/uncode_[^\]]*?\]/gi, "");
+  result = result.replace(/\[uncode_[^\]]*?\/?\]/gi, "");
+  result = result.replace(/\[\/uncode_[^\]]*?\]/gi, "");
+  result = result.replace(/\[caption[^\]]*?\]([\s\S]*?)\[\/caption\]/gi, "$1");
+  result = result.replace(/\[gallery[^\]]*?\]/gi, "");
+  result = result.replace(/\[playlist[^\]]*?\]/gi, "");
+  result = result.replace(/\[audio[^\]]*?\]/gi, "");
+  result = result.replace(/\[video[^\]]*?\]/gi, "");
+  result = result.replace(/\s*uncode_shortcode_id="[^"]*"/gi, "");
+  result = result.replace(/(\n\s*){3,}/g, "\n\n");
+  return result;
+}
 
 function slugify(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/, "").slice(0, 200);
@@ -111,6 +139,17 @@ function extractTerms(embedded: Record<string, unknown> | undefined): Array<{ ta
   return terms;
 }
 
+function extractAuthor(item: Record<string, unknown>): { authorId: string; authorName: string } {
+  const authorId = item.author != null ? String(item.author) : "";
+  const embedded = item._embedded as Record<string, unknown> | undefined;
+  const authorArr = embedded?.author;
+  let authorName = "";
+  if (Array.isArray(authorArr) && authorArr.length > 0) {
+    authorName = String((authorArr[0] as Record<string, unknown>).name || "");
+  }
+  return { authorId, authorName };
+}
+
 function getTitle(item: Record<string, unknown>): string {
   if (typeof item.title === "object" && item.title) {
     return (item.title as Record<string, string>).rendered || "";
@@ -141,8 +180,12 @@ function buildStageRecord(
   const wpId = String(item.id ?? "unknown");
   const wpStatus = String(item.status ?? "publish");
   const title = getTitle(item);
-  const content = getContent(item);
-  const excerpt = getExcerpt(item);
+  const rawContent = getContent(item);
+  const rawExcerpt = getExcerpt(item);
+
+  const cleanContent = sanitizeVcShortcodes(rawContent);
+  const cleanExcerpt = stripHtml(rawExcerpt).slice(0, 500);
+
   const postName = String(item.slug ?? "");
   const slug = postName || slugify(title || wpId);
   const targetEntity = targetEntityForPostType(postType);
@@ -155,6 +198,8 @@ function buildStageRecord(
   const date = String(item.date ?? "");
   const modified = String(item.modified ?? "");
 
+  const { authorId, authorName } = extractAuthor(item);
+
   const warnings: string[] = [];
   if (!title) warnings.push("Missing title.");
   if (entry && targetStatus !== "ready") {
@@ -164,6 +209,8 @@ function buildStageRecord(
     warnings.push(`Post status "${wpStatus}" preserved — will remain draft on promotion.`);
   }
 
+  const vcCleaned = cleanContent !== rawContent;
+
   const rawRecord = {
     wp_id: wpId,
     wp_type: postType,
@@ -172,18 +219,21 @@ function buildStageRecord(
     date,
     modified,
     title: stripHtml(title),
-    content,
-    excerpt,
+    content: cleanContent,
+    content_import_cleaned: vcCleaned,
+    excerpt: rawExcerpt,
     slug,
     featured_image: featuredImage,
     terms,
     meta: wpMeta,
+    post_author: authorId || null,
+    author_name: authorName || null,
   };
 
   const mappedRecord = {
     title: stripHtml(title),
-    body: content,
-    excerpt: stripHtml(excerpt).slice(0, 500),
+    body: cleanContent,
+    excerpt: cleanExcerpt,
     slug,
     source_status: wpStatus,
     post_type: postType,
@@ -195,6 +245,9 @@ function buildStageRecord(
     featured_image_alt: featuredImage?.alt || null,
     terms_count: terms.length,
     wp_custom_fields_count: Object.keys(wpMeta).length,
+    vc_shortcodes_cleaned: vcCleaned,
+    post_author: authorId || null,
+    author_name: authorName || null,
   };
 
   return {
@@ -208,10 +261,10 @@ function buildStageRecord(
     target_status: targetStatus,
     target_slug: slug || null,
     title: stripHtml(title) || null,
-    body: content || null,
-    excerpt: stripHtml(excerpt).slice(0, 500) || null,
+    body: cleanContent || null,
+    excerpt: cleanExcerpt || null,
     published_at: parseDate(date),
-    author_name: null,
+    author_name: authorName || null,
     source_url: String(item.link ?? "") || null,
     raw_record: rawRecord,
     mapped_record: mappedRecord,
@@ -251,7 +304,6 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // Load the ingestion run
     const { data: run, error: runErr } = await supabase
       .from("wk_ingestion_runs").select("*").eq("id", runId).maybeSingle();
 
@@ -272,16 +324,14 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // Mark as staging
     await supabase.from("wk_ingestion_runs").update({
       status: "staging", started_at: new Date().toISOString(), errors: [],
     }).eq("id", runId);
 
-    // Clear prior staging for this run
     await supabase.from("wk_import_staging_records").delete().eq("ingestion_run_id", runId);
     await supabase.from("wk_import_staging_failures").delete().eq("ingestion_run_id", runId);
 
-    const stats = { total: 0, staged: 0, failed: 0, skipped: 0, drafts: 0 };
+    const stats = { total: 0, staged: 0, failed: 0, skipped: 0, drafts: 0, vcCleaned: 0, authorsFound: 0 };
     const errors: string[] = [];
     const warnings: string[] = [];
     const entityCounts: Record<string, number> = {};
@@ -289,7 +339,6 @@ Deno.serve(async (req: Request) => {
     const allRecords: Record<string, unknown>[] = [];
     const allFailures: Record<string, unknown>[] = [];
 
-    // Per-post-type diagnostic results
     const typeDiags: Record<string, {
       expectedTotal: number;
       fetchedCount: number;
@@ -302,7 +351,6 @@ Deno.serve(async (req: Request) => {
       warning?: string;
     }> = {};
 
-    // Determine post types to fetch
     let typesToFetch: string[] = [];
     if (buckets.length > 0) {
       for (const bucket of buckets) {
@@ -334,7 +382,6 @@ Deno.serve(async (req: Request) => {
       const restBase = (manifest as Record<string, unknown>).scan?.evidence?.post_types?.[postType]?.restBase || postType;
       const isAggregate = KNOWN_AGGREGATE_CPTS.has(postType);
 
-      // Initialize diagnostics
       typeDiags[postType] = {
         expectedTotal: 0,
         fetchedCount: 0,
@@ -345,10 +392,9 @@ Deno.serve(async (req: Request) => {
         isAggregateCpt: isAggregate,
       };
 
-      // Get total count from X-WP-Total header
       let totalItems = 0;
       try {
-        const countRes = await fetch(`${siteUrl}/wp-json/wp/v2/${restBase}?per_page=1`, {
+        const countRes = await fetch(`${siteUrl}/wp-json/wp/v2/${restBase}?per_page=1&_embed`, {
           headers: { "Accept": "application/json", "User-Agent": "Wakilisha/1.0" },
         });
         if (countRes.ok) {
@@ -375,7 +421,6 @@ Deno.serve(async (req: Request) => {
         continue;
       }
 
-      // For aggregate CPTs that return suspiciously low counts, add a warning
       if (isAggregate && totalItems <= 5) {
         typeDiags[postType].warning = `REST API only exposes ${totalItems} items for this post type. However, the actual track/release/label data is stored in WordPress postmeta, not as individual CPT posts. The MySQL direct-connect pipeline (scripts/imports/stage-wordpress-database-records.ts) can import postmeta data — the REST API cannot.`;
       }
@@ -417,6 +462,15 @@ Deno.serve(async (req: Request) => {
             const targetEnt = stageRecord.target_entity as string;
             entityCounts[targetEnt] = (entityCounts[targetEnt] || 0) + 1;
 
+            const wasCleaned = stageRecord.raw_record as Record<string, unknown> | undefined;
+            if (wasCleaned?.content_import_cleaned === true) {
+              stats.vcCleaned++;
+            }
+
+            if (stageRecord.author_name && String(stageRecord.author_name).length > 0) {
+              stats.authorsFound++;
+            }
+
             if (wpStatus !== "publish") {
               stats.drafts++;
               draftCounts[targetEnt] = (draftCounts[targetEnt] || 0) + 1;
@@ -446,7 +500,6 @@ Deno.serve(async (req: Request) => {
       fetched.add(postType);
     }
 
-    // Insert staging records in batches
     for (let i = 0; i < allRecords.length; i += BATCH_SIZE) {
       const batch = allRecords.slice(i, i + BATCH_SIZE);
       try {
@@ -457,7 +510,6 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Insert failures
     if (allFailures.length > 0) {
       for (let i = 0; i < allFailures.length; i += BATCH_SIZE) {
         const batch = allFailures.slice(i, i + BATCH_SIZE);
@@ -467,7 +519,6 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Compile aggregate CPT warnings
     const aggregateWarnings: string[] = [];
     for (const [pt, diag] of Object.entries(typeDiags)) {
       if (diag.warning) {
@@ -475,15 +526,16 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Update the run
     const stagingSummary = {
       staged_at: new Date().toISOString(),
-      processor: "process-wp-import",
-      version: "2.0.0",
+      processor: "process-wp-import-v4",
+      version: "4.0.0",
       records: allRecords.length,
       failures: allFailures.length,
       counts_by_target_entity: entityCounts,
       draft_counts: draftCounts,
+      vc_shortcodes_cleaned: stats.vcCleaned,
+      authors_found: stats.authorsFound,
       wakilisha_cpt_map_enabled: true,
       production_import_enabled: false,
       type_diagnostics: typeDiags,
@@ -495,9 +547,19 @@ Deno.serve(async (req: Request) => {
       staging: stagingSummary,
     };
 
+    const vcMsg = stats.vcCleaned > 0
+      ? `${stats.vcCleaned} record(s) had VC/WPBakery shortcodes stripped at import time.`
+      : "No VC/WPBakery shortcodes detected in imported content.";
+
+    const authorMsg = stats.authorsFound > 0
+      ? `${stats.authorsFound} record(s) had post_author data captured from _embedded.author.`
+      : "No author data found in _embedded responses.";
+
     const updatedWarnings = Array.from(new Set([
       ...(run.warnings ?? []),
-      "Records staged via WordPress REST API with WAKILISHA CPT mapping enabled.",
+      "v4: Records staged via WordPress REST API with post_author extraction from _embedded.author.",
+      vcMsg,
+      authorMsg,
       allFailures.length > 0 ? `${allFailures.length} staging failure(s) recorded.` : "",
       stats.drafts > 0 ? `${stats.drafts} draft-status items preserved as draft.` : "",
       ...aggregateWarnings,
@@ -521,6 +583,8 @@ Deno.serve(async (req: Request) => {
         ready: stats.staged,
         drafts: stats.drafts,
         failed: allFailures.length,
+        vcShortcodesCleaned: stats.vcCleaned,
+        authorsFound: stats.authorsFound,
       },
       entityCounts,
       draftCounts,

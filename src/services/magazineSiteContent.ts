@@ -1,3 +1,4 @@
+import { deepDecode } from "@/utils/decodeHtmlEntities";
 import { apiGet, type Envelope } from "./backendContract/backendClient";
 
 export type SiteContentItem = MagazineSiteArticle | MagazineSiteArtist | MagazineSiteRelease | MagazineSiteChartEntry;
@@ -88,12 +89,12 @@ async function fetchSiteContent(limit = 200): Promise<SiteContentResponse> {
     ? (payload as Envelope<SiteContentResponse>).data
     : (payload as SiteContentResponse);
 
-  return {
+  return deepDecode({
     articles: data.articles ?? [],
     artists: data.artists ?? [],
     releases: data.releases ?? [],
     chartHighlights: data.chartHighlights ?? [],
-  };
+  });
 }
 
 export async function fetchAllSiteContent(): Promise<SiteContentResponse> {

@@ -7,6 +7,7 @@ import {
 } from "@/services/magazineArticles";
 import { getAuthorMeta } from "@/services/authorProfiles";
 import { SkeletonArticlePage } from "@/components/skeletons/Skeletons";
+import { Chapter19FallbackImage } from "@/components/media/Chapter19FallbackImage";
 
 function formatReadCount(count: number): string {
   if (count >= 1000) return `${(count / 1000).toFixed(1)}k`;
@@ -28,11 +29,19 @@ function RelatedCard({ story }: { story: MagazineArticle }) {
       className="group flex gap-3 active:scale-[0.98] transition-transform"
     >
       <div className="w-20 h-20 shrink-0 rounded-xl overflow-hidden bg-[var(--wk-surface-raised)]">
-        <img
-          src={story.heroUrl}
-          alt={story.title}
-          className="w-full h-full object-cover object-top transition-transform duration-300 group-hover:scale-110"
-        />
+        {story.heroUrl ? (
+          <img
+            src={story.heroUrl}
+            alt={story.title}
+            className="w-full h-full object-cover object-top transition-transform duration-300 group-hover:scale-110"
+          />
+        ) : (
+          <Chapter19FallbackImage
+            id={story.id}
+            slug={story.slug}
+            name={story.title}
+          />
+        )}
       </div>
       <div className="min-w-0 flex-1">
         <span className="text-[9px] font-black uppercase tracking-wider text-[var(--wk-brand)]">
@@ -112,21 +121,19 @@ export default function MobileArticle() {
 
       {/* Full-bleed hero — shorter on mobile */}
       <section className="relative overflow-hidden" style={{ height: "62dvh", minHeight: "380px" }}>
-        {article.heroUrl && (
+        {article.heroUrl ? (
           <img
             src={article.heroUrl}
             alt={article.title}
             className="absolute inset-0 w-full h-full object-cover object-top"
           />
+        ) : (
+          <Chapter19FallbackImage
+            id={article.id}
+            slug={article.slug}
+            name={article.title}
+          />
         )}
-        {/* Gradient fades to page background */}
-        <div
-          className="absolute inset-0"
-          style={{
-            background: "linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.32) 45%, rgba(0,0,0,0.6) 72%, var(--wk-bg) 100%)",
-          }}
-        />
-
         {/* Floating nav */}
         <div className="absolute top-0 left-0 right-0 z-20 px-4 pt-safe-top py-4 flex items-center justify-between">
           <Link

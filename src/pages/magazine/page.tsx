@@ -5,6 +5,7 @@ import { getAuthorMeta } from "@/services/authorProfiles";
 import { MagazineCard } from "./components/MagazineCard";
 import { SectionCarousel } from "./components/SectionCarousel";
 import { SkeletonMagazinePage } from "@/components/skeletons/Skeletons";
+import { Chapter19FallbackImage } from "@/components/media/Chapter19FallbackImage";
 
 /* ── Scroll reveal ── */
 function useScrollReveal(deps: unknown[] = []) {
@@ -88,7 +89,7 @@ export default function Magazine() {
     return () => window.removeEventListener("scroll", onScroll);
   }, [status]);
 
-  useScrollReveal([status]);
+  useScrollReveal([status, activeSection]);
 
   const sectionNames = useMemo(() => {
     const sects = Array.from(new Set(stories.map((s) => s.section || "Article"))).sort();
@@ -154,6 +155,24 @@ export default function Magazine() {
     return sorted.slice(1); // skip current issue
   }, [stories]);
 
+  // ── Filter content based on active section tab ──
+  const filteredPicks = useMemo(() => {
+    if (activeSection === "All") return picks;
+    return picks.filter((s) => (s.section || "Article") === activeSection);
+  }, [picks, activeSection]);
+
+  const filteredLatest = useMemo(() => {
+    if (activeSection === "All") return latest;
+    return latest.filter((s) => (s.section || "Article") === activeSection);
+  }, [latest, activeSection]);
+
+  const filteredTopSections = useMemo(() => {
+    if (activeSection === "All") return topSections;
+    return topSections.filter((s) => s === activeSection);
+  }, [topSections, activeSection]);
+
+  const allContentEmpty = filteredPicks.length === 0 && filteredLatest.length === 0 && filteredTopSections.length === 0;
+
   if (status === "loading") {
     return <SkeletonMagazinePage />;
   }
@@ -179,12 +198,20 @@ export default function Magazine() {
         className="relative min-h-[88vh] flex items-end overflow-hidden bg-[#0a0a0a] block group cursor-pointer"
       >
         {/* Image */}
-        <img
-          ref={heroImgRef}
-          src={heroStory.heroUrl}
-          alt=""
-          className="absolute inset-0 w-full h-full object-cover opacity-85 will-change-transform"
-        />
+        {heroStory.heroUrl ? (
+          <img
+            ref={heroImgRef}
+            src={heroStory.heroUrl}
+            alt=""
+            className="absolute inset-0 w-full h-full object-cover opacity-85 will-change-transform"
+          />
+        ) : (
+          <Chapter19FallbackImage
+            id={heroStory.id}
+            slug={heroStory.slug}
+            name={heroStory.title}
+          />
+        )}
         {/* Gradient overlay — heavier at bottom for text legibility */}
         <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/25 to-black/90" />
 
@@ -251,35 +278,124 @@ export default function Magazine() {
       {/* ═══════════════════════ CONTENT BODY ═══════════════════════ */}
       <div className="max-w-[1280px] mx-auto px-6 lg:px-8 flex flex-col gap-20 py-16">
 
-        {/* ── Editor's Picks ── */}
-        {picks.length > 0 && (
+        {/* ── Empty state: no results for this section across all content areas ── */}
+        {allContentEmpty && activeSection !== "All" ? (
           <section className="mag-reveal">
-            <SectionLabel>Editor&apos;s Picks</SectionLabel>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 lg:items-stretch">
-              <div className="lg:h-full">
-                <MagazineCard variant="hero" story={picks[0]} rank={1} />
+            <div className="relative rounded-2xl overflow-hidden border border-[var(--wk-border)] bg-[var(--wk-surface)]">
+              <div className="absolute inset-0 opacity-[0.06]">
+                <img
+                  src="https://readdy.ai/api/search-image?query=Abstract%20minimalist%20editorial%20composition%20with%20scattered%20magazine%20pages%20and%20soft%20organic%20shapes%20floating%20in%20warm%20morning%20light%2C%20cream%20and%20charcoal%20tones%2C%20peaceful%20contemplative%20mood%2C%20wide%20composition%20with%20ample%20negative%20space%2C%20fine%20art%20editorial%20aesthetic%2C%20soft%20focus%2C%20gentle%20gradients&width=1400&height=600&seq=mag-empty-state-01&orientation=landscape"
+                  alt=""
+                  className="w-full h-full object-cover"
+                />
               </div>
-              <div className="grid grid-cols-1 gap-5 lg:grid-rows-3">
-                {picks.slice(1, 4).map((story, i) => (
-                  <div key={story.slug} className="flex">
-                    <CompactCardFill story={story} rank={i + 2} />
+              <div className="relative z-10 py-20 lg:py-28 px-6 text-center">
+                <div className="w-16 h-16 rounded-2xl bg-[var(--wk-bg)] border border-[var(--wk-border)] flex items-center justify-center mx-auto mb-6 rotate-3">
+                  <i className="ri-pages-line text-[28px] text-[var(--wk-text-faint)]" />
+                </div>
+                <p className="text-[18px] lg:text-[20px] font-black tracking-[-0.025em] text-[var(--wk-text)] mb-3">
+                  No stories in <span className="text-[var(--wk-brand)]">{activeSection}</span> yet
+                </p>
+                <p className="text-[14px] text-[var(--wk-text-muted)] max-w-[420px] mx-auto leading-relaxed mb-8">
+                  This section is quiet for now. Fresh stories are being edited and sequenced — check back soon, or explore everything we have.
+                </p>
+                <button
+                  onClick={() => setActiveSection("All")}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full border border-[var(--wk-border)] bg-[var(--wk-bg)] text-[13px] font-bold text-[var(--wk-text-soft)] hover:text-[var(--wk-text)] hover:border-[var(--wk-border-strong)] transition-all cursor-pointer whitespace-nowrap"
+                >
+                  <i className="ri-arrow-left-line text-[15px]" />
+                  Browse all stories
+                </button>
+              </div>
+            </div>
+          </section>
+        ) : (
+          <>
+            {/* ── Editor's Picks ── */}
+            {filteredPicks.length > 0 && (
+              <section className="mag-reveal">
+                <SectionLabel>Editor&apos;s Picks</SectionLabel>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 lg:items-stretch">
+                  <div className="lg:h-full">
+                    <MagazineCard variant="hero" story={filteredPicks[0]} rank={1} />
                   </div>
-                ))}
-              </div>
-            </div>
-          </section>
-        )}
+                  <div className="grid grid-cols-1 gap-5 lg:grid-rows-3">
+                    {filteredPicks.slice(1, 4).map((story, i) => (
+                      <div key={story.slug} className="flex">
+                        <CompactCardFill story={story} rank={i + 2} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </section>
+            )}
 
-        {/* ── Latest Stories ── */}
-        {latest.length > 0 && (
-          <section className="mag-reveal">
-            <SectionLabel count={latest.length} href="/magazine">Latest Stories</SectionLabel>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-              {latest.map((story) => (
-                <MagazineCard key={story.slug} variant="standard" story={story} />
-              ))}
-            </div>
-          </section>
+            {/* ── Latest Stories ── */}
+            {filteredLatest.length > 0 && (
+              <section className="mag-reveal">
+                <SectionLabel count={filteredLatest.length} href="/magazine">Latest Stories</SectionLabel>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {filteredLatest.map((story) => (
+                    <MagazineCard key={story.slug} variant="standard" story={story} />
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* ── Section Blocks ── */}
+            {(() => {
+              if (filteredTopSections.length > 0) {
+                return filteredTopSections.map((section, sectionIndex) => {
+                  const secStories = sectionMap[section] || [];
+                  if (secStories.length === 0) return null;
+                  const isMusic = section.toLowerCase() === "music";
+                  const isEven = sectionIndex % 2 === 0;
+
+                  return (
+                    <section key={section} className="mag-reveal">
+                      <SectionLabel count={secStories.length} href="/magazine">{section}</SectionLabel>
+                      {isMusic ? (
+                        <SectionCarousel stories={secStories} />
+                      ) : isEven ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                          {secStories.slice(0, 3).map((story, i) => (
+                            <MagazineCard key={story.slug} variant="standard" story={story} rank={i + 1} />
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 lg:grid-cols-5 gap-5 lg:items-stretch">
+                          {secStories.slice(0, 1).map((story) => (
+                            <div key={story.slug} className="lg:col-span-3 lg:h-full">
+                              <MagazineCard variant="hero" story={story} rank={1} />
+                            </div>
+                          ))}
+                          <div className="lg:col-span-2 grid grid-cols-1 gap-5 lg:grid-rows-3">
+                            {secStories.slice(1, 4).map((story, i) => (
+                              <div key={story.slug} className="flex">
+                                <CompactCardFill story={story} rank={i + 2} />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </section>
+                  );
+                });
+              }
+              if (activeSection !== "All") {
+                return (
+                  <section className="mag-reveal py-20 text-center">
+                    <div className="w-14 h-14 rounded-full bg-[var(--wk-surface)] flex items-center justify-center mx-auto mb-5">
+                      <i className="ri-article-line text-[24px] text-[var(--wk-text-faint)]" />
+                    </div>
+                    <p className="text-[16px] font-bold text-[var(--wk-text-muted)] mb-2">No stories in {activeSection}</p>
+                    <p className="text-[13px] text-[var(--wk-text-faint)]">Check back soon or browse All stories.</p>
+                  </section>
+                );
+              }
+              return null;
+            })()}
+          </>
         )}
 
         {/* ── Pullquote (visual rhythm break) ── */}
@@ -319,11 +435,18 @@ export default function Magazine() {
                   to={`/magazine/issue/${issue.key}`}
                   className="group relative shrink-0 w-[200px] lg:w-[240px] aspect-[3/4] rounded-xl overflow-hidden bg-[#0a0a0a]"
                 >
-                  <img
-                    src={issue.coverUrl}
-                    alt={issue.monthName}
-                    className="absolute inset-0 w-full h-full object-cover object-top transition-transform duration-600 group-hover:scale-105"
-                  />
+                  {issue.coverUrl ? (
+                    <img
+                      src={issue.coverUrl}
+                      alt={issue.monthName}
+                      className="absolute inset-0 w-full h-full object-cover object-top transition-transform duration-600 group-hover:scale-105"
+                    />
+                  ) : (
+                    <Chapter19FallbackImage
+                      slug={issue.key}
+                      name={issue.monthName}
+                    />
+                  )}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-black/10" />
                   {/* Top-right issue number */}
                   <div className="absolute top-3 right-3 z-10">
@@ -345,46 +468,6 @@ export default function Magazine() {
             </div>
           </section>
         )}
-
-        {/* ── Section Blocks ── */}
-        {topSections.map((section, sectionIndex) => {
-          const secStories = sectionMap[section] || [];
-          if (secStories.length === 0) return null;
-          const isMusic = section.toLowerCase() === "music";
-          const isEven = sectionIndex % 2 === 0;
-
-          return (
-            <section key={section} className="mag-reveal">
-              <SectionLabel count={secStories.length} href="/magazine">{section}</SectionLabel>
-              {isMusic ? (
-                <SectionCarousel stories={secStories} />
-              ) : isEven ? (
-                /* Even: standard 3-column grid */
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                  {secStories.slice(0, 3).map((story, i) => (
-                    <MagazineCard key={story.slug} variant="standard" story={story} rank={i + 1} />
-                  ))}
-                </div>
-              ) : (
-                /* Odd: 1 large hero card + 3 compact stacked, each stretching to fill height */
-                <div className="grid grid-cols-1 lg:grid-cols-5 gap-5 lg:items-stretch">
-                  {secStories.slice(0, 1).map((story) => (
-                    <div key={story.slug} className="lg:col-span-3 lg:h-full">
-                      <MagazineCard variant="hero" story={story} rank={1} />
-                    </div>
-                  ))}
-                  <div className="lg:col-span-2 grid grid-cols-1 gap-5 lg:grid-rows-3">
-                    {secStories.slice(1, 4).map((story, i) => (
-                      <div key={story.slug} className="flex">
-                        <CompactCardFill story={story} rank={i + 2} />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </section>
-          );
-        })}
 
         {/* ── Newsletter ── */}
         <NewsletterCTA />
@@ -415,11 +498,19 @@ function CompactCardFill({ story, rank }: { story: MagazineArticle; rank: number
       className="group flex gap-4 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4 hover:border-[var(--wk-border-strong)] hover:bg-[var(--wk-surface-raised)] transition-all duration-300 w-full h-full"
     >
       <div className="w-24 shrink-0 rounded-lg overflow-hidden bg-[var(--wk-surface-raised)] self-stretch min-h-[90px]">
-        <img
-          src={story.heroUrl}
-          alt=""
-          className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-110"
-        />
+        {story.heroUrl ? (
+          <img
+            src={story.heroUrl}
+            alt=""
+            className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-110"
+          />
+        ) : (
+          <Chapter19FallbackImage
+            id={story.id}
+            slug={story.slug}
+            name={story.title}
+          />
+        )}
       </div>
       <div className="flex flex-col justify-center gap-1.5 flex-1 min-w-0">
         <div className="flex items-center gap-2">

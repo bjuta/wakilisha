@@ -4,7 +4,7 @@
  * Maps old WordPress image URLs (from wakilisha.africa/wp-content/uploads)
  * to their corresponding Supabase Storage URLs in the article-media bucket.
  *
- * The edge function `migrate-wp-images` stores files at:
+ * The edge function `backfill-article-hero-storage` stores files at:
  *   article-media/wp-import/YYYY/MM/filename.jpg
  *
  * Old URLs look like:
@@ -17,16 +17,38 @@ const WP_UPLOADS_BASE = 'https://wakilisha.africa/wp-content/uploads/';
 const STORAGE_BASE = `${SUPABASE_URL}/storage/v1/object/public/article-media/wp-import`;
 
 /**
+ * Sanitize a filename to ASCII-only for Supabase Storage compatibility.
+ * Must match the edge function's sanitizeFilename exactly.
+ */
+function sanitizeFilename(name: string): string {
+  return name
+    .replace(/\u2013/g, '-')   // en-dash → hyphen
+    .replace(/\u2014/g, '-')   // em-dash → hyphen
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, ''); // strip combining diacritics (ï → i, é → e, etc.)
+}
+
+/**
  * Rewrite a single WordPress uploads URL to its Supabase Storage equivalent.
+ * Sanitizes the filename portion to match the storage path.
  */
 export function rewriteWpImageUrl(url: string): string {
   if (!url || typeof url !== 'string') return url;
   if (!url.includes('wakilisha.africa/wp-content/uploads/')) return url;
 
   const path = url.replace(WP_UPLOADS_BASE, '');
-  // Remove any query params or hash
-  const cleanPath = path.split('?')[0].split('#')[0];
-  return `${STORAGE_BASE}/${cleanPath}`;
+  const rawPath = path.split('?')[0].split('#')[0];
+  const decoded = decodeURIComponent(rawPath);
+
+  // Split into directory parts and filename, sanitize only the filename
+  const parts = decoded.split('/');
+  if (parts.length >= 2) {
+    const filename = parts.pop() || '';
+    const sanitized = sanitizeFilename(filename);
+    return `${STORAGE_BASE}/${parts.join('/')}/${sanitized}`;
+  }
+
+  return `${STORAGE_BASE}/${sanitizeFilename(decoded)}`;
 }
 
 /**
@@ -38,8 +60,17 @@ export function rewriteWpImageUrls(html: string): string {
   return html.replace(
     /https:\/\/wakilisha\.africa\/wp-content\/uploads\/([^"'\s\)]+)/g,
     (match, path) => {
-      const cleanPath = String(path).split('?')[0].split('#')[0];
-      return `${STORAGE_BASE}/${cleanPath}`;
+      const rawPath = String(path).split('?')[0].split('#')[0];
+      const decoded = decodeURIComponent(rawPath);
+
+      const parts = decoded.split('/');
+      if (parts.length >= 2) {
+        const filename = parts.pop() || '';
+        const sanitized = sanitizeFilename(filename);
+        return `${STORAGE_BASE}/${parts.join('/')}/${sanitized}`;
+      }
+
+      return `${STORAGE_BASE}/${sanitizeFilename(decoded)}`;
     }
   );
 }

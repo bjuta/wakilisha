@@ -19,6 +19,7 @@ export type MagazineArticle = {
   title: string;
   section: string;
   author: string;
+  authorSlug?: string;
   date: string;
   readingTime: number;
   heroUrl: string;

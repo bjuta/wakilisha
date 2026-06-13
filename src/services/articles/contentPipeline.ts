@@ -16,12 +16,13 @@ import { generateExcerpt as generateExcerptUtil } from "@/utils/generateExcerpt"
 
 /**
  * Full content processing pipeline for article body HTML.
- * Applies: WP shortcode sanitization → image URL rewrite → rich media embedding.
+ * Applies: WP shortcode sanitization → entity decode → image URL rewrite → rich media embedding.
  */
 export function processArticleContent(rawHtml: string | null | undefined): string {
   if (!rawHtml) return "";
   let html = rawHtml;
   html = sanitizeVcShortcodes(html);
+  html = decodeHtmlEntities(html);
   html = rewriteWpImageUrls(html);
   html = embedRichMedia(html);
   return html;
@@ -30,12 +31,13 @@ export function processArticleContent(rawHtml: string | null | undefined): strin
 /**
  * Light content processing for admin editor display.
  * Skips embedRichMedia so embedded players don't clutter the editing UI.
- * Applies: WP shortcode sanitization → image URL rewrite.
+ * Applies: WP shortcode sanitization → entity decode → image URL rewrite.
  */
 export function processArticleContentForEditor(rawHtml: string | null | undefined): string {
   if (!rawHtml) return "";
   let html = rawHtml;
   html = sanitizeVcShortcodes(html);
+  html = decodeHtmlEntities(html);
   html = rewriteWpImageUrls(html);
   return html;
 }

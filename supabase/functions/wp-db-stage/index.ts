@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { Client } from "https://deno.land/x/mysql@v2.12.1/mod.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
@@ -9,11 +8,6 @@ const corsHeaders = {
 };
 
 const BATCH_SIZE = 100;
-
-// WAKILISHA CPT map — wp_posts (editorial / surface CPTs only)
-// Tracks, releases, labels, artists, genres, charts, editions, and edition
-// items MUST come from wp_wkcharts_* plugin tables, NOT from wp_posts shell
-// CPTs like wk_registry_track (which contain only 1-2 records each).
 
 const ALLOWED_WP_POST_TYPES = new Set([
   "post",
@@ -158,6 +152,7 @@ function mapPost(runId: string, row: Record<string, unknown>): Record<string, un
   else if (entry && !ready) { warnings.push(`WAKILISHA CPT ${type} mapped to ${target}; review metadata/relationships.`); }
   else if (!ready && isAttachment) { warnings.push("Attachment staged as media asset; file copy policy required."); }
   else if (!ready && title) { warnings.push(`Post type/status requires review: ${type}/${status}`); }
+  const wpPostAuthor = clean(row.post_author);
   return {
     ingestion_run_id: runId, source_kind: "wordpress_database", source_file: "mysql.wp_posts",
     source_entity: `mysql.${type}`, source_record_id: clean(row.ID) || null, source_slug: clean(row.post_name) || null,
@@ -167,7 +162,7 @@ function mapPost(runId: string, row: Record<string, unknown>): Record<string, un
     body: clean(row.post_content) || null, excerpt: clean(row.post_excerpt) || null,
     published_at: parseDate(clean(row.post_date_gmt) || clean(row.post_date)), author_name: null, source_url: clean(row.guid) || null,
     raw_record: row,
-    mapped_record: { post_type: type, canonical_kind: canonicalKindForPostType(type), wakilisha_cpt: Boolean(entry), allowed_post_type: allowed, status, slug, mime_type: clean(row.post_mime_type) || null },
+    mapped_record: { post_type: type, canonical_kind: canonicalKindForPostType(type), wakilisha_cpt: Boolean(entry), allowed_post_type: allowed, status, slug, mime_type: clean(row.post_mime_type) || null, post_author: wpPostAuthor || null },
     mapping_candidate_ids: [blocked ? "quarantined-post-type" : entry ? `wakilisha-cpt-${type}` : isAttachment ? "mysql-attachments" : "mysql-posts"],
     warnings, errors: title || isAttachment ? [] : ["Missing title"],
   };
@@ -293,7 +288,6 @@ async function stageAll(
   const failures: Record<string, unknown>[] = [];
   const ignoredPostTypeCounts: Record<string, number> = {};
 
-  // wp_posts
   try {
     const result = await client.execute(`SELECT ID, post_author, post_date, post_date_gmt, post_content, post_title, post_excerpt, post_status, post_name, post_type, post_mime_type, guid FROM \`${prefix}posts\` WHERE post_type NOT IN ('revision','nav_menu_item')`);
     for (const row of result.rows as Array<Record<string, unknown>>) {
@@ -303,31 +297,26 @@ async function stageAll(
     }
   } catch (err) { failures.push(makeFailure(runId, "mysql.wp_posts", "fetch", err)); }
 
-  // editorial authors
   try {
     const result = await client.execute(`SELECT DISTINCT u.ID, u.user_login, u.user_nicename, u.user_email, u.user_url, u.display_name FROM \`${prefix}users\` u JOIN \`${prefix}posts\` p ON p.post_author = u.ID WHERE p.post_status = 'publish' AND p.post_type IN ('post','page','wk_field_guide','wk_methodology','wk_chart_series','wk_chart_edition','wakilisha_artist')`);
     for (const row of result.rows as Array<Record<string, unknown>>) records.push(mapEditorialUser(runId, row));
   } catch (err) { failures.push(makeFailure(runId, "mysql.wp_users", "fetch", err)); }
 
-  // terms
   try {
     const result = await client.execute(`SELECT t.term_id, t.name, t.slug, tt.term_taxonomy_id, tt.taxonomy, tt.description, tt.parent, tt.count FROM \`${prefix}terms\` t JOIN \`${prefix}term_taxonomy\` tt ON t.term_id = tt.term_id`);
     for (const row of result.rows as Array<Record<string, unknown>>) records.push(mapTerm(runId, row));
   } catch (err) { failures.push(makeFailure(runId, "mysql.wp_terms", "fetch", err)); }
 
-  // term relationships
   try {
     const result = await client.execute(`SELECT object_id, term_taxonomy_id, term_order FROM \`${prefix}term_relationships\``);
     for (const row of result.rows as Array<Record<string, unknown>>) records.push(mapGeneric(runId, "mysql.wp_term_relationships", "mysql.relationships", "entity_relationships", row, ["mysql-relationships"]));
   } catch (err) { failures.push(makeFailure(runId, "mysql.wp_term_relationships", "fetch", err)); }
 
-  // postmeta
   try {
     const result = await client.execute(`SELECT meta_id, post_id, meta_key, meta_value FROM \`${prefix}postmeta\` LIMIT ${maxPostmeta}`);
     for (const row of result.rows as Array<Record<string, unknown>>) records.push(mapGeneric(runId, "mysql.wp_postmeta", "mysql.postmeta", "custom_fields", row, ["mysql-postmeta"]));
   } catch (err) { failures.push(makeFailure(runId, "mysql.wp_postmeta", "fetch", err)); }
 
-  // plugin tables
   for (const pt of WAKILISHA_PLUGIN_TABLE_MAP) {
     try {
       const result = await client.execute(`SELECT * FROM \`${prefix}${pt.table}\``);
@@ -335,7 +324,6 @@ async function stageAll(
     } catch (err) { failures.push(makeFailure(runId, `mysql.wp_${pt.table}`, "fetch", err)); }
   }
 
-  // relationship tables
   for (const rel of WAKILISHA_PLUGIN_RELATIONSHIP_TABLES) {
     try {
       const result = await client.execute(`SELECT * FROM \`${prefix}${rel.table}\``);
@@ -343,7 +331,6 @@ async function stageAll(
     } catch (err) { failures.push(makeFailure(runId, `mysql.wp_${rel.table}`, "fetch", err)); }
   }
 
-  // insert batches
   for (let i = 0; i < records.length; i += BATCH_SIZE) {
     const batch = records.slice(i, i + BATCH_SIZE);
     try { const { error } = await supabase.from("wk_import_staging_records").insert(batch); if (error) throw new Error(error.message); }
@@ -406,15 +393,15 @@ serve(async (req: Request) => {
 
     if (action === "stage") {
       const effectiveRunId = runId || crypto.randomUUID();
-      if (!runId) { await supabase.from("wk_ingestion_runs").insert({ id: effectiveRunId, source_name: `${host}/${database}`, source_kind: "wordpress_database", status: "staging", started_at: new Date().toISOString(), errors: [], warnings: ["v4 — plugin tables + editorial authors."] }); }
+      if (!runId) { await supabase.from("wk_ingestion_runs").insert({ id: effectiveRunId, source_name: `${host}/${database}`, source_kind: "wordpress_database", status: "staging", started_at: new Date().toISOString(), errors: [], warnings: ["v5 — post_author extraction enabled."] }); }
       else { await supabase.from("wk_ingestion_runs").update({ status: "staging", started_at: new Date().toISOString(), errors: [] }).eq("id", runId); }
       await supabase.from("wk_import_staging_records").delete().eq("ingestion_run_id", effectiveRunId);
       await supabase.from("wk_import_staging_failures").delete().eq("ingestion_run_id", effectiveRunId);
       const maxPostmeta = Number(body.maxPostmeta ?? 20000);
       const result = await stageAll(client, supabase, prefix, effectiveRunId, maxPostmeta);
       await client.close();
-      const summary = { staged_at: new Date().toISOString(), processor: "wp-db-stage", version: "4.0.0", records: result.records, failures: result.failures, counts_by_target_entity: result.counts, counts_by_status: result.statusCounts, postmeta_limit: maxPostmeta, plugin_tables: WAKILISHA_PLUGIN_TABLE_MAP.map(t => t.table), ignored_post_types: result.ignoredPostTypeCounts };
-      await supabase.from("wk_ingestion_runs").update({ status: "staged", finished_at: new Date().toISOString(), imported_counts: result.counts, source_manifest: { staging: summary }, warnings: [`v4 staging: ${result.records} records. Plugin tables staged. Unknown post types quarantined.`], errors: result.failures > 0 ? [`${result.failures} failures.`] : [] }).eq("id", effectiveRunId);
+      const summary = { staged_at: new Date().toISOString(), processor: "wp-db-stage", version: "5.0.0", records: result.records, failures: result.failures, counts_by_target_entity: result.counts, counts_by_status: result.statusCounts, postmeta_limit: maxPostmeta, plugin_tables: WAKILISHA_PLUGIN_TABLE_MAP.map(t => t.table), ignored_post_types: result.ignoredPostTypeCounts };
+      await supabase.from("wk_ingestion_runs").update({ status: "staged", finished_at: new Date().toISOString(), imported_counts: result.counts, source_manifest: { staging: summary }, warnings: [`v5 staging: ${result.records} records. post_author preserved in mapped_record and raw_record.`], errors: result.failures > 0 ? [`${result.failures} failures.`] : [] }).eq("id", effectiveRunId);
       return jsonResponse({ success: true, runId: effectiveRunId, stats: { total: result.records, ready: result.statusCounts.ready ?? 0, needs_review: result.statusCounts.needs_review ?? 0, blocked: result.statusCounts.blocked ?? 0, failed: result.failures }, entityCounts: result.counts, ignoredPostTypes: result.ignoredPostTypeCounts });
     }
 

@@ -11,6 +11,7 @@ import { WkIcon } from "@/components/design-system/Icon";
 import { ArticleFloatHeader } from "./components/ArticleFloatHeader";
 import { ArticleRelated } from "./components/ArticleRelated";
 import { SkeletonArticlePage } from "@/components/skeletons/Skeletons";
+import { Chapter19FallbackImage } from "@/components/media/Chapter19FallbackImage";
 import {
   checkArticleScheduling,
   lookupSlugRedirect,
@@ -21,15 +22,22 @@ function InlineMediaGallery({ assets }: { assets: MediaAsset[] }) {
   const inlineAssets = assets.filter((a) => a.role !== "hero" && a.url);
   if (!inlineAssets.length) return null;
   return (
-    <div className="my-10 grid gap-4 sm:grid-cols-2">
+    <div className="my-10 grid gap-5 sm:grid-cols-2">
       {inlineAssets.map((asset) => (
         <figure
           key={asset.id}
-          className="overflow-hidden rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)]"
+          className="flex flex-col overflow-hidden rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)]"
         >
-          <img src={asset.url} alt={asset.altText || ""} className="h-full w-full object-cover" loading="lazy" />
+          <div className="relative aspect-[4/3] overflow-hidden bg-[var(--wk-surface-raised)]">
+            <img
+              src={asset.url}
+              alt={asset.altText || ""}
+              className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 hover:scale-105"
+              loading="lazy"
+            />
+          </div>
           {asset.altText && (
-            <figcaption className="px-4 py-2 text-[11px] text-[var(--wk-text-muted)]">
+            <figcaption className="px-4 py-3 text-[11px] leading-relaxed text-[var(--wk-text-muted)]">
               {asset.altText}
             </figcaption>
           )}
@@ -305,18 +313,20 @@ export default function ArticlePage() {
 
       {/* ── Full-bleed hero ── */}
       <section className="relative overflow-hidden" style={{ height: "70vh", minHeight: "480px" }}>
-        <img
-          src={article.heroUrl}
-          alt={article.title}
-          className="absolute inset-0 w-full h-full object-cover object-top"
-        />
-        {/* Gradient fades to page background so float card feels seamless */}
-        <div
-          className="absolute inset-0"
-          style={{
-            background: "linear-gradient(to bottom, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.28) 45%, rgba(0,0,0,0.55) 72%, var(--wk-bg) 100%)",
-          }}
-        />
+        {article.heroUrl ? (
+          <img
+            src={article.heroUrl}
+            alt={article.title}
+            className="absolute inset-0 w-full h-full object-cover"
+            style={{ objectPosition: "50% 30%" }}
+          />
+        ) : (
+          <Chapter19FallbackImage
+            id={article.id}
+            slug={article.slug}
+            name={article.title}
+          />
+        )}
 
         {/* Nav overlay */}
         <div className="absolute top-0 left-0 right-0 z-20 px-6 py-5 flex items-center justify-between">
@@ -352,8 +362,8 @@ export default function ArticlePage() {
       <div
         className="relative z-10 rounded-t-[28px] bg-[var(--wk-bg)]"
         style={{
-          marginTop: "-72px",
-          boxShadow: "0 -8px 48px -12px rgba(0,0,0,0.14)",
+          marginTop: "-64px",
+          boxShadow: "0 -4px 32px -8px rgba(0,0,0,0.10), 0 4px 16px -4px rgba(0,0,0,0.06)",
         }}
       >
         {/* Float card header: stats, title, dek, author, share */}

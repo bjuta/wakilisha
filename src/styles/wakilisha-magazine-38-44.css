@@ -156,16 +156,18 @@
   font-style: normal;
 }
 
-.article-content-v2 img,
 .article-content-v2 figure {
-  margin: 36px 0;
+  max-width: 100% !important;
+  width: auto !important;
+  margin: 36px auto;
   border-radius: var(--wk-r-4);
   overflow: hidden;
 }
 
 .article-content-v2 img {
-  width: 100%;
-  height: auto;
+  max-width: 100% !important;
+  width: 100% !important;
+  height: auto !important;
   display: block;
 }
 
@@ -200,6 +202,26 @@
 .article-content-v2 strong {
   color: var(--wk-text);
   font-weight: 700;
+}
+
+.article-content-v2 figcaption,
+.article-content-v2 .wp-caption-text {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--wk-text-muted);
+  padding: 10px 4px 4px;
+  text-align: center;
+}
+
+.article-content-v2 .wp-caption,
+.article-content-v2 .wp-block-image,
+.article-content-v2 .alignnone,
+.article-content-v2 .aligncenter,
+.article-content-v2 .alignleft,
+.article-content-v2 .alignright {
+  max-width: 100% !important;
+  width: auto !important;
+  height: auto !important;
 }
 
 .article-sidebar-v2 {
@@ -338,16 +360,18 @@
   font-style: normal;
 }
 
-.article-content-v2-mobile img,
 .article-content-v2-mobile figure {
-  margin: 24px 0;
+  max-width: 100% !important;
+  width: auto !important;
+  margin: 24px auto;
   border-radius: var(--wk-r-4);
   overflow: hidden;
 }
 
 .article-content-v2-mobile img {
-  width: 100%;
-  height: auto;
+  max-width: 100% !important;
+  width: 100% !important;
+  height: auto !important;
   display: block;
 }
 
@@ -367,6 +391,26 @@
   height: 1px;
   background: var(--wk-divider);
   margin: 36px 0;
+}
+
+.article-content-v2-mobile figcaption,
+.article-content-v2-mobile .wp-caption-text {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--wk-text-muted);
+  padding: 8px 2px 2px;
+  text-align: center;
+}
+
+.article-content-v2-mobile .wp-caption,
+.article-content-v2-mobile .wp-block-image,
+.article-content-v2-mobile .alignnone,
+.article-content-v2-mobile .aligncenter,
+.article-content-v2-mobile .alignleft,
+.article-content-v2-mobile .alignright {
+  max-width: 100% !important;
+  width: auto !important;
+  height: auto !important;
 }
 
 @media (max-width: 960px) {

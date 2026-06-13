@@ -1,8 +1,11 @@
-import { useEffect, useState, useMemo, useRef } from 'react';
+import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { WkIcon } from '@/components/design-system/Icon';
 import { getArticlesByAuthor, type MagazineArticle } from '@/services/magazineArticles';
 import { getAuthorMeta, getVerticalColor, resolveAuthorMeta, type AuthorRow, type AuthorMeta } from '@/services/authorProfiles';
+import { useAuthUser } from '@/hooks/useAuthUser';
+import { checkAuthorOwnership } from '@/services/authorOwnership';
+import AuthorOwnerBar from './components/AuthorOwnerBar';
 
 type SortMode = 'latest' | 'oldest' | 'longest';
 type AuthorMetaResolved = Awaited<ReturnType<typeof resolveAuthorMeta>>;
@@ -31,7 +34,21 @@ export default function AuthorProfilePage() {
   const sentinelRef = useRef<HTMLDivElement>(null);
   const sortWrapRef = useRef<HTMLDivElement>(null);
 
+  // ─── Auth & ownership ───
+  const authUser = useAuthUser();
+  const [isOwner, setIsOwner] = useState(false);
+  const [ownerAuthorRow, setOwnerAuthorRow] = useState<AuthorRow | null>(null);
+  const [ownershipChecked, setOwnershipChecked] = useState(false);
+
   const normalizedSlug = (slug || '').toLowerCase().replace(/[\s_-]+/g, '-');
+
+  const refreshAuthorMeta = useCallback(() => {
+    if (!normalizedSlug) return;
+    resolveAuthorMeta(normalizedSlug)
+      .then((resolved) => setAuthorMetaResolved(resolved))
+      .catch(() => {});
+  }, [normalizedSlug]);
+
   // Fallback meta while real data loads
   const fallbackMeta = getAuthorMeta(normalizedSlug);
   const authorMeta = authorMetaResolved ?? fallbackMeta;
@@ -59,6 +76,18 @@ export default function AuthorProfilePage() {
         // Silent fallback — getAuthorMeta will handle it
       });
 
+    // Check if the logged-in user owns this author profile
+    if (authUser.id && !authUser.loading) {
+      checkAuthorOwnership(authUser, normalizedSlug).then((ownership) => {
+        if (!alive) return;
+        setIsOwner(ownership.isOwner);
+        setOwnerAuthorRow(ownership.authorRow);
+        setOwnershipChecked(true);
+      });
+    } else if (!authUser.loading) {
+      setOwnershipChecked(true);
+    }
+
     getArticlesByAuthor(normalizedSlug)
       .then((items) => {
         if (!alive) return;
@@ -73,6 +102,25 @@ export default function AuthorProfilePage() {
 
     return () => { alive = false; };
   }, [normalizedSlug]);
+
+  // Re-check ownership when auth state changes (login / logout)
+  useEffect(() => {
+    if (!normalizedSlug || authUser.loading) return;
+    let alive = true;
+    if (authUser.id) {
+      checkAuthorOwnership(authUser, normalizedSlug).then((ownership) => {
+        if (!alive) return;
+        setIsOwner(ownership.isOwner);
+        setOwnerAuthorRow(ownership.authorRow);
+        setOwnershipChecked(true);
+      });
+    } else {
+      setIsOwner(false);
+      setOwnerAuthorRow(null);
+      setOwnershipChecked(true);
+    }
+    return () => { alive = false; };
+  }, [authUser.id, authUser.loading, normalizedSlug]);
 
   useEffect(() => {
     if (!sortOpen) return;
@@ -356,6 +404,15 @@ export default function AuthorProfilePage() {
   return (
     <main className="author-profile-shell">
       <div className="author-profile-content">
+
+        {/* ═══════════ OWNER BAR ═══════════ */}
+        {isOwner && ownerAuthorRow && (
+          <AuthorOwnerBar
+            authUser={authUser}
+            authorRow={ownerAuthorRow}
+            onProfileUpdated={refreshAuthorMeta}
+          />
+        )}
 
         {/* ═══════════ HERO ═══════════ */}
         <section className="author-profile-hero">

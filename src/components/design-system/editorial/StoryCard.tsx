@@ -37,8 +37,9 @@ export function StoryCard({
           <div className="relative aspect-[16/7] overflow-hidden">
             <img
               src={heroUrl}
-              alt={title}
-              className="h-full w-full object-cover object-top transition-transform duration-[var(--wk-d-standard)] group-hover:scale-105"
+              alt=""
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+              loading="lazy"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
             {section && (
@@ -81,8 +82,9 @@ export function StoryCard({
         <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-[var(--wk-surface-raised)]">
           <img
             src={heroUrl}
-            alt={title}
-            className="h-full w-full object-cover object-top transition-transform duration-[var(--wk-d-standard)] group-hover:scale-105"
+            alt=""
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            loading="lazy"
           />
         </div>
       )}

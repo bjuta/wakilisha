@@ -38,3 +38,32 @@ export function safeDecode(val: string | null | undefined): string {
   if (val == null) return "";
   return decodeHtmlEntities(String(val));
 }
+
+/**
+ * Recursively walk any value (object, array, string, primitive) and decode
+ * all HTML entities in every string found. This ensures that data sourced
+ * from WordPress — which uses entities in titles, artist names, excerpts,
+ * content HTML, and metadata — renders correctly everywhere in the app.
+ *
+ * Apply this at the data-loading boundary (API responses, Supabase query
+ * results) so no consumer has to remember to decode manually.
+ */
+export function deepDecode<T>(value: T): T {
+  if (typeof value === "string") {
+    return decodeHtmlEntities(value) as unknown as T;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => deepDecode(item)) as unknown as T;
+  }
+
+  if (value !== null && typeof value === "object") {
+    const decoded: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
+      decoded[key] = deepDecode(val);
+    }
+    return decoded as unknown as T;
+  }
+
+  return value;
+}

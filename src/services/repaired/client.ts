@@ -1,3 +1,4 @@
+import { deepDecode } from "@/utils/decodeHtmlEntities";
 import type {
   RepairedGenreDetail,
   RepairedLabelDetail,
@@ -43,7 +44,7 @@ async function fetchPublic<T>(path: string): Promise<T> {
     );
   }
 
-  return payload.data as T;
+  return deepDecode(payload.data as T);
 }
 
 export function getGenre(
