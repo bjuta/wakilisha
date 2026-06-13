@@ -487,10 +487,36 @@ async function main() {
     stats.releaseTracksUpserted = releaseTrackRows.length;
     stats.trackArtistsUpserted = trackArtistRows.length;
 
+    // Deduplicate release-track links (same (release_id, track_id) from multiple shells)
+    const dedupedReleaseTracks = new Map<string, Record<string,unknown>>();
+    for (const rt of releaseTrackRows) {
+      const key = `${rt.release_id}::${rt.track_id}`;
+      if (!dedupedReleaseTracks.has(key)) dedupedReleaseTracks.set(key, rt);
+    }
+    const uniqueReleaseTrackRows = [...dedupedReleaseTracks.values()];
+    const dupesRemoved = releaseTrackRows.length - uniqueReleaseTrackRows.length;
+    if (dupesRemoved > 0) console.log(`[enrich] Deduped release-track links: ${dupesRemoved} duplicates removed`);
+
+    // Deduplicate release-artist links by (release_id, artist_id, role, credit_order)
+    const dedupedReleaseArtists = new Map<string, Record<string,unknown>>();
+    for (const ra of releaseArtistRows) {
+      const key = `${ra.release_id}::${ra.artist_id}::${ra.role}::${ra.credit_order}`;
+      if (!dedupedReleaseArtists.has(key)) dedupedReleaseArtists.set(key, ra);
+    }
+    const uniqueReleaseArtistRows = [...dedupedReleaseArtists.values()];
+
+    // Deduplicate track-artist links by (track_id, artist_id, role, credit_order)
+    const dedupedTrackArtists = new Map<string, Record<string,unknown>>();
+    for (const ta of trackArtistRows) {
+      const key = `${ta.track_id}::${ta.artist_id}::${ta.role}::${ta.credit_order}`;
+      if (!dedupedTrackArtists.has(key)) dedupedTrackArtists.set(key, ta);
+    }
+    const uniqueTrackArtistRows = [...dedupedTrackArtists.values()];
+
     console.log(`\n[enrich] Releases to upsert:     ${releaseRows.length}`);
     console.log(`[enrich] Tracks to upsert:        ${trackRows.length}`);
     console.log(`[enrich] Release-artist links:    ${releaseArtistRows.length}`);
-    console.log(`[enrich] Release-track links:     ${releaseTrackRows.length}`);
+    console.log(`[enrich] Release-track links:     ${uniqueReleaseTrackRows.length}`);
     console.log(`[enrich] Standalone tracks:       ${standaloneAdded}`);
     console.log(`[enrich] Track-artist links:      ${trackArtistRows.length}`);
 
@@ -503,25 +529,25 @@ async function main() {
       if (trackRows.length > 0) { console.log(`[enrich] Inserting ${trackRows.length} tracks...`); await batchUpsert(pool, "registry_tracks", trackRows, "slug"); }
 
       if (releaseArtistRows.length > 0) {
-        const rids = [...new Set(releaseArtistRows.map(r => String(r.release_id)))];
+        const rids = [...new Set(uniqueReleaseArtistRows.map(r => String(r.release_id)))];
         for (let i = 0; i < rids.length; i += 200) {
           await pool.query(`DELETE FROM registry_release_artists WHERE release_id = ANY($1::uuid[]) AND source = 'wkcharts_release_shell_artists'`, [rids.slice(i, i + 200)]);
         }
-        await batchInsert(pool, "registry_release_artists", releaseArtistRows);
+        await batchInsert(pool, "registry_release_artists", uniqueReleaseArtistRows);
       }
       if (releaseTrackRows.length > 0) {
-        const rids = [...new Set(releaseTrackRows.map(r => String(r.release_id)))];
+        const rids = [...new Set(uniqueReleaseTrackRows.map(r => String(r.release_id)))];
         for (let i = 0; i < rids.length; i += 200) {
           await pool.query(`DELETE FROM registry_release_tracks WHERE release_id = ANY($1::uuid[]) AND source = 'wkcharts_release_shell_tracks'`, [rids.slice(i, i + 200)]);
         }
-        await batchInsert(pool, "registry_release_tracks", releaseTrackRows);
+        await batchInsert(pool, "registry_release_tracks", uniqueReleaseTrackRows);
       }
       if (trackArtistRows.length > 0) {
-        const tids = [...new Set(trackArtistRows.map(r => String(r.track_id)))];
+        const tids = [...new Set(uniqueTrackArtistRows.map(r => String(r.track_id)))];
         for (let i = 0; i < tids.length; i += 200) {
           await pool.query(`DELETE FROM registry_track_artists WHERE track_id = ANY($1::uuid[]) AND source = 'wkcharts_track_artists'`, [tids.slice(i, i + 200)]);
         }
-        await batchInsert(pool, "registry_track_artists", trackArtistRows);
+        await batchInsert(pool, "registry_track_artists", uniqueTrackArtistRows);
       }
       console.log("\n✓ COMMIT COMPLETE");
     } else {
