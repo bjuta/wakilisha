@@ -12,7 +12,6 @@ const ALLOWED_ORIGINS = [
 
 function corsHeaders(req: Request): Record<string, string> {
   const origin = req.headers.get("Origin") ?? "";
-  // Also allow any *.readdy.cc subdomain for preview builds
   const isReaddyPreview = origin.endsWith(".readdy.cc") || origin === "https://readdy.cc";
   const allowedOrigin = ALLOWED_ORIGINS.includes(origin) || isReaddyPreview ? origin : ALLOWED_ORIGINS[0];
   return {
@@ -25,7 +24,7 @@ function corsHeaders(req: Request): Record<string, string> {
 
 const PROVIDER_SECRET_KEYS: Record<string, string[]> = {
   spotify: ["SPOTIFY_CLIENT_ID", "SPOTIFY_CLIENT_SECRET", "SPOTIFY_MARKET"],
-  apple_music: ["APPLE_MUSIC_TEAM_ID", "APPLE_MUSIC_KEY_ID", "APPLE_MUSIC_STOREFRONT"],
+  apple_music: ["APPLE_MUSIC_TEAM_ID", "APPLE_MUSIC_KEY_ID", "APPLE_MUSIC_PRIVATE_KEY", "APPLE_MUSIC_STOREFRONT", "APPLE_MUSIC_SERVICE_ID", "APPLE_MUSIC_TOKEN_TTL"],
   acrcloud: ["ACR_HOST", "ACR_ACCESS_KEY", "ACR_ACCESS_SECRET", "ACR_CALLBACK_SECRET"],
   youtube: ["YOUTUBE_API_KEY"],
   airplay: ["AIRPLAY_API_BASE", "AIRPLAY_API_KEY"],
@@ -39,6 +38,8 @@ const DB_KEY_PREFIX: Record<string, string> = {
   APPLE_MUSIC_KEY_ID: "apple_music_key_id",
   APPLE_MUSIC_STOREFRONT: "apple_music_storefront",
   APPLE_MUSIC_PRIVATE_KEY: "apple_music_private_key",
+  APPLE_MUSIC_SERVICE_ID: "apple_music_service_id",
+  APPLE_MUSIC_TOKEN_TTL: "apple_music_token_ttl",
   ACR_HOST: "acr_host",
   ACR_ACCESS_KEY: "acr_access_key",
   ACR_ACCESS_SECRET: "acr_access_secret",
