@@ -249,6 +249,14 @@ async function main() {
     // If filtering by artist, match shells via shell_artists.artist_name or shell.artist_name_raw
     if (ARTIST_SLUG) {
       const targetArtist = wpArtists.find(a => clean(a.slug) === ARTIST_SLUG);
+      console.log(`[enrich] DEBUG targetArtist found: ${!!targetArtist}`);
+      if (targetArtist) {
+        console.log(`[enrich] DEBUG   display_name:    "${clean(targetArtist.display_name)}"`);
+        console.log(`[enrich] DEBUG   normalized_name: "${clean(targetArtist.normalized_name)}"`);
+        console.log(`[enrich] DEBUG   post_id:         ${targetArtist.post_id}`);
+        console.log(`[enrich] DEBUG   id:              ${targetArtist.id}`);
+      }
+
       const targetNames: string[] = [];
       if (targetArtist) {
         const dn = clean(targetArtist.display_name);
@@ -259,6 +267,45 @@ async function main() {
       // Fallback: slug → name (e.g. "4mr-frank-white" → "4mr frank white")
       const slugName = ARTIST_SLUG.replace(/-/g, " ").toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
       if (!targetNames.includes(slugName)) targetNames.push(slugName);
+      console.log(`[enrich] DEBUG targetNames: ${JSON.stringify(targetNames)}`);
+
+      // Show a sample of shell_artist names and shell artist_name_raw values
+      const saNames = [...new Set(wpShellArtists.map(sa => clean(sa.artist_name)))].slice(0, 20);
+      console.log(`[enrich] DEBUG sample shell_artists.artist_name (${saNames.length} unique of ${wpShellArtists.length}):`);
+      saNames.forEach(n => console.log(`[enrich] DEBUG   "${n}"`));
+
+      const rawNames = [...new Set(wpShells.map(s => clean(s.artist_name_raw)))].filter(Boolean).slice(0, 20);
+      console.log(`[enrich] DEBUG sample shells.artist_name_raw (${rawNames.length} unique of ${wpShells.length}):`);
+      rawNames.forEach(n => console.log(`[enrich] DEBUG   "${n}"`));
+
+      // Also show shell_artists with matching post_id approach
+      if (targetArtist) {
+        const targetPostId = Number(targetArtist.post_id);
+        console.log(`[enrich] DEBUG checking shell_artists by post_id=${targetPostId}:`);
+        const matchingByPostId = wpShellArtists.filter(sa => Number(sa.artist_post_id) === targetPostId);
+        console.log(`[enrich] DEBUG   ${matchingByPostId.length} shell_artists match by post_id`);
+        if (matchingByPostId.length > 0) {
+          matchingByPostId.slice(0, 5).forEach(sa => {
+            console.log(`[enrich] DEBUG     shell_id=${sa.shell_id} artist_name="${clean(sa.artist_name)}"`);
+          });
+        }
+
+        // Check by wp_artists.id vs shell_artists.artist_id (not post_id)
+        const targetWpId = Number(targetArtist.id);
+        console.log(`[enrich] DEBUG checking shell_artists where artist_name matches targetNames:`);
+        // Scan ALL shell_artists for name matches
+        const nameMatches: Record<string,unknown>[] = [];
+        for (const sa of wpShellArtists) {
+          const saName = clean(sa.artist_name).toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
+          if (targetNames.some(tn => saName.includes(tn) || tn.includes(saName))) {
+            nameMatches.push(sa);
+          }
+        }
+        console.log(`[enrich] DEBUG   ${nameMatches.length} shell_artists match by name`);
+        nameMatches.slice(0, 5).forEach(sa => {
+          console.log(`[enrich] DEBUG     shell_id=${sa.shell_id} artist_name="${clean(sa.artist_name)}" artist_post_id=${sa.artist_post_id}`);
+        });
+      }
 
       const targetShellIds = new Set<number>();
       for (const sa of wpShellArtists) {
@@ -274,6 +321,7 @@ async function main() {
           targetShellIds.add(Number(s.id));
         }
       }
+      console.log(`[enrich] DEBUG targetShellIds from name matching: ${targetShellIds.size}`);
       wpShells = wpShells.filter(s => targetShellIds.has(Number(s.id)));
       console.log(`[enrich] WP shells (filtered for ${ARTIST_SLUG}): ${wpShells.length}`);
     }
