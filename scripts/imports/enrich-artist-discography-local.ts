@@ -230,23 +230,13 @@ async function main() {
     }
 
     // ════════════════════════════════════════════════════════════════════
-    // 4. Load WP release shells
+    // 4. Load WP release shells (unfiltered — we filter after loading shell_artists)
     // ════════════════════════════════════════════════════════════════════
     let shellQ = `SELECT id, shell_uuid, status, artist_post_id, artist_name_raw, title_raw, title_normalized, release_type_guess, release_date, artwork_url FROM ${t(WP.prefix, "wkcharts_release_shells")} WHERE status != 'ignored'`;
-    if (ARTIST_SLUG) {
-      // Filter shells to only those linked to the target artist (via artist_post_id → wp_artists.post_id → slug)
-      const targetPostIds = [...wpPostIdToSlug.entries()].filter(([,s]) => s === ARTIST_SLUG).map(([pid]) => pid);
-      if (targetPostIds.length > 0) {
-        shellQ += ` AND artist_post_id IN (${targetPostIds.join(", ")})`;
-      } else {
-        shellQ += ` AND 1=0`; // No matching artist, skip all shells
-      }
-    }
     if (LIMIT > 0) shellQ += ` LIMIT ${LIMIT * 10}`;
     const [shellRows] = await wp.query(shellQ);
-    const wpShells = shellRows as Record<string,unknown>[];
-    stats.wpShells = wpShells.length;
-    console.log(`[enrich] WP shells: ${wpShells.length}`);
+    let wpShells = shellRows as Record<string,unknown>[];
+    console.log(`[enrich] WP shells (all): ${wpShells.length}`);
 
     // ════════════════════════════════════════════════════════════════════
     // 5. Load shell artists
@@ -255,6 +245,20 @@ async function main() {
     const wpShellArtists = saRows as Record<string,unknown>[];
     stats.wpShellArtists = wpShellArtists.length;
     console.log(`[enrich] WP shell artists: ${wpShellArtists.length}`);
+
+    // If filtering by artist, filter shells to those whose shell_artists include our target
+    if (ARTIST_SLUG) {
+      const targetPostIds = [...wpPostIdToSlug.entries()].filter(([,s]) => s === ARTIST_SLUG).map(([pid]) => pid);
+      const targetShellIds = new Set<number>();
+      for (const sa of wpShellArtists) {
+        if (targetPostIds.includes(Number(sa.artist_post_id))) {
+          targetShellIds.add(Number(sa.shell_id));
+        }
+      }
+      wpShells = wpShells.filter(s => targetShellIds.has(Number(s.id)));
+      console.log(`[enrich] WP shells (filtered for ${ARTIST_SLUG}): ${wpShells.length}`);
+    }
+    stats.wpShells = wpShells.length;
 
     const shellArtistsMap = new Map<number, Record<string,unknown>[]>();
     for (const sa of wpShellArtists) {
