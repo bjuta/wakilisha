@@ -246,13 +246,32 @@ async function main() {
     stats.wpShellArtists = wpShellArtists.length;
     console.log(`[enrich] WP shell artists: ${wpShellArtists.length}`);
 
-    // If filtering by artist, filter shells to those whose shell_artists include our target
+    // If filtering by artist, match shells via shell_artists.artist_name or shell.artist_name_raw
     if (ARTIST_SLUG) {
-      const targetPostIds = [...wpPostIdToSlug.entries()].filter(([,s]) => s === ARTIST_SLUG).map(([pid]) => pid);
+      const targetArtist = wpArtists.find(a => clean(a.slug) === ARTIST_SLUG);
+      const targetNames: string[] = [];
+      if (targetArtist) {
+        const dn = clean(targetArtist.display_name);
+        const nn = clean(targetArtist.normalized_name);
+        if (dn) targetNames.push(dn.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, ""));
+        if (nn && nn.toLowerCase() !== dn?.toLowerCase()) targetNames.push(nn.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, ""));
+      }
+      // Fallback: slug → name (e.g. "4mr-frank-white" → "4mr frank white")
+      const slugName = ARTIST_SLUG.replace(/-/g, " ").toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
+      if (!targetNames.includes(slugName)) targetNames.push(slugName);
+
       const targetShellIds = new Set<number>();
       for (const sa of wpShellArtists) {
-        if (targetPostIds.includes(Number(sa.artist_post_id))) {
+        const saName = clean(sa.artist_name).toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
+        if (targetNames.some(tn => saName.includes(tn) || tn.includes(saName))) {
           targetShellIds.add(Number(sa.shell_id));
+        }
+      }
+      // Also check shell.artist_name_raw directly
+      for (const s of wpShells) {
+        const rawName = clean(s.artist_name_raw).toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
+        if (targetNames.some(tn => rawName.includes(tn) || tn.includes(rawName))) {
+          targetShellIds.add(Number(s.id));
         }
       }
       wpShells = wpShells.filter(s => targetShellIds.has(Number(s.id)));
