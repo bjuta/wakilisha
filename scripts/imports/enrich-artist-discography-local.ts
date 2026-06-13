@@ -355,18 +355,18 @@ async function main() {
     info(`WP shell-track links fetched: ${wpShellTracks.length}`);
 
     // ── 7. Load tracks ───────────────────────────────────────────────────
-    const [trackRows] = await wp.query(
+    const [trackResultRows] = await wp.query(
       `SELECT id, title, slug, isrc, duration, explicit, track_number, spotify_id, apple_music_id, youtube_id, artwork_url, status FROM ${table(WP.prefix, "wkcharts_tracks")}`
     );
-    const wpTracks = trackRows as Record<string, unknown>[];
+    const wpTracks = trackResultRows as Record<string, unknown>[];
     stats.wp_tracks = wpTracks.length;
     info(`WP tracks fetched: ${wpTracks.length}`);
 
     // ── 8. Load track-artist links ─────────────────────────────────────────
-    const [trackArtistRows] = await wp.query(
+    const [trackArtistResultRows] = await wp.query(
       `SELECT id, track_id, artist_id, role, is_primary FROM ${table(WP.prefix, "wkcharts_track_artists")}`
     );
-    const wpTrackArtists = trackArtistRows as Record<string, unknown>[];
+    const wpTrackArtists = trackArtistResultRows as Record<string, unknown>[];
     stats.wp_track_artists = wpTrackArtists.length;
     info(`WP track-artist links fetched: ${wpTrackArtists.length}`);
 
