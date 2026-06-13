@@ -54,6 +54,17 @@ function parseReleaseType(t: string): string {
   if (l.includes("compilation") || l.includes("mixtape")) return l;
   return "album";
 }
+function normalizeArtistType(t: string): string {
+  const l = t.toLowerCase().trim();
+  if (!l || l === "not_applicable") return "unknown";
+  // Direct matches first
+  if (["solo", "group", "collective", "band", "duo", "unknown"].includes(l)) return l;
+  // Map common WP/legacy values
+  if (["musician", "artist", "rapper", "singer", "producer", "dj", "composer", "songwriter", "performer"].includes(l)) return "solo";
+  if (["trio", "quartet", "quintet", "ensemble", "orchestra", "choir"].includes(l)) return "group";
+  if (["duo_act"].includes(l)) return "duo";
+  return "unknown";
+}
 function dedupeSlug(base: string, seen: Set<string>): string {
   if (!seen.has(base)) { seen.add(base); return base; }
   let i = 2; while (seen.has(`${base}-${i}`)) i++;
@@ -162,7 +173,7 @@ async function main() {
         const patch: Record<string,unknown> = {};
         if (clean(wa.image_url) && !ra.public_image_url) patch.public_image_url = clean(wa.image_url);
         if (clean(wa.country_iso2) && !ra.origin_iso2) patch.origin_iso2 = clean(wa.country_iso2);
-        if (clean(wa.artist_type) && !ra.artist_type) patch.artist_type = clean(wa.artist_type);
+        if (clean(wa.artist_type) && !ra.artist_type) patch.artist_type = normalizeArtistType(clean(wa.artist_type));
         const meta = (ra.metadata || {}) as Record<string,unknown>;
         const metaP: Record<string,unknown> = {};
         if (clean(wa.spotify_artist_id) && !meta.spotify_artist_id) metaP.spotify_artist_id = clean(wa.spotify_artist_id);
