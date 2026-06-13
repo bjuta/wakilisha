@@ -26,12 +26,13 @@ function normalizeDbUrl(url: string) { try { const u = new URL(url); u.searchPar
 const COMMIT = hasFlag("--commit");
 
 const WP = {
-  host: required(arg("--host") ?? process.env.WP_DB_HOST, "WP_DB_HOST"),
+  host: arg("--host") ?? process.env.WP_DB_HOST ?? "localhost",
   port: Number(arg("--port") ?? process.env.WP_DB_PORT ?? 3306),
   user: required(arg("--user") ?? process.env.WP_DB_USER, "WP_DB_USER"),
   password: required(arg("--password") ?? process.env.WP_DB_PASSWORD, "WP_DB_PASSWORD"),
   database: required(arg("--database") ?? process.env.WP_DB_NAME, "WP_DB_NAME"),
   prefix: arg("--prefix") ?? process.env.WP_DB_PREFIX ?? "wp_",
+  socket: arg("--socket") ?? process.env.WP_DB_SOCKET ?? undefined,
 };
 const DATABASE_URL = required(process.env.DATABASE_URL, "DATABASE_URL");
 
@@ -94,12 +95,19 @@ async function main() {
   console.log("  Wakilisha Guide Content Enrichment (LOCAL)");
   console.log("═══════════════════════════════════════════════════════");
   console.log(`  Mode:       ${COMMIT ? "COMMIT" : "DRY RUN"}`);
-  console.log(`  WP MySQL:   ${WP.user}@${WP.host}:${WP.port}/${WP.database}`);
+  console.log(`  WP MySQL:   ${WP.user}@${WP.socket ? `socket:${WP.socket}` : `${WP.host}:${WP.port}`}/${WP.database}`);
   console.log("═══════════════════════════════════════════════════════\n");
 
-  const wp = await mysql.createConnection({ host: WP.host, port: WP.port, user: WP.user, password: WP.password, database: WP.database, connectTimeout: 20000 });
+  const wpConn: Record<string,unknown> = { user: WP.user, password: WP.password, database: WP.database, connectTimeout: 20000 };
+  if (WP.socket) {
+    wpConn.socketPath = WP.socket;
+  } else {
+    wpConn.host = WP.host;
+    wpConn.port = WP.port;
+  }
+  const wp = await mysql.createConnection(wpConn);
   await wp.ping();
-  console.log("[enrich] Connected to WordPress MySQL");
+  console.log(`[enrich] Connected to WordPress MySQL${WP.socket ? ` via socket ${WP.socket}` : ""}`);
 
   const pool = new pg.Pool({ connectionString: normalizeDbUrl(DATABASE_URL), ssl: { rejectUnauthorized: false }, max: 4 });
 
