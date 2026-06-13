@@ -15,6 +15,7 @@ import {
   type ChartEntryRowViewModel,
 } from "@/services/chartsPublic/viewModels";
 import { ChartRefreshButton } from "@/components/charts/ChartRefreshButton";
+import { trackUrl } from "@/utils/trackUrl";
 
 export default function MobileCharts() {
   const [activeSeries, setActiveSeries] = useState("weekly-top-40");
@@ -29,7 +30,7 @@ export default function MobileCharts() {
     setError(null);
     setEmpty(false);
     try {
-      const { data: families } = await getChartFamilies();
+      const { data: { families } } = await getChartFamilies();
       if (families.length === 0) {
         setEmpty(true);
         setLoading(false);
@@ -277,7 +278,7 @@ export default function MobileCharts() {
           {top3.map((entry, i) => (
             <Link
               key={entry.rank}
-              to={`/tracks/${entry.slug}`}
+              to={trackUrl(entry.slug, entry.artistSlugs)}
               className="group flex items-center gap-4 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4 transition-all hover:border-[var(--wk-brand)]/40 active:scale-[0.98] active:opacity-80"
             >
               <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[var(--wk-surface-raised)]">

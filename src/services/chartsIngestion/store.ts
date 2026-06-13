@@ -4,10 +4,6 @@
  * Starts empty — no mock data. Data only exists when created through the pipeline.
  */
 
-import {
-  DEMO_JOB_ID,
-  getFamilyById,
-} from "./mockData";
 import type {
   ChartFamily,
   IngestJob,
@@ -117,13 +113,11 @@ export function commit(state: StoreState): void {
 
 // ─── Job helpers ───
 export function getJob(jobId: string): IngestJob | null {
-  const j = mutableStore.jobs.find((job) => job.id === jobId);
-  if (!j) return null;
-  return { ...j, chartFamily: getFamilyById(j.chartFamilyId) };
+  return mutableStore.jobs.find((job) => job.id === jobId) ?? null;
 }
 
 export function getJobs(): IngestJob[] {
-  return mutableStore.jobs.map((j) => ({ ...j, chartFamily: getFamilyById(j.chartFamilyId) }));
+  return mutableStore.jobs;
 }
 
 export function updateJob(jobId: string, updater: (job: IngestJob) => IngestJob): void {
@@ -469,8 +463,3 @@ export function getLogsForJob(jobId: string): IngestJobLog[] {
   return mutableStore.logs.filter((l) => l.jobId === jobId);
 }
 
-// ─── Re-export helpers ───
-export {
-  getFamilyById,
-  DEMO_JOB_ID,
-};

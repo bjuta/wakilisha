@@ -1,4 +1,4 @@
-// chart-ingest-api v14 — Fixed CORS to allow readdy.cc preview domains
+// chart-ingest-api v15 — Registry-first commit: writes tracks into registry_tracks during publish
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
 const ALLOWED_ORIGINS = [
@@ -14,7 +14,6 @@ const ALLOWED_ORIGINS = [
 
 function corsHeaders(req: Request): Record<string, string> {
   const origin = req.headers.get("Origin") ?? "";
-  // Also allow any *.readdy.cc subdomain for preview builds
   const isReaddyPreview = origin.endsWith(".readdy.cc") || origin === "https://readdy.cc";
   const allowedOrigin = ALLOWED_ORIGINS.includes(origin) || isReaddyPreview ? origin : ALLOWED_ORIGINS[0];
   return {
@@ -49,7 +48,6 @@ function safeError(req: Request, action: string, err: unknown): Response {
   });
 }
 
-// ── Capability authorization ────────────────────────────────────────────────
 async function requireCapability(
   db: ReturnType<typeof createClient>,
   userId: string,
@@ -132,7 +130,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // v14: All handlers now receive the real Request so CORS headers match the caller's origin
     if (action === "create_dry_run") return handleCreateDryRun(req, db, params, user);
     if (action === "list_runs") return handleListRuns(req, db, params);
     if (action === "get_run") return handleGetRun(req, db, params);
@@ -235,6 +232,14 @@ function build_normalized_key(title: string, full_artist_line: string): string {
   const lk = lead_artist_key(full_artist_line);
   if (!nt || !lk) return "";
   return `${nt}::${lk}`;
+}
+
+function generateTrackSlug(title: string): string {
+  return title.toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/-+$/, "")
+    .replace(/^-+/, "")
+    .slice(0, 200) || "untitled";
 }
 
 const LN = Math.log;
@@ -420,83 +425,8 @@ async function fetchProviderSource(provider: string, sourceUrl: string, market: 
   switch (provider) {
     case "spotify": return fetchSpotifySource(sourceUrl, market, maxRows, db);
     case "apple_music": return fetchAppleMusicSource(sourceUrl, market, maxRows, db);
-    case "csv_legacy": return { tracks: [], warnings: ["CSV source requires CSV upload, not provider fetch."], error: "CSV source type does not support API fetch." };
-    case "manual": return { tracks: [], warnings: ["Manual source has no API."], error: "Manual sources need hand-entered data." };
     default: return { tracks: [], warnings: [`Unknown provider: ${provider}`], error: `Unknown provider '${provider}'. Supported: spotify, apple_music.` };
   }
-}
-
-// ═══════ CSV Parsing Utilities ═══════
-interface CsvUploadRow { id: string; run_id: string; filename: string; filepath: string; detected_chart_type: string; confidence: string; row_count: number; headers: string[]; sample_rows: Record<string, string>[]; detected_date: string | null; detected_week: string | null; mapping_status: string; validation_status: string; validation_issues: string[]; mapped_fields: Record<string, string>; source_size: number; created_at?: string; updated_at?: string; }
-
-const CHART_TYPE_PATTERNS: Array<{ pattern: RegExp; type: string }> = [
-  { pattern: /top[\s_-]?40/i, type: "top_40" },
-  { pattern: /top[\s_-]?100/i, type: "top_100" },
-  { pattern: /afrobeats/i, type: "afrobeats" },
-  { pattern: /hip[\s_-]?hop/i, type: "hip_hop" },
-  { pattern: /rnb|r&b/i, type: "rnb" },
-  { pattern: /dance|electronic/i, type: "dance" },
-  { pattern: /legacy|import|archive/i, type: "generic_ranked" },
-];
-
-const FIELD_ALIASES: Record<string, string[]> = {
-  rank: ["rank", "position", "pos", "no", "#"],
-  title: ["title", "track_title", "track", "song", "name"],
-  artist_line: ["artist_line", "artist_name", "artist", "artists", "performer", "by"],
-  isrc: ["isrc", "isrc_code"],
-  upc: ["upc", "upc_code", "barcode"],
-  release_title: ["release_title", "album", "release", "ep"],
-  label: ["label", "record_label", "publisher"],
-  genre: ["genre", "style", "category"],
-  artwork_url: ["artwork_url", "artwork", "cover_url", "image_url", "cover"],
-  spotify_url: ["spotify_url", "spotify", "spotify_link"],
-  apple_music_url: ["apple_music_url", "apple", "apple_music", "itunes"],
-  youtube_url: ["youtube_url", "youtube", "yt_link", "video_url"],
-  chart_week: ["chart_week", "week", "chart_date", "date", "edition_date"],
-};
-
-function detectChartType(filename: string, headers: string[]): string {
-  for (const { pattern, type } of CHART_TYPE_PATTERNS) if (pattern.test(filename)) return type;
-  const headerStr = headers.join(" ").toLowerCase();
-  if (headerStr.includes("rank") || headerStr.includes("position")) return "generic_ranked";
-  return "unknown";
-}
-
-function autoMapFields(headers: string[]): Record<string, string> {
-  const mapped: Record<string, string> = {};
-  const lowerHeaders = headers.map(h => h.toLowerCase().trim());
-  for (const [field, aliases] of Object.entries(FIELD_ALIASES)) {
-    for (const alias of aliases) {
-      const idx = lowerHeaders.findIndex(h => h === alias.toLowerCase());
-      if (idx !== -1) { mapped[field] = headers[idx]; break; }
-    }
-  }
-  return mapped;
-}
-
-function parseCsvToRows(csvText: string): { headers: string[]; rows: Record<string, string>[] } {
-  const lines = csvText.trim().split(/\r?\n/).filter(l => l.trim());
-  if (lines.length === 0) return { headers: [], rows: [] };
-  const headers = lines[0].split(",").map(h => h.trim().replace(/^["']|["']$/g, ""));
-  const rows: Record<string, string>[] = [];
-  for (let i = 1; i < lines.length; i++) {
-    const values = lines[i].split(",").map(v => v.trim().replace(/^["']|["']$/g, ""));
-    const row: Record<string, string> = {};
-    for (let j = 0; j < headers.length; j++) row[headers[j]] = values[j] ?? "";
-    rows.push(row);
-  }
-  return { headers, rows };
-}
-
-async function acrcloudSign(accessKey: string, accessSecret: string, method: string, host: string, uri: string): Promise<{ signature: string; timestamp: number }> {
-  const timestamp = Math.floor(Date.now() / 1000);
-  const signatureVersion = "1";
-  const stringToSign = `${method}\n${host}\n${uri}\n${accessKey}\n${signatureVersion}\n${timestamp}`;
-  const encoder = new TextEncoder();
-  const key = await crypto.subtle.importKey("raw", encoder.encode(accessSecret), { name: "HMAC", hash: "SHA-1" }, false, ["sign"]);
-  const sig = await crypto.subtle.sign("HMAC", key, encoder.encode(stringToSign));
-  const signature = btoa(String.fromCharCode(...new Uint8Array(sig)));
-  return { signature, timestamp };
 }
 
 function anchorToMonday(dateStr: string): string {
@@ -509,7 +439,7 @@ function anchorToMonday(dateStr: string): string {
   return d.toISOString().split("T")[0];
 }
 
-// ═══════ Handler stubs — v14: all handlers now receive req: Request as first parameter for correct CORS ═══════
+// ═══════ Handler stubs ═══════
 
 async function handleCreateDryRun(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) {
   const rq = params.request as Record<string, unknown>; if (!rq) return json(req, { error: "request_required" }, 400);
@@ -640,7 +570,8 @@ async function handleRunCarryForward(req: Request, db: ReturnType<typeof createC
     const now = new Date().toISOString();
     for (const meta of previousEntryMetas) {
       const cid = crypto.randomUUID();
-      createdCandidates.push({ id: cid, run_id: runId, normalized_key: meta.nk, lead_artist_key: meta.nk.split("::")[1] ?? "", title: meta.title, artist_display: meta.artist, source_count: 0, source_urls_seen: [], occurrence_count: 0, release_date: meta.release_date, candidate_type: "carry_forward", status: "eligible", version: 1, carry_forward_only: true, continuity_locked: false, airplay_candidate_only: false, isrc: null, upc: null, artwork_url: meta.artwork_url, external_url: null, canonical_track_id: meta.canonical_track_id, canonical_release_id: null, canonical_artist_id: null, track_slug: meta.track_slug, artist_slug: meta.artist_slug, created_at: now, updated_at: now });
+      createdCandidates.push({ id: cid, run_id: runId, normalized_key: meta.nk, lead_artist_key: meta.nk.split("::")[1] ?? "", title: meta.title, artist_display: meta.artist, source_count: 0, source_urls_seen: [], occurrence_count: 0, release_date: meta.release_date, candidate_type: "carry_forward", status: "eligible", version: 1, carry_forward_only: true, continuity_locked: false, airplay_candidate_only: false, isrc: null, upc: null, artwork_url: meta.artwork_url, external_url: null, canonical_track_id: meta.canonical_track_id, release_title: null, streaming_qualified: false, created_at: now, updated_at: now });
+      carryForwardCount++;
     }
     const CH = 200;
     for (let j = 0; j < createdCandidates.length; j += CH) {
@@ -653,7 +584,6 @@ async function handleRunCarryForward(req: Request, db: ReturnType<typeof createC
         return json(req, { error: "carry_forward_insert_failed", detail: ie.message }, 500);
       }
     }
-    carryForwardCount = createdCandidates.length;
   }
   const d = Date.now() - ss;
   const msg = carryForwardCount > 0 ? `${carryForwardCount} carry-forward candidates created from previous edition. ${skippedCount} previous entries had fresh evidence this week.` : `No carry-forward candidates needed — ${skippedCount} previous entries had fresh evidence, ${freshKeys.size} fresh candidates this week.`;
@@ -805,6 +735,12 @@ async function handleRunShortlist(req: Request, db: ReturnType<typeof createClie
   return json(req, { ok: true, runId, stage: "shortlist", shortlistedCount: shortlistedIds.length, totalScored: candidates.length, excludedCount: excludedIds.length, chartSize, durationMs: d });
 }
 
+// ════════════════════════════════════════════════════════════════════════
+// v15: REGISTRY-FIRST COMMIT — writes tracks into registry_tracks during publish
+// Charts are a customer of the registry. Every track that enters a chart
+// MUST exist in the registry. ISRC is the unique dedup key.
+// ════════════════════════════════════════════════════════════════════════
+
 async function handleCommitRun(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) {
   const { runId, publishImmediately, notes, acknowledgedWarnings } = params as { runId: string; publishImmediately?: boolean; notes?: string; acknowledgedWarnings?: string[] };
   if (!runId) return json(req, { error: "runId_required" }, 400);
@@ -830,10 +766,133 @@ async function handleCommitRun(req: Request, db: ReturnType<typeof createClient>
   let previousKeys = new Set<string>();
   try {
     const { data: prevEdition } = await db.from("wk_chart_editions_v2").select("id").eq("program_id", programId).in("status", ["committed", "published"]).lt("edition_date", editionDate).order("edition_date", { ascending: false }).limit(1).maybeSingle();
-    if (prevEdition) { const { data: prevEntries } = await db.from("wk_chart_entries_v2").select("normalized_key, rank").eq("edition_id", prevEdition.id); if (prevEntries) { for (const pe of prevEntries) { if (pe.normalized_key) { previousMap.set(pe.normalized_key, pe.rank as number); previousKeys.add(pe.normalized_key); } } } }
+    if (prevEdition) { const { data: prevEntries } = await db.from("wk_chart_editions_v2").select("normalized_key, rank").eq("edition_id", prevEdition.id); if (prevEntries) { for (const pe of prevEntries) { if (pe.normalized_key) { previousMap.set(pe.normalized_key, pe.rank as number); previousKeys.add(pe.normalized_key); } } } }
   } catch { /* best-effort */ }
-  const editionId = crypto.randomUUID();
-  const editionSlug = `${seriesSlug}-${editionDate}`.replace(/\s+/g, "-").toLowerCase();
+
+  // ════════════════════════════════════════════════════════════════════
+  // v15: REGISTRY WRITE — ensure every chart track exists in registry_tracks
+  // ISRC is the unique dedup key. Existing tracks get enriched, new tracks get created.
+  // ════════════════════════════════════════════════════════════════════
+
+  const registryMap = new Map<string, { canonicalTrackId: string; trackSlug: string; isNew: boolean }>();
+  const candidateIsrcs: string[] = [];
+  const isrcToCandidateIdx = new Map<string, number[]>();
+
+  for (let i = 0; i < topN.length; i++) {
+    const isrc = ((topN[i].isrc as string) || "").trim();
+    if (isrc) {
+      candidateIsrcs.push(isrc);
+      if (!isrcToCandidateIdx.has(isrc)) isrcToCandidateIdx.set(isrc, []);
+      isrcToCandidateIdx.get(isrc)!.push(i);
+    }
+  }
+
+  // Batch lookup all ISRCs in registry
+  const existingByIsrc = new Map<string, { id: string; slug: string; artwork_url: string | null }>();
+  if (candidateIsrcs.length > 0) {
+    const uniqueIsrcs = [...new Set(candidateIsrcs)];
+    const { data: regTracks } = await db.from("registry_tracks")
+      .select("id, slug, isrc, artwork_url")
+      .in("isrc", uniqueIsrcs);
+    for (const rt of (regTracks || [])) {
+      existingByIsrc.set(rt.isrc, { id: rt.id, slug: rt.slug, artwork_url: rt.artwork_url });
+    }
+  }
+
+  const newRegistryTracks: Array<Record<string, unknown>> = [];
+  const enrichUpdates: Array<{ id: string; artwork_url?: string }> = [];
+  const usedSlugs = new Set<string>();
+
+  // Pre-load all existing slugs to avoid collisions
+  for (const [, v] of existingByIsrc) usedSlugs.add(v.slug);
+
+  for (let i = 0; i < topN.length; i++) {
+    const c = topN[i];
+    const isrc = ((c.isrc as string) || "").trim();
+    const title = (c.title as string) || "Untitled";
+    const artistDisplay = (c.artist_display as string) || "Unknown";
+
+    if (isrc && existingByIsrc.has(isrc)) {
+      // Track already in registry — link to it and enrich if needed
+      const existing = existingByIsrc.get(isrc)!;
+      registryMap.set(c.id as string, { canonicalTrackId: existing.id, trackSlug: existing.slug, isNew: false });
+
+      // Enrich if candidate has artwork but registry doesn't
+      if (c.artwork_url && !existing.artwork_url) {
+        enrichUpdates.push({ id: existing.id, artwork_url: c.artwork_url as string });
+      }
+    } else {
+      // Track not in registry — create it
+      const newId = crypto.randomUUID();
+      let slug = generateTrackSlug(title);
+
+      // Ensure slug uniqueness
+      if (usedSlugs.has(slug) || slug === "untitled") {
+        const shortId = newId.slice(0, 8);
+        const baseSlug = slug === "untitled" ? "track" : slug;
+        slug = `${baseSlug}-${shortId}`;
+      }
+      // Double-check against DB
+      const { data: slugConflict } = await db.from("registry_tracks").select("id").eq("slug", slug).limit(1);
+      if (slugConflict && slugConflict.length > 0) {
+        slug = `${slug}-${newId.slice(0, 6)}`;
+      }
+      usedSlugs.add(slug);
+
+      newRegistryTracks.push({
+        id: newId,
+        slug,
+        title,
+        normalized_title: (c.normalized_key as string)?.split("::")[0] || title.toLowerCase(),
+        isrc: isrc || null,
+        artwork_url: c.artwork_url || null,
+        status: "active",
+        metadata: {
+          source: "chart_ingest_commit",
+          artist_display: artistDisplay,
+          committed_at: now,
+          committed_by: byEmail,
+          edition_date: editionDate,
+          program_id: programId,
+        },
+        created_at: now,
+        updated_at: now,
+      });
+
+      registryMap.set(c.id as string, { canonicalTrackId: newId, trackSlug: slug, isNew: true });
+    }
+  }
+
+  // Apply enrichments to existing registry tracks
+  for (const eu of enrichUpdates) {
+    const updates: Record<string, unknown> = { updated_at: now };
+    if (eu.artwork_url) updates.artwork_url = eu.artwork_url;
+    await db.from("registry_tracks").update(updates).eq("id", eu.id);
+  }
+
+  // Insert new registry tracks
+  if (newRegistryTracks.length > 0) {
+    const RCH = 100;
+    for (let j = 0; j < newRegistryTracks.length; j += RCH) {
+      const chunk = newRegistryTracks.slice(j, j + RCH);
+      const { error: regErr } = await db.from("registry_tracks").insert(chunk);
+      if (regErr) {
+        console.error("[commit] registry insert failed:", regErr.message);
+        return json(req, { error: "registry_write_failed", detail: `Failed to create ${newRegistryTracks.length} registry tracks: ${regErr.message}. Charts require registry entries to publish.` }, 500);
+      }
+    }
+  }
+
+  const registryStats = {
+    existing: enrichUpdates.length,
+    created: newRegistryTracks.length,
+    linked: registryMap.size,
+  };
+
+  // ════════════════════════════════════════════════════════════════════
+  // Build edition and entry rows (with canonical_track_id populated)
+  // ════════════════════════════════════════════════════════════════════
+
   let carryForwardCount = 0, newEntriesCount = 0, reEntriesCount = 0;
   for (const c of topN) { const nk = (c.normalized_key as string) || ""; const cfOnly = !!(c.carry_forward_only); if (cfOnly) carryForwardCount++; if (previousMap.has(nk) && !cfOnly) { } else if (previousKeys.has(nk)) reEntriesCount++; else if (!cfOnly) newEntriesCount++; }
   const ruleSnapshot = (run.rule_snapshot_json as Record<string, unknown>) || {};
@@ -841,11 +900,20 @@ async function handleCommitRun(req: Request, db: ReturnType<typeof createClient>
   const scoringPolicyVersion = (run.scoring_policy_version as string) || "1.0.1";
   const sourcePolicyVersion = (run.source_policy_version as string) || "1.0.0";
   const eligibilityPolicyVersion = (run.eligibility_policy_version as string) || "1.0.0";
+  const editionId = crypto.randomUUID();
+  const editionSlug = `${seriesSlug}-${editionDate}`.replace(/\s+/g, "-").toLowerCase();
   const { error: editionErr } = await db.from("wk_chart_editions_v2").insert({ id: editionId, program_id: programId, edition_slug: editionSlug, edition_label: `${seriesSlug} \u2014 ${editionDate}`, edition_date: editionDate, period_start: run.period_start || editionDate, period_end: run.period_end || editionDate, entry_count: topN.length, status: publishImmediately ? "published" : "committed", methodology_version: methodologyVersion, source_policy_version: sourcePolicyVersion, eligibility_policy_version: eligibilityPolicyVersion, scoring_policy_version: scoringPolicyVersion, rule_set_snapshot: ruleSnapshot, chart_size: chartSize, carry_forward_count: carryForwardCount, new_entries_count: newEntriesCount, re_entries_count: reEntriesCount, exclusion_summary: {}, override_mode: "metadata_and_matching_only", ingest_run_id: runId, published_at: publishImmediately ? now : null, published_by: publishImmediately ? byEmail : null, created_at: now, updated_at: now });
-  if (editionErr) return json(req, { error: "edition_create_failed", detail: editionErr.message }, 500);
+  if (editionErr) {
+    console.error("[commit] edition create failed:", editionErr.message);
+    return json(req, { error: "edition_create_failed", detail: editionErr.message }, 500);
+  }
   const entryRows: Array<Record<string, unknown>> = [];
   for (let i = 0; i < topN.length; i++) {
     const c = topN[i]; const rank = i + 1; const nk = (c.normalized_key as string) || ""; const score = scoreByCid.get(c.id as string); const prevRank = previousMap.get(nk) ?? null;
+    const regInfo = registryMap.get(c.id as string);
+    const canonicalTrackId: string | null = regInfo?.canonicalTrackId ?? null;
+    const trackSlug: string = regInfo?.trackSlug ?? `isrc:${(c.isrc as string) || ""}`;
+
     let movement: string | null = null;
     if (prevRank === null) movement = previousKeys.has(nk) ? "reentry" : "new";
     else if (rank === prevRank) movement = "same";
@@ -854,15 +922,15 @@ async function handleCommitRun(req: Request, db: ReturnType<typeof createClient>
     const ag = (score?.anti_gaming_json as Record<string, unknown>) || {};
     const ap = (score?.airplay_json as Record<string, unknown>) || {};
     const sourcePayload = { score_breakdown: { source_score: Number(score?.source_score ?? 0), cross_source_bonus: Number(score?.cross_source_bonus ?? 0), overlap_bonus: Number(score?.overlap_bonus ?? 0), recency_score: Number(score?.recency_score ?? 0), continuity_score: Number(score?.continuity_score ?? 0), carry_forward_bonus: Number(score?.carry_forward_bonus ?? 0), airplay_score: Number(score?.airplay_score ?? 0), anti_gaming_penalty: Number(score?.anti_gaming_penalty ?? 0), total_score: Number(score?.final_score ?? 0) }, anti_gaming: { overlap_bonus_capped: Number(score?.overlap_bonus ?? 0) >= 10, lead_artist_overflow: ag.lead_artist_overflow ?? false, overflow_index: ag.overflow_index ?? 0, stale_carry_forward_demoted: false }, airplay_detail: ap.W !== undefined ? ap : null, eligibility: { status: "eligible", warnings: [], reasons: [] }, source_urls_seen: c.source_urls_seen || [], inputs: { source_count: Number(c.source_count ?? 0), occurrence_count: Number(c.occurrence_count ?? 0), release_date: c.release_date ?? null, release_recency_days: score?.recency_days ?? null, previous_position: prevRank, carry_forward_only: !!(c.carry_forward_only), continuity_locked: !!(c.continuity_locked), airplay_candidate_only: !!(c.airplay_candidate_only) } };
-    entryRows.push({ id: crypto.randomUUID(), edition_id: editionId, rank, previous_rank: prevRank, movement, track_slug: null, track_title: (c.title as string) || "", artist_slug: null, artist_name: (c.artist_display as string) || "", artwork_url: c.artwork_url ?? null, normalized_key: nk, lead_artist_key: (c.lead_artist_key as string) || "", source_count: Number(c.source_count ?? 0), occurrence_count: Number(c.occurrence_count ?? 0), source_urls_seen: c.source_urls_seen || [], release_date: c.release_date ?? null, release_recency_days: score?.recency_days ?? null, canonical_track_id: null, canonical_release_id: null, canonical_artist_id: null, source_score: Number(score?.source_score ?? 0), cross_source_bonus: Number(score?.cross_source_bonus ?? 0), overlap_bonus: Number(score?.overlap_bonus ?? 0), recency_score: Number(score?.recency_score ?? 0), continuity_score: Number(score?.continuity_score ?? 0), carry_forward_bonus: Number(score?.carry_forward_bonus ?? 0), airplay_score: Number(score?.airplay_score ?? 0), anti_gaming_penalty: Number(score?.anti_gaming_penalty ?? 0), total_score: Number(score?.final_score ?? 0), carry_forward_only: !!(c.carry_forward_only), continuity_locked: !!(c.continuity_locked), airplay_candidate_only: !!(c.airplay_candidate_only), overlap_bonus_capped: Number(score?.overlap_bonus ?? 0) >= 10, lead_artist_overflow: ag.lead_artist_overflow ?? false, stale_carry_forward_demoted: false, eligibility_status: "eligible", eligibility_warnings: [], source_payload: sourcePayload, scoring_policy_version: scoringPolicyVersion, methodology_version: methodologyVersion, eligibility_policy_version: eligibilityPolicyVersion, airplay_detections: ap.detection_count ?? null, airplay_station_count: ap.station_count ?? null, airplay_total_duration: null, airplay_weighted_score: ap.W ?? null, airplay_last_detected_at: null, airplay_matched_by: null, airplay_rescue_mode: null, created_at: now, updated_at: now });
+    entryRows.push({ id: crypto.randomUUID(), edition_id: editionId, rank, previous_rank: prevRank, movement, track_slug: trackSlug, track_title: (c.title as string) || "", artist_slug: null, artist_name: (c.artist_display as string) || "", artwork_url: c.artwork_url ?? null, normalized_key: nk, lead_artist_key: (c.lead_artist_key as string) || "", source_count: Number(c.source_count ?? 0), occurrence_count: Number(c.occurrence_count ?? 0), source_urls_seen: c.source_urls_seen || [], release_date: c.release_date ?? null, release_recency_days: score?.recency_days ?? null, canonical_track_id: canonicalTrackId, canonical_release_id: null, canonical_artist_id: null, source_score: Number(score?.source_score ?? 0), cross_source_bonus: Number(score?.cross_source_bonus ?? 0), overlap_bonus: Number(score?.overlap_bonus ?? 0), recency_score: Number(score?.recency_score ?? 0), continuity_score: Number(score?.continuity_score ?? 0), carry_forward_bonus: Number(score?.carry_forward_bonus ?? 0), airplay_score: Number(score?.airplay_score ?? 0), anti_gaming_penalty: Number(score?.anti_gaming_penalty ?? 0), total_score: Number(score?.final_score ?? 0), carry_forward_only: !!(c.carry_forward_only), continuity_locked: !!(c.continuity_locked), airplay_candidate_only: !!(c.airplay_candidate_only), overlap_bonus_capped: Number(score?.overlap_bonus ?? 0) >= 10, lead_artist_overflow: ag.lead_artist_overflow ?? false, stale_carry_forward_demoted: false, eligibility_status: "eligible", eligibility_warnings: [], source_payload: sourcePayload, scoring_policy_version: scoringPolicyVersion, methodology_version: methodologyVersion, eligibility_policy_version: eligibilityPolicyVersion, airplay_detections: ap.detection_count ?? null, airplay_station_count: ap.station_count ?? null, airplay_total_duration: null, airplay_weighted_score: ap.W ?? null, airplay_last_detected_at: null, airplay_matched_by: null, airplay_rescue_mode: null, created_at: now, updated_at: now });
   }
   const ECH = 100;
   for (let j = 0; j < entryRows.length; j += ECH) { const chunk = entryRows.slice(j, j + ECH); const { error: entryErr } = await db.from("wk_chart_entries_v2").insert(chunk); if (entryErr) { await db.from("wk_chart_editions_v2").delete().eq("id", editionId); return json(req, { error: "entry_create_failed", detail: entryErr.message }, 500); } }
   const status = publishImmediately ? "published" : "committed";
   await db.from("chart_ingest_runs").update({ status, committed_at: now, published_at: publishImmediately ? now : null, commit_edition_id: editionId, commit_mode: publishImmediately ? "publish" : "commit", notes: notes ?? null, updated_at: now }).eq("id", runId);
-  await db.from("chart_ingest_stage_events").update({ status: "completed", finished_at: now, duration_ms: 0, message: `${topN.length} entries committed to edition ${editionSlug}.`, metrics_json: { entryCount: topN.length, editionId, editionSlug, editionDate } }).eq("run_id", runId).eq("stage", "commit_write");
-  await db.from("chart_ingest_audit_events").insert({ run_id: runId, actor: user.id, actor_email: byEmail, action: "run_committed", new_status: status, payload_json: { editionId, editionSlug, editionDate, entryCount: topN.length, publishImmediately: publishImmediately ?? false, notes: notes ?? null } });
-  return json(req, { runId, status, programId, publicSlug: seriesSlug, editionId, editionSlug, editionDate, entryCount: topN.length, snapshotId: editionId, publicUrl: `/charts/${editionSlug}`, apiUrl: `/api/charts/${editionSlug}`, integrity: { ok: true, warnings: [], errors: [] }, auditEventId: crypto.randomUUID(), committedAt: now, committedBy: byEmail });
+  await db.from("chart_ingest_stage_events").update({ status: "completed", finished_at: now, duration_ms: 0, message: `${topN.length} entries committed to edition ${editionSlug}. Registry: ${registryStats.created} new tracks, ${registryStats.existing} enriched, ${registryStats.linked} linked.`, metrics_json: { entryCount: topN.length, editionId, editionSlug, editionDate, registryCreated: registryStats.created, registryEnriched: registryStats.existing, registryLinked: registryStats.linked } }).eq("run_id", runId).eq("stage", "commit_write");
+  await db.from("chart_ingest_audit_events").insert({ run_id: runId, actor: user.id, actor_email: byEmail, action: "run_committed", new_status: status, payload_json: { editionId, editionSlug, editionDate, entryCount: topN.length, publishImmediately: publishImmediately ?? false, registryStats, notes: notes ?? null } });
+  return json(req, { runId, status, programId, publicSlug: seriesSlug, editionId, editionSlug, editionDate, entryCount: topN.length, snapshotId: editionId, publicUrl: `/charts/${editionSlug}`, apiUrl: `/api/charts/${editionSlug}`, registryStats, integrity: { ok: true, warnings: [], errors: [] }, auditEventId: crypto.randomUUID(), committedAt: now, committedBy: byEmail });
 }
 
 async function handleRunAirplayDetection(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) {
@@ -913,4 +981,3 @@ async function handleCsvUpload(req: Request, db: ReturnType<typeof createClient>
 async function handleCsvList(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>) { return json(req, { csvs: [] }); }
 async function handleCsvNormalize(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { return json(req, { error: "not_implemented" }, 501); }
 async function handleApplyRowDecision(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { return json(req, { ok: true }); }
-

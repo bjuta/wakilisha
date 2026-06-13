@@ -5,8 +5,8 @@
  * All fromWp* functions convert WordPress responses to React format.
  */
 
+import { ChartFamily } from "./types";
 import type {
-  ChartFamily,
   IngestJob,
   IngestSource,
   IngestCandidate,
@@ -227,6 +227,7 @@ export function fromWpChartFamily(data: unknown): ChartFamily {
     editionFrequency: (d.edition_frequency ?? d.editionFrequency ?? "weekly") as "weekly" | "monthly" | "daily",
     defaultRuleset: String(d.default_ruleset ?? d.defaultRuleset ?? ""),
     defaultScoringModel: String(d.default_scoring_model ?? d.defaultScoringModel ?? ""),
+    publicSlug: String(d.public_slug ?? d.publicSlug ?? d.familyKey ?? d.id ?? ""),
     createdAt: String(d.created_at ?? d.createdAt ?? ""),
     updatedAt: String(d.updated_at ?? d.updatedAt ?? ""),
   };

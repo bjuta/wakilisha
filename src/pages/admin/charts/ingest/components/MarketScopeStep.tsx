@@ -7,21 +7,14 @@ import {
   type StoredChartMarketScope,
 } from "@/services/chartsMarkets/marketScopeStore";
 import { setCurrentIngestMarketScopeSelection } from "@/services/chartsMarkets/marketScopePersistence";
+import {
+  getSortedCountryCodes,
+  getCountryNameForIso2,
+  iso2ToCountrySlug,
+} from "@/utils/countries";
 
 const INPUT_CLASS = "w-full rounded-md border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text outline-none focus:border-wk-border-strong focus:ring-1 focus:ring-wk-brand/20";
 const LABEL_CLASS = "mb-1 block text-[12px] font-semibold text-wk-text-soft";
-const COUNTRY_OPTIONS = [
-  { marketSlug: "kenya", countryCode: "KE" },
-  { marketSlug: "uganda", countryCode: "UG" },
-  { marketSlug: "tanzania", countryCode: "TZ" },
-  { marketSlug: "nigeria", countryCode: "NG" },
-  { marketSlug: "ghana", countryCode: "GH" },
-  { marketSlug: "south-africa", countryCode: "ZA" },
-  { marketSlug: "rwanda", countryCode: "RW" },
-  { marketSlug: "burundi", countryCode: "BI" },
-  { marketSlug: "ethiopia", countryCode: "ET" },
-  { marketSlug: "somalia", countryCode: "SO" },
-];
 
 type MarketScopeStepProps = {
   scopes: StoredChartMarketScope[];
@@ -106,9 +99,7 @@ export function MarketScopeStep({ scopes, selectedMarketScopeId, onSelectMarketS
     if (draftMarkets.length === 0) { setError("Select at least one included country."); return; }
 
     const includedMarkets = draftMarkets
-      .map((countryCode) => COUNTRY_OPTIONS.find((country) => country.countryCode === countryCode))
-      .filter(Boolean)
-      .map((country) => ({ ...country!, weight: 1 }));
+      .map((countryCode) => ({ marketSlug: iso2ToCountrySlug(countryCode), countryCode: countryCode.toUpperCase(), weight: 1 }));
 
     try {
       const created = createMarketScope({
@@ -199,11 +190,11 @@ export function MarketScopeStep({ scopes, selectedMarketScopeId, onSelectMarketS
           <div className="mt-3">
             <label className={LABEL_CLASS}>Included countries *</label>
             <div className="flex flex-wrap gap-2">
-              {COUNTRY_OPTIONS.map((country) => {
-                const active = draftMarkets.includes(country.countryCode);
+              {getSortedCountryCodes().map((countryCode) => {
+                const active = draftMarkets.includes(countryCode);
                 return (
-                  <button key={country.countryCode} type="button" onClick={() => toggleCountry(country.countryCode)} className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition-all ${active ? "border-wk-brand bg-wk-brand text-wk-brand-on" : "border-wk-border bg-wk-surface text-wk-text-soft"}`}>
-                    {country.countryCode} · {country.marketSlug}
+                  <button key={countryCode} type="button" onClick={() => toggleCountry(countryCode)} className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition-all ${active ? "border-wk-brand bg-wk-brand text-wk-brand-on" : "border-wk-border bg-wk-surface text-wk-text-soft"}`}>
+                    {getCountryNameForIso2(countryCode)} · {countryCode.toUpperCase()}
                   </button>
                 );
               })}

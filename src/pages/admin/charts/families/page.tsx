@@ -25,7 +25,7 @@ export default function AdminChartsFamilies() {
   useEffect(() => {
     getChartFamilies()
       .then((result) => {
-        setFamilies(result.data);
+        setFamilies(result.data.families);
         setLoading(false);
       })
       .catch((err) => {
@@ -89,7 +89,7 @@ export default function AdminChartsFamilies() {
       <AdminChartsPageHeader
         eyebrow="Chart Configuration"
         title="Chart Programs"
-        description="V2 chart programs — each defines a series (what) × market (where). Data comes from the public chart API."
+        description="V2 chart programs — each defines a family (what) × market (where). Data comes from the public chart API."
       >
         <button onClick={() => navigate("/admin/charts/ingest")} className="wk-button wk-button-primary wk-button-sm whitespace-nowrap">
           <WkIcon name="Plus" size={14} /> New Ingest
@@ -103,9 +103,9 @@ export default function AdminChartsFamilies() {
             <WkIcon name="BarChart3" size={16} />
           </div>
           <div>
-            <p className="text-[13px] font-bold text-wk-text">V2 Chart Ontology: Program = Series × Market</p>
+            <p className="text-[13px] font-bold text-wk-text">V2 Chart Ontology: Program = Family × Market</p>
             <p className="mt-1 text-[12px] text-wk-text-muted">
-              A <strong>ChartProgram</strong> is the combination of a <strong>ChartSeries</strong> (what is ranked — e.g., "R&B Songs") and a <strong>ChartMarket</strong> (where — e.g., "Kenya").
+              A <strong>ChartProgram</strong> is the combination of a <strong>ChartFamily</strong> (what is ranked — e.g., "R&B Songs") and a <strong>ChartMarket</strong> (where — e.g., "Kenya").
               Programs have canonical public slugs: <code className="bg-background-100 text-[11px] rounded px-1">rnb-kenya</code>, <code className="bg-background-100 text-[11px] rounded px-1">top-songs-kenya</code>.
               Data is loaded directly from the public chart API — no hardcoded mappings.
             </p>
@@ -121,7 +121,7 @@ export default function AdminChartsFamilies() {
             <h2 className="text-[13px] font-bold text-wk-text">Program Mapping</h2>
             <span className="text-[11px] text-wk-text-muted ml-auto">
               {families.length} program{families.length !== 1 ? "s" : ""} ·{" "}
-              {new Set(families.map((f) => f.seriesSlug).filter(Boolean)).size} series ·{" "}
+              {new Set(families.map((f) => f.seriesSlug).filter(Boolean)).size} families ·{" "}
               {new Set(families.map((f) => f.marketSlug).filter(Boolean)).size} market
               {new Set(families.map((f) => f.marketSlug).filter(Boolean)).size !== 1 ? "s" : ""}
             </span>
@@ -130,7 +130,7 @@ export default function AdminChartsFamilies() {
             <table className="w-full text-left text-[12px]">
               <thead>
                 <tr className="border-b border-wk-border">
-                  {["Source Slug", "Series", "Market", "Public Slug (V2)", "Public Label", "Chart Size"].map((h) => (
+                  {["Source Slug", "Family", "Market", "Public Slug (V2)", "Public Label", "Chart Size"].map((h) => (
                     <th key={h} className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider text-wk-text-muted">{h}</th>
                   ))}
                 </tr>
@@ -164,7 +164,7 @@ export default function AdminChartsFamilies() {
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <AdminChartsKpiCard value={families.length} label="Total Programs" icon="FolderTree" accent="muted" />
         <AdminChartsKpiCard value={activeCount} label="Active" icon="CheckCircle2" accent={families.length > 0 ? "success" : "muted"} />
-        <AdminChartsKpiCard value={new Set(families.map((f) => f.seriesSlug).filter(Boolean)).size} label="Series" icon="Layers" accent="brand" />
+        <AdminChartsKpiCard value={new Set(families.map((f) => f.seriesSlug).filter(Boolean)).size} label="Families" icon="Layers" accent="brand" />
         <AdminChartsKpiCard value={new Set(families.map((f) => f.marketSlug).filter(Boolean)).size} label="Markets" icon="Globe" accent="warning" />
       </div>
 
@@ -239,7 +239,7 @@ export default function AdminChartsFamilies() {
           <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
             {selectedFamily.seriesSlug && (
               <div className="rounded-lg bg-wk-info-soft p-2.5">
-                <p className="text-[10px] font-bold uppercase text-wk-info">Series</p>
+                <p className="text-[10px] font-bold uppercase text-wk-info">Family</p>
                 <p className="mt-1 text-[13px] font-semibold text-wk-text">{selectedFamily.seriesSlug}</p>
                 <p className="text-[11px] text-wk-text-muted">{selectedFamily.seriesLabel ?? "—"}</p>
               </div>

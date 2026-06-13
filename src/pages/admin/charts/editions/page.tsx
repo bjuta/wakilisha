@@ -47,7 +47,7 @@ export default function AdminChartsEditions() {
   useEffect(() => {
     async function load() {
       const familiesResult = await getChartFamilies();
-      const allFamilies = familiesResult.data;
+      const allFamilies = familiesResult.data.families;
       setFamilies(allFamilies);
       setDataSource(familiesResult.meta.source);
 

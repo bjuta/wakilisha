@@ -47,7 +47,7 @@ const V1_TESTS = [
     endpoint: `${PUBLIC_API_BASE}/charts`,
     run: async () => {
       const result = await getChartFamilies();
-      return { dataSource: result.meta.source, resultCount: result.data.length };
+      return { dataSource: result.meta.source, resultCount: result.data.families.length };
     },
   },
   {
@@ -120,7 +120,7 @@ const V2_TESTS = [
     endpoint: `${PUBLIC_V2_API_BASE}/charts`,
     run: async () => {
       const result = await getV2ChartFamilies();
-      return { dataSource: "wordpress" as const, resultCount: result.length };
+      return { dataSource: "wordpress" as const, resultCount: result.families.length };
     },
   },
   {

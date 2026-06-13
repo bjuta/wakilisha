@@ -555,8 +555,8 @@ The old staging→finalize pipeline is **deprecated for charts**. Chart data mus
 ### Core Principles
 
 1. **Direct import, no staging** — Chart data goes WP → cleaned/mapped → `wk_chart_*_v2` tables. The `wk_import_staging_records` table is NOT used for chart data.
-2. **Registry owns the data, charts are a customer** — Tracks/artists/releases are looked up in `registry_tracks`, `registry_artists`, `registry_releases` during import. `canonical_track_id`, `canonical_release_id`, `canonical_artist_id` are populated where matches exist.
-3. **Publish-first, enrich-later** — Missing registry data NEVER blocks chart publication. Charts go live immediately. Tracks without registry matches are still published with available metadata. Enrichment happens afterward through release shells.
+2. **Registry owns the data, charts are a customer** — Tracks/artists/releases are looked up in `registry_tracks`, `registry_artists`, `registry_releases` during import. Every track that enters a chart MUST exist in the registry. Charts write into the registry on commit — the registry then feeds back to the charts. ISRC is the unique dedup key.
+3. **No chart-only tracks** — There is no such thing as a "chart-only" track. Every track rendered on any public page comes from `registry_tracks`. The public API has no chart-data fallback. If a track isn't in the registry, it's a 404.
 4. **No review queue for charts** — Charts always publish. Individual tracks can be flagged for enrichment through the release shells infrastructure, but charts themselves never sit in review.
 5. **Rich metadata at import time** — ISRC, Spotify ID, Apple Music ID, YouTube ID, source URLs, and all available track metadata imported fully. This minimizes future enrichment needs.
 6. **Verified market mapping** — Only Kenya has been published. Market assignment must be explicit and verified. No auto-inference that could create phantom markets.
@@ -568,8 +568,8 @@ For every chart entry during import:
 1. **Look up track** in `registry_tracks` by ISRC first, then by slug match on normalized title
 2. **Look up artist** in `registry_artists` by slug match
 3. **Look up release** in `registry_releases` by release date + artist match
-4. **If matched**: populate `canonical_track_id`, `canonical_release_id`, `canonical_artist_id`
-5. **If NOT matched**: leave canonical fields null, publish anyway, flag for future enrichment
+4. **If matched**: populate `canonical_track_id`, `canonical_release_id`, `canonical_artist_id`. Enrich existing registry entity with any new provider metadata (artwork, duration, etc.) that the registry doesn't already have.
+5. **If NOT matched**: create a new `registry_tracks` entry with ISRC as the unique key, generate a slug from the track title (with collision avoidance), and set `canonical_track_id`. Charts always write into the registry — there are no orphan chart entries.
 
 ### Market Mapping (Verified)
 
@@ -602,15 +602,52 @@ Any chart slug that doesn't match a known mapping is flagged for review but stil
 - ~~`finalize-wp-staging`~~ — No longer used for chart data. Retained for non-chart entity staging→production.
 - ~~Staging chart records in `wk_import_staging_records`~~ — Chart data no longer touches this table.
 - ~~`wk_chart_editions_v2.override_mode = "metadata_and_matching_only"`~~ — Editions publish with full commitment, not override mode.
+- ~~Chart-data fallback in `wakilisha-public-api`~~ — Removed in v14. All tracks render from `registry_tracks` exclusively. No fallback queries to `wk_chart_entries_v2` for track data.
+- ~~`isrc:XXXXX` track_slug format~~ — Replaced with registry slugs. All 6,332 existing chart entries backfilled June 2026.
 
-### Post-Import Verification
+---
 
-After import, the full scoring test suite must pass:
-```bash
-npx vitest run test/scoring/
-```
+## Registry-First Architecture ✅ IMPLEMENTED (June 2026)
 
-Target: 100% pass rate across all 11 test files (Gate A pipeline, P1-P5 property tests, anti-gaming, normalization, golden-file migration, gate-c).
+### Principle
+
+The registry is the single source of truth for all entities. Charts are a customer of the registry — they read from it, and on publish they write into it. There is no such thing as a "chart-only" track, release, or artist. Every entity rendered on any public page originates from the registry tables.
+
+### Key Rules
+
+1. **ISRC is the unique dedup key for tracks.** Before any write to `registry_tracks`, the system checks if a track with that ISRC already exists. If it does, the existing entity is enriched with any new provider data. If nothing new, the entity is skipped entirely.
+
+2. **Charts write into the registry on commit.** The `chart-ingest-api` commit flow (`handleCommitRun`) batch-looks-up all candidate ISRCs in `registry_tracks`. Existing tracks get linked via `canonical_track_id` and optionally enriched. Missing tracks get created as new `registry_tracks` entries before the chart edition is published.
+
+3. **No duplicate ISRCs.** The registry enforces ISRC uniqueness at the application layer. If a provider (Spotify) has metadata for a track and another provider (Apple Music) also has data, the second provider's data enriches the existing entity rather than creating a duplicate.
+
+4. **All chart entries carry `canonical_track_id`.** The `wk_chart_entries_v2.canonical_track_id` field links every chart entry back to its registry track. This field is populated during chart commit (new editions) and was backfilled for all 6,332 existing entries (June 2026).
+
+5. **Public API has no chart fallback.** `wakilisha-public-api` v14 queries chart history by `canonical_track_id`. If a track isn't in the registry, the API returns 404 — no fallback query to chart tables for entity data.
+
+### Implementation Status
+
+| Component | Status |
+|-----------|--------|
+| `chart-ingest-api` v15 — registry write on commit | ✅ Deployed |
+| `wk_chart_entries_v2` — 6,332/6,332 entries have `canonical_track_id` | ✅ Backfilled |
+| 111 missing registry tracks created from chart data | ✅ Backfilled |
+| 0 duplicate ISRCs in `registry_tracks` | ✅ Verified |
+| `wakilisha-public-api` v14 — chart fallback removed | ✅ Deployed |
+| Chart history queries use `canonical_track_id` | ✅ Deployed |
+| `track_slug` format: registry slugs (not `isrc:XXXXX`) | ✅ Backfilled |
+
+### Enrichment Model
+
+When a track already exists in the registry (matched by ISRC):
+- **Provider metadata comparison**: The system checks if the incoming provider data has fields the registry doesn't (e.g., artwork_url, duration_ms)
+- **Enrichment on commit**: If the provider has data the registry is missing, the registry entity is updated
+- **Skip if nothing new**: If the registry already has all the data the provider offers, no write occurs
+
+This means:
+- Spotify metadata + Apple Music metadata → single registry entity with combined data
+- No duplicate tracks
+- No conflicting data (registry is authoritative, providers are enrichment sources)
 
 ---
 

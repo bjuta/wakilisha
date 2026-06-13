@@ -394,7 +394,7 @@ export default function AdminChartsDashboard() {
               <QuickActionButton
                 icon="FolderTree"
                 label="Manage Families"
-                description="Configure chart series and rulesets"
+                description="Configure chart families and rulesets"
                 onClick={() => navigate("/admin/charts/families")}
               />
               <QuickActionButton

@@ -17,15 +17,11 @@ import type {
   RankOverridePayload,
   IngestJobStatus,
   IssueStatus,
-  DiscoveredCsvSource,
-  SourceType,
-  Provider,
   CsvImportSession,
   CandidateSourceType,
 } from "./types";
 import {
   getStore,
-  commit,
   getJob,
   getJobs,
   getJobSources,
@@ -55,12 +51,9 @@ import {
   getRawItemsForJob,
   getLogsForJob,
   appendJobLog,
-  DEMO_JOB_ID,
-  addCsvImportSession,
   getJobCsvImportSessions,
-  clearCsvImportSessions,
 } from "./store";
-import { getDiscoveredCsvs } from "./mockData";
+
 
 // ─── Store Operations ───
 export function resetStore(): void {
@@ -614,11 +607,6 @@ export function getJobSummaryApi(jobId: string): Promise<ReturnType<typeof getJo
   return Promise.resolve(getJobSummary(jobId));
 }
 
-// ─── Demo data helpers ───
-export function getDemoJobId(): string {
-  return DEMO_JOB_ID;
-}
-
 // ─── Canonical tracks for rematch search ───
 export function searchCanonicalTracks(query: string): Promise<{ id: string; title: string; artist: string }[]> {
   const candidates = getStore().candidates;
@@ -632,171 +620,7 @@ export function searchCanonicalTracks(query: string): Promise<{ id: string; titl
   return Promise.resolve(results);
 }
 
-// ─── Discovered CSVs ───
-export function getDiscoveredCsvSources(): Promise<DiscoveredCsvSource[]> {
-  return Promise.resolve(getDiscoveredCsvs());
-}
 
-export function getDiscoveredCsvSourceById(id: string): Promise<DiscoveredCsvSource | undefined> {
-  return Promise.resolve(getDiscoveredCsvs().find((c) => c.id === id));
-}
-
-export function attachCsvAsSource(jobId: string, csvId: string): Promise<IngestSource> {
-  const csv = getDiscoveredCsvs().find((c) => c.id === csvId);
-  if (!csv) throw new Error(`CSV not found: ${csvId}`);
-  const newSource: IngestSource = {
-    id: `src-${Date.now()}`, jobId,
-    sourceType: "csv" as SourceType, provider: "csv" as Provider,
-    sourceUrl: null, uploadedFileId: csv.id, weight: 0.1, priority: 100,
-    status: "completed", rawCount: csv.rowCount, normalizedCount: 0, errorCount: 0,
-    fetchedAt: new Date().toISOString(), rawResponseHash: null, errorMessage: null,
-  };
-  addSource(newSource);
-  appendJobLog(jobId, "source_added", "info", `CSV source added from discovered file: ${csv.filename}`, {
-    sourceId: newSource.id, csvId: csv.id, filename: csv.filename, rowCount: csv.rowCount,
-  });
-  return Promise.resolve(newSource);
-}
-
-export async function normalizeCsvCandidates(
-  jobId: string,
-  csvId: string
-): Promise<IngestCandidate[]> {
-  const csv = getDiscoveredCsvs().find((c) => c.id === csvId);
-  if (!csv) throw new Error(`CSV not found: ${csvId}`);
-
-  const { normalizeCsvToCandidates: normalizeRows } = await import("./csv/parser");
-  const result = normalizeRows(csv);
-
-  const newCandidates: IngestCandidate[] = result.provenance.map((prov, i) => {
-    const id = `csv-cand-${Date.now()}-${i}`;
-    const title = prov.mappedFields["title"] || prov.mappedFields["track_title"] || "Unknown";
-    const artist = prov.mappedFields["artist_line"] || prov.mappedFields["artist_name"] || "Unknown";
-    const isrc = prov.mappedFields["isrc"] || null;
-    const release = prov.mappedFields["release_title"] || prov.mappedFields["album"] || null;
-    const artwork = prov.mappedFields["artwork_url"] || null;
-    const position = prov.sourcePosition ?? i + 1;
-
-    return {
-      id, jobId,
-      rawItemIds: [prov.rawRowHash],
-      normalizedTitle: title,
-      normalizedArtistLine: artist,
-      normalizedArtists: [artist],
-      normalizedReleaseTitle: release,
-      isrc, upc: null, artworkUrl: artwork, previewUrl: null,
-      externalUrls: {
-        spotify: prov.mappedFields["spotify_url"] || "",
-        apple: prov.mappedFields["apple_music_url"] || "",
-        youtube: prov.mappedFields["youtube_url"] || "",
-      },
-      durationMs: null, releaseDate: null,
-      label: prov.mappedFields["label"] || null,
-      genre: null,
-      sourcePositions: { csv: position },
-      sourceMetrics: { csv: 100 },
-      candidateHash: prov.rawRowHash,
-      dedupeGroupKey: null,
-      eligibilityStatus: "eligible",
-      eligibilityReasons: [],
-      score: Math.max(10, 50 - position * 1.2),
-      calculatedRank: position,
-      manualRankOverride: null,
-      finalRank: position,
-      status: "candidate" as const,
-      sourceType: "csv" as CandidateSourceType,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-  });
-
-  const state = getStore();
-  state.candidates = [...state.candidates, ...newCandidates];
-  commit(state);
-
-  // Create import session
-  const session: CsvImportSession = {
-    id: `csv-session-${Date.now()}`,
-    jobId, filename: csv.filename, sourceId: csv.id,
-    rowCount: csv.rowCount, validRows: newCandidates.length,
-    candidateCount: newCandidates.length,
-    issueCount: result.errors.length + result.warnings.length,
-    normalizedAt: new Date().toISOString(),
-    normalizedBy: "Current User",
-    mappingUsed: csv.mappedFields,
-    validationSummary: {
-      errors: result.errors, warnings: result.warnings, skippedRows: result.skippedRows,
-    },
-  };
-  addCsvImportSession(session);
-
-  appendJobLog(jobId, "csv_normalize", "success", `CSV validated and normalized: ${csv.filename}`, {
-    csvId: csv.id, filename: csv.filename, candidateCount: newCandidates.length,
-    skippedRows: result.skippedRows, sessionId: session.id,
-  });
-  appendJobLog(jobId, "csv_normalize", "info", `CSV normalized into ${newCandidates.length} candidates`, {
-    sessionId: session.id,
-  });
-
-  if (result.errors.length > 0 || result.warnings.length > 0) {
-    appendJobLog(jobId, "csv_normalize", "warning", `CSV review issues generated: ${result.errors.length} errors, ${result.warnings.length} warnings`, {
-      errors: result.errors, warnings: result.warnings,
-    });
-  }
-
-  // Add validation issues if any
-  for (const err of result.errors) {
-    addIssue({
-      id: `csv-issue-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      jobId, candidateId: null, severity: "medium", issueType: "missing_title",
-      message: `CSV validation: ${err}`, status: "open", blocking: false,
-      resolutionNote: null, resolvedBy: null, resolvedAt: null,
-      createdAt: new Date().toISOString(),
-    });
-  }
-  for (const warn of result.warnings) {
-    addIssue({
-      id: `csv-issue-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      jobId, candidateId: null, severity: "low", issueType: "missing_source_url",
-      message: `CSV warning: ${warn}`, status: "open", blocking: false,
-      resolutionNote: null, resolvedBy: null, resolvedAt: null,
-      createdAt: new Date().toISOString(),
-    });
-  }
-
-  return Promise.resolve(newCandidates);
-}
-
-// ─── CSV Import Sessions ───
-export function getCsvImportSessions(jobId: string): Promise<CsvImportSession[]> {
-  return Promise.resolve(getJobCsvImportSessions(jobId));
-}
-
-export function createCsvImportSession(
-  jobId: string,
-  csv: DiscoveredCsvSource,
-  candidateCount: number,
-  issueCount: number,
-  validationSummary: CsvImportSession["validationSummary"]
-): Promise<CsvImportSession> {
-  const session: CsvImportSession = {
-    id: `csv-session-${Date.now()}`, jobId, filename: csv.filename, sourceId: csv.id,
-    rowCount: csv.rowCount, validRows: candidateCount, candidateCount, issueCount,
-    normalizedAt: new Date().toISOString(), normalizedBy: "Current User",
-    mappingUsed: csv.mappedFields, validationSummary,
-  };
-  addCsvImportSession(session);
-  appendJobLog(jobId, "csv_normalize", "success", `CSV import session created: ${csv.filename}`, {
-    sessionId: session.id, candidateCount, issueCount,
-  });
-  return Promise.resolve(session);
-}
-
-export function clearCsvImportSessionsApi(jobId: string): Promise<void> {
-  clearCsvImportSessions(jobId);
-  appendJobLog(jobId, "csv_normalize", "info", "CSV import sessions cleared", {});
-  return Promise.resolve();
-}
 
 // ─── CSV Draft Integrity ───
 export interface CsvIntegrityViolation {

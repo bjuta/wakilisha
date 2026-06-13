@@ -61,7 +61,7 @@ export default function AdminChartsSnapshots() {
     async function load() {
       try {
         const familiesResult = await getChartFamilies();
-        const families = familiesResult.data;
+        const families = familiesResult.data.families;
 
         const editionPromises = families.map((family) =>
           getChartEditionsForFamily(family.familyKey)

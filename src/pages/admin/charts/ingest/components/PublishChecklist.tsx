@@ -66,7 +66,7 @@ async function buildChecklist(run: IngestRun): Promise<ChecklistItem[]> {
       blocking: true,
       detail: program
         ? `Program: ${program.label} (${program.publicSlug})`
-        : `No V2 program found for series '${programId}'. Select a valid chart series.`,
+        : `No V2 program found for family '${programId}'. Select a valid chart family.`,
     },
     {
       label: "Sources fetched",

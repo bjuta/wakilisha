@@ -77,9 +77,7 @@ function generateSmartExcerpt(html: string | null | undefined, maxChars = 280): 
   if (plain.length <= maxChars) return plain;
   const chopped = plain.slice(0, maxChars);
   const lastSpace = chopped.lastIndexOf(" ");
-  if (lastSpace > maxChars * 0.6) {
-    return chopped.slice(0, lastSpace).replace(/[,\s]+$/, "") + "\u2026";
-  }
+  if (lastSpace > maxChars * 0.6) return chopped.slice(0, lastSpace).replace(/[,\s]+$/, "") + "\u2026";
   return chopped.replace(/[,\s]+$/, "") + "\u2026";
 }
 
@@ -87,10 +85,6 @@ function resolveDek(article: Record<string, unknown>, maxChars = 280): string {
   const manualExcerpt = String(article.excerpt || "").trim();
   if (manualExcerpt) return manualExcerpt;
   return generateSmartExcerpt(String(article.content_html || ""), maxChars);
-}
-
-function makeUrlSafe(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+$/, "");
 }
 
 function parseCategoryNames(categories: any): string[] {
@@ -143,9 +137,7 @@ function resolveAuthor(article: Record<string, unknown>): string {
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: { ...corsHeaders, ...securityHeaders } });
-  }
+  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: { ...corsHeaders, ...securityHeaders } });
   const url = new URL(req.url);
   const path = normalizePath(url.pathname);
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -299,10 +291,10 @@ Deno.serve(async (req) => {
       if (meta.country) genres.push(String(meta.country));
       const albums: any[] = [];
       const metaAlbums = meta.studio_albums;
-      if (Array.isArray(metaAlbums)) { for (const al of metaAlbums as any[]) { albums.push({ slug: makeUrlSafe(String(al.title || "")), title: String(al.title || ""), releaseType: "Album", year: extractYear(String(al.release_date || al.year || "")), releaseDate: al.release_date || "", trackCount: Number(al.track_count || al.trackCount || 0), artworkUrl: String(al.image || al.artwork || al.artworkUrl || al.artwork_url || ""), tracks: Array.isArray(al.tracks) ? al.tracks.map((tr: any) => ({ title: String(tr.title || ""), duration: String(tr.duration || "") })) : [] }); } }
+      if (Array.isArray(metaAlbums)) { for (const al of metaAlbums as any[]) { albums.push({ slug: al.title ? String(al.title).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+$/, "") : "", title: String(al.title || ""), releaseType: "Album", year: extractYear(String(al.release_date || al.year || "")), releaseDate: al.release_date || "", trackCount: Number(al.track_count || al.trackCount || 0), artworkUrl: String(al.image || al.artwork || al.artworkUrl || al.artwork_url || ""), tracks: Array.isArray(al.tracks) ? al.tracks.map((tr: any) => ({ title: String(tr.title || ""), duration: String(tr.duration || "") })) : [] }); } }
       const eps: any[] = [];
       const metaEps = meta.eps_compilations;
-      if (Array.isArray(metaEps)) { for (const ep of metaEps as any[]) { eps.push({ slug: makeUrlSafe(String(ep.title || "")), title: String(ep.title || ""), releaseType: "EP", year: extractYear(String(ep.release_date || ep.year || "")), releaseDate: ep.release_date || "", trackCount: Number(ep.track_count || ep.trackCount || 0), artworkUrl: String(ep.image || ep.artwork || ep.artworkUrl || ep.artwork_url || ""), tracks: Array.isArray(ep.tracks) ? ep.tracks.map((tr: any) => ({ title: String(tr.title || ""), duration: String(tr.duration || "") })) : [] }); } }
+      if (Array.isArray(metaEps)) { for (const ep of metaEps as any[]) { eps.push({ slug: ep.title ? String(ep.title).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+$/, "") : "", title: String(ep.title || ""), releaseType: "EP", year: extractYear(String(ep.release_date || ep.year || "")), releaseDate: ep.release_date || "", trackCount: Number(ep.track_count || ep.trackCount || 0), artworkUrl: String(ep.image || ep.artwork || ep.artworkUrl || ep.artwork_url || ""), tracks: Array.isArray(ep.tracks) ? ep.tracks.map((tr: any) => ({ title: String(tr.title || ""), duration: String(tr.duration || "") })) : [] }); } }
       const topSongs: any[] = [];
       const metaSongs = meta.top_songs;
       if (Array.isArray(metaSongs)) { for (const s of metaSongs as any[]) { topSongs.push({ title: String(s.title || ""), artists: String(s.artists || s.artist || ""), image: String(s.image || s.artwork || s.artworkUrl || s.artwork_url || ""), duration: String(s.duration || s.runtime || ""), songUrl: String(s.song_url || s.songUrl || s.url || "") }); } }
@@ -451,23 +443,47 @@ Deno.serve(async (req) => {
       data = { labels: (labels ?? []).map((l: any) => ({ id: String(l.id), slug: String(l.slug), name: String(l.name), country: l.country_code || null, logoUrl: null, artistCount: 0, releaseCount: 0, featuredArtists: [], isFeatured: false, description: l.description || null })) };
     }
 
-    // ── TRACK DETAIL ──
+    // ──────────────────────────────────────────────────────────────────
+    // TRACK DETAIL — v14: Registry-only, no chart fallback.
+    // All tracks MUST exist in registry_tracks. Chart entries carry
+    // canonical_track_id linking back. ISRC is the unique dedup key.
+    // ──────────────────────────────────────────────────────────────────
     else if (path.startsWith("/tracks/")) {
       const tSegments = path.replace(/^\/tracks\//, "").split("/").filter(Boolean);
       const tSlug = tSegments[tSegments.length - 1] || "";
-      const { data: track } = await supabase.from("registry_tracks").select("id, slug, title, duration_ms, artwork_url, isrc, explicit, track_number, disc_number, release_id, metadata, status").eq("slug", tSlug).maybeSingle();
+
+      let track: any = null;
+      const isIsrcLookup = tSlug.toLowerCase().startsWith("isrc:");
+      if (isIsrcLookup) {
+        const isrc = tSlug.slice(5);
+        const { data: byIsrc } = await supabase.from("registry_tracks").select("id, slug, title, duration_ms, artwork_url, isrc, explicit, track_number, disc_number, release_id, metadata, status").eq("isrc", isrc).order("status", { ascending: true }).order("slug", { ascending: true }).limit(1);
+        track = byIsrc && byIsrc.length > 0 ? byIsrc[0] : null;
+      } else {
+        const { data: bySlug } = await supabase.from("registry_tracks").select("id, slug, title, duration_ms, artwork_url, isrc, explicit, track_number, disc_number, release_id, metadata, status").eq("slug", tSlug).maybeSingle();
+        track = bySlug;
+      }
+
+      // v14: No chart fallback. Registry is the single source of truth.
       if (!track) return jsonResponse({ data: null }, 404);
+
+      const trackId = String(track.id);
       const { data: release } = track.release_id ? await supabase.from("registry_releases").select("slug, title, release_date, release_type, artwork_url, label_id").eq("id", String(track.release_id)).maybeSingle() : { data: null };
       const { data: label } = release?.label_id ? await supabase.from("registry_labels").select("slug, name, country_code").eq("id", String(release.label_id)).maybeSingle() : { data: null };
-      const { data: chartEntries } = await supabase.from("wk_chart_entries_v2").select("edition_id, rank, previous_rank, movement, track_title, artist_name, artwork_url").eq("track_slug", tSlug).order("rank", { ascending: true });
-      const { data: historyEntries } = await supabase.from("wk_chart_entries_v2").select("rank, edition_id, movement").eq("track_slug", tSlug).order("rank", { ascending: true });
+
+      // v14: Query chart history by canonical_track_id (registry link), not track_slug
+      const { data: chartEntries } = await supabase.from("wk_chart_entries_v2").select("edition_id, rank, previous_rank, movement, track_title, artist_name, artwork_url").eq("canonical_track_id", trackId).order("rank", { ascending: true });
+      const { data: historyEntries } = await supabase.from("wk_chart_entries_v2").select("rank, edition_id, movement").eq("canonical_track_id", trackId).order("rank", { ascending: true });
+
       let peakRank: number | null = null;
       if (historyEntries && historyEntries.length > 0) peakRank = Math.min(...historyEntries.map((e: any) => Number(e.rank || 0)).filter((r: number) => r > 0));
+
       const bestEntry = chartEntries && chartEntries.length > 0 ? chartEntries[0] : null;
       const artistName = bestEntry ? String(bestEntry.artist_name || "") : "Unknown";
       const artistSlugFromEntry = bestEntry ? (String(bestEntry.artist_name || "").split(",")[0] || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-") : "";
+
       const chartHistory = (historyEntries ?? []).map((e: any) => Number(e.rank || 0));
       const chartHistoryUnique = chartHistory.filter((r: number, i: number) => chartHistory.indexOf(r) === i).slice(0, 52);
+
       const allChartAppearances = (chartEntries ?? []).map((e: any) => ({
         editionSlug: String(e.edition_id || ""),
         editionLabel: String(e.edition_id || ""),
@@ -476,6 +492,7 @@ Deno.serve(async (req) => {
         previousRank: e.previous_rank != null ? Number(e.previous_rank) : null,
         movement: String(e.movement || "same"),
       }));
+
       const prevRank = bestEntry && bestEntry.previous_rank != null ? Number(bestEntry.previous_rank) : null;
       const rawMovement = String(bestEntry?.movement || "").toLowerCase();
       let movement: string = ["up", "down", "new", "same"].includes(rawMovement) ? rawMovement : "same";
@@ -490,7 +507,35 @@ Deno.serve(async (req) => {
           movementAmount = Math.abs(prevRank - curr);
         }
       }
-      data = { track: { id: String(track.id), slug: String(track.slug), title: String(track.title), durationMs: track.duration_ms || 0, artworkUrl: track.artwork_url || "", isrc: track.isrc || null, explicit: track.explicit || false, trackNumber: track.track_number || 0, discNumber: track.disc_number || 0, metadata: track.metadata || {}, status: track.status || "active" }, artist: { slug: artistSlugFromEntry, name: artistName, imageUrl: bestEntry?.artwork_url || "" }, release: release ? { slug: String(release.slug), title: String(release.title), releaseDate: release.release_date || "", releaseType: String(release.release_type || "single"), artworkUrl: release.artwork_url || "" } : null, label: label ? { slug: String(label.slug), name: String(label.name), countryCode: label.country_code || null } : null, genres: [], chartHistory: chartHistoryUnique, chartAppearances: allChartAppearances, chartAppearanceCount: allChartAppearances.length, peakRank, weeksOnChart: historyEntries ? historyEntries.length : 0, currentRank: bestEntry ? Number(bestEntry.rank) : null, previousRank: prevRank, movement, movementAmount };
+
+      data = {
+        track: {
+          id: String(track.id),
+          slug: String(track.slug),
+          title: String(track.title),
+          durationMs: track.duration_ms || 0,
+          artworkUrl: track.artwork_url || "",
+          isrc: track.isrc || null,
+          explicit: track.explicit || false,
+          trackNumber: track.track_number || 0,
+          discNumber: track.disc_number || 0,
+          metadata: track.metadata || {},
+          status: track.status || "active",
+        },
+        artist: { slug: artistSlugFromEntry, name: artistName, imageUrl: bestEntry?.artwork_url || "" },
+        release: release ? { slug: String(release.slug), title: String(release.title), releaseDate: release.release_date || "", releaseType: String(release.release_type || "single"), artworkUrl: release.artwork_url || "" } : null,
+        label: label ? { slug: String(label.slug), name: String(label.name), countryCode: label.country_code || null } : null,
+        genres: [],
+        chartHistory: chartHistoryUnique,
+        chartAppearances: allChartAppearances,
+        chartAppearanceCount: allChartAppearances.length,
+        peakRank,
+        weeksOnChart: historyEntries ? historyEntries.length : 0,
+        currentRank: bestEntry ? Number(bestEntry.rank) : null,
+        previousRank: prevRank,
+        movement,
+        movementAmount,
+      };
     }
 
     // ── CHARTS — list all programs ──

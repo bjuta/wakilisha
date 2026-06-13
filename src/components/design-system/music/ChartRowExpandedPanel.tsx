@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
+import { trackUrl } from "@/utils/trackUrl";
 
 export interface ChartRowExpandedPanelProps {
   rank: number;
@@ -220,7 +221,7 @@ export function ChartRowExpandedPanel({
 
           {slug && (
             <Link
-              to={`/tracks/${slug}`}
+              to={trackUrl(slug, artistSlugs)}
               onClick={(e) => e.stopPropagation()}
               className="flex items-center gap-1 text-[11px] font-bold text-[var(--wk-brand)] transition-opacity hover:opacity-70 cursor-pointer whitespace-nowrap"
             >

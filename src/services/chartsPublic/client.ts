@@ -93,7 +93,7 @@ async function withCache<T>(
   }
 }
 
-export function getChartFamilies(): Promise<ChartResult<ChartFamily[]>> {
+export function getChartFamilies(): Promise<ChartResult<{ families: ChartFamily[]; editions: ChartEdition[] }>> {
   return withCache("chart_families_public_api", async () => ({
     data: await getV2ChartFamilies(),
     source: "wordpress",

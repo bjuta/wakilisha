@@ -381,7 +381,11 @@ function OverviewTab({ track, related }: { track: TrackViewModel; related: Track
           <div className="mb-4 text-[12px] font-black uppercase tracking-wider text-[var(--wk-text-muted)]">More from {track.artist.split(" ft.")[0].split(" ft ")[0]}</div>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             {related.map((rel) => (
-              <Link key={rel.slug} to={`/tracks/${rel.slug}`} className="overflow-hidden rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] transition-all hover:border-[var(--wk-brand)]">
+              <Link
+                key={rel.slug}
+                to={rel.artistSlug ? `/tracks/${rel.artistSlug}/${rel.slug}` : `/tracks/${rel.slug}`}
+                className="overflow-hidden rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] transition-all hover:border-[var(--wk-brand)]"
+              >
                 <div className="relative aspect-square bg-[var(--wk-surface-raised)]">
                   <img src={rel.artworkUrl} alt={rel.title} className="h-full w-full object-cover" />
                   {rel.rank > 0 && <div className="absolute left-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-[11px] font-black text-white">#{rel.rank}</div>}

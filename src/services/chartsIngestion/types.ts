@@ -76,6 +76,7 @@ export interface ChartFamily {
   editionFrequency: "weekly" | "monthly" | "daily";
   defaultRuleset: string;
   defaultScoringModel: string;
+  publicSlug: string;
   createdAt: string;
   updatedAt: string;
 }

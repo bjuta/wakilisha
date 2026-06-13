@@ -4,6 +4,7 @@ import { WkTag } from "@/components/design-system/primitives/Tag";
 import { usePlayer } from "@/context/PlayerContext";
 import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 import { ChartRowExpandedPanel } from "@/components/design-system/music/ChartRowExpandedPanel";
+import { trackUrl } from "@/utils/trackUrl";
 
 export interface ChartRowProps {
   rank: number;
@@ -187,7 +188,7 @@ export function ChartRow({
           <div className="mb-0.5 flex items-center gap-2">
             {slug ? (
               <Link
-                to={`/tracks/${slug}`}
+                to={trackUrl(slug, artistSlugs)}
                 onClick={(e) => e.stopPropagation()}
                 className="truncate text-[14px] font-bold text-[var(--wk-text)] hover:underline"
               >

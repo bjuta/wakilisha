@@ -247,9 +247,20 @@ function toEntry(entry: V2Entry, editionSlug: string): ChartEditionEntry {
   };
 }
 
-export async function getV2ChartFamilies(): Promise<ChartFamily[]> {
+export async function getV2ChartFamilies(): Promise<{ families: ChartFamily[]; editions: ChartEdition[] }> {
   const data = unwrap<V2ProgramListData>(await v2Get<ApiEnvelope<V2ProgramListData> | V2ProgramListData>("/charts"));
-  return (data.programs ?? []).map(toFamily);
+  const families: ChartFamily[] = [];
+  const editions: ChartEdition[] = [];
+  for (const program of (data.programs ?? [])) {
+    const family = toFamily(program);
+    families.push(family);
+    if (program.archive) {
+      for (const ed of program.archive) {
+        editions.push(toEdition(ed, program.publicSlug));
+      }
+    }
+  }
+  return { families, editions };
 }
 
 export async function getV2ChartFamily(programSlug: string): Promise<ChartFamily | null> {

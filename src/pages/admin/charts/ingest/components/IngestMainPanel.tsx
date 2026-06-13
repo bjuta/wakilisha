@@ -3,6 +3,7 @@ import type { IngestRun, ProviderName } from "@/services/chartsIngestion/ingestS
 import type { ChartFamily } from "@/services/chartsIngestion/types";
 import type { BackendCommitResponse } from "@/services/backendContract/backendTypes";
 import type { StoredChartMarketScope } from "@/services/chartsMarkets/marketScopeStore";
+import type { ChartFamilyDefaults, ChartFamilyDefaultsDiff } from "@/services/chartsIngestion/chartFamilyDefaultsStore";
 import { CommitResultPanel } from "./CommitResultPanel";
 import { IngestRulesSetupStep } from "./IngestRulesSetupStep";
 import { PreviewStep } from "./PreviewStep";
@@ -67,6 +68,11 @@ type IngestMainPanelProps = {
   commitError: string | null;
   onOpenRun: () => void;
   commitResult: BackendCommitResponse | null;
+  familyDefaults: ChartFamilyDefaults | null;
+  defaultsDiff: ChartFamilyDefaultsDiff;
+  onSaveDefaults: () => void;
+  onResetToDefaults: () => void;
+  familiesWithDefaults: Set<string>;
 };
 
 export function IngestMainPanel(props: IngestMainPanelProps) {
@@ -126,6 +132,11 @@ export function IngestMainPanel(props: IngestMainPanelProps) {
     commitError,
     onOpenRun,
     commitResult,
+    familyDefaults,
+    defaultsDiff,
+    onSaveDefaults,
+    onResetToDefaults,
+    familiesWithDefaults,
   } = props;
 
   return (
@@ -164,6 +175,11 @@ export function IngestMainPanel(props: IngestMainPanelProps) {
           onQuickTemplate={onQuickTemplate}
           onContinueToRules={onContinueToRules}
           onReset={onReset}
+          familyDefaults={familyDefaults}
+          defaultsDiff={defaultsDiff}
+          onSaveDefaults={onSaveDefaults}
+          onResetToDefaults={onResetToDefaults}
+          familiesWithDefaults={familiesWithDefaults}
         />
       )}
 

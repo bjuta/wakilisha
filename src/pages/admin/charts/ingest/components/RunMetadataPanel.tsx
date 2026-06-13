@@ -65,7 +65,7 @@ export function RunMetadataPanel({ run }: RunMetadataPanelProps) {
           <span className="font-semibold text-wk-text-soft">{new Date(run.createdAt).toLocaleString()}</span>
         </div>
         <div>
-          <span className="text-wk-text-muted">Series:</span>{" "}
+          <span className="text-wk-text-muted">Family:</span>{" "}
           <span className="font-semibold text-wk-text-soft">{run.existingSeriesId || "—"}</span>
         </div>
         <div>

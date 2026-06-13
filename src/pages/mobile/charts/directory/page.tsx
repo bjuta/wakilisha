@@ -14,6 +14,7 @@ import {
 } from "@/services/chartsPublic/viewModels";
 import { ChartRefreshButton } from "@/components/charts/ChartRefreshButton";
 import { WkIcon } from "@/components/design-system/Icon";
+import { trackUrl } from "@/utils/trackUrl";
 
 
 const rankClass = (rank: number) =>
@@ -60,7 +61,7 @@ export default function MobileChartsDirectory() {
   const load = useCallback(async () => {
     setState({ status: "loading" });
     try {
-      const { data: families } = await getChartFamilies();
+      const { data: { families } } = await getChartFamilies();
       if (families.length === 0) {
         setState({ status: "empty" });
         return;
@@ -260,7 +261,7 @@ export default function MobileChartsDirectory() {
         </div>
         <div>
           <div className="stat-val">{data.stats.series}</div>
-          <div className="stat-lbl">Series</div>
+          <div className="stat-lbl">Families</div>
         </div>
         <div>
           <div className="stat-val">{totalEditions}</div>
@@ -289,7 +290,7 @@ export default function MobileChartsDirectory() {
       {/* Top 3 cards */}
       <div className="chart-hero-cards">
         {top3.map((entry, idx) => (
-          <Link key={`${entry.rank}-${entry.slug}`} to={`/tracks/${entry.slug}`} className="chart-hero-card mobile-pressable">
+          <Link key={`${entry.rank}-${entry.slug}`} to={trackUrl(entry.slug, entry.artistSlugs)} className="chart-hero-card mobile-pressable">
             <img src={entry.artworkUrl} alt="" />
             <div className="chart-hero-overlay">
               <div className={`chart-hero-rank ${rankClass(entry.rank)}`}>{entry.rank}</div>
@@ -316,7 +317,7 @@ export default function MobileChartsDirectory() {
       <div className="spec-section-hd">Positions 4–{data.stats.entries}</div>
       <div className="chart-row-list">
         {allRows.map((entry) => (
-          <Link key={`${entry.rank}-${entry.slug}`} to={`/tracks/${entry.slug}`} className="chart-row mobile-pressable">
+          <Link key={`${entry.rank}-${entry.slug}`} to={trackUrl(entry.slug, entry.artistSlugs)} className="chart-row mobile-pressable">
             <div className="chart-row-num">{entry.rank}</div>
             <div className="chart-row-art">
               <img src={entry.artworkUrl} alt="" />
@@ -351,7 +352,7 @@ export default function MobileChartsDirectory() {
               </div>
               {/* Taxonomy metadata */}
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-[var(--wk-text-muted)] pl-[52px]">
-                <span><span className="font-bold text-[var(--wk-text)]">Series:</span> {series.seriesLabel}</span>
+                <span><span className="font-bold text-[var(--wk-text)]">Family:</span> {series.seriesLabel}</span>
                 <span className="text-[var(--wk-text-faint)]">·</span>
                 <span><span className="font-bold text-[var(--wk-text)]">Market:</span> {series.marketLabel}</span>
                 <span className="text-[var(--wk-text-faint)]">·</span>

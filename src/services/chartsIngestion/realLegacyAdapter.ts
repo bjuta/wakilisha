@@ -124,13 +124,14 @@ export async function getChartFamilies(): Promise<ChartFamily[]> {
   return rows.map((row) => ({
     id: row.id,
     familyKey: row.series_slug ?? row.id,
-    label: row.label ?? row.series_slug ?? row.id,
+    label: row.public_label ?? row.series_slug ?? row.id,
     description: "",
-    defaultChartSize: row.default_chart_size ?? 20,
+    defaultChartSize: row.chart_size ?? 20,
     defaultRegion: row.market_slug ?? "KE",
     editionFrequency: (row.default_period_type as ChartFamily["editionFrequency"]) ?? "weekly",
     defaultRuleset: row.default_methodology_version ?? "1.0.0",
     defaultScoringModel: row.default_methodology_version ?? "1.0.0",
+    publicSlug: row.public_slug ?? row.series_slug ?? row.id,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }));
@@ -152,13 +153,14 @@ async function loadJobFamily(programId: string): Promise<ChartFamily | undefined
   return {
     id: match.id,
     familyKey: match.series_slug ?? match.id,
-    label: match.label ?? match.series_slug ?? match.id,
+    label: match.public_label ?? match.series_slug ?? match.id,
     description: "",
-    defaultChartSize: match.default_chart_size ?? 20,
+    defaultChartSize: match.chart_size ?? 20,
     defaultRegion: match.market_slug ?? "KE",
     editionFrequency: (match.default_period_type as ChartFamily["editionFrequency"]) ?? "weekly",
     defaultRuleset: match.default_methodology_version ?? "1.0.0",
     defaultScoringModel: match.default_methodology_version ?? "1.0.0",
+    publicSlug: match.public_slug ?? match.series_slug ?? match.id,
     createdAt: match.created_at,
     updatedAt: match.updated_at,
   };

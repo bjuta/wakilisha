@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   cancelIngestRun,
@@ -27,6 +27,15 @@ import { wakilishaBackend } from "@/services/backendContract/backendClient";
 import type { ChartEligibilityProfile } from "@/services/chartsEligibility/eligibilityTypes";
 import { getMarketScopes, type StoredChartMarketScope } from "@/services/chartsMarkets/marketScopeStore";
 import { generateAndPersistIngestRunIntelligence } from "@/services/chartsIntelligence/intelligenceStore";
+import {
+  getFamilyDefaults,
+  saveFamilyDefaults,
+  computeDefaultsDiff,
+  getFamiliesWithDefaults,
+  type ChartFamilyDefaults,
+  type ChartFamilyDefaultsDiff,
+} from "@/services/chartsIngestion/chartFamilyDefaultsStore";
+import { iso2ToCountrySlug, countrySlugToIso2 } from "@/utils/countries";
 
 import { IngestKpiStrip } from "./components/IngestKpiStrip";
 import { IngestLoadingState } from "./components/IngestLoadingState";
@@ -64,12 +73,13 @@ function createCustomFamily(label: string, key: string, chartSize: number, marke
     id: key,
     familyKey: key,
     label,
-    description: "Custom chart series",
+    description: "Custom chart family",
     defaultChartSize: chartSize,
     defaultRegion: market,
     editionFrequency: "weekly",
     defaultRuleset: "csv_registry_import_v1",
     defaultScoringModel: "csv_position_order",
+    publicSlug: key,
     createdAt: timestamp,
     updatedAt: timestamp,
   };
@@ -87,6 +97,15 @@ function toMarketScopeSnapshot(scope: StoredChartMarketScope | null) {
     visibility: scope.visibility,
     description: scope.description,
   };
+}
+
+function getISOWeekNumber(d: Date): number {
+  const tmp = new Date(d.getTime());
+  tmp.setHours(0, 0, 0, 0);
+  tmp.setDate(tmp.getDate() + 3 - ((tmp.getDay() + 6) % 7));
+  const jan1 = new Date(tmp.getFullYear(), 0, 1);
+  const week = Math.round(((tmp.getTime() - jan1.getTime()) / 86400000 + jan1.getDay() + 1) / 7);
+  return week;
 }
 
 export default function AdminChartsIngest() {
@@ -135,6 +154,33 @@ export default function AdminChartsIngest() {
   const [cancelLoading, setCancelLoading] = useState<string | null>(null);
   const [retryLoading, setRetryLoading] = useState<string | null>(null);
   const [commitResult, setCommitResult] = useState<BackendCommitResponse | null>(null);
+  const prevMarketRef = useRef<string>(market);
+
+  // ── Family defaults ──
+  const [familyDefaults, setFamilyDefaults] = useState<ChartFamilyDefaults | null>(null);
+  const [defaultsToast, setDefaultsToast] = useState<string | null>(null);
+
+  const familiesWithDefaults = useMemo(
+    () => getFamiliesWithDefaults(families.map((f) => f.id)),
+    [families],
+  );
+
+  const defaultsDiff = useMemo<ChartFamilyDefaultsDiff>(() => {
+    if (!existingSeriesId || existingSeriesId === "__new__") {
+      return { hasDefaults: false, fields: { chartTitle: false, chartSlug: false, chartSize: false, market: false, chartKind: false, coverStyle: false, eligibilityProfileId: false, marketScopeId: false, sourceUrlsTemplate: false }, changedCount: 0 };
+    }
+    return computeDefaultsDiff(existingSeriesId, {
+      chartTitle,
+      chartSlug,
+      chartSize,
+      market,
+      chartKind,
+      coverStyle,
+      eligibilityProfileId: selectedEligibilityProfileId,
+      marketScopeId: selectedMarketScopeId,
+      sourceUrls,
+    });
+  }, [existingSeriesId, chartTitle, chartSlug, chartSize, market, chartKind, coverStyle, selectedEligibilityProfileId, selectedMarketScopeId, sourceUrls]);
 
   const loadData = useCallback(async () => {
     const [kpiData, recentActivity, ingestRuns, chartFamilies, eligibilityResult] = await Promise.all([
@@ -187,23 +233,127 @@ export default function AdminChartsIngest() {
   const filteredRows = useMemo(() => !dryRunResult ? [] : rowFilter === "all" ? dryRunResult.rows : dryRunResult.rows.filter((row) => row.matchStatus === rowFilter), [dryRunResult, rowFilter]);
   const activeRun = runs.find((run) => run.status === "running");
 
+  // Auto-load saved family defaults when family changes
   useEffect(() => {
-    if (!selectedFamily) return;
-    setChartSize(selectedFamily.defaultChartSize);
-    const regionToMarket: Record<string, string> = { Africa: "KE", Kenya: "KE", Nigeria: "NG", "South Africa": "ZA", Ghana: "GH", Uganda: "UG", Tanzania: "TZ" };
-    setMarket(regionToMarket[selectedFamily.defaultRegion] ?? "KE");
-  }, [selectedFamily]);
+    if (!existingSeriesId || existingSeriesId === "__new__") {
+      setFamilyDefaults(null);
+      return;
+    }
+    const defaults = getFamilyDefaults(existingSeriesId);
+    if (defaults) {
+      setFamilyDefaults(defaults);
+      setChartTitle(defaults.chartTitle);
+      setChartSlug(defaults.chartSlug);
+      setChartSize(defaults.chartSize);
+      setMarket(defaults.market);
+      setChartKind(defaults.chartKind);
+      setCoverStyle(defaults.coverStyle);
+      setSelectedEligibilityProfileId(defaults.eligibilityProfileId);
+      setSelectedMarketScopeId(defaults.marketScopeId);
+      setSourceUrls(defaults.sourceUrlsTemplate);
+      setSaveAsRecurring(true);
+    } else {
+      setFamilyDefaults(null);
+      // No saved defaults yet → generate smart defaults from the ChartFamily object
+      const family = families.find((f) => f.id === existingSeriesId);
+      if (family) {
+        const d = new Date(editionDate);
+        const weekNumber = getISOWeekNumber(d);
+        const generatedTitle = `${family.label} — Week ${weekNumber}`;
+        const generatedSlug = family.publicSlug;
+        setChartTitle(generatedTitle);
+        setChartSlug(generatedSlug);
+        setChartSize(family.defaultChartSize);
+        // Extract market from the publicSlug (e.g. "top-songs-kenya" → "KE")
+        const slugParts = family.publicSlug.split("-");
+        const possibleCountrySlug = slugParts.slice(-2).join("-"); // try last 2 segments for "south-africa" etc
+        const iso2From2 = countrySlugToIso2(possibleCountrySlug);
+        const iso2From1 = countrySlugToIso2(slugParts[slugParts.length - 1] ?? "");
+        const extractedIso2 = iso2From2 ?? iso2From1;
+        setMarket(extractedIso2 ?? "KE");
+        prevMarketRef.current = extractedIso2 ?? "KE";
+        setChartKind("tracks");
+        setCoverStyle("default");
+      }
+    }
+  }, [existingSeriesId, editionDate]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     const firstMarket = selectedMarketScope?.includedMarkets[0]?.countryCode;
-    if (firstMarket && firstMarket !== market) setMarket(firstMarket);
-  }, [selectedMarketScope, market]);
+    if (firstMarket) {
+      setMarket(firstMarket);
+      prevMarketRef.current = firstMarket;
+    }
+  }, [selectedMarketScopeId]);
+
+  // Auto-dismiss toast
+  useEffect(() => {
+    if (!defaultsToast) return;
+    const timer = setTimeout(() => setDefaultsToast(null), 3000);
+    return () => clearTimeout(timer);
+  }, [defaultsToast]);
+
+  // ── Market → Slug connection ──
+  // When the user changes the market, update the chart slug to reflect the new country
+  useEffect(() => {
+    const prevMarket = prevMarketRef.current;
+    if (prevMarket === market) { prevMarketRef.current = market; return; }
+
+    const oldSlug = iso2ToCountrySlug(prevMarket);
+    const newSlug = iso2ToCountrySlug(market);
+
+    setChartSlug((previous) => {
+      // Replace the market suffix at the end of the slug
+      if (previous.endsWith(`-${oldSlug}`)) {
+        return previous.replace(new RegExp(`-${oldSlug}$`), `-${newSlug}`);
+      }
+      // If the slug doesn't end with the old market pattern, just append
+      if (market && market !== "GLOBAL") {
+        return `${previous}-${newSlug}`;
+      }
+      return previous;
+    });
+
+    prevMarketRef.current = market;
+  }, [market]);
+
+  function handleSaveDefaults() {
+    if (!existingSeriesId || existingSeriesId === "__new__") return;
+    const saved = saveFamilyDefaults(existingSeriesId, {
+      chartTitle,
+      chartSlug,
+      chartSize,
+      market,
+      chartKind,
+      coverStyle,
+      eligibilityProfileId: selectedEligibilityProfileId,
+      marketScopeId: selectedMarketScopeId,
+      sourceUrlsTemplate: sourceUrls,
+    });
+    setFamilyDefaults(saved);
+    setDefaultsToast(`Defaults saved for "${selectedFamily?.label ?? existingSeriesId}"`);
+  }
+
+  function handleResetToDefaults() {
+    if (!familyDefaults) return;
+    setChartTitle(familyDefaults.chartTitle);
+    setChartSlug(familyDefaults.chartSlug);
+    setChartSize(familyDefaults.chartSize);
+    setMarket(familyDefaults.market);
+    setChartKind(familyDefaults.chartKind);
+    setCoverStyle(familyDefaults.coverStyle);
+    setSelectedEligibilityProfileId(familyDefaults.eligibilityProfileId);
+    setSelectedMarketScopeId(familyDefaults.marketScopeId);
+    setSourceUrls(familyDefaults.sourceUrlsTemplate);
+    setDefaultsToast("Reset to saved defaults");
+  }
 
   function validateProgramStep(): string | null {
     if (!chartTitle.trim()) return "Chart title is required.";
     if (!chartSlug.trim()) return "Chart slug is required.";
     if (!editionDate) return "Edition date is required.";
     if (chartSize < 1 || chartSize > 100) return "Chart size must be between 1 and 100.";
-    if (!existingSeriesId || existingSeriesId === "__new__") return "Select an existing chart series.";
+    if (!existingSeriesId || existingSeriesId === "__new__") return "Select an existing chart family.";
     return null;
   }
 
@@ -227,7 +377,7 @@ export default function AdminChartsIngest() {
       eastAfrica: { title: "WAKILISHA East African Artists", slug: "east-african-artists", size: 100, market: "KE", marketScopeId: "scope_east_africa_ke_ug_tz", seriesId: "kenya", eligibilityProfileId: "elig_east_africa_selected_markets" },
     };
     const selected = templates[template];
-    setChartTitle(selected.title); setChartSlug(selected.slug); setChartSize(selected.size); setMarket(selected.market); setSelectedMarketScopeId(selected.marketScopeId); setExistingSeriesId(selected.seriesId); setSelectedEligibilityProfileId(selected.eligibilityProfileId); setSaveAsRecurring(true);
+    setChartTitle(selected.title); setChartSlug(selected.slug); setChartSize(selected.size); setMarket(selected.market); prevMarketRef.current = selected.market; setSelectedMarketScopeId(selected.marketScopeId); setExistingSeriesId(selected.seriesId); setSelectedEligibilityProfileId(selected.eligibilityProfileId); setSaveAsRecurring(true);
   }
 
   function handleCreateSeries() {
@@ -314,6 +464,14 @@ export default function AdminChartsIngest() {
       <IngestKpiStrip kpis={kpis} />
       <IngestStatusStack formError={formError} successMessage={successMessage} editionExistsWarning={editionExistsWarning} />
 
+      {/* Family defaults toast */}
+      {defaultsToast && (
+        <div className="fixed bottom-6 right-6 z-50 rounded-xl bg-wk-success px-4 py-3 text-[13px] font-semibold text-white shadow-lg flex items-center gap-2">
+          <i className="ri-check-line" />
+          {defaultsToast}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <IngestMainPanel
           step={step}
@@ -371,6 +529,11 @@ export default function AdminChartsIngest() {
           commitError={formError && formError.includes("Commit") ? formError : null}
           onOpenRun={() => dryRunResult && navigate(`${ADMIN_CHARTS_BASE}/ingest-runs/${dryRunResult.id}`)}
           commitResult={commitResult}
+          familyDefaults={familyDefaults}
+          defaultsDiff={defaultsDiff}
+          onSaveDefaults={handleSaveDefaults}
+          onResetToDefaults={handleResetToDefaults}
+          familiesWithDefaults={familiesWithDefaults}
         />
         <IngestSidebar activeRun={activeRun} dryRunResult={dryRunResult} selectedMarketScope={selectedMarketScope} selectedEligibilityProfile={selectedEligibilityProfile} guardStatus={guardStatus} runs={runs} activity={activity} cancelLoading={cancelLoading} retryLoading={retryLoading} onNavigate={navigate} onCancelRun={handleCancelRun} onRetryRun={handleRetryRun} />
       </div>

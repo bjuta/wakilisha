@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 import { usePlayer } from "@/context/PlayerContext";
 import type { ChartEditionEntry } from "@/services/chartsPublic/client";
+import { trackUrl } from "@/utils/trackUrl";
 
 const FALLBACK_IMGS = [
   "https://readdy.ai/api/search-image?query=Close%20up%20detail%20of%20African%20djembe%20drum%20with%20intricate%20carved%20wooden%20body%20and%20leather%20drumhead%20warm%20amber%20lighting%20showcasing%20craft%20and%20texture%20cultural%20musical%20instrument%20photography%20editorial%20quality%20dark%20background%20product%20style%20with%20artistic%20shadows%20beautiful%20depth&width=600&height=600&seq=feat1-wk26&orientation=squarish",
@@ -80,7 +81,7 @@ export function HomeFeatured({ chartEntries, loading }: Props) {
               return (
                 <Link
                   key={entry?.trackSlug ?? i}
-                  to={hasEntry ? `/tracks/${entry!.trackSlug}` : "/charts"}
+                  to={hasEntry ? trackUrl(entry!.trackSlug, entry!.artistSlugs) : "/charts"}
                   className="group relative rounded-2xl overflow-hidden border border-[var(--wk-border)] block cursor-pointer"
                   style={{
                     background: "var(--wk-surface)",

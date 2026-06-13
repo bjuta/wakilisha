@@ -21,7 +21,7 @@ export default function MobileHome() {
       const [storiesData] = await Promise.all([listMagazineStories()]);
       setStories(storiesData);
 
-      const { data: families } = await getChartFamilies();
+      const { data: { families } } = await getChartFamilies();
       if (families.length > 0) {
         const slug = families[0].publicSlug ?? families[0].slug ?? families[0].familyKey;
         const { data: edition } = await getLatestChartEdition(slug);

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { usePlayer } from "@/context/PlayerContext";
 import { ChartRowExpandedPanel } from "@/components/design-system/music/ChartRowExpandedPanel";
 import { ChartHighlights } from "./components/ChartHighlights";
@@ -22,6 +22,7 @@ import {
 import type { ChartEdition, ChartEditionEntry } from "@/services/chartsPublic/types";
 import { ChartRefreshButton } from "@/components/charts/ChartRefreshButton";
 import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
+import { trackUrl } from "@/utils/trackUrl";
 
 // ─── Constants ───
 
@@ -34,6 +35,37 @@ const METALLIC = {
 const HERO_FALLBACK =
   "https://readdy.ai/api/search-image?query=abstract%20african%20music%20visualization%20with%20vibrant%20green%20and%20gold%20energy%20waves%20radiating%20from%20a%20central%20point%20on%20deep%20charcoal%20black%20background%20rhythmic%20geometric%20patterns%20inspired%20by%20african%20textile%20art%20premium%20cinematic%20atmosphere%20with%20subtle%20luminous%20particles%20no%20text%20high%20contrast%20editorial%20photography%20style&width=1600&height=720&seq=charts-home-hero-v2&orientation=landscape";
 
+// ─── Grouping ───
+
+interface SourceFamilyGroup {
+  sourceSlug: string;
+  label: string;
+  icon: string;
+  description: string;
+  markets: ChartFamilyViewModel[];
+}
+
+function groupFamiliesBySource(all: ChartFamilyViewModel[]): SourceFamilyGroup[] {
+  const map = new Map<string, ChartFamilyViewModel[]>();
+  for (const f of all) {
+    const key = f.sourceFamilySlug || f.slug;
+    if (!map.has(key)) map.set(key, []);
+    map.get(key)!.push(f);
+  }
+  const groups: SourceFamilyGroup[] = [];
+  for (const [key, markets] of map) {
+    const rep = markets[0];
+    groups.push({
+      sourceSlug: key,
+      label: rep.shortLabel ?? rep.publicLabel ?? key,
+      icon: rep.icon,
+      description: rep.description,
+      markets,
+    });
+  }
+  return groups;
+}
+
 // ─── Helpers ───
 
 function rankAccent(rank: number) {
@@ -42,7 +74,6 @@ function rankAccent(rank: number) {
   if (rank === 3) return { color: METALLIC.bronze, ring: "ring-[#B87333]/20" };
   return null;
 }
-
 
 function entryPlaylist(entries: ChartEntryRowViewModel[]) {
   return entries
@@ -75,6 +106,21 @@ function LeaderboardRow({
   const accent = rankAccent(entry.rank);
   const mvtAmt = entry.movementAmount && entry.movementAmount > 0 ? entry.movementAmount : null;
 
+  const mvtBadge = useMemo(() => {
+    switch (entry.movement) {
+      case "up":
+        return { icon: "ri-arrow-up-line", color: "var(--wk-success)", label: mvtAmt ? `+${mvtAmt}` : "+" };
+      case "down":
+        return { icon: "ri-arrow-down-line", color: "var(--wk-danger)", label: mvtAmt ? `−${mvtAmt}` : "−" };
+      case "new":
+        return { icon: null, color: "var(--wk-brand)", label: "NEW" };
+      case "re_entry":
+        return { icon: "ri-refresh-line", color: "var(--wk-brand)", label: "RE" };
+      default:
+        return null;
+    }
+  }, [entry.movement, mvtAmt]);
+
   return (
     <div
       id={rowId}
@@ -83,19 +129,19 @@ function LeaderboardRow({
       {/* Row */}
       <div
         onClick={() => setIsExpanded((v) => !v)}
-        className="flex cursor-pointer select-none items-center gap-2.5 px-3 py-2.5 md:gap-3.5 md:px-4 md:py-3"
+        className="flex cursor-pointer select-none items-center gap-2 px-3 py-3 md:gap-3.5 md:px-4 md:py-3"
       >
         {/* Rank */}
-        <div className="flex w-8 shrink-0 items-center justify-center md:w-10">
+        <div className="flex w-7 shrink-0 items-center justify-center md:w-10">
           {accent ? (
             <span
-              className="flex h-8 w-8 items-center justify-center rounded-full text-[15px] font-black md:h-9 md:w-9 md:text-[16px]"
+              className="flex h-7 w-7 items-center justify-center rounded-full text-[12px] font-black md:h-9 md:w-9 md:text-[16px]"
               style={{ backgroundColor: `${accent.color}18`, color: accent.color }}
             >
               {entry.rank}
             </span>
           ) : (
-            <span className="text-[14px] font-bold text-[var(--wk-text-muted)] tabular-nums md:text-[15px]">
+            <span className="text-[12px] font-bold text-[var(--wk-text-muted)] tabular-nums md:text-[15px]">
               {entry.rank}
             </span>
           )}
@@ -110,34 +156,49 @@ function LeaderboardRow({
           )}
         </div>
 
-        {/* Track info */}
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
+        {/* Track info — on mobile, movement + weeks are inline here */}
+        <div className="min-w-0 flex-1 py-0.5">
+          {/* Title row */}
+          <div className="flex items-center gap-1.5">
             <Link
-              to={`/tracks/${entry.slug}`}
+              to={trackUrl(entry.slug, entry.artistSlugs)}
               onClick={(e) => e.stopPropagation()}
-              className="truncate text-[13px] font-bold text-[var(--wk-text)] hover:text-[var(--wk-brand)] transition-colors md:text-[14px]"
+              className="truncate text-[13px] font-bold text-[var(--wk-text)] hover:text-[var(--wk-brand)] transition-colors leading-tight md:text-[14px]"
             >
               {entry.title}
             </Link>
             {entry.movement === "new" && (
-              <span className="shrink-0 rounded-full bg-[var(--wk-brand-soft)] px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-[var(--wk-brand)]">
+              <span className="shrink-0 rounded-full bg-[var(--wk-brand-soft)] px-1.5 py-px text-[8px] font-black uppercase tracking-wider text-[var(--wk-brand)]">
                 NEW
               </span>
             )}
-            {entry.peakPosition === entry.rank && entry.movement !== "new" && (
-              <span className="shrink-0 rounded-full bg-[var(--wk-brand-soft)] px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-[var(--wk-brand)]">
-                PEAK
+            {/* Mobile-only: movement inline, right-aligned */}
+            {mvtBadge && (
+              <span
+                className="md:hidden ml-auto flex shrink-0 items-center gap-0.5 text-[11px] font-bold tabular-nums"
+                style={{ color: mvtBadge.color }}
+              >
+                {mvtBadge.icon && <i className={`${mvtBadge.icon} text-[10px]`} />}
+                {mvtBadge.label}
               </span>
             )}
+            {(entry.movement === "same" || !entry.movement) && (
+              <span className="md:hidden ml-auto shrink-0 text-[11px] font-bold text-[var(--wk-text-faint)]">—</span>
+            )}
           </div>
-          <div className="flex items-center gap-2 mt-0.5">
+
+          {/* Artist row */}
+          <div className="flex items-center gap-1.5 mt-0.5">
             <span className="truncate text-[11px] text-[var(--wk-text-muted)] md:text-[12px]">{entry.artist}</span>
+            {/* Mobile-only: weeks count inline */}
+            <span className="md:hidden ml-auto shrink-0 text-[10px] text-[var(--wk-text-faint)] tabular-nums">
+              {entry.weeksOnChart}w
+            </span>
           </div>
         </div>
 
-        {/* Movement delta */}
-        <div className="flex shrink-0 w-16 items-center justify-end">
+        {/* Movement delta — desktop only */}
+        <div className="hidden md:flex shrink-0 w-16 items-center justify-end">
           {entry.movement === "up" && (
             <span className="flex items-center gap-0.5 text-[12px] font-bold tabular-nums" style={{ color: "var(--wk-success)" }}>
               <i className="ri-arrow-up-line text-[11px]" />
@@ -165,7 +226,7 @@ function LeaderboardRow({
           )}
         </div>
 
-        {/* Weeks + Peak */}
+        {/* Weeks + Peak — desktop only */}
         <div className="hidden w-16 shrink-0 flex-col items-end gap-0.5 md:flex">
           <span className="text-[11px] text-[var(--wk-text-soft)] tabular-nums">
             {entry.weeksOnChart} wk{entry.weeksOnChart !== 1 ? "s" : ""}
@@ -178,18 +239,11 @@ function LeaderboardRow({
         {/* Play button */}
         <button
           onClick={(e) => { e.stopPropagation(); onPlay(); }}
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] opacity-0 transition-all duration-200 group-hover:opacity-100 hover:scale-110 md:h-9 md:w-9"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] transition-all duration-200 hover:scale-110 active:scale-95 md:h-9 md:w-9"
           aria-label={`Play ${entry.title}`}
         >
           <i className="ri-play-mini-fill text-sm" />
         </button>
-
-        {/* Expand chevron */}
-        <div
-          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[var(--wk-text-faint)] transition-all duration-200 ${isExpanded ? "rotate-180 bg-[var(--wk-surface-raised)] text-[var(--wk-text)]" : "group-hover:text-[var(--wk-text-muted)]"}`}
-        >
-          <i className="ri-arrow-down-s-line text-[16px]" />
-        </div>
       </div>
 
       {/* Expandable panel */}
@@ -237,7 +291,7 @@ function MiniEntryRow({
 }) {
   return (
     <Link
-      to={`/tracks/${entry.slug}`}
+      to={trackUrl(entry.slug, entry.artistSlugs)}
       className="flex items-center gap-2.5 rounded-lg p-2 transition-colors hover:bg-[var(--wk-bg)] group"
     >
       <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--wk-brand)] text-[10px] font-black text-[var(--wk-brand-on)] tabular-nums">
@@ -251,10 +305,10 @@ function MiniEntryRow({
         )}
       </div>
       <div className="min-w-0 flex-1">
-        <div className="truncate text-[12px] font-bold text-[var(--wk-text)] group-hover:text-[var(--wk-brand)] transition-colors">
+        <div className="truncate text-[12px] font-bold text-[var(--wk-text)] group-hover:text-[var(--wk-brand)] transition-colors leading-tight">
           {entry.title}
         </div>
-        <div className="truncate text-[10px] text-[var(--wk-text-muted)]">{entry.artist}</div>
+        <div className="truncate text-[10px] text-[var(--wk-text-muted)] mt-0.5">{entry.artist}</div>
       </div>
       <span className="shrink-0 text-[10px] font-bold text-[var(--wk-brand)] uppercase">{badge}</span>
     </Link>
@@ -273,7 +327,7 @@ function SidebarCard({
   emptyLabel?: string;
 }) {
   return (
-    <div className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4">
+    <div className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-3.5 md:p-4">
       <div className="mb-3 flex items-center justify-between">
         <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--wk-text-faint)]">{title}</span>
         <span className="text-[11px] font-bold text-[var(--wk-brand)] tabular-nums">{entries.length}</span>
@@ -291,17 +345,58 @@ function SidebarCard({
   );
 }
 
+// ─── Market Switcher ───
+
+function MarketSwitcher({
+  markets,
+  activeSlug,
+  onSelect,
+}: {
+  markets: ChartFamilyViewModel[];
+  activeSlug: string;
+  onSelect: (slug: string) => void;
+}) {
+  if (markets.length <= 1) return null;
+  return (
+    <div className="flex items-center gap-1.5 flex-wrap">
+      <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--wk-text-faint)] mr-1">
+        <i className="ri-global-line text-[11px]" /> Market
+      </span>
+      {markets.map((m) => {
+        const isActive = m.slug === activeSlug;
+        return (
+          <button
+            key={m.slug}
+            onClick={() => onSelect(m.slug)}
+            className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-bold transition-all duration-[var(--wk-d-fast)] whitespace-nowrap cursor-pointer ${
+              isActive
+                ? "bg-[var(--wk-brand-soft)] text-[var(--wk-brand)] border border-[var(--wk-brand)]/25"
+                : "text-[var(--wk-text-muted)] hover:text-[var(--wk-text)] hover:bg-[var(--wk-surface-raised)] border border-transparent"
+            }`}
+          >
+            {m.marketLabel}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 // ─── Main Component ───
 
 export default function ChartsDirectory() {
   const { playTrack } = usePlayer();
   const scrollY = useRef(0);
   const [scrollPos, setScrollPos] = useState(0);
+  const [searchParams] = useSearchParams();
 
   // ── core state ──
   const [phase, setPhase] = useState<"loading" | "error" | "empty" | "ready">("loading");
   const [errorMsg, setErrorMsg] = useState("");
   const [families, setFamilies] = useState<ChartFamilyViewModel[]>([]);
+  const [editions, setEditions] = useState<ChartEdition[]>([]);
+  const [sourceGroups, setSourceGroups] = useState<SourceFamilyGroup[]>([]);
+  const [activeSourceFamily, setActiveSourceFamily] = useState<string>("");
   const [activeSlug, setActiveSlug] = useState<string>("");
   const [cache, setCache] = useState<Record<string, { edition: ChartEditionViewModel | null; entries: ChartEntryRowViewModel[] }>>({});
   const [switching, setSwitching] = useState(false);
@@ -352,17 +447,56 @@ export default function ChartsDirectory() {
     async function load() {
       setPhase("loading");
       try {
-        const { data: familiesData, meta: familiesMeta } = await getChartFamilies();
+        const { data: { families: familiesData, editions: editionsData }, meta: familiesMeta } = await getChartFamilies();
         if (cancelled) return;
         if (familiesData.length === 0) { setPhase("empty"); return; }
-        const editionsForFamilies: ChartEdition[] = [];
-        const vms = familiesData.map((f) => toChartFamilyViewModel(f, editionsForFamilies));
+
+        const vms = familiesData.map((f) => toChartFamilyViewModel(f, editionsData));
         setFamilies(vms);
+        setEditions(editionsData);
         setMeta(familiesMeta);
-        const first = vms[0];
-        setActiveSlug(first.slug);
+
+        const groups = groupFamiliesBySource(vms);
+        setSourceGroups(groups);
+
+        // ── URL deep-link support ──
+        const urlFamily = searchParams.get("family")?.toLowerCase();
+        const urlMarket = searchParams.get("market")?.toLowerCase();
+
+        let targetGroup = groups[0];
+        let targetMarket = targetGroup.markets[0];
+
+        if (urlFamily) {
+          const matchedGroup = groups.find(
+            (g) => g.sourceSlug.toLowerCase() === urlFamily
+          );
+          if (matchedGroup) {
+            targetGroup = matchedGroup;
+            if (urlMarket) {
+              const matchedMarket = matchedGroup.markets.find(
+                (m) => m.marketSlug.toLowerCase() === urlMarket
+              );
+              if (matchedMarket) targetMarket = matchedMarket;
+              else targetMarket = matchedGroup.markets[0];
+            } else {
+              targetMarket = matchedGroup.markets[0];
+            }
+          }
+        }
+
+        setActiveSourceFamily(targetGroup.sourceSlug);
+        setActiveSlug(targetMarket.slug);
         setPhase("ready");
-        loadFamilyEntry(first.slug, first);
+        loadFamilyEntry(targetMarket.slug, targetMarket);
+
+        // Pre-load first market of every other family group for highlights
+        for (const group of groups) {
+          if (group.sourceSlug === targetGroup.sourceSlug) continue;
+          const firstMarket = group.markets[0];
+          if (firstMarket) {
+            loadFamilyEntry(firstMarket.slug, firstMarket);
+          }
+        }
       } catch (err) {
         if (cancelled) return;
         setPhase("error");
@@ -382,16 +516,54 @@ export default function ChartsDirectory() {
     let cancelled = false;
     (async () => {
       try {
-        const { data: familiesData, meta: familiesMeta } = await getChartFamilies();
+        const { data: { families: familiesData, editions: editionsData }, meta: familiesMeta } = await getChartFamilies();
         if (cancelled) return;
         if (familiesData.length === 0) { setPhase("empty"); return; }
-        const vms = familiesData.map((f) => toChartFamilyViewModel(f, []));
+        const vms = familiesData.map((f) => toChartFamilyViewModel(f, editionsData));
         setFamilies(vms);
+        setEditions(editionsData);
         setMeta(familiesMeta);
-        const first = vms[0];
-        setActiveSlug(first.slug);
+
+        const groups = groupFamiliesBySource(vms);
+        setSourceGroups(groups);
+
+        const urlFamily = searchParams.get("family")?.toLowerCase();
+        const urlMarket = searchParams.get("market")?.toLowerCase();
+
+        let targetGroup = groups[0];
+        let targetMarket = targetGroup.markets[0];
+
+        if (urlFamily) {
+          const matchedGroup = groups.find(
+            (g) => g.sourceSlug.toLowerCase() === urlFamily
+          );
+          if (matchedGroup) {
+            targetGroup = matchedGroup;
+            if (urlMarket) {
+              const matchedMarket = matchedGroup.markets.find(
+                (m) => m.marketSlug.toLowerCase() === urlMarket
+              );
+              if (matchedMarket) targetMarket = matchedMarket;
+              else targetMarket = matchedGroup.markets[0];
+            } else {
+              targetMarket = matchedGroup.markets[0];
+            }
+          }
+        }
+
+        setActiveSourceFamily(targetGroup.sourceSlug);
+        setActiveSlug(targetMarket.slug);
         setPhase("ready");
-        loadFamilyEntry(first.slug, first);
+        loadFamilyEntry(targetMarket.slug, targetMarket);
+
+        // Pre-load first market of every other family group for highlights
+        for (const group of groups) {
+          if (group.sourceSlug === targetGroup.sourceSlug) continue;
+          const firstMarket = group.markets[0];
+          if (firstMarket) {
+            loadFamilyEntry(firstMarket.slug, firstMarket);
+          }
+        }
       } catch (err) {
         if (cancelled) return;
         setPhase("error");
@@ -399,13 +571,35 @@ export default function ChartsDirectory() {
       }
     })();
     return () => { cancelled = true; };
-  }, [loadFamilyEntry]);
+  }, [loadFamilyEntry, searchParams]);
+
+  // ── compute merged entries from all cached families for highlights ──
+  const mergedHighlightEntries = useMemo(() => {
+    const seen = new Set<string>();
+    const merged: ChartEntryRowViewModel[] = [];
+    for (const key of Object.keys(cache)) {
+      const data = cache[key];
+      if (!data?.entries) continue;
+      for (const entry of data.entries) {
+        if (seen.has(entry.slug)) continue;
+        seen.add(entry.slug);
+        merged.push(entry);
+      }
+    }
+    return merged;
+  }, [cache]);
 
   // ── derived ──
   const activeFamily = useMemo(
-    () => families.find((f) => f.slug === activeSlug) ?? families[0] ?? null,
+    () => families.find((f) => f.slug === activeSlug) ?? null,
     [families, activeSlug]
   );
+
+  const activeGroup = useMemo(
+    () => sourceGroups.find((g) => g.sourceSlug === activeSourceFamily) ?? sourceGroups[0] ?? null,
+    [sourceGroups, activeSourceFamily]
+  );
+
   const activeData = cache[activeSlug];
   const activeEntries = activeData?.entries ?? [];
   const activeEdition = activeData?.edition ?? null;
@@ -430,16 +624,31 @@ export default function ChartsDirectory() {
     ? { backgroundImage: `url(${topTrack.artworkUrl})`, filter: "blur(90px) saturate(1.5)", transform: `scale(1.12) translateY(${scrollPos * 0.04}px)` }
     : { backgroundImage: `url(${HERO_FALLBACK})`, backgroundSize: "cover", backgroundPosition: "center" };
 
-  const handleTabClick = useCallback(
-    (slug: string) => {
-      if (slug === activeSlug) return;
-      setActiveSlug(slug);
-      if (!cache[slug]) {
-        const family = families.find((f) => f.slug === slug);
-        if (family) loadFamilyEntry(slug, family);
+  const handleSourceFamilyTab = useCallback(
+    (sourceSlug: string) => {
+      if (sourceSlug === activeSourceFamily) return;
+      const group = sourceGroups.find((g) => g.sourceSlug === sourceSlug);
+      if (!group) return;
+      const market = group.markets[0];
+      setActiveSourceFamily(sourceSlug);
+      setActiveSlug(market.slug);
+      if (!cache[market.slug]) {
+        loadFamilyEntry(market.slug, market);
       }
     },
-    [activeSlug, cache, families, loadFamilyEntry]
+    [activeSourceFamily, sourceGroups, cache, loadFamilyEntry]
+  );
+
+  const handleMarketSelect = useCallback(
+    (marketSlug: string) => {
+      if (marketSlug === activeSlug) return;
+      setActiveSlug(marketSlug);
+      if (!cache[marketSlug]) {
+        const market = activeGroup?.markets.find((m) => m.slug === marketSlug);
+        if (market) loadFamilyEntry(marketSlug, market);
+      }
+    },
+    [activeSlug, cache, activeGroup, loadFamilyEntry]
   );
 
   const handlePlayTop10 = useCallback(() => {
@@ -456,13 +665,14 @@ export default function ChartsDirectory() {
 
   const handleJumpTo = useCallback((slug: string) => {
     setHighlightedSlug(slug);
-    // slight delay so discovery panels can close first
     setTimeout(() => {
       document.getElementById(`entry-${slug}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
     }, 280);
-    // clear highlight after the scroll + glow animation
     setTimeout(() => setHighlightedSlug(null), 2600);
-  }, []); 
+  }, []);
+
+  const totalEditions = families.reduce((sum, f) => sum + (f.editionCount ?? 0), 0);
+  const totalEntries = families.reduce((sum, f) => sum + (f.entryCount ?? 0), 0);
 
   const metaLine = meta?.isStale
     ? `Cached (stale) · ${new Date(meta.fetchedAt).toLocaleString()}`
@@ -535,9 +745,6 @@ export default function ChartsDirectory() {
   }
 
   // ── render: main ──
-  const totalEditions = families.reduce((sum, f) => sum + (f.editionCount ?? 0), 0);
-  const totalEntries = families.reduce((sum, f) => sum + (f.entryCount ?? 0), 0);
-
   return (
     <div className="min-h-screen bg-[var(--wk-bg)]">
       {/* ═══════════════════════════════════════════
@@ -564,16 +771,23 @@ export default function ChartsDirectory() {
                 {activeEdition.date}
               </span>
             )}
+            {activeGroup && activeGroup.markets.length > 1 && (
+              <MarketSwitcher
+                markets={activeGroup.markets}
+                activeSlug={activeSlug}
+                onSelect={handleMarketSelect}
+              />
+            )}
           </div>
 
           {/* Title */}
           <h1 className="max-w-[780px] text-[clamp(36px,6.5vw,80px)] font-black leading-[0.90] tracking-[-0.055em] text-[var(--wk-text)]">
-            {activeFamily?.publicLabel ?? activeFamily?.label ?? "African Charts"}
+            {activeGroup?.label ?? activeFamily?.publicLabel ?? activeFamily?.label ?? "African Charts"}
           </h1>
 
           {/* Description */}
           <p className="mt-4 max-w-[540px] text-[14px] leading-relaxed text-[var(--wk-text-soft)] md:text-[15px]">
-            {activeFamily?.description || "The definitive index of African music — tracking what is rising, what has stayed, and what is breaking through across the continent."}
+            {activeGroup?.description || activeFamily?.description || "The definitive index of African music — tracking what is rising, what has stayed, and what is breaking through across the continent."}
           </p>
 
           {/* Meta pills */}
@@ -615,34 +829,64 @@ export default function ChartsDirectory() {
       </section>
 
       {/* ═══════════════════════════════════════════
-          CHART FAMILY TABS
+          CHART FAMILY TABS + MARKET SWITCHER
           ═══════════════════════════════════════════ */}
       <section className="sticky top-0 z-30 border-b border-[var(--wk-border)] bg-[var(--wk-bg)]/95 backdrop-blur-md">
         <div className="wk-container px-4 md:px-6">
-          <div className="flex gap-1 overflow-x-auto py-2 scrollbar-hide -mx-1 px-1">
-            {families.map((family) => {
-              const isActive = family.slug === activeSlug;
-              const data = cache[family.slug];
-              const count = data?.edition?.totalEntries ?? family.entryCount;
-              return (
-                <button
-                  key={family.slug}
-                  onClick={() => handleTabClick(family.slug)}
-                  className={`flex shrink-0 items-center gap-2 rounded-full px-3.5 py-2 text-[12px] font-bold transition-all duration-[var(--wk-d-fast)] whitespace-nowrap ${
-                    isActive
-                      ? "bg-[var(--wk-brand)] text-[var(--wk-brand-on)]"
-                      : "text-[var(--wk-text-muted)] hover:text-[var(--wk-text)] hover:bg-[var(--wk-surface-raised)]"
-                  }`}
-                >
-                  <i className={`${family.icon} text-[13px]`} />
-                  <span className="hidden sm:inline">{family.shortLabel ?? family.publicLabel}</span>
-                  <span className="sm:hidden">{family.shortLabel ?? family.publicLabel?.split(" ")[0] ?? family.slug}</span>
-                  <span className={`text-[10px] tabular-nums ${isActive ? "opacity-70" : "opacity-40"}`}>
-                    {count}
-                  </span>
-                </button>
-              );
-            })}
+          <div className="flex flex-col gap-1.5 py-2">
+            {/* Source family tabs */}
+            <div className="flex gap-1 overflow-x-auto scrollbar-hide -mx-1 px-1">
+              {sourceGroups.map((group) => {
+                const isActive = group.sourceSlug === activeSourceFamily;
+                const totalInGroup = group.markets.reduce((sum, m) => sum + (m.entryCount ?? 0), 0);
+                return (
+                  <button
+                    key={group.sourceSlug}
+                    onClick={() => handleSourceFamilyTab(group.sourceSlug)}
+                    className={`flex shrink-0 items-center gap-2 rounded-full px-3.5 py-2 text-[12px] font-bold transition-all duration-[var(--wk-d-fast)] whitespace-nowrap cursor-pointer ${
+                      isActive
+                        ? "bg-[var(--wk-brand)] text-[var(--wk-brand-on)]"
+                        : "text-[var(--wk-text-muted)] hover:text-[var(--wk-text)] hover:bg-[var(--wk-surface-raised)]"
+                    }`}
+                  >
+                    <i className={`${group.icon} text-[13px]`} />
+                    <span className="hidden sm:inline">{group.label}</span>
+                    <span className="sm:hidden">{group.label.split(" ")[0] ?? group.sourceSlug}</span>
+                    <span className={`text-[10px] tabular-nums ${isActive ? "opacity-70" : "opacity-40"}`}>
+                      {totalInGroup}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Market pills (only for families with multiple markets) */}
+            {activeGroup && activeGroup.markets.length > 1 && (
+              <div className="flex gap-1 overflow-x-auto scrollbar-hide -mx-1 px-1 pb-0.5">
+                {activeGroup.markets.map((m) => {
+                  const isActive = m.slug === activeSlug;
+                  const data = cache[m.slug];
+                  const count = data?.edition?.totalEntries ?? m.entryCount;
+                  return (
+                    <button
+                      key={m.slug}
+                      onClick={() => handleMarketSelect(m.slug)}
+                      className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-all duration-[var(--wk-d-fast)] whitespace-nowrap cursor-pointer ${
+                        isActive
+                          ? "bg-[var(--wk-brand-soft)] text-[var(--wk-brand)] border border-[var(--wk-brand)]/25"
+                          : "text-[var(--wk-text-muted)] hover:text-[var(--wk-text)] hover:bg-[var(--wk-surface-raised)] border border-transparent"
+                      }`}
+                    >
+                      <i className="ri-global-line text-[11px]" />
+                      {m.marketLabel}
+                      <span className={`text-[10px] tabular-nums ${isActive ? "opacity-60" : "opacity-40"}`}>
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       </section>
@@ -650,9 +894,9 @@ export default function ChartsDirectory() {
       {/* ═══════════════════════════════════════════
           WAYS INTO THE CHARTS
           ═══════════════════════════════════════════ */}
-      {activeEntries.length > 0 && (
+      {mergedHighlightEntries.length > 0 && (
         <ChartHighlights
-          entries={activeEntries}
+          entries={mergedHighlightEntries}
           onJumpTo={handleJumpTo}
         />
       )}
@@ -666,7 +910,7 @@ export default function ChartsDirectory() {
             <div className="wk-eyebrow mb-2">This Week</div>
             <h2 className="wk-h-section">Top {previewCount}</h2>
             <p className="mt-1 text-[13px] text-[var(--wk-text-muted)]">
-              {activeEdition?.date ?? ""} · Showing {previewCount} of {entryCount} positions
+              {activeEdition?.date ?? ""} · {activeFamily?.marketLabel ?? ""} · Showing {previewCount} of {entryCount} positions
             </p>
           </div>
           <div className="hidden md:flex items-center gap-2 text-[12px] text-[var(--wk-text-faint)]">
@@ -675,9 +919,16 @@ export default function ChartsDirectory() {
             <span className="inline-flex items-center gap-1"><i className="ri-star-smile-line text-[var(--wk-brand)]" /> New</span>
             <span className="inline-flex items-center gap-1"><i className="ri-refresh-line text-[var(--wk-info)]" /> Re</span>
           </div>
+          {/* Compact legend for mobile */}
+          <div className="flex md:hidden items-center gap-2 text-[10px] text-[var(--wk-text-faint)] shrink-0">
+            <span className="inline-flex items-center gap-0.5"><i className="ri-arrow-up-line text-[var(--wk-success)] text-[11px]" /></span>
+            <span className="inline-flex items-center gap-0.5"><i className="ri-arrow-down-line text-[var(--wk-danger)] text-[11px]" /></span>
+            <span className="inline-flex items-center gap-0.5"><i className="ri-star-smile-line text-[var(--wk-brand)] text-[11px]" /></span>
+            <span className="inline-flex items-center gap-0.5"><i className="ri-refresh-line text-[var(--wk-info)] text-[11px]" /></span>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_320px]">
+        <div className="grid grid-cols-1 gap-4 md:gap-5 lg:grid-cols-[1fr_320px]">
           {/* Leaderboard card */}
           <div className="overflow-hidden rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)]">
             {/* Column headers (desktop) */}
@@ -762,15 +1013,15 @@ export default function ChartsDirectory() {
           </div>
 
           {/* Sidebar */}
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-3 md:gap-4">
             {/* Quick stats */}
-            <div className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4">
+            <div className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-3.5 md:p-4">
               <div className="text-[11px] font-bold uppercase tracking-wider text-[var(--wk-text-faint)] mb-3">
                 Chart stats
               </div>
-              <div className="grid grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-2 gap-2 md:gap-2.5">
                 <StatTile value={entryCount} label="Positions" />
-                <StatTile value={families.length} label="Series" />
+                <StatTile value={sourceGroups.length} label="Families" />
                 <StatTile value={totalEditions} label="Editions" />
                 <StatTile value={newEntries.length} label="New" />
               </div>

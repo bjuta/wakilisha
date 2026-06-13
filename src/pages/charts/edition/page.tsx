@@ -32,6 +32,7 @@ import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 import { ChartRow } from "@/components/design-system/music/ChartRow";
 import { ArtistRolodex } from "@/pages/charts/directory/components/ArtistRolodex";
 import { SkeletonChartEdition } from "@/components/skeletons/Skeletons";
+import { trackUrl } from "@/utils/trackUrl";
 
 const rankTone = (rank: number) =>
   rank === 1 ? "gold" : rank === 2 ? "silver" : rank === 3 ? "bronze" : "";
@@ -335,7 +336,7 @@ export default function ChartEdition() {
         <div className="max-w-md mx-auto text-center px-6">
           <WkIcon name="BarChart3" size={42} className="mx-auto mb-4 text-[var(--wk-text-faint)]" />
           <h1 className="text-[24px] font-black tracking-[-.03em] text-[var(--wk-text)] mb-2">Chart not found</h1>
-          <p className="text-[14px] text-[var(--wk-text-muted)] mb-6">The chart series you are looking for does not exist.</p>
+          <p className="text-[14px] text-[var(--wk-text-muted)] mb-6">The chart family you are looking for does not exist.</p>
           <Link to="/charts" className="chart-hero-v2-cta">
             <i className="ri-arrow-left-line" /> Back to charts
           </Link>
@@ -352,7 +353,7 @@ export default function ChartEdition() {
           <WkIcon name="BarChart3" size={42} className="mx-auto mb-4 text-[var(--wk-text-faint)]" />
           <h1 className="text-[24px] font-black tracking-[-.03em] text-[var(--wk-text)] mb-2">Edition not found</h1>
           <p className="text-[14px] text-[var(--wk-text-muted)] mb-6">
-            The edition <code className="font-mono text-[12px] bg-[var(--wk-bg)] px-1 rounded">{editionSlug}</code> does not exist in the <strong>{state.familyLabel}</strong> series.
+            The edition <code className="font-mono text-[12px] bg-[var(--wk-bg)] px-1 rounded">{editionSlug}</code> does not exist in the <strong>{state.familyLabel}</strong> family.
           </p>
           <div className="flex items-center justify-center gap-3">
             {state.latestEditionSlug && (
@@ -470,7 +471,7 @@ export default function ChartEdition() {
           {/* Metadata pills */}
           <div className="chart-hero-v2-meta-strip">
             <span className="chart-hero-v2-meta-pill">
-              <span className="font-bold text-white/90">Series:</span> {edition.seriesLabel}
+              <span className="font-bold text-white/90">Family:</span> {edition.seriesLabel}
             </span>
             <span className="chart-hero-v2-meta-pill">
               <span className="font-bold text-white/90">Market:</span> {edition.marketLabel}
@@ -538,7 +539,7 @@ export default function ChartEdition() {
             <div className="chart-section-header">
               <div className="chart-section-eyebrow">Edition history</div>
               <h2 className="chart-section-title">Recent editions</h2>
-              <p className="chart-section-sub">Browse through previous editions of this chart series.</p>
+              <p className="chart-section-sub">Browse through previous editions of this chart family.</p>
             </div>
             <div className="chart-archive-carousel">
               {archive.latest && (
@@ -637,7 +638,7 @@ export default function ChartEdition() {
             {top3.map((entry, idx) => (
               <Link
                 key={`${entry.rank}-${entry.slug}`}
-                to={`/tracks/${entry.slug}`}
+                to={trackUrl(entry.slug, entry.artistSlugs)}
                 className="chart-podium-v2-card"
               >
                 <img src={entry.artworkUrl} alt="" className="chart-podium-v2-img" />
@@ -678,7 +679,7 @@ export default function ChartEdition() {
               {/* ── Biggest climber ── */}
               {biggestUpMover ? (
                 <Link
-                  to={`/tracks/${biggestUpMover.slug}`}
+                  to={trackUrl(biggestUpMover.slug, biggestUpMover.artistSlugs)}
                   className="chart-mover-card chart-mover-card--up"
                 >
                   <div className="chart-mover-card-badge chart-mover-card-badge--up">
@@ -737,7 +738,7 @@ export default function ChartEdition() {
               {/* ── Biggest fall ── */}
               {biggestDownMover ? (
                 <Link
-                  to={`/tracks/${biggestDownMover.slug}`}
+                  to={trackUrl(biggestDownMover.slug, biggestDownMover.artistSlugs)}
                   className="chart-mover-card chart-mover-card--down"
                 >
                   <div className="chart-mover-card-badge chart-mover-card-badge--down">
@@ -844,7 +845,7 @@ export default function ChartEdition() {
                 {newEntries.map((entry) => (
                   <Link
                     key={`new-${entry.rank}-${entry.slug}`}
-                    to={`/tracks/${entry.slug}`}
+                    to={trackUrl(entry.slug, entry.artistSlugs)}
                     className="chart-sidebox-v2-row"
                   >
                     <span className="chart-sidebox-v2-row-metric">NEW</span>
@@ -869,7 +870,7 @@ export default function ChartEdition() {
                 {climbers.map((entry) => (
                   <Link
                     key={`climb-${entry.rank}-${entry.slug}`}
-                    to={`/tracks/${entry.slug}`}
+                    to={trackUrl(entry.slug, entry.artistSlugs)}
                     className="chart-sidebox-v2-row"
                   >
                     <span className="chart-sidebox-v2-row-metric">+{entry.movementAmount ?? 0}</span>
