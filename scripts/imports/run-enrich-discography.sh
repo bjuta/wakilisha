@@ -17,7 +17,7 @@ export WP_DB_USER="bn_wordpress"
 export WP_DB_PASSWORD="2364074f9404d1cd2215f9759d1ddc198d04fa6aaffc7d61fb98f1422c4eb0b"
 export WP_DB_NAME="bitnami_wordpress"
 export WP_DB_PREFIX="wp_"
-export WP_DB_SOCKET="/opt/bitnami/mysql/tmp/mysql.sock"
+export WP_DB_SOCKET="/opt/bitnami/mariadb/tmp/mysql.sock"
 
 # ── Run ───────────────────────────────────────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
