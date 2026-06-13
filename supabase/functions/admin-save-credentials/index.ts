@@ -4,11 +4,17 @@ const ALLOWED_ORIGINS = [
   "https://wakilisha.africa",
   "https://www.wakilisha.africa",
   "https://staging.wakilisha.africa",
+  "https://readdy.cc",
+  "https://www.readdy.cc",
+  "http://localhost:5173",
+  "http://localhost:3000",
 ];
 
 function corsHeaders(req: Request): Record<string, string> {
   const origin = req.headers.get("Origin") ?? "";
-  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  // Also allow any *.readdy.cc subdomain for preview builds
+  const isReaddyPreview = origin.endsWith(".readdy.cc") || origin === "https://readdy.cc";
+  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) || isReaddyPreview ? origin : ALLOWED_ORIGINS[0];
   return {
     "Access-Control-Allow-Origin": allowedOrigin,
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",

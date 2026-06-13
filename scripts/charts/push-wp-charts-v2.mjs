@@ -137,6 +137,7 @@ async function main() {
           peak_position: null,
           is_new_entry: (item.carry_forward_only === 1) ? 0 : (item.previous_position == null ? 1 : 0),
           is_re_entry: (item.continuity_locked === 1 ? 0 : 0),
+          source_count: outSources.length > 0 ? outSources.length : (item.source_count != null ? Number(item.source_count) : 0),
           track: {
             id: Number(item.track_id || 0),
             title: trackTitle,
@@ -167,6 +168,7 @@ async function main() {
       name: c(ch.title),
       slug: c(ch.slug),
       status: "published",
+      chart_size: ch.chart_size != null ? Number(ch.chart_size) : 20,
       chart_type: c(ch.provider),
       editions: outEds,
     });

@@ -71,11 +71,9 @@ serve(async (req: Request) => {
 
       const tbl = (n: string) => `\`${prefix}${n}\``;
 
-      // ---- Pull all charts ----
       const chartRows = await client.execute(`SELECT id, name, slug, status, chart_type FROM ${tbl("wkcharts_charts")}`);
       const charts = chartRows.rows as Array<Record<string, unknown>>;
 
-      // ---- Pull all editions ----
       const edRows = await client.execute(`SELECT id, chart_id, title, slug, status, edition_date FROM ${tbl("wkcharts_editions")} ORDER BY edition_date DESC`);
       const editionsByChart = new Map<number, Array<Record<string, unknown>>>();
       for (const ed of edRows.rows as Array<Record<string, unknown>>) {
@@ -84,7 +82,6 @@ serve(async (req: Request) => {
         editionsByChart.get(cid)!.push(ed);
       }
 
-      // ---- Pull all edition items ----
       const itemRows = await client.execute(`SELECT id, edition_id, rank, previous_rank, weeks_on_chart, peak_position, is_new_entry, is_re_entry, track_id FROM ${tbl("wkcharts_edition_items")} ORDER BY rank ASC`);
       const itemsByEdition = new Map<number, Array<Record<string, unknown>>>();
       const allTrackIds = new Set<number>();
@@ -95,7 +92,6 @@ serve(async (req: Request) => {
         if (item.track_id != null) allTrackIds.add(Number(item.track_id));
       }
 
-      // ---- Pull all tracks ----
       const trackIds = [...allTrackIds];
       let tracksById = new Map<number, Record<string, unknown>>();
       if (trackIds.length > 0) {
@@ -106,7 +102,6 @@ serve(async (req: Request) => {
         }
       }
 
-      // ---- Pull all artists ----
       const allArtistIds = new Set<number>();
       for (const t of tracksById.values()) { if (t.artist_id != null) allArtistIds.add(Number(t.artist_id)); }
       const artistIds = [...allArtistIds];
@@ -119,7 +114,6 @@ serve(async (req: Request) => {
         }
       }
 
-      // ---- Pull track sources ----
       let sourcesByTrack = new Map<number, Array<Record<string, unknown>>>();
       if (trackIds.length > 0) {
         const placeholders = trackIds.map(() => "?").join(",");
@@ -133,7 +127,6 @@ serve(async (req: Request) => {
 
       await client.close();
 
-      // ---- Build v2 payload ----
       const seriesSet = new Map<string, { series_slug: string; series_label: string }>();
       const marketsSet = new Map<string, Record<string, unknown>>();
       const programs: Record<string, unknown>[] = [];
@@ -257,7 +250,6 @@ serve(async (req: Request) => {
         }
       }
 
-      // ---- Write to v2 tables ----
       const errors: string[] = [];
       const inserted: Record<string, number> = {};
 
@@ -277,14 +269,28 @@ serve(async (req: Request) => {
         const { error } = await supabase.from("wk_chart_editions_v2").upsert(editions, { onConflict: "id" });
         if (error) errors.push("editions: " + error.message); else inserted.editions = editions.length;
       }
+
+      // FIXED: continue on batch failure instead of breaking the entire import loop
       if (entries.length > 0) {
+        let entryFailures = 0;
         for (let i = 0; i < entries.length; i += 200) {
           const batch = entries.slice(i, i + 200);
           const { error } = await supabase.from("wk_chart_entries_v2").upsert(batch, { onConflict: "id" });
-          if (error) { errors.push("entries batch " + i + ": " + error.message); break; }
+          if (error) {
+            errors.push("entries batch " + i + ": " + error.message);
+            entryFailures++;
+            console.error("Batch " + i + " failed: " + error.message);
+            continue;
+          }
         }
-        if (!errors.some((e) => e.startsWith("entries"))) inserted.entries = entries.length;
+        if (entryFailures === 0) {
+          inserted.entries = entries.length;
+        } else {
+          inserted.entries = entries.length;
+          errors.push("entries: " + entryFailures + " batch(es) failed, entries may be incomplete");
+        }
       }
+
       if (coverage.length > 0) {
         const { error } = await supabase.from("wk_chart_source_coverage_v2").upsert(coverage, { onConflict: "id" });
         if (error) errors.push("coverage: " + error.message); else inserted.coverage = coverage.length;

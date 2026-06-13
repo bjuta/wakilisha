@@ -497,7 +497,7 @@ Deno.serve(async (req) => {
     else if (path === "/charts" || path === "/charts/") {
       const { data: programs } = await supabase
         .from("wk_chart_programs_v2")
-        .select("id, public_slug, public_label, series_slug, market_slug, chart_size, default_period_type, default_methodology_version")
+        .select("id, public_slug, public_label, source_family_slug, series_slug, market_slug, chart_size, default_period_type, default_methodology_version")
         .order("public_label", { ascending: true });
 
       const programsWithEditions = await Promise.all((programs ?? []).map(async (p: any) => {
@@ -517,7 +517,7 @@ Deno.serve(async (req) => {
           publicSlug: String(p.public_slug),
           publicLabel: String(p.public_label),
           shortLabel: String(p.public_label),
-          sourceFamilySlug: String(p.public_slug),
+          sourceFamilySlug: String(p.source_family_slug || p.public_slug),
           seriesSlug: String(p.series_slug || ""),
           seriesLabel: String(p.series_slug || ""),
           marketSlug: String(p.market_slug || ""),
@@ -544,7 +544,7 @@ Deno.serve(async (req) => {
         const slug = segments[0];
         const { data: program } = await supabase
           .from("wk_chart_programs_v2")
-          .select("id, public_slug, public_label, series_slug, market_slug, chart_size, default_period_type, default_methodology_version")
+          .select("id, public_slug, public_label, source_family_slug, series_slug, market_slug, chart_size, default_period_type, default_methodology_version")
           .eq("public_slug", slug)
           .maybeSingle();
 
@@ -564,7 +564,7 @@ Deno.serve(async (req) => {
         data = {
           program: {
             id: String(program.id), publicSlug: String(program.public_slug), publicLabel: String(program.public_label), shortLabel: String(program.public_label),
-            sourceFamilySlug: String(program.public_slug), seriesSlug: String(program.series_slug || ""), seriesLabel: String(program.series_slug || ""),
+            sourceFamilySlug: String(program.source_family_slug || program.public_slug), seriesSlug: String(program.series_slug || ""), seriesLabel: String(program.series_slug || ""),
             marketSlug: String(program.market_slug || ""), marketLabel: String(program.market_slug || ""),
             periodType: String(program.default_period_type || "weekly"), methodologyVersion: String(program.default_methodology_version || "legacy-import-v1"), eligibilityRulesVersion: "legacy-import-v1",
             latestEdition,
@@ -578,13 +578,13 @@ Deno.serve(async (req) => {
 
         const { data: program } = await supabase
           .from("wk_chart_programs_v2")
-          .select("id, public_slug, public_label, series_slug, market_slug, chart_size, default_period_type, default_methodology_version")
+          .select("id, public_slug, public_label, source_family_slug, series_slug, market_slug, chart_size, default_period_type, default_methodology_version")
           .eq("public_slug", slug)
           .maybeSingle();
 
         if (!program) return jsonResponse({ error: "Not found" }, 404);
 
-        const programVM = { id: String(program.id), publicSlug: String(program.public_slug), publicLabel: String(program.public_label), seriesSlug: String(program.series_slug || ""), seriesLabel: String(program.series_slug || ""), marketSlug: String(program.market_slug || ""), marketLabel: String(program.market_slug || "") };
+        const programVM = { id: String(program.id), publicSlug: String(program.public_slug), publicLabel: String(program.public_label), seriesSlug: String(program.series_slug || ""), seriesLabel: String(program.series_slug || ""), marketSlug: String(program.market_slug || ""), marketLabel: String(program.market_slug || ""), sourceFamilySlug: String(program.source_family_slug || program.public_slug) };
 
         if (second === "latest") {
           const { data: editions } = await supabase
@@ -617,7 +617,7 @@ Deno.serve(async (req) => {
 
         const { data: program } = await supabase
           .from("wk_chart_programs_v2")
-          .select("id, public_slug, public_label, series_slug, market_slug")
+          .select("id, public_slug, public_label, series_slug, market_slug, source_family_slug")
           .eq("public_slug", slug)
           .maybeSingle();
 

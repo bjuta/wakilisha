@@ -1,15 +1,22 @@
-// chart-ingest-api v11 — Vault-backed Apple key reads, locked CORS, capability checks, safe errors
+// chart-ingest-api v14 — Fixed CORS to allow readdy.cc preview domains
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
 const ALLOWED_ORIGINS = [
   "https://wakilisha.africa",
   "https://www.wakilisha.africa",
   "https://staging.wakilisha.africa",
+  "https://readdy.ai",
+  "https://readdy.cc",
+  "https://www.readdy.cc",
+  "http://localhost:5173",
+  "http://localhost:3000",
 ];
 
 function corsHeaders(req: Request): Record<string, string> {
   const origin = req.headers.get("Origin") ?? "";
-  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  // Also allow any *.readdy.cc subdomain for preview builds
+  const isReaddyPreview = origin.endsWith(".readdy.cc") || origin === "https://readdy.cc";
+  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) || isReaddyPreview ? origin : ALLOWED_ORIGINS[0];
   return {
     "Access-Control-Allow-Origin": allowedOrigin,
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -33,12 +40,12 @@ function json(req: Request, body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders(req), "Content-Type": "application/json" } });
 }
 
-function safeError(action: string, err: unknown): Response {
+function safeError(req: Request, action: string, err: unknown): Response {
   const m = err instanceof Error ? err.message : String(err);
   console.error(`[chart-ingest-api] ${action} error:`, m);
   return new Response(JSON.stringify({ error: "internal_error", requestId: crypto.randomUUID().slice(0, 12) }), {
     status: 500,
-    headers: { ...corsHeaders(new Request("http://localhost")), "Content-Type": "application/json" },
+    headers: { ...corsHeaders(req), "Content-Type": "application/json" },
   });
 }
 
@@ -49,7 +56,7 @@ async function requireCapability(
   requiredCapability: string,
 ): Promise<void> {
   const { data: rows } = await db.from("user_role_assignments")
-    .select("role_key, role_definitions!inner(capabilities)")
+    .select("role_key, role_definitions!inner(role_capabilities(capability_key))")
     .eq("user_id", userId)
     .eq("status", "active")
     .or("expires_at.is.null,expires_at.gt.now()");
@@ -58,8 +65,9 @@ async function requireCapability(
   }
   const allCaps = new Set<string>();
   for (const r of rows) {
-    const caps = (r.role_definitions as { capabilities?: string[] } | null)?.capabilities ?? [];
-    for (const c of caps) allCaps.add(c);
+    const roleDef = (r.role_definitions as { role_capabilities?: Array<{ capability_key: string }> } | null);
+    const caps = roleDef?.role_capabilities ?? [];
+    for (const c of caps) allCaps.add(c.capability_key);
   }
   if (!allCaps.has(requiredCapability) && !allCaps.has("admin_god_mode")) {
     throw Object.assign(new Error(`Missing capability: ${requiredCapability}`), { status: 403 });
@@ -124,39 +132,40 @@ Deno.serve(async (req) => {
   }
 
   try {
-    if (action === "create_dry_run") return handleCreateDryRun(db, params, user);
-    if (action === "list_runs") return handleListRuns(db, params);
-    if (action === "get_run") return handleGetRun(db, params);
-    if (action === "get_stages") return handleGetStages(db, params);
-    if (action === "get_sources") return handleGetSources(db, params);
-    if (action === "get_candidates") return handleGetCandidates(db, params);
-    if (action === "get_normalized") return handleGetNormalized(db, params);
-    if (action === "normalize_run") return handleNormalizeRun(db, params, user);
-    if (action === "source_fetch") return handleSourceFetch(db, params, user);
-    if (action === "run_eligibility") return handleRunEligibility(db, params, user);
-    if (action === "run_carry_forward") return handleRunCarryForward(db, params, user);
-    if (action === "run_scoring") return handleRunScoring(db, params, user);
-    if (action === "run_shortlist") return handleRunShortlist(db, params, user);
-    if (action === "run_airplay_detection") return handleRunAirplayDetection(db, params, user);
-    if (action === "cancel_run") return handleCancelRun(db, params, user);
-    if (action === "retry_run") return handleRetryRun(db, params, user);
-    if (action === "reset_pipeline") return handleResetPipeline(db, params, user);
-    if (action === "preflight") return handlePreflight(db, params);
-    if (action === "get_kpis") return handleGetKpis(db);
-    if (action === "get_activity") return handleGetActivity(db);
-    if (action === "get_resource_guard") return handleGetResourceGuard(db, params);
-    if (action === "send_gaps_to_review") return handleSendGapsToReview(db, params, user);
-    if (action === "apply_row_decision") return handleApplyRowDecision(db, params, user);
-    if (action === "get_review_issues") return handleGetReviewIssues(db, params);
-    if (action === "get_matches_for_run") return handleGetMatchesForRun(db, params);
-    if (action === "validate_commit") return handleValidateCommit(db, params);
-    if (action === "commit_run") return handleCommitRun(db, params, user);
-    if (action === "csv_upload") return handleCsvUpload(db, params, user);
-    if (action === "csv_list") return handleCsvList(db, params);
-    if (action === "csv_normalize") return handleCsvNormalize(db, params, user);
+    // v14: All handlers now receive the real Request so CORS headers match the caller's origin
+    if (action === "create_dry_run") return handleCreateDryRun(req, db, params, user);
+    if (action === "list_runs") return handleListRuns(req, db, params);
+    if (action === "get_run") return handleGetRun(req, db, params);
+    if (action === "get_stages") return handleGetStages(req, db, params);
+    if (action === "get_sources") return handleGetSources(req, db, params);
+    if (action === "get_candidates") return handleGetCandidates(req, db, params);
+    if (action === "get_normalized") return handleGetNormalized(req, db, params);
+    if (action === "normalize_run") return handleNormalizeRun(req, db, params, user);
+    if (action === "source_fetch") return handleSourceFetch(req, db, params, user);
+    if (action === "run_eligibility") return handleRunEligibility(req, db, params, user);
+    if (action === "run_carry_forward") return handleRunCarryForward(req, db, params, user);
+    if (action === "run_scoring") return handleRunScoring(req, db, params, user);
+    if (action === "run_shortlist") return handleRunShortlist(req, db, params, user);
+    if (action === "run_airplay_detection") return handleRunAirplayDetection(req, db, params, user);
+    if (action === "cancel_run") return handleCancelRun(req, db, params, user);
+    if (action === "retry_run") return handleRetryRun(req, db, params, user);
+    if (action === "reset_pipeline") return handleResetPipeline(req, db, params, user);
+    if (action === "preflight") return handlePreflight(req, db, params);
+    if (action === "get_kpis") return handleGetKpis(req, db);
+    if (action === "get_activity") return handleGetActivity(req, db);
+    if (action === "get_resource_guard") return handleGetResourceGuard(req, db, params);
+    if (action === "send_gaps_to_review") return handleSendGapsToReview(req, db, params, user);
+    if (action === "apply_row_decision") return handleApplyRowDecision(req, db, params, user);
+    if (action === "get_review_issues") return handleGetReviewIssues(req, db, params);
+    if (action === "get_matches_for_run") return handleGetMatchesForRun(req, db, params);
+    if (action === "validate_commit") return handleValidateCommit(req, db, params);
+    if (action === "commit_run") return handleCommitRun(req, db, params, user);
+    if (action === "csv_upload") return handleCsvUpload(req, db, params, user);
+    if (action === "csv_list") return handleCsvList(req, db, params);
+    if (action === "csv_normalize") return handleCsvNormalize(req, db, params, user);
     return json(req, { error: `unknown_action: ${action}` }, 400);
   } catch (err) {
-    return safeError(action, err);
+    return safeError(req, action, err);
   }
 });
 
@@ -184,7 +193,7 @@ function stripBracketedContent(text: string): string {
   return result;
 }
 const FEAT_PATTERNS: RegExp[] = [
-  /\b(?:feat|featuring|ft)\s*\.?\s+(?:(?!\b(?:remix|edit|mix|version|radio|acoustic|instrumental|live|extended|original)\b)[^\s,;:&]+(?:\s+(?:(?!\b(?:remix|edit|mix|version|radio|acoustic|instrumental|live|extended|original)\b)[^\s,;:&]+))*)/gi,
+  /\b(?:feat|featuring|ft)\s*\.?\s+(?:(?!\b(?:remix|edit|mix|version|radio|acoustic|instrumental|live|extended|original)\b)[^\s,;:&]+(?:\s+(?:(?!\b(?:remix|edit|mix|version|radio|acoustic|instrumental|live|extended|original)\b)[^\s,;:&]+))*)*/gi,
 ];
 function stripFeaturing(text: string): string {
   let result = text;
@@ -202,9 +211,9 @@ function normalizeCore(text: string): string {
   result = stripBracketedContent(result);
   result = stripFeaturing(result);
   result = result.replace(/[\u2010-\u2015\u2018\u2019\u201A\u201B\u2032\u2035\u2212\u2E3A\u2E3B]/g, " ");
-  result = result.replace(/[-–—‒―•·‧]/g, " ");
+  result = result.replace(/[-\u2013\u2014\u2012\u2015\u2022\u00B7\u2027]/g, " ");
   result = result.replace(/[\/\\|]/g, " ");
-  result = result.replace(/[!"#$%&'()*+,./:;<=>?@\[\]^_`{|}~¡¢£¤¥¦§¨©ª«¬®¯°±²³´µ¶·¸¹º»¼½¾¿×÷]/g, " ");
+  result = result.replace(/[!"#$%&'()*+,./:;<=>?@\[\]^_`{|}~\u00A1\u00A2\u00A3\u00A4\u00A5\u00A6\u00A7\u00A8\u00A9\u00AA\u00AB\u00AC\u00AE\u00AF\u00B0\u00B1\u00B2\u00B3\u00B4\u00B5\u00B6\u00B7\u00B8\u00B9\u00BA\u00BB\u00BC\u00BD\u00BE\u00BF\u00D7\u00F7]/g, " ");
   result = collapseWhitespace(result);
   return result;
 }
@@ -304,52 +313,25 @@ function computeCandidateProvisionalScore(
 interface ProviderTrack { title: string; artist: string; release_date: string | null; isrc: string | null; source_position: number; provider_track_id: string | null; provider_release_id: string | null; provider_artist_ids: string[]; artwork_url: string | null; external_url: string | null; preview_url: string | null; raw_payload: unknown; }
 interface ProviderFetchResult { tracks: ProviderTrack[]; warnings: string[]; error: string | null; }
 
-/**
- * Read a credential from the most secure available store.
- * Priority: Edge Function env secret → Supabase Vault → admin_settings_secrets table.
- */
 async function readCredential(db: ReturnType<typeof createClient> | null, envVar: string, dbKey: string): Promise<string | null> {
-  // 1. Edge Function secret (highest priority)
   const ev = Deno.env.get(envVar);
   if (ev && ev.trim()) return ev.trim();
-
-  // 2. Supabase Vault (encrypted at rest) — for Apple Music private key
   if (envVar === "APPLE_MUSIC_PRIVATE_KEY") {
     try {
       const vaultRes = await fetch(
         `${SUPABASE_URL}/rest/v1/rpc/create_secret`,
-        {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${SERVICE_KEY}`,
-            "Content-Type": "application/json",
-            "apikey": SERVICE_KEY,
-          },
-          body: JSON.stringify({ _read_only_check: true }),
-        },
+        { method: "POST", headers: { "Authorization": `Bearer ${SERVICE_KEY}`, "Content-Type": "application/json", "apikey": SERVICE_KEY }, body: JSON.stringify({ _read_only_check: true }) },
       );
-      // Vault RPC exists — now query decrypted_secrets
       const decRes = await fetch(
         `${SUPABASE_URL}/rest/v1/vault/decrypted_secrets?select=decrypted_secret&name=eq.apple_music_private_key&limit=1`,
-        {
-          headers: {
-            "Authorization": `Bearer ${SERVICE_KEY}`,
-            "apikey": SERVICE_KEY,
-          },
-        },
+        { headers: { "Authorization": `Bearer ${SERVICE_KEY}`, "apikey": SERVICE_KEY } },
       );
       if (decRes.ok) {
         const decData = await decRes.json() as Array<{ decrypted_secret: string }>;
-        if (decData.length > 0 && decData[0].decrypted_secret?.trim()) {
-          return decData[0].decrypted_secret.trim();
-        }
+        if (decData.length > 0 && decData[0].decrypted_secret?.trim()) return decData[0].decrypted_secret.trim();
       }
-    } catch {
-      // Vault unavailable — fall through to table
-    }
+    } catch { /* fall through */ }
   }
-
-  // 3. admin_settings_secrets table (legacy fallback)
   if (!db) return null;
   try {
     const { data: row } = await db.from("admin_settings_secrets").select("setting_value").eq("setting_key", dbKey).maybeSingle();
@@ -362,7 +344,7 @@ async function fetchSpotifySource(sourceUrl: string, market: string, maxRows: nu
   const clientId = await readCredential(db, "SPOTIFY_CLIENT_ID", "spotify_client_id");
   const clientSecret = await readCredential(db, "SPOTIFY_CLIENT_SECRET", "spotify_client_secret");
   const spotifyMarket = (await readCredential(db, "SPOTIFY_MARKET", "spotify_market")) || market;
-  if (!clientId || !clientSecret) return { tracks: [], warnings: [], error: "Spotify credentials not configured. Set SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET in edge function secrets, or save them via Settings → Integrations." };
+  if (!clientId || !clientSecret) return { tracks: [], warnings: [], error: "Spotify credentials not configured. Set SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET in edge function secrets, or save them via Settings \u2192 Integrations." };
   const tokenRes = await fetch("https://accounts.spotify.com/api/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded", Authorization: `Basic ${btoa(`${clientId}:${clientSecret}`)}` }, body: "grant_type=client_credentials" });
   if (!tokenRes.ok) { const eb = await tokenRes.text(); return { tracks: [], warnings: [], error: `Spotify auth failed (${tokenRes.status}): ${eb.slice(0, 200)}` }; }
   const tokenData = await tokenRes.json() as { access_token: string };
@@ -410,7 +392,7 @@ async function fetchAppleMusicSource(sourceUrl: string, market: string, maxRows:
     if (!privateKey) m.push("APPLE_MUSIC_PRIVATE_KEY");
     if (!teamId) m.push("APPLE_TEAM_ID");
     if (!musicKeyId) m.push("APPLE_MUSIC_KEY_ID");
-    return { tracks: [], warnings: [], error: `Apple Music credentials missing: ${m.join(", ")}. Set in edge function secrets or Settings → Integrations.` };
+    return { tracks: [], warnings: [], error: `Apple Music credentials missing: ${m.join(", ")}. Set in edge function secrets or Settings \u2192 Integrations.` };
   }
   let dt: string;
   try { dt = await createAppleMusicJWT(privateKey, teamId, musicKeyId); }
@@ -527,82 +509,80 @@ function anchorToMonday(dateStr: string): string {
   return d.toISOString().split("T")[0];
 }
 
-// ═══════ Handler stubs — these contain the full implementations from the previous version ═══════
+// ═══════ Handler stubs — v14: all handlers now receive req: Request as first parameter for correct CORS ═══════
 
-async function handleCreateDryRun(db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) {
-  const req = params.request as Record<string, unknown>; if (!req) return json(new Request("http://localhost"), { error: "request_required" }, 400);
-  const runId = crypto.randomUUID(); const ed = req.editionDate as string; const sUrls = (req.sourceUrls as string[]) || [];
-  const { error: rErr } = await db.from("chart_ingest_runs").insert({ id: runId, program_id: (req.existingSeriesId as string) || "unknown", series_slug: (req.existingSeriesId as string) || null, market_slug: (req.market as string) || "KE", chart_kind: (req.chartKind as string) || "tracks", edition_date: ed, period_start: ed, period_end: ed, chart_size: (req.chartSize as number) || 20, status: "queued", rule_snapshot_json: { chartTitle: req.chartTitle, chartSlug: req.chartSlug, coverStyle: req.coverStyle || "default", saveAsRecurringSeries: req.saveAsRecurringSeries || false, methodologyVersion: req.methodologyVersion || "1.0.0" }, market_scope_snapshot_json: (req.marketScopeSnapshot as object) || {}, eligibility_profile_id: (req.eligibilityProfileId as string) || null, market_scope_id: (req.marketScopeId as string) || null, scoring_policy_version: "1.0.1", source_policy_version: "1.0.0", eligibility_policy_version: "1.0.0", methodology_version: (req.methodologyVersion as string) || "1.0.0", created_by: user.id, created_by_email: user.email || null });
-  if (rErr) return json(new Request("http://localhost"), { error: "run_create_failed", detail: rErr.message }, 500);
-  if (sUrls.length > 0) { const srs = sUrls.map((url, i) => ({ run_id: runId, provider: detectProvider(url), source_type: url.endsWith(".csv") ? "csv" : "playlist", source_url: url, storefront_or_market: (req.market as string) || "KE", enabled: true, priority: i, fetch_status: "pending" })); await db.from("chart_ingest_run_sources").insert(srs); }
+async function handleCreateDryRun(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) {
+  const rq = params.request as Record<string, unknown>; if (!rq) return json(req, { error: "request_required" }, 400);
+  const runId = crypto.randomUUID(); const ed = rq.editionDate as string; const sUrls = (rq.sourceUrls as string[]) || [];
+  const { error: rErr } = await db.from("chart_ingest_runs").insert({ id: runId, program_id: (rq.existingSeriesId as string) || "unknown", series_slug: (rq.existingSeriesId as string) || null, market_slug: (rq.market as string) || "KE", chart_kind: (rq.chartKind as string) || "tracks", edition_date: ed, period_start: ed, period_end: ed, chart_size: (rq.chartSize as number) || 20, status: "queued", rule_snapshot_json: { chartTitle: rq.chartTitle, chartSlug: rq.chartSlug, coverStyle: rq.coverStyle || "default", saveAsRecurringSeries: rq.saveAsRecurringSeries || false, methodologyVersion: rq.methodologyVersion || "1.0.0" }, market_scope_snapshot_json: (rq.marketScopeSnapshot as object) || {}, eligibility_profile_id: (rq.eligibilityProfileId as string) || null, market_scope_id: (rq.marketScopeId as string) || null, scoring_policy_version: "1.0.1", source_policy_version: "1.0.0", eligibility_policy_version: "1.0.0", methodology_version: (rq.methodologyVersion as string) || "1.0.0", created_by: user.id, created_by_email: user.email || null });
+  if (rErr) return json(req, { error: "run_create_failed", detail: rErr.message }, 500);
+  if (sUrls.length > 0) { const srs = sUrls.map((url, i) => ({ run_id: runId, provider: detectProvider(url), source_type: url.endsWith(".csv") ? "csv" : "playlist", source_url: url, storefront_or_market: (rq.market as string) || "KE", enabled: true, priority: i, fetch_status: "pending" })); await db.from("chart_ingest_run_sources").insert(srs); }
   const sgs = ALL_STAGES.map(s => ({ run_id: runId, stage: s, status: "idle", metrics_json: {} })); await db.from("chart_ingest_stage_events").insert(sgs);
   await db.from("chart_ingest_audit_events").insert({ run_id: runId, actor: user.id, actor_email: user.email || null, action: "run_created", new_status: "queued", payload_json: { sourceCount: sUrls.length } });
-  return json(new Request("http://localhost"), { runId, status: "queued" });
+  return json(req, { runId, status: "queued" });
 }
 
-async function handleListRuns(db: ReturnType<typeof createClient>, params: Record<string, unknown>) {
+async function handleListRuns(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>) {
   const limit = Math.min((params.limit as number) || 100, 200);
   const { data: runs, error } = await db.from("chart_ingest_runs").select("*").order("created_at", { ascending: false }).limit(limit);
-  if (error) return json(new Request("http://localhost"), { error: error.message }, 500);
+  if (error) return json(req, { error: error.message }, 500);
   const rl = runs || [];
   if (rl.length > 0) {
     const rids = rl.map((r: { id: string }) => r.id);
     const [sr, sg] = await Promise.all([db.from("chart_ingest_run_sources").select("*").in("run_id", rids).order("priority"), db.from("chart_ingest_stage_events").select("*").in("run_id", rids).order("created_at")]);
     const sbm = new Map<string, unknown[]>(); for (const s of (sr.data || [])) { const rid = s.run_id as string; if (!sbm.has(rid)) sbm.set(rid, []); sbm.get(rid)!.push(s); }
     const stm = new Map<string, unknown[]>(); for (const s of (sg.data || [])) { const rid = s.run_id as string; if (!stm.has(rid)) stm.set(rid, []); stm.get(rid)!.push(s); }
-    return json(new Request("http://localhost"), { runs: rl.map((r: { id: string }) => ({ ...r, chart_ingest_run_sources: sbm.get(r.id) || [], chart_ingest_stage_events: stm.get(r.id) || [] })) });
+    return json(req, { runs: rl.map((r: { id: string }) => ({ ...r, chart_ingest_run_sources: sbm.get(r.id) || [], chart_ingest_stage_events: stm.get(r.id) || [] })) });
   }
-  return json(new Request("http://localhost"), { runs: [] });
+  return json(req, { runs: [] });
 }
 
-async function handleGetRun(db: ReturnType<typeof createClient>, params: Record<string, unknown>) {
-  const { runId } = params as { runId: string }; if (!runId) return json(new Request("http://localhost"), { error: "runId_required" }, 400);
+async function handleGetRun(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>) {
+  const { runId } = params as { runId: string }; if (!runId) return json(req, { error: "runId_required" }, 400);
   const { data: run, error } = await db.from("chart_ingest_runs").select("*").eq("id", runId).maybeSingle();
-  if (error) return json(new Request("http://localhost"), { error: error.message }, 500); if (!run) return json(new Request("http://localhost"), { error: "run_not_found" }, 404);
+  if (error) return json(req, { error: error.message }, 500); if (!run) return json(req, { error: "run_not_found" }, 404);
   const [sr, sg] = await Promise.all([db.from("chart_ingest_run_sources").select("*").eq("run_id", runId).order("priority"), db.from("chart_ingest_stage_events").select("*").eq("run_id", runId).order("created_at")]);
   const [t1, t2, t3, t4] = await Promise.all([db.from("chart_ingest_candidates").select("*", { count: "exact", head: true }).eq("run_id", runId), db.from("chart_ingest_candidates").select("*", { count: "exact", head: true }).eq("run_id", runId).eq("status", "eligible"), db.from("chart_ingest_candidates").select("*", { count: "exact", head: true }).eq("run_id", runId).eq("status", "needs_review"), db.from("chart_ingest_candidates").select("*", { count: "exact", head: true }).eq("run_id", runId).eq("status", "excluded")]);
-  return json(new Request("http://localhost"), { run: { ...run, chart_ingest_run_sources: sr.data || [], chart_ingest_stage_events: sg.data || [], candidateCounts: { total: t1.count || 0, eligible: t2.count || 0, needsReview: t3.count || 0, excluded: t4.count || 0 } } });
+  return json(req, { run: { ...run, chart_ingest_run_sources: sr.data || [], chart_ingest_stage_events: sg.data || [], candidateCounts: { total: t1.count || 0, eligible: t2.count || 0, needsReview: t3.count || 0, excluded: t4.count || 0 } } });
 }
 
-// ═══════ Remaining handler stubs (unchanged from v10) ═══════
+async function handleGetStages(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>) { const { runId } = params as { runId: string }; const { data, error } = await db.from("chart_ingest_stage_events").select("*").eq("run_id", runId).order("created_at"); if (error) return json(req, { error: error.message }, 500); return json(req, { stages: data || [] }); }
+async function handleGetSources(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>) { const { runId } = params as { runId: string }; const { data, error } = await db.from("chart_ingest_run_sources").select("*").eq("run_id", runId).order("priority"); if (error) return json(req, { error: error.message }, 500); return json(req, { sources: data || [] }); }
+async function handleGetCandidates(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>) { const { runId, status, limit = 200 } = params as { runId: string; status?: string; limit?: number }; let q = db.from("chart_ingest_candidates").select("*").eq("run_id", runId).limit(Math.min(limit, 500)); if (status) q = q.eq("status", status); const { data, error } = await q; if (error) return json(req, { error: error.message }, 500); const cs = data || []; if (cs.length > 0) { const cids = cs.map((c: { id: string }) => c.id); const [sc, mc] = await Promise.all([db.from("chart_ingest_candidate_scores").select("*").in("candidate_id", cids), db.from("chart_ingest_matches").select("*").in("candidate_id", cids)]); const sbc = new Map<string, unknown[]>(); for (const s of (sc.data || [])) { const cid = s.candidate_id as string; if (!sbc.has(cid)) sbc.set(cid, []); sbc.get(cid)!.push(s); } const mbc = new Map<string, unknown[]>(); for (const m of (mc.data || [])) { const cid = m.candidate_id as string; if (!mbc.has(cid)) mbc.set(cid, []); mbc.get(cid)!.push(m); } return json(req, { candidates: cs.map((c: { id: string }) => ({ ...c, chart_ingest_candidate_scores: sbc.get(c.id) || [], chart_ingest_matches: mbc.get(c.id) || [] })) }); } return json(req, { candidates: [] }); }
+async function handleGetReviewIssues(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>) { const { runId, candidateId, status: issueStatus } = params as { runId?: string; candidateId?: string; status?: string }; let q = db.from("chart_ingest_review_issues").select("*").order("created_at", { ascending: false }); if (runId) q = q.eq("run_id", runId); if (candidateId) q = q.eq("candidate_id", candidateId); if (issueStatus) q = q.eq("status", issueStatus); const { data, error } = await q; if (error) return json(req, { error: error.message }, 500); return json(req, { review_issues: data || [] }); }
+async function handleGetMatchesForRun(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>) { const { runId, candidateId } = params as { runId?: string; candidateId?: string }; let q = db.from("chart_ingest_matches").select("*").order("created_at", { ascending: false }); if (runId) q = q.eq("run_id", runId); if (candidateId) q = q.eq("candidate_id", candidateId); const { data, error } = await q; if (error) return json(req, { error: error.message }, 500); return json(req, { matches: data || [] }); }
+async function handleGetNormalized(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>) { const { runId } = params as { runId: string }; if (!runId) return json(req, { error: "runId_required" }, 400); const { data, error } = await db.from("chart_ingest_normalized_rows").select("*").eq("run_id", runId).order("created_at"); if (error) return json(req, { error: error.message }, 500); return json(req, { normalized_rows: data || [] }); }
+async function handleGetKpis(req: Request, db: ReturnType<typeof createClient>) { const wa = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(); const { count: etw } = await db.from("chart_ingest_runs").select("*", { count: "exact", head: true }).in("status", ["committed", "published"]).gte("committed_at", wa); const { count: rar } = await db.from("chart_ingest_candidates").select("*", { count: "exact", head: true }).eq("status", "needs_review"); return json(req, { editionsThisWeek: etw || 0, canonicalMatchRate: 0, rowsAwaitingReview: rar || 0, averageRunTimeMs: 0 }); }
+async function handleGetActivity(req: Request, db: ReturnType<typeof createClient>) { const { data: events } = await db.from("chart_ingest_audit_events").select("*").in("action", ["run_created", "run_committed", "edition_published", "run_cancelled"]).order("created_at", { ascending: false }).limit(20); const activity = (events || []).map((e: Record<string, unknown>) => ({ id: e.id, type: e.action === "run_committed" ? "commit" : e.action === "run_cancelled" ? "cancel" : "dry_run", chartTitle: `Run ${(e.run_id as string).slice(0, 8)}`, runId: e.run_id, status: (e.new_status as string) || "unknown", actor: (e.actor_email as string) || (e.actor as string) || "Unknown", createdAt: e.created_at })); return json(req, { activity }); }
+async function handleGetResourceGuard(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>) { const { runId } = params as { runId: string }; const { data: sources } = await db.from("chart_ingest_run_sources").select("provider").eq("run_id", runId).eq("enabled", true); const sc = sources?.length || 0; const { count: ar } = await db.from("chart_ingest_runs").select("*", { count: "exact", head: true }).eq("status", "running"); return json(req, { sourceCount: sc, providerBudgetRemaining: Math.max(0, 100 - sc * 10), workerConcurrency: 4, estimatedRowCount: sc * 100, duplicateRunWarning: (ar || 0) > 0 ? "Another run is currently active." : null, sameEditionDateWarning: null }); }
+async function handleSendGapsToReview(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { const { runId } = params as { runId: string }; await db.from("chart_ingest_runs").update({ status: "needs_review", updated_at: new Date().toISOString() }).eq("id", runId).in("status", ["dry_run_complete", "ready_to_commit"]); return json(req, { ok: true }); }
+async function handleCancelRun(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { const { runId } = params as { runId: string }; const { data: run, error: le } = await db.from("chart_ingest_runs").select("status").eq("id", runId).maybeSingle(); if (le) return json(req, { error: le.message }, 500); if (!run) return json(req, { error: "run_not_found" }, 404); if (!["draft", "queued", "running", "needs_review", "dry_run_complete"].includes(run.status)) return json(req, { error: "cannot_cancel" }, 400); await db.from("chart_ingest_runs").update({ status: "cancelled", error_message: "Cancelled by admin", updated_at: new Date().toISOString() }).eq("id", runId); return json(req, { ok: true, status: "cancelled" }); }
+async function handleRetryRun(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { const { runId } = params as { runId: string }; const { data: run, error: le } = await db.from("chart_ingest_runs").select("status").eq("id", runId).maybeSingle(); if (le) return json(req, { error: le.message }, 500); if (!run) return json(req, { error: "run_not_found" }, 404); if (!["failed", "cancelled", "source_fetch_failed"].includes(run.status)) return json(req, { error: "cannot_retry" }, 400); await db.from("chart_ingest_runs").update({ status: "queued", error_code: null, error_message: null, updated_at: new Date().toISOString() }).eq("id", runId); await db.from("chart_ingest_stage_events").update({ status: "idle", started_at: null, finished_at: null, duration_ms: null, message: null, error_code: null, error_message: null }).eq("run_id", runId); return json(req, { ok: true, status: "queued" }); }
+async function handlePreflight(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>) { const { programId, editionDate, sources } = params as { programId: string; editionDate: string; sources?: Array<{ provider: string; sourceUrl?: string }> }; const blockers: Array<{ code: string; message: string }> = []; const warnings: Array<{ code: string; message: string }> = []; const es = (sources || []).filter(s => s.sourceUrl); if (es.length === 0) blockers.push({ code: "no_enabled_sources", message: "At least one enabled source URL required." }); if (!programId) blockers.push({ code: "unknown_program", message: "program_id required." }); if (!editionDate) blockers.push({ code: "missing_edition_date", message: "edition_date required." }); if (es.length === 1) warnings.push({ code: "single_source_only", message: "Only one source." }); return json(req, { ok: blockers.length === 0, blockers, warnings, estimates: { sourceCount: es.length, expectedProviderRequests: es.length, expectedRowCap: es.length * 100 } }); }
+async function handleValidateCommit(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>) { const { runId } = params as { runId: string }; const { data: run } = await db.from("chart_ingest_runs").select("*").eq("id", runId).maybeSingle(); if (!run) return json(req, { canCommit: false, errors: [{ code: "run_not_found", message: "Run not found" }], warnings: [] }); const errors: Array<{ code: string; message: string }> = []; if (!["dry_run_complete", "ready_to_commit", "needs_review"].includes(run.status)) errors.push({ code: "commit_not_ready", message: `Run status '${run.status}' not committable.` }); const { count: cc } = await db.from("chart_ingest_candidates").select("*", { count: "exact", head: true }).eq("run_id", runId); if (!cc) errors.push({ code: "no_candidates", message: "No candidates exist." }); return json(req, { canCommit: errors.length === 0, errors, warnings: [] }); }
 
-async function handleGetStages(db: ReturnType<typeof createClient>, params: Record<string, unknown>) { const { runId } = params as { runId: string }; const { data, error } = await db.from("chart_ingest_stage_events").select("*").eq("run_id", runId).order("created_at"); if (error) return json(new Request("http://localhost"), { error: error.message }, 500); return json(new Request("http://localhost"), { stages: data || [] }); }
-async function handleGetSources(db: ReturnType<typeof createClient>, params: Record<string, unknown>) { const { runId } = params as { runId: string }; const { data, error } = await db.from("chart_ingest_run_sources").select("*").eq("run_id", runId).order("priority"); if (error) return json(new Request("http://localhost"), { error: error.message }, 500); return json(new Request("http://localhost"), { sources: data || [] }); }
-async function handleGetCandidates(db: ReturnType<typeof createClient>, params: Record<string, unknown>) { const { runId, status, limit = 200 } = params as { runId: string; status?: string; limit?: number }; let q = db.from("chart_ingest_candidates").select("*").eq("run_id", runId).limit(Math.min(limit, 500)); if (status) q = q.eq("status", status); const { data, error } = await q; if (error) return json(new Request("http://localhost"), { error: error.message }, 500); const cs = data || []; if (cs.length > 0) { const cids = cs.map((c: { id: string }) => c.id); const [sc, mc] = await Promise.all([db.from("chart_ingest_candidate_scores").select("*").in("candidate_id", cids), db.from("chart_ingest_matches").select("*").in("candidate_id", cids)]); const sbc = new Map<string, unknown[]>(); for (const s of (sc.data || [])) { const cid = s.candidate_id as string; if (!sbc.has(cid)) sbc.set(cid, []); sbc.get(cid)!.push(s); } const mbc = new Map<string, unknown[]>(); for (const m of (mc.data || [])) { const cid = m.candidate_id as string; if (!mbc.has(cid)) mbc.set(cid, []); mbc.get(cid)!.push(m); } return json(new Request("http://localhost"), { candidates: cs.map((c: { id: string }) => ({ ...c, chart_ingest_candidate_scores: sbc.get(c.id) || [], chart_ingest_matches: mbc.get(c.id) || [] })) }); } return json(new Request("http://localhost"), { candidates: [] }); }
-async function handleGetReviewIssues(db: ReturnType<typeof createClient>, params: Record<string, unknown>) { const { runId, candidateId, status } = params as { runId?: string; candidateId?: string; status?: string }; let q = db.from("chart_ingest_review_issues").select("*").order("created_at", { ascending: false }); if (runId) q = q.eq("run_id", runId); if (candidateId) q = q.eq("candidate_id", candidateId); if (status) q = q.eq("status", status); const { data, error } = await q; if (error) return json(new Request("http://localhost"), { error: error.message }, 500); return json(new Request("http://localhost"), { review_issues: data || [] }); }
-async function handleGetMatchesForRun(db: ReturnType<typeof createClient>, params: Record<string, unknown>) { const { runId, candidateId } = params as { runId?: string; candidateId?: string }; let q = db.from("chart_ingest_matches").select("*").order("created_at", { ascending: false }); if (runId) q = q.eq("run_id", runId); if (candidateId) q = q.eq("candidate_id", candidateId); const { data, error } = await q; if (error) return json(new Request("http://localhost"), { error: error.message }, 500); return json(new Request("http://localhost"), { matches: data || [] }); }
-async function handleGetNormalized(db: ReturnType<typeof createClient>, params: Record<string, unknown>) { const { runId } = params as { runId: string }; if (!runId) return json(new Request("http://localhost"), { error: "runId_required" }, 400); const { data, error } = await db.from("chart_ingest_normalized_rows").select("*").eq("run_id", runId).order("created_at"); if (error) return json(new Request("http://localhost"), { error: error.message }, 500); return json(new Request("http://localhost"), { normalized_rows: data || [] }); }
-async function handleGetKpis(db: ReturnType<typeof createClient>) { const wa = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(); const { count: etw } = await db.from("chart_ingest_runs").select("*", { count: "exact", head: true }).in("status", ["committed", "published"]).gte("committed_at", wa); const { count: rar } = await db.from("chart_ingest_candidates").select("*", { count: "exact", head: true }).eq("status", "needs_review"); return json(new Request("http://localhost"), { editionsThisWeek: etw || 0, canonicalMatchRate: 0, rowsAwaitingReview: rar || 0, averageRunTimeMs: 0 }); }
-async function handleGetActivity(db: ReturnType<typeof createClient>) { const { data: events } = await db.from("chart_ingest_audit_events").select("*").in("action", ["run_created", "run_committed", "edition_published", "run_cancelled"]).order("created_at", { ascending: false }).limit(20); const activity = (events || []).map((e: Record<string, unknown>) => ({ id: e.id, type: e.action === "run_committed" ? "commit" : e.action === "run_cancelled" ? "cancel" : "dry_run", chartTitle: `Run ${(e.run_id as string).slice(0, 8)}`, runId: e.run_id, status: (e.new_status as string) || "unknown", actor: (e.actor_email as string) || (e.actor as string) || "Unknown", createdAt: e.created_at })); return json(new Request("http://localhost"), { activity }); }
-async function handleGetResourceGuard(db: ReturnType<typeof createClient>, params: Record<string, unknown>) { const { runId } = params as { runId: string }; const { data: sources } = await db.from("chart_ingest_run_sources").select("provider").eq("run_id", runId).eq("enabled", true); const sc = sources?.length || 0; const { count: ar } = await db.from("chart_ingest_runs").select("*", { count: "exact", head: true }).eq("status", "running"); return json(new Request("http://localhost"), { sourceCount: sc, providerBudgetRemaining: Math.max(0, 100 - sc * 10), workerConcurrency: 4, estimatedRowCount: sc * 100, duplicateRunWarning: (ar || 0) > 0 ? "Another run is currently active." : null, sameEditionDateWarning: null }); }
-async function handleSendGapsToReview(db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { const { runId } = params as { runId: string }; await db.from("chart_ingest_runs").update({ status: "needs_review", updated_at: new Date().toISOString() }).eq("id", runId).in("status", ["dry_run_complete", "ready_to_commit"]); return json(new Request("http://localhost"), { ok: true }); }
-async function handleCancelRun(db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { const { runId } = params as { runId: string }; const { data: run, error: le } = await db.from("chart_ingest_runs").select("status").eq("id", runId).maybeSingle(); if (le) return json(new Request("http://localhost"), { error: le.message }, 500); if (!run) return json(new Request("http://localhost"), { error: "run_not_found" }, 404); if (!["draft", "queued", "running", "needs_review", "dry_run_complete"].includes(run.status)) return json(new Request("http://localhost"), { error: "cannot_cancel" }, 400); await db.from("chart_ingest_runs").update({ status: "cancelled", error_message: "Cancelled by admin", updated_at: new Date().toISOString() }).eq("id", runId); return json(new Request("http://localhost"), { ok: true, status: "cancelled" }); }
-async function handleRetryRun(db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { const { runId } = params as { runId: string }; const { data: run, error: le } = await db.from("chart_ingest_runs").select("status").eq("id", runId).maybeSingle(); if (le) return json(new Request("http://localhost"), { error: le.message }, 500); if (!run) return json(new Request("http://localhost"), { error: "run_not_found" }, 404); if (!["failed", "cancelled", "source_fetch_failed"].includes(run.status)) return json(new Request("http://localhost"), { error: "cannot_retry" }, 400); await db.from("chart_ingest_runs").update({ status: "queued", error_code: null, error_message: null, updated_at: new Date().toISOString() }).eq("id", runId); await db.from("chart_ingest_stage_events").update({ status: "idle", started_at: null, finished_at: null, duration_ms: null, message: null, error_code: null, error_message: null }).eq("run_id", runId); return json(new Request("http://localhost"), { ok: true, status: "queued" }); }
-async function handlePreflight(db: ReturnType<typeof createClient>, params: Record<string, unknown>) { const { programId, editionDate, sources } = params as { programId: string; editionDate: string; sources?: Array<{ provider: string; sourceUrl?: string }> }; const blockers: Array<{ code: string; message: string }> = []; const warnings: Array<{ code: string; message: string }> = []; const es = (sources || []).filter(s => s.sourceUrl); if (es.length === 0) blockers.push({ code: "no_enabled_sources", message: "At least one enabled source URL required." }); if (!programId) blockers.push({ code: "unknown_program", message: "program_id required." }); if (!editionDate) blockers.push({ code: "missing_edition_date", message: "edition_date required." }); if (es.length === 1) warnings.push({ code: "single_source_only", message: "Only one source." }); return json(new Request("http://localhost"), { ok: blockers.length === 0, blockers, warnings, estimates: { sourceCount: es.length, expectedProviderRequests: es.length, expectedRowCap: es.length * 100 } }); }
-async function handleValidateCommit(db: ReturnType<typeof createClient>, params: Record<string, unknown>) { const { runId } = params as { runId: string }; const { data: run } = await db.from("chart_ingest_runs").select("*").eq("id", runId).maybeSingle(); if (!run) return json(new Request("http://localhost"), { canCommit: false, errors: [{ code: "run_not_found", message: "Run not found" }], warnings: [] }); const errors: Array<{ code: string; message: string }> = []; if (!["dry_run_complete", "ready_to_commit", "needs_review"].includes(run.status)) errors.push({ code: "commit_not_ready", message: `Run status '${run.status}' not committable.` }); const { count: cc } = await db.from("chart_ingest_candidates").select("*", { count: "exact", head: true }).eq("run_id", runId); if (!cc) errors.push({ code: "no_candidates", message: "No candidates exist." }); return json(new Request("http://localhost"), { canCommit: errors.length === 0, errors, warnings: [] }); }
-
-async function handleNormalizeRun(db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) {
-  const { runId } = params as { runId: string }; if (!runId) return json(new Request("http://localhost"), { error: "runId_required" }, 400);
+async function handleNormalizeRun(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) {
+  const { runId } = params as { runId: string }; if (!runId) return json(req, { error: "runId_required" }, 400);
   const ss = Date.now();
-  const { data: run } = await db.from("chart_ingest_runs").select("id,status").eq("id", runId).maybeSingle(); if (!run) return json(new Request("http://localhost"), { error: "run_not_found" }, 404);
+  const { data: run } = await db.from("chart_ingest_runs").select("id,status").eq("id", runId).maybeSingle(); if (!run) return json(req, { error: "run_not_found" }, 404);
   await db.from("chart_ingest_normalized_rows").delete().eq("run_id", runId);
   await db.from("chart_ingest_stage_events").update({ status: "running", started_at: new Date().toISOString(), message: null, error_code: null, error_message: null }).eq("run_id", runId).eq("stage", "normalize");
   const { data: rawRows } = await db.from("chart_ingest_raw_rows").select("*").eq("run_id", runId).order("created_at");
   if (!rawRows || rawRows.length === 0) {
     const d = Date.now() - ss;
     await db.from("chart_ingest_stage_events").update({ status: "completed", finished_at: new Date().toISOString(), duration_ms: d, message: "No raw rows.", metrics_json: { rawCount: 0, uniqueCount: 0, dedupedCount: 0 } }).eq("run_id", runId).eq("stage", "normalize");
-    return json(new Request("http://localhost"), { ok: true, runId, stage: "normalize", rawCount: 0, uniqueCount: 0, dedupedCount: 0 });
+    return json(req, { ok: true, runId, stage: "normalize", rawCount: 0, uniqueCount: 0, dedupedCount: 0 });
   }
-  return json(new Request("http://localhost"), { ok: true, runId, stage: "normalize", rawCount: rawRows.length, uniqueCount: rawRows.length, dedupedCount: 0 });
+  return json(req, { ok: true, runId, stage: "normalize", rawCount: rawRows.length, uniqueCount: rawRows.length, dedupedCount: 0 });
 }
 
-async function handleSourceFetch(db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) {
-  const { runId } = params as { runId: string }; if (!runId) return json(new Request("http://localhost"), { error: "runId_required" }, 400);
-  const { data: run } = await db.from("chart_ingest_runs").select("id,status,edition_date,chart_size").eq("id", runId).maybeSingle(); if (!run) return json(new Request("http://localhost"), { error: "run_not_found" }, 404);
+async function handleSourceFetch(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) {
+  const { runId } = params as { runId: string }; if (!runId) return json(req, { error: "runId_required" }, 400);
+  const { data: run } = await db.from("chart_ingest_runs").select("id,status,edition_date,chart_size").eq("id", runId).maybeSingle(); if (!run) return json(req, { error: "run_not_found" }, 404);
   await db.from("chart_ingest_raw_rows").delete().eq("run_id", runId);
   await db.from("chart_ingest_stage_events").update({ status: "running", started_at: new Date().toISOString(), message: null, error_code: null, error_message: null }).eq("run_id", runId).eq("stage", "source_fetch");
   const { data: sources } = await db.from("chart_ingest_run_sources").select("*").eq("run_id", runId).eq("enabled", true).order("priority");
-  if (!sources || sources.length === 0) { const d = Date.now(); await db.from("chart_ingest_stage_events").update({ status: "completed", finished_at: new Date().toISOString(), duration_ms: d, message: "No enabled sources.", metrics_json: { sourceCount: 0, rawRowCount: 0 } }).eq("run_id", runId).eq("stage", "source_fetch"); return json(new Request("http://localhost"), { ok: true, runId, stage: "source_fetch", sourceCount: 0, rawRowCount: 0 }); }
+  if (!sources || sources.length === 0) { const d = Date.now(); await db.from("chart_ingest_stage_events").update({ status: "completed", finished_at: new Date().toISOString(), duration_ms: d, message: "No enabled sources.", metrics_json: { sourceCount: 0, rawRowCount: 0 } }).eq("run_id", runId).eq("stage", "source_fetch"); return json(req, { ok: true, runId, stage: "source_fetch", sourceCount: 0, rawRowCount: 0 }); }
   const ed = (run.edition_date as string) || new Date().toISOString().split("T")[0]; const cs = (run.chart_size as number) || 20;
   let trr = 0, tfs = 0; const aw: string[] = []; const srs: Array<{ sourceId: string; fetchedCount: number; droppedCount: number; provider: string; warnings: string[]; error: string | null }> = [];
   for (const source of sources) {
@@ -619,15 +599,15 @@ async function handleSourceFetch(db: ReturnType<typeof createClient>, params: Re
   const d = Date.now(); const sm = trr > 0 ? `${trr} raw rows from ${sources.length - tfs}/${sources.length} source(s)` : `All sources failed. Check credentials.`;
   await db.from("chart_ingest_stage_events").update({ status: trr > 0 ? "completed" : "failed", finished_at: new Date().toISOString(), duration_ms: d, message: sm, metrics_json: { sourceCount: sources.length, rawRowCount: trr, failedSourceCount: tfs, sourceResults: srs } }).eq("run_id", runId).eq("stage", "source_fetch");
   if (trr > 0) { await db.from("chart_ingest_stage_events").update({ status: "completed", finished_at: new Date().toISOString(), duration_ms: 1, message: "Raw rows persisted.", metrics_json: { rawRowCount: trr } }).eq("run_id", runId).eq("stage", "raw_persist"); await db.from("chart_ingest_runs").update({ status: "running", updated_at: new Date().toISOString() }).eq("id", runId); }
-  else { await db.from("chart_ingest_runs").update({ status: "source_fetch_failed", error_code: "all_sources_failed", error_message: "Configure credentials in Settings → Integrations.", updated_at: new Date().toISOString() }).eq("id", runId); }
-  return json(new Request("http://localhost"), { ok: trr > 0, runId, stage: "source_fetch", sourceCount: sources.length, rawRowCount: trr, failedSourceCount: tfs, sourceResults: srs, durationMs: d });
+  else { await db.from("chart_ingest_runs").update({ status: "source_fetch_failed", error_code: "all_sources_failed", error_message: "Configure credentials in Settings \u2192 Integrations.", updated_at: new Date().toISOString() }).eq("id", runId); }
+  return json(req, { ok: trr > 0, runId, stage: "source_fetch", sourceCount: sources.length, rawRowCount: trr, failedSourceCount: tfs, sourceResults: srs, durationMs: d });
 }
 
-async function handleRunCarryForward(db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) {
-  const { runId } = params as { runId: string }; if (!runId) return json(new Request("http://localhost"), { error: "runId_required" }, 400);
+async function handleRunCarryForward(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) {
+  const { runId } = params as { runId: string }; if (!runId) return json(req, { error: "runId_required" }, 400);
   const ss = Date.now();
   const { data: run } = await db.from("chart_ingest_runs").select("id,status,edition_date,chart_size,program_id,series_slug,market_slug").eq("id", runId).maybeSingle();
-  if (!run) return json(new Request("http://localhost"), { error: "run_not_found" }, 404);
+  if (!run) return json(req, { error: "run_not_found" }, 404);
   await db.from("chart_ingest_stage_events").update({ status: "running", started_at: new Date().toISOString(), message: null, error_code: null, error_message: null }).eq("run_id", runId).eq("stage", "carry_forward");
   const editionDate = (run.edition_date as string) || new Date().toISOString().split("T")[0];
   const programId = (run.program_id as string) || "unknown";
@@ -654,7 +634,7 @@ async function handleRunCarryForward(db: ReturnType<typeof createClient>, params
     console.error("[carry_forward] prev edition lookup failed:", err instanceof Error ? err.message : String(err));
     const d = Date.now() - ss;
     await db.from("chart_ingest_stage_events").update({ status: "completed", finished_at: new Date().toISOString(), duration_ms: d, message: `Previous edition lookup failed — no carry-forward candidates created.`, metrics_json: { previousEditionFound: false, carryForwardCount: 0, freshEvidenceCount: freshKeys.size, skippedExistingCount: 0 } }).eq("run_id", runId).eq("stage", "carry_forward");
-    return json(new Request("http://localhost"), { ok: true, runId, stage: "carry_forward", carryForwardCount: 0, freshEvidenceCount: freshKeys.size, previousEditionFound: false, durationMs: d });
+    return json(req, { ok: true, runId, stage: "carry_forward", carryForwardCount: 0, freshEvidenceCount: freshKeys.size, previousEditionFound: false, durationMs: d });
   }
   if (previousEntryMetas.length > 0) {
     const now = new Date().toISOString();
@@ -670,7 +650,7 @@ async function handleRunCarryForward(db: ReturnType<typeof createClient>, params
         console.error("[carry_forward] insert error:", ie.message);
         const d = Date.now() - ss;
         await db.from("chart_ingest_stage_events").update({ status: "failed", finished_at: new Date().toISOString(), duration_ms: d, message: `Candidate insert failed: ${ie.message}`, error_code: "carry_forward_insert_failed", error_message: ie.message }).eq("run_id", runId).eq("stage", "carry_forward");
-        return json(new Request("http://localhost"), { error: "carry_forward_insert_failed", detail: ie.message }, 500);
+        return json(req, { error: "carry_forward_insert_failed", detail: ie.message }, 500);
       }
     }
     carryForwardCount = createdCandidates.length;
@@ -678,20 +658,20 @@ async function handleRunCarryForward(db: ReturnType<typeof createClient>, params
   const d = Date.now() - ss;
   const msg = carryForwardCount > 0 ? `${carryForwardCount} carry-forward candidates created from previous edition. ${skippedCount} previous entries had fresh evidence this week.` : `No carry-forward candidates needed — ${skippedCount} previous entries had fresh evidence, ${freshKeys.size} fresh candidates this week.`;
   await db.from("chart_ingest_stage_events").update({ status: "completed", finished_at: new Date().toISOString(), duration_ms: d, message: msg, metrics_json: { previousEditionFound: true, previousEntryCount: previousEntryMetas.length + skippedCount, carryForwardCount, freshEvidenceCount: freshKeys.size, skippedExistingCount: skippedCount } }).eq("run_id", runId).eq("stage", "carry_forward");
-  return json(new Request("http://localhost"), { ok: true, runId, stage: "carry_forward", carryForwardCount, freshEvidenceCount: freshKeys.size, previousEntryCount: previousEntryMetas.length + skippedCount, skippedExistingCount: skippedCount, previousEditionFound: true, durationMs: d });
+  return json(req, { ok: true, runId, stage: "carry_forward", carryForwardCount, freshEvidenceCount: freshKeys.size, previousEntryCount: previousEntryMetas.length + skippedCount, skippedExistingCount: skippedCount, previousEditionFound: true, durationMs: d });
 }
 
-async function handleRunEligibility(db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) {
-  const { runId } = params as { runId: string }; if (!runId) return json(new Request("http://localhost"), { error: "runId_required" }, 400);
+async function handleRunEligibility(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) {
+  const { runId } = params as { runId: string }; if (!runId) return json(req, { error: "runId_required" }, 400);
   const ss = Date.now();
   const { data: run } = await db.from("chart_ingest_runs").select("id,status,edition_date,chart_size,program_id,series_slug").eq("id", runId).maybeSingle();
-  if (!run) return json(new Request("http://localhost"), { error: "run_not_found" }, 404);
+  if (!run) return json(req, { error: "run_not_found" }, 404);
   await db.from("chart_ingest_stage_events").update({ status: "running", started_at: new Date().toISOString(), message: null, error_code: null, error_message: null }).eq("run_id", runId).eq("stage", "eligibility_execution");
   const { data: candidates } = await db.from("chart_ingest_candidates").select("*").eq("run_id", runId);
   if (!candidates || candidates.length === 0) {
     const d = Date.now() - ss;
     await db.from("chart_ingest_stage_events").update({ status: "completed", finished_at: new Date().toISOString(), duration_ms: d, message: "No candidates to evaluate.", metrics_json: { candidateCount: 0, eligibleCount: 0, excludedCount: 0 } }).eq("run_id", runId).eq("stage", "eligibility_execution");
-    return json(new Request("http://localhost"), { ok: true, runId, candidateCount: 0, excludedCount: 0, inputRowCount: 0, durationMs: d });
+    return json(req, { ok: true, runId, candidateCount: 0, excludedCount: 0, inputRowCount: 0, durationMs: d });
   }
   const now = new Date().toISOString();
   const eligible: string[] = [];
@@ -723,14 +703,14 @@ async function handleRunEligibility(db: ReturnType<typeof createClient>, params:
   }
   const d = Date.now() - ss;
   await db.from("chart_ingest_stage_events").update({ status: "completed", finished_at: new Date().toISOString(), duration_ms: d, message: `${eligible.length} eligible, ${excluded.length} excluded from ${candidates.length} total.`, metrics_json: { candidateCount: candidates.length, eligibleCount: eligible.length, excludedCount: excluded.length } }).eq("run_id", runId).eq("stage", "eligibility_execution");
-  return json(new Request("http://localhost"), { ok: true, runId, candidateCount: candidates.length, excludedCount: excluded.length, inputRowCount: candidates.length, durationMs: d });
+  return json(req, { ok: true, runId, candidateCount: candidates.length, excludedCount: excluded.length, inputRowCount: candidates.length, durationMs: d });
 }
 
-async function handleRunScoring(db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) {
-  const { runId } = params as { runId: string }; if (!runId) return json(new Request("http://localhost"), { error: "runId_required" }, 400);
+async function handleRunScoring(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) {
+  const { runId } = params as { runId: string }; if (!runId) return json(req, { error: "runId_required" }, 400);
   const ss = Date.now();
   const { data: run } = await db.from("chart_ingest_runs").select("*").eq("id", runId).maybeSingle();
-  if (!run) return json(new Request("http://localhost"), { error: "run_not_found" }, 404);
+  if (!run) return json(req, { error: "run_not_found" }, 404);
   await db.from("chart_ingest_stage_events").update({ status: "running", started_at: new Date().toISOString(), message: null, error_code: null, error_message: null }).eq("run_id", runId).eq("stage", "methodology_scoring");
   const editionDate = (run.edition_date as string) || new Date().toISOString().split("T")[0];
   const chartSize = (run.chart_size as number) || 20;
@@ -739,7 +719,7 @@ async function handleRunScoring(db: ReturnType<typeof createClient>, params: Rec
   if (!candidates || candidates.length === 0) {
     const d = Date.now() - ss;
     await db.from("chart_ingest_stage_events").update({ status: "completed", finished_at: new Date().toISOString(), duration_ms: d, message: "No eligible candidates to score.", metrics_json: { scoredCount: 0, overflowCount: 0, airplayTrackCount: 0 } }).eq("run_id", runId).eq("stage", "methodology_scoring");
-    return json(new Request("http://localhost"), { ok: true, runId, stage: "methodology_scoring", scoredCount: 0, overflowCount: 0, airplayTrackCount: 0, durationMs: d });
+    return json(req, { ok: true, runId, stage: "methodology_scoring", scoredCount: 0, overflowCount: 0, airplayTrackCount: 0, durationMs: d });
   }
   let previousMap = new Map<string, number>();
   try {
@@ -792,24 +772,24 @@ async function handleRunScoring(db: ReturnType<typeof createClient>, params: Rec
   }
   await db.from("chart_ingest_candidate_scores").delete().eq("run_id", runId);
   const SCH = 200;
-  for (let j = 0; j < scoreRows.length; j += SCH) { const chunk = scoreRows.slice(j, j + SCH); if (chunk.length === 0) continue; const { error: ie } = await db.from("chart_ingest_candidate_scores").insert(chunk); if (ie) { console.error("[run_scoring] insert error:", ie.message); const d = Date.now() - ss; await db.from("chart_ingest_stage_events").update({ status: "failed", finished_at: new Date().toISOString(), duration_ms: d, message: `Score insert failed: ${ie.message}`, error_code: "score_insert_failed", error_message: ie.message }).eq("run_id", runId).eq("stage", "methodology_scoring"); return json(new Request("http://localhost"), { error: "score_insert_failed", detail: ie.message }, 500); } }
+  for (let j = 0; j < scoreRows.length; j += SCH) { const chunk = scoreRows.slice(j, j + SCH); if (chunk.length === 0) continue; const { error: ie } = await db.from("chart_ingest_candidate_scores").insert(chunk); if (ie) { console.error("[run_scoring] insert error:", ie.message); const d = Date.now() - ss; await db.from("chart_ingest_stage_events").update({ status: "failed", finished_at: new Date().toISOString(), duration_ms: d, message: `Score insert failed: ${ie.message}`, error_code: "score_insert_failed", error_message: ie.message }).eq("run_id", runId).eq("stage", "methodology_scoring"); return json(req, { error: "score_insert_failed", detail: ie.message }, 500); } }
   const d = Date.now() - ss;
   await db.from("chart_ingest_stage_events").update({ status: "completed", finished_at: new Date().toISOString(), duration_ms: d, message: `${scored.length} candidates scored. ${overflowCount} anti-gaming overflows.`, metrics_json: { scoredCount: scored.length, overflowCount, airplayTrackCount } }).eq("run_id", runId).eq("stage", "methodology_scoring");
-  return json(new Request("http://localhost"), { ok: true, runId, stage: "methodology_scoring", scoredCount: scored.length, overflowCount, airplayTrackCount, durationMs: d });
+  return json(req, { ok: true, runId, stage: "methodology_scoring", scoredCount: scored.length, overflowCount, airplayTrackCount, durationMs: d });
 }
 
-async function handleRunShortlist(db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) {
-  const { runId } = params as { runId: string }; if (!runId) return json(new Request("http://localhost"), { error: "runId_required" }, 400);
+async function handleRunShortlist(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) {
+  const { runId } = params as { runId: string }; if (!runId) return json(req, { error: "runId_required" }, 400);
   const ss = Date.now();
   const { data: run } = await db.from("chart_ingest_runs").select("id,status,edition_date,chart_size").eq("id", runId).maybeSingle();
-  if (!run) return json(new Request("http://localhost"), { error: "run_not_found" }, 404);
+  if (!run) return json(req, { error: "run_not_found" }, 404);
   await db.from("chart_ingest_stage_events").update({ status: "running", started_at: new Date().toISOString(), message: null, error_code: null, error_message: null }).eq("run_id", runId).eq("stage", "shortlist");
   const chartSize = (run.chart_size as number) || 20;
   const { data: candidates } = await db.from("chart_ingest_candidates").select("*").eq("run_id", runId).eq("status", "eligible");
   if (!candidates || candidates.length === 0) {
     const d = Date.now() - ss;
     await db.from("chart_ingest_stage_events").update({ status: "completed", finished_at: new Date().toISOString(), duration_ms: d, message: "No eligible candidates to shortlist.", metrics_json: { shortlistedCount: 0, totalScored: 0, excludedCount: 0 } }).eq("run_id", runId).eq("stage", "shortlist");
-    return json(new Request("http://localhost"), { ok: true, runId, stage: "shortlist", shortlistedCount: 0, totalScored: 0, excludedCount: 0, chartSize, durationMs: d });
+    return json(req, { ok: true, runId, stage: "shortlist", shortlistedCount: 0, totalScored: 0, excludedCount: 0, chartSize, durationMs: d });
   }
   const cids = candidates.map(c => c.id as string);
   const { data: scores } = await db.from("chart_ingest_candidate_scores").select("*").in("candidate_id", cids);
@@ -822,14 +802,14 @@ async function handleRunShortlist(db: ReturnType<typeof createClient>, params: R
   if (excludedIds.length > 0) { const CH = 200; for (let j = 0; j < excludedIds.length; j += CH) { await db.from("chart_ingest_candidates").update({ status: "excluded", updated_at: now }).in("id", excludedIds.slice(j, j + CH)).eq("run_id", runId); } }
   const d = Date.now() - ss;
   await db.from("chart_ingest_stage_events").update({ status: "completed", finished_at: new Date().toISOString(), duration_ms: d, message: `${shortlistedIds.length} shortlisted to top ${chartSize}. ${excludedIds.length} excluded.`, metrics_json: { shortlistedCount: shortlistedIds.length, totalScored: candidates.length, excludedCount: excludedIds.length, chartSize } }).eq("run_id", runId).eq("stage", "shortlist");
-  return json(new Request("http://localhost"), { ok: true, runId, stage: "shortlist", shortlistedCount: shortlistedIds.length, totalScored: candidates.length, excludedCount: excludedIds.length, chartSize, durationMs: d });
+  return json(req, { ok: true, runId, stage: "shortlist", shortlistedCount: shortlistedIds.length, totalScored: candidates.length, excludedCount: excludedIds.length, chartSize, durationMs: d });
 }
 
-async function handleCommitRun(db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) {
+async function handleCommitRun(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) {
   const { runId, publishImmediately, notes, acknowledgedWarnings } = params as { runId: string; publishImmediately?: boolean; notes?: string; acknowledgedWarnings?: string[] };
-  if (!runId) return json(new Request("http://localhost"), { error: "runId_required" }, 400);
+  if (!runId) return json(req, { error: "runId_required" }, 400);
   const { data: run } = await db.from("chart_ingest_runs").select("*").eq("id", runId).maybeSingle();
-  if (!run) return json(new Request("http://localhost"), { error: "run_not_found" }, 404);
+  if (!run) return json(req, { error: "run_not_found" }, 404);
   const now = new Date().toISOString();
   const editionDate = (run.edition_date as string) || now.split("T")[0];
   const chartSize = (run.chart_size as number) || 20;
@@ -839,7 +819,7 @@ async function handleCommitRun(db: ReturnType<typeof createClient>, params: Reco
   const chartKind = (run.chart_kind as string) || "tracks";
   const byEmail = user.email || user.id;
   const { data: eligibleCandidates } = await db.from("chart_ingest_candidates").select("*").eq("run_id", runId).eq("status", "eligible").order("created_at");
-  if (!eligibleCandidates || eligibleCandidates.length === 0) return json(new Request("http://localhost"), { error: "no_eligible_candidates", detail: "No eligible candidates to commit. Run eligibility and scoring first." }, 400);
+  if (!eligibleCandidates || eligibleCandidates.length === 0) return json(req, { error: "no_eligible_candidates", detail: "No eligible candidates to commit. Run eligibility and scoring first." }, 400);
   const ecids = eligibleCandidates.map(c => c.id as string);
   const { data: candidateScores } = await db.from("chart_ingest_candidate_scores").select("*").in("candidate_id", ecids);
   const scoreByCid = new Map<string, Record<string, unknown>>();
@@ -862,7 +842,7 @@ async function handleCommitRun(db: ReturnType<typeof createClient>, params: Reco
   const sourcePolicyVersion = (run.source_policy_version as string) || "1.0.0";
   const eligibilityPolicyVersion = (run.eligibility_policy_version as string) || "1.0.0";
   const { error: editionErr } = await db.from("wk_chart_editions_v2").insert({ id: editionId, program_id: programId, edition_slug: editionSlug, edition_label: `${seriesSlug} \u2014 ${editionDate}`, edition_date: editionDate, period_start: run.period_start || editionDate, period_end: run.period_end || editionDate, entry_count: topN.length, status: publishImmediately ? "published" : "committed", methodology_version: methodologyVersion, source_policy_version: sourcePolicyVersion, eligibility_policy_version: eligibilityPolicyVersion, scoring_policy_version: scoringPolicyVersion, rule_set_snapshot: ruleSnapshot, chart_size: chartSize, carry_forward_count: carryForwardCount, new_entries_count: newEntriesCount, re_entries_count: reEntriesCount, exclusion_summary: {}, override_mode: "metadata_and_matching_only", ingest_run_id: runId, published_at: publishImmediately ? now : null, published_by: publishImmediately ? byEmail : null, created_at: now, updated_at: now });
-  if (editionErr) return json(new Request("http://localhost"), { error: "edition_create_failed", detail: editionErr.message }, 500);
+  if (editionErr) return json(req, { error: "edition_create_failed", detail: editionErr.message }, 500);
   const entryRows: Array<Record<string, unknown>> = [];
   for (let i = 0; i < topN.length; i++) {
     const c = topN[i]; const rank = i + 1; const nk = (c.normalized_key as string) || ""; const score = scoreByCid.get(c.id as string); const prevRank = previousMap.get(nk) ?? null;
@@ -877,24 +857,24 @@ async function handleCommitRun(db: ReturnType<typeof createClient>, params: Reco
     entryRows.push({ id: crypto.randomUUID(), edition_id: editionId, rank, previous_rank: prevRank, movement, track_slug: null, track_title: (c.title as string) || "", artist_slug: null, artist_name: (c.artist_display as string) || "", artwork_url: c.artwork_url ?? null, normalized_key: nk, lead_artist_key: (c.lead_artist_key as string) || "", source_count: Number(c.source_count ?? 0), occurrence_count: Number(c.occurrence_count ?? 0), source_urls_seen: c.source_urls_seen || [], release_date: c.release_date ?? null, release_recency_days: score?.recency_days ?? null, canonical_track_id: null, canonical_release_id: null, canonical_artist_id: null, source_score: Number(score?.source_score ?? 0), cross_source_bonus: Number(score?.cross_source_bonus ?? 0), overlap_bonus: Number(score?.overlap_bonus ?? 0), recency_score: Number(score?.recency_score ?? 0), continuity_score: Number(score?.continuity_score ?? 0), carry_forward_bonus: Number(score?.carry_forward_bonus ?? 0), airplay_score: Number(score?.airplay_score ?? 0), anti_gaming_penalty: Number(score?.anti_gaming_penalty ?? 0), total_score: Number(score?.final_score ?? 0), carry_forward_only: !!(c.carry_forward_only), continuity_locked: !!(c.continuity_locked), airplay_candidate_only: !!(c.airplay_candidate_only), overlap_bonus_capped: Number(score?.overlap_bonus ?? 0) >= 10, lead_artist_overflow: ag.lead_artist_overflow ?? false, stale_carry_forward_demoted: false, eligibility_status: "eligible", eligibility_warnings: [], source_payload: sourcePayload, scoring_policy_version: scoringPolicyVersion, methodology_version: methodologyVersion, eligibility_policy_version: eligibilityPolicyVersion, airplay_detections: ap.detection_count ?? null, airplay_station_count: ap.station_count ?? null, airplay_total_duration: null, airplay_weighted_score: ap.W ?? null, airplay_last_detected_at: null, airplay_matched_by: null, airplay_rescue_mode: null, created_at: now, updated_at: now });
   }
   const ECH = 100;
-  for (let j = 0; j < entryRows.length; j += ECH) { const chunk = entryRows.slice(j, j + ECH); const { error: entryErr } = await db.from("wk_chart_entries_v2").insert(chunk); if (entryErr) { await db.from("wk_chart_editions_v2").delete().eq("id", editionId); return json(new Request("http://localhost"), { error: "entry_create_failed", detail: entryErr.message }, 500); } }
+  for (let j = 0; j < entryRows.length; j += ECH) { const chunk = entryRows.slice(j, j + ECH); const { error: entryErr } = await db.from("wk_chart_entries_v2").insert(chunk); if (entryErr) { await db.from("wk_chart_editions_v2").delete().eq("id", editionId); return json(req, { error: "entry_create_failed", detail: entryErr.message }, 500); } }
   const status = publishImmediately ? "published" : "committed";
   await db.from("chart_ingest_runs").update({ status, committed_at: now, published_at: publishImmediately ? now : null, commit_edition_id: editionId, commit_mode: publishImmediately ? "publish" : "commit", notes: notes ?? null, updated_at: now }).eq("id", runId);
   await db.from("chart_ingest_stage_events").update({ status: "completed", finished_at: now, duration_ms: 0, message: `${topN.length} entries committed to edition ${editionSlug}.`, metrics_json: { entryCount: topN.length, editionId, editionSlug, editionDate } }).eq("run_id", runId).eq("stage", "commit_write");
   await db.from("chart_ingest_audit_events").insert({ run_id: runId, actor: user.id, actor_email: byEmail, action: "run_committed", new_status: status, payload_json: { editionId, editionSlug, editionDate, entryCount: topN.length, publishImmediately: publishImmediately ?? false, notes: notes ?? null } });
-  return json(new Request("http://localhost"), { runId, status, programId, publicSlug: seriesSlug, editionId, editionSlug, editionDate, entryCount: topN.length, snapshotId: editionId, publicUrl: `/charts/${editionSlug}`, apiUrl: `/api/charts/${editionSlug}`, integrity: { ok: true, warnings: [], errors: [] }, auditEventId: crypto.randomUUID(), committedAt: now, committedBy: byEmail });
+  return json(req, { runId, status, programId, publicSlug: seriesSlug, editionId, editionSlug, editionDate, entryCount: topN.length, snapshotId: editionId, publicUrl: `/charts/${editionSlug}`, apiUrl: `/api/charts/${editionSlug}`, integrity: { ok: true, warnings: [], errors: [] }, auditEventId: crypto.randomUUID(), committedAt: now, committedBy: byEmail });
 }
 
-async function handleRunAirplayDetection(db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) {
-  const { runId } = params as { runId: string }; if (!runId) return json(new Request("http://localhost"), { error: "runId_required" }, 400); const ss = Date.now();
-  const { data: run } = await db.from("chart_ingest_runs").select("id,status,edition_date,market_slug").eq("id", runId).maybeSingle(); if (!run) return json(new Request("http://localhost"), { error: "run_not_found" }, 404);
+async function handleRunAirplayDetection(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) {
+  const { runId } = params as { runId: string }; if (!runId) return json(req, { error: "runId_required" }, 400); const ss = Date.now();
+  const { data: run } = await db.from("chart_ingest_runs").select("id,status,edition_date,market_slug").eq("id", runId).maybeSingle(); if (!run) return json(req, { error: "run_not_found" }, 404);
   await db.from("chart_ingest_stage_events").update({ status: "running", started_at: new Date().toISOString(), message: null, error_code: null, error_message: null }).eq("run_id", runId).eq("stage", "airplay_evidence");
   const acrHost = await readCredential(db, "ACR_HOST", "acr_host");
   const acrAccessKey = await readCredential(db, "ACR_ACCESS_KEY", "acr_access_key");
   const acrAccessSecret = await readCredential(db, "ACR_ACCESS_SECRET", "acr_access_secret");
-  if (!acrHost || !acrAccessKey || !acrAccessSecret) { const missing: string[] = []; if (!acrHost) missing.push("ACR_HOST"); if (!acrAccessKey) missing.push("ACR_ACCESS_KEY"); if (!acrAccessSecret) missing.push("ACR_ACCESS_SECRET"); const msg = `ACRCloud credentials missing: ${missing.join(", ")}. Save them via Settings \u2192 Integrations.`; const d = Date.now() - ss; await db.from("chart_ingest_stage_events").update({ status: "failed", finished_at: new Date().toISOString(), duration_ms: d, message: msg, error_code: "acr_credentials_missing", error_message: msg }).eq("run_id", runId).eq("stage", "airplay_evidence"); return json(new Request("http://localhost"), { ok: false, runId, stage: "airplay_evidence", error: msg, sourceCount: 0, detectionCount: 0, durationMs: d }); }
+  if (!acrHost || !acrAccessKey || !acrAccessSecret) { const missing: string[] = []; if (!acrHost) missing.push("ACR_HOST"); if (!acrAccessKey) missing.push("ACR_ACCESS_KEY"); if (!acrAccessSecret) missing.push("ACR_ACCESS_SECRET"); const msg = `ACRCloud credentials missing: ${missing.join(", ")}. Save them via Settings \u2192 Integrations.`; const d = Date.now() - ss; await db.from("chart_ingest_stage_events").update({ status: "failed", finished_at: new Date().toISOString(), duration_ms: d, message: msg, error_code: "acr_credentials_missing", error_message: msg }).eq("run_id", runId).eq("stage", "airplay_evidence"); return json(req, { ok: false, runId, stage: "airplay_evidence", error: msg, sourceCount: 0, detectionCount: 0, durationMs: d }); }
   const { data: sources } = await db.from("airplay_sources").select("*").eq("enabled", true);
-  if (!sources || sources.length === 0) { const d = Date.now() - ss; await db.from("chart_ingest_stage_events").update({ status: "completed", finished_at: new Date().toISOString(), duration_ms: d, message: "No enabled airplay stations configured.", metrics_json: { sourceCount: 0, detectionCount: 0, evidenceBucketCount: 0 } }).eq("run_id", runId).eq("stage", "airplay_evidence"); return json(new Request("http://localhost"), { ok: true, runId, stage: "airplay_evidence", sourceCount: 0, detectionCount: 0, evidenceBucketCount: 0, durationMs: d }); }
+  if (!sources || sources.length === 0) { const d = Date.now() - ss; await db.from("chart_ingest_stage_events").update({ status: "completed", finished_at: new Date().toISOString(), duration_ms: d, message: "No enabled airplay stations configured.", metrics_json: { sourceCount: 0, detectionCount: 0, evidenceBucketCount: 0 } }).eq("run_id", runId).eq("stage", "airplay_evidence"); return json(req, { ok: true, runId, stage: "airplay_evidence", sourceCount: 0, detectionCount: 0, evidenceBucketCount: 0, durationMs: d }); }
   const apiHost = acrHost.replace(/^https?:\/\//, "").replace(/\/$/, ""); const apiBase = `https://${apiHost}`;
   const ed = (run.edition_date as string) || new Date().toISOString().split("T")[0]; const dateParam = ed.replace(/-/g, ""); const now2 = new Date().toISOString();
   let totalDetections = 0; const sourceResults: Array<{ sourceId: string; stationName: string; detectionCount: number; error: string | null }> = [];
@@ -914,24 +894,23 @@ async function handleRunAirplayDetection(db: ReturnType<typeof createClient>, pa
   }
   const d = Date.now() - ss; const msg2 = totalDetections > 0 ? `${totalDetections} detections from ${sources.length} station(s)` : "No ACRCloud detections found for any station.";
   await db.from("chart_ingest_stage_events").update({ status: "completed", finished_at: new Date().toISOString(), duration_ms: d, message: msg2, metrics_json: { sourceCount: sources.length, detectionCount: totalDetections, evidenceBucketCount: 0, sourceResults } }).eq("run_id", runId).eq("stage", "airplay_evidence");
-  return json(new Request("http://localhost"), { ok: true, runId, stage: "airplay_evidence", sourceCount: sources.length, detectionCount: totalDetections, evidenceBucketCount: 0, sourceResults, durationMs: d });
+  return json(req, { ok: true, runId, stage: "airplay_evidence", sourceCount: sources.length, detectionCount: totalDetections, evidenceBucketCount: 0, sourceResults, durationMs: d });
 }
 
-async function handleResetPipeline(db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) {
-  const { runId } = params as { runId: string }; if (!runId) return json(new Request("http://localhost"), { error: "runId_required" }, 400);
-  const { data: run } = await db.from("chart_ingest_runs").select("id,status").eq("id", runId).maybeSingle(); if (!run) return json(new Request("http://localhost"), { error: "run_not_found" }, 404);
-  if (!["draft", "queued", "running", "dry_run_complete", "needs_review"].includes(run.status)) return json(new Request("http://localhost"), { error: "cannot_reset_pipeline" }, 400);
+async function handleResetPipeline(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) {
+  const { runId } = params as { runId: string }; if (!runId) return json(req, { error: "runId_required" }, 400);
+  const { data: run } = await db.from("chart_ingest_runs").select("id,status").eq("id", runId).maybeSingle(); if (!run) return json(req, { error: "run_not_found" }, 404);
+  if (!["draft", "queued", "running", "dry_run_complete", "needs_review"].includes(run.status)) return json(req, { error: "cannot_reset_pipeline" }, 400);
   const now = new Date().toISOString();
   await db.from("chart_ingest_stage_events").update({ status: "idle", started_at: null, finished_at: null, duration_ms: null, message: null, error_code: null, error_message: null, metrics_json: {} }).eq("run_id", runId);
   await Promise.all([db.from("chart_ingest_raw_rows").delete().eq("run_id", runId), db.from("chart_ingest_normalized_rows").delete().eq("run_id", runId), db.from("chart_ingest_candidates").delete().eq("run_id", runId), db.from("chart_ingest_exclusions").delete().eq("run_id", runId), db.from("chart_ingest_candidate_scores").delete().eq("run_id", runId), db.from("chart_ingest_matches").delete().eq("run_id", runId), db.from("chart_ingest_review_issues").delete().eq("run_id", runId)]);
   await db.from("chart_ingest_run_sources").update({ fetch_status: "pending", fetched_count: 0, normalized_count: 0, dropped_count: 0, warnings_json: [], error_code: null, error_message: null, started_at: null, finished_at: null }).eq("run_id", runId);
   await db.from("chart_ingest_runs").update({ status: "draft", dry_run_completed_at: null, updated_at: now, error_code: null, error_message: null }).eq("id", runId);
-  return json(new Request("http://localhost"), { ok: true, runId, status: "draft", previousStatus: run.status });
+  return json(req, { ok: true, runId, status: "draft", previousStatus: run.status });
 }
 
-async function handleCsvUpload(db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) {
-  return json(new Request("http://localhost"), { error: "not_implemented" }, 501);
-}
-async function handleCsvList(db: ReturnType<typeof createClient>, params: Record<string, unknown>) { return json(new Request("http://localhost"), { csvs: [] }); }
-async function handleCsvNormalize(db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { return json(new Request("http://localhost"), { error: "not_implemented" }, 501); }
-async function handleApplyRowDecision(db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { return json(new Request("http://localhost"), { ok: true }); }
+async function handleCsvUpload(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { return json(req, { error: "not_implemented" }, 501); }
+async function handleCsvList(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>) { return json(req, { csvs: [] }); }
+async function handleCsvNormalize(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { return json(req, { error: "not_implemented" }, 501); }
+async function handleApplyRowDecision(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { return json(req, { ok: true }); }
+

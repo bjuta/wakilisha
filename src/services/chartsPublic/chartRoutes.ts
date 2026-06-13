@@ -21,16 +21,16 @@ import type { ChartFamily } from "./types";
  */
 
 const LEGACY_CHART_ROUTE_MAP: Record<string, string> = {
-  "charts": "top-songs/kenya/kenya",
-  "charts-kenya": "top-songs/kenya/kenya",
-  "kenya": "top-songs/kenya/kenya",
-  "kenya-kenya": "top-songs/kenya/kenya",
-  "rnb": "top-songs/kenya/rnb",
-  "rnb-kenya": "top-songs/kenya/rnb",
-  "gengetone": "top-songs/kenya/gengetone",
-  "gengetone-kenya": "top-songs/kenya/gengetone",
-  "2026": "top-songs/kenya/2026",
-  "2026-kenya": "top-songs/kenya/2026",
+  "charts": "top-songs-kenya",
+  "charts-kenya": "top-songs-kenya",
+  "kenya": "top-songs-kenya",
+  "kenya-kenya": "top-songs-kenya",
+  "rnb": "rnb-kenya",
+  "rnb-kenya": "rnb-kenya",
+  "gengetone": "gengetone-kenya",
+  "gengetone-kenya": "gengetone-kenya",
+  "2026": "2026-kenya",
+  "2026-kenya": "2026-kenya",
 };
 
 export function normalizeChartProgramSlug(slug?: string | null): string {

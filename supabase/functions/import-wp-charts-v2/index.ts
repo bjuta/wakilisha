@@ -25,11 +25,9 @@ const COUNTRY_PATTERNS: Array<{ market: string; iso: string; tz: string; re: Reg
 
 function inferMarket(slug: string, name: string): string {
   const haystack = (name + " " + slug).toLowerCase();
-  // Check full country names and city names first (word-boundary, no false positives)
   for (const cp of COUNTRY_PATTERNS) {
     if (cp.re.test(haystack)) return cp.market;
   }
-  // Fallback: check 2-letter ISO codes only as standalone tokens
   if (/\b(?:ke)\b/.test(slug.toLowerCase())) return "kenya";
   if (/\b(?:ng)\b/.test(slug.toLowerCase())) return "nigeria";
   if (/\b(?:za)\b/.test(slug.toLowerCase())) return "south-africa";
@@ -41,7 +39,6 @@ function inferMarket(slug: string, name: string): string {
 
 function inferSeries(slug: string, _name: string): string {
   const s = slug.toLowerCase();
-  // Only match full genre words, not substrings
   if (/\b(?:rnb|r[\s&]*b)\b/.test(s)) return "rnb";
   if (/\bgengetone\b/.test(s)) return "gengetone";
   if (/\bgospel\b/.test(s)) return "gospel";
@@ -50,13 +47,10 @@ function inferSeries(slug: string, _name: string): string {
   if (/\b(?:reggae|dancehall)\b/.test(s)) return "reggae";
   if (/\b(?:bongo|flava)\b/.test(s)) return "bongo-flava";
   if (/\b(?:gqom|amapiano)\b/.test(s)) return s;
-  // Year-based slugs
   if (/^\d{4}$/.test(s)) return s;
   if (/^(20\d{2})/.test(s)) return s.match(/^(20\d{2})/)![1];
-  // Descriptive
   if (/\bnew[\s-]?releases?\b/.test(s)) return "new-releases";
   if (/\b(?:top|hot|trending)\b/.test(s)) return "top-songs";
-  // If slug is a country/region name, fall back to "top-songs"
   if (/\b(?:kenya|nigeria|ghana|tanzania|uganda|south[\s-]?africa|africa|east[\s-]?africa)\b/.test(s)) return "top-songs";
   return s;
 }
@@ -73,6 +67,31 @@ function makeMarketRecord(market: string) {
     market_type: "country", country_code: iso,
     timezone: tz, default_language: "en",
   };
+}
+
+async function ensureLegacyVersions(supabase: ReturnType<typeof createClient>) {
+  const { data: methods } = await supabase.from("wk_chart_methodologies_v2").select("methodology_version").eq("methodology_version", "legacy-import-v1").limit(1);
+  if (!methods || methods.length === 0) {
+    await supabase.from("wk_chart_methodologies_v2").upsert({
+      methodology_version: "legacy-import-v1",
+      label: "Legacy Import (WordPress)",
+      scoring_policy_version: "legacy-import",
+      rule_set: { source: "wordpress_migration", scoring: "passthrough" },
+      changelog: "Auto-generated for WP import",
+      effective_from: "2025-01-01",
+    }, { onConflict: "methodology_version" });
+  }
+
+  const { data: rules } = await supabase.from("wk_chart_eligibility_rules_v2").select("eligibility_version").eq("eligibility_version", "legacy-import-v1").limit(1);
+  if (!rules || rules.length === 0) {
+    await supabase.from("wk_chart_eligibility_rules_v2").upsert({
+      eligibility_version: "legacy-import-v1",
+      label: "Legacy Import (WordPress)",
+      rule_set: { source: "wordpress_migration", rules: "passthrough" },
+      description: "Auto-generated for WP import",
+      effective_from: "2025-01-01",
+    }, { onConflict: "eligibility_version" });
+  }
 }
 
 serve(async (req: Request) => {
@@ -109,13 +128,16 @@ serve(async (req: Request) => {
         return new Response(JSON.stringify({ error: "payload.charts required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
+      await ensureLegacyVersions(supabase);
+
       const charts = payload.charts as Array<{
-        id: number; name: string; slug: string; status: string; chart_type: string;
+        id: number; name: string; slug: string; status: string; chart_size: number; chart_type: string;
         editions: Array<{
           id: number; title: string; slug: string; status: string; edition_date: string;
           items: Array<{
             rank: number; previous_rank: number | null; weeks_on_chart: number | null;
             peak_position: number | null; is_new_entry: number | null; is_re_entry: number | null;
+            source_count: number;
             track: { id: number; title: string; slug: string; artist_name?: string; artist_slug?: string; spotify_id?: string; apple_music_id?: string; youtube_id?: string; isrc?: string } | null;
             sources: Array<{ provider: string; url?: string }>;
           }>;
@@ -142,12 +164,15 @@ serve(async (req: Request) => {
         if (!marketsSet.has(market)) {
           marketsSet.set(market, makeMarketRecord(market));
         }
+
+        const chartSize = (chart.chart_size && chart.chart_size > 0) ? chart.chart_size : 20;
+
         programs.push({
           id: progId, series_slug: series, market_slug: market, public_slug: pubSlug,
-          public_label: chart.name || series.replace(/-/g, " ") + " · " + market.replace(/-/g, " "),
+          public_label: chart.name || series.replace(/-/g, " ") + " \u00b7 " + market.replace(/-/g, " "),
           short_label: chart.name || series, source_family_slug: chart.slug || series,
           default_period_type: "weekly", default_methodology_version: "legacy-import-v1",
-          default_eligibility_rules_version: "legacy-import-v1", chart_size: 20,
+          default_eligibility_rules_version: "legacy-import-v1", chart_size: chartSize,
           streaming_min_sources: 1, cross_source_mode: "standard", cross_source_weight: 1,
           continuity_weight: 1, carry_forward_weight: 1, airplay_enabled: false,
           airplay_station_scope: "all", airplay_min_duration: 20, airplay_weight: 1,
@@ -162,10 +187,10 @@ serve(async (req: Request) => {
           const edId = safeId("edition", pubSlug + "_" + ed.edition_date);
           editions.push({
             id: edId, program_id: progId, edition_slug: ed.edition_date,
-            edition_label: ed.title || pubSlug + " · " + ed.edition_date,
+            edition_label: ed.title || pubSlug + " \u00b7 " + ed.edition_date,
             edition_date: ed.edition_date, period_start: ed.edition_date, period_end: ed.edition_date,
             status: ed.status === "published" ? "published" : "draft",
-            entry_count: ed.items.length, chart_size: 20,
+            entry_count: ed.items.length, chart_size: chartSize,
             methodology_version: "legacy-import-v1", source_policy_version: "legacy-import",
             eligibility_policy_version: "legacy-import", scoring_policy_version: "legacy-import",
             rule_set_snapshot: { old_edition_id: ed.id, old_chart_id: chart.id, migrated_at: new Date().toISOString() },
@@ -193,12 +218,16 @@ serve(async (req: Request) => {
               else if (item.rank > item.previous_rank) movement = "down";
             }
 
+            // FIX: include edition_id (edId) in entry ID to prevent cross-program collisions
+            // Old: safeId("entry", ed.edition_date + "_" + ...) — collided when same date/rank/track across programs
+            // New: safeId("entry", edId + "_" + ...) — unique per edition per program
             entries.push({
-              id: safeId("entry", ed.edition_date + "_" + String(item.rank).padStart(3, "0") + "_" + (item.track?.id || "0")),
+              id: safeId("entry", edId + "_" + String(item.rank).padStart(3, "0") + "_" + (item.track?.id || "0")),
               edition_id: edId, rank: item.rank, previous_rank: item.previous_rank, movement,
               track_slug: item.track?.slug || null, track_title: trackTitle,
               artist_slug: item.track?.artist_slug || null, artist_name: artistName,
               artwork_url: null, normalized_key: safeSlug(trackTitle) + "::" + safeSlug(artistName),
+              source_count: item.source_count ?? (item.sources.length || 0),
               source_urls_seen: [...new Set(sourceUrls)],
               source_payload: {
                 old_track_id: item.track?.id, weeks_on_chart: item.weeks_on_chart,
@@ -244,14 +273,28 @@ serve(async (req: Request) => {
         const { error } = await supabase.from("wk_chart_editions_v2").upsert(editions, { onConflict: "id" });
         if (error) errors.push("editions: " + error.message); else inserted.editions = editions.length;
       }
+
+      // FIXED: continue on batch failure instead of breaking, so one bad batch doesn't drop all remaining entries
       if (entries.length > 0) {
+        let entryFailures = 0;
         for (let i = 0; i < entries.length; i += 200) {
           const batch = entries.slice(i, i + 200);
           const { error } = await supabase.from("wk_chart_entries_v2").upsert(batch, { onConflict: "id" });
-          if (error) { errors.push("entries batch " + i + ": " + error.message); break; }
+          if (error) {
+            errors.push("entries batch " + i + ": " + error.message);
+            entryFailures++;
+            console.error("Batch " + i + " failed: " + error.message);
+            continue;
+          }
         }
-        if (!errors.some((e) => e.startsWith("entries"))) inserted.entries = entries.length;
+        if (entryFailures === 0) {
+          inserted.entries = entries.length;
+        } else {
+          inserted.entries = entries.length;
+          errors.push("entries: " + entryFailures + " batch(es) failed, entries may be incomplete");
+        }
       }
+
       if (coverage.length > 0) {
         const { error } = await supabase.from("wk_chart_source_coverage_v2").upsert(coverage, { onConflict: "id" });
         if (error) errors.push("coverage: " + error.message); else inserted.coverage = coverage.length;

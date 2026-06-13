@@ -72,7 +72,7 @@ export const CHART_PRESENTATION_OVERRIDES: Record<string, ChartPresentationOverr
     seriesLabel: "2026 Releases",
     marketSlug: "kenya",
     marketLabel: "Kenya",
-    publicSlug: "2026-releases-kenya",
+    publicSlug: "2026-kenya",
     publicLabel: "2026 Releases · Kenya",
     shortLabel: "2026 Releases",
     description: "A weekly ranking of songs released in 2026, currently scoped to Kenya and ready to expand into other markets.",
