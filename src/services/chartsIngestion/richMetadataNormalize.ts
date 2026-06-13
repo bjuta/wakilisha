@@ -6,6 +6,7 @@ import type {
   RichTrackMetadata,
 } from "../chartsIntelligence/intelligenceTypes";
 import type { NormalizedChartRow } from "./ingestStudioTypes";
+import { normalize_title, normalize_artist } from "@/services/chartsScoring/normalize";
 
 function rawObject(row: NormalizedChartRow): Record<string, unknown> {
   return row.raw && typeof row.raw === "object" ? (row.raw as Record<string, unknown>) : {};
@@ -34,10 +35,6 @@ function booleanValue(value: unknown): boolean | null {
 function stringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value.filter((item): item is string => typeof item === "string" && item.trim().length > 0).map((item) => item.trim());
-}
-
-function normalizeTitle(value: string): string {
-  return value.toLowerCase().trim().replace(/\s+/g, " ");
 }
 
 function normalizeProvider(provider: NormalizedChartRow["sourceProvider"]): ProviderKey {
@@ -122,7 +119,7 @@ export function normalizeRichTrackMetadata(row: NormalizedChartRow): RichTrackMe
 
   return {
     title,
-    normalizedTitle: normalizeTitle(title),
+    normalizedTitle: normalize_title(title),
     canonicalTrackId: null,
     canonicalReleaseId: null,
     isrc: stringValue(raw.isrc) ?? stringValue(raw.ISRC),
@@ -153,7 +150,7 @@ export function normalizeArtistCredits(row: NormalizedChartRow): RelationalArtis
   return names.map((displayName, index) => ({
     id: `${row.sourceProvider}_${row.sourceRowId ?? row.providerTrackId ?? row.rank}_artist_${index + 1}`,
     displayName,
-    normalizedName: normalizeTitle(displayName),
+    normalizedName: normalize_title(displayName),
     role: index === 0 ? "primary_artist" : "featured_artist",
     creditOrder: index + 1,
     canonicalArtistId: null,

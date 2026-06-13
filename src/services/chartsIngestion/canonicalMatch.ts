@@ -7,6 +7,7 @@
 
 import type { NormalizedChartRow, IngestResolvedRow, MatchStatus } from "./ingestStudioTypes";
 import { build_normalized_key, lead_artist_key } from "@/services/chartsScoring/normalize";
+import { normalize_title, normalize_artist, normalize_title_no_brackets } from "@/services/chartsScoring/normalize";
 
 // ─── Registry Types ───
 export interface CanonicalTrack {
@@ -54,14 +55,10 @@ export function getCanonicalRegistry(): CanonicalRegistry {
 }
 
 // ─── String Similarity (Jaro-Winkler Approximation) ───
-function normalize(s: string): string {
-  return s.toLowerCase().trim().replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ");
-}
-
 function tokenSimilarity(a: string, b: string): number {
   if (!a || !b) return 0;
-  const na = normalize(a);
-  const nb = normalize(b);
+  const na = normalize_title_no_brackets(a);
+  const nb = normalize_title_no_brackets(b);
   if (na === nb) return 1.0;
 
   const tokensA = new Set(na.split(" ").filter(Boolean));
@@ -75,8 +72,8 @@ function tokenSimilarity(a: string, b: string): number {
 
 function artistSimilarity(a: string[], b: string[]): number {
   if (!a.length || !b.length) return 0;
-  const aNorm = a.map((x) => normalize(x));
-  const bNorm = b.map((x) => normalize(x));
+  const aNorm = a.map((x) => normalize_artist(x));
+  const bNorm = b.map((x) => normalize_artist(x));
   let matched = 0;
   aNorm.forEach((an) => {
     if (bNorm.some((bn) => tokenSimilarity(an, bn) > 0.8)) matched++;
@@ -100,7 +97,7 @@ export function scoreMatch(row: NormalizedChartRow, track: CanonicalTrack): Matc
   // ISRC exact match — highest confidence
   const rowRaw = row.raw as Record<string, unknown> | undefined;
   const rowIsrc = rowRaw?.isrc as string | undefined;
-  if (rowIsrc && track.isrc && normalize(rowIsrc) === normalize(track.isrc)) {
+  if (rowIsrc && track.isrc && normalize_title(rowIsrc) === normalize_title(track.isrc)) {
     confidence = 99;
     method = "isrc";
     reasons.push("ISRC exact match");
@@ -470,7 +467,7 @@ export function applyMatchDecision(
 export function searchRegistryByQuery(query: string, registry?: CanonicalRegistry): CanonicalTrack[] {
   const reg = registry ?? getCanonicalRegistry();
   if (!query.trim()) return [];
-  const q = normalize(query);
+  const q = normalize_title_no_brackets(query);
   return reg.tracks
     .filter((t) => {
       const titleSim = tokenSimilarity(t.title, q);

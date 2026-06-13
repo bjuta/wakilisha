@@ -8,9 +8,48 @@
  * - No Math.random, no Date.now, no external state
  * - Every function must be independently testable
  *
- * Scoring Policy: 1.0.1
- * Last updated: 2026-06-11
+ * Scoring Policy: 1.0.2
+ * Last updated: 2026-06-14
+ *
+ * §3.0 Hardening (2026-06-14):
+ * - Added zero-width character stripping (v11 backfill lessons)
+ * - Added combining diacritic stripping after NFKD decomposition (v13 backfill lessons)
+ * - Added normalizeCoreNoBrackets variant for entity resolution — retains
+ *   parenthetical content (e.g., "(Remix)", "(Acoustic)") as distinguishing tokens
+ *   while still stripping brackets + feat credits for canonical identity
+ *
+ * These fixes prevent phantom different normalized keys caused by invisible
+ * Unicode characters and ensure byte-for-byte equivalence with the backfill
+ * artwork pipeline's normalization.
  */
+
+// ─────────────────────────────────────────────────────────────────────────────
+// §3.0 Character Class Constants
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Zero-width and invisible formatting characters that can corrupt
+ * normalized keys without any visible effect.
+ *
+ * U+200B — Zero-width space
+ * U+200C — Zero-width non-joiner
+ * U+200D — Zero-width joiner
+ * U+2060 — Word joiner
+ * U+FEFF — Byte order mark / zero-width no-break space
+ * U+00AD — Soft hyphen
+ */
+const ZERO_WIDTH_CHARS = /[\u200B\u200C-\u200D\u2060\uFEFF\u00AD]/g;
+
+/**
+ * Combining diacritical marks range (Unicode block 0300–036F).
+ * After NFKD decomposition, accented characters become base + combining mark.
+ * We strip the combining marks to get truly diacritic-free strings.
+ *
+ * Examples after NFKD:
+ *   "Café"  → "cafe\u0301"  → strip → "cafe"
+ *   "Nīūnyonaga" → "Ni\u0304u\u0304nyonaga" → strip → "niunyonaga"
+ */
+const COMBINING_DIACRITICS = /[\u0300-\u036F]/g;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // §3.1 Core Normalization Pipeline
@@ -71,45 +110,122 @@ function stripFeaturing(text: string): string {
  * Normalize a single piece of text for identity matching.
  * This is the shared core that both title and artist normalization use.
  *
- * Pipeline:
+ * Pipeline (v1.0.2 — hardened):
+ * 0. Strip zero-width and invisible formatting characters
  * 1. Unicode NFKD decomposition (separates diacritics from base chars)
- * 2. Lowercase
- * 3. Strip bracketed content
- * 4. Strip featuring credits
- * 5. Replace hyphens, en-dashes, em-dashes, bullet with spaces
- * 6. Replace forward slashes and vertical bars with spaces
- * 7. Strip remaining ASCII punctuation (but preserve digits, letters, spaces)
- * 8. Collapse whitespace
- * 9. Trim
+ * 2. Strip combining diacritical marks (\u0300-\u036F)
+ * 3. Lowercase
+ * 4. Strip bracketed content
+ * 5. Strip featuring credits
+ * 6. Replace hyphens, en-dashes, em-dashes, bullet with spaces
+ * 7. Replace forward slashes and vertical bars with spaces
+ * 8. Strip remaining ASCII punctuation (but preserve digits, letters, spaces)
+ * 9. Collapse whitespace
+ * 10. Trim
  */
 function normalizeCore(text: string): string {
   if (!text || !text.trim()) return "";
 
   let result = text;
 
+  // Step 0: Strip zero-width and invisible formatting characters
+  // These silently corrupt keys without any visible effect
+  result = result.replace(ZERO_WIDTH_CHARS, "");
+
+  // Step 1: NFKD decomposition
   result = result.normalize("NFKD");
 
+  // Step 2: Strip combining diacritical marks
+  // After NFKD, "é" → "e\u0301". We strip \u0301 so we get plain "e".
+  result = result.replace(COMBINING_DIACRITICS, "");
+
+  // Step 3: Lowercase
   result = result.toLowerCase();
 
+  // Step 4: Strip bracketed content
   result = stripBracketedContent(result);
 
+  // Step 5: Strip featuring credits
   result = stripFeaturing(result);
 
+  // Step 6: Replace dashes and hyphens with spaces
   result = result.replace(/[\u2010-\u2015\u2018\u2019\u201A\u201B\u2032\u2035\u2212\u2E3A\u2E3B]/g, " ");
 
   result = result.replace(/[-–—‒―•·‧]/g, " ");
 
+  // Step 7: Replace slashes and pipes with spaces
   result = result.replace(/[\/\\|]/g, " ");
 
+  // Step 8: Strip remaining ASCII punctuation
   result = result.replace(/[!"#$%&'()*+,./:;<=>?@\[\]^_`{|}~¡¢£¤¥¦§¨©ª«¬®¯°±²³´µ¶·¸¹º»¼½¾¿×÷]/g, " ");
 
+  // Step 9: Collapse whitespace
+  result = collapseWhitespace(result);
+
+  return result;
+}
+
+/**
+ * Normalize a single piece of text for identity matching — NO BRACKET STRIPPING variant.
+ *
+ * This variant RETAINS parenthetical content but still strips the bracket
+ * characters themselves, so "(Remix)" becomes "remix" rather than being
+ * completely removed. This preserves distinguishing tokens that can help
+ * differentiate between a track and its remix during entity resolution.
+ *
+ * Used by entity resolution engines (canonicalMatch, entityResolution)
+ * where parenthetical content carries meaningful distinguishing info.
+ *
+ * Pipeline:
+ * 0. Strip zero-width chars
+ * 1. NFKD decomposition
+ * 2. Strip combining diacritics
+ * 3. Lowercase
+ * 4. Strip featuring credits (but NOT bracketed content — brackets replaced with spaces)
+ * 5–9. Same as normalizeCore (dashes→spaces, slashes→spaces, strip punctuation, collapse, trim)
+ */
+function normalizeCoreNoBrackets(text: string): string {
+  if (!text || !text.trim()) return "";
+
+  let result = text;
+
+  // Step 0: Strip zero-width and invisible formatting characters
+  result = result.replace(ZERO_WIDTH_CHARS, "");
+
+  // Step 1: NFKD decomposition
+  result = result.normalize("NFKD");
+
+  // Step 2: Strip combining diacritical marks
+  result = result.replace(COMBINING_DIACRITICS, "");
+
+  // Step 3: Lowercase
+  result = result.toLowerCase();
+
+  // Step 4: Replace brackets with spaces (keep the content)
+  // Different from normalizeCore which strips content entirely
+  result = result.replace(/[\(\)\[\]\{\}「」〈〉]/g, " ");
+
+  // Step 5: Strip featuring credits
+  result = stripFeaturing(result);
+
+  // Step 6: Replace dashes and hyphens with spaces
+  result = result.replace(/[\u2010-\u2015\u2018\u2019\u201A\u201B\u2032\u2035\u2212\u2E3A\u2E3B]/g, " ");
+  result = result.replace(/[-–—‒―•·‧]/g, " ");
+
+  // Step 7: Replace slashes and pipes with spaces
+  result = result.replace(/[\/\\|]/g, " ");
+
+  // Step 8: Strip remaining ASCII punctuation
+  result = result.replace(/[!"#$%&'()*+,./:;<=>?@\[\]^_`{|}~¡¢£¤¥¦§¨©ª«¬®¯°±²³´µ¶·¸¹º»¼½¾¿×÷]/g, " ");
+
+  // Step 9: Collapse whitespace
   result = collapseWhitespace(result);
 
   return result;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// §3.2 Public API — Four Exported Functions
+// §3.2 Public API — Five Exported Functions
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
@@ -118,6 +234,8 @@ function normalizeCore(text: string): string {
  * Normalizes a track title for identity matching across editions.
  *
  * Rules:
+ * - Strip zero-width characters
+ * - NFKD decomposition + combining diacritic stripping
  * - Lowercase
  * - Strip all punctuation
  * - Remove feat./ft./featuring
@@ -126,12 +244,29 @@ function normalizeCore(text: string): string {
  *
  * Examples:
  *   "7 Days (Radio Edit)"          → "7 days"
- *   "Buga (Lo Lo Lo) [Bonus Track]" → "buga lo lo lo"
+ *   "Buga (Lo Lo Lo) [Bonus Track]" → "buga"
  *   "ON FIRE!!! (feat. Mr Eazi)"   → "on fire"
  *   "Sip (Alcohol) - Remix"        → "sip alcohol"
+ *   "Café del Mar"                 → "cafe del mar"
+ *   "I\u2060HATED\u2060YOUR\u2060RELATIONSHIP" → "i hated your relationship"
  */
 export function normalize_title(title: string): string {
   return normalizeCore(title);
+}
+
+/**
+ * §3.2.1a: normalize_title_no_brackets()
+ *
+ * Normalizes a track title WITHOUT stripping parenthetical content.
+ * Brackets → spaces, content kept. Useful for entity resolution
+ * where "(Remix)" vs original is a meaningful distinction.
+ *
+ * Examples:
+ *   "7 Days (Radio Edit)"  → "7 days radio edit"
+ *   "Buga (Remix)"         → "buga remix"
+ */
+export function normalize_title_no_brackets(title: string): string {
+  return normalizeCoreNoBrackets(title);
 }
 
 /**
@@ -140,6 +275,8 @@ export function normalize_title(title: string): string {
  * Normalizes a full artist credit line for comparison.
  *
  * Rules:
+ * - Strip zero-width characters
+ * - NFKD decomposition + combining diacritic stripping
  * - Lowercase
  * - Strip punctuation
  * - Remove feat./ft./featuring (the credited artist section)
@@ -150,6 +287,7 @@ export function normalize_title(title: string): string {
  *   "BURNA BOY"                       → "burna boy"
  *   "Sauti Sol ft. Nyashinski"        → "sauti sol"
  *   "WizKid, Tems & Justin Bieber"    → "wizkid tems justin bieber"
+ *   "Björk"                           → "bjork"
  */
 export function normalize_artist(artist_line: string): string {
   return normalizeCore(artist_line);
@@ -176,6 +314,7 @@ export function normalize_artist(artist_line: string): string {
  *   "Sauti Sol & Nyashinski"           → "sauti sol"
  *   "BURNA BOY"                        → "burna boy"
  *   "Rema ft. Selena Gomez"            → "rema"
+ *   "Nīūnyonaga"                       → "niunyonaga"
  */
 export function lead_artist_key(full_artist_line: string): string {
   if (!full_artist_line || !full_artist_line.trim()) return "";
@@ -215,7 +354,7 @@ export function lead_artist_key(full_artist_line: string): string {
  * Example:
  *   title="Buga (Lo Lo Lo)", artist="Kizz Daniel feat. Tekno"
  *   → build_normalized_key("Buga (Lo Lo Lo)", "Kizz Daniel feat. Tekno")
- *   → "buga lo lo lo::kizz daniel"
+ *   → "buga::kizz daniel"
  */
 export function build_normalized_key(title: string, full_artist_line: string): string {
   const normalizedTitle = normalize_title(title);

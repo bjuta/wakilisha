@@ -9,6 +9,7 @@ import type {
   RichTrackMetadata,
 } from "../chartsIntelligence/intelligenceTypes";
 import type { IngestResolvedRow } from "../chartsIngestion/ingestStudioTypes";
+import { normalize_title, normalize_artist } from "@/services/chartsScoring/normalize";
 
 export type CanonicalArtistEntity = {
   id: string;
@@ -52,13 +53,9 @@ export type EntityResolutionRegistry = {
   doNotMergePairs?: Array<{ left: string; right: string; reason?: string }>;
 };
 
-function normalizeText(value: string): string {
-  return value.toLowerCase().trim().replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ");
-}
-
 function tokenSimilarity(a: string, b: string): number {
-  const na = normalizeText(a);
-  const nb = normalizeText(b);
+  const na = normalize_title(a);
+  const nb = normalize_title(b);
   if (!na || !nb) return 0;
   if (na === nb) return 1;
   const aTokens = new Set(na.split(" ").filter(Boolean));
@@ -76,8 +73,8 @@ function providerOverlap(a: ProviderIdentifierSet[] = [], b: ProviderIdentifierS
       if (left.provider !== right.provider) continue;
       const trackMatch = left.trackId && right.trackId && left.trackId === right.trackId;
       const releaseMatch = left.releaseId && right.releaseId && left.releaseId === right.releaseId;
-      const isrcMatch = left.isrc && right.isrc && normalizeText(left.isrc) === normalizeText(right.isrc);
-      const upcMatch = left.upc && right.upc && normalizeText(left.upc) === normalizeText(right.upc);
+      const isrcMatch = left.isrc && right.isrc && normalize_title(left.isrc) === normalize_title(right.isrc);
+      const upcMatch = left.upc && right.upc && normalize_title(left.upc) === normalize_title(right.upc);
       const artistMatch = (left.artistIds ?? []).some((id) => (right.artistIds ?? []).includes(id));
       if (trackMatch || releaseMatch || isrcMatch || upcMatch || artistMatch) overlaps.push(left);
     }
@@ -151,11 +148,11 @@ function scoreArtist(credit: RelationalArtistCredit, artist: CanonicalArtistEnti
     confidence = 97;
     method = "provider_id";
     reasons.push("Provider artist ID overlap");
-  } else if (artist.aliases.map(normalizeText).includes(normalizeText(credit.displayName))) {
+  } else if (artist.aliases.map(normalize_title).includes(normalize_title(credit.displayName))) {
     confidence = 94;
     method = "alias";
     reasons.push("Known alias match");
-  } else if (normalizeText(credit.displayName) === artist.normalizedName) {
+  } else if (normalize_title(credit.displayName) === artist.normalizedName) {
     confidence = 93;
     method = "exact_name";
     reasons.push("Exact normalized artist name match");
@@ -173,7 +170,7 @@ function scoreTrack(metadata: RichTrackMetadata, row: IngestResolvedRow, track: 
   const reasons: string[] = [];
   let confidence = 0;
   let method: EntityResolutionCandidate["method"] = "fuzzy";
-  if (metadata.isrc && track.isrc && normalizeText(metadata.isrc) === normalizeText(track.isrc)) {
+  if (metadata.isrc && track.isrc && normalize_title(metadata.isrc) === normalize_title(track.isrc)) {
     confidence = 99;
     method = "isrc";
     reasons.push("ISRC exact match");
@@ -199,7 +196,7 @@ function scoreRelease(metadata: RichTrackMetadata, release: CanonicalReleaseEnti
   const reasons: string[] = [];
   let confidence = 0;
   let method: EntityResolutionCandidate["method"] = "fuzzy";
-  if (metadata.upc && release.upc && normalizeText(metadata.upc) === normalizeText(release.upc)) {
+  if (metadata.upc && release.upc && normalize_title(metadata.upc) === normalize_title(release.upc)) {
     confidence = 98;
     method = "provider_id";
     reasons.push("UPC exact match");
@@ -219,8 +216,8 @@ function scoreRelease(metadata: RichTrackMetadata, release: CanonicalReleaseEnti
 function scoreLabel(metadata: RichTrackMetadata, label: CanonicalLabelEntity, registry: EntityResolutionRegistry): EntityResolutionCandidate | null {
   if (!metadata.labelName) return null;
   if (isBlocked(registry, metadata.labelName, label.id)) return null;
-  const aliases = label.aliases.map(normalizeText);
-  const labelName = normalizeText(metadata.labelName);
+  const aliases = label.aliases.map(normalize_title);
+  const labelName = normalize_title(metadata.labelName);
   const reasons: string[] = [];
   let confidence = 0;
   let method: EntityResolutionCandidate["method"] = "fuzzy";
@@ -255,7 +252,7 @@ function overallStatus(decisions: EntityResolutionDecision[]): EntityResolutionS
 export function resolveRowEntities(row: IngestResolvedRow, registry: EntityResolutionRegistry): EntityResolutionBundle {
   const metadata = getRichMetadata(row) ?? {
     title: row.title,
-    normalizedTitle: normalizeText(row.title),
+    normalizedTitle: normalize_title(row.title),
     providerIds: [],
     providerUrls: [],
   } as RichTrackMetadata;
@@ -268,11 +265,11 @@ export function resolveRowEntities(row: IngestResolvedRow, registry: EntityResol
 
   const artistDecisions = credits.map((credit) => {
     const candidates = sortCandidates(registry.artists.map((artist) => scoreArtist(credit, artist, registry)));
-    return buildDecision({ entityKind: "artist", sourceId: credit.id, sourceLabel: credit.displayName, candidates, shellId: `artist_shell_${normalizeText(credit.displayName).replace(/\s+/g, "_")}` });
+    return buildDecision({ entityKind: "artist", sourceId: credit.id, sourceLabel: credit.displayName, candidates, shellId: `artist_shell_${normalize_title(credit.displayName).replace(/\s+/g, "_")}` });
   });
 
   const labelCandidates = metadata.labelName ? sortCandidates(registry.labels.map((label) => scoreLabel(metadata, label, registry))) : [];
-  const labelDecision = metadata.labelName ? buildDecision({ entityKind: "label", sourceId: `${row.id}:label`, sourceLabel: metadata.labelName, candidates: labelCandidates, shellId: `label_shell_${normalizeText(metadata.labelName).replace(/\s+/g, "_")}` }) : null;
+  const labelDecision = metadata.labelName ? buildDecision({ entityKind: "label", sourceId: `${row.id}:label`, sourceLabel: metadata.labelName, candidates: labelCandidates, shellId: `label_shell_${normalize_title(metadata.labelName).replace(/\s+/g, "_")}` }) : null;
 
   const decisions = [trackDecision, releaseDecision, labelDecision, ...artistDecisions].filter((decision): decision is EntityResolutionDecision => Boolean(decision));
   const status = overallStatus(decisions);
@@ -335,7 +332,7 @@ export function createSeedEntityResolutionRegistry(rows: IngestResolvedRow[]): E
       tracks.set(row.canonicalTrackId, {
         id: row.canonicalTrackId,
         title: row.title,
-        normalizedTitle: normalizeText(row.title),
+        normalizedTitle: normalize_title(row.title),
         artistNames: row.artistNames,
         isrc: metadata?.isrc ?? null,
         providerIds: metadata?.providerIds ?? [],
@@ -345,25 +342,25 @@ export function createSeedEntityResolutionRegistry(rows: IngestResolvedRow[]): E
       releases.set(row.canonicalReleaseId, {
         id: row.canonicalReleaseId,
         title: metadata?.releaseTitle ?? row.title,
-        normalizedTitle: normalizeText(metadata?.releaseTitle ?? row.title),
+        normalizedTitle: normalize_title(metadata?.releaseTitle ?? row.title),
         upc: metadata?.upc ?? null,
         providerIds: metadata?.providerIds ?? [],
       });
     }
     const credits = getArtistCredits(row);
     credits.forEach((credit, index) => {
-      const canonicalId = row.canonicalArtistIds?.[index] ?? credit.canonicalArtistId ?? `artist_seed_${normalizeText(credit.displayName).replace(/\s+/g, "_")}`;
+      const canonicalId = row.canonicalArtistIds?.[index] ?? credit.canonicalArtistId ?? `artist_seed_${normalize_title(credit.displayName).replace(/\s+/g, "_")}`;
       artists.set(canonicalId, {
         id: canonicalId,
         displayName: credit.displayName,
-        normalizedName: normalizeText(credit.displayName),
+        normalizedName: normalize_title(credit.displayName),
         aliases: [credit.displayName],
         providerIds: credit.providerArtistIds ?? [],
       });
     });
     if (metadata?.labelName) {
-      const id = `label_seed_${normalizeText(metadata.labelName).replace(/\s+/g, "_")}`;
-      labels.set(id, { id, name: metadata.labelName, normalizedName: normalizeText(metadata.labelName), aliases: [metadata.labelName] });
+      const id = `label_seed_${normalize_title(metadata.labelName).replace(/\s+/g, "_")}`;
+      labels.set(id, { id, name: metadata.labelName, normalizedName: normalize_title(metadata.labelName), aliases: [metadata.labelName] });
     }
   }
 

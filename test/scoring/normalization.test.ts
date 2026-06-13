@@ -5,6 +5,12 @@
  * Covers: §3.1–§3.3 normalization, lead artist extraction,
  * key building, batch normalization, deduplication.
  *
+ * v1.0.2 update (2026-06-14):
+ * - Added zero-width character stripping tests
+ * - Added combining diacritic stripping tests (real assertions, not substring matches)
+ * - Added normalize_title_no_brackets() tests
+ * - Fixed false-positive diacritic test (was using toContain)
+ *
  * IMPORTANT: These tests drive 100% line + branch coverage on normalize.ts.
  * All edge cases and code paths must be exercised here.
  */
@@ -18,6 +24,7 @@ import {
   build_normalized_key,
   normalize_batch,
   deduplicate_pairs,
+  normalize_title_no_brackets,
 } from '@/services/chartsScoring/normalize';
 
 describe('§3 — normalize_title()', () => {
@@ -42,10 +49,31 @@ describe('§3 — normalize_title()', () => {
     expect(normalize_title('Song featuring Artist B')).not.toContain('featuring');
   });
 
-  it('strips diacritics via NFKD decomposition', () => {
-    // 'é' decomposes to 'e' + combining accent → accent stripped
-    const result = normalize_title('Café');
-    expect(result).toContain('cafe');
+  it('strips combining diacritics after NFKD — exact match not substring', () => {
+    // Before hardening: "Café" → "cafe\u0301" (toContain was a false positive)
+    // After hardening:  "Café" → "cafe" (combining mark stripped)
+    expect(normalize_title('Café')).toBe('cafe');
+    expect(normalize_title('Björk')).toBe('bjork');
+    expect(normalize_title('Nīūnyonaga')).toBe('niunyonaga');
+    expect(normalize_title('Crème Brûlée')).toBe('creme brulee');
+  });
+
+  it('strips zero-width and invisible formatting characters', () => {
+    // U+2060 = word joiner — backfill v11 lesson
+    expect(normalize_title('State\u2060Of\u2060My\u2060Heart')).toBe('stateofmyheart');
+    // U+200B = zero-width space
+    expect(normalize_title('I\u200BHATED\u200BYOUR\u200BRELATIONSHIP')).toBe('i hated your relationship');
+    // U+FEFF = BOM / zero-width no-break space
+    expect(normalize_title('\uFEFFSioni Haja')).toBe('sioni haja');
+    // U+00AD = soft hyphen
+    expect(normalize_title('soft\u00ADhyphen')).toBe('softhyphen');
+    // Mixed invisible chars
+    expect(normalize_title('\u200BHello\u2060\u200BWorld\uFEFF')).toBe('hello world');
+  });
+
+  it('handles combining diacritics + zero-width chars together', () => {
+    // Real-world regression: title with both combining chars AND zero-width joiner
+    expect(normalize_title('Café\u2060del\u2060Mar')).toBe('cafe del mar');
   });
 
   it('replaces hyphens, en-dashes, em-dashes with spaces', () => {
@@ -68,6 +96,58 @@ describe('§3 — normalize_title()', () => {
   it('preserves digits', () => {
     expect(normalize_title('Track 404')).toContain('404');
     expect(normalize_title('7 Days')).toContain('7');
+  });
+
+  it('is deterministic — same input always produces same output', () => {
+    fc.assert(
+      fc.property(fc.string(), (title) => {
+        const r1 = normalize_title(title);
+        const r2 = normalize_title(title);
+        expect(r1).toBe(r2);
+      }),
+      { numRuns: 500 },
+    );
+  });
+
+  it('never produces output with invisible characters', () => {
+    fc.assert(
+      fc.property(fc.string(), (title) => {
+        const result = normalize_title(title);
+        // Must not contain zero-width chars
+        expect(result).not.toMatch(/[\u200B\u200C\u200D\u2060\uFEFF\u00AD]/);
+        // Must not contain combining diacritics
+        expect(result).not.toMatch(/[\u0300-\u036F]/);
+      }),
+      { numRuns: 500 },
+    );
+  });
+});
+
+describe('§3 — normalize_title_no_brackets()', () => {
+  it('retains parenthetical content but strips brackets', () => {
+    expect(normalize_title_no_brackets('7 Days (Radio Edit)')).toBe('7 days radio edit');
+    expect(normalize_title_no_brackets('Buga (Remix)')).toBe('buga remix');
+    expect(normalize_title_no_brackets('Track [Bonus]')).toBe('track bonus');
+  });
+
+  it('still strips featuring credits', () => {
+    expect(normalize_title_no_brackets('Song feat. Artist B')).not.toContain('feat');
+    expect(normalize_title_no_brackets('Song ft. Artist B')).not.toContain('ft');
+  });
+
+  it('strips zero-width chars and combining diacritics', () => {
+    expect(normalize_title_no_brackets('Café\u2060(Remix)')).toBe('cafe remix');
+    expect(normalize_title_no_brackets('Björk [Live]')).toBe('bjork live');
+  });
+
+  it('distinguishes remix from original', () => {
+    // normalize_title strips parentheticals → both normalize to "buga"
+    // normalize_title_no_brackets keeps them → they differ
+    const original = normalize_title_no_brackets('Buga');
+    const remix = normalize_title_no_brackets('Buga (Remix)');
+    expect(original).toBe('buga');
+    expect(remix).toBe('buga remix');
+    expect(original).not.toBe(remix);
   });
 });
 
@@ -111,6 +191,17 @@ describe('§3 — normalize_artist()', () => {
     expect(normalize_artist('WizKid')).toBe('wizkid');
     expect(normalize_artist('Kizz Daniel')).toBe('kizz daniel');
   });
+
+  it('strips combining diacritics in artist names', () => {
+    expect(normalize_artist('Björk')).toBe('bjork');
+    expect(normalize_artist('Nīūnyonaga')).toBe('niunyonaga');
+    expect(normalize_artist('José González')).toBe('jose gonzalez');
+  });
+
+  it('strips zero-width characters in artist names', () => {
+    expect(normalize_artist('Artist\u200BN\u200Bame')).toBe('artist name');
+    expect(normalize_artist('\uFEFFDiamond Platnumz\u2060')).toBe('diamond platnumz');
+  });
 });
 
 describe('§3 — lead_artist_key()', () => {
@@ -150,6 +241,15 @@ describe('§3 — lead_artist_key()', () => {
 
   it('normalizes the extracted name', () => {
     expect(lead_artist_key('KIZZ DANIEL feat. Tekno')).toBe('kizz daniel');
+  });
+
+  it('strips diacritics from extracted lead artist', () => {
+    expect(lead_artist_key('Björk feat. Guest')).toBe('bjork');
+    expect(lead_artist_key('Nīūnyonaga ft. Someone')).toBe('niunyonaga');
+  });
+
+  it('strips zero-width chars from extracted lead artist', () => {
+    expect(lead_artist_key('\u200BLead\u200BArtist\u200B feat. Guest')).toBe('lead artist');
   });
 });
 
@@ -191,10 +291,25 @@ describe('§3 — build_normalized_key()', () => {
   });
 
   it('handles East African chart entry examples', () => {
-    // "Buga (Lo Lo Lo)" + "Kizz Daniel feat. Tekno" → "buga::kizz daniel"
     expect(build_normalized_key('Buga (Lo Lo Lo)', 'Kizz Daniel feat. Tekno')).toBe(
       'buga::kizz daniel',
     );
+  });
+
+  it('produces diacritic-free keys', () => {
+    const key = build_normalized_key('Café del Mar', 'Björk');
+    expect(key).toBe('cafe del mar::bjork');
+  });
+
+  it('produces zero-width-char-free keys', () => {
+    const key = build_normalized_key('\u200BMy\u200BSong\u200B', '\uFEFFArtist\u2060Name');
+    expect(key).toBe('my song::artist name');
+  });
+
+  it('two inputs differing only in diacritics produce same key', () => {
+    const keyWith = build_normalized_key('Café', 'Björk');
+    const keyWithout = build_normalized_key('Cafe', 'Bjork');
+    expect(keyWith).toBe(keyWithout);
   });
 });
 
@@ -229,6 +344,15 @@ describe('§3 — normalize_batch()', () => {
     expect(r.normalized_key).toBe(
       build_normalized_key('Test Track', 'Test Artist ft. Guest'),
     );
+  });
+
+  it('diacritic-only differences collapse to same key', () => {
+    const pairs = [
+      { title: 'Café', artist_line: 'Björk' },
+      { title: 'Cafe', artist_line: 'Bjork' },
+    ];
+    const result = normalize_batch(pairs);
+    expect(result[0].normalized_key).toBe(result[1].normalized_key);
   });
 });
 
@@ -274,7 +398,6 @@ describe('§3 — deduplicate_pairs()', () => {
     ]);
 
     const { unique } = deduplicate_pairs(pairs);
-    // Only the real pair makes it through
     expect(unique.every((p) => p.normalized_key !== '')).toBe(true);
   });
 

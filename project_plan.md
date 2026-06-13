@@ -611,3 +611,29 @@ npx vitest run test/scoring/
 ```
 
 Target: 100% pass rate across all 11 test files (Gate A pipeline, P1-P5 property tests, anti-gaming, normalization, golden-file migration, gate-c).
+
+---
+
+## Normalization Hardening ✅ COMPLETE (June 2026)
+
+### What We Learned from the Backfill (v1 → v13)
+
+The `backfill-chart-artwork` Edge Function surfaced 3 critical edge cases the scoring engine missed:
+
+- **v11**: Zero-width chars (U+2060, U+200B, U+FEFF, U+00AD) corrupt normalized keys silently
+- **v12**: Multi-pass matching needed: full-key → title-only → no-brackets → external fallback
+- **v13**: Combining diacritics (U+0300–U+036F) survive NFKD and create phantom key differences
+
+### What Was Broken
+
+Three separate normalize functions across 4 files, all producing different output for the same input. The existing "Café" test was a false positive (used `toContain` not `toBe`).
+
+### What We Fixed (7 changes across 5 files)
+
+1. `scoring/normalize.ts` — Added ZERO_WIDTH_CHARS + COMBINING_DIACRITICS stripping; added `normalize_title_no_brackets()`
+2. `canonicalMatch.ts` — Replaced weak `normalize()` with scoring engine imports
+3. `entityResolutionEngine.ts` — Replaced 22 `normalizeText()` calls with `normalize_title()`
+4. `richMetadataNormalize.ts` — Replaced `normalizeTitle()` with `normalize_title()`
+5. `test/scoring/normalization.test.ts` — 20+ new edge cases, property-based fuzz tests, fixed false positive
+
+Policy bumped 1.0.1 → 1.0.2. Remaining hardening: golden-file tests, Gate A regression, P4 carry-forward decay, backfill CI byte-for-byte verification.
