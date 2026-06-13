@@ -3,6 +3,7 @@ import type {
   NormalizedProviderRelease,
   NormalizedProviderTrack,
 } from '../../../types/registry/normalized-provider-payload';
+import { readAppleMusicCredentials } from "@/services/adminSettings/providerCredentialReader";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -103,11 +104,10 @@ export class AppleMusicAdapter {
   }
 
   static fromEnv(storefront = 'ke'): AppleMusicAdapter {
-    const developerToken = typeof import.meta !== 'undefined' && import.meta.env?.APPLE_MUSIC_DEVELOPER_TOKEN
-      ? String(import.meta.env.APPLE_MUSIC_DEVELOPER_TOKEN)
-      : '';
+    const creds = readAppleMusicCredentials();
+    const developerToken = creds.developerToken;
     if (!developerToken) {
-      throw new AppleMusicAdapterError('APPLE_MUSIC_DEVELOPER_TOKEN is required.');
+      throw new AppleMusicAdapterError('APPLE_MUSIC_DEVELOPER_TOKEN is required. Set it in Settings → Integrations or .env.local.');
     }
 
     return new AppleMusicAdapter({ developerToken, storefront });

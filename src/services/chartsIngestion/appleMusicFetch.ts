@@ -5,6 +5,7 @@
  */
 
 import type { NormalizedChartRow } from "./ingestStudioTypes";
+import { readAppleMusicCredentials } from "@/services/adminSettings/providerCredentialReader";
 
 // ─── Apple Music API Types ───
 interface AppleMusicSong {
@@ -55,8 +56,7 @@ interface AppleMusicChartResponse {
   }[];
 }
 
-// ─── Configuration ───
-const APPLE_MUSIC_DEV_TOKEN = import.meta.env.VITE_APPLE_MUSIC_DEVELOPER_TOKEN as string | undefined;
+// ─── Configuration (reads from Settings → Integrations or .env.local) ───
 
 export type AppleMusicFetchResult = {
   success: boolean;
@@ -193,13 +193,14 @@ export async function fetchFromAppleMusic(
   const start = performance.now();
   const warnings: string[] = [];
 
-  // Check if developer token is available
-  const devToken = APPLE_MUSIC_DEV_TOKEN;
+  // Check if developer token is available (from integrations settings or VITE_ env)
+  const creds = readAppleMusicCredentials();
+  const devToken = creds.developerToken;
   if (!devToken) {
     return {
       success: false,
       normalizedRows: [],
-      error: "Apple Music developer token not configured. Set VITE_APPLE_MUSIC_DEVELOPER_TOKEN in .env.local.",
+      error: "Apple Music developer token not configured. Set APPLE_MUSIC_DEVELOPER_TOKEN in Settings → Integrations or .env.local.",
       rawPayload: { credentialError: true, sourceUrl },
       warnings: ["Apple Music developer token not available — no data fetched"],
       metrics: { fetchedCount: 0, normalizedCount: 0, droppedCount: 0, durationMs: Math.round(performance.now() - start) },
@@ -279,4 +280,4 @@ export async function fetchFromAppleMusic(
 }
 
 // ─── Export helpers ───
-export { APPLE_MUSIC_DEV_TOKEN };
+export { readAppleMusicCredentials as getAppleMusicCredentials };

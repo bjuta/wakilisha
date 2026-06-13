@@ -1,8 +1,8 @@
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { useNavigate } from "react-router-dom";
 import { getIngestionMode } from "@/services/chartsIngestion/client";
-import { getEnrichmentProviderHealth } from "@/services/chartsIngestion/enrichment";
-import type { ProviderHealthStatus } from "@/services/chartsIngestion/enrichment";
+import { getProviderCredentialHealth } from "@/services/adminSettings/providerCredentialReader";
+import type { ProviderCredentialHealth } from "@/services/adminSettings/providerCredentialReader";
 
 const PROVIDER_ICONS: Record<string, string> = {
   Spotify: "ri-spotify-fill",
@@ -19,14 +19,12 @@ const PROVIDER_COLORS: Record<string, string> = {
 };
 
 interface ProviderRowProps {
-  health: ProviderHealthStatus;
+  health: ProviderCredentialHealth;
 }
 
 function ProviderRow({ health }: ProviderRowProps) {
   const color = PROVIDER_COLORS[health.provider];
   const icon = PROVIDER_ICONS[health.provider] || "ri-database-2-line";
-  const isLive = health.status === "live";
-  const isMocked = health.status === "mocked";
 
   return (
     <div className="flex items-start gap-2.5 py-2 first:pt-0 last:pb-0 border-b border-wk-border last:border-0">
@@ -37,14 +35,14 @@ function ProviderRow({ health }: ProviderRowProps) {
         <div className="flex items-center justify-between gap-2">
           <span className="text-[12px] font-semibold text-wk-text">{health.provider}</span>
           <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
-            isLive ? "bg-wk-success-soft text-wk-success" :
-            isMocked ? "bg-wk-warning-soft text-wk-warning" :
+            health.status === "live" ? "bg-wk-success-soft text-wk-success" :
+            health.status === "mocked" ? "bg-wk-warning-soft text-wk-warning" :
             "bg-wk-danger-soft text-wk-danger"
           }`}>
-            {isLive ? "Live" : isMocked ? "Mocked" : "No Creds"}
+            {health.status === "live" ? "Live" : health.status === "mocked" ? "Mocked" : "No Creds"}
           </span>
         </div>
-        {!isLive && !isMocked && (
+        {health.status === "missing_credentials" && (
           <div className="mt-0.5">
             {health.envVars.map((v) => (
               <code key={v} className="mr-1 text-[9px] font-mono text-wk-text-faint bg-wk-surface-raised px-1 py-0.5 rounded">
@@ -61,9 +59,9 @@ function ProviderRow({ health }: ProviderRowProps) {
 export function ProviderHealthPanel() {
   const navigate = useNavigate();
   const mode = getIngestionMode();
-  const enrichmentHealth = getEnrichmentProviderHealth();
-  const missingCount = enrichmentHealth.filter((h) => h.status === "missing_credentials").length;
-  const liveCount = enrichmentHealth.filter((h) => h.status === "live").length;
+  const providerHealth = getProviderCredentialHealth();
+  const missingCount = providerHealth.filter((h) => h.status === "missing_credentials").length;
+  const liveCount = providerHealth.filter((h) => h.status === "live").length;
 
   const registryStatus = {
     provider: "Registry DB",
@@ -96,7 +94,7 @@ export function ProviderHealthPanel() {
       </div>
 
       <div className="space-y-0">
-        {enrichmentHealth.map((h) => (
+        {providerHealth.map((h) => (
           <ProviderRow key={h.provider} health={h} />
         ))}
         <ProviderRow health={{ provider: "Registry DB", status: "mocked", message: registryStatus.message, envVars: [] }} />
@@ -106,10 +104,14 @@ export function ProviderHealthPanel() {
       {missingCount > 0 && (
         <div className="mt-3 rounded-lg border border-wk-warning/20 bg-wk-warning-soft px-3 py-2">
           <p className="text-[11px] font-semibold text-wk-warning mb-1">
-            <i className="ri-alert-line mr-1" />{missingCount} provider(s) running in mock mode
+            <i className="ri-alert-line mr-1" />{missingCount} provider(s) missing credentials
           </p>
           <p className="text-[10px] text-wk-text-soft">
-            Add credentials to <code className="font-mono">.env.local</code> and restart to enable real enrichment.
+            Configure provider credentials in{" "}
+            <button onClick={() => navigate("/admin/settings/integrations")} className="font-semibold underline hover:text-wk-brand">
+              Settings → Integrations
+            </button>
+            {" "}or add to <code className="font-mono">.env.local</code>.
           </p>
         </div>
       )}

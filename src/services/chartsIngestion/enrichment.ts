@@ -6,6 +6,12 @@
  */
 
 import type { IngestResolvedRow } from "./ingestStudioTypes";
+import {
+  readSpotifyCredentials,
+  readAppleMusicCredentials,
+  readAcrCloudCredentials,
+  readYouTubeCredentials,
+} from "@/services/adminSettings/providerCredentialReader";
 
 // ─── Enrichment Config ───
 export interface EnrichmentConfig {
@@ -80,21 +86,26 @@ export interface CredentialError {
 
 // ─── Credential Checks ───
 function getEnrichmentConfig(): EnrichmentConfig {
+  const spotify = readSpotifyCredentials();
+  const apple = readAppleMusicCredentials();
+  const acr = readAcrCloudCredentials();
+  const youtube = readYouTubeCredentials();
+
   return {
     spotify: {
-      clientId: import.meta.env.VITE_SPOTIFY_CLIENT_ID as string | undefined,
-      clientSecret: import.meta.env.VITE_SPOTIFY_CLIENT_SECRET as string | undefined,
+      clientId: spotify.clientId ?? undefined,
+      clientSecret: spotify.clientSecret ?? undefined,
     },
     appleMusic: {
-      developerToken: import.meta.env.VITE_APPLE_MUSIC_DEVELOPER_TOKEN as string | undefined,
+      developerToken: apple.developerToken ?? undefined,
     },
     acrCloud: {
-      host: import.meta.env.VITE_ACRCLOUD_HOST as string | undefined,
-      accessKey: import.meta.env.VITE_ACRCLOUD_ACCESS_KEY as string | undefined,
-      accessSecret: import.meta.env.VITE_ACRCLOUD_ACCESS_SECRET as string | undefined,
+      host: acr.host ?? undefined,
+      accessKey: acr.accessKey ?? undefined,
+      accessSecret: acr.accessSecret ?? undefined,
     },
     youtube: {
-      apiKey: import.meta.env.VITE_YOUTUBE_API_KEY as string | undefined,
+      apiKey: youtube.apiKey ?? undefined,
     },
   };
 }
@@ -106,29 +117,29 @@ export function checkEnrichmentCredentials(): CredentialError[] {
   if (!config.spotify?.clientId || !config.spotify?.clientSecret) {
     errors.push({
       provider: "Spotify",
-      envVarName: "VITE_SPOTIFY_CLIENT_ID / VITE_SPOTIFY_CLIENT_SECRET",
-      message: "Spotify enrichment disabled — set VITE_SPOTIFY_CLIENT_ID and VITE_SPOTIFY_CLIENT_SECRET in .env.local",
+      envVarName: "SPOTIFY_CLIENT_ID / SPOTIFY_CLIENT_SECRET",
+      message: "Spotify enrichment disabled — set SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET in Settings → Integrations or .env.local",
     });
   }
   if (!config.appleMusic?.developerToken) {
     errors.push({
       provider: "Apple Music",
-      envVarName: "VITE_APPLE_MUSIC_DEVELOPER_TOKEN",
-      message: "Apple Music enrichment disabled — set VITE_APPLE_MUSIC_DEVELOPER_TOKEN in .env.local",
+      envVarName: "APPLE_MUSIC_DEVELOPER_TOKEN",
+      message: "Apple Music enrichment disabled — set APPLE_MUSIC_DEVELOPER_TOKEN in Settings → Integrations or .env.local",
     });
   }
   if (!config.acrCloud?.host || !config.acrCloud?.accessKey || !config.acrCloud?.accessSecret) {
     errors.push({
       provider: "ACRCloud",
-      envVarName: "VITE_ACRCLOUD_HOST / VITE_ACRCLOUD_ACCESS_KEY / VITE_ACRCLOUD_ACCESS_SECRET",
-      message: "ACRCloud audio fingerprinting disabled — set ACRCloud credentials in .env.local",
+      envVarName: "ACR_HOST / ACR_ACCESS_KEY / ACR_ACCESS_SECRET",
+      message: "ACRCloud audio fingerprinting disabled — set ACRCloud credentials in Settings → Integrations or .env.local",
     });
   }
   if (!config.youtube?.apiKey) {
     errors.push({
       provider: "YouTube",
-      envVarName: "VITE_YOUTUBE_API_KEY",
-      message: "YouTube enrichment disabled — set VITE_YOUTUBE_API_KEY in .env.local",
+      envVarName: "YOUTUBE_API_KEY",
+      message: "YouTube enrichment disabled — set YOUTUBE_API_KEY in Settings → Integrations or .env.local",
     });
   }
 
@@ -144,7 +155,7 @@ async function enrichFromYouTube(title: string, artistNames: string[]): Promise<
 }> {
   const config = getEnrichmentConfig();
   if (!config.youtube?.apiKey) {
-    return { warning: "YouTube enrichment skipped — VITE_YOUTUBE_API_KEY not set" };
+    return { warning: "YouTube enrichment skipped — YOUTUBE_API_KEY not set in Settings → Integrations or .env.local" };
   }
 
   const query = encodeURIComponent(`${title} ${artistNames.join(" ")} official`);
@@ -153,7 +164,7 @@ async function enrichFromYouTube(title: string, artistNames: string[]): Promise<
   try {
     const res = await fetch(url);
     if (!res.ok) {
-      return { warning: `YouTube API returned ${res.status} — check VITE_YOUTUBE_API_KEY quota` };
+      return { warning: `YouTube API returned ${res.status} — check YOUTUBE_API_KEY quota` };
     }
     const data = await res.json() as {
       items?: { id: { videoId: string }; snippet: { title: string } }[];
@@ -181,7 +192,7 @@ async function enrichFromAppleMusic(providerTrackId: string, artistNames: string
 }> {
   const config = getEnrichmentConfig();
   if (!config.appleMusic?.developerToken) {
-    return { warning: "Apple Music enrichment skipped — VITE_APPLE_MUSIC_DEVELOPER_TOKEN not set" };
+    return { warning: "Apple Music enrichment skipped — APPLE_MUSIC_DEVELOPER_TOKEN not set in Settings → Integrations or .env.local" };
   }
 
   // Apple track ID from provider
@@ -235,7 +246,7 @@ async function enrichFromACRCloud(title: string, artistNames: string[]): Promise
 }> {
   const config = getEnrichmentConfig();
   if (!config.acrCloud?.host || !config.acrCloud?.accessKey || !config.acrCloud?.accessSecret) {
-    return { warning: "ACRCloud enrichment skipped — set VITE_ACRCLOUD_HOST, VITE_ACRCLOUD_ACCESS_KEY, VITE_ACRCLOUD_ACCESS_SECRET" };
+    return { warning: "ACRCloud enrichment skipped — set ACR_HOST, ACR_ACCESS_KEY, ACR_ACCESS_SECRET in Settings → Integrations or .env.local" };
   }
 
   // ACRCloud requires audio data for fingerprinting — defer to server-side proxy.
@@ -251,8 +262,8 @@ async function enrichFromACRCloud(title: string, artistNames: string[]): Promise
       },
     });
     if (!res.ok) {
-      if (res.status === 401) return { warning: "ACRCloud: invalid access key — check VITE_ACRCLOUD_ACCESS_KEY" };
-      if (res.status === 403) return { warning: "ACRCloud: access denied — VITE_ACRCLOUD_ACCESS_KEY may lack metadata permissions" };
+      if (res.status === 401) return { warning: "ACRCloud: invalid access key — check ACR_ACCESS_KEY in Settings → Integrations" };
+      if (res.status === 403) return { warning: "ACRCloud: access denied — ACR_ACCESS_KEY may lack metadata permissions" };
       return { warning: `ACRCloud API ${res.status}` };
     }
     const data = await res.json() as {
@@ -310,7 +321,7 @@ async function enrichFromSpotify(
 }> {
   const config = getEnrichmentConfig();
   if (!config.spotify?.clientId || !config.spotify?.clientSecret) {
-    return { warning: "Spotify enrichment skipped — set VITE_SPOTIFY_CLIENT_ID and VITE_SPOTIFY_CLIENT_SECRET" };
+    return { warning: "Spotify enrichment skipped — set SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET in Settings → Integrations or .env.local" };
   }
 
   const token = await getSpotifyAccessTokenForEnrich(
@@ -318,7 +329,7 @@ async function enrichFromSpotify(
     config.spotify.clientSecret
   );
   if (!token) {
-    return { warning: "Spotify enrichment failed — could not obtain access token. Check VITE_SPOTIFY_CLIENT_ID and VITE_SPOTIFY_CLIENT_SECRET" };
+    return { warning: "Spotify enrichment failed — could not obtain access token. Check SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET in Settings → Integrations" };
   }
 
   const trackId = providerTrackId?.replace("spotify:track:", "");
@@ -347,7 +358,7 @@ async function enrichFromSpotify(
     });
     if (!res.ok) {
       if (res.status === 404) return { warning: `Spotify track not found: ${trackId}` };
-      if (res.status === 429) return { warning: "Spotify rate limit exceeded — retry after backoff. Check VITE_SPOTIFY_CLIENT_ID usage." };
+      if (res.status === 429) return { warning: "Spotify rate limit exceeded — retry after backoff. Check SPOTIFY_CLIENT_ID usage." };
       return { warning: `Spotify API ${res.status} for track ${trackId}` };
     }
     const track = await res.json() as SpotifyTrackDetail;
@@ -585,8 +596,8 @@ export function getEnrichmentProviderHealth(): ProviderHealthStatus[] {
     status: config.spotify?.clientId && config.spotify?.clientSecret ? "live" : "missing_credentials",
     message: config.spotify?.clientId && config.spotify?.clientSecret
       ? "Credentials configured — real API calls will be made"
-      : "Missing credentials — set VITE_SPOTIFY_CLIENT_ID and VITE_SPOTIFY_CLIENT_SECRET",
-    envVars: ["VITE_SPOTIFY_CLIENT_ID", "VITE_SPOTIFY_CLIENT_SECRET"],
+      : "Missing credentials — set SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET in Settings → Integrations or .env.local",
+    envVars: ["SPOTIFY_CLIENT_ID", "SPOTIFY_CLIENT_SECRET"],
   });
 
   results.push({
@@ -594,8 +605,8 @@ export function getEnrichmentProviderHealth(): ProviderHealthStatus[] {
     status: config.appleMusic?.developerToken ? "live" : "missing_credentials",
     message: config.appleMusic?.developerToken
       ? "Developer token configured — real API calls will be made"
-      : "Missing developer token — set VITE_APPLE_MUSIC_DEVELOPER_TOKEN",
-    envVars: ["VITE_APPLE_MUSIC_DEVELOPER_TOKEN"],
+      : "Missing developer token — set APPLE_MUSIC_DEVELOPER_TOKEN in Settings → Integrations or .env.local",
+    envVars: ["APPLE_MUSIC_DEVELOPER_TOKEN"],
   });
 
   results.push({
@@ -605,8 +616,8 @@ export function getEnrichmentProviderHealth(): ProviderHealthStatus[] {
       : "missing_credentials",
     message: config.acrCloud?.host && config.acrCloud?.accessKey && config.acrCloud?.accessSecret
       ? "ACRCloud configured — audio fingerprint enrichment available"
-      : "Missing ACRCloud credentials — set VITE_ACRCLOUD_HOST, VITE_ACRCLOUD_ACCESS_KEY, VITE_ACRCLOUD_ACCESS_SECRET. Note: audio fingerprinting requires a server-side proxy.",
-    envVars: ["VITE_ACRCLOUD_HOST", "VITE_ACRCLOUD_ACCESS_KEY", "VITE_ACRCLOUD_ACCESS_SECRET"],
+      : "Missing ACRCloud credentials — set ACR_HOST, ACR_ACCESS_KEY, ACR_ACCESS_SECRET in Settings → Integrations or .env.local. Note: audio fingerprinting requires a server-side proxy.",
+    envVars: ["ACR_HOST", "ACR_ACCESS_KEY", "ACR_ACCESS_SECRET"],
   });
 
   results.push({
@@ -614,8 +625,8 @@ export function getEnrichmentProviderHealth(): ProviderHealthStatus[] {
     status: config.youtube?.apiKey ? "live" : "missing_credentials",
     message: config.youtube?.apiKey
       ? "YouTube API key configured — video search enrichment active"
-      : "Missing YouTube API key — set VITE_YOUTUBE_API_KEY",
-    envVars: ["VITE_YOUTUBE_API_KEY"],
+      : "Missing YouTube API key — set YOUTUBE_API_KEY in Settings → Integrations or .env.local",
+    envVars: ["YOUTUBE_API_KEY"],
   });
 
   return results;

@@ -12,6 +12,8 @@ import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { AdminChartsPageHeader } from "../components/AdminChartsPageHeader";
 import { AdminChartsKpiCard } from "../components/AdminChartsKpiCard";
 import { AdminChartsStatusBadge } from "../components/AdminChartsStatusBadge";
+import { getProviderCredentialHealth } from "@/services/adminSettings/providerCredentialReader";
+import type { ProviderCredentialHealth } from "@/services/adminSettings/providerCredentialReader";
 
 type TestStatus = "idle" | "running" | "ok" | "error";
 interface HealthResult { ok: boolean; plugin: string; charts_ingestion: boolean; version: string; }
@@ -22,36 +24,6 @@ interface EndpointTestResult {
   durationMs?: number;
   message?: string;
 }
-
-const PROVIDER_HEALTH = [
-  {
-    key: "spotify",
-    label: "Spotify Web API",
-    icon: "ri-spotify-fill",
-    color: "#1DB954",
-    envVars: ["VITE_SPOTIFY_CLIENT_ID", "VITE_SPOTIFY_CLIENT_SECRET"],
-    status: "mock" as const,
-    statusLabel: "Mock mode — credentials server-side only",
-  },
-  {
-    key: "apple_music",
-    label: "Apple Music API",
-    icon: "ri-apple-fill",
-    color: "",
-    envVars: ["VITE_APPLE_MUSIC_DEVELOPER_TOKEN"],
-    status: "mock" as const,
-    statusLabel: "Mock mode — developer token required",
-  },
-  {
-    key: "registry",
-    label: "Registry DB",
-    icon: "ri-database-2-line",
-    color: "",
-    envVars: ["VITE_SUPABASE_URL", "VITE_SUPABASE_ANON_KEY"],
-    status: "not_connected" as const,
-    statusLabel: "Supabase not connected",
-  },
-];
 
 const METHOD_COLOR_MAP: Record<string, string> = {
   GET: "bg-wk-success-soft text-wk-success",
@@ -250,29 +222,45 @@ export default function AdminChartsIngestHealth() {
       <WkSurface className="p-5">
         <h2 className="mb-4 text-[14px] font-bold text-wk-text">Provider Credentials</h2>
         <div className="space-y-3">
-          {PROVIDER_HEALTH.map((provider) => (
-            <div key={provider.key} className="flex items-center justify-between rounded-lg border border-wk-border p-3">
+          {getProviderCredentialHealth().map((provider) => (
+            <div key={provider.provider} className="flex items-center justify-between rounded-lg border border-wk-border p-3">
               <div className="flex items-center gap-3">
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-wk-surface-raised">
-                  <i className={`${provider.icon} text-[16px]`} style={{ color: provider.color || undefined }} />
+                  <i className={`${
+                    provider.provider === "Spotify" ? "ri-spotify-fill" :
+                    provider.provider === "Apple Music" ? "ri-apple-fill" :
+                    provider.provider === "ACRCloud" ? "ri-fingerprint-line" :
+                    provider.provider === "YouTube" ? "ri-youtube-fill" :
+                    provider.provider === "Airplay" ? "ri-radio-line" :
+                    "ri-database-2-line"
+                  } text-[16px]`} style={{ color: provider.provider === "Spotify" ? "#1DB954" : provider.provider === "Apple Music" ? "#FA233B" : provider.provider === "ACRCloud" ? "#FF6B2C" : provider.provider === "YouTube" ? "#FF0000" : undefined }} />
                 </div>
                 <div>
-                  <p className="text-[13px] font-semibold text-wk-text">{provider.label}</p>
+                  <p className="text-[13px] font-semibold text-wk-text">{provider.provider}</p>
                   <p className="text-[11px] text-wk-text-muted">
                     {provider.envVars.map((v) => <code key={v} className="mr-1">{v}</code>)}
                   </p>
                 </div>
               </div>
-              <AdminChartsStatusBadge status="mocked" size="sm" />
+              <AdminChartsStatusBadge
+                status={provider.status === "live" ? "ready" : provider.status === "mocked" ? "mocked" : "not_configured"}
+                size="sm"
+              />
             </div>
           ))}
         </div>
         <div className="mt-4 rounded-lg bg-wk-surface-raised p-3">
-          <p className="text-[12px] font-semibold text-wk-text mb-2">Add to .env.local for real provider fetch:</p>
-          <pre className="text-[11px] text-wk-text-soft overflow-x-auto">{`VITE_SPOTIFY_CLIENT_ID=your_spotify_client_id
-VITE_SPOTIFY_CLIENT_SECRET=your_spotify_client_secret
-VITE_APPLE_MUSIC_DEVELOPER_TOKEN=your_apple_developer_token`}</pre>
-          <p className="mt-2 text-[11px] text-wk-text-muted">Restart dev server after adding. In production, store credentials server-side as WP options or edge function secrets.</p>
+          <p className="text-[12px] font-semibold text-wk-text mb-2">Credentials are read from:</p>
+          <ol className="list-decimal list-inside text-[11px] text-wk-text-soft space-y-0.5">
+            <li><strong>Settings → Integrations</strong> — saved via admin UI, synced to Supabase edge function secrets</li>
+            <li><code className="font-mono">.env.local</code> — build-time VITE_* environment variables (requires restart)</li>
+          </ol>
+          <p className="mt-2 text-[11px] text-wk-text-muted">
+            <button onClick={() => navigate("/admin/settings/integrations")} className="font-semibold underline hover:text-wk-brand">
+              Go to Integrations Settings
+            </button>
+            {" "}to manage credentials.
+          </p>
         </div>
       </WkSurface>
 

@@ -5,6 +5,7 @@
  */
 
 import type { NormalizedChartRow } from "./ingestStudioTypes";
+import { readSpotifyCredentials } from "@/services/adminSettings/providerCredentialReader";
 
 // ─── Spotify API Types ───
 interface SpotifyPlaylistTrack {
@@ -36,9 +37,7 @@ interface SpotifyPlaylistResponse {
   };
 }
 
-// ─── Configuration ───
-const SPOTIFY_CLIENT_ID = import.meta.env.VITE_SPOTIFY_CLIENT_ID as string | undefined;
-const SPOTIFY_CLIENT_SECRET = import.meta.env.VITE_SPOTIFY_CLIENT_SECRET as string | undefined;
+// ─── Configuration (reads from Settings → Integrations or .env.local) ───
 
 export type SpotifyFetchResult = {
   success: boolean;
@@ -63,13 +62,14 @@ export function parseSpotifyPlaylistUrl(url: string): { type: "playlist"; id: st
 
 // ─── Client Credentials Token ───
 async function getSpotifyAccessToken(): Promise<string | null> {
-  if (!SPOTIFY_CLIENT_ID || !SPOTIFY_CLIENT_SECRET) return null;
+  const creds = readSpotifyCredentials();
+  if (!creds.configured) return null;
   try {
     const response = await fetch("https://accounts.spotify.com/api/token", {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
-        Authorization: `Basic ${btoa(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`)}`,
+        Authorization: `Basic ${btoa(`${creds.clientId}:${creds.clientSecret}`)}`,
       },
       body: "grant_type=client_credentials",
     });
@@ -152,7 +152,7 @@ export async function fetchFromSpotify(
     return {
       success: false,
       normalizedRows: [],
-      error: "Spotify credentials not configured. Set VITE_SPOTIFY_CLIENT_ID and VITE_SPOTIFY_CLIENT_SECRET in .env.local.",
+      error: "Spotify credentials not configured. Set SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET in Settings → Integrations or .env.local.",
       rawPayload: { credentialError: true, sourceUrl },
       warnings: ["Spotify client credentials not available — no data fetched"],
       metrics: { fetchedCount: 0, normalizedCount: 0, droppedCount: 0, durationMs: Math.round(performance.now() - start) },

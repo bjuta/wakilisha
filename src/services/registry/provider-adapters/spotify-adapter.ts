@@ -15,6 +15,7 @@
  */
 
 import type { NormalizedProviderRelease } from '../../../types/registry/normalized-provider-payload';
+import { readSpotifyCredentials } from "@/services/adminSettings/providerCredentialReader";
 
 export class SpotifyAdapter {
   private readonly clientId: string;
@@ -24,6 +25,18 @@ export class SpotifyAdapter {
   constructor(clientId: string, clientSecret: string) {
     this.clientId = clientId;
     this.clientSecret = clientSecret;
+  }
+
+  /**
+   * Create a SpotifyAdapter from stored credentials (Settings → Integrations or .env.local).
+   * Throws if credentials are not configured.
+   */
+  static fromStore(): SpotifyAdapter {
+    const creds = readSpotifyCredentials();
+    if (!creds.configured) {
+      throw new Error("Spotify credentials not configured. Set SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET in Settings → Integrations or .env.local.");
+    }
+    return new SpotifyAdapter(creds.clientId!, creds.clientSecret!);
   }
 
   async authenticate(): Promise<void> {
