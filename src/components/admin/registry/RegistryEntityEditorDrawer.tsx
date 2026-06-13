@@ -83,7 +83,7 @@ export default function RegistryEntityEditorDrawer({
   const [draft, setDraft] = useState<Record<string, unknown>>(() => ({ ...entity }));
   const [saving, setSaving] = useState(false);
   const [saveResult, setSaveResult] = useState<RegistrySaveResult | null>(null);
-  const [validationErrors, setValidationErrors] = useState<Record<string, string>>();
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [showSystemFields, setShowSystemFields] = useState(false);
   const drawerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();

@@ -26,7 +26,7 @@ interface ArtistDiscographyProps {
   emptyDescription?: string;
 }
 
-type Filter = "All" | "Albums" | "EPs";
+type Filter = "All" | "Albums" | "EPs" | "Singles";
 
 function formatYear(dateStr?: string, year?: string | number): string {
   if (year) return String(year);
@@ -152,14 +152,16 @@ export function ArtistDiscography({
     if (filter === "All") return true;
     if (filter === "Albums") return r.releaseType === "Album";
     if (filter === "EPs") return r.releaseType === "EP";
+    if (filter === "Singles") return r.releaseType === "single";
     return true;
   });
 
-  const filters: Filter[] = ["All", "Albums", "EPs"];
+  const filters: Filter[] = ["All", "Albums", "EPs", "Singles"];
   const counts: Record<Filter, number> = {
     All: sortedReleases.length,
     Albums: sortedReleases.filter((r) => r.releaseType === "Album").length,
     EPs: sortedReleases.filter((r) => r.releaseType === "EP").length,
+    Singles: sortedReleases.filter((r) => r.releaseType === "single").length,
   };
 
   return (

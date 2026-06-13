@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/lib/supabase";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
-import { supabase } from "@/lib/supabase";
 
 /* ─── Types ─── */
 
@@ -93,6 +93,8 @@ function sourceLabel(source: string): string {
       return "WP Tracks";
     case "apple_music":
       return "Apple Music";
+    case "apple_music_ingest":
+      return "Apple Music";
     case "spotify":
       return "Spotify";
     default:
@@ -120,137 +122,162 @@ export function DiscographyPanel({ artistSlug }: { artistSlug: string }) {
   const [releases, setReleases] = useState<DiscographyRelease[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [ingesting, setIngesting] = useState(false);
+  const [ingestResult, setIngestResult] = useState<string | null>(null);
 
-  useEffect(() => {
+  const loadDiscography = useCallback(async () => {
     if (!artistSlug) return;
-    let cancelled = false;
+    setLoading(true);
+    setError(null);
 
-    async function load() {
-      setLoading(true);
-      setError(null);
+    /* 1. Get artist-release links via RPC */
+    const { data: links, error: linkErr } = await supabase
+      .rpc("get_release_artists_for_anon_v2", { p_artist_slug: artistSlug });
 
-      /* 1. Get artist-release links */
-      const { data: links, error: linkErr } = await supabase
-        .from("registry_release_artists")
-        .select("release_id, role, is_primary, source, confidence")
-        .eq("artist_slug", artistSlug)
-        .order("created_at", { ascending: false });
+    if (linkErr) {
+      setError(linkErr.message);
+      setLoading(false);
+      return;
+    }
 
-      if (linkErr) {
-        if (!cancelled) { setError(linkErr.message); setLoading(false); }
-        return;
-      }
+    if (!links || links.length === 0) {
+      setReleases([]);
+      setLoading(false);
+      return;
+    }
 
-      if (!links || links.length === 0) {
-        if (!cancelled) { setReleases([]); setLoading(false); }
-        return;
-      }
+    /* 2. Get release metadata via RPC */
+    const releaseIds = [...new Set((links as Array<{ release_id: string }>).map((l) => l.release_id))];
+    const { data: releaseRows, error: releaseErr } = await supabase
+      .rpc("get_releases_by_ids_v2", { p_release_ids: releaseIds });
 
-      /* 2. Get release metadata */
-      const releaseIds = [...new Set(links.map((l) => l.release_id))];
-      const { data: releaseRows, error: releaseErr } = await supabase
-        .from("registry_releases")
-        .select("id, slug, title, release_type, release_date, artwork_url, status, metadata")
-        .in("id", releaseIds);
+    if (releaseErr) {
+      setError(releaseErr.message);
+      setLoading(false);
+      return;
+    }
 
-      if (releaseErr) {
-        if (!cancelled) { setError(releaseErr.message); setLoading(false); }
-        return;
-      }
+    const releaseById = new Map((releaseRows || []).map((r: RegistryRelease) => [r.id, r]));
 
-      const releaseById = new Map((releaseRows || []).map((r) => [r.id, r]));
+    /* 3. Get track count per release via RPC */
+    const { data: trackLinks, error: trackLinkErr } = await supabase
+      .rpc("get_release_tracks_by_ids", { p_release_ids: releaseIds });
 
-      /* 3. Get track count per release via registry_release_tracks */
-      const { data: trackLinks, error: trackLinkErr } = await supabase
-        .from("registry_release_tracks")
-        .select("release_id, track_id, track_number, disc_number")
-        .in("release_id", releaseIds);
+    if (trackLinkErr) {
+      setError(trackLinkErr.message);
+      setLoading(false);
+      return;
+    }
 
-      if (trackLinkErr) {
-        if (!cancelled) { setError(trackLinkErr.message); setLoading(false); }
-        return;
-      }
+    const trackCountByRelease = new Map<string, number>();
+    const trackLinksByRelease = new Map<string, ReleaseTrackLink[]>();
 
-      const trackCountByRelease = new Map<string, number>();
-      const trackLinksByRelease = new Map<string, ReleaseTrackLink[]>();
-
-      for (const tl of (trackLinks || [])) {
-        const rid = tl.release_id;
-        trackCountByRelease.set(rid, (trackCountByRelease.get(rid) || 0) + 1);
-        if (!trackLinksByRelease.has(rid)) trackLinksByRelease.set(rid, []);
-        trackLinksByRelease.get(rid)!.push(tl);
-      }
-
-      /* 4. Get track details */
-      const allTrackIds = [...new Set((trackLinks || []).map((tl) => tl.track_id))];
-      const trackById = new Map<string, RegistryTrack>();
-
-      if (allTrackIds.length > 0) {
-        const { data: trackRows } = await supabase
-          .from("registry_tracks")
-          .select("id, title, slug, duration_ms, track_number, disc_number, artwork_url")
-          .in("id", allTrackIds);
-
-        for (const t of (trackRows || [])) {
-          trackById.set(t.id, t as RegistryTrack);
-        }
-      }
-
-      /* 5. Build release objects, sorted by date */
-      const built: DiscographyRelease[] = (links as ReleaseArtistLink[])
-        .filter((l) => releaseById.has(l.release_id))
-        .map((l) => {
-          const r = releaseById.get(l.release_id)!;
-          const tls = trackLinksByRelease.get(r.id) || [];
-          const tracks: DiscographyTrack[] = tls
-            .map((tl) => {
-              const t = trackById.get(tl.track_id);
-              return {
-                id: tl.track_id,
-                slug: t?.slug || tl.track_id,
-                title: t?.title || `Track ${tl.track_number || "?"}`,
-                duration: formatDuration(t?.duration_ms || null),
-                trackNumber: tl.track_number || t?.track_number || 0,
-                artworkUrl: t?.artwork_url || r.artwork_url || "",
-              };
-            })
-            .sort((a, b) => a.trackNumber - b.trackNumber);
-
-          return {
-            id: r.id,
-            slug: r.slug,
-            title: r.title,
-            releaseType: r.release_type || "album",
-            releaseDate: r.release_date || "",
-            year: formatYear(r.release_date),
-            artworkUrl: r.artwork_url || "",
-            role: l.role || "primary_artist",
-            isPrimary: l.is_primary,
-            source: l.source || "unknown",
-            confidence: l.confidence || 0,
-            trackCount: tracks.length || trackCountByRelease.get(r.id) || 0,
-            tracks,
-            expanded: false,
-          };
-        });
-
-      // Sort by date descending
-      built.sort((a, b) => {
-        if (!a.releaseDate && !b.releaseDate) return 0;
-        if (!a.releaseDate) return 1;
-        if (!b.releaseDate) return -1;
-        return b.releaseDate.localeCompare(a.releaseDate);
+    for (const tl of (trackLinks || [])) {
+      const rid = (tl as Record<string, unknown>).release_id as string;
+      trackCountByRelease.set(rid, (trackCountByRelease.get(rid) || 0) + 1);
+      if (!trackLinksByRelease.has(rid)) trackLinksByRelease.set(rid, []);
+      trackLinksByRelease.get(rid)!.push({
+        track_id: (tl as Record<string, unknown>).track_id as string,
+        track_number: (tl as Record<string, unknown>).track_number as number | null,
+        disc_number: (tl as Record<string, unknown>).disc_number as number | null,
       });
+    }
 
-      if (!cancelled) {
-        setReleases(built);
-        setLoading(false);
+    /* 4. Get track details via RPC */
+    const allTrackIds = [...new Set((trackLinks || []).map((tl) => (tl as Record<string, unknown>).track_id as string))];
+    const trackById = new Map<string, RegistryTrack>();
+
+    if (allTrackIds.length > 0) {
+      const { data: trackRows } = await supabase
+        .rpc("get_tracks_by_ids", { p_track_ids: allTrackIds });
+
+      for (const t of (trackRows || [])) {
+        trackById.set((t as RegistryTrack).id, t as RegistryTrack);
       }
     }
 
-    load();
-    return () => { cancelled = true; };
+    /* 5. Build release objects, sorted by date */
+    const built: DiscographyRelease[] = (links as Array<Record<string, unknown>>)
+      .filter((l) => releaseById.has(l.release_id as string))
+      .map((l) => {
+        const r = releaseById.get(l.release_id as string)!;
+        const tls = trackLinksByRelease.get(r.id) || [];
+        const tracks: DiscographyTrack[] = tls
+          .map((tl) => {
+            const t = trackById.get(tl.track_id);
+            return {
+              id: tl.track_id,
+              slug: t?.slug || tl.track_id,
+              title: t?.title || `Track ${tl.track_number || "?"}`,
+              duration: formatDuration(t?.duration_ms || null),
+              trackNumber: tl.track_number || t?.track_number || 0,
+              artworkUrl: t?.artwork_url || r.artwork_url || "",
+            };
+          })
+          .sort((a, b) => a.trackNumber - b.trackNumber);
+
+        return {
+          id: r.id,
+          slug: r.slug,
+          title: r.title,
+          releaseType: r.release_type || "album",
+          releaseDate: r.release_date || "",
+          year: formatYear(r.release_date),
+          artworkUrl: r.artwork_url || "",
+          role: (l.role as string) || "primary_artist",
+          isPrimary: l.is_primary as boolean,
+          source: (l.source as string) || "unknown",
+          confidence: (l.confidence as number) || 0,
+          trackCount: tracks.length || trackCountByRelease.get(r.id) || 0,
+          tracks,
+          expanded: false,
+        };
+      });
+
+    // Sort by date descending
+    built.sort((a, b) => {
+      if (!a.releaseDate && !b.releaseDate) return 0;
+      if (!a.releaseDate) return 1;
+      if (!b.releaseDate) return -1;
+      return b.releaseDate.localeCompare(a.releaseDate);
+    });
+
+    setReleases(built);
+    setLoading(false);
   }, [artistSlug]);
+
+  useEffect(() => {
+    loadDiscography();
+  }, [loadDiscography]);
+
+  const handleRefreshFromAppleMusic = async () => {
+    setIngesting(true);
+    setIngestResult(null);
+    try {
+      const { data, error: invokeError } = await supabase.functions.invoke(
+        "ingest-artist-discography",
+        { body: { artistSlug } }
+      );
+      if (invokeError) {
+        setIngestResult(invokeError.message);
+      } else if (data?.ok) {
+        const summary = data.summary as Record<string, unknown> | undefined;
+        const releasesCreated = summary?.releases_created || 0;
+        const tracksCreated = summary?.tracks_created || 0;
+        setIngestResult(
+          `Found ${data.albums_fetched || 0} albums on Apple Music. Created ${releasesCreated} releases, ${tracksCreated} tracks in registry.`
+        );
+        // Reload discography to show new data
+        await loadDiscography();
+      } else {
+        setIngestResult((data?.error as string) || "Unknown error from ingest function");
+      }
+    } catch (err) {
+      setIngestResult(err instanceof Error ? err.message : "Failed to invoke ingest function");
+    } finally {
+      setIngesting(false);
+    }
+  };
 
   const toggleExpand = (releaseId: string) => {
     setReleases((prev) =>
@@ -322,8 +349,44 @@ export function DiscographyPanel({ artistSlug }: { artistSlug: string }) {
               </span>
             </>
           )}
+          <div className="h-4 w-px bg-wk-border mx-1" />
+          <button
+            onClick={handleRefreshFromAppleMusic}
+            disabled={ingesting}
+            className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider border border-wk-border bg-wk-surface hover:bg-wk-surface-raised text-wk-text-muted hover:text-wk-text disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer whitespace-nowrap"
+            title="Search Apple Music for this artist's albums and import them into the registry"
+          >
+            <WkIcon
+              name={ingesting ? "Loader2" : "Search"}
+              size={11}
+              className={ingesting ? "animate-spin" : ""}
+            />
+            {ingesting ? "Importing..." : "Apple Music"}
+          </button>
         </div>
       </div>
+
+      {/* Ingest result feedback */}
+      {ingestResult && (
+        <div
+          className={`mb-4 rounded-lg border p-3 text-[12px] font-semibold flex items-start gap-2 ${
+            ingestResult.includes("error") || ingestResult.includes("Failed")
+              ? "border-wk-danger/20 bg-wk-danger-soft text-wk-danger"
+              : "border-wk-success/20 bg-wk-success-soft text-wk-success"
+          }`}
+        >
+          <WkIcon
+            name={
+              ingestResult.includes("error") || ingestResult.includes("Failed")
+                ? "AlertTriangle"
+                : "CheckCircle2"
+            }
+            size={14}
+            className="shrink-0 mt-0.5"
+          />
+          <span>{ingestResult}</span>
+        </div>
+      )}
 
       {releases.length === 0 ? (
         <p className="text-[12px] text-wk-text-faint italic py-4 text-center">

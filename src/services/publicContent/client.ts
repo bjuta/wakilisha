@@ -174,106 +174,67 @@ export interface RegistryDiscographyRelease {
   tracks: Array<{ title: string; duration: string }>;
 }
 
+/* ─── Registry Standalone Tracks ─── */
+
+export interface RegistryStandaloneTrack {
+  id: string;
+  slug: string;
+  title: string;
+  duration: string;
+  image: string;
+  artists: string;
+  songUrl: string;
+}
+
+/* ─── Shared cache for edge function response ─── */
+
+const discographyCache = new Map<string, { releases: RegistryDiscographyRelease[]; standaloneTracks: RegistryStandaloneTrack[] }>();
+
+async function fetchDiscographyFromEdge(
+  artistSlug: string
+): Promise<{ releases: RegistryDiscographyRelease[]; standaloneTracks: RegistryStandaloneTrack[] }> {
+  const cached = discographyCache.get(artistSlug);
+  if (cached) return cached;
+
+  const supabaseUrl = (import.meta.env.VITE_PUBLIC_SUPABASE_URL as string) || "";
+  const resp = await fetch(
+    `${supabaseUrl}/functions/v1/artist-discography?slug=${encodeURIComponent(artistSlug)}`,
+    { headers: { Accept: "application/json" } }
+  );
+  if (!resp.ok) {
+    const empty = { releases: [], standaloneTracks: [] };
+    discographyCache.set(artistSlug, empty);
+    return empty;
+  }
+  const payload = await resp.json();
+  const result = {
+    releases: (payload?.releases || []) as RegistryDiscographyRelease[],
+    standaloneTracks: (payload?.standaloneTracks || []) as RegistryStandaloneTrack[],
+  };
+  discographyCache.set(artistSlug, result);
+  return result;
+}
+
 export async function getArtistDiscographyFromRegistry(
   artistSlug: string
 ): Promise<RegistryDiscographyRelease[]> {
-  /* 1. Get artist-release links */
-  const { data: links, error: linkErr } = await supabase
-    .from("registry_release_artists")
-    .select("release_id, is_primary")
-    .eq("artist_slug", artistSlug)
-    .eq("is_primary", true)
-    .order("created_at", { ascending: false });
-
-  if (linkErr || !links || links.length === 0) return [];
-
-  const releaseIds = [...new Set(links.map((l) => l.release_id))];
-
-  /* 2. Get release metadata */
-  const { data: releaseRows, error: releaseErr } = await supabase
-    .from("registry_releases")
-    .select("id, slug, title, release_type, release_date, artwork_url")
-    .in("id", releaseIds);
-
-  if (releaseErr || !releaseRows) return [];
-
-  const releaseById = new Map(releaseRows.map((r) => [r.id, r]));
-
-  /* 3. Get track count per release */
-  const { data: trackLinks } = await supabase
-    .from("registry_release_tracks")
-    .select("release_id, track_id, track_number")
-    .in("release_id", releaseIds);
-
-  const trackCountByRelease = new Map<string, number>();
-  const trackIdsByRelease = new Map<string, { trackId: string; trackNumber: number }[]>();
-
-  for (const tl of (trackLinks || [])) {
-    const rid = tl.release_id;
-    trackCountByRelease.set(rid, (trackCountByRelease.get(rid) || 0) + 1);
-    if (!trackIdsByRelease.has(rid)) trackIdsByRelease.set(rid, []);
-    trackIdsByRelease.get(rid)!.push({ trackId: tl.track_id, trackNumber: tl.track_number || 0 });
+  try {
+    const data = await fetchDiscographyFromEdge(artistSlug);
+    return data.releases;
+  } catch {
+    return [];
   }
+}
 
-  /* 4. Get track details for releases with ≤20 tracks */
-  const allTrackIds = [...new Set((trackLinks || []).map((tl) => tl.track_id))];
-  const trackById = new Map<string, { title: string; duration_ms: number | null }>();
-
-  if (allTrackIds.length > 0 && allTrackIds.length <= 500) {
-    const { data: trackRows } = await supabase
-      .from("registry_tracks")
-      .select("id, title, duration_ms")
-      .in("id", allTrackIds);
-
-    for (const t of (trackRows || [])) {
-      trackById.set(t.id, { title: t.title, duration_ms: t.duration_ms });
-    }
+export async function getArtistStandaloneTracks(
+  artistSlug: string
+): Promise<RegistryStandaloneTrack[]> {
+  try {
+    const data = await fetchDiscographyFromEdge(artistSlug);
+    return data.standaloneTracks;
+  } catch {
+    return [];
   }
-
-  /* 5. Build release list */
-  const releases: RegistryDiscographyRelease[] = (links as { release_id: string }[])
-    .filter((l) => releaseById.has(l.release_id))
-    .map((l) => {
-      const r = releaseById.get(l.release_id)!;
-      const releaseDate = r.release_date || "";
-      const year = releaseDate ? String(releaseDate).match(/\d{4}/)?.[0] || "" : "";
-      const trackInfos = trackIdsByRelease.get(r.id) || [];
-
-      const tracks = trackInfos
-        .sort((a, b) => a.trackNumber - b.trackNumber)
-        .map((ti) => {
-          const t = trackById.get(ti.trackId);
-          const durationMs = t?.duration_ms;
-          const duration = durationMs
-            ? `${Math.floor(durationMs / 60000)}:${String(Math.floor((durationMs % 60000) / 1000)).padStart(2, "0")}`
-            : "";
-          return {
-            title: t?.title || `Track ${ti.trackNumber || "?"}`,
-            duration,
-          };
-        });
-
-      return {
-        slug: r.slug,
-        title: r.title,
-        releaseType: r.release_type || "album",
-        year,
-        releaseDate,
-        trackCount: trackCountByRelease.get(r.id) || tracks.length,
-        artworkUrl: r.artwork_url || "",
-        tracks: tracks.slice(0, 20),
-      };
-    });
-
-  // Sort by date descending
-  releases.sort((a, b) => {
-    if (!a.releaseDate && !b.releaseDate) return 0;
-    if (!a.releaseDate) return 1;
-    if (!b.releaseDate) return -1;
-    return b.releaseDate.localeCompare(a.releaseDate);
-  });
-
-  return releases;
 }
 
 const API_BASE =

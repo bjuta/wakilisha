@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { WkButton } from "@/components/design-system/primitives/Button";
-import { getArtist, getArtistDiscographyFromRegistry, type RepairedArtistDetail, type RegistryDiscographyRelease } from "@/services/repairedContent/client";
+import { getArtist, getArtistDiscographyFromRegistry, getArtistStandaloneTracks, type RepairedArtistDetail, type RegistryDiscographyRelease, type RegistryStandaloneTrack } from "@/services/repairedContent/client";
 import { ArtistDetailHero } from "./components/ArtistDetailHero";
 import { ArtistChartSection } from "./components/ArtistChartSection";
 import { ArtistDiscography } from "./components/ArtistDiscography";
@@ -14,14 +14,10 @@ function mergeDiscography(
   apiReleases: RepairedArtistDetail["releases"],
   registryReleases: RegistryDiscographyRelease[]
 ): RepairedArtistDetail["releases"] {
-  if (!registryReleases.length) return apiReleases;
+  const safeApiReleases = apiReleases || [];
 
-  const registryBySlug = new Map(
-    registryReleases.map((r) => [r.slug, r])
-  );
-
-  // Start with registry releases (authoritative), then add any API-only ones
-  const merged = registryReleases.map((rr) => ({
+  // Registry is authoritative. First add all registry releases.
+  const merged: RepairedArtistDetail["releases"] = registryReleases.map((rr) => ({
     slug: rr.slug,
     title: rr.title,
     releaseType: rr.releaseType,
@@ -32,14 +28,60 @@ function mergeDiscography(
     tracks: rr.tracks,
   }));
 
-  // Append API releases that don't exist in registry
-  for (const apiRel of apiReleases) {
-    if (!registryBySlug.has(apiRel.slug)) {
-      merged.push(apiRel);
-    }
+  // Track titles we already have (case-insensitive) so we don't add API duplicates
+  const seenTitles = new Set(registryReleases.map((r) => r.title.toLowerCase().trim()));
+  const seenSlugs = new Set(registryReleases.map((r) => r.slug));
+
+  // Only add API releases that are genuinely new (not duplicates by title or slug)
+  for (const apiRel of safeApiReleases) {
+    const titleKey = (apiRel.title || "").toLowerCase().trim();
+    if (seenTitles.has(titleKey) || seenSlugs.has(apiRel.slug)) continue;
+    seenTitles.add(titleKey);
+    seenSlugs.add(apiRel.slug);
+    merged.push(apiRel);
   }
 
   return merged;
+}
+
+function mergeTopSongs(
+  apiSongs: RepairedArtistDetail["topSongs"],
+  standaloneTracks: RegistryStandaloneTrack[]
+): RepairedArtistDetail["topSongs"] {
+  const safeApiSongs = apiSongs || [];
+  if (!standaloneTracks.length) return safeApiSongs;
+
+  const existingTitles = new Set(safeApiSongs.map((s) => s.title.toLowerCase()));
+
+  const newSongs = standaloneTracks
+    .filter((st) => !existingTitles.has(st.title.toLowerCase()))
+    .map((st) => ({
+      title: st.title,
+      artists: st.artists,
+      image: st.image,
+      duration: st.duration,
+      songUrl: st.songUrl,
+    }));
+
+  return [...safeApiSongs, ...newSongs];
+}
+
+function buildSinglesRelease(standaloneTracks: RegistryStandaloneTrack[], artistSlug: string): RegistryDiscographyRelease | null {
+  if (!standaloneTracks.length) return null;
+
+  return {
+    slug: `${artistSlug}-singles`,
+    title: "Singles",
+    releaseType: "single",
+    year: "",
+    releaseDate: "",
+    trackCount: standaloneTracks.length,
+    artworkUrl: standaloneTracks[0]?.image || "",
+    tracks: standaloneTracks.map((st) => ({
+      title: st.title,
+      duration: st.duration,
+    })),
+  };
 }
 
 export default function ArtistDetail() {
@@ -61,8 +103,9 @@ export default function ArtistDetail() {
     Promise.all([
       getArtist(slug),
       getArtistDiscographyFromRegistry(slug).catch(() => [] as RegistryDiscographyRelease[]),
+      getArtistStandaloneTracks(slug).catch(() => [] as RegistryStandaloneTrack[]),
     ])
-      .then(([data, registryDiscography]) => {
+      .then(([data, registryDiscography, standaloneTracks]) => {
         if (!alive) return;
         if (!data) {
           setStatus("error");
@@ -73,6 +116,29 @@ export default function ArtistDetail() {
         if (registryDiscography.length > 0) {
           data.releases = mergeDiscography(data.releases, registryDiscography);
         }
+
+        // Merge standalone tracks into top songs
+        if (standaloneTracks.length > 0) {
+          data.topSongs = mergeTopSongs(data.topSongs, standaloneTracks);
+        }
+
+        // Add standalone tracks as a "Singles" pseudo-release in discography
+        if (standaloneTracks.length > 0) {
+          const singlesRelease = buildSinglesRelease(standaloneTracks, slug);
+          if (singlesRelease) {
+            data.releases = [...data.releases, {
+              slug: singlesRelease.slug,
+              title: singlesRelease.title,
+              releaseType: singlesRelease.releaseType,
+              year: singlesRelease.year,
+              releaseDate: singlesRelease.releaseDate,
+              trackCount: singlesRelease.trackCount,
+              artworkUrl: singlesRelease.artworkUrl,
+              tracks: singlesRelease.tracks,
+            }];
+          }
+        }
+
         setArtist(data);
         setStatus("ready");
       })

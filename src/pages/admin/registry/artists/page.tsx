@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { type RegistryEntityProfile } from "@/services/registry/admin/types";
 import { getEntitySchema } from "@/services/registry/admin/entitySchemas";
@@ -53,6 +53,7 @@ function getDisplayCountry(artist: RegistryEntityProfile): string {
 
 export default function ArtistsPage() {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const urlFilter = searchParams.get("filter");
 
   const [artists, setArtists] = useState<RegistryEntityProfile[]>([]);
@@ -343,9 +344,16 @@ export default function ArtistsPage() {
                           )}
 
                           <div className="min-w-0">
-                            <p className="truncate font-black text-[#171712]">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/admin/registry/artists/${artist.slug}`);
+                              }}
+                              className="truncate font-black text-[#171712] hover:text-[#5f8f2f] transition-colors text-left cursor-pointer"
+                            >
                               {artist._displayName}
-                            </p>
+                            </button>
                             <p className="mt-1 truncate text-xs text-[#858c7e]">
                               {String(artist.slug || artist.id)}
                             </p>
