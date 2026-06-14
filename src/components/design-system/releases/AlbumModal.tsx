@@ -23,36 +23,17 @@ interface AlbumModalProps {
   onClose: () => void;
 }
 
-function formatDuration(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${m}:${String(s).padStart(2, "0")}`;
-}
-
-function parseDurationToSeconds(dur: string): number {
-  if (!dur) return 0;
-  const parts = dur.split(":");
-  if (parts.length === 2) return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
-  return 0;
-}
-
-function fallbackTracks(release: ModalRelease): Array<{ title: string; artist: string; duration: string }> {
-  return Array.from({ length: Math.max(1, Math.min(release.trackCount || 1, 30)) }, (_, index) => ({
-    title: index === 0 ? release.title : `${release.title} · Track ${index + 1}`,
-    artist: release.artist,
-    duration: `${2 + (index % 3)}:${String(18 + index * 7).padStart(2, "0").slice(0, 2)}`,
-  }));
-}
-
 function resolveTracks(release: ModalRelease): Array<{ title: string; artist: string; duration: string }> {
   if (release.tracks && release.tracks.length > 0) {
-    return release.tracks.map((t) => ({
-      title: t.title,
-      artist: release.artist,
-      duration: parseDurationToSeconds(t.duration) > 0 ? t.duration : formatDuration(parseDurationToSeconds(t.duration) || 180),
-    }));
+    return release.tracks
+      .filter((t) => t.title && !t.title.startsWith("Track ") && !t.title.startsWith("Unknown"))
+      .map((t) => ({
+        title: t.title,
+        artist: release.artist,
+        duration: t.duration || "",
+      }));
   }
-  return fallbackTracks(release);
+  return [];
 }
 
 export function AlbumModal({ release, open, onClose }: AlbumModalProps) {

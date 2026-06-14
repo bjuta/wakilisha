@@ -440,7 +440,7 @@ Deno.serve(async (req: Request) => {
     stage = "load_existing";
     const [existingReleasesRes, existingTracksRes, artistReleaseIdsRes] = await Promise.all([
       db.from("registry_releases").select("id, slug, title, metadata").eq("status", "active"),
-      db.from("registry_tracks").select("id, slug, isrc").eq("status", "active"),
+      db.from("registry_tracks").select("id, slug, isrc"),
       db.from("registry_release_artists")
         .select("release_id")
         .eq("artist_id", artistId)
@@ -455,14 +455,32 @@ Deno.serve(async (req: Request) => {
     }
 
     const allActiveReleases = existingReleasesRes.data ?? [];
-    const existingTrackBySlug = new Map(
-      (existingTracksRes.data ?? []).map((t: { id: string; slug: string }) => [t.slug, t.id])
-    );
-    const existingTrackByIsrc = new Map(
-      (existingTracksRes.data ?? [])
-        .filter((t: { isrc: string | null }) => t.isrc)
-        .map((t: { id: string; isrc: string }) => [t.isrc, t.id])
-    );
+
+    // ── Build track lookup maps ───────────────────────────────────────────
+    // slug → id  (for matching incoming tracks whose slugify(title) hits a known slug)
+    const existingTrackBySlug = new Map<string, string>();
+    // isrc → id  (for matching by ISRC; uppercase + trimmed)
+    const existingTrackByIsrc = new Map<string, string>();
+    // id → slug (reverse lookup — used to preserve the existing DB slug when we
+    // match by ISRC but the Apple Music slug would differ, avoiding SEO breaks)
+    const existingTrackIdToSlug = new Map<string, string>();
+
+    for (const t of existingTracksRes.data ?? []) {
+      const tid = t.id as string;
+      const tslug = t.slug as string;
+      const tisrc = t.isrc as string | null;
+
+      existingTrackBySlug.set(tslug, tid);
+      existingTrackIdToSlug.set(tid, tslug);
+      if (tisrc && tisrc.trim()) {
+        const normalized = tisrc.trim().toUpperCase();
+        // First ISRC wins — if two rows share an ISRC (shouldn't happen, but
+        // guard anyway), the first one we encounter keeps the mapping.
+        if (!existingTrackByIsrc.has(normalized)) {
+          existingTrackByIsrc.set(normalized, tid);
+        }
+      }
+    }
 
     const artistReleaseIdList = (artistReleaseIdsRes.data ?? []).map((r: { release_id: string }) => r.release_id);
     let existingArtistReleases: Array<{ id: string; slug: string; title: string; metadata: Record<string, unknown> | null }> = [];
@@ -506,14 +524,12 @@ Deno.serve(async (req: Request) => {
         );
       }
 
-      // Filter to albums where artistName matches
       const artistNameLower = artistName.toLowerCase();
       const matchingAlbums = searchResults.filter((a) => {
         const albumArtist = (a.attributes?.artistName ?? "").toLowerCase();
         return albumArtist.includes(artistNameLower) || artistNameLower.includes(albumArtist);
       });
 
-      // Fetch album details in parallel
       stage = "fetch_albums";
       const albumIds = matchingAlbums.map((a) => a.id);
       let fetchedResults: { detail: AppleAlbumDetail; id: string }[];
@@ -530,7 +546,6 @@ Deno.serve(async (req: Request) => {
       const albumDetails = fetchedResults.map((r) => r.detail);
       const failedIds = albumIds.filter((id) => !fetchedResults.find((r) => r.id === id));
 
-      // Build preview albums with rich metadata
       const previewAlbums: PreviewAlbum[] = albumDetails.map((album) => {
         const attrs = album.attributes ?? {};
         const rawTitle = attrs.name ?? "Unknown Album";
@@ -546,10 +561,8 @@ Deno.serve(async (req: Request) => {
           awUrl = artworkUrl(attrs.artwork.url, 800);
         }
 
-        // Check existing match
         const existingMatch = existingArtistReleaseBySlug.get(rawSlug);
 
-        // Build tracks
         const tracksData = album.relationships?.tracks?.data ?? [];
         const previewTracks: PreviewTrack[] = tracksData.map((track) => {
           const tAttrs = track.attributes ?? {};
@@ -560,14 +573,13 @@ Deno.serve(async (req: Request) => {
             disc_number: tAttrs.discNumber ?? null,
             duration_ms: tAttrs.durationInMillis ?? null,
             duration_display: formatDuration(tAttrs.durationInMillis ?? 0),
-            isrc: tAttrs.isrc ? String(tAttrs.isrc).trim() : null,
+            isrc: tAttrs.isrc ? String(tAttrs.isrc).trim().toUpperCase() : null,
             artist_name: tAttrs.artistName ?? artistName,
             explicit: (tAttrs.contentRating ?? "") === "explicit",
             preview_url: tAttrs.previews?.[0]?.url ?? null,
           };
         });
 
-        // Build featured artists from related artists (non-primary)
         const relatedArtists = album.relationships?.artists?.data ?? [];
         const featuredArtists = relatedArtists
           .filter((a) => {
@@ -599,7 +611,6 @@ Deno.serve(async (req: Request) => {
         };
       });
 
-      // Sort: existing matches first, then by release date desc
       previewAlbums.sort((a, b) => {
         if (a.match_status !== b.match_status) {
           return a.match_status === "existing" ? -1 : 1;
@@ -653,14 +664,13 @@ Deno.serve(async (req: Request) => {
           JSON.stringify({
             ok: true,
             mode: "apply",
-            summary: { merged: 0, canonicalized: 0, ignored: selections.length, tracks_created: 0 },
+            summary: { merged: 0, canonicalized: 0, ignored: selections.length, tracks_created: 0, errors: [] },
             duration_ms: Date.now() - start,
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      // Fetch details for selected albums
       stage = "fetch_selected";
       const selectedIds = toProcess.map((s) => s.apple_music_id);
       let fetchedResults: { detail: AppleAlbumDetail; id: string }[];
@@ -680,7 +690,6 @@ Deno.serve(async (req: Request) => {
       const seenReleaseSlugs = new Set(existingReleaseSlugs);
       const seenTrackSlugs = new Set(existingTrackBySlug.keys());
 
-      // Build batches
       const releaseRows: Record<string, unknown>[] = [];
       const releaseArtistRows: Record<string, unknown>[] = [];
       const trackRows: Record<string, unknown>[] = [];
@@ -689,7 +698,6 @@ Deno.serve(async (req: Request) => {
 
       const processedReleaseIds = new Set<string>();
       const processedTrackIds = new Set<string>();
-      // Track which tracks we've already added to trackRows to avoid duplicates
       const seenTrackIds = new Set<string>();
       let mergeCount = 0;
       let canonicalizeCount = 0;
@@ -779,7 +787,7 @@ Deno.serve(async (req: Request) => {
         for (const track of tracksData) {
           const tAttrs = track.attributes ?? {};
           const trackTitle = tAttrs.name ?? "Untitled";
-          const trackIsrc = tAttrs.isrc ? String(tAttrs.isrc).trim() : null;
+          const trackIsrc = tAttrs.isrc ? String(tAttrs.isrc).trim().toUpperCase() : null;
           const rawTrackSlug = slugify(trackTitle);
           const discNum = tAttrs.discNumber ?? 1;
           const trackNum = tAttrs.trackNumber ?? null;
@@ -789,17 +797,24 @@ Deno.serve(async (req: Request) => {
           let trackId: string | undefined;
           let trackSlug: string;
 
+          // Match by ISRC (most reliable), fall back to slug match
           if (trackIsrc) trackId = existingTrackByIsrc.get(trackIsrc);
           if (!trackId) trackId = existingTrackBySlug.get(rawTrackSlug);
 
           if (!trackId) {
+            // Brand-new track — allocate UUID and dedupe the slug
             trackId = crypto.randomUUID();
             trackSlug = dedupeSlug(rawTrackSlug, seenTrackSlugs);
             existingTrackBySlug.set(trackSlug, trackId);
+            existingTrackIdToSlug.set(trackId, trackSlug);
             if (trackIsrc) existingTrackByIsrc.set(trackIsrc, trackId);
             seenTrackSlugs.add(trackSlug);
           } else {
-            trackSlug = rawTrackSlug;
+            // Existing track (matched by ISRC or slug).
+            // PRESERVE the existing DB slug — it's already indexed by search
+            // engines and changing it would break SEO. Only use rawTrackSlug
+            // as a fallback if the reverse lookup somehow misses.
+            trackSlug = existingTrackIdToSlug.get(trackId) ?? rawTrackSlug;
           }
 
           processedTrackIds.add(trackId);
@@ -814,8 +829,6 @@ Deno.serve(async (req: Request) => {
 
           const previewUrl = tAttrs.previews?.[0]?.url ?? null;
 
-          // Only add track row once per unique track — tracks can appear on multiple releases
-          // but registry_tracks has a unique index on isrc and a unique constraint on slug
           if (!seenTrackIds.has(trackId)) {
             seenTrackIds.add(trackId);
             trackRows.push({
@@ -824,7 +837,7 @@ Deno.serve(async (req: Request) => {
               title: trackTitle,
               normalized_title: slugify(trackTitle).replace(/-/g, " "),
               isrc: trackIsrc,
-              release_id: null, // relationship is handled via registry_release_tracks
+              release_id: null,
               duration_ms: durationMs,
               explicit,
               track_number: trackNum,
@@ -885,7 +898,6 @@ Deno.serve(async (req: Request) => {
         return chunks;
       }
 
-      // Upsert releases
       if (releaseRows.length > 0) {
         for (const batch of chunk(releaseRows, BATCH)) {
           const { error } = await db.from("registry_releases").upsert(batch, { onConflict: "slug", ignoreDuplicates: false });
@@ -893,15 +905,18 @@ Deno.serve(async (req: Request) => {
         }
       }
 
-      // Upsert tracks
+      // Upsert tracks on id. We reuse existing IDs when matched by ISRC/slug,
+      // so this updates the row in-place. Slug is always the EXISTING DB slug
+      // (preserved via existingTrackIdToSlug), so SEO-friendly URLs are stable.
+      // Title, ISRC, duration, artwork and other metadata are refreshed from
+      // Apple Music.
       if (trackRows.length > 0) {
         for (const batch of chunk(trackRows, BATCH)) {
-          const { error } = await db.from("registry_tracks").upsert(batch, { onConflict: "slug", ignoreDuplicates: false });
+          const { error } = await db.from("registry_tracks").upsert(batch, { onConflict: "id", ignoreDuplicates: false });
           if (error) summary.errors.push(`tracks: ${error.message}`);
         }
       }
 
-      // Delete existing links for processed releases, then insert fresh
       if (releaseArtistRows.length > 0) {
         const rIds = [...processedReleaseIds];
         for (const idChunk of chunk(rIds, 100)) {
@@ -935,7 +950,6 @@ Deno.serve(async (req: Request) => {
         }
       }
 
-      // Update artist metadata
       const appleAlbumIds = selections.map((s) => s.apple_music_id);
       await db.from("registry_artists").update({
         metadata: { ...artistMeta, apple_music_album_ids: appleAlbumIds, apple_music_discography_ingested_at: new Date().toISOString() },
@@ -951,7 +965,6 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Unknown mode
     return new Response(
       JSON.stringify({ ok: false, error: `Unknown mode: "${mode}". Use "preview" or "apply".` }),
       { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }

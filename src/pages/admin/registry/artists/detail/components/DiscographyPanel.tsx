@@ -209,16 +209,18 @@ export function DiscographyPanel({ artistSlug, artistName }: { artistSlug: strin
         const tracks: DiscographyTrack[] = tls
           .map((tl) => {
             const t = trackById.get(tl.track_id);
+            if (!t || !t.title) return null;
             return {
               id: tl.track_id,
               slug: t?.slug || tl.track_id,
-              title: t?.title || `Track ${tl.track_number || "?"}`,
+              title: t.title,
               duration: formatDuration(t?.duration_ms || null),
               trackNumber: tl.track_number || t?.track_number || 0,
               artworkUrl: t?.artwork_url || r.artwork_url || "",
               isrc: t?.isrc || null,
             };
           })
+          .filter(Boolean)
           .sort((a, b) => a.trackNumber - b.trackNumber);
 
         return {

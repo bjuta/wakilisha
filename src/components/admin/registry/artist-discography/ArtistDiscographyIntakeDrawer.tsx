@@ -461,9 +461,12 @@ export function ArtistDiscographyIntakeDrawer({
       }
 
       setApplyResult(response.summary);
-      setTimeout(() => {
-        onComplete();
-      }, 1500);
+      // Only auto-close the drawer on clean success — keep it open if errors occurred
+      if (response.summary.errors.length === 0) {
+        setTimeout(() => {
+          onComplete();
+        }, 1500);
+      }
     } catch (err) {
       console.error("[Intake] apply caught error:", err);
       setApplyError(err instanceof Error ? err.message : "Apply failed");
@@ -561,7 +564,9 @@ export function ArtistDiscographyIntakeDrawer({
                 <div>
                   <p className="text-[15px] font-black text-emerald-800">Applied successfully</p>
                   <p className="text-[11px] text-emerald-700">
-                    Discography will refresh…
+                    {applyResult.errors.length > 0
+                      ? "Some errors occurred — review below and retry."
+                      : "Discography will refresh…"}
                   </p>
                 </div>
               </div>
@@ -616,7 +621,7 @@ export function ArtistDiscographyIntakeDrawer({
           )}
 
           {/* Stats summary bar */}
-          {!loading && !error && albums.length > 0 && !applyResult && (
+          {!loading && !error && albums.length > 0 && (!applyResult || applyResult.errors.length > 0) && (
             <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-[#dfe4d8] bg-white p-4">
               <div className="rounded-full bg-[#f0f3ec] px-3 py-1.5 text-[11px] font-bold text-[#71796b]">
                 {albums.length} albums · {duration}ms
@@ -650,7 +655,7 @@ export function ArtistDiscographyIntakeDrawer({
           )}
 
           {/* Album cards */}
-          {!loading && !error && albums.length > 0 && !applyResult && (
+          {!loading && !error && albums.length > 0 && (!applyResult || applyResult.errors.length > 0) && (
             <div className="space-y-3 pb-20">
               {albums.map((album) => (
                 <AlbumCard
@@ -666,7 +671,7 @@ export function ArtistDiscographyIntakeDrawer({
         </div>
 
         {/* Footer actions */}
-        {!loading && !error && albums.length > 0 && !applyResult && (
+        {!loading && !error && albums.length > 0 && (!applyResult || applyResult.errors.length > 0) && (
           <div className="shrink-0 border-t border-[#dfe4d8] bg-white px-6 py-4">
             <div className="flex items-center justify-between gap-4">
               <div className="flex flex-col gap-1">

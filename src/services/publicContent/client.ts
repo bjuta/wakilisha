@@ -487,7 +487,7 @@ async function getRegistryTracklist(releaseId: string, fallbackArtist: string): 
     .sort((a, b) => a.position - b.position || a.index - b.index)
     .map((relationship, index) => {
       const track = tracksById.get(relationship.trackId) || {};
-      const title = textValue(track, ["title", "name", "display_title", "normalized_title", "slug"], `Track ${index + 1}`);
+      const title = textValue(track, ["title", "name", "display_title", "normalized_title", "slug"], "");
       const slug = textValue(track, ["slug", "normalized_slug"], relationship.trackId);
       const artist = textValue(track, ["artist", "artist_name", "primary_artist_name", "artists"], fallbackArtist);
       const mediaUrl = mediaUrlFor(mediaCandidates(slug, title), mediaBySlug);
@@ -508,7 +508,8 @@ async function getRegistryTracklist(releaseId: string, fallbackArtist: string): 
         trackNumber: relationship.position || index + 1,
         artworkUrl: artwork || generatedReleaseArtwork(title, artist),
       };
-    });
+    })
+    .filter((track) => track.title);
 }
 
 function mapShellToRelease(shell: ReleaseShellRow, tracks: PublicReleaseDetail["tracks"] = [], releaseArtworkUrl = ""): PublicReleaseDetail {

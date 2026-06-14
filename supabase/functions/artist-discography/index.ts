@@ -86,8 +86,6 @@ Deno.serve(async (req: Request) => {
     }
 
     // Step 6: Group releases by title (case-insensitive) and pick the best one.
-    // For each title group, prefer the release that's explicitly linked AND has tracks.
-    // If the linked release has 0 tracks, fall back to the one with the most tracks.
     const titleGroups = new Map<string, { releaseId: string; slug: string; title: string; releaseType: string; releaseDate: string; artworkUrl: string; isLinked: boolean; trackCount: number }[]>();
 
     for (const r of releaseRows) {
@@ -110,22 +108,18 @@ Deno.serve(async (req: Request) => {
     }
 
     // Step 7: Pick the best release per title group
-    // Prefer: linked with tracks > non-linked with tracks > linked with 0 tracks > non-linked with 0 tracks
+    // Prefer linked with tracks > non-linked with tracks > linked with 0 tracks > non-linked with 0 tracks
     const bestReleases: { releaseId: string; slug: string; title: string; releaseType: string; releaseDate: string; artworkUrl: string }[] = [];
 
     for (const [titleKey, candidates] of titleGroups) {
       candidates.sort((a, b) => {
-        // First: has tracks beats 0 tracks
         if ((a.trackCount > 0) !== (b.trackCount > 0)) return a.trackCount > 0 ? -1 : 1;
-        // Second: linked beats non-linked
         if (a.isLinked !== b.isLinked) return a.isLinked ? -1 : 1;
-        // Third: more tracks beats fewer tracks
         if (a.trackCount !== b.trackCount) return b.trackCount - a.trackCount;
         return (b.releaseDate || "").localeCompare(a.releaseDate || "");
       });
 
       const best = candidates[0];
-      // Only include if the best has tracks (skip 0-track ghosts)
       if (best.trackCount === 0) continue;
 
       bestReleases.push({
@@ -141,7 +135,6 @@ Deno.serve(async (req: Request) => {
     // Step 8: Track details for ALL releases in the best set
     const bestReleaseIds = new Set(bestReleases.map((br) => br.releaseId));
     const allTrackIdsForBest = new Set<string>();
-
     const trackIdsByRelease = new Map<string, { trackId: string; trackNumber: number }[]>();
 
     for (const rt of releaseTrackLinks) {
@@ -166,27 +159,29 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Step 9: Build release list
+    // Step 9: Build release list — NEVER generate fake track titles
     const releases: any[] = [];
     for (const br of bestReleases) {
       const releaseDate = br.releaseDate;
       const year = releaseDate ? String(releaseDate).match(/\d{4}/)?.[0] || "" : "";
       const trackInfos = trackIdsByRelease.get(br.releaseId) || [];
-      const count = trackInfos.length;
 
       const tracks = trackInfos
         .sort((a, b) => a.trackNumber - b.trackNumber)
         .map((ti) => {
           const t = trackById.get(ti.trackId);
+          // Skip tracks with no real data — never generate fallback titles
+          if (!t || !t.title) return null;
           const durationMs = t?.duration_ms;
           const duration = durationMs
             ? `${Math.floor(durationMs / 60000)}:${String(Math.floor((durationMs % 60000) / 1000)).padStart(2, "0")}`
             : "";
           return {
-            title: t?.title || `Track ${ti.trackNumber || "?"}`,
+            title: t.title,
             duration,
           };
-        });
+        })
+        .filter(Boolean);
 
       releases.push({
         slug: br.slug,
@@ -194,7 +189,7 @@ Deno.serve(async (req: Request) => {
         releaseType: br.releaseType,
         year,
         releaseDate,
-        trackCount: count,
+        trackCount: tracks.length,
         artworkUrl: br.artworkUrl,
         tracks: tracks.slice(0, 20),
       });
