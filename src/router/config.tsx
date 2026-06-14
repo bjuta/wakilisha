@@ -33,6 +33,7 @@ import AdminReviewQueuePage from "../pages/admin/review/queue/page";
 import AdminImportsPage from "../pages/admin/imports/page";
 import AdminImportsJobsPage from "../pages/admin/imports/jobs/page";
 import AdminImportsJobDetailPage from "../pages/admin/imports/jobs/detail/page";
+import AdminScraperPage from "../pages/admin/imports/scraper/page";
 import AdminArticleDetailPage from "../pages/admin/content/articles/detail/page";
 import AdminNewArticlePage from "../pages/admin/content/articles/new/page";
 import AdminArtistDetailPage from "../pages/admin/registry/artists/detail/page";
@@ -317,6 +318,7 @@ const routes: RouteObject[] = [
           { index: true, element: <AdminImportsPage /> },
           { path: "jobs", element: <AdminImportsJobsPage /> },
           { path: "jobs/:id", element: <AdminImportsJobDetailPage /> },
+          { path: "scraper", element: <AdminScraperPage /> },
         ],
       },
       { path: "charts", element: <AdminChartsLayout />, children: [

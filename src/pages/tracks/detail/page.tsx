@@ -37,6 +37,7 @@ type TrackViewModel = {
   releaseYear: string;
   source: string;
   isPlayable: boolean;
+  previewUrl: string | null;
   albumTitle: string;
   credits: Array<{ role: string; name: string }>;
   chartHistory: number[];
@@ -80,6 +81,9 @@ function apiToViewModel(api: RepairedTrackDetail): TrackViewModel {
   const duration = trackData.durationMs ? Math.round(trackData.durationMs / 1000) : (trackData.duration || 0);
   const artworkUrl = trackData.artworkUrl || releaseData?.artworkUrl || artistData?.imageUrl || "";
 
+  // Extract previewUrl — may come from api.previewUrl (top-level) or trackData.previewUrl (nested)
+  const previewUrl: string | null = api.previewUrl || trackData.previewUrl || null;
+
   return {
     slug: trackData.slug,
     title: trackData.title,
@@ -100,7 +104,8 @@ function apiToViewModel(api: RepairedTrackDetail): TrackViewModel {
     streamCount: null,
     releaseYear: releaseData?.releaseDate ? releaseData.releaseDate.split("-")[0] : String(metadata.release_date || "").slice(0, 4),
     source: "WAKILISHA Registry",
-    isPlayable: false,
+    isPlayable: !!previewUrl,
+    previewUrl,
     albumTitle: releaseData?.title || "",
     credits: [],
     chartHistory: history,
@@ -257,8 +262,8 @@ export default function TrackDetail() {
     if (!track.isPlayable) return;
     if (isCurrentTrack) { togglePlay(); return; }
     playTrack(
-      { id: track.slug, title: track.title, artist: track.artist, artworkUrl: track.artworkUrl, isPlayable: track.isPlayable, source: track.source, duration: track.duration },
-      [track].filter((t) => t.isPlayable).map((t) => ({ id: t.slug, title: t.title, artist: t.artist, artworkUrl: t.artworkUrl, isPlayable: t.isPlayable, source: t.source, duration: t.duration }))
+      { id: track.slug, title: track.title, artist: track.artist, artworkUrl: track.artworkUrl, isPlayable: track.isPlayable, source: track.source, duration: track.duration, previewUrl: track.previewUrl || undefined },
+      [track].filter((t) => t.isPlayable).map((t) => ({ id: t.slug, title: t.title, artist: t.artist, artworkUrl: t.artworkUrl, isPlayable: t.isPlayable, source: t.source, duration: t.duration, previewUrl: t.previewUrl || undefined }))
     );
   };
 

@@ -91,6 +91,7 @@ export interface ChartEntryRowViewModel {
   source: string;
   score: number;
   duration?: number;
+  previewUrl?: string;
 }
 
 export interface ChartDirectoryViewModel {
@@ -115,6 +116,7 @@ export interface ChartTrackPlayerModel {
   isPlayable?: boolean;
   source?: string;
   duration?: number;
+  previewUrl?: string;
 }
 
 // ─── Archive view models ───
@@ -222,6 +224,7 @@ export function toChartEntryRowViewModel(
     isPlayable?: boolean;
     duration?: number;
     movementAmount?: number;
+    previewUrl?: string;
   };
 
   // previousRank of 0 means no prior comparison data exists (first ingest or broken pipeline).
@@ -255,6 +258,7 @@ export function toChartEntryRowViewModel(
     source: rich.source ?? "WAKILISHA chart data",
     score: entry.score,
     duration: rich.duration ?? 180 + ((entry.trackTitle.length * 7) % 120),
+    previewUrl: rich.previewUrl,
   };
 }
 
@@ -490,6 +494,7 @@ export function toChartTrackPlayerModel(entry: ChartEntryRowViewModel): ChartTra
     isPlayable: entry.isPlayable,
     source: entry.source,
     duration: entry.duration,
+    previewUrl: entry.previewUrl,
   };
 }
 

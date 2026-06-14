@@ -18,6 +18,7 @@ import {
   getV2ChartFamily,
   getV2ChartEditionsForFamily,
   getV2LatestChartEdition,
+  getV2LatestChartEditionWithEntries,
   getV2ChartEdition,
   getV2ChartEditionEntries,
   getV2TrackChartHistory,
@@ -117,6 +118,13 @@ export function getChartEditionsForFamily(familySlug: string): Promise<ChartResu
 export function getLatestChartEdition(familySlug: string): Promise<ChartResult<ChartEdition | null>> {
   return withCache(`chart_latest_public_api_${familySlug}`, async () => ({
     data: await getV2LatestChartEdition(familySlug),
+    source: "wordpress",
+  }));
+}
+
+export function getLatestChartEditionWithEntries(familySlug: string): Promise<ChartResult<{ edition: ChartEdition | null; entries: ChartEditionEntry[] }>> {
+  return withCache(`chart_latest_entries_public_api_${familySlug}`, async () => ({
+    data: await getV2LatestChartEditionWithEntries(familySlug),
     source: "wordpress",
   }));
 }

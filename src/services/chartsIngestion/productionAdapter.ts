@@ -128,9 +128,16 @@ function mapDbRunToUi(dbRun: DbRun): IngestRun {
   const stages: IngestStageStatus[] = STAGE_ORDER.map((name) => {
     const db = stageMap.get(name);
     if (!db) return { stage: name as IngestStageStatus["stage"], status: "idle" };
+    // Map DB status 'completed' to UI status 'done' so PipelinePanel recognizes finished stages
+    const uiStatus: IngestStageStatus["status"] =
+      db.status === "completed" ? "done"
+      : db.status === "running" ? "running"
+      : db.status === "failed" ? "failed"
+      : db.status === "warning" ? "warning"
+      : "idle";
     return {
       stage: name as IngestStageStatus["stage"],
-      status: db.status as IngestStageStatus["status"],
+      status: uiStatus,
       message: db.message ?? undefined,
       durationMs: db.duration_ms ?? undefined,
       startedAt: db.started_at ?? undefined,
@@ -606,4 +613,16 @@ export async function resetPipeline(runId: string): Promise<{
   };
 }> {
   return invokeApi("reset_pipeline", { runId });
+}
+
+/** Run the full pipeline: source_fetch → normalize → carry_forward → eligibility → scoring → shortlist.
+ *  Marks the run as dry_run_complete when all stages succeed. */
+export async function runFullPipeline(runId: string): Promise<{
+  ok: boolean;
+  runId: string;
+  status: string;
+  pipelineStages: Array<{ stage: string; result: string }>;
+  totalDurationMs: number;
+}> {
+  return invokeApi("run_full_pipeline", { runId });
 }

@@ -5,8 +5,7 @@ import { ChartRowExpandedPanel } from "@/components/design-system/music/ChartRow
 import { ChartHighlights } from "./components/ChartHighlights";
 import {
   getChartFamilies,
-  getLatestChartEdition,
-  getChartEditionEntries,
+  getLatestChartEditionWithEntries,
 } from "@/services/chartsPublic/client";
 import {
   toChartDirectoryViewModel,
@@ -420,19 +419,18 @@ export default function ChartsDirectory() {
   const loadFamilyEntry = useCallback(async (slug: string, family: ChartFamilyViewModel) => {
     setSwitching(true);
     try {
-      const { data: edition, meta: edMeta } = await getLatestChartEdition(slug);
-      if (!edition) {
+      const { data: { edition, entries: rawEntries }, meta: edMeta } = await getLatestChartEditionWithEntries(slug);
+      if (!edition || rawEntries.length === 0) {
         setCache((prev) => ({ ...prev, [slug]: { edition: null, entries: [] } }));
         if (!metaRef.current) setMeta(edMeta);
         return;
       }
-      const { data: entries } = await getChartEditionEntries(slug, edition.slug);
       const edVM = toChartEditionViewModel(
         edition,
         { ...family, sourceFamilySlug: family.sourceFamilySlug, familyKey: slug } as any,
-        entries
+        rawEntries
       );
-      const entryVMs = entries.map(toChartEntryRowViewModel);
+      const entryVMs = rawEntries.map(toChartEntryRowViewModel);
       setCache((prev) => ({ ...prev, [slug]: { edition: edVM, entries: entryVMs } }));
       if (!metaRef.current) setMeta(edMeta);
     } catch {

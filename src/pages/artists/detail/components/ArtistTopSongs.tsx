@@ -1,6 +1,7 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
 import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
+import { usePlayer } from "@/context/PlayerContext";
 
 interface Song {
   title: string;
@@ -25,10 +26,31 @@ function SongExpandedPanel({
   song: Song;
   rank: number;
 }) {
+  const { playTrack, currentTrack, isPlaying, togglePlay } = usePlayer();
   const artistList = song.artists
     .split(/,\s*|feat\.\s*|ft\.\s*/i)
     .map((a) => a.trim())
     .filter(Boolean);
+
+  const trackId = `top-song-${song.title}-${song.artists}`.toLowerCase().replace(/\s+/g, "-");
+  const isCurrentTrack = currentTrack?.id === trackId;
+  const isTrackPlaying = isCurrentTrack && isPlaying;
+
+  const handlePlaySong = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isCurrentTrack) {
+      togglePlay();
+      return;
+    }
+    playTrack({
+      id: trackId,
+      title: song.title,
+      artist: song.artists,
+      artworkUrl: song.image,
+      isPlayable: true,
+      previewUrl: song.songUrl,
+    });
+  };
 
   return (
     <div className="overflow-hidden">
@@ -75,16 +97,13 @@ function SongExpandedPanel({
           </div>
 
           {song.songUrl && (
-            <a
-              href={song.songUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
+            <button
+              onClick={handlePlaySong}
               className="flex items-center gap-1 text-[11px] font-bold text-[var(--wk-brand)] transition-opacity hover:opacity-70 whitespace-nowrap"
             >
-              <i className="ri-external-link-line text-[10px]" />
-              Listen
-            </a>
+              <i className={`text-[10px] ${isTrackPlaying ? "ri-pause-line" : "ri-play-line"}`} />
+              {isTrackPlaying ? "Pause" : "Listen"}
+            </button>
           )}
         </div>
       </div>
@@ -96,8 +115,29 @@ function SongExpandedPanel({
    Single song row — mirrors ChartRow exactly
    ───────────────────────────────────────────── */
 function ArtistSongRow({ song, index }: { song: Song; index: number }) {
+  const { playTrack, currentTrack, isPlaying, togglePlay } = usePlayer();
   const [isExpanded, setIsExpanded] = useState(false);
   const rank = index + 1;
+
+  const trackId = `top-song-${song.title}-${song.artists}`.toLowerCase().replace(/\s+/g, "-");
+  const isCurrentTrack = currentTrack?.id === trackId;
+  const isTrackPlaying = isCurrentTrack && isPlaying;
+
+  const handlePlaySong = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isCurrentTrack) {
+      togglePlay();
+      return;
+    }
+    playTrack({
+      id: trackId,
+      title: song.title,
+      artist: song.artists,
+      artworkUrl: song.image,
+      isPlayable: true,
+      previewUrl: song.songUrl,
+    });
+  };
 
   return (
     <div
@@ -128,19 +168,6 @@ function ArtistSongRow({ song, index }: { song: Song; index: number }) {
           ) : (
             <Ch19GradientImage slug={`song-${index}-${song.title}`} name={song.title} />
           )}
-          {/* Hover play overlay */}
-          {song.songUrl && (
-            <a
-              href={song.songUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100"
-              aria-label={`Play ${song.title}`}
-            >
-              <i className="ri-play-fill text-white text-lg" />
-            </a>
-          )}
         </div>
 
         {/* Title + artist */}
@@ -160,21 +187,18 @@ function ArtistSongRow({ song, index }: { song: Song; index: number }) {
           </span>
         )}
 
-        {/* Play button */}
-        {song.songUrl ? (
-          <a
-            href={song.songUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            aria-label={`Listen to ${song.title}`}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] transition-all opacity-0 group-hover:opacity-100 group-hover:scale-100 scale-75 duration-150"
-          >
-            <i className="ri-play-mini-fill text-sm" />
-          </a>
-        ) : (
-          <div className="h-9 w-9 shrink-0" />
-        )}
+        {/* Play button — always uses PlayerContext, never downloads */}
+        <button
+          onClick={handlePlaySong}
+          aria-label={isTrackPlaying ? `Pause ${song.title}` : `Play ${song.title}`}
+          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-all duration-150 whitespace-nowrap ${
+            isCurrentTrack
+              ? "bg-[var(--wk-brand)] text-[var(--wk-brand-on)] opacity-100 scale-100"
+              : "bg-[var(--wk-brand)] text-[var(--wk-brand-on)] opacity-0 group-hover:opacity-100 group-hover:scale-100 scale-75"
+          }`}
+        >
+          <i className={`text-sm ${isTrackPlaying ? "ri-pause-mini-fill" : "ri-play-mini-fill"}`} />
+        </button>
 
         {/* Expand chevron */}
         <div

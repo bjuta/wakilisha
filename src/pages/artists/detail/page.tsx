@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { WkButton } from "@/components/design-system/primitives/Button";
-import { getArtist, getArtistDiscographyFromRegistry, getArtistStandaloneTracks, type RepairedArtistDetail, type RegistryDiscographyRelease, type RegistryStandaloneTrack } from "@/services/repairedContent/client";
+import { getArtist, getArtistAppearsOn, clearDiscographyCache, type RepairedArtistDetail, type RegistryAppearsOnRelease } from "@/services/repairedContent/client";
 import { ArtistDetailHero } from "./components/ArtistDetailHero";
 import { ArtistChartSection } from "./components/ArtistChartSection";
 import { ArtistDiscography } from "./components/ArtistDiscography";
@@ -10,83 +10,10 @@ import { ArtistTopSongs } from "./components/ArtistTopSongs";
 import { ArtistBioSection } from "./components/ArtistBioSection";
 import { ArtistVideos } from "./components/ArtistVideos";
 
-function mergeDiscography(
-  apiReleases: RepairedArtistDetail["releases"],
-  registryReleases: RegistryDiscographyRelease[]
-): RepairedArtistDetail["releases"] {
-  const safeApiReleases = apiReleases || [];
-
-  // Registry is authoritative. First add all registry releases.
-  const merged: RepairedArtistDetail["releases"] = registryReleases.map((rr) => ({
-    slug: rr.slug,
-    title: rr.title,
-    releaseType: rr.releaseType,
-    year: rr.year,
-    releaseDate: rr.releaseDate,
-    trackCount: rr.trackCount,
-    artworkUrl: rr.artworkUrl,
-    tracks: rr.tracks,
-  }));
-
-  // Track titles we already have (case-insensitive) so we don't add API duplicates
-  const seenTitles = new Set(registryReleases.map((r) => r.title.toLowerCase().trim()));
-  const seenSlugs = new Set(registryReleases.map((r) => r.slug));
-
-  // Only add API releases that are genuinely new (not duplicates by title or slug)
-  for (const apiRel of safeApiReleases) {
-    const titleKey = (apiRel.title || "").toLowerCase().trim();
-    if (seenTitles.has(titleKey) || seenSlugs.has(apiRel.slug)) continue;
-    seenTitles.add(titleKey);
-    seenSlugs.add(apiRel.slug);
-    merged.push(apiRel);
-  }
-
-  return merged;
-}
-
-function mergeTopSongs(
-  apiSongs: RepairedArtistDetail["topSongs"],
-  standaloneTracks: RegistryStandaloneTrack[]
-): RepairedArtistDetail["topSongs"] {
-  const safeApiSongs = apiSongs || [];
-  if (!standaloneTracks.length) return safeApiSongs;
-
-  const existingTitles = new Set(safeApiSongs.map((s) => s.title.toLowerCase()));
-
-  const newSongs = standaloneTracks
-    .filter((st) => !existingTitles.has(st.title.toLowerCase()))
-    .map((st) => ({
-      title: st.title,
-      artists: st.artists,
-      image: st.image,
-      duration: st.duration,
-      songUrl: st.songUrl,
-    }));
-
-  return [...safeApiSongs, ...newSongs];
-}
-
-function buildSinglesRelease(standaloneTracks: RegistryStandaloneTrack[], artistSlug: string): RegistryDiscographyRelease | null {
-  if (!standaloneTracks.length) return null;
-
-  return {
-    slug: `${artistSlug}-singles`,
-    title: "Singles",
-    releaseType: "single",
-    year: "",
-    releaseDate: "",
-    trackCount: standaloneTracks.length,
-    artworkUrl: standaloneTracks[0]?.image || "",
-    tracks: standaloneTracks.map((st) => ({
-      title: st.title,
-      duration: st.duration,
-    })),
-  };
-}
-
 export default function ArtistDetail() {
   const { slug } = useParams<{ slug: string }>();
   const [artist, setArtist] = useState<RepairedArtistDetail | null>(null);
+  const [appearsOn, setAppearsOn] = useState<RegistryAppearsOnRelease[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [error, setError] = useState<string | null>(null);
 
@@ -100,45 +27,21 @@ export default function ArtistDetail() {
     setStatus("loading");
     setError(null);
 
+    clearDiscographyCache(slug);
+
     Promise.all([
       getArtist(slug),
-      getArtistDiscographyFromRegistry(slug).catch(() => [] as RegistryDiscographyRelease[]),
-      getArtistStandaloneTracks(slug).catch(() => [] as RegistryStandaloneTrack[]),
+      getArtistAppearsOn(slug).catch(() => [] as RegistryAppearsOnRelease[]),
     ])
-      .then(([data, registryDiscography, standaloneTracks]) => {
+      .then(([data, registryAppearsOn]) => {
         if (!alive) return;
         if (!data) {
           setStatus("error");
           setError("Artist not found in the registry.");
           return;
         }
-        // Registry is the lord — merge its discography as authoritative
-        if (registryDiscography.length > 0) {
-          data.releases = mergeDiscography(data.releases, registryDiscography);
-        }
 
-        // Merge standalone tracks into top songs
-        if (standaloneTracks.length > 0) {
-          data.topSongs = mergeTopSongs(data.topSongs, standaloneTracks);
-        }
-
-        // Add standalone tracks as a "Singles" pseudo-release in discography
-        if (standaloneTracks.length > 0) {
-          const singlesRelease = buildSinglesRelease(standaloneTracks, slug);
-          if (singlesRelease) {
-            data.releases = [...data.releases, {
-              slug: singlesRelease.slug,
-              title: singlesRelease.title,
-              releaseType: singlesRelease.releaseType,
-              year: singlesRelease.year,
-              releaseDate: singlesRelease.releaseDate,
-              trackCount: singlesRelease.trackCount,
-              artworkUrl: singlesRelease.artworkUrl,
-              tracks: singlesRelease.tracks,
-            }];
-          }
-        }
-
+        setAppearsOn(registryAppearsOn);
         setArtist(data);
         setStatus("ready");
       })
@@ -181,9 +84,8 @@ export default function ArtistDetail() {
   const debutYear = releaseYears.length > 0 ? Math.min(...releaseYears) : new Date().getFullYear();
 
   const hasChartEntries = artist.chartEntries.length > 0;
-  const appearances = Array.isArray((artist as any).appearances) ? (artist as any).appearances : [];
+  const hasAppearsOn = appearsOn.length > 0;
   const hasReleases = artist.releases.length > 0;
-  const hasAppearances = appearances.length > 0;
   const hasRelated = artist.relatedArtists.length > 0;
   const hasTopSongs = artist.topSongs.length > 0;
   const hasBio = artist.bio || artist.fullBio;
@@ -228,15 +130,21 @@ export default function ArtistDetail() {
 
           {/* Discography */}
           {hasReleases && (
-            <ArtistDiscography releases={artist.releases} />
+            <ArtistDiscography
+              releases={artist.releases}
+              eyebrow="Discography"
+              title="Releases"
+              emptyTitle="No releases"
+              emptyDescription="No releases match the selected filter."
+            />
           )}
 
           {/* Appears On */}
-          {hasAppearances && (
+          {hasAppearsOn && (
             <ArtistDiscography
-              releases={appearances}
+              releases={appearsOn}
               eyebrow="Appears On"
-              title="Features & appearances"
+              title="Features &amp; appearances"
               emptyTitle="No appearances"
               emptyDescription="No appearances match the selected filter."
             />

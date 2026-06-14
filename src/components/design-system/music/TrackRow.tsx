@@ -14,6 +14,7 @@ export interface TrackRowProps {
   isPlaying?: boolean;
   compact?: boolean;
   id?: string;
+  previewUrl?: string;
 }
 
 export function TrackRow({
@@ -28,6 +29,7 @@ export function TrackRow({
   isPlaying: isPlayingProp,
   compact = false,
   id,
+  previewUrl,
 }: TrackRowProps) {
   const { currentTrack, isPlaying: isPlayingCtx, playTrack } = usePlayer();
   const trackId = id || `${title}-${artist}`.toLowerCase().replace(/\s+/g, "-");
@@ -48,6 +50,7 @@ export function TrackRow({
       artworkUrl,
       isPlayable: playable,
       source,
+      previewUrl,
     };
     playTrack(track, [track]);
   };
@@ -68,14 +71,6 @@ export function TrackRow({
         ) : (
           <Ch19GradientImage slug={trackId} name={title} />
         )}
-        <button
-            onClick={handlePlay}
-            disabled={!playable}
-            aria-label={isPlaying ? "Pause" : "Play"}
-            className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100 disabled:opacity-0"
-          >
-            <i className={`text-white ${isPlaying ? "ri-pause-fill" : "ri-play-fill"}`} />
-          </button>
       </div>
 
       <div className="min-w-0 flex-1">

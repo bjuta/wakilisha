@@ -8,7 +8,9 @@ interface ExclusionSummaryPanelProps {
 
 const REASON_LABELS: Record<string, { label: string; description: string; color: string }> = {
   missing_release_date:      { label: "Missing Release Date",     description: "Release date absent or unparseable", color: "text-wk-warning" },
-  release_window:            { label: "Release Window",           description: "Outside configured release_start/end window", color: "text-wk-danger" },
+  release_window:            { label: "Release Window",           description: "Outside configured release window dates", color: "text-wk-danger" },
+  release_window_too_early:  { label: "Release Window (too early)", description: "Released before the start of the release window", color: "text-wk-danger" },
+  release_window_too_late:   { label: "Release Window (too late)", description: "Released after the end of the release window", color: "text-wk-danger" },
   country_exclude:           { label: "Country Excluded",         description: "Artist origin matches an exclusion country", color: "text-wk-danger" },
   country_include:           { label: "Country Not Included",     description: "Artist origin not in the include list", color: "text-wk-danger" },
   gender_filter:             { label: "Gender Filter",            description: "Artist gender not in genders_include", color: "text-wk-text-muted" },

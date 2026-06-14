@@ -3,13 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { usePlayer } from "@/context/PlayerContext";
 import { WkIcon } from "@/components/design-system/Icon";
 
-const LYRICS = [
-  "The culture lives in the numbers",
-  "From the coast to the valley",
-  "We index the rhythm of the continent",
-  "Charts in motion, every week",
-];
-
 export default function MobilePlayer() {
   const nav = useNavigate();
   const {
@@ -46,7 +39,6 @@ export default function MobilePlayer() {
 
   const formatTime = (seconds: number) => `${Math.floor(seconds / 60)}:${Math.floor(seconds % 60).toString().padStart(2, "0")}`;
   const pct = Math.max(0, Math.min(1, progress || 0));
-  const activeLyric = Math.floor((currentTime / (duration || 1)) * LYRICS.length) % LYRICS.length;
   const upcoming = queue.slice(queueIndex + 1, queueIndex + 4);
 
   return (
@@ -94,8 +86,7 @@ export default function MobilePlayer() {
         </div>
 
         <div className="fp-lyrics">
-          <p className="fp-lyric active">{LYRICS[activeLyric]}</p>
-          <p className="fp-lyric">{LYRICS[(activeLyric + 1) % LYRICS.length]}</p>
+          <p className="fp-lyric" style={{ opacity: 0.5 }}>No synced lyrics available</p>
         </div>
 
         {upcoming.length > 0 && (

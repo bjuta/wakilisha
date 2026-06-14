@@ -187,6 +187,7 @@ export const runCarryForward = ingestStudioAdapter.runCarryForward;
 export const runScoring = ingestStudioAdapter.runScoring;
 export const runShortlist = ingestStudioAdapter.runShortlist;
 export const resetPipeline = ingestStudioAdapter.resetPipeline;
+export const runFullPipeline = ingestStudioAdapter.runFullPipeline;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Legacy ingest studio (9-phase UI) — now backed by real DB tables

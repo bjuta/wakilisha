@@ -15,7 +15,7 @@ interface DiscoRelease {
   trackCount?: number;
   releaseDate?: string;
   labelName?: string;
-  tracks?: Array<{ title: string; duration: string }>;
+  tracks?: Array<{ title: string; duration: string; artists?: string; previewUrl?: string }>;
 }
 
 interface ArtistDiscographyProps {
@@ -44,7 +44,12 @@ function toModalRelease(r: DiscoRelease): ModalRelease {
     labelName: r.labelName,
     artworkUrl: r.artworkUrl || "",
     trackCount: r.trackCount || (r.tracks?.length || 0),
-    tracks: r.tracks || [],
+    tracks: (r.tracks || []).map((t) => ({
+      title: t.title,
+      duration: t.duration,
+      artists: t.artists || "",
+      previewUrl: t.previewUrl,
+    })),
   };
 }
 
@@ -88,11 +93,16 @@ function ReleaseCard({
           <div className="p-4 pb-5">
             <div className="space-y-1.5">
               {trackPreviews.map((track, idx) => (
-                <div key={idx} className="flex items-center gap-2 text-[13px] text-white/90">
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/15 text-[10px] font-bold">
+                <div key={idx} className="flex items-start gap-2 text-[13px] text-white/90">
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/15 text-[10px] font-bold shrink-0">
                     {idx + 1}
                   </span>
-                  <span className="truncate">{track.title}</span>
+                  <div className="min-w-0">
+                    <span className="truncate block">{track.title}</span>
+                    {track.artists && (
+                      <span className="text-[10px] text-white/50 truncate block leading-tight">feat. {track.artists}</span>
+                    )}
+                  </div>
                 </div>
               ))}
               {hasMoreTracks && (
@@ -123,6 +133,9 @@ function ReleaseCard({
         <h4 className="text-[16px] font-bold leading-tight text-[var(--wk-text)] group-hover:text-[var(--wk-brand)] transition-colors">
           {release.title}
         </h4>
+        {release.artist && (
+          <p className="mt-1 text-[12px] text-[var(--wk-text-faint)]">by {release.artist}</p>
+        )}
       </div>
     </button>
   );
@@ -150,9 +163,9 @@ export function ArtistDiscography({
 
   const filtered = sortedReleases.filter((r) => {
     if (filter === "All") return true;
-    if (filter === "Albums") return r.releaseType === "Album";
-    if (filter === "EPs") return r.releaseType === "EP";
-    if (filter === "Singles") return r.releaseType === "single";
+    if (filter === "Albums") return (r.releaseType || "").toLowerCase() === "album";
+    if (filter === "EPs") return (r.releaseType || "").toLowerCase() === "ep";
+    if (filter === "Singles") return (r.releaseType || "").toLowerCase() === "single";
     return true;
   });
 
@@ -171,7 +184,7 @@ export function ArtistDiscography({
         <div>
           <div className="wk-eyebrow mb-2">{eyebrow}</div>
           <h2 className="text-[clamp(26px,3vw,40px)] font-black leading-[0.92] tracking-[-0.04em] text-[var(--wk-text)]">
-            Releases
+            {title}
           </h2>
         </div>
 

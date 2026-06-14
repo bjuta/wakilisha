@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useScrollLock } from "@/hooks/useScrollLock";
 import { ShareButton } from "@/components/design-system/share/ShareSheet";
 import { WkIcon } from "@/components/design-system/Icon";
+import { usePlayer } from "@/context/PlayerContext";
 import { releaseUrl } from "@/services/repairedContent/client";
 
 export interface ModalRelease {
@@ -14,7 +15,7 @@ export interface ModalRelease {
   labelName?: string;
   artworkUrl: string;
   trackCount: number;
-  tracks?: Array<{ title: string; duration: string }>;
+  tracks?: Array<{ title: string; duration: string; artists?: string; previewUrl?: string }>;
 }
 
 interface AlbumModalProps {
@@ -23,24 +24,89 @@ interface AlbumModalProps {
   onClose: () => void;
 }
 
-function resolveTracks(release: ModalRelease): Array<{ title: string; artist: string; duration: string }> {
+function resolveTracks(release: ModalRelease): Array<{ title: string; artist: string; duration: string; featuredArtists: string; previewUrl?: string }> {
   if (release.tracks && release.tracks.length > 0) {
     return release.tracks
       .filter((t) => t.title && !t.title.startsWith("Track ") && !t.title.startsWith("Unknown"))
-      .map((t) => ({
-        title: t.title,
-        artist: release.artist,
-        duration: t.duration || "",
-      }));
+      .map((t) => {
+        const allArtists = t.artists || "";
+        const displayArtist = allArtists || release.artist;
+        return {
+          title: t.title,
+          artist: displayArtist,
+          duration: t.duration || "",
+          featuredArtists: allArtists,
+          previewUrl: t.previewUrl,
+        };
+      });
   }
   return [];
 }
 
 export function AlbumModal({ release, open, onClose }: AlbumModalProps) {
   useScrollLock(open);
+  const { currentTrack, isPlaying, playTrack, togglePlay } = usePlayer();
 
   if (!open || !release) return null;
   const tracks = resolveTracks(release);
+
+  const handlePlayAll = () => {
+    if (!tracks.length) return;
+
+    const queueTracks = tracks.map((t, i) => ({
+      id: `${release.slug}-${i}`,
+      title: t.title,
+      artist: t.artist,
+      artworkUrl: release.artworkUrl,
+      duration: parseDuration(t.duration),
+      previewUrl: t.previewUrl,
+      album: release.title,
+    }));
+
+    // If the first track is already playing, toggle instead
+    if (currentTrack?.id === queueTracks[0].id) {
+      togglePlay();
+      return;
+    }
+
+    playTrack(queueTracks[0], queueTracks);
+  };
+
+  const handlePlayTrack = (trackIndex: number) => {
+    if (!tracks.length) return;
+
+    // Build queue starting from the clicked index
+    const queueTracks = tracks.slice(trackIndex).map((t, i) => ({
+      id: `${release.slug}-${trackIndex + i}`,
+      title: t.title,
+      artist: t.artist,
+      artworkUrl: release.artworkUrl,
+      duration: parseDuration(t.duration),
+      previewUrl: t.previewUrl,
+      album: release.title,
+    }));
+
+    const remainingTracks = tracks.slice(0, trackIndex).map((t, i) => ({
+      id: `${release.slug}-${i}`,
+      title: t.title,
+      artist: t.artist,
+      artworkUrl: release.artworkUrl,
+      duration: parseDuration(t.duration),
+      previewUrl: t.previewUrl,
+      album: release.title,
+    }));
+
+    const fullQueue = [...queueTracks, ...remainingTracks];
+
+    if (currentTrack?.id === queueTracks[0].id) {
+      togglePlay();
+      return;
+    }
+
+    playTrack(queueTracks[0], fullQueue);
+  };
+
+  const isThisReleasePlaying = currentTrack?.album === release.title && isPlaying;
 
   const modal = (
     <div className="album-modal-backdrop" onClick={onClose} role="dialog" aria-modal="true">
@@ -52,7 +118,13 @@ export function AlbumModal({ release, open, onClose }: AlbumModalProps) {
             <h2 className="album-modal-title">{release.title}</h2>
             <div className="album-modal-sub">{release.artist} · {release.year}{release.labelName ? ` · ${release.labelName}` : ""}</div>
             <div className="album-modal-actions">
-              <button className="wk-button wk-button-primary"><WkIcon name="Play" size={16} /> Play</button>
+              <button
+                className="wk-button wk-button-primary whitespace-nowrap cursor-pointer"
+                onClick={handlePlayAll}
+              >
+                <WkIcon name={isThisReleasePlaying ? "Pause" : "Play"} size={16} />
+                {isThisReleasePlaying ? "Pause" : "Play"}
+              </button>
               <ShareButton item={{ title: release.title, subtitle: release.artist, description: `${release.releaseType} by ${release.artist}`, imageUrl: release.artworkUrl, type: "album" }} />
               <Link to={releaseUrl(release)} className="wk-button wk-button-ghost"><WkIcon name="ArrowUpRight" size={16} /> Full page</Link>
             </div>
@@ -61,14 +133,29 @@ export function AlbumModal({ release, open, onClose }: AlbumModalProps) {
         </div>
         <div className="album-modal-body">
           <div className="album41-tracklist">
-            {tracks.map((track, index) => (
-              <div key={`${track.title}-${index}`} className="album41-track">
-                <div className="album41-track-num">{index + 1}</div>
-                <div className="min-w-0"><div className="album41-track-title">{track.title}</div><div className="album41-track-sub">{track.artist}</div></div>
-                <div className="album41-duration">{track.duration}</div>
-                <button className="chart-btn"><WkIcon name="Play" size={14} /></button>
-              </div>
-            ))}
+            {tracks.map((track, index) => {
+              const trackId = `${release.slug}-${index}`;
+              const isCurrentTrack = currentTrack?.id === trackId;
+              const isThisPlaying = isCurrentTrack && isPlaying;
+
+              return (
+                <div key={trackId} className="album41-track">
+                  <div className="album41-track-num">{index + 1}</div>
+                  <div className="min-w-0">
+                    <div className="album41-track-title">{track.title}</div>
+                    <div className="album41-track-sub">{track.artist}</div>
+                  </div>
+                  <div className="album41-duration">{track.duration}</div>
+                  <button
+                    className="chart-btn cursor-pointer whitespace-nowrap"
+                    onClick={() => handlePlayTrack(index)}
+                    aria-label={isThisPlaying ? "Pause" : `Play ${track.title}`}
+                  >
+                    <WkIcon name={isThisPlaying ? "Pause" : "Play"} size={14} />
+                  </button>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -76,4 +163,12 @@ export function AlbumModal({ release, open, onClose }: AlbumModalProps) {
   );
 
   return createPortal(modal, document.body);
+}
+
+function parseDuration(duration: string): number {
+  if (!duration) return 0;
+  const parts = duration.split(":").map(Number);
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  return Number(duration) || 0;
 }

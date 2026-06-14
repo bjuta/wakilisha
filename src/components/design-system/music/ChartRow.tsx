@@ -30,6 +30,7 @@ export interface ChartRowProps {
   score?: number;
   duration?: number;
   compact?: boolean;
+  previewUrl?: string;
 }
 
 
@@ -61,6 +62,7 @@ export function ChartRow({
   score,
   duration,
   compact,
+  previewUrl,
 }: ChartRowProps) {
   const { currentTrack, isPlaying, playTrack } = usePlayer();
   const [isExpanded, setIsExpanded] = useState(false);
@@ -68,13 +70,15 @@ export function ChartRow({
   const trackId = slug || `${title}-${artist}`.toLowerCase().replace(/\s+/g, "-");
   const isCurrentTrack = currentTrack?.id === trackId;
   const isTop3 = rank <= 3;
-  const playable = isPlayable !== false;
+  // Derive isPlayable from whether we have a previewUrl
+  const resolvedPlayable = isPlayable ?? (!!previewUrl);
+  const playable = resolvedPlayable !== false;
 
   const handlePlay = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!playable) return;
     if (onPlay) { onPlay(); return; }
-    const track = { id: trackId, title, artist, artworkUrl, isPlayable: playable, source };
+    const track = { id: trackId, title, artist, artworkUrl, isPlayable: playable, source, previewUrl };
     playTrack(track, [track]);
   };
 
@@ -173,14 +177,6 @@ export function ChartRow({
           ) : (
             <Ch19GradientImage slug={slug || trackId} name={title} />
           )}
-          <button
-            onClick={handlePlay}
-            disabled={!playable}
-            aria-label={isCurrentTrack && isPlaying ? "Pause" : "Play"}
-            className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity duration-150 group-hover:opacity-100 disabled:opacity-0"
-          >
-            <i className={`text-white ${isCurrentTrack && isPlaying ? "ri-pause-fill" : "ri-play-fill"}`} />
-          </button>
         </div>
 
         {/* Info */}

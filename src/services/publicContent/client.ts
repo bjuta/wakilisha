@@ -77,6 +77,7 @@ export type PublicReleaseDetail = PublicRelease & {
     duration: number;
     trackNumber: number;
     artworkUrl: string;
+    previewUrl?: string;
   }>;
   metadata: Record<string, unknown>;
 };
@@ -171,48 +172,50 @@ export interface RegistryDiscographyRelease {
   releaseDate: string;
   trackCount: number;
   artworkUrl: string;
-  tracks: Array<{ title: string; duration: string }>;
+  tracks: Array<{ title: string; duration: string; artists?: string; previewUrl?: string }>;
 }
 
-/* ─── Registry Standalone Tracks ─── */
-
-export interface RegistryStandaloneTrack {
-  id: string;
-  slug: string;
-  title: string;
-  duration: string;
-  image: string;
-  artists: string;
-  songUrl: string;
+export interface RegistryAppearsOnRelease extends RegistryDiscographyRelease {
+  artist: string; // the primary artist of this release (not the page artist)
 }
 
 /* ─── Shared cache for edge function response ─── */
 
-const discographyCache = new Map<string, { releases: RegistryDiscographyRelease[]; standaloneTracks: RegistryStandaloneTrack[] }>();
+const discographyCache = new Map<string, { releases: RegistryDiscographyRelease[]; appearsOn: RegistryAppearsOnRelease[] }>();
 
 async function fetchDiscographyFromEdge(
   artistSlug: string
-): Promise<{ releases: RegistryDiscographyRelease[]; standaloneTracks: RegistryStandaloneTrack[] }> {
+): Promise<{ releases: RegistryDiscographyRelease[]; appearsOn: RegistryAppearsOnRelease[] }> {
   const cached = discographyCache.get(artistSlug);
   if (cached) return cached;
 
   const supabaseUrl = (import.meta.env.VITE_PUBLIC_SUPABASE_URL as string) || "";
+  const anonKey = (import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY as string) || "";
+  const t = Date.now();
   const resp = await fetch(
-    `${supabaseUrl}/functions/v1/artist-discography?slug=${encodeURIComponent(artistSlug)}`,
-    { headers: { Accept: "application/json" } }
+    `${supabaseUrl}/functions/v1/artist-discography?slug=${encodeURIComponent(artistSlug)}&t=${t}`,
+    {
+      headers: {
+        Accept: "application/json",
+        apikey: anonKey,
+        Authorization: `Bearer ${anonKey}`,
+      },
+      cache: "no-store",
+    }
   );
   if (!resp.ok) {
-    const empty = { releases: [], standaloneTracks: [] };
+    console.warn(`fetchDiscographyFromEdge failed: ${resp.status} ${resp.statusText}`);
+    const empty = { releases: [], appearsOn: [] };
     return empty;
   }
   const payload = await resp.json();
   const result = {
     releases: (payload?.releases || []) as RegistryDiscographyRelease[],
-    standaloneTracks: (payload?.standaloneTracks || []) as RegistryStandaloneTrack[],
+    appearsOn: (payload?.appearsOn || []) as RegistryAppearsOnRelease[],
   };
   // Only cache when there's actual data, not empty responses — prevents
   // stale-empty caches from hiding newly ingested discography data.
-  if (result.releases.length > 0 || result.standaloneTracks.length > 0) {
+  if (result.releases.length > 0 || result.appearsOn.length > 0) {
     discographyCache.set(artistSlug, result);
   }
   return result;
@@ -240,12 +243,12 @@ export async function getArtistDiscographyFromRegistry(
   }
 }
 
-export async function getArtistStandaloneTracks(
+export async function getArtistAppearsOn(
   artistSlug: string
-): Promise<RegistryStandaloneTrack[]> {
+): Promise<RegistryAppearsOnRelease[]> {
   try {
     const data = await fetchDiscographyFromEdge(artistSlug);
-    return data.standaloneTracks;
+    return data.appearsOn;
   } catch {
     return [];
   }
@@ -303,7 +306,10 @@ type RegistryMediaAsset = {
 async function apiGet<T>(path: string): Promise<T> {
   const base = API_BASE.replace(/\/$/, "");
   const url = `${base}${path.startsWith("/") ? path : `/${path}`}`;
-  const response = await fetch(url, { headers: { Accept: "application/json" } });
+  const response = await fetch(url, {
+    headers: { Accept: "application/json" },
+    cache: "no-store",
+  });
 
   if (!response.ok) {
     const text = await response.text().catch(() => "");
@@ -507,6 +513,7 @@ async function getRegistryTracklist(releaseId: string, fallbackArtist: string): 
         duration: numberValue(track, ["duration", "duration_seconds", "length_seconds"], 0),
         trackNumber: relationship.position || index + 1,
         artworkUrl: artwork || generatedReleaseArtwork(title, artist),
+        previewUrl: textValue(track, ["preview_url"]) || undefined,
       };
     })
     .filter((track) => track.title);
@@ -671,8 +678,12 @@ export async function listReleases(): Promise<PublicRelease[]> {
 }
 
 export async function getRelease(artistSlug: string, releaseSlug: string): Promise<PublicReleaseDetail | null> {
+  // Try registry first (most authoritative)
+  const registryRelease = await getReleaseFromRegistry(artistSlug, releaseSlug);
+  if (registryRelease && registryRelease.tracks.length > 0) return registryRelease;
+
   const shellRelease = await getReleaseFromShell(artistSlug, releaseSlug);
-  if (shellRelease) return shellRelease;
+  if (shellRelease && shellRelease.tracks.length > 0) return shellRelease;
 
   const result = await safeApiGet<{ release: PublicReleaseDetail | null }>(`/releases/${artistSlug}/${releaseSlug}`, { release: null });
   if (!result.release) return null;
@@ -697,4 +708,145 @@ export async function listLabels(): Promise<PublicLabel[]> {
     ...label,
     logoUrl: image(label.logoUrl, { id: label.id, slug: label.slug, name: label.name, type: "label" }),
   }));
+}
+
+async function getReleaseFromRegistry(artistSlug: string, releaseSlug: string): Promise<PublicReleaseDetail | null> {
+  // 1. Find the release by slug
+  const { data: releaseRow } = await supabase
+    .from("registry_releases")
+    .select("id, slug, title, release_type, release_date, artwork_url")
+    .eq("slug", releaseSlug)
+    .eq("status", "active")
+    .maybeSingle();
+
+  if (!releaseRow) return null;
+
+  const releaseId = releaseRow.id;
+
+  // 2. Find the primary artist for this release
+  const { data: releaseArtistRows } = await supabase
+    .from("registry_release_artists")
+    .select("artist_name_text, artist_slug, is_primary, is_featured")
+    .eq("release_id", releaseId)
+    .eq("status", "active");
+
+  const primaryReleaseArtist = (releaseArtistRows || []).find((ra) => ra.is_primary);
+  const fallbackArtist = primaryReleaseArtist?.artist_name_text || "";
+  const fallbackArtistSlug = primaryReleaseArtist?.artist_slug || artistSlug;
+
+  // 3. Get tracklist via registry_release_tracks
+  // Do NOT filter by registry_release_tracks.status — the join table's
+  // status is a migration flag (shadow/active), not a visibility gate.
+  // Tracks themselves are filtered by registry_tracks.status below.
+  const { data: releaseTrackRows } = await supabase
+    .from("registry_release_tracks")
+    .select("track_id, track_number, disc_number")
+    .eq("release_id", releaseId)
+    .order("track_number", { ascending: true });
+
+  const trackIds = (releaseTrackRows || []).map((rt) => rt.track_id);
+
+  if (trackIds.length === 0) return null;
+
+  // 4. Get track data
+  const { data: trackRows } = await supabase
+    .from("registry_tracks")
+    .select("id, slug, title, duration_ms, artwork_url, preview_url")
+    .in("id", trackIds)
+    .eq("status", "active");
+
+  const tracksById = new Map((trackRows || []).map((t) => [t.id, t]));
+
+  // 5. Get track artists for all tracks
+  const { data: trackArtistRows } = await supabase
+    .from("registry_track_artists")
+    .select("track_id, artist_name_text, artist_slug, is_primary, is_featured, credit_order")
+    .in("track_id", trackIds)
+    .eq("status", "active")
+    .order("credit_order", { ascending: true });
+
+  const artistsByTrack = new Map<string, Array<{ name: string; slug: string; isPrimary: boolean; isFeatured: boolean }>>();
+  for (const ta of (trackArtistRows || [])) {
+    if (!artistsByTrack.has(ta.track_id)) artistsByTrack.set(ta.track_id, []);
+    artistsByTrack.get(ta.track_id)!.push({
+      name: ta.artist_name_text || ta.artist_slug,
+      slug: ta.artist_slug || "",
+      isPrimary: ta.is_primary,
+      isFeatured: ta.is_featured,
+    });
+  }
+
+  // 6. Build tracklist with correct artist attribution
+  const tracks: PublicReleaseDetail["tracks"] = (releaseTrackRows || [])
+    .map((rt, index) => {
+      const track = tracksById.get(rt.track_id);
+      if (!track) return null;
+
+      const trackArtists = artistsByTrack.get(rt.track_id) || [];
+
+      // Determine the primary artist for this track:
+      // Use the release's primary artist if they're on this track.
+      // Otherwise, fall back to the first artist marked as primary,
+      // or the track artist with the lowest credit_order.
+      const releasePrimaryArtist = trackArtists.find(
+        (a) => a.slug === fallbackArtistSlug && a.isPrimary
+      );
+      const firstPrimaryArtist = trackArtists.find((a) => a.isPrimary);
+      const firstArtist = trackArtists[0];
+      const primaryArtist = releasePrimaryArtist || firstPrimaryArtist || firstArtist;
+
+      // Featured artists are everyone else who is NOT the primary artist
+      const featuredArtists = trackArtists
+        .filter((a) => a.slug !== (primaryArtist?.slug || ""))
+        .map((a) => a.name)
+        .filter(Boolean);
+
+      const artistStr = featuredArtists.length > 0
+        ? `${primaryArtist?.name || fallbackArtist || "Unknown"} (feat. ${featuredArtists.join(", ")})`
+        : (primaryArtist?.name || fallbackArtist || "Unknown");
+
+      const durationSeconds = track.duration_ms ? Math.round(track.duration_ms / 1000) : 0;
+
+      return {
+        id: track.id,
+        slug: track.slug || rt.track_id,
+        title: track.title,
+        artist: artistStr,
+        duration: durationSeconds,
+        trackNumber: rt.track_number || index + 1,
+        artworkUrl: track.artwork_url || "",
+        previewUrl: track.preview_url || undefined,
+      };
+    })
+    .filter(Boolean) as PublicReleaseDetail["tracks"];
+
+  const totalDuration = tracks.reduce((sum, t) => sum + (t.duration || 0), 0);
+  const trackCount = tracks.length;
+  const releaseType = releaseTypeFromTrackCount(trackCount);
+
+  const releaseDate = releaseRow.release_date || "";
+  const year = yearFromDate(releaseDate);
+
+  return {
+    id: releaseRow.id,
+    slug: releaseRow.slug,
+    title: releaseRow.title,
+    artist: fallbackArtist || "Unknown artist",
+    year,
+    releaseType,
+    labelName: "WAKILISHA Registry",
+    artworkUrl: releaseRow.artwork_url || "",
+    trackCount,
+    description: `${releaseRow.title} is a ${releaseType.toLowerCase()} by ${fallbackArtist || "Unknown artist"}, from the WAKILISHA canonical registry.`,
+    releaseDate,
+    labelSlug: "wakilisha-registry",
+    totalDuration,
+    tracks,
+    metadata: {
+      source: "registry_releases",
+      releaseId: releaseRow.id,
+      tracklistSource: "registry_release_tracks",
+      artworkSource: releaseRow.artwork_url ? "registry_releases" : "generated",
+    },
+  };
 }

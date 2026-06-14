@@ -59,8 +59,8 @@ export type ChartEligibilityProfile = {
 
   releaseEligibility?: {
     releaseTypes: ReleaseTypeEligibility[];
-    releaseDateFrom?: string;
-    releaseDateTo?: string;
+    releaseWindowFrom?: string;
+    releaseWindowTo?: string;
     includeReissues: boolean;
     includeRemixes: boolean;
     includeAcousticVersions: boolean;

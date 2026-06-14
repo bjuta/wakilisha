@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Link } from "react-router-dom";
 import { AlbumModal } from "@/components/design-system/releases/AlbumModal";
+import type { ModalRelease } from "@/components/design-system/releases/AlbumModal";
 import { ShareButton } from "@/components/design-system/share/ShareSheet";
 import { WkIcon } from "@/components/design-system/Icon";
 import { supabase } from "@/lib/supabase";
@@ -8,6 +9,8 @@ import {
   listReleases,
   listLabels,
   releaseUrl,
+  getRelease,
+  slugify,
   type RepairedRelease,
   type RepairedLabel,
 } from "@/services/repairedContent/client";
@@ -27,6 +30,8 @@ export default function Releases() {
   const [sortKey, setSortKey] = useState<SortKey>("newest");
   const [page, setPage] = useState(1);
   const [modalRelease, setModalRelease] = useState<Release | null>(null);
+  const [modalReleaseDetail, setModalReleaseDetail] = useState<ModalRelease | null>(null);
+  const [modalLoading, setModalLoading] = useState(false);
   const [releases, setReleases] = useState<Release[]>([]);
   const [labels, setLabels] = useState<RepairedLabel[]>([]);
   const [loading, setLoading] = useState(true);
@@ -56,6 +61,49 @@ export default function Releases() {
   useEffect(() => {
     setPage(1);
   }, [artistFilter, query, sortKey, typeFilter, yearFilter]);
+
+  useEffect(() => {
+    if (!modalRelease) {
+      setModalReleaseDetail(null);
+      return;
+    }
+
+    const artistSlug = slugify(modalRelease.artist);
+    let cancelled = false;
+    setModalLoading(true);
+
+    getRelease(artistSlug, modalRelease.slug).then((detail) => {
+      if (cancelled) return;
+      if (detail && detail.tracks.length > 0) {
+        setModalReleaseDetail({
+          slug: detail.slug,
+          title: detail.title,
+          artist: detail.artist,
+          releaseType: detail.releaseType,
+          year: detail.year,
+          labelName: detail.labelName,
+          artworkUrl: detail.artworkUrl,
+          trackCount: detail.trackCount,
+          tracks: detail.tracks.map((t) => ({
+            title: t.title,
+            duration: formatDurationSeconds(t.duration),
+            artists: t.artist,
+            previewUrl: t.previewUrl,
+          })),
+        });
+      } else {
+        setModalReleaseDetail(null);
+      }
+      setModalLoading(false);
+    }).catch(() => {
+      if (!cancelled) {
+        setModalReleaseDetail(null);
+        setModalLoading(false);
+      }
+    });
+
+    return () => { cancelled = true; };
+  }, [modalRelease]);
 
   const releaseTypes = useMemo(() => [ALL, ...uniqueSorted(releases.map((r) => r.releaseType).filter(Boolean))], [releases]);
   const releaseYears = useMemo(() => [ALL, ...uniqueSorted(releases.map((r) => yearValue(r.year)).filter(Boolean)).sort((a, b) => Number(b) - Number(a))], [releases]);
@@ -223,7 +271,7 @@ export default function Releases() {
         </section>
       </div>
 
-      <AlbumModal open={Boolean(modalRelease)} release={modalRelease} onClose={() => setModalRelease(null)} />
+      <AlbumModal open={Boolean(modalRelease)} release={modalReleaseDetail || (modalRelease ? { slug: modalRelease.slug, title: modalRelease.title, artist: modalRelease.artist, releaseType: modalRelease.releaseType, year: modalRelease.year, labelName: modalRelease.labelName, artworkUrl: modalRelease.artworkUrl, trackCount: modalRelease.trackCount } : null)} onClose={() => { setModalRelease(null); setModalReleaseDetail(null); }} />
     </main>
   );
 }
@@ -371,6 +419,12 @@ function isGeneratedArtwork(url: string): boolean { return !url || url.startsWit
 function normalized(value: string): string { return value.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""); }
 function pickFeaturedReleases(releases: Release[]): Release[] { const withArtwork = releases.filter((release) => !isGeneratedArtwork(release.artworkUrl)); const source = withArtwork.length >= 5 ? withArtwork : releases; return source.slice(0, 10); }
 function paginationWindow(page: number, totalPages: number): Array<number | "…"> { if (totalPages <= 7) return Array.from({ length: totalPages }, (_, index) => index + 1); const pages = new Set([1, totalPages, page - 1, page, page + 1].filter((item) => item >= 1 && item <= totalPages)); const sorted = Array.from(pages).sort((a, b) => a - b); return sorted.flatMap((item, index) => index > 0 && item - sorted[index - 1] > 1 ? ["…" as const, item] : [item]); }
+function formatDurationSeconds(seconds: number): string {
+  if (!seconds || seconds <= 0) return "";
+  const min = Math.floor(seconds / 60);
+  const sec = seconds % 60;
+  return `${min}:${String(sec).padStart(2, "0")}`;
+}
 
 async function hydrateReleaseArtwork(releases: Release[]): Promise<Release[]> {
   const generatedCount = releases.filter((release) => isGeneratedArtwork(release.artworkUrl)).length;

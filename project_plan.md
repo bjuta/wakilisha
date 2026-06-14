@@ -3,9 +3,9 @@
 ## 1. Project Description
 WAKILISHA is a premier cultural institution and digital platform dedicated to preserving, promoting, and investing in African creative life. It builds the systems — discovery, documentation, funding, valuation, and sustainability — that help African creative work travel further, last longer, and generate meaningful value.
 
-**Current state:** Music vertical is the mature layer. Real data has been imported from the legacy WordPress/Wkcharts stack into Supabase — 1,713 artists, 4,582 tracks, 687 releases, 232 labels, 27 genres, plus 74K+ relationship records. A repaired content API serves listing data. Admin infrastructure (Chart Ingestion Studio, WordPress-like CMS) is production-ready. Public listing pages (artists, genres, labels, releases, charts, magazine) are built with real API connections. Mobile counterparts exist for all listing pages. **Chart v2 tables are empty — WordPress chart data import is pending schema discovery.**
+**Current state:** Music vertical is the mature layer. Real data has been imported from the legacy WordPress/Wkcharts stack into Supabase — 1,713 artists, 5,263 tracks, 687 releases, 232 labels, 27 genres, plus 74K+ relationship records. 859 dead unscoped tracks archived and 393 orphaned relationships deleted (June 2026). A repaired content API serves listing data. Admin infrastructure (Chart Ingestion Studio, WordPress-like CMS) is production-ready. Public listing pages (artists, genres, labels, releases, charts, magazine) are built with real API connections. Mobile counterparts exist for all listing pages. Chart v2 tables contain 4 programs, 77 editions, 6,332+ entries — all imported from WordPress with registry canonicalization.
 
-**Gap:** Relationship data (track↔artist, release↔track, artist↔genre, etc.) sits unresolved in staging with old database IDs instead of slugs (Phase 1). Chart data from WordPress has not yet been imported into v2 tables. Cross-linking between entity pages is incomplete (Phase 6). Mobile parity and SEO polish remain (Phases 7-9).
+**Gap:** Relationship data (track↔artist, release↔track, artist↔genre, etc.) sits unresolved in staging with old database IDs instead of slugs (Phase 1). Cross-linking between entity pages is incomplete (Phase 6). Mobile parity and SEO polish remain (Phases 7-9).
 
 ## 2. What's Already Done (do not rebuild)
 
@@ -232,7 +232,7 @@ Phase 1 is a pure database/scripts task — no frontend changes. It unblocks ric
 | entity_type | count | has rich content |
 |-------------|-------|-----------------|
 | artists | 1,713 | 64 have bios, 84 have excerpts |
-| tracks | 4,582 | skeleton only (ISRC + release_id) |
+| tracks | 5,263 | skeleton only (ISRC + release_id) |
 | releases | 687 | empty mapped_record |
 | labels | 232 | empty mapped_record |
 | chart_editions | 164 | minimal |
@@ -715,6 +715,48 @@ Three separate normalize functions across 4 files, all producing different outpu
 5. `test/scoring/normalization.test.ts` — 20+ new edge cases, property-based fuzz tests, fixed false positive
 
 Policy bumped 1.0.1 → 1.0.2. Remaining hardening: golden-file tests, Gate A regression, P4 carry-forward decay, backfill CI byte-for-byte verification.
+
+## Data Repair: Dead Track Cleanup ✅ COMPLETE (June 2026)
+
+**Problem:** The `registry_tracks` table contained 859 completely orphaned tracks — no release linkage (`registry_release_tracks`), no artist linkage (`registry_track_artists`), no chart appearances (`wk_chart_entries_v2`), and no entity relationships (`registry_entity_relationships`). Additionally, 393 `registry_entity_relationships` records pointed to track slugs that don't exist in `registry_tracks`.
+
+**What was done:**
+1. Archived 859 dead unscoped tracks (status: active → archived, updated_at set)
+2. Deleted 393 orphaned entity relationships (target_entity_type = 'track' with no matching registry_tracks.slug)
+3. Verified zero remaining dead tracks and zero remaining orphaned relationships
+
+**After cleanup:**
+- Active tracks: 5,263 (was 6,122)
+- Archived tracks: 861 (was 2)
+- Total cleaned: 1,252 records
+
+## Data Repair: Chart Entry → Registry Track Wiring ✅ COMPLETE (June 2026)
+
+**Problem:** All 2,977 `wk_chart_entries_v2` records had zero connection to real registry tracks and artists. 2,178 entries had `canonical_track_id` UUIDs pointing to non-existent registry tracks. 799 entries pointed to zombie tracks (`title--title` slugs) with fake `registry_track_artists` rows (`artist_id = NULL`). The charts page could show track titles and positions (stored directly in chart entries) but clicking through to artist pages, showing artist images, or linking to discographies was completely broken.
+
+**What was done:**
+
+### Step 1: canonical_track_id repair
+Updated all 2,977 entries to point to correct `registry_tracks` via `track_slug` → `registry_tracks.slug` matching (100% match rate on 191 unique track slugs).
+
+### Step 2: Artist connection repair
+- **206 entries**: Fixed by matching chart `artist_name` → `registry_artists.display_name` (simple name match)
+- **380 entries** (21 unique tracks): Fixed by splitting comma-separated multi-artist names, matching 48 of 50 individual artists to `registry_artists.display_name`
+- **2 edge cases** (Le'Laika, Nikita Kering'): Smart-quote vs straight-quote mismatch in `registry_artists.display_name` — resolved via slug-based lookup
+
+### Step 3: Zombie row cleanup
+- Deleted all `registry_track_artists` rows with `artist_id = NULL` (1,016 rows total — none linked to chart entry tracks after repair)
+- Created proper `registry_track_artists` rows for every chart track with `role: primary`, `source: chart_entry_wiring`, `confidence: 80`, `status: active`
+
+### End State
+| Metric | Before | After |
+|--------|--------|-------|
+| Chart entries with valid registry track | 799 (27%) | 2,977 (100%) |
+| Chart entries with real artist connection | 0 (0%) | 2,977 (100%) |
+| Zombie artist rows (artist_id = NULL) | 1,016 | 0 |
+| Unique tracks in charts connected to artists | 0 | 191 |
+
+Every chart entry now resolves: chart entry → registry track → real registry artist. Zero dead links, zero ghosts, zero zombies.
 
 ## Guides: CMS-Driven Architecture ✅ IMPLEMENTED (June 2026)
 

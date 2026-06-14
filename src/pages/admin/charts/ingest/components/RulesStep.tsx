@@ -44,8 +44,8 @@ export function RulesStep({ profiles, selectedEligibilityProfileId, onSelectElig
   const [originCountries, setOriginCountries] = useState<string[]>(["KE"]);
   const [genderMode, setGenderMode] = useState<ArtistGenderEligibilityMode>("any");
   const [artistTypeMode, setArtistTypeMode] = useState<ArtistTypeEligibilityMode>("any");
-  const [releaseDateFrom, setReleaseDateFrom] = useState("");
-  const [releaseDateTo, setReleaseDateTo] = useState("");
+  const [releaseWindowFrom, setReleaseWindowFrom] = useState("");
+  const [releaseWindowTo, setReleaseWindowTo] = useState("");
   const [releaseTypes, setReleaseTypes] = useState<ReleaseTypeEligibility[]>(["single", "ep", "album", "mixtape", "compilation"]);
   const [requireIsrc, setRequireIsrc] = useState(false);
   const [requirePreview, setRequirePreview] = useState(false);
@@ -75,7 +75,7 @@ export function RulesStep({ profiles, selectedEligibilityProfileId, onSelectElig
     if (originMode !== "any") parts.push(`artist origin ${originCountries.join(" + ")}`);
     if (genderMode !== "any") parts.push(genderMode.replace(/_/g, " "));
     if (artistTypeMode !== "any") parts.push(artistTypeMode.replace(/_/g, " "));
-    if (releaseDateFrom || releaseDateTo) parts.push(`released ${releaseDateFrom || "…"} to ${releaseDateTo || "…"}`);
+    if (releaseWindowFrom || releaseWindowTo) parts.push(`release window ${releaseWindowFrom || "…"} to ${releaseWindowTo || "…"}`);
     if (releaseTypes.length) parts.push(`release types: ${releaseTypes.join(", ")}`);
     if (enrichmentOptions.ingestWithPreviewData) parts.push("preview data requested");
     return parts.length ? `Custom eligibility profile: ${parts.join("; ")}.` : "Custom eligibility profile with no restrictive filters.";
@@ -105,8 +105,8 @@ export function RulesStep({ profiles, selectedEligibilityProfileId, onSelectElig
         },
         releaseEligibility: {
           releaseTypes,
-          releaseDateFrom: releaseDateFrom || undefined,
-          releaseDateTo: releaseDateTo || undefined,
+          releaseWindowFrom: releaseWindowFrom || undefined,
+          releaseWindowTo: releaseWindowTo || undefined,
           includeReissues: true,
           includeRemixes: true,
           includeAcousticVersions: true,
@@ -174,7 +174,7 @@ export function RulesStep({ profiles, selectedEligibilityProfileId, onSelectElig
       </div>
 
       <div className="mb-5 grid gap-4 lg:grid-cols-2">
-        <div className="rounded-xl border border-wk-border bg-wk-surface-raised p-4"><h3 className="mb-3 text-[13px] font-bold text-wk-text">Track/release eligibility</h3><div className="grid gap-3 sm:grid-cols-2"><div><label className={LABEL_CLASS}>Released from</label><input type="date" value={releaseDateFrom} onChange={(event) => setReleaseDateFrom(event.target.value)} className={INPUT_CLASS} /></div><div><label className={LABEL_CLASS}>Released to</label><input type="date" value={releaseDateTo} onChange={(event) => setReleaseDateTo(event.target.value)} className={INPUT_CLASS} /></div></div><div className="mt-3 flex flex-wrap gap-2">{RELEASE_TYPES.map((type) => <button key={type} type="button" onClick={() => toggleReleaseType(type)} className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${releaseTypes.includes(type) ? "border-wk-brand bg-wk-brand text-wk-brand-on" : "border-wk-border bg-wk-surface text-wk-text-soft"}`}>{type}</button>)}</div></div>
+        <div className="rounded-xl border border-wk-border bg-wk-surface-raised p-4"><h3 className="mb-3 text-[13px] font-bold text-wk-text">Track/release eligibility</h3><p className="mb-3 text-[11px] text-wk-text-muted">Release window: only tracks released within these dates will be eligible.</p><div className="grid gap-3 sm:grid-cols-2"><div><label className={LABEL_CLASS}>Window from</label><input type="date" value={releaseWindowFrom} onChange={(event) => setReleaseWindowFrom(event.target.value)} className={INPUT_CLASS} /></div><div><label className={LABEL_CLASS}>Window to</label><input type="date" value={releaseWindowTo} onChange={(event) => setReleaseWindowTo(event.target.value)} className={INPUT_CLASS} /></div></div><div className="mt-3 flex flex-wrap gap-2">{RELEASE_TYPES.map((type) => <button key={type} type="button" onClick={() => toggleReleaseType(type)} className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${releaseTypes.includes(type) ? "border-wk-brand bg-wk-brand text-wk-brand-on" : "border-wk-border bg-wk-surface text-wk-text-soft"}`}>{type}</button>)}</div></div>
         <div className="rounded-xl border border-wk-border bg-wk-surface-raised p-4"><h3 className="mb-3 text-[13px] font-bold text-wk-text">Evidence and collaboration policy</h3><div className="grid gap-2"><Toggle checked={requireIsrc} onChange={setRequireIsrc} label="Require ISRC" help="Rows without ISRC should be blocked or sent to review." /><Toggle checked={requirePreview} onChange={setRequirePreview} label="Require preview" help="Use only for charts where playable preview is part of eligibility." /><Toggle checked={explicitAllowed} onChange={setExplicitAllowed} label="Allow explicit tracks" /><Toggle checked={allowFeaturedArtists} onChange={setAllowFeaturedArtists} label="Allow featured artists" /><Toggle checked={primaryArtistMustMatch} onChange={setPrimaryArtistMustMatch} label="Primary artist must match eligibility" /><Toggle checked={allArtistsMustMatch} onChange={setAllArtistsMustMatch} label="All credited artists must match eligibility" help="Use for strict country/gender/type charts." /></div></div>
       </div>
 

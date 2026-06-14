@@ -258,13 +258,13 @@ function evaluateRelease(row: IngestResolvedRow, profile: ChartEligibilityProfil
   }
 
   const releaseDate = getReleaseDate(row);
-  if (release.releaseDateFrom && releaseDate && releaseDate < release.releaseDateFrom) {
-    addFailure(decision, "release_date_too_early", `Release date ${releaseDate} is earlier than ${release.releaseDateFrom}.`);
+  if (release.releaseWindowFrom && releaseDate && releaseDate < release.releaseWindowFrom) {
+    addFailure(decision, "release_window_too_early", `Release date ${releaseDate} is earlier than ${release.releaseWindowFrom}.`);
   }
-  if (release.releaseDateTo && releaseDate && releaseDate > release.releaseDateTo) {
-    addFailure(decision, "release_date_too_late", `Release date ${releaseDate} is later than ${release.releaseDateTo}.`);
+  if (release.releaseWindowTo && releaseDate && releaseDate > release.releaseWindowTo) {
+    addFailure(decision, "release_window_too_late", `Release date ${releaseDate} is later than ${release.releaseWindowTo}.`);
   }
-  if ((release.releaseDateFrom || release.releaseDateTo) && !releaseDate) {
+  if ((release.releaseWindowFrom || release.releaseWindowTo) && !releaseDate) {
     decision.warnings.push("Release date is unknown; date-window eligibility could not be fully verified.");
   }
 }

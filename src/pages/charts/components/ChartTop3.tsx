@@ -20,6 +20,7 @@ export interface Top3Entry {
   artistSlug?: string;
   isPlayable?: boolean;
   source?: string;
+  previewUrl?: string;
 }
 
 const MOVEMENT_CONFIG = {
@@ -85,6 +86,7 @@ export function ChartTop3({
       artworkUrl: entry.artworkUrl,
       isPlayable: entry.isPlayable !== false,
       source: entry.source,
+      previewUrl: entry.previewUrl,
     };
     playTrack(track, [track]);
   };
@@ -139,21 +141,6 @@ export function ChartTop3({
 
                 {/* Overlays */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-
-                {/* Play overlay */}
-                {isPlayable && (
-                  <button
-                    onClick={() => handlePlay(entry)}
-                    className={`absolute inset-0 flex items-center justify-center bg-black/40 transition-opacity duration-[var(--wk-d-standard)] ${isHovered ? "opacity-100" : "opacity-0"}`}
-                  >
-                    <div
-                      className="flex h-14 w-14 items-center justify-center rounded-full transition-transform duration-[var(--wk-d-fast)]"
-                      style={{ background: styles.badgeBg, transform: isHovered ? "scale(1)" : "scale(0.8)" }}
-                    >
-                      <i className={`${isPlayingCurrent ? "ri-pause-fill" : "ri-play-fill"} text-xl`} style={{ color: styles.badgeText }} />
-                    </div>
-                  </button>
-                )}
 
                 {/* Top bar: rank + movement */}
                 <div className="absolute left-3 right-3 top-3 flex items-start justify-between">

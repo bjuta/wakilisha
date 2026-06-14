@@ -281,6 +281,14 @@ export async function getV2LatestChartEdition(programSlug: string): Promise<Char
   return data.edition ? toEdition(data.edition, familyId) : null;
 }
 
+export async function getV2LatestChartEditionWithEntries(programSlug: string): Promise<{ edition: ChartEdition | null; entries: ChartEditionEntry[] }> {
+  const data = unwrap<V2EditionData>(await v2Get<ApiEnvelope<V2EditionData> | V2EditionData>(`/charts/${programSlug}/latest`));
+  const familyId = data.program?.publicSlug ?? programSlug;
+  const edition = data.edition ? toEdition(data.edition, familyId) : null;
+  const entries = (data.entries ?? []).map((entry) => toEntry(entry, data.edition?.slug ?? programSlug));
+  return { edition, entries };
+}
+
 export async function getV2ChartEdition(programSlug: string, editionSlug: string): Promise<ChartEdition | null> {
   const data = unwrap<V2EditionData>(await v2Get<ApiEnvelope<V2EditionData> | V2EditionData>(`/charts/${programSlug}/${editionSlug}`));
   const familyId = data.program?.publicSlug ?? programSlug;

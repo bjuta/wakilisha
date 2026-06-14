@@ -1,3 +1,4 @@
+
 // enrich-artist-discography/index.ts
 // Connects to WordPress MySQL, reads wkcharts_artists, wkcharts_tracks,
 // wkcharts_track_artists, wkcharts_release_shells, wkcharts_release_shell_artists,
@@ -177,7 +178,6 @@ serve(async (req: Request) => {
         continue;
       }
 
-      // Only enrich fields that are missing
       const patch: Record<string, unknown> = {};
       const wpImage = clean(wa.image_url);
       if (wpImage && !registryArtist.public_image_url) {
@@ -187,7 +187,6 @@ serve(async (req: Request) => {
       if (wpBio && !registryArtist.bio) {
         patch.bio = wpBio;
       }
-      // Merge metadata (spotify_id, artist_type, origin, website, apple_music_id)
       const existingMeta = (registryArtist.metadata || {}) as Record<string, unknown>;
       const metaPatch: Record<string, unknown> = {};
       if (clean(wa.spotify_id) && !existingMeta.spotify_artist_id) metaPatch.spotify_artist_id = clean(wa.spotify_id);
@@ -247,7 +246,6 @@ serve(async (req: Request) => {
     log.push(`WP wkcharts_track_artists fetched: ${wpTrackArtists.length}`);
 
     // ── Build lookup maps ────────────────────────────────────────────────────────
-    // WP shell id → artists list
     const shellArtistsMap = new Map<number, Array<Record<string, unknown>>>();
     for (const sa of wpShellArtists) {
       const shellId = Number(sa.release_shell_id);
@@ -255,7 +253,6 @@ serve(async (req: Request) => {
       shellArtistsMap.get(shellId)!.push(sa);
     }
 
-    // WP shell id → tracks list
     const shellTracksMap = new Map<number, Array<Record<string, unknown>>>();
     for (const st of wpShellTracks) {
       const shellId = Number(st.release_shell_id);
@@ -263,13 +260,11 @@ serve(async (req: Request) => {
       shellTracksMap.get(shellId)!.push(st);
     }
 
-    // WP track id → track row
     const wpTrackById = new Map<number, Record<string, unknown>>();
     for (const t of wpTracks) {
       wpTrackById.set(Number(t.id), t);
     }
 
-    // WP track id → artists list
     const trackArtistsMap = new Map<number, Array<Record<string, unknown>>>();
     for (const ta of wpTrackArtists) {
       const trackId = Number(ta.track_id);
@@ -288,19 +283,24 @@ serve(async (req: Request) => {
     const existingTrackBySlug = new Map<string, string>((existingTracks ?? []).map((t: any) => [String(t.slug), String(t.id)]));
     const existingTrackSlugs = new Set(existingTrackBySlug.keys());
 
+    // Preload existing track→artist links so slug-matching is scoped by artist.
+    // An "Intro" by Sauti Sol is not the same song as "Intro" by Wakadinali.
+    const { data: existingTrackArtists } = await supabase.from("registry_track_artists")
+      .select("track_id, artist_slug").eq("status", "active");
+    const existingTrackArtistSet = new Set<string>(
+      (existingTrackArtists ?? []).map((r: any) => `${r.track_id}:${r.artist_slug}`)
+    );
+
     // ── 11. Process each release shell ────────────────────────────────────────────
     const seenReleaseSlugs = new Set<string>(existingReleaseSlugs);
     const seenTrackSlugs = new Set<string>(existingTrackSlugs);
 
-    // We'll batch inserts
     const releaseRows: Record<string, unknown>[] = [];
     const releaseArtistRows: Record<string, unknown>[] = [];
     const trackRows: Record<string, unknown>[] = [];
     const releaseTrackRows: Record<string, unknown>[] = [];
 
-    // Map from WP shell id → registry release id (uuid)
     const shellIdToRegistryReleaseId = new Map<number, string>();
-    // Map from WP track id → registry track id (uuid)
     const wpTrackIdToRegistryId = new Map<number, string>();
 
     for (const shell of wpShells) {
@@ -315,7 +315,6 @@ serve(async (req: Request) => {
 
       shellIdToRegistryReleaseId.set(shellId, releaseId);
 
-      // Only create if not already in registry
       if (!existingReleaseBySlug.has(rawSlug)) {
         releaseRows.push({
           id: releaseId,
@@ -332,12 +331,13 @@ serve(async (req: Request) => {
           },
         });
       } else {
-        // Use existing release id
         shellIdToRegistryReleaseId.set(shellId, existingReleaseBySlug.get(rawSlug)!);
       }
 
       // ── Shell artists → registry_release_artists ─────────────────────────────
       const shellArtists = shellArtistsMap.get(shellId) ?? [];
+      // Build set of registry artist slugs for this release (for track dedup scoping)
+      const releaseArtistSlugs = new Set<string>();
       for (const sa of shellArtists) {
         const wpArtistId = Number(sa.artist_id);
         const wpArtistSlug = wpArtistIdToSlug.get(wpArtistId);
@@ -347,6 +347,7 @@ serve(async (req: Request) => {
           stats.skipped_no_registry_match++;
           continue;
         }
+        releaseArtistSlugs.add(registryArtist.slug);
         const isPrimary = Number(sa.is_primary) === 1;
         const role = clean(sa.role) || "primary_artist";
         releaseArtistRows.push({
@@ -379,17 +380,38 @@ serve(async (req: Request) => {
         const trackNumber = Number(st.track_number || wpTrack.track_number || 0);
         const discNumber = Number(st.disc_number || 1);
 
-        // Check if this track already exists by ISRC or slug
+        // Build WP artist slugs for this track (for dedup scoping)
+        const wpTrackArtists = trackArtistsMap.get(wpTrackId) ?? [];
+        const trackArtistSlugs = new Set<string>();
+        for (const ta of wpTrackArtists) {
+          const wpAId = Number(ta.artist_id);
+          const slug = wpArtistIdToSlug.get(wpAId);
+          if (slug) trackArtistSlugs.add(slug);
+        }
+
+        // Match by ISRC first (globally unique)
         let existingTrackId = trackIsrc ? existingTrackByIsrc.get(trackIsrc) : undefined;
         const rawTrackSlug = clean(wpTrack.slug) || slugify(trackTitle);
-        if (!existingTrackId) existingTrackId = existingTrackBySlug.get(rawTrackSlug);
+
+        // Fallback: match by slug BUT only if the existing track is already
+        // linked to at least one artist from this release OR this track's WP artists.
+        // Prevents "Intro" cross-artist merging.
+        if (!existingTrackId) {
+          const slugMatchId = existingTrackBySlug.get(rawTrackSlug);
+          if (slugMatchId) {
+            const scopedArtists = new Set([...releaseArtistSlugs, ...trackArtistSlugs]);
+            const isSameArtistContext = [...scopedArtists].some(
+              (slug) => existingTrackArtistSet.has(`${slugMatchId}:${slug}`)
+            );
+            if (isSameArtistContext) existingTrackId = slugMatchId;
+          }
+        }
 
         let trackId: string;
         if (existingTrackId) {
           trackId = existingTrackId;
           wpTrackIdToRegistryId.set(wpTrackId, trackId);
         } else if (!wpTrackIdToRegistryId.has(wpTrackId)) {
-          // New track
           trackId = crypto.randomUUID();
           const trackSlug = dedupeSlug(rawTrackSlug, seenTrackSlugs);
           wpTrackIdToRegistryId.set(wpTrackId, trackId);
@@ -421,7 +443,6 @@ serve(async (req: Request) => {
           trackId = wpTrackIdToRegistryId.get(wpTrackId)!;
         }
 
-        // release_tracks link
         releaseTrackRows.push({
           release_id: releaseId,
           track_id: trackId,
@@ -446,7 +467,6 @@ serve(async (req: Request) => {
     log.push(`Release-track links to upsert: ${releaseTrackRows.length}`);
 
     // ── 12. Also migrate standalone tracks (not in release shells) ───────────────
-    // For wkcharts_tracks NOT in any shell, still create registry entries
     const shellTrackWpIds = new Set<number>();
     for (const [, tracks] of shellTracksMap) {
       for (const st of tracks) shellTrackWpIds.add(Number(st.track_id));
@@ -455,16 +475,35 @@ serve(async (req: Request) => {
     let standaloneTracksAdded = 0;
     for (const wpTrack of wpTracks) {
       const wpTrackId = Number(wpTrack.id);
-      if (shellTrackWpIds.has(wpTrackId)) continue; // already handled above
+      if (shellTrackWpIds.has(wpTrackId)) continue;
       if (wpTrackIdToRegistryId.has(wpTrackId)) continue;
 
       const trackTitle = clean(wpTrack.title);
       const trackIsrc = clean(wpTrack.isrc) || null;
       const rawTrackSlug = clean(wpTrack.slug) || slugify(trackTitle);
 
-      // Check existing by ISRC or slug
+      // Build WP artist slugs for this track
+      const wpTrackArtists = trackArtistsMap.get(wpTrackId) ?? [];
+      const trackArtistSlugs = new Set<string>();
+      for (const ta of wpTrackArtists) {
+        const wpAId = Number(ta.artist_id);
+        const slug = wpArtistIdToSlug.get(wpAId);
+        if (slug) trackArtistSlugs.add(slug);
+      }
+
       let existingTrackId = trackIsrc ? existingTrackByIsrc.get(trackIsrc) : undefined;
-      if (!existingTrackId) existingTrackId = existingTrackBySlug.get(rawTrackSlug);
+
+      // Artist-scoped slug fallback
+      if (!existingTrackId) {
+        const slugMatchId = existingTrackBySlug.get(rawTrackSlug);
+        if (slugMatchId) {
+          const isSameArtistContext = [...trackArtistSlugs].some(
+            (slug) => existingTrackArtistSet.has(`${slugMatchId}:${slug}`)
+          );
+          if (isSameArtistContext) existingTrackId = slugMatchId;
+        }
+      }
+
       if (existingTrackId) {
         wpTrackIdToRegistryId.set(wpTrackId, existingTrackId);
         continue;
@@ -485,7 +524,7 @@ serve(async (req: Request) => {
         title: trackTitle || `Track ${wpTrackId}`,
         normalized_title: slugify(trackTitle || String(wpTrackId)).replace(/-/g, " "),
         isrc: trackIsrc,
-        release_id: null, // standalone, no release yet
+        release_id: null,
         duration_ms: durationMs,
         explicit: Number(wpTrack.explicit) === 1,
         track_number: Number(wpTrack.track_number) || null,
@@ -537,7 +576,6 @@ serve(async (req: Request) => {
     if (commit) {
       const BATCH = 200;
 
-      // releases
       if (releaseRows.length > 0) {
         for (let i = 0; i < releaseRows.length; i += BATCH) {
           const { error } = await supabase.from("registry_releases").upsert(releaseRows.slice(i, i + BATCH), { onConflict: "slug" });
@@ -546,18 +584,15 @@ serve(async (req: Request) => {
         log.push(`Releases inserted: ${releaseRows.length}`);
       }
 
-      // tracks
       if (trackRows.length > 0) {
         for (let i = 0; i < trackRows.length; i += BATCH) {
           const batch = trackRows.slice(i, i + BATCH);
-          // Use slug as conflict key since isrc may be null
           const { error } = await supabase.from("registry_tracks").upsert(batch, { onConflict: "slug", ignoreDuplicates: true });
           if (error) { log.push(`ERROR inserting tracks batch ${i}: ${error.message}`); stats.errors++; }
         }
         log.push(`Tracks inserted: ${trackRows.length}`);
       }
 
-      // release_artists — delete existing for these releases first to avoid dupes
       if (releaseArtistRows.length > 0) {
         const releaseIds = [...new Set(releaseArtistRows.map((r) => String(r.release_id)))];
         for (let i = 0; i < releaseIds.length; i += 200) {
@@ -570,7 +605,6 @@ serve(async (req: Request) => {
         log.push(`Release-artist links inserted: ${releaseArtistRows.length}`);
       }
 
-      // release_tracks — delete existing for these releases first
       if (releaseTrackRows.length > 0) {
         const releaseIds = [...new Set(releaseTrackRows.map((r) => String(r.release_id)))];
         for (let i = 0; i < releaseIds.length; i += 200) {
@@ -583,9 +617,7 @@ serve(async (req: Request) => {
         log.push(`Release-track links inserted: ${releaseTrackRows.length}`);
       }
 
-      // registry_track_artists
       if (trackArtistRows.length > 0) {
-        // Check if table exists
         const { error: checkErr } = await supabase.from("registry_track_artists").select("id").limit(1);
         if (!checkErr) {
           const trackIds = [...new Set(trackArtistRows.map((r) => String(r.track_id)))];

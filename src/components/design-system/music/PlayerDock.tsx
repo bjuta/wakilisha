@@ -18,7 +18,7 @@ export function PlayerDock() {
 
   if (!currentTrack) return null;
 
-  const isPlayable = currentTrack.isPlayable !== false;
+  const isPlayable = currentTrack.isPlayable !== false && !!currentTrack.previewUrl;
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
     const s = Math.floor(seconds % 60);

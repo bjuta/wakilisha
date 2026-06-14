@@ -1,13 +1,15 @@
+import { supabase } from "@/lib/supabase";
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { usePlayer } from "@/context/PlayerContext";
 import {
   getChartFamily,
-  getLatestChartEdition,
+  getLatestChartEditionWithEntries,
   getChartEdition,
   getChartEditionEntries,
   getChartEditionsForFamily,
 } from "@/services/chartsPublic/client";
+import type { ChartEditionEntry } from "@/services/chartsPublic/types";
 import {
   toChartEditionViewModel,
   toChartEntryRowViewModel,
@@ -121,35 +123,72 @@ export default function ChartEdition() {
 
       let editionResult: Awaited<ReturnType<typeof getChartEdition>>;
       let editionMeta: { source: "mock" | "wordpress" | "cache"; fetchedAt: string; isStale: boolean };
+      let rawEntries: ChartEditionEntry[] = [];
 
       if (editionSlug) {
         const result = await getChartEdition(chartProgramSlug, editionSlug);
         editionResult = result;
         editionMeta = result.meta;
+        if (result.data) {
+          const entriesResult = await getChartEditionEntries(chartProgramSlug, result.data.slug);
+          rawEntries = entriesResult.data;
+        }
       } else {
-        const result = await getLatestChartEdition(chartProgramSlug);
-        editionResult = result;
+        const result = await getLatestChartEditionWithEntries(chartProgramSlug);
         editionMeta = result.meta;
+        if (result.data.edition) {
+          editionResult = {
+            data: result.data.edition,
+            meta: result.meta,
+          };
+          rawEntries = result.data.entries;
+        } else {
+          editionResult = { data: null as any, meta: result.meta };
+        }
       }
 
       if (!editionResult.data) {
-        const { data: latestEdition } = await getLatestChartEdition(chartProgramSlug);
+        const { data: latestResult } = await getLatestChartEditionWithEntries(chartProgramSlug);
         setState({
           status: "edition_not_found",
           familySlug: chartProgramSlug,
           familyLabel: family.label,
-          latestEditionSlug: latestEdition.data?.slug,
+          latestEditionSlug: latestResult.edition?.slug,
         });
         return;
       }
 
-      const { data: rawEntries } = await getChartEditionEntries(chartProgramSlug, editionResult.data.slug);
       if (rawEntries.length === 0) {
         setState({ status: "empty" });
         return;
       }
 
       // Entries are auto-enriched with real movement data by getChartEditionEntries
+
+      // Enrich entries with previewUrl from registry_tracks
+      const trackSlugs = rawEntries.map((e) => e.trackSlug).filter(Boolean);
+      if (trackSlugs.length > 0) {
+        try {
+          const { data: previewRows } = await supabase
+            .from("registry_tracks")
+            .select("slug, preview_url")
+            .in("slug", trackSlugs)
+            .not("preview_url", "is", null);
+
+          if (previewRows && previewRows.length > 0) {
+            const previewMap = new Map(previewRows.map((row: { slug: string; preview_url: string | null }) => [row.slug, row.preview_url]));
+            rawEntries.forEach((entry) => {
+              const pv = previewMap.get(entry.trackSlug);
+              if (pv) {
+                (entry as ChartEditionEntry & { previewUrl?: string }).previewUrl = pv;
+              }
+            });
+          }
+        } catch {
+          // Non-critical — entries work without previewUrl
+        }
+      }
+
       const entries = rawEntries.map(toChartEntryRowViewModel);
       const editionVM = toChartEditionViewModel(editionResult.data, family, rawEntries);
 

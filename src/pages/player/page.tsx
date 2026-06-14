@@ -3,21 +3,6 @@ import { useNavigate, Link } from "react-router-dom";
 import { usePlayer } from "@/context/PlayerContext";
 import { WkIcon } from "@/components/design-system/Icon";
 
-const LYRICS = [
-  "The culture lives in the numbers",
-  "From the coast to the valley",
-  "We index the rhythm of the continent",
-  "Charts in motion, every week",
-  "One by one, we count the rise",
-  "From Lagos to Nairobi, we're alive",
-  "Every beat, every rhyme, every soul",
-  "This is where the story gets told",
-  "The numbers don't lie, they don't pretend",
-  "We chart the truth from start to end",
-  "Afrobeats to the world, it's our time",
-  "WAKILISHA, the sound that climbs",
-];
-
 function formatTime(seconds: number) {
   const m = Math.floor(seconds / 60);
   const s = Math.floor(seconds % 60);
@@ -58,7 +43,7 @@ export default function DesktopPlayerPage() {
 
   const [liked, setLiked] = useState(false);
   const [scrubbing, setScrubbing] = useState(false);
-  const [showQueue, setShowQueue] = useState(true);
+  const [showQueue, setShowQueue] = useState(false);
   const [showLyrics, setShowLyrics] = useState(false);
 
   const handleScrub = useCallback(
@@ -110,7 +95,6 @@ export default function DesktopPlayerPage() {
   }
 
   const pct = Math.max(0, Math.min(1, progress || 0));
-  const activeLyric = Math.floor((currentTime / (duration || 1)) * LYRICS.length) % LYRICS.length;
   const remainingCount = queue.length - queueIndex - 1;
   const upcoming = queue.slice(queueIndex + 1);
   const hasQueue = queue.length > 1;
@@ -317,15 +301,12 @@ export default function DesktopPlayerPage() {
               <div className="mt-6 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-5 lg:p-6">
                 <div className="mb-3 flex items-center justify-between">
                   <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--wk-text-muted)]">Lyrics</span>
-                  <span className="text-[11px] text-[var(--wk-text-faint)]">Live preview</span>
+                  <span className="text-[11px] text-[var(--wk-text-faint)]">Preview</span>
                 </div>
-                <div className="space-y-2">
-                  <p className="text-[16px] font-bold leading-relaxed text-[var(--wk-text)] lg:text-[18px]">
-                    {LYRICS[activeLyric]}
-                  </p>
-                  <p className="text-[14px] leading-relaxed text-[var(--wk-text-faint)]">
-                    {LYRICS[(activeLyric + 1) % LYRICS.length]}
-                  </p>
+                <div className="py-8 text-center">
+                  <WkIcon name="FileText" size={24} className="mx-auto mb-2 text-[var(--wk-text-faint)]" />
+                  <p className="text-[13px] text-[var(--wk-text-muted)]">No synced lyrics available</p>
+                  <p className="mt-1 text-[12px] text-[var(--wk-text-faint)]">Lyrics are contributed by the WAKILISHA community.</p>
                 </div>
               </div>
             )}

@@ -78,6 +78,7 @@ export interface RepairedTrackRecord {
   discNumber: number;
   metadata: Record<string, unknown>;
   status: string;
+  previewUrl?: string | null;
 }
 
 export interface RepairedTrackArtist {
@@ -115,4 +116,5 @@ export interface RepairedTrackDetail {
   peakRank: number | null;
   weeksOnChart: number;
   currentRank: number | null;
+  previewUrl?: string | null;
 }

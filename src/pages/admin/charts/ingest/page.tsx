@@ -13,6 +13,7 @@ import {
   isValidProviderUrl,
   retryIngestRun,
   runDryRun,
+  runFullPipeline,
 } from "@/services/chartsIngestion/client";
 import type {
   IngestRun,
@@ -417,6 +418,11 @@ export default function AdminChartsIngest() {
         marketScopeSnapshot,
         enrichmentOptions: null,
       });
+
+      // Trigger the full pipeline after creating the run record
+      setSuccessMessage(`Run created (${response.runId.slice(0, 8)}) — running pipeline stages…`);
+      await runFullPipeline(response.runId);
+
       const run = await getIngestRuns().then((allRuns) => allRuns.find((item) => item.id === response.runId));
       if (run) {
         generateAndPersistIngestRunIntelligence(run, {

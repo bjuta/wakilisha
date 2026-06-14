@@ -1,7 +1,7 @@
-import { useState } from "react";
 import { Link } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
+import { usePlayer } from "@/context/PlayerContext";
 import type { RepairedReleaseDetail } from "@/services/repairedContent/client";
 
 function formatDuration(seconds: number): string {
@@ -18,8 +18,42 @@ export default function ReleaseTracklist({
   release: RepairedReleaseDetail;
   tracks: RepairedReleaseDetail["tracks"];
 }) {
-  const [playing, setPlaying] = useState<string | null>(null);
+  const { currentTrack, isPlaying, playTrack, togglePlay } = usePlayer();
   const { ref, revealed } = useScrollReveal<HTMLDivElement>(0.1);
+
+  const handlePlayTrack = (track: typeof tracks[number], trackIndex: number) => {
+    // If this track is already the current track, toggle play/pause
+    if (currentTrack?.id === track.id) {
+      togglePlay();
+      return;
+    }
+
+    // Build queue from all tracks starting at the clicked index
+    const queueTracks = tracks.slice(trackIndex).map((t, i) => ({
+      id: t.id,
+      title: t.title,
+      artist: t.artist,
+      artworkUrl: t.artworkUrl,
+      duration: t.duration,
+      previewUrl: t.previewUrl,
+      album: release.title,
+    }));
+
+    // Also include tracks before the clicked index (for a full queue)
+    const remainingTracks = tracks.slice(0, trackIndex).map((t) => ({
+      id: t.id,
+      title: t.title,
+      artist: t.artist,
+      artworkUrl: t.artworkUrl,
+      duration: t.duration,
+      previewUrl: t.previewUrl,
+      album: release.title,
+    }));
+
+    const fullQueue = [...queueTracks, ...remainingTracks];
+
+    playTrack(queueTracks[0], fullQueue);
+  };
 
   return (
     <div ref={ref} className={`${revealed ? "is-visible" : ""} reveal-up`}>
@@ -36,20 +70,18 @@ export default function ReleaseTracklist({
 
         <div className="border border-[var(--wk-border)] rounded-2xl overflow-hidden bg-[var(--wk-surface)]">
           {tracks.map((track, index) => {
-            const isPlaying = playing === track.id;
+            const isCurrentTrack = currentTrack?.id === track.id;
+            const isThisPlaying = isCurrentTrack && isPlaying;
+
             return (
-              <Link
+              <div
                 key={track.id}
-                to={`/tracks/${track.slug}`}
                 className="group grid items-center gap-3 px-4 py-3.5 border-b border-[var(--wk-divider)] last:border-b-0 transition-colors hover:bg-[var(--wk-surface-raised)]"
                 style={{ gridTemplateColumns: "44px 1fr 72px 40px" }}
-                onClick={(e) => {
-                  if (isPlaying) e.preventDefault();
-                }}
               >
-                {/* Track number */}
+                {/* Track number / play button */}
                 <div className="flex items-center justify-center w-8 h-8 rounded-full text-[13px] font-extrabold text-[var(--wk-text-faint)] group-hover:text-[var(--wk-brand)] transition-colors">
-                  {isPlaying ? (
+                  {isThisPlaying ? (
                     <span className="animate-pulse text-[var(--wk-brand)]">
                       <WkIcon name="Volume2" size={14} />
                     </span>
@@ -57,41 +89,57 @@ export default function ReleaseTracklist({
                     <span className="group-hover:hidden">{index + 1}</span>
                   )}
                   <button
-                    className="hidden group-hover:inline-flex items-center justify-center w-8 h-8 rounded-full bg-[var(--wk-brand)] text-white"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setPlaying(isPlaying ? null : track.id);
-                    }}
+                    className={`hidden group-hover:inline-flex items-center justify-center w-8 h-8 rounded-full text-white whitespace-nowrap cursor-pointer ${
+                      isCurrentTrack
+                        ? "bg-[var(--wk-brand)]"
+                        : "bg-[var(--wk-brand)]"
+                    }`}
+                    onClick={() => handlePlayTrack(track, index)}
+                    aria-label={isCurrentTrack ? (isPlaying ? "Pause" : "Play") : `Play ${track.title}`}
                   >
-                    <WkIcon name="Play" size={13} />
+                    <WkIcon
+                      name={isCurrentTrack && isPlaying ? "Pause" : "Play"}
+                      size={13}
+                    />
                   </button>
                 </div>
 
-                {/* Track info */}
-                <div className="min-w-0">
-                  <div className="text-[14px] font-extrabold text-[var(--wk-text)] truncate">
+                {/* Track info — clicking navigates to track detail */}
+                <Link
+                  to={`/tracks/${track.slug}`}
+                  className="min-w-0 block"
+                  onClick={(e) => {
+                    // Don't navigate if we're interacting with the play button area
+                    if ((e.target as HTMLElement).closest("button")) {
+                      e.preventDefault();
+                    }
+                  }}
+                >
+                  <div className="text-[14px] font-extrabold text-[var(--wk-text)] truncate group-hover:text-[var(--wk-brand)] transition-colors">
                     {track.title}
                   </div>
                   <div className="text-[11px] font-semibold text-[var(--wk-text-muted)] mt-0.5 truncate">
                     {track.artist}
                   </div>
-                </div>
+                </Link>
 
                 {/* Duration */}
                 <div className="text-[12px] font-bold text-[var(--wk-text-faint)] text-right tabular-nums">
                   {formatDuration(track.duration)}
                 </div>
 
-                {/* More / Play indicator */}
-                <div className="flex items-center justify-center">
+                {/* Chevron to detail page */}
+                <Link
+                  to={`/tracks/${track.slug}`}
+                  className="flex items-center justify-center"
+                >
                   <WkIcon
                     name="ChevronRight"
                     size={14}
                     className="text-[var(--wk-text-faint)] group-hover:text-[var(--wk-text-muted)] transition-colors"
                   />
-                </div>
-              </Link>
+                </Link>
+              </div>
             );
           })}
 

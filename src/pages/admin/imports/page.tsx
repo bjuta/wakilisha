@@ -453,9 +453,14 @@ export default function AdminImportsPage() {
             One-time migration from wakilisha.africa. Connect to your live WordPress site, use the database directly, or upload a ZIP export as fallback.
           </p>
         </div>
-        <button onClick={() => navigate("/admin/imports/jobs")} className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap">
-          <WkIcon name="List" size={14} /> View Past Jobs
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => navigate("/admin/imports/scraper")} className="wk-button wk-button-primary wk-button-sm whitespace-nowrap">
+            <WkIcon name="Zap" size={14} /> Artist Scraper
+          </button>
+          <button onClick={() => navigate("/admin/imports/jobs")} className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap">
+            <WkIcon name="List" size={14} /> View Past Jobs
+          </button>
+        </div>
       </div>
 
       {/* Step Indicator (only for WordPress flow) */}
