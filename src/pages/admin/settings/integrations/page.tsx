@@ -300,7 +300,7 @@ export default function AdminSettingsIntegrations() {
                     {[
                       { label: "Team ID", present: !!values.teamId },
                       { label: "Key ID", present: !!values.keyId },
-                      { label: ".p8 Private Key", present: !!values.privateKeyFile },
+                      { label: ".p8 Private Key", present: values.privateKeyFile === "__server_stored__" || values.privateKeyFile?.startsWith("uploaded:") },
                     ].map((item) => (
                       <div key={item.label} className={`flex items-center gap-2 rounded-md px-2.5 py-2 ${item.present ? "bg-[var(--wk-success-soft)] text-[var(--wk-success)]" : "bg-[var(--wk-surface-raised)] text-[var(--wk-text-muted)]"}`}>
                         <WkIcon name={item.present ? "CheckCircle2" : "Circle"} size={12} />
@@ -310,12 +310,12 @@ export default function AdminSettingsIntegrations() {
                   </div>
                   {!values.privateKeyFile && (
                     <p className="mt-2 text-[11px] text-[var(--wk-warning)]">
-                      The .p8 private key must be stored server-side. Never paste it into localStorage or client code. The developer token is generated server-side from this key.
+                      The .p8 private key must be stored server-side. Upload your AuthKey_*.p8 file above.
                     </p>
                   )}
-                  {values.teamId && values.keyId && values.privateKeyFile && (
+                  {(values.privateKeyFile === "__server_stored__" || values.privateKeyFile?.startsWith("uploaded:")) && (
                     <p className="mt-2 text-[11px] text-[var(--wk-success)]">
-                      All credentials provided. The developer token will be generated server-side when you test the connection.
+                      Private key stored server-side. The developer token will be generated on-demand.
                     </p>
                   )}
                 </div>
@@ -479,8 +479,9 @@ function ProviderField({ providerKey, field, value, error, showSecret, onToggleS
       const result = await res.json();
       if (!result.ok) throw new Error(result.error || "Upload failed.");
 
+      // Mark the key as uploaded in localStorage form state
       setUploadedFileName(file.name);
-      onChange(`uploaded:${file.name}`);
+      onChange("__server_stored__");
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : "Upload failed.");
     } finally {

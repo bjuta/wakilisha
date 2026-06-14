@@ -1,11 +1,3 @@
-// ingest-artist-discography
-// Searches Apple Music for albums by an artist, fetches full album details
-// with tracks, and upserts into registry_releases, registry_tracks,
-// registry_release_tracks, registry_release_artists, registry_track_artists.
-//
-// Input: { artistSlug: string }
-// Output: { ok, summary, releases_created, tracks_created, ... }
-
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { SignJWT } from "https://esm.sh/jose@5";
 
@@ -62,6 +54,22 @@ function artworkUrl(urlTemplate: string, width: number): string {
   return urlTemplate.replace("{w}", String(width)).replace("{h}", String(width));
 }
 
+function base64ToBytes(base64: string): Uint8Array {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
+function formatDuration(ms: number): string {
+  const totalSeconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}
+
 // ── Apple Music JWT ─────────────────────────────────────────────────────────
 
 async function createAppleMusicToken(
@@ -69,26 +77,40 @@ async function createAppleMusicToken(
   keyId: string,
   privateKeyRaw: string
 ): Promise<string> {
-  const key = privateKeyRaw
-    .replace(/-----BEGIN PRIVATE KEY-----/, "")
-    .replace(/-----END PRIVATE KEY-----/, "")
-    .replace(/\s/g, "");
+  let key = privateKeyRaw;
+  if (key.includes("-----BEGIN PRIVATE KEY-----")) {
+    key = key.replace(/-----BEGIN PRIVATE KEY-----/, "");
+  }
+  if (key.includes("-----END PRIVATE KEY-----")) {
+    key = key.replace(/-----END PRIVATE KEY-----/, "");
+  }
+  key = key.replace(/[\s\n\r\t]/g, "");
 
-  const binaryKey = Uint8Array.from(atob(key), (c) => c.charCodeAt(0));
+  let binaryKey: Uint8Array;
+  try {
+    binaryKey = base64ToBytes(key);
+  } catch (e) {
+    throw new Error(`Base64 decode failed: ${e instanceof Error ? e.message : String(e)}`);
+  }
 
-  const cryptoKey = await crypto.subtle.importKey(
-    "pkcs8",
-    binaryKey,
-    { name: "ECDSA", namedCurve: "P-256" },
-    false,
-    ["sign"]
-  );
+  let cryptoKey: CryptoKey;
+  try {
+    cryptoKey = await crypto.subtle.importKey(
+      "pkcs8",
+      binaryKey,
+      { name: "ECDSA", namedCurve: "P-256" },
+      false,
+      ["sign"]
+    );
+  } catch (e) {
+    throw new Error(`Crypto key import failed (check private key format): ${e instanceof Error ? e.message : String(e)}`);
+  }
 
   const token = await new SignJWT({})
     .setProtectedHeader({ alg: "ES256", kid: keyId })
     .setIssuer(teamId)
     .setIssuedAt()
-    .setExpirationTime("12h")
+    .setExpirationTime("30m")
     .sign(cryptoKey);
 
   return token;
@@ -107,7 +129,7 @@ async function readCredential(
     .maybeSingle();
 
   if (error) {
-    console.error(`[ingest-discography] readCredential(${key}) error:`, error.message);
+    throw new Error(`Failed to read credential "${key}": ${error.message}`);
   }
 
   if (data?.setting_value?.trim()) return data.setting_value.trim();
@@ -132,6 +154,7 @@ interface AppleAlbumSearchResult {
     upc?: string;
     genreNames?: string[];
     url?: string;
+    recordLabel?: string;
   };
 }
 
@@ -145,6 +168,7 @@ interface AppleTrackAttributes {
   artwork?: { url: string; width: number; height: number };
   contentRating?: string;
   previews?: Array<{ url: string }>;
+  genreNames?: string[];
 }
 
 interface AppleAlbumDetail {
@@ -161,6 +185,7 @@ interface AppleAlbumDetail {
     upc?: string;
     genreNames?: string[];
     url?: string;
+    recordLabel?: string;
   };
   relationships?: {
     tracks?: {
@@ -168,6 +193,16 @@ interface AppleAlbumDetail {
         id: string;
         type: string;
         attributes: AppleTrackAttributes;
+      }>;
+    };
+    artists?: {
+      data: Array<{
+        id: string;
+        type: string;
+        attributes: {
+          name: string;
+          url?: string;
+        };
       }>;
     };
   };
@@ -196,10 +231,8 @@ async function searchAlbums(
 
     if (!res.ok) {
       const errText = await res.text();
-      console.error(
-        `[ingest-discography] Apple Music search failed: ${res.status} ${errText.slice(0, 200)}`
-      );
-      break;
+      console.error(`[ingest-discography] Apple Music search failed: ${res.status} ${errText.slice(0, 300)}`);
+      throw new Error(`Apple Music search returned ${res.status}: ${errText.slice(0, 200)}`);
     }
 
     const data = await res.json();
@@ -219,7 +252,7 @@ async function fetchAlbumDetail(
   storefront: string,
   albumId: string
 ): Promise<AppleAlbumDetail | null> {
-  const url = `https://api.music.apple.com/v1/catalog/${storefront}/albums/${albumId}?include=tracks`;
+  const url = `https://api.music.apple.com/v1/catalog/${storefront}/albums/${albumId}?include=tracks,artists`;
 
   const res = await fetch(url, {
     headers: {
@@ -230,9 +263,7 @@ async function fetchAlbumDetail(
 
   if (!res.ok) {
     const errText = await res.text();
-    console.error(
-      `[ingest-discography] fetch album ${albumId} failed: ${res.status} ${errText.slice(0, 200)}`
-    );
+    console.error(`[ingest-discography] fetch album ${albumId} failed: ${res.status} ${errText.slice(0, 200)}`);
     return null;
   }
 
@@ -261,13 +292,53 @@ async function fetchAlbumsInParallel(
     }
   }
 
-  // Run N workers in parallel
   await Promise.all(Array.from({ length: concurrency }, () => worker()));
-
   return results;
 }
 
+// ── Preview album data shape ────────────────────────────────────────────────
+
+interface PreviewTrack {
+  apple_music_id: string;
+  title: string;
+  track_number: number | null;
+  disc_number: number | null;
+  duration_ms: number | null;
+  duration_display: string;
+  isrc: string | null;
+  artist_name: string;
+  explicit: boolean;
+  preview_url: string | null;
+}
+
+interface PreviewAlbum {
+  apple_music_id: string;
+  title: string;
+  slug: string;
+  release_type: string;
+  release_date: string | null;
+  upc: string | null;
+  record_label: string | null;
+  genre_names: string[];
+  artwork_url: string | null;
+  apple_music_url: string | null;
+  track_count: number;
+  tracks: PreviewTrack[];
+  match_status: "existing" | "new";
+  existing_release: {
+    id: string;
+    slug: string;
+    title: string;
+    source: string;
+  } | null;
+}
+
 // ── Main Handler ────────────────────────────────────────────────────────────
+
+interface ApplySelection {
+  apple_music_id: string;
+  action: "merge" | "canonicalize" | "ignore";
+}
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -275,6 +346,7 @@ Deno.serve(async (req: Request) => {
   }
 
   const start = Date.now();
+  let stage = "init";
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
@@ -291,7 +363,6 @@ Deno.serve(async (req: Request) => {
 
     const db = createClient(supabaseUrl, supabaseKey);
 
-    // Parse body
     let body: Record<string, unknown>;
     try {
       body = await req.json();
@@ -310,7 +381,10 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // ── Read Apple Music credentials ──────────────────────────────────────
+    const mode = String(body.mode ?? "preview").trim();
+
+    // ── Stage 1: Read credentials ─────────────────────────────────────────
+    stage = "credentials";
     const [teamId, keyId, privateKey, storefrontRaw] = await Promise.all([
       readCredential(db, "apple_music_team_id"),
       readCredential(db, "apple_music_key_id"),
@@ -323,13 +397,14 @@ Deno.serve(async (req: Request) => {
       return new Response(
         JSON.stringify({
           ok: false,
-          error: "Apple Music credentials not configured. Set apple_music_team_id, apple_music_key_id, and apple_music_private_key.",
+          error: "Apple Music credentials not configured.",
         }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // ── Look up the artist in registry_artists ────────────────────────────
+    // ── Stage 2: Look up artist ───────────────────────────────────────────
+    stage = "artist_lookup";
     const { data: artistRow, error: artistErr } = await db
       .from("registry_artists")
       .select("id, slug, display_name, metadata")
@@ -337,12 +412,10 @@ Deno.serve(async (req: Request) => {
       .maybeSingle();
 
     if (artistErr || !artistRow) {
+      const msg = artistErr ? artistErr.message : `Artist not found: ${artistSlug}`;
       return new Response(
-        JSON.stringify({
-          ok: false,
-          error: `Artist not found: ${artistSlug}`,
-        }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ ok: false, error: msg }),
+        { status: artistErr ? 500 : 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -350,87 +423,38 @@ Deno.serve(async (req: Request) => {
     const artistName = artistRow.display_name as string;
     const artistMeta = (artistRow.metadata ?? {}) as Record<string, unknown>;
 
-    // ── Generate Apple Music developer token ──────────────────────────────
+    // ── Stage 3: Create Apple Music JWT ───────────────────────────────────
+    stage = "jwt";
     let token: string;
     try {
       token = await createAppleMusicToken(teamId, keyId, privateKey);
     } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
       return new Response(
-        JSON.stringify({
-          ok: false,
-          error: `Failed to create Apple Music JWT: ${err instanceof Error ? err.message : String(err)}`,
-        }),
+        JSON.stringify({ ok: false, error: "apple_music_jwt_failed", detail: msg, stage: "jwt" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // ── Search Apple Music for albums ─────────────────────────────────────
-    console.log(`[ingest-discography] Searching Apple Music for: "${artistName}"`);
-    const searchResults = await searchAlbums(token, storefront, artistName, 50);
-
-    if (searchResults.length === 0) {
-      return new Response(
-        JSON.stringify({
-          ok: true,
-          message: `No albums found on Apple Music for "${artistName}"`,
-          releases_created: 0,
-          tracks_created: 0,
-          albums_searched: 0,
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    console.log(
-      `[ingest-discography] Found ${searchResults.length} album search results`
-    );
-
-    // ── Filter to albums where artistName matches ─────────────────────────
-    const artistNameLower = artistName.toLowerCase();
-    const matchingAlbums = searchResults.filter((a) => {
-      const albumArtist = (a.attributes?.artistName ?? "").toLowerCase();
-      return albumArtist.includes(artistNameLower) || artistNameLower.includes(albumArtist);
-    });
-
-    console.log(
-      `[ingest-discography] ${matchingAlbums.length} albums match artist name, fetching details in parallel...`
-    );
-
-    // ── Fetch full details for matching albums IN PARALLEL (8 concurrent) ──
-    const albumIds = matchingAlbums.map((a) => a.id);
-    const fetchedResults = await fetchAlbumsInParallel(token, storefront, albumIds, 8);
-    const albumDetails = fetchedResults.map((r) => r.detail);
-    const failedIds = albumIds.filter((id) => !fetchedResults.find((r) => r.id === id));
-
-    console.log(
-      `[ingest-discography] Fetched ${albumDetails.length} album details, ${failedIds.length} failed (${Date.now() - start}ms elapsed)`
-    );
-
-    if (albumDetails.length === 0) {
-      return new Response(
-        JSON.stringify({
-          ok: true,
-          message: `Found ${matchingAlbums.length} album results but failed to fetch details for all of them.`,
-          releases_created: 0,
-          tracks_created: 0,
-          albums_searched: matchingAlbums.length,
-          albums_failed: failedIds,
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // ── Load existing registry data to avoid duplicates ───────────────────
-    const [existingReleasesRes, existingTracksRes] = await Promise.all([
-      db.from("registry_releases").select("id, slug").eq("status", "active"),
+    // ── Load existing registry data ───────────────────────────────────────
+    stage = "load_existing";
+    const [existingReleasesRes, existingTracksRes, artistReleaseIdsRes] = await Promise.all([
+      db.from("registry_releases").select("id, slug, title, metadata").eq("status", "active"),
       db.from("registry_tracks").select("id, slug, isrc").eq("status", "active"),
+      db.from("registry_release_artists")
+        .select("release_id")
+        .eq("artist_id", artistId)
+        .eq("status", "active"),
     ]);
 
-    const existingReleaseSlugs = new Set(
-      (existingReleasesRes.data ?? []).map((r: { slug: string }) => r.slug)
-    );
-    const seenReleaseSlugs = new Set(existingReleaseSlugs);
+    if (existingReleasesRes.error || existingTracksRes.error || artistReleaseIdsRes.error) {
+      return new Response(
+        JSON.stringify({ ok: false, error: "Failed to load existing registry data." }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
+    const allActiveReleases = existingReleasesRes.data ?? [];
     const existingTrackBySlug = new Map(
       (existingTracksRes.data ?? []).map((t: { id: string; slug: string }) => [t.slug, t.id])
     );
@@ -439,143 +463,305 @@ Deno.serve(async (req: Request) => {
         .filter((t: { isrc: string | null }) => t.isrc)
         .map((t: { id: string; isrc: string }) => [t.isrc, t.id])
     );
-    const seenTrackSlugs = new Set(existingTrackBySlug.keys());
 
-    console.log(
-      `[ingest-discography] Loaded ${existingReleaseSlugs.size} release slugs, ${existingTrackBySlug.size} track slugs (${Date.now() - start}ms elapsed)`
+    const artistReleaseIdList = (artistReleaseIdsRes.data ?? []).map((r: { release_id: string }) => r.release_id);
+    let existingArtistReleases: Array<{ id: string; slug: string; title: string; metadata: Record<string, unknown> | null }> = [];
+    if (artistReleaseIdList.length > 0) {
+      existingArtistReleases = allActiveReleases.filter((r) => artistReleaseIdList.includes(r.id));
+    }
+
+    const existingArtistReleaseBySlug = new Map(
+      existingArtistReleases.map((r) => [r.slug, r])
     );
 
-    // ── Build insert batches ──────────────────────────────────────────────
-    const releaseRows: Record<string, unknown>[] = [];
-    const releaseArtistRows: Record<string, unknown>[] = [];
-    const trackRows: Record<string, unknown>[] = [];
-    const releaseTrackRows: Record<string, unknown>[] = [];
-    const trackArtistRows: Record<string, unknown>[] = [];
+    const existingReleaseSlugs = new Set(allActiveReleases.map((r: { slug: string }) => r.slug));
 
-    const albumIdToReleaseId = new Map<string, string>();
-
-    for (const album of albumDetails) {
-      const attrs = album.attributes ?? {};
-      const rawTitle = attrs.name ?? "Unknown Album";
-      const rawSlug = slugify(rawTitle);
-      const releaseSlug = dedupeSlug(rawSlug, seenReleaseSlugs);
-      const releaseType = parseReleaseTypeFromApple(attrs);
-      const releaseDate = parseDate(attrs.releaseDate ?? null);
-      const upc = attrs.upc ? String(attrs.upc) : null;
-      const releaseId = crypto.randomUUID();
-
-      albumIdToReleaseId.set(album.id, releaseId);
-
-      let awUrl: string | null = null;
-      if (attrs.artwork?.url) {
-        awUrl = artworkUrl(attrs.artwork.url, 800);
+    // ── MODE: PREVIEW ────────────────────────────────────────────────────
+    if (mode === "preview") {
+      stage = "search";
+      let searchResults: AppleAlbumSearchResult[];
+      try {
+        searchResults = await searchAlbums(token, storefront, artistName, 50);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return new Response(
+          JSON.stringify({ ok: false, error: "apple_music_search_failed", detail: msg }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
 
-      releaseRows.push({
-        id: releaseId,
-        slug: releaseSlug,
-        title: rawTitle,
-        normalized_title: slugify(rawTitle).replace(/-/g, " "),
-        release_type: releaseType,
-        upc,
-        release_date: releaseDate,
-        artwork_url: awUrl,
-        status: "active",
-        metadata: {
-          apple_music_album_id: album.id,
-          apple_music_url: attrs.url ?? null,
-          genre_names: attrs.genreNames ?? [],
-          source: "apple_music_ingest",
-        },
+      if (searchResults.length === 0) {
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            mode: "preview",
+            artist: { id: artistId, slug: artistSlug, name: artistName },
+            storefront,
+            albums_searched: 0,
+            albums_fetched: 0,
+            albums: [],
+            duration_ms: Date.now() - start,
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Filter to albums where artistName matches
+      const artistNameLower = artistName.toLowerCase();
+      const matchingAlbums = searchResults.filter((a) => {
+        const albumArtist = (a.attributes?.artistName ?? "").toLowerCase();
+        return albumArtist.includes(artistNameLower) || artistNameLower.includes(albumArtist);
       });
 
-      releaseArtistRows.push({
-        release_id: releaseId,
-        artist_id: artistId,
-        artist_slug: artistSlug,
-        artist_name_text: artistName,
-        role: "primary_artist",
-        is_primary: true,
-        is_featured: false,
-        credit_order: 1,
-        source: "apple_music_ingest",
-        confidence: 90,
-        status: "active",
-        metadata: { apple_music_album_id: album.id },
-      });
+      // Fetch album details in parallel
+      stage = "fetch_albums";
+      const albumIds = matchingAlbums.map((a) => a.id);
+      let fetchedResults: { detail: AppleAlbumDetail; id: string }[];
+      try {
+        fetchedResults = await fetchAlbumsInParallel(token, storefront, albumIds, 8);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return new Response(
+          JSON.stringify({ ok: false, error: "album_fetch_failed", detail: msg }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
 
-      const tracksData = album.relationships?.tracks?.data ?? [];
-      for (const track of tracksData) {
-        const tAttrs = track.attributes ?? {};
-        const trackTitle = tAttrs.name ?? "Untitled";
-        const trackIsrc = tAttrs.isrc ? String(tAttrs.isrc).trim() : null;
-        const rawTrackSlug = slugify(trackTitle);
-        const discNum = tAttrs.discNumber ?? 1;
-        const trackNum = tAttrs.trackNumber ?? null;
-        const durationMs = tAttrs.durationInMillis ?? null;
-        const explicit = (tAttrs.contentRating ?? "") === "explicit";
+      const albumDetails = fetchedResults.map((r) => r.detail);
+      const failedIds = albumIds.filter((id) => !fetchedResults.find((r) => r.id === id));
 
-        let trackId: string | undefined;
-        if (trackIsrc) trackId = existingTrackByIsrc.get(trackIsrc);
-        if (!trackId) trackId = existingTrackBySlug.get(rawTrackSlug);
+      // Build preview albums with rich metadata
+      const previewAlbums: PreviewAlbum[] = albumDetails.map((album) => {
+        const attrs = album.attributes ?? {};
+        const rawTitle = attrs.name ?? "Unknown Album";
+        const rawSlug = slugify(rawTitle);
+        const releaseType = parseReleaseTypeFromApple(attrs);
+        const releaseDate = parseDate(attrs.releaseDate ?? null);
+        const upc = attrs.upc ? String(attrs.upc) : null;
+        const recordLabel = attrs.recordLabel ?? null;
+        const genreNames = attrs.genreNames ?? [];
 
-        if (!trackId) {
-          trackId = crypto.randomUUID();
-          const trackSlug = dedupeSlug(rawTrackSlug, seenTrackSlugs);
-          existingTrackBySlug.set(trackSlug, trackId);
-          if (trackIsrc) existingTrackByIsrc.set(trackIsrc, trackId);
-          seenTrackSlugs.add(trackSlug);
-
-          let trackAwUrl: string | null = null;
-          if (tAttrs.artwork?.url) {
-            trackAwUrl = artworkUrl(tAttrs.artwork.url, 800);
-          } else {
-            trackAwUrl = awUrl;
-          }
-
-          const previewUrl =
-            tAttrs.previews && tAttrs.previews.length > 0
-              ? tAttrs.previews[0].url
-              : null;
-
-          trackRows.push({
-            id: trackId,
-            slug: trackSlug,
-            title: trackTitle,
-            normalized_title: slugify(trackTitle).replace(/-/g, " "),
-            isrc: trackIsrc,
-            release_id: releaseId,
-            duration_ms: durationMs,
-            explicit,
-            track_number: trackNum,
-            disc_number: discNum,
-            artwork_url: trackAwUrl,
-            preview_url: previewUrl,
-            status: "active",
-            metadata: {
-              apple_music_track_id: track.id,
-              apple_music_album_id: album.id,
-              source: "apple_music_ingest",
-            },
-          });
+        let awUrl: string | null = null;
+        if (attrs.artwork?.url) {
+          awUrl = artworkUrl(attrs.artwork.url, 800);
         }
 
-        releaseTrackRows.push({
-          release_id: releaseId,
-          track_id: trackId!,
-          disc_number: discNum,
-          track_number: trackNum,
-          source: "apple_music_ingest",
-          confidence: 90,
+        // Check existing match
+        const existingMatch = existingArtistReleaseBySlug.get(rawSlug);
+
+        // Build tracks
+        const tracksData = album.relationships?.tracks?.data ?? [];
+        const previewTracks: PreviewTrack[] = tracksData.map((track) => {
+          const tAttrs = track.attributes ?? {};
+          return {
+            apple_music_id: track.id,
+            title: tAttrs.name ?? "Untitled",
+            track_number: tAttrs.trackNumber ?? null,
+            disc_number: tAttrs.discNumber ?? null,
+            duration_ms: tAttrs.durationInMillis ?? null,
+            duration_display: formatDuration(tAttrs.durationInMillis ?? 0),
+            isrc: tAttrs.isrc ? String(tAttrs.isrc).trim() : null,
+            artist_name: tAttrs.artistName ?? artistName,
+            explicit: (tAttrs.contentRating ?? "") === "explicit",
+            preview_url: tAttrs.previews?.[0]?.url ?? null,
+          };
+        });
+
+        // Build featured artists from related artists (non-primary)
+        const relatedArtists = album.relationships?.artists?.data ?? [];
+        const featuredArtists = relatedArtists
+          .filter((a) => {
+            const aName = (a.attributes?.name ?? "").toLowerCase();
+            return !aName.includes(artistNameLower) && !artistNameLower.includes(aName);
+          })
+          .map((a) => a.attributes?.name ?? "Unknown");
+
+        return {
+          apple_music_id: album.id,
+          title: rawTitle,
+          slug: rawSlug,
+          release_type: releaseType,
+          release_date: releaseDate,
+          upc,
+          record_label: recordLabel,
+          genre_names: genreNames,
+          artwork_url: awUrl,
+          apple_music_url: attrs.url ?? null,
+          track_count: tracksData.length,
+          tracks: previewTracks,
+          match_status: existingMatch ? "existing" : "new",
+          existing_release: existingMatch ? {
+            id: existingMatch.id,
+            slug: existingMatch.slug,
+            title: existingMatch.title,
+            source: existingMatch.metadata?.source ? String(existingMatch.metadata.source) : "registry",
+          } : null,
+        };
+      });
+
+      // Sort: existing matches first, then by release date desc
+      previewAlbums.sort((a, b) => {
+        if (a.match_status !== b.match_status) {
+          return a.match_status === "existing" ? -1 : 1;
+        }
+        if (!a.release_date && !b.release_date) return 0;
+        if (!a.release_date) return 1;
+        if (!b.release_date) return -1;
+        return b.release_date.localeCompare(a.release_date);
+      });
+
+      const durationMs = Date.now() - start;
+      console.log(`[ingest-discography] PREVIEW done: ${previewAlbums.length} albums in ${durationMs}ms`);
+
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          mode: "preview",
+          artist: { id: artistId, slug: artistSlug, name: artistName },
+          storefront,
+          albums_searched: matchingAlbums.length,
+          albums_fetched: albumDetails.length,
+          albums_failed: failedIds,
+          albums: previewAlbums,
+          duration_ms: durationMs,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // ── MODE: APPLY ──────────────────────────────────────────────────────
+    if (mode === "apply") {
+      const rawSelected = body.selected_albums;
+      if (!Array.isArray(rawSelected) || rawSelected.length === 0) {
+        return new Response(
+          JSON.stringify({ ok: false, error: "Missing or empty selected_albums array." }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const selections: ApplySelection[] = rawSelected.map((s: unknown) => {
+        const item = s as Record<string, unknown>;
+        return {
+          apple_music_id: String(item.apple_music_id ?? ""),
+          action: String(item.action ?? "ignore") as ApplySelection["action"],
+        };
+      }).filter((s) => s.apple_music_id && ["merge", "canonicalize", "ignore"].includes(s.action));
+
+      const toProcess = selections.filter((s) => s.action !== "ignore");
+      if (toProcess.length === 0) {
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            mode: "apply",
+            summary: { merged: 0, canonicalized: 0, ignored: selections.length, tracks_created: 0 },
+            duration_ms: Date.now() - start,
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Fetch details for selected albums
+      stage = "fetch_selected";
+      const selectedIds = toProcess.map((s) => s.apple_music_id);
+      let fetchedResults: { detail: AppleAlbumDetail; id: string }[];
+      try {
+        fetchedResults = await fetchAlbumsInParallel(token, storefront, selectedIds, 8);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return new Response(
+          JSON.stringify({ ok: false, error: "album_fetch_failed", detail: msg }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const albumById = new Map(fetchedResults.map((r) => [r.id, r.detail]));
+      const actionById = new Map(toProcess.map((s) => [s.apple_music_id, s.action]));
+
+      const seenReleaseSlugs = new Set(existingReleaseSlugs);
+      const seenTrackSlugs = new Set(existingTrackBySlug.keys());
+
+      // Build batches
+      const releaseRows: Record<string, unknown>[] = [];
+      const releaseArtistRows: Record<string, unknown>[] = [];
+      const trackRows: Record<string, unknown>[] = [];
+      const releaseTrackRows: Record<string, unknown>[] = [];
+      const trackArtistRows: Record<string, unknown>[] = [];
+
+      const processedReleaseIds = new Set<string>();
+      const processedTrackIds = new Set<string>();
+      // Track which tracks we've already added to trackRows to avoid duplicates
+      const seenTrackIds = new Set<string>();
+      let mergeCount = 0;
+      let canonicalizeCount = 0;
+      let trackCount = 0;
+
+      for (const sel of toProcess) {
+        const album = albumById.get(sel.apple_music_id);
+        if (!album) continue;
+        const action = actionById.get(sel.apple_music_id) || "ignore";
+
+        const attrs = album.attributes ?? {};
+        const rawTitle = attrs.name ?? "Unknown Album";
+        const rawSlug = slugify(rawTitle);
+        const releaseType = parseReleaseTypeFromApple(attrs);
+        const releaseDate = parseDate(attrs.releaseDate ?? null);
+        const upc = attrs.upc ? String(attrs.upc) : null;
+
+        let releaseId: string;
+        let releaseSlug: string;
+        let isMerge = false;
+
+        if (action === "merge") {
+          const existingMatch = existingArtistReleaseBySlug.get(rawSlug);
+          if (existingMatch) {
+            releaseId = existingMatch.id;
+            releaseSlug = rawSlug;
+            isMerge = true;
+            mergeCount++;
+            console.log(`[ingest-discography] MERGE: "${rawTitle}" → overwriting "${existingMatch.title}" (${releaseId})`);
+          } else {
+            releaseId = crypto.randomUUID();
+            releaseSlug = dedupeSlug(rawSlug, seenReleaseSlugs);
+            canonicalizeCount++;
+            console.log(`[ingest-discography] CANONICALIZE (fallback): "${rawTitle}" — no existing match found for merge`);
+          }
+        } else {
+          releaseId = crypto.randomUUID();
+          releaseSlug = dedupeSlug(rawSlug, seenReleaseSlugs);
+          canonicalizeCount++;
+        }
+
+        seenReleaseSlugs.add(releaseSlug);
+        processedReleaseIds.add(releaseId);
+
+        let awUrl: string | null = null;
+        if (attrs.artwork?.url) {
+          awUrl = artworkUrl(attrs.artwork.url, 800);
+        }
+
+        releaseRows.push({
+          id: releaseId,
+          slug: releaseSlug,
+          title: rawTitle,
+          normalized_title: slugify(rawTitle).replace(/-/g, " "),
+          release_type: releaseType,
+          upc,
+          release_date: releaseDate,
+          artwork_url: awUrl,
           status: "active",
           metadata: {
-            apple_music_track_id: track.id,
             apple_music_album_id: album.id,
+            apple_music_url: attrs.url ?? null,
+            genre_names: attrs.genreNames ?? [],
+            record_label: attrs.recordLabel ?? null,
+            source: "apple_music_ingest",
+            overwritten_from: isMerge ? (existingArtistReleaseBySlug.get(rawSlug)?.metadata?.source as string ?? "unknown") : null,
+            ingested_at: new Date().toISOString(),
           },
         });
 
-        trackArtistRows.push({
-          track_id: trackId!,
+        releaseArtistRows.push({
+          release_id: releaseId,
           artist_id: artistId,
           artist_slug: artistSlug,
           artist_name_text: artistName,
@@ -586,186 +772,197 @@ Deno.serve(async (req: Request) => {
           source: "apple_music_ingest",
           confidence: 90,
           status: "active",
-          metadata: {
-            apple_music_track_id: track.id,
-            apple_music_album_id: album.id,
-          },
+          metadata: { apple_music_album_id: album.id },
         });
+
+        const tracksData = album.relationships?.tracks?.data ?? [];
+        for (const track of tracksData) {
+          const tAttrs = track.attributes ?? {};
+          const trackTitle = tAttrs.name ?? "Untitled";
+          const trackIsrc = tAttrs.isrc ? String(tAttrs.isrc).trim() : null;
+          const rawTrackSlug = slugify(trackTitle);
+          const discNum = tAttrs.discNumber ?? 1;
+          const trackNum = tAttrs.trackNumber ?? null;
+          const durationMs = tAttrs.durationInMillis ?? null;
+          const explicit = (tAttrs.contentRating ?? "") === "explicit";
+
+          let trackId: string | undefined;
+          let trackSlug: string;
+
+          if (trackIsrc) trackId = existingTrackByIsrc.get(trackIsrc);
+          if (!trackId) trackId = existingTrackBySlug.get(rawTrackSlug);
+
+          if (!trackId) {
+            trackId = crypto.randomUUID();
+            trackSlug = dedupeSlug(rawTrackSlug, seenTrackSlugs);
+            existingTrackBySlug.set(trackSlug, trackId);
+            if (trackIsrc) existingTrackByIsrc.set(trackIsrc, trackId);
+            seenTrackSlugs.add(trackSlug);
+          } else {
+            trackSlug = rawTrackSlug;
+          }
+
+          processedTrackIds.add(trackId);
+          trackCount++;
+
+          let trackAwUrl: string | null = null;
+          if (tAttrs.artwork?.url) {
+            trackAwUrl = artworkUrl(tAttrs.artwork.url, 800);
+          } else {
+            trackAwUrl = awUrl;
+          }
+
+          const previewUrl = tAttrs.previews?.[0]?.url ?? null;
+
+          // Only add track row once per unique track — tracks can appear on multiple releases
+          // but registry_tracks has a unique index on isrc and a unique constraint on slug
+          if (!seenTrackIds.has(trackId)) {
+            seenTrackIds.add(trackId);
+            trackRows.push({
+              id: trackId,
+              slug: trackSlug,
+              title: trackTitle,
+              normalized_title: slugify(trackTitle).replace(/-/g, " "),
+              isrc: trackIsrc,
+              release_id: null, // relationship is handled via registry_release_tracks
+              duration_ms: durationMs,
+              explicit,
+              track_number: trackNum,
+              disc_number: discNum,
+              artwork_url: trackAwUrl,
+              preview_url: previewUrl,
+              status: "active",
+              metadata: {
+                apple_music_track_id: track.id,
+                apple_music_album_id: album.id,
+                source: "apple_music_ingest",
+              },
+            });
+          }
+
+          releaseTrackRows.push({
+            release_id: releaseId,
+            track_id: trackId,
+            disc_number: discNum,
+            track_number: trackNum,
+            source: "apple_music_ingest",
+            confidence: 90,
+            status: "active",
+            metadata: { apple_music_track_id: track.id, apple_music_album_id: album.id },
+          });
+
+          trackArtistRows.push({
+            track_id: trackId,
+            artist_id: artistId,
+            artist_slug: artistSlug,
+            artist_name_text: artistName,
+            role: "primary_artist",
+            is_primary: true,
+            is_featured: false,
+            credit_order: 1,
+            source: "apple_music_ingest",
+            confidence: 90,
+            status: "active",
+            metadata: { apple_music_track_id: track.id, apple_music_album_id: album.id },
+          });
+        }
       }
-    }
 
-    console.log(
-      `[ingest-discography] Built ${releaseRows.length} releases, ${trackRows.length} tracks, ${releaseTrackRows.length} release-track links, ${releaseArtistRows.length} release-artist links, ${trackArtistRows.length} track-artist links (${Date.now() - start}ms elapsed)`
-    );
+      // ── Commit ──────────────────────────────────────────────────────────
+      stage = "commit";
+      const BATCH = 200;
+      const summary = {
+        merged: mergeCount,
+        canonicalized: canonicalizeCount,
+        ignored: selections.filter((s) => s.action === "ignore").length,
+        tracks_created: trackCount,
+        errors: [] as string[],
+      };
 
-    // ── Commit to database (parallelized where possible) ──────────────────
-    const BATCH = 200;
-    const summary = {
-      releases_created: 0,
-      releases_skipped: 0,
-      tracks_created: 0,
-      tracks_skipped: 0,
-      release_artist_links: 0,
-      release_track_links: 0,
-      track_artist_links: 0,
-      errors: [] as string[],
-    };
-
-    function chunk<T>(arr: T[], size: number): T[][] {
-      const chunks: T[][] = [];
-      for (let i = 0; i < arr.length; i += size) {
-        chunks.push(arr.slice(i, i + size));
+      function chunk<T>(arr: T[], size: number): T[][] {
+        const chunks: T[][] = [];
+        for (let i = 0; i < arr.length; i += size) chunks.push(arr.slice(i, i + size));
+        return chunks;
       }
-      return chunks;
-    }
 
-    // Upsert releases and tracks in parallel
-    const writePromises: Promise<void>[] = [];
-
-    if (releaseRows.length > 0) {
-      for (const batch of chunk(releaseRows, BATCH)) {
-        writePromises.push(
-          (async () => {
-            const { error } = await db
-              .from("registry_releases")
-              .upsert(batch, { onConflict: "slug", ignoreDuplicates: true });
-            if (error) summary.errors.push(`releases: ${error.message}`);
-          })()
-        );
+      // Upsert releases
+      if (releaseRows.length > 0) {
+        for (const batch of chunk(releaseRows, BATCH)) {
+          const { error } = await db.from("registry_releases").upsert(batch, { onConflict: "slug", ignoreDuplicates: false });
+          if (error) summary.errors.push(`releases: ${error.message}`);
+        }
       }
-      summary.releases_created = releaseRows.length;
-    }
 
-    if (trackRows.length > 0) {
-      for (const batch of chunk(trackRows, BATCH)) {
-        writePromises.push(
-          (async () => {
-            const { error } = await db
-              .from("registry_tracks")
-              .upsert(batch, { onConflict: "slug", ignoreDuplicates: true });
-            if (error) summary.errors.push(`tracks: ${error.message}`);
-          })()
-        );
+      // Upsert tracks
+      if (trackRows.length > 0) {
+        for (const batch of chunk(trackRows, BATCH)) {
+          const { error } = await db.from("registry_tracks").upsert(batch, { onConflict: "slug", ignoreDuplicates: false });
+          if (error) summary.errors.push(`tracks: ${error.message}`);
+        }
       }
-      summary.tracks_created = trackRows.length;
-    }
 
-    await Promise.all(writePromises);
+      // Delete existing links for processed releases, then insert fresh
+      if (releaseArtistRows.length > 0) {
+        const rIds = [...processedReleaseIds];
+        for (const idChunk of chunk(rIds, 100)) {
+          await db.from("registry_release_artists").delete().in("release_id", idChunk);
+        }
+        for (const batch of chunk(releaseArtistRows, BATCH)) {
+          const { error } = await db.from("registry_release_artists").insert(batch);
+          if (error) summary.errors.push(`release_artists: ${error.message}`);
+        }
+      }
 
-    console.log(
-      `[ingest-discography] Releases + tracks upserted (${Date.now() - start}ms elapsed)`
-    );
+      if (releaseTrackRows.length > 0) {
+        const rIds = [...processedReleaseIds];
+        for (const idChunk of chunk(rIds, 100)) {
+          await db.from("registry_release_tracks").delete().in("release_id", idChunk);
+        }
+        for (const batch of chunk(releaseTrackRows, BATCH)) {
+          const { error } = await db.from("registry_release_tracks").insert(batch);
+          if (error) summary.errors.push(`release_tracks: ${error.message}`);
+        }
+      }
 
-    // Now handle link tables — delete first, then insert
-    const linkWritePromises: Promise<void>[] = [];
+      if (trackArtistRows.length > 0) {
+        const tIds = [...new Set(trackArtistRows.map((r) => String(r.track_id)))];
+        for (const idChunk of chunk(tIds, 100)) {
+          await db.from("registry_track_artists").delete().in("track_id", idChunk).eq("artist_id", artistId);
+        }
+        for (const batch of chunk(trackArtistRows, BATCH)) {
+          const { error } = await db.from("registry_track_artists").insert(batch);
+          if (error) summary.errors.push(`track_artists: ${error.message}`);
+        }
+      }
 
-    if (releaseArtistRows.length > 0) {
-      const releaseIds = [...new Set(releaseArtistRows.map((r) => String(r.release_id)))];
-      linkWritePromises.push(
-        (async () => {
-          for (const idChunk of chunk(releaseIds, 100)) {
-            await db
-              .from("registry_release_artists")
-              .delete()
-              .in("release_id", idChunk)
-              .eq("source", "apple_music_ingest");
-          }
-          for (const batch of chunk(releaseArtistRows, BATCH)) {
-            const { error } = await db
-              .from("registry_release_artists")
-              .insert(batch);
-            if (error) summary.errors.push(`release_artists: ${error.message}`);
-          }
-        })()
-      );
-      summary.release_artist_links = releaseArtistRows.length;
-    }
-
-    if (releaseTrackRows.length > 0) {
-      const releaseIds = [...new Set(releaseTrackRows.map((r) => String(r.release_id)))];
-      linkWritePromises.push(
-        (async () => {
-          for (const idChunk of chunk(releaseIds, 100)) {
-            await db
-              .from("registry_release_tracks")
-              .delete()
-              .in("release_id", idChunk)
-              .eq("source", "apple_music_ingest");
-          }
-          for (const batch of chunk(releaseTrackRows, BATCH)) {
-            const { error } = await db
-              .from("registry_release_tracks")
-              .insert(batch);
-            if (error) summary.errors.push(`release_tracks: ${error.message}`);
-          }
-        })()
-      );
-      summary.release_track_links = releaseTrackRows.length;
-    }
-
-    if (trackArtistRows.length > 0) {
-      const trackIds = [...new Set(trackArtistRows.map((r) => String(r.track_id)))];
-      linkWritePromises.push(
-        (async () => {
-          for (const idChunk of chunk(trackIds, 100)) {
-            await db
-              .from("registry_track_artists")
-              .delete()
-              .in("track_id", idChunk)
-              .eq("source", "apple_music_ingest");
-          }
-          for (const batch of chunk(trackArtistRows, BATCH)) {
-            const { error } = await db
-              .from("registry_track_artists")
-              .insert(batch);
-            if (error) summary.errors.push(`track_artists: ${error.message}`);
-          }
-        })()
-      );
-      summary.track_artist_links = trackArtistRows.length;
-    }
-
-    await Promise.all(linkWritePromises);
-
-    console.log(
-      `[ingest-discography] Link tables written (${Date.now() - start}ms elapsed)`
-    );
-
-    // ── Update artist metadata ────────────────────────────────────────────
-    const appleAlbumIds = albumDetails.map((a) => a.id);
-    const updatedMeta = {
-      ...artistMeta,
-      apple_music_album_ids: appleAlbumIds,
-      apple_music_discography_ingested_at: new Date().toISOString(),
-    };
-
-    await db
-      .from("registry_artists")
-      .update({
-        metadata: updatedMeta,
+      // Update artist metadata
+      const appleAlbumIds = selections.map((s) => s.apple_music_id);
+      await db.from("registry_artists").update({
+        metadata: { ...artistMeta, apple_music_album_ids: appleAlbumIds, apple_music_discography_ingested_at: new Date().toISOString() },
         updated_at: new Date().toISOString(),
-      })
-      .eq("id", artistId);
+      }).eq("id", artistId);
 
-    const durationMs = Date.now() - start;
+      const durationMs = Date.now() - start;
+      console.log(`[ingest-discography] APPLY done: ${mergeCount} merged, ${canonicalizeCount} canonicalized, ${trackCount} tracks in ${durationMs}ms`);
 
+      return new Response(
+        JSON.stringify({ ok: true, mode: "apply", summary, duration_ms: durationMs }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Unknown mode
     return new Response(
-      JSON.stringify({
-        ok: true,
-        artist: { id: artistId, slug: artistSlug, name: artistName },
-        albums_searched: matchingAlbums.length,
-        albums_fetched: albumDetails.length,
-        albums_failed: failedIds,
-        summary,
-        duration_ms: durationMs,
-      }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({ ok: false, error: `Unknown mode: "${mode}". Use "preview" or "apply".` }),
+      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
+
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error("[ingest-discography] fatal:", msg);
+    const stack = err instanceof Error ? (err.stack ?? "").slice(0, 500) : "";
+    console.error(`[ingest-discography] FATAL at stage "${stage}":`, msg, stack);
     return new Response(
-      JSON.stringify({ ok: false, error: "internal_error", detail: msg.slice(0, 300) }),
+      JSON.stringify({ ok: false, error: "internal_error", detail: `[${stage}] ${msg.slice(0, 300)}`, stage }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

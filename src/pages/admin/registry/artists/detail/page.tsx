@@ -415,7 +415,7 @@ export default function ArtistDetailPage() {
           </WkSurface>
 
           {/* Discography — from registry_release_artists */}
-          <DiscographyPanel artistSlug={artist.slug} />
+          <DiscographyPanel artistSlug={artist.slug} artistName={artist.display_name} />
         </div>
 
         {/* Sidebar */}

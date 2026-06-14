@@ -203,7 +203,6 @@ async function fetchDiscographyFromEdge(
   );
   if (!resp.ok) {
     const empty = { releases: [], standaloneTracks: [] };
-    discographyCache.set(artistSlug, empty);
     return empty;
   }
   const payload = await resp.json();
@@ -211,8 +210,23 @@ async function fetchDiscographyFromEdge(
     releases: (payload?.releases || []) as RegistryDiscographyRelease[],
     standaloneTracks: (payload?.standaloneTracks || []) as RegistryStandaloneTrack[],
   };
-  discographyCache.set(artistSlug, result);
+  // Only cache when there's actual data, not empty responses — prevents
+  // stale-empty caches from hiding newly ingested discography data.
+  if (result.releases.length > 0 || result.standaloneTracks.length > 0) {
+    discographyCache.set(artistSlug, result);
+  }
   return result;
+}
+
+/** Clear the in-memory discography cache so the public artist page re-fetches
+ *  fresh data from the registry edge function. Call this after running the
+ *  Apple Music intake to ensure the public profile picks up new releases. */
+export function clearDiscographyCache(artistSlug?: string): void {
+  if (artistSlug) {
+    discographyCache.delete(artistSlug);
+  } else {
+    discographyCache.clear();
+  }
 }
 
 export async function getArtistDiscographyFromRegistry(

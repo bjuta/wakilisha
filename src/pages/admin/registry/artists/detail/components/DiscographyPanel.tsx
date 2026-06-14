@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
+import { ArtistDiscographyIntakeDrawer } from "@/components/admin/registry/artist-discography/ArtistDiscographyIntakeDrawer";
+import { clearDiscographyCache } from "@/services/publicContent/client";
 
 /* ─── Types ─── */
 
@@ -33,6 +35,7 @@ interface RegistryTrack {
   track_number: number | null;
   disc_number: number | null;
   artwork_url: string | null;
+  isrc: string | null;
 }
 
 interface ReleaseTrackLink {
@@ -65,6 +68,7 @@ interface DiscographyTrack {
   duration: string;
   trackNumber: number;
   artworkUrl: string;
+  isrc: string | null;
 }
 
 /* ─── Helpers ─── */
@@ -107,7 +111,7 @@ function typeBadgeColor(type: string): string {
     case "album":
       return "bg-wk-brand/10 text-wk-brand border-wk-brand/20";
     case "ep":
-      return "bg-wk-accent/10 text-wk-accent border-wk-accent/20";
+      return "bg-wk-warning-soft text-wk-warning border-wk-warning/20";
     case "single":
       return "bg-wk-surface-raised text-wk-text-muted border-wk-border";
     default:
@@ -117,13 +121,13 @@ function typeBadgeColor(type: string): string {
 
 /* ─── Component ─── */
 
-export function DiscographyPanel({ artistSlug }: { artistSlug: string }) {
+export function DiscographyPanel({ artistSlug, artistName }: { artistSlug: string; artistName?: string }) {
   const navigate = useNavigate();
   const [releases, setReleases] = useState<DiscographyRelease[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [ingesting, setIngesting] = useState(false);
-  const [ingestResult, setIngestResult] = useState<string | null>(null);
+  const [showIntakeDrawer, setShowIntakeDrawer] = useState(false);
+  const [artistDisplayName, setArtistDisplayName] = useState(artistName || "");
 
   const loadDiscography = useCallback(async () => {
     if (!artistSlug) return;
@@ -212,6 +216,7 @@ export function DiscographyPanel({ artistSlug }: { artistSlug: string }) {
               duration: formatDuration(t?.duration_ms || null),
               trackNumber: tl.track_number || t?.track_number || 0,
               artworkUrl: t?.artwork_url || r.artwork_url || "",
+              isrc: t?.isrc || null,
             };
           })
           .sort((a, b) => a.trackNumber - b.trackNumber);
@@ -250,33 +255,28 @@ export function DiscographyPanel({ artistSlug }: { artistSlug: string }) {
     loadDiscography();
   }, [loadDiscography]);
 
-  const handleRefreshFromAppleMusic = async () => {
-    setIngesting(true);
-    setIngestResult(null);
-    try {
-      const { data, error: invokeError } = await supabase.functions.invoke(
-        "ingest-artist-discography",
-        { body: { artistSlug } }
-      );
-      if (invokeError) {
-        setIngestResult(invokeError.message);
-      } else if (data?.ok) {
-        const summary = data.summary as Record<string, unknown> | undefined;
-        const releasesCreated = summary?.releases_created || 0;
-        const tracksCreated = summary?.tracks_created || 0;
-        setIngestResult(
-          `Found ${data.albums_fetched || 0} albums on Apple Music. Created ${releasesCreated} releases, ${tracksCreated} tracks in registry.`
-        );
-        // Reload discography to show new data
-        await loadDiscography();
-      } else {
-        setIngestResult((data?.error as string) || "Unknown error from ingest function");
-      }
-    } catch (err) {
-      setIngestResult(err instanceof Error ? err.message : "Failed to invoke ingest function");
-    } finally {
-      setIngesting(false);
-    }
+  // Also grab the artist name for the intake drawer if not provided
+  useEffect(() => {
+    if (artistName) return;
+    if (!artistSlug) return;
+    supabase
+      .from("registry_artists")
+      .select("display_name")
+      .eq("slug", artistSlug)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data) setArtistDisplayName(data.display_name);
+      });
+  }, [artistSlug, artistName]);
+
+  const handleOpenIntake = () => {
+    setShowIntakeDrawer(true);
+  };
+
+  const handleIntakeComplete = () => {
+    setShowIntakeDrawer(false);
+    loadDiscography();
+    clearDiscographyCache();
   };
 
   const toggleExpand = (releaseId: string) => {
@@ -326,184 +326,176 @@ export function DiscographyPanel({ artistSlug }: { artistSlug: string }) {
   const featureReleases = releases.filter((r) => !r.isPrimary);
 
   return (
-    <WkSurface className="p-5">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <WkIcon name="Album" size={14} className="text-wk-text-faint" />
-          <h3 className="text-[11px] font-bold uppercase tracking-wider text-wk-text-muted">
-            Discography
-          </h3>
-          <span className="inline-flex items-center justify-center h-4 min-w-[16px] px-1 rounded-full text-[9px] font-bold bg-wk-surface-raised text-wk-text-faint">
-            {releases.length}
-          </span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="text-[10px] text-wk-text-faint">
-            {primaryReleases.length} primary
-          </span>
-          {featureReleases.length > 0 && (
-            <>
-              <span className="text-[10px] text-wk-text-faint">·</span>
-              <span className="text-[10px] text-wk-text-faint">
-                {featureReleases.length} feature
-              </span>
-            </>
-          )}
-          <div className="h-4 w-px bg-wk-border mx-1" />
-          <button
-            onClick={handleRefreshFromAppleMusic}
-            disabled={ingesting}
-            className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider border border-wk-border bg-wk-surface hover:bg-wk-surface-raised text-wk-text-muted hover:text-wk-text disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer whitespace-nowrap"
-            title="Search Apple Music for this artist's albums and import them into the registry"
-          >
-            <WkIcon
-              name={ingesting ? "Loader2" : "Search"}
-              size={11}
-              className={ingesting ? "animate-spin" : ""}
-            />
-            {ingesting ? "Importing..." : "Apple Music"}
-          </button>
-        </div>
-      </div>
-
-      {/* Ingest result feedback */}
-      {ingestResult && (
-        <div
-          className={`mb-4 rounded-lg border p-3 text-[12px] font-semibold flex items-start gap-2 ${
-            ingestResult.includes("error") || ingestResult.includes("Failed")
-              ? "border-wk-danger/20 bg-wk-danger-soft text-wk-danger"
-              : "border-wk-success/20 bg-wk-success-soft text-wk-success"
-          }`}
-        >
-          <WkIcon
-            name={
-              ingestResult.includes("error") || ingestResult.includes("Failed")
-                ? "AlertTriangle"
-                : "CheckCircle2"
-            }
-            size={14}
-            className="shrink-0 mt-0.5"
-          />
-          <span>{ingestResult}</span>
-        </div>
+    <>
+      {/* Intake drawer */}
+      {showIntakeDrawer && (
+        <ArtistDiscographyIntakeDrawer
+          artistSlug={artistSlug}
+          artistName={artistDisplayName}
+          onClose={() => setShowIntakeDrawer(false)}
+          onComplete={handleIntakeComplete}
+        />
       )}
 
-      {releases.length === 0 ? (
-        <p className="text-[12px] text-wk-text-faint italic py-4 text-center">
-          No releases linked to this artist in the registry.
-        </p>
-      ) : (
-        <div className="space-y-2">
-          {releases.map((release) => (
-            <div
-              key={release.id}
-              className="rounded-lg border border-wk-border bg-wk-bg-subtle overflow-hidden"
+      <WkSurface className="p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <WkIcon name="Album" size={14} className="text-wk-text-faint" />
+            <h3 className="text-[11px] font-bold uppercase tracking-wider text-wk-text-muted">
+              Discography
+            </h3>
+            <span className="inline-flex items-center justify-center h-4 min-w-[16px] px-1 rounded-full text-[9px] font-bold bg-wk-surface-raised text-wk-text-faint">
+              {releases.length}
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] text-wk-text-faint">
+              {primaryReleases.length} primary
+            </span>
+            {featureReleases.length > 0 && (
+              <>
+                <span className="text-[10px] text-wk-text-faint">·</span>
+                <span className="text-[10px] text-wk-text-faint">
+                  {featureReleases.length} feature
+                </span>
+              </>
+            )}
+            <div className="h-4 w-px bg-wk-border mx-1" />
+            <button
+              onClick={handleOpenIntake}
+              className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider border border-wk-border bg-wk-surface hover:bg-wk-surface-raised text-wk-text-muted hover:text-wk-text disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer whitespace-nowrap"
+              title="Search Apple Music for this artist's albums and review before importing"
             >
-              {/* Release row */}
-              <div className="flex items-center gap-3 p-3">
-                {/* Artwork thumbnail */}
-                <div className="h-12 w-12 shrink-0 rounded-md overflow-hidden bg-wk-surface-raised border border-wk-border">
-                  {release.artworkUrl ? (
-                    <img
-                      src={release.artworkUrl}
-                      alt={release.title}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex items-center justify-center h-full w-full text-wk-text-faint">
-                      <WkIcon name="Album" size={18} />
+              <WkIcon name="Search" size={11} />
+              Apple Music
+            </button>
+          </div>
+        </div>
+
+        {releases.length === 0 ? (
+          <p className="text-[12px] text-wk-text-faint italic py-4 text-center">
+            No releases linked to this artist in the registry.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {releases.map((release) => (
+              <div
+                key={release.id}
+                className="rounded-lg border border-wk-border bg-wk-bg-subtle overflow-hidden"
+              >
+                {/* Release row */}
+                <div className="flex items-center gap-3 p-3">
+                  {/* Artwork thumbnail */}
+                  <div className="h-12 w-12 shrink-0 rounded-md overflow-hidden bg-wk-surface-raised border border-wk-border">
+                    {release.artworkUrl ? (
+                      <img
+                        src={release.artworkUrl}
+                        alt={release.title}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex items-center justify-center h-full w-full text-wk-text-faint">
+                        <WkIcon name="Album" size={18} />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button
+                        onClick={() => navigate(`/admin/registry/releases/${release.slug}`)}
+                        className="text-[13px] font-bold text-wk-text hover:text-wk-brand transition-colors truncate max-w-[320px] text-left cursor-pointer"
+                      >
+                        {release.title}
+                      </button>
+                      {!release.isPrimary && (
+                        <span className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-bold bg-wk-warning-soft text-wk-warning uppercase">
+                          feat
+                        </span>
+                      )}
                     </div>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-bold uppercase border ${typeBadgeColor(release.releaseType)}`}>
+                        {release.releaseType}
+                      </span>
+                      <span className="text-[11px] text-wk-text-faint">
+                        {release.year}
+                      </span>
+                      {release.trackCount > 0 && (
+                        <span className="text-[11px] text-wk-text-faint">
+                          · {release.trackCount} tracks
+                        </span>
+                      )}
+                      <span className="inline-flex items-center gap-1 text-[10px] text-wk-text-faint">
+                        <span className="h-1.5 w-1.5 rounded-full bg-wk-text-faint/40" />
+                        {sourceLabel(release.source)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Expand button */}
+                  {release.trackCount > 0 && (
+                    <button
+                      onClick={() => toggleExpand(release.id)}
+                      className="shrink-0 flex items-center justify-center h-7 w-7 rounded-md border border-wk-border bg-wk-surface hover:bg-wk-surface-raised transition-colors cursor-pointer"
+                    >
+                      <WkIcon
+                        name={release.expanded ? "ChevronUp" : "ChevronDown"}
+                        size={14}
+                        className="text-wk-text-muted"
+                      />
+                    </button>
+                  )}
+
+                  {/* Confidence badge */}
+                  {release.confidence < 95 && (
+                    <span
+                      className="shrink-0 inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-bold bg-wk-warning-soft text-wk-warning"
+                      title={`Confidence: ${release.confidence}%`}
+                    >
+                      {release.confidence}%
+                    </span>
                   )}
                 </div>
 
-                {/* Info */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <button
-                      onClick={() => navigate(`/admin/registry/releases/${release.slug}`)}
-                      className="text-[13px] font-bold text-wk-text hover:text-wk-brand transition-colors truncate max-w-[320px] text-left cursor-pointer"
-                    >
-                      {release.title}
-                    </button>
-                    {!release.isPrimary && (
-                      <span className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-bold bg-wk-warning-soft text-wk-warning uppercase">
-                        feat
-                      </span>
-                    )}
+                {/* Expanded tracklist */}
+                {release.expanded && release.tracks.length > 0 && (
+                  <div className="border-t border-wk-border">
+                    <div className="divide-y divide-wk-border/50">
+                      {release.tracks.map((track, idx) => (
+                        <div
+                          key={track.id}
+                          className="flex items-center gap-3 px-3 py-2 hover:bg-wk-surface-raised transition-colors"
+                        >
+                          <span className="text-[11px] font-mono text-wk-text-faint w-6 text-right shrink-0">
+                            {track.trackNumber || idx + 1}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <span className="text-[12px] text-wk-text-soft truncate block">
+                              {track.title}
+                            </span>
+                            {track.isrc && (
+                              <span className="text-[9px] font-mono text-wk-text-faint mt-0.5 block">
+                                {track.isrc}
+                              </span>
+                            )}
+                          </div>
+                          {track.duration && (
+                            <span className="text-[11px] font-mono text-wk-text-faint shrink-0">
+                              {track.duration}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-bold uppercase border ${typeBadgeColor(release.releaseType)}`}>
-                      {release.releaseType}
-                    </span>
-                    <span className="text-[11px] text-wk-text-faint">
-                      {release.year}
-                    </span>
-                    {release.trackCount > 0 && (
-                      <span className="text-[11px] text-wk-text-faint">
-                        · {release.trackCount} tracks
-                      </span>
-                    )}
-                    <span className="inline-flex items-center gap-1 text-[10px] text-wk-text-faint">
-                      <span className="h-1.5 w-1.5 rounded-full bg-wk-text-faint/40" />
-                      {sourceLabel(release.source)}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Expand button */}
-                {release.trackCount > 0 && (
-                  <button
-                    onClick={() => toggleExpand(release.id)}
-                    className="shrink-0 flex items-center justify-center h-7 w-7 rounded-md border border-wk-border bg-wk-surface hover:bg-wk-surface-raised transition-colors cursor-pointer"
-                  >
-                    <WkIcon
-                      name={release.expanded ? "ChevronUp" : "ChevronDown"}
-                      size={14}
-                      className="text-wk-text-muted"
-                    />
-                  </button>
-                )}
-
-                {/* Confidence badge */}
-                {release.confidence < 95 && (
-                  <span
-                    className="shrink-0 inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-bold bg-wk-warning-soft text-wk-warning"
-                    title={`Confidence: ${release.confidence}%`}
-                  >
-                    {release.confidence}%
-                  </span>
                 )}
               </div>
-
-              {/* Expanded tracklist */}
-              {release.expanded && release.tracks.length > 0 && (
-                <div className="border-t border-wk-border">
-                  <div className="divide-y divide-wk-border/50">
-                    {release.tracks.map((track, idx) => (
-                      <div
-                        key={track.id}
-                        className="flex items-center gap-3 px-3 py-2 hover:bg-wk-surface-raised transition-colors"
-                      >
-                        <span className="text-[11px] font-mono text-wk-text-faint w-6 text-right shrink-0">
-                          {track.trackNumber || idx + 1}
-                        </span>
-                        <span className="flex-1 text-[12px] text-wk-text-soft truncate">
-                          {track.title}
-                        </span>
-                        {track.duration && (
-                          <span className="text-[11px] font-mono text-wk-text-faint shrink-0">
-                            {track.duration}
-                          </span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-    </WkSurface>
+            ))}
+          </div>
+        )}
+      </WkSurface>
+    </>
   );
 }

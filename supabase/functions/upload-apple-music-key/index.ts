@@ -4,6 +4,12 @@ const ALLOWED_ORIGINS = [
   "https://wakilisha.africa",
   "https://www.wakilisha.africa",
   "https://staging.wakilisha.africa",
+  "https://readdy.ai",
+  "https://readdy-site.link",
+  "https://readdy-site.com",
+  "https://readdy-staging.com",
+  "https://localhost:5173",
+  "http://localhost:5173",
 ];
 
 function corsHeaders(req: Request): Record<string, string> {
@@ -135,15 +141,42 @@ Deno.serve(async (req) => {
 
   const now = new Date().toISOString();
   const fileName = file.name || "uploaded.p8";
-  const description = `Apple Music .p8 private key — ${fileName} (${keyLength} chars, uploaded ${now})`;
 
-  // ── Store in Supabase Vault (encrypted at rest) ──
+  // ── PRIMARY: Store in admin_settings_secrets (read by ingest function) ──
+  const { error: upsertErr } = await adminClient
+    .from("admin_settings_secrets")
+    .upsert({
+      setting_key: "apple_music_private_key",
+      setting_value: keyContent,
+      updated_by: user.id,
+      updated_at: now,
+      metadata: {
+        uploaded_file_name: fileName,
+        uploaded_at: now,
+        file_size: keyLength,
+        storage: "admin_settings_secrets",
+      },
+    }, { onConflict: "setting_key" });
+
+  if (upsertErr) {
+    console.error("[upload-key] Failed to store in admin_settings_secrets:", upsertErr.message);
+    return new Response(JSON.stringify({
+      ok: false,
+      error: `Failed to store key: ${upsertErr.message}`,
+    }), {
+      status: 500,
+      headers: { ...ch, "Content-Type": "application/json" },
+    });
+  }
+
+  console.log(`[upload-key] Apple Music .p8 stored in admin_settings_secrets: ${keyLength} chars`);
+
+  // ── SECONDARY: Try Supabase Vault (encrypted at rest) for extra security ──
   let vaultAction = "none";
   let vaultError: string | null = null;
 
   try {
-    // Check if secret already exists in Vault
-    const checkRes = await fetch(
+    const vaultRes = await fetch(
       `${supabaseUrl}/rest/v1/rpc/create_secret`,
       {
         method: "POST",
@@ -156,97 +189,18 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           secret: keyContent,
           name: "apple_music_private_key",
-          description,
+          description: `Apple Music .p8 private key — ${fileName} (${keyLength} chars, uploaded ${now})`,
         }),
       },
     );
 
-    if (checkRes.ok) {
+    if (vaultRes.ok) {
       vaultAction = "created";
     } else {
-      // Likely already exists — try update via a separate approach
-      // Vault's update_secret requires the secret UUID, which we fetch first
-      const secretsRes = await fetch(
-        `${supabaseUrl}/rest/v1/vault/secrets?id=eq.apple_music_private_key&select=id&name=eq.apple_music_private_key`,
-        {
-          headers: {
-            "Authorization": `Bearer ${supabaseKey}`,
-            "apikey": supabaseKey,
-          },
-        },
-      );
-      
-      // Actually, vault.secrets may not be directly queryable. Try update_secret via RPC:
-      // First get the existing id from the create_secret error or try a different path
-      // Fallback: delete + recreate via vault functions
-      const updateBody = JSON.stringify({
-        secret: keyContent,
-        name: "apple_music_private_key",
-        description,
-      });
-      
-      // Try create_secret with a slightly different name first (to check if it's a name conflict)
-      const retryRes = await fetch(
-        `${supabaseUrl}/rest/v1/rpc/create_secret`,
-        {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${supabaseKey}`,
-            "Content-Type": "application/json",
-            "apikey": supabaseKey,
-          },
-          body: updateBody,
-        },
-      );
-      
-      if (retryRes.ok) {
-        vaultAction = "created";
-      } else {
-        const errText = await retryRes.text();
-        console.error("Vault create_secret failed:", retryRes.status, errText);
-        
-        // Fallback: store in admin_settings_secrets (encrypted column) for backward compat
-        // This ensures the key is still accessible during Vault transition
-        const { error: fallbackErr } = await adminClient
-          .from("admin_settings_secrets")
-          .upsert({
-            setting_key: "apple_music_private_key",
-            setting_value: keyContent,
-            updated_by: user.id,
-            updated_at: now,
-            metadata: { uploaded_file_name: fileName, uploaded_at: now, file_size: keyLength, storage: "fallback_admin_settings_secrets" },
-          }, { onConflict: "setting_key" });
-
-        if (fallbackErr) {
-          vaultError = `Vault unavailable, fallback failed: ${fallbackErr.message}`;
-        } else {
-          vaultAction = "fallback_table";
-          vaultError = `Vault create_secret returned ${retryRes.status}. Stored in admin_settings_secrets as fallback.`;
-        }
-      }
+      vaultError = `Vault create_secret returned ${vaultRes.status}`;
     }
   } catch (err) {
     vaultError = `Vault RPC exception: ${err instanceof Error ? err.message : String(err)}`;
-    console.error("Vault storage error:", vaultError);
-
-    // Emergency fallback
-    const { error: fallbackErr } = await adminClient
-      .from("admin_settings_secrets")
-      .upsert({
-        setting_key: "apple_music_private_key",
-        setting_value: keyContent,
-        updated_by: user.id,
-        updated_at: now,
-        metadata: { uploaded_file_name: fileName, uploaded_at: now, file_size: keyLength, storage: "fallback_admin_settings_secrets_after_error" },
-      }, { onConflict: "setting_key" });
-
-    if (fallbackErr) {
-      console.error("Emergency fallback also failed:", fallbackErr.message);
-      return new Response(JSON.stringify({ ok: false, error: "Failed to store private key securely in both Vault and fallback storage." }), {
-        status: 500,
-        headers: { ...ch, "Content-Type": "application/json" },
-      });
-    }
   }
 
   // Audit event
@@ -264,17 +218,15 @@ Deno.serve(async (req) => {
     },
   });
 
-  const storedIn = vaultAction === "fallback_table" || vaultAction.startsWith("fallback") ? "admin_settings_secrets (Vault fallback)" : "Supabase Vault";
-
   return new Response(JSON.stringify({
     ok: true,
-    message: `Apple Music .p8 private key uploaded and stored securely in ${storedIn}.`,
+    message: `Apple Music .p8 private key (${keyLength} chars) uploaded and stored securely.`,
     details: {
       file_name: fileName,
       key_length: keyLength,
       uploaded_at: now,
-      storage: storedIn,
       vault_action: vaultAction,
+      vault_error: vaultError,
     },
   }), {
     status: 200,
