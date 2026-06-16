@@ -84,8 +84,8 @@ function toFamily(row: DbRow, latest?: ChartEdition | null): ChartFamily {
     defaultChartSize: asNumber(row.default_chart_size ?? row.defaultChartSize ?? latest?.entryCount, latest?.entryCount || 100),
     defaultRegion: marketLabel,
     editionFrequency: "weekly",
-    defaultRuleset: pick(row, ["eligibility_rules_version", "eligibilityRulesVersion"], "legacy-import-v1"),
-    defaultScoringModel: pick(row, ["methodology_version", "methodologyVersion"], "legacy-import-v1"),
+    defaultRuleset: pick(row, ["eligibility_rules_version", "eligibilityRulesVersion", "default_eligibility_rules_version"], "legacy-import-v1"),
+    defaultScoringModel: pick(row, ["methodology_version", "methodologyVersion", "default_methodology_version"], "legacy-import-v1"),
     createdAt: asString(row.created_at),
     updatedAt: asString(row.updated_at),
     slug,
@@ -99,8 +99,8 @@ function toFamily(row: DbRow, latest?: ChartEdition | null): ChartFamily {
     shortLabel: pick(row, ["short_label", "shortLabel"], label),
     chartMode: "data",
     periodType: "weekly",
-    methodologyVersion: pick(row, ["methodology_version", "methodologyVersion"], "legacy-import-v1"),
-    eligibilityRulesVersion: pick(row, ["eligibility_rules_version", "eligibilityRulesVersion"], "legacy-import-v1"),
+    methodologyVersion: pick(row, ["methodology_version", "methodologyVersion", "default_methodology_version"], "legacy-import-v1"),
+    eligibilityRulesVersion: pick(row, ["eligibility_rules_version", "eligibilityRulesVersion", "default_eligibility_rules_version"], "legacy-import-v1"),
     legacySlugs: [],
   };
 }
@@ -109,7 +109,7 @@ function toEdition(row: DbRow, familySlug: string): ChartEdition {
   const id = pick(row, ["id", "edition_id", "uuid"], familySlug);
   const date = dateOnly(row.chart_date ?? row.edition_date ?? row.date ?? row.published_at ?? row.created_at);
   const slug = slugify(pick(row, ["slug", "edition_slug", "public_slug"], date || id), id);
-  const label = pick(row, ["label", "title", "name", "edition_title"], `${familySlug.replaceAll("-", " ")} ${date}`.trim());
+  const label = pick(row, ["label", "title", "name", "edition_title", "edition_label"], `${familySlug.replaceAll("-", " ")} ${date}`.trim());
 
   return {
     id,
@@ -120,12 +120,12 @@ function toEdition(row: DbRow, familySlug: string): ChartEdition {
     periodStart: dateOnly(row.period_start ?? row.periodStart ?? row.start_date) || date,
     periodEnd: dateOnly(row.period_end ?? row.periodEnd ?? row.end_date) || date,
     status: asString(row.status, "published") === "draft" ? "draft" : "published",
-    ingestJobId: asString(row.ingest_job_id) || null,
+    ingestJobId: asString(row.ingest_job_id ?? row.ingestRunId) || null,
     publishedAt: asString(row.published_at) || null,
     publishedBy: asString(row.published_by) || null,
     entryCount: asNumber(row.entry_count ?? row.entryCount ?? row.entries_count, 0),
-    newEntries: asNumber(row.new_entries ?? row.newEntries, 0),
-    reEntries: asNumber(row.re_entries ?? row.reEntries, 0),
+    newEntries: asNumber(row.new_entries ?? row.newEntries ?? row.new_entries_count, 0),
+    reEntries: asNumber(row.re_entries ?? row.reEntries ?? row.re_entries_count, 0),
   };
 }
 
@@ -166,12 +166,19 @@ function sortEditions(a: EditionLookup, b: EditionLookup): number {
 }
 
 async function loadEditionLookups(): Promise<EditionLookup[]> {
-  const { data, error } = await supabase.from("wk_chart_editions_v2").select("*").limit(500);
+  // Join with wk_chart_programs_v2 to get the public_slug (family slug) for each edition
+  const { data, error } = await supabase
+    .from("wk_chart_editions_v2")
+    .select("*, program:wk_chart_programs_v2!inner(id, public_slug, public_label, series_slug, market_slug)")
+    .order("edition_date", { ascending: false })
+    .limit(500);
+
   if (error) throw new Error(error.message);
 
   return deepDecode(((data || []) as DbRow[]))
     .map((row) => {
-      const familySlug = editionFamilySlug(row, "charts");
+      const program = (row.program ?? {}) as DbRow;
+      const familySlug = editionFamilySlug(program, asString(row.program_id, "charts"));
       return { edition: toEdition(row, familySlug), raw: row, familySlug };
     })
     .sort(sortEditions);
@@ -184,7 +191,8 @@ export async function getSupabaseChartFamilies(): Promise<ChartFamily[]> {
     if (!latestByFamily.has(lookup.familySlug)) latestByFamily.set(lookup.familySlug, lookup.edition);
   }
 
-  const { data, error } = await supabase.from("wk_chart_series_v2").select("*").limit(100);
+  // Load from wk_chart_programs_v2 (richer metadata than wk_chart_series_v2)
+  const { data, error } = await supabase.from("wk_chart_programs_v2").select("*").limit(100);
   if (!error && data && data.length > 0) {
     return deepDecode((data as DbRow[])).map((row) => {
       const slug = familySlugFromRow(row);
@@ -192,6 +200,7 @@ export async function getSupabaseChartFamilies(): Promise<ChartFamily[]> {
     });
   }
 
+  // Fallback: derive families from edition data
   const familyRows = Array.from(latestByFamily.entries()).map(([slug, latest]) => ({
     id: slug,
     slug,

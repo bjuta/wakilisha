@@ -1342,7 +1342,7 @@ export default function AdminRegistryReleaseShells() {
           <div>
             {/* Table header */}
             <div className="grid items-center gap-3 border-b border-[#e8ece2] bg-[#fbfcf8] px-5 py-3 text-[10px] font-black uppercase tracking-wider text-[#71796b]"
-              style={{ gridTemplateColumns: "32px 36px minmax(0,2fr) minmax(0,1.2fr) minmax(0,0.8fr) 110px 120px 36px" }}
+              style={{ gridTemplateColumns: "32px 36px minmax(0,2fr) minmax(0,1.2fr) minmax(0,0.8fr) 110px 120px 90px 36px" }}
             >
               <span />
               <span>#</span>
@@ -1351,6 +1351,7 @@ export default function AdminRegistryReleaseShells() {
               <span>Provider</span>
               <span>Status</span>
               <span>Suggestions</span>
+              <span>Actions</span>
               <span />
             </div>
 
@@ -1371,7 +1372,7 @@ export default function AdminRegistryReleaseShells() {
                   <Fragment key={row.shellKey}>
                     <div
                       className={`grid items-center gap-3 border-b border-[#eef1ea] px-5 py-4 transition-colors last:border-b-0 ${isExpanded ? "bg-[#fbfcf8]" : "hover:bg-[#fbfcf8]"}`}
-                      style={{ gridTemplateColumns: "32px 36px minmax(0,2fr) minmax(0,1.2fr) minmax(0,0.8fr) 110px 120px 36px" }}
+                      style={{ gridTemplateColumns: "32px 36px minmax(0,2fr) minmax(0,1.2fr) minmax(0,0.8fr) 110px 120px 90px 36px" }}
                     >
                       {/* Checkbox */}
                       <input
@@ -1433,6 +1434,16 @@ export default function AdminRegistryReleaseShells() {
                             />
                           </div>
                         )}
+                      </div>
+
+                      {/* Review button */}
+                      <div>
+                        <button
+                          onClick={() => setExpandedRows((p) => ({ ...p, [row.shellKey]: !p[row.shellKey] }))}
+                          className="rounded-xl border border-[#dfe4d8] bg-white px-3 py-1.5 text-[11px] font-bold text-[#5f8f2f] hover:border-[#85c441] hover:bg-[#f0f7e8] transition-colors whitespace-nowrap"
+                        >
+                          {isExpanded ? "Close" : "Review"}
+                        </button>
                       </div>
 
                       {/* Expand toggle */}

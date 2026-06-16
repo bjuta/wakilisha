@@ -43,11 +43,7 @@ export default function AdminImportsJobsPage() {
 
   async function load() {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("wk_ingestion_runs")
-      .select("id, source_name, source_kind, source_manifest, status, started_at, finished_at, created_at, imported_counts, warnings, errors")
-      .order("created_at", { ascending: false })
-      .limit(100);
+    const { data, error } = await supabase.rpc("get_admin_import_runs", { p_limit: 100 });
     if (error) console.error("Error loading import jobs:", error);
     else setRuns(data ?? []);
     setLoading(false);

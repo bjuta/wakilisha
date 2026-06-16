@@ -132,6 +132,7 @@ export default function ArtistDetail() {
           {hasReleases && (
             <ArtistDiscography
               releases={artist.releases}
+              artistName={artist.name}
               eyebrow="Discography"
               title="Releases"
               emptyTitle="No releases"
@@ -143,6 +144,7 @@ export default function ArtistDetail() {
           {hasAppearsOn && (
             <ArtistDiscography
               releases={appearsOn}
+              artistName={artist.name}
               eyebrow="Appears On"
               title="Features &amp; appearances"
               emptyTitle="No appearances"

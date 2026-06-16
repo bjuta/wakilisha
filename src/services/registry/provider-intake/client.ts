@@ -1,3 +1,4 @@
+import { supabase } from "@/lib/supabase";
 import type {
   CreateReleaseShellResult,
   IntakeCreateInput,
@@ -6,51 +7,38 @@ import type {
   ProviderSearchResponse,
 } from "./types";
 
-const INTAKE_API_BASE = "/__wakilisha-v2-api/api/v1/registry";
-
-function isJsonContentType(response: Response): boolean {
-  return (response.headers.get("content-type") ?? "").includes("application/json");
+function edgeFunctionError(err: unknown): Error {
+  const message = err instanceof Error ? err.message : "Provider intake API call failed.";
+  return new Error(message);
 }
 
-function apiUnavailableError(): Error {
-  return new Error("Provider intake API is unavailable. Check that the registry admin server is running.");
+function extractBodyError(data: unknown): string | null {
+  if (!data || typeof data !== "object") return null;
+  const body = data as Record<string, unknown>;
+  if (typeof body.error === "string" && body.error) return body.error;
+  if (typeof body.detail === "string" && body.detail) return "Internal error: " + body.detail;
+  return null;
 }
 
 export async function searchProviderCatalogue(
   input: IntakeSearchInput,
 ): Promise<ProviderSearchResponse> {
-  const params = new URLSearchParams({
-    provider: input.provider,
-    q: input.query,
-    type: input.entityType,
-    storefront: input.storefront,
-    limit: String(input.limit ?? 25),
+  const { data, error } = await supabase.functions.invoke("provider-intake-api", {
+    body: {
+      route: "search",
+      provider: input.provider,
+      storefront: input.storefront,
+      entityType: input.entityType,
+      query: input.query,
+      limit: input.limit ?? 25,
+    },
   });
 
-  const response = await fetch(`${INTAKE_API_BASE}/provider-search?${params.toString()}`, {
-    method: "GET",
-  });
+  const bodyErr = extractBodyError(data);
+  if (bodyErr) throw new Error(bodyErr);
+  if (error) throw edgeFunctionError(error);
 
-  if (!isJsonContentType(response)) {
-    throw apiUnavailableError();
-  }
-
-  const payload = (await response.json()) as {
-    data?: ProviderSearchResponse;
-    message?: string;
-  } & Partial<ProviderSearchResponse>;
-
-  if (!response.ok) {
-    throw new Error(payload.message ?? "Provider search failed.");
-  }
-
-  const result = (payload.data ?? payload) as ProviderSearchResponse;
-
-  if (result.error) {
-    throw new Error(result.error);
-  }
-
-  return result;
+  return data as ProviderSearchResponse;
 }
 
 export async function inspectProviderEntity(
@@ -59,104 +47,91 @@ export async function inspectProviderEntity(
   providerEntityId: string,
   storefront: string,
 ): Promise<ProviderInspectResponse> {
-  const response = await fetch(`${INTAKE_API_BASE}/provider-search/inspect`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ provider, providerEntityType, providerEntityId, storefront }),
+  const { data, error } = await supabase.functions.invoke("provider-intake-api", {
+    body: {
+      route: "inspect",
+      provider,
+      providerEntityType,
+      providerEntityId,
+      storefront,
+    },
   });
 
-  if (!isJsonContentType(response)) {
-    throw apiUnavailableError();
-  }
+  const bodyErr = extractBodyError(data);
+  if (bodyErr) throw new Error(bodyErr);
+  if (error) throw edgeFunctionError(error);
 
-  const payload = (await response.json()) as {
-    data?: ProviderInspectResponse;
-    message?: string;
-  } & Partial<ProviderInspectResponse>;
-
-  if (!response.ok) {
-    throw new Error(payload.message ?? "Provider inspect failed.");
-  }
-
-  return (payload.data ?? payload) as ProviderInspectResponse;
+  return data as ProviderInspectResponse;
 }
 
 export async function createReleaseShellFromProvider(
   input: IntakeCreateInput,
 ): Promise<CreateReleaseShellResult> {
-  const response = await fetch(`${INTAKE_API_BASE}/release-shells/intake/create`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
+  const { data, error } = await supabase.functions.invoke("provider-intake-api", {
+    body: {
+      route: "create-shell",
+      ...input,
+    },
   });
 
-  if (!isJsonContentType(response)) {
-    throw apiUnavailableError();
-  }
+  // Check the response body for a structured error FIRST (edge function returns 200 even for errors now)
+  const bodyErr = extractBodyError(data);
+  if (bodyErr) throw new Error(bodyErr);
+  if (error) throw edgeFunctionError(error);
 
-  const payload = (await response.json()) as {
-    data?: CreateReleaseShellResult;
-    message?: string;
-  } & Partial<CreateReleaseShellResult>;
-
-  if (!response.ok) {
-    throw new Error(payload.message ?? "Failed to create release shell from provider result.");
-  }
-
-  return (payload.data ?? payload) as CreateReleaseShellResult;
+  return data as CreateReleaseShellResult;
 }
 
 export async function attachProviderResultToShell(
   input: IntakeCreateInput & { targetRegistryEntityId: string },
 ): Promise<CreateReleaseShellResult> {
-  const response = await fetch(`${INTAKE_API_BASE}/release-shells/intake/attach`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
+  const { data, error } = await supabase.functions.invoke("provider-intake-api", {
+    body: {
+      route: "attach-shell",
+      ...input,
+    },
   });
 
-  if (!isJsonContentType(response)) {
-    throw apiUnavailableError();
-  }
+  const bodyErr = extractBodyError(data);
+  if (bodyErr) throw new Error(bodyErr);
+  if (error) throw edgeFunctionError(error);
 
-  const payload = (await response.json()) as {
-    data?: CreateReleaseShellResult;
-    message?: string;
-  } & Partial<CreateReleaseShellResult>;
+  return data as CreateReleaseShellResult;
+}
 
-  if (!response.ok) {
-    throw new Error(payload.message ?? "Failed to attach provider result to existing shell.");
-  }
+export async function refreshReleaseShell(
+  input: IntakeCreateInput,
+): Promise<CreateReleaseShellResult> {
+  const { data, error } = await supabase.functions.invoke("provider-intake-api", {
+    body: {
+      route: "refresh-shell",
+      ...input,
+    },
+  });
 
-  return (payload.data ?? payload) as CreateReleaseShellResult;
+  const bodyErr = extractBodyError(data);
+  if (bodyErr) throw new Error(bodyErr);
+  if (error) throw edgeFunctionError(error);
+
+  return data as CreateReleaseShellResult;
 }
 
 export async function backfillExistingRelease(
   input: IntakeCreateInput & { targetRegistryEntityId: string },
 ): Promise<CreateReleaseShellResult> {
-  const response = await fetch(`${INTAKE_API_BASE}/release-shells/intake/backfill`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
+  const { data, error } = await supabase.functions.invoke("provider-intake-api", {
+    body: {
+      route: "backfill",
       ...input,
       mode: "backfill_existing_release",
-    }),
+    },
   });
 
-  if (!isJsonContentType(response)) {
-    throw apiUnavailableError();
-  }
+  const bodyErr = extractBodyError(data);
+  if (bodyErr) throw new Error(bodyErr);
+  if (error) throw edgeFunctionError(error);
 
-  const payload = (await response.json()) as {
-    data?: CreateReleaseShellResult;
-    message?: string;
-  } & Partial<CreateReleaseShellResult>;
-
-  if (!response.ok) {
-    throw new Error(payload.message ?? "Failed to backfill existing release from provider result.");
-  }
-
-  return (payload.data ?? payload) as CreateReleaseShellResult;
+  return data as CreateReleaseShellResult;
 }
 
 export type ProviderConnectionTestResult = {
@@ -173,18 +148,17 @@ export async function testProviderConnection(
   provider: string,
   storefront: string,
 ): Promise<ProviderConnectionTestResult> {
-  const params = new URLSearchParams({ provider, storefront });
-  const response = await fetch(`${INTAKE_API_BASE}/provider-search/test-connection?${params.toString()}`, {
-    method: "GET",
+  const { data, error } = await supabase.functions.invoke("provider-intake-api", {
+    body: {
+      route: "test-connection",
+      provider,
+      storefront,
+    },
   });
 
-  if (!isJsonContentType(response)) {
-    throw apiUnavailableError();
-  }
+  const bodyErr = extractBodyError(data);
+  if (bodyErr) throw new Error(bodyErr);
+  if (error) throw edgeFunctionError(error);
 
-  const payload = (await response.json()) as {
-    data?: ProviderConnectionTestResult;
-  } & Partial<ProviderConnectionTestResult>;
-
-  return (payload.data ?? payload) as ProviderConnectionTestResult;
+  return data as ProviderConnectionTestResult;
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { AdminChartsPageHeader } from "../components/AdminChartsPageHeader";
@@ -7,10 +7,12 @@ import { AdminChartsStatusBadge } from "../components/AdminChartsStatusBadge";
 import { AdminChartsEmptyState } from "../components/AdminChartsEmptyState";
 import { AdminChartsLoadingState } from "../components/AdminChartsLoadingState";
 import { WkIcon } from "@/components/design-system/Icon";
-import { getChartFamilies, getChartEditionsForFamily } from "@/services/chartsPublic/client";
+import { getSupabaseChartFamilies, getSupabaseChartEditionsForFamily } from "@/services/chartsPublic/client";
 import type { ChartEdition, ChartFamily } from "@/services/chartsPublic/client";
 import { getAllV2Editions, refreshV2EditionStore } from "@/services/chartsIngestion/v2EditionStore";
 import type { V2Edition } from "@/services/chartsIngestion/commitTypes";
+import { reingestEdition } from "@/services/chartsIngestion/client";
+import type { ReingestEditionResult } from "@/services/chartsIngestion/client";
 
 // Augment with admin metadata (in production this comes from the backend)
 interface AdminEdition extends ChartEdition {
@@ -42,19 +44,60 @@ export default function AdminChartsEditions() {
   const [search, setSearch] = useState("");
   const [familyFilter, setFamilyFilter] = useState<string>("all");
   const [toastMsg, setToastMsg] = useState<string | null>(null);
-  const [dataSource, setDataSource] = useState<"mock" | "wordpress" | "cache">("mock");
+  const [dataSource, setDataSource] = useState<"database" | "cache">("database");
+
+  // ── Reingest state ──
+  const [reingestingId, setReingestingId] = useState<string | null>(null);
+  const [reingestResult, setReingestResult] = useState<ReingestEditionResult | null>(null);
+  const [reingestError, setReingestError] = useState<string | null>(null);
+  const [reingestDialogOpen, setReingestDialogOpen] = useState(false);
+  const [pendingReingestId, setPendingReingestId] = useState<string | null>(null);
+  const reingestRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (reingestRef.current && !reingestRef.current.contains(e.target as Node) && reingestDialogOpen) {
+        setReingestDialogOpen(false);
+      }
+    }
+    if (reingestDialogOpen) {
+      document.addEventListener("mousedown", handleClick);
+      return () => document.removeEventListener("mousedown", handleClick);
+    }
+  }, [reingestDialogOpen]);
+
+  async function handleReingest(editionId: string) {
+    setReingestDialogOpen(false);
+    setReingestingId(editionId);
+    setReingestError(null);
+    setReingestResult(null);
+    try {
+      const result = await reingestEdition({ editionId, dryRun: true });
+      setReingestResult(result);
+    } catch (err) {
+      setReingestError(err instanceof Error ? err.message : "Reingest failed");
+    } finally {
+      setReingestingId(null);
+    }
+  }
+
+  function openReingestDialog(editionId: string) {
+    setPendingReingestId(editionId);
+    setReingestError(null);
+    setReingestResult(null);
+    setReingestDialogOpen(true);
+  }
 
   useEffect(() => {
     async function load() {
-      const familiesResult = await getChartFamilies();
-      const allFamilies = familiesResult.data.families;
-      setFamilies(allFamilies);
-      setDataSource(familiesResult.meta.source);
+      const families = await getSupabaseChartFamilies();
+      setFamilies(families);
+      setDataSource("database");
 
       // Load editions for all families in parallel
-      const editionPromises = allFamilies.map((family) =>
-        getChartEditionsForFamily(family.familyKey)
-          .then((result) => result.data.map((e) => toAdminEdition(e, family)))
+      const editionPromises = families.map((family) =>
+        getSupabaseChartEditionsForFamily(family.familyKey)
+          .then((editions) => editions.map((e) => toAdminEdition(e, family)))
           .catch(() => [] as AdminEdition[])
       );
       const results = await Promise.all(editionPromises);
@@ -92,7 +135,7 @@ export default function AdminChartsEditions() {
     setTimeout(() => setToastMsg(null), 2000);
   };
 
-  if (loading) return <AdminChartsLoadingState message="Loading editions from public API…" />;
+  if (loading) return <AdminChartsLoadingState message="Loading editions from database…" />;
 
   return (
     <div className="space-y-6">
@@ -105,7 +148,7 @@ export default function AdminChartsEditions() {
       <AdminChartsPageHeader
         eyebrow="Published Charts"
         title="Chart Editions"
-        description="Committed chart outputs from all chart programs. Source: V2 public chart API."
+        description="Committed chart outputs from all chart programs. Source: live database."
       >
         <button
           onClick={() => navigate("/admin/charts/ingest")}
@@ -126,12 +169,11 @@ export default function AdminChartsEditions() {
       {/* Data source badge */}
       <div className="flex items-center gap-2">
         <div className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold ${
-          dataSource === "wordpress" ? "bg-wk-success-soft text-wk-success" :
-          dataSource === "cache" ? "bg-wk-info-soft text-wk-info" :
-          "bg-wk-warning-soft text-wk-warning"
+          dataSource === "database" ? "bg-wk-success-soft text-wk-success" :
+          "bg-wk-info-soft text-wk-info"
         }`}>
-          <WkIcon name={dataSource === "mock" ? "FlaskConical" : dataSource === "cache" ? "Database" : "Globe"} size={12} />
-          {dataSource === "mock" ? "Mock data" : dataSource === "cache" ? "Cached" : "Live WordPress"}
+          <WkIcon name={dataSource === "database" ? "Database" : "Database"} size={12} />
+          {dataSource === "database" ? "Live Database" : "Cached"}
         </div>
         <span className="text-[12px] text-wk-text-muted">
           {editions.length} editions loaded across {families.length} chart programs
@@ -278,6 +320,18 @@ export default function AdminChartsEditions() {
                           <WkIcon name="Link" size={14} />
                         </button>
                       )}
+                      <button
+                        onClick={() => openReingestDialog(edition.id)}
+                        disabled={reingestingId === edition.id}
+                        className="flex h-7 w-7 items-center justify-center rounded text-wk-warning hover:bg-wk-warning-soft transition-colors disabled:opacity-50"
+                        title="Re-process edition through registry resolution"
+                      >
+                        {reingestingId === edition.id ? (
+                          <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-wk-warning/30 border-t-wk-warning" />
+                        ) : (
+                          <WkIcon name="RefreshCw" size={14} />
+                        )}
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -290,9 +344,9 @@ export default function AdminChartsEditions() {
             {editions.length === 0 ? (
               <AdminChartsEmptyState
                 icon="Layers"
-                title="No editions loaded"
-                description="Editions are loaded from the V2 public chart API. Make sure the public JSON data is available."
-                action={{ label: "Open Public API QA", onClick: () => navigate("/admin/charts/public-api-qa"), icon: "FlaskConical" }}
+                title="No editions found"
+                description="No chart editions exist in the database yet. Create one from the Ingest Studio."
+                action={{ label: "Open Ingest Studio", onClick: () => navigate("/admin/charts/ingest"), icon: "FlaskConical" }}
               />
             ) : (
               <AdminChartsEmptyState
@@ -329,17 +383,85 @@ export default function AdminChartsEditions() {
           </div>
           <div className="mt-4 text-[12px] text-wk-text-muted">
             <strong className="text-wk-text">{totalEntries.toLocaleString()}</strong> total published entries across all programs.
-            Data sourced from the V2 public chart API — same data served to the public site.
-            Run{" "}
-            <button
-              onClick={() => navigate("/admin/charts/public-api-qa")}
-              className="font-semibold text-wk-brand hover:underline"
-            >
-              Public API QA
-            </button>
-            {" "}to verify endpoint health.
+            Data sourced directly from the database.
           </div>
         </WkSurface>
+      )}
+
+      {/* Reingest result panel */}
+      {(reingestResult || reingestError) && (
+        <div className={`rounded-lg border p-4 ${reingestResult ? "border-wk-success/20 bg-wk-success-soft" : "border-wk-danger/20 bg-wk-danger-soft"}`}>
+          <div className="flex items-start gap-3">
+            <WkIcon name={reingestResult ? "CheckCircle2" : "AlertCircle"} size={20} className={reingestResult ? "text-wk-success shrink-0 mt-0.5" : "text-wk-danger shrink-0 mt-0.5"} />
+            <div className="flex-1 min-w-0">
+              <p className={`text-[14px] font-bold mb-1 ${reingestResult ? "text-wk-success" : "text-wk-danger"}`}>
+                {reingestResult ? `Reingest ${reingestResult.dry_run ? "Preview" : "Complete"} — ${reingestResult.edition_slug}` : "Reingest Failed"}
+              </p>
+              {reingestResult ? (
+                <div className="text-[12px] text-wk-text grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1">
+                  <span>Tracks found: <strong className="text-wk-success">{reingestResult.stats.tracks_found}</strong></span>
+                  <span>Tracks created: <strong className="text-wk-brand">{reingestResult.stats.tracks_created}</strong></span>
+                  <span>Artists found: <strong className="text-wk-success">{reingestResult.stats.artists_found}</strong></span>
+                  <span>Artists created: <strong className="text-wk-brand">{reingestResult.stats.artists_created}</strong></span>
+                  <span>Links created: <strong>{reingestResult.stats.links_created}</strong></span>
+                  <span>Slugs fixed: <strong>{reingestResult.stats.artist_slugs_fixed}</strong></span>
+                  <span>Canonical IDs: <strong>{reingestResult.stats.canonical_ids_set}</strong></span>
+                  <span>Errors: <strong className={reingestResult.stats.errors > 0 ? "text-wk-danger" : ""}>{reingestResult.stats.errors}</strong></span>
+                </div>
+              ) : (
+                <p className="text-[12px] text-wk-danger/90">{reingestError}</p>
+              )}
+              {reingestResult?.repairs && reingestResult.repairs.length > 0 && (
+                <div className="mt-3 space-y-1 max-h-40 overflow-y-auto">
+                  <p className="text-[11px] font-semibold text-wk-text-muted">Repairs ({reingestResult.repairs.length}):</p>
+                  {reingestResult.repairs.slice(0, 6).map((r, i) => (
+                    <div key={i} className="text-[11px] text-wk-text-soft flex items-center gap-2">
+                      <span className="font-semibold">{r.track_title}</span>
+                      <span className="text-wk-text-faint">by</span>
+                      <span>{r.artist_name}</span>
+                      <span className="rounded bg-wk-surface-raised border border-wk-border px-1.5 py-0.5 text-[10px] font-mono ml-auto">{r.action}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <button
+                onClick={() => { setReingestResult(null); setReingestError(null); }}
+                className="mt-3 text-[11px] font-semibold text-wk-text-muted hover:text-wk-text transition-colors"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reingest confirm dialog */}
+      {reingestDialogOpen && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/50">
+          <div ref={reingestRef} className="w-full max-w-sm rounded-xl border border-wk-border bg-wk-surface p-6 shadow-lg">
+            <div className="flex items-center gap-2">
+              <WkIcon name="RefreshCw" size={18} className="text-wk-warning" />
+              <h3 className="text-[15px] font-bold text-wk-text">Reingest Edition</h3>
+            </div>
+            <p className="mt-2 text-[13px] text-wk-text-muted">
+              This will re-process this edition's entries through the registry. For each entry: it looks up existing registry tracks and artists, creates new ones where missing, links them up, and populates correct canonical IDs and slugs. Running as a dry run first.
+            </p>
+            <div className="mt-5 flex items-center justify-end gap-2">
+              <button
+                onClick={() => setReingestDialogOpen(false)}
+                className="inline-flex items-center gap-1.5 rounded-md border border-wk-border-2 bg-wk-surface px-4 py-2 text-[13px] font-semibold text-wk-text transition-colors hover:bg-wk-surface-raised whitespace-nowrap cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => pendingReingestId && handleReingest(pendingReingestId)}
+                className="inline-flex items-center gap-1.5 rounded-md bg-wk-warning px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:opacity-90 whitespace-nowrap cursor-pointer"
+              >
+                Run Dry Run
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

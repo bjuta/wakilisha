@@ -157,7 +157,7 @@ export default function LabelDetail() {
                   {sortedReleases.map((release) => (
                     <Link
                       key={release.slug}
-                      to={`/releases/${label.slug}/${release.slug}`}
+                      to={`/releases/${label.slug}--${release.slug}`}
                       className="group overflow-hidden rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] transition-all hover:border-[var(--wk-brand)]"
                     >
                       <div className="relative aspect-square bg-[var(--wk-surface-raised)]">

@@ -142,12 +142,13 @@ export default function MobileArtistDetail() {
           )}
 
           {hasReleases && (
-            <ArtistDiscography releases={artist.releases} />
+            <ArtistDiscography releases={artist.releases} artistName={artist.name} />
           )}
 
           {hasAppearances && (
             <ArtistDiscography
               releases={appearances}
+              artistName={artist.name}
               eyebrow="Appears On"
               title="Features & appearances"
               emptyTitle="No appearances"

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
+import { useScrollLock } from "@/hooks/useScrollLock";
 import type {
   CreateReleaseShellResult,
   IntakeSearchInput,
@@ -13,6 +14,7 @@ import {
   createReleaseShellFromProvider,
   attachProviderResultToShell,
   backfillExistingRelease,
+  refreshReleaseShell,
   testProviderConnection,
 } from "@/services/registry/provider-intake/client";
 import { ProviderSearchResults } from "./ProviderSearchResults";
@@ -40,6 +42,9 @@ const STOREFRONTS = [
 type EntityTypeFilter = "all" | "release" | "track" | "artist";
 
 export function ReleaseShellIntakeDrawer({ onClose, onShellCreated }: ReleaseShellIntakeDrawerProps) {
+  // Lock background scroll while drawer is open
+  useScrollLock(true);
+
   const [screen, setScreen] = useState<IntakeScreen>("search");
 
   // Search state
@@ -60,6 +65,10 @@ export function ReleaseShellIntakeDrawer({ onClose, onShellCreated }: ReleaseShe
   // Creation state
   const [creating, setCreating] = useState(false);
   const [createResult, setCreateResult] = useState<CreateReleaseShellResult | null>(null);
+  const [createError, setCreateError] = useState<string | null>(null);
+
+  // Last create attempt (for refresh fallback from search results card)
+  const [lastCreateAttempt, setLastCreateAttempt] = useState<ProviderSearchResult | null>(null);
 
   // Track selection state
   const [selectedTrackIds, setSelectedTrackIds] = useState<string[]>([]);
@@ -71,11 +80,42 @@ export function ReleaseShellIntakeDrawer({ onClose, onShellCreated }: ReleaseShe
   const [connectionError, setConnectionError] = useState<string | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
 
+  // Focus trap: when drawer opens, focus the search input after a short delay
   useEffect(() => {
     const timer = setTimeout(() => inputRef.current?.focus(), 100);
     return () => clearTimeout(timer);
   }, []);
+
+  // Keyboard: close on Escape, trap focus
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        onClose();
+        return;
+      }
+      // Basic focus trap: keep Tab cycling within the drawer
+      if (e.key === "Tab" && drawerRef.current) {
+        const focusable = drawerRef.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
 
   const handleSearch = useCallback(async () => {
     const q = searchQuery.trim();
@@ -113,7 +153,8 @@ export function ReleaseShellIntakeDrawer({ onClose, onShellCreated }: ReleaseShe
     setInspectError(null);
     setInspectSourceResult(result);
     setScreen("inspect");
-    setSelectedTrackIds([]); // Reset track selection on new inspect
+    setSelectedTrackIds([]);
+    setCreateError(null);
 
     try {
       const response = await inspectProviderEntity(
@@ -123,7 +164,6 @@ export function ReleaseShellIntakeDrawer({ onClose, onShellCreated }: ReleaseShe
         storefront,
       );
       setInspectedResult(response);
-      // Auto-select all tracks when inspecting a release
       if (response.detail.tracks.length > 0) {
         setSelectedTrackIds(response.detail.tracks.map((t) => t.providerEntityId));
       }
@@ -159,7 +199,9 @@ export function ReleaseShellIntakeDrawer({ onClose, onShellCreated }: ReleaseShe
       return;
     }
 
+    setLastCreateAttempt(source);
     setCreating(true);
+    setCreateError(null);
     try {
       const response = await createReleaseShellFromProvider({
         provider: source.provider,
@@ -173,7 +215,44 @@ export function ReleaseShellIntakeDrawer({ onClose, onShellCreated }: ReleaseShe
       setCreateResult(response);
       setScreen("done");
     } catch (err) {
-      setSearchError(err instanceof Error ? err.message : "Failed to create release shell.");
+      const message = err instanceof Error ? err.message : "Failed to create release shell.";
+      setCreateError(message);
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleRefreshShell = async (result?: ProviderSearchResult) => {
+    const source = result ?? inspectSourceResult ?? lastCreateAttempt;
+    if (!source) return;
+
+    if (source.providerEntityType === "artist") {
+      return;
+    }
+
+    // If we're refreshing from the search screen (not inspect), we don't have inspectSourceResult yet.
+    // We still need a source result for the success screen, so use the search result directly.
+    if (!inspectSourceResult) {
+      setInspectSourceResult(source);
+    }
+
+    setCreating(true);
+    setCreateError(null);
+    try {
+      const response = await refreshReleaseShell({
+        provider: source.provider,
+        providerEntityType: source.providerEntityType,
+        providerEntityId: source.providerEntityId,
+        storefrontOrMarket: storefront,
+        mode: "refresh_shell",
+        idempotencyKey: `${source.provider}:${source.providerEntityType}:${source.providerEntityId}:${storefront}:refresh_shell`,
+        selectedTrackIds,
+      });
+      setCreateResult(response);
+      setScreen("done");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to refresh release shell.";
+      setCreateError(message);
     } finally {
       setCreating(false);
     }
@@ -184,6 +263,7 @@ export function ReleaseShellIntakeDrawer({ onClose, onShellCreated }: ReleaseShe
     if (!source) return;
 
     setCreating(true);
+    setCreateError(null);
     try {
       const response = await attachProviderResultToShell({
         provider: source.provider,
@@ -197,7 +277,8 @@ export function ReleaseShellIntakeDrawer({ onClose, onShellCreated }: ReleaseShe
       setCreateResult(response);
       setScreen("done");
     } catch (err) {
-      setSearchError(err instanceof Error ? err.message : "Failed to attach provider result to shell.");
+      const message = err instanceof Error ? err.message : "Failed to attach provider result to shell.";
+      setCreateError(message);
     } finally {
       setCreating(false);
     }
@@ -208,6 +289,7 @@ export function ReleaseShellIntakeDrawer({ onClose, onShellCreated }: ReleaseShe
     if (!source) return;
 
     setCreating(true);
+    setCreateError(null);
     try {
       const response = await backfillExistingRelease({
         provider: source.provider,
@@ -222,7 +304,8 @@ export function ReleaseShellIntakeDrawer({ onClose, onShellCreated }: ReleaseShe
       setCreateResult(response);
       setScreen("done");
     } catch (err) {
-      setSearchError(err instanceof Error ? err.message : "Failed to backfill release.");
+      const message = err instanceof Error ? err.message : "Failed to backfill release.";
+      setCreateError(message);
     } finally {
       setCreating(false);
     }
@@ -257,21 +340,36 @@ export function ReleaseShellIntakeDrawer({ onClose, onShellCreated }: ReleaseShe
   const handleSearchAgain = () => {
     setScreen("search");
     setCreateResult(null);
+    setCreateError(null);
     setInspectedResult(null);
+    setInspectSourceResult(null);
+    setLastCreateAttempt(null);
     setSearchResults(null);
     setSearchQuery("");
     setTimeout(() => inputRef.current?.focus(), 100);
   };
 
-  const isProviderAvailable = provider === "apple_music"; // Spotify not configured
+  const isProviderAvailable = provider === "apple_music";
+
+  // Figure out which source to show on the done screen.
+  // inspectSourceResult is the rich source after inspect; lastCreateAttempt is the fallback
+  // when refresh was triggered directly from search results.
+  const doneScreenSource = inspectSourceResult ?? lastCreateAttempt;
 
   return (
-    <div className="fixed inset-0 z-50 flex" role="dialog" aria-modal="true" aria-label="Release Shell Intake">
+    <div
+      ref={drawerRef}
+      className="fixed inset-0 z-50 flex"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Release Shell Intake"
+    >
       {/* Backdrop */}
       <button
         className="absolute inset-0 bg-black/40 cursor-default"
         onClick={onClose}
         aria-label="Close intake drawer"
+        ref={closeButtonRef}
       />
 
       {/* Drawer */}
@@ -301,7 +399,6 @@ export function ReleaseShellIntakeDrawer({ onClose, onShellCreated }: ReleaseShe
         {screen !== "done" && (
           <div className="border-b border-[#dfe4d8] bg-white px-6 py-4">
             <div className="grid gap-3 sm:grid-cols-[1fr_auto_auto]">
-              {/* Search input */}
               <div className="relative">
                 <WkIcon name="Search" size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#b8bfb2]" />
                 <input
@@ -316,7 +413,6 @@ export function ReleaseShellIntakeDrawer({ onClose, onShellCreated }: ReleaseShe
                 />
               </div>
 
-              {/* Storefront selector */}
               <select
                 value={storefront}
                 onChange={(e) => setStorefront(e.target.value)}
@@ -327,7 +423,6 @@ export function ReleaseShellIntakeDrawer({ onClose, onShellCreated }: ReleaseShe
                 ))}
               </select>
 
-              {/* Search button */}
               <button
                 onClick={handleSearch}
                 disabled={searching || !searchQuery.trim() || !isProviderAvailable}
@@ -341,7 +436,6 @@ export function ReleaseShellIntakeDrawer({ onClose, onShellCreated }: ReleaseShe
               </button>
             </div>
 
-            {/* Entity type filter */}
             <div className="mt-3 flex flex-wrap gap-1.5">
               {(["all", "release", "track", "artist"] as EntityTypeFilter[]).map((type) => (
                 <button
@@ -358,7 +452,6 @@ export function ReleaseShellIntakeDrawer({ onClose, onShellCreated }: ReleaseShe
               ))}
             </div>
 
-            {/* Provider status */}
             <div className="mt-3 flex items-center gap-3">
               <div className="flex items-center gap-1.5">
                 <span className={`h-1.5 w-1.5 rounded-full ${
@@ -400,10 +493,10 @@ export function ReleaseShellIntakeDrawer({ onClose, onShellCreated }: ReleaseShe
         {/* Content area */}
         <div className="flex-1 overflow-y-auto px-6 py-5">
           {/* Done screen */}
-          {screen === "done" && createResult && inspectSourceResult && (
+          {screen === "done" && createResult && doneScreenSource && (
             <IntakeResultSummary
               result={createResult}
-              sourceResult={inspectSourceResult}
+              sourceResult={doneScreenSource}
               onOpenShell={handleOpenShell}
               onSearchAgain={handleSearchAgain}
             />
@@ -432,12 +525,24 @@ export function ReleaseShellIntakeDrawer({ onClose, onShellCreated }: ReleaseShe
                   </div>
                 </div>
               )}
+              {createError && (
+                <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 p-4">
+                  <div className="flex items-start gap-3">
+                    <WkIcon name="AlertTriangle" size={18} className="shrink-0 text-red-700" />
+                    <div>
+                      <p className="text-[13px] font-bold text-red-800">Create failed</p>
+                      <p className="mt-0.5 text-[12px] text-red-700">{createError}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
               {!inspecting && !inspectError && inspectedResult && (
                 <ProviderResultInspector
                   inspected={inspectedResult}
                   onCreateShell={() => handleCreateShell()}
                   onAttachToShell={handleAttachToShell}
                   onBackfillRelease={handleBackfillRelease}
+                  onRefreshShell={() => handleRefreshShell()}
                   onBack={() => setScreen("search")}
                   isCreating={creating}
                   selectedTrackIds={selectedTrackIds}
@@ -452,7 +557,6 @@ export function ReleaseShellIntakeDrawer({ onClose, onShellCreated }: ReleaseShe
           {/* Search screen */}
           {screen === "search" && (
             <>
-              {/* Searching loader */}
               {searching && (
                 <div className="flex flex-col items-center justify-center gap-3 py-16">
                   <WkIcon name="Loader2" size={28} className="animate-spin text-[#5f8f2f]" />
@@ -461,7 +565,6 @@ export function ReleaseShellIntakeDrawer({ onClose, onShellCreated }: ReleaseShe
                 </div>
               )}
 
-              {/* Search error */}
               {searchError && !searching && (
                 <div className="rounded-2xl border border-red-200 bg-red-50 p-5">
                   <div className="flex items-start gap-3">
@@ -480,7 +583,31 @@ export function ReleaseShellIntakeDrawer({ onClose, onShellCreated }: ReleaseShe
                 </div>
               )}
 
-              {/* Results */}
+              {createError && !searching && (
+                <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 p-4">
+                  <div className="flex items-start gap-3">
+                    <WkIcon name="AlertTriangle" size={18} className="shrink-0 text-red-700" />
+                    <div className="flex-1">
+                      <p className="text-[13px] font-bold text-red-800">Create failed</p>
+                      <p className="mt-0.5 text-[12px] text-red-700">{createError}</p>
+                      {createError.toLowerCase().includes("already exists") && lastCreateAttempt && (
+                        <button
+                          onClick={() => handleRefreshShell(lastCreateAttempt)}
+                          disabled={creating}
+                          className="mt-2 flex items-center gap-1.5 rounded-xl bg-[#4a7a9e] px-3 py-1.5 text-[11px] font-bold text-white hover:bg-[#3a6080] disabled:opacity-50 whitespace-nowrap"
+                        >
+                          {creating ? (
+                            <><WkIcon name="Loader2" size={12} className="animate-spin" /> Refreshing…</>
+                          ) : (
+                            <><WkIcon name="RefreshCw" size={12} /> Refresh shell instead</>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {searchResults && !searching && !searchError && (
                 <ProviderSearchResults
                   response={searchResults}
@@ -494,8 +621,7 @@ export function ReleaseShellIntakeDrawer({ onClose, onShellCreated }: ReleaseShe
                 />
               )}
 
-              {/* Empty state — no search yet */}
-              {!searchResults && !searching && !searchError && (
+              {!searchResults && !searching && !searchError && !createError && (
                 <div className="flex flex-col items-center gap-4 py-16 text-center">
                   <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#f0f3ec]">
                     <WkIcon name="Music2" size={28} className="text-[#97a290]" />

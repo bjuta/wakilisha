@@ -16,7 +16,8 @@ export function IntakeResultSummary({
 }: IntakeResultSummaryProps) {
   const { writes, skipped, shell } = result;
   const totalSkipped = skipped.length;
-  const isNewShell = writes.lifecycleEvents > 0;
+  const isNewShell = result.mode === "create";
+  const isRefresh = result.mode === "refresh";
 
   return (
     <div className="flex flex-col items-center gap-6 px-4 py-8 text-center">
@@ -26,10 +27,12 @@ export function IntakeResultSummary({
 
       <div>
         <h2 className="text-[18px] font-black text-[#171712]">
-          {isNewShell ? "Release shell created" : "Provider data attached"}
+          {isRefresh ? "Shell refreshed" : isNewShell ? "Release shell created" : "Provider data attached"}
         </h2>
         <p className="mt-1 text-[13px] text-[#697062]">
-          {isNewShell
+          {isRefresh
+            ? `Release shell refreshed with fresh Apple Music data. Slug and URL preserved.`
+            : isNewShell
             ? `Release shell created from Apple Music ${sourceResult.providerEntityType}.`
             : `Provider data attached to existing shell.`}
         </p>

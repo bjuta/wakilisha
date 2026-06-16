@@ -10,13 +10,18 @@ import ReleaseMetadata from "./components/ReleaseMetadata";
 import ReleaseExcerpt from "./components/ReleaseExcerpt";
 
 export default function ReleaseDetail() {
-  const { artistSlug, releaseSlug } = useParams<{ artistSlug: string; releaseSlug: string }>();
+  const { slug } = useParams<{ slug: string }>();
   const [release, setRelease] = useState<RepairedReleaseDetail | null>(null);
   const [related, setRelated] = useState<RepairedRelease[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [error, setError] = useState<string | null>(null);
 
   const { ref: artistRef, revealed: artistRevealed } = useScrollReveal<HTMLDivElement>(0.1);
+
+  // Parse combined slug: artistSlug--releaseSlug
+  const parts = (slug || "").split("--");
+  const artistSlug = parts[0] || "";
+  const releaseSlug = parts.slice(1).join("--") || "";
 
   const load = useCallback(async () => {
     if (!artistSlug || !releaseSlug) {

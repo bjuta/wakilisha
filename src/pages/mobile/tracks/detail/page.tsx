@@ -2,9 +2,10 @@ import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { usePlayer } from "@/context/PlayerContext";
 import { getTrack, type RepairedTrackDetail } from "@/services/repaired/client";
+import { buildTrackSummaryFromApi } from "@/services/registryNlg";
 import { TrackChartHistorySection } from "@/components/charts/TrackChartHistory";
-import { SyncedLyricsDisplay } from "@/components/lyrics/SyncedLyricsDisplay";
-import { WkIcon } from "@/components/design-system/Icon";
+
+/* ─── Types ─── */
 
 type TrackChartAppearance = {
   editionSlug?: string;
@@ -20,10 +21,11 @@ type TrackViewModel = {
   title: string;
   artist: string;
   artistSlug: string;
+  artists: Array<{ name: string; slug: string; isPrimary: boolean; isFeatured: boolean; creditOrder: number; role: string }>;
   genre: string;
+  genreSlug: string;
   label: string;
   labelSlug: string;
-  genreSlug: string;
   rank: number;
   peakPosition: number;
   weeksOnChart: number;
@@ -32,34 +34,55 @@ type TrackViewModel = {
   previousWeek: number | null;
   artworkUrl: string;
   duration: number;
-  streamCount: string | null;
   releaseYear: string;
-  source: string;
+  releaseDate: string;
   isPlayable: boolean;
+  previewUrl: string | null;
   albumTitle: string;
-  credits: Array<{ role: string; name: string }>;
+  albumSlug: string;
+  albumTrackNumber: number;
+  albumTotalTracks: number;
   chartHistory: number[];
   chartAppearances: TrackChartAppearance[];
   chartAppearanceCount: number;
-  streamingLinks: Array<{ platform: string; url: string }>;
   lyrics: string | null;
   lyricsContributor: { name: string; source?: string } | null;
   artistImage: string;
+  isrc: string | null;
+  explicit: boolean;
+  isStandalone: boolean;
+  firstChartedDate: string;
+  editionLabels: string[];
+  sourceProviders: string[];
 };
+
+/* ─── ViewModel builder ─── */
 
 function apiToViewModel(api: RepairedTrackDetail): TrackViewModel {
   const raw = api as any;
   const trackData = raw.track ?? raw;
-  const metadata = trackData.metadata ?? {};
   const artistData = raw.artist ?? {};
   const releaseData = raw.release ?? trackData.release ?? null;
   const labelData = raw.label ?? null;
-  const artistName = artistData.name || metadata.artist_name || metadata.artist || "WAKILISHA Registry";
-  const resolvedArtistSlug = artistData.slug || metadata.artistSlug || metadata.artist_slug || "";
+
+  const artistsArr: TrackViewModel["artists"] = Array.isArray(raw.artists) && raw.artists.length > 0
+    ? raw.artists.map((a: any) => ({
+        name: a.name || a.artist_name_text || "",
+        slug: a.slug || a.artist_slug || "",
+        isPrimary: Boolean(a.isPrimary ?? a.is_primary),
+        isFeatured: Boolean(a.isFeatured ?? a.is_featured),
+        creditOrder: Number(a.creditOrder ?? a.credit_order ?? 0),
+        role: a.role || "primary",
+      }))
+    : [];
+
+  const primaryArtist = artistsArr.find((a) => a.isPrimary) || artistsArr[0];
+  const artistName = primaryArtist?.name || artistData.name || "WAKILISHA Registry";
+  const resolvedArtistSlug = primaryArtist?.slug || artistData.slug || "";
+
   const history = Array.isArray(raw.chartHistory) ? raw.chartHistory : [];
   const chartAppearances = Array.isArray(raw.chartAppearances) ? raw.chartAppearances : [];
-  const chartAppearanceCount = Number(raw.chartAppearanceCount ?? chartAppearances.length ?? 0);
-  const currentRank = raw.currentRank ?? metadata.topChartPosition ?? 0;
+  const currentRank = raw.currentRank ?? 0;
   const prevRank = raw.previousRank ?? (history.length > 1 ? history[history.length - 2] : 0);
 
   const rawMovement = String(raw.movement || "").toLowerCase();
@@ -67,55 +90,61 @@ function apiToViewModel(api: RepairedTrackDetail): TrackViewModel {
     ? (rawMovement as TrackViewModel["movement"])
     : "same";
   let movementAmount = Number(raw.movementAmount ?? 0) || 0;
-
   if (!rawMovement) {
     if (!prevRank || prevRank <= 0) movement = "new";
     else if (currentRank > 0 && currentRank < prevRank) { movement = "up"; movementAmount = prevRank - currentRank; }
     else if (currentRank > 0 && currentRank > prevRank) { movement = "down"; movementAmount = currentRank - prevRank; }
   }
 
-  const primaryGenre = api.genres && api.genres.length > 0 ? api.genres[0].name : "Unknown";
+  const primaryGenre = api.genres && api.genres.length > 0 ? api.genres[0].name : "";
   const primaryGenreSlug = api.genres && api.genres.length > 0 ? api.genres[0].slug : "";
   const duration = trackData.durationMs ? Math.round(trackData.durationMs / 1000) : (trackData.duration || 0);
   const artworkUrl = trackData.artworkUrl || releaseData?.artworkUrl || artistData?.imageUrl || "";
+  const previewUrl: string | null = api.previewUrl || (trackData as any).previewUrl || null;
+  const albumTitle = releaseData?.title || "";
+  const rawAlbumSlug = releaseData?.slug || "";
+  const albumSlug = rawAlbumSlug.includes('--') ? rawAlbumSlug : (rawAlbumSlug ? `${resolvedArtistSlug}--${rawAlbumSlug}` : "");
+  const albumTrackNumber = trackData.trackNumber || trackData.track_number || 0;
+  const albumTotalTracks = releaseData?.trackCount || 0;
+  const releaseFullDate = releaseData?.releaseDate || "";
 
   return {
     slug: trackData.slug,
     title: trackData.title,
     artist: artistName,
     artistSlug: resolvedArtistSlug,
+    artists: artistsArr,
     genre: primaryGenre,
     genreSlug: primaryGenreSlug,
-    label: labelData?.name || metadata.label_name || "Unknown",
-    labelSlug: labelData?.slug || "",
+    label: labelData?.name || releaseData?.labelName || "",
+    labelSlug: labelData?.slug || releaseData?.labelSlug || "",
     rank: currentRank,
-    peakPosition: raw.peakRank ?? metadata.topChartPosition ?? currentRank,
-    weeksOnChart: raw.weeksOnChart ?? metadata.chartCount ?? history.length ?? 0,
-    movement,
-    movementAmount,
+    peakPosition: raw.peakRank ?? currentRank,
+    weeksOnChart: raw.weeksOnChart ?? history.length ?? 0,
+    movement, movementAmount,
     previousWeek: prevRank > 0 ? prevRank : null,
-    artworkUrl,
-    duration,
-    streamCount: null,
-    releaseYear: releaseData?.releaseDate ? releaseData.releaseDate.split("-")[0] : String(metadata.release_date || "").slice(0, 4),
-    source: "WAKILISHA Registry",
-    isPlayable: false,
-    albumTitle: releaseData?.title || "",
-    credits: [],
+    artworkUrl, duration,
+    releaseYear: releaseFullDate ? releaseFullDate.split("-")[0] : "",
+    releaseDate: releaseFullDate,
+    isPlayable: !!previewUrl,
+    previewUrl,
+    albumTitle, albumSlug, albumTrackNumber, albumTotalTracks,
     chartHistory: history,
     chartAppearances,
-    chartAppearanceCount,
-    streamingLinks: [],
+    chartAppearanceCount: Number(raw.chartAppearanceCount ?? chartAppearances.length ?? 0),
     lyrics: null,
     lyricsContributor: null,
     artistImage: artistData.imageUrl || "",
+    isrc: trackData.isrc || null,
+    explicit: Boolean(trackData.explicit),
+    isStandalone: !releaseData,
+    firstChartedDate: raw.firstChartedDate || "",
+    editionLabels: Array.isArray(raw.editionLabels) ? raw.editionLabels : [],
+    sourceProviders: Array.isArray(raw.sourceProviders) ? raw.sourceProviders : [],
   };
 }
 
-function getTimedLyrics(_trackSlug: string): any { return undefined; }
-
-const TABS = ["Overview", "Chart stats", "Lyrics", "Credits"] as const;
-type Tab = (typeof TABS)[number];
+/* ─── Helpers ─── */
 
 function formatDuration(seconds: number): string {
   if (!seconds || seconds <= 0) return "";
@@ -124,96 +153,100 @@ function formatDuration(seconds: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-function MovementBadge({ movement, amount }: { movement?: string; amount?: number }) {
-  if (movement === "new") return <span className="rounded bg-[var(--wk-brand-soft)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[var(--wk-brand)]">New</span>;
-  if (movement === "up") return <span className="flex items-center gap-0.5 text-[12px] font-bold text-[var(--wk-brand)]"><WkIcon name="ArrowUp" size={13} /> {amount}</span>;
-  if (movement === "down") return <span className="flex items-center gap-0.5 text-[12px] font-bold text-[var(--wk-danger)]"><WkIcon name="ArrowDown" size={13} /> {amount}</span>;
-  return <span className="text-[12px] text-[var(--wk-text-faint)]">—</span>;
+function formatDate(dateStr: string): string {
+  if (!dateStr) return "";
+  try {
+    const d = new Date(dateStr);
+    if (Number.isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+  } catch { return dateStr; }
 }
 
-function ChartSparklineMobile({ data }: { data: number[] }) {
-  if (!data || data.length < 2) return null;
-  const max = Math.max(...data);
-  const min = Math.min(...data);
-  const range = max - min || 1;
-  const w = 300;
-  const h = 64;
-  const padX = 4;
-  const padY = 6;
-  const step = (w - padX * 2) / (data.length - 1);
-  const points = data.map((val, i) => {
-    const x = padX + i * step;
-    const y = h - padY - ((val - min) / range) * (h - padY * 2);
-    return `${x},${y}`;
-  });
-  const path = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p}`).join(" ");
-  const areaPath = `${path} L ${points[points.length - 1].split(",")[0]},${h} L ${points[0].split(",")[0]},${h} Z`;
+function humanList(items: string[]): string {
+  if (items.length === 0) return "";
+  if (items.length === 1) return items[0];
+  if (items.length === 2) return `${items[0]} and ${items[1]}`;
+  return `${items.slice(0, -1).join(", ")}, and ${items[items.length - 1]}`;
+}
+
+/* ─── Mobile Curator's Note ─── */
+
+function MobileCuratorsNote({ apiData }: { apiData: RepairedTrackDetail }) {
+  const { artists = [], release, genres, chartHistory, peakRank, weeksOnChart, firstChartedDate, editionLabels, sourceProviders } = apiData;
+
+  const artistsForNlg = artists.map((a) => ({
+    name: a.name, slug: a.slug, isPrimary: a.isPrimary, isFeatured: a.isFeatured, creditOrder: a.creditOrder,
+  }));
+
+  const releaseForNlg = release ? {
+    title: release.title, slug: release.slug, releaseDate: release.releaseDate,
+    releaseType: release.releaseType, trackCount: release.trackCount,
+    labelName: release.labelName, labelSlug: release.labelSlug,
+  } : null;
+
+  const chartCtx = (peakRank && peakRank > 0) || weeksOnChart > 0 ? {
+    peakRank: peakRank || 0, weeksOnChart,
+    firstChartedDate: firstChartedDate || "",
+    appearances: chartHistory.length,
+    editionLabels: editionLabels || [],
+  } : null;
+
+  const summary = buildTrackSummaryFromApi(
+    {
+      title: apiData.track.title,
+      durationMs: apiData.track.durationMs,
+      isrc: apiData.track.isrc,
+      explicit: apiData.track.explicit,
+      trackNumber: apiData.track.trackNumber,
+      previewUrl: (apiData.track as any).previewUrl,
+    },
+    artistsForNlg, releaseForNlg,
+    genres.map((g) => g.name),
+    chartCtx, sourceProviders || [],
+  );
+
+  if (!summary) return null;
+
+  const firstChar = summary.charAt(0);
+  const rest = summary.slice(1);
+
   return (
-    <div className="w-full">
-      <svg viewBox={`0 0 ${w} ${h}`} className="h-[64px] w-full" preserveAspectRatio="none">
-        <defs>
-          <linearGradient id="sparkFillMob" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--wk-brand)" stopOpacity="0.2" />
-            <stop offset="100%" stopColor="var(--wk-brand)" stopOpacity="0" />
-          </linearGradient>
-        </defs>
-        <path d={areaPath} fill="url(#sparkFillMob)" />
-        <path d={path} fill="none" stroke="var(--wk-brand)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-      <div className="mt-1 flex items-center justify-between text-[9px] text-[var(--wk-text-faint)]"><span>Week {data.length} ago</span><span>Current</span></div>
+    <div>
+      <p className="text-[15px] leading-[1.8] text-[var(--wk-text-soft)]">
+        <span className="float-left mr-2 font-black leading-[0.75] text-[var(--wk-brand)]" style={{ fontSize: "50px", marginTop: "0.02em" }}>
+          {firstChar}
+        </span>
+        <span>{rest}</span>
+      </p>
+      <div className="mt-4 pt-3 border-t border-[var(--wk-divider)]">
+        <p className="text-[10px] text-[var(--wk-text-faint)] italic leading-relaxed">
+          Generated from the WAKILISHA relationship graph. A deterministic summary drawn from connected registry data.
+        </p>
+      </div>
     </div>
   );
 }
 
-function StreamingBadge({ platform }: { platform: string }) {
-  const iconMap: Record<string, string> = {
-    Spotify: "Radio",
-    "Apple Music": "Music2",
-    YouTube: "Youtube",
-    Tidal: "AudioWaveform",
-    Deezer: "Music2",
-    Audiomack: "Headphones",
-    Boomplay: "PlayCircle",
-  };
-  const colorMap: Record<string, string> = {
-    Spotify: "#1DB954",
-    "Apple Music": "#FA243C",
-    YouTube: "#FF0000",
-    Tidal: "var(--wk-text)",
-    Deezer: "#EF5466",
-    Audiomack: "#FF8A00",
-    Boomplay: "#E91E63",
-  };
-  return (
-    <span className="inline-flex items-center gap-1 rounded-full border border-[var(--wk-border)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--wk-text)]">
-      <WkIcon name={iconMap[platform] || "Music2"} size={13} style={{ color: colorMap[platform] || "var(--wk-brand)" }} />
-      {platform}
-    </span>
-  );
-}
+/* ─── Main Page ─── */
 
 export default function MobileTrackDetail() {
-  const { artistSlug, slug } = useParams<{ slug: string }>();
+  const { slug } = useParams<{ slug: string }>();
   const { playTrack, currentTrack, isPlaying, togglePlay } = usePlayer();
-  const [activeTab, setActiveTab] = useState<Tab>("Overview");
-  const [copied, setCopied] = useState(false);
   const [track, setTrack] = useState<TrackViewModel | null>(null);
+  const [rawData, setRawData] = useState<RepairedTrackDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     let alive = true;
     if (!slug) { setLoading(false); setError("No track slug provided"); return; }
-    setLoading(true);
-    setError(null);
-    getTrack(slug, artistSlug)
+    setLoading(true); setError(null);
+    getTrack(slug)
       .then((apiData) => {
         if (!alive) return;
-        if (!apiData) {
-          setError("Track not found in the registry.");
-          setLoading(false);
-          return;
-        }
+        if (!apiData) { setError("Track not found in the registry."); setLoading(false); return; }
+        setRawData(apiData);
         setTrack(apiToViewModel(apiData));
         setLoading(false);
       })
@@ -223,14 +256,14 @@ export default function MobileTrackDetail() {
         setLoading(false);
       });
     return () => { alive = false; };
-  }, [artistSlug, slug]);
+  }, [slug]);
 
   if (loading) {
     return (
-      <div className="wk-mobile-v5 flex min-h-screen items-center justify-center">
-        <div className="text-center">
-          <div className="mx-auto mb-3 h-14 w-14 rounded-xl bg-[var(--wk-surface-raised)] animate-pulse" />
-          <p className="text-[14px] font-semibold text-[var(--wk-text-muted)]">Loading track...</p>
+      <div className="min-h-screen bg-[var(--wk-bg)] flex items-center justify-center">
+        <div className="text-center space-y-3">
+          <div className="mx-auto h-16 w-16 rounded-xl bg-[var(--wk-surface-raised)] animate-pulse" />
+          <p className="text-[14px] font-semibold text-[var(--wk-text-muted)]">Opening registry file&hellip;</p>
         </div>
       </div>
     );
@@ -238,10 +271,15 @@ export default function MobileTrackDetail() {
 
   if (error || !track) {
     return (
-      <div className="wk-mobile-v5 px-5 py-20 text-center">
-        <WkIcon name="Music2" size={38} className="mx-auto mb-3 text-[var(--wk-text-faint)]" />
-        <p className="text-[var(--wk-text-muted)]">{error || "Track not found"}</p>
-        <Link to="/charts" className="mt-4 inline-block text-[14px] font-bold text-[var(--wk-brand)]">Back to charts</Link>
+      <div className="min-h-screen bg-[var(--wk-bg)] px-5 py-20 text-center">
+        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[var(--wk-surface-raised)]">
+          <i className="ri-file-music-line text-[var(--wk-text-faint)] text-[28px]" />
+        </div>
+        <h1 className="mb-2 text-[22px] font-black text-[var(--wk-text)]">Not in the registry</h1>
+        <p className="mb-6 text-[14px] text-[var(--wk-text-muted)]">{error || "This recording has not yet been catalogued."}</p>
+        <Link to="/charts" className="inline-flex items-center gap-2 rounded-full bg-[var(--wk-brand)] px-5 py-2.5 text-[13px] font-extrabold text-[var(--wk-brand-on)] whitespace-nowrap">
+          <i className="ri-bar-chart-2-line" /> Browse charts
+        </Link>
       </div>
     );
   }
@@ -253,8 +291,8 @@ export default function MobileTrackDetail() {
     if (!track.isPlayable) return;
     if (isCurrentTrack) { togglePlay(); return; }
     playTrack(
-      { id: track.slug, title: track.title, artist: track.artist, artworkUrl: track.artworkUrl, isPlayable: track.isPlayable, source: track.source, duration: track.duration },
-      [track].filter((t) => t.isPlayable).map((t) => ({ id: t.slug, title: t.title, artist: t.artist, artworkUrl: t.artworkUrl, isPlayable: t.isPlayable, source: t.source, duration: t.duration }))
+      { id: track.slug, title: track.title, artist: track.artist, artworkUrl: track.artworkUrl, isPlayable: track.isPlayable, source: "WAKILISHA Registry", duration: track.duration, previewUrl: track.previewUrl || undefined },
+      [track].filter((t) => t.isPlayable).map((t) => ({ id: t.slug, title: t.title, artist: t.artist, artworkUrl: t.artworkUrl, isPlayable: t.isPlayable, source: "WAKILISHA Registry", duration: t.duration, previewUrl: t.previewUrl || undefined }))
     );
   };
 
@@ -265,229 +303,306 @@ export default function MobileTrackDetail() {
   };
 
   return (
-    <div className="wk-mobile-v5 min-h-screen">
-      <section className="relative flex min-h-[300px] items-end overflow-hidden">
-        {track.artworkUrl && <><div className="absolute inset-0" style={{ backgroundImage: `url(${track.artworkUrl})`, backgroundSize: "cover", backgroundPosition: "center" }} /><div className="absolute inset-0 bg-gradient-to-t from-[var(--wk-bg)] via-[var(--wk-bg)]/70 to-[var(--wk-bg)]/30" /></>}
-        <div className="relative w-full px-5 pb-6 pt-16">
-          <div className="mb-2 flex items-center gap-2">
-            <Link to="/charts" className="flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-[0.22em] text-[var(--wk-brand)]"><span className="h-px w-5 bg-[var(--wk-brand)]" />Charts</Link>
-            {track.rank > 0 && <span className="rounded-full bg-[var(--wk-brand-soft)] px-2 py-0.5 text-[9px] font-bold uppercase text-[var(--wk-brand)]">#{track.rank}</span>}
-            {track.movement === "new" && <span className="rounded-full bg-[var(--wk-brand)] px-2 py-0.5 text-[9px] font-bold uppercase text-[var(--wk-brand-on)]">New Entry</span>}
-          </div>
-          <h1 className="font-black leading-[0.92] tracking-[-0.04em] text-[var(--wk-text)]" style={{ fontSize: "clamp(28px, 9vw, 44px)" }}>{track.title}</h1>
-          <div className="mt-2 flex flex-wrap items-center gap-2 text-[13px] text-[var(--wk-text-muted)]">
-            {track.artistSlug ? (
-              <Link to={`/artists/${track.artistSlug}`} className="font-semibold text-[var(--wk-text-soft)] hover:text-[var(--wk-brand)]">{track.artist}</Link>
-            ) : (
-              <span className="font-semibold text-[var(--wk-text-soft)]">{track.artist}</span>
+    <div className="min-h-screen bg-[var(--wk-bg)]">
+      {/* ── Hero ── */}
+      <section className="relative overflow-hidden" style={{ minHeight: "340px" }}>
+        {track.artworkUrl ? (
+          <div
+            className="absolute inset-0"
+            style={{ backgroundImage: `url(${track.artworkUrl})`, backgroundSize: "cover", backgroundPosition: "center 30%" }}
+          />
+        ) : (
+          <div className="absolute inset-0 bg-[var(--wk-surface-raised)]" />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/98 via-black/50 to-black/15" />
+
+        {/* Top bar */}
+        <div className="absolute top-0 left-0 right-0 z-10 px-4 py-4 flex items-center justify-between">
+          <Link to="/charts" className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/20 backdrop-blur-md px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.14em] text-white/80 whitespace-nowrap">
+            <i className="ri-arrow-left-line text-[11px]" /> Charts
+          </Link>
+          <button onClick={handleShare} className="h-8 w-8 flex items-center justify-center rounded-full border border-white/15 bg-black/20 backdrop-blur-md text-white/80">
+            <i className={`${copied ? "ri-check-line text-[var(--wk-success)]" : "ri-share-line"} text-[13px]`} />
+          </button>
+        </div>
+
+        {/* Bottom content */}
+        <div className="absolute bottom-0 left-0 right-0 z-10 px-5 pb-6">
+          <div className="mb-3 flex items-center gap-2">
+            <div className="flex items-center gap-1.5 rounded-full border border-white/15 bg-black/25 backdrop-blur-md px-2.5 py-1">
+              <span className="w-1 h-1 rounded-full bg-[var(--wk-brand)]" />
+              <span className="text-[8px] font-extrabold uppercase tracking-[0.2em] text-[var(--wk-brand)]">Registry File</span>
+            </div>
+            {track.rank > 0 && (
+              <span className="rounded-full border border-white/20 bg-black/25 backdrop-blur-md px-2.5 py-1 text-[10px] font-extrabold text-white/80">
+                #{track.rank}
+              </span>
             )}
-            {track.genre && track.genre !== "Unknown" && <><span>·</span><Link to={`/genres/${track.genreSlug}`} className="hover:text-[var(--wk-brand)]">{track.genre}</Link></>}
-            {track.label && track.label !== "Unknown" && <><span>·</span><Link to={`/labels/${track.labelSlug}`} className="hover:text-[var(--wk-brand)]">{track.label}</Link></>}
+            {track.movement === "new" && (
+              <span className="rounded-full bg-[var(--wk-brand)]/20 border border-[var(--wk-brand)]/30 px-2.5 py-1 text-[9px] font-extrabold uppercase tracking-[0.1em] text-[var(--wk-brand)]">
+                New
+              </span>
+            )}
           </div>
-          <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] text-[var(--wk-text-muted)]">
-            {track.streamCount && <span className="inline-flex items-center gap-1"><WkIcon name="Headphones" size={13} className="text-[var(--wk-brand)]" />{track.streamCount}</span>}
-            {track.duration > 0 && <span className="inline-flex items-center gap-1"><WkIcon name="Clock3" size={13} />{formatDuration(track.duration)}</span>}
-            {track.peakPosition > 0 && <span className="inline-flex items-center gap-1"><WkIcon name="Trophy" size={13} className="text-[var(--wk-brand)]" />Peak #{track.peakPosition}</span>}
-            {track.releaseYear && <span className="inline-flex items-center gap-1"><WkIcon name="Calendar" size={13} />{track.releaseYear}</span>}
+          <h1 className="font-black leading-[0.88] tracking-[-0.04em] text-white mb-2" style={{ fontSize: "clamp(28px, 8vw, 48px)" }}>
+            {track.title}
+          </h1>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            {track.artists.length > 0 ? (
+              track.artists.map((a, i) => (
+                <span key={a.slug || i} className="flex items-center gap-1">
+                  {i > 0 && !a.isFeatured && <span className="text-white/25 text-[11px]">·</span>}
+                  {a.slug ? (
+                    <Link to={`/artists/${a.slug}`} className="text-[14px] font-semibold text-white/70 hover:text-white transition-colors">
+                      {a.isPrimary && <span className="inline-block w-1 h-1 rounded-full bg-[var(--wk-brand)] mr-1 align-middle opacity-70" />}
+                      {a.name}
+                    </Link>
+                  ) : (
+                    <span className="text-[14px] font-semibold text-white/70">{a.name}</span>
+                  )}
+                  {a.isFeatured && <span className="text-[9px] font-extrabold uppercase tracking-[0.1em] text-white/30 ml-0.5">feat.</span>}
+                </span>
+              ))
+            ) : (
+              track.artistSlug ? (
+                <Link to={`/artists/${track.artistSlug}`} className="text-[14px] font-semibold text-white/70 hover:text-white">{track.artist}</Link>
+              ) : (
+                <span className="text-[14px] font-semibold text-white/70">{track.artist}</span>
+              )
+            )}
           </div>
         </div>
       </section>
 
-      <div className="flex gap-3 px-5 py-4">
-        <button onClick={handlePlay} disabled={!track.isPlayable} className="mobile-pressable flex h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-[var(--wk-brand)] text-[14px] font-bold text-[var(--wk-brand-on)] disabled:cursor-not-allowed disabled:opacity-40">
-          <WkIcon name={isTrackPlaying ? "Pause" : "Play"} size={16} />{isTrackPlaying ? "Pause" : track.isPlayable ? "Play" : "Preview"}
-        </button>
-        <button onClick={handleShare} className="mobile-pressable flex h-12 flex-1 items-center justify-center gap-2 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] text-[14px] font-bold text-[var(--wk-text)]">
-          <WkIcon name={copied ? "Check" : "Share2"} size={16} className={copied ? "text-[var(--wk-success)]" : undefined} />{copied ? "Copied" : "Share"}
-        </button>
-      </div>
+      {/* ── Content card ── */}
+      <div className="relative z-10 rounded-t-[24px] bg-[var(--wk-bg)] -mt-6" style={{ boxShadow: "0 -6px 30px -10px rgba(0,0,0,0.2)" }}>
 
-      {track.streamingLinks && track.streamingLinks.length > 0 && <div className="flex flex-wrap gap-2 px-5 pb-4"><span className="mb-1 w-full text-[10px] font-bold uppercase tracking-wider text-[var(--wk-text-muted)]">Listen on</span>{track.streamingLinks.map((link) => <StreamingBadge key={link.platform} platform={link.platform} />)}</div>}
-
-      <div className="flex gap-0 overflow-x-auto border-b border-[var(--wk-divider)] px-4" style={{ scrollbarWidth: "none" }}>
-        {TABS.map((tab) => <button key={tab} onClick={() => setActiveTab(tab)} className={`mobile-pressable whitespace-nowrap py-3 pr-4 text-[12px] font-bold transition-all ${activeTab === tab ? "border-b-[1.5px] border-[var(--wk-brand)] text-[var(--wk-brand)]" : "text-[var(--wk-text-faint)]"}`}>{tab}</button>)}
-      </div>
-
-      <div className="pb-4">
-        {activeTab === "Overview" && <OverviewTab track={track} />}
-        {activeTab === "Chart stats" && <ChartStatsTab track={track} />}
-        {activeTab === "Lyrics" && <LyricsTab track={track} />}
-        {activeTab === "Credits" && <CreditsTab track={track} />}
-      </div>
-
-      {track.artistSlug && (
-        <div className="border-t border-[var(--wk-border)] px-5 py-5">
-          <h3 className="mb-3 text-[11px] font-black uppercase tracking-wider text-[var(--wk-text-muted)]">Artist</h3>
-          <Link to={`/artists/${track.artistSlug}`} className="mobile-pressable flex items-center gap-3 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-3">
-            <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-[var(--wk-surface-raised)]">{track.artistImage ? <img src={track.artistImage} alt={track.artist} className="h-full w-full object-cover" /> : <WkIcon name="User" size={18} className="text-[var(--wk-text-muted)]" />}</div>
-            <div className="min-w-0 flex-1"><div className="truncate text-[13px] font-bold text-[var(--wk-text)]">{track.artist}</div><div className="text-[11px] text-[var(--wk-text-muted)]">View artist page</div></div>
-            <WkIcon name="ChevronRight" size={16} className="text-[var(--wk-text-faint)]" />
-          </Link>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function OverviewTab({ track }: { track: TrackViewModel }) {
-  return (
-    <div>
-      <div className="grid grid-cols-4 gap-px border-b border-[var(--wk-border)]" style={{ background: "var(--wk-border)" }}>
-        {[{ label: "Rank", value: track.rank > 0 ? `#${track.rank}` : "—" },{ label: "Peak", value: track.peakPosition > 0 ? `#${track.peakPosition}` : "—" },{ label: "Weeks", value: track.weeksOnChart || "—" },{ label: "Year", value: track.releaseYear || "—" }].map((stat) => (
-          <div key={stat.label} className="bg-[var(--wk-surface)] px-2 py-3 text-center">
-            <div className="text-[16px] font-black text-[var(--wk-brand)]">{stat.value}</div>
-            <div className="text-[9px] font-bold uppercase tracking-wider text-[var(--wk-text-muted)]">{stat.label}</div>
-          </div>
-        ))}
-      </div>
-      <MetaRows track={track} />
-    </div>
-  );
-}
-
-function MetaRows({ track }: { track: TrackViewModel }) {
-  const rows = [
-    { label: "Genre", value: track.genre, link: track.genre && track.genre !== "Unknown" ? `/genres/${track.genreSlug}` : undefined },
-    { label: "Label", value: track.label, link: track.label && track.label !== "Unknown" ? `/labels/${track.labelSlug}` : undefined },
-    track.albumTitle ? { label: "Album", value: track.albumTitle } : null,
-    track.releaseYear ? { label: "Released", value: track.releaseYear } : null,
-    track.source ? { label: "Source", value: track.source } : null,
-    { label: "Playable", value: track.isPlayable ? "Full track" : "Preview only" },
-  ].filter(Boolean) as Array<{ label: string; value: string | number; link?: string }>;
-  return (
-    <div className="divide-y divide-[var(--wk-divider)] border-b border-[var(--wk-divider)]">
-      {rows.map((row) => (
-        <div key={row.label} className="flex items-center justify-between px-5 py-3">
-          <span className="text-[13px] text-[var(--wk-text-soft)]">{row.label}</span>
-          {row.link ? (
-            <Link to={row.link} className="text-[14px] font-bold text-[var(--wk-text)] hover:text-[var(--wk-brand)]">{row.value}</Link>
-          ) : (
-            <span className="text-[14px] font-bold text-[var(--wk-text)]">{row.value}</span>
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function ChartStatsTab({ track }: { track: TrackViewModel }) {
-  return (
-    <div>
-      {track.chartHistory && track.chartHistory.length > 1 && (
-        <div className="border-b border-[var(--wk-divider)] px-5 py-5">
-          <div className="mb-2 text-[11px] font-black uppercase tracking-wider text-[var(--wk-text-muted)]">Chart journey · {track.chartHistory.length} weeks</div>
-          <div className="mb-3 flex items-end gap-4">
-            <div><div className="text-[9px] uppercase tracking-wider text-[var(--wk-text-faint)]">Current</div><div className="text-[24px] font-black text-[var(--wk-brand)]">#{track.rank}</div></div>
-            <div className="h-8 w-px bg-[var(--wk-divider)]" />
-            <div><div className="text-[9px] uppercase tracking-wider text-[var(--wk-text-faint)]">Peak</div><div className="text-[18px] font-black text-[var(--wk-text)]">#{track.peakPosition}</div></div>
-            <div className="h-8 w-px bg-[var(--wk-divider)]" />
-            <div><div className="text-[9px] uppercase tracking-wider text-[var(--wk-text-faint)]">Weeks</div><div className="text-[18px] font-black text-[var(--wk-text)]">{track.weeksOnChart}</div></div>
-          </div>
-          <ChartSparklineMobile data={track.chartHistory} />
-        </div>
-      )}
-
-      <TrackChartHistorySection
-        trackSlug={track.slug}
-        trackRank={track.rank ?? 0}
-        trackPeak={track.peakPosition ?? 0}
-        trackWeeks={track.weeksOnChart ?? 0}
-        trackHistory={track.chartHistory}
-        chartAppearances={track.chartAppearances}
-        chartAppearanceCount={track.chartAppearanceCount}
-        compact
-      />
-
-      <div className="divide-y divide-[var(--wk-divider)] border-b border-[var(--wk-divider)]">
-        {([
-          track.rank > 0 ? { label: "Current position", value: `#${track.rank}` } : null,
-          track.peakPosition > 0 ? { label: "Peak position", value: `#${track.peakPosition}` } : null,
-          track.weeksOnChart > 0 ? { label: "Weeks on chart", value: track.weeksOnChart } : null,
-          track.previousWeek && track.previousWeek > 0 ? { label: "Previous week", value: `#${track.previousWeek}` } : null,
-          track.duration > 0 ? { label: "Duration", value: formatDuration(track.duration) } : null,
-          track.streamCount ? { label: "Verified streams", value: track.streamCount } : null,
-        ].filter(Boolean) as Array<{ label: string; value: string | number }>).map((row) => (
-          <div key={row.label} className="flex items-center justify-between px-5 py-3">
-            <span className="text-[13px] text-[var(--wk-text-soft)]">{row.label}</span>
-            <span className="text-[14px] font-bold text-[var(--wk-text)]">{row.value}</span>
-          </div>
-        ))}
-        <div className="flex items-center justify-between px-5 py-3">
-          <span className="text-[13px] text-[var(--wk-text-soft)]">Movement</span>
-          <MovementBadge movement={track.movement} amount={track.movementAmount} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function LyricsTab({ track }: { track: TrackViewModel }) {
-  const { isPlaying, currentTrack } = usePlayer();
-  const timedLyrics = getTimedLyrics(track.slug);
-  const isThisTrackPlaying = currentTrack?.id === track.slug && isPlaying;
-
-  const handleContribute = () => {
-    window.REACT_APP_NAVIGATE?.(track.artistSlug ? `/tracks/${track.artistSlug}/${track.slug}/lyrics/contribute` : `/tracks/${track.slug}/lyrics/contribute`);
-  };
-
-  if (timedLyrics && timedLyrics.lines && timedLyrics.lines.length > 0) {
-    return (
-      <div className="px-5 py-5">
-        <div className="mb-4 flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-1.5 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-3 py-2 text-[11px] text-[var(--wk-text-muted)]">
-            <WkIcon name="UserStar" size={13} className="text-[var(--wk-brand)]" />
-            <span>Contributed by <span className="font-bold text-[var(--wk-text)]">{timedLyrics.submitterName}</span></span>
-          </div>
-          <div className="flex items-center gap-1 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-2.5 py-2 text-[11px]">
-            <button className="flex items-center gap-1 rounded-lg px-1.5 py-0.5 transition-all hover:bg-[var(--wk-brand)]/10 hover:text-[var(--wk-brand)]" title="Upvote">
-              <WkIcon name="ArrowUp" size={12} /><span className="text-[var(--wk-text)] font-semibold">{timedLyrics.upvotes}</span>
-            </button>
-            <span className="h-3 w-px bg-[var(--wk-divider)]" />
-            <button className="flex items-center gap-1 rounded-lg px-1.5 py-0.5 transition-all hover:bg-red-500/10 hover:text-red-500" title="Downvote">
-              <WkIcon name="ArrowDown" size={12} /><span className="text-[var(--wk-text-muted)]">{timedLyrics.downvotes}</span>
-            </button>
-          </div>
-          {timedLyrics.status === 'approved' ? (
-            <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[9px] font-bold uppercase text-emerald-600">Verified</span>
-          ) : timedLyrics.status === 'pending_review' ? (
-            <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[9px] font-bold uppercase text-amber-600">Under Review</span>
-          ) : null}
-          <button onClick={handleContribute} className="ml-auto flex items-center gap-1 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-3 py-2 text-[11px] font-semibold text-[var(--wk-text-soft)]">
-            <WkIcon name="Edit" size={11} /> Revise
+        {/* Play bar */}
+        <div className="px-5 py-4 flex items-center gap-3 border-b border-[var(--wk-divider)]">
+          <button
+            onClick={handlePlay}
+            disabled={!track.isPlayable}
+            className="flex items-center gap-2 rounded-full bg-[var(--wk-brand)] px-5 py-2.5 text-[13px] font-extrabold text-[var(--wk-brand-on)] transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed whitespace-nowrap"
+          >
+            <i className={`${isTrackPlaying ? "ri-pause-fill" : "ri-play-fill"} text-[16px]`} />
+            {isTrackPlaying ? "Pause" : track.isPlayable ? "Play preview" : "No preview"}
           </button>
+          <div className="text-[11px] text-[var(--wk-text-muted)]">
+            {track.isPlayable ? "Preview available" : "No audio in registry"}
+          </div>
         </div>
-        <SyncedLyricsDisplay lines={timedLyrics.lines} isPlaying={isThisTrackPlaying} />
-        {!isThisTrackPlaying && (
-          <div className="mt-3 text-center text-[11px] text-[var(--wk-text-faint)]">Play this track to see lyrics come alive</div>
-        )}
-      </div>
-    );
-  }
 
-  if (!track.lyrics) return (
-    <div className="py-10 text-center">
-      <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[var(--wk-surface-raised)]"><WkIcon name="FileText" size={28} className="text-[var(--wk-text-faint)]" /></div>
-      <h3 className="mb-2 text-[16px] font-bold text-[var(--wk-text)]">No lyrics yet</h3>
-      <p className="mx-auto mb-5 max-w-[260px] text-[13px] leading-relaxed text-[var(--wk-text-muted)]">Be the first to contribute timed lyrics and get credited.</p>
-      <button onClick={handleContribute} className="inline-flex items-center gap-2 rounded-xl bg-[var(--wk-brand)] px-5 py-2.5 text-[13px] font-bold text-[var(--wk-brand-on)]">
-        <WkIcon name="Edit" size={14} /> Contribute lyrics
-      </button>
-      <div className="mt-4 flex items-center justify-center gap-4 text-[10px] text-[var(--wk-text-faint)]">
-        <span className="inline-flex items-center gap-1"><WkIcon name="UserStar" size={12} /> You get credit</span>
-        <span className="inline-flex items-center gap-1"><WkIcon name="Users" size={12} /> Community reviewed</span>
+        <div className="px-5">
+
+          {/* Curator's Note */}
+          {rawData && (
+            <section className="py-8 border-b border-[var(--wk-divider)]">
+              <div className="mb-4 flex items-center gap-3">
+                <div className="h-px flex-1 bg-[var(--wk-divider)]" />
+                <span className="text-[9px] font-extrabold uppercase tracking-[0.2em] text-[var(--wk-text-faint)] whitespace-nowrap">Curator&rsquo;s Note</span>
+                <div className="h-px flex-1 bg-[var(--wk-divider)]" />
+              </div>
+              <MobileCuratorsNote apiData={rawData} />
+            </section>
+          )}
+
+          {/* Chart KPIs + Trajectory + Appearances */}
+          {(track.weeksOnChart > 0 || track.peakPosition > 0) && (
+            <section className="py-6 border-b border-[var(--wk-divider)]">
+              <div className="grid grid-cols-2 gap-2 mb-4">
+                <div className="rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-3.5">
+                  <span className="text-[9px] font-extrabold uppercase tracking-[0.14em] text-[var(--wk-text-faint)]">Peak</span>
+                  <div className="text-[24px] font-black text-[var(--wk-text)] mt-0.5">{track.peakPosition > 0 ? `#${track.peakPosition}` : "—"}</div>
+                </div>
+                <div className="rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-3.5">
+                  <span className="text-[9px] font-extrabold uppercase tracking-[0.14em] text-[var(--wk-text-faint)]">Weeks</span>
+                  <div className="text-[24px] font-black text-[var(--wk-text)] mt-0.5">{track.weeksOnChart || "—"}</div>
+                </div>
+                <div className="rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-3.5">
+                  <span className="text-[9px] font-extrabold uppercase tracking-[0.14em] text-[var(--wk-text-faint)]">Current</span>
+                  <div className="text-[24px] font-black text-[var(--wk-text)] mt-0.5">{track.rank > 0 ? `#${track.rank}` : "—"}</div>
+                </div>
+                <div className="rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-3.5">
+                  <span className="text-[9px] font-extrabold uppercase tracking-[0.14em] text-[var(--wk-text-faint)]">First charted</span>
+                  <div className="text-[13px] font-extrabold text-[var(--wk-text)] mt-0.5 leading-tight">{track.firstChartedDate ? formatDate(track.firstChartedDate) : track.releaseYear || "—"}</div>
+                </div>
+              </div>
+
+              {track.chartAppearances.length > 0 && (
+                <TrackChartHistorySection
+                  trackSlug={track.slug}
+                  trackRank={track.rank}
+                  trackPeak={track.peakPosition}
+                  trackWeeks={track.weeksOnChart}
+                  trackHistory={track.chartHistory}
+                  chartAppearances={track.chartAppearances}
+                  chartAppearanceCount={track.chartAppearanceCount}
+                  compact
+                />
+              )}
+            </section>
+          )}
+
+          {/* Provenance */}
+          <section className="py-8 border-b border-[var(--wk-divider)]">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="h-px flex-1 bg-[var(--wk-divider)]" />
+              <span className="text-[9px] font-extrabold uppercase tracking-[0.2em] text-[var(--wk-text-faint)] whitespace-nowrap">Provenance</span>
+              <div className="h-px flex-1 bg-[var(--wk-divider)]" />
+            </div>
+            <div className="space-y-1">
+              {track.releaseDate && (
+                <div className="flex items-center justify-between py-2.5">
+                  <span className="text-[13px] text-[var(--wk-text-soft)]">Released</span>
+                  <span className="text-[13px] font-bold text-[var(--wk-text)]">{formatDate(track.releaseDate)}</span>
+                </div>
+              )}
+              {track.albumTitle && (
+                <div className="flex items-center justify-between py-2.5">
+                  <span className="text-[13px] text-[var(--wk-text-soft)]">Release</span>
+                  <Link to={`/releases/${track.albumSlug}`} className="text-[13px] font-bold text-[var(--wk-text)] hover:text-[var(--wk-brand)]">
+                    {track.albumTitle}
+                  </Link>
+                </div>
+              )}
+              {track.label && track.label !== "Unknown" && (
+                <div className="flex items-center justify-between py-2.5">
+                  <span className="text-[13px] text-[var(--wk-text-soft)]">Label</span>
+                  <Link to={`/labels/${track.labelSlug}`} className="text-[13px] font-bold text-[var(--wk-text)] hover:text-[var(--wk-brand)]">
+                    {track.label}
+                  </Link>
+                </div>
+              )}
+              {track.genre && track.genre !== "Unknown" && (
+                <div className="flex items-center justify-between py-2.5">
+                  <span className="text-[13px] text-[var(--wk-text-soft)]">Genre</span>
+                  <Link to={`/genres/${track.genreSlug}`} className="text-[13px] font-bold text-[var(--wk-text)] hover:text-[var(--wk-brand)]">
+                    {track.genre}
+                  </Link>
+                </div>
+              )}
+              {track.isrc && (
+                <div className="flex items-center justify-between py-2.5">
+                  <span className="text-[13px] text-[var(--wk-text-soft)]">ISRC</span>
+                  <span className="text-[12px] font-mono font-bold text-[var(--wk-text)]">{track.isrc}</span>
+                </div>
+              )}
+              {track.duration > 0 && (
+                <div className="flex items-center justify-between py-2.5">
+                  <span className="text-[13px] text-[var(--wk-text-soft)]">Duration</span>
+                  <span className="text-[13px] font-bold text-[var(--wk-text)]">{formatDuration(track.duration)}</span>
+                </div>
+              )}
+              {track.sourceProviders.length > 0 && (
+                <div className="flex items-center justify-between py-2.5">
+                  <span className="text-[13px] text-[var(--wk-text-soft)]">Sources</span>
+                  <span className="text-[13px] font-bold text-[var(--wk-text)]">{humanList(track.sourceProviders)}</span>
+                </div>
+              )}
+            </div>
+          </section>
+
+          {/* Connected Artists */}
+          {track.artists.length > 0 && (
+            <section className="py-8 border-b border-[var(--wk-divider)]">
+              <div className="mb-4 flex items-center gap-3">
+                <div className="h-px flex-1 bg-[var(--wk-divider)]" />
+                <span className="text-[9px] font-extrabold uppercase tracking-[0.2em] text-[var(--wk-text-faint)] whitespace-nowrap">Connected Artists</span>
+                <div className="h-px flex-1 bg-[var(--wk-divider)]" />
+              </div>
+              <div className="space-y-2">
+                {track.artists.map((a) => (
+                  <Link
+                    key={a.slug}
+                    to={a.slug ? `/artists/${a.slug}` : "#"}
+                    className="flex items-center gap-3 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-3 active:scale-[0.98] transition-transform"
+                  >
+                    <div className="flex-shrink-0 h-11 w-11 rounded-full bg-[var(--wk-surface-raised)] flex items-center justify-center overflow-hidden ring-1 ring-[var(--wk-border)]">
+                      {a.isPrimary && track.artworkUrl ? (
+                        <img src={track.artworkUrl} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <i className="ri-user-line text-[var(--wk-text-faint)] text-[17px]" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[13px] font-bold text-[var(--wk-text)] truncate">{a.name}</div>
+                      <div className="text-[10px] text-[var(--wk-text-muted)]">{a.isPrimary ? "Primary" : a.isFeatured ? "Featured" : "Collaborator"}</div>
+                    </div>
+                    <i className="ri-arrow-right-s-line text-[var(--wk-text-faint)] text-[16px]" />
+                  </Link>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Ecosystem */}
+          {(track.albumTitle || (track.label && track.label !== "Unknown") || (track.genre && track.genre !== "Unknown")) && (
+            <section className="py-8">
+              <div className="mb-4 flex items-center gap-3">
+                <div className="h-px flex-1 bg-[var(--wk-divider)]" />
+                <span className="text-[9px] font-extrabold uppercase tracking-[0.2em] text-[var(--wk-text-faint)] whitespace-nowrap">In the Ecosystem</span>
+                <div className="h-px flex-1 bg-[var(--wk-divider)]" />
+              </div>
+              <div className="space-y-2">
+                {track.albumTitle && (
+                  <Link to={`/releases/${track.albumSlug}`} className="flex items-center gap-3 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4 active:scale-[0.98] transition-transform">
+                    <div className="flex-shrink-0 h-11 w-11 rounded-lg bg-[var(--wk-surface-raised)] flex items-center justify-center">
+                      <i className="ri-album-line text-[var(--wk-text-muted)] text-[20px]" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-[var(--wk-text-faint)]">Release</div>
+                      <div className="text-[14px] font-bold text-[var(--wk-text)]">{track.albumTitle}</div>
+                    </div>
+                    <i className="ri-arrow-right-s-line text-[var(--wk-text-faint)] ml-auto" />
+                  </Link>
+                )}
+                {track.label && track.label !== "Unknown" && (
+                  <Link to={`/labels/${track.labelSlug}`} className="flex items-center gap-3 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4 active:scale-[0.98] transition-transform">
+                    <div className="flex-shrink-0 h-11 w-11 rounded-lg bg-[var(--wk-surface-raised)] flex items-center justify-center">
+                      <i className="ri-disc-line text-[var(--wk-text-muted)] text-[20px]" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-[var(--wk-text-faint)]">Label</div>
+                      <div className="text-[14px] font-bold text-[var(--wk-text)]">{track.label}</div>
+                    </div>
+                    <i className="ri-arrow-right-s-line text-[var(--wk-text-faint)] ml-auto" />
+                  </Link>
+                )}
+                {track.genre && track.genre !== "Unknown" && (
+                  <Link to={`/genres/${track.genreSlug}`} className="flex items-center gap-3 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4 active:scale-[0.98] transition-transform">
+                    <div className="flex-shrink-0 h-11 w-11 rounded-lg bg-[var(--wk-surface-raised)] flex items-center justify-center">
+                      <i className="ri-price-tag-3-line text-[var(--wk-text-muted)] text-[20px]" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-[var(--wk-text-faint)]">Genre</div>
+                      <div className="text-[14px] font-bold text-[var(--wk-text)]">{track.genre}</div>
+                    </div>
+                    <i className="ri-arrow-right-s-line text-[var(--wk-text-faint)] ml-auto" />
+                  </Link>
+                )}
+              </div>
+            </section>
+          )}
+
+        </div>
+
+        {/* Footer */}
+        <div className="bg-[var(--wk-surface)] border-t border-[var(--wk-border)] py-10 px-5 text-center mt-4">
+          <p className="text-[9px] font-extrabold uppercase tracking-[0.2em] text-[var(--wk-brand)] mb-3">WAKILISHA Registry</p>
+          <h3 className="text-[18px] font-black tracking-[-0.03em] text-[var(--wk-text)] mb-2">African music, systematically catalogued.</h3>
+          <p className="text-[12px] text-[var(--wk-text-muted)] mb-6 leading-relaxed">
+            Every track in the registry is connected to its artists, releases, labels, genres, and chart history.
+          </p>
+          <div className="flex items-center justify-center gap-2 flex-wrap">
+            <Link to="/charts" className="inline-flex items-center gap-1.5 rounded-full bg-[var(--wk-brand)] px-5 py-2.5 text-[12px] font-extrabold text-[var(--wk-brand-on)] whitespace-nowrap">
+              <i className="ri-bar-chart-2-line" /> Charts
+            </Link>
+            <Link to="/artists" className="inline-flex items-center gap-1.5 rounded-full border border-[var(--wk-border)] bg-[var(--wk-bg)] px-5 py-2.5 text-[12px] font-bold text-[var(--wk-text)] whitespace-nowrap">
+              <i className="ri-user-line" /> Artists
+            </Link>
+          </div>
+        </div>
       </div>
     </div>
   );
-
-  return (
-    <div className="px-5 py-5">
-      {track.lyricsContributor && <div className="mb-4 flex items-center gap-1.5 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-3 py-2 text-[11px] text-[var(--wk-text-muted)]"><WkIcon name="UserStar" size={14} className="text-[var(--wk-brand)]" /><span>Contributed by <span className="font-bold text-[var(--wk-text)]">{track.lyricsContributor.name}</span>{track.lyricsContributor.source && <span className="text-[var(--wk-text-faint)]"> · {track.lyricsContributor.source}</span>}</span></div>}
-      <div className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-5"><p className="text-[15px] leading-[2] text-[var(--wk-text)]"><span className="float-left mr-2 mt-1 font-black leading-none text-[var(--wk-brand)]" style={{ fontSize: "clamp(36px, 8vw, 48px)" }}>{track.lyrics.charAt(0)}</span><span className="whitespace-pre-line">{track.lyrics.slice(1)}</span></p></div>
-    </div>
-  );
-}
-
-function CreditsTab({ track }: { track: TrackViewModel }) {
-  if (!track.credits || track.credits.length === 0) return <div className="px-5 py-12 text-center text-[var(--wk-text-muted)]"><WkIcon name="Users" size={32} className="mx-auto mb-3" />No credit information available.</div>;
-  return <div className="divide-y divide-[var(--wk-divider)] border-b border-[var(--wk-divider)]">{track.credits.map((credit, i) => <div key={i} className="flex items-center justify-between px-5 py-3"><span className="text-[12px] text-[var(--wk-text-faint)]">{credit.role}</span><span className="text-[13px] font-bold text-[var(--wk-text)]">{credit.name}</span></div>)}</div>;
 }

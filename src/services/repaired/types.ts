@@ -87,12 +87,25 @@ export interface RepairedTrackArtist {
   imageUrl: string;
 }
 
+export interface RepairedTrackArtistRole {
+  name: string;
+  slug: string;
+  isPrimary: boolean;
+  isFeatured: boolean;
+  creditOrder: number;
+  role: string;
+}
+
+// v28: enriched release with label and track count for NLG summaries
 export interface RepairedTrackRelease {
   slug: string;
   title: string;
   releaseDate: string;
   releaseType: string;
   artworkUrl: string;
+  trackCount: number;
+  labelName: string;
+  labelSlug: string;
 }
 
 export interface RepairedTrackLabel {
@@ -108,13 +121,31 @@ export interface RepairedGenreRef {
 
 export interface RepairedTrackDetail {
   track: RepairedTrackRecord;
+  // v28: structured per-role artist list (primary, featured, etc.)
+  artists: RepairedTrackArtistRole[];
   artist: RepairedTrackArtist;
   release: RepairedTrackRelease | null;
   label: RepairedTrackLabel | null;
   genres: RepairedGenreRef[];
   chartHistory: number[];
+  chartAppearances?: Array<{
+    editionSlug: string;
+    editionLabel: string;
+    date: string;
+    rank: number;
+    previousRank: number | null;
+    movement: string;
+  }>;
+  chartAppearanceCount?: number;
   peakRank: number | null;
   weeksOnChart: number;
   currentRank: number | null;
+  previousRank?: number | null;
+  movement?: string;
+  movementAmount?: number;
   previewUrl?: string | null;
+  // v28: additional context for NLG
+  firstChartedDate?: string;
+  editionLabels?: string[];
+  sourceProviders?: string[];
 }

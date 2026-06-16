@@ -64,12 +64,9 @@ export function getLabel(
 }
 
 export function getTrack(
-  slug: string,
-  artistSlug?: string
+  slug: string
 ): Promise<RepairedTrackDetail | null> {
-  const encodedSlug = encodeURIComponent(slug);
-  const encodedArtist = artistSlug ? encodeURIComponent(artistSlug) : "";
   return fetchPublic<RepairedTrackDetail | null>(
-    artistSlug ? `/tracks/${encodedArtist}/${encodedSlug}` : `/tracks/${encodedSlug}`
+    `/tracks/${encodeURIComponent(slug)}`
   );
 }

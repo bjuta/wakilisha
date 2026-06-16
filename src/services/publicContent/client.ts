@@ -378,7 +378,11 @@ export function slugify(name: string): string {
 }
 
 export function releaseUrl(release: { slug: string; artist: string }): string {
-  return `/releases/${slugify(release.artist)}/${release.slug}`;
+  const artistSlug = slugify(release.artist);
+  if (release.slug.startsWith(`${artistSlug}--`)) {
+    return `/releases/${release.slug}`;
+  }
+  return `/releases/${artistSlug}--${release.slug}`;
 }
 
 function yearFromDate(value: string | null | undefined): string {

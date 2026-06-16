@@ -14,8 +14,9 @@ import {
   runScoring,
   runShortlist,
 } from "@/services/chartsIngestion/client";
+import { validateRunReadinessAsync } from "@/services/chartsIngestion/productionAdapter";
 import { SkeletonBlock } from "@/components/skeletons/Skeletons";
-import type { CommitIngestRunResponse } from "@/services/chartsIngestion/commitTypes";
+import type { CommitIngestRunResponse, CommitValidationResult } from "@/services/chartsIngestion/commitTypes";
 import type { IngestRun, IngestStageStatus, ResourceGuardStatus } from "@/services/chartsIngestion/ingestStudioTypes";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { WkIcon } from "@/components/design-system/Icon";
@@ -154,6 +155,7 @@ export default function AdminChartsIngestRunDetail() {
   const [commitResult, setCommitResult] = useState<CommitIngestRunResponse | null>(null);
   const [commitError, setCommitError] = useState<string | null>(null);
   const [stageLoading, setStageLoading] = useState<string | null>(null);
+  const [commitValidation, setCommitValidation] = useState<CommitValidationResult | null>(null);
 
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -201,6 +203,46 @@ export default function AdminChartsIngestRunDetail() {
     if (TERMINAL_STATUSES.has(run.status)) stopPolling();
     else startPolling(run);
   }, [run?.status]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch commit readiness asynchronously when run reaches a committable status
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      if (!run || (run.status !== "dry_run_complete" && run.status !== "ready_to_commit")) {
+        setCommitValidation(null);
+        return;
+      }
+      try {
+        // Use the production async validator which calls the edge function's
+        // validate_commit endpoint — this checks actual DB state, not mock data.
+        const asyncResult = await validateRunReadinessAsync(run.id);
+        if (!cancelled) {
+          // Map the edge function response to the CommitValidationResult shape
+          setCommitValidation({
+            canCommit: asyncResult.canCommit,
+            errors: asyncResult.errors.map((e: { code: string; message: string }) => ({
+              code: e.code,
+              message: e.message,
+              retryable: true,
+            })),
+            warnings: asyncResult.warnings,
+          });
+        }
+      } catch {
+        if (!cancelled) {
+          // Fall back to client-side validation if the edge function is unreachable
+          try {
+            const localResult = await validateCommitReadiness(run);
+            if (!cancelled) setCommitValidation(localResult);
+          } catch {
+            if (!cancelled) setCommitValidation(null);
+          }
+        }
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+  }, [run?.id, run?.status]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleCommit() {
     if (!runId || !run) return;
@@ -322,11 +364,8 @@ export default function AdminChartsIngestRunDetail() {
   const canRetry = run.status === "failed" || run.status === "cancelled";
   const canSendGaps = run.status === "dry_run_complete" && run.summary.gaps > 0;
 
-  // Get commit readiness for button tooltip
-  const commitValidation = (run.status === "dry_run_complete" || run.status === "ready_to_commit")
-    ? validateCommitReadiness(run)
-    : null;
-  const commitButtonTitle = !commitValidation?.canCommit && commitValidation?.errors[0]
+  // Get commit readiness for button tooltip (fetched async via useEffect above)
+  const commitButtonTitle = !commitValidation?.canCommit && commitValidation?.errors?.[0]
     ? commitValidation.errors[0].message
     : "Commit this edition to V2";
 

@@ -557,10 +557,24 @@ async function writeScrapeToRegistry(
     existingTracks.map((t) => [t.slug, t.id])
   );
 
+  // Build slug prefix used by artist-scoped track slugs (e.g. "4mr-frank-white--intro")
+  const artistScopedSlugPrefix = `${data.slug}--`;
+
   const trackNormTitleToSlug = new Map<string, string>();
   for (const t of existingTracks) {
     const key = normalizeForMatch(t.title as string);
     if (key) trackNormTitleToSlug.set(key, t.slug);
+  }
+
+  // Override with artist-scoped entries for this artist so title-based lookups
+  // prefer the artist-qualified slug over a generic slug that could collide
+  // with another artist's track of the same name.
+  for (const t of existingTracks) {
+    const slug = t.slug as string;
+    if (slug.startsWith(artistScopedSlugPrefix)) {
+      const key = normalizeForMatch(t.title as string);
+      if (key) trackNormTitleToSlug.set(key, slug);
+    }
   }
 
   const existingReleaseArtists = await fetchAllRows<{ release_id: string; artist_id: string; artist_slug: string }>(
@@ -599,12 +613,18 @@ async function writeScrapeToRegistry(
     let releaseId = existingReleaseByTitle.get(titleKey);
     if (!releaseId) {
       const baseSlug = slugify(title);
-      releaseId = existingReleaseBySlug.get(baseSlug);
+      const scopedCandidate = `${data.slug}--${baseSlug}`;
+      releaseId = existingReleaseBySlug.get(scopedCandidate);
+      if (!releaseId) {
+        // Fall back to flat slug for backwards compatibility with pre-scoped releases
+        releaseId = existingReleaseBySlug.get(baseSlug);
+      }
     }
 
     if (!releaseId) {
       const newId = crypto.randomUUID();
-      const relSlug = dedupeSlug(slugify(title), seenReleaseSlugs);
+      // Scoped release slug: artistSlug--titleSlug
+      const relSlug = dedupeSlug(`${data.slug}--${slugify(title)}`, seenReleaseSlugs);
       const newRelease = {
         id: newId,
         slug: relSlug,
@@ -722,6 +742,14 @@ async function writeScrapeToRegistry(
       let trackId: string | undefined;
 
       if (track.isrc) trackId = existingTrackByIsrc.get(track.isrc);
+
+      // Check artist-scoped slug (e.g. "4mr-frank-white--intro") — matches
+      // tracks created by rebuild-discography-from-metadata and other pipelines
+      // that use artist-qualified slugs to avoid cross-artist collisions.
+      if (!trackId) {
+        const scopedSlug = `${artistScopedSlugPrefix}${trackTitleSlug}`;
+        trackId = existingTrackBySlug.get(scopedSlug);
+      }
 
       if (!trackId) {
         const slugMatchId = existingTrackBySlug.get(trackTitleSlug);
@@ -897,6 +925,17 @@ async function writeScrapeToRegistry(
       let trackId: string | undefined;
 
       if (track.isrc) trackId = existingTrackByIsrc.get(track.isrc);
+
+      // Check scoped slugs for both the release owner and the scraped artist.
+      // Appears-on tracks may have been created under either artist's namespace.
+      if (!trackId) {
+        const ownerScopedSlug = `${releaseOwnerSlug}--${trackTitleSlug}`;
+        trackId = existingTrackBySlug.get(ownerScopedSlug);
+        if (!trackId) {
+          const scrapedScopedSlug = `${data.slug}--${trackTitleSlug}`;
+          trackId = existingTrackBySlug.get(scrapedScopedSlug);
+        }
+      }
 
       if (!trackId) {
         const slugMatchId = existingTrackBySlug.get(trackTitleSlug);

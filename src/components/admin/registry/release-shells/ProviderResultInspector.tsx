@@ -7,6 +7,7 @@ interface ProviderResultInspectorProps {
   onCreateShell: () => void;
   onAttachToShell: (shellId: string) => void;
   onBackfillRelease: (targetId: string) => void;
+  onRefreshShell: () => void;
   onBack: () => void;
   isCreating: boolean;
   selectedTrackIds: string[];
@@ -126,6 +127,7 @@ export function ProviderResultInspector({
   onCreateShell,
   onAttachToShell,
   onBackfillRelease,
+  onRefreshShell,
   onBack,
   isCreating,
   selectedTrackIds,
@@ -411,9 +413,13 @@ export function ProviderResultInspector({
                   </button>
                 )}
                 {hasExistingShell && (
-                  <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-200 px-2 py-1 text-[10px] font-bold text-amber-700">
-                    <WkIcon name="AlertTriangle" size={10} /> Shell exists
-                  </span>
+                  <button
+                    onClick={onRefreshShell}
+                    disabled={isCreating}
+                    className="shrink-0 flex items-center gap-1.5 rounded-xl bg-[#4a7a9e] px-3 py-1.5 text-[11px] font-bold text-white hover:bg-[#3a6080] disabled:opacity-50 whitespace-nowrap"
+                  >
+                    {isCreating ? <><WkIcon name="Loader2" size={12} className="animate-spin" /> Refreshing…</> : <><WkIcon name="RefreshCw" size={12} /> Refresh shell</>}
+                  </button>
                 )}
               </div>
             </div>

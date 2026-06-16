@@ -255,6 +255,8 @@ export {
 // ─── Auto-restored chart admin barrel exports ───
 export { validateCommitReadiness } from "./commitService";
 export { getIngestRun, runPreflightCheck as preflight, validateRunReadinessAsync } from "./productionAdapter";
+export { fixChartArtistSlugs, reingestEdition } from "./productionAdapter";
+export type { FixArtistSlugsResult, ReingestEditionResult } from "./productionAdapter";
 export { detectProvidersFromUrls, isValidProviderUrl } from "./providerDetection";
 export { clearAllSimulations, getActiveSimulations, getLastErrorMessage, isSimulated, retry, simulate } from "./simulation";
 export { getStepStatus } from "./workflow";

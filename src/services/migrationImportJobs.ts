@@ -48,17 +48,15 @@ export async function uploadZipAndCreateIngestionRun(file: File): Promise<Ingest
   };
 
   const { data, error } = await supabase
-    .from('wk_ingestion_runs')
-    .insert({
-      source_name: file.name,
-      source_kind: 'wordpress_export_zip',
-      source_manifest: manifest,
-      status: 'queued',
-      imported_counts: null,
-      warnings: ['ZIP uploaded and queued. Waiting for backend processor to validate and import.'],
-      errors: [],
+    .rpc('create_import_run', {
+      p_source_name: file.name,
+      p_source_kind: 'wordpress_export_zip',
+      p_source_manifest: manifest,
+      p_status: 'queued',
+      p_imported_counts: null,
+      p_warnings: ['ZIP uploaded and queued. Waiting for backend processor to validate and import.'],
+      p_errors: [],
     })
-    .select('id, source_name, source_kind, source_manifest, status, started_at, finished_at, created_at, imported_counts, warnings, errors')
     .single();
 
   if (error) {
@@ -70,20 +68,15 @@ export async function uploadZipAndCreateIngestionRun(file: File): Promise<Ingest
 
 export async function listZipIngestionRuns(limit = 20): Promise<IngestionRun[]> {
   const { data, error } = await supabase
-    .from('wk_ingestion_runs')
-    .select('id, source_name, source_kind, source_manifest, status, started_at, finished_at, created_at, imported_counts, warnings, errors')
-    .eq('source_kind', 'wordpress_export_zip')
-    .order('created_at', { ascending: false })
-    .limit(limit);
+    .rpc('get_admin_import_runs', { p_limit: limit });
   if (error) throw new Error(error.message);
-  return (data ?? []) as IngestionRun[];
+  const runs = (data ?? []) as IngestionRun[];
+  return runs.filter(r => r.source_kind === 'wordpress_export_zip');
 }
 
 export async function getIngestionRun(id: string): Promise<IngestionRun | null> {
   const { data, error } = await supabase
-    .from('wk_ingestion_runs')
-    .select('id, source_name, source_kind, source_manifest, status, started_at, finished_at, created_at, imported_counts, warnings, errors')
-    .eq('id', id)
+    .rpc('get_import_run_by_id', { p_id: id })
     .maybeSingle();
   if (error) throw new Error(error.message);
   return (data ?? null) as IngestionRun | null;

@@ -117,6 +117,7 @@ import ArtistDetail from "../pages/artists/detail/page";
 // Other entity pages
 import Releases from "../pages/releases/page";
 import ReleaseDetail from "../pages/releases/detail/page";
+import MobileReleaseDetail from "../pages/mobile/releases/detail/page";
 import Genres from "../pages/genres/page";
 import GenreDetail from "../pages/genres/detail/page";
 import Labels from "../pages/labels/page";
@@ -192,12 +193,10 @@ const routes: RouteObject[] = [
       { path: "/charts/:series/:edition", element: <ResponsivePage mobile={<MobileChartEdition />} desktop={<ChartEdition />} /> },
       { path: "/artists", element: <ResponsivePage mobile={<MobileArtists />} desktop={<Artists />} /> },
       { path: "/artists/:slug", element: <ResponsivePage mobile={<MobileArtistDetail />} desktop={<ArtistDetail />} /> },
-      { path: "/tracks/:artistSlug/:slug", element: <ResponsivePage mobile={<MobileTrackDetail />} desktop={<TrackDetail />} /> },
       { path: "/tracks/:slug", element: <ResponsivePage mobile={<MobileTrackDetail />} desktop={<TrackDetail />} /> },
-      { path: "/tracks/:artistSlug/:slug/lyrics/contribute", element: <LyricContribution /> },
       { path: "/tracks/:slug/lyrics/contribute", element: <LyricContribution /> },
       { path: "/releases", element: <ResponsivePage mobile={<Releases />} desktop={<Releases />} /> },
-      { path: "/releases/:artistSlug/:releaseSlug", element: <ResponsivePage mobile={<ReleaseDetail />} desktop={<ReleaseDetail />} /> },
+      { path: "/releases/:slug", element: <ResponsivePage mobile={<MobileReleaseDetail />} desktop={<ReleaseDetail />} /> },
       { path: "/genres/:slug", element: <ResponsivePage mobile={<MobileGenreDetail />} desktop={<GenreDetail />} /> },
       { path: "/genres", element: <ResponsivePage mobile={<MobileGenres />} desktop={<Genres />} /> },
       { path: "/labels/:slug", element: <ResponsivePage mobile={<MobileLabelDetail />} desktop={<LabelDetail />} /> },

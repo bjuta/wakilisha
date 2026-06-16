@@ -24,6 +24,7 @@ interface ArtistDiscographyProps {
   title?: string;
   emptyTitle?: string;
   emptyDescription?: string;
+  artistName?: string;
 }
 
 type Filter = "All" | "Albums" | "EPs" | "Singles";
@@ -34,11 +35,11 @@ function formatYear(dateStr?: string, year?: string | number): string {
   return "";
 }
 
-function toModalRelease(r: DiscoRelease): ModalRelease {
+function toModalRelease(r: DiscoRelease, fallbackArtist?: string): ModalRelease {
   return {
     slug: r.slug,
     title: r.title,
-    artist: r.artist || "",
+    artist: r.artist || fallbackArtist || "",
     releaseType: r.releaseType || "Release",
     year: r.year || formatYear(r.releaseDate),
     labelName: r.labelName,
@@ -147,6 +148,7 @@ export function ArtistDiscography({
   title = "Releases",
   emptyTitle = "No releases",
   emptyDescription = "{emptyDescription}",
+  artistName,
 }: ArtistDiscographyProps) {
   const [filter, setFilter] = useState<Filter>("All");
   const [modalRelease, setModalRelease] = useState<DiscoRelease | null>(null);
@@ -227,7 +229,7 @@ export function ArtistDiscography({
 
       <AlbumModal
         open={Boolean(modalRelease)}
-        release={modalRelease ? toModalRelease(modalRelease) : null}
+        release={modalRelease ? toModalRelease(modalRelease, artistName) : null}
         onClose={() => setModalRelease(null)}
       />
     </section>

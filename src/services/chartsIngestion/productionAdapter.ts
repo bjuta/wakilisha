@@ -626,3 +626,60 @@ export async function runFullPipeline(runId: string): Promise<{
 }> {
   return invokeApi("run_full_pipeline", { runId });
 }
+
+// ════════════════════════════════════════════════════════════════════════
+// v18: Registry-first actions — fix artist slugs & reingest editions
+// ════════════════════════════════════════════════════════════════════════
+
+export interface FixArtistSlugsResult {
+  ok: boolean;
+  dry_run?: boolean;
+  total_entries: number;
+  to_fix?: number;
+  fixed?: number;
+  skipped: number;
+  fix_preview?: Array<{ id: string; track_title: string; artist_name: string; current_slug: string; correct_slug: string; method: string }>;
+  skipped_samples?: string[];
+}
+
+/** Fix corrupt artist_slug values in chart entries — resolves through registry_track_artists. */
+export async function fixChartArtistSlugs(params: {
+  editionId?: string;
+  dryRun?: boolean;
+}): Promise<FixArtistSlugsResult> {
+  return invokeApi<FixArtistSlugsResult>("fix_chart_artist_slugs", {
+    editionId: params.editionId ?? null,
+    dryRun: params.dryRun ?? true,
+  });
+}
+
+export interface ReingestEditionResult {
+  ok: boolean;
+  dry_run: boolean;
+  edition_slug: string;
+  stats: {
+    total: number;
+    tracks_found: number;
+    tracks_created: number;
+    artists_found: number;
+    artists_created: number;
+    links_created: number;
+    artist_slugs_fixed: number;
+    canonical_ids_set: number;
+    errors: number;
+  };
+  repairs?: Array<{ id: string; track_title: string; artist_name: string; action: string }>;
+}
+
+/** Re-process an existing chart edition through registry resolution.
+ *  For each entry: looks up or creates registry tracks + artists, links them,
+ *  and populates canonical_track_id, track_slug, and artist_slug. */
+export async function reingestEdition(params: {
+  editionId: string;
+  dryRun?: boolean;
+}): Promise<ReingestEditionResult> {
+  return invokeApi<ReingestEditionResult>("reingest_edition", {
+    editionId: params.editionId,
+    dryRun: params.dryRun ?? true,
+  });
+}

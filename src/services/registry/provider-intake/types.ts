@@ -113,6 +113,18 @@ export type CreateReleaseShellResult = {
     providerEntityId: string;
     reason: string;
   }>;
+  mode?: "create" | "refresh" | "attach" | "backfill";
+  slug?: {
+    pattern: string;
+    scoped: string;
+    artistSlug: string;
+    artistName: string;
+  };
+  release?: {
+    id: string;
+    slug: string;
+    createdNew: boolean;
+  };
 };
 
 export type IntakeSearchInput = {
@@ -123,7 +135,7 @@ export type IntakeSearchInput = {
   limit?: number;
 };
 
-export type ProviderIntakeMode = "create_shell" | "attach_to_shell" | "backfill_existing_release";
+export type ProviderIntakeMode = "create_shell" | "attach_to_shell" | "backfill_existing_release" | "refresh_shell";
 
 export type IntakeCreateInput = {
   provider: string;
