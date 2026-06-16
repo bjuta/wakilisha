@@ -23,6 +23,7 @@ import AdminArtistsPage from "../pages/admin/registry/artists/page";
 import AdminTracksPage from "../pages/admin/registry/tracks/page";
 import AdminReleasesPage from "../pages/admin/registry/releases/page";
 import AdminRegistryReleaseShells from "../pages/admin/registry/release-shells/page";
+import AdminArtistAliasesPage from "../pages/admin/registry/artist-aliases/page";
 import AdminLabelsPage from "../pages/admin/registry/labels/page";
 import AdminGenresPage from "../pages/admin/registry/genres/page";
 import AdminMediaLibraryPage from "../pages/admin/media/library/page";
@@ -37,6 +38,7 @@ import AdminScraperPage from "../pages/admin/imports/scraper/page";
 import AdminArticleDetailPage from "../pages/admin/content/articles/detail/page";
 import AdminNewArticlePage from "../pages/admin/content/articles/new/page";
 import AdminArtistDetailPage from "../pages/admin/registry/artists/detail/page";
+import AdminArtistIntakePage from "../pages/admin/registry/artists/intake/page";
 import AdminTrackDetailPage from "../pages/admin/registry/tracks/detail/page";
 import AdminReleaseDetailPage from "../pages/admin/registry/releases/detail/page";
 import AdminLabelDetailPage from "../pages/admin/registry/labels/detail/page";
@@ -79,7 +81,6 @@ import AdminChartsIntegrationMap from "../pages/admin/charts/integration-map/pag
 import AdminChartsPublicApiQa from "../pages/admin/charts/public-api-qa/page";
 import AdminChartsReviewQueue from "../pages/admin/charts/review-queue/page";
 import AdminChartsNoMatch from "../pages/admin/charts/no-match/page";
-import AdminChartsReleaseShells from "../pages/admin/charts/release-shells/page";
 import AdminChartsCanonGaps from "../pages/admin/charts/canon-gaps/page";
 import AdminChartsIngestRuns from "../pages/admin/charts/ingest-runs/page";
 import AdminChartsIngestRunDetail from "../pages/admin/charts/ingest-run-detail/page";
@@ -270,12 +271,14 @@ const routes: RouteObject[] = [
         children: [
           { index: true, element: <AdminRegistryOverview /> },
           { path: "artists", element: <AdminArtistsPage /> },
+          { path: "artists/intake", element: <AdminArtistIntakePage /> },
           { path: "artists/:slug", element: <AdminArtistDetailPage /> },
           { path: "tracks", element: <AdminTracksPage /> },
           { path: "tracks/:slug", element: <AdminTrackDetailPage /> },
           { path: "releases", element: <AdminReleasesPage /> },
           { path: "release-shells", element: <AdminRegistryReleaseShells /> },
           { path: "release-shells/intake", element: <AdminRegistryReleaseShells /> },
+          { path: "artist-aliases", element: <AdminArtistAliasesPage /> },
           { path: "releases/:slug", element: <AdminReleaseDetailPage /> },
           { path: "labels", element: <AdminLabelsPage /> },
           { path: "labels/:slug", element: <AdminLabelDetailPage /> },

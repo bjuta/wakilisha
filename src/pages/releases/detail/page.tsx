@@ -8,6 +8,7 @@ import ReleaseDetailHero from "./components/ReleaseDetailHero";
 import ReleaseTracklist from "./components/ReleaseTracklist";
 import ReleaseMetadata from "./components/ReleaseMetadata";
 import ReleaseExcerpt from "./components/ReleaseExcerpt";
+import ReleaseFeaturedArtists from "./components/ReleaseFeaturedArtists";
 
 export default function ReleaseDetail() {
   const { slug } = useParams<{ slug: string }>();
@@ -103,6 +104,12 @@ export default function ReleaseDetail() {
 
             {/* Tracklist */}
             <ReleaseTracklist release={release} tracks={release.tracks} />
+
+            {/* Featured Artists Grid */}
+            <ReleaseFeaturedArtists
+              artists={release.featuredArtists || []}
+              releaseArtist={release.artist}
+            />
 
             {/* Artist link */}
             <div ref={artistRef} className={`${artistRevealed ? "is-visible" : ""} reveal-up`}>

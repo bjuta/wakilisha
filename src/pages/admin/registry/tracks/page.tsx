@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { type RegistryEntityProfile } from "@/services/registry/admin/types";
 import { getEntitySchema } from "@/services/registry/admin/entitySchemas";
-import { calculateCompleteness, completenessTone, completenessLabel } from "@/services/registry/admin/completeness";
+import { calculateCompleteness, completenessTone } from "@/services/registry/admin/completeness";
 import { getRegistryEntityList } from "@/services/registry/admin/client";
 import RegistryEntityEditorDrawer from "@/components/admin/registry/RegistryEntityEditorDrawer";
+import { WkIcon } from "@/components/design-system/Icon";
 
 const schema = getEntitySchema("track");
+const PAGE_SIZE = 20;
 
 type SortMode = "recent" | "title" | "completeness_low" | "completeness_high";
 
@@ -28,17 +30,6 @@ interface EnrichedTrack extends RegistryEntityProfile {
   _displayDuration: string;
 }
 
-function formatDate(value: string | null | undefined): string {
-  if (!value) return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).format(date);
-}
-
 function formatDuration(ms: number | null | undefined): string {
   if (ms === null || ms === undefined || ms <= 0) return "—";
   const minutes = Math.floor(ms / 60000);
@@ -46,8 +37,215 @@ function formatDuration(ms: number | null | undefined): string {
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
+/* ─────────────── Pagination helper ─────────────── */
+
+function Pagination({
+  currentPage,
+  totalPages,
+  onPageChange,
+  totalItems,
+  pageSize,
+}: {
+  currentPage: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+  totalItems: number;
+  pageSize: number;
+}) {
+  if (totalPages <= 1) return null;
+
+  const start = (currentPage - 1) * pageSize + 1;
+  const end = Math.min(currentPage * pageSize, totalItems);
+
+  const getVisiblePages = () => {
+    const pages: (number | string)[] = [];
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      pages.push(1);
+      if (currentPage > 3) pages.push("...");
+      const startPage = Math.max(2, currentPage - 1);
+      const endPage = Math.min(totalPages - 1, currentPage + 1);
+      for (let i = startPage; i <= endPage; i++) pages.push(i);
+      if (currentPage < totalPages - 2) pages.push("...");
+      pages.push(totalPages);
+    }
+    return pages;
+  };
+
+  return (
+    <div className="flex items-center justify-between rounded-2xl border border-[#dfe4d8] bg-white px-4 py-3">
+      <span className="text-[12px] text-[#858c7e]">
+        Showing <strong className="text-[#171712]">{start}</strong>
+        –<strong className="text-[#171712]">{end}</strong> of{" "}
+        <strong className="text-[#171712]">{totalItems}</strong>
+      </span>
+      <div className="flex items-center gap-1">
+        <button
+          onClick={() => onPageChange(currentPage - 1)}
+          disabled={currentPage <= 1}
+          className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#dfe4d8] text-[#858c7e] disabled:opacity-40 hover:border-[#85c441] hover:text-[#5f8f2f]"
+        >
+          <WkIcon name="ChevronLeft" size={16} />
+        </button>
+        {getVisiblePages().map((page, i) =>
+          typeof page === "string" ? (
+            <span key={`dots-${i}`} className="px-2 text-[11px] text-[#858c7e]">
+              …
+            </span>
+          ) : (
+            <button
+              key={page}
+              onClick={() => onPageChange(page)}
+              className={`flex h-8 w-8 items-center justify-center rounded-lg text-[12px] font-bold transition ${
+                page === currentPage
+                  ? "bg-[#5f8f2f] text-white"
+                  : "border border-[#dfe4d8] text-[#71796b] hover:border-[#85c441] hover:text-[#5f8f2f]"
+              }`}
+            >
+              {page}
+            </button>
+          )
+        )}
+        <button
+          onClick={() => onPageChange(currentPage + 1)}
+          disabled={currentPage >= totalPages}
+          className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#dfe4d8] text-[#858c7e] disabled:opacity-40 hover:border-[#85c441] hover:text-[#5f8f2f]"
+        >
+          <WkIcon name="ChevronRight" size={16} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────── Track Card ─────────────── */
+
+function TrackCard({
+  track,
+  onOpen,
+  onNavigate,
+}: {
+  track: EnrichedTrack;
+  onOpen: (track: EnrichedTrack) => void;
+  onNavigate: (slug: string) => void;
+}) {
+  const [hovered, setHovered] = useState(false);
+  const q = track._quality;
+
+  return (
+    <div
+      className="group relative overflow-hidden rounded-2xl border border-[#dfe4d8] bg-white transition-all hover:border-[#85c441] hover:shadow-sm"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      {/* Artwork area */}
+      <div className="relative aspect-square bg-[#f0f3ec]">
+        {track.artwork_url ? (
+          <img
+            src={String(track.artwork_url)}
+            alt={track._displayTitle}
+            className="h-full w-full object-cover"
+            loading="lazy"
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center">
+            <WkIcon name="Music" size={40} className="text-[#c8d0be]" />
+          </div>
+        )}
+        {/* Hover overlay */}
+        <div
+          className={`absolute inset-0 flex items-center justify-center bg-black/50 transition-opacity ${
+            hovered ? "opacity-100" : "opacity-0"
+          }`}
+        >
+          <div className="flex gap-2">
+            <button
+              onClick={() => onOpen(track)}
+              className="rounded-xl bg-white px-4 py-2 text-[12px] font-bold text-[#171712] hover:bg-[#f0f3ec]"
+            >
+              Edit
+            </button>
+            <button
+              onClick={() => onNavigate(track.slug)}
+              className="rounded-xl border border-white/50 px-4 py-2 text-[12px] font-bold text-white hover:bg-white/20"
+            >
+              Details
+            </button>
+          </div>
+        </div>
+        {/* Duration badge */}
+        {track._displayDuration !== "—" && (
+          <div className="absolute right-3 top-3">
+            <span className="rounded-full bg-black/50 px-2.5 py-1 text-[10px] font-bold text-white backdrop-blur-sm">
+              {track._displayDuration}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Content */}
+      <div className="p-3.5">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <button
+              onClick={() => onNavigate(track.slug)}
+              className="text-left text-[14px] font-bold text-[#171712] hover:text-[#5f8f2f] transition-colors truncate block"
+            >
+              {track._displayTitle}
+            </button>
+            <p className="mt-0.5 text-[11px] text-[#858c7e] truncate">{track.slug}</p>
+          </div>
+          <button
+            onClick={() => onOpen(track)}
+            className="shrink-0 flex h-8 w-8 items-center justify-center rounded-lg border border-[#dfe4d8] text-[#858c7e] hover:border-[#85c441] hover:text-[#5f8f2f]"
+            title="Quick edit"
+          >
+            <WkIcon name="Pencil" size={14} />
+          </button>
+        </div>
+
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          {track.isrc && (
+            <span className="rounded-full bg-[#f0f3ec] px-2 py-0.5 text-[10px] font-bold text-[#71796b] uppercase tracking-wide font-mono">
+              {String(track.isrc)}
+            </span>
+          )}
+          <span className="rounded-full bg-[#f0f3ec] px-2 py-0.5 text-[10px] font-bold text-[#71796b] uppercase tracking-wide">
+            {String(track.status || "—")}
+          </span>
+        </div>
+
+        {/* Completeness bar */}
+        <div className="mt-3">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[10px] font-bold text-[#858c7e] uppercase tracking-wide">Completeness</span>
+            <span className={`text-[11px] font-black ${completenessTone(q.completeness)}`}>
+              {q.completeness}%
+            </span>
+          </div>
+          <div className="h-1.5 overflow-hidden rounded-full bg-[#eef1e8]">
+            <div
+              className="h-full rounded-full bg-[#85c441] transition-all"
+              style={{ width: `${q.completeness}%` }}
+            />
+          </div>
+          {q.missingFields.length > 0 && (
+            <p className="mt-1 text-[10px] text-[#a8ad9e] truncate">
+              Missing: {q.missingFields.join(", ")}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────── Page ─────────────── */
+
 export default function TracksPage() {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const urlFilter = searchParams.get("filter");
 
   const [tracks, setTracks] = useState<RegistryEntityProfile[]>([]);
@@ -60,10 +258,10 @@ export default function TracksPage() {
     (urlFilter as QualityFilter) || "all"
   );
   const [sortMode, setSortMode] = useState<SortMode>("recent");
+  const [page, setPage] = useState(1);
 
   const [artistSlugs, setArtistSlugs] = useState<Set<string>>(new Set());
   const [releaseSlugs, setReleaseSlugs] = useState<Set<string>>(new Set());
-
   const [selectedTrack, setSelectedTrack] = useState<EnrichedTrack | null>(null);
 
   const showToast = useCallback((message: string) => {
@@ -74,16 +272,13 @@ export default function TracksPage() {
   async function fetchTracks() {
     setLoading(true);
     setError(null);
-
     const { data, error: fetchError } = await getRegistryEntityList("track", { limit: 250 });
-
     if (fetchError) {
       setError(fetchError);
       setTracks([]);
     } else {
       setTracks(data);
     }
-
     setLoading(false);
   }
 
@@ -135,13 +330,11 @@ export default function TracksPage() {
     const averageCompleteness = total
       ? Math.round(enrichedTracks.reduce((sum, t) => sum + t._quality.completeness, 0) / total)
       : 0;
-
     return { total, complete, missingIsrc, missingArtwork, blocked, averageCompleteness };
   }, [enrichedTracks]);
 
-  const visibleTracks = useMemo(() => {
+  const filteredTracks = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
-
     let rows = enrichedTracks.filter((track) => {
       const searchable = [
         track._displayTitle,
@@ -153,9 +346,7 @@ export default function TracksPage() {
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
-
       if (normalizedQuery && !searchable.includes(normalizedQuery)) return false;
-
       if (qualityFilter === "complete") return track._quality.completeness >= 85;
       if (qualityFilter === "incomplete") return track._quality.completeness < 85;
       if (qualityFilter === "missing_isrc") return !track.isrc;
@@ -164,30 +355,28 @@ export default function TracksPage() {
       if (qualityFilter === "missing_artist") return !artistSlugs.has(String(track.slug));
       if (qualityFilter === "missing_release") return !releaseSlugs.has(String(track.slug));
       if (qualityFilter === "blocked") return track._quality.state === "blocked";
-
       return true;
     });
-
     rows = [...rows].sort((a, b) => {
       if (sortMode === "title") return a._displayTitle.localeCompare(b._displayTitle);
       if (sortMode === "completeness_low") return a._quality.completeness - b._quality.completeness;
       if (sortMode === "completeness_high") return b._quality.completeness - a._quality.completeness;
-
       const aTime = new Date(String(a.updated_at || a.created_at || 0)).getTime();
       const bTime = new Date(String(b.updated_at || b.created_at || 0)).getTime();
       return bTime - aTime;
     });
-
     return rows;
   }, [enrichedTracks, query, qualityFilter, sortMode, artistSlugs, releaseSlugs]);
 
-  function openTrack(track: EnrichedTrack) {
-    setSelectedTrack(track);
-  }
+  const totalPages = Math.max(1, Math.ceil(filteredTracks.length / PAGE_SIZE));
+  const pagedTracks = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return filteredTracks.slice(start, start + PAGE_SIZE);
+  }, [filteredTracks, page]);
 
-  function closeEditor() {
-    setSelectedTrack(null);
-  }
+  useEffect(() => {
+    setPage(1);
+  }, [query, qualityFilter, sortMode]);
 
   function handleSaved(updatedEntity: Record<string, unknown>) {
     setTracks((prev) =>
@@ -207,6 +396,7 @@ export default function TracksPage() {
       )}
 
       <div className="mx-auto max-w-7xl">
+        {/* Header */}
         <header className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="mb-2 text-[11px] font-black uppercase tracking-[0.18em] text-[#5f8f2f]">
@@ -214,26 +404,22 @@ export default function TracksPage() {
             </p>
             <h1 className="text-3xl font-black tracking-tight">Tracks</h1>
             <p className="mt-2 max-w-2xl text-sm text-[#697062]">
-              Review, search, open, edit, and save canonical track records idempotently.
+              {filteredTracks.length.toLocaleString()} track{filteredTracks.length !== 1 ? "s" : ""} in registry
             </p>
           </div>
-
           <div className="flex flex-wrap gap-2">
             <button
               onClick={fetchTracks}
-              className="rounded-2xl border border-[#dfe4d8] bg-white px-4 py-3 text-sm font-black text-[#171712] shadow-sm transition hover:border-[#85c441]"
+              className="rounded-2xl border border-[#dfe4d8] bg-white px-4 py-3 text-sm font-black text-[#171712] shadow-sm transition hover:border-[#85c441] flex items-center gap-2"
             >
+              <WkIcon name="RefreshCcw" size={14} />
               Refresh
             </button>
-
-            <div className="rounded-2xl border border-[#dfe4d8] bg-white px-4 py-3 text-sm text-[#5d6557] shadow-sm">
-              <span className="font-black text-[#171712]">{visibleTracks.length}</span> shown ·{" "}
-              <span className="font-black text-[#171712]">{summary.total}</span> loaded
-            </div>
           </div>
         </header>
 
-        <section className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+        {/* KPI stats */}
+        <section className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
           {[
             ["Loaded", summary.total],
             ["Avg. completeness", `${summary.averageCompleteness}%`],
@@ -242,30 +428,28 @@ export default function TracksPage() {
             ["Missing artwork", summary.missingArtwork],
             ["Blocked", summary.blocked],
           ].map(([label, value]) => (
-            <div
-              key={label}
-              className="rounded-2xl border border-[#dfe4d8] bg-white p-4 shadow-sm"
-            >
-              <p className="text-[11px] font-black uppercase tracking-wide text-[#71796b]">
-                {label}
-              </p>
-              <p className="mt-2 text-2xl font-black text-[#171712]">{value}</p>
+            <div key={label as string} className="rounded-2xl border border-[#dfe4d8] bg-white p-4">
+              <p className="text-[11px] font-black uppercase tracking-wide text-[#71796b]">{label}</p>
+              <p className="mt-2 text-2xl font-black text-[#171712]">{value as number}</p>
             </div>
           ))}
         </section>
 
-        <section className="mb-4 rounded-2xl border border-[#dfe4d8] bg-white p-3 shadow-sm">
+        {/* Filter bar */}
+        <section className="mb-5 rounded-2xl border border-[#dfe4d8] bg-white p-3">
           <div className="grid gap-3 lg:grid-cols-[1fr_220px_220px]">
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search tracks by title, ISRC, slug, id, or status..."
-              className="h-11 w-full rounded-xl border border-[#dfe4d8] bg-[#f8f9f4] px-4 text-sm outline-none transition focus:border-[#85c441] focus:bg-white"
-            />
-
+            <div className="relative">
+              <WkIcon name="Search" size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#a8ad9e]" />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search tracks by title, ISRC, slug, id, status…"
+                className="h-11 w-full rounded-xl border border-[#dfe4d8] bg-[#f8f9f4] pl-10 pr-4 text-sm outline-none transition focus:border-[#85c441] focus:bg-white"
+              />
+            </div>
             <select
               value={qualityFilter}
-              onChange={(event) => setQualityFilter(event.target.value as QualityFilter)}
+              onChange={(e) => setQualityFilter(e.target.value as QualityFilter)}
               className="h-11 rounded-xl border border-[#dfe4d8] bg-[#f8f9f4] px-3 text-sm outline-none transition focus:border-[#85c441] focus:bg-white"
             >
               <option value="all">All quality states</option>
@@ -278,157 +462,78 @@ export default function TracksPage() {
               <option value="missing_release">Missing release</option>
               <option value="blocked">Blocked</option>
             </select>
-
             <select
               value={sortMode}
-              onChange={(event) => setSortMode(event.target.value as SortMode)}
+              onChange={(e) => setSortMode(e.target.value as SortMode)}
               className="h-11 rounded-xl border border-[#dfe4d8] bg-[#f8f9f4] px-3 text-sm outline-none transition focus:border-[#85c441] focus:bg-white"
             >
               <option value="recent">Recently updated</option>
               <option value="title">Title A-Z</option>
-              <option value="completeness_low">Completeness low-high</option>
-              <option value="completeness_high">Completeness high-low</option>
+              <option value="completeness_low">Completeness low → high</option>
+              <option value="completeness_high">Completeness high → low</option>
             </select>
           </div>
         </section>
 
+        {/* Error */}
         {error && (
           <section className="mb-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
             <p className="font-bold">Could not load registry tracks</p>
             <p className="mt-1 text-xs">{error}</p>
-            <button
-              onClick={fetchTracks}
-              className="mt-2 rounded-xl border border-red-300 bg-white px-3 py-1.5 text-xs font-bold text-red-700 hover:bg-red-100"
-            >
+            <button onClick={fetchTracks} className="mt-2 rounded-xl border border-red-300 bg-white px-3 py-1.5 text-xs font-bold text-red-700 hover:bg-red-100">
               Retry
             </button>
           </section>
         )}
 
-        <section className="overflow-hidden rounded-2xl border border-[#dfe4d8] bg-white shadow-sm">
-          {loading ? (
-            <div className="p-8 text-sm text-[#697062]">Loading registry tracks…</div>
-          ) : visibleTracks.length === 0 ? (
-            <div className="p-8 text-sm text-[#697062]">
-              {query || qualityFilter !== "all"
-                ? "No tracks match the current filters."
-                : "No live registry tracks found."}
+        {/* Loading */}
+        {loading && (
+          <div className="flex min-h-[300px] items-center justify-center rounded-2xl border border-[#dfe4d8] bg-white">
+            <div className="flex flex-col items-center gap-3">
+              <WkIcon name="Loader2" size={28} className="animate-spin text-[#5f8f2f]" />
+              <p className="text-[13px] font-bold text-[#697062]">Loading tracks…</p>
             </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[1080px] border-collapse text-left text-sm">
-                <thead>
-                  <tr className="border-b border-[#e8ece2] bg-[#fbfcf8] text-[11px] font-black uppercase tracking-wide text-[#71796b]">
-                    <th className="w-[36%] px-5 py-4">Track</th>
-                    <th className="w-[12%] px-5 py-4">ISRC</th>
-                    <th className="w-[12%] px-5 py-4">Duration</th>
-                    <th className="w-[10%] px-5 py-4">Status</th>
-                    <th className="w-[10%] px-5 py-4">Updated</th>
-                    <th className="w-[14%] px-5 py-4">Quality</th>
-                    <th className="w-[6%] px-5 py-4">Edit</th>
-                  </tr>
-                </thead>
+          </div>
+        )}
 
-                <tbody>
-                  {visibleTracks.map((track) => (
-                    <tr
+        {/* Results */}
+        {!loading && (
+          <div className="space-y-4">
+            {filteredTracks.length === 0 ? (
+              <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-[#dfe4d8] bg-white px-6 py-16 text-center">
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#f0f3ec]">
+                  <WkIcon name="SearchX" size={28} className="text-[#858c7e]" />
+                </div>
+                <p className="text-[16px] font-black text-[#171712]">No tracks found</p>
+                <p className="max-w-md text-[13px] text-[#697062]">
+                  {query || qualityFilter !== "all"
+                    ? "No tracks match your current filters. Try adjusting your search or filters."
+                    : "No live registry tracks found."}
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+                  {pagedTracks.map((track) => (
+                    <TrackCard
                       key={track.id}
-                      onClick={() => openTrack(track)}
-                      className="cursor-pointer border-b border-[#eef1ea] align-middle last:border-b-0 hover:bg-[#fbfcf8]"
-                    >
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-3">
-                          {track.artwork_url ? (
-                            <img
-                              src={String(track.artwork_url)}
-                              alt=""
-                              className="h-11 w-11 flex-none rounded-xl object-cover"
-                              loading="lazy"
-                            />
-                          ) : (
-                            <div className="flex h-11 w-11 flex-none items-center justify-center rounded-xl bg-[#f0f3ec] text-xs font-black text-[#8a9283]">
-                              ♪
-                            </div>
-                          )}
-
-                          <div className="min-w-0">
-                            <p className="truncate font-black text-[#171712]">
-                              {track._displayTitle}
-                            </p>
-                            <p className="mt-1 truncate text-xs text-[#858c7e]">
-                              {String(track.slug || track.id)}
-                            </p>
-                          </div>
-                        </div>
-                      </td>
-
-                      <td className="px-5 py-4">
-                        {track.isrc ? (
-                          <span className="font-mono text-xs text-[#2d3329]">{String(track.isrc)}</span>
-                        ) : (
-                          <span className="text-[#9aa292]">—</span>
-                        )}
-                      </td>
-
-                      <td className="px-5 py-4 text-[#2d3329]">
-                        {track._displayDuration}
-                      </td>
-
-                      <td className="px-5 py-4">
-                        <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-black uppercase tracking-wide text-emerald-700">
-                          {String(track.status || "unknown")}
-                        </span>
-                      </td>
-
-                      <td className="px-5 py-4 text-[#5d6557]">
-                        {formatDate(String(track.updated_at || track.created_at))}
-                      </td>
-
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-3">
-                          <span
-                            className={`rounded-full px-2.5 py-1 text-[11px] font-black ${completenessTone(
-                              track._quality.completeness,
-                            )}`}
-                          >
-                            {track._quality.completeness}%
-                          </span>
-                          <span className="text-[11px] font-bold text-[#8a9283]">
-                            {completenessLabel(track._quality.state)}
-                          </span>
-                        </div>
-                        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#eef1e8]">
-                          <div
-                            className="h-full rounded-full bg-[#85c441]"
-                            style={{ width: `${track._quality.completeness}%` }}
-                          />
-                        </div>
-                        {track._quality.missingFields.length > 0 && (
-                          <p className="mt-1 text-[10px] text-[#8a9283]">
-                            Missing: {track._quality.missingFields.join(", ")}
-                          </p>
-                        )}
-                      </td>
-
-                      <td className="px-5 py-4">
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            openTrack(track);
-                          }}
-                          className="rounded-xl border border-[#dfe4d8] bg-white px-3 py-2 text-xs font-black text-[#171712] transition hover:border-[#85c441]"
-                        >
-                          Open
-                        </button>
-                      </td>
-                    </tr>
+                      track={track}
+                      onOpen={setSelectedTrack}
+                      onNavigate={(slug) => navigate(`/admin/registry/tracks/${slug}`)}
+                    />
                   ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
+                </div>
+                <Pagination
+                  currentPage={page}
+                  totalPages={totalPages}
+                  onPageChange={setPage}
+                  totalItems={filteredTracks.length}
+                  pageSize={PAGE_SIZE}
+                />
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {selectedTrack && (
@@ -436,7 +541,7 @@ export default function TracksPage() {
           entityType="track"
           entity={selectedTrack}
           schema={schema}
-          onClose={closeEditor}
+          onClose={() => setSelectedTrack(null)}
           onSaved={handleSaved}
         />
       )}

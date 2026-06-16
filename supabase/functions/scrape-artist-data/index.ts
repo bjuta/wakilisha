@@ -279,6 +279,11 @@ function parseTrackRows(modalHtml: string): TrackData[] {
   return tracks;
 }
 
+// ── v5 changelog ──
+// - Added bioOnly mode: skip all release/track/appears-on/top-song processing, only update bio
+// - Bio scraping preserves HTML formatting (p, strong, em, a, br, etc.)
+// - Basic sanitization removes script tags and event handlers
+
 async function scrapeArtistPage(slug: string): Promise<ArtistScrapeResult | null> {
   const url = `${SITE_BASE}/artists/${slug}/`;
   let html: string;
@@ -302,8 +307,19 @@ async function scrapeArtistPage(slug: string): Promise<ArtistScrapeResult | null
 
   const h1Match = html.match(/class="wk-title wk-title--sm">([\s\S]*?)<\/h1>/);
   const name = h1Match ? decodeHtmlEntities(h1Match[1].replace(/<[^>]+>/g, "").trim()) : slug;
-  const bioMatch = html.match(/class="wk-prose wk-artist-about-copy[\s\S]*?<p>([\s\S]*?)<\/div>\s*<\/section>/);
-  const bio = bioMatch ? decodeHtmlEntities(bioMatch[1].replace(/<[^>]+>/g, "").trim()) : null;
+
+  // ── Bio: capture full HTML content with formatting preserved ──
+  const bioMatch = html.match(/class="wk-prose wk-artist-about-copy[^"]*"[^>]*>([\s\S]*?)<\/div>\s*<\/section>/);
+  let bio: string | null = null;
+  if (bioMatch) {
+    bio = bioMatch[1].trim();
+    // Remove script tags and their content
+    bio = bio.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "");
+    // Remove event handler attributes (onclick, onload, etc.)
+    bio = bio.replace(/\s+on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "");
+    bio = bio.trim() || null;
+  }
+
   const avatarMatch = html.match(/class=["'][^"']*wk-artist-avatar[^"']*["']>[\s\S]*?<img src=["']([^">\s]+)["']/);
   const imageUrl = avatarMatch ? avatarMatch[1] : null;
   const genreMatches = html.matchAll(/class="wk-artist-badge wk-artist-badge--genre">([\s\S]*?)<\/span>/g);
@@ -403,7 +419,7 @@ async function scrapeArtistPage(slug: string): Promise<ArtistScrapeResult | null
 async function writeScrapeToRegistry(
   supabase: ReturnType<typeof createClient>,
   data: ArtistScrapeResult,
-  options: { dryRun: boolean; overwrite: boolean }
+  options: { dryRun: boolean; overwrite: boolean; bioOnly: boolean }
 ): Promise<{ success: boolean; stats: Record<string, number>; errors: string[] }> {
   const stats: Record<string, number> = {
     releases_upserted: 0,
@@ -457,6 +473,7 @@ async function writeScrapeToRegistry(
 
   const artistId = artistRow.id as string;
 
+  // ── Bio update (always runs, even in bioOnly mode) ──
   const artistPatch: Record<string, unknown> = {};
   if (data.bio && (!artistRow.bio || (artistRow.bio as string).length < 50 || options.overwrite)) {
     artistPatch.bio = data.bio;
@@ -464,62 +481,67 @@ async function writeScrapeToRegistry(
   if (data.imageUrl && (!artistRow.public_image_url || options.overwrite)) {
     artistPatch.public_image_url = data.imageUrl;
   }
+
   const existingMeta = (artistRow.metadata || {}) as Record<string, unknown>;
   const metaPatch: Record<string, unknown> = {};
-  if (data.spotifyUrl && (!existingMeta.spotify_url || options.overwrite)) metaPatch.spotify_url = data.spotifyUrl;
-  if (data.instagramUrl && (!existingMeta.instagram_url || options.overwrite)) metaPatch.instagram_url = data.instagramUrl;
-  if (data.youtubeUrl && (!existingMeta.youtube_url || options.overwrite)) metaPatch.youtube_url = data.youtubeUrl;
-  if (data.country && (!existingMeta.country || options.overwrite)) metaPatch.country = data.country;
-  if (data.genres.length > 0 && (!existingMeta.genres || options.overwrite)) metaPatch.genres = data.genres;
 
-  if (data.videos.length > 0 && (!existingMeta.youtube_videos || options.overwrite)) {
-    metaPatch.youtube_videos = data.videos.map(v => ({
-      youtubeId: v.youtubeId,
-      title: v.title,
-      url: `https://www.youtube.com/watch?v=${v.youtubeId}`,
-    }));
-  }
+  // In bioOnly mode, skip all metadata fields except basic bio-related ones
+  if (!options.bioOnly) {
+    if (data.spotifyUrl && (!existingMeta.spotify_url || options.overwrite)) metaPatch.spotify_url = data.spotifyUrl;
+    if (data.instagramUrl && (!existingMeta.instagram_url || options.overwrite)) metaPatch.instagram_url = data.instagramUrl;
+    if (data.youtubeUrl && (!existingMeta.youtube_url || options.overwrite)) metaPatch.youtube_url = data.youtubeUrl;
+    if (data.country && (!existingMeta.country || options.overwrite)) metaPatch.country = data.country;
+    if (data.genres.length > 0 && (!existingMeta.genres || options.overwrite)) metaPatch.genres = data.genres;
 
-  if (data.topSongs.length > 0 && (!existingMeta.top_songs || options.overwrite)) {
-    metaPatch.top_songs = data.topSongs.map(s => ({
-      title: s.title,
-      artists: s.artist,
-      image: s.artworkUrl || "",
-      duration: "",
-      songUrl: s.previewUrl || "",
-    }));
-  }
-  if (data.relatedArtists.length > 0 && (!existingMeta.related_artists || options.overwrite)) {
-    metaPatch.related_artists = data.relatedArtists.map(slug => ({
-      slug,
-      name: slug.replace(/-/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()),
-    }));
-  }
-  if (data.imageUrl && (!existingMeta.portrait_image || options.overwrite)) {
-    metaPatch.portrait_image = data.imageUrl;
-  }
-  if (data.releases.length > 0) {
-    const albums = data.releases.filter(r => r.releaseType !== "single" && r.releaseType !== "ep");
-    const epsSingles = data.releases.filter(r => r.releaseType === "ep" || r.releaseType === "single");
-    if (albums.length > 0 && (!existingMeta.studio_albums || options.overwrite)) {
-      metaPatch.studio_albums = albums.map(r => ({
-        title: r.title,
-        release_date: r.releaseDate || r.year || "",
-        year: r.year || "",
-        track_count: r.trackCount,
-        image: r.artworkUrl || "",
-        tracks: r.tracks.map(t => ({ title: t.title, duration: t.duration || "" })),
+    if (data.videos.length > 0 && (!existingMeta.youtube_videos || options.overwrite)) {
+      metaPatch.youtube_videos = data.videos.map(v => ({
+        youtubeId: v.youtubeId,
+        title: v.title,
+        url: `https://www.youtube.com/watch?v=${v.youtubeId}`,
       }));
     }
-    if (epsSingles.length > 0 && (!existingMeta.eps_compilations || options.overwrite)) {
-      metaPatch.eps_compilations = epsSingles.map(r => ({
-        title: r.title,
-        release_date: r.releaseDate || r.year || "",
-        year: r.year || "",
-        track_count: r.trackCount,
-        image: r.artworkUrl || "",
-        tracks: r.tracks.map(t => ({ title: t.title, duration: t.duration || "" })),
+
+    if (data.topSongs.length > 0 && (!existingMeta.top_songs || options.overwrite)) {
+      metaPatch.top_songs = data.topSongs.map(s => ({
+        title: s.title,
+        artists: s.artist,
+        image: s.artworkUrl || "",
+        duration: "",
+        songUrl: s.previewUrl || "",
       }));
+    }
+    if (data.relatedArtists.length > 0 && (!existingMeta.related_artists || options.overwrite)) {
+      metaPatch.related_artists = data.relatedArtists.map(slug => ({
+        slug,
+        name: slug.replace(/-/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()),
+      }));
+    }
+    if (data.imageUrl && (!existingMeta.portrait_image || options.overwrite)) {
+      metaPatch.portrait_image = data.imageUrl;
+    }
+    if (data.releases.length > 0) {
+      const albums = data.releases.filter(r => r.releaseType !== "single" && r.releaseType !== "ep");
+      const epsSingles = data.releases.filter(r => r.releaseType === "ep" || r.releaseType === "single");
+      if (albums.length > 0 && (!existingMeta.studio_albums || options.overwrite)) {
+        metaPatch.studio_albums = albums.map(r => ({
+          title: r.title,
+          release_date: r.releaseDate || r.year || "",
+          year: r.year || "",
+          track_count: r.trackCount,
+          image: r.artworkUrl || "",
+          tracks: r.tracks.map(t => ({ title: t.title, duration: t.duration || "" })),
+        }));
+      }
+      if (epsSingles.length > 0 && (!existingMeta.eps_compilations || options.overwrite)) {
+        metaPatch.eps_compilations = epsSingles.map(r => ({
+          title: r.title,
+          release_date: r.releaseDate || r.year || "",
+          year: r.year || "",
+          track_count: r.trackCount,
+          image: r.artworkUrl || "",
+          tracks: r.tracks.map(t => ({ title: t.title, duration: t.duration || "" })),
+        }));
+      }
     }
   }
 
@@ -536,6 +558,13 @@ async function writeScrapeToRegistry(
   } else if (Object.keys(artistPatch).length > 0) {
     stats.artist_updated++;
   }
+
+  // ── Bio-only mode: skip all release/track/appears-on/top-song processing ──
+  if (options.bioOnly) {
+    return { success: true, stats, errors };
+  }
+
+  // ── Full scrape mode continues below ──
 
   const existingReleases = await fetchAllRows<{ id: string; slug: string; title: string }>(
     "registry_releases", "id, slug, title"
@@ -557,7 +586,6 @@ async function writeScrapeToRegistry(
     existingTracks.map((t) => [t.slug, t.id])
   );
 
-  // Build slug prefix used by artist-scoped track slugs (e.g. "4mr-frank-white--intro")
   const artistScopedSlugPrefix = `${data.slug}--`;
 
   const trackNormTitleToSlug = new Map<string, string>();
@@ -566,9 +594,6 @@ async function writeScrapeToRegistry(
     if (key) trackNormTitleToSlug.set(key, t.slug);
   }
 
-  // Override with artist-scoped entries for this artist so title-based lookups
-  // prefer the artist-qualified slug over a generic slug that could collide
-  // with another artist's track of the same name.
   for (const t of existingTracks) {
     const slug = t.slug as string;
     if (slug.startsWith(artistScopedSlugPrefix)) {
@@ -616,14 +641,12 @@ async function writeScrapeToRegistry(
       const scopedCandidate = `${data.slug}--${baseSlug}`;
       releaseId = existingReleaseBySlug.get(scopedCandidate);
       if (!releaseId) {
-        // Fall back to flat slug for backwards compatibility with pre-scoped releases
         releaseId = existingReleaseBySlug.get(baseSlug);
       }
     }
 
     if (!releaseId) {
       const newId = crypto.randomUUID();
-      // Scoped release slug: artistSlug--titleSlug
       const relSlug = dedupeSlug(`${data.slug}--${slugify(title)}`, seenReleaseSlugs);
       const newRelease = {
         id: newId,
@@ -743,9 +766,6 @@ async function writeScrapeToRegistry(
 
       if (track.isrc) trackId = existingTrackByIsrc.get(track.isrc);
 
-      // Check artist-scoped slug (e.g. "4mr-frank-white--intro") — matches
-      // tracks created by rebuild-discography-from-metadata and other pipelines
-      // that use artist-qualified slugs to avoid cross-artist collisions.
       if (!trackId) {
         const scopedSlug = `${artistScopedSlugPrefix}${trackTitleSlug}`;
         trackId = existingTrackBySlug.get(scopedSlug);
@@ -926,8 +946,6 @@ async function writeScrapeToRegistry(
 
       if (track.isrc) trackId = existingTrackByIsrc.get(track.isrc);
 
-      // Check scoped slugs for both the release owner and the scraped artist.
-      // Appears-on tracks may have been created under either artist's namespace.
       if (!trackId) {
         const ownerScopedSlug = `${releaseOwnerSlug}--${trackTitleSlug}`;
         trackId = existingTrackBySlug.get(ownerScopedSlug);
@@ -1279,17 +1297,19 @@ Deno.serve(async (req: Request) => {
       if (!artistSlug) return respond({ error: "Missing artistSlug" }, 400);
       const dryRun = body.dryRun === true;
       const overwrite = body.overwrite === true;
+      const bioOnly = body.bioOnly === true;
       const scraped = await scrapeArtistPage(artistSlug);
       if (!scraped) {
         return respond({ success: false, error: `Could not scrape artist page: ${artistSlug}`, artistSlug });
       }
-      const result = await writeScrapeToRegistry(supabase, scraped, { dryRun, overwrite });
+      const result = await writeScrapeToRegistry(supabase, scraped, { dryRun, overwrite, bioOnly });
       return respond({
         mode: "scrape_one",
         success: true,
         artistSlug,
         dryRun,
         overwrite,
+        bioOnly,
         scraped: {
           name: scraped.name,
           bio_length: scraped.bio?.length ?? 0,
@@ -1321,6 +1341,7 @@ Deno.serve(async (req: Request) => {
       const slugs = (body.slugs as string[]) || [];
       const dryRun = body.dryRun === true;
       const overwrite = body.overwrite === true;
+      const bioOnly = body.bioOnly === true;
       if (!slugs.length) return respond({ error: "Missing slugs array" }, 400);
       const batchResults: Array<{
         slug: string;
@@ -1350,7 +1371,7 @@ Deno.serve(async (req: Request) => {
             aggregateStats.artists_failed++;
             continue;
           }
-          const result = await writeScrapeToRegistry(supabase, scraped, { dryRun, overwrite });
+          const result = await writeScrapeToRegistry(supabase, scraped, { dryRun, overwrite, bioOnly });
           batchResults.push({
             slug: artistSlug,
             success: result.success,
@@ -1379,6 +1400,7 @@ Deno.serve(async (req: Request) => {
         success: true,
         dryRun,
         overwrite,
+        bioOnly,
         total: slugs.length,
         aggregate: aggregateStats,
         results: batchResults,

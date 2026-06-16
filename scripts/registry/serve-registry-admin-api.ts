@@ -1,10 +1,11 @@
 /**
  * WAKILISHA Registry Admin API
  * ────────────────────────────
- * Dedicated HTTP server for registry admin routes, including the release-shell
- * canonicalization workflow and provider intake system.
+ * Dedicated HTTP server for the release-shell canonicalization workflow.
+ * Provider intake (search, inspect, create) is handled exclusively by the
+ * Supabase Edge Function `provider-intake-api`.
  *
- * Enrichment-review routes:
+ * Routes:
  *   GET  /api/v1/registry/enrichment-review/release-shells
  *   POST /api/v1/registry/enrichment-review/release-shells
  *   GET  /api/v1/registry/enrichment-review/release-shells/:id/audit
@@ -12,13 +13,6 @@
  *   POST /api/v1/registry/enrichment-review/release-shells/suggestions/:id/decision
  *   POST /api/v1/registry/enrichment-review/release-shells/preview-apply
  *   POST /api/v1/registry/enrichment-review/release-shells/apply-approved
- *
- * Provider intake routes:
- *   GET  /api/v1/registry/provider-search?provider=apple_music&q=...&type=all&storefront=ke&limit=25
- *   POST /api/v1/registry/provider-search/inspect
- *   POST /api/v1/registry/release-shells/intake/create
- *   POST /api/v1/registry/release-shells/intake/attach
- *   POST /api/v1/registry/release-shells/intake/backfill
  */
 
 import http from "node:http";
@@ -40,14 +34,6 @@ import {
   loadAuthorizedAdmin,
   type AuthorizedAdmin,
 } from "../lib/admin-authz";
-import {
-  handleProviderSearch,
-  handleProviderInspect,
-  handleCreateReleaseShell,
-  handleAttachToShell,
-  handleBackfillExistingRelease,
-  handleTestProviderConnection,
-} from "./provider-intake/routes";
 
 const port = Number(process.env.WAKILISHA_REGISTRY_ADMIN_API_PORT ?? 4177);
 const host = process.env.WAKILISHA_REGISTRY_ADMIN_API_HOST;
@@ -125,123 +111,6 @@ async function route(req: http.IncomingMessage, res: http.ServerResponse): Promi
   // Health check
   if (parts.length === 0 || parts[0] === "health") {
     ok(res, { ok: true, service: "wakilisha-registry-admin-api", version: "v1" });
-    return;
-  }
-
-  // ── Provider intake routes ────────────────────────────────────────────────
-
-  // GET /api/v1/registry/provider-search
-  if (parts[0] === "registry" && parts[1] === "provider-search" && parts.length === 2) {
-    if (req.method !== "GET") { err(res, 405, "method_not_allowed", "Only GET supported."); return; }
-    try {
-      const response = await handleProviderSearch(getPool(), url.searchParams);
-      ok(res, response, { source: "provider_intake" });
-    } catch (searchErr) {
-      const message = searchErr instanceof Error ? searchErr.message : "Provider search failed.";
-      err(res, 502, "provider_search_failed", message);
-    }
-    return;
-  }
-
-  // GET /api/v1/registry/provider-search/test-connection
-  if (parts[0] === "registry" && parts[1] === "provider-search" && parts[2] === "test-connection") {
-    if (req.method !== "GET") { err(res, 405, "method_not_allowed", "Only GET supported."); return; }
-    try {
-      const response = await handleTestProviderConnection(getPool(), url.searchParams);
-      ok(res, response, { source: "provider_intake" });
-    } catch (testErr) {
-      const message = testErr instanceof Error ? testErr.message : "Connection test failed.";
-      err(res, 502, "connection_test_failed", message);
-    }
-    return;
-  }
-
-  // POST /api/v1/registry/provider-search/inspect
-  if (parts[0] === "registry" && parts[1] === "provider-search" && parts[2] === "inspect") {
-    if (req.method !== "POST") { err(res, 405, "method_not_allowed", "Only POST supported."); return; }
-    try {
-      const body = await readBody(req);
-      const response = await handleProviderInspect(getPool(), body);
-      ok(res, response, { source: "provider_intake" });
-    } catch (inspectErr) {
-      const message = inspectErr instanceof Error ? inspectErr.message : "Provider inspect failed.";
-      err(res, 502, "provider_inspect_failed", message);
-    }
-    return;
-  }
-
-  // POST /api/v1/registry/release-shells/intake/create
-  if (parts[0] === "registry" && parts[1] === "release-shells" && parts[2] === "intake" && parts[3] === "create") {
-    if (req.method !== "POST") { err(res, 405, "method_not_allowed", "Only POST supported."); return; }
-
-    let adminUser: AuthorizedAdmin;
-    try {
-      adminUser = await requireAuth(req, "manage_registry");
-    } catch (authErr: unknown) {
-      const status = (authErr as { status?: number }).status ?? 403;
-      const message = authErr instanceof Error ? authErr.message : "Forbidden";
-      err(res, status, "unauthorized", message);
-      return;
-    }
-
-    try {
-      const body = await readBody(req);
-      const response = await handleCreateReleaseShell(getPool(), body, adminUser.userId);
-      ok(res, response, { source: "provider_intake" });
-    } catch (createErr) {
-      const message = createErr instanceof Error ? createErr.message : "Shell creation failed.";
-      err(res, 500, "intake_create_failed", message);
-    }
-    return;
-  }
-
-  // POST /api/v1/registry/release-shells/intake/attach
-  if (parts[0] === "registry" && parts[1] === "release-shells" && parts[2] === "intake" && parts[3] === "attach") {
-    if (req.method !== "POST") { err(res, 405, "method_not_allowed", "Only POST supported."); return; }
-
-    let adminUser: AuthorizedAdmin;
-    try {
-      adminUser = await requireAuth(req, "manage_registry");
-    } catch (authErr: unknown) {
-      const status = (authErr as { status?: number }).status ?? 403;
-      const message = authErr instanceof Error ? authErr.message : "Forbidden";
-      err(res, status, "unauthorized", message);
-      return;
-    }
-
-    try {
-      const body = await readBody(req);
-      const response = await handleAttachToShell(getPool(), body, adminUser.userId);
-      ok(res, response, { source: "provider_intake" });
-    } catch (attachErr) {
-      const message = attachErr instanceof Error ? attachErr.message : "Shell attach failed.";
-      err(res, 500, "intake_attach_failed", message);
-    }
-    return;
-  }
-
-  // POST /api/v1/registry/release-shells/intake/backfill
-  if (parts[0] === "registry" && parts[1] === "release-shells" && parts[2] === "intake" && parts[3] === "backfill") {
-    if (req.method !== "POST") { err(res, 405, "method_not_allowed", "Only POST supported."); return; }
-
-    let adminUser: AuthorizedAdmin;
-    try {
-      adminUser = await requireAuth(req, "manage_registry");
-    } catch (authErr: unknown) {
-      const status = (authErr as { status?: number }).status ?? 403;
-      const message = authErr instanceof Error ? authErr.message : "Forbidden";
-      err(res, status, "unauthorized", message);
-      return;
-    }
-
-    try {
-      const body = await readBody(req);
-      const response = await handleBackfillExistingRelease(getPool(), body, adminUser.userId);
-      ok(res, response, { source: "provider_intake" });
-    } catch (backfillErr) {
-      const message = backfillErr instanceof Error ? backfillErr.message : "Release backfill failed.";
-      err(res, 500, "intake_backfill_failed", message);
-    }
     return;
   }
 

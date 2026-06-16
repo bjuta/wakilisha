@@ -134,6 +134,30 @@ export async function backfillExistingRelease(
   return data as CreateReleaseShellResult;
 }
 
+export async function refreshShellTracks(
+  shellId: string,
+  providerEntityId: string,
+  provider: string,
+  storefront: string,
+): Promise<{ tracksFetched: number; error?: string }> {
+  const { data, error } = await supabase.functions.invoke("provider-intake-api", {
+    body: {
+      route: "refresh-shell",
+      provider,
+      providerEntityType: "release",
+      providerEntityId,
+      storefrontOrMarket: storefront,
+    },
+  });
+
+  const bodyErr = extractBodyError(data);
+  if (bodyErr) throw new Error(bodyErr);
+  if (error) throw edgeFunctionError(error);
+
+  const diag = (data as Record<string, unknown>)?.diag as { tracksFetched?: number } | undefined;
+  return { tracksFetched: diag?.tracksFetched ?? 0 };
+}
+
 export type ProviderConnectionTestResult = {
   provider: string;
   storefront: string;

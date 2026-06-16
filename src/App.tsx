@@ -14,6 +14,7 @@ import { ThemeProvider } from "./components/design-system/theme/ThemeProvider";
 import { PlayerProvider } from "./context/PlayerContext";
 import { RecoveryRedirectGuard } from "./components/auth/RecoveryRedirectGuard";
 import { PageTitle } from "./components/seo/PageTitle";
+import ScrollRestoration from "./components/base/ScrollRestoration";
 
 function App() {
   return (
@@ -23,6 +24,7 @@ function App() {
           <PlayerProvider>
             <RecoveryRedirectGuard />
             <PageTitle />
+            <ScrollRestoration />
             <AppRoutes />
           </PlayerProvider>
         </ThemeProvider>

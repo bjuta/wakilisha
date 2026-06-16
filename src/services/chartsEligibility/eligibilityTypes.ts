@@ -143,4 +143,8 @@ export type ChartMarketScope = {
     weight?: number;
   }>;
   aggregationMode: "combined" | "separate_then_combined" | "weighted" | "minimum_presence" | "editorial";
+  /** ISO2 codes of countries whose artists are allowed on this chart (empty = no filter) */
+  artistOriginCountries?: string[];
+  /** How to handle artists with unknown/missing origin: 'exclude' | 'warn' | 'include' */
+  artistOriginUnknownMode?: "exclude" | "warn" | "include";
 };

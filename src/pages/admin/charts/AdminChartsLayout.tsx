@@ -21,7 +21,7 @@ const MORE_ITEMS: NavItem[] = [
   { path: "/admin/charts/families", label: "Chart Families", icon: "FolderTree", requiredCapability: "manage_charts" },
   { path: "/admin/charts/snapshots", label: "Snapshots", icon: "Camera", requiredCapability: "view_charts_admin" },
   { path: "/admin/charts/no-match", label: "No-match", icon: "XCircle", requiredCapability: "view_charts_admin" },
-  { path: "/admin/charts/release-shells", label: "Release Shells", icon: "FolderPlus", requiredCapability: "view_charts_admin" },
+  { path: "/admin/registry/release-shells", label: "Release Shells", icon: "FolderPlus", requiredCapability: "view_charts_admin" },
   { path: "/admin/charts/canon-gaps", label: "Canon Gaps", icon: "AlertCircle", requiredCapability: "view_charts_admin" },
   { path: "/admin/charts/integration-map", label: "Integration Map", icon: "Map", requiredCapability: "view_charts_admin" },
   { path: "/admin/charts/public-api-qa", label: "Public API QA", icon: "FlaskConical", requiredCapability: "view_charts_admin" },

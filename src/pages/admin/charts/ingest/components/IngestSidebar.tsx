@@ -120,7 +120,7 @@ export function IngestSidebar({
         <div className="space-y-1">
           <NavButton icon={GitPullRequest} label="Review Queue" path={`${ADMIN_CHARTS_BASE}/review-queue`} />
           <NavButton icon={XCircle} label="No-match Releases" path={`${ADMIN_CHARTS_BASE}/no-match`} />
-          <NavButton icon={FolderPlus} label="Release Shells" path={`${ADMIN_CHARTS_BASE}/release-shells`} />
+          <NavButton icon={FolderPlus} label="Release Shells" path="/admin/registry/release-shells" />
           <NavButton icon={AlertCircle} label="Canon Gaps" path={`${ADMIN_CHARTS_BASE}/canon-gaps`} />
           <button
             onClick={() => { setFixSlugsOpen(true); setFixSlugsResult(null); setFixSlugsError(null); }}

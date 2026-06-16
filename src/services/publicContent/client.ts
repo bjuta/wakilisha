@@ -80,6 +80,7 @@ export type PublicReleaseDetail = PublicRelease & {
     previewUrl?: string;
   }>;
   metadata: Record<string, unknown>;
+  featuredArtists: Array<{ name: string; slug: string }>;
 };
 
 export type PublicArticleDetail = PublicStory & {
@@ -374,7 +375,12 @@ function generatedReleaseArtwork(title: string, artist: string): string {
 }
 
 export function slugify(name: string): string {
-  return name.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  return name
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
 }
 
 export function releaseUrl(release: { slug: string; artist: string }): string {
@@ -484,6 +490,26 @@ async function getRegistryTracklist(releaseId: string, fallbackArtist: string): 
   }
 
   const tracksById = new Map(deepDecode(((trackRows || []) as GenericRow[])).map((track) => [textValue(track, ["id"]), track]));
+
+  // Fetch track artists for featured artist display
+  const { data: trackArtistRows } = await supabase
+    .from("registry_track_artists")
+    .select("track_id, artist_name_text, artist_slug, is_primary, is_featured, credit_order")
+    .in("track_id", trackIds)
+    .eq("status", "active")
+    .order("credit_order", { ascending: true });
+
+  const artistsByTrack = new Map<string, Array<{ name: string; slug: string; isPrimary: boolean; isFeatured: boolean }>>();
+  for (const ta of (trackArtistRows || [])) {
+    if (!artistsByTrack.has(ta.track_id)) artistsByTrack.set(ta.track_id, []);
+    artistsByTrack.get(ta.track_id)!.push({
+      name: ta.artist_name_text || ta.artist_slug,
+      slug: ta.artist_slug || "",
+      isPrimary: ta.is_primary,
+      isFeatured: ta.is_featured,
+    });
+  }
+
   const mediaSlugs: string[] = [];
   for (const relationship of relationships) {
     const track = tracksById.get(relationship.trackId) || {};
@@ -499,31 +525,45 @@ async function getRegistryTracklist(releaseId: string, fallbackArtist: string): 
       const track = tracksById.get(relationship.trackId) || {};
       const title = textValue(track, ["title", "name", "display_title", "normalized_title", "slug"], "");
       const slug = textValue(track, ["slug", "normalized_slug"], relationship.trackId);
-      const artist = textValue(track, ["artist", "artist_name", "primary_artist_name", "artists"], fallbackArtist);
       const mediaUrl = mediaUrlFor(mediaCandidates(slug, title), mediaBySlug);
       const directArtwork = textValue(track, ["artwork_url", "cover_image_url", "image_url", "thumbnail_url"]);
-      const artwork = mediaUrl || image(directArtwork, {
-        id: relationship.trackId,
-        slug,
-        name: title,
-        type: "track",
-      });
+
+      // Build artist string with featured artists
+      const trackArtists = artistsByTrack.get(relationship.trackId) || [];
+      const primaryArtist = trackArtists.find((a) => a.isPrimary) || trackArtists[0];
+      const featuredArtists = trackArtists
+        .filter((a) => a.slug !== (primaryArtist?.slug || ""))
+        .map((a) => a.name)
+        .filter(Boolean);
+      const artistStr = featuredArtists.length > 0
+        ? `${primaryArtist?.name || fallbackArtist} (feat. ${featuredArtists.join(", ")})`
+        : (primaryArtist?.name || textValue(track, ["artist", "artist_name", "primary_artist_name", "artists"], fallbackArtist));
 
       return {
         id: relationship.trackId,
         slug,
         title,
-        artist,
+        artist: artistStr,
         duration: numberValue(track, ["duration", "duration_seconds", "length_seconds"], 0),
         trackNumber: relationship.position || index + 1,
-        artworkUrl: artwork || generatedReleaseArtwork(title, artist),
+        artworkUrl: mediaUrl || image(directArtwork, {
+          id: relationship.trackId,
+          slug,
+          name: title,
+          type: "track",
+        }) || generatedReleaseArtwork(title, artistStr),
         previewUrl: textValue(track, ["preview_url"]) || undefined,
       };
     })
     .filter((track) => track.title);
 }
 
-function mapShellToRelease(shell: ReleaseShellRow, tracks: PublicReleaseDetail["tracks"] = [], releaseArtworkUrl = ""): PublicReleaseDetail {
+function mapShellToRelease(
+  shell: ReleaseShellRow,
+  tracks: PublicReleaseDetail["tracks"] = [],
+  releaseArtworkUrl = "",
+  featuredArtists: Array<{ name: string; slug: string }> = []
+): PublicReleaseDetail {
   const artist = shell.primary_artist_name || "Unknown artist";
   const trackCount = tracks.length || Number(shell.track_count || 0);
   const releaseType = releaseTypeFromTrackCount(trackCount);
@@ -556,36 +596,118 @@ function mapShellToRelease(shell: ReleaseShellRow, tracks: PublicReleaseDetail["
       tracklistSource: tracks.length ? "registry_release_tracks" : "shell_only",
       artworkSource: releaseArtworkUrl ? "registry_media_assets" : tracks.some((track) => !track.artworkUrl.startsWith("data:image/svg+xml")) ? "track_registry_media_assets" : "generated_placeholder",
     },
+    featuredArtists,
   };
 }
 
 async function getReleaseFromShell(artistSlug: string, releaseSlug: string): Promise<PublicReleaseDetail | null> {
-  const { data, error } = await supabase
-    .from("registry_release_shells")
-    .select("id, release_id, slug, title, primary_artist_name, primary_artist_slug, release_date, track_count, has_artwork, readiness, missing, shell_route, source_provenance, status, updated_at")
-    .eq("status", "ready")
-    .eq("slug", releaseSlug)
-    .eq("primary_artist_slug", artistSlug)
-    .maybeSingle();
+  // The shell slug may be stored as the combined "artistSlug--releaseSlug"
+  // (e.g. "bensoul--the-lion-of-sudah") or just the plain release slug.
+  const combinedSlug = `${artistSlug}--${releaseSlug}`;
+  const slugCandidates = releaseSlug !== combinedSlug ? [releaseSlug, combinedSlug] : [releaseSlug];
 
-  if (error) {
-    console.warn(`WAKILISHA release shell lookup failed: ${error.message}`);
-    return null;
+  for (const candidateSlug of slugCandidates) {
+    const { data, error } = await supabase
+      .from("registry_release_shells")
+      .select("id, release_id, slug, title, primary_artist_name, primary_artist_slug, release_date, track_count, has_artwork, readiness, missing, shell_route, source_provenance, status, updated_at")
+      .in("status", ["ready", "canonicalized"])
+      .eq("slug", candidateSlug)
+      .eq("primary_artist_slug", artistSlug)
+      .maybeSingle();
+
+    if (error) {
+      console.warn(`WAKILISHA release shell lookup failed: ${error.message}`);
+      continue;
+    }
+
+    if (data) {
+      const shell = deepDecode(data as ReleaseShellRow);
+      const tracks = await getRegistryTracklist(shell.release_id, shell.primary_artist_name || "Unknown artist");
+      const releaseMedia = await getRegistryMediaBySlugs(mediaCandidates(shell.slug, shell.title));
+      const releaseArtworkUrl = mediaUrlFor(mediaCandidates(shell.slug, shell.title), releaseMedia);
+
+      // Aggregate featured artists from track-level data
+      const featuredArtists = await aggregateFeaturedArtists(shell.release_id);
+
+      return mapShellToRelease(shell, tracks, releaseArtworkUrl, featuredArtists);
+    }
   }
 
-  if (!data) return null;
-  const shell = deepDecode(data as ReleaseShellRow);
-  const tracks = await getRegistryTracklist(shell.release_id, shell.primary_artist_name || "Unknown artist");
-  const releaseMedia = await getRegistryMediaBySlugs(mediaCandidates(shell.slug, shell.title));
-  const releaseArtworkUrl = mediaUrlFor(mediaCandidates(shell.slug, shell.title), releaseMedia);
-  return mapShellToRelease(shell, tracks, releaseArtworkUrl);
+  return null;
+}
+
+/** Collect unique featured artists across all tracks of a release. */
+async function aggregateFeaturedArtists(
+  releaseId: string
+): Promise<Array<{ name: string; slug: string }>> {
+  // 1. Check release-level featured artists first
+  const { data: releaseArtists } = await supabase
+    .from("registry_release_artists")
+    .select("artist_name_text, artist_slug, is_featured")
+    .eq("release_id", releaseId)
+    .eq("status", "active")
+    .eq("is_featured", true);
+
+  const seen = new Map<string, { name: string; slug: string }>();
+
+  for (const ra of (releaseArtists || [])) {
+    const key = ra.artist_slug || ra.artist_name_text;
+    if (key && !seen.has(key)) {
+      seen.set(key, { name: ra.artist_name_text || ra.artist_slug, slug: ra.artist_slug || "" });
+    }
+  }
+
+  // 2. Aggregate from track-level featured artists
+  const { data: trackRelations } = await supabase
+    .from("registry_release_tracks")
+    .select("track_id")
+    .eq("release_id", releaseId);
+
+  const trackIds = (trackRelations || []).map((rt) => rt.track_id);
+  if (trackIds.length > 0) {
+    const { data: featuredTrackArtists } = await supabase
+      .from("registry_track_artists")
+      .select("artist_name_text, artist_slug, is_featured")
+      .in("track_id", trackIds)
+      .eq("status", "active")
+      .eq("is_featured", true);
+
+    for (const ta of (featuredTrackArtists || [])) {
+      const key = ta.artist_slug || ta.artist_name_text;
+      if (key && !seen.has(key)) {
+        seen.set(key, { name: ta.artist_name_text || ta.artist_slug, slug: ta.artist_slug || "" });
+      }
+    }
+  }
+
+  return Array.from(seen.values());
+}
+
+/** Extract unique featured artists from track artist rows (in-memory aggregation). */
+function aggregateFeaturedFromTrackArtists(
+  trackArtistRows: GenericRow[] | null,
+  primaryArtistSlug: string
+): Array<{ name: string; slug: string }> {
+  const seen = new Map<string, { name: string; slug: string }>();
+  for (const ta of (trackArtistRows || [])) {
+    if (ta.is_featured && ta.artist_slug && ta.artist_slug !== primaryArtistSlug) {
+      const key = ta.artist_slug || ta.artist_name_text;
+      if (key && !seen.has(key)) {
+        seen.set(key, {
+          name: ta.artist_name_text || ta.artist_slug,
+          slug: ta.artist_slug || "",
+        });
+      }
+    }
+  }
+  return Array.from(seen.values());
 }
 
 async function listReleasesFromShells(): Promise<PublicRelease[]> {
   const { data, error } = await supabase
     .from("registry_release_shells")
     .select("id, release_id, slug, title, primary_artist_name, primary_artist_slug, release_date, track_count, has_artwork, readiness, missing, shell_route, source_provenance, status, updated_at")
-    .eq("status", "ready")
+    .in("status", ["ready", "canonicalized"])
     .order("updated_at", { ascending: false })
     .limit(500);
 
@@ -681,53 +803,25 @@ export async function listReleases(): Promise<PublicRelease[]> {
   }));
 }
 
-export async function getRelease(artistSlug: string, releaseSlug: string): Promise<PublicReleaseDetail | null> {
-  // Try registry first (most authoritative)
-  const registryRelease = await getReleaseFromRegistry(artistSlug, releaseSlug);
-  if (registryRelease && registryRelease.tracks.length > 0) return registryRelease;
-
-  const shellRelease = await getReleaseFromShell(artistSlug, releaseSlug);
-  if (shellRelease && shellRelease.tracks.length > 0) return shellRelease;
-
-  const result = await safeApiGet<{ release: PublicReleaseDetail | null }>(`/releases/${artistSlug}/${releaseSlug}`, { release: null });
-  if (!result.release) return null;
-  return {
-    ...result.release,
-    artworkUrl: image(result.release.artworkUrl, { id: result.release.id, slug: result.release.slug, name: result.release.title, type: "release" }),
-    tracks: (result.release.tracks || []).map((track) => ({
-      ...track,
-      artworkUrl: image(track.artworkUrl, { id: track.id, slug: track.slug, name: track.title, type: "track" }),
-    })),
-  };
-}
-
-export async function listGenres(): Promise<PublicGenre[]> {
-  const result = await safeApiGet<{ genres: PublicGenre[] }>("/genres?limit=500", { genres: [] });
-  return result.genres;
-}
-
-export async function listLabels(): Promise<PublicLabel[]> {
-  const result = await safeApiGet<{ labels: PublicLabel[] }>("/labels?limit=500", { labels: [] });
-  return result.labels.map((label) => ({
-    ...label,
-    logoUrl: image(label.logoUrl, { id: label.id, slug: label.slug, name: label.name, type: "label" }),
-  }));
-}
-
 async function getReleaseFromRegistry(artistSlug: string, releaseSlug: string): Promise<PublicReleaseDetail | null> {
-  // 1. Find the release by slug
-  const { data: releaseRow } = await supabase
-    .from("registry_releases")
-    .select("id, slug, title, release_type, release_date, artwork_url")
-    .eq("slug", releaseSlug)
-    .eq("status", "active")
-    .maybeSingle();
+  const combinedSlug = `${artistSlug}--${releaseSlug}`;
+  const slugCandidates = releaseSlug !== combinedSlug ? [releaseSlug, combinedSlug] : [releaseSlug];
+
+  let releaseRow: GenericRow | null = null;
+  for (const candidateSlug of slugCandidates) {
+    const { data } = await supabase
+      .from("registry_releases")
+      .select("id, slug, title, release_type, release_date, artwork_url")
+      .eq("slug", candidateSlug)
+      .eq("status", "active")
+      .maybeSingle();
+    if (data) { releaseRow = data; break; }
+  }
 
   if (!releaseRow) return null;
 
   const releaseId = releaseRow.id;
 
-  // 2. Find the primary artist for this release
   const { data: releaseArtistRows } = await supabase
     .from("registry_release_artists")
     .select("artist_name_text, artist_slug, is_primary, is_featured")
@@ -738,10 +832,6 @@ async function getReleaseFromRegistry(artistSlug: string, releaseSlug: string): 
   const fallbackArtist = primaryReleaseArtist?.artist_name_text || "";
   const fallbackArtistSlug = primaryReleaseArtist?.artist_slug || artistSlug;
 
-  // 3. Get tracklist via registry_release_tracks
-  // Do NOT filter by registry_release_tracks.status — the join table's
-  // status is a migration flag (shadow/active), not a visibility gate.
-  // Tracks themselves are filtered by registry_tracks.status below.
   const { data: releaseTrackRows } = await supabase
     .from("registry_release_tracks")
     .select("track_id, track_number, disc_number")
@@ -752,7 +842,6 @@ async function getReleaseFromRegistry(artistSlug: string, releaseSlug: string): 
 
   if (trackIds.length === 0) return null;
 
-  // 4. Get track data
   const { data: trackRows } = await supabase
     .from("registry_tracks")
     .select("id, slug, title, duration_ms, artwork_url, preview_url")
@@ -761,7 +850,6 @@ async function getReleaseFromRegistry(artistSlug: string, releaseSlug: string): 
 
   const tracksById = new Map((trackRows || []).map((t) => [t.id, t]));
 
-  // 5. Get track artists for all tracks
   const { data: trackArtistRows } = await supabase
     .from("registry_track_artists")
     .select("track_id, artist_name_text, artist_slug, is_primary, is_featured, credit_order")
@@ -780,7 +868,6 @@ async function getReleaseFromRegistry(artistSlug: string, releaseSlug: string): 
     });
   }
 
-  // 6. Build tracklist with correct artist attribution
   const tracks: PublicReleaseDetail["tracks"] = (releaseTrackRows || [])
     .map((rt, index) => {
       const track = tracksById.get(rt.track_id);
@@ -788,10 +875,6 @@ async function getReleaseFromRegistry(artistSlug: string, releaseSlug: string): 
 
       const trackArtists = artistsByTrack.get(rt.track_id) || [];
 
-      // Determine the primary artist for this track:
-      // Use the release's primary artist if they're on this track.
-      // Otherwise, fall back to the first artist marked as primary,
-      // or the track artist with the lowest credit_order.
       const releasePrimaryArtist = trackArtists.find(
         (a) => a.slug === fallbackArtistSlug && a.isPrimary
       );
@@ -799,7 +882,6 @@ async function getReleaseFromRegistry(artistSlug: string, releaseSlug: string): 
       const firstArtist = trackArtists[0];
       const primaryArtist = releasePrimaryArtist || firstPrimaryArtist || firstArtist;
 
-      // Featured artists are everyone else who is NOT the primary artist
       const featuredArtists = trackArtists
         .filter((a) => a.slug !== (primaryArtist?.slug || ""))
         .map((a) => a.name)
@@ -852,5 +934,46 @@ async function getReleaseFromRegistry(artistSlug: string, releaseSlug: string): 
       tracklistSource: "registry_release_tracks",
       artworkSource: releaseRow.artwork_url ? "registry_releases" : "generated",
     },
+    featuredArtists: aggregateFeaturedFromTrackArtists(trackArtistRows, fallbackArtistSlug),
   };
+}
+
+export async function getRelease(artistSlug: string, releaseSlug: string): Promise<PublicReleaseDetail | null> {
+  // Try registry first (most authoritative) — even without tracks, use it
+  const registryRelease = await getReleaseFromRegistry(artistSlug, releaseSlug);
+  if (registryRelease && registryRelease.tracks.length > 0) return registryRelease;
+
+  // Try shell as authoritative fallback
+  const shellRelease = await getReleaseFromShell(artistSlug, releaseSlug);
+  if (shellRelease && shellRelease.tracks.length > 0) return shellRelease;
+
+  // If registry or shell returned data but without tracks, still use it
+  if (registryRelease) return registryRelease;
+  if (shellRelease) return shellRelease;
+
+  // Last resort: fall back to public API
+  const result = await safeApiGet<{ release: PublicReleaseDetail | null }>(`/releases/${artistSlug}/${releaseSlug}`, { release: null });
+  if (!result.release) return null;
+  return {
+    ...result.release,
+    artworkUrl: image(result.release.artworkUrl, { id: result.release.id, slug: result.release.slug, name: result.release.title, type: "release" }),
+    tracks: (result.release.tracks || []).map((track) => ({
+      ...track,
+      artworkUrl: image(track.artworkUrl, { id: track.id, slug: track.slug, name: track.title, type: "track" }),
+    })),
+    featuredArtists: result.release.featuredArtists || [],
+  };
+}
+
+export async function listGenres(): Promise<PublicGenre[]> {
+  const result = await safeApiGet<{ genres: PublicGenre[] }>("/genres?limit=500", { genres: [] });
+  return result.genres;
+}
+
+export async function listLabels(): Promise<PublicLabel[]> {
+  const result = await safeApiGet<{ labels: PublicLabel[] }>("/labels?limit=500", { labels: [] });
+  return result.labels.map((label) => ({
+    ...label,
+    logoUrl: image(label.logoUrl, { id: label.id, slug: label.slug, name: label.name, type: "label" }),
+  }));
 }

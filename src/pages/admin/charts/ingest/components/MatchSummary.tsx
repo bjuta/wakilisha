@@ -15,7 +15,7 @@ export function MatchSummary({ summary, runId }: MatchSummaryProps) {
 
   const segments = [
     { label: "Canonical", value: summary.canonicalMatches, color: "bg-wk-success", text: "text-wk-success", icon: "ri-check-double-line", action: null },
-    { label: "Shells", value: summary.shells, color: "bg-wk-warning", text: "text-wk-warning", icon: "ri-folder-add-line", action: "/admin/charts/release-shells" },
+    { label: "Shells", value: summary.shells, color: "bg-wk-warning", text: "text-wk-warning", icon: "ri-folder-add-line", action: "/admin/registry/release-shells" },
     { label: "No Match", value: summary.gaps, color: "bg-wk-danger", text: "text-wk-danger", icon: "ri-close-circle-line", action: "/admin/charts/no-match" },
     { label: "Duplicates", value: summary.duplicateCandidates, color: "bg-wk-info", text: "text-wk-info", icon: "ri-file-copy-line", action: "/admin/charts/review-queue" },
     { label: "Needs Review", value: needsReviewEst, color: "bg-wk-brand", text: "text-wk-brand", icon: "ri-flag-line", action: "/admin/charts/review-queue" },
@@ -87,7 +87,7 @@ export function MatchSummary({ summary, runId }: MatchSummaryProps) {
           )}
           {summary.shells > 0 && (
             <button
-              onClick={() => navigate("/admin/charts/release-shells")}
+              onClick={() => navigate("/admin/registry/release-shells")}
               className="flex items-center gap-1.5 rounded-lg border border-wk-warning/20 bg-wk-warning-soft px-3 py-1.5 text-[11px] font-semibold text-wk-warning transition-colors hover:bg-wk-warning/20"
             >
               <i className="ri-folder-add-line" />

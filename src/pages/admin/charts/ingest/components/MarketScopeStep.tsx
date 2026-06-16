@@ -40,6 +40,8 @@ function toScopePatch(scope: StoredChartMarketScope) {
       primaryMarketSlug: scope.primaryMarketSlug,
       includedMarkets: scope.includedMarkets,
       aggregationMode: scope.aggregationMode,
+      artistOriginCountries: scope.artistOriginCountries ?? [],
+      artistOriginUnknownMode: scope.artistOriginUnknownMode ?? "exclude",
     },
   };
 }
@@ -53,6 +55,8 @@ export function MarketScopeStep({ scopes, selectedMarketScopeId, onSelectMarketS
   const [draftMarkets, setDraftMarkets] = useState<string[]>(["KE"]);
   const [draftAggregation, setDraftAggregation] = useState<StoredChartMarketScope["aggregationMode"]>("combined");
   const [draftVisibility, setDraftVisibility] = useState<StoredChartMarketScope["visibility"]>("admin_only");
+  const [draftArtistOriginCountries, setDraftArtistOriginCountries] = useState<string[]>([]);
+  const [draftArtistOriginUnknownMode, setDraftArtistOriginUnknownMode] = useState<"exclude" | "warn" | "include">("exclude");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -88,6 +92,8 @@ export function MarketScopeStep({ scopes, selectedMarketScopeId, onSelectMarketS
     setDraftMarkets(["KE"]);
     setDraftAggregation("combined");
     setDraftVisibility("admin_only");
+    setDraftArtistOriginCountries([]);
+    setDraftArtistOriginUnknownMode("exclude");
     setError(null);
   }
 
@@ -110,6 +116,8 @@ export function MarketScopeStep({ scopes, selectedMarketScopeId, onSelectMarketS
         primaryMarketSlug: includedMarkets.length === 1 ? includedMarkets[0].marketSlug : slug,
         includedMarkets,
         aggregationMode: draftAggregation,
+        artistOriginCountries: draftArtistOriginCountries,
+        artistOriginUnknownMode: draftArtistOriginUnknownMode,
       });
       const next = getMarketScopes();
       setLocalScopes(next);
@@ -200,6 +208,39 @@ export function MarketScopeStep({ scopes, selectedMarketScopeId, onSelectMarketS
               })}
             </div>
           </div>
+          <div className="mt-4 rounded-xl border border-wk-accent/30 bg-wk-accent-soft/30 p-4">
+            <div className="mb-2 flex items-center gap-2 text-[12px] font-bold text-wk-text">
+              <WkIcon name="MapPin" size={14} className="text-wk-accent" />
+              Artist Origin Filter
+            </div>
+            <p className="mb-3 text-[11px] text-wk-text-soft">
+              Restrict this chart to only include artists whose verified country of origin matches one of the selected countries. Artists without origin data are handled by the unknown-origin rule below.
+            </p>
+            <div className="mb-3">
+              <label className={LABEL_CLASS}>Allowed artist origins</label>
+              <div className="flex flex-wrap gap-2">
+                {getSortedCountryCodes().map((countryCode) => {
+                  const active = draftArtistOriginCountries.includes(countryCode);
+                  return (
+                    <button key={`origin-${countryCode}`} type="button" onClick={() => setDraftArtistOriginCountries((current) => current.includes(countryCode) ? current.filter((c) => c !== countryCode) : [...current, countryCode])} className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition-all ${active ? "border-wk-accent bg-wk-accent text-wk-accent-on" : "border-wk-border bg-wk-surface text-wk-text-soft"}`}>
+                      {getCountryNameForIso2(countryCode)} · {countryCode.toUpperCase()}
+                    </button>
+                  );
+                })}
+              </div>
+              {draftArtistOriginCountries.length === 0 && (
+                <p className="mt-1 text-[11px] text-wk-text-muted">Leave empty to allow artists from any country (no origin filter applied).</p>
+              )}
+            </div>
+            <div>
+              <label className={LABEL_CLASS}>When artist origin is unknown</label>
+              <select value={draftArtistOriginUnknownMode} onChange={(event) => setDraftArtistOriginUnknownMode(event.target.value as "exclude" | "warn" | "include")} className={INPUT_CLASS}>
+                <option value="exclude">Exclude — remove tracks by artists with unknown origin</option>
+                <option value="warn">Warn — keep but flag for manual review</option>
+                <option value="include">Include — let unknown-origin artists through</option>
+              </select>
+            </div>
+          </div>
           <div className="mt-4 flex flex-wrap gap-2">
             <button type="button" onClick={createScopeFromDraft} className="rounded-md bg-wk-brand px-4 py-2 text-[12px] font-bold text-wk-brand-on">Save scope for this ingest</button>
             <button type="button" onClick={() => { resetDraft(); setShowCreate(false); }} className="rounded-md border border-wk-border bg-wk-surface px-4 py-2 text-[12px] font-bold text-wk-text-soft">Cancel</button>
@@ -231,6 +272,22 @@ export function MarketScopeStep({ scopes, selectedMarketScopeId, onSelectMarketS
             <WkIcon name="Info" size={12} className="mr-1 inline text-wk-brand" />
             This scope is stored with the ingest run as a snapshot so future analytics can preserve exactly which countries and aggregation rules were used.
           </div>
+          {(selectedScope.artistOriginCountries?.length ?? 0) > 0 && (
+            <div className="mt-3 rounded-lg border border-wk-accent/30 bg-wk-accent-soft/20 p-3 text-[11px]">
+              <div className="mb-1 flex items-center gap-1.5 font-bold text-wk-accent">
+                <WkIcon name="MapPin" size={12} />
+                Artist origin filtered to:
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {selectedScope.artistOriginCountries!.map((cc) => (
+                  <span key={cc} className="rounded-full bg-wk-accent/15 px-2 py-0.5 text-[10px] font-semibold text-wk-accent">{getCountryNameForIso2(cc)} · {cc.toUpperCase()}</span>
+                ))}
+              </div>
+              <div className="mt-1.5 text-wk-text-muted">
+                Unknown origins: <span className="font-semibold">{selectedScope.artistOriginUnknownMode ?? "exclude"}</span>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </WkSurface>

@@ -84,7 +84,7 @@ export default function MobileLabelDetail() {
           ) : (
             <div className="grid grid-cols-3 gap-2">
               {sortedReleases.map((r) => (
-                <Link key={r.slug} to={`/releases/${label.slug}--${r.slug}`} className="overflow-hidden rounded-lg border border-[var(--wk-border)] bg-[var(--wk-surface)]">
+                <Link key={r.slug} to={`/releases/${r.slug}`} className="overflow-hidden rounded-lg border border-[var(--wk-border)] bg-[var(--wk-surface)]">
                   <div className="aspect-square bg-[var(--wk-surface-raised)]">
                     {r.artworkUrl ? <img src={r.artworkUrl} alt={r.title} className="h-full w-full object-cover" /> : <Chapter19FallbackImage slug={r.slug} name={r.title} className="h-full" />}
                   </div>

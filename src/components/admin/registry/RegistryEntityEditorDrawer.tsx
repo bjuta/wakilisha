@@ -12,6 +12,7 @@ import {
 } from "@/services/registry/admin/client";
 import { normalizeSlug, validateField } from "@/services/registry/admin/fieldNormalization";
 import { calculateCompleteness, completenessLabel, completenessTone } from "@/services/registry/admin/completeness";
+import { supabase } from "@/lib/supabase";
 
 interface RegistryEntityEditorDrawerProps {
   entityType: RegistryEntityType;
@@ -19,6 +20,51 @@ interface RegistryEntityEditorDrawerProps {
   schema: RegistryEntitySchema;
   onClose: () => void;
   onSaved: (updatedEntity: Record<string, unknown>) => void;
+}
+
+/* ─── Release rich-data types ─── */
+
+interface RichTrackItem {
+  track_id: string;
+  track_slug: string;
+  track_title: string;
+  track_number: number;
+  disc_number: number;
+  duration_ms: number;
+  isrc: string | null;
+  track_artwork_url: string | null;
+  track_status: string;
+}
+
+interface RichTrackArtist {
+  track_id: string;
+  artist_id: string;
+  artist_slug: string;
+  artist_name_text: string;
+  is_primary: boolean;
+  is_featured: boolean;
+  credit_order: number;
+}
+
+interface RichReleaseArtist {
+  artist_id: string;
+  artist_slug: string;
+  artist_name_text: string;
+  role: string;
+  is_primary: boolean;
+}
+
+interface RichLabel {
+  id: string;
+  slug: string;
+  name: string;
+}
+
+interface ReleaseRichData {
+  tracks: RichTrackItem[];
+  trackArtists: RichTrackArtist[];
+  releaseArtists: RichReleaseArtist[];
+  label: RichLabel | null;
 }
 
 const FIELD_GROUPS: Record<string, string[]> = {
@@ -73,6 +119,19 @@ function groupEditableFields(
   return groups;
 }
 
+function formatDurationMs(ms: number): string {
+  const totalSec = Math.round(ms / 1000);
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+function getFeaturedForTrack(trackId: string, allArtists: RichTrackArtist[]): RichTrackArtist[] {
+  return allArtists
+    .filter((a) => a.track_id === trackId && a.is_featured)
+    .sort((a, b) => a.credit_order - b.credit_order);
+}
+
 export default function RegistryEntityEditorDrawer({
   entityType,
   entity,
@@ -85,6 +144,9 @@ export default function RegistryEntityEditorDrawer({
   const [saveResult, setSaveResult] = useState<RegistrySaveResult | null>(null);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [showSystemFields, setShowSystemFields] = useState(false);
+  const [richData, setRichData] = useState<ReleaseRichData | null>(null);
+  const [richDataLoading, setRichDataLoading] = useState(false);
+  const [showRichPanel, setShowRichPanel] = useState(false);
   const drawerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
@@ -96,6 +158,86 @@ export default function RegistryEntityEditorDrawer({
     document.addEventListener("keydown", handleKey);
     return () => document.removeEventListener("keydown", handleKey);
   }, [onClose]);
+
+  // Fetch release rich data
+  useEffect(() => {
+    if (entityType !== "release") return;
+    const releaseId = String(entity.id ?? "");
+    const labelId = entity.label_id ? String(entity.label_id) : null;
+
+    let cancelled = false;
+    async function load() {
+      setRichDataLoading(true);
+      try {
+        // Step 1: Get release tracks
+        const { data: tracksData, error: tracksErr } = await supabase
+          .from("registry_release_tracks")
+          .select("track_number, disc_number, status, track_id")
+          .eq("release_id", releaseId)
+          .order("disc_number")
+          .order("track_number");
+
+        if (tracksErr || !tracksData) { if (!cancelled) setRichDataLoading(false); return; }
+
+        const trackIds = tracksData.map((t) => t.track_id);
+
+        // Step 2: Load track details, track artists, release artists, label
+        const [trackDetailsRes, trackArtistsRes, releaseArtistsRes, labelRes] = await Promise.all([
+          trackIds.length > 0
+            ? supabase
+                .from("registry_tracks")
+                .select("id, slug, title, duration_ms, isrc, artwork_url, status")
+                .in("id", trackIds)
+            : Promise.resolve({ data: [], error: null }),
+          trackIds.length > 0
+            ? supabase
+                .from("registry_track_artists")
+                .select("track_id, artist_id, artist_slug, artist_name_text, is_primary, is_featured, credit_order")
+                .in("track_id", trackIds)
+            : Promise.resolve({ data: [], error: null }),
+          supabase
+            .from("registry_release_artists")
+            .select("artist_id, artist_slug, artist_name_text, role, is_primary")
+            .eq("release_id", releaseId),
+          labelId
+            ? supabase.from("registry_labels").select("id, slug, name").eq("id", labelId).maybeSingle()
+            : Promise.resolve(null),
+        ]);
+
+        if (cancelled) return;
+
+        // Merge tracks
+        const detailMap = new Map((trackDetailsRes.data ?? []).map((td: Record<string, unknown>) => [td.id, td]));
+        const tracks: RichTrackItem[] = tracksData.map((rt) => {
+          const td = detailMap.get(rt.track_id);
+          return {
+            track_id: rt.track_id,
+            track_slug: (td?.slug as string) ?? "",
+            track_title: (td?.title as string) ?? "(Unknown)",
+            track_number: rt.track_number ?? 0,
+            disc_number: rt.disc_number ?? 1,
+            duration_ms: (td?.duration_ms as number) ?? 0,
+            isrc: (td?.isrc as string) ?? null,
+            track_artwork_url: (td?.artwork_url as string) ?? null,
+            track_status: (td?.status as string) ?? "draft",
+          };
+        });
+
+        setRichData({
+          tracks,
+          trackArtists: (trackArtistsRes.data ?? []) as RichTrackArtist[],
+          releaseArtists: (releaseArtistsRes.data ?? []) as RichReleaseArtist[],
+          label: labelRes?.data ? (labelRes.data as RichLabel) : null,
+        });
+      } catch (err) {
+        console.error("[RegistryDrawer] rich data error:", err);
+      } finally {
+        if (!cancelled) setRichDataLoading(false);
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+  }, [entityType, entity.id, entity.label_id]);
 
   const displayName = String(entity[schema.displayNameField] ?? "Untitled");
   const quality = useMemo(() => calculateCompleteness(entity, schema), [entity, schema]);
@@ -554,6 +696,278 @@ export default function RegistryEntityEditorDrawer({
                 )}
               </div>
             )}
+
+            {/* ─── Release Rich-Data Panel ─── */}
+            {entityType === "release" && (
+              <div className="mt-8 border-t border-[#e8ece2] pt-6">
+                <button
+                  type="button"
+                  onClick={() => setShowRichPanel(!showRichPanel)}
+                  className="flex w-full items-center justify-between group"
+                >
+                  <span className="flex items-center gap-2">
+                    <span className="h-4 w-1 rounded-full bg-[#85c441]" />
+                    <span className="text-[11px] font-black uppercase tracking-[0.12em] text-[#71796b]">
+                      Release Content
+                    </span>
+                    {richData && (
+                      <span className="rounded-full bg-[#eef7df] px-1.5 py-0.5 text-[9px] font-bold text-[#5f8f2f]">
+                        {richData.tracks.length} tracks
+                      </span>
+                    )}
+                  </span>
+                  <i
+                    className={`ri-arrow-down-s-line text-[#9aa292] transition-transform duration-200 ${
+                      showRichPanel ? "rotate-180" : ""
+                    } group-hover:text-[#71796b]`}
+                  />
+                </button>
+
+                {showRichPanel && (
+                  <div className="mt-4 space-y-4 animate-[slideIn_200ms_ease-out]">
+                    {richDataLoading && (
+                      <div className="flex items-center gap-2 text-xs text-[#858c7e]">
+                        <i className="ri-loader-4-line animate-spin" />
+                        Loading tracks and artists…
+                      </div>
+                    )}
+
+                    {!richDataLoading && !richData && (
+                      <p className="text-xs text-[#858c7e]">No track data available.</p>
+                    )}
+
+                    {richData && (
+                      <>
+                        {/* ─── Release snapshot chips ─── */}
+                        <div className="flex flex-wrap items-center gap-3">
+                          {/* Artwork */}
+                          {entity.artwork_url ? (
+                            <img
+                              src={String(entity.artwork_url)}
+                              alt=""
+                              className="h-16 w-16 shrink-0 rounded-xl object-cover border border-[#dfe4d8]"
+                            />
+                          ) : (
+                            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border border-[#dfe4d8] bg-[#f0f3ec] text-xs font-black text-[#8a9283]">
+                              <i className="ri-album-line text-lg" />
+                            </div>
+                          )}
+
+                          <div className="min-w-0 space-y-1">
+                            {/* Release type + date */}
+                            <div className="flex items-center gap-2">
+                              {entity.release_type && (
+                                <span className="inline-flex items-center rounded-full bg-[#eef7df] px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-[#5f8f2f]">
+                                  {String(entity.release_type)}
+                                </span>
+                              )}
+                              {entity.release_date && (
+                                <span className="text-[10px] font-semibold text-[#858c7e]">
+                                  {String(entity.release_date)}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Label */}
+                            {richData.label && (
+                              <div className="flex items-center gap-1.5">
+                                <i className="ri-building-2-line text-[10px] text-[#9aa292]" />
+                                <a
+                                  href={`/admin/registry/labels/${richData.label.slug}`}
+                                  className="text-xs font-bold text-[#171712] hover:text-[#5f8f2f] transition-colors truncate"
+                                >
+                                  {richData.label.name}
+                                </a>
+                              </div>
+                            )}
+
+                            {/* Primary artist */}
+                            {(() => {
+                              const primary = richData.releaseArtists.find((ra) => ra.is_primary) || richData.releaseArtists[0];
+                              if (!primary) return null;
+                              return (
+                                <div className="flex items-center gap-1.5">
+                                  <i className="ri-user-line text-[10px] text-[#9aa292]" />
+                                  <a
+                                    href={`/admin/registry/artists/${primary.artist_slug}`}
+                                    className="text-xs font-bold text-[#171712] hover:text-[#5f8f2f] transition-colors truncate"
+                                  >
+                                    {primary.artist_name_text}
+                                  </a>
+                                </div>
+                              );
+                            })()}
+
+                            {/* Track count + total duration */}
+                            <div className="flex items-center gap-3">
+                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#697062]">
+                                <i className="ri-list-check text-xs" />
+                                {richData.tracks.length} track{richData.tracks.length !== 1 ? "s" : ""}
+                              </span>
+                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#697062]">
+                                <i className="ri-timer-line text-xs" />
+                                {formatDurationMs(richData.tracks.reduce((sum, t) => sum + t.duration_ms, 0))}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* View public page + detail page links */}
+                        <div className="flex flex-wrap items-center gap-2">
+                          {entity.slug && (
+                            <a
+                              href={`/releases/${entity.slug}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 rounded-xl border border-[#dfe4d8] bg-white px-3 py-2 text-[11px] font-bold text-[#171712] hover:border-[#85c441] hover:text-[#5f8f2f] transition-colors"
+                            >
+                              <i className="ri-external-link-line text-xs" />
+                              View Public Page
+                            </a>
+                          )}
+                          <a
+                            href={`/admin/registry/releases/${entity.slug || entity.id}`}
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-[#dfe4d8] bg-white px-3 py-2 text-[11px] font-bold text-[#171712] hover:border-[#85c441] hover:text-[#5f8f2f] transition-colors"
+                          >
+                            <i className="ri-file-list-3-line text-xs" />
+                            Full Detail Page
+                          </a>
+                        </div>
+
+                        {/* Description / NLG excerpt */}
+                        {entity.description && (
+                          <div className="rounded-xl border border-[#dfe4d8] bg-[#fbfcf8] px-4 py-3">
+                            <p className="text-[10px] font-black uppercase tracking-wide text-[#71796b] mb-1.5">
+                              Description
+                            </p>
+                            <p className="text-xs text-[#5d6557] leading-relaxed line-clamp-4">
+                              {String(entity.description)}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Provider metadata */}
+                        {entity.metadata && typeof entity.metadata === "object" && (
+                          <ProviderMetadataChips metadata={entity.metadata as Record<string, unknown>} />
+                        )}
+
+                        {/* Featured artists summary */}
+                        {richData.releaseArtists.filter((ra) => !ra.is_primary).length > 0 && (
+                          <div className="rounded-xl border border-[#dfe4d8] bg-[#fbfcf8] px-4 py-3">
+                            <p className="text-[10px] font-black uppercase tracking-wide text-[#71796b] mb-2">
+                              Featured Artists
+                            </p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {richData.releaseArtists
+                                .filter((ra) => !ra.is_primary)
+                                .map((ra) => (
+                                  <a
+                                    key={ra.artist_id}
+                                    href={`/admin/registry/artists/${ra.artist_slug}`}
+                                    className="inline-flex items-center gap-1 rounded-full border border-[#dfe4d8] bg-white px-2.5 py-1 text-[11px] font-semibold text-[#2d3329] hover:border-[#85c441] hover:text-[#5f8f2f] transition-colors"
+                                  >
+                                    {ra.artist_name_text}
+                                    <span className="text-[9px] text-[#9aa292]">{ra.role}</span>
+                                  </a>
+                                ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Mini tracklist */}
+                        <div className="rounded-xl border border-[#dfe4d8] overflow-hidden">
+                          <div className="flex items-center gap-2 px-4 py-2.5 bg-[#fbfcf8] border-b border-[#e8ece2]">
+                            <i className="ri-list-ordered text-xs text-[#9aa292]" />
+                            <span className="text-[10px] font-black uppercase tracking-wide text-[#71796b]">
+                              Tracklist
+                            </span>
+                          </div>
+                          <div className="divide-y divide-[#eef1ea]">
+                            {richData.tracks.slice(0, 20).map((track) => {
+                              const featured = getFeaturedForTrack(track.track_id, richData.trackArtists);
+                              return (
+                                <div
+                                  key={track.track_id}
+                                  className="flex items-center gap-2.5 px-4 py-2.5 hover:bg-[#fbfcf8] transition-colors"
+                                >
+                                  {/* Track number */}
+                                  <span className="w-6 text-right text-[10px] font-extrabold text-[#9aa292] tabular-nums shrink-0">
+                                    {track.track_number}
+                                  </span>
+
+                                  {/* Artwork thumbnail */}
+                                  <div className="w-7 h-7 shrink-0 rounded-md overflow-hidden bg-[#f0f3ec] border border-[#dfe4d8]">
+                                    {track.track_artwork_url ? (
+                                      <img src={track.track_artwork_url} alt="" className="w-full h-full object-cover" />
+                                    ) : (
+                                      <div className="w-full h-full flex items-center justify-center">
+                                        <i className="ri-music-line text-[10px] text-[#c5ccba]" />
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {/* Title + featured */}
+                                  <div className="flex-1 min-w-0">
+                                    <a
+                                      href={`/admin/registry/tracks/${track.track_slug}`}
+                                      className="text-[12px] font-extrabold text-[#171712] hover:text-[#5f8f2f] transition-colors truncate block"
+                                    >
+                                      {track.track_title}
+                                    </a>
+                                    {featured.length > 0 && (
+                                      <div className="flex flex-wrap items-center gap-x-1 mt-0.5">
+                                        <span className="text-[9px] text-[#9aa292]">ft.</span>
+                                        {featured.map((fa, i) => (
+                                          <a
+                                            key={fa.artist_id}
+                                            href={`/admin/registry/artists/${fa.artist_slug}`}
+                                            className="text-[10px] font-medium text-[#697062] hover:text-[#5f8f2f] transition-colors"
+                                          >
+                                            {fa.artist_name_text}{i < featured.length - 1 ? "," : ""}
+                                          </a>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {/* Duration */}
+                                  <span className="text-[10px] font-semibold text-[#9aa292] tabular-nums shrink-0">
+                                    {formatDurationMs(track.duration_ms)}
+                                  </span>
+
+                                  {/* Status */}
+                                  <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase ${
+                                    track.track_status === "active" ? "bg-emerald-50 text-emerald-700" :
+                                    track.track_status === "draft" ? "bg-amber-50 text-amber-700" :
+                                    "bg-gray-100 text-gray-500"
+                                  }`}>
+                                    {track.track_status}
+                                  </span>
+                                </div>
+                              );
+                            })}
+
+                            {richData.tracks.length > 20 && (
+                              <div className="px-4 py-2.5 text-center">
+                                <p className="text-[10px] font-semibold text-[#9aa292]">
+                                  +{richData.tracks.length - 20} more tracks ·{" "}
+                                  <a
+                                    href={`/admin/registry/releases/${entity.slug || entity.id}`}
+                                    className="text-[#5f8f2f] hover:underline"
+                                  >
+                                    View full detail page
+                                  </a>
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -603,6 +1017,51 @@ export default function RegistryEntityEditorDrawer({
           </div>
         </footer>
       </aside>
+    </div>
+  );
+}
+
+function ProviderMetadataChips({ metadata }: { metadata: Record<string, unknown> }) {
+  const chips: Array<{ icon: string; label: string; value: string }> = [];
+
+  const source = metadata.source || metadata.provider || metadata.provider_name;
+  if (source && typeof source === "string") {
+    chips.push({ icon: "ri-cloud-line", label: "Source", value: source });
+  }
+
+  if (metadata.provider_url && typeof metadata.provider_url === "string") {
+    chips.push({ icon: "ri-link", label: "Provider URL", value: metadata.provider_url });
+  }
+
+  const genres = metadata.genres || metadata.genre_names;
+  if (Array.isArray(genres) && genres.length > 0) {
+    chips.push({ icon: "ri-price-tag-3-line", label: "Genres", value: genres.join(", ") });
+  } else if (genres && typeof genres === "string") {
+    chips.push({ icon: "ri-price-tag-3-line", label: "Genres", value: genres });
+  }
+
+  if (metadata.upc && typeof metadata.upc === "string") {
+    chips.push({ icon: "ri-barcode-line", label: "UPC", value: metadata.upc });
+  }
+
+  if (chips.length === 0) return null;
+
+  return (
+    <div className="rounded-xl border border-[#dfe4d8] bg-[#fbfcf8] px-4 py-3">
+      <p className="text-[10px] font-black uppercase tracking-wide text-[#71796b] mb-2">
+        Provider Metadata
+      </p>
+      <div className="space-y-1.5">
+        {chips.map((chip) => (
+          <div key={chip.label} className="flex items-start gap-2">
+            <i className={`${chip.icon} text-[10px] text-[#9aa292] mt-0.5 shrink-0`} />
+            <div className="min-w-0">
+              <span className="text-[9px] font-bold uppercase text-[#9aa292]">{chip.label}</span>
+              <p className="text-[11px] text-[#5d6557] truncate">{chip.value}</p>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

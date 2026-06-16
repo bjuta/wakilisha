@@ -797,3 +797,128 @@ The 3 published guides ("In Minor Keys", "Dakar Biennale 2026", "The Day Reading
 
 - **Admin editor** — CRUD sections, reorder, preview, publish. The `updateGuideSections()` service function exists and is ready for the admin UI.
 - **Old hardcoded files** — `data.ts`, `dakarData.ts`, `readingData.ts`, and the old siloed section components in `src/pages/guides/detail/components/` are now unused by the rendering path but retained for reference during admin editor build-out.
+
+## Release Shells Infrastructure Refactor — June 2026 ✅
+**Status:** COMPLETE
+**Goal:** Simplify the release shells system. Two parallel backends collapsed into one; tracks stored on shell rows; full canonicalization that writes tracks, artist roles, and provider links.
+
+### What was changed:
+
+**Phase A: Dead code removal**
+- Removed `src/pages/admin/charts/release-shells/page.tsx` — disconnected page reading from chart ingestion runs
+- Removed `scripts/registry/provider-intake/` (5 files) — redundant Node.js backend for intake
+- Removed `src/services/registry/provider-enrichment/` (4 files) — unused PG-based enrichment code
+- Removed `src/services/registry/providerIntake/types.ts` — duplicate type file
+- Stripped intake routes from `scripts/registry/serve-registry-admin-api.ts` — now only handles enrichment-review
+- Updated all navigation links to point to `/admin/registry/release-shells`
+
+**Phase B: Tracks storage**
+- Added `tracks` JSONB column to `registry_release_shells`
+- `provider-intake-api` v2 stores full track data (title, ISRC, duration, track number, artist, artwork, preview URL) on shell creation and refresh
+
+**Phase C: Duplicate detection**
+- `provider-intake-api` v2 checks `provider_entity_links` for existing provider entity IDs before creating shells
+
+**Phase D: Full canonicalization**
+- `registry-enrichment-review` v2 `apply-approved` handler now:
+  - Writes release fields (title, release_date, artwork_url)
+  - Reads shell.tracks JSONB
+  - Upserts tracks into `registry_tracks` (ISRC dedup)
+  - Creates `registry_release_tracks` joins with disc/track numbers
+  - Creates `registry_track_artists` roles for matching artists
+  - Creates `registry_release_artists` roles for the primary artist
+  - Sets release status to "active" after tracks are written
+  - Marks suggestions as "applied"
+  - Creates audit events
+
+**Phase E: Client update**
+- `ReleaseShellEnrichmentContext` now includes `tracks` array
+- `getLiveReleaseShellReviewRows` populates tracks from the shell row
+- `RegistryReleaseShellReviewRow` includes tracks from context
+
+### Architecture (after refactor):
+```
+Apple Music API
+     ↓
+provider-intake-api (Supabase Edge Function)
+     ↓
+registry_release_shells (with tracks JSONB)
+     ↓
+registry-enrichment-review (review workflow)
+     ↓
+registry_releases + registry_tracks + registry_release_tracks
+  + registry_track_artists + registry_release_artists
+```
+
+### What was kept:
+- `src/services/registry/provider-intake/client.ts` — frontend client (calls edge function)
+- `src/services/registry/provider-intake/types.ts` — frontend types
+- `src/components/admin/registry/release-shells/` — intake drawer components
+- `src/pages/admin/registry/release-shells/page.tsx` — main review page
+- `src/services/registry/enrichment-review/client.ts` — enrichment review client
+
+## Release Shells (Simplified v3 — 2026-06-16)
+After user feedback that the Phase 8C enrichment workflow was too complex, the release shells flow was rebuilt to match the old WordPress simplicity:
+
+**Backend:**
+- `registry-enrichment-review` edge function v3 adds:
+  - `POST /canonicalize` — canonicalizes a shell directly (no suggestion workflow required). Writes release fields, creates/upserts tracks with ISRC dedup, writes release-track joins, track-artist roles, release-artist roles, updates shell status to `canonicalized`.
+  - `POST /check-duplicate` — checks for existing releases with similar title + artist.
+  - `POST /save-shell` — saves edits to shell metadata and linked release.
+  - `POST /reject-shell` — marks shell and linked release as rejected.
+
+**Frontend:**
+- Intake drawer kept as-is (search Apple Music → inspect → create shell).
+- New `ShellReviewDrawer` component replaces the complex inline enrichment panel. It shows:
+  - Editable shell metadata form (title, artist, release date, artwork URL, review notes)
+  - Track list with ISRC, duration, preview links
+  - Duplicate detection results (if any)
+  - Actions: Save, Canonicalize, Reject
+- Main page rewritten from 1502 lines to ~200 lines:
+  - Simple table: artwork, title, artist, provider, status, tracks, action
+  - Search + 4 status filters (All, Pending, Canonicalized, Rejected)
+  - No KPIs, no activity feed, no bulk ops, no suggestion lanes, no audit panels
+
+**Mental model:**
+```
+Apple Music → provider-intake-api → registry_release_shells (with tracks JSONB)
+                                         ↓
+                                   Review drawer (edit + tracks + canonicalize)
+                                         ↓
+                                   Canonicalize → writes everything to canonical tables
+```
+
+## Phase 10: API Naming & Architecture Harmonization 🔌 PLANNED
+
+**Status:** PLANNED — Full audit in `docs/api-naming-audit.md`
+**Goal:** Reduce 50-function edge function fleet to 3 API gateways with consistent naming, routing, auth, and error envelopes. Commercial-grade API surface.
+
+### Current Debt (Summary)
+- 50+ edge functions with no naming convention (4 different styles)
+- 4 different routing paradigms (path-based, action-body, route-body, mixed)
+- 5 different error shapes across the fleet
+- 2 admin functions without capability checks (`provider-intake-api`, `registry-enrichment-review`)
+- Apple Music JWT logic copy-pasted in 3 separate functions
+- CORS logic copy-pasted in every function
+- Dead code: `src/api/v2/wakilishaRepairedEndpoints.ts`, `backendContract/` ghost layer
+- 8 env var names for 1 concept (API base URL)
+
+### Phase A — Shared Library (1–2 weeks, no breaking changes)
+1. Create `supabase/shared/` with `cors.ts`, `auth.ts`, `errors.ts`, `db.ts`, `appleMusic.ts`
+2. Refactor 5 critical functions to use shared library
+3. Add missing capability checks to `provider-intake-api` and `registry-enrichment-review`
+4. Delete dead code and ghost layers
+5. Unify error format to `{ ok, data/error, meta }` in core functions
+
+### Phase B — 3 Gateways (2–3 weeks, URL changes)
+1. `public-content-read` → `/api/v1/public/...` (replaces `wakilisha-public-api`)
+2. `admin-router` → `/api/v1/admin/...` (replaces 9 admin functions)
+3. `system-worker` → `/api/v1/system/...` (replaces all backfill/migration functions)
+
+### Phase C — Commercial Polish (1–2 weeks)
+1. OpenAPI spec per gateway
+2. Health check endpoints
+3. Rate limiting (public generous, admin moderate, system internal-only)
+4. Request tracing with `requestId`
+
+**Full spec:** `docs/api-naming-audit.md`

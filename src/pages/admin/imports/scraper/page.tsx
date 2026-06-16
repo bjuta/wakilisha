@@ -66,12 +66,14 @@ export default function ScraperPage() {
   const [singleSlug, setSingleSlug] = useState("bien");
   const [singleDryRun, setSingleDryRun] = useState(true);
   const [singleOverwrite, setSingleOverwrite] = useState(false);
+  const [singleBioOnly, setSingleBioOnly] = useState(false);
   const [singleLoading, setSingleLoading] = useState(false);
   const [singleResult, setSingleResult] = useState<{ success: boolean; scraped?: ScrapedPreview; write_result?: { success: boolean; stats: Record<string, number>; errors: string[] }; error?: string } | null>(null);
 
   // Batch scrape
   const [batchDryRun, setBatchDryRun] = useState(true);
   const [batchOverwrite, setBatchOverwrite] = useState(false);
+  const [batchBioOnly, setBatchBioOnly] = useState(false);
   const [batchRunning, setBatchRunning] = useState(false);
   const [batchProgress, setBatchProgress] = useState<{ current: number; total: number; currentSlug: string }>({ current: 0, total: 0, currentSlug: "" });
   const [batchResults, setBatchResults] = useState<BatchSummary[]>([]);
@@ -113,7 +115,7 @@ export default function ScraperPage() {
     setSingleResult(null);
     try {
       const { data, error } = await supabase.functions.invoke("scrape-artist-data", {
-        body: { mode: "scrape_one", artistSlug: singleSlug.trim(), dryRun: singleDryRun, overwrite: singleOverwrite },
+        body: { mode: "scrape_one", artistSlug: singleSlug.trim(), dryRun: singleDryRun, overwrite: singleOverwrite, bioOnly: singleBioOnly },
       });
       if (error) {
         setSingleResult({ success: false, error: error.message });
@@ -126,7 +128,7 @@ export default function ScraperPage() {
     } finally {
       setSingleLoading(false);
     }
-  }, [singleSlug, singleDryRun, singleOverwrite, loadStatus]);
+  }, [singleSlug, singleDryRun, singleOverwrite, singleBioOnly, loadStatus]);
 
   // ── Batch scrape ─────────────────────────────────────────────────────────
   const handleBatchScrape = useCallback(async () => {
@@ -150,7 +152,7 @@ export default function ScraperPage() {
 
       try {
         const { data, error } = await supabase.functions.invoke("scrape-artist-data", {
-          body: { mode: "batch", slugs: batch, dryRun: batchDryRun, overwrite: batchOverwrite },
+          body: { mode: "batch", slugs: batch, dryRun: batchDryRun, overwrite: batchOverwrite, bioOnly: batchBioOnly },
         });
 
         if (!error && data) {
@@ -172,7 +174,7 @@ export default function ScraperPage() {
 
     setBatchRunning(false);
     await loadStatus();
-  }, [artists, batchDryRun, batchOverwrite, batchSlice, loadStatus]);
+  }, [artists, batchDryRun, batchOverwrite, batchBioOnly, batchSlice, loadStatus]);
 
   // ── Aggregate batch stats ────────────────────────────────────────────────
   const aggregateStats = batchResults.reduce((acc, batch) => {
@@ -312,6 +314,21 @@ export default function ScraperPage() {
             )}
           </label>
 
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={singleBioOnly}
+              onChange={e => setSingleBioOnly(e.target.checked)}
+              className="h-4 w-4 accent-green-600 cursor-pointer"
+            />
+            <span className="text-[13px] font-semibold text-wk-text">Bio only</span>
+            {singleBioOnly && (
+              <span className="rounded-full border border-green-500/30 bg-green-100 px-2 py-0.5 text-[10px] font-bold text-green-700">
+                Skips releases &amp; tracks
+              </span>
+            )}
+          </label>
+
           <button
             onClick={handleScrapeOne}
             disabled={singleLoading || !singleSlug.trim()}
@@ -319,7 +336,7 @@ export default function ScraperPage() {
           >
             {singleLoading
               ? <><WkIcon name="Loader2" size={14} className="animate-spin" /> Scraping...</>
-              : <><i className="ri-search-line" /> Scrape Artist</>}
+              : <><i className="ri-search-line" /> {singleBioOnly ? "Scrape Bio" : "Scrape Artist"}</>}
           </button>
         </div>
 
@@ -329,7 +346,7 @@ export default function ScraperPage() {
               <WkIcon name={singleResult.success ? "CheckCircle2" : "XCircle"} size={16} className={singleResult.success ? "text-wk-success" : "text-wk-danger"} />
               <span className="text-[13px] font-bold text-wk-text">
                 {singleResult.success
-                  ? `${singleResult.scraped?.name} — scraped successfully${singleDryRun ? " (dry run)" : ""}`
+                  ? `${singleResult.scraped?.name} — scraped successfully${singleDryRun ? " (dry run)" : ""}${singleBioOnly ? " (bio only)" : ""}`
                   : `Scrape failed: ${singleResult.error}`}
               </span>
               {singleResult.success && !singleDryRun && (
@@ -504,6 +521,20 @@ export default function ScraperPage() {
                 </span>
               )}
             </label>
+            <label className="flex items-center gap-2 pb-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={batchBioOnly}
+                onChange={e => setBatchBioOnly(e.target.checked)}
+                className="h-4 w-4 accent-green-600 cursor-pointer"
+              />
+              <span className="text-[13px] font-semibold text-wk-text">Bio only</span>
+              {batchBioOnly && (
+                <span className="rounded-full border border-green-500/30 bg-green-100 px-2 py-0.5 text-[10px] font-bold text-green-700">
+                  Skips releases &amp; tracks
+                </span>
+              )}
+            </label>
           </div>
         </div>
 
@@ -526,8 +557,8 @@ export default function ScraperPage() {
             className="inline-flex items-center gap-2 rounded-xl bg-primary-500 px-5 py-2.5 text-[13px] font-bold text-white whitespace-nowrap hover:bg-primary-600 disabled:opacity-50 transition-colors ml-auto"
           >
             {batchRunning
-              ? <><WkIcon name="Loader2" size={14} className="animate-spin" /> Running... ({batchProgress.current}/{batchProgress.total})</>
-              : <><WkIcon name="Zap" size={14} /> {batchDryRun ? "Dry Run All" : "Scrape & Write All"}</>}
+                ? <><WkIcon name="Loader2" size={14} className="animate-spin" /> Running... ({batchProgress.current}/{batchProgress.total})</>
+                : <><WkIcon name="Zap" size={14} /> {batchDryRun ? "Dry Run All" : batchBioOnly ? "Scrape Bios Only" : "Scrape & Write All"}</>}
           </button>
         </div>
 

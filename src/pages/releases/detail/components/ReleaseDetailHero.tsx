@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
 import { ShareButton } from "@/components/design-system/share/ShareSheet";
+import { slugify } from "@/services/publicContent/client";
 import type { RepairedReleaseDetail } from "@/services/repairedContent/client";
 
 export default function ReleaseDetailHero({
@@ -94,8 +95,28 @@ export default function ReleaseDetailHero({
             <div className="flex flex-wrap items-center gap-3 mt-4 text-[15px] md:text-[17px] font-bold text-[var(--wk-text-muted)]">
               <span className="text-[var(--wk-text)]">{release.artist}</span>
               <span className="text-[var(--wk-text-faint)]">·</span>
-              <span>{release.labelName}</span>
             </div>
+
+            {/* Featured Artists */}
+            {release.featuredArtists && release.featuredArtists.length > 0 && (
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-3 text-[12px] font-semibold text-[var(--wk-text-muted)]">
+                <WkIcon name="UserPlus" size={13} />
+                <span className="text-[var(--wk-text-faint)]">feat.</span>
+                {release.featuredArtists.map((fa, i) => (
+                  <span key={fa.slug || fa.name}>
+                    <a
+                      href={`/artists/${fa.slug || slugify(fa.name)}`}
+                      className="text-[var(--wk-text)] hover:text-[var(--wk-brand)] transition-colors"
+                    >
+                      {fa.name}
+                    </a>
+                    {i < release.featuredArtists.length - 1 && (
+                      <span className="text-[var(--wk-text-faint)] ml-1">,</span>
+                    )}
+                  </span>
+                ))}
+              </div>
+            )}
 
             {/* Meta row */}
             <div className="flex flex-wrap items-center gap-5 mt-6 text-[12px] font-bold text-[var(--wk-text-muted)]">

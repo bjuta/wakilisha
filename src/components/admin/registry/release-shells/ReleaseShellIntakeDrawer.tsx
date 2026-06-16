@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { supabase } from "@/lib/supabase";
 import { WkIcon } from "@/components/design-system/Icon";
 import { useScrollLock } from "@/hooks/useScrollLock";
 import type {
@@ -26,6 +27,7 @@ type IntakeScreen = "search" | "inspect" | "done";
 interface ReleaseShellIntakeDrawerProps {
   onClose: () => void;
   onShellCreated: () => void;
+  onShellCreatedWithId?: (shellId: string) => void;
 }
 
 const STOREFRONTS = [
@@ -41,7 +43,7 @@ const STOREFRONTS = [
 
 type EntityTypeFilter = "all" | "release" | "track" | "artist";
 
-export function ReleaseShellIntakeDrawer({ onClose, onShellCreated }: ReleaseShellIntakeDrawerProps) {
+export function ReleaseShellIntakeDrawer({ onClose, onShellCreated, onShellCreatedWithId }: ReleaseShellIntakeDrawerProps) {
   // Lock background scroll while drawer is open
   useScrollLock(true);
 
@@ -191,11 +193,39 @@ export function ReleaseShellIntakeDrawer({ onClose, onShellCreated }: ReleaseShe
     setSelectedTrackIds([]);
   }, []);
 
+  // Find existing shell by provider entity ID
+  const findExistingShell = async (providerEntityId: string, provider: string): Promise<string | null> => {
+    try {
+      const { data: links } = await supabase
+        .from("provider_entity_links")
+        .select("registry_entity_id")
+        .eq("provider_entity_id", providerEntityId)
+        .eq("provider", provider)
+        .eq("registry_entity_type", "release")
+        .limit(1);
+      if (links && links.length > 0) {
+        return links[0].registry_entity_id as string;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  };
+
   const handleCreateShell = async (result?: ProviderSearchResult) => {
     const source = result ?? inspectSourceResult;
     if (!source) return;
 
     if (source.providerEntityType === "artist") {
+      return;
+    }
+
+    // Check if shell already exists for this provider entity
+    const existingShellId = await findExistingShell(source.providerEntityId, source.provider);
+    if (existingShellId) {
+      // Shell already exists — open it in the review drawer
+      onShellCreatedWithId?.(existingShellId);
+      onClose();
       return;
     }
 
@@ -213,7 +243,13 @@ export function ReleaseShellIntakeDrawer({ onClose, onShellCreated }: ReleaseShe
         selectedTrackIds,
       });
       setCreateResult(response);
-      setScreen("done");
+      // Open the review drawer for the new shell
+      if (response.shell?.registryEntityId) {
+        onShellCreatedWithId?.(response.shell.registryEntityId);
+        onClose();
+      } else {
+        setScreen("done");
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to create release shell.";
       setCreateError(message);
@@ -249,7 +285,13 @@ export function ReleaseShellIntakeDrawer({ onClose, onShellCreated }: ReleaseShe
         selectedTrackIds,
       });
       setCreateResult(response);
-      setScreen("done");
+      // Open the review drawer for the refreshed shell
+      if (response.shell?.registryEntityId) {
+        onShellCreatedWithId?.(response.shell.registryEntityId);
+        onClose();
+      } else {
+        setScreen("done");
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to refresh release shell.";
       setCreateError(message);
@@ -270,12 +312,18 @@ export function ReleaseShellIntakeDrawer({ onClose, onShellCreated }: ReleaseShe
         providerEntityType: source.providerEntityType,
         providerEntityId: source.providerEntityId,
         storefrontOrMarket: storefront,
-        mode: "attach",
+        mode: "attach_to_shell",
         idempotencyKey: `${source.provider}:${source.providerEntityType}:${source.providerEntityId}:attach:${targetRegistryEntityId}`,
         targetRegistryEntityId,
       });
       setCreateResult(response);
-      setScreen("done");
+      // Open the review drawer for the attached shell
+      if (response.shell?.registryEntityId) {
+        onShellCreatedWithId?.(response.shell.registryEntityId);
+        onClose();
+      } else {
+        setScreen("done");
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to attach provider result to shell.";
       setCreateError(message);
@@ -302,13 +350,36 @@ export function ReleaseShellIntakeDrawer({ onClose, onShellCreated }: ReleaseShe
         targetRegistryEntityId,
       });
       setCreateResult(response);
-      setScreen("done");
+      // Open the review drawer for the backfilled shell
+      if (response.shell?.registryEntityId) {
+        onShellCreatedWithId?.(response.shell.registryEntityId);
+        onClose();
+      } else {
+        setScreen("done");
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to backfill release.";
       setCreateError(message);
     } finally {
       setCreating(false);
     }
+  };
+
+  // Handle "Attach to existing shell" from search results card
+  const handleSearchResultAttach = async (result: ProviderSearchResult) => {
+    if (result.providerEntityType === "artist") return;
+
+    // Check if shell already exists for this provider entity
+    const existingShellId = await findExistingShell(result.providerEntityId, result.provider);
+    if (existingShellId) {
+      // Shell already exists — open it in the review drawer
+      onShellCreatedWithId?.(existingShellId);
+      onClose();
+      return;
+    }
+
+    // No existing shell found — create one
+    await handleCreateShell(result);
   };
 
   const handleOpenShell = () => {
@@ -613,10 +684,7 @@ export function ReleaseShellIntakeDrawer({ onClose, onShellCreated }: ReleaseShe
                   response={searchResults}
                   onInspect={handleInspect}
                   onCreateShell={(result) => handleCreateShell(result)}
-                  onAttachToShell={(result) => {
-                    setInspectSourceResult(result);
-                    handleInspect(result);
-                  }}
+                  onAttachToShell={handleSearchResultAttach}
                   isLoading={creating}
                 />
               )}

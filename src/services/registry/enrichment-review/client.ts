@@ -70,6 +70,17 @@ export interface ReleaseShellLifecycleSnapshot {
   createdAt: string | null;
 }
 
+export interface ShellTrack {
+  id?: string;
+  title: string;
+  artistName: string;
+  trackNumber: number | null;
+  durationMs: number | null;
+  isrc: string | null;
+  artworkUrl: string | null;
+  previewUrl: string | null;
+}
+
 export interface ReleaseShellEnrichmentContext {
   shellKey: string;
   registryEntityId: string;
@@ -78,6 +89,7 @@ export interface ReleaseShellEnrichmentContext {
   observations: ProviderFieldObservationReviewItem[];
   suggestions: RegistryEnrichmentSuggestionReviewItem[];
   providerLinks: ProviderEntityLinkReviewItem[];
+  tracks: ShellTrack[];
 }
 
 export interface CanonicalWriteAuditEvent {
@@ -112,10 +124,6 @@ export interface RegistryReleaseShellReviewRow extends IngestResolvedRow {
   sourceRunId: string;
   sourceRunTitle: string;
   sourceEditionDate: string;
-}
-
-function getSuggestionValue(context: ReleaseShellEnrichmentContext, fieldName: string): string | null {
-  return context.suggestions.find((suggestion) => suggestion.fieldName === fieldName)?.suggestedValue ?? null;
 }
 
 function normalizeConfidence(value: number): number {
@@ -179,22 +187,28 @@ function toFieldObservation(o: Record<string, unknown>): ProviderFieldObservatio
   };
 }
 
-function toAuditEvent(e: Record<string, unknown>): CanonicalWriteAuditEvent {
+function buildContextFromShellRow(shell: Record<string, unknown>, shellSuggestions: RegistryEnrichmentSuggestionReviewItem[], shellLinks: ProviderEntityLinkReviewItem[], lifecycle: ReleaseShellLifecycleSnapshot, shellObservations: ProviderFieldObservationReviewItem[]): ReleaseShellEnrichmentContext {
+  const rawTracks = Array.isArray(shell.tracks) ? shell.tracks as Array<Record<string, unknown>> : [];
+  const tracks: ShellTrack[] = rawTracks.map((t) => ({
+    id: t.id as string | undefined,
+    title: (t.title as string) || "Untitled",
+    artistName: (t.artistName as string) || "",
+    trackNumber: t.trackNumber as number | null,
+    durationMs: t.durationMs as number | null,
+    isrc: (t.isrc as string) || null,
+    artworkUrl: (t.artworkUrl as string) || null,
+    previewUrl: (t.previewUrl as string) || null,
+  }));
+
   return {
-    id: e.id as string,
-    registryEntityType: e.registry_entity_type as string,
-    registryEntityId: e.registry_entity_id as string,
-    sourceSuggestionId: e.source_suggestion_id as string | null,
-    sourceTable: e.source_table as string,
-    fieldName: e.field_name as string,
-    targetPath: e.target_path as string,
-    beforeValue: e.before_value as unknown,
-    afterValue: e.after_value as unknown,
-    action: e.action as string,
-    status: e.status as string,
-    errorMessage: e.error_message as string | null,
-    actor: e.actor as string,
-    createdAt: e.created_at as string,
+    shellKey: shell.id as string,
+    registryEntityId: shell.id as string,
+    dataSource: "runtime_api",
+    lifecycle,
+    observations: shellObservations,
+    suggestions: shellSuggestions,
+    providerLinks: shellLinks,
+    tracks,
   };
 }
 
@@ -205,7 +219,6 @@ export async function getLiveReleaseShellReviewRows(options: { includeResolved?:
   contexts: Record<string, ReleaseShellEnrichmentContext>;
 }> {
   try {
-    // Fetch all shells (newest first)
     const { data: shellsData, error: shellsError } = await supabase
       .from("registry_release_shells")
       .select("*")
@@ -221,7 +234,6 @@ export async function getLiveReleaseShellReviewRows(options: { includeResolved?:
       .map((s) => ((s.source_provenance as Record<string, unknown> | null)?.provider_entity_id as string) ?? "")
       .filter(Boolean);
 
-    // Fetch all related data in parallel
     const [
       suggestionsResult,
       linksResult,
@@ -257,14 +269,12 @@ export async function getLiveReleaseShellReviewRows(options: { includeResolved?:
         .in("id", shellsData.map((s) => s.release_id)),
     ]);
 
-    // Group data by shell
     const suggestionsByShell = groupBy(suggestionsResult.data ?? [], "registry_entity_id");
     const linksByShell = groupBy(linksResult.data ?? [], "registry_entity_id");
     const lifecycleByShell = groupBy(lifecycleResult.data ?? [], "registry_entity_id");
     const observationsByProviderItem = groupBy(observationsResult.data ?? [], "provider_item_id");
     const releasesById = Object.fromEntries((releasesResult.data ?? []).map((r) => [r.id, r]));
 
-    // Build contexts and rows
     const contexts: Record<string, ReleaseShellEnrichmentContext> = {};
     const rows: RegistryReleaseShellReviewRow[] = [];
 
@@ -288,23 +298,14 @@ export async function getLiveReleaseShellReviewRows(options: { includeResolved?:
 
       const shellObservations = (observationsByProviderItem[providerEntityId] ?? []).map(toFieldObservation);
 
-      const context: ReleaseShellEnrichmentContext = {
-        shellKey: shell.id,
-        registryEntityId: shell.id,
-        dataSource: "runtime_api",
-        lifecycle,
-        observations: shellObservations,
-        suggestions: shellSuggestions,
-        providerLinks: shellLinks,
-      };
-
+      const context = buildContextFromShellRow(shell as Record<string, unknown>, shellSuggestions, shellLinks, lifecycle, shellObservations);
       contexts[shell.id] = context;
 
       const release = releasesById[shell.release_id];
       const providerLink = shellLinks[0];
       const confidence = shellSuggestions[0]?.confidenceScore ?? providerLink?.confidenceScore ?? 0.95;
 
-      const row: RegistryReleaseShellReviewRow = {
+      rows.push({
         id: shell.id,
         shellKey: shell.id,
         rank: index + 1,
@@ -318,15 +319,12 @@ export async function getLiveReleaseShellReviewRows(options: { includeResolved?:
         releaseShellId: shell.id,
         sourceSurface: "registry",
         sourceRunId: "registry-enrichment-review",
-        sourceRunTitle: "Live Phase 8C staging",
+        sourceRunTitle: "Live staging",
         sourceEditionDate: "live",
         raw: context,
-      };
-
-      rows.push(row);
+      });
     });
 
-    // Filter resolved if needed
     const filteredRows = options.includeResolved
       ? rows
       : rows.filter((r) => {
@@ -406,6 +404,7 @@ export async function getReleaseShellEnrichmentContexts(
         observations: shellObservations,
         suggestions: shellSuggestions,
         providerLinks: shellLinks,
+        tracks: [],
       };
     });
 
@@ -459,23 +458,18 @@ export async function updateReleaseShellSuggestionDecision(
 
   const contentType = response.headers.get("content-type") ?? "";
   if (!contentType.includes("application/json")) {
-    throw new Error(`Edge function returned non-JSON response (${response.status}). Please check if the function is deployed.`);
+    throw new Error(`Edge function returned non-JSON response (${response.status}).`);
   }
 
   const payload = (await response.json()) as {
-    data?: {
-      decision?: UpdateReleaseShellSuggestionDecisionResult;
-    };
+    data?: { decision?: UpdateReleaseShellSuggestionDecisionResult };
     decision?: UpdateReleaseShellSuggestionDecisionResult;
     error?: string;
   };
 
-  if (!response.ok) {
-    throw new Error(payload.error ?? `Edge function returned HTTP ${response.status}.`);
-  }
-
+  if (!response.ok) throw new Error(payload.error ?? `Edge function returned HTTP ${response.status}.`);
   const decision = payload.data?.decision ?? payload.decision;
-  if (!decision) throw new Error("No decision payload returned from edge function.");
+  if (!decision) throw new Error("No decision payload returned.");
   return decision;
 }
 
@@ -486,21 +480,10 @@ export async function previewApprovedReleaseShellSuggestions(
     method: "POST",
     body: JSON.stringify({ registryEntityId }),
   });
-
   const contentType = response.headers.get("content-type") ?? "";
-  if (!contentType.includes("application/json")) {
-    throw new Error(`Edge function returned non-JSON response (${response.status}).`);
-  }
-
-  const payload = (await response.json()) as {
-    data?: ApplyApprovedReleaseShellSuggestionsPreview;
-    error?: string;
-  };
-
-  if (!response.ok) {
-    throw new Error(payload.error ?? `Edge function returned HTTP ${response.status}.`);
-  }
-
+  if (!contentType.includes("application/json")) throw new Error(`Edge function returned non-JSON response (${response.status}).`);
+  const payload = (await response.json()) as { data?: ApplyApprovedReleaseShellSuggestionsPreview; error?: string };
+  if (!response.ok) throw new Error(payload.error ?? `Edge function returned HTTP ${response.status}.`);
   return payload.data as ApplyApprovedReleaseShellSuggestionsPreview;
 }
 
@@ -511,21 +494,10 @@ export async function applyApprovedReleaseShellSuggestions(
     method: "POST",
     body: JSON.stringify({ registryEntityId }),
   });
-
   const contentType = response.headers.get("content-type") ?? "";
-  if (!contentType.includes("application/json")) {
-    throw new Error(`Edge function returned non-JSON response (${response.status}).`);
-  }
-
-  const payload = (await response.json()) as {
-    data?: ApplyApprovedReleaseShellSuggestionsResult;
-    error?: string;
-  };
-
-  if (!response.ok) {
-    throw new Error(payload.error ?? `Edge function returned HTTP ${response.status}.`);
-  }
-
+  if (!contentType.includes("application/json")) throw new Error(`Edge function returned non-JSON response (${response.status}).`);
+  const payload = (await response.json()) as { data?: ApplyApprovedReleaseShellSuggestionsResult; error?: string };
+  if (!response.ok) throw new Error(payload.error ?? `Edge function returned HTTP ${response.status}.`);
   return payload.data as ApplyApprovedReleaseShellSuggestionsResult;
 }
 
@@ -538,47 +510,134 @@ export async function updateReleaseShellLifecycleStatus(
     method: "POST",
     body: JSON.stringify({ status, reason }),
   });
-
   const contentType = response.headers.get("content-type") ?? "";
-  if (!contentType.includes("application/json")) {
-    throw new Error(`Edge function returned non-JSON response (${response.status}).`);
-  }
-
+  if (!contentType.includes("application/json")) throw new Error(`Edge function returned non-JSON response (${response.status}).`);
   const payload = (await response.json()) as {
     data?: { lifecycle?: ReleaseShellLifecycleSnapshot };
     lifecycle?: ReleaseShellLifecycleSnapshot;
     error?: string;
   };
-
-  if (!response.ok) {
-    throw new Error(payload.error ?? `Edge function returned HTTP ${response.status}.`);
-  }
-
+  if (!response.ok) throw new Error(payload.error ?? `Edge function returned HTTP ${response.status}.`);
   const lifecycle = payload.data?.lifecycle ?? payload.lifecycle;
-  if (!lifecycle) throw new Error("No lifecycle payload returned from edge function.");
+  if (!lifecycle) throw new Error("No lifecycle payload returned.");
   return lifecycle;
 }
 
 export async function getReleaseShellCanonicalWriteAuditEvents(
   registryEntityId: string,
 ): Promise<CanonicalWriteAuditEvent[]> {
-  const response = await edgeFetch(`${encodeURIComponent(registryEntityId)}/audit`, {
-    method: "GET",
-  });
-
+  const response = await edgeFetch(`${encodeURIComponent(registryEntityId)}/audit`, { method: "GET" });
   if (!response.ok) return [];
-
   const contentType = response.headers.get("content-type") ?? "";
   if (!contentType.includes("application/json")) return [];
-
-  const payload = (await response.json()) as {
-    data?: { events?: CanonicalWriteAuditEvent[] };
-    events?: CanonicalWriteAuditEvent[];
-  };
-
+  const payload = (await response.json()) as { data?: { events?: CanonicalWriteAuditEvent[] }; events?: CanonicalWriteAuditEvent[] };
   return payload.data?.events ?? payload.events ?? [];
 }
 
 export function formatConfidence(value: number): string {
   return `${Math.round(normalizeConfidence(value) * 100)}%`;
+}
+
+export interface ShellDuplicateCheckResult {
+  registryEntityId: string;
+  duplicates: Array<{
+    registryEntityId: string;
+    slug: string;
+    title: string;
+    releaseDate: string | null;
+    artworkUrl: string | null;
+    status: string;
+    matchReason: string;
+    matchScore: number;
+  }>;
+  hasDuplicates: boolean;
+}
+
+export interface ShellCanonicalizeResult {
+  registryEntityId: string;
+  releaseId: string;
+  tracks: {
+    created: number;
+    joins: number;
+    trackArtists: number;
+    releaseArtists: number;
+  };
+  collisionResolved?: boolean;
+  success: boolean;
+}
+
+export interface CanonicalReleaseComparison {
+  id: string;
+  slug: string;
+  title: string;
+  artistName: string | null;
+  releaseDate: string | null;
+  artworkUrl: string | null;
+  status: string;
+  trackCount: number;
+  tracks: Array<{
+    title: string;
+    trackNumber: number | null;
+    durationMs: number | null;
+    isrc: string | null;
+  }>;
+}
+
+export async function canonicalizeShell(registryEntityId: string): Promise<ShellCanonicalizeResult> {
+  const response = await edgeFetch("canonicalize", {
+    method: "POST",
+    body: JSON.stringify({ registryEntityId }),
+  });
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) throw new Error(`Edge function returned non-JSON response (${response.status}).`);
+  const payload = (await response.json()) as { data?: ShellCanonicalizeResult; error?: string };
+  if (!response.ok) throw new Error(payload.error ?? `Edge function returned HTTP ${response.status}.`);
+  return payload.data as ShellCanonicalizeResult;
+}
+
+export async function saveShell(registryEntityId: string, updates: Record<string, unknown>): Promise<{ registryEntityId: string; saved: boolean }> {
+  const response = await edgeFetch("save-shell", {
+    method: "POST",
+    body: JSON.stringify({ registryEntityId, updates }),
+  });
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) throw new Error(`Edge function returned non-JSON response (${response.status}).`);
+  const payload = (await response.json()) as { data?: { registryEntityId: string; saved: boolean }; error?: string };
+  if (!response.ok) throw new Error(payload.error ?? `Edge function returned HTTP ${response.status}.`);
+  return payload.data as { registryEntityId: string; saved: boolean };
+}
+
+export async function rejectShell(registryEntityId: string, reason?: string): Promise<{ registryEntityId: string; status: string; reason: string }> {
+  const response = await edgeFetch("reject-shell", {
+    method: "POST",
+    body: JSON.stringify({ registryEntityId, reason }),
+  });
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) throw new Error(`Edge function returned non-JSON response (${response.status}).`);
+  const payload = (await response.json()) as { data?: { registryEntityId: string; status: string; reason: string }; error?: string };
+  if (!response.ok) throw new Error(payload.error ?? `Edge function returned HTTP ${response.status}.`);
+  return payload.data as { registryEntityId: string; status: string; reason: string };
+}
+
+export async function checkDuplicate(registryEntityId: string): Promise<ShellDuplicateCheckResult> {
+  const response = await edgeFetch("check-duplicate", {
+    method: "POST",
+    body: JSON.stringify({ registryEntityId }),
+  });
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) throw new Error(`Edge function returned non-JSON response (${response.status}).`);
+  const payload = (await response.json()) as { data?: ShellDuplicateCheckResult; error?: string };
+  if (!response.ok) throw new Error(payload.error ?? `Edge function returned HTTP ${response.status}.`);
+  return payload.data as ShellDuplicateCheckResult;
+}
+
+export async function fetchCanonicalReleaseForComparison(releaseId: string): Promise<CanonicalReleaseComparison> {
+  const response = await edgeFetch(`release-comparison/${encodeURIComponent(releaseId)}`, {
+    method: "GET",
+  });
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) throw new Error(`Edge function returned non-JSON response (${response.status}).`);
+  const payload = (await response.json()) as { data?: CanonicalReleaseComparison; error?: string };
+  if (!response.ok) throw new Error(payload.error ?? `Edge function returned HTTP ${response.status}.`);
+  return payload.data as CanonicalReleaseComparison;
 }
