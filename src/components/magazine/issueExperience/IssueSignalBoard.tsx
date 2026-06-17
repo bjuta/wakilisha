@@ -15,7 +15,7 @@ export function IssueSignalBoard({ issue, experience }: IssueSignalBoardProps) {
       <div className="mag-signal">
         <div className="mag-rail magazine-meta">
           <span>{experience.archetypeLabel}</span>
-          <span>{experience.interactionPattern}</span>
+          <span>{experience.issueCta}</span>
         </div>
         <div className="mag-signal-head">
           <h2>{experience.signalTitle}</h2>
