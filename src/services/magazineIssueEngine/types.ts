@@ -18,20 +18,53 @@ export type EditorNoteMode = 'letter' | 'one-line' | 'image-note' | 'song-note' 
 export type FeatureVisualMode = 'issue-one-route' | 'photo-led' | 'type-led' | 'archive-board' | 'signal-board' | 'paper-file';
 export type IssueThinness = 'rich' | 'medium' | 'thin';
 
+export type IssueSignalName =
+  | 'sound'
+  | 'scene'
+  | 'memory'
+  | 'systems'
+  | 'guide'
+  | 'argument'
+  | 'image'
+  | 'review';
+
 export type SectionCount = {
   section: string;
   count: number;
+  weight: number;
 };
 
-export type IssueArticleCluster = {
-  sound: MagazineIssueArticle[];
-  scene: MagazineIssueArticle[];
-  memory: MagazineIssueArticle[];
-  systems: MagazineIssueArticle[];
-  guide: MagazineIssueArticle[];
-  argument: MagazineIssueArticle[];
-  image: MagazineIssueArticle[];
-  review: MagazineIssueArticle[];
+export type IssueArticleCluster = Record<IssueSignalName, MagazineIssueArticle[]>;
+
+export type IssueRoleCounts = {
+  core: number;
+  support: number;
+  backup: number;
+  needsReview: number;
+  stale: number;
+  excluded: number;
+};
+
+export type IssueSignalScore = {
+  signal: IssueSignalName;
+  label: string;
+  count: number;
+  score: number;
+  articles: MagazineIssueArticle[];
+};
+
+export type IssueTension = {
+  primary: IssueSignalName;
+  secondary?: IssueSignalName;
+  label: string;
+  description: string;
+};
+
+export type IssueReadingDoor = {
+  mode: IssueSignalName | 'mixed' | 'thin';
+  title: string;
+  reason: string;
+  article?: MagazineIssueArticle;
 };
 
 export type IssueFacts = {
@@ -42,15 +75,30 @@ export type IssueFacts = {
   subtitle?: string;
   deck?: string;
   articleCount: number;
+  usableArticles: MagazineIssueArticle[];
+  heldArticles: MagazineIssueArticle[];
   coreCount: number;
   supportCount: number;
   excludedCount: number;
+  roleCounts: IssueRoleCounts;
   dominantSection?: string;
   secondarySection?: string;
+  topSections: string[];
   sectionMix: SectionCount[];
+  sectionEntropy: number;
+  hasBalancedMix: boolean;
+  hasSingleDominantSection: boolean;
   topArticle?: MagazineIssueArticle;
+  topArticleReason?: string;
+  featureCandidate?: MagazineIssueArticle;
   leadArticles: MagazineIssueArticle[];
+  leadArticleTitles: string[];
+  imageArticles: MagazineIssueArticle[];
+  imageCount: number;
   clusters: IssueArticleCluster;
+  signalScores: IssueSignalScore[];
+  primarySignal?: IssueSignalScore;
+  secondarySignal?: IssueSignalScore;
   hasStrongImage: boolean;
   hasStrongSound: boolean;
   hasStrongPlace: boolean;
@@ -60,7 +108,12 @@ export type IssueFacts = {
   hasStrongMemory: boolean;
   hasStrongSystems: boolean;
   tension?: string;
+  tensionDetail?: IssueTension;
+  readingDoor: IssueReadingDoor;
+  averageScore: number;
+  scoreSpread: number;
   thinness: IssueThinness;
+  factSummary: string[];
 };
 
 export type IssueScore = {
