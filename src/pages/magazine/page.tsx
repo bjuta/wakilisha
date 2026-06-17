@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useMemo, useState, useRef, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { useMagazineArticles, type MagazineArticle } from "@/services/magazineArticles";
 import { getAuthorMeta } from "@/services/authorProfiles";
@@ -6,6 +6,15 @@ import { MagazineCard } from "./components/MagazineCard";
 import { SectionCarousel } from "./components/SectionCarousel";
 import { SkeletonMagazinePage } from "@/components/skeletons/Skeletons";
 import { Chapter19FallbackImage } from "@/components/media/Chapter19FallbackImage";
+import { buildMagazineIssues, issueUrl, type MagazineIssue } from "@/services/magazineIssues";
+import { buildIssueEditorialSystem } from "@/services/magazineNlg";
+import type { MagazineIssueExperience } from "@/services/magazineIssueEngine";
+import "@/components/magazine/issueExperience/issueMicrointeractions.css";
+
+type LandingIssueMoment = {
+  issue: MagazineIssue;
+  experience: MagazineIssueExperience;
+};
 
 /* ── Scroll reveal ── */
 function useScrollReveal(deps: unknown[] = []) {
@@ -27,14 +36,23 @@ function useScrollReveal(deps: unknown[] = []) {
   }, deps);
 }
 
-function computeIssueInfo(articles: MagazineArticle[]) {
+function computeIssueInfo(articles: MagazineArticle[], latestIssue?: MagazineIssue) {
+  if (latestIssue) {
+    return {
+      number: latestIssue.issueNumber,
+      date: latestIssue.issueLabel,
+    };
+  }
   if (!articles.length) return { number: 1, date: "June 2026" };
   const latest = articles[0];
   const d = latest.date ? new Date(latest.date) : new Date();
   const safe = Number.isNaN(d.getTime()) ? new Date() : d;
   const year = safe.getFullYear();
   const month = safe.getMonth() + 1;
-  return { number: Math.max(1, (year - 2024) * 12 + month), date: safe.toLocaleDateString("en", { month: "long", year: "numeric" }) };
+  return {
+    number: Math.max(1, (year - 2024) * 12 + month),
+    date: safe.toLocaleDateString("en", { month: "long", year: "numeric" }),
+  };
 }
 
 /* ── Section header ── */
@@ -47,7 +65,7 @@ function SectionLabel({ children, count, href }: { children: string; count?: num
         </span>
         {count !== undefined && (
           <span className="text-[11px] font-semibold text-[var(--wk-text-faint)] bg-[var(--wk-surface)] border border-[var(--wk-border)] px-2.5 py-0.5 rounded-full">
-            {count} stories
+            {count} {count === 1 ? "story" : "stories"}
           </span>
         )}
       </div>
@@ -64,7 +82,7 @@ export default function Magazine() {
   const { articles: stories, loading, error } = useMagazineArticles();
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [activeSection, setActiveSection] = useState("All");
-  const heroRef = useRef<HTMLDivElement>(null);
+  const heroRef = useRef<HTMLAnchorElement>(null);
   const heroImgRef = useRef<HTMLImageElement>(null);
 
   useEffect(() => {
@@ -72,6 +90,17 @@ export default function Magazine() {
     else if (error) setStatus("error");
     else setStatus("ready");
   }, [loading, error]);
+
+  const issueMoments = useMemo<LandingIssueMoment[]>(() => {
+    return buildMagazineIssues(stories).map((issue) => ({
+      issue,
+      experience: buildIssueEditorialSystem(issue),
+    }));
+  }, [stories]);
+
+  const latestIssue = issueMoments[0]?.issue;
+  const latestIssueExperience = issueMoments[0]?.experience;
+  const homepageIssueMoments = issueMoments.slice(1, 7);
 
   /* Parallax scroll on hero image */
   useEffect(() => {
@@ -96,16 +125,10 @@ export default function Magazine() {
     return ["All", ...sects.filter((s) => s !== "All")];
   }, [stories]);
 
-  const sectionCounts = useMemo(() => {
-    const cts: Record<string, number> = {};
-    for (const s of stories) {
-      const sec = s.section || "Article";
-      cts[sec] = (cts[sec] || 0) + 1;
-    }
-    return cts;
-  }, [stories]);
-
-  const { number: issueNum, date: issueDate } = useMemo(() => computeIssueInfo(stories), [stories]);
+  const { number: issueNum, date: issueDate } = useMemo(
+    () => computeIssueInfo(stories, latestIssue),
+    [stories, latestIssue],
+  );
 
   const heroStory = stories[0];
   const picks = stories.slice(1, 5);
@@ -126,34 +149,6 @@ export default function Magazine() {
     () => Object.entries(sectionMap).sort((a, b) => b[1].length - a[1].length).slice(0, 3).map(([n]) => n),
     [sectionMap],
   );
-
-  const pastIssues = useMemo(() => {
-    const grouped: Record<string, { articles: MagazineArticle[]; coverArticle: MagazineArticle }> = {};
-    for (const article of stories) {
-      const parsed = new Date(article.date);
-      if (Number.isNaN(parsed.getTime())) continue;
-      const key = `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}`;
-      if (!grouped[key]) {
-        grouped[key] = { articles: [], coverArticle: article };
-      }
-      grouped[key].articles.push(article);
-    }
-    const sorted = Object.entries(grouped)
-      .sort((a, b) => b[0].localeCompare(a[0]))
-      .map(([key, val], idx, arr) => {
-        const [y, m] = key.split('-');
-        const monthName = new Date(Number(y), Number(m) - 1).toLocaleDateString('en', { month: 'long', year: 'numeric' });
-        return {
-          key,
-          monthName,
-          issueNumber: arr.length - idx, // most recent = highest number
-          coverUrl: val.coverArticle.heroUrl,
-          articleCount: val.articles.length,
-          firstSlug: val.coverArticle.slug,
-        };
-      });
-    return sorted.slice(1); // skip current issue
-  }, [stories]);
 
   // ── Filter content based on active section tab ──
   const filteredPicks = useMemo(() => {
@@ -188,6 +183,8 @@ export default function Magazine() {
     );
   }
 
+  const emptyMessage = latestIssueExperience?.emptyState ?? "This section is quiet for now. Follow another route through the magazine while the next story opens.";
+
   return (
     <main className="min-h-screen bg-[var(--wk-bg)]">
 
@@ -212,20 +209,21 @@ export default function Magazine() {
             name={heroStory.title}
           />
         )}
-        {/* Gradient overlay — heavier at bottom for text legibility */}
         <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/25 to-black/90" />
 
-        {/* Content — anchored bottom-left */}
         <div className="relative z-10 w-full max-w-[1280px] mx-auto px-6 lg:px-8 pb-16 pt-28 text-white">
+          {latestIssueExperience && (
+            <span className="inline-flex items-center gap-2 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-white/80 font-black uppercase tracking-[0.16em] text-[10px] px-3 py-1.5 mb-5 mag-archetype-badge">
+              {latestIssueExperience.archetypeLabel}
+            </span>
+          )}
           <h1 className="text-[clamp(40px,6vw,80px)] font-black tracking-[-0.05em] leading-[0.92] max-w-[16ch] group-hover:opacity-90 transition-opacity duration-500">
             {heroStory.title}
           </h1>
 
-          {heroStory.dek && (
-            <p className="mt-5 text-[16px] lg:text-[18px] leading-relaxed text-white/60 max-w-[52ch]">
-              {heroStory.dek}
-            </p>
-          )}
+          <p className="mt-5 text-[16px] lg:text-[18px] leading-relaxed text-white/60 max-w-[52ch]">
+            {latestIssueExperience?.heroIntro ?? heroStory.dek}
+          </p>
 
           <div className="flex items-center gap-2 mt-6 text-[12px] flex-wrap">
             <Link
@@ -244,7 +242,6 @@ export default function Magazine() {
           </div>
         </div>
 
-        {/* Scroll hint */}
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 hidden lg:flex flex-col items-center gap-2">
           <div className="w-px h-12 bg-gradient-to-b from-white/40 to-transparent" />
         </div>
@@ -282,29 +279,22 @@ export default function Magazine() {
         {allContentEmpty && activeSection !== "All" ? (
           <section className="mag-reveal">
             <div className="relative rounded-2xl overflow-hidden border border-[var(--wk-border)] bg-[var(--wk-surface)]">
-              <div className="absolute inset-0 opacity-[0.06]">
-                <img
-                  src="https://readdy.ai/api/search-image?query=Abstract%20minimalist%20editorial%20composition%20with%20scattered%20magazine%20pages%20and%20soft%20organic%20shapes%20floating%20in%20warm%20morning%20light%2C%20cream%20and%20charcoal%20tones%2C%20peaceful%20contemplative%20mood%2C%20wide%20composition%20with%20ample%20negative%20space%2C%20fine%20art%20editorial%20aesthetic%2C%20soft%20focus%2C%20gentle%20gradients&width=1400&height=600&seq=mag-empty-state-01&orientation=landscape"
-                  alt=""
-                  className="w-full h-full object-cover"
-                />
-              </div>
               <div className="relative z-10 py-20 lg:py-28 px-6 text-center">
                 <div className="w-16 h-16 rounded-2xl bg-[var(--wk-bg)] border border-[var(--wk-border)] flex items-center justify-center mx-auto mb-6 rotate-3">
-                  <i className="ri-pages-line text-[28px] text-[var(--wk-text-faint)]" />
+                  <i className="ri-compass-3-line text-[28px] text-[var(--wk-text-faint)]" />
                 </div>
                 <p className="text-[18px] lg:text-[20px] font-black tracking-[-0.025em] text-[var(--wk-text)] mb-3">
                   No stories in <span className="text-[var(--wk-brand)]">{activeSection}</span> yet
                 </p>
                 <p className="text-[14px] text-[var(--wk-text-muted)] max-w-[420px] mx-auto leading-relaxed mb-8">
-                  This section is quiet for now. Fresh stories are being edited and sequenced — check back soon, or explore everything we have.
+                  {emptyMessage}
                 </p>
                 <button
                   onClick={() => setActiveSection("All")}
                   className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full border border-[var(--wk-border)] bg-[var(--wk-bg)] text-[13px] font-bold text-[var(--wk-text-soft)] hover:text-[var(--wk-text)] hover:border-[var(--wk-border-strong)] transition-all cursor-pointer whitespace-nowrap"
                 >
                   <i className="ri-arrow-left-line text-[15px]" />
-                  Browse all stories
+                  Open every route
                 </button>
               </div>
             </div>
@@ -389,7 +379,7 @@ export default function Magazine() {
                       <i className="ri-article-line text-[24px] text-[var(--wk-text-faint)]" />
                     </div>
                     <p className="text-[16px] font-bold text-[var(--wk-text-muted)] mb-2">No stories in {activeSection}</p>
-                    <p className="text-[13px] text-[var(--wk-text-faint)]">Check back soon or browse All stories.</p>
+                    <p className="text-[13px] text-[var(--wk-text-faint)]">{emptyMessage}</p>
                   </section>
                 );
               }
@@ -409,62 +399,85 @@ export default function Magazine() {
           </div>
         </div>
 
-        {/* ── Past Issues Archive ── */}
-        {pastIssues.length > 0 && (
+        {/* ── Issue Doors ── */}
+        {homepageIssueMoments.length > 0 && (
           <section className="mag-reveal">
             <div className="flex items-end justify-between mb-8 gap-4 flex-wrap">
               <div className="flex items-center gap-3">
                 <span className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--wk-brand)]">
-                  Past Issues
+                  Issue doors
                 </span>
                 <span className="text-[11px] font-semibold text-[var(--wk-text-faint)] bg-[var(--wk-surface)] border border-[var(--wk-border)] px-2.5 py-0.5 rounded-full">
-                  {pastIssues.length} issues
+                  {homepageIssueMoments.length} ways in
                 </span>
               </div>
               <Link to="/magazine/issues" className="text-[12px] font-bold text-[var(--wk-text-muted)] hover:text-[var(--wk-brand)] transition-colors flex items-center gap-1 whitespace-nowrap">
-                Browse all <i className="ri-arrow-right-line text-[11px]" />
+                Open all issues <i className="ri-arrow-right-line text-[11px]" />
               </Link>
             </div>
             <div
               className="flex gap-5 overflow-x-auto scrollbar-none pb-2 -mx-6 lg:-mx-8 px-6 lg:px-8"
               style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
             >
-              {pastIssues.map((issue) => (
-                <Link
-                  key={issue.key}
-                  to={`/magazine/issue/${issue.key}`}
-                  className="group relative shrink-0 w-[200px] lg:w-[240px] aspect-[3/4] rounded-xl overflow-hidden bg-[#0a0a0a]"
-                >
-                  {issue.coverUrl ? (
-                    <img
-                      src={issue.coverUrl}
-                      alt={issue.monthName}
-                      className="absolute inset-0 w-full h-full object-cover object-top transition-transform duration-600 group-hover:scale-105"
-                    />
-                  ) : (
-                    <Chapter19FallbackImage
-                      slug={issue.key}
-                      name={issue.monthName}
-                    />
-                  )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-black/10" />
-                  {/* Top-right issue number */}
-                  <div className="absolute top-3 right-3 z-10">
-                    <span className="inline-flex items-center rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-white/80 text-[10px] font-black tracking-[0.12em] px-2.5 py-1">
-                      No. {issue.issueNumber}
-                    </span>
-                  </div>
-                  {/* Bottom content */}
-                  <div className="absolute bottom-0 left-0 right-0 z-10 p-4">
-                    <p className="text-[12px] lg:text-[13px] font-bold text-white/50 tracking-[0.06em] uppercase mb-0.5">
-                      {issue.monthName}
-                    </p>
-                    <p className="text-[10px] text-white/35">
-                      {issue.articleCount} {issue.articleCount === 1 ? 'story' : 'stories'}
-                    </p>
-                  </div>
-                </Link>
-              ))}
+              {homepageIssueMoments.map(({ issue, experience }) => {
+                const coverArticle = issue.articles[0];
+                return (
+                  <Link
+                    key={issue.slug}
+                    to={issueUrl(issue)}
+                    className="group relative shrink-0 w-[230px] lg:w-[280px] min-h-[360px] rounded-2xl overflow-hidden bg-[#0a0a0a] mag-meaning-card"
+                  >
+                    {coverArticle?.heroUrl ? (
+                      <img
+                        src={coverArticle.heroUrl}
+                        alt={issue.title}
+                        className="absolute inset-0 w-full h-full object-cover object-top transition-transform duration-700 group-hover:scale-105 mag-soft-parallax"
+                      />
+                    ) : (
+                      <Chapter19FallbackImage
+                        slug={issue.slug}
+                        name={issue.title}
+                      />
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/55 to-black/10" />
+                    <div className="relative z-10 h-full min-h-[360px] p-5 flex flex-col">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="mag-archetype-badge text-white/80">
+                          {experience.archetypeLabel}
+                        </span>
+                        <span className="text-[9px] font-black uppercase tracking-[0.16em] text-white/45">
+                          {issue.issueLabel}
+                        </span>
+                      </div>
+                      <div className="mt-auto">
+                        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--wk-brand)] mb-2">
+                          {experience.issueCta}
+                        </p>
+                        <h3 className="font-[Fraunces] text-[30px] leading-[0.92] tracking-[-0.04em] text-white">
+                          {issue.title}
+                        </h3>
+                        <p className="mt-3 text-[12px] leading-relaxed text-white/58 line-clamp-3">
+                          {experience.archiveBlurb}
+                        </p>
+                        <p className="mag-card-why mt-3 text-[11px] leading-relaxed text-white/46">
+                          {experience.cardBlurb}
+                        </p>
+                        <div className="mt-4 flex items-center justify-between gap-3">
+                          <span className="text-[10px] text-white/40">
+                            {issue.articles.length} {issue.articles.length === 1 ? "story" : "stories"}
+                          </span>
+                          <span className="mag-start-here text-[10px] font-black uppercase tracking-[0.16em] text-white">
+                            Start here
+                          </span>
+                        </div>
+                        <p className="mt-2 text-[10px] text-white/35 line-clamp-2">
+                          {experience.searchSnippet}
+                        </p>
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
             </div>
           </section>
         )}
@@ -481,7 +494,7 @@ export default function Magazine() {
             Stories that move East African culture forward.
           </p>
           <p className="mt-3 text-[12px] text-[var(--wk-text-faint)]">
-            Issue {issueNum} &middot; {issueDate}
+            Issue {issueNum} · {issueDate}
           </p>
         </footer>
       </div>
@@ -540,7 +553,7 @@ function NewsletterCTA() {
   const [email, setEmail] = useState("");
   const [done, setDone] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (email.trim()) setDone(true);
   };
@@ -556,7 +569,7 @@ function NewsletterCTA() {
             You&apos;re on the list
           </h3>
           <p className="text-[14px] text-[var(--wk-text-muted)] max-w-[380px] mx-auto leading-relaxed">
-            Expect WAKILISHA stories, charts, and cultural dispatches — no noise.
+            Expect WAKILISHA stories, charts, and cultural dispatches. No noise.
           </p>
         </div>
       ) : (
