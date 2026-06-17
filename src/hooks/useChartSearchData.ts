@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import { buildChartEntrySearchSnippet } from "@/services/cultureContext/searchAdapters";
 
 export interface ChartSearchItem {
   slug: string;
@@ -10,6 +11,7 @@ export interface ChartSearchItem {
   artworkUrl: string;
   movement: string;
   movementAmount: number;
+  contextText: string;
 }
 
 export function useChartSearchData() {
@@ -63,7 +65,7 @@ export function useChartSearchData() {
             movementAmount = Math.abs(e.previous_rank - e.rank);
           }
 
-          return {
+          const item = {
             slug: e.track_slug,
             title: e.track_title,
             artist: e.artist_name || "",
@@ -72,6 +74,11 @@ export function useChartSearchData() {
             artworkUrl: e.artwork_url || "",
             movement: e.movement || "same",
             movementAmount,
+          };
+
+          return {
+            ...item,
+            contextText: buildChartEntrySearchSnippet(item),
           };
         });
 
