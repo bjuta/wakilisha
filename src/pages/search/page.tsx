@@ -19,6 +19,7 @@ const TABS = ["All", "Artists", "Tracks", "Releases", "Genres", "Labels", "Chart
 type Tab = (typeof TABS)[number];
 
 function highlight(text: string, query: string) {
+  if (!text) return null;
   if (!query.trim()) return text;
   const parts = text.split(new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi"));
   return parts.map((part, i) =>
@@ -74,12 +75,12 @@ export default function Search() {
   const results = useMemo(() => {
     if (!q) return { artists: [] as ArtistSearchItem[], tracks: [] as TrackSearchItem[], releases: [] as RepairedRelease[], genres: [] as GenreSearchItem[], labels: [] as LabelSearchItem[], charts: [] as ChartSearchItem[] };
 
-    const artists = artistData.filter((a) => a.name.toLowerCase().includes(q) || a.genres.some((g) => g.toLowerCase().includes(q)) || (a.country || "").toLowerCase().includes(q));
-    const tracks = trackData.filter((t) => t.title.toLowerCase().includes(q) || t.artist.toLowerCase().includes(q) || t.genre.toLowerCase().includes(q) || t.label.toLowerCase().includes(q));
-    const filteredReleases = releasesLoading ? [] : releases.filter((r) => r.title.toLowerCase().includes(q) || r.artist.toLowerCase().includes(q) || (r.labelName || "").toLowerCase().includes(q));
-    const filteredGenres = genreData.filter((g) => g.name.toLowerCase().includes(q) || g.representativeArtists?.some((a) => a.toLowerCase().includes(q)));
-    const filteredLabels = labelData.filter((l) => l.name.toLowerCase().includes(q) || (l.country || "").toLowerCase().includes(q));
-    const filteredCharts = chartData.filter((c) => c.title.toLowerCase().includes(q) || c.artist.toLowerCase().includes(q));
+    const artists = artistData.filter((a) => a.name.toLowerCase().includes(q) || a.genres.some((g) => g.toLowerCase().includes(q)) || (a.country || "").toLowerCase().includes(q) || a.contextText.toLowerCase().includes(q));
+    const tracks = trackData.filter((t) => t.title.toLowerCase().includes(q) || t.artist.toLowerCase().includes(q) || t.genre.toLowerCase().includes(q) || t.label.toLowerCase().includes(q) || t.contextText.toLowerCase().includes(q));
+    const filteredReleases = releasesLoading ? [] : releases.filter((r) => r.title.toLowerCase().includes(q) || r.artist.toLowerCase().includes(q) || (r.labelName || "").toLowerCase().includes(q) || buildReleaseSearchSnippet(r).toLowerCase().includes(q));
+    const filteredGenres = genreData.filter((g) => g.name.toLowerCase().includes(q) || g.representativeArtists?.some((a) => a.toLowerCase().includes(q)) || g.contextText.toLowerCase().includes(q));
+    const filteredLabels = labelData.filter((l) => l.name.toLowerCase().includes(q) || (l.country || "").toLowerCase().includes(q) || l.contextText.toLowerCase().includes(q));
+    const filteredCharts = chartData.filter((c) => c.title.toLowerCase().includes(q) || c.artist.toLowerCase().includes(q) || c.contextText.toLowerCase().includes(q));
 
     return { artists, tracks, releases: filteredReleases, genres: filteredGenres, labels: filteredLabels, charts: filteredCharts };
   }, [q, artistData, trackData, releases, releasesLoading, genreData, labelData, chartData]);
@@ -257,7 +258,7 @@ export default function Search() {
                 </div>
                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
                   {results.artists.slice(0, activeTab === "All" ? 4 : undefined).map((artist) => (
-                    <ArtistCard key={artist.slug} {...artist} />
+                    <ArtistCard key={artist.slug} {...artist} contextText={artist.contextText} />
                   ))}
                 </div>
               </section>
@@ -275,29 +276,31 @@ export default function Search() {
                 </div>
                 <div className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] overflow-hidden">
                   <div className="divide-y divide-[var(--wk-divider)]">
-                    {results.tracks.slice(0, activeTab === "All" ? 6 : undefined).map((track) => (
-                      <div key={track.slug} className="group flex items-center gap-3 px-5 py-3 transition-colors hover:bg-[var(--wk-surface-raised)]">
-                        <div className="h-12 w-12 shrink-0 overflow-hidden rounded-md bg-[var(--wk-surface-raised)]">
-                          <img src={track.artworkUrl} alt="" className="h-full w-full object-cover" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <Link to={`/tracks/${slugify(track.artist)}/${track.slug}`} className="text-[13px] font-bold text-[var(--wk-text)] hover:underline">
-                            {highlight(track.title, query)}
-                          </Link>
-                          <div className="text-[11px] text-[var(--wk-text-muted)]">
-                            {highlight(track.artist, query)} · {track.genre} · {track.label}
+                    {results.tracks.slice(0, activeTab === "All" ? 6 : undefined).map((track) => {
+                      const meta = [track.artist, track.genre, track.label].filter(Boolean).join(" · ");
+                      return (
+                        <div key={track.slug} className="group flex items-center gap-3 px-5 py-3 transition-colors hover:bg-[var(--wk-surface-raised)]">
+                          <div className="h-12 w-12 shrink-0 overflow-hidden rounded-md bg-[var(--wk-surface-raised)]">
+                            <img src={track.artworkUrl} alt="" className="h-full w-full object-cover" />
                           </div>
+                          <div className="min-w-0 flex-1">
+                            <Link to={`/tracks/${slugify(track.artist)}/${track.slug}`} className="text-[13px] font-bold text-[var(--wk-text)] hover:underline">
+                              {highlight(track.title, query)}
+                            </Link>
+                            {meta && <div className="text-[11px] text-[var(--wk-text-muted)]">{highlight(meta, query)}</div>}
+                            {track.contextText && <p className="mt-1 line-clamp-2 text-[12px] leading-snug text-[var(--wk-text-soft)]">{highlight(track.contextText, query)}</p>}
+                          </div>
+                          <button
+                            onClick={() => handlePlayTrack(track)}
+                            disabled={!track.isPlayable}
+                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] opacity-0 transition-all group-hover:opacity-100 disabled:opacity-0"
+                            aria-label="Play"
+                          >
+                            <i className="ri-play-mini-fill text-sm" />
+                          </button>
                         </div>
-                        <button
-                          onClick={() => handlePlayTrack(track)}
-                          disabled={!track.isPlayable}
-                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] opacity-0 transition-all group-hover:opacity-100 disabled:opacity-0"
-                          aria-label="Play"
-                        >
-                          <i className="ri-play-mini-fill text-sm" />
-                        </button>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               </section>
@@ -342,6 +345,7 @@ export default function Search() {
                         Genre
                       </div>
                       <h3 className="text-[18px] font-black tracking-tight text-[var(--wk-text)]">{highlight(genre.name, query)}</h3>
+                      {genre.contextText && <p className="relative mt-2 line-clamp-2 text-[13px] leading-snug text-[var(--wk-text-soft)]">{highlight(genre.contextText, query)}</p>}
                       <div className="mt-3 flex items-center gap-4 text-[13px] text-[var(--wk-text-muted)]">
                         <span className="inline-flex items-center gap-1"><i className="ri-user-line" /> {genre.artistCount}</span>
                         <span className="inline-flex items-center gap-1"><i className="ri-music-2-line" /> {genre.trackCount}</span>
@@ -359,16 +363,17 @@ export default function Search() {
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   {results.labels.map((label) => (
-                    <div key={label.slug} className="rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-5">
+                    <Link key={label.slug} to={`/labels/${label.slug}`} className="block rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-5 transition-all hover:border-[var(--wk-border-2)] hover:bg-[var(--wk-surface-raised)]">
                       <div className="flex items-center justify-between mb-2">
                         <h3 className="text-[16px] font-bold text-[var(--wk-text)]">{highlight(label.name, query)}</h3>
                         {label.country && <span className="text-[11px] text-[var(--wk-text-muted)]">{label.country}</span>}
                       </div>
+                      {label.contextText && <p className="mb-3 line-clamp-2 text-[13px] leading-snug text-[var(--wk-text-soft)]">{highlight(label.contextText, query)}</p>}
                       <div className="flex items-center gap-4 text-[13px] text-[var(--wk-text-muted)]">
                         <span className="inline-flex items-center gap-1"><i className="ri-user-line" /> {label.artistCount} artists</span>
                         <span className="inline-flex items-center gap-1"><i className="ri-album-line" /> {label.releaseCount} releases</span>
                       </div>
-                    </div>
+                    </Link>
                   ))}
                 </div>
               </section>
@@ -382,7 +387,7 @@ export default function Search() {
                 <div className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] overflow-hidden">
                   <div className="divide-y divide-[var(--wk-divider)]">
                     {results.charts.map((entry) => (
-                      <div key={entry.rank} className="flex items-center gap-3 px-5 py-3">
+                      <div key={`${entry.rank}-${entry.slug}`} className="flex items-center gap-3 px-5 py-3">
                         <div className="w-6 text-right text-[14px] font-black text-[var(--wk-brand)]">{entry.rank}</div>
                         <div className="h-10 w-10 shrink-0 overflow-hidden rounded-md bg-[var(--wk-surface-raised)]">
                           <img src={entry.artworkUrl} alt="" className="h-full w-full object-cover" />
@@ -392,6 +397,7 @@ export default function Search() {
                             {highlight(entry.title, query)}
                           </Link>
                           <div className="text-[11px] text-[var(--wk-text-muted)]">{highlight(entry.artist, query)}</div>
+                          {entry.contextText && <p className="mt-1 line-clamp-2 text-[12px] leading-snug text-[var(--wk-text-soft)]">{highlight(entry.contextText, query)}</p>}
                         </div>
                         <div className="flex items-center gap-1 text-[12px] font-bold">
                           {entry.movement === "up" && <i className="ri-arrow-up-line text-[var(--wk-success)]" />}
