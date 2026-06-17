@@ -9,54 +9,24 @@ export const WAKILISHA_MAGAZINE_EDITOR = {
 function startLine(context: MagazineIssueRecipeContext): string {
   const { facts, score } = context;
   const lead = quoteTitle(facts.topArticle?.title);
-  switch (score.archetype) {
-    case 'listeningIssue':
-      return `Start with the sound. ${lead} gives this issue its pulse.`;
-    case 'recordReviewIssue':
-      return `Read this one with the records open. ${lead} is the cleanest door in.`;
-    case 'sceneIssue':
-      return `This issue has rooms in it. ${lead} is where the door opens.`;
-    case 'fieldGuideIssue':
-      return `Keep this one close. ${lead} turns the issue into a route.`;
-    case 'memoryIssue':
-      return `This issue is about what stays. ${lead} carries the quiet weight.`;
-    case 'systemsIssue':
-      return `Culture is never just the beautiful part. ${lead} looks under the hood.`;
-    case 'imageIssue':
-      return `Look first, then read. ${lead} sets the visual temperature.`;
-    case 'argumentIssue':
-      return `This issue has a raised eyebrow. ${lead} opens the argument.`;
-    case 'thinIssue':
-      return `This is a smaller issue. Start with ${lead}, then follow the thread that is already visible.`;
-    default:
-      return `Start with ${lead}. It makes the rest of the issue easier to follow.`;
+
+  if (score.archetype === 'thinIssue') {
+    return `This is a smaller issue. Start with ${lead}, then follow the thread that is already visible.`;
   }
+
+  return `${score.profile.openingVerb}. ${lead} is the cleanest door into ${score.profile.publicName}.`;
 }
 
 function secondLine(context: MagazineIssueRecipeContext): string {
   const { facts, score } = context;
   const sections = humanList(facts.sectionMix.slice(0, 3).map((section) => section.section.toLowerCase()));
   const tension = facts.tension ? `The thread running through it is ${facts.tension}.` : `The strongest pieces gather around ${sections}.`;
-  switch (score.archetype) {
-    case 'systemsIssue':
-      return `${tension} Rights, platforms, money and memory all sit closer to the work than people admit.`;
-    case 'memoryIssue':
-      return `${tension} It is quieter, but not softer.`;
-    case 'sceneIssue':
-      return `${tension} The culture is not abstract here. It has addresses, stages and people in motion.`;
-    case 'listeningIssue':
-      return `${tension} Read it like a listening session, one story opening the next.`;
-    case 'fieldGuideIssue':
-      return `${tension} It is built for movement, not just reading.`;
-    case 'argumentIssue':
-      return `${tension} These pieces do not sit politely. They talk back.`;
-    case 'imageIssue':
-      return `${tension} The images are not decoration. They are part of the argument.`;
-    case 'thinIssue':
-      return 'There is not enough here for a grand statement yet, so the issue stays honest and points you to what is strongest.';
-    default:
-      return tension;
+
+  if (score.archetype === 'thinIssue') {
+    return 'There is not enough here for a grand statement yet, so the issue stays honest and points you to what is strongest.';
   }
+
+  return `${tension} ${score.profile.readerPromise}`;
 }
 
 export function buildEditorNote(context: MagazineIssueRecipeContext): MagazineIssueEditorNote {
@@ -83,7 +53,7 @@ export function buildEditorNote(context: MagazineIssueRecipeContext): MagazineIs
     mode,
     eyebrow: mode === 'image-note' ? 'Editor’s image note' : mode === 'playlist-note' ? 'Editor’s listening note' : 'Editor’s note',
     title: startLine(context),
-    pull: lead ? `Start with ${quoteTitle(lead.title)}.` : undefined,
+    pull: lead ? `${score.profile.cta}: ${quoteTitle(lead.title)}.` : score.profile.readerPromise,
     imageUrl: mode === 'image-note' ? lead?.heroUrl : undefined,
     imageCaption: mode === 'image-note' && lead ? `From ${quoteTitle(lead.title)}, the piece that sets the issue’s visual temperature.` : undefined,
     lovedRelease: mode === 'song-note' ? lead : undefined,
