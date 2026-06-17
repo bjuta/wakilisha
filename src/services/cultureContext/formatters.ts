@@ -75,19 +75,24 @@ export function extractMonthName(value: unknown): string | undefined {
 export function normalizeReleaseType(value: unknown): ReleaseType {
   const clean = cleanText(value).toLowerCase();
   if (!clean) return "unknown";
-  if (clean.includes("album")) return "album";
+
+  // More specific release shapes must come before broad album/single checks.
+  if (clean.includes("deluxe") || clean.includes("expanded edition")) return "deluxe";
+  if (clean.includes("soundtrack") || clean.includes("ost")) return "soundtrack";
+  if (clean.includes("live")) return "live";
+  if (clean.includes("mixtape")) return "mixtape";
+  if (clean.includes("compilation") || clean.includes("various artists")) return "compilation";
   if (clean === "ep" || clean.includes("extended play")) return "ep";
   if (clean.includes("single")) return "single";
-  if (clean.includes("mixtape")) return "mixtape";
-  if (clean.includes("compilation")) return "compilation";
-  if (clean.includes("soundtrack")) return "soundtrack";
-  if (clean.includes("live")) return "live";
-  if (clean.includes("deluxe")) return "deluxe";
+  if (clean.includes("album") || clean.includes("lp")) return "album";
+
   return "unknown";
 }
 
 export function releaseTypeLabel(type: ReleaseType): string {
   if (type === "ep") return "EP";
+  if (type === "live") return "live release";
+  if (type === "deluxe") return "deluxe edition";
   return type;
 }
 
