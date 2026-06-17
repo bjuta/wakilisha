@@ -24,13 +24,30 @@ function heroIntro(facts: LabelFacts): string {
   return `${name} has a growing WAKILISHA profile. More artists, releases, and context will be added as the archive grows.`;
 }
 
+function searchSnippet(facts: LabelFacts): string {
+  const name = facts.name || "This label";
+  const topArtists = humanList(facts.topArtists, 3);
+  const counts = humanList([
+    facts.artistCount ? pluralize(facts.artistCount, "artist") : "",
+    facts.releaseCount ? pluralize(facts.releaseCount, "release") : "",
+    facts.chartEntryCount ? pluralize(facts.chartEntryCount, "chart moment") : "",
+  ].filter(Boolean), 3);
+  const scene = humanList([facts.country, ...facts.genres].filter(Boolean) as string[], 3);
+
+  if (topArtists) return `${name} connects to artists like ${topArtists}.`;
+  if (counts && scene) return `${name} connects ${counts} around ${scene}.`;
+  if (counts) return `${name} connects ${counts} in WAKILISHA.`;
+  if (scene) return `${name} is connected to ${scene}.`;
+  return `${name} has a growing WAKILISHA profile.`;
+}
+
 export function buildLabelContext(context: CultureRecipeContext<LabelFacts>): CultureRecipeResult {
   const { facts, surface } = context;
   const topArtists = humanList(facts.topArtists, 3);
   const textBySurface = {
     heroIntro: heroIntro(facts),
     cardBlurb: facts.artistCount ? `${facts.name || "This label"} connects ${pluralize(facts.artistCount, "artist")} in WAKILISHA.` : `${facts.name || "This label"} has a growing WAKILISHA profile.`,
-    searchSnippet: topArtists ? `Label connected to ${topArtists}.` : "Label profile on WAKILISHA.",
+    searchSnippet: searchSnippet(facts),
     seoDescription: `Explore ${facts.name || "this label"} on WAKILISHA, with artists, releases, chart moments, genres, and related music.`,
     chartNote: facts.chartEntryCount ? `${facts.name || "This label"} has ${pluralize(facts.chartEntryCount, "chart moment")} connected in WAKILISHA.` : "No chart moment is connected yet.",
     whyItMatters: "Label pages help show the teams, collectives, and companies behind the sound.",
