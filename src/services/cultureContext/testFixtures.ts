@@ -55,6 +55,71 @@ export const singleFixture: ReleaseFacts = {
   standoutTracks: [],
 };
 
+export const compilationFixture: ReleaseFacts = {
+  title: "Nairobi Link Up",
+  releaseType: "compilation",
+  artistNames: ["Various Artists"],
+  releaseYear: "2026",
+  trackCount: 14,
+  genres: ["Gengetone", "Arbantone"],
+  hasMultipleArtists: true,
+  isCompilation: true,
+  country: "Kenya",
+  standoutTracks: [],
+};
+
+export const mixtapeFixture: ReleaseFacts = {
+  title: "Street Mode",
+  releaseType: "mixtape",
+  artistNames: ["Fresh Voice"],
+  releaseYear: "2026",
+  trackCount: 9,
+  genres: ["Rap", "Gengetone"],
+  hasMultipleArtists: false,
+  isCompilation: false,
+  country: "Kenya",
+  standoutTracks: [],
+};
+
+export const liveFixture: ReleaseFacts = {
+  title: "Live at the Dome",
+  releaseType: "live",
+  artistNames: ["Stage Name"],
+  releaseYear: "2026",
+  trackCount: 11,
+  genres: ["Afropop"],
+  hasMultipleArtists: false,
+  isCompilation: false,
+  country: "Kenya",
+  standoutTracks: [],
+};
+
+export const soundtrackFixture: ReleaseFacts = {
+  title: "City Lights Soundtrack",
+  releaseType: "soundtrack",
+  artistNames: ["Various Artists"],
+  releaseYear: "2026",
+  trackCount: 16,
+  genres: ["Score", "Afropop"],
+  hasMultipleArtists: true,
+  isCompilation: false,
+  country: "Kenya",
+  standoutTracks: [],
+};
+
+export const deluxeFixture: ReleaseFacts = {
+  title: "Soft Launch Deluxe",
+  releaseType: "deluxe",
+  artistNames: ["Njerae"],
+  releaseYear: "2026",
+  trackCount: 9,
+  genres: ["R&B", "Soul"],
+  hasMultipleArtists: false,
+  isCompilation: false,
+  country: "Kenya",
+  standoutTracks: [],
+};
+
 export const artistFixture: ArtistFacts = {
   name: "Njerae",
   country: "Kenya",
