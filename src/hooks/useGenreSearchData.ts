@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import { buildGenreSearchSnippet } from "@/services/cultureContext/searchAdapters";
 
 export interface GenreSearchItem {
   slug: string;
@@ -8,6 +9,7 @@ export interface GenreSearchItem {
   artistCount: number;
   trackCount: number;
   representativeArtists: string[];
+  contextText: string;
 }
 
 const WARM_GENRE_ACCENTS = [
@@ -53,7 +55,7 @@ export function useGenreSearchData() {
     const fetchData = async () => {
       setLoading(true);
       try {
-        // Fetch genres — only those with status "active" that aren't merged redirects
+        // Fetch genres, only those with status active that are not merged redirects
         const { data: genres, error: err } = await supabase
           .from("registry_genres")
           .select("slug, name, metadata")
@@ -77,7 +79,7 @@ export function useGenreSearchData() {
         let artistsByGenre: Record<string, string[]> = {};
 
         if (genreSlugs.length > 0) {
-          // Look for artist→track relationships where track metadata includes genre
+          // Look for artist to track relationships where track metadata includes genre
           const { data: entityRels } = await supabase
             .from("registry_entity_relationships")
             .select("source_slug, target_slug")
@@ -94,12 +96,12 @@ export function useGenreSearchData() {
               .in("slug", artistSlugs)
               .eq("status", "active");
 
-            const artistGenreMap: Record<string, string> = {};
             (artistsMeta || []).forEach((a) => {
               const meta = (a.metadata as Record<string, unknown>) || {};
               const ags = Array.isArray(meta.genres) ? (meta.genres as string[]) : [];
               if (ags.length > 0) {
-                artistGenreMap[a.slug] = ags[0].toLowerCase();
+                // This map may become useful when genre scoring gets richer.
+                void ags[0];
               }
             });
 
@@ -123,13 +125,20 @@ export function useGenreSearchData() {
 
         const mapped: GenreSearchItem[] = published.map((g) => {
           const meta = (g.metadata as Record<string, unknown>) || {};
-          return {
+          const artistCount = typeof meta.artist_count === "number" ? meta.artist_count : 0;
+          const representativeArtists = artistsByGenre[g.slug] || [];
+          const item = {
             slug: g.slug,
             name: g.name,
             accentVar: accentForGenre(g.slug),
-            artistCount: typeof meta.artist_count === "number" ? meta.artist_count : 0,
+            artistCount,
             trackCount: 0,
-            representativeArtists: artistsByGenre[g.slug] || [],
+            representativeArtists,
+          };
+
+          return {
+            ...item,
+            contextText: buildGenreSearchSnippet(item),
           };
         });
 
