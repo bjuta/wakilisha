@@ -4,16 +4,32 @@ import { quoteTitle } from '../formatters';
 export function buildCoverLine({ facts, score }: MagazineIssueRecipeContext): string {
   if (facts.issueNumber === 1) return 'Your people are here.';
 
-  const lead = quoteTitle(facts.topArticle?.title);
-  const profile = score.profile;
+  const lead = quoteTitle(facts.readingDoor.article?.title ?? facts.topArticle?.title);
+  const thread = facts.tension ?? score.profile.publicName;
 
   if (score.archetype === 'thinIssue') {
-    return 'A smaller issue with one clear thread.';
+    return `One clear thread, led by ${lead}.`;
   }
 
-  if (score.archetype === 'mixedCultureIssue') {
-    return `A WAKILISHA issue led by ${lead}, where different signals start talking to each other.`;
+  switch (score.archetype) {
+    case 'listeningIssue':
+      return `Start with the sound. ${lead} carries the pulse.`;
+    case 'recordReviewIssue':
+      return `Records in focus, with ${lead} at the center.`;
+    case 'sceneIssue':
+      return `Rooms, routes and people, entered through ${lead}.`;
+    case 'fieldGuideIssue':
+      return `A guide for movement. Begin with ${lead}.`;
+    case 'memoryIssue':
+      return `What stays, what speaks back, and ${lead}.`;
+    case 'systemsIssue':
+      return `The machinery around culture, opened by ${lead}.`;
+    case 'imageIssue':
+      return `Look first. ${lead} sets the visual charge.`;
+    case 'argumentIssue':
+      return `A raised eyebrow issue, led by ${lead}.`;
+    case 'mixedCultureIssue':
+    default:
+      return `A WAKILISHA issue about ${thread}, led by ${lead}.`;
   }
-
-  return `${profile.label}. ${profile.openingVerb} through ${lead}.`;
 }
