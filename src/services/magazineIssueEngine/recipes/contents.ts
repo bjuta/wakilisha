@@ -4,62 +4,41 @@ import { articleSection, humanList, quoteTitle } from '../formatters';
 export function buildContentsIntro({ facts, score }: MagazineIssueRecipeContext): string {
   if (facts.thinness === 'thin') return 'A short issue. Start with the strongest piece, then follow the thread that is already visible.';
 
-  switch (score.archetype) {
-    case 'listeningIssue':
-      return 'Read it like a listening session. Start with the pulse, then follow the room it opens.';
-    case 'sceneIssue':
-      return 'Enter through the room, then follow the route through people, places and scenes.';
-    case 'systemsIssue':
-      return 'Start with the cleanest argument, then follow the receipts around it.';
-    case 'memoryIssue':
-      return 'Move slowly here. The issue is built from words, memory and what keeps returning.';
-    case 'fieldGuideIssue':
-      return 'Use this like a route. Start here, then carry the next piece with you.';
-    case 'argumentIssue':
-      return 'Open the argument first. The rest of the issue shows what talks back.';
-    case 'imageIssue':
-      return 'Look first. The path begins with the image, then moves into the story behind it.';
-    default:
-      return `Start with ${quoteTitle(facts.topArticle?.title)}, then follow ${humanList(facts.sectionMix.slice(0, 3).map((item) => item.section.toLowerCase()))}.`;
+  if (score.archetype === 'mixedCultureIssue') {
+    return `Start with ${quoteTitle(facts.topArticle?.title)}, then follow ${humanList(facts.sectionMix.slice(0, 3).map((item) => item.section.toLowerCase()))}.`;
   }
+
+  return score.profile.readerPromise;
 }
 
 export function buildContentsTitle({ facts, score }: MagazineIssueRecipeContext): string {
   if (facts.issueNumber === 1) return 'The culture, on record.';
-  switch (score.archetype) {
-    case 'listeningIssue':
-      return 'Start with the sound.';
-    case 'sceneIssue':
-      return 'Enter the room.';
-    case 'systemsIssue':
-      return 'Open the machinery.';
-    case 'memoryIssue':
-      return 'Follow what stays.';
-    case 'fieldGuideIssue':
-      return 'Carry this with you.';
-    case 'argumentIssue':
-      return 'Open the argument.';
-    case 'imageIssue':
-      return 'Look first.';
-    default:
-      return `What ${facts.dominantSection?.toLowerCase() ?? 'the culture'} left behind.`;
-  }
+  return score.profile.cta;
 }
 
 export function buildReadingPath(context: MagazineIssueRecipeContext): ReadingPathStep[] {
   const { facts, score } = context;
-  const lead = facts.topArticle;
-  const sectionSteps = facts.leadArticles.slice(0, 4).map((article, index) => ({
+  const lead = facts.readingDoor.article ?? facts.topArticle;
+  const signalArticles = score.profile.signal
+    ? facts.clusters[score.profile.signal].filter((article) => article.slug !== lead?.slug)
+    : [];
+  const mixedArticles = facts.leadArticles.filter((article) => article.slug !== lead?.slug);
+  const pathArticles = [lead, ...signalArticles, ...mixedArticles]
+    .filter(Boolean)
+    .filter((article, index, items) => items.findIndex((item) => item?.slug === article?.slug) === index)
+    .slice(0, 4);
+
+  const steps = pathArticles.map((article, index) => ({
     id: `${facts.issue.slug}-path-${index + 1}`,
-    label: index === 0 ? 'Start here' : index === 1 ? 'Then follow' : 'Keep going',
-    title: article.title,
+    label: index === 0 ? 'Start here' : index === 1 ? score.profile.pathVerb : 'Keep going',
+    title: article!.title,
     description: index === 0
-      ? `This is the issue’s cleanest doorway into ${score.archetype.replace(/Issue$/, '').replace(/([A-Z])/g, ' $1').toLowerCase()}.`
-      : `A ${articleSection(article).toLowerCase()} piece that keeps the thread moving.`,
-    articleSlug: article.slug,
+      ? `${score.profile.openingVerb}. ${facts.readingDoor.reason}`
+      : `A ${articleSection(article!).toLowerCase()} piece that keeps ${score.profile.publicName} moving.`,
+    articleSlug: article!.slug,
   }));
 
-  if (!sectionSteps.length && lead) {
+  if (!steps.length && lead) {
     return [{
       id: `${facts.issue.slug}-path-start`,
       label: 'Start here',
@@ -69,5 +48,5 @@ export function buildReadingPath(context: MagazineIssueRecipeContext): ReadingPa
     }];
   }
 
-  return sectionSteps;
+  return steps;
 }
