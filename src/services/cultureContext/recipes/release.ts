@@ -46,19 +46,16 @@ function indefiniteType(type: ReleaseType): string {
   return "a release";
 }
 
-function scenePhrase(facts: ReleaseFacts): string {
-  return humanList([facts.country, ...facts.genres].filter(Boolean) as string[], 3);
-}
-
 function standoutTrackPhrase(facts: ReleaseFacts): string {
   return humanList(facts.standoutTracks.map((track) => track.title), 3);
 }
 
 function chartSentence(facts: ReleaseFacts): string | undefined {
   if (!facts.chartEntryCount && !facts.topChartPeak) return undefined;
-  const peak = facts.topChartPeak ? `peaking at #${facts.topChartPeak}` : "showing up on the charts";
-  const count = facts.chartEntryCount ? `across ${pluralize(facts.chartEntryCount, "chart moment")}` : "";
-  return sentenceJoin([`It is connected to WAKILISHA chart movement`, count || undefined, peak ? `, ${peak}.` : "."]);
+
+  const count = facts.chartEntryCount ? ` across ${pluralize(facts.chartEntryCount, "chart moment")}` : "";
+  const peak = facts.topChartPeak ? `, peaking at #${facts.topChartPeak}` : "";
+  return `It is connected to WAKILISHA chart movement${count}${peak}.`;
 }
 
 function standoutSentence(facts: ReleaseFacts): string | undefined {
@@ -142,8 +139,7 @@ function cardBlurb(facts: ReleaseFacts): string {
   if (facts.releaseType === "soundtrack") return `A soundtrack${byText}, connecting songs to a screen story or visual moment.`;
   if (facts.releaseType === "deluxe") return `A deluxe edition${byText}, with extra tracks and more room inside the era.`;
 
-  const type = releaseTypeLabel(facts.releaseType);
-  return `${releaseName(facts)} is ${indefiniteType(type === "unknown" ? "unknown" : facts.releaseType)}${byText}.`;
+  return `${releaseName(facts)} is ${indefiniteType(facts.releaseType)}${byText}.`;
 }
 
 function searchSnippet(facts: ReleaseFacts): string {
