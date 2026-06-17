@@ -57,9 +57,9 @@ export function IssueExperienceShell(props: IssueExperienceComponentProps) {
       data-issue-archetype={experience.archetype}
       data-interaction-pattern={experience.interactionPattern}
     >
-      <div className="flex items-center justify-between gap-4 mb-0">
+      <div className="mag-experience-chrome">
         <Link to="/magazine/issues" className="magazine-backlink">
-          ← Browse all issues
+          Back to the magazine
         </Link>
         <div className="magazine-meta" style={{ textAlign: 'right' }}>
           {experience.archetypeLabel}
