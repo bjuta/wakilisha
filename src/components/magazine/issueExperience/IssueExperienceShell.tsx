@@ -11,6 +11,7 @@ import { ImageIssueExperience } from './ImageIssueExperience';
 import { ArgumentIssueExperience } from './ArgumentIssueExperience';
 import { MixedIssueExperience } from './MixedIssueExperience';
 import { ThinIssueExperience } from './ThinIssueExperience';
+import './issueExperience.css';
 
 export type IssueExperienceComponentProps = {
   issue: MagazineIssue;
