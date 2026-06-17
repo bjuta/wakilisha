@@ -2,8 +2,10 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { Chapter19FallbackImage } from "@/components/media/Chapter19FallbackImage";
+import { MetaTags } from "@/components/seo/MetaTags";
 import { ch19Background } from "@/utils/ch19";
 import { getGenre, type RepairedGenreDetail } from "@/services/repaired/client";
+import { buildGenreHeroIntro, buildGenreSeoDescription } from "@/services/cultureContext/genreAdapters";
 import { trackUrl } from "@/utils/trackUrl";
 import { releaseUrl } from "@/utils/releaseUrl";
 import { slugify } from "@/services/repairedContent/client";
@@ -80,11 +82,17 @@ export default function GenreDetail() {
   const { genre, artists, releases, topTracks, relatedGenres } = detail;
   const sortedReleases = [...(releases || [])].sort((a, b) => (b.releaseDate || "").localeCompare(a.releaseDate || ""));
   const heroBg = ch19Background({ slug: genre.slug, name: genre.name });
+  const genreIntro = buildGenreHeroIntro(detail) || genre.description || "";
+  const seoDescription = buildGenreSeoDescription(detail);
 
   return (
     <main className="min-h-screen bg-[var(--wk-bg)]">
+      <MetaTags
+        title={`${genre.name} on WAKILISHA`}
+        description={seoDescription}
+        type="website"
+      />
 
-      {/* ═══════════ HERO ═══════════ */}
       <section className="relative -mt-16 pt-16 flex min-h-[380px] items-end overflow-hidden md:min-h-[520px]">
         <div className="absolute inset-0" style={{ background: heroBg }} />
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
@@ -94,8 +102,8 @@ export default function GenreDetail() {
               <span className="h-px w-5 bg-white/40" /> Genres
             </Link>
             <h1 className="font-black leading-[0.88] tracking-[-0.04em] text-white" style={{ fontSize: "clamp(36px, 7vw, 88px)" }}>{genre.name}</h1>
-            {genre.description && (
-              <p className="mt-3 max-w-[620px] text-[14px] leading-relaxed text-white/60 md:text-[17px]">{genre.description}</p>
+            {genreIntro && (
+              <p className="mt-3 max-w-[620px] text-[14px] leading-relaxed text-white/60 md:text-[17px]">{genreIntro}</p>
             )}
             <div className="mt-5 flex flex-wrap items-center gap-4 text-[12px] text-white/50 md:text-[13px]">
               <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 backdrop-blur-sm">
@@ -119,8 +127,6 @@ export default function GenreDetail() {
 
       <div className="mx-auto max-w-[1100px] px-4 py-10 md:px-8 md:py-14">
         <div className="space-y-14">
-
-          {/* ═══════════ REPRESENTATIVE ARTISTS ═══════════ */}
           {artists.length > 0 && (
             <section>
               <div className="mb-5 flex items-center gap-3">
@@ -152,7 +158,6 @@ export default function GenreDetail() {
             </section>
           )}
 
-          {/* ═══════════ TOP TRACKS ═══════════ */}
           {topTracks.length > 0 && (
             <section>
               <div className="mb-5 flex items-center gap-3">
@@ -185,7 +190,6 @@ export default function GenreDetail() {
             </section>
           )}
 
-          {/* ═══════════ RELEASES ═══════════ */}
           {sortedReleases.length > 0 && (
             <section>
               <div className="mb-5 flex items-center gap-3">
@@ -214,7 +218,7 @@ export default function GenreDetail() {
                       <div className="truncate text-[13px] font-bold text-[var(--wk-text)]">{release.title}</div>
                       <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-[var(--wk-text-muted)]">
                         {release.artistName && <span>{release.artistName} · </span>}
-                        <span>{release.releaseDate ? release.releaseDate.split("-")[0] : "—"}</span>
+                        <span>{release.releaseDate ? release.releaseDate.split("-")[0] : "More soon"}</span>
                       </div>
                     </div>
                   </Link>
@@ -223,7 +227,6 @@ export default function GenreDetail() {
             </section>
           )}
 
-          {/* ═══════════ DESCRIPTION ═══════════ */}
           {genre.description && (
             <section>
               <h2 className="mb-3 text-[11px] font-black uppercase tracking-[0.18em] text-[var(--wk-text-muted)]">About this genre</h2>
@@ -243,7 +246,6 @@ export default function GenreDetail() {
             </section>
           )}
 
-          {/* ═══════════ RELATED GENRES ═══════════ */}
           {relatedGenres.length > 0 && (
             <section>
               <div className="mb-5 flex items-center gap-3">
@@ -264,7 +266,6 @@ export default function GenreDetail() {
             </section>
           )}
 
-          {/* ═══════════ BROWSE ALL ═══════════ */}
           <div className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-6 md:p-8">
             <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -281,7 +282,6 @@ export default function GenreDetail() {
               </div>
             </div>
           </div>
-
         </div>
       </div>
     </main>
