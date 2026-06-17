@@ -2,7 +2,19 @@ import type { ArtistFacts, LabelFacts, ReleaseFacts, TrackFacts } from "./types"
 
 export type TrackStory = "chartHeat" | "releasePlacement" | "collaboration" | "sceneMarker" | "thinTrack";
 export type ArtistStory = "chartActor" | "catalogBuilder" | "collaborator" | "sceneVoice" | "thinArtist";
-export type ReleaseStory = "chartRelease" | "standoutTracks" | "fullProject" | "focusedProject" | "singleMoment" | "manyVoices" | "sceneRelease" | "thinRelease";
+export type ReleaseStory =
+  | "chartRelease"
+  | "standoutTracks"
+  | "albumProject"
+  | "epProject"
+  | "singleMoment"
+  | "compilationSet"
+  | "mixtapeRun"
+  | "liveMoment"
+  | "soundtrackWorld"
+  | "expandedEdition"
+  | "sceneRelease"
+  | "thinRelease";
 export type LabelStory = "chartHome" | "rosterHome" | "releaseEngine" | "sceneBuilder" | "thinLabel";
 
 export function selectTrackStory(facts: TrackFacts): TrackStory {
@@ -24,9 +36,13 @@ export function selectArtistStory(facts: ArtistFacts): ArtistStory {
 export function selectReleaseStory(facts: ReleaseFacts): ReleaseStory {
   if ((facts.chartEntryCount && facts.chartEntryCount > 0) || (facts.topChartPeak && facts.topChartPeak > 0)) return "chartRelease";
   if (facts.standoutTracks.length > 0) return "standoutTracks";
-  if (facts.isCompilation || facts.releaseType === "compilation" || facts.hasMultipleArtists) return "manyVoices";
-  if (facts.releaseType === "album" && facts.trackCount && facts.trackCount > 1) return "fullProject";
-  if (facts.releaseType === "ep" && facts.trackCount && facts.trackCount > 1) return "focusedProject";
+  if (facts.releaseType === "deluxe") return "expandedEdition";
+  if (facts.releaseType === "soundtrack") return "soundtrackWorld";
+  if (facts.releaseType === "live") return "liveMoment";
+  if (facts.releaseType === "mixtape") return "mixtapeRun";
+  if (facts.isCompilation || facts.releaseType === "compilation" || facts.hasMultipleArtists) return "compilationSet";
+  if (facts.releaseType === "album") return "albumProject";
+  if (facts.releaseType === "ep") return "epProject";
   if (facts.releaseType === "single") return "singleMoment";
   if (facts.genres.length > 0 || facts.country || facts.labelName) return "sceneRelease";
   return "thinRelease";
