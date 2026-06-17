@@ -102,19 +102,23 @@ function orderedArtists(artists: TrackArtistRole[]): TrackArtistRole[] {
   return [...artists].sort((a, b) => (a.creditOrder ?? 0) - (b.creditOrder ?? 0));
 }
 
+function primaryFallbackFlag(artist: TrackArtistRole, index: number, hasPrimary: boolean, hasNonFeatured: boolean): boolean {
+  if (hasPrimary) return artist.isPrimary === true;
+  if (hasNonFeatured) return artist.isFeatured !== true;
+  return index === 0;
+}
+
 /**
  * Legacy API. Prefer buildCultureContext({ entityType: "track", ... }).
  */
 export function buildTrackSummary(data: TrackRelationshipData): string {
   const sortedArtists = orderedArtists(data.artists || []);
-  const primaryArtists = sortedArtists.filter((artist) => artist.isPrimary);
-  const artistsForEngine = (primaryArtists.length > 0 ? sortedArtists : sortedArtists.map((artist, index) => ({
-    ...artist,
-    isPrimary: index === 0,
-  }))).map((artist) => ({
+  const hasPrimary = sortedArtists.some((artist) => artist.isPrimary);
+  const hasNonFeatured = sortedArtists.some((artist) => !artist.isFeatured);
+  const artistsForEngine = sortedArtists.map((artist, index) => ({
     name: artist.name,
     slug: artist.slug,
-    isPrimary: artist.isPrimary,
+    isPrimary: primaryFallbackFlag(artist, index, hasPrimary, hasNonFeatured),
     isFeatured: artist.isFeatured,
     creditOrder: artist.creditOrder,
   }));
@@ -242,7 +246,7 @@ export function buildTrackSummaryFromApi(
     artists: artists.map((artist, index) => ({
       name: artist.name,
       slug: artist.slug,
-      isPrimary: artist.isPrimary ?? index === 0,
+      isPrimary: artist.isPrimary === true,
       isFeatured: artist.isFeatured ?? false,
       creditOrder: artist.creditOrder ?? index,
     })),
