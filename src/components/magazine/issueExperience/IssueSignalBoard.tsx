@@ -57,7 +57,7 @@ export function IssueSignalBoard({ issue, experience }: IssueSignalBoardProps) {
             <h4>How to move through it</h4>
             <p>{experience.visualPromise}</p>
             <div className="mag-context-chips" aria-label="Issue context">
-              <span>{experience.interactionPattern}</span>
+              <span>{experience.issueCta}</span>
               <span>{experience.archetypeLabel}</span>
               <span>{issue.articles.length} stories</span>
             </div>
