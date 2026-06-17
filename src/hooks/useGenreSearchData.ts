@@ -96,15 +96,6 @@ export function useGenreSearchData() {
               .in("slug", artistSlugs)
               .eq("status", "active");
 
-            (artistsMeta || []).forEach((a) => {
-              const meta = (a.metadata as Record<string, unknown>) || {};
-              const ags = Array.isArray(meta.genres) ? (meta.genres as string[]) : [];
-              if (ags.length > 0) {
-                // This map may become useful when genre scoring gets richer.
-                void ags[0];
-              }
-            });
-
             published.forEach((g) => {
               const matchingArtists = (artistsMeta || [])
                 .filter((a) => {
