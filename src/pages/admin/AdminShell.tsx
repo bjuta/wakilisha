@@ -73,6 +73,7 @@ const NAV_GROUPS: NavGroup[] = [
     { path: "/admin/settings/navigation", label: "Navigation", icon: "Compass", requiredCapability: "manage_appearance" },
     { path: "/admin/settings/audit", label: "Audit Log", icon: "ClipboardList", requiredCapability: "view_settings" },
   ] },
+  { label: "Developer", visible: () => true, items: [{ path: "/admin/api-docs", label: "API Docs", icon: "BookOpen", requiredCapability: undefined }] },
   { label: "Users", visible: (can) => can("manage_users"), items: [{ path: "/admin/users", label: "Manage Users", icon: "Users", requiredCapability: "manage_users" }] },
 ];
 

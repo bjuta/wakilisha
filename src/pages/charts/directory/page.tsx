@@ -748,7 +748,7 @@ export default function ChartsDirectory() {
       {/* ═══════════════════════════════════════════
           HERO
           ═══════════════════════════════════════════ */}
-      <section className="relative min-h-[480px] md:min-h-[620px] overflow-hidden flex items-end">
+      <section className="relative min-h-[480px] md:min-h-[620px] overflow-hidden flex items-end -mt-16">
         <div
           className="absolute inset-0 bg-cover bg-center transition-transform duration-[var(--wk-d-slow)]"
           style={heroStyle}

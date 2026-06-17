@@ -107,6 +107,12 @@ import AdminSettingsAudit from "../pages/admin/settings/audit/page";
 import AdminSettingsSiteIdentity from "../pages/admin/settings/site-identity/page";
 import AdminSettingsDesignSystem from "../pages/admin/settings/design-system/page";
 
+// Admin API Docs
+import AdminApiDocsPage from "../pages/admin/api-docs/page";
+
+// Public API Docs
+import PublicApiDocsPage from "../pages/api-docs/page";
+
 // Charts
 import ChartsDirectory from "../pages/charts/directory/page";
 import ChartEdition from "../pages/charts/edition/page";
@@ -343,6 +349,7 @@ const routes: RouteObject[] = [
         { path: "scoring-runs", element: <AdminChartsScoringRuns /> },
         { path: "editions/:editionId", element: <AdminChartsEditionDetail /> },
       ] },
+      { path: "api-docs", element: <AdminApiDocsPage /> },
       { path: "settings", element: <AdminSettingsLayout />, children: [
         { index: true, element: <AdminSettingsHub /> },
         { path: "chart-defaults", element: <AdminSettingsChartDefaults /> },
@@ -364,6 +371,7 @@ const routes: RouteObject[] = [
       ] },
     ],
   },
+  { path: "/api-docs", element: <PublicApiDocsPage /> },
   { path: "/player/full", element: <MobileFullPlayer /> },
   { path: "*", element: <ResponsivePage mobile={<MobileNotFound />} desktop={<NotFound />} /> },
   { path: "/m", element: <Navigate to="/" replace /> },

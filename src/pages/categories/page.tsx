@@ -94,7 +94,7 @@ export default function CategoriesIndex() {
   if (loading) {
     return (
       <main className="min-h-screen bg-[var(--wk-bg)]">
-        <div className="relative min-h-[70vh] flex items-end bg-[#0a0a0a] overflow-hidden">
+        <div className="relative min-h-[70vh] flex items-end bg-[#0a0a0a] overflow-hidden -mt-16">
           <div className="absolute inset-0">
             <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/25 to-black/90" />
           </div>

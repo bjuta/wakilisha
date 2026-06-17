@@ -195,7 +195,7 @@ export default function Magazine() {
       <Link
         to={`/magazine/${heroStory.slug}`}
         ref={heroRef}
-        className="relative min-h-[88vh] flex items-end overflow-hidden bg-[#0a0a0a] block group cursor-pointer"
+        className="relative min-h-[88vh] flex items-end overflow-hidden bg-[#0a0a0a] block group cursor-pointer -mt-16"
       >
         {/* Image */}
         {heroStory.heroUrl ? (

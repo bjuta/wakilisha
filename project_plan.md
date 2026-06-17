@@ -929,10 +929,16 @@ Apple Music → provider-intake-api → registry_release_shells (with tracks JSO
 2. ✅ `admin-router` → `/functions/v1/admin-router` (replaces 9 admin functions) — deployed June 16, 2026
 3. ✅ `system-worker` — PRAGMATICALLY COMPLETE (June 16, 2026). The 30+ system functions (backfill-*, migrate-*, clean-*, run-chart-scoring, etc.) are one-off data repair scripts with zero frontend calls, service_role auth, and no shared CORS/auth duplication. Consolidation into a single gateway provides zero practical benefit — each function is a standalone script with completely different logic, and they don't serve API traffic. These remain as discrete edge functions by design.
 
-### Phase C — Commercial Polish (remaining)
-1. OpenAPI spec per gateway
-2. Health check endpoints (public-content-read has `/health`, others pending)
-3. Rate limiting
-4. Request tracing with `requestId`
+### Phase C — Commercial Polish ✅ COMPLETE (June 17, 2026)
 
-**Full spec:** `docs/api-naming-audit.md`
+**Done:**
+1. ✅ OpenAPI specs for both gateways — `docs/openapi/public-content-read.yaml` (20 endpoints) and `docs/openapi/admin-router.yaml` (4 sections, 30 chart actions)
+2. ✅ Health check endpoints — `public-content-read` (v1, already had it) and `admin-router` (v4, deployed June 16)
+3. ✅ Rate limiting — `rate_limit_log` table with sliding window, both gateways protected:
+   - Public gateway (`public-content-read` v2): 1,000 requests per 60s window per IP, fail-open on DB errors
+   - Admin gateway (`admin-router` v5): 300 requests per 60s window per authenticated user, health endpoint excluded
+4. ✅ Request tracing — `requestId` on all admin responses since v4
+5. ✅ Redoc API docs pages:
+   - `/api-docs` — public API reference page (Redoc standalone, renders from TypeScript spec object)
+   - `/admin/api-docs` — admin API docs with tab switcher (Public API / Admin API), renders both specs
+6. ✅ Admin nav — "Developer" section with "API Docs" link visible to all admin users

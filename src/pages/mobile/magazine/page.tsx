@@ -188,7 +188,7 @@ export default function MobileMagazine() {
       <Link
         to={`/magazine/${heroStory.slug}`}
         ref={heroRef}
-        className="relative h-screen flex items-end overflow-hidden bg-[#0a0a0a] block"
+        className="relative h-screen flex items-end overflow-hidden bg-[#0a0a0a] block -mt-16"
       >
         {heroStory.heroUrl ? (
           <img

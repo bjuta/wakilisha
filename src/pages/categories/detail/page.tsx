@@ -164,7 +164,7 @@ export default function CategoryDetail() {
   if (loading) {
     return (
       <main className="min-h-screen bg-[var(--wk-bg)]">
-        <div className="relative min-h-[65vh] flex items-end bg-[#0a0a0a] overflow-hidden">
+        <div className="relative min-h-[65vh] flex items-end bg-[#0a0a0a] overflow-hidden -mt-16">
           <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/25 to-black/90" />
           <div className="relative z-10 w-full max-w-[1280px] mx-auto px-6 pb-14 lg:px-8 lg:pb-18">
             <div className="h-4 w-24 rounded bg-white/10 animate-pulse mb-4" />

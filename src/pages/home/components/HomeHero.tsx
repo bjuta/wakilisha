@@ -193,7 +193,7 @@ export function HomeHero({ chartEntries, stories, loading }: Props) {
   }, []);
 
   return (
-    <section className="relative overflow-hidden" style={{ minHeight: "100vh" }}>
+    <section className="relative overflow-hidden -mt-16" style={{ minHeight: "100vh" }}>
       {/* Background image */}
       <div className="absolute inset-0">
         <img

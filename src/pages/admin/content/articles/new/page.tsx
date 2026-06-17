@@ -54,29 +54,23 @@ export default function AdminNewArticlePage() {
     setError(null);
 
     try {
-      // Check slug collision first
-      const { data: existing, error: checkError } = await supabase
-        .from("wk_articles")
-        .select("id")
-        .eq("slug", finalSlug)
-        .maybeSingle();
-
-      if (checkError) {
-        setError(`Failed to check slug: ${checkError.message}`);
+      // Get auth token for edge function call
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        setError("Session expired. Please sign in again.");
         setCreating(false);
         return;
       }
 
-      if (existing) {
-        setError(`The slug "${finalSlug}" is already in use. Please choose a different one.`);
-        setCreating(false);
-        return;
-      }
-
-      // Direct INSERT — RLS policy checks edit_own_articles capability or administrator role
-      const { data: inserted, error: insertError } = await supabase
-        .from("wk_articles")
-        .insert({
+      // Route through admin-router edge function — bypasses RLS using service_role
+      const SUPABASE_URL = import.meta.env.VITE_PUBLIC_SUPABASE_URL;
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/admin-router/content/articles`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
           slug: finalSlug,
           title: finalTitle,
           wp_status: "draft",
@@ -84,21 +78,26 @@ export default function AdminNewArticlePage() {
           tags: [],
           seo: {},
           raw_meta: {},
-        })
-        .select("id, slug")
-        .single();
+        }),
+      });
 
-      if (insertError) {
-        if (insertError.message.includes("permission denied") || insertError.message.includes("policy")) {
-          setError("You don't have permission to create articles. The 'edit_own_articles' capability or administrator role is required.");
+      const result = await response.json();
+
+      if (!response.ok) {
+        const errCode = result?.error?.code ?? result?.error ?? "unknown";
+        if (errCode === "slug_taken" || response.status === 409) {
+          setError(`The slug "${finalSlug}" is already in use. Please choose a different one.`);
+        } else if (response.status === 403) {
+          setError("You don't have permission to create articles. The 'edit_own_articles' capability is required.");
         } else {
-          setError(`Failed to create article: ${insertError.message}`);
+          setError(`Failed to create article: ${result?.error?.message ?? result?.error ?? "Unknown error"}`);
         }
         setCreating(false);
         return;
       }
 
-      if (!inserted) {
+      const inserted = result?.data;
+      if (!inserted?.slug) {
         setError("Article was created but no data was returned.");
         setCreating(false);
         return;

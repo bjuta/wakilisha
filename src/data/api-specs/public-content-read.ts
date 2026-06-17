@@ -1,0 +1,84 @@
+const ArtistSummary = { type: "object", properties: { id: { type: "string" }, slug: { type: "string" }, name: { type: "string" }, country: { type: "string", nullable: true }, imageUrl: { type: "string", nullable: true }, genres: { type: "array", items: { type: "string" } }, trackCount: { type: "integer" }, releaseCount: { type: "integer" }, isChartArtist: { type: "boolean" }, isRising: { type: "boolean" }, topChartPosition: { type: "integer", nullable: true } } } as const;
+const ArtistDetail = { type: "object", properties: { id: { type: "string" }, slug: { type: "string" }, name: { type: "string" }, country: { type: "string" }, imageUrl: { type: "string" }, profileImageUrl: { type: "string" }, genres: { type: "array", items: { type: "string" } }, trackCount: { type: "integer" }, releaseCount: { type: "integer" }, isChartArtist: { type: "boolean" }, isRising: { type: "boolean" }, topChartPosition: { type: "integer", nullable: true }, bio: { type: "string" }, fullBio: { type: "string" }, artistType: { type: "string" }, followerCount: { type: "integer" }, popularity: { type: "integer" }, spotifyUrl: { type: "string" }, instagram: { type: "string" }, youtubeChannel: { type: "string" }, discographySource: { type: "string" } } } as const;
+const ArtistRef = { type: "object", properties: { slug: { type: "string" }, name: { type: "string" }, imageUrl: { type: "string" } } } as const;
+const ReleaseSummary = { type: "object", properties: { id: { type: "string" }, slug: { type: "string" }, title: { type: "string" }, artist: { type: "string" }, year: { type: "string" }, releaseType: { type: "string" }, labelName: { type: "string" }, artworkUrl: { type: "string" }, trackCount: { type: "integer" }, description: { type: "string" } } } as const;
+const ReleaseDetail = { type: "object", properties: { id: { type: "string" }, slug: { type: "string" }, title: { type: "string" }, artist: { type: "string" }, year: { type: "string" }, releaseDate: { type: "string" }, releaseType: { type: "string" }, labelName: { type: "string" }, labelSlug: { type: "string" }, artworkUrl: { type: "string" }, trackCount: { type: "integer" }, totalDuration: { type: "number" }, description: { type: "string" }, metadata: { type: "object" } } } as const;
+const TrackOut = { type: "object", properties: { title: { type: "string" }, duration: { type: "string" }, artists: { type: "string" }, previewUrl: { type: "string" } } } as const;
+const ReleaseWithTracks = { type: "object", properties: { slug: { type: "string" }, title: { type: "string" }, releaseType: { type: "string" }, year: { type: "string" }, releaseDate: { type: "string" }, trackCount: { type: "integer" }, artworkUrl: { type: "string" }, artist: { type: "string" } } } as const;
+const TrackRef = { type: "object", properties: { id: { type: "string" }, slug: { type: "string" }, title: { type: "string" }, artist: { type: "string" }, duration: { type: "number" }, trackNumber: { type: "integer" }, artworkUrl: { type: "string" } } } as const;
+const TrackArtistRole = { type: "object", properties: { name: { type: "string" }, slug: { type: "string" }, isPrimary: { type: "boolean" }, isFeatured: { type: "boolean" }, creditOrder: { type: "integer" }, role: { type: "string" } } } as const;
+const TrackReleaseRef = { type: "object", properties: { slug: { type: "string" }, title: { type: "string" }, releaseDate: { type: "string" }, releaseType: { type: "string" }, artworkUrl: { type: "string" }, trackCount: { type: "integer" }, labelName: { type: "string" }, labelSlug: { type: "string" } } } as const;
+const ChartAppearance = { type: "object", properties: { editionSlug: { type: "string" }, editionLabel: { type: "string" }, date: { type: "string" }, rank: { type: "integer" }, movement: { type: "string" } } } as const;
+const TrackDetail = { type: "object", properties: { id: { type: "string" }, slug: { type: "string" }, title: { type: "string" }, durationMs: { type: "integer" }, artworkUrl: { type: "string" }, isrc: { type: "string", nullable: true }, explicit: { type: "boolean" }, trackNumber: { type: "integer" }, discNumber: { type: "integer" }, status: { type: "string" }, previewUrl: { type: "string", nullable: true }, movement: { type: "string" }, movementAmount: { type: "integer" }, firstChartedDate: { type: "string" } } } as const;
+const TopSong = { type: "object", properties: { title: { type: "string" }, artists: { type: "string" }, image: { type: "string" }, duration: { type: "string" }, songUrl: { type: "string" } } } as const;
+const VideoRef = { type: "object", properties: { id: { type: "string" }, title: { type: "string" }, url: { type: "string" }, thumbnail: { type: "string" }, platform: { type: "string" } } } as const;
+const RelatedArtist = { type: "object", properties: { slug: { type: "string" }, name: { type: "string" }, imageUrl: { type: "string" }, score: { type: "integer" }, sharedTracksAll: { type: "integer" }, sharedChartTracks: { type: "integer" }, featuresThem: { type: "integer" }, theyFeature: { type: "integer" }, sharedTitles: { type: "array", items: { type: "string" } } } } as const;
+const GenreSummary = { type: "object", properties: { id: { type: "string" }, slug: { type: "string" }, name: { type: "string" }, artistCount: { type: "integer" }, trackCount: { type: "integer" }, representativeArtists: { type: "array", items: { type: "string" } } } } as const;
+const GenreDetail = { type: "object", properties: { id: { type: "string" }, slug: { type: "string" }, name: { type: "string" }, description: { type: "string", nullable: true } } } as const;
+const GenreRef = { type: "object", properties: { slug: { type: "string" }, name: { type: "string" } } } as const;
+const ChartTrackRef = { type: "object", properties: { slug: { type: "string" }, title: { type: "string" }, artistName: { type: "string" }, artworkUrl: { type: "string" }, peakRank: { type: "integer" } } } as const;
+const LabelSummary = { type: "object", properties: { id: { type: "string" }, slug: { type: "string" }, name: { type: "string" }, country: { type: "string", nullable: true }, logoUrl: { type: "string", nullable: true }, artistCount: { type: "integer" }, releaseCount: { type: "integer" }, featuredArtists: { type: "array", items: { type: "string" } }, isFeatured: { type: "boolean" }, description: { type: "string", nullable: true } } } as const;
+const LabelDetail = { type: "object", properties: { id: { type: "string" }, slug: { type: "string" }, name: { type: "string" }, description: { type: "string", nullable: true }, countryCode: { type: "string", nullable: true } } } as const;
+const LabelRef = { type: "object", properties: { slug: { type: "string" }, name: { type: "string" }, countryCode: { type: "string", nullable: true } } } as const;
+const ChartEditionSummary = { type: "object", properties: { id: { type: "string" }, slug: { type: "string" }, label: { type: "string" }, date: { type: "string" }, entryCount: { type: "integer" } } } as const;
+const ChartProgram = { type: "object", properties: { id: { type: "string" }, publicSlug: { type: "string" }, publicLabel: { type: "string" }, shortLabel: { type: "string" }, sourceFamilySlug: { type: "string" }, seriesSlug: { type: "string" }, seriesLabel: { type: "string" }, marketSlug: { type: "string" }, marketLabel: { type: "string" }, periodType: { type: "string" }, methodologyVersion: { type: "string" }, eligibilityRulesVersion: { type: "string" } } } as const;
+const ChartEntry = { type: "object", properties: { id: { type: "string" }, rank: { type: "integer" }, movement: { type: "string" }, trackSlug: { type: "string" }, trackTitle: { type: "string" }, artistNames: { type: "array", items: { type: "string" } }, artistSlugs: { type: "array", items: { type: "string" } }, score: { type: "number", nullable: true }, sourceEntryId: { type: "string" } } } as const;
+const ChartEntryRef = { type: "object", properties: { rank: { type: "integer" }, title: { type: "string" }, artist: { type: "string" }, slug: { type: "string" }, movement: { type: "string" }, movementAmount: { type: "integer" }, peakPosition: { type: "integer" }, weeksOnChart: { type: "integer" }, artworkUrl: { type: "string" } } } as const;
+const ArticleSummary = { type: "object", properties: { id: { type: "string" }, slug: { type: "string" }, title: { type: "string" }, section: { type: "string" }, dek: { type: "string" }, author: { type: "string" }, authorSlug: { type: "string" }, date: { type: "string" }, readingTime: { type: "integer" }, heroUrl: { type: "string" }, tags: { type: "array", items: { type: "string" } } } } as const;
+const AuthorSummary = { type: "object", properties: { id: { type: "string" }, slug: { type: "string" }, name: { type: "string" }, bio: { type: "string", nullable: true }, role: { type: "string" }, location: { type: "string", nullable: true }, avatarUrl: { type: "string", nullable: true }, coverUrl: { type: "string", nullable: true }, joinedDate: { type: "string", nullable: true } } } as const;
+const SiteContentArtist = { type: "object", properties: { contentType: { type: "string", enum: ["artist"] }, id: { type: "string" }, slug: { type: "string" }, title: { type: "string" }, section: { type: "string" }, dek: { type: "string" }, heroUrl: { type: "string" }, tags: { type: "array", items: { type: "string" } }, originIso2: { type: "string", nullable: true } } } as const;
+const SiteContentRelease = { type: "object", properties: { contentType: { type: "string", enum: ["release"] }, id: { type: "string" }, slug: { type: "string" }, title: { type: "string" }, section: { type: "string" }, dek: { type: "string" }, date: { type: "string" }, heroUrl: { type: "string" }, releaseType: { type: "string" } } } as const;
+const SiteContentChartEntry = { type: "object", properties: { contentType: { type: "string", enum: ["chart_entry"] }, id: { type: "string" }, slug: { type: "string" }, title: { type: "string" }, section: { type: "string" }, dek: { type: "string" }, heroUrl: { type: "string" }, rank: { type: "integer" }, artistName: { type: "string" } } } as const;
+
+export const publicContentReadSpec = {
+  openapi: "3.0.3",
+  info: {
+    title: "WAKILISHA Public Content API",
+    version: "2.0.0",
+    contact: { name: "WAKILISHA Engineering", url: "https://wakilisha.africa" }
+  },
+  servers: [{ url: "https://pgzizndxdyhqmtyywjmt.supabase.co/functions/v1/public-content-read", description: "Production" }],
+  tags: [
+    { name: "Artists" }, { name: "Releases" }, { name: "Tracks" }, { name: "Genres" },
+    { name: "Labels" }, { name: "Charts" }, { name: "Magazine" }, { name: "Authors" },
+    { name: "Preview" }, { name: "System" }
+  ],
+  paths: {
+    "/health": { get: { summary: "Health check", operationId: "healthCheck", tags: ["System"], responses: { "200": { description: "Service is healthy" } } } },
+    "/artists": { get: { summary: "List all artists", operationId: "listArtists", tags: ["Artists"], parameters: [{ name: "limit", in: "query", schema: { type: "integer", default: 500 } }], responses: { "200": { description: "Artist list" } } } },
+    "/artists/{slug}": { get: { summary: "Artist detail", operationId: "getArtistDetail", tags: ["Artists"], parameters: [{ name: "slug", in: "path", required: true, schema: { type: "string" } }], responses: { "200": { description: "Full artist profile" }, "404": { description: "Not found" } } } },
+    "/artists/{slug}/discography": { get: { summary: "Artist discography", operationId: "getArtistDiscography", tags: ["Artists"], parameters: [{ name: "slug", in: "path", required: true, schema: { type: "string" } }], responses: { "200": { description: "Discography data" } } } },
+    "/releases": { get: { summary: "List releases", operationId: "listReleases", tags: ["Releases"], responses: { "200": { description: "Release list" } } } },
+    "/releases/{slug}": { get: { summary: "Release detail", operationId: "getReleaseDetail", tags: ["Releases"], parameters: [{ name: "slug", in: "path", required: true, schema: { type: "string" } }], responses: { "200": { description: "Release detail" }, "404": { description: "Not found" } } } },
+    "/tracks/{slug}": { get: { summary: "Track detail", operationId: "getTrackDetail", tags: ["Tracks"], parameters: [{ name: "slug", in: "path", required: true, schema: { type: "string" } }], responses: { "200": { description: "Track detail" }, "404": { description: "Not found" } } } },
+    "/genres": { get: { summary: "List genres", operationId: "listGenres", tags: ["Genres"], responses: { "200": { description: "Genre list" } } } },
+    "/genres/{slug}": { get: { summary: "Genre detail", operationId: "getGenreDetail", tags: ["Genres"], parameters: [{ name: "slug", in: "path", required: true, schema: { type: "string" } }], responses: { "200": { description: "Genre detail" } } } },
+    "/labels": { get: { summary: "List labels", operationId: "listLabels", tags: ["Labels"], responses: { "200": { description: "Label list" } } } },
+    "/labels/{slug}": { get: { summary: "Label detail", operationId: "getLabelDetail", tags: ["Labels"], parameters: [{ name: "slug", in: "path", required: true, schema: { type: "string" } }], responses: { "200": { description: "Label detail" } } } },
+    "/charts": { get: { summary: "List chart programs", operationId: "listCharts", tags: ["Charts"], responses: { "200": { description: "Chart programs" } } } },
+    "/charts/{programSlug}": { get: { summary: "Chart program detail", operationId: "getChartProgram", tags: ["Charts"], parameters: [{ name: "programSlug", in: "path", required: true, schema: { type: "string" } }], responses: { "200": { description: "Program detail" } } } },
+    "/charts/{programSlug}/latest": { get: { summary: "Latest edition", operationId: "getChartLatestEdition", tags: ["Charts"], parameters: [{ name: "programSlug", in: "path", required: true, schema: { type: "string" } }], responses: { "200": { description: "Latest edition" } } } },
+    "/charts/{programSlug}/{editionSlug}": { get: { summary: "Specific edition", operationId: "getChartEdition", tags: ["Charts"], responses: { "200": { description: "Edition" } } } },
+    "/charts/{programSlug}/{editionSlug}/entries": { get: { summary: "Edition entries", operationId: "getChartEditionEntries", tags: ["Charts"], responses: { "200": { description: "Entries" } } } },
+    "/magazine": { get: { summary: "Magazine articles", operationId: "listMagazineArticles", tags: ["Magazine"], parameters: [{ name: "limit", in: "query", schema: { type: "integer", default: 500 } }], responses: { "200": { description: "Article list" } } } },
+    "/magazine/{slug}": { get: { summary: "Single article", operationId: "getMagazineArticle", tags: ["Magazine"], parameters: [{ name: "slug", in: "path", required: true, schema: { type: "string" } }], responses: { "200": { description: "Full article" } } } },
+    "/magazine/site-content": { get: { summary: "Aggregated site content", operationId: "getSiteContent", tags: ["Magazine"], responses: { "200": { description: "Aggregated content" } } } },
+    "/magazine/public/issues/{slug}": { get: { summary: "Published issue", operationId: "getPublishedMagazineIssue", tags: ["Magazine"], parameters: [{ name: "slug", in: "path", required: true, schema: { type: "string" } }], responses: { "200": { description: "Full issue" } } } },
+    "/authors": { get: { summary: "List authors", operationId: "listAuthors", tags: ["Authors"], responses: { "200": { description: "Author list" } } } },
+    "/authors/{slug}": { get: { summary: "Author detail", operationId: "getAuthorDetail", tags: ["Authors"], parameters: [{ name: "slug", in: "path", required: true, schema: { type: "string" } }], responses: { "200": { description: "Author profile" } } } },
+    "/preview/{nonce}": { get: { summary: "Preview article", operationId: "previewArticle", tags: ["Preview"], parameters: [{ name: "nonce", in: "path", required: true, schema: { type: "string" } }], responses: { "200": { description: "Article preview" } } } }
+  } as Record<string, unknown>,
+  components: {
+    schemas: {
+      ArtistSummary, ArtistDetail, ArtistRef, RelatedArtist,
+      ReleaseSummary, ReleaseDetail, ReleaseWithTracks, TrackOut,
+      TrackRef, TrackDetail, TrackArtistRole, TrackReleaseRef,
+      ChartAppearance, TopSong, VideoRef,
+      GenreSummary, GenreDetail, GenreRef, ChartTrackRef,
+      LabelSummary, LabelDetail, LabelRef,
+      ChartProgram, ChartEditionSummary, ChartEntry, ChartEntryRef,
+      ArticleSummary, AuthorSummary,
+      SiteContentArtist, SiteContentRelease, SiteContentChartEntry
+    }
+  }
+};
