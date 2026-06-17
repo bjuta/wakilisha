@@ -14,7 +14,7 @@ import { buildSearchSnippet } from './recipes/search';
 import { buildSeoDescription } from './recipes/seo';
 import { buildAdminQualityNote } from './recipes/admin';
 
-export const MAGAZINE_ISSUE_ENGINE_VERSION = 'magazine-issue-engine.v0.1.0';
+export const MAGAZINE_ISSUE_ENGINE_VERSION = 'magazine-issue-engine.v0.2.0';
 
 function sanitizeFeatureFrame(frame: MagazineIssueFeatureFrame): MagazineIssueFeatureFrame {
   const publicFieldNote = sanitizePublicIssueCopy(frame.publicFieldNote);
@@ -64,6 +64,9 @@ export function buildMagazineIssueExperience(issue: MagazineIssue): MagazineIssu
   }));
 
   const publicValues = [
+    score.profile.readerPromise,
+    score.profile.visualPromise,
+    score.profile.cta,
     coverLine,
     cardBlurb,
     archiveBlurb,
@@ -101,6 +104,11 @@ export function buildMagazineIssueExperience(issue: MagazineIssue): MagazineIssu
     signalDeck,
     backMatterLine,
     archetype: score.archetype,
+    archetypeLabel: score.profile.label,
+    interactionPattern: score.interactionPattern,
+    readerPromise: sanitizePublicIssueCopy(score.profile.readerPromise),
+    visualPromise: sanitizePublicIssueCopy(score.profile.visualPromise),
+    issueCta: sanitizePublicIssueCopy(score.profile.cta),
     coverLine,
     cardBlurb,
     archiveBlurb,
@@ -117,5 +125,6 @@ export function buildMagazineIssueExperience(issue: MagazineIssue): MagazineIssu
 }
 
 export * from './types';
+export * from './archetypes';
 export { buildIssueFacts } from './facts';
 export { scoreIssueArchetype } from './scoring';
