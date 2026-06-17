@@ -34,7 +34,7 @@ export function IssueOpening({ issue, experience, eyebrow }: IssueOpeningProps) 
           <h1 className="mag-cover-title">{issue.title}</h1>
           <p className="mag-cover-deck">{experience.coverLine || issue.deck}</p>
           <p className="mag-note-open" style={{ marginTop: 24 }}>
-            {experience.readerPromise}
+            {experience.heroIntro}
           </p>
           <Link to={putMeOnHref} className="mag-put-me-on">
             <span className="mag-put-me-on-pulse" aria-hidden="true" />
@@ -48,7 +48,7 @@ export function IssueOpening({ issue, experience, eyebrow }: IssueOpeningProps) 
               <Link key={article.slug} to={`/magazine/${article.slug}`} className="mag-entry-card mag-meaning-card">
                 <span className="mag-entry-card-label">Enter here</span>
                 <span>{article.title}</span>
-                <p className="mag-card-why">{whyThisMatters(article, experience.readerPromise)}</p>
+                <p className="mag-card-why">{whyThisMatters(article, experience.cardBlurb)}</p>
                 <span className="mag-start-here">Start here</span>
               </Link>
             ))}
