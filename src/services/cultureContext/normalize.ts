@@ -51,22 +51,47 @@ function artistNamesFromUnknown(value: unknown): string[] {
   return cleanStringArray(value);
 }
 
+function normalizeTrackArtistNames(rawArtists: Record<string, unknown>[]): { primaryArtists: string[]; featuredArtists: string[] } {
+  const namedArtists = rawArtists
+    .map((artist, index) => ({
+      name: cleanText(artist.name),
+      isPrimary: artist.isPrimary === true,
+      isFeatured: artist.isFeatured === true,
+      creditOrder: numberValue(artist.creditOrder) ?? index,
+    }))
+    .filter((artist) => artist.name)
+    .sort((a, b) => a.creditOrder - b.creditOrder);
+
+  const explicitPrimaryArtists = namedArtists
+    .filter((artist) => artist.isPrimary)
+    .map((artist) => artist.name);
+
+  const fallbackPrimaryArtists = namedArtists
+    .filter((artist) => !artist.isFeatured)
+    .map((artist) => artist.name);
+
+  const primaryArtists = explicitPrimaryArtists.length > 0
+    ? explicitPrimaryArtists
+    : fallbackPrimaryArtists.length > 0
+      ? fallbackPrimaryArtists
+      : namedArtists.slice(0, 1).map((artist) => artist.name);
+
+  const primarySet = new Set(primaryArtists);
+  const featuredArtists = namedArtists
+    .filter((artist) => artist.isFeatured && !primarySet.has(artist.name))
+    .map((artist) => artist.name);
+
+  return { primaryArtists, featuredArtists };
+}
+
 export function normalizeTrackFacts(data: unknown): TrackFacts {
   const record = asRecord(data);
   const rawArtists = Array.isArray(record.artists) ? record.artists.map(asRecord) : [];
-  const primaryArtists = rawArtists
-    .filter((artist) => artist.isPrimary === true)
-    .map((artist) => cleanText(artist.name))
-    .filter(Boolean);
-  const fallbackPrimary = primaryArtists.length > 0 ? primaryArtists : rawArtists.slice(0, 1).map((artist) => cleanText(artist.name)).filter(Boolean);
-  const featuredArtists = rawArtists
-    .filter((artist) => artist.isFeatured === true)
-    .map((artist) => cleanText(artist.name))
-    .filter(Boolean);
+  const { primaryArtists, featuredArtists } = normalizeTrackArtistNames(rawArtists);
 
   return {
     title: firstString(record, ["title", "name"]),
-    primaryArtists: fallbackPrimary,
+    primaryArtists,
     featuredArtists,
     releaseTitle: firstString(record, ["releaseTitle", "albumTitle"]),
     releaseType: normalizeReleaseType(record.releaseType),
