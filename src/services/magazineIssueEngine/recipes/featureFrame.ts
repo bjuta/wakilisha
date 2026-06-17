@@ -29,13 +29,19 @@ function publicFeatureNote(context: MagazineIssueRecipeContext): string {
       return `${lead} opens the argument. The issue follows the tension around ${thread}.`;
     case 'mixedCultureIssue':
     default:
-      return `${lead} is the issue’s main doorway. The thread is ${thread}.`;
+      return `${lead} is the issue's main doorway. The thread is ${thread}.`;
   }
 }
 
 function adminFeatureNote(context: MagazineIssueRecipeContext): string {
   const { facts, score } = context;
-  return `Admin: ${score.archetype} uses ${score.featureVisualMode} with ${score.interactionPattern}. Dominant section: ${facts.dominantSection ?? 'unknown'}. Lead: ${facts.topArticle?.title ?? 'missing'}.`;
+  const cluster = facts.primarySignal
+    ? `${facts.primarySignal.label.toLowerCase()} with ${facts.primarySignal.count} linked stories`
+    : facts.dominantSection ?? 'the strongest available issue thread';
+  const secondary = facts.secondarySignal ? ` Secondary cluster: ${facts.secondarySignal.label.toLowerCase()}.` : '';
+  const lead = facts.readingDoor.article?.title ?? facts.topArticle?.title ?? 'missing lead story';
+
+  return `Admin: Use ${score.featureVisualMode} because archetype is ${score.archetype} and top stories cluster around ${cluster}.${secondary} Interaction pattern: ${score.interactionPattern}. Lead story: ${lead}.`;
 }
 
 export function buildFeatureFrame(context: MagazineIssueRecipeContext): MagazineIssueFeatureFrame {
@@ -49,7 +55,7 @@ export function buildFeatureFrame(context: MagazineIssueRecipeContext): Magazine
       routeLabel: 'Johannesburg to Nairobi',
       titlePrefix: 'A route through sound',
       publicFieldNote,
-      adminDesignNote: 'Admin: keep the launch issue route frame because Issue 001 introduces WAKILISHA as cultural infrastructure beginning with music.',
+      adminDesignNote: 'Admin: Use the launch route frame because Issue 001 introduces WAKILISHA as cultural infrastructure beginning with music.',
       fieldNote: publicFieldNote,
     };
   }
@@ -70,7 +76,7 @@ export function buildFeatureFrame(context: MagazineIssueRecipeContext): Magazine
   return {
     eyebrow: eyebrowByPattern[score.interactionPattern] ?? `Feature · ${facts.dominantSection ?? 'Issue lead'}`,
     titlePrefix: score.profile.openingVerb,
-    imageCaption: feature?.heroUrl ? `${quoteTitle(feature.title)} carries the issue’s first visual feeling.` : undefined,
+    imageCaption: feature?.heroUrl ? `${quoteTitle(feature.title)} carries the issue's first visual feeling.` : undefined,
     publicFieldNote,
     adminDesignNote: adminFeatureNote(context),
     fieldNote: publicFieldNote,
