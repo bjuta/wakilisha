@@ -9,8 +9,8 @@ export function ArgumentIssueExperience(props: IssueExperienceComponentProps) {
   return (
     <div className="mag-issue-experience mag-issue-experience-argument">
       <IssueOpening issue={issue} experience={experience} eyebrow="Argument issue" />
-      <section className="magazine-spread mag-reveal mag-color-interlude" id={`${issue.id}-open-the-argument`}>
-        <div className="mag-color-interlude-inner">
+      <section className="mag-issue-zone mag-reveal mag-experience-room mag-argument-room" id={`${issue.id}-open-the-argument`}>
+        <div className="mag-room-inner">
           <div className="magazine-meta">Open the argument</div>
           <h2>This issue has a raised eyebrow.</h2>
           <p>{experience.readerPromise}</p>
