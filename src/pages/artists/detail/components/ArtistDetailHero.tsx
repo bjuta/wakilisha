@@ -170,7 +170,7 @@ export function ArtistDetailHero({
                 {chartEntryCount > 0 && (
                   <>
                     <span className="text-white/35">·</span>
-                    <span>{chartEntryCount.toLocaleString()} chart entries</span>
+                    <span>{chartEntryCount.toLocaleString()} chart moments</span>
                   </>
                 )}
               </div>
