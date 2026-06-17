@@ -10,6 +10,7 @@ import {
 } from '@/services/magazineIssues';
 import { buildIssueEditorialSystem } from '@/services/magazineNlg';
 import { IssueExperienceShell } from '@/components/magazine/issueExperience';
+import { MetaTags } from '@/components/seo/MetaTags';
 import { useArtDirector } from '@/magazine-art-director';
 import { useTheme } from '@/components/design-system/theme/ThemeProvider';
 import './magazineIssue.css';
@@ -107,9 +108,17 @@ export default function MagazineIssuePage() {
 
   const experience = buildIssueEditorialSystem(issue);
   const { previousIssue, nextIssue } = getAdjacentIssues(issues, issue);
+  const coverImage = issue.articles.find((article) => article.heroUrl)?.heroUrl;
 
   return (
     <main className={issueClass} style={cssVars}>
+      <MetaTags
+        title={`${issue.issueLabel}: ${issue.title}`}
+        description={experience.seoDescription}
+        imageUrl={coverImage}
+        url={typeof window !== 'undefined' ? window.location.href : undefined}
+        type="article"
+      />
       <IssueExperienceShell
         issue={issue}
         experience={experience}
