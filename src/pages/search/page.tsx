@@ -12,6 +12,7 @@ import { useLabelSearchData, type LabelSearchItem } from "@/hooks/useLabelSearch
 import { useChartSearchData, type ChartSearchItem } from "@/hooks/useChartSearchData";
 import { SkeletonBlock } from "@/components/skeletons/Skeletons";
 import { listReleases, type RepairedRelease } from "@/services/repairedContent/client";
+import { buildReleaseSearchSnippet } from "@/services/cultureContext/releaseAdapters";
 
 const TABS = ["All", "Artists", "Tracks", "Releases", "Genres", "Labels", "Charts"] as const;
 
@@ -37,11 +38,11 @@ export default function Search() {
   const [releasesLoading, setReleasesLoading] = useState(true);
   const { playTrack } = usePlayer();
   const { suggestions: trendingArtists, loading: trendingLoading } = useArtistSearchSuggestions(12);
-  const { data: artistData, loading: artistsLoading } = useArtistSearchData();
-  const { data: trackData, loading: tracksLoading } = useTrackSearchData();
-  const { data: genreData, loading: genresLoading } = useGenreSearchData();
-  const { data: labelData, loading: labelsLoading } = useLabelSearchData();
-  const { data: chartData, loading: chartsLoading } = useChartSearchData();
+  const { data: artistData } = useArtistSearchData();
+  const { data: trackData } = useTrackSearchData();
+  const { data: genreData } = useGenreSearchData();
+  const { data: labelData } = useLabelSearchData();
+  const { data: chartData } = useChartSearchData();
 
   const q = query.trim().toLowerCase();
 
@@ -101,19 +102,17 @@ export default function Search() {
 
   return (
     <div className="min-h-screen">
-      {/* Search Hero */}
       <div className="wk-container-wide px-6 py-10 md:py-14">
         <div className="wk-eyebrow mb-4">Discovery</div>
-        <h1 className="wk-h-page mb-6">Search</h1>
+        <h1 className="wk-h-page mb-6">Search WAKILISHA</h1>
 
-        {/* Search input */}
         <div className="relative max-w-2xl">
           <i className="ri-search-line absolute left-4 top-1/2 -translate-y-1/2 text-[var(--wk-text-muted)] text-lg" />
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search artists, tracks, releases, genres, labels, charts..."
+            placeholder="Search artists, songs, releases, genres, labels, charts..."
             className="w-full rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] py-3.5 pl-12 pr-4 text-[15px] text-[var(--wk-text)] placeholder:text-[var(--wk-text-faint)] outline-none focus:border-[var(--wk-brand)]"
             autoFocus
           />
@@ -125,7 +124,6 @@ export default function Search() {
         </div>
       </div>
 
-      {/* Tabs */}
       {q && (
         <div className="border-b border-[var(--wk-border)] sticky top-0 z-10" style={{ background: "var(--wk-bg)" }}>
           <div className="wk-container-wide flex gap-1 overflow-x-auto px-6 py-2 scrollbar-hide">
@@ -163,21 +161,19 @@ export default function Search() {
         </div>
       )}
 
-      {/* Results */}
       <div className="wk-container-wide px-6 py-8 md:py-12">
         {!q && (
           <div className="space-y-12">
-            {/* Browse by category */}
             <div>
               <div className="wk-eyebrow mb-4">Browse</div>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                 {[
-                  { icon: "ri-bar-chart-line", label: "Charts", to: "/charts", desc: "Current rankings" },
-                  { icon: "ri-user-line", label: "Artists", to: "/artists", desc: "Artist directory" },
-                  { icon: "ri-album-line", label: "Releases", to: "/search?q=releases", desc: "Albums & singles" },
-                  { icon: "ri-folder-music-line", label: "Genres", to: "/genres", desc: "Genre archive" },
-                  { icon: "ri-building-2-line", label: "Labels", to: "/labels", desc: "Label archive" },
-                  { icon: "ri-article-line", label: "Magazine", to: "/magazine", desc: "Editorial stories" },
+                  { icon: "ri-bar-chart-line", label: "Charts", to: "/charts", desc: "This week’s charts" },
+                  { icon: "ri-user-line", label: "Artists", to: "/artists", desc: "Artists" },
+                  { icon: "ri-album-line", label: "Releases", to: "/releases", desc: "Albums, EPs and singles" },
+                  { icon: "ri-folder-music-line", label: "Genres", to: "/genres", desc: "Sounds and scenes" },
+                  { icon: "ri-building-2-line", label: "Labels", to: "/labels", desc: "Labels and collectives" },
+                  { icon: "ri-article-line", label: "Magazine", to: "/magazine", desc: "Magazine stories" },
                 ].map((cat) => (
                   <Link
                     key={cat.to}
@@ -194,7 +190,6 @@ export default function Search() {
               </div>
             </div>
 
-            {/* Starting points */}
             <div>
               <div className="wk-eyebrow mb-4">Jump in</div>
               {trendingLoading ? (
@@ -206,7 +201,7 @@ export default function Search() {
                   ))}
                 </div>
               ) : trendingArtists.length === 0 ? (
-                <p className="text-[13px] text-[var(--wk-text-muted)]">Type a name, genre, or place to get started.</p>
+                <p className="text-[13px] text-[var(--wk-text-muted)]">Type a name, sound, or place to get started.</p>
               ) : (
                 <div className="flex flex-wrap gap-2">
                   {trendingArtists.map((name) => (
@@ -243,14 +238,13 @@ export default function Search() {
         {q && !loading && total === 0 && (
           <div className="py-20 text-center text-[var(--wk-text-muted)]">
             <i className="ri-search-line mb-4 block text-5xl" />
-            <div className="text-[18px] font-bold text-[var(--wk-text)] mb-2">No results for "{query}"</div>
-            <div className="text-[14px]">Try a different search term or browse by category.</div>
+            <div className="text-[18px] font-bold text-[var(--wk-text)] mb-2">Nothing came up for "{query}"</div>
+            <div className="text-[14px]">Try another spelling, another name, or start from the sections below.</div>
           </div>
         )}
 
         {q && !loading && (
           <div className="space-y-10">
-            {/* Artists */}
             {showArtists && results.artists.length > 0 && (
               <section>
                 <div className="mb-4 flex items-center justify-between">
@@ -269,7 +263,6 @@ export default function Search() {
               </section>
             )}
 
-            {/* Tracks */}
             {showTracks && results.tracks.length > 0 && (
               <section>
                 <div className="mb-4 flex items-center justify-between">
@@ -310,7 +303,6 @@ export default function Search() {
               </section>
             )}
 
-            {/* Releases */}
             {showReleases && results.releases.length > 0 && (
               <section>
                 <div className="mb-4 flex items-center justify-between">
@@ -323,13 +315,16 @@ export default function Search() {
                 </div>
                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
                   {results.releases.slice(0, activeTab === "All" ? 4 : undefined).map((release) => (
-                    <ReleaseCard key={release.slug} {...release} />
+                    <ReleaseCard
+                      key={release.slug}
+                      {...release}
+                      contextText={buildReleaseSearchSnippet(release)}
+                    />
                   ))}
                 </div>
               </section>
             )}
 
-            {/* Genres */}
             {showGenres && results.genres.length > 0 && (
               <section>
                 <div className="mb-4 flex items-center justify-between">
@@ -357,7 +352,6 @@ export default function Search() {
               </section>
             )}
 
-            {/* Labels */}
             {showLabels && results.labels.length > 0 && (
               <section>
                 <div className="mb-4 flex items-center justify-between">
@@ -380,7 +374,6 @@ export default function Search() {
               </section>
             )}
 
-            {/* Charts */}
             {showCharts && results.charts.length > 0 && (
               <section>
                 <div className="mb-4 flex items-center justify-between">
