@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import type { MagazineIssue } from '@/services/magazineIssues';
 import type { MagazineIssueExperience } from '@/services/magazineIssueEngine';
@@ -34,7 +35,7 @@ export function IssuePath({ issue, experience }: IssuePathProps) {
               </>
             );
 
-            const style = { '--path-step-progress': `${Math.round((index / totalSteps) * 100)}%` } as React.CSSProperties;
+            const style = { '--path-step-progress': `${Math.round((index / totalSteps) * 100)}%` } as CSSProperties;
 
             return step.articleSlug ? (
               <Link className="mag-route-step mag-meaning-card" to={`/magazine/${step.articleSlug}`} key={step.id} style={style}>
