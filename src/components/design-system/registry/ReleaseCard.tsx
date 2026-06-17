@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { WkTag } from "@/components/design-system/primitives/Tag";
 import { releaseUrl } from "@/services/repairedContent/client";
 import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
+import { buildReleaseCardBlurb } from "@/services/cultureContext/releaseAdapters";
 
 export interface ReleaseCardProps {
   slug: string;
@@ -9,10 +10,11 @@ export interface ReleaseCardProps {
   artist: string;
   artistSlug?: string;
   artworkUrl?: string;
-  releaseType?: "Album" | "EP" | "Single" | "Compilation";
+  releaseType?: string;
   year?: string | number;
   trackCount?: number;
   labelName?: string;
+  contextText?: string;
   onQuickView?: () => void;
 }
 
@@ -26,8 +28,20 @@ export function ReleaseCard({
   year,
   trackCount,
   labelName,
+  contextText,
   onQuickView,
 }: ReleaseCardProps) {
+  const blurb = contextText || buildReleaseCardBlurb({
+    slug,
+    title,
+    artist,
+    releaseType,
+    year: year ? String(year) : "",
+    trackCount: trackCount ?? 0,
+    labelName: labelName || "",
+    artworkUrl: artworkUrl || "",
+  });
+
   return (
     <div className="group relative rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] overflow-hidden transition-all hover:border-[var(--wk-border-2)]">
       <Link to={releaseUrl({ slug, artist })} className="block">
@@ -51,12 +65,15 @@ export function ReleaseCard({
               artist
             )}
           </div>
+          <p className="mt-2 line-clamp-2 text-[11px] font-semibold leading-snug text-[var(--wk-text-soft)]">
+            {blurb}
+          </p>
           <div className="mt-2 flex flex-wrap items-center gap-1">
             {releaseType && <WkTag>{releaseType}</WkTag>}
             {year && <WkTag>{year}</WkTag>}
-            {trackCount !== undefined && (
+            {trackCount !== undefined && trackCount > 0 && (
               <span className="text-[11px] text-[var(--wk-text-faint)]">
-                {trackCount} tracks
+                {trackCount} {trackCount === 1 ? "track" : "tracks"}
               </span>
             )}
           </div>
