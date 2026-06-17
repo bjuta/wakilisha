@@ -13,8 +13,10 @@ import { buildArchiveBlurb, buildCardBlurb } from './recipes/card';
 import { buildSearchSnippet } from './recipes/search';
 import { buildSeoDescription } from './recipes/seo';
 import { buildAdminQualityNote } from './recipes/admin';
+import { buildHeroIntro } from './recipes/hero';
+import { buildIssueEmptyState } from './recipes/emptyState';
 
-export const MAGAZINE_ISSUE_ENGINE_VERSION = 'magazine-issue-engine.v0.4.0';
+export const MAGAZINE_ISSUE_ENGINE_VERSION = 'magazine-issue-engine.v0.5.0';
 
 function sanitizeFeatureFrame(frame: MagazineIssueFeatureFrame): MagazineIssueFeatureFrame {
   const publicFieldNote = sanitizePublicIssueCopy(frame.publicFieldNote);
@@ -45,6 +47,7 @@ export function buildMagazineIssueExperience(issue: MagazineIssue): MagazineIssu
   };
 
   const featureFrame = sanitizeFeatureFrame(buildFeatureFrame(context));
+  const heroIntro = sanitizePublicIssueCopy(buildHeroIntro(context));
   const coverLine = sanitizePublicIssueCopy(buildCoverLine(context));
   const cardBlurb = sanitizePublicIssueCopy(buildCardBlurb(context));
   const archiveBlurb = sanitizePublicIssueCopy(buildArchiveBlurb(context));
@@ -56,6 +59,7 @@ export function buildMagazineIssueExperience(issue: MagazineIssue): MagazineIssu
   const signalDeck = sanitizePublicIssueCopy(buildSignalDeck(context));
   const signalReading = sanitizePublicIssueCopy(buildSignalReading(context));
   const backMatterLine = sanitizePublicIssueCopy(buildBackMatterLine(context));
+  const emptyState = sanitizePublicIssueCopy(buildIssueEmptyState(context));
   const adminQualityNote = buildAdminQualityNote(context);
   const readingPath = buildReadingPath(context).map((step) => ({
     ...step,
@@ -68,6 +72,7 @@ export function buildMagazineIssueExperience(issue: MagazineIssue): MagazineIssu
     score.profile.readerPromise,
     score.profile.visualPromise,
     score.profile.cta,
+    heroIntro,
     coverLine,
     cardBlurb,
     archiveBlurb,
@@ -79,6 +84,7 @@ export function buildMagazineIssueExperience(issue: MagazineIssue): MagazineIssu
     signalDeck,
     signalReading,
     backMatterLine,
+    emptyState,
     editorNote.eyebrow,
     editorNote.title,
     editorNote.pull,
@@ -92,6 +98,15 @@ export function buildMagazineIssueExperience(issue: MagazineIssue): MagazineIssu
   ];
 
   const warnings = validatePublicIssueCopy(publicValues);
+  const surfaces = {
+    heroIntro,
+    cardBlurb,
+    searchSnippet,
+    seoDescription,
+    archiveBlurb,
+    emptyState,
+    adminQualityNote,
+  };
 
   return {
     issueMood: score.mood,
@@ -110,15 +125,18 @@ export function buildMagazineIssueExperience(issue: MagazineIssue): MagazineIssu
     readerPromise: sanitizePublicIssueCopy(score.profile.readerPromise),
     visualPromise: sanitizePublicIssueCopy(score.profile.visualPromise),
     issueCta: sanitizePublicIssueCopy(score.profile.cta),
+    heroIntro,
     coverLine,
     cardBlurb,
     archiveBlurb,
     searchSnippet,
     seoDescription,
     contentsIntro,
+    emptyState,
     readingPath,
     signalReading,
     adminQualityNote,
+    surfaces,
     adminNotes: {
       featureDesign: featureFrame.adminDesignNote,
       quality: adminQualityNote,
