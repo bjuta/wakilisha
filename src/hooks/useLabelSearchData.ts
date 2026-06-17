@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import { buildLabelSearchSnippet } from "@/services/cultureContext/searchAdapters";
 
 export interface LabelSearchItem {
   slug: string;
@@ -7,6 +8,7 @@ export interface LabelSearchItem {
   country: string;
   artistCount: number;
   releaseCount: number;
+  contextText: string;
 }
 
 export function useLabelSearchData() {
@@ -50,13 +52,20 @@ export function useLabelSearchData() {
           });
         }
 
-        const mapped: LabelSearchItem[] = (labels || []).map((l) => ({
-          slug: l.slug,
-          name: l.name,
-          country: l.country_code || "",
-          artistCount: 0,
-          releaseCount: releaseCountsByLabel[l.name.toLowerCase()] || 0,
-        }));
+        const mapped: LabelSearchItem[] = (labels || []).map((l) => {
+          const item = {
+            slug: l.slug,
+            name: l.name,
+            country: l.country_code || "",
+            artistCount: 0,
+            releaseCount: releaseCountsByLabel[l.name.toLowerCase()] || 0,
+          };
+
+          return {
+            ...item,
+            contextText: buildLabelSearchSnippet(item),
+          };
+        });
 
         setData(mapped);
       } catch (e) {
