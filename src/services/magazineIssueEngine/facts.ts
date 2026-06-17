@@ -278,7 +278,7 @@ function leadArticleReason(article: MagazineIssueArticle | undefined, clusters: 
   return hasImage ? `${signalPhrase} It also has the strongest visual door.` : signalPhrase;
 }
 
-function readingDoorFor(facts: Omit<IssueFacts, 'readingDoor'>): IssueReadingDoor {
+function readingDoorFor(facts: Omit<IssueFacts, 'readingDoor' | 'factSummary'>): IssueReadingDoor {
   if (facts.thinness === 'thin') {
     return {
       mode: 'thin',
