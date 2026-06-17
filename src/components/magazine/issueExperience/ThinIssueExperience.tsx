@@ -8,18 +8,12 @@ export function ThinIssueExperience(props: IssueExperienceComponentProps) {
   return (
     <div className="mag-issue-experience mag-issue-experience-thin">
       <IssueOpening issue={issue} experience={experience} eyebrow="Short issue" />
-      <section className="magazine-spread mag-reveal" id={`${issue.id}-short-thread`}>
-        <div className="mag-note">
-          <aside className="mag-note-side">
-            <div className="mag-note-label magazine-meta">One clear thread</div>
-          </aside>
-          <div>
-            <p className="mag-note-open">{experience.readerPromise}</p>
-            <div className="mag-note-flow">
-              <p>{experience.visualPromise}</p>
-              <p>{experience.searchSnippet}</p>
-            </div>
-          </div>
+      <section className="mag-issue-zone mag-reveal mag-experience-room mag-short-thread-room" id={`${issue.id}-short-thread`}>
+        <div className="mag-room-inner">
+          <div className="magazine-meta">One clear thread</div>
+          <p className="mag-note-open">{experience.readerPromise}</p>
+          <p>{experience.visualPromise}</p>
+          <p>{experience.searchSnippet}</p>
         </div>
       </section>
       <IssuePath issue={issue} experience={experience} />
