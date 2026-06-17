@@ -1,82 +1,85 @@
-// chart-ingest-api v22 — artist origin filter via registry_artists.origin_iso2
+// ── SHARED BLOCK (Phase A) ──
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const ALLOWED_ORIGINS = ["https://wakilisha.africa","https://www.wakilisha.africa","https://staging.wakilisha.africa","https://readdy.ai","https://readdy.cc","https://www.readdy.cc","http://localhost:5173","http://localhost:3000"];
 
-function corsHeaders(req: Request): Record<string, string> {
-  const origin = req.headers.get("Origin") ?? "";
-  const isReaddyPreview = origin.endsWith(".readdy.cc") || origin === "https://readdy.cc";
-  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) || isReaddyPreview ? origin : ALLOWED_ORIGINS[0];
-  return {"Access-Control-Allow-Origin":allowedOrigin,"Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Vary":"Origin"};
-}
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+function corsRestricted(req: Request, methods="POST, OPTIONS"): Record<string,string> { const o=req.headers.get("Origin")??""; const isR=o.endsWith(".readdy.cc")||o==="https://readdy.cc"; const ao=ALLOWED_ORIGINS.includes(o)||isR?o:ALLOWED_ORIGINS[0]; return {"Access-Control-Allow-Origin":ao,"Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":methods,"Vary":"Origin"}; }
+
+async function verifyJwt(req: Request): Promise<{id:string;email?:string}|null> { const ah=req.headers.get("Authorization"); if(!ah||!ah.startsWith("Bearer ")) return null; const t=ah.replace("Bearer ",""); const uc=createClient(SUPABASE_URL,SERVICE_KEY,{global:{headers:{Authorization:`Bearer ${t}`}}}); const {data:{user},error}=await uc.auth.getUser(t); if(error||!user) return null; return {id:user.id,email:user.email}; }
+
+async function requireCap(userId: string, cap: string, db?: ReturnType<typeof createClient>): Promise<boolean> { const c=db??createClient(SUPABASE_URL,SERVICE_KEY); const {data:roles}=await c.from("user_role_assignments").select("role_key, role_definitions!inner(role_capabilities(capability_key))").eq("user_id",userId).eq("status","active").or("expires_at.is.null,expires_at.gt.now()"); if(!roles||roles.length===0) return false; if(roles.some((r:{role_key:string})=>r.role_key==="administrator")) return true; const all=new Set<string>(); for(const r of roles){const caps=(r.role_definitions as {role_capabilities?:Array<{capability_key:string}>}|null)?.role_capabilities??[];for(const c of caps)all.add(c.capability_key);} return all.has(cap); }
+
+const rid=()=>crypto.randomUUID().slice(0,12);
+const iso=()=>new Date().toISOString();
+// ── END SHARED BLOCK ──
+
 const ALL_STAGES = ["validate","provider_detection","resource_guard","source_fetch","raw_persist","normalize","dedupe","release_candidate_build","canonical_match","entity_resolution","eligibility_execution","airplay_evidence","airplay_rescue","carry_forward","methodology_scoring","anti_gaming","shortlist","review_gate","commit_validate","commit_write","public_verify"];
 
-function json(req: Request, body: unknown, status = 200): Response { return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders(req), "Content-Type": "application/json" } }); }
-function safeError(req: Request, action: string, err: unknown): Response { const m = err instanceof Error ? err.message : String(err); console.error("[chart-ingest-api] "+action+" error:", m); return new Response(JSON.stringify({ error: "internal_error", requestId: crypto.randomUUID().slice(0, 12) }), { status: 500, headers: { ...corsHeaders(req), "Content-Type": "application/json" } }); }
-
-async function requireCapability(db: ReturnType<typeof createClient>, userId: string, requiredCapability: string): Promise<void> {
-  const { data: rows } = await db.from("user_role_assignments").select("role_key, role_definitions!inner(role_capabilities(capability_key))").eq("user_id", userId).eq("status", "active").or("expires_at.is.null,expires_at.gt.now()");
-  if (!rows || rows.length === 0) throw Object.assign(new Error("User has no active role assignment."), { status: 403 });
-  const allCaps = new Set<string>();
-  for (const r of rows) { const caps = (r.role_definitions as { role_capabilities?: Array<{ capability_key: string }> } | null)?.role_capabilities ?? []; for (const c of caps) allCaps.add(c.capability_key); }
-  if (!allCaps.has(requiredCapability) && !allCaps.has("admin_god_mode")) throw Object.assign(new Error("Missing capability: "+requiredCapability), { status: 403 });
-}
+function json(req: Request, body: unknown, status = 200): Response { const cors = corsRestricted(req); return new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } }); }
+function safeError(req: Request, action: string, err: unknown): Response { const m = err instanceof Error ? err.message : String(err); console.error("[chart-ingest-api] "+action+" error:", m); const cors = corsRestricted(req); return new Response(JSON.stringify({ error: "internal_error", requestId: rid() }), { status: 500, headers: { ...cors, "Content-Type": "application/json" } }); }
 
 const ACTION_CAPABILITIES: Record<string, string> = {
   list_runs:"view_charts_admin",get_run:"view_charts_admin",get_stages:"view_charts_admin",get_sources:"view_charts_admin",get_candidates:"view_charts_admin",get_normalized:"view_charts_admin",get_kpis:"view_charts_admin",get_activity:"view_charts_admin",get_resource_guard:"view_charts_admin",get_review_issues:"view_charts_admin",get_matches_for_run:"view_charts_admin",validate_commit:"view_charts_admin",preflight:"view_charts_admin",csv_list:"view_charts_admin",
   create_dry_run:"manage_ingest",source_fetch:"manage_ingest",normalize_run:"manage_ingest",run_eligibility:"manage_ingest",run_carry_forward:"manage_ingest",run_scoring:"manage_ingest",run_shortlist:"manage_ingest",run_airplay_detection:"manage_ingest",run_full_pipeline:"manage_ingest",send_gaps_to_review:"manage_ingest",apply_row_decision:"manage_ingest",cancel_run:"manage_ingest",retry_run:"manage_ingest",reset_pipeline:"manage_ingest",csv_upload:"manage_ingest",csv_normalize:"manage_ingest",commit_run:"publish_charts",fix_chart_artist_slugs:"publish_charts",reingest_edition:"publish_charts"};
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders(req) });
-  const ah = req.headers.get("Authorization"); if (!ah || !ah.startsWith("Bearer ")) return json(req, { error: "unauthorized" }, 401);
-  const token = ah.replace("Bearer ", "");
-  const uc = createClient(SUPABASE_URL, SERVICE_KEY, { global: { headers: { Authorization: "Bearer "+token } } });
-  const { data: { user }, error: ae } = await uc.auth.getUser(token);
-  if (ae || !user) return json(req, { error: "unauthorized" }, 401);
-  const db = createClient(SUPABASE_URL, SERVICE_KEY);
+  const cors = corsRestricted(req);
+  if (req.method === "OPTIONS") return new Response(null, { headers: cors });
+
+  const auth = await verifyJwt(req);
+  if (!auth) return json(req, { error: "unauthorized" }, 401);
+
   let body: Record<string, unknown>; try { body = await req.json(); } catch { return json(req, { error: "invalid_json" }, 400); }
   const { action, ...params } = body as { action: string; [k: string]: unknown };
   const requiredCapability = ACTION_CAPABILITIES[action];
-  if (requiredCapability) { try { await requireCapability(db, user.id, requiredCapability); } catch (capErr: unknown) { const s = (capErr as { status?: number }).status ?? 403; return json(req, { error: "forbidden" }, s); } }
+
+  if (requiredCapability) {
+    const can = await requireCap(auth.id, requiredCapability);
+    if (!can) return json(req, { error: "forbidden" }, 403);
+  }
+
+  const db = createClient(SUPABASE_URL, SERVICE_KEY);
+
   try {
-    if (action === "create_dry_run") return handleCreateDryRun(req, db, params, user);
+    if (action === "create_dry_run") return handleCreateDryRun(req, db, params, auth);
     if (action === "list_runs") return handleListRuns(req, db, params);
     if (action === "get_run") return handleGetRun(req, db, params);
     if (action === "get_stages") return handleGetStages(req, db, params);
     if (action === "get_sources") return handleGetSources(req, db, params);
     if (action === "get_candidates") return handleGetCandidates(req, db, params);
     if (action === "get_normalized") return handleGetNormalized(req, db, params);
-    if (action === "normalize_run") return handleNormalizeRun(req, db, params, user);
-    if (action === "source_fetch") return handleSourceFetch(req, db, params, user);
-    if (action === "run_eligibility") return handleRunEligibility(req, db, params, user);
-    if (action === "run_carry_forward") return handleRunCarryForward(req, db, params, user);
-    if (action === "run_scoring") return handleRunScoring(req, db, params, user);
-    if (action === "run_shortlist") return handleRunShortlist(req, db, params, user);
-    if (action === "run_airplay_detection") return handleRunAirplayDetection(req, db, params, user);
-    if (action === "run_full_pipeline") return handleRunFullPipeline(req, db, params, user);
-    if (action === "cancel_run") return handleCancelRun(req, db, params, user);
-    if (action === "retry_run") return handleRetryRun(req, db, params, user);
-    if (action === "reset_pipeline") return handleResetPipeline(req, db, params, user);
+    if (action === "normalize_run") return handleNormalizeRun(req, db, params, auth);
+    if (action === "source_fetch") return handleSourceFetch(req, db, params, auth);
+    if (action === "run_eligibility") return handleRunEligibility(req, db, params, auth);
+    if (action === "run_carry_forward") return handleRunCarryForward(req, db, params, auth);
+    if (action === "run_scoring") return handleRunScoring(req, db, params, auth);
+    if (action === "run_shortlist") return handleRunShortlist(req, db, params, auth);
+    if (action === "run_airplay_detection") return handleRunAirplayDetection(req, db, params, auth);
+    if (action === "run_full_pipeline") return handleRunFullPipeline(req, db, params, auth);
+    if (action === "cancel_run") return handleCancelRun(req, db, params, auth);
+    if (action === "retry_run") return handleRetryRun(req, db, params, auth);
+    if (action === "reset_pipeline") return handleResetPipeline(req, db, params, auth);
     if (action === "preflight") return handlePreflight(req, db, params);
     if (action === "get_kpis") return handleGetKpis(req, db);
     if (action === "get_activity") return handleGetActivity(req, db);
     if (action === "get_resource_guard") return handleGetResourceGuard(req, db, params);
-    if (action === "send_gaps_to_review") return handleSendGapsToReview(req, db, params, user);
-    if (action === "apply_row_decision") return handleApplyRowDecision(req, db, params, user);
+    if (action === "send_gaps_to_review") return handleSendGapsToReview(req, db, params, auth);
+    if (action === "apply_row_decision") return handleApplyRowDecision(req, db, params, auth);
     if (action === "get_review_issues") return handleGetReviewIssues(req, db, params);
     if (action === "get_matches_for_run") return handleGetMatchesForRun(req, db, params);
     if (action === "validate_commit") return handleValidateCommit(req, db, params);
-    if (action === "commit_run") return handleCommitRun(req, db, params, user);
-    if (action === "fix_chart_artist_slugs") return handleFixChartArtistSlugs(req, db, params, user);
-    if (action === "reingest_edition") return handleReingestEdition(req, db, params, user);
+    if (action === "commit_run") return handleCommitRun(req, db, params, auth);
+    if (action === "fix_chart_artist_slugs") return handleFixChartArtistSlugs(req, db, params, auth);
+    if (action === "reingest_edition") return handleReingestEdition(req, db, params, auth);
     if (action === "csv_list") return handleCsvList(req, db, params);
     return json(req, { error: "unknown_action: "+action }, 400);
   } catch (err) { return safeError(req, action, err); }
 });
 
-// ----- HELPERS -----
+// ── HELPERS ──
 function detectProvider(url: string): string {
   if (!url) return "manual"; const u = url.toLowerCase();
   if (u.includes("spotify.com")) return "spotify";
@@ -256,7 +259,7 @@ function parseArtists(artistLine: string): string[] {
   return artists;
 }
 
-// HANDLERS
+// ── HANDLERS ──
 async function handleFixChartArtistSlugs(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) {
   const { editionId, dryRun } = params as { editionId?: string; dryRun?: boolean }; const isDryRun = dryRun !== false; const now = new Date().toISOString();
   let query = db.from("wk_chart_entries_v2").select("id, track_title, artist_name, artist_slug, track_slug, canonical_track_id, edition_id"); if (editionId) query = query.eq("edition_id", editionId);

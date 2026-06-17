@@ -1237,7 +1237,7 @@ export function refreshStore(): void {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function invokeCsvApi<T>(action: string, params: Record<string, unknown>): Promise<T> {
-  return supabase.functions.invoke("chart-ingest-api", { body: { action, ...params } }).then(({ data, error }) => {
+  return supabase.functions.invoke("admin-router", { body: { action, ...params } }).then(({ data, error }) => {
     if (error) throw new Error(error.message);
     if (data?.error) throw new Error(data.error + (data.detail ? `: ${data.detail}` : ""));
     return data as T;

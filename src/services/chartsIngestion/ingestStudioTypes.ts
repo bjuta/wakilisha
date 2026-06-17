@@ -253,6 +253,28 @@ export type CommitIngestRunResponse = {
   committedBy: string;
 };
 
+export type BackendCommitResponse = {
+  runId: string;
+  status: "committed";
+  programId: string;
+  publicSlug: string;
+  editionId: string;
+  editionSlug: string;
+  editionDate: string;
+  entryCount: number;
+  publicUrl: string;
+  apiUrl: string;
+  snapshotId?: string | null;
+  commitPersistence: CommitPersistence;
+  publicAvailability: PublicAvailability;
+  integrity: {
+    ok: boolean;
+    warnings: string[];
+    errors: string[];
+  };
+  auditEventId?: string | null;
+};
+
 export type ApiEnvelope<T> = {
   data: T;
   meta: {
@@ -290,3 +312,6 @@ export type ResourceGuardStatus = {
   duplicateRunWarning?: string | null;
   sameEditionDateWarning?: string | null;
 };
+
+export type CommitPersistence = "local_only" | "backend_persisted" | "database_persisted";
+export type PublicAvailability = "not_public" | "local_preview_only" | "api_verified";

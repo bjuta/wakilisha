@@ -1,0 +1,388 @@
+openapi: "3.0.3"
+info:
+  title: WAKILISHA Admin API
+  description: |
+    Admin gateway for WAKILISHA operations — registry CRUD, chart ingestion, provider credentials, and user management.
+    
+    **Base URL:** `https://<project>.supabase.co/functions/v1/admin-router`
+    
+    **Authentication:** All endpoints (except `/health`) require a Supabase JWT in the `Authorization: Bearer <token>` header.
+    The JWT is verified server-side and the caller's capabilities are checked per-endpoint.
+    
+    **Response envelope (success):**
+    ```json
+    { "ok": true, "data": <payload>, "meta": { "requestId": "abc123", "servedAt": "2026-...", "version": "4.0.0" } }
+    ```
+    
+    **Response envelope (error):**
+    ```json
+    { "ok": false, "error": { "code": "not_found", "message": "Entity not found" }, "meta": { "requestId": "abc123", "servedAt": "2026-...", "version": "4.0.0" } }
+    ```
+    
+    **Capability gates per section:**
+    - Registry: `manage_registry`
+    - Credentials: `manage_settings`
+    - Users: `manage_users`
+    - Charts read: `view_charts_admin`
+    - Charts ingest: `manage_ingest`
+    - Charts publish: `publish_charts`
+  version: "4.0.0"
+  contact:
+    name: WAKILISHA Engineering
+    url: https://wakilisha.africa
+
+servers:
+  - url: https://pgzizndxdyhqmtyywjmt.supabase.co/functions/v1/admin-router
+    description: Production
+
+security:
+  - bearerAuth: []
+
+paths:
+  /health:
+    get:
+      summary: Health check (public — no auth)
+      operationId: healthCheck
+      tags: [System]
+      security: []
+      responses:
+        "200":
+          description: Service health
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  data:
+                    type: object
+                    properties:
+                      ok: { type: boolean }
+                      service: { type: string }
+                      version: { type: string }
+                      timestamp: { type: string }
+                      sections:
+                        type: array
+                        items: { type: string }
+                      uptime: { type: string }
+
+  # ═══════════════════════════════════════
+  # SECTION 1: REGISTRY
+  # ═══════════════════════════════════════
+  /registry/entities:
+    get:
+      summary: List registry entities
+      operationId: listRegistryEntities
+      tags: [Registry]
+      parameters:
+        - name: entityType
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [artist, track, release, label, genre]
+        - name: limit
+          in: query
+          schema: { type: integer, default: 250, maximum: 1000 }
+        - name: orderBy
+          in: query
+          schema: { type: string, default: updated_at }
+        - name: ascending
+          in: query
+          schema: { type: boolean, default: false }
+      responses:
+        "200":
+          description: Entity list
+        "400":
+          description: Invalid entityType
+        "403":
+          description: Missing manage_registry capability
+
+  /registry/entities/{entityType}/{entityId}:
+    get:
+      summary: Get single registry entity
+      operationId: getRegistryEntity
+      tags: [Registry]
+      parameters:
+        - name: entityType
+          in: path
+          required: true
+          schema: { type: string, enum: [artist, track, release, label, genre] }
+        - name: entityId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Entity data
+        "404":
+          description: Entity not found
+    patch:
+      summary: Update registry entity fields
+      operationId: patchRegistryEntity
+      tags: [Registry]
+      parameters:
+        - name: entityType
+          in: path
+          required: true
+          schema: { type: string, enum: [artist, track, release, label, genre] }
+        - name: entityId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                _expected_updated_at:
+                  type: string
+                  description: Stale-update guard — send the last known updated_at. If mismatched, returns 409.
+              additionalProperties: true
+      responses:
+        "200":
+          description: Fields saved. Returns savedFields, skippedFields, updatedEntity.
+        "400":
+          description: Malformed body or invalid entityType
+        "403":
+          description: Missing manage_registry capability
+        "404":
+          description: Entity not found
+        "409":
+          description: Stale update (code: stale_update) or duplicate key (code: duplicate_key)
+
+  # ═══════════════════════════════════════
+  # SECTION 2: CREDENTIALS
+  # ═══════════════════════════════════════
+  /credentials:
+    post:
+      summary: Save, clear, or health-check provider credentials
+      operationId: manageCredentials
+      tags: [Credentials]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action, provider]
+              properties:
+                action:
+                  type: string
+                  enum: [save, clear, health_check]
+                provider:
+                  type: string
+                  enum: [spotify, apple_music, acrcloud, youtube, airplay]
+                credentials:
+                  type: object
+                  description: Key-value pairs mapping env var names to values. Required for "save".
+                envVars:
+                  type: array
+                  items: { type: string }
+                  description: Specific env vars to clear. Optional for "clear".
+      responses:
+        "200":
+          description: Operation result
+        "400":
+          description: Missing provider, unknown action, or missing credentials
+        "403":
+          description: Missing manage_settings capability
+
+  # ═══════════════════════════════════════
+  # SECTION 3: USERS
+  # ═══════════════════════════════════════
+  /users:
+    post:
+      summary: Invite users, send password resets, or test email delivery
+      operationId: manageUsers
+      tags: [Users]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action:
+                  type: string
+                  enum: [invite_user, send_password_reset, send_test_email]
+                email:
+                  type: string
+                  format: email
+                role_key:
+                  type: string
+                  description: Required for invite_user (e.g., registry_editor)
+                display_name:
+                  type: string
+                redirect_to:
+                  type: string
+                  format: uri
+                scopes:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      scope_type: { type: string }
+                      scope_value: { type: string }
+                      can_view: { type: boolean }
+                      can_edit: { type: boolean }
+                      can_publish: { type: boolean }
+                user_id:
+                  type: string
+                  description: Optional for send_password_reset (avoids user lookup)
+      responses:
+        "200":
+          description: Operation result including delivery provider and status
+        "400":
+          description: Missing required fields
+        "403":
+          description: Missing manage_users capability
+
+  # ═══════════════════════════════════════
+  # SECTION 4: CHARTS (body-based actions)
+  # ═══════════════════════════════════════
+  /charts:
+    post:
+      summary: Chart ingestion operations (action-based dispatch)
+      description: |
+        All chart actions are dispatched via `POST /charts` with `{ "action": "<name>", ...params }` in the body.
+        Capability checks are action-specific: read actions require `view_charts_admin`, ingest mutations require `manage_ingest`, publish actions require `publish_charts`.
+      operationId: chartAction
+      tags: [Charts]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action:
+                  type: string
+                  enum:
+                    - create_dry_run
+                    - list_runs
+                    - get_run
+                    - source_fetch
+                    - normalize_run
+                    - run_eligibility
+                    - run_carry_forward
+                    - run_scoring
+                    - run_shortlist
+                    - run_full_pipeline
+                    - cancel_run
+                    - retry_run
+                    - reset_pipeline
+                    - csv_list
+                    - preflight
+                    - get_stages
+                    - get_sources
+                    - get_candidates
+                    - get_normalized
+                    - get_kpis
+                    - get_activity
+                    - get_resource_guard
+                    - get_review_issues
+                    - get_matches_for_run
+                    - validate_commit
+                    - commit_run
+                    - run_airplay_detection
+                    - send_gaps_to_review
+                    - fix_chart_artist_slugs
+                    - reingest_edition
+                runId:
+                  type: string
+                  description: Required for most actions
+                limit:
+                  type: integer
+                  description: For list_runs
+                request:
+                  type: object
+                  description: Required for create_dry_run
+                  properties:
+                    editionDate: { type: string }
+                    chartTitle: { type: string }
+                    chartSlug: { type: string }
+                    chartKind: { type: string }
+                    chartSize: { type: integer }
+                    market: { type: string }
+                    sourceUrls: { type: array, items: { type: string } }
+                    existingSeriesId: { type: string }
+                    methodologyVersion: { type: string }
+                    marketScopeSnapshot: { type: object }
+                    coverStyle: { type: string }
+      responses:
+        "200":
+          description: Action result (shape varies by action)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  data: { type: object, additionalProperties: true }
+                  meta:
+                    type: object
+                    properties:
+                      requestId: { type: string }
+                      servedAt: { type: string }
+                      version: { type: string }
+        "400":
+          description: Missing required params (e.g., runId)
+        "403":
+          description: Missing required capability for the action
+        "500":
+          description: Internal error with detail
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Supabase JWT from auth session
+
+  schemas:
+    ApiError:
+      type: object
+      properties:
+        ok: { type: boolean, enum: [false] }
+        error:
+          type: object
+          properties:
+            code: { type: string }
+            message: { type: string }
+            detail: { type: string }
+        meta:
+          type: object
+          properties:
+            requestId: { type: string }
+            servedAt: { type: string }
+            version: { type: string }
+
+    ApiSuccess:
+      type: object
+      properties:
+        ok: { type: boolean, enum: [true] }
+        data: {}
+        meta:
+          type: object
+          properties:
+            requestId: { type: string }
+            servedAt: { type: string }
+            version: { type: string }
+
+tags:
+  - name: System
+    description: Health check
+  - name: Registry
+    description: Entity CRUD (artists, tracks, releases, labels, genres)
+  - name: Credentials
+    description: Provider credential management (Spotify, Apple Music, ACRCloud, YouTube, Airplay)
+  - name: Users
+    description: Admin user invites, password resets, email testing
+  - name: Charts
+    description: Chart ingestion pipeline — dry runs, scoring, normalization, carry-forward, shortlist, commit

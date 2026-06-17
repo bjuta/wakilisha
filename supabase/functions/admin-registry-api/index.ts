@@ -1,17 +1,25 @@
+
+// ── SHARED BLOCK (Phase A) ──
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, PATCH, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
-};
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-function jsonResponse(data: unknown, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
-}
+const ALLOWED_ORIGINS = ["https://wakilisha.africa","https://www.wakilisha.africa","https://staging.wakilisha.africa","https://readdy.ai","https://readdy.cc","https://www.readdy.cc","http://localhost:5173","http://localhost:3000"];
+
+function corsRestricted(req: Request, methods="GET, POST, OPTIONS"): Record<string,string> { const o=req.headers.get("Origin")??""; const isR=o.endsWith(".readdy.cc")||o==="https://readdy.cc"; const ao=ALLOWED_ORIGINS.includes(o)||isR?o:ALLOWED_ORIGINS[0]; return {"Access-Control-Allow-Origin":ao,"Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":methods,"Vary":"Origin"}; }
+
+async function verifyJwt(req: Request): Promise<{id:string;email?:string}|null> { const ah=req.headers.get("Authorization"); if(!ah||!ah.startsWith("Bearer ")) return null; const t=ah.replace("Bearer ",""); const uc=createClient(SUPABASE_URL,SERVICE_KEY,{global:{headers:{Authorization:`Bearer ${t}`}}}); const {data:{user},error}=await uc.auth.getUser(t); if(error||!user) return null; return {id:user.id,email:user.email}; }
+
+async function requireCap(userId: string, cap: string, db?: ReturnType<typeof createClient>): Promise<boolean> { const c=db??createClient(SUPABASE_URL,SERVICE_KEY); const {data:roles}=await c.from("user_role_assignments").select("role_key, role_definitions!inner(role_capabilities(capability_key))").eq("user_id",userId).eq("status","active").or("expires_at.is.null,expires_at.gt.now()"); if(!roles||roles.length===0) return false; if(roles.some((r:{role_key:string})=>r.role_key==="administrator")) return true; const all=new Set<string>(); for(const r of roles){const caps=(r.role_definitions as {role_capabilities?:Array<{capability_key:string}>}|null)?.role_capabilities??[];for(const c of caps)all.add(c.capability_key);} return all.has(cap); }
+
+const rid=()=>crypto.randomUUID().slice(0,12);
+const iso=()=>new Date().toISOString();
+
+function jsonOk(data:unknown,cors:Record<string,string>,s=200):Response{return new Response(JSON.stringify({ok:true,data,meta:{requestId:rid(),servedAt:iso(),version:"1.0.0"}}),{status:s,headers:{...cors,"Content-Type":"application/json"}});}
+function jsonErr(code:string,msg:string,cors:Record<string,string>,s=400,detail?:string):Response{return new Response(JSON.stringify({ok:false,error:{code,message:msg,...(detail?{detail}:{})},meta:{requestId:rid(),servedAt:iso(),version:"1.0.0"}}),{status:s,headers:{...cors,"Content-Type":"application/json"}});}
+function jsonRaw(data:unknown,cors:Record<string,string>,s=200):Response{return new Response(JSON.stringify(data),{status:s,headers:{...cors,"Content-Type":"application/json"}});}
+// ── END SHARED BLOCK ──
 
 // ── Table mapping ──
 const TABLE_MAP: Record<string, string> = {
@@ -46,35 +54,8 @@ const EDITABLE_FIELDS: Record<string, string[]> = {
 
 const VALID_ENTITY_TYPES = Object.keys(TABLE_MAP);
 
-// ── Permission check ──
-async function userCanManageRegistry(
-  adminClient: ReturnType<typeof createClient>,
-  userId: string,
-): Promise<boolean> {
-  const { data, error } = await adminClient
-    .from("user_role_assignments")
-    .select("role_key")
-    .eq("user_id", userId)
-    .eq("status", "active");
-
-  if (error || !data || data.length === 0) return false;
-
-  const roleKeys = data.map((r: { role_key: string }) => r.role_key);
-
-  if (roleKeys.includes("administrator")) return true;
-
-  const { data: caps } = await adminClient
-    .from("role_capabilities")
-    .select("capability_key")
-    .in("role_key", roleKeys)
-    .eq("capability_key", "manage_registry");
-
-  return (caps && caps.length > 0);
-}
-
-// ── Write audit log ──
-async function writeAuditLog(
-  adminClient: ReturnType<typeof createClient>,
+// ── Registry-specific audit log (separate from chart_ingest_audit_events) ──
+async function writeRegistryAudit(
   params: {
     actorId: string;
     actorLabel: string;
@@ -86,74 +67,51 @@ async function writeAuditLog(
     metadata?: Record<string, unknown>;
   },
 ): Promise<void> {
-  await adminClient.from("registry_audit_log").insert({
-    actor_id: params.actorId,
-    actor_label: params.actorLabel,
-    action: params.action,
-    entity_type: params.entityType,
-    entity_id: params.entityId,
-    before_value: params.beforeValue ?? {},
-    after_value: params.afterValue,
-    metadata: params.metadata ?? {},
-  });
+  try {
+    const db = createClient(SUPABASE_URL, SERVICE_KEY);
+    await db.from("registry_audit_log").insert({
+      actor_id: params.actorId,
+      actor_label: params.actorLabel,
+      action: params.action,
+      entity_type: params.entityType,
+      entity_id: params.entityId,
+      before_value: params.beforeValue ?? {},
+      after_value: params.afterValue,
+      metadata: params.metadata ?? {},
+    });
+  } catch (e) {
+    console.error("[admin-registry] audit write failed:", e instanceof Error ? e.message : String(e));
+  }
 }
 
 Deno.serve(async (req) => {
+  const cors = corsRestricted(req, "GET, PATCH, OPTIONS");
   if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: corsHeaders });
+    return new Response(null, { status: 204, headers: cors });
   }
 
-  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-  const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-
-  const authHeader = req.headers.get("Authorization");
-  if (!authHeader) {
-    return jsonResponse({
-      ok: false,
-      error: "Missing Authorization header",
-      errorCode: "not_authenticated",
-    }, 401);
+  const auth = await verifyJwt(req);
+  if (!auth) {
+    return jsonErr("not_authenticated", "Missing or invalid Authorization header", cors, 401);
   }
 
-  const token = authHeader.replace("Bearer ", "");
-  const userClient = createClient(supabaseUrl, supabaseKey, {
-    global: { headers: { Authorization: `Bearer ${token}` } },
-  });
-
-  const { data: { user }, error: authError } = await userClient.auth.getUser(token);
-  if (authError || !user) {
-    return jsonResponse({
-      ok: false,
-      error: "Invalid or expired token",
-      errorCode: "not_authenticated",
-    }, 401);
-  }
-
-  const adminClient = createClient(supabaseUrl, supabaseKey);
-
-  const canManage = await userCanManageRegistry(adminClient, user.id);
+  const canManage = await requireCap(auth.id, "manage_registry");
   if (!canManage) {
-    return jsonResponse({
-      ok: false,
-      error: "Insufficient permissions. Requires manage_registry capability.",
-      errorCode: "permission_denied",
-    }, 403);
+    return jsonErr("permission_denied", "Insufficient permissions. Requires manage_registry capability.", cors, 403);
   }
 
-  const actorLabel = user.email ?? user.id;
+  const adminClient = createClient(SUPABASE_URL, SERVICE_KEY);
+  const actorLabel = auth.email ?? auth.id;
   const url = new URL(req.url);
   const rawPath = url.pathname.replace(/^\/admin-registry-api\/?/, "");
   const segments = rawPath.split("/").filter(Boolean);
 
   try {
+    // ── GET /entities?entityType=artist&limit=50&orderBy=updated_at&ascending=false ──
     if (req.method === "GET" && segments[0] === "entities" && segments.length === 1) {
       const entityType = url.searchParams.get("entityType") ?? "";
       if (!entityType || !VALID_ENTITY_TYPES.includes(entityType)) {
-        return jsonResponse({
-          ok: false,
-          error: `Invalid entityType. Must be one of: ${VALID_ENTITY_TYPES.join(", ")}`,
-          errorCode: "invalid_entity_type",
-        }, 400);
+        return jsonErr("invalid_entity_type", `Invalid entityType. Must be one of: ${VALID_ENTITY_TYPES.join(", ")}`, cors, 400);
       }
 
       const table = TABLE_MAP[entityType];
@@ -168,26 +126,19 @@ Deno.serve(async (req) => {
         .limit(limit);
 
       if (error) {
-        return jsonResponse({
-          ok: false,
-          error: error.message,
-          errorCode: "query_failed",
-        }, 500);
+        return jsonErr("query_failed", error.message, cors, 500);
       }
 
-      return jsonResponse({ ok: true, data: data ?? [] });
+      return jsonOk(data ?? [], cors);
     }
 
+    // ── GET /entities/:entityType/:entityId ──
     if (req.method === "GET" && segments[0] === "entities" && segments.length === 3) {
       const entityType = segments[1];
       const entityId = segments[2];
 
       if (!VALID_ENTITY_TYPES.includes(entityType)) {
-        return jsonResponse({
-          ok: false,
-          error: `Invalid entityType: ${entityType}`,
-          errorCode: "invalid_entity_type",
-        }, 400);
+        return jsonErr("invalid_entity_type", `Invalid entityType: ${entityType}`, cors, 400);
       }
 
       const table = TABLE_MAP[entityType];
@@ -198,45 +149,30 @@ Deno.serve(async (req) => {
         .maybeSingle();
 
       if (error) {
-        return jsonResponse({
-          ok: false,
-          error: error.message,
-          errorCode: "query_failed",
-        }, 500);
+        return jsonErr("query_failed", error.message, cors, 500);
       }
 
       if (!data) {
-        return jsonResponse({
-          ok: false,
-          error: "Entity not found",
-          errorCode: "not_found",
-        }, 404);
+        return jsonErr("not_found", "Entity not found", cors, 404);
       }
 
-      return jsonResponse({ ok: true, data });
+      return jsonOk(data, cors);
     }
 
+    // ── PATCH /entities/:entityType/:entityId ──
     if (req.method === "PATCH" && segments[0] === "entities" && segments.length === 3) {
       const entityType = segments[1];
       const entityId = segments[2];
 
       if (!VALID_ENTITY_TYPES.includes(entityType)) {
-        return jsonResponse({
-          ok: false,
-          error: `Invalid entityType: ${entityType}`,
-          errorCode: "invalid_entity_type",
-        }, 400);
+        return jsonErr("invalid_entity_type", `Invalid entityType: ${entityType}`, cors, 400);
       }
 
       let body: Record<string, unknown>;
       try {
         body = await req.json();
       } catch {
-        return jsonResponse({
-          ok: false,
-          error: "Invalid JSON body",
-          errorCode: "malformed_body",
-        }, 400);
+        return jsonErr("malformed_body", "Invalid JSON body", cors, 400);
       }
 
       const expectedUpdatedAt = body._expected_updated_at as string | undefined;
@@ -255,7 +191,7 @@ Deno.serve(async (req) => {
       }
 
       if (Object.keys(safePatch).length === 0) {
-        return jsonResponse({
+        return jsonRaw({
           ok: true,
           entityType,
           entityId,
@@ -265,7 +201,8 @@ Deno.serve(async (req) => {
           warnings: skippedFields.length > 0
             ? [`${skippedFields.length} unsupported field(s) were not saved`]
             : [],
-        });
+          meta: { requestId: rid(), servedAt: iso(), version: "1.0.0" },
+        }, cors);
       }
 
       const table = TABLE_MAP[entityType];
@@ -277,17 +214,13 @@ Deno.serve(async (req) => {
         .maybeSingle();
 
       if (!currentEntity) {
-        return jsonResponse({
-          ok: false,
-          error: "Entity not found",
-          errorCode: "not_found",
-        }, 404);
+        return jsonErr("not_found", "Entity not found", cors, 404);
       }
 
       if (expectedUpdatedAt) {
         const currentUpdatedAt = String(currentEntity.updated_at ?? "");
         if (currentUpdatedAt && currentUpdatedAt !== expectedUpdatedAt) {
-          return jsonResponse({
+          return jsonRaw({
             ok: false,
             entityType,
             entityId,
@@ -295,10 +228,13 @@ Deno.serve(async (req) => {
             skippedFields,
             rejectedFields: [],
             warnings: [],
-            errorCode: "stale_update",
-            message: "This record was modified by another user since you loaded it. Please refresh and try again.",
+            error: {
+              code: "stale_update",
+              message: "This record was modified by another user since you loaded it. Please refresh and try again.",
+            },
             currentEntity,
-          }, 409);
+            meta: { requestId: rid(), servedAt: iso(), version: "1.0.0" },
+          }, cors, 409);
         }
       }
 
@@ -307,7 +243,7 @@ Deno.serve(async (req) => {
         beforeSnapshot[key] = currentEntity[key] ?? null;
       }
 
-      safePatch.updated_at = new Date().toISOString();
+      safePatch.updated_at = iso();
 
       const { data, error } = await adminClient
         .from(table)
@@ -332,7 +268,7 @@ Deno.serve(async (req) => {
             duplicateValue = valueMatch[2];
           }
           if (!duplicateField) {
-            const match = message.match(/unique constraint \"([^\"]+)\"/);
+            const match = message.match(/unique constraint "([^"]+)"/);
             if (match) {
               const parts = match[1].split("_");
               if (parts.length >= 3) {
@@ -364,7 +300,7 @@ Deno.serve(async (req) => {
           errorCode = "required_field_missing";
         }
 
-        return jsonResponse({
+        return jsonRaw({
           ok: false,
           entityType,
           entityId,
@@ -372,16 +308,19 @@ Deno.serve(async (req) => {
           skippedFields,
           rejectedFields: [],
           warnings: [],
-          errorCode,
-          message,
-          conflictingEntity,
-          duplicateField,
-          duplicateValue,
-        }, 409);
+          error: {
+            code: errorCode,
+            message,
+            conflictingEntity,
+            duplicateField,
+            duplicateValue,
+          },
+          meta: { requestId: rid(), servedAt: iso(), version: "1.0.0" },
+        }, cors, 409);
       }
 
-      writeAuditLog(adminClient, {
-        actorId: user.id,
+      writeRegistryAudit({
+        actorId: auth.id,
         actorLabel,
         action: "update",
         entityType,
@@ -391,7 +330,7 @@ Deno.serve(async (req) => {
         metadata: {
           changed_fields: Object.keys(safePatch).filter((k) => k !== "updated_at"),
         },
-      }).catch((err) => console.error("Audit log write failed:", err));
+      });
 
       const savedFields = Object.entries(safePatch)
         .filter(([key]) => key !== "updated_at")
@@ -402,8 +341,7 @@ Deno.serve(async (req) => {
           nextValue: safePatch[key],
         }));
 
-      return jsonResponse({
-        ok: true,
+      return jsonOk({
         entityType,
         entityId,
         savedFields,
@@ -413,20 +351,12 @@ Deno.serve(async (req) => {
           ? [`${skippedFields.length} unsupported field(s) were not saved`]
           : [],
         updatedEntity: data,
-      });
+      }, cors);
     }
 
-    return jsonResponse({
-      ok: false,
-      error: "Not found",
-      errorCode: "route_not_found",
-    }, 404);
+    return jsonErr("route_not_found", "Not found", cors, 404);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
-    return jsonResponse({
-      ok: false,
-      error: message,
-      errorCode: "internal_error",
-    }, 500);
+    return jsonErr("internal_error", message, cors, 500);
   }
 });

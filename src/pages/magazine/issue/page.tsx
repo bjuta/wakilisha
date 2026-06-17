@@ -27,7 +27,7 @@ import "./magazineImmersive.css";
 import "@/magazine-art-director/schools.css";
 
 // ── Published issue check via public API ──
-const PUBLIC_API_BASE = String(import.meta.env.VITE_WAKILISHA_PUBLIC_API_BASE ?? '/api/v1').replace(/\/$/, '');
+const PUBLIC_API_BASE = String(import.meta.env.VITE_PUBLIC_API_BASE ?? '/api/v1').replace(/\/$/, '');
 
 async function fetchPublishedIssue(slug: string): Promise<{ data: Record<string, unknown> } | null> {
   try {

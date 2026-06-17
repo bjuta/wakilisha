@@ -6,7 +6,7 @@ import type {
 } from "./types";
 
 export const PUBLIC_API_BASE =
-  import.meta.env.VITE_WAKILISHA_PUBLIC_API_BASE || "/api/v1";
+  import.meta.env.VITE_PUBLIC_API_BASE || "/api/v1";
 
 export class RepairedApiError extends Error {
   status: number;

@@ -28,7 +28,7 @@ export default function PreviewPage() {
     async function load() {
       setLoading(true);
       try {
-        const apiBase = (import.meta.env.VITE_WAKILISHA_PUBLIC_API_BASE as string | undefined) || "/api/v1";
+        const apiBase = (import.meta.env.VITE_PUBLIC_API_BASE as string | undefined) || "/api/v1";
         const response = await fetch(`${apiBase}/preview/${nonce}`, {
           headers: { Accept: "application/json" },
         });

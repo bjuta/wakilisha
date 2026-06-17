@@ -1,7 +1,7 @@
 import type { ChartEligibilityProfile } from "@/services/chartsEligibility/eligibilityTypes";
 import type { IngestRun, ProviderName } from "@/services/chartsIngestion/ingestStudioTypes";
 import type { ChartFamily } from "@/services/chartsIngestion/types";
-import type { BackendCommitResponse } from "@/services/backendContract/backendTypes";
+import type { BackendCommitResponse } from "@/services/chartsIngestion/ingestStudioTypes";
 import type { StoredChartMarketScope } from "@/services/chartsMarkets/marketScopeStore";
 import type { ChartFamilyDefaults, ChartFamilyDefaultsDiff } from "@/services/chartsIngestion/chartFamilyDefaultsStore";
 import { CommitResultPanel } from "./CommitResultPanel";

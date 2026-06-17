@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { WkIcon } from "@/components/design-system/Icon";
-import type { BackendCommitResponse } from "@/services/backendContract/backendTypes";
+import type { BackendCommitResponse } from "@/services/chartsIngestion/ingestStudioTypes";
 
 interface CommitResultPanelProps {
   result: BackendCommitResponse;

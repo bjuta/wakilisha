@@ -21,10 +21,10 @@ import type {
   ProviderName,
   RecentIngestActivity,
   ResourceGuardStatus,
+  BackendCommitResponse,
 } from "@/services/chartsIngestion/ingestStudioTypes";
 import type { ChartFamily } from "@/services/chartsIngestion/types";
-import type { BackendCommitResponse } from "@/services/backendContract/backendTypes";
-import { wakilishaBackend } from "@/services/backendContract/backendClient";
+import { getEligibilityProfiles } from "@/services/chartsEligibility/eligibilityStore";
 import type { ChartEligibilityProfile } from "@/services/chartsEligibility/eligibilityTypes";
 import { getMarketScopes, type StoredChartMarketScope } from "@/services/chartsMarkets/marketScopeStore";
 import { generateAndPersistIngestRunIntelligence } from "@/services/chartsIntelligence/intelligenceStore";
@@ -184,32 +184,28 @@ export default function AdminChartsIngest() {
   }, [existingSeriesId, chartTitle, chartSlug, chartSize, market, chartKind, coverStyle, selectedEligibilityProfileId, selectedMarketScopeId, sourceUrls]);
 
   const loadData = useCallback(async () => {
-    const [kpiData, recentActivity, ingestRuns, chartFamilies, eligibilityResult] = await Promise.all([
+    const [kpiData, recentActivity, ingestRuns, chartFamilies] = await Promise.all([
       getIngestKpis(),
       getRecentIngestActivity(),
       getIngestRuns(),
       getChartFamilies(),
-      wakilishaBackend.charts.getEligibilityProfiles(),
     ]);
     const scopes = getMarketScopes();
+    const profiles = getEligibilityProfiles();
 
     setKpis(kpiData);
     setActivity(recentActivity);
     setRuns(ingestRuns);
     setFamilies(chartFamilies);
     setMarketScopes(scopes);
+    setEligibilityProfiles(profiles);
 
     if (!scopes.some((scope) => scope.id === selectedMarketScopeId)) {
       setSelectedMarketScopeId(scopes[0]?.id ?? "scope_kenya");
     }
 
-    if (eligibilityResult.ok) {
-      setEligibilityProfiles(eligibilityResult.data);
-      if (!eligibilityResult.data.some((profile) => profile.id === selectedEligibilityProfileId)) {
-        setSelectedEligibilityProfileId(eligibilityResult.data[0]?.id ?? "elig_all_artists");
-      }
-    } else {
-      setFormError(eligibilityResult.error.message);
+    if (!profiles.some((profile) => profile.id === selectedEligibilityProfileId)) {
+      setSelectedEligibilityProfileId(profiles[0]?.id ?? "elig_all_artists");
     }
 
     setLoading(false);

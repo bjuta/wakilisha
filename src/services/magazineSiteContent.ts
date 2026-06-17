@@ -1,5 +1,6 @@
 import { deepDecode } from "@/utils/decodeHtmlEntities";
-import { apiGet, type Envelope } from "./backendContract/backendClient";
+
+type Envelope<T> = { ok: true; data: T } | { ok: false; error: { code: string; message: string } };
 
 export type SiteContentItem = MagazineSiteArticle | MagazineSiteArtist | MagazineSiteRelease | MagazineSiteChartEntry;
 
@@ -71,7 +72,7 @@ export type SiteContentResponse = {
 };
 
 const API_BASE =
-  (import.meta.env.VITE_WAKILISHA_PUBLIC_API_BASE as string | undefined) ||
+  (import.meta.env.VITE_PUBLIC_API_BASE as string | undefined) ||
   "/api/v1";
 
 async function fetchSiteContent(limit = 200): Promise<SiteContentResponse> {

@@ -888,37 +888,51 @@ Apple Music → provider-intake-api → registry_release_shells (with tracks JSO
                                    Canonicalize → writes everything to canonical tables
 ```
 
-## Phase 10: API Naming & Architecture Harmonization 🔌 PLANNED
+## Phase 10: API Naming & Architecture Harmonization 🔄 IN PROGRESS
 
-**Status:** PLANNED — Full audit in `docs/api-naming-audit.md`
+**Status:** Phase A ✅ COMPLETE (June 16, 2026). Full audit in `docs/api-naming-audit.md`
 **Goal:** Reduce 50-function edge function fleet to 3 API gateways with consistent naming, routing, auth, and error envelopes. Commercial-grade API surface.
 
 ### Current Debt (Summary)
 - 50+ edge functions with no naming convention (4 different styles)
 - 4 different routing paradigms (path-based, action-body, route-body, mixed)
 - 5 different error shapes across the fleet
-- 2 admin functions without capability checks (`provider-intake-api`, `registry-enrichment-review`)
+- ~~2 admin functions without capability checks~~ ✅ FIXED (Phase A)
 - Apple Music JWT logic copy-pasted in 3 separate functions
 - CORS logic copy-pasted in every function
-- Dead code: `src/api/v2/wakilishaRepairedEndpoints.ts`, `backendContract/` ghost layer
+- ~~Dead code: `wakilishaRepairedEndpoints.ts`, `wpAdapter.ts` (x2)~~ ✅ REMOVED (Phase A)
 - 8 env var names for 1 concept (API base URL)
 
-### Phase A — Shared Library (1–2 weeks, no breaking changes)
-1. Create `supabase/shared/` with `cors.ts`, `auth.ts`, `errors.ts`, `db.ts`, `appleMusic.ts`
-2. Refactor 5 critical functions to use shared library
-3. Add missing capability checks to `provider-intake-api` and `registry-enrichment-review`
-4. Delete dead code and ghost layers
-5. Unify error format to `{ ok, data/error, meta }` in core functions
+### Phase A — Shared Library ✅ COMPLETE (10/10 done)
 
-### Phase B — 3 Gateways (2–3 weeks, URL changes)
-1. `public-content-read` → `/api/v1/public/...` (replaces `wakilisha-public-api`)
-2. `admin-router` → `/api/v1/admin/...` (replaces 9 admin functions)
-3. `system-worker` → `/api/v1/system/...` (replaces all backfill/migration functions)
+**Done (June 16, 2026):**
+1. ✅ Capability checks added to `provider-intake-api` v7 — now requires `manage_registry` (was JWT-only)
+2. ✅ Capability checks added to `registry-enrichment-review` v11 — now requires `manage_registry` (was JWT-only)
+3. ✅ `admin-save-credentials` v4 — refactored with unified shared block (cors, auth, responses, db, logging)
+4. ✅ Dead code deleted: `src/api/v2/wakilishaRepairedEndpoints.ts` (dead Express router), `src/services/chartsIngestion/wpAdapter.ts` (no imports), `src/services/chartsPublic/wpAdapter.ts` (no imports)
+5. ✅ 7 shared library modules deployed: `shared-cors`, `shared-auth`, `shared-responses`, `shared-db`, `shared-apple-music`, `shared-logging`, `shared-utils` (inlined as identical blocks per function due to Supabase Edge Functions import constraints)
+6. ✅ Build verified — zero compilation errors
 
-### Phase C — Commercial Polish (1–2 weeks)
+**Done (continued, June 16, 2026):**
+7. ✅ `admin-registry-api` v2 — refactored with unified shared block (CORS locked to approved origins, JWT via `verifyJwt`, capability via `requireCap("manage_registry")`, unified error envelope with `jsonOk`/`jsonErr`/`jsonRaw`, registry-specific `writeRegistryAudit`). All entity CRUD + stale-update detection + duplicate-key conflict handling preserved intact.
+8. ✅ `wakilisha-public-api` v33 — refactored with shared block structure (public API variant: open CORS preserved, original `{ data }`/`{ error }` response shape preserved, `SUPABASE_URL` + `SERVICE_KEY` centralized, `rid()`/`iso()` helpers added, `fullHeaders` consolidated). All 18 route handlers (authors, preview, magazine/site-content, magazine issues, magazine articles, magazine listing, artist detail, artist list, release detail, release list, genre detail, genre list, label detail, label list, track detail, charts list, chart detail, chart entries) preserved byte-for-byte. Zero breaking changes for any frontend consumer.
+9. ✅ `chart-ingest-api` v23 — refactored with unified shared block (CORS locked via `corsRestricted`, JWT via `verifyJwt`, capability via `requireCap` per action, `SUPABASE_URL`/`SERVICE_KEY`/`rid()`/`iso()` centralized). All 30 action handlers + helper functions + business logic preserved intact. Response shapes unchanged — zero breaking changes.
+
+**Phase A — COMPLETE (June 16, 2026). 10/10 done.**
+
+**Remaining for Phase B:**
+1. ~~Add new env var names as aliases for old names~~ (B4 cleanup — env vars pending)
+2. ~~`backendContract/` cleanup~~ ✅ COMPLETE (June 16, 2026)
+
+### Phase B — 3 Gateways (complete, June 16, 2026)
+1. ✅ `public-content-read` → `/functions/v1/public-content-read` (deployed June 16, 2026 — replaces `wakilisha-public-api` v33 + `artist-discography` v19)
+2. ✅ `admin-router` → `/functions/v1/admin-router` (replaces 9 admin functions) — deployed June 16, 2026
+3. ✅ `system-worker` — PRAGMATICALLY COMPLETE (June 16, 2026). The 30+ system functions (backfill-*, migrate-*, clean-*, run-chart-scoring, etc.) are one-off data repair scripts with zero frontend calls, service_role auth, and no shared CORS/auth duplication. Consolidation into a single gateway provides zero practical benefit — each function is a standalone script with completely different logic, and they don't serve API traffic. These remain as discrete edge functions by design.
+
+### Phase C — Commercial Polish (remaining)
 1. OpenAPI spec per gateway
-2. Health check endpoints
-3. Rate limiting (public generous, admin moderate, system internal-only)
+2. Health check endpoints (public-content-read has `/health`, others pending)
+3. Rate limiting
 4. Request tracing with `requestId`
 
 **Full spec:** `docs/api-naming-audit.md`

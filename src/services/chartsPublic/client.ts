@@ -24,7 +24,7 @@ import {
   getV2TrackChartHistory,
 } from "./v2Adapter";
 
-export const PUBLIC_API_BASE = import.meta.env.VITE_WAKILISHA_PUBLIC_API_BASE || "/api/v1";
+export const PUBLIC_API_BASE = import.meta.env.VITE_PUBLIC_API_BASE || "/api/v1";
 export const PUBLIC_MODE = "public-api" as const;
 export const PUBLIC_API_VERSION = "v1-public-api" as const;
 

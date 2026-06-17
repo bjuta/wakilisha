@@ -194,7 +194,7 @@ async function fetchDiscographyFromEdge(
   const anonKey = (import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY as string) || "";
   const t = Date.now();
   const resp = await fetch(
-    `${supabaseUrl}/functions/v1/artist-discography?slug=${encodeURIComponent(artistSlug)}&t=${t}`,
+    `${supabaseUrl}/functions/v1/public-content-read/artists/${encodeURIComponent(artistSlug)}/discography?t=${t}`,
     {
       headers: {
         Accept: "application/json",
@@ -256,7 +256,7 @@ export async function getArtistAppearsOn(
 }
 
 const API_BASE =
-  (import.meta.env.VITE_WAKILISHA_PUBLIC_API_BASE as string | undefined) ||
+  (import.meta.env.VITE_PUBLIC_API_BASE as string | undefined) ||
   "/api/v1";
 
 type Envelope<T> = {

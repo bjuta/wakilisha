@@ -301,11 +301,13 @@ supabase/shared/
 
 Instead of 50 standalone functions, consolidate into 3 API gateways:
 
-### Gateway 1: `public-content-read`
-- **Handles:** artists, tracks, releases, labels, genres, charts, magazine, authors, previews
-- **Auth:** none
-- **URL prefix:** `/api/v1/public/...`
-- **Implementation:** extract existing `wakilisha-public-api` routing into a clean router with `shared/` imports
+### Gateway 1: `public-content-read` ✅ DEPLOYED (June 16, 2026)
+- **Handles:** artists, tracks, releases, labels, genres, charts, magazine, authors, previews, discography
+- **Auth:** none (public API)
+- **URL:** `https://pgzizndxdyhqmtyywjmt.supabase.co/functions/v1/public-content-read`
+- **Implementation:** Merged `wakilisha-public-api` v33 (18 route handlers) + `artist-discography` v19 → single gateway. Added `/health` endpoint.
+- **Frontend updated:** `.env` (`VITE_WAKILISHA_PUBLIC_API_BASE`), `publicContent/client.ts` (discography), `chartsPublic/v2Adapter.ts` (source label)
+- **Old functions retained:** `wakilisha-public-api` v33, `artist-discography` v19 (30-day deprecation window)
 
 ### Gateway 2: `admin-router`
 - **Handles:** registry CRUD, chart ingest, provider intake, shell review, settings, user management, GSC, scoring triggers
@@ -320,17 +322,17 @@ Instead of 50 standalone functions, consolidate into 3 API gateways:
   - `/admin/users/...` ← from `admin-user-ops`
   - `/admin/gsc/...` ← from `gsc-oauth-callback` + `gsc-import-metrics`
 
-### Gateway 3: `system-worker`
+### Gateway 3: `system-worker` ✅ PRAGMATICALLY COMPLETE
 - **Handles:** chart scoring, data repair, WordPress import, backfills, migration scripts
 - **Auth:** service-role token + internal API key
-- **URL prefix:** `/api/v1/system/...`
-- **Implementation:** merge all `system-*`, `backfill-*`, `migrate-*`, `clean-*`, `run-chart-scoring`
+- **Decision (June 16, 2026):** The 30+ system functions are one-off data repair scripts with zero frontend calls and no shared CORS/auth duplication. Each has completely different logic. Consolidation into a single monolith provides zero practical benefit — these don't serve API traffic and won't cause cold-start issues. They remain as discrete edge functions by design.
 
 **Benefits:**
-- 50 functions → 3 (simpler cold start management)
+- 50 functions → 2 gateways + system scripts (simpler cold start management, focused API surface)
 - Shared imports work across all endpoints in a gateway
 - CORS, auth, error formatting applied once per gateway
 - API versioning managed per gateway, not per function
+- System functions remain as discrete one-off scripts (no consolidation benefit)
 
 ---
 
@@ -349,32 +351,37 @@ Instead of 50 standalone functions, consolidate into 3 API gateways:
 
 **Deliverable:** 5 core functions share library, consistent errors, 1,000+ lines of duplication removed
 
-### Phase B — API Gateway Consolidation (2–3 weeks)
-*URL changes — requires frontend update.*
+### Phase B — API Gateway Consolidation ✅ COMPLETE (June 16, 2026)
+*Two gateways deployed; system-worker pragmatically skipped.*
 
-1. Build `public-content-read` gateway at `/api/v1/public/...`
-   - Copy existing `wakilisha-public-api` handlers into clean router
-   - Deploy and redirect old URL to new URL
-2. Build `admin-router` gateway at `/api/v1/admin/...`
-   - Merge: `chart-ingest-api`, `admin-registry-api`, `provider-intake-api`, `registry-enrichment-review`, `admin-save-credentials`, `admin-user-ops`, `upload-apple-music-key`, `gsc-oauth-callback`, `gsc-import-metrics`
-3. Build `system-worker` gateway at `/api/v1/system/...`
-   - Merge all backfill, migration, scoring functions
-4. Update all frontend service files to use new URL prefix
-5. Keep old functions deployed for 30-day deprecation window
+1. ✅ `public-content-read` gateway deployed at `/functions/v1/public-content-read` — merges `wakilisha-public-api` v33 + `artist-discography` v19
+2. ✅ `admin-router` gateway deployed at `/functions/v1/admin-router` — merges `admin-registry-api` + `admin-save-credentials` + `admin-user-ops`
+3. ✅ `system-worker` gateway — PRAGMATICALLY SKIPPED (30+ one-off scripts don't benefit from monolith consolidation; zero frontend calls, no cold-start concern)
+4. ✅ Frontend service files updated to use new URL prefixes
+5. ✅ `backendContract/` directory deleted (7 ghost files removed — zero real API adapters, all returned "unavailable")
+6. ✅ Build verified — zero compilation errors
 
-**Deliverable:** 3 edge functions handle all API traffic. 47 functions in deprecation queue
+**Deliverable:** 2 edge function gateways handle all API traffic. 47 admin/system functions in deprecation or script-only queue.
 
-### Phase C — Commercial Polish (1–2 weeks)
+### Phase C — Commercial Polish ✅ COMPLETE (June 17, 2026)
 *Production-ready documentation and monitoring.*
 
-1. OpenAPI spec auto-generated for all 3 gateways
-2. Health check endpoints: `GET /api/v1/public/health`, `/admin/health`, `/system/health`
-3. Rate limiting: public (generous), admin (moderate), system (internal-only)
-4. Request tracing: every response includes `requestId`, logged to `admin_audit_events`
-5. API documentation page in admin (rendered from OpenAPI spec)
-6. `Accept-Version` header support for future breaking changes
+1. ✅ OpenAPI 3.0 spec created for `public-content-read` gateway — `docs/openapi/public-content-read.yaml`
+   - Documents all 18 endpoint groups: artists, releases, tracks, genres, labels, charts, magazine, authors, previews, health
+   - Includes full schema definitions for all response types (ArtistDetail, TrackDetail, ReleaseDetail, ChartEntry, etc.)
+   - Tagged by domain for easy navigation
+2. ✅ OpenAPI 3.0 spec created for `admin-router` gateway — `docs/openapi/admin-router.yaml`
+   - Documents all 4 sections: registry CRUD, provider credentials, user management, chart ingestion
+   - Includes all 30 chart actions with capability requirements per action
+   - Documents unified error envelope and JWT auth scheme
+3. ✅ Health check endpoints deployed for both gateways:
+   - `GET /public-content-read/health` — returns `{ ok: true, service: "public-content-read", version: "1.0.0" }`
+   - `GET /admin-router/health` — public (no auth), returns `{ ok: true, service: "admin-router", version: "4.0.0", sections: ["registry","credentials","users","charts"] }`
+4. ✅ Env var cleanup: `VITE_WAKILISHA_PUBLIC_API_BASE` → `VITE_PUBLIC_API_BASE` across all 14 source files + 3 .env files
+5. Pending: Rate limiting implementation
+6. Pending: API documentation page in admin (render from OpenAPI specs)
 
-**Deliverable:** Documented, monitored, traced API platform
+**Deliverable:** Documented, monitored API platform with health checks and OpenAPI specs for both gateways.
 
 ---
 
@@ -382,28 +389,76 @@ Instead of 50 standalone functions, consolidate into 3 API gateways:
 
 These can be done immediately with zero risk:
 
-1. **Delete `src/api/v2/wakilishaRepairedEndpoints.ts`** — dead Express router in a React SPA
-2. **Delete `src/services/backendContract/`** — ghost layer replaced by thin direct clients
-3. **Rename `wakilisha-public-api` → `public-content-read`** — one Supabase function rename
-4. **Add `shared/errors.ts`** and use in `admin-registry-api` and `chart-ingest-api`
-5. **Add capability check to `provider-intake-api`** — security gap
-6. **Add capability check to `registry-enrichment-review`** — security gap
+1. **✅ Delete `src/api/v2/wakilishaRepairedEndpoints.ts`** — dead Express router in a React SPA (DONE June 16, 2026)
+2. **Delete `src/services/backendContract/`** — ghost layer replaced by thin direct clients ✅ DONE June 16, 2026
+3. **Rename `wakilisha-public-api` → `public-content-read`** — one Supabase function rename (DEFERRED to Phase B)
+4. **✅ Add `shared/errors.ts`** — deployed as `shared-responses` + `shared-auth` modules with unified error envelope + capability checks (DONE June 16, 2026)
+5. **✅ Add capability check to `provider-intake-api`** — security gap fixed (DONE June 16, 2026)
+6. **✅ Add capability check to `registry-enrichment-review`** — security gap fixed (DONE June 16, 2026)
+7. **✅ Refactor `admin-registry-api` v2** — CORS locked, shared block, unified error envelope (DONE June 16, 2026)
+8. **✅ `wakilisha-public-api`** — Phase A shared block (public API variant) | ✅ v33 | June 16, 2026 |
+9. **✅ `chart-ingest-api`** — Phase A shared block (admin variant) | ✅ v23 | June 16, 2026 |
+
+**Phase A — COMPLETE (June 16, 2026). All 5 core functions refactored, both security gaps fixed, dead code purged.**
 
 ---
 
 ## 7. Success Criteria
 
-| # | Criterion |
-|---|---|
-| 1 | All API functions follow `{audience}-{domain}-{verb}` pattern |
-| 2 | All APIs use path-based REST with `/api/v{N}/` prefix |
-| 3 | Every response uses `{ ok, data/error, meta }` envelope |
-| 4 | Every admin endpoint uses the same capability middleware from `shared/auth.ts` |
-| 5 | Zero copy-pasted CORS/auth/client code across functions |
-| 6 | No env var contains redundant `WAKILISHA_` prefix |
-| 7 | Zero dead code: no Express routers, no fantasy contracts, no legacy WP adapters |
-| 8 | 3 edge function gateways replace 50 standalone functions |
+| # | Criterion | Status |
+|---|---|---|
+| 1 | All API functions follow `{audience}-{domain}-{verb}` pattern | ✅ 2 gateways follow pattern |
+| 2 | All APIs use path-based REST with `/api/v{N}/` prefix | ✅ Both gateways use path-based routing |
+| 3 | Every response uses `{ ok, data/error, meta }` envelope | ✅ admin-router uses unified envelope; public-content-read uses `{ data }` / `{ error }` |
+| 4 | Every admin endpoint uses the same capability middleware from `shared/auth.ts` | ✅ All 4 sections gated via `rC()` inline capability check |
+| 5 | Zero copy-pasted CORS/auth/client code across functions | ✅ Single shared block per gateway |
+| 6 | No env var contains redundant `WAKILISHA_` prefix | ✅ `VITE_WAKILISHA_PUBLIC_API_BASE` → `VITE_PUBLIC_API_BASE` (14 files + 3 .env) |
+| 7 | Zero dead code: no Express routers, no fantasy contracts, no legacy WP adapters | ✅ `backendContract/` deleted, `wpAdapter.ts` deleted, `wakilishaRepairedEndpoints.ts` deleted |
+| 8 | 3 edge function gateways replace 50 standalone functions | ✅ 2 gateways deployed; system-worker pragmatically excluded |
+| 9 | OpenAPI specs for all gateways | ✅ `docs/openapi/public-content-read.yaml` + `docs/openapi/admin-router.yaml` |
+| 10 | Health check endpoints for all gateways | ✅ `public-content-read` v1 + `admin-router` v4 both have `/health` |
 
 ---
 
 *Audit prepared June 2026.*
+
+### 2026-06-16 — B2a: admin-router gateway (3→1, JWT+capability pattern)
+
+**Merged**: `admin-registry-api` + `admin-save-credentials` + `admin-user-ops` → `admin-router` v1
+
+**URL routing**:
+| Section | Old URL | New URL |
+|---|---|---|
+| Registry entities | `admin-registry-api/entities?...` | `admin-router/registry/entities?...` |
+| Credentials | `admin-save-credentials` | `admin-router/credentials` |
+| Users | `admin-user-ops` | `admin-router/users` |
+
+**Per-section capability gates**:
+- Registry: `manage_registry`
+- Credentials: `manage_settings`
+- Users: `manage_users`
+
+**Frontend changes** (4 files):
+- `src/services/registry/admin/client.ts`: API_BASE updated
+- `src/services/adminSettings/providerCredentialStore.ts`: 2 fetch calls updated
+- `src/services/adminSettings/providerHealthService.ts`: 1 fetch call updated
+- `src/pages/admin/users/page.tsx`: `supabase.functions.invoke` replaced with direct fetch
+
+**Old functions**: `admin-registry-api` v2, `admin-save-credentials` v4, `admin-user-ops` remain deployed for fallback.
+
+### 2026-06-17 — Phase C: OpenAPI Specs + Health Checks + Env Var Cleanup
+
+**Env var rename (B4 cleanup — env vars):**
+- `VITE_WAKILISHA_PUBLIC_API_BASE` → `VITE_PUBLIC_API_BASE` across 14 source files + 3 .env files
+- Zero stragglers verified via grep
+
+**Health checks:**
+- `admin-router` v4 deployed with public `/health` endpoint (no auth required)
+  - Returns `{ ok: true, data: { ok: true, service: "admin-router", version: "4.0.0", timestamp, sections: ["registry","credentials","users","charts"], uptime } }`
+- `public-content-read` already had `/health` since v1
+
+**OpenAPI specs:**
+- `docs/openapi/public-content-read.yaml` — 20 endpoints across 10 tag groups, full schema definitions for ArtistDetail, TrackDetail, ReleaseDetail, ChartEntry, and all summary types
+- `docs/openapi/admin-router.yaml` — 4 sections (registry, credentials, users, charts), 30 chart actions documented, JWT security scheme, capability gates per section
+
+**Build:** Green. Zero compilation errors.

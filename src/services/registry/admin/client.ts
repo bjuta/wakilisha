@@ -9,7 +9,7 @@ import { getEntitySchema } from "./entitySchemas";
 import { normalizeForSave, normalizeForCompare, validateField } from "./fieldNormalization";
 
 const supabaseUrl = import.meta.env.VITE_PUBLIC_SUPABASE_URL as string;
-const API_BASE = `${supabaseUrl}/functions/v1/admin-registry-api`;
+const API_BASE = `${supabaseUrl}/functions/v1/admin-router/registry`;
 
 async function getAuthHeaders(): Promise<Record<string, string> | null> {
   const { data: { session } } = await supabase.auth.getSession();

@@ -131,11 +131,14 @@ async function callAdminUserOps(payload: Record<string, unknown>) {
   const { data: sessionData } = await supabase.auth.getSession();
   const token = sessionData.session?.access_token;
   if (!token) throw new Error("Admin session is missing. Sign in again.");
-  const { data, error } = await supabase.functions.invoke("admin-user-ops", {
-    body: payload,
-    headers: { Authorization: `Bearer ${token}` },
+  const supabaseUrl = import.meta.env.VITE_PUBLIC_SUPABASE_URL as string;
+  const res = await fetch(`${supabaseUrl}/functions/v1/admin-router/users`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
   });
-  if (error) throw error;
+  const data = await res.json();
+  if (!res.ok && data?.error) throw new Error(String(data.error));
   if (data?.error) throw new Error(String(data.error));
   return data;
 }

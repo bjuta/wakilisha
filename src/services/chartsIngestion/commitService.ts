@@ -33,7 +33,7 @@ import type { IngestRun, IngestResolvedRow } from "./ingestStudioTypes";
 // ─── Public API base for V2 verification ───
 const PUBLIC_V2_BASE =
   typeof import.meta !== "undefined" && import.meta.env
-    ? (import.meta.env.VITE_WAKILISHA_PUBLIC_API_BASE || "/api/v1")
+    ? (import.meta.env.VITE_PUBLIC_API_BASE || "/api/v1")
     : "/api/v1";
 
 // ─── Step 1: Load run (already loaded from store, passed in) ───

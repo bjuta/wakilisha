@@ -1,0 +1,965 @@
+openapi: "3.0.3"
+info:
+  title: WAKILISHA Public Content API
+  description: |
+    Public read-only gateway for WAKILISHA music and editorial content.
+    Serves artists, tracks, releases, labels, genres, charts, magazine articles, authors, and guides.
+    
+    **Base URL:** `https://<project>.supabase.co/functions/v1/public-content-read`
+    
+    **Authentication:** None — this is a public API with open CORS.
+    
+    **Response envelope:** All successful responses wrap data in `{ data: <payload> }`.
+    Errors return `{ error: "<message>" }`.
+  version: "1.0.0"
+  contact:
+    name: WAKILISHA Engineering
+    url: https://wakilisha.africa
+
+servers:
+  - url: https://pgzizndxdyhqmtyywjmt.supabase.co/functions/v1/public-content-read
+    description: Production
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      operationId: healthCheck
+      tags: [System]
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean, example: true }
+                  service: { type: string, example: "public-content-read" }
+                  version: { type: string, example: "1.0.0" }
+                  timestamp: { type: string, format: date-time }
+
+  /artists:
+    get:
+      summary: List all artists
+      operationId: listArtists
+      tags: [Artists]
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, default: 500, maximum: 500 }
+      responses:
+        "200":
+          description: Artist list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      artists:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/ArtistSummary"
+
+  /artists/{slug}:
+    get:
+      summary: Artist detail with full discography, chart history, and related artists
+      operationId: getArtistDetail
+      tags: [Artists]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+          example: breeder-lw
+      responses:
+        "200":
+          description: Full artist profile
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      artist:
+                        $ref: "#/components/schemas/ArtistDetail"
+        "404":
+          description: Artist not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: "null" }
+
+  /artists/{slug}/discography:
+    get:
+      summary: Artist discography — own releases and appearances
+      operationId: getArtistDiscography
+      tags: [Artists]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Discography data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  artist:
+                    type: object
+                    properties:
+                      id: { type: string }
+                      slug: { type: string }
+                      name: { type: string }
+                  releases:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ReleaseWithTracks"
+                  appearsOn:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ReleaseWithTracks"
+
+  /releases:
+    get:
+      summary: List all releases
+      operationId: listReleases
+      tags: [Releases]
+      responses:
+        "200":
+          description: Release list (up to 200)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      releases:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/ReleaseSummary"
+
+  /releases/{slug}:
+    get:
+      summary: Release detail with tracklist
+      operationId: getReleaseDetail
+      tags: [Releases]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Release detail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      release:
+                        $ref: "#/components/schemas/ReleaseDetail"
+        "404":
+          description: Release not found
+
+  /tracks/{slug}:
+    get:
+      summary: Track detail with chart history and appearances
+      operationId: getTrackDetail
+      tags: [Tracks]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+          description: Track slug or ISRC (prefixed with "isrc:")
+      responses:
+        "200":
+          description: Track detail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      track:
+                        $ref: "#/components/schemas/TrackDetail"
+        "404":
+          description: Track not found
+
+  /genres:
+    get:
+      summary: List all genres with artist counts
+      operationId: listGenres
+      tags: [Genres]
+      responses:
+        "200":
+          description: Genre list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      genres:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/GenreSummary"
+
+  /genres/{slug}:
+    get:
+      summary: Genre detail with roster artists and top tracks
+      operationId: getGenreDetail
+      tags: [Genres]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Genre detail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      genre: { $ref: "#/components/schemas/GenreDetail" }
+                      artists: { type: array, items: { $ref: "#/components/schemas/ArtistRef" } }
+                      topTracks: { type: array, items: { $ref: "#/components/schemas/ChartTrackRef" } }
+                      relatedGenres: { type: array, items: { $ref: "#/components/schemas/GenreRef" } }
+
+  /labels:
+    get:
+      summary: List all labels
+      operationId: listLabels
+      tags: [Labels]
+      responses:
+        "200":
+          description: Label list (up to 500)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      labels:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/LabelSummary"
+
+  /labels/{slug}:
+    get:
+      summary: Label detail with release catalog and roster
+      operationId: getLabelDetail
+      tags: [Labels]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Label detail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      label: { $ref: "#/components/schemas/LabelDetail" }
+                      roster: { type: array, items: { $ref: "#/components/schemas/ArtistRef" } }
+                      releases: { type: array, items: { $ref: "#/components/schemas/ReleaseSummary" } }
+                      relatedLabels: { type: array, items: { $ref: "#/components/schemas/LabelRef" } }
+
+  /charts:
+    get:
+      summary: List all chart programs with latest editions
+      operationId: listCharts
+      tags: [Charts]
+      responses:
+        "200":
+          description: Chart programs list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      programs:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/ChartProgram"
+
+  /charts/{programSlug}:
+    get:
+      summary: Chart program detail with edition archive
+      operationId: getChartProgram
+      tags: [Charts]
+      parameters:
+        - name: programSlug
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Chart program detail
+        "404":
+          description: Program not found
+
+  /charts/{programSlug}/latest:
+    get:
+      summary: Latest edition of a chart program with full entries
+      operationId: getChartLatestEdition
+      tags: [Charts]
+      parameters:
+        - name: programSlug
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Latest edition with ranked entries
+        "404":
+          description: No editions found
+
+  /charts/{programSlug}/{editionSlug}:
+    get:
+      summary: Specific chart edition (entry count only)
+      operationId: getChartEdition
+      tags: [Charts]
+      parameters:
+        - name: programSlug
+          in: path
+          required: true
+          schema: { type: string }
+        - name: editionSlug
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Edition summary
+        "404":
+          description: Edition not found
+
+  /charts/{programSlug}/{editionSlug}/entries:
+    get:
+      summary: Chart edition ranked entries (up to 150)
+      operationId: getChartEditionEntries
+      tags: [Charts]
+      parameters:
+        - name: programSlug
+          in: path
+          required: true
+          schema: { type: string }
+        - name: editionSlug
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Ranked entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      entries:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/ChartEntry"
+
+  /magazine:
+    get:
+      summary: Magazine article listing (up to 500, published only)
+      operationId: listMagazineArticles
+      tags: [Magazine]
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, default: 500, maximum: 500 }
+      responses:
+        "200":
+          description: Article list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      stories:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/ArticleSummary"
+
+  /magazine/{slug}:
+    get:
+      summary: Single magazine article (published or scheduled-and-due)
+      operationId: getMagazineArticle
+      tags: [Magazine]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Full article with content HTML
+        "404":
+          description: Article not found or not published
+
+  /magazine/site-content:
+    get:
+      summary: Aggregated site content for magazine issue production
+      operationId: getSiteContent
+      tags: [Magazine]
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, default: 200, maximum: 500 }
+      responses:
+        "200":
+          description: Aggregated content across articles, artists, releases, charts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      articles: { type: array, items: { $ref: "#/components/schemas/ArticleSummary" } }
+                      artists: { type: array, items: { $ref: "#/components/schemas/SiteContentArtist" } }
+                      releases: { type: array, items: { $ref: "#/components/schemas/SiteContentRelease" } }
+                      chartHighlights: { type: array, items: { $ref: "#/components/schemas/SiteContentChartEntry" } }
+
+  /magazine/public/issues/{slug}:
+    get:
+      summary: Published magazine issue with sections, entities, and visual assets
+      operationId: getPublishedMagazineIssue
+      tags: [Magazine]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Full issue data
+        "404":
+          description: Issue not found or not published
+
+  /authors:
+    get:
+      summary: List all authors
+      operationId: listAuthors
+      tags: [Authors]
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50, maximum: 500 }
+      responses:
+        "200":
+          description: Author list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      authors:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/AuthorSummary"
+
+  /authors/{slug}:
+    get:
+      summary: Author detail with their published articles
+      operationId: getAuthorDetail
+      tags: [Authors]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Author profile and articles
+        "404":
+          description: Author not found
+
+  /preview/{nonce}:
+    get:
+      summary: Preview an unpublished article by nonce
+      operationId: previewArticle
+      tags: [Preview]
+      parameters:
+        - name: nonce
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Article preview
+        "404":
+          description: Expired or invalid preview nonce
+
+components:
+  schemas:
+    ArtistSummary:
+      type: object
+      properties:
+        id: { type: string }
+        slug: { type: string }
+        name: { type: string }
+        country: { type: string, nullable: true }
+        imageUrl: { type: string, nullable: true }
+        genres: { type: array, items: { type: string } }
+        trackCount: { type: integer }
+        releaseCount: { type: integer }
+        isChartArtist: { type: boolean }
+        isRising: { type: boolean }
+        topChartPosition: { type: integer, nullable: true }
+
+    ArtistDetail:
+      type: object
+      properties:
+        id: { type: string }
+        slug: { type: string }
+        name: { type: string }
+        country: { type: string }
+        imageUrl: { type: string }
+        profileImageUrl: { type: string }
+        genres: { type: array, items: { type: string } }
+        trackCount: { type: integer }
+        releaseCount: { type: integer }
+        isChartArtist: { type: boolean }
+        isRising: { type: boolean }
+        topChartPosition: { type: integer, nullable: true }
+        bio: { type: string }
+        fullBio: { type: string }
+        artistType: { type: string }
+        followerCount: { type: integer }
+        popularity: { type: integer }
+        spotifyUrl: { type: string }
+        instagram: { type: string }
+        youtubeChannel: { type: string }
+        chartEntries: { type: array, items: { $ref: "#/components/schemas/ChartEntryRef" } }
+        releases: { type: array, items: { $ref: "#/components/schemas/ReleaseWithTracks" } }
+        topSongs: { type: array, items: { $ref: "#/components/schemas/TopSong" } }
+        relatedArtists: { type: array, items: { $ref: "#/components/schemas/RelatedArtist" } }
+        videos: { type: array, items: { $ref: "#/components/schemas/VideoRef" } }
+        discographySource: { type: string }
+
+    ArtistRef:
+      type: object
+      properties:
+        slug: { type: string }
+        name: { type: string }
+        imageUrl: { type: string }
+
+    RelatedArtist:
+      type: object
+      properties:
+        slug: { type: string }
+        name: { type: string }
+        imageUrl: { type: string }
+        score: { type: integer }
+        sharedTracksAll: { type: integer }
+        sharedChartTracks: { type: integer }
+        featuresThem: { type: integer }
+        theyFeature: { type: integer }
+        sharedTitles: { type: array, items: { type: string } }
+
+    ReleaseSummary:
+      type: object
+      properties:
+        id: { type: string }
+        slug: { type: string }
+        title: { type: string }
+        artist: { type: string }
+        year: { type: string }
+        releaseType: { type: string }
+        labelName: { type: string }
+        artworkUrl: { type: string }
+        trackCount: { type: integer }
+        description: { type: string }
+
+    ReleaseDetail:
+      type: object
+      properties:
+        id: { type: string }
+        slug: { type: string }
+        title: { type: string }
+        artist: { type: string }
+        year: { type: string }
+        releaseDate: { type: string }
+        releaseType: { type: string }
+        labelName: { type: string }
+        labelSlug: { type: string }
+        artworkUrl: { type: string }
+        trackCount: { type: integer }
+        tracks: { type: array, items: { $ref: "#/components/schemas/TrackRef" } }
+        totalDuration: { type: number }
+        description: { type: string }
+        metadata: { type: object }
+
+    ReleaseWithTracks:
+      type: object
+      properties:
+        slug: { type: string }
+        title: { type: string }
+        releaseType: { type: string }
+        year: { type: string }
+        releaseDate: { type: string }
+        trackCount: { type: integer }
+        artworkUrl: { type: string }
+        artist: { type: string }
+        tracks: { type: array, items: { $ref: "#/components/schemas/TrackOut" } }
+
+    TrackOut:
+      type: object
+      properties:
+        title: { type: string }
+        duration: { type: string }
+        artists: { type: string }
+        previewUrl: { type: string }
+
+    TrackRef:
+      type: object
+      properties:
+        id: { type: string }
+        slug: { type: string }
+        title: { type: string }
+        artist: { type: string }
+        duration: { type: number }
+        trackNumber: { type: integer }
+        artworkUrl: { type: string }
+
+    TrackDetail:
+      type: object
+      properties:
+        id: { type: string }
+        slug: { type: string }
+        title: { type: string }
+        durationMs: { type: integer }
+        artworkUrl: { type: string }
+        isrc: { type: string, nullable: true }
+        explicit: { type: boolean }
+        trackNumber: { type: integer }
+        discNumber: { type: integer }
+        status: { type: string }
+        previewUrl: { type: string, nullable: true }
+        artists: { type: array, items: { $ref: "#/components/schemas/TrackArtistRole" } }
+        artist: { $ref: "#/components/schemas/ArtistRef" }
+        release: { $ref: "#/components/schemas/TrackReleaseRef", nullable: true }
+        label: { $ref: "#/components/schemas/LabelRef", nullable: true }
+        genres: { type: array, items: { type: string } }
+        chartHistory: { type: array, items: { type: integer } }
+        chartAppearances: { type: array, items: { $ref: "#/components/schemas/ChartAppearance" } }
+        chartAppearanceCount: { type: integer }
+        peakRank: { type: integer, nullable: true }
+        weeksOnChart: { type: integer }
+        currentRank: { type: integer, nullable: true }
+        previousRank: { type: integer, nullable: true }
+        movement: { type: string }
+        movementAmount: { type: integer }
+        firstChartedDate: { type: string }
+        editionLabels: { type: array, items: { type: string } }
+        sourceProviders: { type: array, items: { type: string } }
+
+    TrackArtistRole:
+      type: object
+      properties:
+        name: { type: string }
+        slug: { type: string }
+        isPrimary: { type: boolean }
+        isFeatured: { type: boolean }
+        creditOrder: { type: integer }
+        role: { type: string }
+
+    TrackReleaseRef:
+      type: object
+      properties:
+        slug: { type: string }
+        title: { type: string }
+        releaseDate: { type: string }
+        releaseType: { type: string }
+        artworkUrl: { type: string }
+        trackCount: { type: integer }
+        labelName: { type: string }
+        labelSlug: { type: string }
+
+    ChartAppearance:
+      type: object
+      properties:
+        editionSlug: { type: string }
+        editionLabel: { type: string }
+        date: { type: string }
+        rank: { type: integer }
+        previousRank: { type: integer, nullable: true }
+        movement: { type: string }
+
+    TopSong:
+      type: object
+      properties:
+        title: { type: string }
+        artists: { type: string }
+        image: { type: string }
+        duration: { type: string }
+        songUrl: { type: string }
+
+    VideoRef:
+      type: object
+      properties:
+        id: { type: string }
+        title: { type: string }
+        url: { type: string }
+        thumbnail: { type: string }
+        platform: { type: string }
+
+    GenreSummary:
+      type: object
+      properties:
+        id: { type: string }
+        slug: { type: string }
+        name: { type: string }
+        artistCount: { type: integer }
+        trackCount: { type: integer }
+        representativeArtists: { type: array, items: { type: string } }
+
+    GenreDetail:
+      type: object
+      properties:
+        id: { type: string }
+        slug: { type: string }
+        name: { type: string }
+        description: { type: string, nullable: true }
+
+    GenreRef:
+      type: object
+      properties:
+        slug: { type: string }
+        name: { type: string }
+
+    ChartTrackRef:
+      type: object
+      properties:
+        slug: { type: string }
+        title: { type: string }
+        artistName: { type: string }
+        artworkUrl: { type: string }
+        peakRank: { type: integer }
+
+    LabelSummary:
+      type: object
+      properties:
+        id: { type: string }
+        slug: { type: string }
+        name: { type: string }
+        country: { type: string, nullable: true }
+        logoUrl: { type: string, nullable: true }
+        artistCount: { type: integer }
+        releaseCount: { type: integer }
+        featuredArtists: { type: array, items: { type: string } }
+        isFeatured: { type: boolean }
+        description: { type: string, nullable: true }
+
+    LabelDetail:
+      type: object
+      properties:
+        id: { type: string }
+        slug: { type: string }
+        name: { type: string }
+        description: { type: string, nullable: true }
+        countryCode: { type: string, nullable: true }
+
+    LabelRef:
+      type: object
+      properties:
+        slug: { type: string }
+        name: { type: string }
+        countryCode: { type: string, nullable: true }
+
+    ChartProgram:
+      type: object
+      properties:
+        id: { type: string }
+        publicSlug: { type: string }
+        publicLabel: { type: string }
+        shortLabel: { type: string }
+        sourceFamilySlug: { type: string }
+        seriesSlug: { type: string }
+        seriesLabel: { type: string }
+        marketSlug: { type: string }
+        marketLabel: { type: string }
+        periodType: { type: string }
+        methodologyVersion: { type: string }
+        eligibilityRulesVersion: { type: string }
+        latestEdition: { $ref: "#/components/schemas/ChartEditionSummary", nullable: true }
+        archive: { type: array, items: { $ref: "#/components/schemas/ChartEditionSummary" } }
+
+    ChartEditionSummary:
+      type: object
+      properties:
+        id: { type: string }
+        slug: { type: string }
+        label: { type: string }
+        date: { type: string }
+        periodStart: { type: string, nullable: true }
+        periodEnd: { type: string, nullable: true }
+        entryCount: { type: integer }
+
+    ChartEntry:
+      type: object
+      properties:
+        id: { type: string }
+        rank: { type: integer }
+        previousRank: { type: integer, nullable: true }
+        movement: { type: string }
+        trackSlug: { type: string }
+        trackTitle: { type: string }
+        artistNames: { type: array, items: { type: string } }
+        artistSlugs: { type: array, items: { type: string } }
+        artworkUrl: { type: string, nullable: true }
+        score: { type: number, nullable: true }
+        sourceEntryId: { type: string }
+
+    ChartEntryRef:
+      type: object
+      properties:
+        rank: { type: integer }
+        title: { type: string }
+        artist: { type: string }
+        slug: { type: string }
+        movement: { type: string }
+        movementAmount: { type: integer }
+        peakPosition: { type: integer }
+        weeksOnChart: { type: integer }
+        artworkUrl: { type: string }
+
+    ArticleSummary:
+      type: object
+      properties:
+        id: { type: string }
+        slug: { type: string }
+        title: { type: string }
+        section: { type: string }
+        dek: { type: string }
+        author: { type: string }
+        authorSlug: { type: string }
+        date: { type: string }
+        readingTime: { type: integer }
+        heroUrl: { type: string }
+        tags: { type: array, items: { type: string } }
+
+    AuthorSummary:
+      type: object
+      properties:
+        id: { type: string }
+        slug: { type: string }
+        name: { type: string }
+        bio: { type: string, nullable: true }
+        role: { type: string }
+        location: { type: string, nullable: true }
+        avatarUrl: { type: string, nullable: true }
+        coverUrl: { type: string, nullable: true }
+        socialLinks: { type: array, items: {} }
+        joinedDate: { type: string, nullable: true }
+
+    SiteContentArtist:
+      type: object
+      properties:
+        contentType: { type: string, enum: [artist] }
+        id: { type: string }
+        slug: { type: string }
+        title: { type: string }
+        section: { type: string }
+        dek: { type: string }
+        heroUrl: { type: string }
+        tags: { type: array, items: { type: string } }
+        originIso2: { type: string, nullable: true }
+
+    SiteContentRelease:
+      type: object
+      properties:
+        contentType: { type: string, enum: [release] }
+        id: { type: string }
+        slug: { type: string }
+        title: { type: string }
+        section: { type: string }
+        dek: { type: string }
+        date: { type: string }
+        heroUrl: { type: string }
+        releaseType: { type: string }
+
+    SiteContentChartEntry:
+      type: object
+      properties:
+        contentType: { type: string, enum: [chart_entry] }
+        id: { type: string }
+        slug: { type: string }
+        title: { type: string }
+        section: { type: string }
+        dek: { type: string }
+        heroUrl: { type: string }
+        rank: { type: integer }
+        artistName: { type: string }
+
+tags:
+  - name: Artists
+    description: Artist profiles, listings, and discography
+  - name: Releases
+    description: Release detail and listing
+  - name: Tracks
+    description: Track detail with chart history
+  - name: Genres
+    description: Genre listing and detail
+  - name: Labels
+    description: Label listing and detail
+  - name: Charts
+    description: Chart programs, editions, and entries
+  - name: Magazine
+    description: Articles, issues, and aggregated site content
+  - name: Authors
+    description: Author profiles and their articles
+  - name: Preview
+    description: Unpublished article previews
+  - name: System
+    description: Health check and service metadata

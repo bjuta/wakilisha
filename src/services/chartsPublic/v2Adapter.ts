@@ -20,7 +20,7 @@ export class PublicV2ApiError extends Error {
 }
 
 const RAW_BASE =
-  import.meta.env.VITE_WAKILISHA_PUBLIC_API_BASE || "/api/v1";
+  import.meta.env.VITE_PUBLIC_API_BASE || "/api/v1";
 
 const BASE_PATH = "/";
 const normalizedBasePath = BASE_PATH.replace(/\/$/, "");
@@ -241,7 +241,7 @@ function toEntry(entry: V2Entry, editionSlug: string): ChartEditionEntry {
     artworkUrl: entry.artworkUrl,
     score: typeof entry.score === "number" ? entry.score : 0,
     entryPayload: {
-      source: "wakilisha-public-api",
+      source: "public-content-read",
       sourceEntryId: entry.sourceEntryId ?? entry.id,
     },
   };

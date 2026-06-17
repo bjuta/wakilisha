@@ -167,7 +167,7 @@ export async function syncProviderCredentialsToServer(
     if (!token) return { ok: false, message: "Not authenticated. Please log in again.", savedKeys: [] };
 
     const supabaseUrl = import.meta.env.VITE_PUBLIC_SUPABASE_URL as string;
-    const res = await fetch(`${supabaseUrl}/functions/v1/admin-save-credentials`, {
+    const res = await fetch(`${supabaseUrl}/functions/v1/admin-router/credentials`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({ action: "save", provider: providerKey, credentials }),
@@ -194,7 +194,7 @@ export async function clearProviderCredentialsFromServer(providerKey: string): P
     if (!token) return { ok: false, message: "Not authenticated. Please log in again.", savedKeys: [] };
 
     const supabaseUrl = import.meta.env.VITE_PUBLIC_SUPABASE_URL as string;
-    const res = await fetch(`${supabaseUrl}/functions/v1/admin-save-credentials`, {
+    const res = await fetch(`${supabaseUrl}/functions/v1/admin-router/credentials`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({ action: "clear", provider: providerKey, envVars }),

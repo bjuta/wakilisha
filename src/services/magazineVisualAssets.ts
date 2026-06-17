@@ -32,7 +32,7 @@ export type MagazineVisualAsset = {
 const STORAGE_KEY = 'wakilisha.magazine.visual_assets.v1.fallback';
 const EVENT_NAME = 'wakilisha:magazine-visual-assets-updated';
 const DEFAULT_USER = 'Muiruri Beautah';
-const API_BASE = String(import.meta.env.VITE_WAKILISHA_PUBLIC_API_BASE ?? '/api/v1').replace(/\/$/, '');
+const API_BASE = String(import.meta.env.VITE_PUBLIC_API_BASE ?? '/api/v1').replace(/\/$/, '');
 const API_PATH = `${API_BASE}/magazine/visual-assets`;
 
 function now() { return new Date().toISOString(); }

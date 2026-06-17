@@ -59,7 +59,7 @@ export async function testAcrcloudHealth(): Promise<AcrcloudHealthResult> {
     }
 
     const supabaseUrl = import.meta.env.VITE_PUBLIC_SUPABASE_URL as string;
-    const res = await fetch(`${supabaseUrl}/functions/v1/admin-save-credentials`, {
+    const res = await fetch(`${supabaseUrl}/functions/v1/admin-router/credentials`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
