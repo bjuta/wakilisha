@@ -151,6 +151,7 @@ docs/product-behavior-harness-audit.md
 docs/data-contract.md
 docs/react-parity-migration-plan.md
 docs/wordpress-plugin-audit.md
+docs/culture-context-engine-plan.md
 ```
 
 ## Acceptance gate before frontend work
