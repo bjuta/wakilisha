@@ -15,6 +15,12 @@ import {
   type RepairedRelease,
   type ReleaseCatalogStats,
 } from "@/services/repairedContent/client";
+import {
+  buildReleaseCardBlurb,
+  buildReleaseHeroIntro,
+  buildReleaseSeoDescription,
+  releaseEmptyStateCopy,
+} from "@/services/cultureContext/releaseAdapters";
 
 type Release = RepairedRelease;
 type SortKey = "newest" | "updated" | "artist" | "title";
@@ -33,7 +39,6 @@ function useDebouncedValue<T>(value: T, delay: number): T {
 }
 
 export default function Releases() {
-  /* ── Filter state ── */
   const [typeFilter, setTypeFilter] = useState<ReleaseTypeFilter>("All");
   const [yearFilter, setYearFilter] = useState(ALL);
   const [artistFilter, setArtistFilter] = useState(ALL);
@@ -43,7 +48,6 @@ export default function Releases() {
 
   const debouncedSearch = useDebouncedValue(searchInput, 350);
 
-  /* ── Data state ── */
   const [releases, setReleases] = useState<Release[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [stats, setStats] = useState<ReleaseCatalogStats>({ total: 0, albums: 0, eps: 0, singles: 0 });
@@ -51,18 +55,14 @@ export default function Releases() {
   const [filterYears, setFilterYears] = useState<string[]>([]);
   const [featuredReleases, setFeaturedReleases] = useState<Release[]>([]);
 
-  /* ── UI state ── */
   const [pageLoading, setPageLoading] = useState(false);
   const [metaLoading, setMetaLoading] = useState(true);
   const [pageError, setPageError] = useState<string | null>(null);
   const [metaError, setMetaError] = useState<string | null>(null);
 
-  /* ── Modal ── */
   const [modalRelease, setModalRelease] = useState<Release | null>(null);
   const [modalReleaseDetail, setModalReleaseDetail] = useState<ModalRelease | null>(null);
-  const [modalLoading, setModalLoading] = useState(false);
 
-  /* ── Reset page when filters change ── */
   const prevFiltersRef = useRef({ typeFilter, yearFilter, artistFilter, search: debouncedSearch, sortKey });
 
   useEffect(() => {
@@ -79,7 +79,6 @@ export default function Releases() {
     prevFiltersRef.current = { typeFilter, yearFilter, artistFilter, search: debouncedSearch, sortKey };
   }, [typeFilter, yearFilter, artistFilter, debouncedSearch, sortKey]);
 
-  /* ── Load metadata once on mount ── */
   const loadMeta = useCallback(async () => {
     setMetaLoading(true);
     setMetaError(null);
@@ -93,7 +92,6 @@ export default function Releases() {
       setStats(statsData);
       setFilterArtists(artists);
       setFilterYears(years);
-      // Pick first 10 featured with real artwork
       const withArtwork = featuredData.releases.filter(
         (r) => r.artworkUrl && !r.artworkUrl.startsWith("data:image/svg")
       );
@@ -109,7 +107,6 @@ export default function Releases() {
     loadMeta();
   }, [loadMeta]);
 
-  /* ── Load paginated releases ── */
   const loadPage = useCallback(async () => {
     setPageLoading(true);
     setPageError(null);
@@ -136,7 +133,6 @@ export default function Releases() {
     loadPage();
   }, [loadPage]);
 
-  /* ── Modal detail fetch ── */
   useEffect(() => {
     if (!modalRelease) {
       setModalReleaseDetail(null);
@@ -145,7 +141,6 @@ export default function Releases() {
 
     const artistSlug = slugify(modalRelease.artist);
     let cancelled = false;
-    setModalLoading(true);
 
     getRelease(artistSlug, modalRelease.slug).then((detail) => {
       if (cancelled) return;
@@ -169,18 +164,13 @@ export default function Releases() {
       } else {
         setModalReleaseDetail(null);
       }
-      setModalLoading(false);
     }).catch(() => {
-      if (!cancelled) {
-        setModalReleaseDetail(null);
-        setModalLoading(false);
-      }
+      if (!cancelled) setModalReleaseDetail(null);
     });
 
     return () => { cancelled = true; };
   }, [modalRelease]);
 
-  /* ── Derived values ── */
   const releaseTypes: ReleaseTypeFilter[] = useMemo(() => ["All", "Album", "EP", "Single"], []);
 
   const typeCounts: Record<ReleaseTypeFilter, number> = useMemo(() => ({
@@ -200,10 +190,8 @@ export default function Releases() {
     visible: totalCount,
     albums: stats.albums,
     eps: stats.eps,
-    labelsRepresented: 0, // not available from the paginated endpoint
   }), [stats, totalCount]);
 
-  /* ── Loading skeletons ── */
   if (metaLoading) {
     return <ReleasesLoading />;
   }
@@ -232,15 +220,13 @@ export default function Releases() {
       />
 
       <div className="wk-container-wide px-4 py-10 md:px-6">
-        {/* Stats */}
         <div className="chart-stats-strip mb-10">
-          <Stat value={stats.total} label="Catalog" />
-          <Stat value={totalCount} label="Visible" />
+          <Stat value={stats.total} label="Releases" />
+          <Stat value={totalCount} label="Showing" />
           <Stat value={stats.albums} label="Albums" />
           <Stat value={stats.eps} label="EPs" />
         </div>
 
-        {/* Filter & Search */}
         <section className="mb-10 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4 md:p-5">
           <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between mb-5">
             <div>
@@ -280,7 +266,7 @@ export default function Releases() {
                 <input
                   value={searchInput}
                   onChange={(event) => setSearchInput(event.target.value)}
-                  placeholder="Search title, artist, label…"
+                  placeholder="Search title, artist, label..."
                   className="w-full bg-transparent text-[14px] font-semibold text-[var(--wk-text)] outline-none placeholder:text-[var(--wk-text-faint)]"
                 />
                 {searchInput && (
@@ -315,13 +301,12 @@ export default function Releases() {
           </div>
         </section>
 
-        {/* Catalog Grid */}
         <section>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between mb-6">
             <div>
               <div className="inline-flex items-center gap-2 rounded-full border border-[var(--wk-brand)]/20 bg-[var(--wk-brand-soft)]/40 px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.18em] text-[var(--wk-brand)] mb-3">
                 <WkIcon name="Disc3" size={12} />
-                Catalog
+                Release shelf
               </div>
               <h2 className="text-[clamp(22px,3vw,32px)] font-black leading-[0.92] tracking-[-0.04em] text-[var(--wk-text)]">
                 All releases
@@ -329,12 +314,11 @@ export default function Releases() {
             </div>
             <p className="text-[12px] font-semibold text-[var(--wk-text-muted)]">
               {totalCount > 0
-                ? `Showing ${showingFrom}&ndash;${showingTo} of ${totalCount}`
+                ? `Showing ${showingFrom} to ${showingTo} of ${totalCount}`
                 : "No releases found"}
             </p>
           </div>
 
-          {/* Page-level loading overlay */}
           {pageLoading ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-5">
               {Array.from({ length: PAGE_SIZE }).map((_, i) => (
@@ -370,16 +354,7 @@ export default function Releases() {
               )}
 
               {releases.length === 0 && (
-                <div className="rounded-2xl border border-dashed border-[var(--wk-border)] p-20 text-center">
-                  <WkIcon name="Disc3" size={36} className="mx-auto text-[var(--wk-text-faint)]" />
-                  <p className="mt-4 text-[15px] font-semibold text-[var(--wk-text-muted)]">No releases match these filters.</p>
-                  <button
-                    onClick={() => { setSearchInput(""); setTypeFilter("All"); setYearFilter(ALL); setArtistFilter(ALL); setSortKey("newest"); }}
-                    className="wk-button wk-button-sm wk-button-primary mt-5 cursor-pointer"
-                  >
-                    Clear all filters
-                  </button>
-                </div>
+                <ReleaseEmptyState onClear={() => { setSearchInput(""); setTypeFilter("All"); setYearFilter(ALL); setArtistFilter(ALL); setSortKey("newest"); }} />
               )}
             </>
           )}
@@ -404,11 +379,11 @@ export default function Releases() {
   );
 }
 
-/* ── Artwork-first Release Card ── */
 function ReleaseArtworkCard({ release, onPreview }: { release: Release; onPreview: (release: Release) => void }) {
   const displayYear = yearValue(release.year);
   const typeLabel = release.releaseType || "Release";
   const href = releaseUrl(release);
+  const blurb = buildReleaseCardBlurb(release);
 
   return (
     <div className="group flex flex-col">
@@ -432,7 +407,7 @@ function ReleaseArtworkCard({ release, onPreview }: { release: Release; onPrevie
             className="opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0 transition-all duration-200 inline-flex items-center gap-1.5 rounded-full bg-white/90 px-3.5 py-2 text-[11px] font-extrabold text-black backdrop-blur cursor-pointer whitespace-nowrap"
           >
             <WkIcon name="Eye" size={12} />
-            Preview
+            Look inside
           </button>
         </div>
       </Link>
@@ -443,11 +418,32 @@ function ReleaseArtworkCard({ release, onPreview }: { release: Release; onPrevie
       <div className="text-[11px] font-semibold text-[var(--wk-text-muted)] truncate mt-0.5">
         {release.artist}{displayYear ? ` · ${displayYear}` : ""}
       </div>
+      <p className="mt-1 line-clamp-2 text-[11px] font-semibold leading-snug text-[var(--wk-text-soft)]">
+        {blurb}
+      </p>
     </div>
   );
 }
 
-/* ── Artwork image (with fallback) ── */
+function ReleaseEmptyState({ onClear }: { onClear: () => void }) {
+  const empty = releaseEmptyStateCopy(true);
+  return (
+    <div className="rounded-2xl border border-dashed border-[var(--wk-border)] p-20 text-center">
+      <WkIcon name="Disc3" size={36} className="mx-auto text-[var(--wk-text-faint)]" />
+      <h3 className="mt-4 text-[20px] font-black text-[var(--wk-text)]">{empty.title}</h3>
+      <p className="mx-auto mt-2 max-w-md text-[14px] font-semibold leading-relaxed text-[var(--wk-text-muted)]">
+        {empty.body}
+      </p>
+      <button
+        onClick={onClear}
+        className="wk-button wk-button-sm wk-button-primary mt-5 cursor-pointer"
+      >
+        {empty.action}
+      </button>
+    </div>
+  );
+}
+
 function ReleaseArtworkImage({ release }: { release: Release }) {
   const [failed, setFailed] = useState(false);
 
@@ -476,8 +472,7 @@ function ReleaseArtworkImage({ release }: { release: Release }) {
   );
 }
 
-/* ── Featured Carousel ── */
-function FeaturedReleaseCarousel({ releases, catalogStats, onPreview }: { releases: Release[]; catalogStats: { total: number; visible: number; albums: number; eps: number; labelsRepresented: number }; onPreview: (release: Release) => void }) {
+function FeaturedReleaseCarousel({ releases, catalogStats, onPreview }: { releases: Release[]; catalogStats: { total: number; visible: number; albums: number; eps: number }; onPreview: (release: Release) => void }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const active = releases[activeIndex] || releases[0];
@@ -493,6 +488,9 @@ function FeaturedReleaseCarousel({ releases, catalogStats, onPreview }: { releas
 
   if (!active) return null;
 
+  const activeIntro = buildReleaseHeroIntro(active);
+  const shareDescription = buildReleaseSeoDescription(active);
+
   return (
     <section className="relative min-h-[78vh] overflow-hidden border-b border-[var(--wk-border)] bg-[#0d120a] text-white">
       <CarouselBackground release={active} />
@@ -502,23 +500,26 @@ function FeaturedReleaseCarousel({ releases, catalogStats, onPreview }: { releas
           <div className="grid items-end gap-8 lg:grid-cols-[minmax(0,1fr)_420px]">
             <div className="max-w-4xl">
               <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-[0.18em] text-white/85 backdrop-blur">
-                <WkIcon name="Sparkles" size={13} /> Releases discovery
+                <WkIcon name="Sparkles" size={13} /> Release shelf
               </div>
               <h1 className="font-[var(--wk-font-display)] text-[clamp(56px,9vw,128px)] font-black leading-[0.82] tracking-[-0.075em] text-white drop-shadow-2xl">
-                Albums &amp; releases
+                Albums, EPs &amp; singles
               </h1>
               <p className="mt-6 max-w-2xl text-[17px] font-semibold leading-[1.75] text-white/74 md:text-[19px]">
-                A release shelf for albums, EPs and singles across WAKILISHA. Swipe through featured records, then filter the full catalog below.
+                Browse the records moving through WAKILISHA. New drops, older gems, and releases that deserve more love.
               </p>
               <div className="mt-7 flex flex-wrap items-center gap-3 text-[12px] font-extrabold text-white/82">
                 <span className="inline-flex items-center gap-2 rounded-full border border-white/16 bg-white/10 px-3 py-2 backdrop-blur">
                   <WkIcon name="Disc3" size={14} /> {catalogStats.total} releases
                 </span>
                 <span className="inline-flex items-center gap-2 rounded-full border border-white/16 bg-white/10 px-3 py-2 backdrop-blur">
-                  <WkIcon name="ListFilter" size={14} /> {catalogStats.visible} visible
+                  <WkIcon name="ListFilter" size={14} /> {catalogStats.visible} showing
                 </span>
                 <span className="inline-flex items-center gap-2 rounded-full border border-white/16 bg-white/10 px-3 py-2 backdrop-blur">
-                  <WkIcon name="Building2" size={14} /> {catalogStats.labelsRepresented} labels
+                  <WkIcon name="Album" size={14} /> {catalogStats.albums} albums
+                </span>
+                <span className="inline-flex items-center gap-2 rounded-full border border-white/16 bg-white/10 px-3 py-2 backdrop-blur">
+                  <WkIcon name="ListMusic" size={14} /> {catalogStats.eps} EPs
                 </span>
               </div>
             </div>
@@ -532,14 +533,17 @@ function FeaturedReleaseCarousel({ releases, catalogStats, onPreview }: { releas
                 <div className="mt-3 text-[13px] font-bold text-white/70">
                   {active.artist} · {yearValue(active.year) || "Unknown year"} · {trackCountLabel(active.trackCount)}
                 </div>
+                <p className="mt-3 line-clamp-3 text-[13px] font-semibold leading-relaxed text-white/72">
+                  {activeIntro}
+                </p>
                 <div className="mt-4 flex flex-wrap gap-2">
                   <button onClick={() => onPreview(active)} className="wk-button wk-button-primary cursor-pointer whitespace-nowrap">
-                    <WkIcon name="Eye" size={15} /> Preview
+                    <WkIcon name="Eye" size={15} /> Look inside
                   </button>
                   <Link to={releaseUrl(active)} className="wk-button wk-button-ghost border-white/20 bg-white/10 text-white hover:bg-white/16 whitespace-nowrap">
                     <WkIcon name="ArrowUpRight" size={15} /> Open
                   </Link>
-                  <ShareButton item={{ title: active.title, subtitle: active.artist, description: `${active.releaseType} by ${active.artist} on WAKILISHA`, imageUrl: active.artworkUrl, type: "album" }} />
+                  <ShareButton item={{ title: active.title, subtitle: active.artist, description: shareDescription, imageUrl: active.artworkUrl, type: "album" }} />
                 </div>
               </div>
             </div>
@@ -594,7 +598,6 @@ function FeaturedReleaseCarousel({ releases, catalogStats, onPreview }: { releas
   );
 }
 
-/* ── Loading skeleton ── */
 function ReleasesLoading() {
   return (
     <main className="min-h-screen bg-[var(--wk-bg)]">
@@ -626,7 +629,6 @@ function ReleasesLoading() {
   );
 }
 
-/* ── Pagination ── */
 function Pagination({ page, totalPages, onPageChange, loading }: { page: number; totalPages: number; onPageChange: (page: number) => void; loading?: boolean }) {
   const pages = paginationWindow(page, totalPages);
   return (
@@ -640,8 +642,8 @@ function Pagination({ page, totalPages, onPageChange, loading }: { page: number;
       </button>
       <div className="flex flex-wrap items-center gap-2">
         {pages.map((item, index) =>
-          item === "…" ? (
-            <span key={`ellipsis-${index}`} className="px-1 text-[var(--wk-text-faint)]">…</span>
+          item === "..." ? (
+            <span key={`ellipsis-${index}`} className="px-1 text-[var(--wk-text-faint)]">...</span>
           ) : (
             <button
               key={item}
@@ -669,7 +671,6 @@ function Pagination({ page, totalPages, onPageChange, loading }: { page: number;
   );
 }
 
-/* ── Carousel background ── */
 function CarouselBackground({ release }: { release: Release }) {
   const [failed, setFailed] = useState(false);
   if (!release.artworkUrl || failed) {
@@ -683,7 +684,6 @@ function CarouselBackground({ release }: { release: Release }) {
   );
 }
 
-/* ── Filter select ── */
 function FilterSelect({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (value: string) => void }) {
   return (
     <label className="block">
@@ -701,16 +701,15 @@ function FilterSelect({ label, value, options, onChange }: { label: string; valu
   );
 }
 
-/* ── Stat chip ── */
 function Stat({ value, label }: { value: string | number; label: string }) {
   return <div className="chart-stat-card"><div className="chart-stat-value">{value}</div><div className="chart-stat-label">{label}</div></div>;
 }
 
-/* ── Pure helpers ── */
 function yearValue(value: string): string {
   if (!value || value === "Unknown year") return "";
   return value.match(/\d{4}/)?.[0] || "";
 }
+
 function optionLabel(value: string): string {
   if (value === "newest") return "Newest";
   if (value === "updated") return "Recently updated";
@@ -718,16 +717,19 @@ function optionLabel(value: string): string {
   if (value === "title") return "Title A-Z";
   return value;
 }
+
 function trackCountLabel(count: number): string {
   if (!count) return "tracks pending";
   return `${count} track${count === 1 ? "" : "s"}`;
 }
-function paginationWindow(page: number, totalPages: number): Array<number | "…"> {
+
+function paginationWindow(page: number, totalPages: number): Array<number | "..."> {
   if (totalPages <= 7) return Array.from({ length: totalPages }, (_, index) => index + 1);
   const pages = new Set([1, totalPages, page - 1, page, page + 1].filter((item) => item >= 1 && item <= totalPages));
   const sorted = Array.from(pages).sort((a, b) => a - b);
-  return sorted.flatMap((item, index) => (index > 0 && item - sorted[index - 1] > 1 ? ["…" as const, item] : [item]));
+  return sorted.flatMap((item, index) => (index > 0 && item - sorted[index - 1] > 1 ? ["..." as const, item] : [item]));
 }
+
 function formatDurationSeconds(seconds: number): string {
   if (!seconds || seconds <= 0) return "";
   const min = Math.floor(seconds / 60);
