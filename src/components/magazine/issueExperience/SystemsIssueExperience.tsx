@@ -9,12 +9,10 @@ export function SystemsIssueExperience(props: IssueExperienceComponentProps) {
   return (
     <div className="mag-issue-experience mag-issue-experience-systems">
       <IssueOpening issue={issue} experience={experience} eyebrow="Systems issue" />
-      <section className="magazine-spread mag-reveal" id={`${issue.id}-under-the-hood`}>
-        <div className="mag-signal">
+      <section className="mag-issue-zone mag-reveal mag-experience-room mag-systems-room" id={`${issue.id}-under-the-hood`}>
+        <div className="mag-room-inner">
           <div className="magazine-meta">Look under the hood</div>
-          <div className="mag-signal-head">
-            <h2>Rights, platforms, money, rules and the beautiful work caught inside them.</h2>
-          </div>
+          <h2>Rights, platforms, money, rules and the beautiful work caught inside them.</h2>
           <p>{experience.readerPromise}</p>
         </div>
       </section>
