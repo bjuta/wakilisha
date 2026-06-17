@@ -67,8 +67,6 @@ function editorBody(context: MagazineIssueRecipeContext): string[] {
   const { facts, score } = context;
   const lead = leadTitle(context);
   const thread = facts.tension ?? sectionThread(context);
-  const nextTitles = facts.readingPath?.length ? [] : [];
-  void nextTitles;
 
   if (facts.issueNumber === 1) {
     return [
