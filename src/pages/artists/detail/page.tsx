@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { WkButton } from "@/components/design-system/primitives/Button";
 import { getArtist, getArtistAppearsOn, clearDiscographyCache, type RepairedArtistDetail, type RegistryAppearsOnRelease } from "@/services/repairedContent/client";
+import { buildArtistHeroIntro } from "@/services/cultureContext/artistAdapters";
 import { ArtistDetailHero } from "./components/ArtistDetailHero";
 import { ArtistChartSection } from "./components/ArtistChartSection";
 import { ArtistDiscography } from "./components/ArtistDiscography";
@@ -90,7 +91,7 @@ export default function ArtistDetail() {
   const hasTopSongs = artist.topSongs.length > 0;
   const hasBio = artist.bio || artist.fullBio;
   const hasVideos = artist.videos && artist.videos.length > 0;
-  const heroBio = cleanBioExcerpt(artist.fullBio || artist.bio || "");
+  const heroBio = buildArtistHeroIntro(artist) || cleanBioExcerpt(artist.fullBio || artist.bio || "");
 
   return (
     <div className="wk-app-shell">
@@ -103,6 +104,11 @@ export default function ArtistDetail() {
         isRising={artist.isRising}
         spotifyUrl={artist.spotifyUrl}
         artistType={artist.artistType}
+        country={artist.country}
+        genres={artist.genres}
+        trackCount={artist.trackCount}
+        releaseCount={artist.releaseCount}
+        chartEntryCount={artist.chartEntries.length}
       />
 
 
