@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
+import { buildArtistCardBlurb } from "@/services/cultureContext/artistAdapters";
 
 export interface ArtistCardProps {
   slug: string;
@@ -10,6 +11,9 @@ export interface ArtistCardProps {
   releaseCount?: number;
   isChartArtist?: boolean;
   country?: string;
+  topChartPosition?: number | null;
+  chartEntryCount?: number;
+  contextText?: string;
 }
 
 export function ArtistCard({
@@ -21,7 +25,21 @@ export function ArtistCard({
   releaseCount,
   isChartArtist,
   country,
+  topChartPosition,
+  chartEntryCount,
+  contextText,
 }: ArtistCardProps) {
+  const blurb = contextText || buildArtistCardBlurb({
+    name,
+    genres,
+    trackCount,
+    releaseCount,
+    isChartArtist,
+    country,
+    topChartPosition,
+    chartEntryCount,
+  });
+
   return (
     <Link
       to={`/artists/${slug}`}
@@ -54,6 +72,11 @@ export function ArtistCard({
           {trackCount !== undefined && releaseCount !== undefined && <span>·</span>}
           {releaseCount !== undefined && <span>{releaseCount} releases</span>}
         </div>
+        {blurb && (
+          <p className="mt-2 line-clamp-2 text-[11px] font-semibold leading-snug text-white/70">
+            {blurb}
+          </p>
+        )}
         {genres.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1">
             {genres.slice(0, 2).map((g) => (
