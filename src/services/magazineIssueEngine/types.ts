@@ -28,6 +28,38 @@ export type IssueSignalName =
   | 'image'
   | 'review';
 
+export type IssueInteractionPattern =
+  | 'listeningPath'
+  | 'sceneRoute'
+  | 'recordStack'
+  | 'fieldGuide'
+  | 'memoryFragments'
+  | 'signalBoard'
+  | 'imageGallery'
+  | 'argumentStack'
+  | 'constellation'
+  | 'singleThread';
+
+export type IssueArchetypeProfile = {
+  archetype: IssueArchetype;
+  label: string;
+  publicName: string;
+  signal?: IssueSignalName;
+  mood: IssueMood;
+  coverVariant: IssueCoverVariant;
+  editorNoteMode: EditorNoteMode;
+  featureVisualMode: FeatureVisualMode;
+  interactionPattern: IssueInteractionPattern;
+  readerPromise: string;
+  visualPromise: string;
+  openingVerb: string;
+  pathVerb: string;
+  cta: string;
+  surfaceTone: string;
+  scoreBias: number;
+  minSignalScore: number;
+};
+
 export type SectionCount = {
   section: string;
   count: number;
@@ -118,10 +150,12 @@ export type IssueFacts = {
 
 export type IssueScore = {
   archetype: IssueArchetype;
+  profile: IssueArchetypeProfile;
   mood: IssueMood;
   coverVariant: IssueCoverVariant;
   editorNoteMode: EditorNoteMode;
   featureVisualMode: FeatureVisualMode;
+  interactionPattern: IssueInteractionPattern;
   reasons: string[];
 };
 
@@ -173,6 +207,11 @@ export type MagazineIssueExperience = {
   signalDeck: string;
   backMatterLine: string;
   archetype: IssueArchetype;
+  archetypeLabel: string;
+  interactionPattern: IssueInteractionPattern;
+  readerPromise: string;
+  visualPromise: string;
+  issueCta: string;
   coverLine: string;
   cardBlurb: string;
   archiveBlurb: string;
