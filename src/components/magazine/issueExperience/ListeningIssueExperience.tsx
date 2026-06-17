@@ -9,10 +9,10 @@ export function ListeningIssueExperience(props: IssueExperienceComponentProps) {
   return (
     <div className="mag-issue-experience mag-issue-experience-listening">
       <IssueOpening issue={issue} experience={experience} eyebrow="Listening issue" />
-      <section className="magazine-spread mag-reveal" id={`${issue.id}-listen-first`}>
-        <div className="mag-color-interlude-inner">
+      <section className="mag-issue-zone mag-reveal mag-experience-room mag-listening-room" id={`${issue.id}-listen-first`}>
+        <div className="mag-room-inner">
           <div className="magazine-meta">Start with the sound</div>
-          <h2>The issue opens like a listening session.</h2>
+          <h2>The issue opens by ear.</h2>
           <p>{experience.visualPromise}</p>
         </div>
       </section>
