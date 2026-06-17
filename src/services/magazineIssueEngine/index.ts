@@ -14,7 +14,7 @@ import { buildSearchSnippet } from './recipes/search';
 import { buildSeoDescription } from './recipes/seo';
 import { buildAdminQualityNote } from './recipes/admin';
 
-export const MAGAZINE_ISSUE_ENGINE_VERSION = 'magazine-issue-engine.v0.3.0';
+export const MAGAZINE_ISSUE_ENGINE_VERSION = 'magazine-issue-engine.v0.4.0';
 
 function sanitizeFeatureFrame(frame: MagazineIssueFeatureFrame): MagazineIssueFeatureFrame {
   const publicFieldNote = sanitizePublicIssueCopy(frame.publicFieldNote);
@@ -56,6 +56,7 @@ export function buildMagazineIssueExperience(issue: MagazineIssue): MagazineIssu
   const signalDeck = sanitizePublicIssueCopy(buildSignalDeck(context));
   const signalReading = sanitizePublicIssueCopy(buildSignalReading(context));
   const backMatterLine = sanitizePublicIssueCopy(buildBackMatterLine(context));
+  const adminQualityNote = buildAdminQualityNote(context);
   const readingPath = buildReadingPath(context).map((step) => ({
     ...step,
     label: sanitizePublicIssueCopy(step.label),
@@ -117,7 +118,12 @@ export function buildMagazineIssueExperience(issue: MagazineIssue): MagazineIssu
     contentsIntro,
     readingPath,
     signalReading,
-    adminQualityNote: buildAdminQualityNote(context),
+    adminQualityNote,
+    adminNotes: {
+      featureDesign: featureFrame.adminDesignNote,
+      quality: adminQualityNote,
+      scoring: score.reasons,
+    },
     warnings,
     factsUsed: score.reasons,
     version: MAGAZINE_ISSUE_ENGINE_VERSION,
