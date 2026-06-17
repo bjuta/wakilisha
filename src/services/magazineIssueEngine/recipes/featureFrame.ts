@@ -4,31 +4,17 @@ import { quoteTitle } from '../formatters';
 function publicFeatureNote(context: MagazineIssueRecipeContext): string {
   const { facts, score } = context;
   const lead = quoteTitle(facts.topArticle?.title);
-  switch (score.archetype) {
-    case 'systemsIssue':
-      return `${lead} carries the main argument. Read it as the receipt, not just the headline.`;
-    case 'memoryIssue':
-      return `${lead} carries the memory thread. It gives the issue its quiet center.`;
-    case 'sceneIssue':
-      return `${lead} opens the room. The rest of the issue moves around that scene.`;
-    case 'listeningIssue':
-      return `${lead} sets the pulse. Start there, then follow the sound outward.`;
-    case 'fieldGuideIssue':
-      return `${lead} is the route marker. Use it to enter the issue in motion.`;
-    case 'argumentIssue':
-      return `${lead} starts the argument. The other pieces sharpen it.`;
-    case 'imageIssue':
-      return `${lead} sets the visual temperature. Look at it before you explain it.`;
-    case 'thinIssue':
-      return `${lead} is the clearest piece in this smaller issue.`;
-    default:
-      return `${lead} is the issue’s main doorway.`;
+
+  if (score.archetype === 'thinIssue') {
+    return `${lead} is the clearest piece in this smaller issue.`;
   }
+
+  return `${lead} is the issue’s main doorway. ${score.profile.readerPromise}`;
 }
 
 function adminFeatureNote(context: MagazineIssueRecipeContext): string {
   const { facts, score } = context;
-  return `Use ${score.featureVisualMode} because archetype is ${score.archetype}, dominant section is ${facts.dominantSection ?? 'unknown'}, and top article is ${facts.topArticle?.title ?? 'missing'}.`;
+  return `Use ${score.featureVisualMode} because archetype is ${score.archetype}, interaction pattern is ${score.interactionPattern}, dominant section is ${facts.dominantSection ?? 'unknown'}, and top article is ${facts.topArticle?.title ?? 'missing'}.`;
 }
 
 export function buildFeatureFrame(context: MagazineIssueRecipeContext): MagazineIssueFeatureFrame {
@@ -47,25 +33,22 @@ export function buildFeatureFrame(context: MagazineIssueRecipeContext): Magazine
     };
   }
 
-  const eyebrowByMode: Record<string, string> = {
-    'signal-board': 'Feature · Systems file',
-    'paper-file': 'Feature · Paper trail',
-    'photo-led': `Feature · ${facts.dominantSection ?? 'Issue lead'}`,
-    'type-led': `Feature · ${facts.dominantSection ?? 'Issue lead'}`,
-    'archive-board': `Feature · ${facts.dominantSection ?? 'Issue lead'}`,
-  };
-
-  const prefixByMode: Record<string, string> = {
-    'signal-board': 'Open the machinery',
-    'paper-file': 'A reading note',
-    'photo-led': 'Look first',
-    'type-led': 'The argument opens here',
-    'archive-board': 'The thread starts here',
+  const eyebrowByPattern: Record<string, string> = {
+    listeningPath: 'Feature · Listening path',
+    sceneRoute: 'Feature · Scene route',
+    recordStack: 'Feature · Record stack',
+    fieldGuide: 'Feature · Field guide',
+    memoryFragments: 'Feature · Memory fragments',
+    signalBoard: 'Feature · Systems file',
+    imageGallery: 'Feature · Image lead',
+    argumentStack: 'Feature · Argument stack',
+    constellation: `Feature · ${facts.dominantSection ?? 'Issue lead'}`,
+    singleThread: 'Feature · Small issue',
   };
 
   return {
-    eyebrow: eyebrowByMode[score.featureVisualMode] ?? `Feature · ${facts.dominantSection ?? 'Issue lead'}`,
-    titlePrefix: prefixByMode[score.featureVisualMode] ?? 'Start here',
+    eyebrow: eyebrowByPattern[score.interactionPattern] ?? `Feature · ${facts.dominantSection ?? 'Issue lead'}`,
+    titlePrefix: score.profile.openingVerb,
     imageCaption: feature?.heroUrl ? `Image from ${quoteTitle(feature.title)}.` : undefined,
     publicFieldNote,
     adminDesignNote: adminFeatureNote(context),
