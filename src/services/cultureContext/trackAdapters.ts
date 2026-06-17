@@ -34,16 +34,23 @@ function numberValue(value: unknown): number | undefined {
   return Number.isFinite(number) && number > 0 ? number : undefined;
 }
 
+function fallbackPrimaryFlag(hasPrimary: boolean, hasNonFeatured: boolean, isPrimary: unknown, isFeatured: unknown, index: number): boolean {
+  if (hasPrimary) return isPrimary === true;
+  if (hasNonFeatured) return isFeatured !== true;
+  return index === 0;
+}
+
 function artistRolesFromDetail(track: RepairedTrackDetail): Array<{ name: string; slug: string; isPrimary: boolean; isFeatured: boolean; creditOrder: number }> {
   const roles = Array.isArray(track.artists) ? track.artists : [];
   if (roles.length > 0) {
     const sorted = [...roles].sort((a, b) => (a.creditOrder ?? 0) - (b.creditOrder ?? 0));
     const hasPrimary = sorted.some((artist) => artist.isPrimary);
+    const hasNonFeatured = sorted.some((artist) => artist.isFeatured !== true);
     return sorted
       .map((artist, index) => ({
         name: clean(artist.name),
         slug: clean(artist.slug),
-        isPrimary: hasPrimary ? artist.isPrimary === true : index === 0,
+        isPrimary: fallbackPrimaryFlag(hasPrimary, hasNonFeatured, artist.isPrimary, artist.isFeatured, index),
         isFeatured: artist.isFeatured === true,
         creditOrder: artist.creditOrder ?? index,
       }))
@@ -59,10 +66,11 @@ function artistRolesFromLike(track: TrackLike): Array<{ name: string; isPrimary:
   if (roles.length > 0) {
     const sorted = [...roles].sort((a, b) => (a.creditOrder ?? 0) - (b.creditOrder ?? 0));
     const hasPrimary = sorted.some((artist) => artist.isPrimary);
+    const hasNonFeatured = sorted.some((artist) => artist.isFeatured !== true);
     return sorted
       .map((artist, index) => ({
         name: clean(artist.name),
-        isPrimary: hasPrimary ? artist.isPrimary === true : index === 0,
+        isPrimary: fallbackPrimaryFlag(hasPrimary, hasNonFeatured, artist.isPrimary, artist.isFeatured, index),
         isFeatured: artist.isFeatured === true,
         creditOrder: artist.creditOrder ?? index,
       }))
