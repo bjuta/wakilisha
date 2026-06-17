@@ -10,6 +10,21 @@ function baseFactsUsed(facts: GenreFacts): string[] {
   ];
 }
 
+function searchSnippet(facts: GenreFacts): string {
+  const name = facts.name || "This sound";
+  const topArtists = humanList(facts.topArtists, 3);
+  const counts = humanList([
+    facts.artistCount ? pluralize(facts.artistCount, "artist") : "",
+    facts.trackCount ? pluralize(facts.trackCount, "track") : "",
+    facts.releaseCount ? pluralize(facts.releaseCount, "release") : "",
+  ].filter(Boolean), 3);
+
+  if (topArtists && counts) return `${name} connects ${counts}, with artists like ${topArtists}.`;
+  if (topArtists) return `${name} connects to artists like ${topArtists}.`;
+  if (counts) return `${name} connects ${counts} in WAKILISHA.`;
+  return `${name} is a sound path in WAKILISHA.`;
+}
+
 export function buildGenreContext(context: CultureRecipeContext<GenreFacts>): CultureRecipeResult {
   const { facts, surface } = context;
   const name = facts.name || "This sound";
@@ -24,7 +39,7 @@ export function buildGenreContext(context: CultureRecipeContext<GenreFacts>): Cu
   const textBySurface = {
     heroIntro: `${name} is a way into the sound. Start with the artists, songs, and releases connected here${counts ? `, including ${counts}` : ""}.`,
     cardBlurb: counts ? `${name} connects ${counts} in WAKILISHA.` : `${name} is a sound path in WAKILISHA.`,
-    searchSnippet: topArtists ? `${name} connects to artists like ${topArtists}.` : `${name} genre page on WAKILISHA.`,
+    searchSnippet: searchSnippet(facts),
     seoDescription: `Explore ${name} on WAKILISHA, with artists, tracks, releases, chart moments, and related sounds.`,
     chartNote: topTracks ? `Start with ${topTracks}, then follow the artists around the sound.` : "No chart moment is connected yet.",
     whyItMatters: "Genres are doors into the culture. They help users move from a sound to the artists, songs, and scenes around it.",
