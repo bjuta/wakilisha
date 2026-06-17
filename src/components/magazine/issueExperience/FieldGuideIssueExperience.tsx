@@ -9,17 +9,11 @@ export function FieldGuideIssueExperience(props: IssueExperienceComponentProps) 
   return (
     <div className="mag-issue-experience mag-issue-experience-field-guide">
       <IssueOpening issue={issue} experience={experience} eyebrow="Field guide issue" />
-      <section className="magazine-spread mag-reveal" id={`${issue.id}-carry-this`}>
-        <div className="mag-guide">
-          <div className="mag-guide-hero">
-            <div>
-              <div className="magazine-meta">Carry this one</div>
-              <h2 className="mag-guide-title">A route through what to notice, where to begin and what to keep close.</h2>
-            </div>
-          </div>
-          <div className="mag-guide-body">
-            <p>{experience.readerPromise}</p>
-          </div>
+      <section className="mag-issue-zone mag-reveal mag-experience-room mag-guide-room" id={`${issue.id}-carry-this`}>
+        <div className="mag-room-inner">
+          <div className="magazine-meta">Carry this one</div>
+          <h2>A route through what to notice, where to begin and what to keep close.</h2>
+          <p>{experience.readerPromise}</p>
         </div>
       </section>
       <IssuePath issue={issue} experience={experience} />
