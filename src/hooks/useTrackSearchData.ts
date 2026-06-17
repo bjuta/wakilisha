@@ -103,6 +103,7 @@ export function useTrackSearchData() {
           const artist = artistInfo?.name || "Unknown";
           const genre = artistGenreMap[artistSlug] || "";
           const label = t.release_id ? (releaseLabelMap[t.release_id] || "") : "";
+          const contextText = buildTrackCardBlurb({ title: t.title, artist, genre, label, isPlayable: !!t.preview_url });
           return {
             slug: t.slug,
             title: t.title,
@@ -111,8 +112,8 @@ export function useTrackSearchData() {
             artworkUrl: t.artwork_url || "",
             isPlayable: !!t.preview_url,
             source: "apple_music",
-            label,
-            contextText: buildTrackCardBlurb({ title: t.title, artist, genre, label, isPlayable: !!t.preview_url }),
+            label: label || contextText,
+            contextText,
           };
         });
 
