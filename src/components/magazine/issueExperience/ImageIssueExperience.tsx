@@ -4,9 +4,15 @@ import { IssueSignalBoard } from './IssueSignalBoard';
 import { IssueBackMatter } from './IssueBackMatter';
 import type { IssueExperienceComponentProps } from './IssueExperienceShell';
 
+type ImageArticle = IssueExperienceComponentProps['issue']['articles'][number] & { heroUrl: string };
+
+function hasHeroImage(article: IssueExperienceComponentProps['issue']['articles'][number]): article is ImageArticle {
+  return Boolean(article.heroUrl);
+}
+
 export function ImageIssueExperience(props: IssueExperienceComponentProps) {
   const { issue, experience } = props;
-  const images = issue.articles.filter((article) => article.heroUrl).slice(0, 4);
+  const images = issue.articles.filter(hasHeroImage).slice(0, 4);
 
   return (
     <div className="mag-issue-experience mag-issue-experience-image">
