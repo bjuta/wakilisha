@@ -20,7 +20,7 @@ const DESTINATIONS: DestinationCard[] = [
   },
   {
     label: "Artists",
-    sub: "Profiles, discographies, and chart history",
+    sub: "Profiles, chart moments, and full discographies.",
     href: "/artists",
     img: "https://readdy.ai/api/search-image?query=Abstract%20artistic%20portrait%20composition%20with%20warm%20golden%20amber%20light%20rays%20intersecting%20organic%20flowing%20forms%20dark%20background%20with%20rich%20earthy%20tones%20terracotta%20and%20ochre%20contemporary%20fine%20art%20aesthetic%20cultural%20depth%20sophisticated%20minimal%20gallery%20quality%20refined%20texture%20subtle%20human%20presence%20suggested%20through%20light%20and%20form&width=800&height=500&seq=explore-artists-wk26&orientation=landscape",
     acc: "var(--wk-v-music)",
@@ -28,7 +28,7 @@ const DESTINATIONS: DestinationCard[] = [
   },
   {
     label: "Genres",
-    sub: "Map the sounds shaping African music",
+    sub: "Every sound has a story. Start here.",
     href: "/genres",
     img: "https://readdy.ai/api/search-image?query=Abstract%20interconnected%20network%20visualization%20with%20colorful%20warm%20nodes%20and%20flowing%20lines%20representing%20musical%20genre%20relationships%20dark%20background%20with%20amber%20coral%20teal%20and%20gold%20highlights%20organic%20flowing%20connections%20data%20art%20style%20sophisticated%20editorial%20quality%20modern%20minimal%20aesthetic%20cultural%20mapping%20concept&width=800&height=500&seq=explore-genres-wk26&orientation=landscape",
     accent: "var(--wk-v-intel)",
@@ -36,7 +36,7 @@ const DESTINATIONS: DestinationCard[] = [
   },
   {
     label: "Magazine",
-    sub: "Deep-dive stories and editorial features",
+    sub: "Stories, interviews, reviews, essays, and field notes.",
     href: "/magazine",
     img: "https://readdy.ai/api/search-image?query=Abstract%20editorial%20composition%20with%20layered%20warm%20toned%20paper%20textures%20typography%20elements%20and%20photographic%20fragments%20floating%20in%20space%20rich%20amber%20ochre%20and%20dark%20green%20palette%20contemporary%20art%20direction%20sophisticated%20magazine%20aesthetic%20cultural%20storytelling%20visual%20poetry%20refined%20artistic%20arrangement&width=800&height=500&seq=explore-magazine-wk26&orientation=landscape",
     accent: "var(--wk-v-film)",
@@ -44,7 +44,7 @@ const DESTINATIONS: DestinationCard[] = [
   },
   {
     label: "Guides",
-    sub: "Curated discovery paths through the culture",
+    sub: "Where to go, what to hear, who to know.",
     href: "/guides",
     img: "https://readdy.ai/api/search-image?query=Abstract%20composition%20suggesting%20a%20curated%20journey%20through%20layered%20cultural%20landscapes%20warm%20golden%20light%20pathways%20through%20dark%20rich%20textured%20terrain%20organic%20flowing%20forms%20amber%20and%20ochre%20tones%20refined%20contemporary%20art%20aesthetic%20exploration%20and%20discovery%20theme%20sophisticated%20minimal%20composition%20editorial%20quality%20depth%20and%20mystery&width=800&height=500&seq=explore-guides-wk26&orientation=landscape",
     accent: "var(--wk-v-places)",
@@ -52,7 +52,7 @@ const DESTINATIONS: DestinationCard[] = [
   },
   {
     label: "Labels",
-    sub: "The imprints behind the sound",
+    sub: "The labels, imprints, and collectives behind the music.",
     href: "/labels",
     img: "https://readdy.ai/api/search-image?query=Abstract%20geometric%20composition%20with%20overlapping%20translucent%20circular%20forms%20suggesting%20vinyl%20records%20and%20music%20labels%20warm%20dark%20amber%20and%20gold%20tones%20with%20subtle%20coral%20highlights%20rich%20layered%20textures%20contemporary%20minimal%20art%20aesthetic%20sophisticated%20cultural%20branding%20visual%20refined%20editorial%20quality%20elegant%20composition&width=800&height=500&seq=explore-labels-wk26&orientation=landscape",
     accent: "var(--wk-v-food)",
@@ -79,11 +79,11 @@ export function HomeExplore() {
             className="font-black tracking-[-0.03em] text-[var(--wk-text)]"
             style={{ fontSize: "clamp(1.7rem,3.3vw,2.5rem)", lineHeight: 1.05 }}
           >
-            Explore the ecosystem
+            Start Where the Culture Moves
           </h2>
           <p className="mt-3 text-[14px] leading-relaxed text-[var(--wk-text-muted)]">
-            Every part of African creative life, connected — from the charts that track
-            what&apos;s moving to the stories, guides, and registry that give it staying power.
+            Jump into charts, artists, releases, stories, guides, genres, and labels. Find what you know.
+            Discover what you missed. Argue with the rankings.
           </p>
         </div>
 

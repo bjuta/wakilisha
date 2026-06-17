@@ -62,7 +62,7 @@ export default function MobileArtistDetail() {
       <div className="flex min-h-screen flex-col items-center justify-center gap-5 px-6 text-center bg-[var(--wk-bg)]">
         <i className="ri-user-line text-5xl text-[var(--wk-text-faint)]" />
         <h1 className="text-[20px] font-black text-[var(--wk-text)]">Artist not found</h1>
-        <p className="text-[14px] text-[var(--wk-text-muted)]">{error || "This artist is not in the registry."}</p>
+        <p className="text-[14px] text-[var(--wk-text-muted)]">{error || "This artist could not be found."}</p>
         <Link
           to="/artists"
           className="inline-flex items-center gap-2 rounded-full bg-[var(--wk-brand)] px-6 py-3 text-[13px] font-bold text-[var(--wk-brand-on)]"

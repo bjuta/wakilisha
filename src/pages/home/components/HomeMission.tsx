@@ -2,25 +2,25 @@ const PILLARS = [
   {
     k: "01",
     t: "Discover",
-    d: "Make African creative work easy to find. A registry and charts that surface what's happening, not what an algorithm decides should trend.",
+    d: "Find the people, songs, stories, and scenes shaping the culture. Charts and a deep archive that surface what is actually happening.",
     color: "var(--wk-brand)",
   },
   {
     k: "02",
     t: "Document",
-    d: "Build archives that outlast the moment. Names, scenes, lyrics and lineage recorded so culture becomes harder to erase.",
+    d: "Keep the culture visible before it disappears into someone's camera roll. Names, scenes, lyrics, and lineage all recorded.",
     color: "var(--wk-v-intel)",
   },
   {
     k: "03",
-    t: "Fund & Value",
-    d: "Connect creativity with capital, audiences and institutions — turning cultural value into visibility, participation and opportunity.",
+    t: "Support",
+    d: "Help artists, scenes, and cultural work find real audiences. Connect creativity with the people and institutions that care.",
     color: "var(--wk-v-food)",
   },
   {
     k: "04",
     t: "Sustain",
-    d: "Stand up the long-term structures — partnerships, experiences, commercial models — that let creatives thrive on their own terms.",
+    d: "Stand up the long-term structures so creatives can thrive on their own terms. Culture should not vanish just because the internet moved on.",
     color: "var(--wk-v-places)",
   },
 ];
@@ -29,7 +29,7 @@ const STATS = [
   { n: "8", l: "cultural domains", sub: "mapped and connected" },
   { n: "2", l: "live today", sub: "Music & Guides" },
   { n: "7yr", l: "building", sub: "how culture travels" },
-  { n: "∞", l: "harder", sub: "to erase" },
+  { n: "∞", l: "harder to erase", sub: "because we are here" },
 ];
 
 export function HomeMission() {
@@ -55,12 +55,11 @@ export function HomeMission() {
             className="font-black tracking-[-0.03em] text-[var(--wk-text)] mb-4"
             style={{ fontSize: "clamp(1.7rem,3.3vw,2.5rem)", lineHeight: 1.05 }}
           >
-            Four verbs. One commitment.
+            We are building WAKILISHA so African culture has somewhere to live, grow, travel, and be remembered.
           </h2>
           <p className="text-[14px] leading-relaxed text-[var(--wk-text-muted)]">
-            WAKILISHA exists to build structures that help African creative work
-            travel further, last longer, and generate meaningful value for the people
-            behind it.
+            We are starting with music because music moves fast. But the mission is bigger.
+            We are here to help the culture be seen, remembered, shared, and celebrated.
           </p>
         </div>
 

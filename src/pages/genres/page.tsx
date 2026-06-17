@@ -297,7 +297,7 @@ export default function Genres() {
             <div className="genre43-pullquote-line" />
             <p className="genre43-pullquote-text">
               Genres are portals, not people. Every territory is mapped through
-              texture, color, metadata density, and cultural routing — because
+              texture, colour, density, and cultural context — because
               sound deserves an ecosystem, not a headshot.
             </p>
             <div className="genre43-pullquote-line" />
@@ -368,8 +368,8 @@ export default function Genres() {
               <span className="genre43-context-eyebrow">Directory rule</span>
               <h3 className="genre43-context-title">Genres are portals.</h3>
               <p className="genre43-context-body">
-                This chapter uses abstract visual treatment, metadata density,
-                iconography, and cultural routing. Human photography belongs to
+                This chapter uses abstract visual treatment, cultural density,
+                iconography, and geographical routing. Human photography belongs to
                 artist pages, not genre cards. Every genre here carries a unique
                 gradient identity derived from its name — a visual signature for
                 each cultural territory.

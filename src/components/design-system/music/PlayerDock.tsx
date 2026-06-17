@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { usePlayer } from "@/context/PlayerContext";
 import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 
@@ -9,20 +9,27 @@ export function PlayerDock() {
     isPlaying,
     togglePlay,
     openFullPlayer,
+    closeFullPlayer,
     next,
     prev,
     progress,
     canGoNext,
     canGoPrev,
+    isFullPlayerOpen,
   } = usePlayer();
+  const navigate = useNavigate();
 
   if (!currentTrack) return null;
 
   const isPlayable = currentTrack.isPlayable !== false && !!currentTrack.previewUrl;
-  const formatTime = (seconds: number) => {
-    const m = Math.floor(seconds / 60);
-    const s = Math.floor(seconds % 60);
-    return `${m}:${s.toString().padStart(2, "0")}`;
+
+  const handleExpandToggle = () => {
+    if (isFullPlayerOpen) {
+      closeFullPlayer();
+      navigate(-1);
+    } else {
+      openFullPlayer();
+    }
   };
 
   return (
@@ -38,7 +45,9 @@ export function PlayerDock() {
       <div className="flex h-[var(--wk-player-dock-h)] items-center gap-3 px-4">
         {/* Track info — clickable */}
         <button
-          onClick={() => openFullPlayer()}
+          onClick={() => {
+            if (!isFullPlayerOpen) openFullPlayer();
+          }}
           className="flex min-w-0 flex-1 items-center gap-3 text-left"
         >
           <div className="h-10 w-10 shrink-0 overflow-hidden rounded-md bg-[var(--wk-surface-raised)]">
@@ -99,15 +108,25 @@ export function PlayerDock() {
           </button>
         </div>
 
-        {/* Expand button */}
-        <Link
-          to="/player"
-          onClick={() => openFullPlayer()}
-          aria-label="Open full player"
-          className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--wk-text-muted)] transition-all hover:bg-[var(--wk-surface-raised)]"
-        >
-          <i className="ri-arrow-up-s-line" />
-        </Link>
+        {/* Expand / Collapse toggle */}
+        {isFullPlayerOpen ? (
+          <button
+            onClick={handleExpandToggle}
+            aria-label="Close full player"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--wk-text-muted)] transition-all hover:bg-[var(--wk-surface-raised)]"
+          >
+            <i className="ri-arrow-down-s-line" />
+          </button>
+        ) : (
+          <Link
+            to="/player"
+            onClick={() => openFullPlayer()}
+            aria-label="Open full player"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--wk-text-muted)] transition-all hover:bg-[var(--wk-surface-raised)]"
+          >
+            <i className="ri-arrow-up-s-line" />
+          </Link>
+        )}
       </div>
     </div>
   );

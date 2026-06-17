@@ -37,7 +37,7 @@ export default function ArtistDetail() {
         if (!alive) return;
         if (!data) {
           setStatus("error");
-          setError("Artist not found in the registry.");
+          setError("Artist not found.");
           return;
         }
 
@@ -69,7 +69,7 @@ export default function ArtistDetail() {
       <div className="wk-container px-6 py-20 text-center">
         <i className="ri-user-line mb-4 block text-5xl text-[var(--wk-text-faint)]" />
         <h1 className="wk-h-section mb-2">Artist not found</h1>
-        <p className="text-[var(--wk-text-muted)]">{error || "This artist does not exist in the registry."}</p>
+        <p className="text-[var(--wk-text-muted)]">{error || "This artist could not be found."}</p>
         <Link to="/artists" className="mt-6 inline-block">
           <WkButton variant="primary">Back to directory</WkButton>
         </Link>

@@ -155,7 +155,7 @@ export default function MobileGenres() {
         )}
 
         <div className="genre43-reveal genre43-pullquote">
-          <div className="genre43-pullquote-inner"><div className="genre43-pullquote-line" /><p className="genre43-pullquote-text">Genres are portals, not people. Every territory is mapped through texture, color, metadata density, and cultural routing — because sound deserves an ecosystem, not a headshot.</p><div className="genre43-pullquote-line" /></div>
+          <div className="genre43-pullquote-inner"><div className="genre43-pullquote-line" /><p className="genre43-pullquote-text">Genres are portals, not people. Every territory is mapped through texture, colour, rhythm, and cultural geography — because sound deserves an ecosystem, not a headshot.</p><div className="genre43-pullquote-line" /></div>
         </div>
 
         <section className="genre43-reveal">

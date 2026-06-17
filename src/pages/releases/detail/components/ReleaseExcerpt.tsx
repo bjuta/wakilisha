@@ -90,7 +90,7 @@ function buildDescription(opts: {
   const patterns = detectTrackPatterns(sorted);
 
   const dateLabel = formatReleaseDate(releaseDate) || (year && year !== "Unknown year" ? year : "");
-  const hasRealLabel = labelName && labelName !== "Independent" && labelName !== "Unknown" && labelName !== "WAKILISHA Registry";
+  const hasRealLabel = labelName && labelName !== "Independent" && labelName !== "Unknown" && labelName !== "WAKILISHA Registry" && labelName !== "WAKILISHA";
   const hasDuration = totalDuration > 0;
   const featureCount = featuredArtists?.length || 0;
   const minutes = hasDuration ? Math.round(totalDuration / 60) : 0;
@@ -228,7 +228,7 @@ export default function ReleaseExcerpt({ release }: ReleaseExcerptProps) {
   // Factual chips
   const chips: string[] = [
     `${trackCount} track${trackCount !== 1 ? "s" : ""}`,
-    labelName && labelName !== "WAKILISHA Registry" && labelName !== "Independent" && labelName !== "Unknown" ? labelName : "",
+    labelName && labelName !== "WAKILISHA Registry" && labelName !== "WAKILISHA" && labelName !== "Independent" && labelName !== "Unknown" ? labelName : "",
   ].filter(Boolean);
 
   const sentences = text.split(". ").filter(Boolean);

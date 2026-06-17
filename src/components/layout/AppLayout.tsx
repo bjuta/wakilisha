@@ -45,7 +45,7 @@ export function AppLayout() {
                 WAKILISHA<span className="text-[var(--wk-brand)]">.</span>
               </div>
               <p className="mt-2 text-[13px] leading-relaxed text-[var(--wk-text-muted)]">
-                African culture infrastructure. Building the systems that help creative work travel further, last longer, and generate meaningful value.
+                A home for African creative life. Music first, then stories, artists, places, and everything that moves the culture forward.
               </p>
             </div>
 
@@ -106,7 +106,7 @@ export function AppLayout() {
 
           <div className="mt-10 border-t border-[var(--wk-divider)] pt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <span className="text-[12px] text-[var(--wk-text-faint)]">
-              WAKILISHA Cultural Infrastructure — Discover. Document. Fund. Value. Sustain.
+              WAKILISHA — Your people are here.
             </span>
             <div className="flex items-center gap-3">
               <span className="inline-flex items-center rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] px-2.5 py-1 text-[11px] font-semibold text-[var(--wk-text-muted)]">

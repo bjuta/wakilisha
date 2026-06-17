@@ -201,7 +201,7 @@ export function ArtistBioSection({
     return parseBioSections(fullBio);
   }, [expanded, fullBio]);
 
-  const displayBio = cleanBioExcerpt(fullBio || bio || `${name} is an artist in the WAKILISHA registry.`);
+  const displayBio = cleanBioExcerpt(fullBio || bio || `${name} is an artist on WAKILISHA.`);
 
   const metaItems = [
     ...(artistType ? [{ icon: "ri-user-line", label: artistType }] : []),

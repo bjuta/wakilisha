@@ -43,7 +43,7 @@ function buildExcerpt(opts: AdminReleaseExcerptProps): string {
 
   let open = `"${title}" is ${articleize(rType)} by ${artistName}`;
   if (year) open += `, released in ${year}`;
-  if (labelName && labelName !== "Independent" && labelName !== "Unknown" && labelName !== "WAKILISHA Registry") {
+  if (labelName && labelName !== "Independent" && labelName !== "Unknown" && labelName !== "WAKILISHA") {
     open += ` through ${labelName}`;
   }
   open += ".";
@@ -98,7 +98,7 @@ function buildExcerpt(opts: AdminReleaseExcerptProps): string {
     }
   }
 
-  parts.push(`"${title}" stands as a notable entry in ${artistName}'s discography, catalogued in the WAKILISHA registry.`);
+  parts.push(`"${title}" stands as a notable entry in ${artistName}'s discography, catalogued on WAKILISHA.`);
 
   return parts.join(" ");
 }
@@ -112,7 +112,7 @@ export default function AdminReleaseExcerpt(props: AdminReleaseExcerptProps) {
     `${props.tracks.length} track${props.tracks.length !== 1 ? "s" : ""}`,
     releaseTypeLabel(props.releaseType),
     formatYear(props.releaseDate) || "",
-    props.labelName !== "WAKILISHA Registry" && props.labelName !== "Unknown" ? props.labelName : "",
+    props.labelName !== "WAKILISHA" && props.labelName !== "Unknown" ? props.labelName : "",
   ].filter(Boolean);
 
   return (
@@ -124,7 +124,7 @@ export default function AdminReleaseExcerpt(props: AdminReleaseExcerptProps) {
           <div className="flex items-center gap-2">
             <WkIcon name="FileText" size={14} className="text-[var(--wk-brand)]" />
             <span className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-[var(--wk-brand)]">
-              Registry Summary
+              Release Summary
             </span>
           </div>
 
@@ -146,7 +146,7 @@ export default function AdminReleaseExcerpt(props: AdminReleaseExcerptProps) {
 
         <div className="mt-4 pt-4 border-t border-[var(--wk-border)]">
           <p className="text-[10px] text-[var(--wk-text-faint)] leading-relaxed">
-            Auto-generated from registry data. Updated as new information becomes available.
+            Auto-generated from WAKILISHA archive data. Updated as new information becomes available.
           </p>
         </div>
       </div>

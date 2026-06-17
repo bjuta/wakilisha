@@ -39,7 +39,7 @@ export function HomeFeatured({ chartEntries, loading }: Props) {
             className="mb-3 text-[var(--wk-brand)]"
             style={{ fontFamily: "var(--wk-font-mono, monospace)", fontSize: ".72rem", letterSpacing: ".14em", textTransform: "uppercase", fontWeight: 600 }}
           >
-            Live from the registry
+            What's charting
           </div>
           <h2
             className="font-bold tracking-[-0.02em] text-[var(--wk-text)]"

@@ -39,7 +39,7 @@ export default function LabelDetail() {
       .then((data) => {
         if (!alive) return;
         if (!data) {
-          setError("Label not found in the registry.");
+          setError("Label not found.");
           setLoading(false);
           return;
         }
@@ -70,7 +70,7 @@ export default function LabelDetail() {
       <main className="min-h-screen px-6 py-20 text-center">
         <WkIcon name="Building2" size={42} className="mx-auto mb-4 text-[var(--wk-text-faint)]" />
         <h1 className="mb-2 text-[28px] font-black text-[var(--wk-text)]">Label not found</h1>
-        <p className="text-[var(--wk-text-muted)]">{error || "This label does not exist in the registry."}</p>
+        <p className="text-[var(--wk-text-muted)]">{error || "This label could not be found."}</p>
         <Link to="/labels" className="inline-block mt-6 rounded-xl bg-[var(--wk-brand)] px-6 py-3 text-[14px] font-bold text-[var(--wk-brand-on)]">Back to labels</Link>
       </main>
     );
@@ -84,7 +84,7 @@ export default function LabelDetail() {
     <main className="min-h-screen bg-[var(--wk-bg)]">
 
       {/* ═══════════ HERO ═══════════ */}
-      <section className="relative flex min-h-[320px] items-end overflow-hidden md:min-h-[460px]">
+      <section className="relative -mt-16 pt-16 flex min-h-[320px] items-end overflow-hidden md:min-h-[460px]">
         <div className="absolute inset-0" style={{ background: heroBg }} />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/35 to-transparent" />
         <div className="absolute left-8 top-8 hidden opacity-10 md:block">
@@ -273,7 +273,7 @@ export default function LabelDetail() {
             <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h3 className="text-[16px] font-black text-[var(--wk-text)]">Explore the label directory</h3>
-                <p className="mt-1 text-[13px] text-[var(--wk-text-muted)]">Browse all labels, their rosters and release catalogs across the WAKILISHA registry.</p>
+                <p className="mt-1 text-[13px] text-[var(--wk-text-muted)]">Browse all labels, their rosters and release catalogs across WAKILISHA.</p>
               </div>
               <div className="flex gap-2">
                 <Link to="/labels" className="whitespace-nowrap rounded-xl bg-[var(--wk-brand)] px-5 py-2.5 text-[13px] font-bold text-[var(--wk-brand-on)] transition-all hover:opacity-90">

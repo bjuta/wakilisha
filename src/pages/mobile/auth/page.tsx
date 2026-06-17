@@ -119,7 +119,7 @@ export default function MobileAuth() {
             className="mt-4 max-w-[300px] text-center leading-relaxed"
             style={{ fontFamily: "var(--wk-font-body)", fontSize: "14px", color: "var(--wk-text-soft)" }}
           >
-            Your people are here. Sign in to follow artists, save charts, and keep your cultural graph close.
+            Your people are here. Sign in to follow artists, save charts, and keep your culture close.
           </p>
 
           {/* Choice pills — same as desktop */}
@@ -151,7 +151,7 @@ export default function MobileAuth() {
             {mode === "signin" ? "Welcome back" : "Create your account"}
           </h1>
           <p className="mb-6 leading-relaxed" style={{ fontFamily: "var(--wk-font-body)", fontSize: "14px", color: "var(--wk-text-muted)" }}>
-            {mode === "signin" ? "Sign in to continue to your cultural graph." : "Join WAKILISHA and connect with African culture."}
+            {mode === "signin" ? "Sign in to continue to your WAKILISHA account." : "Join WAKILISHA and connect with African culture."}
           </p>
 
           {/* Error banner */}

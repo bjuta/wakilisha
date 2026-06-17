@@ -26,12 +26,12 @@ export function ArtistSpotlightSpread({ artists, mood, sectionColor }: { artists
     <section className="magazine-spread mag-reveal" style={{ background: "var(--mag-surface)" }}>
       <div className="mag-registry-spotlight">
         <div className="mag-registry-spotlight-rail">
-          <div className="magazine-meta" style={{ color: accent }}>Registry · Artists on record</div>
+          <div className="magazine-meta" style={{ color: accent }}>Archive · Artists on record</div>
           <div className="mag-registry-spotlight-title">
             <span>Voices in the archive</span>
           </div>
           <p style={{ color: "var(--mag-text-muted)", fontSize: 13, maxWidth: 360 }}>
-            The artists linked to this issue's cultural moment — pulled from the WAKILISHA registry.
+            The artists linked to this issue's cultural moment — pulled from the WAKILISHA archive.
           </p>
           <Link
             to="/artists"
@@ -68,12 +68,12 @@ export function ReleaseSpotlightSpread({ releases, mood, sectionColor }: { relea
     <section className="magazine-spread mag-reveal" style={{ background: "var(--mag-surface)" }}>
       <div className="mag-registry-spotlight">
         <div className="mag-registry-spotlight-rail">
-          <div className="magazine-meta" style={{ color: accent }}>Registry · Releases filed</div>
+          <div className="magazine-meta" style={{ color: accent }}>Archive · Releases filed</div>
           <div className="mag-registry-spotlight-title">
             <span>Records that shaped the window</span>
           </div>
           <p style={{ color: "var(--mag-text-muted)", fontSize: 13, maxWidth: 360 }}>
-            Releases connected to this issue's timeframe — pulled from the WAKILISHA registry.
+            Releases connected to this issue's timeframe — pulled from the WAKILISHA archive.
           </p>
           <Link
             to="/releases"

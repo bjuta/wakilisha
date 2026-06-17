@@ -714,7 +714,7 @@ export default function ChartsDirectory() {
           <div className="mb-4 mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--wk-danger-soft)] text-[var(--wk-danger)]">
             <i className="ri-error-warning-line text-2xl" />
           </div>
-          <h1 className="text-[20px] font-black text-[var(--wk-text)] mb-2">Charts unavailable</h1>
+          <h1 className="text-[20px] font-black text-[var(--wk-text)] mb-2">Charts unavailable right now</h1>
           <p className="text-[14px] text-[var(--wk-text-muted)] mb-6">{errorMsg}</p>
           <button onClick={retry} className="inline-flex items-center gap-2 rounded-full bg-[var(--wk-brand)] px-5 py-2.5 text-[13px] font-bold text-[var(--wk-brand-on)] transition-all hover:opacity-90">
             <i className="ri-refresh-line" /> Try again
@@ -732,8 +732,8 @@ export default function ChartsDirectory() {
           <div className="mb-4 mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]">
             <i className="ri-bar-chart-box-line text-2xl" />
           </div>
-          <h1 className="text-[20px] font-black text-[var(--wk-text)] mb-2">No charts published yet</h1>
-          <p className="text-[14px] text-[var(--wk-text-muted)] mb-6">Check back soon — the African charts are being compiled.</p>
+          <h1 className="text-[20px] font-black text-[var(--wk-text)] mb-2">No charts out yet</h1>
+          <p className="text-[14px] text-[var(--wk-text-muted)] mb-6">Check back soon. The charts are being compiled.</p>
           <button onClick={retry} className="inline-flex items-center gap-2 rounded-full bg-[var(--wk-brand)] px-5 py-2.5 text-[13px] font-bold text-[var(--wk-brand-on)] transition-all hover:opacity-90">
             <i className="ri-refresh-line" /> Refresh
           </button>
@@ -785,7 +785,7 @@ export default function ChartsDirectory() {
 
           {/* Description */}
           <p className="mt-4 max-w-[540px] text-[14px] leading-relaxed text-[var(--wk-text-soft)] md:text-[15px]">
-            {activeGroup?.description || activeFamily?.description || "The definitive index of African music — tracking what is rising, what has stayed, and what is breaking through across the continent."}
+            {activeGroup?.description || activeFamily?.description || "See what is rising, what is holding strong, what just entered the chat, and what everyone will be arguing about by Friday."}
           </p>
 
           {/* Meta pills */}
@@ -1015,19 +1015,19 @@ export default function ChartsDirectory() {
             {/* Quick stats */}
             <div className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-3.5 md:p-4">
               <div className="text-[11px] font-bold uppercase tracking-wider text-[var(--wk-text-faint)] mb-3">
-                Chart stats
+                This chart
               </div>
               <div className="grid grid-cols-2 gap-2 md:gap-2.5">
-                <StatTile value={entryCount} label="Positions" />
-                <StatTile value={sourceGroups.length} label="Families" />
-                <StatTile value={totalEditions} label="Editions" />
-                <StatTile value={newEntries.length} label="New" />
+                <StatTile value={entryCount} label="Songs ranked" />
+                <StatTile value={sourceGroups.length} label="Chart series" />
+                <StatTile value={totalEditions} label="Past charts" />
+                <StatTile value={newEntries.length} label="New entries" />
               </div>
             </div>
 
             {/* New entries */}
             <SidebarCard
-              title="New entries"
+              title="New this week"
               entries={newEntries}
               badge="New"
               emptyLabel="No debuts this week"
@@ -1038,7 +1038,7 @@ export default function ChartsDirectory() {
               title="Biggest climbers"
               entries={climbers}
               badge="↑"
-              emptyLabel="No climbers this week"
+              emptyLabel="No big moves this week"
             />
           </div>
         </div>
@@ -1057,7 +1057,7 @@ export default function ChartsDirectory() {
               <div>
                 <div className="text-[13px] font-bold text-[var(--wk-text)] mb-1">How the charts work</div>
                 <div className="text-[12px] leading-relaxed text-[var(--wk-text-muted)] max-w-[640px]">
-                  Combined streaming data from Spotify, Apple Music, YouTube, and Boomplay. Radio airplay monitored across 12 African countries. All tracks verified against ISRC and graph relationship data.
+                  Combined streaming data from Spotify, Apple Music, YouTube, and Boomplay. Radio airplay monitored across African countries. All tracks independently verified.
                 </div>
               </div>
             </div>

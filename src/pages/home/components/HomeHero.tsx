@@ -142,7 +142,7 @@ function RegistryPortalCard() {
       </div>
 
       <h3 className="relative z-10 text-[17px] font-black text-white tracking-[-0.02em] mb-4 leading-tight">
-        The Registry
+        The Archive
       </h3>
 
       <div className="relative z-10 flex-1 space-y-3">
@@ -176,7 +176,7 @@ function RegistryPortalCard() {
       </div>
 
       <div className="relative z-10 mt-auto pt-4 flex items-center gap-1.5 text-[12px] font-semibold text-white/60 group-hover:text-white transition-colors">
-        <span>Explore registry</span>
+        <span>Explore the archive</span>
         <i className="ri-arrow-right-line text-[11px] group-hover:translate-x-0.5 transition-transform" />
       </div>
     </Link>
@@ -228,25 +228,25 @@ export function HomeHero({ chartEntries, stories, loading }: Props) {
               }}
             >
               <span className="w-1.5 h-1.5 rounded-full bg-[var(--wk-brand)]" style={{ boxShadow: "0 0 0 4px rgba(132,194,65,0.18)" }} />
-              Cultural infrastructure for African creative life
+              African creative life, starting with music
             </div>
 
             <h1
               className="font-black tracking-[-0.04em] text-white mb-6"
               style={{ fontSize: "clamp(3rem,6.5vw,5.5rem)", lineHeight: 0.94 }}
             >
-              African culture,
+              Your people
               <br />
-              <span style={{ color: "var(--wk-brand)" }}>catalogued.</span>
+              <span style={{ color: "var(--wk-brand)" }}>are here.</span>
             </h1>
 
             <p
               className="text-white/60 leading-relaxed max-w-[52ch]"
               style={{ fontSize: "clamp(1rem,1.4vw,1.2rem)" }}
             >
-              The living registry of African creative life. Charts that reflect
-              the scene. Stories that outlast the moment. And culture made
-              systematically harder to erase.
+              WAKILISHA is where African creative life comes together. Music,
+              stories, artists, charts, scenes, places, language, style, food,
+              film, and the everyday culture that makes us us.
             </p>
           </div>
 

@@ -90,7 +90,7 @@ function apiToViewModel(api: RepairedTrackDetail): TrackViewModel {
     : [];
 
   const primaryArtist = artistsArr.find((a) => a.isPrimary) || artistsArr[0];
-  const artistName = primaryArtist?.name || artistData.name || "WAKILISHA Registry";
+  const artistName = primaryArtist?.name || artistData.name || "WAKILISHA";
   const resolvedArtistSlug = primaryArtist?.slug || artistData.slug || "";
 
   const history = Array.isArray(raw.chartHistory) ? raw.chartHistory : [];
@@ -240,7 +240,7 @@ function CuratorsNote({ apiData }: { apiData: RepairedTrackDetail }) {
       </p>
       <div className="mt-5 pt-4 border-t border-[var(--wk-divider)]">
         <p className="text-[11px] text-[var(--wk-text-faint)] italic leading-relaxed">
-          Generated from the WAKILISHA relationship graph — a deterministic summary drawn from connected registry data.
+          An algorithmic summary drawn from connected data across the WAKILISHA archive.
         </p>
       </div>
     </div>
@@ -254,7 +254,7 @@ function ChartKpiGrid({ vm }: { vm: TrackViewModel }) {
     { label: "Peak position", value: vm.peakPosition > 0 ? `#${vm.peakPosition}` : "—", sub: "All-time best", icon: "ri-trophy-line" },
     { label: "Weeks charted", value: vm.weeksOnChart || "—", sub: "Total weeks ranked", icon: "ri-calendar-check-line" },
     { label: "Current rank", value: vm.rank > 0 ? `#${vm.rank}` : "—", sub: vm.movement === "new" ? "New entry" : vm.movement === "up" ? `Up ${vm.movementAmount}` : vm.movement === "down" ? `Down ${vm.movementAmount}` : "Steady", icon: "ri-bar-chart-2-line" },
-    { label: "First charted", value: vm.firstChartedDate ? formatDate(vm.firstChartedDate) : vm.releaseYear || "—", sub: "Registry debut", icon: "ri-flag-line" },
+    { label: "First charted", value: vm.firstChartedDate ? formatDate(vm.firstChartedDate) : vm.releaseYear || "—", sub: "First charted", icon: "ri-flag-line" },
   ];
 
   return (
@@ -371,11 +371,11 @@ function TrackSidebar({ vm, rawData }: { vm: TrackViewModel; rawData: RepairedTr
         </div>
       )}
 
-      {/* Registry status */}
+      {/* Profile status */}
       <div className="border border-[var(--wk-border)] rounded-2xl bg-[var(--wk-surface)] p-5">
         <div className="flex items-center gap-2 mb-4 text-[11px] font-extrabold uppercase tracking-[0.18em] text-[var(--wk-brand)]">
           <WkIcon name="BadgeCheck" size={13} />
-          Registry status
+          Profile status
         </div>
         <div className="space-y-2 text-[12px] font-semibold text-[var(--wk-text-muted)]">
           <RegistryRow label="Chart data" value={hasChartData ? "Linked" : "Not charted"} />
@@ -533,7 +533,7 @@ export default function TrackDetail() {
     getTrack(artistSlug, trackSlug)
       .then((apiData) => {
         if (!alive) return;
-        if (!apiData) { setError("Track not found in the registry."); setLoading(false); return; }
+        if (!apiData) { setError("Track not found."); setLoading(false); return; }
         setRawData(apiData);
         setTrack(apiToViewModel(apiData));
         setLoading(false);
@@ -552,7 +552,7 @@ export default function TrackDetail() {
       <main className="min-h-screen bg-[var(--wk-bg)] flex items-center justify-center">
         <div className="text-center space-y-4">
           <div className="mx-auto h-24 w-24 rounded-2xl bg-[var(--wk-surface-raised)] animate-pulse" />
-          <p className="text-[15px] font-semibold text-[var(--wk-text-muted)]">Opening registry file&hellip;</p>
+          <p className="text-[15px] font-semibold text-[var(--wk-text-muted)]">Loading track&hellip;</p>
         </div>
       </main>
     );
@@ -565,7 +565,7 @@ export default function TrackDetail() {
         <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-[var(--wk-surface-raised)]">
           <i className="ri-file-music-line text-[var(--wk-text-faint)] text-[32px]" />
         </div>
-        <h1 className="mb-2 text-[28px] font-black text-[var(--wk-text)]">Not in the registry</h1>
+        <h1 className="mb-2 text-[28px] font-black text-[var(--wk-text)]">Track not found</h1>
         <p className="mb-8 text-[15px] text-[var(--wk-text-muted)] max-w-[400px] mx-auto">
           {error || "This recording has not yet been catalogued."}
         </p>
@@ -584,8 +584,8 @@ export default function TrackDetail() {
     if (!track.isPlayable) return;
     if (isCurrentTrack) { togglePlay(); return; }
     playTrack(
-      { id: track.slug, title: track.title, artist: track.artist, artworkUrl: track.artworkUrl, isPlayable: track.isPlayable, source: "WAKILISHA Registry", duration: track.duration, previewUrl: track.previewUrl || undefined },
-      [track].filter((t) => t.isPlayable).map((t) => ({ id: t.slug, title: t.title, artist: t.artist, artworkUrl: t.artworkUrl, isPlayable: t.isPlayable, source: "WAKILISHA Registry", duration: t.duration, previewUrl: t.previewUrl || undefined }))
+      { id: track.slug, title: track.title, artist: track.artist, artworkUrl: track.artworkUrl, isPlayable: track.isPlayable, source: "WAKILISHA", duration: track.duration, previewUrl: track.previewUrl || undefined },
+      [track].filter((t) => t.isPlayable).map((t) => ({ id: t.slug, title: t.title, artist: t.artist, artworkUrl: t.artworkUrl, isPlayable: t.isPlayable, source: "WAKILISHA", duration: t.duration, previewUrl: t.previewUrl || undefined }))
     );
   };
 
@@ -596,7 +596,7 @@ export default function TrackDetail() {
       {/* SEO */}
       <MetaTags
         title={`${track.title} by ${track.artist}`}
-        description={`${track.title} by ${track.artist}${track.albumTitle ? ` from ${track.albumTitle}` : ""} — WAKILISHA Registry${track.rank > 0 ? ` · #${track.rank}` : ""}`}
+        description={`${track.title} by ${track.artist}${track.albumTitle ? ` from ${track.albumTitle}` : ""} — WAKILISHA${track.rank > 0 ? ` · #${track.rank}` : ""}`}
         imageUrl={track.artworkUrl}
         type="music.song"
         artistName={track.artist}
@@ -645,7 +645,7 @@ export default function TrackDetail() {
               {/* Kicker */}
               <div className="inline-flex items-center gap-2 rounded-full border border-[var(--wk-brand)]/30 bg-[var(--wk-brand-soft)]/60 px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-[0.18em] text-[var(--wk-brand)] mb-5">
                 <WkIcon name="Music" size={13} />
-                Registry File
+                Track profile
                 {track.rank > 0 && (
                   <span className="ml-1 opacity-70">· #{track.rank}</span>
                 )}
@@ -751,7 +751,7 @@ export default function TrackDetail() {
                     item={{
                       title: track.title,
                       subtitle: track.artist,
-                      description: `${track.title} by ${track.artist} — WAKILISHA Registry`,
+                      description: `${track.title} by ${track.artist} — WAKILISHA`,
                       imageUrl: track.artworkUrl,
                       type: "track",
                     }}

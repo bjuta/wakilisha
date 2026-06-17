@@ -278,7 +278,7 @@ export default function Labels() {
                   </div>
                   <p className="label43-spot-desc">
                     {spotlight.description ||
-                      `${spotlight.name} is represented in the WAKILISHA registry as a label ecosystem with roster, catalog and chart relationships.`}
+                      `${spotlight.name} is represented on WAKILISHA as a label with roster, catalog and chart relationships.`}
                   </p>
                 </div>
               </Link>
@@ -416,7 +416,7 @@ export default function Labels() {
 
         {/* ── Footer ── */}
         <footer className="label43-reveal label43-footer">
-          <span className="label43-footer-brand">WAKILISHA Registry</span>
+          <span className="label43-footer-brand">WAKILISHA</span>
           <p className="label43-footer-tagline">
             {totalLabels} labels across {countries.length} countries.
             Every institution mapped as an ecosystem.

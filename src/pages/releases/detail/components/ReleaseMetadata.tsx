@@ -79,11 +79,11 @@ export default function ReleaseMetadata({
       <div className="border border-[var(--wk-border)] rounded-2xl bg-[var(--wk-surface)] p-5">
         <div className="flex items-center gap-2 mb-4 text-[11px] font-extrabold uppercase tracking-[0.18em] text-[var(--wk-brand)]">
           <WkIcon name="BadgeCheck" size={13} />
-          Registry status
+          Source details
         </div>
         <div className="space-y-2 text-[12px] font-semibold text-[var(--wk-text-muted)]">
-          <QualityRow label="Tracklist" value={release.tracks.length ? "Linked" : "Shell only"} />
-          <QualityRow label="Artwork" value={String(release.metadata?.artworkSource || "Fallback").replaceAll("_", " ")} />
+          <QualityRow label="Tracklist" value={release.tracks.length ? "Linked" : "Pending"} />
+          <QualityRow label="Artwork" value={String(release.metadata?.artworkSource || "Standard").replaceAll("_", " ")} />
           <QualityRow
             label="Release date"
             value={formatReleaseDate(release.releaseDate) || cleanYear(release.year) || "Year only"}

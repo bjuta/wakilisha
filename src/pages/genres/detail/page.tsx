@@ -40,7 +40,7 @@ export default function GenreDetail() {
       .then((data) => {
         if (!alive) return;
         if (!data) {
-          setError("Genre not found in the registry.");
+          setError("Genre not found.");
           setLoading(false);
           return;
         }
@@ -71,7 +71,7 @@ export default function GenreDetail() {
       <main className="min-h-screen px-6 py-20 text-center">
         <WkIcon name="Compass" size={42} className="mx-auto mb-4 text-[var(--wk-text-faint)]" />
         <h1 className="mb-2 text-[28px] font-black text-[var(--wk-text)]">Genre not found</h1>
-        <p className="text-[var(--wk-text-muted)]">{error || "This genre does not exist in the registry."}</p>
+        <p className="text-[var(--wk-text-muted)]">{error || "This genre could not be found."}</p>
         <Link to="/genres" className="inline-block mt-6 rounded-xl bg-[var(--wk-brand)] px-6 py-3 text-[14px] font-bold text-[var(--wk-brand-on)]">Back to genres</Link>
       </main>
     );
@@ -85,7 +85,7 @@ export default function GenreDetail() {
     <main className="min-h-screen bg-[var(--wk-bg)]">
 
       {/* ═══════════ HERO ═══════════ */}
-      <section className="relative flex min-h-[380px] items-end overflow-hidden md:min-h-[520px]">
+      <section className="relative -mt-16 pt-16 flex min-h-[380px] items-end overflow-hidden md:min-h-[520px]">
         <div className="absolute inset-0" style={{ background: heroBg }} />
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
         <div className="relative w-full px-4 pb-8 pt-20 md:px-8 md:pb-14 md:pt-28">

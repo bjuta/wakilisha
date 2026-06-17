@@ -19,7 +19,7 @@ const makeMobilePage = (
             </div>
             <div className="text-[9px] font-extrabold uppercase tracking-[0.22em] text-[var(--wk-text-muted)] mb-2 flex items-center justify-center gap-2">
               <span className="w-3 h-px bg-[var(--wk-text-faint)]" />
-              Coming Soon
+              Coming next
             </div>
             <h1 className="text-[24px] font-black tracking-[-0.04em] text-[var(--wk-text)] mb-2">WAKILISHA {label}</h1>
             <p className="text-[13px] leading-relaxed text-[var(--wk-text-soft)]">{description}</p>

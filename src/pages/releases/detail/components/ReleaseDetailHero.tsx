@@ -99,7 +99,7 @@ export default function ReleaseDetailHero({
               >
                 {release.artist}
               </a>
-              {release.labelName && release.labelName !== "Independent" && release.labelName !== "WAKILISHA Registry" && release.labelName !== "Unknown" && (
+              {release.labelName && release.labelName !== "Independent" && release.labelName !== "WAKILISHA" && release.labelName !== "WAKILISHA Registry" && release.labelName !== "Unknown" && (
                 <>
                   <span className="text-[var(--wk-text-faint)]">·</span>
                   {release.labelSlug && release.labelSlug !== "wakilisha-registry" ? (

@@ -1,15 +1,15 @@
 import { useState, useMemo, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { usePlayer } from "@/context/PlayerContext";
-import { WkTag } from "@/components/design-system/primitives/Tag";
 import { ArtistCard } from "@/components/design-system/registry/ArtistCard";
 import { ReleaseCard } from "@/components/design-system/registry/ReleaseCard";
 import { slugify } from "@/services/repairedContent/client";
-const ARTISTS: any[] = [];
-const TRACK_DETAILS: any[] = [];
-const GENRES: any[] = [];
-const LABELS: any[] = [];
-const CHART_DATA: any[] = [];
+import { useArtistSearchSuggestions } from "@/hooks/useArtistSearchSuggestions";
+import { useArtistSearchData, type ArtistSearchItem } from "@/hooks/useArtistSearchData";
+import { useTrackSearchData, type TrackSearchItem } from "@/hooks/useTrackSearchData";
+import { useGenreSearchData, type GenreSearchItem } from "@/hooks/useGenreSearchData";
+import { useLabelSearchData, type LabelSearchItem } from "@/hooks/useLabelSearchData";
+import { useChartSearchData, type ChartSearchItem } from "@/hooks/useChartSearchData";
 import { SkeletonBlock } from "@/components/skeletons/Skeletons";
 import { listReleases, type RepairedRelease } from "@/services/repairedContent/client";
 
@@ -36,6 +36,12 @@ export default function Search() {
   const [releases, setReleases] = useState<RepairedRelease[]>([]);
   const [releasesLoading, setReleasesLoading] = useState(true);
   const { playTrack } = usePlayer();
+  const { suggestions: trendingArtists, loading: trendingLoading } = useArtistSearchSuggestions(12);
+  const { data: artistData, loading: artistsLoading } = useArtistSearchData();
+  const { data: trackData, loading: tracksLoading } = useTrackSearchData();
+  const { data: genreData, loading: genresLoading } = useGenreSearchData();
+  const { data: labelData, loading: labelsLoading } = useLabelSearchData();
+  const { data: chartData, loading: chartsLoading } = useChartSearchData();
 
   const q = query.trim().toLowerCase();
 
@@ -65,21 +71,21 @@ export default function Search() {
   }, [q]);
 
   const results = useMemo(() => {
-    if (!q) return { artists: [], tracks: [], releases: [], genres: [], labels: [], charts: [] };
+    if (!q) return { artists: [] as ArtistSearchItem[], tracks: [] as TrackSearchItem[], releases: [] as RepairedRelease[], genres: [] as GenreSearchItem[], labels: [] as LabelSearchItem[], charts: [] as ChartSearchItem[] };
 
-    const artists = ARTISTS.filter((a) => a.name.toLowerCase().includes(q) || a.genres.some((g) => g.toLowerCase().includes(q)) || (a.country || "").toLowerCase().includes(q));
-    const tracks = TRACK_DETAILS.filter((t) => t.title.toLowerCase().includes(q) || t.artist.toLowerCase().includes(q) || t.genre.toLowerCase().includes(q));
+    const artists = artistData.filter((a) => a.name.toLowerCase().includes(q) || a.genres.some((g) => g.toLowerCase().includes(q)) || (a.country || "").toLowerCase().includes(q));
+    const tracks = trackData.filter((t) => t.title.toLowerCase().includes(q) || t.artist.toLowerCase().includes(q) || t.genre.toLowerCase().includes(q) || t.label.toLowerCase().includes(q));
     const filteredReleases = releasesLoading ? [] : releases.filter((r) => r.title.toLowerCase().includes(q) || r.artist.toLowerCase().includes(q) || (r.labelName || "").toLowerCase().includes(q));
-    const filteredGenres = GENRES.filter((g) => g.name.toLowerCase().includes(q) || g.representativeArtists?.some((a) => a.toLowerCase().includes(q)));
-    const filteredLabels = LABELS.filter((l) => l.name.toLowerCase().includes(q) || (l.country || "").toLowerCase().includes(q));
-    const filteredCharts = CHART_DATA.filter((c) => c.title.toLowerCase().includes(q) || c.artist.toLowerCase().includes(q) || (c.genre || "").toLowerCase().includes(q));
+    const filteredGenres = genreData.filter((g) => g.name.toLowerCase().includes(q) || g.representativeArtists?.some((a) => a.toLowerCase().includes(q)));
+    const filteredLabels = labelData.filter((l) => l.name.toLowerCase().includes(q) || (l.country || "").toLowerCase().includes(q));
+    const filteredCharts = chartData.filter((c) => c.title.toLowerCase().includes(q) || c.artist.toLowerCase().includes(q));
 
     return { artists, tracks, releases: filteredReleases, genres: filteredGenres, labels: filteredLabels, charts: filteredCharts };
-  }, [q, releases, releasesLoading]);
+  }, [q, artistData, trackData, releases, releasesLoading, genreData, labelData, chartData]);
 
   const total = results.artists.length + results.tracks.length + results.releases.length + results.genres.length + results.labels.length + results.charts.length;
 
-  const handlePlayTrack = (track: (typeof TRACK_DETAILS)[0]) => {
+  const handlePlayTrack = (track: TrackSearchItem) => {
     playTrack(
       { id: track.slug, title: track.title, artist: track.artist, artworkUrl: track.artworkUrl, isPlayable: track.isPlayable, source: track.source },
       [{ id: track.slug, title: track.title, artist: track.artist, artworkUrl: track.artworkUrl, isPlayable: track.isPlayable, source: track.source }]
@@ -169,8 +175,8 @@ export default function Search() {
                   { icon: "ri-bar-chart-line", label: "Charts", to: "/charts", desc: "Current rankings" },
                   { icon: "ri-user-line", label: "Artists", to: "/artists", desc: "Artist directory" },
                   { icon: "ri-album-line", label: "Releases", to: "/search?q=releases", desc: "Albums & singles" },
-                  { icon: "ri-folder-music-line", label: "Genres", to: "/genres", desc: "Genre territories" },
-                  { icon: "ri-building-2-line", label: "Labels", to: "/labels", desc: "Label registry" },
+                  { icon: "ri-folder-music-line", label: "Genres", to: "/genres", desc: "Genre archive" },
+                  { icon: "ri-building-2-line", label: "Labels", to: "/labels", desc: "Label archive" },
                   { icon: "ri-article-line", label: "Magazine", to: "/magazine", desc: "Editorial stories" },
                 ].map((cat) => (
                   <Link
@@ -188,20 +194,32 @@ export default function Search() {
               </div>
             </div>
 
-            {/* Recent searches */}
+            {/* Starting points */}
             <div>
-              <div className="wk-eyebrow mb-4">Trending</div>
-              <div className="flex flex-wrap gap-2">
-                {["Burna Boy", "Afrobeats", "Amapiano", "Tems", "Wizkid", "Asake", "Davido", "Rema"].map((term) => (
-                  <button
-                    key={term}
-                    onClick={() => setQuery(term)}
-                    className="rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] px-4 py-2 text-[13px] font-semibold text-[var(--wk-text-soft)] transition-all hover:border-[var(--wk-brand)]/40 hover:text-[var(--wk-brand)]"
-                  >
-                    {term}
-                  </button>
-                ))}
-              </div>
+              <div className="wk-eyebrow mb-4">Jump in</div>
+              {trendingLoading ? (
+                <div className="flex flex-wrap gap-2">
+                  {Array.from({ length: 8 }).map((_, i) => (
+                    <span key={i} className="rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] px-4 py-2">
+                      <SkeletonBlock className="h-4 w-20 rounded" />
+                    </span>
+                  ))}
+                </div>
+              ) : trendingArtists.length === 0 ? (
+                <p className="text-[13px] text-[var(--wk-text-muted)]">Type a name, genre, or place to get started.</p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {trendingArtists.map((name) => (
+                    <button
+                      key={name}
+                      onClick={() => setQuery(name)}
+                      className="rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] px-4 py-2 text-[13px] font-semibold text-[var(--wk-text-soft)] transition-all hover:border-[var(--wk-brand)]/40 hover:text-[var(--wk-brand)]"
+                    >
+                      {name}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -324,8 +342,8 @@ export default function Search() {
                       to={`/genres/${genre.slug}`}
                       className="group relative overflow-hidden rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-5 transition-all hover:border-[var(--wk-border-2)]"
                     >
-                      <div className="absolute right-0 top-0 h-32 w-32 rounded-bl-full opacity-[0.08] transition-opacity group-hover:opacity-[0.14]" style={{ background: `var(${genre.accentVar})` }} />
-                      <div className="mb-1 text-[11px] font-black uppercase tracking-[0.18em]" style={{ color: `var(${genre.accentVar})` }}>
+                      <div className="absolute right-0 top-0 h-32 w-32 rounded-bl-full opacity-[0.08] transition-opacity group-hover:opacity-[0.14]" style={{ background: genre.accentVar }} />
+                      <div className="mb-1 text-[11px] font-black uppercase tracking-[0.18em]" style={{ color: genre.accentVar }}>
                         Genre
                       </div>
                       <h3 className="text-[18px] font-black tracking-tight text-[var(--wk-text)]">{highlight(genre.name, query)}</h3>

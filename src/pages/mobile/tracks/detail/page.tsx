@@ -81,7 +81,7 @@ function apiToViewModel(api: RepairedTrackDetail): TrackViewModel {
     : [];
 
   const primaryArtist = artistsArr.find((a) => a.isPrimary) || artistsArr[0];
-  const artistName = primaryArtist?.name || artistData.name || "WAKILISHA Registry";
+  const artistName = primaryArtist?.name || artistData.name || "WAKILISHA";
   const resolvedArtistSlug = primaryArtist?.slug || artistData.slug || "";
 
   const history = Array.isArray(raw.chartHistory) ? raw.chartHistory : [];
@@ -223,7 +223,7 @@ function MobileCuratorsNote({ apiData }: { apiData: RepairedTrackDetail }) {
       </p>
       <div className="mt-4 pt-3 border-t border-[var(--wk-divider)]">
         <p className="text-[10px] text-[var(--wk-text-faint)] italic leading-relaxed">
-          Generated from the WAKILISHA relationship graph.
+          Generated from connected data across the WAKILISHA archive.
         </p>
       </div>
     </div>
@@ -251,7 +251,7 @@ export default function MobileTrackDetail() {
     getTrack(artistSlug, trackSlug)
       .then((apiData) => {
         if (!alive) return;
-        if (!apiData) { setError("Track not found in the registry."); setLoading(false); return; }
+        if (!apiData) { setError("Track not found."); setLoading(false); return; }
         setRawData(apiData);
         setTrack(apiToViewModel(apiData));
         setLoading(false);
@@ -292,7 +292,7 @@ export default function MobileTrackDetail() {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-5 px-6 text-center bg-[var(--wk-bg)]">
         <i className="ri-file-music-line text-5xl text-[var(--wk-text-faint)]" />
-        <h1 className="text-[20px] font-black text-[var(--wk-text)]">Not in the registry</h1>
+        <h1 className="text-[20px] font-black text-[var(--wk-text)]">Track not found</h1>
         <p className="text-[14px] text-[var(--wk-text-muted)]">{error || "This track has not been catalogued yet."}</p>
         <Link to="/charts" className="inline-flex items-center gap-2 rounded-full bg-[var(--wk-brand)] px-6 py-3 text-[13px] font-bold text-[var(--wk-brand-on)] whitespace-nowrap">
           <i className="ri-arrow-left-line" />
@@ -310,8 +310,8 @@ export default function MobileTrackDetail() {
     if (!track.isPlayable) return;
     if (isCurrentTrack) { togglePlay(); return; }
     playTrack(
-      { id: track.slug, title: track.title, artist: track.artist, artworkUrl: track.artworkUrl, isPlayable: track.isPlayable, source: "WAKILISHA Registry", duration: track.duration, previewUrl: track.previewUrl || undefined },
-      [track].filter((t) => t.isPlayable).map((t) => ({ id: t.slug, title: t.title, artist: t.artist, artworkUrl: t.artworkUrl, isPlayable: t.isPlayable, source: "WAKILISHA Registry", duration: t.duration, previewUrl: t.previewUrl || undefined }))
+      { id: track.slug, title: track.title, artist: track.artist, artworkUrl: track.artworkUrl, isPlayable: track.isPlayable, source: "WAKILISHA", duration: track.duration, previewUrl: track.previewUrl || undefined },
+      [track].filter((t) => t.isPlayable).map((t) => ({ id: t.slug, title: t.title, artist: t.artist, artworkUrl: t.artworkUrl, isPlayable: t.isPlayable, source: "WAKILISHA", duration: t.duration, previewUrl: t.previewUrl || undefined }))
     );
   };
 
@@ -320,7 +320,7 @@ export default function MobileTrackDetail() {
       {/* SEO */}
       <MetaTags
         title={`${track.title} by ${track.artist}`}
-        description={`${track.title} by ${track.artist}${track.albumTitle ? ` from ${track.albumTitle}` : ""} — WAKILISHA Registry${track.rank > 0 ? ` · #${track.rank}` : ""}`}
+        description={`${track.title} by ${track.artist}${track.albumTitle ? ` from ${track.albumTitle}` : ""} — WAKILISHA${track.rank > 0 ? ` · #${track.rank}` : ""}`}
         imageUrl={track.artworkUrl}
         type="music.song"
         artistName={track.artist}
@@ -358,7 +358,7 @@ export default function MobileTrackDetail() {
           <div className="mb-2.5 flex items-center gap-2">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--wk-brand)]/90 px-3 py-1 text-[9px] font-bold text-white uppercase tracking-wider backdrop-blur">
               <i className="ri-music-2-line text-[10px]" />
-              Registry File
+              Track profile
             </span>
             {track.rank > 0 && (
               <span className="rounded-full border border-white/20 bg-black/30 backdrop-blur-md px-2.5 py-1 text-[10px] font-extrabold text-white/80">
@@ -525,7 +525,7 @@ export default function MobileTrackDetail() {
         <section>
           <div className="mb-3 flex items-center gap-2">
             <span className="w-5 h-px bg-[var(--wk-brand)]" />
-            <span className="text-[10px] font-extrabold uppercase tracking-[0.22em] text-[var(--wk-brand)]">Registry details</span>
+            <span className="text-[10px] font-extrabold uppercase tracking-[0.22em] text-[var(--wk-brand)]">Track details</span>
           </div>
           <div className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] divide-y divide-[var(--wk-divider)]">
             {(track.releaseDate || track.releaseYear) && (
@@ -684,7 +684,7 @@ export default function MobileTrackDetail() {
 
         {/* Browse CTA */}
         <div className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-5 text-center">
-          <p className="text-[13px] font-semibold text-[var(--wk-text-soft)]">Explore the full registry</p>
+          <p className="text-[13px] font-semibold text-[var(--wk-text-soft)]">Explore the full catalogue</p>
           <Link to="/charts" className="mt-3 inline-flex items-center gap-2 rounded-full bg-[var(--wk-brand)] px-5 py-2.5 text-[12px] font-bold text-white active:scale-[0.97] transition-transform whitespace-nowrap">
             <i className="ri-bar-chart-2-line" />
             Browse charts

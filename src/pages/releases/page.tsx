@@ -508,7 +508,7 @@ function FeaturedReleaseCarousel({ releases, catalogStats, onPreview }: { releas
                 Albums &amp; releases
               </h1>
               <p className="mt-6 max-w-2xl text-[17px] font-semibold leading-[1.75] text-white/74 md:text-[19px]">
-                A registry-backed release shelf for albums, EPs and singles across WAKILISHA. Swipe through featured records, then filter the full catalog below.
+                A release shelf for albums, EPs and singles across WAKILISHA. Swipe through featured records, then filter the full catalog below.
               </p>
               <div className="mt-7 flex flex-wrap items-center gap-3 text-[12px] font-extrabold text-white/82">
                 <span className="inline-flex items-center gap-2 rounded-full border border-white/16 bg-white/10 px-3 py-2 backdrop-blur">

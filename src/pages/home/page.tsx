@@ -107,12 +107,12 @@ export default function Home() {
                   className="font-black tracking-[-0.03em] text-[var(--wk-text)] mb-3"
                   style={{ fontSize: "clamp(22px,2.5vw,32px)", lineHeight: 1.05 }}
                 >
-                  The ecosystem, in your inbox.
+                  The culture, in your inbox.
                 </h2>
 
                 <p className="text-[14px] leading-relaxed text-[var(--wk-text-muted)] mb-6">
                   Chart updates, new guides, editorial deep-dives, and early access to
-                  new verticals as they launch across African creative life.
+                  new sections as they launch across WAKILISHA.
                 </p>
 
                 <form

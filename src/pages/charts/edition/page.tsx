@@ -94,7 +94,6 @@ export default function ChartEdition() {
         requestedSlug: string;
       }
   >({ status: "loading" });
-  const [showDiagnostics, setShowDiagnostics] = useState(false);
 
   const load = useCallback(async () => {
     if (!chartProgramSlug) {
@@ -455,27 +454,18 @@ export default function ChartEdition() {
   }
 
   const metaLine = meta.isStale
-    ? `Loaded from cache (stale) · Last updated ${new Date(meta.fetchedAt).toLocaleString()}`
+    ? `Updated ${new Date(meta.fetchedAt).toLocaleString()}`
     : meta.dataSource === "cache"
-    ? `Loaded from cache · Last updated ${new Date(meta.fetchedAt).toLocaleString()}`
-    : `Loaded from ${meta.dataSource === "mock" ? "mock data" : "WordPress API"} · ${new Date(meta.fetchedAt).toLocaleTimeString()}`;
+    ? `Refreshed ${new Date(meta.fetchedAt).toLocaleString()}`
+    : `Live · ${new Date(meta.fetchedAt).toLocaleTimeString()}`;
 
-  const diagnosticsData = {
-    requestedSlug,
-    resolvedSourceFamilySlug: sourceFamilySlug,
-    canonicalPublicSlug: publicSlug,
-    editionSlug: edition.slug,
-    editionLabel: edition.label,
-    dataSource: meta.dataSource,
-    canonicalized: canonicalized ? "Yes" : "No",
-    totalEntries: entries.length,
-  };
+  // diagnostics kept server-side only
 
   return (
     <main className="min-h-screen bg-[var(--wk-bg)]">
 
       {/* ═══════════════════════ HERO ═══════════════════════ */}
-      <section className="chart-hero-v2">
+      <section className="chart-hero-v2 -mt-16">
         <div className="chart-hero-v2-media">
           <img
             ref={heroImgRef}
@@ -510,13 +500,10 @@ export default function ChartEdition() {
           {/* Metadata pills */}
           <div className="chart-hero-v2-meta-strip">
             <span className="chart-hero-v2-meta-pill">
-              <span className="font-bold text-white/90">Family:</span> {edition.seriesLabel}
+              <span className="font-bold text-white/90">Chart series:</span> {edition.seriesLabel}
             </span>
             <span className="chart-hero-v2-meta-pill">
-              <span className="font-bold text-white/90">Market:</span> {edition.marketLabel}
-            </span>
-            <span className="chart-hero-v2-meta-pill">
-              <span className="font-bold text-white/90">Methodology:</span> {edition.methodologyVersion}
+              <span className="font-bold text-white/90">Scene:</span> {edition.marketLabel}
             </span>
           </div>
 
@@ -841,7 +828,7 @@ export default function ChartEdition() {
           <div className="chart-section-header">
             <div className="chart-section-eyebrow">Full ranking</div>
             <h2 className="chart-section-title">Positions 4–{entries.length}</h2>
-            <p className="chart-section-sub">Every track ranked by composite score. Click any row for full track details, or play directly.</p>
+            <p className="chart-section-sub">Follow the full chart from number one to the new entries, big jumps, and songs refusing to leave.</p>
           </div>
           <div className="chart-body-grid">
             {/* Table */}
@@ -1035,40 +1022,11 @@ export default function ChartEdition() {
         </section>
       </div>
 
-      {/* ═══════════════════════ METADATA BAR ═══════════════════════ */}
+      {/* data freshness bar */}
       <div className="chart-meta-bar">
         <div className="chart-meta-bar-inner">
           <span className="chart-meta-bar-text">{metaLine}</span>
-          <button
-            onClick={() => setShowDiagnostics(!showDiagnostics)}
-            className="chart-meta-bar-toggle"
-          >
-            <i className={`ri-${showDiagnostics ? "arrow-up" : "arrow-down"}-s-line text-[12px]`} />
-            {showDiagnostics ? "Hide" : "Show"} diagnostics
-          </button>
         </div>
-        {showDiagnostics && (
-          <div className="chart-meta-bar-inner">
-            <div className="chart-meta-bar-diagnostics">
-              <span className="text-[var(--wk-text-faint)]">Requested slug</span>
-              <span>{diagnosticsData.requestedSlug}</span>
-              <span className="text-[var(--wk-text-faint)]">Resolved sourceFamilySlug</span>
-              <span>{diagnosticsData.resolvedSourceFamilySlug}</span>
-              <span className="text-[var(--wk-text-faint)]">Canonical publicSlug</span>
-              <span className="text-[var(--wk-brand)]">{diagnosticsData.canonicalPublicSlug}</span>
-              <span className="text-[var(--wk-text-faint)]">Edition slug</span>
-              <span>{diagnosticsData.editionSlug}</span>
-              <span className="text-[var(--wk-text-faint)]">Edition label</span>
-              <span>{diagnosticsData.editionLabel}</span>
-              <span className="text-[var(--wk-text-faint)]">Data source</span>
-              <span>{diagnosticsData.dataSource}</span>
-              <span className="text-[var(--wk-text-faint)]">Canonicalized</span>
-              <span className={diagnosticsData.canonicalized === "Yes" ? "text-[var(--wk-brand)]" : ""}>{diagnosticsData.canonicalized}</span>
-              <span className="text-[var(--wk-text-faint)]">Total entries</span>
-              <span>{diagnosticsData.totalEntries}</span>
-            </div>
-          </div>
-        )}
       </div>
     </main>
   );

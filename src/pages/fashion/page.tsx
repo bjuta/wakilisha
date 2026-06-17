@@ -23,7 +23,7 @@ export default function FashionPage() {
           </div>
           <div className="wk-eyebrow mb-4 justify-center">
             <span className="hidden">—</span>
-            Coming Soon
+            Coming next
           </div>
           <h1 className="font-black text-[clamp(32px,5vw,56px)] leading-[0.94] tracking-[-0.04em] text-[var(--wk-text)] mb-4">
             WAKILISHA {VERTICAL.label}

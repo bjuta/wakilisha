@@ -64,7 +64,7 @@ function buildDescription(opts: {
 
   let open = `"${title}" is ${articleize(rType)} by ${artist}`;
   if (year && year !== "Unknown year") open += `, released in ${year}`;
-  if (labelName && labelName !== "Independent" && labelName !== "Unknown" && labelName !== "WAKILISHA Registry") {
+  if (labelName && labelName !== "Independent" && labelName !== "Unknown" && labelName !== "WAKILISHA Registry" && labelName !== "WAKILISHA") {
     open += ` through ${labelName}`;
   }
   open += ".";
@@ -287,7 +287,7 @@ export default function MobileReleaseDetail() {
               <Link to={`/artists/${slugify(release.artist)}`} className="text-[14px] font-bold text-[var(--wk-text)] active:opacity-70">
                 {release.artist}
               </Link>
-              <div className="text-[11px] text-[var(--wk-text-muted)]">{release.year} · {release.trackCount} tracks{release.labelName && release.labelName !== "WAKILISHA Registry" ? ` · ${release.labelName}` : ""}</div>
+              <div className="text-[11px] text-[var(--wk-text-muted)]">{release.year} · {release.trackCount} tracks{release.labelName && release.labelName !== "WAKILISHA Registry" && release.labelName !== "WAKILISHA" ? ` · ${release.labelName}` : ""}</div>
             </div>
           </div>
           <div className="mt-4 flex items-center gap-3">
@@ -413,7 +413,7 @@ export default function MobileReleaseDetail() {
         <section>
           <div className="mb-3 flex items-center gap-2">
             <span className="w-5 h-px bg-[var(--wk-brand)]" />
-            <span className="text-[10px] font-extrabold uppercase tracking-[0.22em] text-[var(--wk-brand)]">Registry details</span>
+            <span className="text-[10px] font-extrabold uppercase tracking-[0.22em] text-[var(--wk-brand)]">Catalogue details</span>
           </div>
           <div className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] divide-y divide-[var(--wk-divider)]">
             <div className="flex items-center justify-between px-4 py-3">
@@ -424,7 +424,7 @@ export default function MobileReleaseDetail() {
               <span className="text-[12px] font-semibold text-[var(--wk-text-muted)]">Release date</span>
               <span className="text-[13px] font-bold text-[var(--wk-text)]">{release.releaseDate || release.year}</span>
             </div>
-            {release.labelName && release.labelName !== "WAKILISHA Registry" && (
+            {release.labelName && release.labelName !== "WAKILISHA Registry" && release.labelName !== "WAKILISHA" && (
               <div className="flex items-center justify-between px-4 py-3">
                 <span className="text-[12px] font-semibold text-[var(--wk-text-muted)]">Label</span>
                 <span className="text-[13px] font-bold text-[var(--wk-text)]">{release.labelName}</span>

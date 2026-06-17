@@ -196,7 +196,7 @@ export default function AuthPage() {
       </div>
       <div className="relative z-10 p-10 md:p-14 pb-14">
         <p className="max-w-[340px] leading-relaxed" style={{ fontFamily: "var(--wk-font-body)", fontSize: "15px", color: "var(--wk-text-soft)" }}>
-          {isRecovery ? "Choose a new password and get back into your account securely." : mode === "forgot" ? "Reset your public WAKILISHA account password securely." : mode === "magic" ? "Use a one-time email link to continue without a password." : "Your people are here. Sign in to follow artists, save charts, and keep your cultural graph close."}
+          {isRecovery ? "Choose a new password and get back into your account securely." : mode === "forgot" ? "Reset your public WAKILISHA account password securely." : mode === "magic" ? "Use a one-time email link to continue without a password." : "Your people are here. Sign in to follow artists, save charts, and keep your culture close."}
         </p>
         {!isRecovery && <div className="flex gap-2 mt-8">{(["charts", "artists", "magazine"] as const).map((c) => <button key={c} onClick={() => setChoice(c)} className="px-4 py-2 rounded-full text-[11px] font-bold uppercase tracking-[0.12em] whitespace-nowrap transition-all duration-200 cursor-pointer capitalize" style={{ background: choice === c ? "var(--wk-brand-soft)" : "transparent", border: choice === c ? "1px solid rgba(var(--wk-brand-rgb), 0.35)" : "1px solid var(--wk-border)", color: choice === c ? "var(--wk-brand)" : "var(--wk-text-muted)" }}>{c}</button>)}</div>}
       </div>
@@ -208,7 +208,7 @@ export default function AuthPage() {
   }
 
   const heading = isRecovery ? "Reset your password" : mode === "forgot" ? "Forgot password?" : mode === "magic" ? "Get a magic link" : mode === "signin" ? "Welcome back" : "Create your account";
-  const subcopy = isRecovery ? "Enter a new password for your WAKILISHA account." : mode === "forgot" ? "Enter your email and we will send a secure reset link." : mode === "magic" ? "Enter your email and we will send a one-time sign-in link." : mode === "signin" ? "Sign in to continue to your cultural graph." : "Join WAKILISHA and connect with African culture.";
+  const subcopy = isRecovery ? "Enter a new password for your WAKILISHA account." : mode === "forgot" ? "Enter your email and we will send a secure reset link." : mode === "magic" ? "Enter your email and we will send a one-time sign-in link." : mode === "signin" ? "Sign in to continue to your WAKILISHA account." : "Join WAKILISHA and connect with African culture.";
 
   return (
     <main className="flex min-h-screen" style={{ background: "var(--wk-bg)" }}>

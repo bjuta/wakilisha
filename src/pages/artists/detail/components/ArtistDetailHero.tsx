@@ -36,7 +36,7 @@ export function ArtistDetailHero({
   const visibleGenres = genres.slice(0, 3);
 
   return (
-    <section className="relative min-h-[420px] md:min-h-[600px] flex items-end overflow-hidden">
+    <section className="relative -mt-16 pt-16 min-h-[420px] md:min-h-[600px] flex items-end overflow-hidden">
 
       {/* Background image — full bleed, acts as artist photo on mobile */}
       {imageUrl && (
@@ -57,7 +57,7 @@ export function ArtistDetailHero({
 
       {/* ─── Content ─── */}
       <div className="relative w-full">
-        <div className="wk-container px-4 pb-7 pt-16 md:px-6 md:pb-16 md:pt-24">
+        <div className="wk-container px-4 pb-7 md:px-6 md:pb-16 md:pt-24">
 
           {/* Breadcrumb — desktop only (mobile has floating back button) */}
           <div className="hero-text-reveal mb-4 md:mb-6 hidden md:flex items-center gap-3">
@@ -69,7 +69,7 @@ export function ArtistDetailHero({
             </Link>
             <i className="ri-arrow-right-line text-[10px] text-white/40" />
             <span className="text-[11px] font-extrabold uppercase tracking-[0.22em] text-white/50">
-              Registry
+              Profile
             </span>
           </div>
 

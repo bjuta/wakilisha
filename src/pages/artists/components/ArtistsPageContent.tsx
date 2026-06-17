@@ -211,7 +211,7 @@ export default function ArtistsPageContent() {
           <div className="h-1 w-32 overflow-hidden rounded-full bg-[var(--wk-surface-raised)]">
             <div className="h-full w-1/2 animate-pulse rounded-full bg-[var(--wk-brand)]" />
           </div>
-          <span className="text-[12px] font-semibold uppercase tracking-[0.2em] text-[var(--wk-text-faint)]">Loading African Greats</span>
+          <span className="text-[12px] font-semibold uppercase tracking-[0.2em] text-[var(--wk-text-faint)]">Loading artists</span>
         </div>
       </div>
     );
@@ -316,10 +316,10 @@ export default function ArtistsPageContent() {
           <div className="mb-10 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
             <div>
               <div className="wk-eyebrow mb-3">Complete archive</div>
-              <h2 className="wk-h-page">Every voice, every nation</h2>
+              <h2 className="wk-h-page">Browse the artist archive</h2>
             </div>
             <p className="wk-copy max-w-[44ch] text-[13px]">
-              Browse {artists.length.toLocaleString()} artists shaping the sound of the continent — ranked by impact, not alphabet.
+              Search by name, country, genre, chart moments, or release history. Start with who you know. Leave with someone new.
             </p>
           </div>
 
@@ -339,7 +339,7 @@ export default function ArtistsPageContent() {
                   className="directory-search pl-9"
                   value={query}
                   onChange={(e) => { setQuery(e.target.value); setVisibleCount(PAGE_SIZE); }}
-                  placeholder="Search artist, genre, or country"
+                  placeholder="Search by artist, genre, or country"
                 />
               </div>
               <div className="view-toggle" aria-label="View mode">
@@ -497,13 +497,13 @@ export default function ArtistsPageContent() {
       <footer className="px-4 md:px-6 pb-14">
         <div className="wk-container-wide border-t border-[var(--wk-border)] pt-14 text-center">
           <span className="block text-[9px] font-black uppercase tracking-[0.24em] text-[var(--wk-brand)] mb-3">
-            WAKILISHA Registry
+            WAKILISHA Artists
           </span>
           <p className="text-[22px] font-black tracking-[-0.03em] text-[var(--wk-text)] leading-snug max-w-[380px] mx-auto">
             {artists.length.toLocaleString()} artists shaping the sound of the continent.
           </p>
           <p className="mt-3 text-[12px] font-semibold text-[var(--wk-text-faint)]">
-            Every voice, every nation, every beat.
+            More voices, more places, more music.
           </p>
         </div>
       </footer>
@@ -701,13 +701,13 @@ function SplitHero({ artists }: SplitHeroProps) {
           </span>
 
           <h1 className="hero-text-reveal-d1 font-black text-[clamp(42px,9vw,130px)] leading-[0.85] tracking-[-0.06em] text-white drop-shadow-[0_2px_24px_rgba(0,0,0,0.7)]">
-            African<br />
-            <span className="text-[var(--wk-brand)] drop-shadow-[0_2px_24px_rgba(0,0,0,0.7)]">Greats</span>
+            Artists<br />
+            <span className="text-[var(--wk-brand)] drop-shadow-[0_2px_24px_rgba(0,0,0,0.7)]">in focus</span>
           </h1>
 
           <p className="hero-text-reveal-d2 max-w-[52ch] text-[14px] leading-[1.75] text-white drop-shadow-[0_1px_8px_rgba(0,0,0,0.8)] md:text-[16px]" style={{ textShadow: "0 1px 12px rgba(0,0,0,0.9), 0 0 40px rgba(0,0,0,0.5)" }}>
-            A curated hall of the artists, pioneers, and rising voices shaping the sound of Africa.
-            From chart-toppers to underground legends — every story, every nation, every beat.
+            Find the artists shaping African music, from familiar names to rising voices,
+            deep catalog acts, scene builders, and people you are about to start pretending you knew all along.
           </p>
         </div>
 
