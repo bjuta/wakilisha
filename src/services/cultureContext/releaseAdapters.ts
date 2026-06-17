@@ -89,6 +89,6 @@ export function releaseEmptyStateCopy(hasFilters = false): { title: string; body
   return {
     title: "The release shelf is still filling up.",
     body: "Albums, EPs, singles, mixtapes, and more will show up here as WAKILISHA connects them.",
-    action: "Browse artists",
+    action: "Browse releases",
   };
 }
