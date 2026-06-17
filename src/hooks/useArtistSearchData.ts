@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import { buildArtistSearchSnippet } from "@/services/cultureContext/artistAdapters";
 
 export interface ArtistSearchItem {
   slug: string;
@@ -7,6 +8,7 @@ export interface ArtistSearchItem {
   imageUrl?: string;
   genres: string[];
   country?: string;
+  contextText: string;
 }
 
 export function useArtistSearchData() {
@@ -34,12 +36,19 @@ export function useArtistSearchData() {
 
         const mapped: ArtistSearchItem[] = (artists || []).map((a) => {
           const meta = (a.metadata as Record<string, unknown>) || {};
-          return {
+          const genres = Array.isArray(meta.genres) ? (meta.genres as string[]) : [];
+          const country = typeof meta.country === "string" ? meta.country : undefined;
+          const item = {
             slug: a.slug,
             name: a.display_name,
             imageUrl: a.public_image_url || undefined,
-            genres: Array.isArray(meta.genres) ? (meta.genres as string[]) : [],
-            country: typeof meta.country === "string" ? meta.country : undefined,
+            genres,
+            country,
+          };
+
+          return {
+            ...item,
+            contextText: buildArtistSearchSnippet(item),
           };
         });
 
