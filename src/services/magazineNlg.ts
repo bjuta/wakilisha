@@ -1,6 +1,7 @@
 import type { MagazineIssue } from './magazineIssues';
 import type { MagazineIssueExperience } from './magazineIssueEngine';
 import { buildMagazineIssueExperience } from './magazineIssueEngine';
+import { MAGAZINE_EDITORIAL_PATHS } from './magazineIssueEngine/editorialPaths';
 
 export const WAKILISHA_MAGAZINE_EDITOR = {
   name: 'Muiruri Beautah',
@@ -24,5 +25,16 @@ export type MagazineEditorialSystem = MagazineIssueExperience;
  * separated from public field notes.
  */
 export function buildIssueEditorialSystem(issue: MagazineIssue): MagazineEditorialSystem {
-  return buildMagazineIssueExperience(issue);
+  const experience = buildMagazineIssueExperience(issue);
+  if (issue.issueNumber !== 1 && issue.slug !== 'issue-001') return experience;
+
+  return {
+    ...experience,
+    editorNote: {
+      ...experience.editorNote,
+      mdxPath: MAGAZINE_EDITORIAL_PATHS.editorNote,
+      hasMdxOverride: true,
+      generatedFallbackBody: experience.editorNote.body,
+    },
+  } as MagazineEditorialSystem;
 }
