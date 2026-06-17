@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { buildLabelSearchSnippet } from "@/services/cultureContext/searchAdapters";
+import { normalizeCountry } from "@/services/cultureContext/formatters";
 
 export interface LabelSearchItem {
   slug: string;
@@ -56,7 +57,7 @@ export function useLabelSearchData() {
           const item = {
             slug: l.slug,
             name: l.name,
-            country: l.country_code || "",
+            country: normalizeCountry(l.country_code) || "",
             artistCount: 0,
             releaseCount: releaseCountsByLabel[l.name.toLowerCase()] || 0,
           };
