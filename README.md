@@ -152,6 +152,8 @@ docs/data-contract.md
 docs/react-parity-migration-plan.md
 docs/wordpress-plugin-audit.md
 docs/culture-context-engine-plan.md
+docs/magazine-issue-engine-plan.md
+docs/magazine-issue-ui-experience-plan.md
 ```
 
 ## Acceptance gate before frontend work
