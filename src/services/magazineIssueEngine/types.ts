@@ -203,6 +203,16 @@ export type MagazineIssueAdminNotes = {
   scoring: string[];
 };
 
+export type MagazineIssueSurfaces = {
+  heroIntro: string;
+  cardBlurb: string;
+  searchSnippet: string;
+  seoDescription: string;
+  archiveBlurb: string;
+  emptyState: string;
+  adminQualityNote: string;
+};
+
 export type MagazineIssueExperience = {
   issueMood: IssueMood;
   coverVariant: IssueCoverVariant;
@@ -220,15 +230,18 @@ export type MagazineIssueExperience = {
   readerPromise: string;
   visualPromise: string;
   issueCta: string;
+  heroIntro: string;
   coverLine: string;
   cardBlurb: string;
   archiveBlurb: string;
   searchSnippet: string;
   seoDescription: string;
   contentsIntro: string;
+  emptyState: string;
   readingPath: ReadingPathStep[];
   signalReading: string;
   adminQualityNote: string;
+  surfaces: MagazineIssueSurfaces;
   adminNotes: MagazineIssueAdminNotes;
   warnings: string[];
   factsUsed: string[];
