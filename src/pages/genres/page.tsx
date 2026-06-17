@@ -3,9 +3,15 @@ import { Link } from "react-router-dom";
 import { ShareButton } from "@/components/design-system/share/ShareSheet";
 import { WkIcon } from "@/components/design-system/Icon";
 import { Chapter19FallbackImage } from "@/components/media/Chapter19FallbackImage";
-import { listGenres, type RepairedGenre } from "@/services/repairedContent/client";
+import {
+  listGenresPaginated,
+  getGenreCatalogStats,
+  type PublicGenre,
+  type GenreCatalogStats,
+} from "@/services/publicContent/client";
 
 const filters = ["All", "High activity", "Artist-rich", "Track-rich", "Recently updated"];
+const PAGE_SIZE = 24;
 
 function useScrollReveal(deps: unknown[] = []) {
   useEffect(() => {
@@ -29,7 +35,9 @@ function useScrollReveal(deps: unknown[] = []) {
 export default function Genres() {
   const [activeFilter, setActiveFilter] = useState("All");
   const [query, setQuery] = useState("");
-  const [genres, setGenres] = useState<RepairedGenre[]>([]);
+  const [page, setPage] = useState(1);
+  const [genres, setGenres] = useState<PublicGenre[]>([]);
+  const [stats, setStats] = useState<GenreCatalogStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,57 +45,70 @@ export default function Genres() {
     setLoading(true);
     setError(null);
     try {
-      const data = await listGenres();
-      setGenres(data);
+      const [statsData, pageData] = await Promise.all([
+        getGenreCatalogStats(),
+        listGenresPaginated({
+          page: 1,
+          pageSize: PAGE_SIZE,
+          search: query,
+          activityFilter: activeFilter,
+        }),
+      ]);
+      setStats(statsData);
+      setGenres(pageData.genres);
+      setPage(1);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load genres.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [query, activeFilter]);
+
+  const loadPage = useCallback(async (targetPage: number) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const pageData = await listGenresPaginated({
+        page: targetPage,
+        pageSize: PAGE_SIZE,
+        search: query,
+        activityFilter: activeFilter,
+      });
+      setGenres(pageData.genres);
+      setPage(targetPage);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not load genres.");
+    } finally {
+      setLoading(false);
+    }
+  }, [query, activeFilter]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
 
-  useScrollReveal([loading]);
+  useScrollReveal([loading, page]);
 
-  const totalArtists = genres.reduce((s, g) => s + g.artistCount, 0);
-  const totalTracks = genres.reduce((s, g) => s + g.trackCount, 0);
+  const totalArtists = stats?.totalArtists ?? 0;
+  const totalTracks = stats?.totalTracks ?? 0;
+  const totalGenres = stats?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(totalGenres / PAGE_SIZE));
 
   const sortedByActivity = useMemo(
-    () => [...genres].sort((a, b) => b.trackCount - a.trackCount),
-    [genres]
+    () => [...genres].sort((a, b) => b.artistCount - a.artistCount),
+    [genres],
   );
 
   const spotlight = sortedByActivity[0];
   const compactGenres = sortedByActivity.slice(1, 4);
+  const trendingGenres = sortedByActivity.slice(0, 8);
 
-  const filteredGenres = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return genres.filter((genre) => {
-      const matchesQuery =
-        !q ||
-        genre.name.toLowerCase().includes(q) ||
-        genre.representativeArtists?.some((artist) =>
-          artist.toLowerCase().includes(q)
-        );
-      const matchesFilter =
-        activeFilter === "All" ||
-        (activeFilter === "High activity" && genre.trackCount >= 100) ||
-        (activeFilter === "Artist-rich" && genre.artistCount >= 25) ||
-        (activeFilter === "Track-rich" && genre.trackCount >= 50) ||
-        activeFilter === "Recently updated";
-      return matchesQuery && matchesFilter;
-    });
-  }, [activeFilter, query, genres]);
+  const updateFilter = (next: string) => {
+    setActiveFilter(next);
+    setPage(1);
+  };
 
-  const trendingGenres = useMemo(
-    () => sortedByActivity.slice(0, 8),
-    [sortedByActivity]
-  );
-
-  if (loading) {
+  if (loading && genres.length === 0) {
     return (
       <main className="min-h-screen">
         <div className="genre43-hero-skel">
@@ -112,14 +133,14 @@ export default function Genres() {
     );
   }
 
-  if (error) {
+  if (error && genres.length === 0) {
     return (
       <main className="min-h-screen wk-container px-6 py-20">
         <div className="max-w-2xl mx-auto rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-8 text-center">
           <WkIcon name="Compass" size={42} className="mx-auto mb-4 text-[var(--wk-text-faint)]" />
           <h1 className="wk-h-section mb-2">Could not load genres</h1>
           <p className="text-[var(--wk-text-muted)] mb-6">{error}</p>
-          <button onClick={loadData} className="wk-button wk-button-primary">
+          <button onClick={() => loadData()} className="wk-button wk-button-primary">
             <i className="ri-refresh-line" /> Retry
           </button>
         </div>
@@ -148,14 +169,17 @@ export default function Genres() {
               <input
                 className="genre43-hero-search"
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  setPage(1);
+                }}
                 placeholder="Search genre or representative artist..."
               />
             </div>
             <ShareButton
               item={{
                 title: "WAKILISHA Genre Directory",
-                subtitle: `${genres.length} genres`,
+                subtitle: `${totalGenres} genres`,
                 description: "Browse the WAKILISHA cultural map by genre.",
                 type: "page",
               }}
@@ -163,7 +187,7 @@ export default function Genres() {
           </div>
           <div className="genre43-hero-stats">
             <div className="genre43-hero-stat">
-              <span className="genre43-hero-stat-val">{genres.length}</span>
+              <span className="genre43-hero-stat-val">{totalGenres}</span>
               <span className="genre43-hero-stat-lbl">Genres</span>
             </div>
             <div className="genre43-hero-stat">
@@ -189,7 +213,7 @@ export default function Genres() {
             {filters.map((f) => (
               <button
                 key={f}
-                onClick={() => setActiveFilter(f)}
+                onClick={() => updateFilter(f)}
                 className={`genre43-filter-pill ${activeFilter === f ? "on" : ""}`}
               >
                 {f}
@@ -282,18 +306,40 @@ export default function Genres() {
 
         {/* ── Full directory ── */}
         <section className="genre43-reveal">
-          <SectionLabel count={filteredGenres.length}>Full directory</SectionLabel>
+          <SectionLabel count={genres.length}>Full directory</SectionLabel>
 
           <div className="genre43-grid">
-            {filteredGenres.map((genre) => (
+            {genres.map((genre) => (
               <GenreCard key={genre.slug} genre={genre} />
             ))}
           </div>
 
-          {filteredGenres.length === 0 && (
+          {genres.length === 0 && !loading && (
             <div className="genre43-empty">
               <WkIcon name="Compass" size={32} />
               <span>No genres match this search.</span>
+            </div>
+          )}
+
+          {totalPages > 1 && (
+            <div className="genre43-pagination">
+              <button
+                className="genre43-page-btn"
+                disabled={page === 1}
+                onClick={() => loadPage(Math.max(1, page - 1))}
+              >
+                <WkIcon name="ArrowLeft" size={14} />
+              </button>
+              <span className="genre43-page-indicator">
+                Page {page} of {totalPages}
+              </span>
+              <button
+                className="genre43-page-btn"
+                disabled={page === totalPages}
+                onClick={() => loadPage(Math.min(totalPages, page + 1))}
+              >
+                <WkIcon name="ArrowRight" size={14} />
+              </button>
             </div>
           )}
         </section>
@@ -312,7 +358,7 @@ export default function Genres() {
                   >
                     <div className="genre43-context-dot-brand" />
                     <span className="genre43-context-row-name">{genre.name}</span>
-                    <span className="genre43-context-row-stat">{genre.trackCount} tracks</span>
+                    <span className="genre43-context-row-stat">{genre.artistCount} artists</span>
                     <i className="ri-arrow-right-s-line genre43-context-row-arrow" />
                   </Link>
                 ))}
@@ -330,7 +376,7 @@ export default function Genres() {
               </p>
               <div className="genre43-context-stats">
                 <div className="genre43-context-stat">
-                  <span className="genre43-context-stat-val">{genres.length}</span>
+                  <span className="genre43-context-stat-val">{totalGenres}</span>
                   <span className="genre43-context-stat-lbl">Genres mapped</span>
                 </div>
                 <div className="genre43-context-stat">
@@ -346,7 +392,7 @@ export default function Genres() {
         <footer className="genre43-reveal genre43-footer">
           <span className="genre43-footer-brand">WAKILISHA Cultural Map</span>
           <p className="genre43-footer-tagline">
-            {genres.length} genres across the continent. Every territory mapped
+            {totalGenres} genres across the continent. Every territory mapped
             as a living ecosystem.
           </p>
           <p className="genre43-footer-meta">
@@ -373,7 +419,7 @@ function SectionLabel({ children, count }: { children: string; count?: number })
 }
 
 /* ── Genre card ── */
-function GenreCard({ genre }: { genre: RepairedGenre }) {
+function GenreCard({ genre }: { genre: PublicGenre }) {
   return (
     <Link to={`/genres/${genre.slug}`} className="genre43-card group">
       <div className="genre43-card-artwork-wrap">

@@ -1,15 +1,23 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import { usePlayer } from "@/context/PlayerContext";
 import { getTrack, type RepairedTrackDetail } from "@/services/repaired/client";
 import { buildTrackSummaryFromApi } from "@/services/registryNlg";
-import { TrackChartHistorySection } from "@/components/charts/TrackChartHistory";
+import { TrackChartSparkline } from "@/components/charts/TrackChartSparkline";
+import { MetaTags } from "@/components/seo/MetaTags";
+import TrackLyricsSection from "./components/TrackLyricsSection";
+import TrackRelatedTracks from "./components/TrackRelatedTracks";
+import { releaseUrl } from "@/utils/releaseUrl";
+import { WkIcon } from "@/components/design-system/Icon";
+import { useScrollReveal } from "@/hooks/useScrollReveal";
+import { ShareButton } from "@/components/design-system/share/ShareSheet";
 
 /* ─── Types ─── */
 
 type TrackChartAppearance = {
   editionSlug?: string;
   editionLabel?: string;
+  familySlug?: string;
   date?: string;
   rank?: number;
   previousRank?: number | null;
@@ -86,7 +94,15 @@ function apiToViewModel(api: RepairedTrackDetail): TrackViewModel {
   const resolvedArtistSlug = primaryArtist?.slug || artistData.slug || "";
 
   const history = Array.isArray(raw.chartHistory) ? raw.chartHistory : [];
-  const chartAppearances = Array.isArray(raw.chartAppearances) ? raw.chartAppearances : [];
+  const chartAppearances = Array.isArray(raw.chartAppearances) ? raw.chartAppearances.map((a: any) => ({
+    editionSlug: a.editionSlug || "",
+    editionLabel: a.editionLabel || "",
+    familySlug: a.familySlug || "",
+    date: a.date || "",
+    rank: Number(a.rank || 0),
+    previousRank: a.previousRank != null ? Number(a.previousRank) : null,
+    movement: a.movement || "same",
+  })) : [];
   const currentRank = raw.currentRank ?? 0;
   const prevRank = raw.previousRank ?? (history.length > 1 ? history[history.length - 2] : 0);
 
@@ -108,7 +124,7 @@ function apiToViewModel(api: RepairedTrackDetail): TrackViewModel {
   const previewUrl: string | null = api.previewUrl || trackData.previewUrl || null;
   const albumTitle = releaseData?.title || "";
   const rawAlbumSlug = releaseData?.slug || "";
-  const albumSlug = rawAlbumSlug.includes('--') ? rawAlbumSlug : (rawAlbumSlug ? `${resolvedArtistSlug}--${rawAlbumSlug}` : "");
+  const albumSlug = rawAlbumSlug.includes("--") ? rawAlbumSlug.split("--").slice(1).join("--") || rawAlbumSlug : rawAlbumSlug;
   const albumTrackNumber = trackData.trackNumber || trackData.track_number || 0;
   const albumTotalTracks = releaseData?.trackCount || 0;
   const releaseFullDate = releaseData?.releaseDate || "";
@@ -147,9 +163,6 @@ function apiToViewModel(api: RepairedTrackDetail): TrackViewModel {
     firstChartedDate: raw.firstChartedDate || "",
     editionLabels: Array.isArray(raw.editionLabels) ? raw.editionLabels : [],
     sourceProviders: Array.isArray(raw.sourceProviders) ? raw.sourceProviders : [],
-    source: "WAKILISHA Registry",
-    streamCount: null,
-    streamingLinks: [],
   };
 }
 
@@ -169,103 +182,6 @@ function formatDate(dateStr: string): string {
     if (Number.isNaN(d.getTime())) return dateStr;
     return d.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
   } catch { return dateStr; }
-}
-
-function humanList(items: string[]): string {
-  if (items.length === 0) return "";
-  if (items.length === 1) return items[0];
-  if (items.length === 2) return `${items[0]} and ${items[1]}`;
-  return `${items.slice(0, -1).join(", ")}, and ${items[items.length - 1]}`;
-}
-
-/* ─── Sub-components ─── */
-
-/* ─── Artist chip for hero ─── */
-
-function ArtistChip({ artist, isPrimary }: { artist: TrackViewModel["artists"][0]; isPrimary: boolean }) {
-  if (!artist.slug) return (
-    <span className="text-[15px] md:text-[17px] font-semibold text-white/70">{artist.name}</span>
-  );
-  return (
-    <Link
-      to={`/artists/${artist.slug}`}
-      className="inline-flex items-center gap-1.5 text-[15px] md:text-[17px] font-semibold text-white/80 hover:text-white transition-colors group/artist"
-    >
-      {isPrimary && (
-        <span className="w-1.5 h-1.5 rounded-full bg-[var(--wk-brand)] opacity-70 group-hover/artist:opacity-100 transition-opacity" />
-      )}
-      {artist.name}
-      {artist.isFeatured && (
-        <span className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-white/35 ml-0.5">feat.</span>
-      )}
-    </Link>
-  );
-}
-
-/* ─── Provenance spec bar ─── */
-
-function ProvenanceBar({ vm }: { vm: TrackViewModel }) {
-  const specs: Array<{ label: string; value: React.ReactNode; icon: string }> = [];
-
-  if (vm.releaseDate) {
-    specs.push({ label: "Released", value: formatDate(vm.releaseDate), icon: "ri-calendar-line" });
-  }
-  if (vm.albumTitle) {
-    specs.push({
-      label: "Release",
-      value: vm.albumSlug
-        ? <Link to={`/releases/${vm.albumSlug}`} className="hover:text-[var(--wk-brand)] transition-colors">{vm.albumTitle}</Link>
-        : vm.albumTitle,
-      icon: "ri-album-line",
-    });
-  }
-  if (vm.albumTrackNumber > 0 && vm.albumTotalTracks > 0) {
-    specs.push({ label: "Track", value: `${vm.albumTrackNumber} of ${vm.albumTotalTracks}`, icon: "ri-play-list-2-line" });
-  }
-  if (vm.label && vm.label !== "Unknown") {
-    specs.push({
-      label: "Label",
-      value: vm.labelSlug
-        ? <Link to={`/labels/${vm.labelSlug}`} className="hover:text-[var(--wk-brand)] transition-colors">{vm.label}</Link>
-        : vm.label,
-      icon: "ri-disc-line",
-    });
-  }
-  if (vm.genre && vm.genre !== "Unknown") {
-    specs.push({
-      label: "Genre",
-      value: vm.genreSlug
-        ? <Link to={`/genres/${vm.genreSlug}`} className="hover:text-[var(--wk-brand)] transition-colors">{vm.genre}</Link>
-        : vm.genre,
-      icon: "ri-price-tag-3-line",
-    });
-  }
-  if (vm.isrc) {
-    specs.push({ label: "ISRC", value: <span className="font-mono text-[12px] tracking-wider">{vm.isrc}</span>, icon: "ri-barcode-line" });
-  }
-  if (vm.duration > 0) {
-    specs.push({ label: "Duration", value: formatDuration(vm.duration), icon: "ri-timer-line" });
-  }
-  if (vm.explicit) {
-    specs.push({ label: "Advisory", value: <span className="text-[var(--wk-danger)] font-bold uppercase text-[11px]">Explicit</span>, icon: "ri-alert-line" });
-  }
-  if (vm.sourceProviders.length > 0) {
-    specs.push({ label: "Sources", value: humanList(vm.sourceProviders), icon: "ri-database-2-line" });
-  }
-
-  return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-px rounded-2xl overflow-hidden border border-[var(--wk-border)] bg-[var(--wk-border)]">
-      {specs.map((spec) => (
-        <div key={spec.label} className="flex flex-col gap-1 bg-[var(--wk-surface)] px-4 py-3.5">
-          <span className="flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-[0.14em] text-[var(--wk-text-faint)]">
-            <i className={`${spec.icon} text-[11px]`} />
-            {spec.label}
-          </span>
-          <span className="text-[13px] font-bold text-[var(--wk-text)] leading-snug">{spec.value}</span>
-        </div>
-      ))}
-    </div>
-  );
 }
 
 /* ─── Curator's Note (NLG Summary) ─── */
@@ -312,28 +228,224 @@ function CuratorsNote({ apiData }: { apiData: RepairedTrackDetail }) {
   const rest = summary.slice(1);
 
   return (
-    <div className="max-w-[680px]">
-      <p className="text-[18px] md:text-[20px] leading-[1.85] text-[var(--wk-text-soft)]">
+    <div className="max-w-[640px]">
+      <p className="text-[16px] md:text-[18px] leading-[1.85] text-[var(--wk-text-soft)]">
         <span
-          className="float-left mr-4 font-black leading-[0.75] text-[var(--wk-brand)]"
-          style={{ fontSize: "clamp(64px, 8vw, 88px)", marginTop: "0.02em" }}
+          className="float-left mr-3 font-black leading-[0.75] text-[var(--wk-brand)]"
+          style={{ fontSize: "clamp(56px, 7vw, 78px)", marginTop: "0.02em" }}
         >
           {firstChar}
         </span>
         <span>{rest}</span>
       </p>
-      <div className="mt-6 pt-4 border-t border-[var(--wk-divider)]">
+      <div className="mt-5 pt-4 border-t border-[var(--wk-divider)]">
         <p className="text-[11px] text-[var(--wk-text-faint)] italic leading-relaxed">
-          Generated from the WAKILISHA relationship graph. A deterministic summary drawn from connected registry data — artists, releases, chart performance, genres, labels, and source providers.
+          Generated from the WAKILISHA relationship graph — a deterministic summary drawn from connected registry data.
         </p>
       </div>
     </div>
   );
 }
 
-/* ─── Artist Gallery ─── */
+/* ─── Chart KPIs ─── */
 
-function ArtistGallery({ artists, artworkUrl }: { artists: TrackViewModel["artists"]; artworkUrl: string }) {
+function ChartKpiGrid({ vm }: { vm: TrackViewModel }) {
+  const kpis = [
+    { label: "Peak position", value: vm.peakPosition > 0 ? `#${vm.peakPosition}` : "—", sub: "All-time best", icon: "ri-trophy-line" },
+    { label: "Weeks charted", value: vm.weeksOnChart || "—", sub: "Total weeks ranked", icon: "ri-calendar-check-line" },
+    { label: "Current rank", value: vm.rank > 0 ? `#${vm.rank}` : "—", sub: vm.movement === "new" ? "New entry" : vm.movement === "up" ? `Up ${vm.movementAmount}` : vm.movement === "down" ? `Down ${vm.movementAmount}` : "Steady", icon: "ri-bar-chart-2-line" },
+    { label: "First charted", value: vm.firstChartedDate ? formatDate(vm.firstChartedDate) : vm.releaseYear || "—", sub: "Registry debut", icon: "ri-flag-line" },
+  ];
+
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      {kpis.map((kpi) => (
+        <div
+          key={kpi.label}
+          className="border border-[var(--wk-border)] rounded-xl bg-[var(--wk-bg)] p-3.5 hover:border-[var(--wk-brand)]/20 transition-colors"
+        >
+          <div className="text-[9px] font-extrabold uppercase tracking-[0.14em] text-[var(--wk-text-faint)] mb-2">
+            {kpi.label}
+          </div>
+          <div className="text-[22px] md:text-[26px] font-black text-[var(--wk-text)] tracking-[-0.03em] leading-none mb-1">
+            {kpi.value}
+          </div>
+          <div className="text-[10px] text-[var(--wk-text-muted)]">{kpi.sub}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ─── Sidebar Metadata ─── */
+
+function TrackSidebar({ vm, rawData }: { vm: TrackViewModel; rawData: RepairedTrackDetail | null }) {
+  const { ref, revealed } = useScrollReveal<HTMLDivElement>(0.05);
+
+  const hasChartData = vm.weeksOnChart > 0 || vm.peakPosition > 0;
+
+  return (
+    <aside ref={ref} className={`${revealed ? "is-visible" : ""} reveal-up space-y-5 lg:sticky lg:top-[88px] lg:self-start`}>
+
+      {/* Chart Sparkline — compact sidebar preview */}
+      {(vm.weeksOnChart > 0 || vm.peakPosition > 0) && vm.chartHistory.length >= 2 && (
+        <div className="border border-[var(--wk-border)] rounded-2xl bg-[var(--wk-surface)] p-5">
+          <div className="flex items-center gap-2 mb-4 text-[11px] font-extrabold uppercase tracking-[0.18em] text-[var(--wk-brand)]">
+            <WkIcon name="TrendingUp" size={13} />
+            Chart trajectory
+          </div>
+          <TrackChartSparkline
+            history={vm.chartHistory}
+            peakPosition={vm.peakPosition}
+            currentRank={vm.rank}
+            weeksOnChart={vm.weeksOnChart}
+            compact
+          />
+        </div>
+      )}
+
+      {/* Stats */}
+      <div className="border border-[var(--wk-border)] rounded-2xl bg-[var(--wk-surface)] p-5">
+        <div className="flex items-center gap-2 mb-4 text-[11px] font-extrabold uppercase tracking-[0.18em] text-[var(--wk-brand)]">
+          <WkIcon name="Activity" size={13} />
+          Track stats
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          {vm.duration > 0 && (
+            <StatCard value={formatDuration(vm.duration)} label="Duration" />
+          )}
+          {vm.releaseDate ? (
+            <StatCard value={formatDate(vm.releaseDate)} label="Released" />
+          ) : vm.releaseYear ? (
+            <StatCard value={vm.releaseYear} label="Year" />
+          ) : null}
+          {vm.rank > 0 && <StatCard value={`#${vm.rank}`} label="Current rank" />}
+          {vm.peakPosition > 0 && <StatCard value={`#${vm.peakPosition}`} label="Peak position" />}
+          {vm.weeksOnChart > 0 && <StatCard value={String(vm.weeksOnChart)} label="Weeks charted" />}
+          {vm.albumTrackNumber > 0 && vm.albumTotalTracks > 0 && (
+            <StatCard value={`${vm.albumTrackNumber} / ${vm.albumTotalTracks}`} label="Track no." />
+          )}
+        </div>
+      </div>
+
+      {/* Label */}
+      {vm.label && vm.label !== "Unknown" && (
+        <div className="border border-[var(--wk-border)] rounded-2xl bg-[var(--wk-surface)] p-5">
+          <div className="flex items-center gap-2 mb-4 text-[11px] font-extrabold uppercase tracking-[0.18em] text-[var(--wk-brand)]">
+            <WkIcon name="Building2" size={13} />
+            Label
+          </div>
+          <div className="text-[15px] font-extrabold text-[var(--wk-text)]">{vm.label}</div>
+          <div className="text-[12px] font-semibold text-[var(--wk-text-muted)] mt-1 capitalize">
+            {vm.genre && vm.genre !== "Unknown" ? vm.genre : ""}
+          </div>
+          {vm.labelSlug && (
+            <Link
+              to={`/labels/${vm.labelSlug}`}
+              className="inline-flex items-center gap-2 mt-4 text-[12px] font-bold text-[var(--wk-brand)] hover:underline"
+            >
+              Open label
+              <WkIcon name="ArrowUpRight" size={12} />
+            </Link>
+          )}
+        </div>
+      )}
+
+      {/* Genre */}
+      {vm.genre && vm.genre !== "Unknown" && (
+        <div className="border border-[var(--wk-border)] rounded-2xl bg-[var(--wk-surface)] p-5">
+          <div className="flex items-center gap-2 mb-4 text-[11px] font-extrabold uppercase tracking-[0.18em] text-[var(--wk-brand)]">
+            <WkIcon name="Tag" size={13} />
+            Genre
+          </div>
+          <div className="text-[15px] font-extrabold text-[var(--wk-text)]">{vm.genre}</div>
+          {vm.genreSlug && (
+            <Link
+              to={`/genres/${vm.genreSlug}`}
+              className="inline-flex items-center gap-2 mt-4 text-[12px] font-bold text-[var(--wk-brand)] hover:underline"
+            >
+              Explore genre
+              <WkIcon name="ArrowUpRight" size={12} />
+            </Link>
+          )}
+        </div>
+      )}
+
+      {/* Registry status */}
+      <div className="border border-[var(--wk-border)] rounded-2xl bg-[var(--wk-surface)] p-5">
+        <div className="flex items-center gap-2 mb-4 text-[11px] font-extrabold uppercase tracking-[0.18em] text-[var(--wk-brand)]">
+          <WkIcon name="BadgeCheck" size={13} />
+          Registry status
+        </div>
+        <div className="space-y-2 text-[12px] font-semibold text-[var(--wk-text-muted)]">
+          <RegistryRow label="Chart data" value={hasChartData ? "Linked" : "Not charted"} />
+          <RegistryRow label="Preview" value={vm.isPlayable ? "Available" : "Not available"} />
+          {vm.isrc && <RegistryRow label="ISRC" value={<span className="font-mono text-[11px]">{vm.isrc}</span>} />}
+          {vm.explicit && <RegistryRow label="Advisory" value={<span className="text-[var(--wk-danger)] font-bold uppercase text-[10px]">Explicit</span>} />}
+          {vm.sourceProviders.length > 0 && (
+            <RegistryRow label="Sources" value={vm.sourceProviders.slice(0, 2).join(", ")} />
+          )}
+        </div>
+      </div>
+
+      {/* Album */}
+      {vm.albumTitle && (
+        <div className="border border-[var(--wk-border)] rounded-2xl bg-[var(--wk-surface)] p-5">
+          <div className="flex items-center gap-2 mb-4 text-[11px] font-extrabold uppercase tracking-[0.18em] text-[var(--wk-brand)]">
+            <WkIcon name="Disc3" size={13} />
+            Release
+          </div>
+          <Link
+            to={releaseUrl({ slug: vm.albumSlug, artist: vm.artist })}
+            className="group flex items-center gap-3 p-2 -mx-2 rounded-xl hover:bg-[var(--wk-surface-raised)] transition-colors"
+          >
+            <div className="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 bg-[var(--wk-bg)] border border-[var(--wk-border)]">
+              {vm.artworkUrl && (
+                <img src={vm.artworkUrl} alt="" className="w-full h-full object-cover" />
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-[13px] font-extrabold text-[var(--wk-text)] truncate group-hover:text-[var(--wk-brand)] transition-colors">
+                {vm.albumTitle}
+              </div>
+              {vm.albumTrackNumber > 0 && (
+                <div className="text-[11px] font-semibold text-[var(--wk-text-muted)]">
+                  Track {vm.albumTrackNumber}
+                </div>
+              )}
+            </div>
+            <WkIcon name="ArrowRight" size={14} className="text-[var(--wk-text-faint)] group-hover:text-[var(--wk-text-muted)] transition-colors" />
+          </Link>
+        </div>
+      )}
+    </aside>
+  );
+}
+
+function StatCard({ value, label }: { value: string | number; label: string }) {
+  return (
+    <div className="border border-[var(--wk-border)] rounded-xl bg-[var(--wk-bg)] p-3.5">
+      <div className="text-[17px] font-black text-[var(--wk-text)] leading-tight tracking-[-0.02em] break-words">{value}</div>
+      <div className="text-[9px] font-extrabold uppercase tracking-[0.14em] text-[var(--wk-text-faint)] mt-1.5">
+        {label}
+      </div>
+    </div>
+  );
+}
+
+function RegistryRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span>{label}</span>
+      <span className="text-right font-extrabold capitalize text-[var(--wk-text)]">{value}</span>
+    </div>
+  );
+}
+
+/* ─── Artists section ─── */
+
+function ConnectedArtists({ artists, artworkUrl }: { artists: TrackViewModel["artists"]; artworkUrl: string }) {
+  const { ref, revealed } = useScrollReveal<HTMLDivElement>(0.1);
   if (!artists || artists.length === 0) return null;
 
   const primary = artists.filter((a) => a.isPrimary);
@@ -347,73 +459,58 @@ function ArtistGallery({ artists, artworkUrl }: { artists: TrackViewModel["artis
   ].filter((g) => g.items.length > 0);
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-      {allGroups.map((group) => (
-        <div key={group.label}>
-          <div className="mb-3 flex items-center gap-2">
-            <span className="w-1 h-3 rounded-full bg-[var(--wk-brand)]" />
-            <span className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[var(--wk-text-muted)]">
-              {group.label}
-            </span>
+    <div ref={ref} className={`${revealed ? "is-visible" : ""} reveal-up`}>
+      <section className="border border-[var(--wk-border)] rounded-2xl bg-[var(--wk-surface)] p-5 md:p-6">
+        <div className="flex items-center gap-3 mb-5">
+          <div className="inline-flex items-center gap-2 rounded-full border border-[var(--wk-brand)]/20 bg-[var(--wk-brand-soft)]/40 px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.18em] text-[var(--wk-brand)]">
+            <WkIcon name="UserPlus" size={12} />
+            Connected artists
           </div>
-          <div className="space-y-2">
-            {group.items.map((a) => (
-              <Link
-                key={a.slug}
-                to={a.slug ? `/artists/${a.slug}` : "#"}
-                className="group flex items-center gap-4 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4 transition-all duration-300 hover:border-[var(--wk-brand)]/30 hover:bg-[var(--wk-surface-raised)] hover:-translate-y-0.5"
-              >
-                <div className="relative flex-shrink-0 h-14 w-14 rounded-full overflow-hidden bg-[var(--wk-surface-raised)] ring-2 ring-[var(--wk-border)] group-hover:ring-[var(--wk-brand)]/30 transition-all">
-                  {a.isPrimary && artworkUrl ? (
-                    <img src={artworkUrl} alt={a.name} className="h-full w-full object-cover" />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center">
-                      <i className="ri-user-line text-[var(--wk-text-faint)] text-xl" />
+          <h2 className="text-[18px] font-black text-[var(--wk-text)] tracking-[-0.02em]">
+            {artists.length} artist{artists.length !== 1 ? "s" : ""}
+          </h2>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {allGroups.map((group) => (
+            <div key={group.label}>
+              <div className="mb-3 flex items-center gap-2">
+                <span className="w-1 h-3 rounded-full bg-[var(--wk-brand)]" />
+                <span className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[var(--wk-text-muted)]">
+                  {group.label}
+                </span>
+              </div>
+              <div className="space-y-2">
+                {group.items.map((a) => (
+                  <Link
+                    key={a.slug || a.name}
+                    to={a.slug ? `/artists/${a.slug}` : "#"}
+                    className="group flex items-center gap-4 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] p-4 transition-all duration-200 hover:border-[var(--wk-brand)]/30 hover:bg-[var(--wk-surface-raised)] hover:-translate-y-0.5"
+                  >
+                    <div className="relative flex-shrink-0 h-12 w-12 rounded-full overflow-hidden bg-[var(--wk-surface-raised)] ring-2 ring-[var(--wk-border)] group-hover:ring-[var(--wk-brand)]/30 transition-all">
+                      {a.isPrimary && artworkUrl ? (
+                        <img src={artworkUrl} alt={a.name} className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center">
+                          <i className="ri-user-line text-[var(--wk-text-faint)] text-xl" />
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-bold text-[15px] text-[var(--wk-text)] truncate group-hover:text-[var(--wk-brand)] transition-colors">
-                    {a.name}
-                  </div>
-                  <div className="text-[11px] text-[var(--wk-text-muted)]">
-                    {a.role === "primary" ? "Primary artist" : a.role === "featured" ? "Featured artist" : "Collaborator"}
-                  </div>
-                </div>
-                <i className="ri-arrow-right-line text-[var(--wk-text-faint)] group-hover:text-[var(--wk-brand)] group-hover:translate-x-0.5 transition-all text-[14px]" />
-              </Link>
-            ))}
-          </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-bold text-[14px] text-[var(--wk-text)] truncate group-hover:text-[var(--wk-brand)] transition-colors">
+                        {a.name}
+                      </div>
+                      <div className="text-[11px] text-[var(--wk-text-muted)]">
+                        {a.isPrimary ? "Primary artist" : a.isFeatured ? "Featured" : "Collaborator"}
+                      </div>
+                    </div>
+                    <WkIcon name="ArrowRight" size={14} className="text-[var(--wk-text-faint)] group-hover:text-[var(--wk-brand)] transition-colors" />
+                  </Link>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
-      ))}
-    </div>
-  );
-}
-
-/* ─── Chart KPIs ─── */
-
-function ChartKpiGrid({ vm }: { vm: TrackViewModel }) {
-  const kpis = [
-    { label: "Peak position", value: vm.peakPosition > 0 ? `#${vm.peakPosition}` : "—", sub: "All-time best", icon: "ri-trophy-line" },
-    { label: "Weeks charted", value: vm.weeksOnChart || "—", sub: "Total weeks on the rankings", icon: "ri-calendar-check-line" },
-    { label: "Current rank", value: vm.rank > 0 ? `#${vm.rank}` : "—", sub: vm.movement === "new" ? "New entry" : vm.movement === "up" ? `Up ${vm.movementAmount}` : vm.movement === "down" ? `Down ${vm.movementAmount}` : "Steady", icon: "ri-bar-chart-2-line" },
-    { label: "First charted", value: vm.firstChartedDate ? formatDate(vm.firstChartedDate) : vm.releaseYear || "—", sub: "Registry debut", icon: "ri-flag-line" },
-  ];
-
-  return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-      {kpis.map((kpi) => (
-        <div key={kpi.label} className="rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-5 group hover:border-[var(--wk-brand)]/20 transition-all duration-300">
-          <div className="flex items-center gap-2 mb-3">
-            <i className={`${kpi.icon} text-[var(--wk-text-faint)] text-[15px]`} />
-            <span className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-[var(--wk-text-faint)]">{kpi.label}</span>
-          </div>
-          <div className="text-[30px] md:text-[34px] font-black text-[var(--wk-text)] tracking-[-0.03em] leading-none mb-1">
-            {kpi.value}
-          </div>
-          <div className="text-[11px] text-[var(--wk-text-muted)]">{kpi.sub}</div>
-        </div>
-      ))}
+      </section>
     </div>
   );
 }
@@ -421,22 +518,19 @@ function ChartKpiGrid({ vm }: { vm: TrackViewModel }) {
 /* ─── Main Page ─── */
 
 export default function TrackDetail() {
-  const { slug } = useParams<{ slug: string }>();
+  const { artistSlug, trackSlug } = useParams<{ artistSlug: string; trackSlug: string }>();
   const { playTrack, currentTrack, isPlaying, togglePlay } = usePlayer();
   const [track, setTrack] = useState<TrackViewModel | null>(null);
   const [rawData, setRawData] = useState<RepairedTrackDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [scrolled, setScrolled] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const lastScroll = useRef(false);
 
   /* ─── Data fetch ─── */
   useEffect(() => {
     let alive = true;
-    if (!slug) { setLoading(false); setError("No track slug provided"); return; }
+    if (!artistSlug || !trackSlug) { setLoading(false); setError("No track slug provided"); return; }
     setLoading(true); setError(null);
-    getTrack(slug)
+    getTrack(artistSlug, trackSlug)
       .then((apiData) => {
         if (!alive) return;
         if (!apiData) { setError("Track not found in the registry."); setLoading(false); return; }
@@ -450,22 +544,9 @@ export default function TrackDetail() {
         setLoading(false);
       });
     return () => { alive = false; };
-  }, [slug]);
+  }, [artistSlug, trackSlug]);
 
-  /* ─── Scroll tracking for floating header ─── */
-  useEffect(() => {
-    const onScroll = () => {
-      const now = window.scrollY > 360;
-      if (now !== lastScroll.current) {
-        lastScroll.current = now;
-        setScrolled(now);
-      }
-    };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
-  /* ─── Loading state ─── */
+  /* ─── Loading ─── */
   if (loading) {
     return (
       <main className="min-h-screen bg-[var(--wk-bg)] flex items-center justify-center">
@@ -477,7 +558,7 @@ export default function TrackDetail() {
     );
   }
 
-  /* ─── Error state ─── */
+  /* ─── Error ─── */
   if (error || !track) {
     return (
       <main className="min-h-screen bg-[var(--wk-bg)] px-6 py-24 text-center">
@@ -486,9 +567,9 @@ export default function TrackDetail() {
         </div>
         <h1 className="mb-2 text-[28px] font-black text-[var(--wk-text)]">Not in the registry</h1>
         <p className="mb-8 text-[15px] text-[var(--wk-text-muted)] max-w-[400px] mx-auto">
-          {error || "This recording has not yet been catalogued. Our research team continuously expands the archive."}
+          {error || "This recording has not yet been catalogued."}
         </p>
-        <Link to="/charts" className="inline-flex items-center gap-2 rounded-full bg-[var(--wk-brand)] px-6 py-3 text-[13px] font-extrabold text-[var(--wk-brand-on)] transition-all hover:opacity-90 whitespace-nowrap">
+        <Link to="/charts" className="inline-flex items-center gap-2 rounded-full bg-[var(--wk-brand)] px-6 py-3 text-[13px] font-extrabold text-[var(--wk-brand-on)] hover:opacity-90 whitespace-nowrap">
           <i className="ri-bar-chart-2-line" />
           Browse the charts
         </Link>
@@ -508,352 +589,334 @@ export default function TrackDetail() {
     );
   };
 
-  const handleShare = () => {
-    navigator.clipboard?.writeText(window.location.href);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
+  const minutes = track.duration ? Math.round(track.duration / 60) : 0;
 
   return (
     <main className="min-h-screen bg-[var(--wk-bg)]">
-      {/* ── Floating mini-header ── */}
-      <div
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-400 ${
-          scrolled ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-full pointer-events-none"
-        } bg-[var(--wk-bg)]/90 backdrop-blur-xl border-b border-[var(--wk-border)]`}
-      >
-        <div className="max-w-[1200px] mx-auto px-6 h-14 flex items-center gap-4">
-          <Link to="/charts" className="flex items-center gap-1.5 text-[12px] font-bold text-[var(--wk-text-muted)] hover:text-[var(--wk-brand)] transition-colors whitespace-nowrap shrink-0">
-            <i className="ri-arrow-left-line text-[14px]" />
-            Charts
-          </Link>
-          <span className="text-[var(--wk-text-faint)] text-[11px]">/</span>
-          <span className="text-[13px] font-bold text-[var(--wk-text)] truncate">{track.title}</span>
-          <span className="text-[var(--wk-text-faint)] text-[11px]">/</span>
-          <span className="text-[12px] text-[var(--wk-text-muted)] truncate">{track.artist}</span>
-          <div className="ml-auto flex items-center gap-2">
-            <button onClick={handlePlay} disabled={!track.isPlayable} className="h-8 px-4 rounded-full bg-[var(--wk-brand)] text-[11px] font-extrabold text-[var(--wk-brand-on)] transition-all hover:opacity-90 disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1.5 whitespace-nowrap">
-              <i className={`${isTrackPlaying ? "ri-pause-fill" : "ri-play-fill"} text-[13px]`} />
-              {isTrackPlaying ? "Pause" : "Play"}
-            </button>
-            <button onClick={handleShare} className="h-8 w-8 flex items-center justify-center rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] text-[var(--wk-text-muted)] hover:text-[var(--wk-brand)] hover:border-[var(--wk-brand)]/30 transition-all">
-              <i className={`${copied ? "ri-check-line text-[var(--wk-success)]" : "ri-share-line"} text-[13px]`} />
-            </button>
-          </div>
-        </div>
-      </div>
+      {/* SEO */}
+      <MetaTags
+        title={`${track.title} by ${track.artist}`}
+        description={`${track.title} by ${track.artist}${track.albumTitle ? ` from ${track.albumTitle}` : ""} — WAKILISHA Registry${track.rank > 0 ? ` · #${track.rank}` : ""}`}
+        imageUrl={track.artworkUrl}
+        type="music.song"
+        artistName={track.artist}
+        releaseDate={track.releaseDate || track.releaseYear}
+      />
 
-      {/* ═══════════════════════════════════════════
-          HERO — full-bleed artwork with editorial overlay
-          ═══════════════════════════════════════════ */}
-      <section className="relative overflow-hidden" style={{ height: "75vh", minHeight: "520px", maxHeight: "800px" }}>
-        {/* Background artwork with ken-burns */}
-        {track.artworkUrl ? (
+      {/* ── Hero — same pattern as release detail ── */}
+      <section className="relative overflow-hidden">
+        {/* Ambient blur */}
+        {track.artworkUrl && (
           <div
-            className="absolute inset-0"
+            className="absolute inset-0 opacity-20 scale-110"
             style={{
-              backgroundImage: `url(${track.artworkUrl})`,
+              backgroundImage: `url("${track.artworkUrl}")`,
               backgroundSize: "cover",
-              backgroundPosition: "center 25%",
-              backgroundRepeat: "no-repeat",
+              backgroundPosition: "center",
+              filter: "blur(90px) saturate(1.4)",
             }}
           />
-        ) : (
-          <div className="absolute inset-0 bg-[var(--wk-surface-raised)]" />
         )}
+        <div className="absolute inset-0 bg-gradient-to-b from-[var(--wk-bg)]/40 via-[var(--wk-bg)]/70 to-[var(--wk-bg)]" />
 
-        {/* Gradient overlays */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/98 via-black/55 to-black/10" />
-        <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-transparent to-black/30" />
-
-        {/* Top nav */}
-        <div className="absolute top-0 left-0 right-0 z-20 px-6 py-5 flex items-center justify-between">
-          <Link
-            to="/charts"
-            className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-black/20 backdrop-blur-md px-4 py-2 text-[11px] font-extrabold uppercase tracking-[0.14em] text-white/80 hover:bg-black/35 transition-all whitespace-nowrap"
-          >
-            <i className="ri-arrow-left-line text-[12px]" />
-            Charts
-          </Link>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleShare}
-              className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/20 backdrop-blur-md px-3 py-2 text-[11px] font-bold text-white/80 hover:bg-black/35 transition-all cursor-pointer whitespace-nowrap"
+        <div className="relative z-10 wk-container-wide px-6 py-16 md:py-24 lg:py-28">
+          <div className="flex flex-col lg:flex-row gap-8 lg:gap-12 items-start lg:items-end">
+            {/* Artwork */}
+            <div
+              className="relative flex-shrink-0 w-[260px] md:w-[320px] lg:w-[360px] aspect-square rounded-2xl overflow-hidden border border-[var(--wk-border)] bg-[var(--wk-surface)]"
+              style={{ boxShadow: "0 32px 80px rgba(0,0,0,0.28)" }}
             >
-              <i className="ri-share-line text-[12px]" />
-              {copied ? "Copied" : "Share"}
-            </button>
-          </div>
-        </div>
-
-        {/* Bottom content */}
-        <div className="absolute bottom-0 left-0 right-0 z-20 px-6 pb-10 md:pb-14">
-          <div className="max-w-[1100px] mx-auto">
-            {/* Registry badge */}
-            <div className="mb-4 md:mb-6 flex items-center gap-3">
-              <div className="flex items-center gap-2 rounded-full border border-white/15 bg-black/25 backdrop-blur-md px-3 py-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-[var(--wk-brand)]" />
-                <span className="text-[9px] font-extrabold uppercase tracking-[0.22em] text-[var(--wk-brand)]">Registry File</span>
-              </div>
-              {track.rank > 0 && (
-                <span className="rounded-full border border-white/20 bg-black/25 backdrop-blur-md px-3 py-1.5 text-[11px] font-extrabold text-white/80">
-                  #{track.rank} on the charts
-                </span>
+              {track.artworkUrl ? (
+                <img
+                  src={track.artworkUrl}
+                  alt={track.title}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="relative h-full w-full bg-[linear-gradient(135deg,#f7f9f1_0%,#dfe8d6_54%,#7fa64a_100%)] flex items-center justify-center">
+                  <i className="ri-music-2-line text-6xl text-[#30451f]/40" />
+                </div>
               )}
-              {track.movement === "new" && (
-                <span className="rounded-full bg-[var(--wk-brand)]/20 border border-[var(--wk-brand)]/30 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.12em] text-[var(--wk-brand)]">
-                  New entry
-                </span>
-              )}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
             </div>
 
-            {/* Title */}
-            <h1
-              className="font-black leading-[0.88] tracking-[-0.04em] text-white mb-4 md:mb-5"
-              style={{ fontSize: "clamp(38px, 6.5vw, 84px)", maxWidth: "900px" }}
-            >
-              {track.title}
-            </h1>
+            {/* Info */}
+            <div className="flex-1 min-w-0 pb-2">
+              {/* Kicker */}
+              <div className="inline-flex items-center gap-2 rounded-full border border-[var(--wk-brand)]/30 bg-[var(--wk-brand-soft)]/60 px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-[0.18em] text-[var(--wk-brand)] mb-5">
+                <WkIcon name="Music" size={13} />
+                Registry File
+                {track.rank > 0 && (
+                  <span className="ml-1 opacity-70">· #{track.rank}</span>
+                )}
+              </div>
 
-            {/* Artists */}
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              {track.artists.length > 0 ? (
-                track.artists.map((a, i) => (
-                  <span key={a.slug || i} className="flex items-center gap-1.5">
-                    {i > 0 && !a.isFeatured && <span className="text-white/25 text-[13px]">·</span>}
-                    <ArtistChip artist={a} isPrimary={a.isPrimary} />
-                  </span>
-                ))
-              ) : (
-                track.artistSlug ? (
-                  <Link to={`/artists/${track.artistSlug}`} className="text-[16px] font-semibold text-white/75 hover:text-white transition-colors">
-                    {track.artist}
-                  </Link>
+              {/* Title */}
+              <h1
+                className="font-[var(--wk-font-display)] font-black text-[var(--wk-text)] leading-[0.9] tracking-[-0.05em]"
+                style={{ fontSize: "clamp(38px, 6vw, 80px)" }}
+              >
+                {track.title}
+              </h1>
+
+              {/* Artists */}
+              <div className="flex flex-wrap items-center gap-3 mt-4">
+                {track.artists.length > 0 ? (
+                  track.artists.map((a, i) => (
+                    <span key={a.slug || i} className="flex items-center gap-2">
+                      {i > 0 && <span className="text-[var(--wk-text-faint)]">·</span>}
+                      {a.slug ? (
+                        <Link
+                          to={`/artists/${a.slug}`}
+                          className="text-[15px] md:text-[17px] font-bold text-[var(--wk-text)] hover:text-[var(--wk-brand)] transition-colors"
+                        >
+                          {a.name}
+                        </Link>
+                      ) : (
+                        <span className="text-[15px] md:text-[17px] font-bold text-[var(--wk-text)]">{a.name}</span>
+                      )}
+                      {a.isFeatured && (
+                        <span className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-[var(--wk-text-faint)]">feat.</span>
+                      )}
+                    </span>
+                  ))
                 ) : (
-                  <span className="text-[16px] font-semibold text-white/75">{track.artist}</span>
-                )
-              )}
+                  <span className="text-[15px] font-bold text-[var(--wk-text)]">{track.artist}</span>
+                )}
+                {/* Label in sub-line */}
+                {track.label && track.label !== "Unknown" && (
+                  <>
+                    <span className="text-[var(--wk-text-faint)]">·</span>
+                    <Link
+                      to={`/labels/${track.labelSlug}`}
+                      className="text-[14px] font-semibold text-[var(--wk-text-muted)] hover:text-[var(--wk-brand)] transition-colors"
+                    >
+                      {track.label}
+                    </Link>
+                  </>
+                )}
+              </div>
+
+              {/* Meta row */}
+              <div className="flex flex-wrap items-center gap-5 mt-6 text-[12px] font-bold text-[var(--wk-text-muted)]">
+                {track.releaseDate ? (
+                  <span className="inline-flex items-center gap-2">
+                    <WkIcon name="Calendar" size={14} />
+                    {formatDate(track.releaseDate)}
+                  </span>
+                ) : track.releaseYear ? (
+                  <span className="inline-flex items-center gap-2">
+                    <WkIcon name="Calendar" size={14} />
+                    {track.releaseYear}
+                  </span>
+                ) : null}
+                {minutes > 0 && (
+                  <span className="inline-flex items-center gap-2">
+                    <WkIcon name="Clock3" size={14} />
+                    {minutes} min
+                  </span>
+                )}
+                {track.genre && track.genre !== "Unknown" && (
+                  <span className="inline-flex items-center gap-2">
+                    <WkIcon name="Tag" size={14} />
+                    {track.genre}
+                  </span>
+                )}
+                {track.explicit && (
+                  <span className="inline-flex items-center gap-1.5 rounded px-1.5 py-0.5 bg-[var(--wk-text-faint)]/10 text-[10px] font-extrabold uppercase tracking-wider text-[var(--wk-text-faint)]">
+                    Explicit
+                  </span>
+                )}
+              </div>
+
+              {/* Actions */}
+              <div className="flex flex-wrap gap-3 mt-8">
+                <button
+                  onClick={handlePlay}
+                  disabled={!track.isPlayable}
+                  className="inline-flex items-center gap-2.5 rounded-xl bg-[var(--wk-brand)] text-white px-6 py-3 text-[14px] font-extrabold hover:bg-[var(--wk-brand)]/90 transition-colors disabled:opacity-30 disabled:cursor-not-allowed whitespace-nowrap"
+                >
+                  <WkIcon name={isTrackPlaying ? "Pause" : "Play"} size={18} />
+                  {isTrackPlaying ? "Pause" : track.isPlayable ? "Play preview" : "No preview"}
+                </button>
+                <Link
+                  to={`/tracks/${artistSlug}/${trackSlug}/lyrics/contribute`}
+                  className="inline-flex items-center gap-2.5 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] text-[var(--wk-text)] px-5 py-3 text-[13px] font-bold hover:bg-[var(--wk-surface-raised)] transition-colors whitespace-nowrap"
+                >
+                  <WkIcon name="Edit3" size={16} />
+                  Contribute lyrics
+                </Link>
+                <div className="ml-1">
+                  <ShareButton
+                    item={{
+                      title: track.title,
+                      subtitle: track.artist,
+                      description: `${track.title} by ${track.artist} — WAKILISHA Registry`,
+                      imageUrl: track.artworkUrl,
+                      type: "track",
+                    }}
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* ═══════════════════════════════════════════
-          FLOATING CONTENT CARD
-          ═══════════════════════════════════════════ */}
-      <div
-        className="relative z-10 rounded-t-[32px] bg-[var(--wk-bg)]"
-        style={{
-          marginTop: "-48px",
-          boxShadow: "0 -8px 40px -12px rgba(0,0,0,0.25)",
-        }}
-      >
-        <div className="max-w-[1100px] mx-auto px-6 md:px-10">
+      {/* ── Content ── */}
+      <div className="wk-container-wide px-6 py-10 md:py-14">
+        <div className="flex flex-col lg:flex-row gap-8 lg:gap-10">
 
-          {/* ── Play bar ── */}
-          <div className="flex items-center gap-4 py-6 border-b border-[var(--wk-divider)]">
-            <button
-              onClick={handlePlay}
-              disabled={!track.isPlayable}
-              className="flex items-center gap-2.5 rounded-full bg-[var(--wk-brand)] px-7 py-3.5 text-[14px] font-extrabold text-[var(--wk-brand-on)] transition-all hover:opacity-90 hover:scale-[1.02] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:scale-100 whitespace-nowrap"
-            >
-              <i className={`${isTrackPlaying ? "ri-pause-fill" : "ri-play-fill"} text-[18px]`} />
-              {isTrackPlaying ? "Pause preview" : track.isPlayable ? "Play preview" : "No preview available"}
-            </button>
-            <div className="text-[12px] text-[var(--wk-text-muted)]">
-              {track.isPlayable ? "Audio preview from registry sources" : "No audio preview in the registry"}
-            </div>
-          </div>
+          {/* Main column */}
+          <div className="flex-1 min-w-0 space-y-10 md:space-y-14">
 
-          {/* ── Section: Curator's Note ── */}
-          <section className="py-12 md:py-16">
-            <div className="mb-8 flex items-center gap-4">
-              <div className="h-px flex-1 bg-[var(--wk-divider)]" />
-              <span className="text-[10px] font-extrabold uppercase tracking-[0.22em] text-[var(--wk-text-faint)] whitespace-nowrap">
-                Curator&rsquo;s Note
-              </span>
-              <div className="h-px flex-1 bg-[var(--wk-divider)]" />
-            </div>
-            {rawData && <CuratorsNote apiData={rawData} />}
-          </section>
+            {/* Curator's Note */}
+            {rawData && (
+              <section>
+                <div className="flex items-center gap-3 mb-5">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-[var(--wk-brand)]/20 bg-[var(--wk-brand-soft)]/40 px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.18em] text-[var(--wk-brand)]">
+                    <WkIcon name="BookOpen" size={12} />
+                    About this track
+                  </div>
+                </div>
+                <CuratorsNote apiData={rawData} />
+              </section>
+            )}
 
-          {/* ── Section: Provenance ── */}
-          <section className="pb-12 md:pb-16">
-            <div className="mb-8 flex items-center gap-4">
-              <div className="h-px flex-1 bg-[var(--wk-divider)]" />
-              <span className="text-[10px] font-extrabold uppercase tracking-[0.22em] text-[var(--wk-text-faint)] whitespace-nowrap">
-                Provenance
-              </span>
-              <div className="h-px flex-1 bg-[var(--wk-divider)]" />
-            </div>
-            <ProvenanceBar vm={track} />
-          </section>
+            {/* Chart Performance */}
+            {(track.chartHistory.length > 0 || track.weeksOnChart > 0) && (
+              <section>
+                <div className="flex items-center gap-3 mb-5">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-[var(--wk-brand)]/20 bg-[var(--wk-brand-soft)]/40 px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.18em] text-[var(--wk-brand)]">
+                    <WkIcon name="BarChart3" size={12} />
+                    Chart performance
+                  </div>
+                  <h2 className="text-[18px] md:text-[22px] font-black text-[var(--wk-text)] tracking-[-0.02em]">
+                    {track.weeksOnChart > 0 ? `${track.weeksOnChart} weeks on chart` : "Chart history"}
+                  </h2>
+                </div>
 
-          {/* ── Section: Chart Performance ── */}
-          {(track.chartHistory.length > 0 || track.weeksOnChart > 0 || track.chartAppearances.length > 0) && (
-            <section className="pb-12 md:pb-16">
-              <div className="mb-8 flex items-center gap-4">
-                <div className="h-px flex-1 bg-[var(--wk-divider)]" />
-                <span className="text-[10px] font-extrabold uppercase tracking-[0.22em] text-[var(--wk-text-faint)] whitespace-nowrap">
-                  Chart Performance
-                </span>
-                <div className="h-px flex-1 bg-[var(--wk-divider)]" />
-              </div>
-
-              <ChartKpiGrid vm={track} />
-
-              {track.chartAppearances.length > 0 && (
-                <div className="mt-8">
-                  <TrackChartHistorySection
-                    trackSlug={track.slug}
-                    trackRank={track.rank}
-                    trackPeak={track.peakPosition}
-                    trackWeeks={track.weeksOnChart}
-                    trackHistory={track.chartHistory}
-                    chartAppearances={track.chartAppearances}
-                    chartAppearanceCount={track.chartAppearanceCount}
+                {/* Sparkline + KPIs */}
+                <div className="border border-[var(--wk-border)] rounded-2xl bg-[var(--wk-surface)] p-5 md:p-6 mb-6">
+                  <TrackChartSparkline
+                    history={track.chartHistory}
+                    peakPosition={track.peakPosition}
+                    currentRank={track.rank}
+                    weeksOnChart={track.weeksOnChart}
                   />
                 </div>
-              )}
-            </section>
-          )}
 
-          {/* ── Section: Connected Artists ── */}
-          {track.artists.length > 0 && (
-            <section className="pb-12 md:pb-16">
-              <div className="mb-8 flex items-center gap-4">
-                <div className="h-px flex-1 bg-[var(--wk-divider)]" />
-                <span className="text-[10px] font-extrabold uppercase tracking-[0.22em] text-[var(--wk-text-faint)] whitespace-nowrap">
-                  Connected Artists
-                </span>
-                <div className="h-px flex-1 bg-[var(--wk-divider)]" />
-              </div>
-              <ArtistGallery artists={track.artists} artworkUrl={track.artworkUrl} />
-            </section>
-          )}
-
-          {/* ── Section: Ecosystem ── */}
-          {(track.albumTitle || (track.label && track.label !== "Unknown") || (track.genre && track.genre !== "Unknown")) && (
-            <section className="pb-12 md:pb-16">
-              <div className="mb-8 flex items-center gap-4">
-                <div className="h-px flex-1 bg-[var(--wk-divider)]" />
-                <span className="text-[10px] font-extrabold uppercase tracking-[0.22em] text-[var(--wk-text-faint)] whitespace-nowrap">
-                  In the Ecosystem
-                </span>
-                <div className="h-px flex-1 bg-[var(--wk-divider)]" />
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                {track.albumTitle && (
-                  <Link
-                    to={`/releases/${track.albumSlug}`}
-                    className="group flex items-center gap-4 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-5 transition-all duration-300 hover:border-[var(--wk-brand)]/25 hover:bg-[var(--wk-surface-raised)] hover:-translate-y-0.5"
-                  >
-                    <div className="flex-shrink-0 h-14 w-14 rounded-xl bg-[var(--wk-surface-raised)] flex items-center justify-center group-hover:bg-[var(--wk-brand-soft)] transition-colors">
-                      <i className="ri-album-line text-[var(--wk-text-muted)] group-hover:text-[var(--wk-brand)] text-[22px] transition-colors" />
+                {/* Chart appearances — clickable edition links */}
+                {track.chartAppearances.length > 0 && (
+                  <div className="mb-6">
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="w-1 h-3 rounded-full bg-[var(--wk-brand)]" />
+                      <span className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[var(--wk-text-muted)]">
+                        Chart appearances ({track.chartAppearances.length})
+                      </span>
                     </div>
-                    <div className="min-w-0">
-                      <div className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-[var(--wk-text-faint)] mb-0.5">Release</div>
-                      <div className="text-[15px] font-bold text-[var(--wk-text)] truncate group-hover:text-[var(--wk-brand)] transition-colors">{track.albumTitle}</div>
-                      {track.albumTrackNumber > 0 && (
-                        <div className="text-[11px] text-[var(--wk-text-muted)]">Track {track.albumTrackNumber} of {track.albumTotalTracks}</div>
-                      )}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      {track.chartAppearances.slice(0, 8).map((app, i) => {
+                        const editionHref = app.familySlug && app.editionSlug
+                          ? `/charts/${app.familySlug}/${app.editionSlug}`
+                          : "/charts";
+                        return (
+                          <Link
+                            key={app.editionSlug || i}
+                            to={editionHref}
+                            className="group flex items-center gap-3 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-4 py-3 hover:border-[var(--wk-brand)]/30 hover:bg-[var(--wk-surface-raised)] transition-all"
+                          >
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--wk-brand)]/10 text-[13px] font-black text-[var(--wk-brand)]">
+                              #{app.rank}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="text-[12px] font-bold text-[var(--wk-text)] truncate group-hover:text-[var(--wk-brand)] transition-colors">
+                                {app.editionLabel || `Edition #${i + 1}`}
+                              </div>
+                              {app.date && (
+                                <div className="text-[10px] text-[var(--wk-text-muted)]">{app.date}</div>
+                              )}
+                            </div>
+                            <WkIcon name="ArrowRight" size={12} className="text-[var(--wk-text-faint)] group-hover:text-[var(--wk-brand)] transition-colors shrink-0" />
+                          </Link>
+                        );
+                      })}
                     </div>
-                    <i className="ri-arrow-right-line text-[var(--wk-text-faint)] group-hover:text-[var(--wk-brand)] group-hover:translate-x-0.5 transition-all ml-auto" />
-                  </Link>
-                )}
-                {track.label && track.label !== "Unknown" && (
-                  <Link
-                    to={`/labels/${track.labelSlug}`}
-                    className="group flex items-center gap-4 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-5 transition-all duration-300 hover:border-[var(--wk-brand)]/25 hover:bg-[var(--wk-surface-raised)] hover:-translate-y-0.5"
-                  >
-                    <div className="flex-shrink-0 h-14 w-14 rounded-xl bg-[var(--wk-surface-raised)] flex items-center justify-center group-hover:bg-[var(--wk-brand-soft)] transition-colors">
-                      <i className="ri-disc-line text-[var(--wk-text-muted)] group-hover:text-[var(--wk-brand)] text-[22px] transition-colors" />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-[var(--wk-text-faint)] mb-0.5">Label</div>
-                      <div className="text-[15px] font-bold text-[var(--wk-text)] truncate group-hover:text-[var(--wk-brand)] transition-colors">{track.label}</div>
-                    </div>
-                    <i className="ri-arrow-right-line text-[var(--wk-text-faint)] group-hover:text-[var(--wk-brand)] group-hover:translate-x-0.5 transition-all ml-auto" />
-                  </Link>
-                )}
-                {track.genre && track.genre !== "Unknown" && (
-                  <Link
-                    to={`/genres/${track.genreSlug}`}
-                    className="group flex items-center gap-4 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-5 transition-all duration-300 hover:border-[var(--wk-brand)]/25 hover:bg-[var(--wk-surface-raised)] hover:-translate-y-0.5"
-                  >
-                    <div className="flex-shrink-0 h-14 w-14 rounded-xl bg-[var(--wk-surface-raised)] flex items-center justify-center group-hover:bg-[var(--wk-brand-soft)] transition-colors">
-                      <i className="ri-price-tag-3-line text-[var(--wk-text-muted)] group-hover:text-[var(--wk-brand)] text-[22px] transition-colors" />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-[var(--wk-text-faint)] mb-0.5">Genre</div>
-                      <div className="text-[15px] font-bold text-[var(--wk-text)] truncate group-hover:text-[var(--wk-brand)] transition-colors">{track.genre}</div>
-                    </div>
-                    <i className="ri-arrow-right-line text-[var(--wk-text-faint)] group-hover:text-[var(--wk-brand)] group-hover:translate-x-0.5 transition-all ml-auto" />
-                  </Link>
-                )}
-              </div>
-            </section>
-          )}
-
-          {/* ── Section: Lyrics (if available) ── */}
-          {track.lyrics && (
-            <section className="pb-12 md:pb-16">
-              <div className="mb-8 flex items-center gap-4">
-                <div className="h-px flex-1 bg-[var(--wk-divider)]" />
-                <span className="text-[10px] font-extrabold uppercase tracking-[0.22em] text-[var(--wk-text-faint)] whitespace-nowrap">
-                  Lyrics
-                </span>
-                <div className="h-px flex-1 bg-[var(--wk-divider)]" />
-              </div>
-              <div className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-8">
-                {track.lyricsContributor && (
-                  <div className="mb-5 flex items-center gap-2 text-[12px] text-[var(--wk-text-muted)]">
-                    <i className="ri-user-star-line text-[var(--wk-brand)] text-[15px]" />
-                    <span>Contributed by <span className="font-bold text-[var(--wk-text)]">{track.lyricsContributor.name}</span></span>
+                    {track.chartAppearances.length > 8 && (
+                      <div className="mt-2 text-center">
+                        <Link
+                          to="/charts"
+                          className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[var(--wk-brand)] hover:underline"
+                        >
+                          View all {track.chartAppearances.length} appearances
+                          <WkIcon name="ArrowRight" size={11} />
+                        </Link>
+                      </div>
+                    )}
                   </div>
                 )}
-                <p className="text-[16px] leading-[2] text-[var(--wk-text)] md:text-[18px] md:leading-[2.2] max-w-[680px]">
-                  <span className="float-left mr-3 mt-1 font-black leading-none text-[var(--wk-brand)]" style={{ fontSize: "clamp(44px, 6vw, 72px)" }}>
-                    {track.lyrics.charAt(0)}
-                  </span>
-                  <span className="whitespace-pre-line">{track.lyrics.slice(1)}</span>
-                </p>
-              </div>
-            </section>
-          )}
 
-        </div>
+                <ChartKpiGrid vm={track} />
+              </section>
+            )}
 
-        {/* ── Footer CTA ── */}
-        <section className="bg-[var(--wk-surface)] border-t border-[var(--wk-border)] py-16 px-6 text-center mt-8">
-          <div className="max-w-[520px] mx-auto">
-            <p className="text-[10px] font-extrabold uppercase tracking-[0.22em] text-[var(--wk-brand)] mb-4">
-              WAKILISHA Registry
-            </p>
-            <h3 className="text-[22px] md:text-[26px] font-black tracking-[-0.035em] text-[var(--wk-text)] mb-3 leading-snug">
-              African music, systematically catalogued.
-            </h3>
-            <p className="text-[14px] text-[var(--wk-text-muted)] mb-8 leading-relaxed">
-              Every track in the registry is connected to its artists, releases, labels, genres, and chart history — creating a living archive of the continent&rsquo;s creative output.
-            </p>
-            <div className="flex items-center justify-center gap-3 flex-wrap">
-              <Link
-                to="/charts"
-                className="inline-flex items-center gap-2 rounded-full bg-[var(--wk-brand)] px-6 py-3 text-[13px] font-extrabold text-[var(--wk-brand-on)] transition-all hover:opacity-90 whitespace-nowrap"
-              >
-                <i className="ri-bar-chart-2-line" />
-                Explore the charts
-              </Link>
-              <Link
-                to="/artists"
-                className="inline-flex items-center gap-2 rounded-full border border-[var(--wk-border)] bg-[var(--wk-bg)] px-6 py-3 text-[13px] font-bold text-[var(--wk-text)] transition-all hover:border-[var(--wk-brand)]/30 hover:text-[var(--wk-brand)] whitespace-nowrap"
-              >
-                <i className="ri-user-line" />
-                Browse artists
-              </Link>
-            </div>
+            {/* Lyrics */}
+            <TrackLyricsSection
+              trackSlug={track.slug}
+              artistSlug={track.artistSlug}
+              trackTitle={track.title}
+              artistName={track.artist}
+              lyrics={track.lyrics}
+              lyricsContributor={track.lyricsContributor}
+            />
+
+            {/* Related Tracks */}
+            <TrackRelatedTracks
+              trackSlug={track.slug}
+              artistSlug={track.artistSlug}
+              artistName={track.artist}
+              albumSlug={track.albumSlug}
+              albumTitle={track.albumTitle}
+              genreSlug={track.genreSlug}
+              genreName={track.genre}
+            />
+
+            {/* Connected Artists */}
+            {track.artists.length > 0 && (
+              <ConnectedArtists artists={track.artists} artworkUrl={track.artworkUrl} />
+            )}
+
+            {/* Artist link */}
+            {track.artistSlug && (
+              <section className="border border-[var(--wk-border)] rounded-2xl bg-[var(--wk-surface)] p-5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-[var(--wk-brand)] mb-1">
+                      Primary Artist
+                    </div>
+                    <div className="text-[18px] font-extrabold text-[var(--wk-text)]">{track.artist}</div>
+                    <div className="text-[12px] font-semibold text-[var(--wk-text-muted)] mt-1">
+                      Primary artist on this track
+                    </div>
+                  </div>
+                  <Link
+                    to={`/artists/${track.artistSlug}`}
+                    className="inline-flex items-center gap-2 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-4 py-2.5 text-[13px] font-bold text-[var(--wk-text)] hover:bg-[var(--wk-surface-raised)] transition-colors whitespace-nowrap"
+                  >
+                    View artist
+                    <WkIcon name="ArrowUpRight" size={13} />
+                  </Link>
+                </div>
+              </section>
+            )}
+
           </div>
-        </section>
+
+          {/* Sidebar */}
+          <div className="w-full lg:w-[340px] flex-shrink-0">
+            <TrackSidebar vm={track} rawData={rawData} />
+          </div>
+        </div>
       </div>
     </main>
   );

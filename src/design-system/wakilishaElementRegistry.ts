@@ -95,7 +95,7 @@ export const wakilishaElementRegistry: WakilishaElement[] = [
     group: 'Product',
     purpose: 'Dense, information-rich rows for tracks, entities and ranked lists.',
     primaryClasses: ['trow', 'trow-pos', 'trow-art', 'trow-meta', 'trow-title', 'trow-artist', 'trow-delta', 'trow-meta-cell'],
-    productRoutes: ['/charts', '/artists/:slug', '/tracks/:slug', '/releases/:slug'],
+    productRoutes: ['/charts', '/artists/:slug', '/tracks/:artistSlug/:trackSlug', '/releases/:artistSlug/:releaseSlug'],
     implementationNotes: ['Rows should carry artwork, title, artist/entity, movement/metadata and a clear action affordance.']
   },
   {
@@ -104,7 +104,7 @@ export const wakilishaElementRegistry: WakilishaElement[] = [
     group: 'Product',
     purpose: 'Dock player, nav capsule, expanded sheet and theater-mode player.',
     primaryClasses: ['player-stage', 'dock', 'dock-left', 'dock-art', 'dock-meta', 'dock-controls', 'dock-progress', 'nav-cap', 'sheet', 'theater'],
-    productRoutes: ['global player', '/tracks/:slug', '/charts/:series/:edition', '/artists/:slug'],
+    productRoutes: ['global player', '/tracks/:artistSlug/:trackSlug', '/charts/:series/:edition', '/artists/:slug'],
     implementationNotes: [
       'Default player is compact; expanded sheet and theater are earned states.',
       'Always show provenance/source context for media where available.'
@@ -197,7 +197,7 @@ export const wakilishaElementRegistry: WakilishaElement[] = [
     group: 'React App UI',
     purpose: 'Track hero, artwork, metadata, actions and waveform.',
     primaryClasses: ['track-hero', 'track-hero-layout', 'track-hero-art', 'track-hero-eyebrow', 'track-hero-title', 'track-hero-artist', 'track-meta-grid', 'track-meta-item', 'track-waveform', 'track-waveform-bar'],
-    productRoutes: ['/tracks/:slug'],
+    productRoutes: ['/tracks/:artistSlug/:trackSlug'],
     implementationNotes: ['Single tracks should expose attribution, source, chart context and playback.']
   },
   {
@@ -206,7 +206,7 @@ export const wakilishaElementRegistry: WakilishaElement[] = [
     group: 'React App UI',
     purpose: 'Album hero, cover interaction and tracklist.',
     primaryClasses: ['album-hero', 'album-hero-layout', 'album-cover', 'album-cover-overlay', 'album-play-btn', 'album-type', 'album-title', 'album-artist', 'album-tracklist', 'album-trow'],
-    productRoutes: ['/releases/:slug'],
+    productRoutes: ['/releases/:artistSlug/:releaseSlug'],
     implementationNotes: ['Do not flatten an album into generic cards; tracklist is part of the release object.']
   },
   {
@@ -323,7 +323,7 @@ export const wakilishaElementRegistry: WakilishaElement[] = [
     group: 'Mobile-First Experience',
     purpose: 'Full mobile player, scrubber, controls and lyrics strip.',
     primaryClasses: ['player-full', 'player-full-art', 'player-full-body', 'player-scrubber', 'player-controls-row', 'player-play-btn', 'player-lyrics-strip', 'lyric-line'],
-    productRoutes: ['mobile player', '/tracks/:slug'],
+    productRoutes: ['mobile player', '/tracks/:artistSlug/:trackSlug'],
     implementationNotes: ['The full player is a premium mobile moment with lyrics and ambient context.']
   },
   {
@@ -377,7 +377,7 @@ export const wakilishaElementRegistry: WakilishaElement[] = [
     group: 'Mobile High-Fidelity Screens',
     purpose: 'High-fidelity full player with ambient art, scrubber, controls and lyrics.',
     primaryClasses: ['full-player', 'fp-art-zone', 'fp-ambient', 'fp-topbar', 'fp-controls', 'fp-track-name', 'fp-track-artist', 'fp-scrub', 'fp-play-btn', 'fp-lyrics'],
-    productRoutes: ['mobile player', '/tracks/:slug'],
+    productRoutes: ['mobile player', '/tracks/:artistSlug/:trackSlug'],
     implementationNotes: ['Full player should feel like a flagship product surface.']
   },
   {

@@ -1,4 +1,4 @@
-// ── Public Content Read Gateway v2 — with rate limiting (1000 req/min per IP) ──
+// ── Public Content Read Gateway v7 — label detail now matches by label_id AND metadata->record_label ──
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -21,7 +21,6 @@ const securityHeaders = {
 
 const fullHeaders = { ...corsHeaders, ...securityHeaders, "Content-Type": "application/json", "Cache-Control": "no-cache, no-store, must-revalidate" };
 
-const rid = () => crypto.randomUUID().slice(0, 12);
 const iso = () => new Date().toISOString();
 
 function jsonResponse(data: unknown, status = 200) {
@@ -35,20 +34,12 @@ const RATE_LIMIT_WINDOW_SECONDS = 60;
 async function checkRateLimit(supabase: ReturnType<typeof createClient>, key: string): Promise<{ allowed: boolean; remaining: number; resetAt: string }> {
   const windowStart = new Date(Date.now() - RATE_LIMIT_WINDOW_SECONDS * 1000).toISOString();
   try {
-    const { count, error } = await supabase
-      .from("rate_limit_log")
-      .select("*", { count: "exact", head: true })
-      .eq("bucket_key", key)
-      .gte("created_at", windowStart);
-
+    const { count, error } = await supabase.from("rate_limit_log").select("*", { count: "exact", head: true }).eq("bucket_key", key).gte("created_at", windowStart);
     if (error) return { allowed: true, remaining: RATE_LIMIT_MAX, resetAt: "" };
-
     const current = count ?? 0;
     const remaining = Math.max(0, RATE_LIMIT_MAX - current - 1);
     const resetAt = new Date(Date.now() + RATE_LIMIT_WINDOW_SECONDS * 1000).toISOString();
-
     supabase.from("rate_limit_log").insert({ bucket_key: key, created_at: iso() }).then(() => {});
-
     return { allowed: current < RATE_LIMIT_MAX, remaining, resetAt };
   } catch {
     return { allowed: true, remaining: RATE_LIMIT_MAX, resetAt: "" };
@@ -82,48 +73,35 @@ function resolveAuthor(article: Record<string, unknown>): string { const storedA
 function authorSlugFromName(name: string): string { return name.trim().toLowerCase().replace(/[\s_-]+/g, "-").replace(/[^a-z0-9-]/g, ""); }
 function buildArticleResponse(a: any) { const catNames = parseCategoryNames(a.categories); const section = catNames.length > 0 ? catNames[0] : "Music"; const contentText = stripHtml(String(a.content_html || "")); const tagNames = parseTagNames(a.tags); const dek = resolveDek(a, 280); let heroUrl = String(a.hero_image_url || ""); if (!heroUrl && a.content_html) heroUrl = extractFirstImgSrc(String(a.content_html)); const authorName = resolveAuthor(a); return { id: String(a.id), slug: String(a.slug), title: String(a.title), section, dek, author: authorName, authorSlug: authorSlugFromName(authorName), date: a.published_at ? String(a.published_at).split("T")[0] : "", readingTime: Math.max(1, Math.ceil(contentText.length / 1500)), heroUrl, tags: tagNames }; }
 
-type ReleaseEntry = { slug: string; title: string; releaseType: string; year: string; releaseDate: string; trackCount: number; artworkUrl: string; labelName?: string; tracks: Array<{ title: string; duration: string }> };
-
-interface TrackOut {
-  title: string;
-  duration: string;
-  artists?: string;
-  previewUrl?: string;
-}
-interface ReleaseOut {
-  slug: string;
-  title: string;
-  releaseType: string;
-  year: string;
-  releaseDate: string;
-  trackCount: number;
-  artworkUrl: string;
-  artist?: string;
-  tracks: TrackOut[];
-}
+type ReleaseEntry = { slug: string; title: string; releaseType: string; year: string; releaseDate: string; trackCount: number; artworkUrl: string; labelName?: string; genres?: string[]; tracks: Array<{ title: string; duration: string; previewUrl?: string }> };
+interface TrackOut { title: string; duration: string; artists?: string; previewUrl?: string; }
+interface ReleaseOut { slug: string; title: string; releaseType: string; year: string; releaseDate: string; trackCount: number; artworkUrl: string; artist?: string; labelName?: string; genres?: string[]; tracks: TrackOut[]; }
 
 async function getArtistDiscography(supabase: ReturnType<typeof createClient>, artistId: string, artistName: string, metadataAlbums: any[], metadataEps: any[]): Promise<ReleaseEntry[]> {
   const releases: ReleaseEntry[] = []; const seenTitles = new Set<string>();
   const { data: releaseArtistRows } = await supabase.from("registry_release_artists").select("release_id, is_primary, role").eq("artist_id", artistId).eq("status", "active").order("credit_order", { ascending: true });
   if (releaseArtistRows && releaseArtistRows.length > 0) {
     const releaseIds = [...new Set(releaseArtistRows.map((r: any) => String(r.release_id)))];
-    const { data: relRows } = await supabase.from("registry_releases").select("id, slug, title, release_type, release_date, artwork_url, label_id").in("id", releaseIds).in("status", ["active", "draft"]).order("release_date", { ascending: false });
+    const { data: relRows } = await supabase.from("registry_releases").select("id, slug, title, release_type, release_date, artwork_url, label_id, metadata").in("id", releaseIds).in("status", ["active", "draft"]).order("release_date", { ascending: false });
     if (relRows && relRows.length > 0) {
       const { data: releaseTracks } = await supabase.from("registry_release_tracks").select("release_id, track_id, track_number").in("release_id", releaseIds).order("track_number", { ascending: true });
       const tracksByRelease = new Map<string, Array<{ track_id: string; track_number: number }>>();
       for (const rt of (releaseTracks ?? [])) { const rid = String(rt.release_id); if (!tracksByRelease.has(rid)) tracksByRelease.set(rid, []); tracksByRelease.get(rid)!.push({ track_id: String(rt.track_id), track_number: Number(rt.track_number || 0) }); }
       const trackIds = (releaseTracks ?? []).map((rt: any) => String(rt.track_id));
-      const { data: trackRows } = trackIds.length > 0 ? await supabase.from("registry_tracks").select("id, title, duration_ms").in("id", trackIds) : { data: [] };
+      const { data: trackRows } = trackIds.length > 0 ? await supabase.from("registry_tracks").select("id, title, duration_ms, preview_url").in("id", trackIds) : { data: [] };
       const trackById = new Map((trackRows ?? []).map((t: any) => [String(t.id), t]));
       const labelIds = [...new Set((relRows ?? []).map((r: any) => r.label_id).filter(Boolean).map(String))];
-      const { data: labels } = labelIds.length > 0 ? await supabase.from("registry_labels").select("id, name").in("id", labelIds) : { data: [] };
+      const { data: labels } = labelIds.length > 0 ? await supabase.from("registry_labels").select("id, name").in("id", [...new Set(labelIds)]) : { data: [] };
       const labelById = new Map((labels ?? []).map((l: any) => [String(l.id), String(l.name)]));
       for (const r of relRows as any[]) {
         const releaseTrackList = tracksByRelease.get(String(r.id)) ?? [];
-        const tracks = releaseTrackList.sort((a, b) => (a.track_number || 0) - (b.track_number || 0)).map((rt) => { const t = trackById.get(rt.track_id); if (!t) return null; const dms = Number(t.duration_ms || 0); const minutes = Math.floor(dms / 60000); const seconds = Math.floor((dms % 60000) / 1000); return { title: String(t.title || ""), duration: dms > 0 ? `${minutes}:${String(seconds).padStart(2, "0")}` : "" }; }).filter(Boolean) as Array<{ title: string; duration: string }>;
-        const trackCount = tracks.length || releaseTrackList.length; const labelName = r.label_id ? (labelById.get(String(r.label_id)) || "Independent") : "Independent";
+        const tracks = releaseTrackList.sort((a, b) => (a.track_number || 0) - (b.track_number || 0)).map((rt) => { const t = trackById.get(rt.track_id); if (!t) return null; const dms = Number(t.duration_ms || 0); const minutes = Math.floor(dms / 60000); const seconds = Math.floor((dms % 60000) / 1000); return { title: String(t.title || ""), duration: dms > 0 ? `${minutes}:${String(seconds).padStart(2, "0")}` : "", previewUrl: t.preview_url || undefined }; }).filter(Boolean) as Array<{ title: string; duration: string; previewUrl?: string }>;
+        const trackCount = tracks.length || releaseTrackList.length;
+        const releaseMeta = (r.metadata || {}) as Record<string, unknown>;
+        const labelName = r.label_id ? (labelById.get(String(r.label_id)) || String(releaseMeta.record_label || "") || "Independent") : (String(releaseMeta.record_label || "") || "Independent");
+        const genres = Array.isArray(releaseMeta.genre_names) ? (releaseMeta.genre_names as string[]).map(String) : [];
         seenTitles.add(normalizeTitleForDedup(String(r.title)));
-        releases.push({ slug: String(r.slug), title: String(r.title), releaseType: String(r.release_type || "album"), year: r.release_date ? String(r.release_date).split("-")[0] : "", releaseDate: r.release_date || "", trackCount, artworkUrl: String(r.artwork_url || ""), labelName, tracks });
+        releases.push({ slug: String(r.slug), title: String(r.title), releaseType: String(r.release_type || "album"), year: r.release_date ? String(r.release_date).split("-")[0] : "", releaseDate: r.release_date || "", trackCount, artworkUrl: String(r.artwork_url || ""), labelName, genres, tracks });
       }
     }
   }
@@ -146,14 +124,22 @@ async function getTopSongsFromRelationships(supabase: ReturnType<typeof createCl
   return uniqueRels.map(rel => { const track = trackBySlug.get(rel.target_slug); if (!track) return null; const dms = Number(track.duration_ms || 0); const duration = dms > 0 ? `${Math.floor(dms / 60000)}:${String(Math.floor((dms % 60000) / 1000)).padStart(2, "0")}` : ""; return { title: String(track.title || ""), artists: artistsByTrackId.get(String(track.id)) || "", image: String(track.artwork_url || ""), duration, songUrl: String(track.preview_url || "") }; }).filter(Boolean) as Array<{ title: string; artists: string; image: string; duration: string; songUrl: string }>;
 }
 
-function buildProgramSummary(p: any) {
-  return { id: String(p.id), publicSlug: String(p.public_slug), publicLabel: String(p.public_label), shortLabel: String(p.public_label), sourceFamilySlug: String(p.source_family_slug || p.public_slug), seriesSlug: String(p.series_slug || ""), seriesLabel: String(p.series_slug || ""), marketSlug: String(p.market_slug || ""), marketLabel: String(p.market_slug || ""), periodType: String(p.default_period_type || "weekly"), methodologyVersion: String(p.default_methodology_version || "legacy-import-v1"), eligibilityRulesVersion: "legacy-import-v1" };
+function buildProgramSummary(p: any) { return { id: String(p.id), publicSlug: String(p.public_slug), publicLabel: String(p.public_label), shortLabel: String(p.public_label), sourceFamilySlug: String(p.source_family_slug || p.public_slug), seriesSlug: String(p.series_slug || ""), seriesLabel: String(p.series_slug || ""), marketSlug: String(p.market_slug || ""), marketLabel: String(p.market_slug || ""), periodType: String(p.default_period_type || "weekly"), methodologyVersion: String(p.default_methodology_version || "legacy-import-v1"), eligibilityRulesVersion: "legacy-import-v1" }; }
+function buildEditionSummary(e: any) { return { id: String(e.edition_slug), slug: String(e.edition_slug), label: String(e.edition_label), date: String(e.edition_date), periodStart: e.period_start || null, periodEnd: e.period_end || null, entryCount: e.entry_count || 0 }; }
+function buildEntryItem(e: any) { return { id: String(e.id), rank: Number(e.rank || 0), previousRank: e.previous_rank != null ? Number(e.previous_rank) : null, movement: String(e.movement || "same"), trackSlug: String(e.track_slug || ""), trackTitle: String(e.track_title || ""), artistNames: String(e.artist_name || "").split(",").map((s: string) => s.trim()).filter(Boolean), artistSlugs: String(e.artist_name || "").split(",").map((s: string) => s.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+$/g, "")).filter(Boolean), artworkUrl: e.artwork_url || null, score: e.total_score != null ? Number(e.total_score) : null, sourceEntryId: String(e.id) }; }
+
+function extractLabelAndGenres(releaseRow: Record<string, unknown>, labelById: Map<string, string>): { labelName: string; genres: string[] } {
+  const releaseMeta = (releaseRow.metadata || {}) as Record<string, unknown>;
+  const labelName = releaseRow.label_id ? (labelById.get(String(releaseRow.label_id)) || String(releaseMeta.record_label || "") || "Independent") : (String(releaseMeta.record_label || "") || "Independent");
+  const genres = Array.isArray(releaseMeta.genre_names) ? (releaseMeta.genre_names as string[]).map(String) : [];
+  return { labelName, genres };
 }
-function buildEditionSummary(e: any) {
-  return { id: String(e.edition_slug), slug: String(e.edition_slug), label: String(e.edition_label), date: String(e.edition_date), periodStart: e.period_start || null, periodEnd: e.period_end || null, entryCount: e.entry_count || 0 };
-}
-function buildEntryItem(e: any) {
-  return { id: String(e.id), rank: Number(e.rank || 0), previousRank: e.previous_rank != null ? Number(e.previous_rank) : null, movement: String(e.movement || "same"), trackSlug: String(e.track_slug || ""), trackTitle: String(e.track_title || ""), artistNames: String(e.artist_name || "").split(",").map((s: string) => s.trim()).filter(Boolean), artistSlugs: String(e.artist_name || "").split(",").map((s: string) => s.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+$/g, "")).filter(Boolean), artworkUrl: e.artwork_url || null, score: e.total_score != null ? Number(e.total_score) : null, sourceEntryId: String(e.id) };
+
+async function fetchLabelMapForReleases(supabase: ReturnType<typeof createClient>, releases: Array<{ label_id?: string | null }>): Promise<Map<string, string>> {
+  const labelIds = [...new Set(releases.map((r) => r.label_id).filter(Boolean).map(String))];
+  if (!labelIds.length) return new Map();
+  const { data: labels } = await supabase.from("registry_labels").select("id, name").in("id", labelIds);
+  return new Map((labels ?? []).map((l: any) => [String(l.id), String(l.name)]));
 }
 
 Deno.serve(async (req) => {
@@ -163,15 +149,11 @@ Deno.serve(async (req) => {
 
   const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
-  // Rate limiting — per IP
   const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "unknown";
   const rateLimitKey = `public:${clientIp}`;
   const rl = await checkRateLimit(supabase, rateLimitKey);
   if (!rl.allowed) {
-    return new Response(JSON.stringify({ error: "Too many requests", retryAfter: rl.resetAt }), {
-      status: 429,
-      headers: { ...fullHeaders, "Retry-After": String(RATE_LIMIT_WINDOW_SECONDS), "X-RateLimit-Remaining": String(rl.remaining), "X-RateLimit-Reset": rl.resetAt },
-    });
+    return new Response(JSON.stringify({ error: "Too many requests", retryAfter: rl.resetAt }), { status: 429, headers: { ...fullHeaders, "Retry-After": String(RATE_LIMIT_WINDOW_SECONDS), "X-RateLimit-Remaining": String(rl.remaining), "X-RateLimit-Reset": rl.resetAt } });
   }
 
   const url = new URL(req.url);
@@ -181,35 +163,22 @@ Deno.serve(async (req) => {
     let data: unknown;
 
     if (path === "/health" || path === "/health/") {
-      data = { ok: true, service: "public-content-read", version: "2.0.0", timestamp: iso() };
+      data = { ok: true, service: "public-content-read", version: "7.0.0", timestamp: iso() };
     }
 
     else if (path.endsWith("/discography") && path.includes("/artists/")) {
       const artistSlug = path.replace(/^\/artists\//, "").replace(/\/discography\/?$/, "");
       if (!artistSlug) return jsonResponse({ error: "Missing artist slug" }, 400);
-
-      const { data: artist, error: artistErr } = await supabase
-        .from("registry_artists")
-        .select("id, slug, display_name")
-        .eq("slug", artistSlug)
-        .eq("status", "active")
-        .maybeSingle();
+      const { data: artist, error: artistErr } = await supabase.from("registry_artists").select("id, slug, display_name").eq("slug", artistSlug).eq("status", "active").maybeSingle();
       if (artistErr || !artist) return jsonResponse({ error: artistErr?.message || "Artist not found" }, 404);
-
       const artistId = String(artist.id);
       const displayName = String(artist.display_name);
-
-      const { data: primaryLinks } = await supabase
-        .from("registry_release_artists")
-        .select("release_id")
-        .eq("artist_id", artistId)
-        .eq("is_primary", true)
-        .eq("status", "active");
+      const { data: primaryLinks } = await supabase.from("registry_release_artists").select("release_id").eq("artist_id", artistId).eq("is_primary", true).eq("status", "active");
       const primaryReleaseIds = (primaryLinks ?? []).map((r: any) => String(r.release_id));
-
       let ownReleases: ReleaseOut[] = [];
       if (primaryReleaseIds.length > 0) {
-        const { data: releases } = await supabase.from("registry_releases").select("id, title, slug, release_type, release_date, artwork_url").in("id", primaryReleaseIds).in("status", ["active", "draft"]).order("release_date", { ascending: false });
+        const { data: releases } = await supabase.from("registry_releases").select("id, title, slug, release_type, release_date, artwork_url, label_id, metadata").in("id", primaryReleaseIds).in("status", ["active", "draft"]).order("release_date", { ascending: false });
+        const labelMap = await fetchLabelMapForReleases(supabase, releases ?? []);
         if (releases) {
           for (const rel of releases as any[]) {
             const { data: relTracks } = await supabase.from("registry_release_tracks").select("track_id, track_number, disc_number").eq("release_id", rel.id).order("disc_number").order("track_number");
@@ -222,21 +191,13 @@ Deno.serve(async (req) => {
               for (const ta of (trackArtists ?? [])) { const list = artistsByTrack.get(ta.track_id) || []; list.push(ta.artist_name_text); artistsByTrack.set(ta.track_id, list); }
               const trackMetaMap = new Map<string, { durationMs: number | null; previewUrl: string | null }>();
               for (const tr of (trackRows ?? [])) { trackMetaMap.set(tr.id, { durationMs: tr.duration_ms ?? null, previewUrl: tr.preview_url ?? null }); }
-              tracks = (relTracks ?? []).map((rt: any) => {
-                const t = (trackRows ?? []).find((tr: any) => tr.id === rt.track_id);
-                if (!t) return null;
-                const meta = trackMetaMap.get(t.id);
-                const trackArtistsList = artistsByTrack.get(t.id) || [];
-                const nonPageArtist = trackArtistsList.filter((a) => a !== displayName);
-                const artistsStr = nonPageArtist.length > 0 ? nonPageArtist.join(", ") : undefined;
-                return { title: t.title || "", duration: formatDuration(meta?.durationMs ?? null), artists: artistsStr, previewUrl: meta?.previewUrl || undefined };
-              }).filter(Boolean) as TrackOut[];
+              tracks = (relTracks ?? []).map((rt: any) => { const t = (trackRows ?? []).find((tr: any) => tr.id === rt.track_id); if (!t) return null; const meta = trackMetaMap.get(t.id); const trackArtistsList = artistsByTrack.get(t.id) || []; const nonPageArtist = trackArtistsList.filter((a) => a !== displayName); const artistsStr = nonPageArtist.length > 0 ? nonPageArtist.join(", ") : undefined; return { title: t.title || "", duration: formatDuration(meta?.durationMs ?? null), artists: artistsStr, previewUrl: meta?.previewUrl || undefined }; }).filter(Boolean) as TrackOut[];
             }
-            ownReleases.push({ slug: rel.slug, title: rel.title, releaseType: rel.release_type || "album", year: extractYear(rel.release_date), releaseDate: rel.release_date || "", trackCount: tracks.length, artworkUrl: rel.artwork_url || "", tracks });
+            const { labelName, genres } = extractLabelAndGenres(rel, labelMap);
+            ownReleases.push({ slug: rel.slug, title: rel.title, releaseType: rel.release_type || "album", year: extractYear(rel.release_date), releaseDate: rel.release_date || "", trackCount: tracks.length, artworkUrl: rel.artwork_url || "", labelName, genres, tracks });
           }
         }
       }
-
       const { data: featuredTrackArtists } = await supabase.from("registry_track_artists").select("track_id").eq("artist_slug", artistSlug).eq("is_primary", false).eq("status", "active");
       let appearsOn: ReleaseOut[] = [];
       if (featuredTrackArtists && featuredTrackArtists.length > 0) {
@@ -245,7 +206,8 @@ Deno.serve(async (req) => {
         if (featuredReleaseTracks && featuredReleaseTracks.length > 0) {
           const featuredReleaseIds = [...new Set(featuredReleaseTracks.map((rt: any) => rt.release_id))].filter((rid) => !primaryReleaseIds.includes(rid));
           if (featuredReleaseIds.length > 0) {
-            const { data: featuredReleases } = await supabase.from("registry_releases").select("id, title, slug, release_type, release_date, artwork_url").in("id", featuredReleaseIds).in("status", ["active", "draft"]).order("release_date", { ascending: false });
+            const { data: featuredReleases } = await supabase.from("registry_releases").select("id, title, slug, release_type, release_date, artwork_url, label_id, metadata").in("id", featuredReleaseIds).in("status", ["active", "draft"]).order("release_date", { ascending: false });
+            const featLabelMap = await fetchLabelMapForReleases(supabase, featuredReleases ?? []);
             if (featuredReleases) {
               const seenTitles2 = new Set<string>();
               for (const rel of featuredReleases as any[]) {
@@ -262,21 +224,15 @@ Deno.serve(async (req) => {
                   for (const ta of (allTrackArtists ?? [])) { const list = abt.get(ta.track_id) || []; list.push(ta.artist_name_text); abt.set(ta.track_id, list); }
                   const tmm = new Map<string, { durationMs: number | null; previewUrl: string | null }>();
                   for (const tr of (tRows ?? [])) { tmm.set(tr.id, { durationMs: tr.duration_ms ?? null, previewUrl: tr.preview_url ?? null }); }
-                  tracks = (tRows ?? []).map((t: any) => {
-                    const meta2 = tmm.get(t.id);
-                    const tal = abt.get(t.id) || [];
-                    const npa = tal.filter((a) => a !== displayName);
-                    const as = npa.length > 0 ? npa.join(", ") : undefined;
-                    return { title: t.title || "", duration: formatDuration(meta2?.durationMs ?? null), artists: as, previewUrl: meta2?.previewUrl || undefined };
-                  });
+                  tracks = (tRows ?? []).map((t: any) => { const meta2 = tmm.get(t.id); const tal = abt.get(t.id) || []; const npa = tal.filter((a) => a !== displayName); const as2 = npa.length > 0 ? npa.join(", ") : undefined; return { title: t.title || "", duration: formatDuration(meta2?.durationMs ?? null), artists: as2, previewUrl: meta2?.previewUrl || undefined }; });
                 }
-                appearsOn.push({ slug: rel.slug, title: rel.title, releaseType: rel.release_type || "album", year: extractYear(rel.release_date), releaseDate: rel.release_date || "", trackCount: tracks.length, artworkUrl: rel.artwork_url || "", artist: primaryArtistLink?.artist_name_text || "Various Artists", tracks });
+                const { labelName, genres } = extractLabelAndGenres(rel, featLabelMap);
+                appearsOn.push({ slug: rel.slug, title: rel.title, releaseType: rel.release_type || "album", year: extractYear(rel.release_date), releaseDate: rel.release_date || "", trackCount: tracks.length, artworkUrl: rel.artwork_url || "", artist: primaryArtistLink?.artist_name_text || "Various Artists", labelName, genres, tracks });
               }
             }
           }
         }
       }
-
       return jsonResponse({ artist: { id: artistId, slug: artistSlug, name: displayName }, releases: ownReleases, appearsOn });
     }
 
@@ -340,10 +296,7 @@ Deno.serve(async (req) => {
       const now = new Date().toISOString();
       const { data: article } = await supabase.from("wk_articles").select("id, slug, title, excerpt, content_html, author, published_at, modified_at, categories, tags, hero_image_url, seo, wp_status, raw_meta").eq("slug", artSlug).maybeSingle();
       if (!article) return jsonResponse({ data: null }, 404);
-      if (article.wp_status === "future" && article.published_at && article.published_at <= now) {
-        const { error: updateError } = await supabase.from("wk_articles").update({ wp_status: "publish", updated_at: now }).eq("id", article.id);
-        if (!updateError) article.wp_status = "publish";
-      }
+      if (article.wp_status === "future" && article.published_at && article.published_at <= now) { const { error: updateError } = await supabase.from("wk_articles").update({ wp_status: "publish", updated_at: now }).eq("id", article.id); if (!updateError) article.wp_status = "publish"; }
       if (article.wp_status !== "publish") return jsonResponse({ data: null }, 404);
       data = { article: { ...buildArticleResponse(article), contentHtml: String(article.content_html || ""), seo: (article.seo || {}) as Record<string, unknown>, categories: parseCategoryNames(article.categories) } };
     }
@@ -382,60 +335,30 @@ Deno.serve(async (req) => {
         const untitled = videos.filter((v: any) => !v.title);
         if (untitled.length > 0) {
           await Promise.all(untitled.map(async (v: any) => {
-            try {
-              const resp = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${v.id}&format=json`);
-              if (resp.ok) { const j = await resp.json(); v.title = String(j.title || "YouTube Video"); }
-              else { v.title = "YouTube Video"; }
-            } catch { v.title = "YouTube Video"; }
+            try { const resp = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${v.id}&format=json`); if (resp.ok) { const j = await resp.json(); v.title = String(j.title || "YouTube Video"); } else { v.title = "YouTube Video"; } } catch { v.title = "YouTube Video"; }
           }));
         }
       }
       const metaAlbums = Array.isArray(meta.studio_albums) ? meta.studio_albums as any[] : [];
       const metaEps = Array.isArray(meta.eps_compilations) ? meta.eps_compilations as any[] : [];
       const releases = await getArtistDiscography(supabase, String(artist.id), displayName, metaAlbums, metaEps);
+      const aggregatedGenres = new Set<string>();
+      for (const r of releases) { if (r.genres) { for (const g of r.genres) { aggregatedGenres.add(g); } } }
+      if (Array.isArray(genresArr)) { for (const g of genresArr as string[]) { aggregatedGenres.add(String(g)); } }
+      if (meta.country) aggregatedGenres.add(String(meta.country));
+      const allGenres = [...aggregatedGenres];
       const { data: chartEntriesBySlug } = await supabase.from("wk_chart_entries_v2").select("rank, track_title, track_slug, movement, previous_rank, artwork_url, edition_id, artist_name").eq("artist_slug", slug).order("rank", { ascending: true }).limit(50);
       let chartEntries = chartEntriesBySlug ?? [];
       if (chartEntries.length === 0 && displayName) { const { data: chartEntriesByName } = await supabase.from("wk_chart_entries_v2").select("rank, track_title, track_slug, movement, previous_rank, artwork_url, edition_id, artist_name").ilike("artist_name", displayName).order("rank", { ascending: true }).limit(50); chartEntries = chartEntriesByName ?? []; }
       const chartEntryList = chartEntries.map((e: any) => { const prev = Number(e.previous_rank || 0); const curr = Number(e.rank || 0); let movement: string = String(e.movement || "same"); let movementAmount = 0; if (prev > 0 && curr > 0) { if (curr < prev) { movement = "up"; movementAmount = prev - curr; } else if (curr > prev) { movement = "down"; movementAmount = curr - prev; } } return { rank: curr, title: String(e.track_title || ""), artist: String(e.artist_name || ""), slug: String(e.track_slug || ""), movement, movementAmount, peakPosition: curr, weeksOnChart: 1, artworkUrl: e.artwork_url || "" }; });
       const relatedArtistsMap = new Map<string, any>();
       const { data: entityArtistRels } = await supabase.from("registry_entity_relationships").select("source_slug, target_slug, relationship_type, relationship_role, confidence, metadata").or(`source_slug.eq.${slug},target_slug.eq.${slug}`).eq("source_entity_type", "artist").eq("target_entity_type", "artist").eq("relationship_status", "active");
-      for (const rel of (entityArtistRels ?? [])) {
-        const isSource = String(rel.source_slug) === slug;
-        const relatedSlug = isSource ? String(rel.target_slug) : String(rel.source_slug);
-        if (relatedSlug === slug) continue;
-        const confidence = Number(rel.confidence || 1);
-        const relMeta = (rel.metadata || {}) as Record<string, unknown>;
-        const relType = String(rel.relationship_type || "");
-        if (!relatedArtistsMap.has(relatedSlug)) { relatedArtistsMap.set(relatedSlug, { slug: relatedSlug, name: "", imageUrl: "", score: 0, sharedTracksAll: 0, sharedChartTracks: 0, featuresThem: 0, theyFeature: 0, sharedTitles: [] }); }
-        const entry = relatedArtistsMap.get(relatedSlug)!;
-        entry.score += confidence;
-        if (relType === "featured_on" || relType === "features") { if (isSource) entry.featuresThem++; else entry.theyFeature++; }
-        if (relMeta.shared_track_count) entry.sharedTracksAll += Number(relMeta.shared_track_count);
-        if (relMeta.shared_chart_count) entry.sharedChartTracks += Number(relMeta.shared_chart_count);
-        if (Array.isArray(relMeta.shared_titles)) { for (const t of relMeta.shared_titles as string[]) { if (!entry.sharedTitles.includes(String(t))) entry.sharedTitles.push(String(t)); } }
-      }
+      for (const rel of (entityArtistRels ?? [])) { const isSource = String(rel.source_slug) === slug; const relatedSlug = isSource ? String(rel.target_slug) : String(rel.source_slug); if (relatedSlug === slug) continue; const confidence = Number(rel.confidence || 1); const relMeta = (rel.metadata || {}) as Record<string, unknown>; const relType = String(rel.relationship_type || ""); if (!relatedArtistsMap.has(relatedSlug)) { relatedArtistsMap.set(relatedSlug, { slug: relatedSlug, name: "", imageUrl: "", score: 0, sharedTracksAll: 0, sharedChartTracks: 0, featuresThem: 0, theyFeature: 0, sharedTitles: [] }); } const entry = relatedArtistsMap.get(relatedSlug)!; entry.score += confidence; if (relType === "featured_on" || relType === "features") { if (isSource) entry.featuresThem++; else entry.theyFeature++; } if (relMeta.shared_track_count) entry.sharedTracksAll += Number(relMeta.shared_track_count); if (relMeta.shared_chart_count) entry.sharedChartTracks += Number(relMeta.shared_chart_count); if (Array.isArray(relMeta.shared_titles)) { for (const t of relMeta.shared_titles as string[]) { if (!entry.sharedTitles.includes(String(t))) entry.sharedTitles.push(String(t)); } } }
       const { data: artistPairs } = await supabase.from("registry_artist_relationships").select("artist_a_slug, artist_b_slug, relationship_type, confidence, metadata").or(`artist_a_slug.eq.${slug},artist_b_slug.eq.${slug}`).eq("relationship_status", "active");
-      for (const pair of (artistPairs ?? [])) {
-        const relatedSlug = String(pair.artist_a_slug) === slug ? String(pair.artist_b_slug) : String(pair.artist_a_slug);
-        if (relatedSlug === slug) continue;
-        const confidence = Number(pair.confidence || 1);
-        const pairMeta = (pair.metadata || {}) as Record<string, unknown>;
-        if (!relatedArtistsMap.has(relatedSlug)) { relatedArtistsMap.set(relatedSlug, { slug: relatedSlug, name: "", imageUrl: "", score: 0, sharedTracksAll: 0, sharedChartTracks: 0, featuresThem: 0, theyFeature: 0, sharedTitles: [] }); }
-        const entry = relatedArtistsMap.get(relatedSlug)!;
-        entry.score += confidence;
-        if (pairMeta.shared_track_count) entry.sharedTracksAll += Number(pairMeta.shared_track_count);
-        if (pairMeta.shared_chart_count) entry.sharedChartTracks += Number(pairMeta.shared_chart_count);
-      }
+      for (const pair of (artistPairs ?? [])) { const relatedSlug = String(pair.artist_a_slug) === slug ? String(pair.artist_b_slug) : String(pair.artist_a_slug); if (relatedSlug === slug) continue; const confidence = Number(pair.confidence || 1); const pairMeta = (pair.metadata || {}) as Record<string, unknown>; if (!relatedArtistsMap.has(relatedSlug)) { relatedArtistsMap.set(relatedSlug, { slug: relatedSlug, name: "", imageUrl: "", score: 0, sharedTracksAll: 0, sharedChartTracks: 0, featuresThem: 0, theyFeature: 0, sharedTitles: [] }); } const entry = relatedArtistsMap.get(relatedSlug)!; entry.score += confidence; if (pairMeta.shared_track_count) entry.sharedTracksAll += Number(pairMeta.shared_track_count); if (pairMeta.shared_chart_count) entry.sharedChartTracks += Number(pairMeta.shared_chart_count); }
       const relatedSlugs = Array.from(relatedArtistsMap.keys());
       let relatedArtists: any[] = [];
-      if (relatedSlugs.length > 0) {
-        const { data: relatedRows } = await supabase.from("registry_artists").select("slug, display_name, public_image_url").in("slug", relatedSlugs).eq("status", "active");
-        const artistLookup2 = new Map((relatedRows ?? []).map((r: any) => [String(r.slug), r]));
-        relatedArtists = Array.from(relatedArtistsMap.values()).map((entry) => {
-          const row = artistLookup2.get(entry.slug);
-          return { slug: entry.slug, name: row ? String(row.display_name) : entry.slug, imageUrl: row?.public_image_url || "", score: Math.round(entry.score * 10), sharedTracksAll: entry.sharedTracksAll, sharedChartTracks: entry.sharedChartTracks, featuresThem: entry.featuresThem, theyFeature: entry.theyFeature, sharedTitles: entry.sharedTitles.slice(0, 5) };
-        }).sort((a, b) => (b.score || 0) - (a.score || 0)).slice(0, 8);
-      }
+      if (relatedSlugs.length > 0) { const { data: relatedRows } = await supabase.from("registry_artists").select("slug, display_name, public_image_url").in("slug", relatedSlugs).eq("status", "active"); const artistLookup2 = new Map((relatedRows ?? []).map((r: any) => [String(r.slug), r])); relatedArtists = Array.from(relatedArtistsMap.values()).map((entry) => { const row = artistLookup2.get(entry.slug); return { slug: entry.slug, name: row ? String(row.display_name) : entry.slug, imageUrl: row?.public_image_url || "", score: Math.round(entry.score * 10), sharedTracksAll: entry.sharedTracksAll, sharedChartTracks: entry.sharedChartTracks, featuresThem: entry.featuresThem, theyFeature: entry.theyFeature, sharedTitles: entry.sharedTitles.slice(0, 5) }; }).sort((a, b) => (b.score || 0) - (a.score || 0)).slice(0, 8); }
       const followerCount = meta.spotify_followers ? Number(meta.spotify_followers) : 0;
       const popularity = meta.spotify_popularity ? Number(meta.spotify_popularity) : 0;
       const country = String(meta.country || artist.origin_iso2 || "");
@@ -443,7 +366,7 @@ Deno.serve(async (req) => {
       const trackCount = releases.reduce((sum: number, r: any) => sum + (Number(r.trackCount) || 0), 0);
       const isChartArtist = chartEntryList.length > 0;
       const topChartPosition = isChartArtist ? Math.min(...chartEntryList.map((e: any) => Number(e.rank))) : null;
-      data = { artist: { id: String(artist.id), slug: String(artist.slug), name: displayName, country, imageUrl: heroImage || artist.public_image_url || "", profileImageUrl: heroImage || artist.public_image_url || "", genres, trackCount, releaseCount: releases.length, isChartArtist, isRising: popularity > 0 && popularity < 40, topChartPosition, bio: shortBio || displayName + " is an artist in the WAKILISHA registry.", fullBio: fullBio || wpBio || "", artistType: String(artist.gender || meta.gender || ""), followerCount, popularity, spotifyUrl: meta.spotify_artist_id ? "https://open.spotify.com/artist/" + meta.spotify_artist_id : socialSpotify || "", instagram: socialInstagram, youtubeChannel, chartEntries: chartEntryList, releases, topSongs, relatedArtists, videos, discographySource: "live_registry" } };
+      data = { artist: { id: String(artist.id), slug: String(artist.slug), name: displayName, country, imageUrl: heroImage || artist.public_image_url || "", profileImageUrl: heroImage || artist.public_image_url || "", genres: allGenres, trackCount, releaseCount: releases.length, isChartArtist, isRising: popularity > 0 && popularity < 40, topChartPosition, bio: shortBio || displayName + " is an artist in the WAKILISHA registry.", fullBio: fullBio || wpBio || "", artistType: String(artist.gender || meta.gender || ""), followerCount, popularity, spotifyUrl: meta.spotify_artist_id ? "https://open.spotify.com/artist/" + meta.spotify_artist_id : socialSpotify || "", instagram: socialInstagram, youtubeChannel, chartEntries: chartEntryList, releases, topSongs, relatedArtists, videos, discographySource: "live_registry" } };
     }
 
     else if (path === "/artists" || path === "/artists/") {
@@ -455,8 +378,8 @@ Deno.serve(async (req) => {
         const artistIds = artists.map((a: any) => String(a.id));
         const slugs = artists.map((a: any) => String(a.slug));
         const { data: releaseArtistRows } = await supabase.from("registry_release_artists").select("artist_id, release_id").in("artist_id", artistIds).eq("status", "active");
-        let trackCountByArtist = new Map<string, number>();
-        let releaseCountByArtist = new Map<string, number>();
+        const trackCountByArtist = new Map<string, number>();
+        const releaseCountByArtist = new Map<string, number>();
         if (releaseArtistRows && releaseArtistRows.length > 0) {
           const releaseIds = [...new Set(releaseArtistRows.map((r: any) => String(r.release_id)))];
           const { data: releaseTracks } = await supabase.from("registry_release_tracks").select("release_id, track_id").in("release_id", releaseIds);
@@ -471,42 +394,296 @@ Deno.serve(async (req) => {
     }
 
     else if (path.startsWith("/releases/")) {
-      const relSegments = path.replace(/^\/releases\//, "").split("/").filter(Boolean); const relSlug = relSegments[relSegments.length - 1] || "";
-      const { data: release } = await supabase.from("registry_releases").select("id, slug, title, release_date, release_type, artwork_url, label_id, metadata, status, description").eq("slug", relSlug).in("status", ["active", "draft"]).maybeSingle();
+      const relSegments = path.replace(/^\/releases\//, "").split("/").filter(Boolean);
+      const releaseSlug = relSegments[relSegments.length - 1] || "";
+      const urlArtistSlug = relSegments.length > 1 ? relSegments[0] : null;
+
+      const { data: release } = await supabase.from("registry_releases").select("id, slug, title, release_date, release_type, artwork_url, label_id, metadata, status, description").eq("slug", releaseSlug).in("status", ["active", "draft"]).maybeSingle();
       if (!release) return jsonResponse({ data: null }, 404);
-      const releaseId = String(release.id); const releaseMeta = (release.metadata || {}) as Record<string, unknown>;
+
+      if (urlArtistSlug) {
+        const { data: releaseArtist } = await supabase.from("registry_release_artists").select("artist_slug").eq("release_id", String(release.id)).eq("artist_slug", urlArtistSlug).eq("status", "active").maybeSingle();
+        if (!releaseArtist) return jsonResponse({ data: null, meta: { reason: "release_not_found_for_artist" } }, 404);
+      }
+
+      const releaseId = String(release.id);
+      const releaseMeta = (release.metadata || {}) as Record<string, unknown>;
       const { data: releaseTracks } = await supabase.from("registry_release_tracks").select("track_id, track_number, disc_number").eq("release_id", releaseId).order("track_number", { ascending: true });
       let trackList: any[] = [];
-      if (releaseTracks && releaseTracks.length > 0) { const trackIds = releaseTracks.map((rt: any) => String(rt.track_id)); const { data: tracks } = await supabase.from("registry_tracks").select("id, slug, title, duration_ms, track_number, artwork_url").in("id", trackIds); const trackById = new Map((tracks ?? []).map((t: any) => [String(t.id), t])); trackList = releaseTracks.map((rt: any) => { const t = trackById.get(String(rt.track_id)); if (!t) return null; return { id: String(t.id), slug: String(t.slug || t.id), title: String(t.title), artist: "Unknown", duration: Number(t.duration_ms || 0) / 1000, trackNumber: Number(rt.track_number || t.track_number || 0), artworkUrl: t.artwork_url || "" }; }).filter(Boolean); }
-      else { const { data: tracks } = await supabase.from("registry_tracks").select("id, slug, title, duration_ms, track_number, artwork_url").eq("release_id", releaseId).order("track_number", { ascending: true }); trackList = (tracks ?? []).map((t: any) => ({ id: String(t.id), slug: String(t.slug || t.id), title: String(t.title), artist: "Unknown", duration: Number(t.duration_ms || 0) / 1000, trackNumber: t.track_number || 0, artworkUrl: t.artwork_url || "" })); }
-      const { data: releaseArtists } = await supabase.from("registry_release_artists").select("artist_id, artist_name_text, is_primary, artist_slug").eq("release_id", releaseId).eq("status", "active").order("credit_order", { ascending: true }).limit(5);
-      const primaryArtist = (releaseArtists ?? []).find((ra: any) => ra.is_primary) || (releaseArtists ?? [])[0];
-      const artistName = primaryArtist ? String(primaryArtist.artist_name_text || primaryArtist.artist_slug || "Unknown") : "Unknown";
+
+      const { data: releaseArtists } = await supabase.from("registry_release_artists").select("artist_id, artist_name_text, is_primary, is_featured, artist_slug").eq("release_id", releaseId).eq("status", "active").order("credit_order", { ascending: true }).limit(20);
+      const primaryArtistRow = (releaseArtists ?? []).find((ra: any) => ra.is_primary) || (releaseArtists ?? [])[0];
+      const artistName = primaryArtistRow ? String(primaryArtistRow.artist_name_text || primaryArtistRow.artist_slug || "Unknown") : "Unknown";
+      const primaryArtistSlug = primaryArtistRow ? String(primaryArtistRow.artist_slug || "") : "";
+
+      // ── v6: collect featured artists using is_featured=true as authoritative source ──
+      const releaseFeaturedSeen = new Map<string, { name: string; slug: string }>();
+
+      // Release-level: explicitly flagged is_featured
+      for (const ra of (releaseArtists ?? [])) {
+        if (ra.is_featured && ra.artist_slug && ra.artist_slug !== primaryArtistSlug) {
+          const key = String(ra.artist_slug || ra.artist_name_text || "");
+          if (key && !releaseFeaturedSeen.has(key)) {
+            releaseFeaturedSeen.set(key, { name: String(ra.artist_name_text || ra.artist_slug || ""), slug: String(ra.artist_slug || "") });
+          }
+        }
+      }
+
+      if (releaseTracks && releaseTracks.length > 0) {
+        const trackIds = releaseTracks.map((rt: any) => String(rt.track_id));
+        const { data: tracks } = await supabase.from("registry_tracks").select("id, slug, title, duration_ms, track_number, artwork_url, preview_url").in("id", trackIds);
+        const trackById = new Map((tracks ?? []).map((t: any) => [String(t.id), t]));
+
+        const { data: trackArtistRows } = await supabase.from("registry_track_artists").select("track_id, artist_name_text, artist_slug, is_primary, is_featured, credit_order").in("track_id", trackIds).eq("status", "active").order("credit_order", { ascending: true });
+        const artistsByTrackId = new Map<string, Array<{ name: string; slug: string; isPrimary: boolean; isFeatured: boolean }>>();
+        for (const ta of (trackArtistRows ?? [])) {
+          const tid = String(ta.track_id);
+          if (!artistsByTrackId.has(tid)) artistsByTrackId.set(tid, []);
+          artistsByTrackId.get(tid)!.push({ name: String(ta.artist_name_text || ta.artist_slug || ""), slug: String(ta.artist_slug || ""), isPrimary: Boolean(ta.is_primary), isFeatured: Boolean(ta.is_featured) });
+        }
+
+        // Track-level: only is_featured=true artists (authoritative flag)
+        for (const ta of (trackArtistRows ?? [])) {
+          if (ta.is_featured && ta.artist_slug && ta.artist_slug !== primaryArtistSlug) {
+            const key = String(ta.artist_slug || ta.artist_name_text || "");
+            if (key && !releaseFeaturedSeen.has(key)) {
+              releaseFeaturedSeen.set(key, { name: String(ta.artist_name_text || ta.artist_slug || ""), slug: String(ta.artist_slug || "") });
+            }
+          }
+        }
+
+        trackList = releaseTracks.map((rt: any) => {
+          const t = trackById.get(String(rt.track_id));
+          if (!t) return null;
+          const tArtists = artistsByTrackId.get(String(t.id)) || [];
+          const tPrimary = tArtists.find((a) => a.isPrimary) || tArtists[0];
+          const tFeatured = tArtists.filter((a) => !a.isPrimary && a.name).map((a) => a.name);
+          const artistStr = tFeatured.length > 0
+            ? `${tPrimary?.name || artistName} (feat. ${tFeatured.join(", ")})`
+            : (tPrimary?.name || artistName);
+          return { id: String(t.id), slug: String(t.slug || t.id), title: String(t.title), artist: artistStr, duration: Number(t.duration_ms || 0) / 1000, trackNumber: Number(rt.track_number || t.track_number || 0), artworkUrl: t.artwork_url || "", previewUrl: t.preview_url || null };
+        }).filter(Boolean);
+      } else {
+        const { data: tracks } = await supabase.from("registry_tracks").select("id, slug, title, duration_ms, track_number, artwork_url, preview_url").eq("release_id", releaseId).order("track_number", { ascending: true });
+        trackList = (tracks ?? []).map((t: any) => ({ id: String(t.id), slug: String(t.slug || t.id), title: String(t.title), artist: artistName, duration: Number(t.duration_ms || 0) / 1000, trackNumber: t.track_number || 0, artworkUrl: t.artwork_url || "", previewUrl: t.preview_url || null }));
+      }
+
+      // ── v4: chart stats for release tracks ──
+      let releaseChartStats: { totalChartAppearances: number; topPeakPosition: number | null; totalWeeksOnChart: number } | null = null;
+      if (trackList.length > 0) {
+        const releaseTrackIds = trackList.map((t: any) => String(t.id));
+        const { data: releaseChartEntries } = await supabase.from("wk_chart_entries_v2").select("canonical_track_id, rank").in("canonical_track_id", releaseTrackIds);
+        if (releaseChartEntries && releaseChartEntries.length > 0) {
+          const allRanks = releaseChartEntries.map((e: any) => Number(e.rank || 0)).filter((r: number) => r > 0);
+          const uniqueTrackIds = new Set(releaseChartEntries.map((e: any) => String(e.canonical_track_id)));
+          const entriesByTrack = new Map<string, number>();
+          for (const e of releaseChartEntries) {
+            const tid = String(e.canonical_track_id);
+            entriesByTrack.set(tid, (entriesByTrack.get(tid) || 0) + 1);
+          }
+          releaseChartStats = {
+            totalChartAppearances: releaseChartEntries.length,
+            topPeakPosition: allRanks.length > 0 ? Math.min(...allRanks) : null,
+            totalWeeksOnChart: Math.max(...Array.from(entriesByTrack.values()), 0),
+          };
+        }
+      }
+
+      const allFeaturedArtists = [...releaseFeaturedSeen.values()].filter(a => a.name);
+
       const { data: label } = release.label_id ? await supabase.from("registry_labels").select("id, slug, name, country_code").eq("id", String(release.label_id)).maybeSingle() : { data: null };
       const totalDuration = trackList.reduce((sum: number, tr: any) => sum + (Number(tr.duration) || 0), 0);
-      const labelName = label?.name || String(releaseMeta.wp_label || "Independent");
-      let description = release.description || ""; if (!description || description.trim().length === 0) { const rType = releaseTypeLabel(String(release.release_type || "album")); const niceDate = formatDateNicely(String(release.release_date || "")); const yearOnly = release.release_date ? String(release.release_date).split("-")[0] : ""; let desc = release.title + " is " + articleize(rType) + " by " + artistName; if (niceDate && niceDate !== yearOnly) desc += ", released on " + niceDate; else if (yearOnly) desc += ", released in " + yearOnly; if (labelName && labelName !== "Independent" && labelName !== "Unknown") desc += " through " + labelName; desc += "."; description = desc; try { await supabase.from("registry_releases").update({ description }).eq("id", releaseId); } catch { /* ignore */ } }
-      data = { release: { id: releaseId, slug: String(release.slug), title: String(release.title), artist: artistName, year: release.release_date ? String(release.release_date).split("-")[0] : "", releaseDate: release.release_date || "", releaseType: String(release.release_type || "album"), labelName, labelSlug: label?.slug || "", artworkUrl: release.artwork_url || "", trackCount: trackList.length, tracks: trackList, totalDuration, description, metadata: { ...releaseMeta, wpLabel: releaseMeta.wp_label || null, wpDistributor: releaseMeta.wp_distributor || null, wpWriters: releaseMeta.wp_writers || null, wpProducers: releaseMeta.wp_producers || null } } };
+      const labelName = label?.name || String(releaseMeta.record_label || releaseMeta.wp_label || "Independent");
+      let description = release.description || "";
+      if (!description || description.trim().length === 0) {
+        const rType = releaseTypeLabel(String(release.release_type || "album"));
+        const niceDate = formatDateNicely(String(release.release_date || ""));
+        const yearOnly = release.release_date ? String(release.release_date).split("-")[0] : "";
+        let desc = release.title + " is " + articleize(rType) + " by " + artistName;
+        if (niceDate && niceDate !== yearOnly) desc += ", released on " + niceDate;
+        else if (yearOnly) desc += ", released in " + yearOnly;
+        if (labelName && labelName !== "Independent" && labelName !== "Unknown") desc += " through " + labelName;
+        desc += ".";
+        description = desc;
+        try { await supabase.from("registry_releases").update({ description }).eq("id", releaseId); } catch { /* ignore */ }
+      }
+      data = { release: { id: releaseId, slug: String(release.slug), title: String(release.title), artist: artistName, year: release.release_date ? String(release.release_date).split("-")[0] : "", releaseDate: release.release_date || "", releaseType: String(release.release_type || "album"), labelName, labelSlug: label?.slug || "", artworkUrl: release.artwork_url || "", trackCount: trackList.length, tracks: trackList, totalDuration, description, featuredArtists: allFeaturedArtists, chartStats: releaseChartStats, metadata: { ...releaseMeta, wpLabel: releaseMeta.wp_label || null, wpDistributor: releaseMeta.wp_distributor || null, wpWriters: releaseMeta.wp_writers || null, wpProducers: releaseMeta.wp_producers || null } } };
     }
 
-    else if (path === "/releases" || path === "/releases/") { const { data: releases } = await supabase.from("registry_releases").select("id, slug, title, release_date, release_type, artwork_url, label_id, status, description").in("status", ["active", "draft"]).order("release_date", { ascending: false }).limit(200); const labelIds = (releases ?? []).map((r: any) => r.label_id).filter(Boolean).map(String); const { data: labels } = labelIds.length > 0 ? await supabase.from("registry_labels").select("id, name").in("id", [...new Set(labelIds)]) : { data: [] }; const labelMap = new Map((labels ?? []).map((l: any) => [String(l.id), String(l.name)])); data = { releases: (releases ?? []).map((r: any) => ({ id: String(r.id), slug: String(r.slug), title: String(r.title), artist: labelMap.get(String(r.label_id)) || "Independent", year: r.release_date ? String(r.release_date).split("-")[0] : "", releaseType: String(r.release_type || "album"), labelName: labelMap.get(String(r.label_id)) || "Independent", artworkUrl: r.artwork_url || "", trackCount: 0, description: r.description || "" })) }; }
+    else if (path === "/releases" || path === "/releases/") {
+      const { data: releases } = await supabase.from("registry_releases").select("id, slug, title, release_date, release_type, artwork_url, label_id, status, description").in("status", ["active", "draft"]).order("release_date", { ascending: false }).limit(200);
+      const labelIds = (releases ?? []).map((r: any) => r.label_id).filter(Boolean).map(String);
+      const { data: labels } = labelIds.length > 0 ? await supabase.from("registry_labels").select("id, name").in("id", [...new Set(labelIds)]) : { data: [] };
+      const labelMap = new Map((labels ?? []).map((l: any) => [String(l.id), String(l.name)]));
+      data = { releases: (releases ?? []).map((r: any) => ({ id: String(r.id), slug: String(r.slug), title: String(r.title), artist: labelMap.get(String(r.label_id)) || "Independent", year: r.release_date ? String(r.release_date).split("-")[0] : "", releaseType: String(r.release_type || "album"), labelName: labelMap.get(String(r.label_id)) || "Independent", artworkUrl: r.artwork_url || "", trackCount: 0, description: r.description || "" })) };
+    }
 
-    else if (path.startsWith("/genres/")) { const gSlug = path.replace(/^\/genres\//, "").replace(/\/$/, ""); const { data: genre } = await supabase.from("registry_genres").select("id, slug, name, description, status").eq("slug", gSlug).eq("status", "active").maybeSingle(); if (!genre) return jsonResponse({ data: null }, 404); const { data: artistGenreRows } = await supabase.from("wk_import_staging_records").select("mapped_record").eq("target_entity", "artist_genres").eq("target_status", "ready").filter("mapped_record->>genre_slug", "eq", gSlug); const artistSlugsFromStaging = [...new Set((artistGenreRows ?? []).map((r: any) => { const mr = (r.mapped_record || {}) as Record<string, unknown>; return String(mr.artist_slug || ""); }).filter(Boolean))]; let registryArtists: any[] = []; if (artistSlugsFromStaging.length > 0) { const { data: regArtists } = await supabase.from("registry_artists").select("slug, display_name, public_image_url").in("slug", artistSlugsFromStaging).eq("status", "active").limit(18); registryArtists = regArtists ?? []; } let topTracks: any[] = []; if (artistSlugsFromStaging.length > 0) { const { data: entries } = await supabase.from("wk_chart_entries_v2").select("track_slug, track_title, artist_name, artwork_url, rank").in("artist_slug", artistSlugsFromStaging).order("rank", { ascending: true }).limit(24); topTracks = entries ?? []; } const { data: relatedGenres } = await supabase.from("registry_genres").select("slug, name").eq("status", "active").neq("slug", gSlug).limit(8); data = { genre: { id: String(genre.id), slug: String(genre.slug), name: String(genre.name), description: genre.description || null }, artists: registryArtists.map((a: any) => ({ slug: String(a.slug), name: String(a.display_name), imageUrl: a.public_image_url || "" })), topTracks: topTracks.map((t: any) => ({ slug: String(t.track_slug), title: String(t.track_title), artistName: String(t.artist_name), artworkUrl: t.artwork_url || "", peakRank: Number(t.rank) })), relatedGenres: (relatedGenres ?? []).map((g: any) => ({ slug: String(g.slug), name: String(g.name) })) }; }
+    // ── v5: GENRE detail — now includes releases via artist links ──
+    else if (path.startsWith("/genres/")) {
+      const gSlug = path.replace(/^\/genres\//, "").replace(/\/$/, "");
+      const { data: genre } = await supabase.from("registry_genres").select("id, slug, name, description, status").eq("slug", gSlug).eq("status", "active").maybeSingle();
+      if (!genre) return jsonResponse({ data: null }, 404);
 
-    else if (path === "/genres" || path === "/genres/") { const { data: genres } = await supabase.from("registry_genres").select("id, slug, name, description, status").eq("status", "active").order("name", { ascending: true }); const { data: artistGenreAll } = await supabase.from("wk_import_staging_records").select("mapped_record").eq("target_entity", "artist_genres").eq("target_status", "ready"); const genreArtistCounts = new Map(); const genreRepresentatives = new Map(); for (const r of (artistGenreAll ?? [])) { const mr = (r.mapped_record || {}) as Record<string, unknown>; const gs = String(mr.genre_slug || ""); const artistName = String(mr.artist_slug || "").replace(/-/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()); if (gs) { genreArtistCounts.set(gs, (genreArtistCounts.get(gs) || 0) + 1); const existing = genreRepresentatives.get(gs) || []; if (existing.length < 4) existing.push(artistName); genreRepresentatives.set(gs, existing); } } data = { genres: (genres ?? []).map((g: any) => { const gs = String(g.slug); return { id: String(g.id), slug: gs, name: String(g.name), artistCount: genreArtistCounts.get(gs) || 0, trackCount: 0, representativeArtists: genreRepresentatives.get(gs) || [] }; }) }; }
+      const { data: artistGenreRows } = await supabase.from("wk_import_staging_records").select("mapped_record").eq("target_entity", "artist_genres").eq("target_status", "ready").filter("mapped_record->>genre_slug", "eq", gSlug);
+      const artistSlugsFromStaging = [...new Set((artistGenreRows ?? []).map((r: any) => { const mr = (r.mapped_record || {}) as Record<string, unknown>; return String(mr.artist_slug || ""); }).filter(Boolean))];
 
-    else if (path.startsWith("/labels/")) { const lSlug = path.replace(/^\/labels\//, "").replace(/\/$/, ""); const { data: label } = await supabase.from("registry_labels").select("id, slug, name, description, country_code, status").eq("slug", lSlug).eq("status", "active").maybeSingle(); if (!label) return jsonResponse({ data: null }, 404); const { data: releases } = await supabase.from("registry_releases").select("id, slug, title, release_date, release_type, artwork_url").eq("label_id", String(label.id)).in("status", ["active", "draft"]).order("release_date", { ascending: false }).limit(50); const releaseIds = (releases ?? []).map((r: any) => String(r.id)); const { data: tracks } = releaseIds.length > 0 ? await supabase.from("registry_tracks").select("id, release_id, title, slug").in("release_id", releaseIds) : { data: [] }; const releaseTrackCount = new Map(); for (const t of (tracks ?? [])) { const rid = String(t.release_id); releaseTrackCount.set(rid, (releaseTrackCount.get(rid) || 0) + 1); } const uniqueTrackSlugs = [...new Set((tracks ?? []).map((t: any) => String(t.slug || t.title || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+$/g, "")).filter(Boolean))]; const rosterMap = new Map(); if (uniqueTrackSlugs.length > 0) { const { data: chartData } = await supabase.from("wk_chart_entries_v2").select("track_slug, artist_slug, artist_name, artwork_url").in("track_slug", uniqueTrackSlugs).limit(120); for (const c of (chartData ?? [])) { const aSlug = String(c.artist_slug || ""); if (aSlug && !rosterMap.has(aSlug)) rosterMap.set(aSlug, { slug: aSlug, name: String(c.artist_name || aSlug), artworkUrl: c.artwork_url || "" }); } } if (releaseIds.length > 0) { const { data: relArtists } = await supabase.from("registry_release_artists").select("artist_slug, artist_name_text, artist_id").in("release_id", releaseIds).eq("status", "active").eq("is_primary", true); for (const ra of (relArtists ?? [])) { const aSlug = String(ra.artist_slug || ""); if (aSlug && !rosterMap.has(aSlug)) rosterMap.set(aSlug, { slug: aSlug, name: String(ra.artist_name_text || aSlug), artworkUrl: "" }); } } const { data: relatedLabels } = await supabase.from("registry_labels").select("slug, name").eq("status", "active").neq("slug", lSlug).limit(8); data = { label: { id: String(label.id), slug: String(label.slug), name: String(label.name), description: label.description || null, countryCode: label.country_code || null }, roster: [...rosterMap.values()], releases: (releases ?? []).map((r: any) => ({ slug: String(r.slug), title: String(r.title), releaseDate: r.release_date || "", releaseType: String(r.release_type || "album"), artworkUrl: r.artwork_url || "", trackCount: releaseTrackCount.get(String(r.id)) || 0 })), relatedLabels: (relatedLabels ?? []).map((g: any) => ({ slug: String(g.slug), name: String(g.name) })) }; }
+      let registryArtists: any[] = [];
+      let genreReleases: Array<{ slug: string; title: string; releaseDate: string; releaseType: string; artworkUrl: string; trackCount: number; artistName: string }> = [];
+
+      if (artistSlugsFromStaging.length > 0) {
+        const { data: regArtists } = await supabase.from("registry_artists").select("slug, display_name, public_image_url").in("slug", artistSlugsFromStaging).eq("status", "active").limit(18);
+        registryArtists = regArtists ?? [];
+
+        const { data: artistIds } = await supabase.from("registry_artists").select("id, slug").in("slug", artistSlugsFromStaging).eq("status", "active");
+        const genreArtistIds = (artistIds ?? []).map((a: any) => String(a.id));
+        const artistSlugMap = new Map((artistIds ?? []).map((a: any) => [String(a.id), String(a.slug)]));
+
+        if (genreArtistIds.length > 0) {
+          const { data: releaseArtistLinks } = await supabase.from("registry_release_artists").select("release_id, artist_id, artist_name_text, is_primary").in("artist_id", genreArtistIds).eq("status", "active").eq("is_primary", true);
+          const releaseIds = [...new Set((releaseArtistLinks ?? []).map((ra: any) => String(ra.release_id)))];
+          const artistForRelease = new Map<string, string>();
+          for (const ra of (releaseArtistLinks ?? [])) {
+            artistForRelease.set(String(ra.release_id), String(ra.artist_name_text || artistSlugMap.get(String(ra.artist_id)) || ""));
+          }
+
+          if (releaseIds.length > 0) {
+            const { data: releases } = await supabase.from("registry_releases").select("id, slug, title, release_date, release_type, artwork_url").in("id", releaseIds).in("status", ["active", "draft"]).order("release_date", { ascending: false }).limit(24);
+            const releaseTrackCount = new Map<string, number>();
+            if (releases && releases.length > 0) {
+              const { data: tracks } = await supabase.from("registry_tracks").select("id, release_id").in("release_id", [...new Set((releases ?? []).map((r: any) => String(r.id)))].filter(Boolean));
+              for (const t of (tracks ?? [])) {
+                const rid = String(t.release_id);
+                releaseTrackCount.set(rid, (releaseTrackCount.get(rid) || 0) + 1);
+              }
+            }
+            genreReleases = (releases ?? []).map((r: any) => ({
+              slug: String(r.slug),
+              title: String(r.title),
+              releaseDate: r.release_date || "",
+              releaseType: String(r.release_type || "album"),
+              artworkUrl: r.artwork_url || "",
+              trackCount: releaseTrackCount.get(String(r.id)) || 0,
+              artistName: artistForRelease.get(String(r.id)) || "",
+            }));
+          }
+        }
+      }
+
+      let topTracks: any[] = [];
+      if (artistSlugsFromStaging.length > 0) {
+        const { data: entries } = await supabase.from("wk_chart_entries_v2").select("track_slug, track_title, artist_name, artwork_url, rank").in("artist_slug", artistSlugsFromStaging).order("rank", { ascending: true }).limit(24);
+        topTracks = entries ?? [];
+      }
+
+      const { data: relatedGenres } = await supabase.from("registry_genres").select("slug, name").eq("status", "active").neq("slug", gSlug).limit(8);
+      data = {
+        genre: { id: String(genre.id), slug: String(genre.slug), name: String(genre.name), description: genre.description || null },
+        artists: registryArtists.map((a: any) => ({ slug: String(a.slug), name: String(a.display_name), imageUrl: a.public_image_url || "" })),
+        releases: genreReleases,
+        topTracks: topTracks.map((t: any) => ({ slug: String(t.track_slug), title: String(t.track_title), artistName: String(t.artist_name), artworkUrl: t.artwork_url || "", peakRank: Number(t.rank) })),
+        relatedGenres: (relatedGenres ?? []).map((g: any) => ({ slug: String(g.slug), name: String(g.name) })),
+      };
+    }
+
+    else if (path === "/genres" || path === "/genres/") { const { data: genres } = await supabase.from("registry_genres").select("id, slug, name, description, status").eq("status", "active").order("name", { ascending: true }); const { data: artistGenreAll } = await supabase.from("wk_import_staging_records").select("mapped_record").eq("target_entity", "artist_genres").eq("target_status", "ready"); const genreArtistCounts = new Map(); const genreRepresentatives = new Map(); for (const r of (artistGenreAll ?? [])) { const mr = (r.mapped_record || {}) as Record<string, unknown>; const gs = String(mr.genre_slug || ""); const artistName2 = String(mr.artist_slug || "").replace(/-/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()); if (gs) { genreArtistCounts.set(gs, (genreArtistCounts.get(gs) || 0) + 1); const existing = genreRepresentatives.get(gs) || []; if (existing.length < 4) existing.push(artistName2); genreRepresentatives.set(gs, existing); } } data = { genres: (genres ?? []).map((g: any) => { const gs = String(g.slug); return { id: String(g.id), slug: gs, name: String(g.name), artistCount: genreArtistCounts.get(gs) || 0, trackCount: 0, representativeArtists: genreRepresentatives.get(gs) || [] }; }) }; }
+
+    // ── v7: LABEL detail — matches by label_id AND metadata->record_label ──
+    else if (path.startsWith("/labels/")) {
+      const lSlug = path.replace(/^\/labels\//, "").replace(/\/$/, "");
+      const { data: label } = await supabase.from("registry_labels").select("id, slug, name, description, country_code, status").eq("slug", lSlug).eq("status", "active").maybeSingle();
+      if (!label) return jsonResponse({ data: null }, 404);
+
+      const labelId = String(label.id);
+      const labelName = String(label.name);
+      
+      const [byLabelId, byMeta] = await Promise.all([
+        supabase.from("registry_releases").select("id, slug, title, release_date, release_type, artwork_url, label_id, metadata").eq("label_id", labelId).in("status", ["active", "draft"]).order("release_date", { ascending: false }).limit(50),
+        supabase.from("registry_releases").select("id, slug, title, release_date, release_type, artwork_url, label_id, metadata").filter("metadata->>record_label", "eq", labelName).in("status", ["active", "draft"]).order("release_date", { ascending: false }).limit(50),
+      ]);
+      
+      const seen = new Set<string>();
+      const releases: any[] = [];
+      for (const row of [...(byLabelId.data ?? []), ...(byMeta.data ?? [])]) {
+        const id = String(row.id);
+        if (!seen.has(id)) {
+          seen.add(id);
+          releases.push(row);
+        }
+      }
+      
+      const releaseIds = releases.map((r: any) => String(r.id));
+
+      const { data: tracks } = releaseIds.length > 0 ? await supabase.from("registry_tracks").select("id, release_id, title, slug").in("release_id", releaseIds) : { data: [] };
+      const releaseTrackCount = new Map<string, number>();
+      for (const t of (tracks ?? [])) {
+        const rid = String(t.release_id);
+        releaseTrackCount.set(rid, (releaseTrackCount.get(rid) || 0) + 1);
+      }
+
+      const artistForRelease = new Map<string, string>();
+      if (releaseIds.length > 0) {
+        const { data: relArtists } = await supabase.from("registry_release_artists").select("release_id, artist_name_text, is_primary").in("release_id", releaseIds).eq("status", "active").eq("is_primary", true);
+        for (const ra of (relArtists ?? [])) {
+          artistForRelease.set(String(ra.release_id), String(ra.artist_name_text || ""));
+        }
+      }
+
+      const rosterMap = new Map<string, { slug: string; name: string; artworkUrl: string }>();
+      if (releaseIds.length > 0) {
+        const { data: allReleaseArtists } = await supabase.from("registry_release_artists").select("artist_slug, artist_name_text, artist_id, release_id").in("release_id", releaseIds).eq("status", "active");
+        for (const ra of (allReleaseArtists ?? [])) {
+          const aSlug = String(ra.artist_slug || "");
+          if (aSlug && !rosterMap.has(aSlug)) {
+            rosterMap.set(aSlug, { slug: aSlug, name: String(ra.artist_name_text || aSlug), artworkUrl: "" });
+          }
+        }
+      }
+
+      const rosterSlugs = [...rosterMap.keys()];
+      if (rosterSlugs.length > 0) {
+        const { data: rosterArtists } = await supabase.from("registry_artists").select("slug, public_image_url").in("slug", rosterSlugs).eq("status", "active");
+        for (const ra of (rosterArtists ?? [])) {
+          const entry = rosterMap.get(String(ra.slug));
+          if (entry) entry.artworkUrl = ra.public_image_url || "";
+        }
+      }
+
+      const { data: relatedLabels } = await supabase.from("registry_labels").select("slug, name").eq("status", "active").neq("slug", lSlug).limit(8);
+
+      data = {
+        label: { id: String(label.id), slug: String(label.slug), name: String(label.name), description: label.description || null, countryCode: label.country_code || null },
+        roster: [...rosterMap.values()],
+        releases: releases.map((r: any) => ({
+          slug: String(r.slug),
+          title: String(r.title),
+          releaseDate: r.release_date || "",
+          releaseType: String(r.release_type || "album"),
+          artworkUrl: r.artwork_url || "",
+          trackCount: releaseTrackCount.get(String(r.id)) || 0,
+          artistName: artistForRelease.get(String(r.id)) || "",
+        })),
+        relatedLabels: (relatedLabels ?? []).map((g: any) => ({ slug: String(g.slug), name: String(g.name) })),
+      };
+    }
 
     else if (path === "/labels" || path === "/labels/") { const { data: labels } = await supabase.from("registry_labels").select("id, slug, name, country_code, description, status").eq("status", "active").order("name", { ascending: true }).limit(500); data = { labels: (labels ?? []).map((l: any) => ({ id: String(l.id), slug: String(l.slug), name: String(l.name), country: l.country_code || null, logoUrl: null, artistCount: 0, releaseCount: 0, featuredArtists: [], isFeatured: false, description: l.description || null })) }; }
 
     else if (path.startsWith("/tracks/")) {
       const tSegments = path.replace(/^\/tracks\//, "").split("/").filter(Boolean);
-      const tSlug = tSegments[tSegments.length - 1] || "";
+      const trackSlug = tSegments[tSegments.length - 1] || "";
+      const urlArtistSlug = tSegments.length > 1 ? tSegments[0] : null;
+
       let track: any = null;
-      const isIsrcLookup = tSlug.toLowerCase().startsWith("isrc:");
-      if (isIsrcLookup) { const isrc = tSlug.slice(5); const { data: byIsrc } = await supabase.from("registry_tracks").select("id, slug, title, duration_ms, artwork_url, isrc, explicit, track_number, disc_number, release_id, metadata, status, preview_url").eq("isrc", isrc).order("status", { ascending: true }).order("slug", { ascending: true }).limit(1); track = byIsrc && byIsrc.length > 0 ? byIsrc[0] : null; }
-      else { const { data: bySlug } = await supabase.from("registry_tracks").select("id, slug, title, duration_ms, artwork_url, isrc, explicit, track_number, disc_number, release_id, metadata, status, preview_url").eq("slug", tSlug).maybeSingle(); track = bySlug; }
+      const isIsrcLookup = trackSlug.toLowerCase().startsWith("isrc:");
+      if (isIsrcLookup) { const isrc = trackSlug.slice(5); const { data: byIsrc } = await supabase.from("registry_tracks").select("id, slug, title, duration_ms, artwork_url, isrc, explicit, track_number, disc_number, release_id, metadata, status, preview_url").eq("isrc", isrc).order("status", { ascending: true }).order("slug", { ascending: true }).limit(1); track = byIsrc && byIsrc.length > 0 ? byIsrc[0] : null; }
+      else { const { data: bySlug } = await supabase.from("registry_tracks").select("id, slug, title, duration_ms, artwork_url, isrc, explicit, track_number, disc_number, release_id, metadata, status, preview_url").eq("slug", trackSlug).maybeSingle(); track = bySlug; }
       if (!track) return jsonResponse({ data: null }, 404);
+
+      if (urlArtistSlug && !isIsrcLookup) {
+        const { data: trackArtist } = await supabase.from("registry_track_artists").select("artist_slug").eq("track_id", String(track.id)).eq("artist_slug", urlArtistSlug).eq("status", "active").maybeSingle();
+        if (!trackArtist) return jsonResponse({ data: null, meta: { reason: "track_not_found_for_artist" } }, 404);
+      }
+
       const trackId = String(track.id);
       const { data: release } = track.release_id ? await supabase.from("registry_releases").select("slug, title, release_date, release_type, artwork_url, label_id, track_count, metadata").eq("id", String(track.release_id)).maybeSingle() : { data: null };
       const { data: label } = release && release.label_id ? await supabase.from("registry_labels").select("slug, name, country_code").eq("id", String(release.label_id)).maybeSingle() : { data: null };
@@ -515,15 +692,54 @@ Deno.serve(async (req) => {
       const trackMeta = (track.metadata || {}) as Record<string, unknown>;
       const genres2: string[] = Array.isArray(trackMeta.genres) ? (trackMeta.genres as string[]).map(String) : [];
       const { data: chartEntriesList } = await supabase.from("wk_chart_entries_v2").select("edition_id, rank, previous_rank, movement, track_title, artist_name, artwork_url").eq("canonical_track_id", trackId).order("rank", { ascending: true });
-      let editionLabels: string[] = [];
-      if (chartEntriesList && chartEntriesList.length > 0) { const editionIds = [...new Set((chartEntriesList as any[]).map((e: any) => String(e.edition_id)).filter(Boolean))]; if (editionIds.length > 0) { const { data: editionRows } = await supabase.from("wk_chart_editions_v2").select("id, edition_label").in("id", editionIds); const elm = new Map((editionRows ?? []).map((e: any) => [String(e.id), String(e.edition_label || "")])); editionLabels = [...new Set((chartEntriesList as any[]).map((e: any) => elm.get(String(e.edition_id)) || "").filter(Boolean))]; } }
+
+      const editionIds = [...new Set((chartEntriesList ?? []).map((e: any) => String(e.edition_id)).filter(Boolean))];
+      let editionMetaBySlug = new Map<string, { editionLabel: string; familySlug: string }>();
+      if (editionIds.length > 0) {
+        const { data: editionRows } = await supabase.from("wk_chart_editions_v2").select("edition_slug, edition_label, program_id").in("edition_slug", editionIds);
+        const programIds = [...new Set((editionRows ?? []).map((e: any) => String(e.program_id)).filter(Boolean))];
+        if (programIds.length > 0) {
+          const { data: programRows } = await supabase.from("wk_chart_programs_v2").select("id, public_slug").in("id", programIds);
+          const publicSlugByProgram = new Map((programRows ?? []).map((p: any) => [String(p.id), String(p.public_slug)]));
+          for (const ed of (editionRows ?? [])) {
+            editionMetaBySlug.set(String(ed.edition_slug), {
+              editionLabel: String(ed.edition_label || ed.edition_slug || ""),
+              familySlug: publicSlugByProgram.get(String(ed.program_id)) || "",
+            });
+          }
+        }
+      }
+
+      let editionLabelsAll: string[] = [];
+      if (chartEntriesList && chartEntriesList.length > 0) {
+        const editionIdsArr = [...new Set((chartEntriesList as any[]).map((e: any) => String(e.edition_id)).filter(Boolean))];
+        if (editionIdsArr.length > 0) {
+          const { data: editionRowsRaw } = await supabase.from("wk_chart_editions_v2").select("id, edition_label").in("id", editionIdsArr);
+          const elm2 = new Map((editionRowsRaw ?? []).map((e: any) => [String(e.id), String(e.edition_label || "")]));
+          editionLabelsAll = [...new Set((chartEntriesList as any[]).map((e: any) => elm2.get(String(e.edition_id)) || "").filter(Boolean))];
+        }
+      }
+
       const { data: historyEntries } = await supabase.from("wk_chart_entries_v2").select("rank, edition_id, movement, release_date").eq("canonical_track_id", trackId).order("rank", { ascending: true });
       let peakRank: number | null = null;
       if (historyEntries && historyEntries.length > 0) peakRank = Math.min(...historyEntries.map((e: any) => Number(e.rank || 0)).filter((r: number) => r > 0));
       const bestEntry = chartEntriesList && chartEntriesList.length > 0 ? chartEntriesList[0] : null;
       const chartHistory = (historyEntries ?? []).map((e: any) => Number(e.rank || 0));
       const chartHistoryUnique = chartHistory.filter((r: number, i: number) => chartHistory.indexOf(r) === i).slice(0, 52);
-      const allChartAppearances = (chartEntriesList ?? []).map((e: any) => ({ editionSlug: String(e.edition_id || ""), editionLabel: String(e.edition_id || ""), date: "", rank: Number(e.rank || 0), previousRank: e.previous_rank != null ? Number(e.previous_rank) : null, movement: String(e.movement || "same") }));
+
+      const allChartAppearances = (chartEntriesList ?? []).map((e: any) => {
+        const meta = editionMetaBySlug.get(String(e.edition_id));
+        return {
+          editionSlug: String(e.edition_id || ""),
+          editionLabel: meta?.editionLabel || String(e.edition_id || ""),
+          familySlug: meta?.familySlug || "",
+          date: "",
+          rank: Number(e.rank || 0),
+          previousRank: e.previous_rank != null ? Number(e.previous_rank) : null,
+          movement: String(e.movement || "same"),
+        };
+      });
+
       const prevRank = bestEntry && bestEntry.previous_rank != null ? Number(bestEntry.previous_rank) : null;
       const rawMovement = String(bestEntry?.movement || "").toLowerCase();
       let movement: string = ["up", "down", "new", "same"].includes(rawMovement) ? rawMovement : "same";
@@ -532,12 +748,13 @@ Deno.serve(async (req) => {
       const firstChartedDate = (historyEntries ?? []).length > 0 ? (historyEntries as any[])[0].release_date || "" : "";
       const sourceProviders: string[] = Array.isArray(trackMeta.source_providers) ? (trackMeta.source_providers as string[]) : [];
       const artistsWithRoles = (trackArtists ?? []).map((ta: any) => ({ name: String(ta.artist_name_text || ta.artist_slug || ""), slug: String(ta.artist_slug || ""), isPrimary: Boolean(ta.is_primary), isFeatured: Boolean(ta.is_featured), creditOrder: Number(ta.credit_order || 0), role: String(ta.role || "primary") }));
-      data = { track: { id: String(track.id), slug: String(track.slug), title: String(track.title), durationMs: track.duration_ms || 0, artworkUrl: track.artwork_url || "", isrc: track.isrc || null, explicit: track.explicit || false, trackNumber: track.track_number || 0, discNumber: track.disc_number || 0, metadata: track.metadata || {}, status: track.status || "active", previewUrl: track.preview_url || null }, artists: artistsWithRoles, artist: artistsWithRoles.length > 0 ? { slug: artistsWithRoles[0].slug, name: artistsWithRoles[0].name, imageUrl: bestEntry?.artwork_url || "" } : { slug: "", name: "Unknown", imageUrl: "" }, release: release ? { slug: String(release.slug), title: String(release.title), releaseDate: release.release_date || "", releaseType: String(release.release_type || "single"), artworkUrl: release.artwork_url || "", trackCount: releaseTrackCount?.count || Number(release.track_count || 0), labelName: label?.name || "", labelSlug: label?.slug || "" } : null, label: label ? { slug: String(label.slug), name: String(label.name), countryCode: label.country_code || null } : null, genres: genres2, chartHistory: chartHistoryUnique, chartAppearances: allChartAppearances, chartAppearanceCount: allChartAppearances.length, peakRank, weeksOnChart: historyEntries ? historyEntries.length : 0, currentRank: bestEntry ? Number(bestEntry.rank) : null, previousRank: prevRank, movement, movementAmount, previewUrl: track.preview_url || null, firstChartedDate, editionLabels, sourceProviders };
+      data = { track: { id: String(track.id), slug: String(track.slug), title: String(track.title), durationMs: track.duration_ms || 0, artworkUrl: track.artwork_url || "", isrc: track.isrc || null, explicit: track.explicit || false, trackNumber: track.track_number || 0, discNumber: track.disc_number || 0, metadata: track.metadata || {}, status: track.status || "active", previewUrl: track.preview_url || null }, artists: artistsWithRoles, artist: artistsWithRoles.length > 0 ? { slug: artistsWithRoles[0].slug, name: artistsWithRoles[0].name, imageUrl: bestEntry?.artwork_url || "" } : { slug: "", name: "Unknown", imageUrl: "" }, release: release ? { slug: String(release.slug), title: String(release.title), releaseDate: release.release_date || "", releaseType: String(release.release_type || "single"), artworkUrl: release.artwork_url || "", trackCount: releaseTrackCount?.count || Number(release.track_count || 0), labelName: label?.name || "", labelSlug: label?.slug || "" } : null, label: label ? { slug: String(label.slug), name: String(label.name), countryCode: label.country_code || null } : null, genres: genres2, chartHistory: chartHistoryUnique, chartAppearances: allChartAppearances, chartAppearanceCount: allChartAppearances.length, peakRank, weeksOnChart: historyEntries ? historyEntries.length : 0, currentRank: bestEntry ? Number(bestEntry.rank) : null, previousRank: prevRank, movement, movementAmount, previewUrl: track.preview_url || null, firstChartedDate, editionLabels: editionLabelsAll, sourceProviders };
     }
 
     else if (path === "/charts" || path === "/charts/") { const { data: programs } = await supabase.from("wk_chart_programs_v2").select("id, public_slug, public_label, source_family_slug, series_slug, market_slug, chart_size, default_period_type, default_methodology_version").order("public_label", { ascending: true }); const programsWithEditions = await Promise.all((programs ?? []).map(async (p: any) => { const { data: editions } = await supabase.from("wk_chart_editions_v2").select("edition_slug, edition_label, edition_date, period_start, period_end, entry_count, status").eq("program_id", p.id).eq("status", "published").order("edition_date", { ascending: false }); const latestEdition = editions && editions.length > 0 ? { id: String(editions[0].edition_slug), slug: String(editions[0].edition_slug), label: String(editions[0].edition_label), date: String(editions[0].edition_date), periodStart: editions[0].period_start || null, periodEnd: editions[0].period_end || null, entryCount: editions[0].entry_count || 0 } : null; return { id: String(p.id), publicSlug: String(p.public_slug), publicLabel: String(p.public_label), shortLabel: String(p.public_label), sourceFamilySlug: String(p.source_family_slug || p.public_slug), seriesSlug: String(p.series_slug || ""), seriesLabel: String(p.series_slug || ""), marketSlug: String(p.market_slug || ""), marketLabel: String(p.market_slug || ""), periodType: String(p.default_period_type || "weekly"), methodologyVersion: String(p.default_methodology_version || "legacy-import-v1"), eligibilityRulesVersion: "legacy-import-v1", latestEdition, archive: (editions ?? []).map((e: any) => ({ id: String(e.edition_slug), slug: String(e.edition_slug), label: String(e.edition_label), date: String(e.edition_date), periodStart: e.period_start || null, periodEnd: e.period_end || null, entryCount: e.entry_count || 0 })) }; })); data = { programs: programsWithEditions }; }
 
-    else if (path.startsWith("/charts/")) { const chartPath = path.replace(/^\/charts\//, ""); const segments = chartPath.split("/").filter(Boolean);
+    else if (path.startsWith("/charts/")) {
+      const chartPath = path.replace(/^\/charts\//, ""); const segments = chartPath.split("/").filter(Boolean);
       if (segments.length === 1) { const cslug = segments[0]; const { data: program } = await supabase.from("wk_chart_programs_v2").select("id, public_slug, public_label, source_family_slug, series_slug, market_slug, chart_size, default_period_type, default_methodology_version").eq("public_slug", cslug).maybeSingle(); if (!program) return jsonResponse({ error: "Not found" }, 404); const { data: editions } = await supabase.from("wk_chart_editions_v2").select("edition_slug, edition_label, edition_date, period_start, period_end, entry_count, status").eq("program_id", program.id).eq("status", "published").order("edition_date", { ascending: false }); const latestEdition = editions && editions.length > 0 ? buildEditionSummary(editions[0]) : null; data = { program: { ...buildProgramSummary(program), latestEdition, archive: (editions ?? []).map((e: any) => buildEditionSummary(e)) } }; }
       else if (segments.length === 2) { const [cslug, target] = segments; const { data: program } = await supabase.from("wk_chart_programs_v2").select("id, public_slug, public_label, source_family_slug, series_slug, market_slug, chart_size, default_period_type, default_methodology_version").eq("public_slug", cslug).maybeSingle(); if (!program) return jsonResponse({ error: "Not found" }, 404); if (target === "latest") { const { data: editions } = await supabase.from("wk_chart_editions_v2").select("id, edition_slug, edition_label, edition_date, period_start, period_end, entry_count, status").eq("program_id", program.id).eq("status", "published").order("edition_date", { ascending: false }).limit(1); if (!editions || editions.length === 0) return jsonResponse({ error: "No editions found" }, 404); const edition = editions[0]; const { data: entries } = await supabase.from("wk_chart_entries_v2").select("id, rank, previous_rank, movement, track_slug, track_title, artist_name, artwork_url, total_score").eq("edition_id", edition.id).order("rank", { ascending: true }).limit(150); data = { program: buildProgramSummary(program), edition: buildEditionSummary(edition), entries: (entries ?? []).map(buildEntryItem) }; } else { const { data: edition } = await supabase.from("wk_chart_editions_v2").select("id, edition_slug, edition_label, edition_date, period_start, period_end, entry_count, status").eq("program_id", program.id).eq("edition_slug", target).maybeSingle(); if (!edition) return jsonResponse({ error: "Edition not found" }, 404); data = { program: buildProgramSummary(program), edition: buildEditionSummary(edition) }; } }
       else if (segments.length === 3 && segments[2] === "entries") { const [cslug, editionSlug] = segments; const { data: program } = await supabase.from("wk_chart_programs_v2").select("id, public_slug, public_label, series_slug, market_slug, source_family_slug").eq("public_slug", cslug).maybeSingle(); if (!program) return jsonResponse({ error: "Not found" }, 404); const { data: edition } = await supabase.from("wk_chart_editions_v2").select("id, edition_slug, edition_label, edition_date, entry_count, status").eq("program_id", program.id).eq("edition_slug", editionSlug).maybeSingle(); if (!edition) return jsonResponse({ error: "Edition not found" }, 404); const { data: entries } = await supabase.from("wk_chart_entries_v2").select("id, rank, previous_rank, movement, track_slug, track_title, artist_name, artwork_url, total_score").eq("edition_id", edition.id).order("rank", { ascending: true }).limit(150); data = { entries: (entries ?? []).map(buildEntryItem) }; }

@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
 import { usePlayer } from "@/context/PlayerContext";
+import { trackUrl } from "@/utils/trackUrl";
 import type { RepairedReleaseDetail } from "@/services/repairedContent/client";
 
 function formatDuration(seconds: number): string {
@@ -14,9 +15,11 @@ function formatDuration(seconds: number): string {
 export default function ReleaseTracklist({
   release,
   tracks,
+  artistSlug,
 }: {
   release: RepairedReleaseDetail;
   tracks: RepairedReleaseDetail["tracks"];
+  artistSlug: string;
 }) {
   const { currentTrack, isPlaying, playTrack, togglePlay } = usePlayer();
   const { ref, revealed } = useScrollReveal<HTMLDivElement>(0.1);
@@ -106,7 +109,7 @@ export default function ReleaseTracklist({
 
                 {/* Track info — clicking navigates to track detail */}
                 <Link
-                  to={`/tracks/${track.slug}`}
+                  to={trackUrl(track.slug, [artistSlug])}
                   className="min-w-0 block"
                   onClick={(e) => {
                     // Don't navigate if we're interacting with the play button area
@@ -130,7 +133,7 @@ export default function ReleaseTracklist({
 
                 {/* Chevron to detail page */}
                 <Link
-                  to={`/tracks/${track.slug}`}
+                  to={trackUrl(track.slug, [artistSlug])}
                   className="flex items-center justify-center"
                 >
                   <WkIcon

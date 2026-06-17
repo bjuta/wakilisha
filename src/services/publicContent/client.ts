@@ -2,6 +2,7 @@ import { deepDecode } from "@/utils/decodeHtmlEntities";
 import { withPlaceholderImage } from "@/utils/imagePlaceholders";
 import { rewriteWpImageUrl } from "@/services/wpImageRewrite";
 import { supabase } from "@/lib/supabase";
+import { releaseUrl, slugify } from "@/utils/releaseUrl";
 
 export type PublicStory = {
   id: string;
@@ -81,6 +82,11 @@ export type PublicReleaseDetail = PublicRelease & {
   }>;
   metadata: Record<string, unknown>;
   featuredArtists: Array<{ name: string; slug: string }>;
+  chartStats?: {
+    totalChartAppearances: number;
+    topPeakPosition: number | null;
+    totalWeeksOnChart: number;
+  } | null;
 };
 
 export type PublicArticleDetail = PublicStory & {
@@ -130,7 +136,9 @@ export type PublicArtistDetail = PublicArtist & {
     releaseDate: string;
     trackCount: number;
     artworkUrl: string;
-    tracks: Array<{ title: string; duration: string }>;
+    labelName?: string;
+    genres?: string[];
+    tracks: Array<{ title: string; duration: string; previewUrl?: string }>;
   }>;
   topSongs: Array<{
     title: string;
@@ -374,22 +382,7 @@ function generatedReleaseArtwork(title: string, artist: string): string {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
-export function slugify(name: string): string {
-  return name
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
-}
-
-export function releaseUrl(release: { slug: string; artist: string }): string {
-  const artistSlug = slugify(release.artist);
-  if (release.slug.startsWith(`${artistSlug}--`)) {
-    return `/releases/${release.slug}`;
-  }
-  return `/releases/${artistSlug}--${release.slug}`;
-}
+export { releaseUrl, slugify };
 
 function yearFromDate(value: string | null | undefined): string {
   if (!value) return "Unknown year";
@@ -562,7 +555,9 @@ function mapShellToRelease(
   shell: ReleaseShellRow,
   tracks: PublicReleaseDetail["tracks"] = [],
   releaseArtworkUrl = "",
-  featuredArtists: Array<{ name: string; slug: string }> = []
+  featuredArtists: Array<{ name: string; slug: string }> = [],
+  labelNameOverride?: string,
+  labelSlugOverride?: string,
 ): PublicReleaseDetail {
   const artist = shell.primary_artist_name || "Unknown artist";
   const trackCount = tracks.length || Number(shell.track_count || 0);
@@ -577,12 +572,12 @@ function mapShellToRelease(
     artist,
     year: yearFromDate(shell.release_date),
     releaseType,
-    labelName: "WAKILISHA Registry",
+    labelName: labelNameOverride || "WAKILISHA Registry",
     artworkUrl,
     trackCount,
     description: `${shell.title} is a ${releaseType.toLowerCase()} by ${artist}, surfaced from the WAKILISHA canonical registry.`,
     releaseDate: shell.release_date || "",
-    labelSlug: "wakilisha-registry",
+    labelSlug: labelSlugOverride || "wakilisha-registry",
     totalDuration,
     tracks,
     metadata: {
@@ -626,10 +621,40 @@ async function getReleaseFromShell(artistSlug: string, releaseSlug: string): Pro
       const releaseMedia = await getRegistryMediaBySlugs(mediaCandidates(shell.slug, shell.title));
       const releaseArtworkUrl = mediaUrlFor(mediaCandidates(shell.slug, shell.title), releaseMedia);
 
+      // Resolve label from registry_releases via the shell's release_id
+      let resolvedLabelName: string | undefined;
+      let resolvedLabelSlug: string | undefined;
+      if (shell.release_id) {
+        const { data: releaseRow } = await supabase
+          .from("registry_releases")
+          .select("label_id, metadata")
+          .eq("id", shell.release_id)
+          .maybeSingle();
+        if (releaseRow?.label_id) {
+          const { data: labelRow } = await supabase
+            .from("registry_labels")
+            .select("slug, name")
+            .eq("id", String(releaseRow.label_id))
+            .maybeSingle();
+          if (labelRow) {
+            resolvedLabelName = String(labelRow.name);
+            resolvedLabelSlug = String(labelRow.slug);
+          }
+        }
+        // Fallback: use metadata.record_label when label_id is null
+        if (!resolvedLabelName && releaseRow?.metadata) {
+          const shellMeta = releaseRow.metadata as Record<string, unknown>;
+          if (shellMeta.record_label) {
+            resolvedLabelName = String(shellMeta.record_label);
+            resolvedLabelSlug = slugify(resolvedLabelName);
+          }
+        }
+      }
+
       // Aggregate featured artists from track-level data
       const featuredArtists = await aggregateFeaturedArtists(shell.release_id);
 
-      return mapShellToRelease(shell, tracks, releaseArtworkUrl, featuredArtists);
+      return mapShellToRelease(shell, tracks, releaseArtworkUrl, featuredArtists, resolvedLabelName, resolvedLabelSlug);
     }
   }
 
@@ -640,24 +665,29 @@ async function getReleaseFromShell(artistSlug: string, releaseSlug: string): Pro
 async function aggregateFeaturedArtists(
   releaseId: string
 ): Promise<Array<{ name: string; slug: string }>> {
-  // 1. Check release-level featured artists first
-  const { data: releaseArtists } = await supabase
-    .from("registry_release_artists")
-    .select("artist_name_text, artist_slug, is_featured")
-    .eq("release_id", releaseId)
-    .eq("status", "active")
-    .eq("is_featured", true);
-
   const seen = new Map<string, { name: string; slug: string }>();
 
+  // 1. Check release-level featured artists first (explicitly flagged)
+  const { data: releaseArtists } = await supabase
+    .from("registry_release_artists")
+    .select("artist_name_text, artist_slug, is_featured, is_primary")
+    .eq("release_id", releaseId)
+    .eq("status", "active");
+
+  // Get the primary artist slug to exclude from featured list
+  const primaryReleaseArtist = (releaseArtists || []).find((ra) => ra.is_primary);
+  const primarySlug = primaryReleaseArtist?.artist_slug || "";
+
+  // Collect all non-primary release artists
   for (const ra of (releaseArtists || [])) {
+    if (ra.is_primary) continue;
     const key = ra.artist_slug || ra.artist_name_text;
-    if (key && !seen.has(key)) {
+    if (key && key !== primarySlug && !seen.has(key)) {
       seen.set(key, { name: ra.artist_name_text || ra.artist_slug, slug: ra.artist_slug || "" });
     }
   }
 
-  // 2. Aggregate from track-level featured artists
+  // 2. Aggregate explicitly is_featured=true track-level artists
   const { data: trackRelations } = await supabase
     .from("registry_release_tracks")
     .select("track_id")
@@ -665,14 +695,15 @@ async function aggregateFeaturedArtists(
 
   const trackIds = (trackRelations || []).map((rt) => rt.track_id);
   if (trackIds.length > 0) {
-    const { data: featuredTrackArtists } = await supabase
+    const { data: trackArtists } = await supabase
       .from("registry_track_artists")
-      .select("artist_name_text, artist_slug, is_featured")
+      .select("artist_name_text, artist_slug, is_primary, is_featured")
       .in("track_id", trackIds)
       .eq("status", "active")
       .eq("is_featured", true);
 
-    for (const ta of (featuredTrackArtists || [])) {
+    for (const ta of (trackArtists || [])) {
+      if (!ta.artist_slug || ta.artist_slug === primarySlug) continue;
       const key = ta.artist_slug || ta.artist_name_text;
       if (key && !seen.has(key)) {
         seen.set(key, { name: ta.artist_name_text || ta.artist_slug, slug: ta.artist_slug || "" });
@@ -690,14 +721,15 @@ function aggregateFeaturedFromTrackArtists(
 ): Array<{ name: string; slug: string }> {
   const seen = new Map<string, { name: string; slug: string }>();
   for (const ta of (trackArtistRows || [])) {
-    if (ta.is_featured && ta.artist_slug && ta.artist_slug !== primaryArtistSlug) {
-      const key = ta.artist_slug || ta.artist_name_text;
-      if (key && !seen.has(key)) {
-        seen.set(key, {
-          name: ta.artist_name_text || ta.artist_slug,
-          slug: ta.artist_slug || "",
-        });
-      }
+    // Only include artists explicitly flagged as is_featured=true
+    if (!ta.is_featured) continue;
+    if (!ta.artist_slug || ta.artist_slug === primaryArtistSlug) continue;
+    const key = ta.artist_slug || ta.artist_name_text;
+    if (key && !seen.has(key)) {
+      seen.set(key, {
+        name: ta.artist_name_text || ta.artist_slug,
+        slug: ta.artist_slug || "",
+      });
     }
   }
   return Array.from(seen.values());
@@ -734,6 +766,300 @@ async function listReleasesFromShells(): Promise<PublicRelease[]> {
       description: release.description,
     };
   });
+}
+
+export interface PaginatedReleasesResult {
+  releases: PublicRelease[];
+  totalCount: number;
+}
+
+export interface ReleasePaginatedParams {
+  page: number;
+  pageSize: number;
+  typeFilter?: string;   // "Album" | "EP" | "Single" | undefined (All)
+  yearFilter?: string;
+  artistFilter?: string;
+  search?: string;
+  sortKey?: string;      // "newest" | "updated" | "artist" | "title"
+}
+
+export async function listReleasesPaginated(params: ReleasePaginatedParams): Promise<PaginatedReleasesResult> {
+  const { page, pageSize, typeFilter, yearFilter, artistFilter, search, sortKey } = params;
+
+  // Check if shells table has any data (cheap head query)
+  const { count: shellCount } = await supabase
+    .from("registry_release_shells")
+    .select("id", { count: "exact", head: true })
+    .in("status", ["ready", "canonicalized"]);
+
+  const hasShells = (shellCount ?? 0) > 0;
+
+  if (!hasShells) {
+    // Fallback: load from API and paginate client-side
+    const allReleases = await listReleases();
+    let filtered = allReleases;
+
+    if (typeFilter === "Single") {
+      filtered = filtered.filter((r) => r.trackCount <= 1);
+    } else if (typeFilter === "EP") {
+      filtered = filtered.filter((r) => r.trackCount >= 2 && r.trackCount <= 6);
+    } else if (typeFilter === "Album") {
+      filtered = filtered.filter((r) => r.trackCount >= 7);
+    }
+
+    if (yearFilter && yearFilter !== "All") {
+      filtered = filtered.filter((r) => r.year === yearFilter || r.year.includes(yearFilter));
+    }
+
+    if (artistFilter && artistFilter !== "All") {
+      filtered = filtered.filter((r) => r.artist === artistFilter);
+    }
+
+    if (search) {
+      const term = search.toLowerCase().trim();
+      filtered = filtered.filter((r) =>
+        r.title.toLowerCase().includes(term) ||
+        r.artist.toLowerCase().includes(term) ||
+        r.labelName?.toLowerCase().includes(term)
+      );
+    }
+
+    if (sortKey === "artist") {
+      filtered.sort((a, b) => a.artist.localeCompare(b.artist));
+    } else if (sortKey === "title") {
+      filtered.sort((a, b) => a.title.localeCompare(b.title));
+    } else {
+      // newest / updated — sort by year descending
+      filtered.sort((a, b) => {
+        const ay = parseInt(a.year, 10) || 0;
+        const by = parseInt(b.year, 10) || 0;
+        return by - ay;
+      });
+    }
+
+    const totalCount = filtered.length;
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize;
+    const releases = filtered.slice(from, to);
+
+    return { releases, totalCount };
+  }
+
+  // Shells exist — use DB-level pagination
+  let query = supabase
+    .from("registry_release_shells")
+    .select("id, release_id, slug, title, primary_artist_name, primary_artist_slug, release_date, track_count, has_artwork, readiness, missing, shell_route, source_provenance, status, updated_at", { count: "exact" })
+    .in("status", ["ready", "canonicalized"]);
+
+  // Type filter via track_count
+  if (typeFilter === "Single") {
+    query = query.lte("track_count", 1);
+  } else if (typeFilter === "EP") {
+    query = query.gte("track_count", 2).lte("track_count", 6);
+  } else if (typeFilter === "Album") {
+    query = query.gte("track_count", 7);
+  }
+
+  // Year filter
+  if (yearFilter && yearFilter !== "All") {
+    const y = parseInt(yearFilter, 10);
+    if (!isNaN(y)) {
+      query = query.gte("release_date", `${y}-01-01`).lt("release_date", `${y + 1}-01-01`);
+    }
+  }
+
+  // Artist filter
+  if (artistFilter && artistFilter !== "All") {
+    query = query.eq("primary_artist_name", artistFilter);
+  }
+
+  // Search
+  if (search) {
+    const term = search.replace(/%/g, "").trim();
+    if (term) {
+      query = query.or(`title.ilike.%${term}%,primary_artist_name.ilike.%${term}%`);
+    }
+  }
+
+  // Sort
+  const sortColumn =
+    sortKey === "updated" ? "updated_at" :
+    sortKey === "artist" ? "primary_artist_name" :
+    sortKey === "title" ? "title" :
+    "release_date";
+  const sortDir = (sortKey === "artist" || sortKey === "title") ? "asc" : "desc";
+  query = query.order(sortColumn, { ascending: sortDir === "asc" });
+
+  // Pagination
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+  query = query.range(from, to);
+
+  const { data, error, count } = await query;
+
+  if (error) {
+    console.warn(`WAKILISHA paginated release list failed: ${error.message}`);
+    return { releases: [], totalCount: 0 };
+  }
+
+  const shells = deepDecode((data || []) as ReleaseShellRow[]);
+  const mediaBySlug = await getRegistryMediaBySlugs(
+    shells.flatMap((shell) => mediaCandidates(shell.slug, shell.title))
+  );
+
+  const totalCount = count ?? 0;
+
+  const releases = shells.map((shell) => {
+    const release = mapShellToRelease(shell, [], mediaUrlFor(mediaCandidates(shell.slug, shell.title), mediaBySlug));
+    return {
+      id: release.id,
+      slug: release.slug,
+      title: release.title,
+      artist: release.artist,
+      year: release.year,
+      releaseType: release.releaseType,
+      labelName: release.labelName,
+      artworkUrl: release.artworkUrl,
+      trackCount: release.trackCount,
+      description: release.description,
+    };
+  });
+
+  return { releases, totalCount };
+}
+
+export interface ReleaseCatalogStats {
+  total: number;
+  albums: number;
+  eps: number;
+  singles: number;
+}
+
+export async function getReleaseCatalogStats(): Promise<ReleaseCatalogStats> {
+  // Check if shells table has data
+  const { count: shellCount } = await supabase
+    .from("registry_release_shells")
+    .select("id", { count: "exact", head: true })
+    .in("status", ["ready", "canonicalized"]);
+
+  const hasShells = (shellCount ?? 0) > 0;
+
+  if (!hasShells) {
+    // Fallback: compute stats from API data
+    const allReleases = await listReleases();
+    const total = allReleases.length;
+    const singles = allReleases.filter((r) => r.trackCount <= 1).length;
+    const eps = allReleases.filter((r) => r.trackCount >= 2 && r.trackCount <= 6).length;
+    const albums = allReleases.filter((r) => r.trackCount >= 7).length;
+    return { total, albums, eps, singles };
+  }
+
+  const { data, error } = await supabase
+    .from("registry_release_shells")
+    .select("track_count")
+    .in("status", ["ready", "canonicalized"]);
+
+  if (error) {
+    console.warn(`WAKILISHA release stats failed: ${error.message}`);
+    return { total: 0, albums: 0, eps: 0, singles: 0 };
+  }
+
+  const rows = (data || []) as Array<{ track_count: number }>;
+  const total = rows.length;
+  const singles = rows.filter((r) => r.track_count <= 1).length;
+  const eps = rows.filter((r) => r.track_count >= 2 && r.track_count <= 6).length;
+  const albums = rows.filter((r) => r.track_count >= 7).length;
+
+  return { total, albums, eps, singles };
+}
+
+export async function getReleaseFilterArtists(limit = 30): Promise<string[]> {
+  // Check if shells table has data
+  const { count: shellCount } = await supabase
+    .from("registry_release_shells")
+    .select("id", { count: "exact", head: true })
+    .in("status", ["ready", "canonicalized"]);
+
+  const hasShells = (shellCount ?? 0) > 0;
+
+  if (!hasShells) {
+    // Fallback: extract artists from API data
+    const allReleases = await listReleases();
+    const seen = new Set<string>();
+    const artists: string[] = [];
+    for (const release of allReleases) {
+      if (!release.artist) continue;
+      if (!seen.has(release.artist)) {
+        seen.add(release.artist);
+        artists.push(release.artist);
+        if (artists.length >= limit) break;
+      }
+    }
+    return artists.sort((a, b) => a.localeCompare(b));
+  }
+
+  const { data, error } = await supabase
+    .from("registry_release_shells")
+    .select("primary_artist_name")
+    .in("status", ["ready", "canonicalized"])
+    .not("primary_artist_name", "is", null)
+    .order("primary_artist_name", { ascending: true });
+
+  if (error) {
+    console.warn(`WAKILISHA release artists filter failed: ${error.message}`);
+    return [];
+  }
+
+  const seen = new Set<string>();
+  const artists: string[] = [];
+  for (const row of (data || []) as Array<{ primary_artist_name: string }>) {
+    if (!row.primary_artist_name) continue;
+    if (!seen.has(row.primary_artist_name)) {
+      seen.add(row.primary_artist_name);
+      artists.push(row.primary_artist_name);
+      if (artists.length >= limit) break;
+    }
+  }
+  return artists;
+}
+
+export async function getReleaseFilterYears(): Promise<string[]> {
+  // Check if shells table has data
+  const { count: shellCount } = await supabase
+    .from("registry_release_shells")
+    .select("id", { count: "exact", head: true })
+    .in("status", ["ready", "canonicalized"]);
+
+  const hasShells = (shellCount ?? 0) > 0;
+
+  if (!hasShells) {
+    // Fallback: extract years from API data
+    const allReleases = await listReleases();
+    const years = new Set<string>();
+    for (const release of allReleases) {
+      const y = (release.year || "").match(/\d{4}/)?.[0];
+      if (y) years.add(y);
+    }
+    return Array.from(years).sort((a, b) => Number(b) - Number(a));
+  }
+
+  const { data, error } = await supabase
+    .from("registry_release_shells")
+    .select("release_date")
+    .in("status", ["ready", "canonicalized"])
+    .not("release_date", "is", null);
+
+  if (error) {
+    console.warn(`WAKILISHA release years filter failed: ${error.message}`);
+    return [];
+  }
+
+  const years = new Set<string>();
+  for (const row of (data || []) as Array<{ release_date: string }>) {
+    const y = (row.release_date || "").match(/\d{4}/)?.[0];
+    if (y) years.add(y);
+  }
+  return Array.from(years).sort((a, b) => Number(b) - Number(a));
 }
 
 export async function listMagazineStories(): Promise<PublicStory[]> {
@@ -811,7 +1137,7 @@ async function getReleaseFromRegistry(artistSlug: string, releaseSlug: string): 
   for (const candidateSlug of slugCandidates) {
     const { data } = await supabase
       .from("registry_releases")
-      .select("id, slug, title, release_type, release_date, artwork_url")
+      .select("id, slug, title, release_type, release_date, artwork_url, label_id, description, metadata")
       .eq("slug", candidateSlug)
       .eq("status", "active")
       .maybeSingle();
@@ -913,6 +1239,27 @@ async function getReleaseFromRegistry(artistSlug: string, releaseSlug: string): 
   const releaseDate = releaseRow.release_date || "";
   const year = yearFromDate(releaseDate);
 
+  // Resolve the actual label name + slug from registry_labels
+  let resolvedLabelName = "Independent";
+  let resolvedLabelSlug = "";
+  const releaseMeta = (releaseRow.metadata || {}) as Record<string, unknown>;
+  if (releaseRow.label_id) {
+    const { data: labelRow } = await supabase
+      .from("registry_labels")
+      .select("slug, name")
+      .eq("id", String(releaseRow.label_id))
+      .maybeSingle();
+    if (labelRow) {
+      resolvedLabelName = String(labelRow.name || "Independent");
+      resolvedLabelSlug = String(labelRow.slug || "");
+    }
+  }
+  // Fallback: use metadata.record_label when label_id is null
+  if (resolvedLabelName === "Independent" && releaseMeta.record_label) {
+    resolvedLabelName = String(releaseMeta.record_label);
+    resolvedLabelSlug = slugify(resolvedLabelName);
+  }
+
   return {
     id: releaseRow.id,
     slug: releaseRow.slug,
@@ -920,12 +1267,12 @@ async function getReleaseFromRegistry(artistSlug: string, releaseSlug: string): 
     artist: fallbackArtist || "Unknown artist",
     year,
     releaseType,
-    labelName: "WAKILISHA Registry",
+    labelName: resolvedLabelName,
     artworkUrl: releaseRow.artwork_url || "",
     trackCount,
-    description: `${releaseRow.title} is a ${releaseType.toLowerCase()} by ${fallbackArtist || "Unknown artist"}, from the WAKILISHA canonical registry.`,
+    description: releaseRow.description || `${releaseRow.title} is a ${releaseType.toLowerCase()} by ${fallbackArtist || "Unknown artist"}, from the WAKILISHA canonical registry.`,
     releaseDate,
-    labelSlug: "wakilisha-registry",
+    labelSlug: resolvedLabelSlug,
     totalDuration,
     tracks,
     metadata: {
@@ -962,6 +1309,7 @@ export async function getRelease(artistSlug: string, releaseSlug: string): Promi
       artworkUrl: image(track.artworkUrl, { id: track.id, slug: track.slug, name: track.title, type: "track" }),
     })),
     featuredArtists: result.release.featuredArtists || [],
+    chartStats: (result.release as any).chartStats || null,
   };
 }
 
@@ -976,4 +1324,397 @@ export async function listLabels(): Promise<PublicLabel[]> {
     ...label,
     logoUrl: image(label.logoUrl, { id: label.id, slug: label.slug, name: label.name, type: "label" }),
   }));
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   LABELS  ·  Server-side paginated (orphan-free)
+   ═══════════════════════════════════════════════════════════════ */
+
+export interface LabelPaginatedParams {
+  page: number;
+  pageSize: number;
+  countryFilter?: string;
+  search?: string;
+}
+
+export interface PaginatedLabelsResult {
+  labels: PublicLabel[];
+  totalCount: number;
+}
+
+export interface LabelCatalogStats {
+  total: number;
+  totalArtists: number;
+  totalReleases: number;
+  featuredCount: number;
+  countries: string[];
+}
+
+export async function listLabelsPaginated(
+  params: LabelPaginatedParams,
+): Promise<PaginatedLabelsResult> {
+  const { page, pageSize, countryFilter, search } = params;
+
+  // 1. Get all active releases with label info (metadata->record_label)
+  const { data: releaseRows, error: relErr } = await supabase
+    .from("registry_releases")
+    .select("id, metadata, label_id")
+    .eq("status", "active")
+    .not("metadata", "is", null);
+
+  if (relErr) {
+    console.warn(`Label paginated release lookup failed: ${relErr.message}`);
+    return { labels: [], totalCount: 0 };
+  }
+
+  // Build label-name -> release-ids map
+  const releaseIdsByLabelName = new Map<string, string[]>();
+  const activeLabelIds = new Set<string>();
+
+  for (const r of (releaseRows || []) as Array<{
+    id: string;
+    metadata: Record<string, unknown> | null;
+    label_id: string | null;
+  }>) {
+    if (r.label_id) activeLabelIds.add(r.label_id);
+    const meta = r.metadata || {};
+    const labelName = (meta.record_label || meta.wp_label || "") as string;
+    if (labelName?.trim()) {
+      const key = labelName.trim().toLowerCase();
+      const ids = releaseIdsByLabelName.get(key) || [];
+      ids.push(r.id);
+      releaseIdsByLabelName.set(key, ids);
+    }
+  }
+
+  if (releaseIdsByLabelName.size === 0 && activeLabelIds.size === 0) {
+    return { labels: [], totalCount: 0 };
+  }
+
+  // 2. Get all active labels
+  const { data: allLabels, error: labelErr } = await supabase
+    .from("registry_labels")
+    .select("id, slug, name, country_code, description, normalized_name, status")
+    .eq("status", "active");
+
+  if (labelErr) {
+    console.warn(`Label paginated label lookup failed: ${labelErr.message}`);
+    return { labels: [], totalCount: 0 };
+  }
+
+  // 3. Filter to labels with active releases (by name or label_id)
+  const activeLabelNames = Array.from(releaseIdsByLabelName.keys());
+  let activeLabels = (allLabels || []).filter((l) => {
+    if (activeLabelIds.has(l.id)) return true;
+    const key = (l.name || "").trim().toLowerCase();
+    const normKey = (l.normalized_name || "").trim().toLowerCase();
+    return activeLabelNames.some(
+      (n) => n === key || n === normKey,
+    );
+  });
+
+  // 4. Apply search filter
+  if (search) {
+    const term = search.toLowerCase().trim();
+    activeLabels = activeLabels.filter(
+      (l) =>
+        (l.name || "").toLowerCase().includes(term) ||
+        (l.country_code || "").toLowerCase().includes(term),
+    );
+  }
+
+  // 5. Apply country filter
+  if (countryFilter && countryFilter !== "All") {
+    activeLabels = activeLabels.filter((l) => l.country_code === countryFilter);
+  }
+
+  // 6. Collect all release IDs for batch artist lookup
+  const allReleaseIds = Array.from(releaseIdsByLabelName.values()).flat();
+
+  let releaseArtistsMap = new Map<string, Array<{ name: string; slug: string }>>();
+  if (allReleaseIds.length > 0) {
+    const { data: releaseArtists } = await supabase
+      .from("registry_release_artists")
+      .select("release_id, artist_name_text, artist_slug")
+      .in("release_id", [...new Set(allReleaseIds)])
+      .eq("status", "active")
+      .eq("is_primary", true);
+
+    for (const ra of (releaseArtists || []) as Array<{
+      release_id: string;
+      artist_name_text: string | null;
+      artist_slug: string | null;
+    }>) {
+      const list = releaseArtistsMap.get(ra.release_id) || [];
+      list.push({
+        name: ra.artist_name_text || ra.artist_slug || "",
+        slug: ra.artist_slug || "",
+      });
+      releaseArtistsMap.set(ra.release_id, list);
+    }
+  }
+
+  // 7. Build enriched label objects
+  const labelsWithCounts: PublicLabel[] = activeLabels.map((l) => {
+    const key = (l.name || "").trim().toLowerCase();
+    const releaseIds = releaseIdsByLabelName.get(key) || [];
+    const releaseCount = releaseIds.length;
+
+    const seenArtists = new Set<string>();
+    const featuredArtists: string[] = [];
+    for (const rid of releaseIds) {
+      const artists = releaseArtistsMap.get(rid) || [];
+      for (const a of artists) {
+        if (a.name && !seenArtists.has(a.name)) {
+          seenArtists.add(a.name);
+          featuredArtists.push(a.name);
+        }
+      }
+    }
+
+    return {
+      id: l.id,
+      slug: l.slug,
+      name: l.name,
+      country: l.country_code,
+      logoUrl: null,
+      artistCount: seenArtists.size,
+      releaseCount,
+      featuredArtists: featuredArtists.slice(0, 5),
+      isFeatured: false,
+      description: l.description,
+    };
+  });
+
+  // 8. Sort by prominence
+  labelsWithCounts.sort(
+    (a, b) => b.artistCount + b.releaseCount - (a.artistCount + a.releaseCount),
+  );
+
+  const totalCount = labelsWithCounts.length;
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize;
+  const paginated = labelsWithCounts.slice(from, to);
+
+  return { labels: paginated, totalCount };
+}
+
+export async function getLabelCatalogStats(): Promise<LabelCatalogStats> {
+  const { data: releaseRows } = await supabase
+    .from("registry_releases")
+    .select("metadata, label_id")
+    .eq("status", "active")
+    .not("metadata", "is", null);
+
+  const releaseIdsByLabelName = new Map<string, string[]>();
+  const activeLabelIds = new Set<string>();
+
+  for (const r of (releaseRows || []) as Array<{
+    metadata: Record<string, unknown> | null;
+    label_id: string | null;
+  }>) {
+    if (r.label_id) activeLabelIds.add(r.label_id);
+    const meta = r.metadata || {};
+    const labelName = (meta.record_label || meta.wp_label || "") as string;
+    if (labelName?.trim()) {
+      const key = labelName.trim().toLowerCase();
+      const ids = releaseIdsByLabelName.get(key) || [];
+      ids.push("");
+      releaseIdsByLabelName.set(key, ids);
+    }
+  }
+
+  const { data: allLabels } = await supabase
+    .from("registry_labels")
+    .select("name, country_code, normalized_name, id")
+    .eq("status", "active");
+
+  const activeNames = Array.from(releaseIdsByLabelName.keys());
+  const activeLabels = (allLabels || []).filter((l) => {
+    if (activeLabelIds.has(l.id)) return true;
+    const key = (l.name || "").trim().toLowerCase();
+    const normKey = (l.normalized_name || "").trim().toLowerCase();
+    return activeNames.some((n) => n === key || n === normKey);
+  });
+
+  const total = activeLabels.length;
+  const countries = [
+    ...new Set(activeLabels.map((l) => l.country_code).filter(Boolean)),
+  ].sort((a, b) => String(a).localeCompare(String(b)));
+
+  let totalReleases = 0;
+  let totalArtists = 0;
+  const allReleaseIds = Array.from(releaseIdsByLabelName.values()).flat();
+
+  if (allReleaseIds.length > 0) {
+    const { data: releaseArtists } = await supabase
+      .from("registry_release_artists")
+      .select("release_id, artist_name_text")
+      .in(
+        "release_id",
+        [...new Set(allReleaseIds)],
+      )
+      .eq("status", "active")
+      .eq("is_primary", true);
+
+    const artistSet = new Set<string>();
+    for (const ra of (releaseArtists || []) as Array<{
+      release_id: string;
+      artist_name_text: string | null;
+    }>) {
+      if (ra.artist_name_text) artistSet.add(ra.artist_name_text);
+    }
+    totalArtists = artistSet.size;
+    totalReleases = allReleaseIds.length;
+  }
+
+  return {
+    total,
+    totalArtists,
+    totalReleases,
+    featuredCount: 0,
+    countries,
+  };
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   GENRES  ·  Server-side paginated
+   ═══════════════════════════════════════════════════════════════ */
+
+export interface GenrePaginatedParams {
+  page: number;
+  pageSize: number;
+  search?: string;
+  activityFilter?: string; // "All" | "High activity" | "Artist-rich" | "Track-rich" | "Recently updated"
+}
+
+export interface PaginatedGenresResult {
+  genres: PublicGenre[];
+  totalCount: number;
+}
+
+export interface GenreCatalogStats {
+  total: number;
+  totalArtists: number;
+  totalTracks: number;
+}
+
+export async function listGenresPaginated(
+  params: GenrePaginatedParams,
+): Promise<PaginatedGenresResult> {
+  const { page, pageSize, search, activityFilter } = params;
+
+  // 1. Get all active genres
+  const { data: genreRows, error: genreErr } = await supabase
+    .from("registry_genres")
+    .select("id, slug, name, description")
+    .eq("status", "active")
+    .order("name", { ascending: true });
+
+  if (genreErr) {
+    console.warn(`Genre paginated lookup failed: ${genreErr.message}`);
+    return { genres: [], totalCount: 0 };
+  }
+
+  // 2. Get artist counts from staging records
+  const { data: stagingRecords } = await supabase
+    .from("wk_import_staging_records")
+    .select("mapped_record")
+    .eq("target_entity", "artist_genres")
+    .eq("target_status", "ready");
+
+  const genreArtistCounts = new Map<string, number>();
+  const genreRepresentatives = new Map<string, string[]>();
+
+  for (const r of (stagingRecords || []) as Array<{
+    mapped_record: Record<string, unknown> | null;
+  }>) {
+    const mr = (r.mapped_record || {}) as Record<string, unknown>;
+    const gSlug = String(mr.genre_slug || "");
+    const artistSlug = String(mr.artist_slug || "");
+    const artistName = artistSlug
+      .replace(/-/g, " ")
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+    if (gSlug) {
+      genreArtistCounts.set(gSlug, (genreArtistCounts.get(gSlug) || 0) + 1);
+      const existing = genreRepresentatives.get(gSlug) || [];
+      if (existing.length < 4 && artistName) existing.push(artistName);
+      genreRepresentatives.set(gSlug, existing);
+    }
+  }
+
+  // 3. Build genre objects
+  const allGenres: PublicGenre[] = (genreRows || []).map((g) => {
+    const slug = String(g.slug);
+    return {
+      id: String(g.id),
+      slug,
+      name: String(g.name),
+      artistCount: genreArtistCounts.get(slug) || 0,
+      trackCount: 0,
+      representativeArtists: genreRepresentatives.get(slug) || [],
+    };
+  });
+
+  // 4. Apply search filter
+  let filtered = allGenres;
+  if (search) {
+    const term = search.toLowerCase().trim();
+    filtered = allGenres.filter(
+      (g) =>
+        g.name.toLowerCase().includes(term) ||
+        g.representativeArtists.some((a) =>
+          a.toLowerCase().includes(term),
+        ),
+    );
+  }
+
+  // 5. Apply activity filter
+  if (activityFilter && activityFilter !== "All") {
+    if (activityFilter === "High activity") {
+      filtered = filtered.filter((g) => g.artistCount >= 10);
+    } else if (activityFilter === "Artist-rich") {
+      filtered = filtered.filter((g) => g.artistCount >= 5);
+    } else if (activityFilter === "Track-rich") {
+      filtered = filtered.filter((g) => g.artistCount >= 3);
+    }
+    // "Recently updated" — no data available, keep all
+  }
+
+  // 6. Sort by activity (artistCount descending)
+  filtered.sort((a, b) => b.artistCount - a.artistCount);
+
+  const totalCount = filtered.length;
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize;
+  const paginated = filtered.slice(from, to);
+
+  return { genres: paginated, totalCount };
+}
+
+export async function getGenreCatalogStats(): Promise<GenreCatalogStats> {
+  const { data: genreRows } = await supabase
+    .from("registry_genres")
+    .select("id")
+    .eq("status", "active");
+
+  const { data: stagingRecords } = await supabase
+    .from("wk_import_staging_records")
+    .select("mapped_record")
+    .eq("target_entity", "artist_genres")
+    .eq("target_status", "ready");
+
+  let totalArtists = 0;
+  for (const r of (stagingRecords || []) as Array<{
+    mapped_record: Record<string, unknown> | null;
+  }>) {
+    const mr = (r.mapped_record || {}) as Record<string, unknown>;
+    if (mr.artist_slug) totalArtists++;
+  }
+
+  return {
+    total: (genreRows || []).length,
+    totalArtists,
+    totalTracks: 0,
+  };
 }

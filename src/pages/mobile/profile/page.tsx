@@ -5,6 +5,7 @@ import { WkIcon } from "@/components/design-system/Icon";
 const HOME_FEATURED_ARTISTS: any[] = [];
 const HOME_TRENDING_TRACKS: any[] = [];
 import { useMagazineArticles } from "@/services/magazineArticles";
+import { slugify } from "@/services/repairedContent/client";
 
 type Tab = "Likes" | "Tracks" | "Reads" | "Settings";
 const tabs: Tab[] = ["Likes", "Tracks", "Reads", "Settings"];
@@ -82,7 +83,7 @@ export default function MobileProfile() {
           <div className="profile74-likes-grid">
             {likesGrid.map((item: any, index) => {
               const img = item.artworkUrl || item.heroUrl;
-              const to = item.slug && item.artworkUrl ? `/tracks/${item.slug}` : item.slug ? `/magazine/${item.slug}` : "/search";
+              const to = item.slug && item.artworkUrl ? `/tracks/${slugify(item.artist || '')  }/${item.slug}` : item.slug ? `/magazine/${item.slug}` : "/search";
               return <Link key={`${item.slug}-${index}`} to={to} className="profile74-like mobile-pressable">{img ? <img src={img} alt="" /> : null}</Link>;
             })}
           </div>
@@ -97,7 +98,7 @@ export default function MobileProfile() {
           </div>
           <div className="profile74-track-list">
             {savedTracks.map((track, index) => (
-              <Link key={track.slug} to={`/tracks/${track.slug}`} className="profile74-track-row mobile-pressable">
+              <Link key={track.slug} to={`/tracks/${slugify(track.artist || '')}/${track.slug}`} className="profile74-track-row mobile-pressable">
                 <div className="profile74-track-num">{index + 1}</div>
                 <div className="profile74-track-art">{track.artworkUrl ? <img src={track.artworkUrl} alt="" /> : <WkIcon name="Music2" size={17} />}</div>
                 <div className="profile74-track-info">

@@ -4,6 +4,7 @@ import { usePlayer } from "@/context/PlayerContext";
 import { WkTag } from "@/components/design-system/primitives/Tag";
 import { ArtistCard } from "@/components/design-system/registry/ArtistCard";
 import { ReleaseCard } from "@/components/design-system/registry/ReleaseCard";
+import { slugify } from "@/services/repairedContent/client";
 const ARTISTS: any[] = [];
 const TRACK_DETAILS: any[] = [];
 const GENRES: any[] = [];
@@ -269,7 +270,7 @@ export default function Search() {
                           <img src={track.artworkUrl} alt="" className="h-full w-full object-cover" />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <Link to={`/tracks/${track.slug}`} className="text-[13px] font-bold text-[var(--wk-text)] hover:underline">
+                          <Link to={`/tracks/${slugify(track.artist)}/${track.slug}`} className="text-[13px] font-bold text-[var(--wk-text)] hover:underline">
                             {highlight(track.title, query)}
                           </Link>
                           <div className="text-[11px] text-[var(--wk-text-muted)]">
@@ -376,7 +377,7 @@ export default function Search() {
                           <img src={entry.artworkUrl} alt="" className="h-full w-full object-cover" />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <Link to={`/tracks/${entry.slug}`} className="text-[13px] font-bold text-[var(--wk-text)] hover:underline">
+                          <Link to={`/tracks/${slugify(entry.artist)}/${entry.slug}`} className="text-[13px] font-bold text-[var(--wk-text)] hover:underline">
                             {highlight(entry.title, query)}
                           </Link>
                           <div className="text-[11px] text-[var(--wk-text-muted)]">{highlight(entry.artist, query)}</div>

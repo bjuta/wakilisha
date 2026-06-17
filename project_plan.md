@@ -1,5 +1,48 @@
 # WAKILISHA — Final Release Plan
 
+## Scoped Entity URL Architecture ✅ IMPLEMENTED (June 2026)
+
+### Principle
+
+Every public entity page uses a **nested URL structure** where the primary artist provides the namespace segment. This prevents slug collisions when two different artists have tracks or releases with the same name. No `--` delimiters, no single-segment fallbacks.
+
+### URL Patterns
+
+| Entity | URL Pattern | Example |
+|--------|-------------|---------|
+| Track | `/tracks/:artistSlug/:trackSlug` | `/tracks/savara/bossa-vibes` |
+| Release | `/releases/:artistSlug/:releaseSlug` | `/releases/savara/no-overthinking` |
+| Artist | `/artists/:slug` | `/artists/savara` |
+| Genre | `/genres/:slug` | `/genres/afrobeat` |
+| Label | `/labels/:slug` | `/labels/mavin-records` |
+
+### Architecture
+
+- **`src/utils/trackUrl.ts`** — `trackUrl(slug, artistSlugs)` generates `/tracks/:artistSlug/:trackSlug`
+- **`src/utils/releaseUrl.ts`** — `releaseUrl({ slug, artist })` generates `/releases/:artistSlug/:releaseSlug`. Contains inline `slugify()` for artist name normalization.
+- **`src/services/publicContent/client.ts`** — Re-exports both utilities so they remain accessible through the `repairedContent` barrel
+
+### No Fallbacks
+
+There are no single-segment fallback routes for tracks or releases. The old `/tracks/:slug` and `/releases/:slug` routes were removed entirely (June 2026). Every link generator requires artist context. No URL is generated with `--` delimiters.
+
+### Key Rules
+
+1. **`trackUrl()` requires `artistSlugs: string[]`** — no default/optional behavior
+2. **`releaseUrl()` requires `{ slug: string; artist: string }`** — artist name is slugified internally
+3. **No hardcoded URL templates anywhere** — `grep "/releases/\${" src` returns zero matches
+4. **DB slugs remain bare** — the namespace is in the URL path, not in the database slug column
+5. **Admin routes unchanged** — `/admin/registry/releases/:slug` and `/admin/registry/tracks/:slug` use direct DB slug lookups behind auth
+
+### All Files Touched (Release Scoping — June 2026)
+
+**Core:** `src/utils/releaseUrl.ts` (new), `src/services/publicContent/client.ts`, `src/router/config.tsx`
+**Detail pages:** `src/pages/releases/detail/page.tsx`, `src/pages/mobile/releases/detail/page.tsx`
+**Admin:** `src/pages/admin/registry/releases/detail/components/AdminReleaseHero.tsx`, `src/components/admin/registry/RegistryEntityEditorDrawer.tsx`
+**Cross-linking:** `src/pages/tracks/detail/page.tsx`, `src/pages/mobile/tracks/detail/page.tsx`, `src/pages/labels/detail/page.tsx`, `src/pages/mobile/labels/detail/page.tsx`, `src/pages/magazine/issues/page.tsx`, `src/pages/admin/content/articles/detail/components/ArticleInternalLinks.tsx`
+**Specs/design:** `src/data/api-specs/public-content-read.ts`, `src/design-system/designSystemManifest.ts`, `src/design-system/designSystemSpec.ts`, `src/design-system/wakilishaElementRegistry.ts`, `src/design-system/chapters/reactAppUI.ts`
+**Types:** `src/services/repaired/types.ts` (added `artistName?` to `RepairedLabelRelease`)
+
 ## 1. Project Description
 WAKILISHA is a premier cultural institution and digital platform dedicated to preserving, promoting, and investing in African creative life. It builds the systems — discovery, documentation, funding, valuation, and sustainability — that help African creative work travel further, last longer, and generate meaningful value.
 

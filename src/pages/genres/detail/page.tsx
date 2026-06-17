@@ -4,10 +4,21 @@ import { WkIcon } from "@/components/design-system/Icon";
 import { Chapter19FallbackImage } from "@/components/media/Chapter19FallbackImage";
 import { ch19Background } from "@/utils/ch19";
 import { getGenre, type RepairedGenreDetail } from "@/services/repaired/client";
+import { trackUrl } from "@/utils/trackUrl";
+import { releaseUrl } from "@/utils/releaseUrl";
+import { slugify } from "@/services/repairedContent/client";
 
 function formatArtistCount(n: number): string {
   if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
   return String(n);
+}
+
+function releaseTypeBadge(type: string) {
+  const t = type.toLowerCase();
+  if (t === "album") return "Album";
+  if (t === "ep") return "EP";
+  if (t === "single") return "Single";
+  return t;
 }
 
 export default function GenreDetail() {
@@ -66,7 +77,8 @@ export default function GenreDetail() {
     );
   }
 
-  const { genre, artists, topTracks, relatedGenres } = detail;
+  const { genre, artists, releases, topTracks, relatedGenres } = detail;
+  const sortedReleases = [...(releases || [])].sort((a, b) => (b.releaseDate || "").localeCompare(a.releaseDate || ""));
   const heroBg = ch19Background({ slug: genre.slug, name: genre.name });
 
   return (
@@ -94,6 +106,12 @@ export default function GenreDetail() {
                 <WkIcon name="Music2" size={13} />
                 <strong className="text-white/80">{topTracks.length}</strong> top tracks
               </span>
+              {sortedReleases.length > 0 && (
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 backdrop-blur-sm">
+                  <WkIcon name="Disc" size={13} />
+                  <strong className="text-white/80">{sortedReleases.length}</strong> releases
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -145,7 +163,7 @@ export default function GenreDetail() {
                 {topTracks.slice(0, 12).map((track, i) => (
                   <Link
                     key={track.slug}
-                    to={`/tracks/${track.slug}`}
+                    to={trackUrl(track.slug, [slugify(track.artistName)])}
                     className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-[var(--wk-surface-raised)] md:px-5 md:py-3.5"
                   >
                     <span className="w-6 text-center text-[12px] font-bold tabular-nums text-[var(--wk-text-faint)]">{i + 1}</span>
@@ -161,6 +179,44 @@ export default function GenreDetail() {
                       <div className="truncate text-[12px] text-[var(--wk-text-muted)]">{track.artistName}</div>
                     </div>
                     <span className="rounded bg-[var(--wk-brand-soft)] px-2 py-0.5 text-[10px] font-bold text-[var(--wk-brand)]">#{track.peakRank}</span>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* ═══════════ RELEASES ═══════════ */}
+          {sortedReleases.length > 0 && (
+            <section>
+              <div className="mb-5 flex items-center gap-3">
+                <h2 className="text-[11px] font-black uppercase tracking-[0.18em] text-[var(--wk-text-muted)]">Releases</h2>
+                <span className="rounded-full bg-[var(--wk-brand-soft)] px-2.5 py-0.5 text-[10px] font-bold text-[var(--wk-brand)]">{sortedReleases.length}</span>
+              </div>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                {sortedReleases.map((release) => (
+                  <Link
+                    key={release.slug}
+                    to={releaseUrl({ slug: release.slug, artist: release.artistName })}
+                    className="group overflow-hidden rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] transition-all hover:border-[var(--wk-brand)]"
+                  >
+                    <div className="relative aspect-square bg-[var(--wk-surface-raised)]">
+                      {release.artworkUrl ? (
+                        <img src={release.artworkUrl} alt={release.title} className="h-full w-full object-cover" />
+                      ) : (
+                        <Chapter19FallbackImage slug={release.slug} name={release.title} className="h-full" />
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
+                      <span className="absolute left-2 top-2 rounded bg-black/50 px-2 py-0.5 text-[10px] font-bold text-white backdrop-blur-sm">
+                        {releaseTypeBadge(release.releaseType)}
+                      </span>
+                    </div>
+                    <div className="p-3">
+                      <div className="truncate text-[13px] font-bold text-[var(--wk-text)]">{release.title}</div>
+                      <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-[var(--wk-text-muted)]">
+                        {release.artistName && <span>{release.artistName} · </span>}
+                        <span>{release.releaseDate ? release.releaseDate.split("-")[0] : "—"}</span>
+                      </div>
+                    </div>
                   </Link>
                 ))}
               </div>

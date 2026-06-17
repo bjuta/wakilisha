@@ -5,7 +5,7 @@ const TRACK_DETAILS: any[] = [];
 const GENRES: any[] = [];
 const LABELS: any[] = [];
 const CHART_DATA: any[] = [];
-import { listReleases, releaseUrl, type RepairedRelease } from "@/services/repairedContent/client";
+import { listReleases, releaseUrl, slugify, type RepairedRelease } from "@/services/repairedContent/client";
 import { WkIcon } from "@/components/design-system/Icon";
 
 const hot = ["Burna Boy", "Afrobeats", "Amapiano", "Tems", "Wizkid", "Asake", "Davido", "Rema"];
@@ -105,14 +105,14 @@ function ArtistHit({ artist }: { artist: typeof ARTISTS[number] }) {
   return <Link to={`/artists/${artist.slug}`} className="lbl-row"><div className="lbl-avatar">{artist.imageUrl ? <img src={artist.imageUrl} alt="" /> : artist.name[0]}</div><div><div className="lbl-name">{artist.name}</div><div className="lbl-meta">{artist.genres.slice(0, 2).join(", ")}</div></div><WkIcon name="ChevronRight" size={16} className="lbl-chevron" /></Link>;
 }
 function TrackHit({ track }: { track: typeof TRACK_DETAILS[number] }) {
-  return <Link to={`/tracks/${track.slug}`} className="lbl-row"><div className="lbl-avatar">{track.artworkUrl ? <img src={track.artworkUrl} alt="" /> : <WkIcon name="Music2" size={17} />}</div><div><div className="lbl-name">{track.title}</div><div className="lbl-meta">{track.artist}</div></div><WkIcon name="ChevronRight" size={16} className="lbl-chevron" /></Link>;
+  return <Link to={`/tracks/${slugify(track.artist)}/${track.slug}`} className="lbl-row"><div className="lbl-avatar">{track.artworkUrl ? <img src={track.artworkUrl} alt="" /> : <WkIcon name="Music2" size={17} />}</div><div><div className="lbl-name">{track.title}</div><div className="lbl-meta">{track.artist}</div></div><WkIcon name="ChevronRight" size={16} className="lbl-chevron" /></Link>;
 }
 function ReleaseHit({ release }: { release: RepairedRelease }) {
   return <Link to={releaseUrl(release)} className="lbl-row"><div className="lbl-avatar">{release.artworkUrl ? <img src={release.artworkUrl} alt="" /> : <WkIcon name="Album" size={17} />}</div><div><div className="lbl-name">{release.title}</div><div className="lbl-meta">{release.artist}</div></div><WkIcon name="ChevronRight" size={16} className="lbl-chevron" /></Link>;
 }
 function ChartHit({ entry }: { entry: typeof CHART_DATA[number] }) {
   return (
-    <Link to={`/tracks/${entry.slug}`} className="lbl-row">
+    <Link to={`/tracks/${slugify(entry.artist)}/${entry.slug}`} className="lbl-row">
       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] text-[11px] font-black">
         {entry.rank}
       </div>

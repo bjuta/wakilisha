@@ -172,7 +172,6 @@ import MobileArticlePage from "../pages/mobile/magazine/article/page";
 import MobileMagazineIssuePage from "../pages/magazine/issue/page";
 import MobileAllIssuesPage from "../pages/mobile/magazine/issues/page";
 import MobileSearch from "../pages/mobile/search/page";
-import MobileNotFound from "../pages/mobile/NotFound";
 import MobileTrackDetail from "../pages/mobile/tracks/detail/page";
 import MobileLyricContribution from "../pages/mobile/tracks/lyrics/contribute/page";
 import MobileAuth from "../pages/mobile/auth/page";
@@ -200,10 +199,10 @@ const routes: RouteObject[] = [
       { path: "/charts/:series/:edition", element: <ResponsivePage mobile={<MobileChartEdition />} desktop={<ChartEdition />} /> },
       { path: "/artists", element: <ResponsivePage mobile={<MobileArtists />} desktop={<Artists />} /> },
       { path: "/artists/:slug", element: <ResponsivePage mobile={<MobileArtistDetail />} desktop={<ArtistDetail />} /> },
-      { path: "/tracks/:slug", element: <ResponsivePage mobile={<MobileTrackDetail />} desktop={<TrackDetail />} /> },
-      { path: "/tracks/:slug/lyrics/contribute", element: <LyricContribution /> },
+      { path: "/tracks/:artistSlug/:trackSlug", element: <ResponsivePage mobile={<MobileTrackDetail />} desktop={<TrackDetail />} /> },
+      { path: "/tracks/:artistSlug/:trackSlug/lyrics/contribute", element: <LyricContribution /> },
       { path: "/releases", element: <ResponsivePage mobile={<Releases />} desktop={<Releases />} /> },
-      { path: "/releases/:slug", element: <ResponsivePage mobile={<MobileReleaseDetail />} desktop={<ReleaseDetail />} /> },
+      { path: "/releases/:artistSlug/:releaseSlug", element: <ResponsivePage mobile={<MobileReleaseDetail />} desktop={<ReleaseDetail />} /> },
       { path: "/genres/:slug", element: <ResponsivePage mobile={<MobileGenreDetail />} desktop={<GenreDetail />} /> },
       { path: "/genres", element: <ResponsivePage mobile={<MobileGenres />} desktop={<Genres />} /> },
       { path: "/labels/:slug", element: <ResponsivePage mobile={<MobileLabelDetail />} desktop={<LabelDetail />} /> },
@@ -373,7 +372,7 @@ const routes: RouteObject[] = [
   },
   { path: "/api-docs", element: <PublicApiDocsPage /> },
   { path: "/player/full", element: <MobileFullPlayer /> },
-  { path: "*", element: <ResponsivePage mobile={<MobileNotFound />} desktop={<NotFound />} /> },
+  { path: "*", element: <NotFound /> },
   { path: "/m", element: <Navigate to="/" replace /> },
 ];
 

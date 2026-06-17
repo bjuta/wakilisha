@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
 import { usePlayer } from "@/context/PlayerContext";
 import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
+import { trackUrl } from "@/utils/trackUrl";
+import { slugify } from "@/services/repairedContent/client";
 
 interface ChartEntry {
   rank: number;
@@ -293,7 +295,7 @@ function TrackChartRow({
           <div className="flex items-center gap-2 mb-0.5">
             {trackSlug ? (
               <Link
-                to={`/tracks/${trackSlug}`}
+                to={trackUrl(track.slug, [slugify(track.artist)])}
                 onClick={(e) => e.stopPropagation()}
                 className="truncate text-[14px] md:text-[15px] font-bold text-[var(--wk-text)] hover:text-[var(--wk-brand)] transition-colors"
               >

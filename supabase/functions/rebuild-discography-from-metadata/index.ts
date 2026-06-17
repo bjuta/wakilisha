@@ -1,10 +1,11 @@
+
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.3";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
-const REBUILD_SOURCE = "metadata_rebuild_v2";
+const REBUILD_SOURCE = "metadata_rebuild_v3";
 const ORPHAN_CHUNK_SIZE = 200;
 
 function slugify(text: string): string {
@@ -28,6 +29,52 @@ function parseReleaseDate(dateStr: string): string | null {
   const d = new Date(dateStr);
   if (isNaN(d.getTime())) return null;
   return d.toISOString().split("T")[0];
+}
+
+function parseFeaturedFromTitle(title: string): string[] {
+  if (!title) return [];
+  const featured: string[] = [];
+  const seen = new Set<string>();
+
+  function addNames(inner: string) {
+    const names = inner.split(/\s*[,&]\s*|\s+and\s+/i).map(s => s.trim()).filter(Boolean);
+    for (const n of names) {
+      const key = n.toLowerCase();
+      if (!seen.has(key)) { seen.add(key); featured.push(n); }
+    }
+  }
+
+  // Parentheses: (feat. X), (ft. X), (featuring X), (with X), (w/ X)
+  const parenMatch = title.match(/\((?:feat\.?|ft\.?|featuring|with|w\/)\s+([^)]+)\)/i);
+  if (parenMatch) addNames(parenMatch[1]);
+
+  // Square brackets: [feat. X], [ft. X], [featuring X], [with X], [w/ X]
+  const bracketMatch = title.match(/\[(?:feat\.?|ft\.?|featuring|with|w\/)\s+([^\]]+)\]/i);
+  if (bracketMatch) addNames(bracketMatch[1]);
+
+  // Dash / em-dash / en-dash: — feat. X, - ft. X, — featuring X, — with X
+  const dashMatch = title.match(/\s[-\u2013\u2014]\s*(?:feat\.?|ft\.?|featuring|with|w\/)\s+(.+)$/i);
+  if (dashMatch) addNames(dashMatch[1]);
+
+  // x collaboration: "Song x Artist2" (colloquial collab marker)
+  const xMatch = title.match(/\s+x\s+([A-Z][^,(\[]+?)(?:\s*[,&]\s*[A-Z][^,(\[]+?)*)\s*$/i);
+  if (!xMatch) {
+    const xMatch2 = title.match(/\s+x\s+([A-Z][^,(\[]+)$/i);
+    if (xMatch2) addNames(xMatch2[1]);
+  } else {
+    addNames(xMatch[1]);
+  }
+
+  // + collaboration: "Song + Artist2"
+  const plusMatch = title.match(/\s+\+\s+([A-Z][^,(\[]+?)(?:\s*[,&]\s*[A-Z][^,(\[]+?)*)\s*$/i);
+  if (!plusMatch) {
+    const plusMatch2 = title.match(/\s+\+\s+([A-Z][^,(\[]+)$/i);
+    if (plusMatch2) addNames(plusMatch2[1]);
+  } else {
+    addNames(plusMatch[1]);
+  }
+
+  return featured;
 }
 
 function makeTrackSlug(artistSlug: string, trackTitle: string): string {
@@ -167,6 +214,21 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    // ================= Pre-load ALL active artists for featured artist resolution =================
+    steps.push("Pre-loading all active artists for featured artist resolution...");
+    const { data: allRegistryArtists } = await supabase
+      .from("registry_artists")
+      .select("id, slug, display_name")
+      .eq("status", "active");
+    const artistByName = new Map<string, { id: string; slug: string; display_name: string }>();
+    const artistBySlug = new Map<string, { id: string; slug: string; display_name: string }>();
+    for (const a of (allRegistryArtists ?? [])) {
+      const nameKey = ((a.display_name as string) || "").toLowerCase().trim();
+      if (nameKey && !artistByName.has(nameKey)) artistByName.set(nameKey, a as any);
+      artistBySlug.set(a.slug as string, a as any);
+    }
+    steps.push(`Loaded ${artistByName.size} artists by name, ${artistBySlug.size} by slug`);
+
     // ================= STEP 4: Fetch this batch of artists =================
     steps.push(`Fetching artist batch ${batch} (offset ${offset}, size ${batchSize})...`);
     const { data: artists, error: artistErr } = await supabase
@@ -191,10 +253,14 @@ Deno.serve(async (req: Request) => {
     let titleCollisions = 0;
     let albumsProcessed = 0;
     let topSongsProcessed = 0;
+    let featLinksCollected = 0;
 
     const trackSlugToArtist: Record<string, { artistId: string; artistSlug: string; artistName: string }> = {};
     const trackSlugToRelease: Record<string, { releaseSlug: string; trackNumber: number }> = {};
     const releaseSlugToArtist: Record<string, { artistId: string; artistSlug: string; artistName: string }> = {};
+
+    // Collect featured artist rows during data collection
+    const featTrackArtistRows: Record<string, unknown>[] = [];
 
     for (const artist of artists) {
       const metadata = artist.metadata as Record<string, unknown> | null;
@@ -263,6 +329,34 @@ Deno.serve(async (req: Request) => {
           trackSlugToArtist[trackSlug] = { artistId, artistSlug, artistName };
           trackSlugToRelease[trackSlug] = { releaseSlug, trackNumber: idx + 1 };
           albumsProcessed++;
+
+          // Parse featured artists from track title
+          const featNames = parseFeaturedFromTitle(track.title);
+          const primaryNameKey = (artistName as string).toLowerCase().trim();
+          for (let fi = 0; fi < featNames.length; fi++) {
+            const featName = featNames[fi];
+            const featNameKey = featName.toLowerCase().trim();
+            const featSlug = slugify(featName);
+            if (featNameKey === primaryNameKey || featSlug === artistSlug) continue;
+
+            const matchedArtist = artistByName.get(featNameKey) || artistBySlug.get(featSlug);
+            featTrackArtistRows.push({
+              track_id: null, // Will be resolved after track insert
+              track_slug: trackSlug,
+              artist_id: matchedArtist?.id ?? null,
+              artist_slug: matchedArtist?.slug ?? featSlug,
+              artist_name_text: matchedArtist?.display_name ?? featName,
+              role: "featured_artist",
+              is_primary: false,
+              is_featured: true,
+              credit_order: 2 + fi,
+              source: REBUILD_SOURCE,
+              confidence: matchedArtist ? 80 : 45,
+              status: "active",
+              metadata: { resolved_by: matchedArtist ? "name_match" : "text_only" },
+            });
+            featLinksCollected++;
+          }
         }
       }
 
@@ -291,9 +385,38 @@ Deno.serve(async (req: Request) => {
 
           trackSlugToArtist[trackSlug] = { artistId, artistSlug, artistName };
           topSongsProcessed++;
+
+          // Parse featured artists from top song title
+          const featNames = parseFeaturedFromTitle(song.title);
+          const primaryNameKey = (artistName as string).toLowerCase().trim();
+          for (let fi = 0; fi < featNames.length; fi++) {
+            const featName = featNames[fi];
+            const featNameKey = featName.toLowerCase().trim();
+            const featSlug = slugify(featName);
+            if (featNameKey === primaryNameKey || featSlug === artistSlug) continue;
+
+            const matchedArtist = artistByName.get(featNameKey) || artistBySlug.get(featSlug);
+            featTrackArtistRows.push({
+              track_id: null,
+              track_slug: trackSlug,
+              artist_id: matchedArtist?.id ?? null,
+              artist_slug: matchedArtist?.slug ?? featSlug,
+              artist_name_text: matchedArtist?.display_name ?? featName,
+              role: "featured_artist",
+              is_primary: false,
+              is_featured: true,
+              credit_order: 2 + fi,
+              source: REBUILD_SOURCE,
+              confidence: matchedArtist ? 80 : 45,
+              status: "active",
+              metadata: { resolved_by: matchedArtist ? "name_match" : "text_only" },
+            });
+            featLinksCollected++;
+          }
         }
       }
     }
+    steps.push(`Collected ${featLinksCollected} potential featured artist links`);
 
     // DEDUPLICATE tracks by slug to avoid "ON CONFLICT DO UPDATE cannot affect row a second time"
     const uniqueTracks = new Map<string, Record<string, unknown>>();
@@ -339,7 +462,7 @@ Deno.serve(async (req: Request) => {
     steps.push(`Inserted ${releaseRows.length} releases, resolved ${Object.keys(releaseIdMap).length} IDs`);
 
     // ================= STEP 8: Resolve and INSERT link rows (ignore duplicates) =================
-    // Track-artist links
+    // Track-artist links (primary artists)
     const trackArtistRows: Record<string, unknown>[] = [];
     for (const slug of Object.keys(trackSlugToArtist)) {
       const trackId = trackIdMap[slug];
@@ -362,6 +485,16 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    // Resolve featured artist rows — fill in track_id from trackIdMap
+    const resolvedFeatRows: Record<string, unknown>[] = [];
+    for (const fr of featTrackArtistRows) {
+      const trackId = trackIdMap[fr.track_slug as string];
+      if (trackId) {
+        const { track_slug, ...rest } = fr;
+        resolvedFeatRows.push({ ...rest, track_id: trackId });
+      }
+    }
+
     let trackArtistLinksCreated = 0;
     if (trackArtistRows.length > 0) {
       const { data: taInserted, error: taErr } = await supabase
@@ -375,6 +508,22 @@ Deno.serve(async (req: Request) => {
         trackArtistLinksCreated = taInserted.length;
       }
     }
+
+    // Insert featured artist links
+    let featArtistLinksCreated = 0;
+    if (resolvedFeatRows.length > 0) {
+      const { data: feInserted, error: feErr } = await supabase
+        .from("registry_track_artists")
+        .insert(resolvedFeatRows)
+        .select("id");
+
+      if (feErr && !feErr.message.includes("duplicate")) {
+        errors.push(`Featured track-artist insert failed: ${feErr.message}`);
+      } else if (feInserted) {
+        featArtistLinksCreated = feInserted.length;
+      }
+    }
+    steps.push(`Featured artist links created: ${featArtistLinksCreated}`);
 
     // Release-track links
     const releaseTrackRows: Record<string, unknown>[] = [];
@@ -480,6 +629,7 @@ Deno.serve(async (req: Request) => {
             releases_inserted: releaseRows.length,
             releases_resolved: Object.keys(releaseIdMap).length,
             track_artist_links_created: trackArtistLinksCreated,
+            featured_artist_links_created: featArtistLinksCreated,
             release_track_links_created: releaseTrackLinksCreated,
             release_artist_links_created: releaseArtistLinksCreated,
             orphans_deleted: totalOrphansDeleted,

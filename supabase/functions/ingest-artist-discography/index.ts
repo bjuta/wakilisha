@@ -63,6 +63,52 @@ function formatDuration(ms: number): string {
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
 
+function parseFeaturedFromTitle(title: string): string[] {
+  if (!title) return [];
+  const featured: string[] = [];
+  const seen = new Set<string>();
+
+  function addNames(inner: string) {
+    const names = inner.split(/\s*[,&]\s*|\s+and\s+/i).map(s => s.trim()).filter(Boolean);
+    for (const n of names) {
+      const key = n.toLowerCase();
+      if (!seen.has(key)) { seen.add(key); featured.push(n); }
+    }
+  }
+
+  // Parentheses: (feat. X), (ft. X), (featuring X), (with X), (w/ X)
+  const parenMatch = title.match(/\((?:feat\.?|ft\.?|featuring|with|w\/)\s+([^)]+)\)/i);
+  if (parenMatch) addNames(parenMatch[1]);
+
+  // Square brackets: [feat. X], [ft. X], [featuring X], [with X], [w/ X]
+  const bracketMatch = title.match(/\[(?:feat\.?|ft\.?|featuring|with|w\/)\s+([^\]]+)\]/i);
+  if (bracketMatch) addNames(bracketMatch[1]);
+
+  // Dash / em-dash / en-dash: — feat. X, - ft. X, — featuring X, — with X
+  const dashMatch = title.match(/\s[-\u2013\u2014]\s*(?:feat\.?|ft\.?|featuring|with|w\/)\s+(.+)$/i);
+  if (dashMatch) addNames(dashMatch[1]);
+
+  // x collaboration: "Song x Artist2" (colloquial collab marker, only when after space + capital)
+  const xMatch = title.match(/\s+x\s+([A-Z][^,(\[]+?)(?:\s*[,&]\s*[A-Z][^,(\[]+?)*)\s*$/i);
+  if (!xMatch) {
+    const xMatch2 = title.match(/\s+x\s+([A-Z][^,(\[]+)$/i);
+    if (xMatch2) addNames(xMatch2[1]);
+  } else {
+    addNames(xMatch[1]);
+  }
+
+  // + collaboration: "Song + Artist2"
+  const plusMatch = title.match(/\s+\+\s+([A-Z][^,(\[]+?)(?:\s*[,&]\s*[A-Z][^,(\[]+?)*)\s*$/i);
+  if (!plusMatch) {
+    const plusMatch2 = title.match(/\s+\+\s+([A-Z][^,(\[]+)$/i);
+    if (plusMatch2) addNames(plusMatch2[1]);
+  } else {
+    addNames(plusMatch[1]);
+  }
+
+  return featured;
+}
+
 async function createAppleMusicToken(teamId: string, keyId: string, privateKeyRaw: string): Promise<string> {
   let key = privateKeyRaw;
   if (key.includes("-----BEGIN PRIVATE KEY-----")) key = key.replace(/-----BEGIN PRIVATE KEY-----/, "");
@@ -231,8 +277,6 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Preload existing track→artist links so slug-matching is scoped by artist.
-    // An "Intro" by Sauti Sol is not the same song as "Intro" by Wakadinali.
     const { data: existingTrackArtists } = await db.from("registry_track_artists")
       .select("track_id, artist_slug").eq("status", "active");
     const existingTrackArtistSet = new Set<string>(
@@ -344,6 +388,19 @@ Deno.serve(async (req: Request) => {
       try { fetchedResults = await fetchAlbumsInParallel(token, storefront, selectedIds, 8); }
       catch (err) { return new Response(JSON.stringify({ ok: false, error: "album_fetch_failed", detail: err instanceof Error ? err.message : String(err) }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }); }
 
+      // Pre-load all active registry artists for featured artist resolution
+      stage = "load_artists_for_featured";
+      const { data: allRegistryArtists } = await db.from("registry_artists")
+        .select("id, slug, display_name")
+        .eq("status", "active");
+      const artistByName = new Map<string, { id: string; slug: string; display_name: string }>();
+      const artistBySlug = new Map<string, { id: string; slug: string; display_name: string }>();
+      for (const a of (allRegistryArtists ?? [])) {
+        const nameKey = ((a.display_name as string) || "").toLowerCase().trim();
+        if (nameKey && !artistByName.has(nameKey)) artistByName.set(nameKey, a as { id: string; slug: string; display_name: string });
+        artistBySlug.set(a.slug as string, a as { id: string; slug: string; display_name: string });
+      }
+
       const albumById = new Map(fetchedResults.map((r) => [r.id, r.detail]));
       const actionById = new Map(toProcess.map((s) => [s.apple_music_id, s.action]));
 
@@ -361,6 +418,7 @@ Deno.serve(async (req: Request) => {
       let mergeCount = 0;
       let canonicalizeCount = 0;
       let trackCount = 0;
+      let featLinksCreated = 0;
 
       for (const sel of toProcess) {
         const album = albumById.get(sel.apple_music_id);
@@ -430,12 +488,8 @@ Deno.serve(async (req: Request) => {
           let trackId: string | undefined;
           let trackSlug: string;
 
-          // Match by ISRC first (always safe — ISRCs are globally unique)
           if (trackIsrc) trackId = existingTrackByIsrc.get(trackIsrc);
 
-          // Fallback: match by slug BUT only if the existing track is already
-          // linked to THIS artist. Prevents "Intro" by Sauti Sol from merging
-          // with "Intro" by Wakadinali — different songs, same title.
           if (!trackId) {
             const slugMatchId = existingTrackBySlug.get(rawTrackSlug);
             if (slugMatchId && existingTrackArtistSet.has(`${slugMatchId}:${artistSlug}`)) {
@@ -474,18 +528,52 @@ Deno.serve(async (req: Request) => {
             source: "apple_music_ingest", confidence: 90, status: "active",
             metadata: { apple_music_track_id: track.id, apple_music_album_id: album.id },
           });
+
+          // Primary artist link
           trackArtistRows.push({
             track_id: trackId, artist_id: artistId, artist_slug: artistSlug, artist_name_text: artistName,
             role: "primary_artist", is_primary: true, is_featured: false, credit_order: 1,
             source: "apple_music_ingest", confidence: 90, status: "active",
             metadata: { apple_music_track_id: track.id, apple_music_album_id: album.id },
           });
+
+          // --- RESOLVE FEATURED ARTISTS FROM TRACK TITLE ---
+          const featNames = parseFeaturedFromTitle(trackTitle);
+          const primaryNameKey = artistName.toLowerCase().trim();
+          const primarySlugKey = artistSlug;
+          for (let fi = 0; fi < featNames.length; fi++) {
+            const featName = featNames[fi];
+            const featNameKey = featName.toLowerCase().trim();
+            const featSlug = slugify(featName);
+
+            // Skip if featured artist is the same as the primary artist
+            if (featNameKey === primaryNameKey || featSlug === primarySlugKey) continue;
+
+            // Try lookup by exact name first, then by slug
+            const matchedArtist = artistByName.get(featNameKey) || artistBySlug.get(featSlug);
+
+            trackArtistRows.push({
+              track_id: trackId,
+              artist_id: matchedArtist?.id ?? null,
+              artist_slug: matchedArtist?.slug ?? featSlug,
+              artist_name_text: matchedArtist?.display_name ?? featName,
+              role: "featured_artist",
+              is_primary: false,
+              is_featured: true,
+              credit_order: 2 + fi,
+              source: "apple_music_ingest",
+              confidence: matchedArtist ? 85 : 50,
+              status: "active",
+              metadata: { apple_music_track_id: track.id, apple_music_album_id: album.id, resolved_by: matchedArtist ? "name_match" : "text_only" },
+            });
+            featLinksCreated++;
+          }
         }
       }
 
       stage = "commit";
       const BATCH = 200;
-      const summary = { merged: mergeCount, canonicalized: canonicalizeCount, ignored: selections.filter((s) => s.action === "ignore").length, tracks_created: trackCount, errors: [] as string[] };
+      const summary = { merged: mergeCount, canonicalized: canonicalizeCount, ignored: selections.filter((s) => s.action === "ignore").length, tracks_created: trackCount, featured_artist_links: featLinksCreated, errors: [] as string[] };
 
       function chunk<T>(arr: T[], size: number): T[][] { const chunks: T[][] = []; for (let i = 0; i < arr.length; i += size) chunks.push(arr.slice(i, i + size)); return chunks; }
 

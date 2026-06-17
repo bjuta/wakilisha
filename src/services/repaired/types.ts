@@ -24,9 +24,20 @@ export interface RepairedRelatedGenre {
   name: string;
 }
 
+export interface RepairedGenreRelease {
+  slug: string;
+  title: string;
+  releaseDate: string;
+  releaseType: string;
+  artworkUrl: string;
+  trackCount: number;
+  artistName: string;
+}
+
 export interface RepairedGenreDetail {
   genre: RepairedGenre;
   artists: RepairedGenreArtist[];
+  releases: RepairedGenreRelease[];
   topTracks: RepairedGenreTrack[];
   relatedGenres: RepairedRelatedGenre[];
 }
@@ -52,6 +63,7 @@ export interface RepairedLabelRelease {
   releaseType: string;
   artworkUrl: string;
   trackCount: number;
+  artistName: string;
 }
 
 export interface RepairedRelatedLabel {
@@ -131,6 +143,7 @@ export interface RepairedTrackDetail {
   chartAppearances?: Array<{
     editionSlug: string;
     editionLabel: string;
+    familySlug?: string;
     date: string;
     rank: number;
     previousRank: number | null;

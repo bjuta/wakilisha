@@ -4,6 +4,7 @@ import { WkIcon } from "@/components/design-system/Icon";
 import { Chapter19FallbackImage } from "@/components/media/Chapter19FallbackImage";
 import { ch19Background } from "@/utils/ch19";
 import { getGenre, type RepairedGenreDetail } from "@/services/repaired/client";
+import { slugify } from "@/services/repairedContent/client";
 
 export default function MobileGenreDetail() {
   const { slug } = useParams<{ slug: string }>();
@@ -93,7 +94,7 @@ export default function MobileGenreDetail() {
             <h2 className="mb-4 text-[11px] font-black uppercase tracking-[0.15em] text-[var(--wk-text-muted)]">Top tracks · {topTracks.length}</h2>
             <div className="divide-y divide-[var(--wk-divider)] rounded-lg border border-[var(--wk-border)] bg-[var(--wk-surface)]">
               {topTracks.slice(0, 10).map((t, i) => (
-                <Link key={t.slug} to={`/tracks/${t.slug}`} className="flex items-center gap-3 px-4 py-3">
+                <Link key={t.slug} to={`/tracks/${slugify(t.artistName || '')}/${t.slug}`} className="flex items-center gap-3 px-4 py-3">
                   <span className="w-5 text-center text-[12px] font-bold text-[var(--wk-text-faint)]">{i + 1}</span>
                   <div className="h-9 w-9 shrink-0 overflow-hidden rounded-md bg-[var(--wk-surface-raised)]">
                     {t.artworkUrl ? <img src={t.artworkUrl} alt={t.title} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center"><WkIcon name="Music2" size={14} className="text-[var(--wk-text-faint)]" /></div>}

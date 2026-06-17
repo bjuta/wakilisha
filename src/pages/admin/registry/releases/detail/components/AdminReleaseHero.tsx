@@ -1,4 +1,5 @@
 import { WkIcon } from "@/components/design-system/Icon";
+import { releaseUrl } from "@/utils/releaseUrl";
 
 export interface ReleaseHeroData {
   title: string;
@@ -57,9 +58,7 @@ function releaseTypeLabel(t: string | null): string {
 }
 
 export default function AdminReleaseHero({ release, trackCount, totalDurationMs, onToggleEdit, editOpen }: AdminReleaseHeroProps) {
-  const publicUrl = release.slug.includes('--')
-    ? `/releases/${release.slug}`
-    : `/releases/${release.artist_slug}--${release.slug}`;
+  const publicUrl = releaseUrl({ slug: release.slug, artist: release.artist_name });
   const artistUrl = `/admin/registry/artists/${release.artist_slug}`;
   const labelUrl = release.label_slug ? `/admin/registry/labels/${release.label_slug}` : "";
   const artworkFailed = false;

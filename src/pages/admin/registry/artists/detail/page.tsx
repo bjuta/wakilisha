@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { useRelatedEntities } from "@/hooks/useRelatedEntities";
 import type { ResolvedRelation } from "@/hooks/useRelatedEntities";
 import { DiscographyPanel } from "./components/DiscographyPanel";
+import { TopSongsPanel } from "./components/TopSongsPanel";
 
 /* ─── Types ─── */
 interface ArtistRecord {
@@ -416,6 +417,9 @@ export default function ArtistDetailPage() {
 
           {/* Discography — from registry_release_artists */}
           <DiscographyPanel artistSlug={artist.slug} artistName={artist.display_name} />
+
+          {/* Top Songs — curated from discography */}
+          <TopSongsPanel artistSlug={artist.slug} artistName={artist.display_name} />
         </div>
 
         {/* Sidebar */}

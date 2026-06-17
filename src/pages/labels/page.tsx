@@ -4,11 +4,11 @@ import { ShareButton } from "@/components/design-system/share/ShareSheet";
 import { WkIcon } from "@/components/design-system/Icon";
 import { Chapter19FallbackImage } from "@/components/media/Chapter19FallbackImage";
 import {
-  listLabels,
-  listReleases,
-  type RepairedLabel,
-  type RepairedRelease,
-} from "@/services/repairedContent/client";
+  listLabelsPaginated,
+  getLabelCatalogStats,
+  type PublicLabel,
+  type LabelCatalogStats,
+} from "@/services/publicContent/client";
 
 const PAGE_SIZE = 24;
 
@@ -36,8 +36,8 @@ export default function Labels() {
   const [query, setQuery] = useState("");
   const [country, setCountry] = useState("All");
   const [page, setPage] = useState(1);
-  const [labels, setLabels] = useState<RepairedLabel[]>([]);
-  const [releases, setReleases] = useState<RepairedRelease[]>([]);
+  const [labels, setLabels] = useState<PublicLabel[]>([]);
+  const [stats, setStats] = useState<LabelCatalogStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const heroRef = useRef<HTMLDivElement>(null);
@@ -46,93 +46,84 @@ export default function Labels() {
     setLoading(true);
     setError(null);
     try {
-      const [labelsData, releasesData] = await Promise.all([
-        listLabels(),
-        listReleases(),
+      const [statsData, pageData] = await Promise.all([
+        getLabelCatalogStats(),
+        listLabelsPaginated({
+          page: 1,
+          pageSize: PAGE_SIZE,
+          countryFilter: country,
+          search: query,
+        }),
       ]);
-      setLabels(labelsData);
-      setReleases(releasesData);
+      setStats(statsData);
+      setLabels(pageData.labels);
+      setPage(1);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load labels.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [query, country]);
+
+  const loadPage = useCallback(async (targetPage: number) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const pageData = await listLabelsPaginated({
+        page: targetPage,
+        pageSize: PAGE_SIZE,
+        countryFilter: country,
+        search: query,
+      });
+      setLabels(pageData.labels);
+      setPage(targetPage);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not load labels.");
+    } finally {
+      setLoading(false);
+    }
+  }, [query, country]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
 
-  useScrollReveal([loading]);
+  useScrollReveal([loading, page]);
 
-  const labelArtists = useMemo(() => {
-    const map: Record<string, string[]> = {};
-    releases.forEach((release) => {
-      const label = release.labelName;
-      if (!label) return;
-      map[label] ||= [];
-      if (!map[label].includes(release.artist)) {
-        map[label].push(release.artist);
-      }
-    });
-    return map;
-  }, [releases]);
+  const totalPages = useMemo(() => {
+    if (!stats) return 1;
+    // Approximate total from filtered count — we need to refetch on filter change
+    return Math.max(1, Math.ceil((stats?.total || 0) / PAGE_SIZE));
+  }, [stats]);
 
-  const countries = useMemo(
-    () =>
-      ["All", ...Array.from(new Set(labels.map((l) => l.country).filter(Boolean)))].sort((a, b) =>
-        a === "All" ? -1 : b === "All" ? 1 : a.localeCompare(b)
-      ),
-    [labels]
-  );
-
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return labels.filter((label) => {
-      const roster = labelArtists[label.name] || label.featuredArtists || [];
-      const matchesQuery =
-        !q ||
-        label.name.toLowerCase().includes(q) ||
-        (label.country || "").toLowerCase().includes(q) ||
-        roster.some((artist) => artist.toLowerCase().includes(q));
-      const matchesCountry = country === "All" || label.country === country;
-      return matchesQuery && matchesCountry;
-    });
-  }, [query, country, labels, labelArtists]);
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
-  /* Sort labels by prominence */
+  // Use current page for display sections
   const sortedByProminence = useMemo(
-    () =>
-      [...labels].sort(
-        (a, b) => b.artistCount + b.releaseCount - (a.artistCount + a.releaseCount)
-      ),
-    [labels]
+    () => [...labels].sort(
+      (a, b) => b.artistCount + b.releaseCount - (a.artistCount + a.releaseCount),
+    ),
+    [labels],
   );
 
   const spotlight = sortedByProminence[0];
   const compactLabels = sortedByProminence.slice(1, 4);
   const featuredLabels = labels.filter((l) => l.isFeatured);
-  const totalArtists = labels.reduce((sum, l) => sum + l.artistCount, 0);
-  const totalReleases = labels.reduce((sum, l) => sum + l.releaseCount, 0);
-  const featuredCount = labels.filter((l) => l.isFeatured).length;
+  const totalArtists = stats?.totalArtists ?? 0;
+  const totalReleases = stats?.totalReleases ?? 0;
+  const featuredCount = stats?.featuredCount ?? 0;
+  const countries = stats?.countries ?? [];
+  const totalLabels = stats?.total ?? 0;
 
-  const countryGroups = countries
-    .filter((item) => item !== "All")
-    .map((name) => ({
-      name,
-      count: labels.filter((l) => l.country === name).length,
-    }))
-    .sort((a, b) => b.count - a.count);
+  const countryGroups = countries.map((name) => ({
+    name,
+    count: labels.filter((l) => l.country === name).length,
+  }));
 
   const updateCountry = (next: string) => {
     setCountry(next);
     setPage(1);
   };
 
-  if (loading) {
+  if (loading && labels.length === 0) {
     return (
       <main className="min-h-screen">
         <div className="label43-hero-skel">
@@ -157,14 +148,14 @@ export default function Labels() {
     );
   }
 
-  if (error) {
+  if (error && labels.length === 0) {
     return (
       <main className="min-h-screen wk-container px-6 py-20">
         <div className="max-w-2xl mx-auto rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-8 text-center">
           <WkIcon name="Building2" size={42} className="mx-auto mb-4 text-[var(--wk-text-faint)]" />
           <h1 className="wk-h-section mb-2">Could not load labels</h1>
           <p className="text-[var(--wk-text-muted)] mb-6">{error}</p>
-          <button onClick={loadData} className="wk-button wk-button-primary">
+          <button onClick={() => loadData()} className="wk-button wk-button-primary">
             <i className="ri-refresh-line" /> Retry
           </button>
         </div>
@@ -204,7 +195,7 @@ export default function Labels() {
             <ShareButton
               item={{
                 title: "WAKILISHA Labels",
-                subtitle: `${labels.length} labels`,
+                subtitle: `${totalLabels} labels`,
                 description:
                   "Browse WAKILISHA labels and music institutions by country, roster, catalog and chart presence.",
                 type: "page",
@@ -213,7 +204,7 @@ export default function Labels() {
           </div>
           <div className="label43-hero-stats">
             <div className="label43-hero-stat">
-              <span className="label43-hero-stat-val">{labels.length}</span>
+              <span className="label43-hero-stat-val">{totalLabels}</span>
               <span className="label43-hero-stat-lbl">Labels</span>
             </div>
             <div className="label43-hero-stat">
@@ -241,7 +232,13 @@ export default function Labels() {
         <div className="label43-toolbar-inner">
           <span className="label43-toolbar-label">Countries</span>
           <div className="label43-country-pills">
-            {countries.slice(0, 14).map((item) => (
+            <button
+              onClick={() => updateCountry("All")}
+              className={`label43-country-pill ${country === "All" ? "on" : ""}`}
+            >
+              All
+            </button>
+            {countries.slice(0, 13).map((item) => (
               <button
                 key={item}
                 onClick={() => updateCountry(item)}
@@ -348,16 +345,16 @@ export default function Labels() {
 
         {/* ── Full directory · section blocks ── */}
         <section id="label-directory" className="label43-reveal">
-          <SectionLabel count={filtered.length} href="#label-directory">
+          <SectionLabel count={labels.length} href="#label-directory">
             Full directory
           </SectionLabel>
 
           {/* First row: asymmetrical if we have enough labels */}
-          {paginated.length >= 4 && page === 1 ? (
+          {labels.length >= 4 && page === 1 ? (
             <div className="label43-asym-grid mb-6">
-              <LabelCard variant="hero" label={paginated[0]} />
+              <LabelCard variant="hero" label={labels[0]} />
               <div className="label43-compact-stack">
-                {paginated.slice(1, 4).map((label, i) => (
+                {labels.slice(1, 4).map((label) => (
                   <Link key={label.slug} to={`/labels/${label.slug}`} className="label43-compact-card group">
                     <div className="label43-compact-artwork-wrap">
                       <Chapter19FallbackImage
@@ -382,12 +379,12 @@ export default function Labels() {
 
           {/* Remaining grid */}
           <div className="label43-grid-v2">
-            {(page === 1 ? paginated.slice(paginated.length >= 4 ? 4 : 0) : paginated).map((label) => (
+            {(page === 1 ? labels.slice(labels.length >= 4 ? 4 : 0) : labels).map((label) => (
               <LabelCard key={label.slug} label={label} />
             ))}
           </div>
 
-          {filtered.length === 0 && (
+          {labels.length === 0 && !loading && (
             <div className="label43-empty">
               <WkIcon name="Building2" size={32} />
               <span>No labels match this search.</span>
@@ -399,7 +396,7 @@ export default function Labels() {
               <button
                 className="label43-page-btn"
                 disabled={page === 1}
-                onClick={() => setPage(Math.max(1, page - 1))}
+                onClick={() => loadPage(Math.max(1, page - 1))}
               >
                 <WkIcon name="ArrowLeft" size={14} />
               </button>
@@ -409,7 +406,7 @@ export default function Labels() {
               <button
                 className="label43-page-btn"
                 disabled={page === totalPages}
-                onClick={() => setPage(Math.min(totalPages, page + 1))}
+                onClick={() => loadPage(Math.min(totalPages, page + 1))}
               >
                 <WkIcon name="ArrowRight" size={14} />
               </button>
@@ -421,7 +418,7 @@ export default function Labels() {
         <footer className="label43-reveal label43-footer">
           <span className="label43-footer-brand">WAKILISHA Registry</span>
           <p className="label43-footer-tagline">
-            {labels.length} labels across {countries.length - 1} countries.
+            {totalLabels} labels across {countries.length} countries.
             Every institution mapped as an ecosystem.
           </p>
           <p className="label43-footer-meta">
@@ -508,7 +505,7 @@ function LabelCard({
   label,
   variant = "standard",
 }: {
-  label: RepairedLabel;
+  label: PublicLabel;
   variant?: "standard" | "hero";
 }) {
   const roster = (label.featuredArtists || []).slice(0, 5);

@@ -4,6 +4,7 @@ import { useMagazineArticles, useSiteContent } from "@/services/magazineArticles
 import { getTopArtists, getLatestReleases } from "@/services/magazineSiteContent";
 import { buildMagazineIssues, issueUrl, type MagazineIssue } from "@/services/magazineIssues";
 import { buildIssueEditorialSystem } from "@/services/magazineNlg";
+import { releaseUrl } from "@/utils/releaseUrl";
 import { SkeletonMagazinePage } from "@/components/skeletons/Skeletons";
 import "../issue/magazineIssue.css";
 
@@ -251,7 +252,7 @@ function SiteContentPreviewStrip({
             {releases.map((release) => (
               <Link
                 key={release.slug}
-                to={`/releases/${release.slug}`}
+                to={releaseUrl({ slug: release.slug, artist: release.author })}
                 className="group flex items-center gap-3 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-3 hover:border-[var(--wk-brand)] transition-all"
               >
                 <div className="w-12 h-12 rounded-lg overflow-hidden bg-[var(--wk-surface-raised)] shrink-0">

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { supabase } from "@/lib/supabase";
+import { releaseUrl } from "@/utils/releaseUrl";
 
 interface LinkSuggestion {
   slug: string;
@@ -139,7 +140,7 @@ export function ArticleInternalLinks({ content, currentSlug, categories, tags, o
       case "artist":
         return `/artists/${suggestion.slug}`;
       case "release":
-        return `/releases/${suggestion.slug}`;
+        return releaseUrl({ slug: suggestion.slug, artist: suggestion.title });
     }
   }
 

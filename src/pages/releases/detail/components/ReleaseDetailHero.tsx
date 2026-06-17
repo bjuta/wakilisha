@@ -93,8 +93,27 @@ export default function ReleaseDetailHero({
 
             {/* Artist / Label */}
             <div className="flex flex-wrap items-center gap-3 mt-4 text-[15px] md:text-[17px] font-bold text-[var(--wk-text-muted)]">
-              <span className="text-[var(--wk-text)]">{release.artist}</span>
-              <span className="text-[var(--wk-text-faint)]">·</span>
+              <a
+                href={`/artists/${slugify(release.artist)}`}
+                className="text-[var(--wk-text)] hover:text-[var(--wk-brand)] transition-colors"
+              >
+                {release.artist}
+              </a>
+              {release.labelName && release.labelName !== "Independent" && release.labelName !== "WAKILISHA Registry" && release.labelName !== "Unknown" && (
+                <>
+                  <span className="text-[var(--wk-text-faint)]">·</span>
+                  {release.labelSlug && release.labelSlug !== "wakilisha-registry" ? (
+                    <a
+                      href={`/labels/${release.labelSlug}`}
+                      className="text-[var(--wk-text-muted)] hover:text-[var(--wk-brand)] transition-colors text-[14px] md:text-[15px]"
+                    >
+                      {release.labelName}
+                    </a>
+                  ) : (
+                    <span className="text-[var(--wk-text-muted)] text-[14px] md:text-[15px]">{release.labelName}</span>
+                  )}
+                </>
+              )}
             </div>
 
             {/* Featured Artists */}

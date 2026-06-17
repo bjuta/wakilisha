@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
+import { MetaTags } from "@/components/seo/MetaTags";
 import { usePlayer } from "@/context/PlayerContext";
-import { getRelease, slugify, type RepairedReleaseDetail, type RepairedRelease } from "@/services/repairedContent/client";
+import { getRelease, slugify, listReleases, type RepairedReleaseDetail, type RepairedRelease } from "@/services/repairedContent/client";
+import { trackUrl } from "@/utils/trackUrl";
 
 function formatDuration(seconds: number): string {
   if (!seconds) return "—";
@@ -98,8 +100,9 @@ function buildDescription(opts: {
 }
 
 export default function MobileReleaseDetail() {
-  const { slug } = useParams<{ slug: string }>();
+  const { artistSlug, releaseSlug } = useParams<{ artistSlug: string; releaseSlug: string }>();
   const [release, setRelease] = useState<RepairedReleaseDetail | null>(null);
+  const [related, setRelated] = useState<RepairedRelease[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -108,11 +111,6 @@ export default function MobileReleaseDetail() {
   const [expandedDescription, setExpandedDescription] = useState(false);
 
   const { currentTrack, isPlaying, playTrack, togglePlay } = usePlayer();
-
-  // Parse combined slug: artistSlug--releaseSlug
-  const parts = (slug || "").split("--");
-  const artistSlug = parts[0] || "";
-  const releaseSlug = parts.slice(1).join("--") || "";
 
   useEffect(() => {
     let alive = true;
@@ -123,8 +121,8 @@ export default function MobileReleaseDetail() {
     }
     setStatus("loading");
     setError(null);
-    getRelease(artistSlug, releaseSlug)
-      .then((data) => {
+    Promise.all([getRelease(artistSlug, releaseSlug), listReleases()])
+      .then(([data, allReleases]) => {
         if (!alive) return;
         if (!data) {
           setStatus("error");
@@ -132,6 +130,10 @@ export default function MobileReleaseDetail() {
           return;
         }
         setRelease(data);
+        const rel = allReleases
+          .filter((r) => r.slug !== releaseSlug && (r.artist === data.artist || r.labelName === data.labelName))
+          .slice(0, 6);
+        setRelated(rel);
         setStatus("ready");
       })
       .catch((err) => {
@@ -228,6 +230,15 @@ export default function MobileReleaseDetail() {
 
   return (
     <div className="min-h-screen bg-[var(--wk-bg)]">
+      {/* SEO */}
+      <MetaTags
+        title={`${release.title} by ${release.artist}`}
+        description={descriptionText ? descriptionText.slice(0, 160) : `${release.title} is a ${release.releaseType} by ${release.artist}, released in ${release.year}.`}
+        imageUrl={release.artworkUrl}
+        type="music.album"
+        artistName={release.artist}
+        releaseDate={release.releaseDate}
+      />
 
       {/* Floating top bar */}
       <div className="fixed left-0 right-0 top-0 z-50 flex items-center justify-between px-4 pt-safe-top pt-4 pointer-events-none">
@@ -331,6 +342,32 @@ export default function MobileReleaseDetail() {
           </div>
         </div>
 
+        {/* Chart stats */}
+        {release.chartStats && release.chartStats.totalChartAppearances > 0 && (
+          <div className="rounded-2xl border border-[var(--wk-brand)]/20 bg-[var(--wk-brand-soft)]/20 p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="w-5 h-px bg-[var(--wk-brand)]" />
+              <span className="text-[10px] font-extrabold uppercase tracking-[0.22em] text-[var(--wk-brand)]">Chart impact</span>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="text-center">
+                <div className="text-[22px] font-black text-[var(--wk-brand)]">{release.chartStats.totalChartAppearances}</div>
+                <div className="text-[9px] font-bold uppercase tracking-wider text-[var(--wk-text-muted)]">Entries</div>
+              </div>
+              {release.chartStats.topPeakPosition != null && (
+                <div className="text-center">
+                  <div className="text-[22px] font-black text-[var(--wk-text)]">#{release.chartStats.topPeakPosition}</div>
+                  <div className="text-[9px] font-bold uppercase tracking-wider text-[var(--wk-text-muted)]">Best rank</div>
+                </div>
+              )}
+              <div className="text-center">
+                <div className="text-[22px] font-black text-[var(--wk-text)]">{release.chartStats.totalWeeksOnChart}</div>
+                <div className="text-[9px] font-bold uppercase tracking-wider text-[var(--wk-text-muted)]">Weeks</div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Tracklist */}
         <section>
           <div className="mb-3 flex items-center justify-between">
@@ -355,7 +392,7 @@ export default function MobileReleaseDetail() {
                     >
                       <i className={`${isCurrentTrack && isPlaying ? "ri-pause-fill" : "ri-play-fill"} text-sm`} />
                     </button>
-                    <Link to={`/tracks/${track.slug}`} className="min-w-0 flex-1">
+                    <Link to={trackUrl(track.slug, [slugify(release.artist)])} className="min-w-0 flex-1">
                       <div className="text-[13px] font-bold text-[var(--wk-text)] truncate">{track.title}</div>
                       <div className="text-[11px] text-[var(--wk-text-muted)] truncate">{track.artist}</div>
                     </Link>
@@ -439,6 +476,37 @@ export default function MobileReleaseDetail() {
             </div>
             <i className="ri-arrow-right-line text-[var(--wk-text-muted)] text-lg" />
           </Link>
+        )}
+
+        {/* Related Releases */}
+        {related.length > 0 && (
+          <section>
+            <div className="mb-3 flex items-center gap-2">
+              <span className="w-5 h-px bg-[var(--wk-brand)]" />
+              <span className="text-[10px] font-extrabold uppercase tracking-[0.22em] text-[var(--wk-brand)]">More releases</span>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              {related.slice(0, 6).map((r) => (
+                <Link
+                  key={r.slug}
+                  to={`/releases/${slugify(r.artist)}/${r.slug}`}
+                  className="group flex flex-col"
+                >
+                  <div className="aspect-square rounded-xl overflow-hidden bg-[var(--wk-bg)] border border-[var(--wk-border)] mb-2">
+                    {r.artworkUrl ? (
+                      <img src={r.artworkUrl} alt={r.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <i className="ri-album-line text-[var(--wk-text-faint)] text-2xl" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="text-[12px] font-extrabold text-[var(--wk-text)] truncate">{r.title}</div>
+                  <div className="text-[10px] text-[var(--wk-text-muted)] truncate">{r.year}</div>
+                </Link>
+              ))}
+            </div>
+          </section>
         )}
 
         {/* Browse catalog CTA */}

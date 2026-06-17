@@ -2,27 +2,25 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkButton } from "@/components/design-system/primitives/Button";
+import { ShareButton } from "@/components/design-system/share/ShareSheet";
+import { MetaTags } from "@/components/seo/MetaTags";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
 import { getRelease, listReleases, releaseUrl, slugify, type RepairedReleaseDetail, type RepairedRelease } from "@/services/repairedContent/client";
 import ReleaseDetailHero from "./components/ReleaseDetailHero";
 import ReleaseTracklist from "./components/ReleaseTracklist";
 import ReleaseMetadata from "./components/ReleaseMetadata";
+import ReleaseRelatedReleases from "./components/ReleaseRelatedReleases";
 import ReleaseExcerpt from "./components/ReleaseExcerpt";
 import ReleaseFeaturedArtists from "./components/ReleaseFeaturedArtists";
 
 export default function ReleaseDetail() {
-  const { slug } = useParams<{ slug: string }>();
+  const { artistSlug, releaseSlug } = useParams<{ artistSlug: string; releaseSlug: string }>();
   const [release, setRelease] = useState<RepairedReleaseDetail | null>(null);
   const [related, setRelated] = useState<RepairedRelease[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [error, setError] = useState<string | null>(null);
 
   const { ref: artistRef, revealed: artistRevealed } = useScrollReveal<HTMLDivElement>(0.1);
-
-  // Parse combined slug: artistSlug--releaseSlug
-  const parts = (slug || "").split("--");
-  const artistSlug = parts[0] || "";
-  const releaseSlug = parts.slice(1).join("--") || "";
 
   const load = useCallback(async () => {
     if (!artistSlug || !releaseSlug) {
@@ -88,9 +86,20 @@ export default function ReleaseDetail() {
   }
 
   const minutes = release.totalDuration ? Math.round(release.totalDuration / 60) : release.trackCount * 3;
+  const chartStats = release.chartStats;
 
   return (
     <main className="min-h-screen bg-[var(--wk-bg)]">
+      {/* SEO */}
+      <MetaTags
+        title={`${release.title} by ${release.artist}`}
+        description={release.description || `${release.title} is a ${release.releaseType} by ${release.artist}, released in ${release.year}.`}
+        imageUrl={release.artworkUrl}
+        type="music.album"
+        artistName={release.artist}
+        releaseDate={release.releaseDate}
+      />
+
       {/* Hero */}
       <ReleaseDetailHero release={release} minutes={minutes} />
 
@@ -102,13 +111,63 @@ export default function ReleaseDetail() {
             {/* Editorial Excerpt */}
             <ReleaseExcerpt release={release} />
 
+            {/* Chart Performance — if release tracks have chart data */}
+            {chartStats && chartStats.totalChartAppearances > 0 && (
+              <section className="border border-[var(--wk-border)] rounded-2xl bg-[var(--wk-surface)] p-5 md:p-6">
+                <div className="flex items-center gap-3 mb-5">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-[var(--wk-brand)]/20 bg-[var(--wk-brand-soft)]/40 px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.18em] text-[var(--wk-brand)]">
+                    <WkIcon name="BarChart3" size={12} />
+                    Chart impact
+                  </div>
+                  <h2 className="text-[18px] md:text-[22px] font-black text-[var(--wk-text)] tracking-[-0.02em]">
+                    Registry-measured chart presence
+                  </h2>
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="border border-[var(--wk-border)] rounded-xl bg-[var(--wk-bg)] p-4 text-center">
+                    <div className="text-[28px] font-black text-[var(--wk-brand)] leading-none">
+                      {chartStats.totalChartAppearances}
+                    </div>
+                    <div className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-[var(--wk-text-faint)] mt-2">
+                      Total chart entries
+                    </div>
+                  </div>
+                  {chartStats.topPeakPosition != null && (
+                    <div className="border border-[var(--wk-border)] rounded-xl bg-[var(--wk-bg)] p-4 text-center">
+                      <div className="text-[28px] font-black text-[var(--wk-text)] leading-none">
+                        #{chartStats.topPeakPosition}
+                      </div>
+                      <div className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-[var(--wk-text-faint)] mt-2">
+                        Best chart position
+                      </div>
+                    </div>
+                  )}
+                  <div className="border border-[var(--wk-border)] rounded-xl bg-[var(--wk-bg)] p-4 text-center">
+                    <div className="text-[28px] font-black text-[var(--wk-text)] leading-none">
+                      {chartStats.totalWeeksOnChart}
+                    </div>
+                    <div className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-[var(--wk-text-faint)] mt-2">
+                      Weeks on chart
+                    </div>
+                  </div>
+                </div>
+              </section>
+            )}
+
             {/* Tracklist */}
-            <ReleaseTracklist release={release} tracks={release.tracks} />
+            <ReleaseTracklist release={release} tracks={release.tracks} artistSlug={artistSlug} />
 
             {/* Featured Artists Grid */}
             <ReleaseFeaturedArtists
               artists={release.featuredArtists || []}
               releaseArtist={release.artist}
+            />
+
+            {/* Related Releases */}
+            <ReleaseRelatedReleases
+              releases={related}
+              currentReleaseSlug={releaseSlug || ""}
+              artistName={release.artist}
             />
 
             {/* Artist link */}

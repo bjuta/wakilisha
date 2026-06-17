@@ -84,7 +84,10 @@ export default function ReleaseMetadata({
         <div className="space-y-2 text-[12px] font-semibold text-[var(--wk-text-muted)]">
           <QualityRow label="Tracklist" value={release.tracks.length ? "Linked" : "Shell only"} />
           <QualityRow label="Artwork" value={String(release.metadata?.artworkSource || "Fallback").replaceAll("_", " ")} />
-          <QualityRow label="Release date" value={formatReleaseDate(release.releaseDate) ? "Known" : "Year only"} />
+          <QualityRow
+            label="Release date"
+            value={formatReleaseDate(release.releaseDate) || cleanYear(release.year) || "Year only"}
+          />
         </div>
       </div>
 

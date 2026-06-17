@@ -24,9 +24,10 @@ function formatTime(seconds: number): string {
 }
 
 export default function LyricContribution() {
-  const { slug } = useParams<{ slug: string }>();
+  const { artistSlug, trackSlug } = useParams<{ artistSlug: string; trackSlug: string }>();
+  const slug = trackSlug || '';
   const { playTrack, currentTrack, isPlaying, togglePlay, currentTime, seek, pause } = usePlayer();
-  const track = getTrackBySlug(slug || '');
+  const track = getTrackBySlug(slug);
 
   const [lines, setLines] = useState<DraftLine[]>([
     { id: nextLineId(), text: '', timestampSeconds: 0 },
@@ -109,7 +110,7 @@ export default function LyricContribution() {
             Once more contributors upvote than downvote, they&apos;ll go live.
           </p>
           <div className="flex items-center justify-center gap-4">
-            <Link to={`/tracks/${slug}`} className="rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-6 py-3 text-[14px] font-bold text-[var(--wk-text)]">Back to track</Link>
+            <Link to={`/tracks/${artistSlug}/${trackSlug}`} className="rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-6 py-3 text-[14px] font-bold text-[var(--wk-text)]">Back to track</Link>
             <button onClick={() => setSubmitted(false)} className="rounded-xl bg-[var(--wk-brand)] px-6 py-3 text-[14px] font-bold text-[var(--wk-brand-on)]">Submit another</button>
           </div>
         </div>
@@ -122,7 +123,7 @@ export default function LyricContribution() {
       {/* Header */}
       <div className="border-b border-[var(--wk-border)] bg-[var(--wk-surface)]">
         <div className="mx-auto flex max-w-[900px] items-center gap-4 px-6 py-4">
-          <Link to={`/tracks/${slug}`} className="flex items-center gap-2 text-[12px] font-bold text-[var(--wk-text-muted)] hover:text-[var(--wk-text)]">
+          <Link to={`/tracks/${artistSlug}/${trackSlug}`} className="flex items-center gap-2 text-[12px] font-bold text-[var(--wk-text-muted)] hover:text-[var(--wk-text)]">
             <WkIcon name="ArrowLeft" size={16} />
             Back
           </Link>

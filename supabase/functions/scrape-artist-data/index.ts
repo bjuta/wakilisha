@@ -1,3 +1,4 @@
+
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
 const SITE_BASE = "https://wakilisha.africa";
@@ -167,21 +168,44 @@ function splitTrackArtists(artistStr: string): string[] {
 function extractFeaturedFromTitle(title: string): string[] {
   if (!title) return [];
   const featured: string[] = [];
+  const seen = new Set<string>();
 
-  const parenMatch = title.match(/\(feat\.?\s+([^)]+)\)/i) ||
-                     title.match(/\(ft\.?\s+([^)]+)\)/i) ||
-                     title.match(/\(featuring\s+([^)]+)\)/i);
-  if (parenMatch) {
-    const inner = parenMatch[1];
+  function addNames(inner: string) {
     const names = inner.split(/\s*[,&]\s*|\s+and\s+/i).map(s => s.trim()).filter(Boolean);
-    featured.push(...names);
+    for (const n of names) {
+      const key = n.toLowerCase();
+      if (!seen.has(key)) { seen.add(key); featured.push(n); }
+    }
   }
 
-  const dashMatch = title.match(/\s[-\u2013\u2014]\s*(?:feat\.?|ft\.?|featuring)\s+(.+)$/i);
-  if (dashMatch) {
-    const inner = dashMatch[1];
-    const names = inner.split(/\s*[,&]\s*|\s+and\s+/i).map(s => s.trim()).filter(Boolean);
-    featured.push(...names);
+  // Parentheses: (feat. X), (ft. X), (featuring X), (with X), (w/ X)
+  const parenMatch = title.match(/\((?:feat\.?|ft\.?|featuring|with|w\/)\s+([^)]+)\)/i);
+  if (parenMatch) addNames(parenMatch[1]);
+
+  // Square brackets: [feat. X], [ft. X], [featuring X], [with X], [w/ X]
+  const bracketMatch = title.match(/\[(?:feat\.?|ft\.?|featuring|with|w\/)\s+([^\]]+)\]/i);
+  if (bracketMatch) addNames(bracketMatch[1]);
+
+  // Dash / em-dash / en-dash: — feat. X, - ft. X, — featuring X, — with X
+  const dashMatch = title.match(/\s[-\u2013\u2014]\s*(?:feat\.?|ft\.?|featuring|with|w\/)\s+(.+)$/i);
+  if (dashMatch) addNames(dashMatch[1]);
+
+  // x collaboration: "Song x Artist2"
+  const xMatch = title.match(/\s+x\s+([A-Z][^,(\[]+?)(?:\s*[,&]\s*[A-Z][^,(\[]+?)*)\s*$/i);
+  if (!xMatch) {
+    const xMatch2 = title.match(/\s+x\s+([A-Z][^,(\[]+)$/i);
+    if (xMatch2) addNames(xMatch2[1]);
+  } else {
+    addNames(xMatch[1]);
+  }
+
+  // + collaboration: "Song + Artist2"
+  const plusMatch = title.match(/\s+\+\s+([A-Z][^,(\[]+?)(?:\s*[,&]\s*[A-Z][^,(\[]+?)*)\s*$/i);
+  if (!plusMatch) {
+    const plusMatch2 = title.match(/\s+\+\s+([A-Z][^,(\[]+)$/i);
+    if (plusMatch2) addNames(plusMatch2[1]);
+  } else {
+    addNames(plusMatch[1]);
   }
 
   return featured;
@@ -279,11 +303,6 @@ function parseTrackRows(modalHtml: string): TrackData[] {
   return tracks;
 }
 
-// ── v5 changelog ──
-// - Added bioOnly mode: skip all release/track/appears-on/top-song processing, only update bio
-// - Bio scraping preserves HTML formatting (p, strong, em, a, br, etc.)
-// - Basic sanitization removes script tags and event handlers
-
 async function scrapeArtistPage(slug: string): Promise<ArtistScrapeResult | null> {
   const url = `${SITE_BASE}/artists/${slug}/`;
   let html: string;
@@ -308,14 +327,11 @@ async function scrapeArtistPage(slug: string): Promise<ArtistScrapeResult | null
   const h1Match = html.match(/class="wk-title wk-title--sm">([\s\S]*?)<\/h1>/);
   const name = h1Match ? decodeHtmlEntities(h1Match[1].replace(/<[^>]+>/g, "").trim()) : slug;
 
-  // ── Bio: capture full HTML content with formatting preserved ──
   const bioMatch = html.match(/class="wk-prose wk-artist-about-copy[^"]*"[^>]*>([\s\S]*?)<\/div>\s*<\/section>/);
   let bio: string | null = null;
   if (bioMatch) {
     bio = bioMatch[1].trim();
-    // Remove script tags and their content
     bio = bio.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "");
-    // Remove event handler attributes (onclick, onload, etc.)
     bio = bio.replace(/\s+on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "");
     bio = bio.trim() || null;
   }
@@ -473,7 +489,6 @@ async function writeScrapeToRegistry(
 
   const artistId = artistRow.id as string;
 
-  // ── Bio update (always runs, even in bioOnly mode) ──
   const artistPatch: Record<string, unknown> = {};
   if (data.bio && (!artistRow.bio || (artistRow.bio as string).length < 50 || options.overwrite)) {
     artistPatch.bio = data.bio;
@@ -485,7 +500,6 @@ async function writeScrapeToRegistry(
   const existingMeta = (artistRow.metadata || {}) as Record<string, unknown>;
   const metaPatch: Record<string, unknown> = {};
 
-  // In bioOnly mode, skip all metadata fields except basic bio-related ones
   if (!options.bioOnly) {
     if (data.spotifyUrl && (!existingMeta.spotify_url || options.overwrite)) metaPatch.spotify_url = data.spotifyUrl;
     if (data.instagramUrl && (!existingMeta.instagram_url || options.overwrite)) metaPatch.instagram_url = data.instagramUrl;
@@ -559,12 +573,9 @@ async function writeScrapeToRegistry(
     stats.artist_updated++;
   }
 
-  // ── Bio-only mode: skip all release/track/appears-on/top-song processing ──
   if (options.bioOnly) {
     return { success: true, stats, errors };
   }
-
-  // ── Full scrape mode continues below ──
 
   const existingReleases = await fetchAllRows<{ id: string; slug: string; title: string }>(
     "registry_releases", "id, slug, title"

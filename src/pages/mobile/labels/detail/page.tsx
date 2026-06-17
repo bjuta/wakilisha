@@ -4,6 +4,7 @@ import { WkIcon } from "@/components/design-system/Icon";
 import { Chapter19FallbackImage } from "@/components/media/Chapter19FallbackImage";
 import { ch19Background } from "@/utils/ch19";
 import { getLabel, type RepairedLabelDetail } from "@/services/repaired/client";
+import { releaseUrl } from "@/utils/releaseUrl";
 
 export default function MobileLabelDetail() {
   const { slug } = useParams<{ slug: string }>();
@@ -84,7 +85,7 @@ export default function MobileLabelDetail() {
           ) : (
             <div className="grid grid-cols-3 gap-2">
               {sortedReleases.map((r) => (
-                <Link key={r.slug} to={`/releases/${r.slug}`} className="overflow-hidden rounded-lg border border-[var(--wk-border)] bg-[var(--wk-surface)]">
+                <Link key={r.slug} to={releaseUrl({ slug: r.slug, artist: r.artistName || label.name })} className="overflow-hidden rounded-lg border border-[var(--wk-border)] bg-[var(--wk-surface)]">
                   <div className="aspect-square bg-[var(--wk-surface-raised)]">
                     {r.artworkUrl ? <img src={r.artworkUrl} alt={r.title} className="h-full w-full object-cover" /> : <Chapter19FallbackImage slug={r.slug} name={r.title} className="h-full" />}
                   </div>

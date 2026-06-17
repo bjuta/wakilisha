@@ -181,7 +181,7 @@ export const reactAppUIChapters: WkDesignChapterSpec[] = [
     componentsRequired: ['WkReleasePage', 'WkReleaseHero', 'WkReleaseTracklist', 'WkReleaseMeta', 'WkReleaseRelationships'],
     tables: ['release_tracks', 'entity_relationships', 'track_playback_sources'],
     parityTargets: [
-      'Build /releases/:slug payload and page.',
+      'Build /releases/:artistSlug/:releaseSlug payload and page.',
       'Release pages are graph-backed and tracklist-accurate.',
     ],
     qaChecks: [

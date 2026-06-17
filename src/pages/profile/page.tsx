@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useTheme } from "@/components/design-system/theme/ThemeProvider";
 import { WkIcon } from "@/components/design-system/Icon";
+import { slugify } from "@/services/repairedContent/client";
 const HOME_FEATURED_ARTISTS: any[] = [];
 const HOME_TRENDING_TRACKS: any[] = [];
 import { useMagazineArticles } from "@/services/magazineArticles";
@@ -132,7 +133,7 @@ export default function ProfilePage() {
                   const img = item.artworkUrl || item.heroUrl;
                   const to =
                     item.slug && item.artworkUrl
-                      ? `/tracks/${item.slug}`
+                      ? `/tracks/${slugify(item.artist || '')}/${item.slug}`
                       : item.slug
                         ? `/magazine/${item.slug}`
                         : "/search";
@@ -154,7 +155,7 @@ export default function ProfilePage() {
               </div>
               <div className="profile-dt-track-list">
                 {savedTracks.map((track, index) => (
-                  <Link key={track.slug} to={`/tracks/${track.slug}`} className="profile-dt-track-row">
+                  <Link key={track.slug} to={`/tracks/${slugify(track.artist)}/${track.slug}`} className="profile-dt-track-row">
                     <div className="profile-dt-track-num">{index + 1}</div>
                     <div className="profile-dt-track-art">
                       {track.artworkUrl ? <img src={track.artworkUrl} alt="" className="h-full w-full object-cover" /> : <WkIcon name="Music2" size={20} />}

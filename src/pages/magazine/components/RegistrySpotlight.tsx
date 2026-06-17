@@ -1,4 +1,6 @@
 import { Link } from "react-router-dom";
+import { trackUrl } from "@/utils/trackUrl";
+import { slugify } from "@/services/repairedContent/client";
 import { ArtistCard } from "@/components/design-system/registry/ArtistCard";
 import { ReleaseCard } from "@/components/design-system/registry/ReleaseCard";
 import type { MagazineSiteArtist, MagazineSiteRelease, MagazineSiteChartEntry } from "@/services/magazineSiteContent";
@@ -127,7 +129,7 @@ export function ChartHighlightSpread({ highlights, mood, sectionColor }: { highl
           {display.map((entry, idx) => (
             <Link
               key={entry.slug}
-              to={`/tracks/${entry.slug}`}
+              to={trackUrl(entry.slug, [slugify(entry.artistName)])}
               className="mag-chart-highlight-row group cursor-pointer"
             >
               <span className="mag-chart-highlight-rank">{String(idx + 1).padStart(2, "0")}</span>

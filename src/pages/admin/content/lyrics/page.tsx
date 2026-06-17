@@ -160,7 +160,7 @@ export default function AdminLyricsPage() {
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-[14px] font-bold text-[var(--wk-text)]">
                         <Link
-                          to={`/tracks/${submission.trackSlug}`}
+                          to={`/tracks/submissions/${submission.trackSlug}`}
                           className="hover:text-[var(--wk-brand)]"
                           onClick={(e) => e.stopPropagation()}
                         >

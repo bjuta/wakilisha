@@ -94,14 +94,18 @@ export function AppTopBar() {
     return location.pathname === to;
   };
 
-  const navBg = isHome && !scrolled ? "bg-transparent" : "bg-[var(--wk-surface)] border-b border-[var(--wk-border)]";
+  const navBg = scrolled
+    ? "bg-[var(--wk-surface)] border-b border-[var(--wk-border)]"
+    : "bg-transparent";
   const navTextColor = isHome && !scrolled ? "text-white" : "text-[var(--wk-text-soft)]";
   const navTextHover = isHome && !scrolled ? "hover:text-white" : "hover:text-[var(--wk-text)]";
   const logoColor = isHome && !scrolled ? "text-white" : "text-[var(--wk-text)]";
-  const iconColor = isHome && !scrolled ? "text-white/80 hover:text-white hover:bg-white/10" : "text-[var(--wk-text-muted)] hover:text-[var(--wk-text)] hover:bg-[var(--wk-surface-raised)]";
+  const iconColor = isHome && !scrolled
+    ? "text-white/80 hover:text-white hover:bg-white/10"
+    : "text-[var(--wk-text-muted)] hover:text-[var(--wk-text)] hover:bg-[var(--wk-surface-raised)]";
 
   return (
-    <header className={`sticky top-0 z-[60] transition-all duration-300 ${navBg} ${isHome && !scrolled ? "backdrop-blur-none" : "backdrop-blur-xl"}`}>
+    <header className={`sticky top-0 z-[60] transition-all duration-300 ${navBg} ${scrolled ? "backdrop-blur-xl" : "backdrop-blur-none"}`}>
       {isHome && !scrolled && <div className="absolute inset-0 bg-gradient-to-b from-black/20 to-transparent pointer-events-none" />}
 
       <div className="wk-container-max flex items-center justify-between gap-6 px-6 py-4">

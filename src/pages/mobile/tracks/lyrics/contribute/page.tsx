@@ -24,9 +24,10 @@ function formatTime(seconds: number): string {
 }
 
 export default function MobileLyricContribution() {
-  const { slug } = useParams<{ slug: string }>();
+  const { artistSlug, trackSlug } = useParams<{ artistSlug: string; trackSlug: string }>();
+  const slug = trackSlug || '';
   const { playTrack, currentTrack, isPlaying, togglePlay, currentTime } = usePlayer();
-  const track = getTrackBySlug(slug || '');
+  const track = getTrackBySlug(slug);
 
   const [lines, setLines] = useState<DraftLine[]>([
     { id: nextLineId(), text: '', timestampSeconds: 0 },
@@ -100,7 +101,7 @@ export default function MobileLyricContribution() {
             Timed lyrics for <strong className="text-[var(--wk-text)]">{track.title}</strong> are now pending community review.
           </p>
           <div className="flex flex-col items-center gap-3">
-            <Link to={`/tracks/${slug}`} className="rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-6 py-2.5 text-[13px] font-bold text-[var(--wk-text)]">Back to track</Link>
+            <Link to={`/tracks/${artistSlug}/${trackSlug}`} className="rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-6 py-2.5 text-[13px] font-bold text-[var(--wk-text)]">Back to track</Link>
             <button onClick={() => setSubmitted(false)} className="rounded-xl bg-[var(--wk-brand)] px-6 py-2.5 text-[13px] font-bold text-white">Submit another</button>
           </div>
         </div>
@@ -113,7 +114,7 @@ export default function MobileLyricContribution() {
       {/* Compact header */}
       <div className="sticky top-0 z-10 border-b border-[var(--wk-border)] bg-[var(--wk-surface)] px-4 py-3">
         <div className="flex items-center gap-3">
-          <Link to={`/tracks/${slug}`} className="text-[var(--wk-text-muted)]">
+          <Link to={`/tracks/${artistSlug}/${trackSlug}`} className="text-[var(--wk-text-muted)]">
             <WkIcon name="ArrowLeft" size={18} />
           </Link>
           {track.artworkUrl && <img src={track.artworkUrl} alt="" className="h-10 w-10 rounded-lg object-cover" />}

@@ -4,6 +4,7 @@ import { WkIcon } from "@/components/design-system/Icon";
 import { Chapter19FallbackImage } from "@/components/media/Chapter19FallbackImage";
 import { ch19Background } from "@/utils/ch19";
 import { getLabel, type RepairedLabelDetail } from "@/services/repaired/client";
+import { releaseUrl } from "@/utils/releaseUrl";
 
 function releaseTypeBadge(type: string) {
   const t = type.toLowerCase();
@@ -157,7 +158,7 @@ export default function LabelDetail() {
                   {sortedReleases.map((release) => (
                     <Link
                       key={release.slug}
-                      to={`/releases/${release.slug}`}
+                      to={releaseUrl({ slug: release.slug, artist: release.artistName || label.name })}
                       className="group overflow-hidden rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] transition-all hover:border-[var(--wk-brand)]"
                     >
                       <div className="relative aspect-square bg-[var(--wk-surface-raised)]">

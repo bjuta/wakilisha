@@ -1,5 +1,6 @@
 import { useMemo, useState, useCallback, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { releaseUrl } from "@/utils/releaseUrl";
 import {
   type RegistryEntityType,
   type RegistryEntitySchema,
@@ -816,7 +817,7 @@ export default function RegistryEntityEditorDrawer({
                         <div className="flex flex-wrap items-center gap-2">
                           {entity.slug && (
                             <a
-                              href={`/releases/${entity.slug}`}
+                              href={releaseUrl({ slug: String(entity.slug), artist: String(entity.display_name || entity.title || "") })}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="inline-flex items-center gap-1.5 rounded-xl border border-[#dfe4d8] bg-white px-3 py-2 text-[11px] font-bold text-[#171712] hover:border-[#85c441] hover:text-[#5f8f2f] transition-colors"
