@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { WkButton } from "@/components/design-system/primitives/Button";
+import { MetaTags } from "@/components/seo/MetaTags";
 import { getArtist, getArtistAppearsOn, clearDiscographyCache, type RepairedArtistDetail, type RegistryAppearsOnRelease } from "@/services/repairedContent/client";
-import { buildArtistHeroIntro } from "@/services/cultureContext/artistAdapters";
+import { buildArtistHeroIntro, buildArtistSeoDescription } from "@/services/cultureContext/artistAdapters";
 import { ArtistDetailHero } from "./components/ArtistDetailHero";
 import { ArtistChartSection } from "./components/ArtistChartSection";
 import { ArtistDiscography } from "./components/ArtistDiscography";
@@ -78,7 +79,6 @@ export default function ArtistDetail() {
     );
   }
 
-  // Compute debut year from earliest release
   const releaseYears = artist.releases
     .map((r) => (r.releaseDate ? parseInt(r.releaseDate.split("-")[0], 10) : 0))
     .filter((y) => y > 0);
@@ -92,10 +92,17 @@ export default function ArtistDetail() {
   const hasBio = artist.bio || artist.fullBio;
   const hasVideos = artist.videos && artist.videos.length > 0;
   const heroBio = buildArtistHeroIntro(artist) || cleanBioExcerpt(artist.fullBio || artist.bio || "");
+  const seoDescription = buildArtistSeoDescription(artist);
 
   return (
     <div className="wk-app-shell">
-      {/* Hero */}
+      <MetaTags
+        title={`${artist.name} on WAKILISHA`}
+        description={seoDescription}
+        imageUrl={artist.profileImageUrl || artist.imageUrl}
+        type="website"
+      />
+
       <ArtistDetailHero
         name={artist.name}
         imageUrl={artist.imageUrl}
@@ -111,12 +118,8 @@ export default function ArtistDetail() {
         chartEntryCount={artist.chartEntries.length}
       />
 
-
-
-      {/* Main Content — full width */}
       <div className="wk-container px-6 py-10 md:py-14">
         <div className="space-y-14 md:space-y-16 max-w-5xl">
-          {/* Bio */}
           {hasBio && (
             <ArtistBioSection
               bio={artist.bio}
@@ -130,12 +133,10 @@ export default function ArtistDetail() {
             />
           )}
 
-          {/* Top Songs */}
           {hasTopSongs && (
             <ArtistTopSongs songs={artist.topSongs} />
           )}
 
-          {/* Discography */}
           {hasReleases && (
             <ArtistDiscography
               releases={artist.releases}
@@ -147,7 +148,6 @@ export default function ArtistDetail() {
             />
           )}
 
-          {/* Appears On */}
           {hasAppearsOn && (
             <ArtistDiscography
               releases={appearsOn}
@@ -159,18 +159,15 @@ export default function ArtistDetail() {
             />
           )}
 
-          {/* Videos */}
           {hasVideos && (
             <ArtistVideos videos={artist.videos} />
           )}
 
-          {/* Chart Entries */}
           {hasChartEntries && (
             <ArtistChartSection entries={artist.chartEntries} />
           )}
         </div>
 
-        {/* Related Artists — full width below */}
         {hasRelated && (
           <div className="mt-14 md:mt-16">
             <RelatedArtistsShelf artists={artist.relatedArtists} />
