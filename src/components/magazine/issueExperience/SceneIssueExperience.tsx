@@ -9,18 +9,12 @@ export function SceneIssueExperience(props: IssueExperienceComponentProps) {
   return (
     <div className="mag-issue-experience mag-issue-experience-scene">
       <IssueOpening issue={issue} experience={experience} eyebrow="Scene issue" />
-      <section className="magazine-spread mag-reveal" id={`${issue.id}-enter-the-room`}>
-        <div className="mag-guide">
-          <div className="mag-guide-hero">
-            <div>
-              <div className="magazine-meta">Enter the room</div>
-              <h2 className="mag-guide-title">Rooms, routes, stages and the people inside them.</h2>
-            </div>
-          </div>
-          <div className="mag-guide-body">
-            <p>{experience.readerPromise}</p>
-            <p>{experience.visualPromise}</p>
-          </div>
+      <section className="mag-issue-zone mag-reveal mag-experience-room mag-scene-room" id={`${issue.id}-enter-the-room`}>
+        <div className="mag-room-inner">
+          <div className="magazine-meta">Enter the room</div>
+          <h2>Rooms, routes, stages and the people inside them.</h2>
+          <p>{experience.readerPromise}</p>
+          <p>{experience.visualPromise}</p>
         </div>
       </section>
       <IssuePath issue={issue} experience={experience} />
