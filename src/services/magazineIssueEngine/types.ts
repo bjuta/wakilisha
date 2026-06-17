@@ -189,10 +189,18 @@ export type MagazineIssueFeatureFrame = {
   routeLabel?: string;
   titlePrefix?: string;
   imageCaption?: string;
+  /** Reader-facing note. This is safe to render on public issue pages. */
   publicFieldNote: string;
+  /** Internal design note. This is for admin/review tooling, never public issue UI. */
   adminDesignNote: string;
-  /** @deprecated Public compatibility alias. Prefer publicFieldNote. */
+  /** @deprecated Public compatibility alias for older issue UI. Prefer publicFieldNote. */
   fieldNote: string;
+};
+
+export type MagazineIssueAdminNotes = {
+  featureDesign: string;
+  quality: string;
+  scoring: string[];
 };
 
 export type MagazineIssueExperience = {
@@ -221,6 +229,7 @@ export type MagazineIssueExperience = {
   readingPath: ReadingPathStep[];
   signalReading: string;
   adminQualityNote: string;
+  adminNotes: MagazineIssueAdminNotes;
   warnings: string[];
   factsUsed: string[];
   version: string;
