@@ -9,8 +9,8 @@ export function MemoryIssueExperience(props: IssueExperienceComponentProps) {
   return (
     <div className="mag-issue-experience mag-issue-experience-memory">
       <IssueOpening issue={issue} experience={experience} eyebrow="Memory issue" />
-      <section className="magazine-spread mag-reveal mag-quote-only" id={`${issue.id}-memory-fragments`}>
-        <div className="mag-quote-inner">
+      <section className="mag-issue-zone mag-reveal mag-experience-room mag-memory-room" id={`${issue.id}-memory-fragments`}>
+        <div className="mag-room-inner">
           <div className="magazine-meta">What refuses to disappear</div>
           <blockquote>{experience.readerPromise}</blockquote>
           <p>{experience.visualPromise}</p>
