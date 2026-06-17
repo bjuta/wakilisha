@@ -11,20 +11,19 @@ type IssueOpeningProps = {
 export function IssueOpening({ issue, experience, eyebrow }: IssueOpeningProps) {
   const lead = issue.articles[0];
   const coverImage = issue.articles.find((article) => article.heroUrl)?.heroUrl;
+  const entryPoints = issue.articles.slice(0, 4);
 
   return (
-    <section className="magazine-spread mag-reveal mag-issue-opening" id={`${issue.id}-opening`}>
+    <section className="mag-issue-zone mag-reveal mag-issue-opening" id={`${issue.id}-opening`}>
       {coverImage && <img className="mag-cover-trace" src={coverImage} alt="" loading="eager" />}
-      <div className="mag-cover-inner">
-        <div className="mag-cover-masthead">
-          <div className="magazine-meta">WAKILISHA Magazine</div>
-          <div className="magazine-meta">{issue.issueLabel}</div>
+      <div className="mag-entry-inner">
+        <div className="mag-entry-kicker">
+          <span>{eyebrow ?? experience.archetypeLabel}</span>
+          <span>{issue.issueLabel}</span>
         </div>
 
-        <div className="mag-cover-center">
-          <div className="mag-cover-eyebrow magazine-meta">
-            {eyebrow ?? experience.archetypeLabel}
-          </div>
+        <div className="mag-entry-center">
+          <div className="mag-entry-eyebrow magazine-meta">{experience.issueCta}</div>
           <h1 className="mag-cover-title">{issue.title}</h1>
           <p className="mag-cover-deck">{experience.coverLine || issue.deck}</p>
           <p className="mag-note-open" style={{ marginTop: 24 }}>
@@ -32,19 +31,19 @@ export function IssueOpening({ issue, experience, eyebrow }: IssueOpeningProps) 
           </p>
         </div>
 
-        <div className="mag-cover-foot">
-          <div className="mag-cover-bills">
-            {issue.articles.slice(0, 4).map((article, index) => (
-              <Link key={article.slug} to={`/magazine/${article.slug}`} className="mag-cover-bill">
-                <span className="n magazine-meta">{String(index + 1).padStart(2, '0')}</span>
+        <div className="mag-entry-footer">
+          <div className="mag-entry-grid" aria-label="Entry points into this issue">
+            {entryPoints.map((article) => (
+              <Link key={article.slug} to={`/magazine/${article.slug}`} className="mag-entry-card">
+                <span className="mag-entry-card-label">Enter here</span>
                 <span>{article.title}</span>
               </Link>
             ))}
           </div>
           {lead && (
-            <Link to={`/magazine/${lead.slug}`} className="mag-cover-coords magazine-meta">
-              {experience.issueCta}
-              <br />Start with {lead.title}
+            <Link to={`/magazine/${lead.slug}`} className="mag-entry-start">
+              <span>{experience.issueCta}</span>
+              <strong>Start with {lead.title}</strong>
             </Link>
           )}
         </div>
