@@ -7,11 +7,9 @@ export function buildSearchSnippet(context: MagazineIssueRecipeContext): string 
   if (facts.thinness === 'thin') return trimToWords(`Small issue led by ${quoteTitle(facts.topArticle?.title)}.`, 22);
 
   const base = buildCardBlurb(context);
-  const suffix = score.archetype === 'systemsIssue'
-    ? ' Useful for readers following rights, platforms and ownership.'
-    : score.archetype === 'listeningIssue'
-      ? ' Useful for readers following music, records and scenes.'
-      : '';
+  const suffix = score.archetype === 'mixedCultureIssue'
+    ? ' Useful for readers following the wider culture map.'
+    : ` Useful for readers looking for ${score.profile.publicName}.`;
 
   return trimToWords(`${base}${suffix}`, 34);
 }
