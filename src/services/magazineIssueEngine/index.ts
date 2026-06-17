@@ -14,7 +14,7 @@ import { buildSearchSnippet } from './recipes/search';
 import { buildSeoDescription } from './recipes/seo';
 import { buildAdminQualityNote } from './recipes/admin';
 
-export const MAGAZINE_ISSUE_ENGINE_VERSION = 'magazine-issue-engine.v0.2.0';
+export const MAGAZINE_ISSUE_ENGINE_VERSION = 'magazine-issue-engine.v0.3.0';
 
 function sanitizeFeatureFrame(frame: MagazineIssueFeatureFrame): MagazineIssueFeatureFrame {
   const publicFieldNote = sanitizePublicIssueCopy(frame.publicFieldNote);
