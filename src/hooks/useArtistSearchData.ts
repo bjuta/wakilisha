@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { buildArtistSearchSnippet } from "@/services/cultureContext/artistAdapters";
+import { normalizeCountry } from "@/services/cultureContext/formatters";
 
 export interface ArtistSearchItem {
   slug: string;
@@ -37,7 +38,7 @@ export function useArtistSearchData() {
         const mapped: ArtistSearchItem[] = (artists || []).map((a) => {
           const meta = (a.metadata as Record<string, unknown>) || {};
           const genres = Array.isArray(meta.genres) ? (meta.genres as string[]) : [];
-          const country = typeof meta.country === "string" ? meta.country : undefined;
+          const country = typeof meta.country === "string" ? normalizeCountry(meta.country) : undefined;
           const item = {
             slug: a.slug,
             name: a.display_name,
