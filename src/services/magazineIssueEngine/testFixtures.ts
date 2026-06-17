@@ -1,0 +1,76 @@
+import type { MagazineIssue, MagazineIssueArticle } from '../magazineIssues';
+
+const baseDate = new Date('2026-01-15T12:00:00Z');
+
+function article(overrides: Partial<MagazineIssueArticle> & Pick<MagazineIssueArticle, 'title' | 'canonicalSection'>): MagazineIssueArticle {
+  const slug = overrides.slug ?? overrides.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  return {
+    id: overrides.id ?? slug,
+    slug,
+    title: overrides.title,
+    section: overrides.section ?? overrides.canonicalSection,
+    author: overrides.author ?? 'WAKILISHA Editorial',
+    date: overrides.date ?? '2026-01-15',
+    readingTime: overrides.readingTime ?? 4,
+    heroUrl: overrides.heroUrl ?? '',
+    dek: overrides.dek ?? `${overrides.title} opens a thread inside the issue.`,
+    body: overrides.body ?? [],
+    contentHtml: overrides.contentHtml ?? '',
+    tags: overrides.tags ?? [],
+    relatedEntities: overrides.relatedEntities ?? [],
+    isFeatured: overrides.isFeatured ?? false,
+    readCount: overrides.readCount ?? 0,
+    mediaAssets: overrides.mediaAssets ?? [],
+    sourceDate: overrides.sourceDate ?? baseDate,
+    score: overrides.score ?? 48,
+    role: overrides.role ?? 'core',
+    canonicalSection: overrides.canonicalSection,
+    staleReason: overrides.staleReason,
+  };
+}
+
+function issue(issueNumber: number, title: string, articles: MagazineIssueArticle[]): MagazineIssue {
+  return {
+    id: `issue-${issueNumber}`,
+    issueNumber,
+    issueLabel: `Issue ${String(issueNumber).padStart(3, '0')}`,
+    slug: `issue-${String(issueNumber).padStart(3, '0')}`,
+    title,
+    subtitle: articles[0]?.canonicalSection ?? 'Field Notes',
+    deck: `${title} gathers the strongest thread in this issue.`,
+    sourceStartDate: baseDate,
+    sourceEndDate: baseDate,
+    sourceWindowLabel: 'Jan 2026',
+    status: 'published',
+    coverTheme: title.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+    primaryVerticals: Array.from(new Set(articles.map((item) => item.canonicalSection))).slice(0, 3),
+    articles,
+    excludedArticles: [],
+    spreads: [],
+    generatedFromRange: true,
+  };
+}
+
+export const magazineIssueEngineFixtures = {
+  listeningIssue: issue(2, 'After the Speakers Cool', [
+    article({ title: 'The Song That Held the Room', canonicalSection: 'The Sound of Now', tags: ['music', 'song'], score: 64, heroUrl: '/fixture/song.jpg' }),
+    article({ title: 'The Record Everyone Returned To', canonicalSection: 'On Record', tags: ['album', 'review'], score: 58 }),
+    article({ title: 'A DJ Set Became the Map', canonicalSection: 'The Sound of Now', tags: ['dj', 'playlist'], score: 52 }),
+  ]),
+  sceneIssue: issue(3, 'The Scene Had an Address', [
+    article({ title: 'The Room That Changed the Weekend', canonicalSection: 'The Scene Is a Place', tags: ['venue', 'city'], score: 66, heroUrl: '/fixture/room.jpg' }),
+    article({ title: 'A Festival Found Its People', canonicalSection: 'The Scene Is a Place', tags: ['festival'], score: 57 }),
+    article({ title: 'Nairobi Kept the Receipts', canonicalSection: 'The Scene Is a Place', tags: ['nairobi', 'scene'], score: 50 }),
+  ]),
+  systemsIssue: issue(4, 'The Machinery Beneath Culture', [
+    article({ title: 'Who Owns the Platform Now', canonicalSection: 'Systems & Futures', tags: ['platform', 'rights'], score: 68 }),
+    article({ title: 'Copyright Came for the Chorus', canonicalSection: 'Systems & Futures', tags: ['copyright', 'policy'], score: 62 }),
+  ]),
+  memoryIssue: issue(5, 'What Refuses to Disappear', [
+    article({ title: 'The Language That Carried Home', canonicalSection: 'Books, Language, Memory', tags: ['language', 'memory'], score: 63 }),
+    article({ title: 'A Book Kept the Door Open', canonicalSection: 'Books, Language, Memory', tags: ['book', 'archive'], score: 56 }),
+  ]),
+  thinIssue: issue(6, 'A Small Record Survives', [
+    article({ title: 'One Story Worth Holding', canonicalSection: 'Field Notes', score: 42 }),
+  ]),
+};
