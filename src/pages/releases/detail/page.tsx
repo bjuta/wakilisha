@@ -2,10 +2,10 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkButton } from "@/components/design-system/primitives/Button";
-import { ShareButton } from "@/components/design-system/share/ShareSheet";
 import { MetaTags } from "@/components/seo/MetaTags";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
 import { getRelease, listReleases, releaseUrl, slugify, type RepairedReleaseDetail, type RepairedRelease } from "@/services/repairedContent/client";
+import { buildReleaseSeoDescription, releaseEmptyStateCopy } from "@/services/cultureContext/releaseAdapters";
 import ReleaseDetailHero from "./components/ReleaseDetailHero";
 import ReleaseTracklist from "./components/ReleaseTracklist";
 import ReleaseMetadata from "./components/ReleaseMetadata";
@@ -25,7 +25,7 @@ export default function ReleaseDetail() {
   const load = useCallback(async () => {
     if (!artistSlug || !releaseSlug) {
       setStatus("error");
-      setError("No release slug provided");
+      setError("We need an artist and release before we can open this shelf.");
       return;
     }
     setStatus("loading");
@@ -48,7 +48,7 @@ export default function ReleaseDetail() {
       console.error("Release fetch failed:", err);
     }
     setStatus("error");
-    setError("This release does not exist in the WAKILISHA catalog.");
+    setError("We do not have this release page ready yet.");
   }, [artistSlug, releaseSlug]);
 
   useEffect(() => {
@@ -64,21 +64,22 @@ export default function ReleaseDetail() {
       <main className="min-h-screen flex items-center justify-center bg-[var(--wk-bg)]">
         <div className="text-center">
           <i className="ri-album-line mb-4 block text-5xl text-[var(--wk-text-faint)] animate-pulse" />
-          <p className="text-[15px] font-semibold text-[var(--wk-text-muted)]">Loading release…</p>
+          <p className="text-[15px] font-semibold text-[var(--wk-text-muted)]">Opening release...</p>
         </div>
       </main>
     );
   }
 
   if (status === "error" || !release) {
+    const empty = releaseEmptyStateCopy(false);
     return (
       <main className="min-h-screen wk-container px-6 py-20">
         <div className="max-w-md mx-auto text-center">
           <i className="ri-album-line mb-4 block text-5xl text-[var(--wk-text-faint)]" />
-          <h1 className="wk-h-section mb-2">Release not found</h1>
-          <p className="text-[var(--wk-text-muted)]">{error || "This release does not exist in the catalog."}</p>
-          <Link to="/" className="mt-6 inline-block">
-            <WkButton variant="primary">Return home</WkButton>
+          <h1 className="wk-h-section mb-2">{empty.title}</h1>
+          <p className="text-[var(--wk-text-muted)]">{error || empty.body}</p>
+          <Link to="/releases" className="mt-6 inline-block">
+            <WkButton variant="primary">{empty.action}</WkButton>
           </Link>
         </div>
       </main>
@@ -87,13 +88,14 @@ export default function ReleaseDetail() {
 
   const minutes = release.totalDuration ? Math.round(release.totalDuration / 60) : release.trackCount * 3;
   const chartStats = release.chartStats;
+  const seoDescription = buildReleaseSeoDescription(release);
 
   return (
     <main className="min-h-screen bg-[var(--wk-bg)]">
       {/* SEO */}
       <MetaTags
         title={`${release.title} by ${release.artist}`}
-        description={release.description || `${release.title} is a ${release.releaseType} by ${release.artist}, released in ${release.year}.`}
+        description={seoDescription}
         imageUrl={release.artworkUrl}
         type="music.album"
         artistName={release.artist}
@@ -111,16 +113,16 @@ export default function ReleaseDetail() {
             {/* Editorial Excerpt */}
             <ReleaseExcerpt release={release} />
 
-            {/* Chart Performance — if release tracks have chart data */}
+            {/* Chart Performance if release tracks have chart data */}
             {chartStats && chartStats.totalChartAppearances > 0 && (
               <section className="border border-[var(--wk-border)] rounded-2xl bg-[var(--wk-surface)] p-5 md:p-6">
                 <div className="flex items-center gap-3 mb-5">
                   <div className="inline-flex items-center gap-2 rounded-full border border-[var(--wk-brand)]/20 bg-[var(--wk-brand-soft)]/40 px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.18em] text-[var(--wk-brand)]">
                     <WkIcon name="BarChart3" size={12} />
-                    Chart impact
+                    Chart moments
                   </div>
                   <h2 className="text-[18px] md:text-[22px] font-black text-[var(--wk-text)] tracking-[-0.02em]">
-                    Registry-measured chart presence
+                    How this release moved
                   </h2>
                 </div>
                 <div className="grid grid-cols-3 gap-3">
@@ -129,7 +131,7 @@ export default function ReleaseDetail() {
                       {chartStats.totalChartAppearances}
                     </div>
                     <div className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-[var(--wk-text-faint)] mt-2">
-                      Total chart entries
+                      Chart moments
                     </div>
                   </div>
                   {chartStats.topPeakPosition != null && (
@@ -138,7 +140,7 @@ export default function ReleaseDetail() {
                         #{chartStats.topPeakPosition}
                       </div>
                       <div className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-[var(--wk-text-faint)] mt-2">
-                        Best chart position
+                        Highest position
                       </div>
                     </div>
                   )}
@@ -147,7 +149,7 @@ export default function ReleaseDetail() {
                       {chartStats.totalWeeksOnChart}
                     </div>
                     <div className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-[var(--wk-text-faint)] mt-2">
-                      Weeks on chart
+                      Weeks here
                     </div>
                   </div>
                 </div>
@@ -181,7 +183,7 @@ export default function ReleaseDetail() {
                     </div>
                     <div className="text-[18px] font-extrabold text-[var(--wk-text)]">{release.artist}</div>
                     <div className="text-[12px] font-semibold text-[var(--wk-text-muted)] mt-1">
-                      Primary artist on this release
+                      Start here if this release put you on.
                     </div>
                   </div>
                   <Link
