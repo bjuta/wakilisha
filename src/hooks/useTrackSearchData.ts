@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import { buildTrackCardBlurb } from "@/services/cultureContext/trackAdapters";
 
 export interface TrackSearchItem {
   slug: string;
@@ -10,6 +11,7 @@ export interface TrackSearchItem {
   isPlayable: boolean;
   source: string;
   label: string;
+  contextText: string;
 }
 
 export function useTrackSearchData() {
@@ -98,15 +100,19 @@ export function useTrackSearchData() {
         const mapped: TrackSearchItem[] = tracks.map((t) => {
           const artistInfo = artistByTrackId[t.id];
           const artistSlug = artistInfo?.slug || "";
+          const artist = artistInfo?.name || "Unknown";
+          const genre = artistGenreMap[artistSlug] || "";
+          const label = t.release_id ? (releaseLabelMap[t.release_id] || "") : "";
           return {
             slug: t.slug,
             title: t.title,
-            artist: artistInfo?.name || "Unknown",
-            genre: artistGenreMap[artistSlug] || "",
+            artist,
+            genre,
             artworkUrl: t.artwork_url || "",
             isPlayable: !!t.preview_url,
             source: "apple_music",
-            label: t.release_id ? (releaseLabelMap[t.release_id] || "") : "",
+            label,
+            contextText: buildTrackCardBlurb({ title: t.title, artist, genre, label, isPlayable: !!t.preview_url }),
           };
         });
 
