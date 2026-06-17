@@ -2,8 +2,10 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { Chapter19FallbackImage } from "@/components/media/Chapter19FallbackImage";
+import { MetaTags } from "@/components/seo/MetaTags";
 import { ch19Background } from "@/utils/ch19";
 import { getLabel, type RepairedLabelDetail } from "@/services/repaired/client";
+import { buildLabelHeroIntro, buildLabelSeoDescription } from "@/services/cultureContext/labelAdapters";
 import { releaseUrl } from "@/utils/releaseUrl";
 
 function releaseTypeBadge(type: string) {
@@ -79,11 +81,17 @@ export default function LabelDetail() {
   const { label, roster, releases, relatedLabels } = detail;
   const heroBg = ch19Background({ slug: label.slug, name: label.name });
   const sortedReleases = [...releases].sort((a, b) => (b.releaseDate || "").localeCompare(a.releaseDate || ""));
+  const labelIntro = buildLabelHeroIntro(detail) || label.description || "";
+  const seoDescription = buildLabelSeoDescription(detail);
 
   return (
     <main className="min-h-screen bg-[var(--wk-bg)]">
+      <MetaTags
+        title={`${label.name} on WAKILISHA`}
+        description={seoDescription}
+        type="website"
+      />
 
-      {/* ═══════════ HERO ═══════════ */}
       <section className="relative -mt-16 pt-16 flex min-h-[320px] items-end overflow-hidden md:min-h-[460px]">
         <div className="absolute inset-0" style={{ background: heroBg }} />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/35 to-transparent" />
@@ -98,8 +106,8 @@ export default function LabelDetail() {
             <div className="flex flex-col gap-3 md:flex-row md:items-end md:gap-6">
               <div className="min-w-0 flex-1">
                 <h1 className="font-black leading-[0.88] tracking-[-0.04em] text-white" style={{ fontSize: "clamp(34px, 6vw, 76px)" }}>{label.name}</h1>
-                {label.description && (
-                  <p className="mt-3 max-w-[580px] text-[14px] leading-relaxed text-white/55 md:text-[16px] line-clamp-2 md:line-clamp-none">{label.description}</p>
+                {labelIntro && (
+                  <p className="mt-3 max-w-[580px] text-[14px] leading-relaxed text-white/55 md:text-[16px] line-clamp-2 md:line-clamp-none">{labelIntro}</p>
                 )}
               </div>
               <div className="flex shrink-0 items-center gap-3 self-start md:self-end">
@@ -126,8 +134,6 @@ export default function LabelDetail() {
 
       <div className="mx-auto max-w-[1100px] px-4 py-10 md:px-8 md:py-14">
         <div className="space-y-14">
-
-          {/* ═══════════ TAB SWITCHER ═══════════ */}
           <div className="flex gap-0 overflow-x-auto border-b border-[var(--wk-divider)]">
             <button
               onClick={() => setActiveTab("releases")}
@@ -145,13 +151,12 @@ export default function LabelDetail() {
             </button>
           </div>
 
-          {/* ═══════════ RELEASE CATALOG ═══════════ */}
           {activeTab === "releases" && (
             <section>
               {sortedReleases.length === 0 ? (
                 <div className="py-12 text-center">
                   <WkIcon name="Disc" size={36} className="mx-auto mb-3 text-[var(--wk-text-faint)]" />
-                  <p className="text-[14px] text-[var(--wk-text-muted)]">No releases catalogued yet.</p>
+                  <p className="text-[14px] text-[var(--wk-text-muted)]">No releases here yet.</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
@@ -191,7 +196,6 @@ export default function LabelDetail() {
             </section>
           )}
 
-          {/* ═══════════ ROSTER ═══════════ */}
           {activeTab === "roster" && (
             <section>
               {roster.length === 0 ? (
@@ -225,7 +229,6 @@ export default function LabelDetail() {
             </section>
           )}
 
-          {/* ═══════════ COUNTRY CONTEXT ═══════════ */}
           {label.countryCode && (
             <section>
               <h2 className="mb-4 text-[11px] font-black uppercase tracking-[0.18em] text-[var(--wk-text-muted)]">Country context</h2>
@@ -238,7 +241,7 @@ export default function LabelDetail() {
                     <h3 className="text-[16px] font-bold text-[var(--wk-text)]">Based in {label.countryCode.toUpperCase()}</h3>
                     <p className="mt-1 text-[14px] leading-relaxed text-[var(--wk-text-muted)]">
                       {label.name} operates from {label.countryCode.toUpperCase()}
-                      {releases.length > 0 && ` with ${releases.length} catalogued release${releases.length === 1 ? "" : "s"}`}
+                      {releases.length > 0 && ` with ${releases.length} release${releases.length === 1 ? "" : "s"}`}
                       {roster.length > 0 && ` across ${roster.length} artist${roster.length === 1 ? "" : "s"}`}.
                     </p>
                   </div>
@@ -247,7 +250,6 @@ export default function LabelDetail() {
             </section>
           )}
 
-          {/* ═══════════ RELATED LABELS ═══════════ */}
           {relatedLabels.length > 0 && (
             <section>
               <div className="mb-5 flex items-center gap-3">
@@ -268,7 +270,6 @@ export default function LabelDetail() {
             </section>
           )}
 
-          {/* ═══════════ BROWSE ALL ═══════════ */}
           <div className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-6 md:p-8">
             <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -285,7 +286,6 @@ export default function LabelDetail() {
               </div>
             </div>
           </div>
-
         </div>
       </div>
     </main>
