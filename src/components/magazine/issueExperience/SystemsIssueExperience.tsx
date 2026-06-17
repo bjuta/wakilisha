@@ -18,16 +18,19 @@ export function SystemsIssueExperience(props: IssueExperienceComponentProps) {
           <h2>Rights, platforms, money, rules and the beautiful work caught inside them.</h2>
           <p>{experience.readerPromise}</p>
           <div className="mag-claim-grid" aria-label="Claims and receipts in this issue">
-            {claims.map((article) => (
-              <details className="mag-claim-card" key={article.slug}>
-                <summary>
-                  <span className="mag-claim-chip">Claim</span>
-                  <strong>{article.title}</strong>
-                </summary>
-                <p>{article.dek || `Follow this piece to see how the ${article.section.toLowerCase()} thread works underneath.`}</p>
-                <Link to={`/magazine/${article.slug}`}>Open the receipt</Link>
-              </details>
-            ))}
+            {claims.map((article) => {
+              const section = article.section || article.canonicalSection || 'culture';
+              return (
+                <details className="mag-claim-card" key={article.slug}>
+                  <summary>
+                    <span className="mag-claim-chip">Claim</span>
+                    <strong>{article.title}</strong>
+                  </summary>
+                  <p>{article.dek || `Follow this piece to see how the ${section.toLowerCase()} thread works underneath.`}</p>
+                  <Link to={`/magazine/${article.slug}`}>Open the receipt</Link>
+                </details>
+              );
+            })}
           </div>
         </div>
       </section>
