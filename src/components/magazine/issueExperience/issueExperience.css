@@ -1,0 +1,73 @@
+.mag-issue-experience-shell {
+  min-height: 100vh;
+}
+
+.mag-issue-experience {
+  position: relative;
+}
+
+.mag-issue-experience .mag-cover-bill,
+.mag-issue-experience .mag-chart-row,
+.mag-issue-experience .mag-toc-line {
+  transition: transform 220ms ease, border-color 220ms ease, color 220ms ease, background 220ms ease;
+}
+
+.mag-issue-experience .mag-cover-bill:hover,
+.mag-issue-experience .mag-chart-row:hover,
+.mag-issue-experience .mag-toc-line:hover {
+  transform: translateX(8px);
+  border-color: var(--mag-accent);
+}
+
+.mag-issue-experience-listening {
+  --issue-pulse: 0 0 36px color-mix(in srgb, var(--mag-accent) 24%, transparent);
+}
+
+.mag-issue-experience-listening .mag-cover-title,
+.mag-issue-experience-record-review .mag-cover-title {
+  text-shadow: var(--issue-pulse, none);
+}
+
+.mag-issue-experience-scene .mag-guide,
+.mag-issue-experience-field-guide .mag-guide {
+  border-color: color-mix(in srgb, var(--mag-accent) 42%, var(--mag-rule));
+}
+
+.mag-issue-experience-systems .mag-finding,
+.mag-issue-experience-argument .mag-finding {
+  border-color: var(--mag-accent);
+}
+
+.mag-issue-experience-memory .mag-quote-inner,
+.mag-issue-experience-image .mag-spread-photo-essay {
+  isolation: isolate;
+}
+
+.mag-issue-experience-image .mag-spread-photo-essay a {
+  transition: transform 320ms ease, filter 320ms ease;
+}
+
+.mag-issue-experience-image .mag-spread-photo-essay a:hover {
+  transform: scale(1.015);
+  filter: saturate(1.08);
+}
+
+.mag-issue-experience-thin .mag-note {
+  min-height: 72vh;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mag-issue-experience .mag-cover-bill,
+  .mag-issue-experience .mag-chart-row,
+  .mag-issue-experience .mag-toc-line,
+  .mag-issue-experience-image .mag-spread-photo-essay a {
+    transition: none;
+  }
+
+  .mag-issue-experience .mag-cover-bill:hover,
+  .mag-issue-experience .mag-chart-row:hover,
+  .mag-issue-experience .mag-toc-line:hover,
+  .mag-issue-experience-image .mag-spread-photo-essay a:hover {
+    transform: none;
+  }
+}
