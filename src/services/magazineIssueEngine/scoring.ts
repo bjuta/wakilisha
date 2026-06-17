@@ -1,4 +1,4 @@
-import type { IssueArchetype, IssueCoverVariant, IssueFacts, IssueMood, IssueScore, EditorNoteMode, FeatureVisualMode } from './types';
+import type { IssueArchetype, IssueCoverVariant, IssueFacts, IssueMood, IssueScore, EditorNoteMode, FeatureVisualMode, IssueSignalName } from './types';
 
 function moodForArchetype(archetype: IssueArchetype): IssueMood {
   switch (archetype) {
@@ -19,7 +19,8 @@ function moodForArchetype(archetype: IssueArchetype): IssueMood {
   }
 }
 
-function coverVariantFor(archetype: IssueArchetype): IssueCoverVariant {
+function coverVariantFor(archetype: IssueArchetype, facts: IssueFacts): IssueCoverVariant {
+  if (facts.hasBalancedMix && archetype === 'mixedCultureIssue') return 'seal-key-visual';
   switch (archetype) {
     case 'systemsIssue':
       return 'signal-grid';
@@ -29,11 +30,11 @@ function coverVariantFor(archetype: IssueArchetype): IssueCoverVariant {
     case 'sceneIssue':
     case 'fieldGuideIssue':
     case 'imageIssue':
-      return 'image-trace';
+      return facts.hasStrongImage ? 'image-trace' : 'type-cover';
     case 'argumentIssue':
       return 'type-cover';
     default:
-      return 'seal-key-visual';
+      return facts.hasStrongImage ? 'image-trace' : 'seal-key-visual';
   }
 }
 
@@ -48,7 +49,7 @@ function featureVisualModeFor(archetype: IssueArchetype, facts: IssueFacts): Fea
     case 'imageIssue':
       return facts.hasStrongImage ? 'photo-led' : 'type-led';
     case 'argumentIssue':
-      return 'type-led';
+      return facts.hasStrongImage ? 'photo-led' : 'type-led';
     case 'sceneIssue':
     case 'fieldGuideIssue':
       return facts.hasStrongImage ? 'photo-led' : 'archive-board';
@@ -66,35 +67,57 @@ function editorNoteModeFor(archetype: IssueArchetype, facts: IssueFacts): Editor
   return 'letter';
 }
 
+function signalScore(facts: IssueFacts, signal: IssueSignalName): number {
+  return facts.signalScores.find((item) => item.signal === signal)?.score ?? 0;
+}
+
+function signalCount(facts: IssueFacts, signal: IssueSignalName): number {
+  return facts.signalScores.find((item) => item.signal === signal)?.count ?? 0;
+}
+
 export function scoreIssueArchetype(facts: IssueFacts): IssueScore {
   const scores: Record<IssueArchetype, number> = {
-    listeningIssue: facts.clusters.sound.length * 4 + (facts.hasStrongSound ? 5 : 0),
-    sceneIssue: facts.clusters.scene.length * 5 + (facts.hasStrongPlace ? 4 : 0),
-    recordReviewIssue: facts.clusters.review.length * 5 + (facts.hasStrongReview ? 4 : 0),
-    fieldGuideIssue: facts.clusters.guide.length * 5 + (facts.hasStrongGuide ? 4 : 0),
-    memoryIssue: facts.clusters.memory.length * 6 + (facts.hasStrongMemory ? 4 : 0),
-    systemsIssue: facts.clusters.systems.length * 6 + (facts.hasStrongSystems ? 5 : 0),
-    imageIssue: facts.clusters.image.length * 3 + (facts.hasStrongImage ? 4 : 0),
-    argumentIssue: facts.clusters.argument.length * 6 + (facts.hasStrongArgument ? 4 : 0),
-    mixedCultureIssue: Math.max(2, facts.sectionMix.length * 2),
-    thinIssue: facts.thinness === 'thin' ? 99 : 0,
+    listeningIssue: signalScore(facts, 'sound') + (facts.hasStrongSound ? 12 : 0),
+    sceneIssue: signalScore(facts, 'scene') + (facts.hasStrongPlace ? 12 : 0),
+    recordReviewIssue: signalScore(facts, 'review') + (facts.hasStrongReview ? 10 : 0),
+    fieldGuideIssue: signalScore(facts, 'guide') + (facts.hasStrongGuide ? 12 : 0),
+    memoryIssue: signalScore(facts, 'memory') + (facts.hasStrongMemory ? 12 : 0),
+    systemsIssue: signalScore(facts, 'systems') + (facts.hasStrongSystems ? 14 : 0),
+    imageIssue: signalScore(facts, 'image') + (facts.hasStrongImage ? 8 : 0),
+    argumentIssue: signalScore(facts, 'argument') + (facts.hasStrongArgument ? 12 : 0),
+    mixedCultureIssue: Math.max(2, facts.sectionEntropy * 12 + facts.sectionMix.length * 3 + (facts.hasBalancedMix ? 18 : 0)),
+    thinIssue: facts.thinness === 'thin' ? 999 : 0,
   };
 
   if (facts.issueNumber === 1) {
-    scores.mixedCultureIssue += 30;
+    scores.mixedCultureIssue += 80;
+  }
+
+  if (facts.hasSingleDominantSection) {
+    scores.mixedCultureIssue -= 8;
+  }
+
+  if (facts.primarySignal?.signal === 'image' && facts.secondarySignal) {
+    scores.imageIssue += 6;
+  }
+
+  if (signalCount(facts, 'review') >= 2 && signalScore(facts, 'review') >= signalScore(facts, 'sound') * 0.7) {
+    scores.recordReviewIssue += 14;
   }
 
   const archetype = Object.entries(scores).sort((a, b) => b[1] - a[1])[0]?.[0] as IssueArchetype;
   const reasons = [
-    `${facts.articleCount} public articles`,
-    facts.dominantSection ? `dominant section: ${facts.dominantSection}` : 'no dominant section',
-    facts.tension ? `tension: ${facts.tension}` : 'no clear tension yet',
+    ...facts.factSummary,
+    facts.readingDoor.article ? `reading door: ${facts.readingDoor.article.title}` : `reading door: ${facts.readingDoor.title}`,
+    facts.topArticleReason ? `lead reason: ${facts.topArticleReason}` : 'no lead reason',
+    `average score: ${facts.averageScore}`,
+    `score spread: ${facts.scoreSpread}`,
   ];
 
   return {
     archetype,
     mood: moodForArchetype(archetype),
-    coverVariant: facts.issueNumber === 1 ? 'seal-key-visual' : coverVariantFor(archetype),
+    coverVariant: facts.issueNumber === 1 ? 'seal-key-visual' : coverVariantFor(archetype, facts),
     editorNoteMode: editorNoteModeFor(archetype, facts),
     featureVisualMode: featureVisualModeFor(archetype, facts),
     reasons,
