@@ -5,6 +5,7 @@ import { useScrollReveal } from "@/hooks/useScrollReveal";
 import { trackUrl } from "@/utils/trackUrl";
 import { getArtistDiscographyFromRegistry } from "@/services/publicContent/client";
 import type { RegistryDiscographyRelease } from "@/services/publicContent/client";
+import { buildTrackCardBlurb } from "@/services/cultureContext/trackAdapters";
 
 interface TrackRelatedTracksProps {
   trackSlug: string;
@@ -180,6 +181,12 @@ export default function TrackRelatedTracks({
 }
 
 function RelatedTrackCard({ track }: { track: RelatedTrack }) {
+  const contextText = buildTrackCardBlurb({
+    title: track.title,
+    artist: track.artist,
+    albumTitle: track.albumTitle,
+  });
+
   return (
     <Link
       to={trackUrl(track.slug, [track.artistSlug])}
@@ -203,10 +210,12 @@ function RelatedTrackCard({ track }: { track: RelatedTrack }) {
       </div>
       <div className="text-[11px] font-semibold text-[var(--wk-text-muted)] truncate mt-0.5">
         {track.artist}
-        {track.albumTitle && track.albumTitle !== track.title && (
-          <span> · {track.albumTitle}</span>
-        )}
       </div>
+      {contextText && (
+        <div className="mt-1 line-clamp-2 text-[10px] font-medium leading-snug text-[var(--wk-text-faint)]">
+          {contextText}
+        </div>
+      )}
       {track.duration && (
         <div className="text-[10px] font-semibold text-[var(--wk-text-faint)] mt-1">
           {track.duration}
