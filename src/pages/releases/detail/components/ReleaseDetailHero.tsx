@@ -3,6 +3,7 @@ import { WkIcon } from "@/components/design-system/Icon";
 import { ShareButton } from "@/components/design-system/share/ShareSheet";
 import { slugify } from "@/services/publicContent/client";
 import type { RepairedReleaseDetail } from "@/services/repairedContent/client";
+import { buildReleaseHeroIntro, buildReleaseSeoDescription } from "@/services/cultureContext/releaseAdapters";
 
 export default function ReleaseDetailHero({
   release,
@@ -20,6 +21,8 @@ export default function ReleaseDetailHero({
 
   const initial = release.title.trim()[0]?.toUpperCase() || "W";
   const canUseArtwork = Boolean(release.artworkUrl && !artworkFailed);
+  const intro = buildReleaseHeroIntro(release);
+  const shareDescription = buildReleaseSeoDescription(release);
 
   return (
     <section className="relative overflow-hidden">
@@ -116,6 +119,11 @@ export default function ReleaseDetailHero({
               )}
             </div>
 
+            {/* Culture Context */}
+            <p className="mt-5 max-w-2xl text-[15px] font-semibold leading-[1.75] text-[var(--wk-text-soft)] md:text-[17px]">
+              {intro}
+            </p>
+
             {/* Featured Artists */}
             {release.featuredArtists && release.featuredArtists.length > 0 && (
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-3 text-[12px] font-semibold text-[var(--wk-text-muted)]">
@@ -176,7 +184,7 @@ export default function ReleaseDetailHero({
                   item={{
                     title: release.title,
                     subtitle: release.artist,
-                    description: `${release.releaseType} by ${release.artist} on WAKILISHA`,
+                    description: shareDescription,
                     imageUrl: release.artworkUrl,
                     type: "album",
                   }}
