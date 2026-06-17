@@ -12,6 +12,7 @@ import { ArgumentIssueExperience } from './ArgumentIssueExperience';
 import { MixedIssueExperience } from './MixedIssueExperience';
 import { ThinIssueExperience } from './ThinIssueExperience';
 import './issueExperience.css';
+import './issueMicrointeractions.css';
 
 export type IssueExperienceComponentProps = {
   issue: MagazineIssue;
