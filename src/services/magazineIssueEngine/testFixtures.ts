@@ -1,4 +1,5 @@
 import type { MagazineIssue, MagazineIssueArticle } from '../magazineIssues';
+import { MAGAZINE_EDITORIAL_PATHS } from './editorialPaths';
 
 const baseDate = new Date('2026-01-15T12:00:00Z');
 
@@ -52,6 +53,18 @@ function issue(issueNumber: number, title: string, articles: MagazineIssueArticl
 }
 
 export const magazineIssueEngineFixtures = {
+  issueOneWithMdxOverrides: {
+    ...issue(1, 'Your People Are Here', [
+      article({ title: 'The Door Into WAKILISHA', canonicalSection: 'The Sound of Now', tags: ['music', 'scene', 'memory'], score: 70, heroUrl: '/fixture/issue-one.jpg' }),
+      article({ title: 'The People Who Carried the Room', canonicalSection: 'The Scene Is a Place', tags: ['scene', 'room'], score: 64 }),
+      article({ title: 'The Language That Stayed With Us', canonicalSection: 'Books, Language, Memory', tags: ['language', 'memory'], score: 58 }),
+    ]),
+    editorialOverrides: {
+      editorNoteMdxPath: MAGAZINE_EDITORIAL_PATHS.editorNote,
+      coverStatementMdxPath: MAGAZINE_EDITORIAL_PATHS.coverStatement,
+      backMatterMdxPath: MAGAZINE_EDITORIAL_PATHS.backMatter,
+    },
+  } as MagazineIssue & { editorialOverrides: Record<string, string> },
   listeningIssue: issue(2, 'After the Speakers Cool', [
     article({ title: 'The Song That Held the Room', canonicalSection: 'The Sound of Now', tags: ['music', 'song'], score: 64, heroUrl: '/fixture/song.jpg' }),
     article({ title: 'A DJ Set Became the Map', canonicalSection: 'The Sound of Now', tags: ['dj', 'playlist'], score: 58 }),
