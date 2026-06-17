@@ -8,6 +8,7 @@ import type { MagazineIssueExperience } from "@/services/magazineIssueEngine";
 import { releaseUrl } from "@/utils/releaseUrl";
 import { SkeletonMagazinePage } from "@/components/skeletons/Skeletons";
 import "../issue/magazineIssue.css";
+import "@/components/magazine/issueExperience/issueMicrointeractions.css";
 
 const MOOD_GRADIENTS: Record<string, { bg: string; accent: string; text: string }> = {
   night: { bg: "linear-gradient(180deg, #0a0c08 0%, #060704 100%)", accent: "#84c241", text: "#ecebe4" },
