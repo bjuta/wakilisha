@@ -244,6 +244,10 @@ function findSection(curated: CuratedContent, types: string[]): ContentSection |
   return (curated.sections || []).find((sec) => types.includes(sec.type) && sec.items && sec.items.length > 0);
 }
 
+function findSectionUnused(curated: CuratedContent, types: string[], consumed: Set<number>): ContentSection | undefined {
+  return (curated.sections || []).find((sec, idx) => types.includes(sec.type) && sec.items && sec.items.length > 0 && !consumed.has(idx));
+}
+
 function genStoryCardRows(items: SectionItem[], origin: string, accent: string): string {
   const s = eH;
   const rows: string[] = [];
@@ -378,20 +382,21 @@ function renderModule(
   curated: CuratedContent,
   origin: string,
   accent: string,
-  branding: Branding
+  branding: Branding,
+  consumed: Set<number>
 ): string {
   const sectionTypes = MODULE_SECTION_MAP[moduleName];
   if (!sectionTypes) return "";
 
-  const usedTypes = new Set<string>();
   const parts: string[] = [];
 
   for (const secType of sectionTypes) {
-    if (usedTypes.has(secType)) continue;
-    usedTypes.add(secType);
-
-    const section = findSection(curated, [secType]);
+    const section = findSectionUnused(curated, [secType], consumed);
     if (!section || !section.items || section.items.length === 0) continue;
+
+    // Mark section index as consumed
+    const secIdx = curated.sections.findIndex((s) => s === section);
+    if (secIdx >= 0) consumed.add(secIdx);
 
     switch (moduleName) {
       case "featured_routes": {
@@ -519,13 +524,8 @@ ${genArtistImageCardRows(section.items, origin, accent)}
         const archiveUrl = `${origin}/guides`;
         parts.push(`<tr><td class="wk-pad" style="padding:36px 48px;border-bottom:1px solid rgba(12,13,10,.08);background:#FAFBF6;">
 <table role="presentation" width="100%"><tr><td class="wk-eyebrow" style="font-family:Arial,sans-serif;font-size:11px;line-height:13px;font-weight:800;letter-spacing:2.2px;text-transform:uppercase;color:${eH(accent)};">From the archive</td><td align="right" style="font-family:Arial,sans-serif;font-size:13px;font-weight:800;"><a href="${eH(archiveUrl)}" style="color:${eH(accent)};">Open archive &rarr;</a></td></tr></table>
-<table role="presentation" width="100%" style="margin-top:18px;background:#FFFFFF;border:1px solid rgba(12,13,10,.12);border-radius:22px;overflow:hidden;">
-<tr><td style="padding:24px;">
-<h2 class="wk-h2" style="margin:0 0 8px;font-family:Arial,sans-serif;font-size:34px;line-height:32px;font-weight:900;letter-spacing:-1.8px;color:#0C0D0A;">${eH(section.title || "From the archive")}</h2>
-<p class="wk-body" style="margin:0;font-family:Arial,sans-serif;font-size:16px;line-height:24px;color:#3F4138;">Deeper explorations from the ${eH(branding.brandName)} library.</p>
-</td></tr>
-</table>
-<div style="height:14px"></div>
+<div style="height:6px"></div>
+<p class="wk-muted" style="margin:0 0 18px;font-family:Arial,sans-serif;font-size:13px;line-height:19px;color:#6B6E62;">${eH(section.title || "Deeper explorations from the archive.")}</p>
 <table role="presentation" width="100%">
 ${genRouteTileRows(section.items, origin, accent)}
 </table>
@@ -680,8 +680,9 @@ ${logoImg}
 `);
 
   // ═══ CATALOG-DRIVEN MODULE LOOP ═══
+  const consumedSections = new Set<number>();
   for (const moduleName of profile.primaryModules) {
-    const html = renderModule(moduleName, curated, origin, accent, branding);
+    const html = renderModule(moduleName, curated, origin, accent, branding, consumedSections);
     if (html) parts.push(html);
   }
 
@@ -1147,25 +1148,118 @@ async function handleCronGenerate(body: any, c: Record<string, string>) {
 function convertLegacyContentToCurated(content: BriefingContent): CuratedContent {
   const sections: ContentSection[] = [];
 
+  // Split articles into multiple sections so different modules can consume them independently
   if (content.articles.length > 0) {
-    sections.push({ title: "Latest Stories", type: "articles", layout: "list", items: content.articles.map((a: any) => ({ slug: a.slug, title: a.title, excerpt: a.excerpt, heroUrl: a.image_url, author: a.author, published_at: a.published_at })) });
+    const half = Math.ceil(content.articles.length / 2);
+    sections.push({
+      title: "Latest Stories",
+      type: "articles",
+      layout: "list",
+      items: content.articles.slice(0, half).map((a: any) => ({
+        slug: a.slug, title: a.title, excerpt: a.excerpt, heroUrl: a.image_url, author: a.author, published_at: a.published_at
+      }))
+    });
+    if (content.articles.length > half) {
+      sections.push({
+        title: "More Stories",
+        type: "articles",
+        layout: "list",
+        items: content.articles.slice(half).map((a: any) => ({
+          slug: a.slug, title: a.title, excerpt: a.excerpt, heroUrl: a.image_url, author: a.author, published_at: a.published_at
+        }))
+      });
+    }
   }
 
+  // Split chart highlights into multiple sections
   if (content.chartHighlights.length > 0) {
-    sections.push({ title: "Chart Watch", type: "charts", layout: "list", items: content.chartHighlights.map((ch: any) => ({ track_title: ch.track_title, artist_name: ch.artist_name, rank: ch.rank, movement: ch.movement, edition_slug: ch.edition_slug, chart_name: ch.chart_name })) });
+    const half = Math.ceil(content.chartHighlights.length / 2);
+    sections.push({
+      title: "Chart Watch",
+      type: "charts",
+      layout: "list",
+      items: content.chartHighlights.slice(0, half).map((ch: any) => ({
+        track_title: ch.track_title, artist_name: ch.artist_name, rank: ch.rank, movement: ch.movement, edition_slug: ch.edition_slug, chart_name: ch.chart_name
+      }))
+    });
+    if (content.chartHighlights.length > half) {
+      sections.push({
+        title: "Chart Movement",
+        type: "charts",
+        layout: "list",
+        items: content.chartHighlights.slice(half).map((ch: any) => ({
+          track_title: ch.track_title, artist_name: ch.artist_name, rank: ch.rank, movement: ch.movement, edition_slug: ch.edition_slug, chart_name: ch.chart_name
+        }))
+      });
+    }
   }
 
+  // Split releases into multiple sections so each module gets its own content
   if (content.newReleases.length > 0) {
-    sections.push({ title: "Fresh Drops", type: "releases", layout: "grid", items: content.newReleases.map((r: any) => ({ slug: r.slug, title: r.title, artist_name: r.artist_name, type: r.type, artwork_url: r.artwork_url, release_date: r.release_date })) });
+    const third = Math.ceil(content.newReleases.length / 3);
+    sections.push({
+      title: "New releases",
+      type: "releases",
+      layout: "grid",
+      items: content.newReleases.slice(0, third).map((r: any) => ({
+        slug: r.slug, title: r.title, artist_name: r.artist_name, type: r.type, artwork_url: r.artwork_url, release_date: r.release_date
+      }))
+    });
+    if (content.newReleases.length > third) {
+      sections.push({
+        title: "Fresh covers",
+        type: "releases",
+        layout: "grid",
+        items: content.newReleases.slice(third, third * 2).map((r: any) => ({
+          slug: r.slug, title: r.title, artist_name: r.artist_name, type: r.type, artwork_url: r.artwork_url, release_date: r.release_date
+        }))
+      });
+    }
+    if (content.newReleases.length > third * 2) {
+      sections.push({
+        title: "More releases",
+        type: "releases",
+        layout: "grid",
+        items: content.newReleases.slice(third * 2).map((r: any) => ({
+          slug: r.slug, title: r.title, artist_name: r.artist_name, type: r.type, artwork_url: r.artwork_url, release_date: r.release_date
+        }))
+      });
+    }
   }
 
+  // Split artists into multiple sections
   if (content.featuredArtists.length > 0) {
-    sections.push({ title: "Artists to Watch", type: "artists", layout: "grid", items: content.featuredArtists.map((a: any) => ({ slug: a.slug, display_name: a.display_name, bio_excerpt: a.bio_excerpt, image_url: a.image_url })) });
+    const half = Math.ceil(content.featuredArtists.length / 2);
+    sections.push({
+      title: "Artists to Watch",
+      type: "artists",
+      layout: "grid",
+      items: content.featuredArtists.slice(0, half).map((a: any) => ({
+        slug: a.slug, display_name: a.display_name, bio_excerpt: a.bio_excerpt, image_url: a.image_url
+      }))
+    });
+    if (content.featuredArtists.length > half) {
+      sections.push({
+        title: "More Artists",
+        type: "artists",
+        layout: "grid",
+        items: content.featuredArtists.slice(half).map((a: any) => ({
+          slug: a.slug, display_name: a.display_name, bio_excerpt: a.bio_excerpt, image_url: a.image_url
+        }))
+      });
+    }
   }
 
-  // v8: Clone articles as "guides" section so archive_routes & guide_hero modules find content
+  // Guides section for archive modules
   if (content.articles.length > 0) {
-    sections.push({ title: "From the Archive", type: "guides", layout: "list", items: content.articles.map((a: any) => ({ slug: a.slug, title: a.title, excerpt: a.excerpt, heroUrl: a.image_url, author: a.author, published_at: a.published_at })) });
+    sections.push({
+      title: "From the Archive",
+      type: "guides",
+      layout: "list",
+      items: content.articles.slice(0, 3).map((a: any) => ({
+        slug: a.slug, title: a.title, excerpt: a.excerpt, heroUrl: a.image_url, author: a.author, published_at: a.published_at
+      }))
+    });
   }
 
   return { sections };

@@ -681,6 +681,7 @@ export default function AdminSettingsEmailBriefings() {
               <ContentPicker
                 initialContent={editorContent}
                 onChange={(c) => setEditorContent(c)}
+                briefingSlug={editorBriefingSlug || undefined}
               />
             </Suspense>
           </WkSurface>
