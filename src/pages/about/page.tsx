@@ -144,7 +144,7 @@ export default function AboutPage() {
       <div ref={heroRef} className="relative min-h-[85vh] flex items-end overflow-hidden bg-[#0a0a0a] -mt-16">
         <img
           ref={heroImgRef}
-          src="https://readdy.ai/api/search-image?query=Abstract%20warm%20editorial%20composition%20with%20layered%20translucent%20shapes%20in%20deep%20olive%20green%20and%20warm%20amber%20tones%2C%20soft%20atmospheric%20light%20rays%20diffused%20through%20textured%20layers%2C%20contemporary%20art%20publication%20aesthetic%2C%20cinematic%20depth%2C%20museum%20gallery%20vibe%2C%20film%20grain%20texture%2C%20rich%20organic%20textures%20with%20subtle%20geometric%20overlays%2C%20editorial%20photography%20style&width=1800&height=1100&seq=about-hero-2026-wk&orientation=landscape"
+          src="https://readdy.ai/api/search-image?query=Cinematic%20portrait%20composition%20of%20creative%20community%20gathering%20in%20warm%20amber%20and%20olive%20ambient%20light%2C%20silhouettes%20and%20profiles%20of%20people%20in%20conversation%20and%20creative%20exchange%2C%20soft%20atmospheric%20haze%20with%20golden%20hour%20light%20rays%20streaming%20across%20the%20frame%2C%20shallow%20depth%20of%20field%20highlighting%20human%20connection%20and%20cultural%20exchange%2C%20film%20grain%20texture%20with%20rich%20warm%20shadows%20and%20glowing%20highlights%2C%20editorial%20documentary%20photography%20style%20with%20intimate%20candid%20quality%2C%20African%20creative%20scene%20modern%20contemporary%20aesthetic&width=1800&height=1100&seq=about-hero-2026-wk-v2&orientation=landscape"
           alt=""
           className="absolute inset-0 w-full h-full object-cover will-change-transform"
         />

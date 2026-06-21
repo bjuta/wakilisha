@@ -48,7 +48,7 @@ export default function PrivacyPage() {
       <div ref={heroRef} className="relative min-h-[40vh] flex items-end overflow-hidden bg-[#0a0a0a] -mt-16">
         <img
           ref={heroImgRef}
-          src="https://readdy.ai/api/search-image?query=Abstract%20editorial%20composition%20with%20warm%20olive%20green%20and%20charcoal%20layers%2C%20soft%20diffused%20light%2C%20contemporary%20gallery%20aesthetic%2C%20clean%20minimal%20structured%20overlaps%2C%20cinematic%20depth%2C%20editorial%20photography%20style%20with%20film%20grain&width=1800&height=800&seq=privacy-hero-2026-wk&orientation=landscape"
+          src="https://readdy.ai/api/search-image?query=Cinematic%20portrait%20of%20a%20solitary%20human%20figure%20in%20contemplative%20repose%20bathed%20in%20warm%20amber%20and%20olive%20ambient%20light%2C%20soft%20golden%20hour%20illumination%20wrapping%20gently%20around%20shoulders%20and%20profile%2C%20intimate%20close%20up%20composition%20conveying%20trust%20protection%20and%20quiet%20dignity%2C%20shallow%20depth%20of%20field%20with%20warm%20blurred%20background%20dissolving%20into%20rich%20charcoal%20shadow%2C%20film%20grain%20texture%20with%20luminous%20skin%20tones%20and%20gentle%20highlight%20falloff%2C%20editorial%20documentary%20photography%20style%20with%20understated%20intimacy%20and%20calm%20protective%20mood%2C%20modern%20warm%20minimal%20aesthetic&width=1800&height=800&seq=privacy-hero-2026-wk-v2&orientation=landscape"
           alt=""
           className="absolute inset-0 w-full h-full object-cover will-change-transform"
         />
