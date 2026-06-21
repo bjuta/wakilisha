@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import { submitForm } from "@/services/formService";
 import type { FollowFormData } from "../sectionTypes";
 
 export default function FollowFormSection({ data }: { data: FollowFormData }) {
@@ -24,9 +25,21 @@ export default function FollowFormSection({ data }: { data: FollowFormData }) {
     }
 
     setSubmitting(true);
-    await new Promise((r) => setTimeout(r, 800));
+
+    const form = e.currentTarget as HTMLFormElement;
+    const formData = new FormData(form);
+    const submission: Record<string, string> = { form_type: "dakar_follow" };
+    formData.forEach((value, key) => {
+      submission[key] = String(value);
+    });
+
+    const result = await submitForm(submission);
+    if (result.success) {
+      setSubmitted(true);
+    } else {
+      setError(result.error ?? "Something went wrong. Please try again.");
+    }
     setSubmitting(false);
-    setSubmitted(true);
   }, [email, consent]);
 
   return (

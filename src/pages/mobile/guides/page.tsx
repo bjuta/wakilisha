@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { trackEvent, getAnalyticsSessionId, getCanonicalPageUrl } from "@/services/analytics";
+import { submitForm } from "@/services/formService";
 
 const guideEntries = [
   {
@@ -48,16 +49,29 @@ export default function MobileGuides() {
   const [email, setEmail] = useState("");
   const [subscribed, setSubscribed] = useState(false);
 
-  const handleSubscribe = (e: React.FormEvent) => {
-    if (!email.trim()) {
-      e.preventDefault();
-      return;
-    }
+  const [subscribing, setSubscribing] = useState(false);
+
+  const handleSubscribe = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim()) return;
+
+    setSubscribing(true);
+
+    const form = e.currentTarget as HTMLFormElement;
+    const formData = new FormData(form);
+    const submission: Record<string, string> = { form_type: "newsletter" };
+    formData.forEach((value, key) => {
+      submission[key] = String(value);
+    });
+
     trackEvent("newsletter_signup", {
       pageType: "guides_listing",
       context: { sourceSection: "newsletter_footer", formId: "guides-newsletter-mobile" },
     });
-    setSubscribed(true);
+
+    const result = await submitForm(submission);
+    if (result.success) setSubscribed(true);
+    setSubscribing(false);
   };
 
   return (
@@ -244,9 +258,6 @@ export default function MobileGuides() {
               </p>
               <form
                 onSubmit={handleSubscribe}
-                action="https://readdy.ai/api/form/d8mnmb50ihgem5t5p940"
-                method="POST"
-                data-readdy-form=""
                 className="flex flex-col gap-3"
               >
                 <input type="hidden" name="wk_session_id" value={getAnalyticsSessionId()} />
@@ -267,9 +278,10 @@ export default function MobileGuides() {
                 </div>
                 <button
                   type="submit"
-                  className="h-12 rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] text-[14px] font-extrabold active:scale-[0.97] transition-transform whitespace-nowrap cursor-pointer"
+                  disabled={subscribing}
+                  className="h-12 rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] text-[14px] font-extrabold active:scale-[0.97] transition-transform whitespace-nowrap cursor-pointer disabled:opacity-60"
                 >
-                  Subscribe
+                  {subscribing ? "Subscribing..." : "Subscribe"}
                 </button>
               </form>
               <p className="mt-3 text-[11px] font-semibold text-[var(--wk-text-faint)]">

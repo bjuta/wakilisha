@@ -6,6 +6,7 @@ import { MagazineCard } from "@/pages/magazine/components/MagazineCard";
 import { SkeletonMagazinePage } from "@/components/skeletons/Skeletons";
 import { Chapter19FallbackImage } from "@/components/media/Chapter19FallbackImage";
 import { trackEvent } from "@/services/analytics";
+import { submitForm } from "@/services/formService";
 
 function useScrollReveal(deps: unknown[] = []) {
   useEffect(() => {
@@ -594,13 +595,28 @@ export default function MobileMagazine() {
 function MobileNewsletterCTA() {
   const [email, setEmail] = useState("");
   const [done, setDone] = useState(false);
-  const handleSubmit = (e: React.FormEvent) => {
+  const [subscribing, setSubscribing] = useState(false);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!email.trim()) return;
+
+    setSubscribing(true);
+
+    const form = e.currentTarget as HTMLFormElement;
+    const formData = new FormData(form);
+    const submission: Record<string, string> = { form_type: "newsletter" };
+    formData.forEach((value, key) => {
+      submission[key] = String(value);
+    });
+
     trackEvent("newsletter_signup", {
       pageType: "magazine",
       context: { sourceSection: "mobile_footer", formId: "magazine-newsletter-mobile" },
     });
-    setDone(true);
+
+    const result = await submitForm(submission);
+    if (result.success) setDone(true);
+    setSubscribing(false);
   };
 
   return (
@@ -625,7 +641,7 @@ function MobileNewsletterCTA() {
           <p className="text-[13px] text-[var(--wk-text-muted)] leading-relaxed mb-6">
             Get weekly analysis, chart commentary, and industry signals delivered to your inbox.
           </p>
-          <form onSubmit={handleSubmit} action="https://readdy.ai/api/form/d8mnmb50ihgem5t5p940" method="POST" data-readdy-form="" className="flex flex-col gap-3">
+          <form onSubmit={handleSubmit} className="flex flex-col gap-3">
             <input type="hidden" name="wk_page_type" value="magazine" />
             <input type="hidden" name="wk_source_section" value="mobile_footer" />
             <div className="relative">
@@ -640,8 +656,8 @@ function MobileNewsletterCTA() {
                 className="w-full h-12 rounded-full border border-[var(--wk-border)] bg-[var(--wk-bg)] pl-10 pr-4 text-[14px] text-[var(--wk-text)] placeholder:text-[var(--wk-text-faint)] outline-none focus:border-[var(--wk-brand)] transition-colors"
               />
             </div>
-            <button type="submit" className="h-12 rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] text-[14px] font-extrabold hover:-translate-y-0.5 transition-transform whitespace-nowrap cursor-pointer">
-              Subscribe
+            <button type="submit" disabled={subscribing} className="h-12 rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] text-[14px] font-extrabold hover:-translate-y-0.5 transition-transform whitespace-nowrap cursor-pointer disabled:opacity-60">
+              {subscribing ? "Subscribing..." : "Subscribe"}
             </button>
           </form>
           <p className="mt-3 text-[10px] font-semibold text-[var(--wk-text-faint)]">No spam. Unsubscribe anytime.</p>

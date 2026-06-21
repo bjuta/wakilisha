@@ -4,6 +4,7 @@ import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { supabase } from "@/lib/supabase";
 import type { SocialLink } from "@/services/authorProfiles";
+import { bustAuthorCache } from "@/services/authorProfiles";
 
 /* ─── Types ─── */
 
@@ -212,6 +213,7 @@ export default function AuthorDetailPage() {
     setAuthor((prev) => (prev ? { ...prev, ...payload, social_links: payload.social_links } : prev));
     setIsDirty(false);
     addToast("success", "Author profile saved.");
+    bustAuthorCache();
   }
 
   /* ─── Keyboard shortcuts ─── */

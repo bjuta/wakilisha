@@ -297,7 +297,6 @@ export default function LabelDetail() {
           {/* ── Newsletter ── */}
           <section>
             <NewsletterSubscribe
-              formAction="https://readdy.ai/api/form/d8qhqude8ise6dlc8d80"
               formId="label-newsletter-form"
               headline={`Follow ${label.name}.`}
               description={`Get updates on ${label.name} releases, roster moves, and new catalog drops as they land.`}

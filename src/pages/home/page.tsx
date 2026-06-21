@@ -83,7 +83,6 @@ export default function Home() {
         <section className="py-16 md:py-24 border-t border-[var(--wk-divider)]" style={{ background: "var(--wk-bg-subtle)" }}>
           <div style={{ maxWidth: 1180, margin: "0 auto", padding: "0 clamp(20px,4vw,40px)" }}>
             <NewsletterSubscribe
-              formAction="https://readdy.ai/api/form/d8qhqude8ise6dlc8da0"
               formId="homepage-newsletter-form"
               headline="The culture, in your inbox."
               description="Chart updates, new guides, editorial deep-dives, and early access to new sections as they launch across WAKILISHA."

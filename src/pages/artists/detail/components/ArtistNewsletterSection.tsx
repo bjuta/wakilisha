@@ -12,7 +12,6 @@ export function ArtistNewsletterSection({ artistName, artistSlug }: ArtistNewsle
   return (
     <section ref={ref} className={`${revealed ? "is-visible" : ""} reveal-up`}>
       <NewsletterSubscribe
-        formAction="https://readdy.ai/api/form/d8qhqude8ise6dlc8d70"
         formId="artist-newsletter-form"
         headline={`Follow ${artistName}.`}
         description="Get updates when new releases, chart entries, and stories drop."

@@ -336,7 +336,6 @@ export default function Magazine() {
       id: "newsletter",
       render: () => (
         <NewsletterSubscribe
-          formAction="https://readdy.ai/api/form/d8qhqude8ise6dlc8d8g"
           formId="magazine-newsletter-form"
           headline="Read with us"
           description="Get weekly analysis, chart commentary, and industry signals delivered to your inbox."
@@ -735,7 +734,6 @@ function NewsletterCTA() {
   return (
     <section className="mag-reveal">
       <NewsletterSubscribe
-        formAction="https://readdy.ai/api/form/d8qhqude8ise6dlc8d8g"
         formId="magazine-newsletter-form"
         headline="Read with us"
         description="Get weekly analysis, chart commentary, and industry signals delivered to your inbox."

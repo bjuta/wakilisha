@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { trackEvent, getAnalyticsSessionId, getCanonicalPageUrl } from "@/services/analytics";
+import { submitForm } from "@/services/formService";
 import { inMinorKeysData } from "../data";
 
 export default function GuideDownloadSection() {
@@ -27,21 +28,18 @@ export default function GuideDownloadSection() {
       },
     });
 
-    try {
-      const form = e.currentTarget;
-      const data = new URLSearchParams(new FormData(form) as unknown as URLSearchParams);
-      const res = await fetch("https://readdy.ai/api/form/d8mnc3t0ihgem5t5p8v0", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: data.toString(),
-      });
-      if (res.ok) {
-        setStatus("success");
-        form.reset();
-      } else {
-        setStatus("error");
-      }
-    } catch {
+    const form = e.currentTarget;
+    const formData = new FormData(form);
+    const submission: Record<string, string> = { form_type: "guide_download" };
+    formData.forEach((value, key) => {
+      submission[key] = String(value);
+    });
+
+    const result = await submitForm(submission);
+    if (result.success) {
+      setStatus("success");
+      form.reset();
+    } else {
       setStatus("error");
     }
   };
@@ -111,7 +109,6 @@ export default function GuideDownloadSection() {
                   </div>
 
                   <form
-                    data-readdy-form
                     onSubmit={handleSubmit}
                     className="space-y-4"
                   >

@@ -997,7 +997,6 @@ export default function ChartEdition() {
         {/* ── Newsletter ── */}
         <section className="chart-reveal">
           <NewsletterSubscribe
-            formAction="https://readdy.ai/api/form/d8qhqude8ise6dlc8d9g"
             formId="charts-edition-newsletter-form"
             headline="Stay in the loop"
             description={`Weekly roundups of ${familyLabel} chart movements, new entries, and analysis. No spam, ever.`}

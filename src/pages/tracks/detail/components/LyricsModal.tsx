@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useScrollLock } from "@/hooks/useScrollLock";
 import { WkButton } from "@/components/design-system/primitives/Button";
+import { submitForm } from "@/services/formService";
 
 interface LyricsContributor {
   name: string;
@@ -59,24 +60,20 @@ export default function LyricsModal({
 
     const form = e.target as HTMLFormElement;
     const formData = new FormData(form);
-    const data = new URLSearchParams();
-    for (const [key, value] of formData.entries()) {
-      data.append(key, value as string);
-    }
+    const submission: Record<string, string> = { form_type: "lyrics_contribution" };
+    formData.forEach((value, key) => {
+      submission[key] = String(value);
+    });
 
-    fetch("https://readdy.ai/api/form/d8doe97ejtnocflsndo0", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: data.toString(),
-    })
-      .then(() => {
+    submitForm(submission).then((result) => {
+      if (result.success) {
         setSubmitted(true);
-      })
-      .catch(() => {
-        setError("Something went wrong. Please try again.");
-      });
+      } else {
+        setError(result.error ?? "Something went wrong. Please try again.");
+      }
+    }).catch(() => {
+      setError("Something went wrong. Please try again.");
+    });
   };
 
   const isEditing = !!existingLyrics;
@@ -126,7 +123,6 @@ export default function LyricsModal({
         ) : (
           <form
             id="lyrics-contribution-form"
-            data-readdy-form
             onSubmit={handleSubmit}
             className="px-6 py-5 space-y-5"
           >

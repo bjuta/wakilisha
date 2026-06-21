@@ -113,6 +113,12 @@ import AdminApiDocsPage from "../pages/admin/api-docs/page";
 // Public API Docs
 import PublicApiDocsPage from "../pages/api-docs/page";
 
+// Briefing public pages
+import BriefingConfirmPage from "../pages/briefing/confirm/page";
+import BriefingUnsubscribePage from "../pages/briefing/unsubscribe/page";
+import BriefingPreferencesPage from "../pages/briefing/preferences/page";
+import BriefingIssuePage from "../pages/briefing/issue/page";
+
 // Charts
 import ChartsDirectory from "../pages/charts/directory/page";
 import ChartEdition from "../pages/charts/edition/page";
@@ -215,6 +221,10 @@ const routes: RouteObject[] = [
       { path: "/faqs", element: <ResponsivePage mobile={<FaqsPage />} desktop={<FaqsPage />} /> },
       { path: "/privacy", element: <ResponsivePage mobile={<PrivacyPage />} desktop={<PrivacyPage />} /> },
       { path: "/terms", element: <ResponsivePage mobile={<TermsPage />} desktop={<TermsPage />} /> },
+      { path: "/briefing/confirm", element: <ResponsivePage mobile={<BriefingConfirmPage />} desktop={<BriefingConfirmPage />} /> },
+      { path: "/briefing/unsubscribe", element: <ResponsivePage mobile={<BriefingUnsubscribePage />} desktop={<BriefingUnsubscribePage />} /> },
+      { path: "/briefing/preferences", element: <ResponsivePage mobile={<BriefingPreferencesPage />} desktop={<BriefingPreferencesPage />} /> },
+      { path: "/briefing/issue/:issueId", element: <BriefingIssuePage /> },
     ],
   },
   {

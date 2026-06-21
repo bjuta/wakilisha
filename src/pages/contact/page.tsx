@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { trackEvent, getAnalyticsSessionId, getCanonicalPageUrl } from "@/services/analytics";
+import { submitForm } from "@/services/formService";
 
 function useScrollReveal() {
   useEffect(() => {
@@ -58,26 +59,24 @@ export default function ContactPage() {
     setSubmitError(null);
 
     const formData = new FormData(form);
-    try {
-      const res = await fetch("https://readdy.ai/api/form/d8qguptcg4qspo125j4g", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams(formData as unknown as Record<string, string>).toString(),
+    const submission: Record<string, string> = { form_type: "contact" };
+    formData.forEach((value, key) => {
+      submission[key] = String(value);
+    });
+
+    const result = await submitForm(submission);
+
+    if (result.success) {
+      setSubmitted(true);
+      trackEvent("contact_form_submit", {
+        pageType: "contact",
+        context: { formId: "contact-main" },
       });
-      if (res.ok) {
-        setSubmitted(true);
-        trackEvent("contact_form_submit", {
-          pageType: "contact",
-          context: { formId: "contact-main" },
-        });
-      } else {
-        setSubmitError("Something went wrong. Please try again or email us directly.");
-      }
-    } catch {
-      setSubmitError("Network error. Please check your connection and try again.");
-    } finally {
-      setSubmitting(false);
+    } else {
+      setSubmitError(result.error ?? "Something went wrong. Please try again or email us directly.");
     }
+
+    setSubmitting(false);
   };
 
   const CONTACT_INFO = [
@@ -140,9 +139,6 @@ export default function ContactPage() {
               <form
                 id="contact-form-main"
                 onSubmit={handleSubmit}
-                action="https://readdy.ai/api/form/d8qguptcg4qspo125j4g"
-                method="POST"
-                data-readdy-form=""
                 className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-6 lg:p-8 space-y-5"
               >
                 <input type="hidden" name="wk_session_id" value={getAnalyticsSessionId()} />

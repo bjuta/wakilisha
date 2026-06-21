@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { trackEvent, getAnalyticsSessionId, getCanonicalPageUrl } from "@/services/analytics";
+import { submitForm } from "@/services/formService";
 import { dakarData } from "@/pages/guides/detail/dakarData";
 import { MobileShareButton } from "@/components/design-system/share/ShareSheet";
 
@@ -14,7 +15,11 @@ export default function MobileDakarGuide() {
   const guideSlug = "dakar-biennale-2026";
   const guideTitle = `${follow.title} ${follow.titleItalic || ""}`;
 
-  const handleFollowSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const [followStatus, setFollowStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
+
+  const handleFollowSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
     trackEvent("newsletter_signup", {
       pageType: "guide_detail",
       entitySlug: guideSlug,
@@ -25,6 +30,21 @@ export default function MobileDakarGuide() {
         guide_slug: guideSlug,
       },
     });
+
+    setFollowStatus("submitting");
+    const form = e.currentTarget;
+    const formData = new FormData(form);
+    const submission: Record<string, string> = { form_type: "dakar_follow" };
+    formData.forEach((value, key) => {
+      submission[key] = String(value);
+    });
+
+    const result = await submitForm(submission);
+    if (result.success) {
+      setFollowStatus("success");
+    } else {
+      setFollowStatus("error");
+    }
   };
 
   const handleCopy = () => {
@@ -269,9 +289,6 @@ export default function MobileDakarGuide() {
             <h3 className="text-[15px] font-bold text-[var(--wk-text)] mb-1">{follow.form.heading}</h3>
             <p className="text-[12px] text-[var(--wk-text-muted)] mb-4">{follow.form.description}</p>
             <form
-              action="https://readdy.ai/api/form/d8m5rsojb57qogjbh760"
-              method="POST"
-              data-readdy-form=""
               onSubmit={handleFollowSubmit}
               className="space-y-3"
             >
@@ -298,8 +315,8 @@ export default function MobileDakarGuide() {
                 <input type="checkbox" name="consent" className="mt-0.5" />
                 <span>{follow.form.consentLabel}</span>
               </label>
-              <button type="submit" className="w-full rounded-lg bg-[var(--wk-brand)] px-4 py-3 text-[13px] font-bold text-[var(--wk-brand-on)] active:scale-[0.98] transition-transform whitespace-nowrap cursor-pointer">
-                {follow.form.submitLabel}
+              <button type="submit" disabled={followStatus === "submitting" || followStatus === "success"} className="w-full rounded-lg bg-[var(--wk-brand)] px-4 py-3 text-[13px] font-bold text-[var(--wk-brand-on)] active:scale-[0.98] transition-transform whitespace-nowrap cursor-pointer disabled:opacity-60">
+                {followStatus === "submitting" ? "Submitting..." : followStatus === "success" ? "You're on the list!" : follow.form.submitLabel}
               </button>
             </form>
           </div>

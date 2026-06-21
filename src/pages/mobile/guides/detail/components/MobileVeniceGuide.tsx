@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { trackEvent, getAnalyticsSessionId, getCanonicalPageUrl } from "@/services/analytics";
+import { submitForm } from "@/services/formService";
 import { inMinorKeysData } from "@/pages/guides/detail/data";
 import { MobileShareButton } from "@/components/design-system/share/ShareSheet";
 
@@ -13,7 +14,11 @@ export default function MobileVeniceGuide() {
   const guideSlug = "in-minor-keys";
   const guideTitle = `${download.title} ${download.titleItalic}`;
 
-  const handleDownloadSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const [downloadStatus, setDownloadStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
+
+  const handleDownloadSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
     trackEvent("newsletter_signup", {
       pageType: "guide_detail",
       entitySlug: guideSlug,
@@ -24,6 +29,21 @@ export default function MobileVeniceGuide() {
         guide_slug: guideSlug,
       },
     });
+
+    setDownloadStatus("submitting");
+    const form = e.currentTarget;
+    const formData = new FormData(form);
+    const submission: Record<string, string> = { form_type: "guide_download" };
+    formData.forEach((value, key) => {
+      submission[key] = String(value);
+    });
+
+    const result = await submitForm(submission);
+    if (result.success) {
+      setDownloadStatus("success");
+    } else {
+      setDownloadStatus("error");
+    }
   };
 
   return (
@@ -279,9 +299,6 @@ export default function MobileVeniceGuide() {
             ))}
           </ul>
           <form
-            action="https://readdy.ai/api/form/d8m5rsojb57qogjbh760"
-            method="POST"
-            data-readdy-form=""
             onSubmit={handleDownloadSubmit}
             className="space-y-3"
           >
@@ -296,8 +313,8 @@ export default function MobileVeniceGuide() {
               required
               className="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-4 py-3 text-[13px] text-[var(--wk-text)] placeholder:text-[var(--wk-text-faint)] outline-none focus:border-[var(--wk-brand)]/40"
             />
-            <button type="submit" className="w-full rounded-lg bg-[var(--wk-v-intel)] px-4 py-3 text-[13px] font-bold text-white active:scale-[0.98] transition-transform whitespace-nowrap cursor-pointer">
-              <i className="ri-download-line mr-1.5" /> Download Free Guide
+            <button type="submit" disabled={downloadStatus === "submitting" || downloadStatus === "success"} className="w-full rounded-lg bg-[var(--wk-v-intel)] px-4 py-3 text-[13px] font-bold text-white active:scale-[0.98] transition-transform whitespace-nowrap cursor-pointer disabled:opacity-60">
+              {downloadStatus === "submitting" ? "Sending..." : downloadStatus === "success" ? "Guide sent!" : <><i className="ri-download-line mr-1.5" /> Download Free Guide</>}
             </button>
           </form>
         </div>

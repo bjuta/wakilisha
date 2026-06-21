@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { trackEvent, getAnalyticsSessionId, getCanonicalPageUrl } from "@/services/analytics";
+import { submitForm } from "@/services/formService";
 import type { DownloadFormData } from "../sectionTypes";
 
 export default function DownloadFormSection({ data }: { data: DownloadFormData }) {
   const { slug } = useParams<{ slug: string }>();
   const titleItalic = data.titleItalic || data.title_italic || "";
-  const formAction = data.formAction || "https://readdy.ai/api/form/d8mnc3t0ihgem5t5p8v0";
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
 
   const sessionId = getAnalyticsSessionId();
@@ -18,7 +18,6 @@ export default function DownloadFormSection({ data }: { data: DownloadFormData }
 
     const guideTitle = `${data.title}${titleItalic ? ` ${titleItalic}` : ""}`;
 
-    // Fire analytics before submission — fire-and-forget
     trackEvent("newsletter_signup", {
       pageType: "guide_detail",
       entitySlug: slug,
@@ -30,21 +29,18 @@ export default function DownloadFormSection({ data }: { data: DownloadFormData }
       },
     });
 
-    try {
-      const form = e.currentTarget;
-      const formData = new URLSearchParams(new FormData(form) as unknown as URLSearchParams);
-      const res = await fetch(formAction, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: formData.toString(),
-      });
-      if (res.ok) {
-        setStatus("success");
-        form.reset();
-      } else {
-        setStatus("error");
-      }
-    } catch {
+    const form = e.currentTarget;
+    const formData = new FormData(form);
+    const submission: Record<string, string> = { form_type: "guide_download" };
+    formData.forEach((value, key) => {
+      submission[key] = String(value);
+    });
+
+    const result = await submitForm(submission);
+    if (result.success) {
+      setStatus("success");
+      form.reset();
+    } else {
       setStatus("error");
     }
   };
@@ -103,7 +99,7 @@ export default function DownloadFormSection({ data }: { data: DownloadFormData }
                     <p className="text-[12px] text-[var(--wk-text-muted)]">Tell us where to send it.</p>
                   </div>
 
-                  <form data-readdy-form onSubmit={handleSubmit} className="space-y-4">
+                  <form onSubmit={handleSubmit} className="space-y-4">
                     <input type="hidden" name="wk_session_id" value={sessionId} />
                     <input type="hidden" name="wk_page_url" value={pageUrl} />
                     <input type="hidden" name="wk_page_type" value="guide_detail" />

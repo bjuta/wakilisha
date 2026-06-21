@@ -1,8 +1,8 @@
 import { useState, useRef } from "react";
 import { trackEvent } from "@/services/analytics";
+import { submitForm } from "@/services/formService";
 
 interface NewsletterSubscribeProps {
-  formAction: string;
   formId: string;
   headline: string;
   description: string;
@@ -17,7 +17,6 @@ interface NewsletterSubscribeProps {
 }
 
 export function NewsletterSubscribe({
-  formAction,
   formId,
   headline,
   description,
@@ -66,50 +65,30 @@ export function NewsletterSubscribe({
     });
 
     const formData = new FormData(form);
-    const params = new URLSearchParams();
+    const submission: Record<string, string> = { form_type: "newsletter" };
     formData.forEach((value, key) => {
-      params.append(key, String(value));
+      submission[key] = String(value);
     });
 
-    try {
-      const response = await fetch(formAction, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: params.toString(),
+    const result = await submitForm(submission);
+
+    if (result.success) {
+      setStatus("success");
+      setMessage("You're in. Watch your inbox for updates.");
+      form.reset();
+
+      trackEvent("newsletter_success", {
+        pageType: analytics?.pageType,
+        entitySlug: analytics?.entitySlug,
+        entityType: analytics?.entityType,
+        context: {
+          form_id: formId,
+          ...analytics?.context,
+        },
       });
-
-      if (response.ok) {
-        setStatus("success");
-        setMessage("You're in. Watch your inbox for updates.");
-        form.reset();
-
-        trackEvent("newsletter_success", {
-          pageType: analytics?.pageType,
-          entitySlug: analytics?.entitySlug,
-          entityType: analytics?.entityType,
-          context: {
-            form_id: formId,
-            ...analytics?.context,
-          },
-        });
-      } else {
-        setStatus("error");
-        setMessage("Something went wrong. Please try again.");
-
-        trackEvent("newsletter_error", {
-          pageType: analytics?.pageType,
-          entitySlug: analytics?.entitySlug,
-          entityType: analytics?.entityType,
-          context: {
-            form_id: formId,
-            ...analytics?.context,
-            error_type: "server_error",
-          },
-        });
-      }
-    } catch {
+    } else {
       setStatus("error");
-      setMessage("Something went wrong. Please try again.");
+      setMessage(result.error ?? "Something went wrong. Please try again.");
 
       trackEvent("newsletter_error", {
         pageType: analytics?.pageType,
@@ -118,7 +97,7 @@ export function NewsletterSubscribe({
         context: {
           form_id: formId,
           ...analytics?.context,
-          error_type: "network_error",
+          error_type: "server_error",
         },
       });
     }
@@ -137,7 +116,6 @@ export function NewsletterSubscribe({
 
         <form
           ref={formRef}
-          data-readdy-form
           id={formId}
           onSubmit={handleSubmit}
           className="mx-auto max-w-lg"

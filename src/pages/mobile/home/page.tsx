@@ -8,12 +8,41 @@ import { HomeMission } from "@/pages/home/components/HomeMission";
 import { listMagazineStories, type PublicStory } from "@/services/publicContent/client";
 import { getChartFamilies, getLatestChartEdition, getChartEditionEntries, type ChartEditionEntry } from "@/services/chartsPublic/client";
 import { trackEvent, getAnalyticsSessionId, getCanonicalPageUrl } from "@/services/analytics";
+import { submitForm } from "@/services/formService";
 
 export default function MobileHome() {
   const [loading, setLoading] = useState(true);
   const [chartEntries, setChartEntries] = useState<ChartEditionEntry[]>([]);
   const [stories, setStories] = useState<PublicStory[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [newsletterStatus, setNewsletterStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
+
+  const handleNewsletterSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const emailInput = form.querySelector('input[name="email"]') as HTMLInputElement;
+    if (!emailInput || !emailInput.value.trim()) return;
+
+    trackEvent("newsletter_signup", {
+      pageType: "home",
+      context: { sourceSection: "newsletter_footer", formId: "homepage-newsletter-mobile" },
+    });
+
+    setNewsletterStatus("submitting");
+    const formData = new FormData(form);
+    const submission: Record<string, string> = { form_type: "newsletter" };
+    formData.forEach((value, key) => {
+      submission[key] = String(value);
+    });
+
+    const result = await submitForm(submission);
+    if (result.success) {
+      setNewsletterStatus("success");
+      form.reset();
+    } else {
+      setNewsletterStatus("error");
+    }
+  };
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -85,15 +114,7 @@ export default function MobileHome() {
                 </p>
                 <form
                   className="flex flex-col sm:flex-row gap-3"
-                  action="https://readdy.ai/api/form/d8m5rsojb57qogjbh760"
-                  method="POST"
-                  data-readdy-form=""
-                  onSubmit={() => {
-                    trackEvent("newsletter_signup", {
-                      pageType: "home",
-                      context: { sourceSection: "newsletter_footer", formId: "homepage-newsletter-mobile" },
-                    });
-                  }}
+                  onSubmit={handleNewsletterSubmit}
                 >
                   <input type="hidden" name="wk_session_id" value={getAnalyticsSessionId()} />
                   <input type="hidden" name="wk_page_url" value={getCanonicalPageUrl()} />

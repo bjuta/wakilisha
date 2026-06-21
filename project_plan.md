@@ -1304,3 +1304,273 @@ Phase 11I (Admin dashboard) ← needs 11A-11H data flowing
 5. **Funnel analysis engine** — The data will be there; the admin dashboard will show basic funnels. Advanced funnel analysis is a separate project.
 
 ---
+
+## Phase 12: Email Briefing Infrastructure ✅ PHASE 1 COMPLETE (June 2026)
+
+**Status:** Phase 1 (Foundation) COMPLETE. Phase 2 (Subscriber UX) COMPLETE. Phase 3 (Admin Control Room) COMPLETE. Phase 4 (Automation) COMPLETE. Phase 5 (Analytics Integration + Issue Preview) COMPLETE (June 2026).
+
+**Goal:** Rebuild the WordPress newsletter briefing system as a first-party WAKILISHA infrastructure — 13 distinct briefing products with subscriber opt-in management, double opt-in confirmation, Resend-powered delivery, public issue archives, and an admin control room. Replace the WordPress `wp_mail()` delivery, transient-based confirmation tokens, cron scheduler, and per-recipient issue storage with production-grade alternatives.
+
+### What Existed in WordPress (Preserved Concepts)
+
+| Concept | Old WordPress | New WAKILISHA |
+|---------|--------------|---------------|
+| **13 briefing types** | Defined in PHP as `wkcharts_dispatch`, `wkcharts_editorial`, etc. | Seeded in `briefing_catalog` table with slugs, titles, cadences, and visual_config |
+| **Subscriber model** | `wp_wkcharts_subscribers` + `wp_wkcharts_subscriber_optins` | `briefing_subscribers` + `briefing_opt_ins` (many-to-many) |
+| **Event log** | `wp_wkcharts_subscriber_events` | `briefing_tokens` with purpose + timestamps |
+| **Issue storage** | `wp_wkcharts_newsletter_issues` (ONE ROW PER RECIPIENT — storage bomb) | `briefing_issues` (ONE ROW PER ISSUE) + `briefing_issue_recipients` (delivery tracking) |
+| **Confirmation** | WordPress transients (cache flush = dead links) | UUID tokens in `briefing_tokens` with 7-day TTL |
+| **Delivery** | `wp_mail()` (no bounce handling, no reputation) | Resend API (production-grade deliverability) |
+| **Public archives** | `/newsletter/MM/DD/YYYY/...` with UTM tracking | `/briefing/confirm`, `/briefing/unsubscribe`, `/briefing/preferences` (archive pages in Phase 2) |
+| **Admin controls** | "Generate / Send / Preview" in WP admin | `briefing-handler` edge function + admin UI (Phase 3) |
+| **Scheduling** | WordPress cron (daily check, weekly guard — fake 2x/week) | pg_cron or Supabase scheduled functions (Phase 4) |
+
+### Phase 1: Foundation (Database + Core Infrastructure) ✅ COMPLETE
+
+#### Database Tables (6 tables, all with RLS)
+
+- **`briefing_catalog`** — 13 briefing types seeded. Fields: `slug`, `title`, `description`, `cadence` (weekly/biweekly/monthly/on_demand), `send_day`, `send_time`, `is_active`, `visual_config` (JSONB for email template styling), `sort_order`
+- **`briefing_subscribers`** — `email` (unique), `status` (pending/confirmed/unsubscribed), `ip_address`, `user_agent`, `confirmed_at`, `unsubscribed_at`
+- **`briefing_opt_ins`** — Many-to-many: `subscriber_id` → `briefing_id` + `status` (active/unsubscribed). Unique constraint on (`subscriber_id`, `briefing_id`)
+- **`briefing_tokens`** — UUID tokens with `purpose` (confirm/unsubscribe/preferences), `expires_at`, `used_at`. Tokens expire after 7 days (confirm) or 365 days (unsubscribe)
+- **`briefing_issues`** — ONE ROW PER ISSUE (not per recipient). Fields: `briefing_id`, `title`, `slug`, `status` (draft/generated/sent), `iso_week`, `issue_date`, `sent_at`, `sent_count`, `html_body`, `plain_text`, `utm_campaign`, `generated_by`, `sent_by`
+- **`briefing_issue_recipients`** — Delivery tracking per recipient: `issue_id`, `subscriber_id`, `delivery_status` (queued/sent/bounced/opened/clicked), timestamps. Unique constraint on (`issue_id`, `subscriber_id`)
+
+**RLS policies:**
+- `briefing_catalog` — Public read (everyone can see the catalog), service_role write
+- `briefing_issues` — Public read only for `status = 'sent'` (published issues), service_role write
+- All other tables — service_role only (edge function handles all operations)
+
+#### Edge Function: `briefing-handler`
+
+**URL:** `/functions/v1/briefing-handler`
+
+**Public actions (no auth, rate-limited 30/min/IP):**
+
+| Action | Description |
+|--------|-------------|
+| `list_catalog` | Returns all active briefings with metadata |
+| `subscribe` | Creates/upserts subscriber, sets opt-ins, generates confirmation token, sends confirmation email via Resend |
+| `confirm` | Validates token, marks subscriber confirmed, activates opt-ins |
+| `unsubscribe` | Token-based or email-based. Supports "unsubscribe from all" or specific briefing only |
+| `preferences` | Token-based. Returns subscriber's current briefing selections for management |
+
+**Admin actions (JWT + `manage_settings` capability):**
+
+| Action | Description |
+|--------|-------------|
+| `generate_issue` | Creates a draft issue for a briefing. Phase 1: placeholder template. Phase 3+: content generation from articles/charts/registry |
+| `send_issue` | Delivers an issue to all active opt-in subscribers via Resend. Creates `briefing_issue_recipients` rows. Marks issue as `sent`. Supports unsubscribe link in every email footer |
+| `send_test` | Sends a single test email to a specified address |
+| `list_issues` | Returns issues filtered by briefing slug, status, with pagination |
+| `list_subscribers` | Returns subscribers filtered by status, briefing slug. Includes opt-in counts and active briefing names |
+
+**Security:**
+- Public actions: IP-based rate limiting (30 req/min), email validation, token expiry enforcement
+- Admin actions: JWT verification + `manage_settings` capability check
+- CORS locked to approved origins
+- All DB operations use service_role key
+
+**Email templates:**
+- Confirmation emails: WAKILISHA-branded HTML with briefing list, confirm button, 7-day expiry notice
+- Unsubscribe emails: One-click unsubscribe link with 365-day token validity
+- Briefing delivery: Wraps `html_body` in branded template with unsubscribe + preferences footer
+
+**Resend integration:**
+- Reads `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `RESEND_FROM_NAME` from Edge Function secrets
+- Sends via `https://api.resend.com/emails`
+- Tags all emails with `wakilisha_event` for tracking
+
+#### Resend Secrets Configuration
+
+The following must be set in Supabase Dashboard → Edge Functions → `briefing-handler` → Secrets:
+
+| Secret | Value | Purpose |
+|--------|-------|---------|
+| `RESEND_API_KEY` | `re_...` | Resend API key |
+| `RESEND_FROM_EMAIL` | `briefings@wakilisha.africa` | Sender email address |
+| `RESEND_FROM_NAME` | `WAKILISHA` | Sender display name |
+
+### The 13 Briefing Types (Seeded)
+
+| # | Slug | Title | Cadence | Send Day |
+|---|------|-------|---------|----------|
+| 1 | `culture-dispatch` | Culture Dispatch | weekly | Monday |
+| 2 | `weekly-editorial` | Weekly Editorial | weekly | Monday |
+| 3 | `charts-digest` | Charts Digest | weekly | Friday |
+| 4 | `field-guides` | Field Guides | on_demand | — |
+| 5 | `artist-signals` | Artist Signals | weekly | Thursday |
+| 6 | `release-radar` | Release Radar | weekly | Wednesday |
+| 7 | `new-voices` | New Voices | biweekly | Tuesday |
+| 8 | `label-industry-notes` | Label & Industry Notes | weekly | Tuesday |
+| 9 | `registry-notes` | Registry Notes | weekly | Friday |
+| 10 | `east-africa-weekly` | East Africa Weekly | weekly | Friday |
+| 11 | `language-and-memory` | Language & Memory | weekly | Friday |
+| 12 | `weekend-agenda` | Weekend Agenda | weekly | Friday |
+| 13 | `diaspora-signals` | Diaspora Signals | weekly | Saturday |
+
+### Phase 2: Subscriber UX ✅ COMPLETE (June 2026)
+
+**What was built:**
+1. **`briefingService.ts`** — Typed API client for the `briefing-handler` edge function. Public methods: `listCatalog()`, `subscribe()`, `confirm()`, `unsubscribe()`, `preferences()`.
+2. **`/briefing/confirm`** — Public confirmation landing page. Validates token via edge function, shows success (with email + manage-preferences link), error, expired, and already-confirmed states. WAKILISHA-branded centered card layout.
+3. **`/briefing/unsubscribe`** — Public unsubscribe page. Two-step flow: confirmation prompt → processing → done. Token-based unsubscribe-all. Re-subscribe CTA after completion. Error and expired-token states.
+4. **`/briefing/preferences`** — Public preferences management page. Loads subscriber's current selections via token, renders all 13 active briefings as toggleable checkboxes with cadence/send-day metadata. Save calls `subscribe()` with updated slug list. Unsubscribe-all path delegates to `/briefing/unsubscribe`. Saved confirmation state.
+5. **Routes** added in `src/router/config.tsx` — all three paths under `ResponsiveAppLayout` with `ResponsivePage` wrapper.
+
+**Design:** All three pages follow WAKILISHA design system — `var(--wk-*)` CSS tokens, `wk-font-display`/`wk-font-body` typography, surface cards with border, brand green (`--wk-brand`) CTAs, danger-red unsubscribe buttons, rounded-2xl containers, centered max-w-[480px] layout, animated loading spinners, footer attribution.
+
+**Files:**
+- `src/services/briefingService.ts` — new
+- `src/pages/briefing/confirm/page.tsx` — new
+- `src/pages/briefing/unsubscribe/page.tsx` — new
+- `src/pages/briefing/preferences/page.tsx` — new
+- `src/router/config.tsx` — 3 routes + 3 imports added
+
+### Phase 3: Admin Control Room ✅ COMPLETE (June 2026)
+
+**What was built:**
+1. ✅ **Rebuilt `email-briefings` admin page** — replaced localStorage shell with real Supabase-backed controls via `briefing-handler` edge function with JWT auth.
+2. ✅ **Briefing Catalog tab** — View all 13 briefing types in a data table with title, description, cadence, send day, send time, and active/inactive toggle switches that write to `briefing_catalog` via `update_catalog` edge function action.
+3. ✅ **Subscribers tab** — Real-time subscriber list from `briefing_subscribers` table. Filter by status (pending/confirmed/unsubscribed). Shows email, status badge, briefing count, confirmation date, join date. KPI strip with total subscribers, confirmed count, active briefings, and total issues.
+4. ✅ **Issues tab** — Generate new issues per briefing (draft status with placeholder HTML), view all issues with title/status/sent-count/date, send draft issues to subscribers via Resend. Send button with loading state and result feedback.
+5. ✅ **Test Send tab** — Send test emails to any address, optionally styled to match a specific briefing's template. Uses Resend API via edge function.
+6. ✅ **Service layer extended** — `briefingService.ts` now has `admin.*` methods (`listAllCatalog`, `listSubscribers`, `listIssues`, `generateIssue`, `sendIssue`, `sendTest`, `updateCatalog`) all using JWT auth via `supabase.auth.getSession()`.
+7. ✅ **Edge function enhanced** — `briefing-handler` now supports `update_catalog` action (admin-only, JWT + `manage_settings`) for toggling briefing active status. `list_catalog` supports `include_all` for admin (returns all briefings; public still sees only active).
+
+**Design:** Tab-based interface with 4 tabs (Catalog, Subscribers, Issues, Test Send) using WAKILISHA design tokens. KPI summary strip at top. Data tables with status badges, hover states, and responsive column visibility. Loading spinners, error states with retry buttons, empty states with helpful messages.
+
+**Files:**
+- `src/pages/admin/settings/email-briefings/page.tsx` — Complete rewrite (340 lines → real data-backed)
+- `src/services/briefingService.ts` — Extended with `admin` namespace + `adminPost()` helper
+- `supabase/functions/briefing-handler/index.ts` — Added `update_catalog` + `include_all` support
+
+### Phase 4: Automation ✅ COMPLETE (June 2026)
+
+**What was built:**
+
+1. **pg_cron scheduled generation** — Daily cron job at 6am UTC calls `briefing_cron_generate()` Postgres function, which uses `pg_net.http_post` to invoke `briefing-handler`'s `cron_generate` action. The edge function checks `CRON_SECRET` for authorization, reads `briefing_catalog` for briefings due on that day-of-week, and generates draft issues for each. Skips briefings that already have an issue for the current ISO week.
+
+2. **Resend webhook tracking** — New webhook endpoint at `/functions/v1/briefing-handler/webhook`. Accepts Resend webhook events (delivered, opened, clicked, bounced, complained) with SVIX signature verification via `RESEND_WEBHOOK_SECRET`. Updates `briefing_issue_recipients` rows matched by `resend_message_id` — sets `opened_at`, `clicked_at`, `bounced_at` and appends events to `webhook_events` JSONB.
+
+3. **List-Unsubscribe header (RFC 8058)** — Every sent briefing email now includes `List-Unsubscribe` and `List-Unsubscribe-Post` headers with both mailto (one-click unsubscribe) and URL options. Fully compliant with Gmail/Yahoo sender requirements.
+
+4. **Content engine** — Replaced placeholder HTML generation with real content pulled from the WAKILISHA registry and content tables:
+   - **Articles** — Latest 4 published articles from `wk_articles`
+   - **Chart highlights** — Top 5 chart entries from `wk_chart_entries_v2` with rank, movement, and chart name
+   - **New releases** — Latest 3 releases from `registry_releases` with artist names and artwork
+   - **Featured artists** — Latest 3 artists from `registry_artists` with bio excerpts
+   - Each briefing type gets its visual_config accent colors applied to the email template
+   - Both HTML and plain-text versions generated
+
+5. **Database schema updates** — Added `bounced_at`, `webhook_events` (JSONB), and `resend_message_id` columns to `briefing_issue_recipients` for webhook tracking.
+
+6. **Admin page enhanced** — 8-column KPI strip now shows Sent, Opens, Clicks, and Bounces. Issues table shows engagement percentages (open rate, click rate). Webhook setup panel with endpoint URL and configuration instructions. Content engine stats displayed on issue generation (articles, charts, releases, artists counts).
+
+**Cron setup:**
+- Extension: `pg_cron` + `pg_net` installed
+- Function: `briefing_cron_generate()` calls edge function with `CRON_SECRET` from `app.briefing_cron_secret` Postgres setting
+- Schedule: Daily at 6am UTC (`0 6 * * *`)
+- Job name: `briefing-daily-generate`
+
+**Secrets to configure:**
+
+| Secret | Where | Purpose |
+|--------|-------|---------|
+| `CRON_SECRET` | Edge Function secrets + `app.briefing_cron_secret` Postgres setting | Auth between pg_cron and edge function |
+| `RESEND_WEBHOOK_SECRET` | Edge Function secrets + Resend dashboard | SVIX signature verification for webhooks |
+| `RESEND_API_KEY` | Edge Function secrets | Resend API key |
+| `RESEND_FROM_EMAIL` | Edge Function secrets | Sender email address |
+| `RESEND_FROM_NAME` | Edge Function secrets | Sender display name |
+
+**Resend webhook URL:** `{SUPABASE_URL}/functions/v1/briefing-handler/webhook`
+
+### Phase 6: Cadence Refactor, Delete Issue, Identity Branding ✅ COMPLETE (June 2026)
+
+**What was built:**
+
+1. **Deleted the hardcoded cadence model** — Removed `weekly`, `biweekly`, etc. as fixed cadences. Replaced with `send_every_days` (integer) + `is_manual` (boolean) per briefing. Admin sets "Send every N days at HH:MM UTC" or toggles Manual mode. The pg_cron handler checks interval-based recency instead of day-of-week.
+
+2. **Delete Issue** — Admin can delete any draft issue (trash icon → inline confirmation row). Sent issues are protected (cannot be deleted). The edge function deletes recipient rows then the issue row.
+
+3. **Identity branding in emails** — `briefingService.ts` now reads Site Identity settings (`getSiteIdentitySettings()`) and injects `brand_name`, `brand_logo_url`, `brand_favicon_url` into every `generate_issue`, `preview_issue`, `send_issue`, and `send_test` call. The edge function uses the logo URL in the email header — if a logo URL is set, it renders as an `<img>` tag; if not, it falls back to the text brand name.
+
+4. **Admin can publish regardless of timing** — The `generate_issue` action no longer checks for an existing issue for the current ISO week. Admin can generate multiple issues per week per briefing whenever needed.
+
+5. **Cadence editor** — Inline per-briefing cadence editor in the Catalog tab. Clicking the pencil icon expands a panel with: Scheduled vs Manual toggle, quick presets (Daily/Weekly/Biweekly/Monthly), custom interval input (1–365 days), send time picker (UTC). Saves via `update_catalog` edge function action.
+
+**Files:**
+- `supabase/functions/briefing-handler/index.ts` — v4: delete_issue, branding passthrough, interval-based cron, no admin duplicate check
+- `src/services/briefingService.ts` — getBrandingPayload(), deleteIssue(), updated updateCatalog type
+- `src/pages/admin/settings/email-briefings/page.tsx` — CadenceEditor component, delete confirm row, CadenceBadge
+- Database: `briefing_catalog` updated with `send_every_days INT`, `is_manual BOOLEAN`
+
+### Phase 5: Analytics Integration + Issue Preview ✅ COMPLETE (June 2026)
+
+**What was built:**
+
+1. **Full analytics pipeline** — Every briefing interaction now flows into `analytics_events` (the same first-party analytics table used by the main WAKILISHA analytics system):
+   - **Client-side events** (via `trackEvent()`): `briefing_confirm_success`, `briefing_confirm_error`, `briefing_confirm_expired`, `briefing_confirm_already`, `briefing_unsubscribe`, `briefing_unsubscribe_expired`, `briefing_unsubscribe_error`, `briefing_resubscribe_click`, `briefing_preferences_view`, `briefing_preferences_save`, `briefing_preferences_unsubscribe_all`
+   - **Server-side events** (via edge function `trackAnalyticsEvent()`): `briefing_subscribe`, `briefing_confirm_success`, `briefing_unsubscribe`, `briefing_issue_generated`, `briefing_issue_sent`, `briefing_test_sent`
+   - **Webhook-driven events** (from Resend → edge function → analytics_events): `briefing_email_delivered`, `briefing_email_opened`, `briefing_email_clicked`, `briefing_email_bounced`, `briefing_email_complained`
+   - All events carry context: email, subscriber_id, briefing slugs, source pages, session IDs, referrer data
+
+2. **Attributable customer journeys** — The full funnel is now trackable end-to-end:
+   - Subscribe event carries `page_url`, `page_type`, `session_id`, and `referrer` — you know exactly which page and campaign drove the signup
+   - Confirm events link back to subscriber_id
+   - Webhook events (delivered/opened/clicked/bounced) carry `message_id`, `recipient_id`, `subscriber_id`, and `issue_id`
+   - Source attribution shows which pages/types are generating the most subscriptions
+
+3. **Issue preview modal** — Two ways to preview:
+   - **Pre-generate preview**: Eye icon next to each "Generate" button in the Issues tab — generates the full HTML without saving to the database, opens in a modal with an iframe renderer
+   - **Post-generate preview**: Eye icon on every issue row in the issues table — opens existing issue HTML in the same modal
+   - Modal features: "Open in new tab" button, "Copy HTML" button, full email rendering with WAKILISHA branding
+
+4. **Analytics tab in admin** — New 5th tab "Analytics" replacing the old 4-tab layout:
+   - **Live counts KPI row**: Total subscribers, confirmed, total sent, opens, clicks, bounces, open rate, click rate
+   - **Customer journey funnel**: Subscribed → Confirmed → Emails Delivered → Opened → Clicked with percentage drop-off between each step
+   - **Daily engagement timeline**: Stacked area chart showing subscribes, confirms, opens, clicks over time
+   - **Subscription sources**: Bar chart showing which page types generate the most subscriptions
+   - **Per-briefing engagement table**: Each briefing with subscribers, sent volume, open rate, click rate — active/inactive status indicators
+   - **Event counts summary**: Tag-style breakdown of all briefing event types with counts
+   - Period selector: 7d, 30d, 90d, 365d
+
+5. **Edge function additions**:
+   - `preview_issue` action — generates HTML for a briefing without persisting, returns `html_body` and `content_stats`
+   - `briefing_analytics` action — admin-only, queries `analytics_events` for all `briefing_*` events plus cross-references `briefing_catalog`, `briefing_subscribers`, `briefing_opt_ins`, `briefing_issues`, and `briefing_issue_recipients` for live counts and per-briefing stats
+   - `trackAnalyticsEvent()` helper — server-side analytics insert using service_role key (used by webhook handler and admin actions)
+   - Webhook handler now fires `briefing_email_*` analytics events for each Resend webhook event (delivered, opened, clicked, bounced, complained)
+
+6. **Service layer additions** (`briefingService.ts`):
+   - `admin.previewIssue(briefingSlug)` — returns preview HTML + content stats
+   - `admin.getBriefingAnalytics(days)` — returns live counts, event counts, daily timeline, source attribution, per-briefing stats
+
+**Files:**
+- `supabase/functions/briefing-handler/index.ts` — v3 with preview_issue, briefing_analytics, analytics tracking
+- `src/services/briefingService.ts` — Added previewIssue + getBriefingAnalytics methods
+- `src/pages/admin/settings/email-briefings/page.tsx` — Rebuilt with Analytics tab + Preview modal
+- `src/pages/briefing/confirm/page.tsx` — Added 4 trackEvent calls
+- `src/pages/briefing/unsubscribe/page.tsx` — Added 4 trackEvent calls
+- `src/pages/briefing/preferences/page.tsx` — Added 3 trackEvent calls
+
+**Files:**
+- `supabase/functions/briefing-handler/index.ts` — v2 with cron_generate, webhook handler, content engine, RFC 8058 headers
+- `src/pages/admin/settings/email-briefings/page.tsx` — Enhanced with engagement metrics and webhook setup panel
+- Database: `briefing_issue_recipients` updated with `bounced_at`, `webhook_events`, `resend_message_id`
+- pg_cron: `briefing_cron_generate()` function + `briefing-daily-generate` schedule
+
+### Key Design Decisions (vs WordPress)
+
+| Decision | Old WordPress | New WAKILISHA | Why |
+|----------|--------------|---------------|-----|
+| Confirmation tokens | WordPress transients (cache flush = dead) | UUID tokens in DB with 7-day TTL | Survives cache flushes, server reboots |
+| Issue storage | One row per recipient per week | One row per issue + recipient tracking table | Avoids storage explosion (3 subscribers × 13 briefings × 52 weeks = 2,028 rows → scales to millions) |
+| Email delivery | `wp_mail()` | Resend API | Production deliverability, bounce handling, analytics |
+| Scheduling | WordPress cron (fake 2x/week) | pg_cron (Phase 4) | Actual scheduling for biweekly and on-demand briefings |
+| Unsubscribe | Incomplete — pointed to `/newsletters/` | One-click token-based with 365-day validity | CAN-SPAM/GDPR compliance |
+| "Generate/Send/Preview" | WordPress admin panel | React admin with briefing-handler API | Integrated with WAKILISHA design system |
+
+### Files
+
+- `supabase/functions/briefing-handler/index.ts` — Edge Function (deployed)
+- Database tables: `briefing_catalog`, `briefing_subscribers`, `briefing_opt_ins`, `briefing_tokens`, `briefing_issues`, `briefing_issue_recipients`

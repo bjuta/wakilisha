@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { WkButton } from "@/components/design-system/primitives/Button";
 import { trackEvent, getAnalyticsSessionId, getCanonicalPageUrl } from "@/services/analytics";
+import { submitForm } from "@/services/formService";
 
 function useScrollReveal() {
   useEffect(() => {
@@ -26,16 +27,24 @@ function AboutNewsletter() {
   const [email, setEmail] = useState("");
   const [done, setDone] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    if (!email.trim()) {
-      e.preventDefault();
-      return;
-    }
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim()) return;
+
+    const form = e.currentTarget as HTMLFormElement;
+    const formData = new FormData(form);
+    const submission: Record<string, string> = { form_type: "newsletter" };
+    formData.forEach((value, key) => {
+      submission[key] = String(value);
+    });
+
     trackEvent("newsletter_signup", {
       pageType: "about",
       context: { sourceSection: "newsletter_footer", formId: "about-newsletter" },
     });
-    setDone(true);
+
+    const result = await submitForm(submission);
+    if (result.success) setDone(true);
   };
 
   return (
@@ -59,7 +68,7 @@ function AboutNewsletter() {
           <p className="text-[14px] text-[var(--wk-text-muted)] leading-relaxed mb-8">
             Chart updates, new guides, editorial deep-dives, and early access to everything we build across African creative life.
           </p>
-          <form onSubmit={handleSubmit} action="https://readdy.ai/api/form/d8qguptcg4qspo125j50" method="POST" data-readdy-form="" className="flex gap-3 max-w-[480px] mx-auto">
+          <form onSubmit={handleSubmit} className="flex gap-3 max-w-[480px] mx-auto">
             <input type="hidden" name="wk_session_id" value={getAnalyticsSessionId()} />
             <input type="hidden" name="wk_page_url" value={getCanonicalPageUrl()} />
             <input type="hidden" name="wk_page_type" value="about" />

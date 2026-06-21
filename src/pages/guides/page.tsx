@@ -56,7 +56,6 @@ function GuidesNewsletter() {
   return (
     <section className="guides-reveal">
       <NewsletterSubscribe
-        formAction="https://readdy.ai/api/form/d8qhqude8ise6dlc8d90"
         formId="guides-newsletter-form"
         headline="Guides delivered first"
         description="Get WAKILISHA guides — field reports, dossiers, literary projects — as soon as they launch. No noise, just signal."

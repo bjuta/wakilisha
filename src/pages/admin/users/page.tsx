@@ -205,6 +205,14 @@ export default function AdminUsersPage() {
     setLoading(true);
     setLoadError(null);
     try {
+      // Ensure we have a valid session before loading
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !session) {
+        setLoadError("Your session has expired. Please sign in again.");
+        setLoading(false);
+        return;
+      }
+
       const [profilesRes, rolesRes, scopesRes, invitesRes, auditsRes, recoveryRes] = await Promise.all([
         supabase
           .from("user_profiles")
@@ -242,14 +250,14 @@ export default function AdminUsersPage() {
           .limit(25),
       ]);
 
-      // Check each result for errors
-      for (const res of [profilesRes, rolesRes, scopesRes, invitesRes, auditsRes, recoveryRes]) {
-        if (res.error) throw res.error;
-      }
+      // Core tables must succeed — profiles and roles are required
+      if (profilesRes.error) throw profilesRes.error;
+      if (rolesRes.error) throw rolesRes.error;
 
       const profiles = (profilesRes.data ?? []) as ProfileRow[];
       const roles = (rolesRes.data ?? []) as AssignmentRow[];
-      const scopes = (scopesRes.data ?? []) as AccessScope[];
+      // Non-critical tables: silently fall back to empty on RLS/permission errors
+      const scopes = (scopesRes.error ? [] : (scopesRes.data ?? [])) as AccessScope[];
 
       const userIds = new Set(
         [
@@ -284,9 +292,9 @@ export default function AdminUsersPage() {
           ),
       );
 
-      setInvites((invitesRes.data ?? []) as InviteRow[]);
-      setAudits((auditsRes.data ?? []) as AuditRow[]);
-      setRecoveries((recoveryRes.data ?? []) as RecoveryRow[]);
+      setInvites((invitesRes.error ? [] : (invitesRes.data ?? [])) as InviteRow[]);
+      setAudits((auditsRes.error ? [] : (auditsRes.data ?? [])) as AuditRow[]);
+      setRecoveries((recoveryRes.error ? [] : (recoveryRes.data ?? [])) as RecoveryRow[]);
     } catch (err) {
       setLoadError(
         err instanceof Error ? err.message : "Failed to load access console data.",

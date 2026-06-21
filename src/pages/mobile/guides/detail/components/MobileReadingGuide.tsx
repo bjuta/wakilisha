@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { trackEvent, getAnalyticsSessionId, getCanonicalPageUrl } from "@/services/analytics";
+import { submitForm } from "@/services/formService";
 import { readingGuide, prologueChapter } from "@/pages/guides/detail/readingData";
 import { MobileShareButton } from "@/components/design-system/share/ShareSheet";
 
@@ -15,7 +16,11 @@ export default function MobileReadingGuide() {
   const guideSlug = "the-day-reading-changed";
   const guideTitle = "The Day Reading Changed";
 
-  const handleNotifySubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const [notifyStatus, setNotifyStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
+
+  const handleNotifySubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
     trackEvent("newsletter_signup", {
       pageType: "guide_detail",
       entitySlug: guideSlug,
@@ -26,6 +31,21 @@ export default function MobileReadingGuide() {
         guide_slug: guideSlug,
       },
     });
+
+    setNotifyStatus("submitting");
+    const form = e.currentTarget;
+    const formData = new FormData(form);
+    const submission: Record<string, string> = { form_type: "guide_download" };
+    formData.forEach((value, key) => {
+      submission[key] = String(value);
+    });
+
+    const result = await submitForm(submission);
+    if (result.success) {
+      setNotifyStatus("success");
+    } else {
+      setNotifyStatus("error");
+    }
   };
 
   // Reading progress tracking
@@ -200,9 +220,6 @@ export default function MobileReadingGuide() {
           <h3 className="text-[18px] font-black text-[var(--wk-text)] mt-1 mb-1">{readingGuide.nextChapter.title}</h3>
           <p className="text-[13px] text-[var(--wk-text-muted)] mb-5">{readingGuide.nextChapter.subtitle}</p>
           <form
-            action="https://readdy.ai/api/form/d8m5rsojb57qogjbh760"
-            method="POST"
-            data-readdy-form=""
             onSubmit={handleNotifySubmit}
             className="space-y-3"
           >
@@ -214,8 +231,8 @@ export default function MobileReadingGuide() {
               type="email" name="email" placeholder="Your email address" required
               className="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-4 py-3 text-[13px] text-[var(--wk-text)] placeholder:text-[var(--wk-text-faint)] outline-none focus:border-[var(--wk-brand)]/40"
             />
-            <button type="submit" className="w-full rounded-lg px-4 py-3 text-[13px] font-bold text-white active:scale-[0.98] transition-transform whitespace-nowrap cursor-pointer" style={{ background: "#C4A35A" }}>
-              Notify me when Chapter One drops
+            <button type="submit" disabled={notifyStatus === "submitting" || notifyStatus === "success"} className="w-full rounded-lg px-4 py-3 text-[13px] font-bold text-white active:scale-[0.98] transition-transform whitespace-nowrap cursor-pointer disabled:opacity-60" style={{ background: "#C4A35A" }}>
+              {notifyStatus === "submitting" ? "Submitting..." : notifyStatus === "success" ? "You're on the list!" : "Notify me when Chapter One drops"}
             </button>
           </form>
         </div>

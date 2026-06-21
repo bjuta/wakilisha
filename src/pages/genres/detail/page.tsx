@@ -299,7 +299,6 @@ export default function GenreDetail() {
           {/* ── Newsletter ── */}
           <section>
             <NewsletterSubscribe
-              formAction="https://readdy.ai/api/form/d8qhqude8ise6dlc8d7g"
               formId="genre-newsletter-form"
               headline={`Stay on the ${genre.name} pulse.`}
               description={`Get updates on ${genre.name} releases, chart movements, and new artists as they break through.`}
