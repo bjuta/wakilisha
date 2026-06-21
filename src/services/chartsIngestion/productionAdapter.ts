@@ -369,17 +369,69 @@ export async function applyRowMatchDecision(
 
 /** Aggregate KPI metrics from the DB. */
 export async function getIngestKpis(): Promise<IngestStudioKpi> {
-  return invokeApi<IngestStudioKpi>("get_kpis");
+  const raw = await invokeApi<{
+    totalRuns: number;
+    completedRuns: number;
+    failedRuns: number;
+    committedRuns: number;
+    activeRuns: number;
+    avgDurationMs: number;
+    pipelineHealth: string;
+  }>("get_kpis");
+
+  // Map edge function response to the UI's IngestStudioKpi shape
+  return {
+    editionsThisWeek: raw.completedRuns ?? 0,
+    canonicalMatchRate: raw.totalRuns > 0 ? ((raw.committedRuns ?? 0) / raw.totalRuns) * 100 : 0,
+    rowsAwaitingReview: raw.activeRuns ?? 0,
+    averageRunTimeMs: raw.avgDurationMs ?? 0,
+  };
 }
 
 /** Recent pipeline activity from audit events. */
 export async function getRecentIngestActivity(): Promise<
   RecentIngestActivity[]
 > {
-  const { activity } = await invokeApi<{
-    activity: RecentIngestActivity[];
+  const raw = await invokeApi<{
+    activity: Array<{
+      id: string;
+      runId: string;
+      actor: string;
+      action: string;
+      timestamp: string;
+      message: string;
+    }>;
   }>("get_activity");
-  return activity ?? [];
+
+  // Map edge function response to the UI's RecentIngestActivity shape
+  return (raw.activity ?? []).map((item) => ({
+    id: item.id,
+    type: mapActionToActivityType(item.action),
+    chartTitle: item.message || item.action,
+    runId: item.runId,
+    status: mapActionToStatus(item.action),
+    actor: item.actor,
+    createdAt: item.timestamp,
+  }));
+}
+
+function mapActionToActivityType(action: string): RecentIngestActivity["type"] {
+  if (action.includes("commit") || action === "run_committed" || action === "published") return "commit";
+  if (action.includes("cancel")) return "cancel";
+  if (action.includes("retry")) return "retry";
+  if (action.includes("review") || action.includes("gap")) return "review";
+  return "dry_run";
+}
+
+function mapActionToStatus(action: string): IngestRunStatus {
+  if (action.includes("commit") || action === "run_committed") return "committed";
+  if (action === "published") return "published";
+  if (action.includes("cancel")) return "cancelled";
+  if (action.includes("failed") || action.includes("error")) return "failed";
+  if (action.includes("review")) return "needs_review";
+  if (action.includes("dry_run_complete")) return "dry_run_complete";
+  if (action.includes("running")) return "running";
+  return "queued";
 }
 
 /** Resource guard status for a specific run. */
