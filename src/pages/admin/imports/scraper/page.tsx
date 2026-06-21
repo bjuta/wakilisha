@@ -324,7 +324,7 @@ export default function ScraperPage() {
             <span className="text-[13px] font-semibold text-wk-text">Bio only</span>
             {singleBioOnly && (
               <span className="rounded-full border border-green-500/30 bg-green-100 px-2 py-0.5 text-[10px] font-bold text-green-700">
-                Skips releases &amp; tracks
+                Skips releases & tracks
               </span>
             )}
           </label>
@@ -531,7 +531,7 @@ export default function ScraperPage() {
               <span className="text-[13px] font-semibold text-wk-text">Bio only</span>
               {batchBioOnly && (
                 <span className="rounded-full border border-green-500/30 bg-green-100 px-2 py-0.5 text-[10px] font-bold text-green-700">
-                  Skips releases &amp; tracks
+                  Skips releases & tracks
                 </span>
               )}
             </label>
@@ -666,7 +666,7 @@ export default function ScraperPage() {
         </div>
         <div className="mt-3 rounded-lg border border-wk-warning/20 bg-wk-warning-soft/30 p-3">
           <p className="text-[11px] leading-5 text-wk-text-muted">
-            <strong>Safe to re-run:</strong> The scraper uses upsert semantics — running it multiple times on the same artist is safe. It won&apos;t create duplicates, and it will fill in any gaps from a previous run.
+            <strong>Safe to re-run:</strong> The scraper uses upsert semantics — running it multiple times on the same artist is safe. It won't create duplicates, and it will fill in any gaps from a previous run.
             Enable <strong>Overwrite existing</strong> to force-update titles, dates, types, artwork, and track metadata on releases that already exist in the registry.
             Always dry-run first to verify extraction quality before committing.
           </p>

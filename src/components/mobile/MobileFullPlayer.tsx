@@ -5,21 +5,6 @@ import { WkIcon } from "@/components/design-system/Icon";
 import { ShareSheet } from "@/components/design-system/share/ShareSheet";
 import { useScrollLock } from "@/hooks/useScrollLock";
 
-const LYRICS = [
-  "The culture lives in the numbers",
-  "From the coast to the valley",
-  "We index the rhythm of the continent",
-  "Charts in motion, every week",
-  "One by one, we count the rise",
-  "From Lagos to Nairobi, we're alive",
-  "Every beat, every rhyme, every soul",
-  "This is where the story gets told",
-  "The numbers don't lie, they don't pretend",
-  "We chart the truth from start to end",
-  "Afrobeats to the world, it's our time",
-  "WAKILISHA, the sound that climbs",
-];
-
 function ActionMenu({
   open,
   onClose,
@@ -115,7 +100,6 @@ export function MobileFullPlayer() {
   const formatTime = (seconds: number) =>
     `${Math.floor(seconds / 60)}:${Math.floor(seconds % 60).toString().padStart(2, "0")}`;
   const pct = Math.max(0, Math.min(1, progress || 0));
-  const activeLyric = Math.floor((currentTime / (duration || 1)) * LYRICS.length) % LYRICS.length;
 
   const remainingCount = queue.length - queueIndex - 1;
   const upcoming = queue.slice(queueIndex + 1);
@@ -247,10 +231,7 @@ export function MobileFullPlayer() {
           </button>
         </div>
 
-        <div className="fp-lyrics">
-          <p className="fp-lyric active">{LYRICS[activeLyric]}</p>
-          <p className="fp-lyric">{LYRICS[(activeLyric + 1) % LYRICS.length]}</p>
-        </div>
+
 
         {hasQueue && (
           <div className="fp-queue-strip">
@@ -303,6 +284,35 @@ export function MobileFullPlayer() {
             </div>
           </div>
         )}
+
+        {/* Lyrics — contribute if no lyrics, link to contribute page if slugs available */}
+        <div className="fp-lyrics">
+          <div className="text-center py-5">
+            <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-[var(--wk-brand-soft)]/50">
+              <WkIcon name="FileText" size={20} className="text-[var(--wk-brand)]" />
+            </div>
+            <p className="text-[13px] font-extrabold text-[var(--wk-text)] mb-1">
+              No lyrics yet
+            </p>
+            <p className="text-[11px] text-[var(--wk-text-muted)] mb-4 max-w-[280px] mx-auto leading-relaxed">
+              Be the first to add timed lyrics for <strong className="text-[var(--wk-text)]">{currentTrack.title}</strong>.
+            </p>
+            {currentTrack.artistSlug && currentTrack.trackSlug ? (
+              <Link
+                to={`/tracks/${currentTrack.artistSlug}/${currentTrack.trackSlug}/lyrics/contribute`}
+                className="inline-flex items-center gap-2 rounded-xl bg-[var(--wk-brand)] text-white px-5 py-2.5 text-[12px] font-extrabold hover:opacity-90 transition-opacity whitespace-nowrap"
+              >
+                <WkIcon name="Edit3" size={14} />
+                Contribute lyrics
+              </Link>
+            ) : (
+              <span className="inline-flex items-center gap-2 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface-raised)] text-[var(--wk-text-muted)] px-5 py-2.5 text-[12px] font-bold whitespace-nowrap">
+                <WkIcon name="Edit3" size={14} />
+                Contribute lyrics
+              </span>
+            )}
+          </div>
+        </div>
       </div>
 
       <ActionMenu

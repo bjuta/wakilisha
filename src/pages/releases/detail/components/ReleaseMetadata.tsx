@@ -1,8 +1,8 @@
 import { Link } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
-import { releaseUrl } from "@/services/repairedContent/client";
-import type { RepairedReleaseDetail } from "@/services/repairedContent/client";
+import { releaseUrl } from "@/services/publicContent/client";
+import type { PublicReleaseDetail } from "@/services/publicContent/client";
 
 export default function ReleaseMetadata({
   release,
@@ -10,7 +10,7 @@ export default function ReleaseMetadata({
   chartTracks,
   chartPositions,
 }: {
-  release: RepairedReleaseDetail;
+  release: PublicReleaseDetail;
   related: Array<{
     slug: string;
     title: string;

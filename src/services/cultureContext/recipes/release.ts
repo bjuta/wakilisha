@@ -74,11 +74,12 @@ function typeHeroIntro(facts: ReleaseFacts): string {
   }
 
   if (facts.releaseType === "ep") {
-    return `${title} is a focused ${trackPrefix(facts)}EP${artists}${released}. Short enough to enter quickly, strong enough to leave a trail.`;
+    return `${title} is a focused ${trackPrefix(facts)}EP${artists}${released}${facts.labelName ? ` via ${facts.labelName}` : ""}. Short enough to enter quickly, strong enough to leave a trail.`;
   }
 
   if (facts.releaseType === "single") {
-    return `${title} is a single${artists}${released}. One song, one moment, and a trail you can follow.`;
+    const labelBit = facts.labelName ? ` via ${facts.labelName}` : "";
+    return `${title} is a single${artists}${released}${labelBit}. One song, one moment, and a trail you can follow.`;
   }
 
   if (facts.releaseType === "compilation" || facts.isCompilation || facts.hasMultipleArtists) {
@@ -131,8 +132,12 @@ function cardBlurb(facts: ReleaseFacts): string {
   const trackText = trackPrefix(facts);
 
   if (facts.releaseType === "album") return `A ${trackText}album${byText}, with songs and context in one place.`;
-  if (facts.releaseType === "ep") return `A focused ${trackText}EP${byText}.`;
-  if (facts.releaseType === "single") return `A single${byText} with release context in WAKILISHA.`;
+  if (facts.releaseType === "ep") return `A focused ${trackText}EP${byText}${facts.labelName ? ` on ${facts.labelName}` : ""}.`;
+  if (facts.releaseType === "single") {
+    const date = releaseDatePhrase(facts);
+    const dateBit = date ? ` (${date})` : "";
+    return `A single${byText}${dateBit}. One song, one moment, and a trail you can follow.`;
+  }
   if (facts.releaseType === "compilation" || facts.isCompilation || facts.hasMultipleArtists) return "A multi-artist release with several voices in one place.";
   if (facts.releaseType === "mixtape") return `A mixtape${byText} with loose cuts, scene energy, and tracks to follow.`;
   if (facts.releaseType === "live") return `A live release${byText}, built around performance, crowd, and moment.`;
@@ -162,14 +167,115 @@ function seoDescription(facts: ReleaseFacts): string {
 }
 
 function whyItMatters(facts: ReleaseFacts): string {
-  if (facts.releaseType === "album") return "Albums give the artist more room to build a world. This page keeps the songs, credits, and chart context together.";
-  if (facts.releaseType === "ep") return "EPs are often where artists test a sound, sharpen a mood, or give fans a quick chapter.";
-  if (facts.releaseType === "single") return "Singles move fast. This page keeps the song connected to the artist, the release moment, and the charts around it.";
-  if (facts.releaseType === "compilation" || facts.isCompilation || facts.hasMultipleArtists) return "Compilations show scenes, networks, and shared moments, not just one artist.";
-  if (facts.releaseType === "mixtape") return "Mixtapes often catch the loose, raw, and experimental side of a sound before it gets polished.";
-  if (facts.releaseType === "live") return "Live releases matter because they keep the room in the music. The crowd, the performance, and the moment all count.";
-  if (facts.releaseType === "soundtrack") return "Soundtracks connect music to film, TV, and visual storytelling. They show how a song can carry a scene.";
-  if (facts.releaseType === "deluxe") return "Deluxe editions stretch an era. They add extra tracks, new context, and more ways into the same project.";
+  if (facts.releaseType === "album") {
+    const title = releaseName(facts);
+    const artists = artistPhrase(facts);
+    const tracks = trackPhrase(facts);
+    const date = releaseDatePhrase(facts);
+    const standout = standoutTrackPhrase(facts);
+    const follow = standout ? ` Start with ${standout}, then follow the rest of the release.` : "";
+    return `${title} is a ${tracks} album${artists}${date ? `, released in ${date}` : ""}. Start here for the full world around this era.${follow}`;
+  }
+  if (facts.releaseType === "ep") {
+    const title = releaseName(facts);
+    const artists = artistPhrase(facts);
+    const tracks = trackPhrase(facts);
+    const date = releaseDatePhrase(facts);
+    const label = facts.labelName ? ` via ${facts.labelName}` : "";
+    const standout = standoutTrackPhrase(facts);
+    const follow = standout ? ` Start with ${standout}, then follow the rest.` : "";
+    const dateBit = date ? `, released in ${date}` : "";
+    return `${title} is a ${tracks} EP${artists}${dateBit}${label}.${follow}`;
+  }
+  if (facts.releaseType === "single") {
+    const title = releaseName(facts);
+    const artists = artistPhrase(facts);
+    const date = releaseDatePhrase(facts);
+    const dateBit = date ? `, released in ${date}` : "";
+    const label = facts.labelName ? ` via ${facts.labelName}` : "";
+    const chartBit = facts.chartEntryCount
+      ? ` It landed on ${pluralize(facts.chartEntryCount, "chart")}${facts.topChartPeak ? `, peaking at #${facts.topChartPeak}` : ""}.`
+      : "";
+    const follow = " Start with the song, then follow the artist for what comes next.";
+    return `${title} is a single${artists}${dateBit}${label}.${chartBit}${follow}`;
+  }
+  if (facts.releaseType === "compilation" || facts.isCompilation || facts.hasMultipleArtists) {
+    const title = releaseName(facts);
+    const artists = artistPhrase(facts);
+    const tracks = trackPhrase(facts);
+    const date = releaseDatePhrase(facts);
+    const dateBit = date ? `, released in ${date}` : "";
+    const chartBit = facts.chartEntryCount
+      ? ` It spans ${pluralize(facts.chartEntryCount, "chart moment")}${facts.topChartPeak ? `, peaking at #${facts.topChartPeak}` : ""}.`
+      : "";
+    const standout = standoutTrackPhrase(facts);
+    const follow = standout
+      ? ` Start with ${standout}, then follow the rest of the voices.`
+      : " Follow the artists and tracks gathered here.";
+    return `${title} is a ${tracks} compilation${artists}${dateBit}.${chartBit}${follow}`;
+  }
+  if (facts.releaseType === "mixtape") {
+    const title = releaseName(facts);
+    const artists = artistPhrase(facts);
+    const tracks = trackPhrase(facts);
+    const date = releaseDatePhrase(facts);
+    const dateBit = date ? `, released in ${date}` : "";
+    const label = facts.labelName ? ` via ${facts.labelName}` : "";
+    const chartBit = facts.chartEntryCount
+      ? ` It landed on ${pluralize(facts.chartEntryCount, "chart")}${facts.topChartPeak ? `, peaking at #${facts.topChartPeak}` : ""}.`
+      : "";
+    const standout = standoutTrackPhrase(facts);
+    const follow = standout ? ` Start with ${standout}, then follow the rest.` : " Follow the tracks for the loose, raw side of the sound.";
+    return `${title} is a ${tracks} mixtape${artists}${dateBit}${label}.${chartBit}${follow}`;
+  }
+  if (facts.releaseType === "live") {
+    const title = releaseName(facts);
+    const artists = artistPhrase(facts);
+    const tracks = trackPhrase(facts);
+    const date = releaseDatePhrase(facts);
+    const dateBit = date ? `, captured in ${date}` : "";
+    const label = facts.labelName ? ` via ${facts.labelName}` : "";
+    const chartBit = facts.chartEntryCount
+      ? ` It reached ${pluralize(facts.chartEntryCount, "chart")}${facts.topChartPeak ? `, peaking at #${facts.topChartPeak}` : ""}.`
+      : "";
+    const standout = standoutTrackPhrase(facts);
+    const follow = standout
+      ? ` Start with ${standout} for the performance, then follow the crowd.`
+      : " Follow the tracks for the room, the crowd, and the moment.";
+    return `${title} is a ${tracks} live release${artists}${dateBit}${label}.${chartBit}${follow}`;
+  }
+  if (facts.releaseType === "soundtrack") {
+    const title = releaseName(facts);
+    const artists = artistPhrase(facts);
+    const tracks = trackPhrase(facts);
+    const date = releaseDatePhrase(facts);
+    const dateBit = date ? `, released in ${date}` : "";
+    const label = facts.labelName ? ` via ${facts.labelName}` : "";
+    const chartBit = facts.chartEntryCount
+      ? ` It connected to ${pluralize(facts.chartEntryCount, "chart moment")}${facts.topChartPeak ? `, peaking at #${facts.topChartPeak}` : ""}.`
+      : "";
+    const standout = standoutTrackPhrase(facts);
+    const follow = standout
+      ? ` Start with ${standout}, then follow the scenes and artists around them.`
+      : " Follow the songs for the scenes they carry.";
+    return `${title} is a ${tracks} soundtrack${artists}${dateBit}${label}.${chartBit}${follow}`;
+  }
+  if (facts.releaseType === "deluxe") {
+    const title = releaseName(facts);
+    const artists = artistPhrase(facts);
+    const tracks = trackPhrase(facts);
+    const date = releaseDatePhrase(facts);
+    const dateBit = date ? `, released in ${date}` : "";
+    const label = facts.labelName ? ` via ${facts.labelName}` : "";
+    const chartBit = facts.chartEntryCount
+      ? ` It extended the era across ${pluralize(facts.chartEntryCount, "chart moment")}${facts.topChartPeak ? `, peaking at #${facts.topChartPeak}` : ""}.`
+      : "";
+    const standout = standoutTrackPhrase(facts);
+    const follow = standout
+      ? ` Start with ${standout}, then loop back to the original project.`
+      : " Start with the extra tracks, then loop back to the original project.";
+    return `${title} is a ${tracks} deluxe edition${artists}${dateBit}${label}.${chartBit}${follow}`;
+  }
   return "This page brings the release, tracks, artists, and context into one place so the moment is easier to follow.";
 }
 

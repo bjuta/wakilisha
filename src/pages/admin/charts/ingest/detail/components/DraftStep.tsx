@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { WkTag } from "@/components/design-system/primitives/Tag";
+import DateRangePicker, { type DateRangeValue } from "@/components/base/DateRangePicker";
 import type { IngestJob, DraftEntry, CsvImportSession } from "@/services/chartsIngestion/types";
 import {
   createDraftEdition,
@@ -27,8 +28,7 @@ type EditionSetupForm = {
   familyId: string;
   editionLabel: string;
   editionDate: string;
-  periodStart: string;
-  periodEnd: string;
+  periodRange: DateRangeValue;
   chartSize: number;
 };
 
@@ -46,8 +46,11 @@ export function DraftStep({ jobId, job, draftEntries, hasBlockingIssues, hasUnre
     familyId: job.chartFamilyId,
     editionLabel: "",
     editionDate: job.editionDate,
-    periodStart: job.periodStart,
-    periodEnd: job.periodEnd,
+    periodRange: {
+      mode: "custom" as const,
+      start: job.periodStart || new Date(Date.now() - 7 * 86400000).toISOString().split("T")[0],
+      end: job.periodEnd || new Date().toISOString().split("T")[0],
+    },
     chartSize: job.chartSize,
   });
   const [selectedEntry, setSelectedEntry] = useState<DraftEntry | null>(null);
@@ -260,23 +263,15 @@ export function DraftStep({ jobId, job, draftEntries, hasBlockingIssues, hasUnre
                 className="mt-1 w-full rounded-md border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[12px] text-[var(--wk-text)]"
               />
             </div>
-            <div>
-              <label className="text-[10px] font-bold uppercase text-[var(--wk-text-muted)]">Period Start</label>
-              <input
-                type="date"
-                value={editionSetup.periodStart}
-                onChange={(e) => setEditionSetup((p) => ({ ...p, periodStart: e.target.value }))}
-                className="mt-1 w-full rounded-md border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[12px] text-[var(--wk-text)]"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] font-bold uppercase text-[var(--wk-text-muted)]">Period End</label>
-              <input
-                type="date"
-                value={editionSetup.periodEnd}
-                onChange={(e) => setEditionSetup((p) => ({ ...p, periodEnd: e.target.value }))}
-                className="mt-1 w-full rounded-md border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[12px] text-[var(--wk-text)]"
-              />
+            <div className="col-span-2 sm:col-span-2 lg:col-span-2">
+              <label className="text-[10px] font-bold uppercase text-[var(--wk-text-muted)]">Period Range</label>
+              <div className="mt-1">
+                <DateRangePicker
+                  value={editionSetup.periodRange}
+                  onChange={(val) => setEditionSetup((p) => ({ ...p, periodRange: val }))}
+                  presets={[]}
+                />
+              </div>
             </div>
           </div>
           <div className="mt-4 flex items-center gap-2">

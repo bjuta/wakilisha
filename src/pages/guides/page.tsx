@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { fetchPublishedGuides } from "@/services/guidePages";
 import type { GuidePageRecord } from "@/pages/guides/detail/sectionTypes";
+import { NewsletterSubscribe } from "@/components/feature/NewsletterSubscribe";
 
 /* ─── Format to visual mapping ─── */
 
@@ -52,45 +53,18 @@ function useGuidesScrollReveal() {
 /* ─── Newsletter ─── */
 
 function GuidesNewsletter() {
-  const [email, setEmail] = useState("");
-  const [done, setDone] = useState(false);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (email.trim()) setDone(true);
-  };
-
   return (
-    <section className="guides-reveal rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] overflow-hidden">
-      {done ? (
-        <div className="py-16 px-6 text-center">
-          <div className="w-14 h-14 rounded-full bg-[var(--wk-brand)] flex items-center justify-center mx-auto mb-5">
-            <i className="ri-check-line text-[28px] text-[var(--wk-brand-on)]" />
-          </div>
-          <h3 className="text-[24px] font-black tracking-[-0.03em] text-[var(--wk-text)] mb-2">You&apos;re on the list</h3>
-          <p className="text-[14px] text-[var(--wk-text-muted)] max-w-[380px] mx-auto leading-relaxed">
-            New guides, field dispatches, and early access delivered to your inbox.
-          </p>
-        </div>
-      ) : (
-        <div className="py-14 px-6 text-center max-w-[580px] mx-auto">
-          <span className="inline-flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.18em] text-[var(--wk-brand)] mb-4">
-            <i className="ri-mail-line text-[15px]" /> Stay ahead of the culture
-          </span>
-          <h2 className="text-[clamp(28px,3vw,38px)] font-black tracking-[-0.04em] text-[var(--wk-text)] leading-tight mb-3">Guides delivered first</h2>
-          <p className="text-[14px] text-[var(--wk-text-muted)] leading-relaxed mb-8">
-            Get WAKILISHA guides — field reports, dossiers, literary projects — as soon as they launch. No noise, just signal.
-          </p>
-          <form onSubmit={handleSubmit} action="https://readdy.ai/api/form/d8mnmb50ihgem5t5p940" method="POST" data-readdy-form="" className="flex gap-3 max-w-[480px] mx-auto">
-            <div className="relative flex-1">
-              <i className="ri-mail-line absolute left-4 top-1/2 -translate-y-1/2 text-[var(--wk-text-faint)] text-[17px] pointer-events-none" />
-              <input type="email" name="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="your@email.com" required className="w-full h-12 rounded-full border border-[var(--wk-border)] bg-[var(--wk-bg)] pl-11 pr-4 text-[14px] text-[var(--wk-text)] placeholder:text-[var(--wk-text-faint)] outline-none focus:border-[var(--wk-brand)] transition-colors" />
-            </div>
-            <button type="submit" className="h-12 px-7 rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] text-[14px] font-extrabold hover:-translate-y-0.5 transition-transform whitespace-nowrap shrink-0 cursor-pointer">Subscribe</button>
-          </form>
-          <p className="mt-4 text-[11px] font-semibold text-[var(--wk-text-faint)]">No spam. Unsubscribe anytime.</p>
-        </div>
-      )}
+    <section className="guides-reveal">
+      <NewsletterSubscribe
+        formAction="https://readdy.ai/api/form/d8qhqude8ise6dlc8d90"
+        formId="guides-newsletter-form"
+        headline="Guides delivered first"
+        description="Get WAKILISHA guides — field reports, dossiers, literary projects — as soon as they launch. No noise, just signal."
+        contextFields={{ wk_page_type: "guides_listing", wk_source_section: "newsletter_footer" }}
+        analytics={{
+          pageType: "guides_listing",
+        }}
+      />
     </section>
   );
 }
@@ -304,7 +278,7 @@ export default function GuidesPage() {
           <div className="max-w-[760px] mx-auto text-center">
             <div className="w-10 h-1 rounded-full bg-[var(--wk-brand)] mx-auto mb-6" />
             <p className="text-[clamp(24px,3.5vw,44px)] font-black tracking-[-0.045em] leading-[0.96] text-[var(--wk-text)]">
-              Culture doesn&apos;t need more noise. It needs signal.
+              Culture doesn't need more noise. It needs signal.
             </p>
             <p className="mt-5 text-[15px] text-[var(--wk-text-muted)] max-w-[480px] mx-auto leading-relaxed">
               Each guide is a focused, edited, resourced route into one corner of African creative life — built to be useful, not just beautiful.

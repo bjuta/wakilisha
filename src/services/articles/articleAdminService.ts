@@ -17,6 +17,7 @@ import {
   generateExcerpt,
   normalizeTaxonomyTerms,
 } from "@/services/articles/contentPipeline";
+import { injectMediaCaptions, buildAssetCaptionMap } from "@/utils/injectMediaCaptions";
 
 /* ─── Raw Supabase Row ─── */
 
@@ -197,12 +198,45 @@ export async function fetchArticleForAdmin(slug: string): Promise<AdminArticleDe
 
   const row = data as ArticleRow & { raw_meta?: Record<string, unknown> };
 
+  let contentHtml = processArticleContentForEditor(row.content_html);
+
+  // Inject captions from media assets for images with data-asset-id
+  if (row.content_html) {
+    const assetIds = extractAssetIdsFromHtml(row.content_html);
+    if (assetIds.length > 0) {
+      try {
+        const { data: assets } = await supabase
+          .from("registry_media_assets")
+          .select("id, title, metadata")
+          .in("id", assetIds);
+
+        if (assets && assets.length > 0) {
+          const captionEntries = (assets as Array<{
+            id: string;
+            title: string | null;
+            metadata: Record<string, unknown> | null;
+          }>).map((a) => ({
+            id: a.id,
+            caption: (a.metadata?.caption as string) || null,
+            altText: (a.metadata?.alt_text as string) || a.title || null,
+            title: a.title || null,
+          }));
+
+          const assetMap = buildAssetCaptionMap(captionEntries);
+          contentHtml = injectMediaCaptions(contentHtml, assetMap);
+        }
+      } catch {
+        // Non-blocking — captions are a nice-to-have
+      }
+    }
+  }
+
   return {
     id: row.id,
     slug: row.slug,
     title: processText(row.title),
     excerpt: processText(row.excerpt) || generateExcerpt(row.content_html),
-    contentHtml: processArticleContentForEditor(row.content_html),
+    contentHtml,
     author: resolveAuthorFromRow(row),
     publishedAt: row.published_at ?? "",
     categories: normalizeTaxonomyTerms(row.categories).map(processText),
@@ -214,6 +248,21 @@ export async function fetchArticleForAdmin(slug: string): Promise<AdminArticleDe
     updatedAt: row.updated_at,
     previewNonce: row.preview_nonce ?? null,
   };
+}
+
+/**
+ * Extract unique data-asset-id values from article HTML content.
+ */
+function extractAssetIdsFromHtml(html: string): string[] {
+  const ids: string[] = [];
+  const regex = /<img[^>]+data-asset-id="([^"]+)"[^>]*>/gi;
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(html)) !== null) {
+    if (match[1] && !ids.includes(match[1])) {
+      ids.push(match[1]);
+    }
+  }
+  return ids;
 }
 
 /**

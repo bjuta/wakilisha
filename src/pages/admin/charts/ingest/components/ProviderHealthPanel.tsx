@@ -120,7 +120,7 @@ export function ProviderHealthPanel() {
         onClick={() => navigate("/admin/charts/ingest-health")}
         className="mt-3 w-full text-[11px] font-semibold text-wk-brand hover:underline text-left"
       >
-        <i className="ri-external-link-line mr-1" />Full API Health &amp; Endpoint Map
+        <i className="ri-external-link-line mr-1" />Full API Health & Endpoint Map
       </button>
     </WkSurface>
   );

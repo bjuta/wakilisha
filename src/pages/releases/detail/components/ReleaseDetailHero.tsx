@@ -1,19 +1,21 @@
 import { useEffect, useState } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
 import { ShareButton } from "@/components/design-system/share/ShareSheet";
+import { usePlayer } from "@/context/PlayerContext";
 import { slugify } from "@/services/publicContent/client";
-import type { RepairedReleaseDetail } from "@/services/repairedContent/client";
-import { buildReleaseHeroIntro, buildReleaseSeoDescription } from "@/services/cultureContext/releaseAdapters";
+import type { PublicReleaseDetail } from "@/services/publicContent/client";
+import { buildReleaseSeoDescription } from "@/services/cultureContext/releaseAdapters";
 
 export default function ReleaseDetailHero({
   release,
   minutes,
 }: {
-  release: RepairedReleaseDetail;
+  release: PublicReleaseDetail;
   minutes: number;
 }) {
   const [hovered, setHovered] = useState(false);
   const [artworkFailed, setArtworkFailed] = useState(false);
+  const { currentTrack, isPlaying, playTrack, togglePlay, toggleShuffle, isShuffle } = usePlayer();
 
   useEffect(() => {
     setArtworkFailed(false);
@@ -21,11 +23,64 @@ export default function ReleaseDetailHero({
 
   const initial = release.title.trim()[0]?.toUpperCase() || "W";
   const canUseArtwork = Boolean(release.artworkUrl && !artworkFailed);
-  const intro = buildReleaseHeroIntro(release);
   const shareDescription = buildReleaseSeoDescription(release);
 
+  const tracks = release.tracks || [];
+  const isThisReleasePlaying = currentTrack && tracks.some((t) => t.id === currentTrack.id);
+
+  const artistSlug = slugify(release.artist);
+
+  const buildQueue = () =>
+    tracks.map((t) => ({
+      id: t.id,
+      title: t.title,
+      artist: t.artist,
+      artworkUrl: t.artworkUrl,
+      duration: t.duration,
+      previewUrl: t.previewUrl,
+      album: release.title,
+      artistSlug,
+      trackSlug: t.slug,
+    }));
+
+  const handlePlay = () => {
+    if (!tracks.length) return;
+
+    // If already playing something from this release, toggle play/pause
+    if (isThisReleasePlaying) {
+      togglePlay();
+      return;
+    }
+
+    const queue = buildQueue();
+    playTrack(queue[0], queue, {
+      pageType: "release_detail",
+      entitySlug: release.slug,
+      entityType: "release",
+      sourceSection: "release_hero",
+    });
+  };
+
+  const handleShuffle = () => {
+    if (!tracks.length) return;
+
+    if (!isShuffle) {
+      toggleShuffle();
+    }
+
+    const queue = buildQueue();
+    // Pick a random track to start
+    const randomIndex = Math.floor(Math.random() * queue.length);
+    playTrack(queue[randomIndex], queue, {
+      pageType: "release_detail",
+      entitySlug: release.slug,
+      entityType: "release",
+      sourceSection: "release_hero",
+    });
+  };
+
   return (
-    <section className="relative overflow-hidden">
+    <section className="relative -mt-16 pt-16 overflow-hidden">
       {/* Ambient blurred background */}
       {canUseArtwork ? (
         <div
@@ -48,15 +103,15 @@ export default function ReleaseDetailHero({
         <div className="flex flex-col lg:flex-row gap-8 lg:gap-12 items-start lg:items-end">
           {/* Album cover */}
           <div
-            className="relative flex-shrink-0 w-[280px] md:w-[340px] lg:w-[380px] aspect-square rounded-2xl overflow-hidden border border-[var(--wk-border)] bg-[var(--wk-surface)]"
-            style={{ boxShadow: "0 32px 80px rgba(0,0,0,0.28)" }}
+            className="relative flex-shrink-0 w-[280px] md:w-[340px] lg:w-[380px] aspect-square overflow-hidden"
             onMouseEnter={() => setHovered(true)}
             onMouseLeave={() => setHovered(false)}
           >
             {canUseArtwork ? (
               <img
                 src={release.artworkUrl}
-                alt={release.title}
+                alt={`${release.title} album artwork`}
+                loading="lazy"
                 className="w-full h-full object-cover transition-transform duration-700 ease-out"
                 style={{ transform: hovered ? "scale(1.04)" : "scale(1)" }}
                 onError={() => setArtworkFailed(true)}
@@ -119,11 +174,6 @@ export default function ReleaseDetailHero({
               )}
             </div>
 
-            {/* Culture Context */}
-            <p className="mt-5 max-w-2xl text-[15px] font-semibold leading-[1.75] text-[var(--wk-text-soft)] md:text-[17px]">
-              {intro}
-            </p>
-
             {/* Featured Artists */}
             {release.featuredArtists && release.featuredArtists.length > 0 && (
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-3 text-[12px] font-semibold text-[var(--wk-text-muted)]">
@@ -167,11 +217,17 @@ export default function ReleaseDetailHero({
 
             {/* Actions */}
             <div className="flex flex-wrap gap-3 mt-8">
-              <button className="inline-flex items-center gap-2.5 rounded-xl bg-[var(--wk-brand)] text-white px-6 py-3 text-[14px] font-extrabold hover:bg-[var(--wk-brand)]/90 transition-colors whitespace-nowrap">
-                <WkIcon name="Play" size={18} />
-                Play
+              <button
+                onClick={handlePlay}
+                className="inline-flex items-center gap-2.5 rounded-xl bg-[var(--wk-brand)] text-white px-6 py-3 text-[14px] font-extrabold hover:bg-[var(--wk-brand)]/90 transition-colors whitespace-nowrap cursor-pointer"
+              >
+                <WkIcon name={isThisReleasePlaying && isPlaying ? "Pause" : "Play"} size={18} />
+                {isThisReleasePlaying && isPlaying ? "Pause" : "Play"}
               </button>
-              <button className="inline-flex items-center gap-2.5 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] text-[var(--wk-text)] px-5 py-3 text-[13px] font-bold hover:bg-[var(--wk-surface-raised)] transition-colors whitespace-nowrap">
+              <button
+                onClick={handleShuffle}
+                className="inline-flex items-center gap-2.5 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] text-[var(--wk-text)] px-5 py-3 text-[13px] font-bold hover:bg-[var(--wk-surface-raised)] transition-colors whitespace-nowrap cursor-pointer"
+              >
                 <WkIcon name="Shuffle" size={16} />
                 Shuffle
               </button>

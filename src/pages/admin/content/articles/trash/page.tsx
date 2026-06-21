@@ -182,7 +182,7 @@ export default function AdminTrashPage() {
             </div>
             <h3 className="text-[16px] font-bold text-wk-text mb-2">Permanently Delete?</h3>
             <p className="text-[13px] text-wk-text-muted mb-1">
-              This will <strong className="text-wk-danger">permanently delete</strong> &quot;{showDeleteConfirm.title}&quot;
+              This will <strong className="text-wk-danger">permanently delete</strong> "{showDeleteConfirm.title}"
               and all its revision history. This action <strong>cannot be undone</strong>.
             </p>
             <p className="text-[12px] text-wk-text-soft bg-wk-bg-subtle rounded-lg px-3 py-2 mb-5 border border-wk-border/50">

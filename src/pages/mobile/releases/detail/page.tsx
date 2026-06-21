@@ -3,8 +3,10 @@ import { useParams, Link } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { MetaTags } from "@/components/seo/MetaTags";
 import { usePlayer } from "@/context/PlayerContext";
-import { getRelease, slugify, listReleases, type RepairedReleaseDetail, type RepairedRelease } from "@/services/repairedContent/client";
+import { getRelease, slugify, listReleases, type PublicReleaseDetail, type PublicRelease } from "@/services/publicContent/client";
 import { trackUrl } from "@/utils/trackUrl";
+import { useScrollDepthTracking } from "@/hooks/useScrollDepthTracking";
+import { MobileShareButton } from "@/components/design-system/share/ShareSheet";
 
 function formatDuration(seconds: number): string {
   if (!seconds) return "—";
@@ -55,7 +57,7 @@ function buildDescription(opts: {
   releaseType: string;
   labelName: string;
   trackCount: number;
-  tracks: RepairedReleaseDetail["tracks"];
+  tracks: PublicReleaseDetail["tracks"];
   totalDuration: number;
 }): string {
   const { title, artist, year, releaseType, labelName, trackCount, tracks, totalDuration } = opts;
@@ -101,12 +103,17 @@ function buildDescription(opts: {
 
 export default function MobileReleaseDetail() {
   const { artistSlug, releaseSlug } = useParams<{ artistSlug: string; releaseSlug: string }>();
-  const [release, setRelease] = useState<RepairedReleaseDetail | null>(null);
-  const [related, setRelated] = useState<RepairedRelease[]>([]);
+
+  useScrollDepthTracking({
+    pageType: "release_detail",
+    entitySlug: releaseSlug,
+    entityType: "release",
+  });
+
+  const [release, setRelease] = useState<PublicReleaseDetail | null>(null);
+  const [related, setRelated] = useState<PublicRelease[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-  const [showShareSheet, setShowShareSheet] = useState(false);
   const [artworkFailed, setArtworkFailed] = useState(false);
   const [expandedDescription, setExpandedDescription] = useState(false);
 
@@ -148,14 +155,7 @@ export default function MobileReleaseDetail() {
     setArtworkFailed(false);
   }, [release?.artworkUrl]);
 
-  const handleShare = () => {
-    navigator.clipboard?.writeText(window.location.href);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-    setShowShareSheet(false);
-  };
-
-  const handlePlayTrack = (track: RepairedReleaseDetail["tracks"][number], trackIndex: number) => {
+  const handlePlayTrack = (track: PublicReleaseDetail["tracks"][number], trackIndex: number) => {
     if (!release) return;
     if (currentTrack?.id === track.id) { togglePlay(); return; }
 
@@ -168,6 +168,8 @@ export default function MobileReleaseDetail() {
       duration: t.duration,
       previewUrl: t.previewUrl,
       album: release.title,
+      artistSlug: slugify(release.artist),
+      trackSlug: t.slug,
     }));
     const remaining = tracks.slice(0, trackIndex).map((t) => ({
       id: t.id,
@@ -177,8 +179,10 @@ export default function MobileReleaseDetail() {
       duration: t.duration,
       previewUrl: t.previewUrl,
       album: release.title,
+      artistSlug: slugify(release.artist),
+      trackSlug: t.slug,
     }));
-    playTrack(queueTracks[0], [...queueTracks, ...remaining]);
+    playTrack(queueTracks[0], [...queueTracks, ...remaining], { pageType: "release_detail", entitySlug: releaseSlug || "", entityType: "release", sourceSection: "tracklist" });
   };
 
   if (status === "loading") {
@@ -249,13 +253,16 @@ export default function MobileReleaseDetail() {
         >
           <i className="ri-arrow-left-line text-lg" />
         </Link>
-        <button
-          onClick={() => setShowShareSheet(true)}
-          className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-md transition-all active:scale-95"
-          aria-label="Share"
-        >
-          <i className="ri-share-line text-lg" />
-        </button>
+        <MobileShareButton
+          item={{
+            title: release?.title || "Release",
+            subtitle: release?.artist,
+            description: release ? `${release.title} by ${release.artist} — ${release.releaseType} released in ${release.year}` : undefined,
+            imageUrl: release?.artworkUrl,
+            type: "album",
+          }}
+          className="pointer-events-auto"
+        />
       </div>
 
       {/* Hero */}
@@ -519,31 +526,6 @@ export default function MobileReleaseDetail() {
         </div>
       </div>
 
-      {/* Share bottom sheet */}
-      {showShareSheet && (
-        <>
-          <div className="fixed inset-0 z-[200] bg-black/50 backdrop-blur-sm" onClick={() => setShowShareSheet(false)} />
-          <div className="fixed bottom-0 left-0 right-0 z-[201] rounded-t-3xl bg-[var(--wk-surface)] p-6 shadow-2xl">
-            <div className="mx-auto mb-5 h-1 w-10 rounded-full bg-[var(--wk-border)]" />
-            <h3 className="mb-5 text-[17px] font-black text-[var(--wk-text)]">Share release</h3>
-            <button
-              onClick={handleShare}
-              className="flex w-full items-center gap-4 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-5 py-4 text-left transition-colors active:bg-[var(--wk-surface-raised)]"
-            >
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--wk-brand-soft)]">
-                <i className={`${copied ? "ri-check-line" : "ri-clipboard-line"} text-[var(--wk-brand)] text-lg`} />
-              </div>
-              <div>
-                <div className="text-[14px] font-bold text-[var(--wk-text)]">{copied ? "Link copied!" : "Copy link"}</div>
-                <div className="text-[12px] text-[var(--wk-text-muted)] break-all">{window.location.href}</div>
-              </div>
-            </button>
-            <button onClick={() => setShowShareSheet(false)} className="mt-3 w-full rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-bg)] py-4 text-[14px] font-bold text-[var(--wk-text-muted)] transition-colors active:bg-[var(--wk-surface-raised)]">
-              Cancel
-            </button>
-          </div>
-        </>
-      )}
     </div>
   );
 }

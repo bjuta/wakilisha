@@ -58,8 +58,22 @@ export function sanitizeVcShortcodes(html: string): string {
   result = result.replace(/\[\/uncode_[^\]]*?\]/gi, '');
 
   // 6. Strip other common WP shortcodes that sneak through
-  //    [caption ...] ... [/caption] — keep inner content
-  result = result.replace(/\[caption[^\]]*?\]([\s\S]*?)\[\/caption\]/gi, '$1');
+  //    [caption ...] ... [/caption] — convert to proper <figure> with <figcaption>
+  //    Preserves the caption structure so image context isn't lost
+  result = result.replace(
+    /\[caption[^\]]*?\]([\s\S]*?)\[\/caption\]/gi,
+    (_match: string, inner: string) => {
+      const alignMatch = _match.match(/align="([^"]*)"/i);
+      const alignClass = alignMatch ? alignMatch[1] : '';
+      const imgMatch = inner.match(/<img[^>]*\/?>/i);
+      if (!imgMatch) return inner.trim();
+      const imgTag = imgMatch[0];
+      const captionText = inner.slice(inner.indexOf(imgTag) + imgTag.length).trim();
+      if (!captionText) return imgTag;
+      const figClass = alignClass ? `wp-caption ${alignClass}` : 'wp-caption';
+      return `<figure class="${figClass}">${imgTag}<figcaption>${captionText}</figcaption></figure>`;
+    }
+  );
 
   //    [gallery ...] — drop entirely (no useful content)
   result = result.replace(/\[gallery[^\]]*?\]/gi, '');

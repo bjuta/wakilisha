@@ -789,7 +789,7 @@ export default function AdminChartsIngestRunDetail() {
             className="inline-flex items-center gap-1 text-[12px] font-semibold text-wk-text-muted hover:text-wk-text transition-colors"
           >
             <WkIcon name="HeartPulse" size={14} />
-            API Health &amp; Endpoint Map
+            API Health & Endpoint Map
           </button>
           <button
             onClick={() => navigate("/admin/charts/review-queue")}

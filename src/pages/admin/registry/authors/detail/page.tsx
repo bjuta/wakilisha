@@ -262,7 +262,7 @@ export default function AuthorDetailPage() {
           <WkIcon name="UserX" size={28} />
         </div>
         <h2 className="text-[18px] font-bold">Author Not Found</h2>
-        <p className="text-[13px] text-[var(--wk-text-muted)]">No author with slug &quot;{slug}&quot;</p>
+        <p className="text-[13px] text-[var(--wk-text-muted)]">No author with slug "{slug}"</p>
         <button
           onClick={() => navigate("/admin/registry/authors")}
           className="wk-button wk-button-secondary wk-button-sm"

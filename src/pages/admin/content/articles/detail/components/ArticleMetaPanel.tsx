@@ -2,12 +2,14 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { MediaPickerButton } from "@/components/admin/MediaPickerButton";
+import { MediaPickerModal } from "@/components/admin/MediaPickerModal";
 import { ArticlePublishTimeline } from "./ArticlePublishTimeline";
 import { ArticleSeoPreview } from "./ArticleSeoPreview";
 import { ArticleSeoAnalyzer } from "./ArticleSeoAnalyzer";
 import { ArticleInternalLinks } from "./ArticleInternalLinks";
 import { ArticleRevisionHistory } from "./ArticleRevisionHistory";
-import { fetchAllAuthors, type AuthorRow } from "@/services/authorProfiles";
+import { ArticleRegistrySearch } from "./ArticleRegistrySearch";
+import { fetchAllAuthors, bustAuthorCache, type AuthorRow } from "@/services/authorProfiles";
 import { supabase } from "@/lib/supabase";
 
 interface SeoMeta {
@@ -44,6 +46,7 @@ interface Props {
   onSeoChange: (v: SeoMeta) => void;
   onSlugChange?: (newSlug: string) => Promise<boolean>;
   onInsertLink?: (url: string) => void;
+  onEmbedRelease?: (marker: string) => void;
   onRestoreDraft?: (payload: {
     title: string;
     excerpt: string;
@@ -63,8 +66,13 @@ interface Props {
   onStatusChange?: (newStatus: string) => void;
   // Preview URL sharing
   previewUrl?: string | null;
+  previewNonce?: string | null;
   isGeneratingPreview?: boolean;
   onGeneratePreviewLink?: () => void;
+  onMagazinePreview?: () => void;
+  // NEW: slug map callbacks so parent can save objects with slugs
+  onCategorySlugMap?: (map: Record<string, string>) => void;
+  onTagSlugMap?: (map: Record<string, string>) => void;
 }
 
 // ── Local date/time helpers ──
@@ -118,6 +126,7 @@ export function ArticleMetaPanel({
   onSeoChange,
   onSlugChange,
   onInsertLink,
+  onEmbedRelease,
   onRestoreDraft,
   onSaveDraft,
   onPublish,
@@ -125,8 +134,12 @@ export function ArticleMetaPanel({
   onDelete,
   onStatusChange,
   previewUrl,
+  previewNonce,
   isGeneratingPreview = false,
   onGeneratePreviewLink,
+  onMagazinePreview,
+  onCategorySlugMap,
+  onTagSlugMap,
 }: Props) {
   // ── Taxonomy term picker state ──
   const [categoryTermOptions, setCategoryTermOptions] = useState<{ id: string; name: string; slug: string }[]>([]);
@@ -138,19 +151,107 @@ export function ArticleMetaPanel({
   const categoryPickerRef = useRef<HTMLDivElement>(null);
   const tagPickerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    Promise.all([
-      supabase.rpc("get_taxonomy_terms", { p_taxonomy: "category" }),
-      supabase.rpc("get_taxonomy_terms", { p_taxonomy: "post_tag" }),
-    ]).then(([catRes, tagRes]) => {
-      if (catRes.data) setCategoryTermOptions(
-        (catRes.data as { id: string; name: string; slug: string }[]).map((t) => ({ id: t.id, name: t.name, slug: t.slug }))
-      );
-      if (tagRes.data) setTagTermOptions(
-        (tagRes.data as { id: string; name: string; slug: string }[]).map((t) => ({ id: t.id, name: t.name, slug: t.slug }))
-      );
-    });
+  // ── Taxonomy slug maps ──
+  const [categorySlugMap, setCategorySlugMap] = useState<Record<string, string>>();
+  const [tagSlugMap, setTagSlugMap] = useState<Record<string, string>>();
+
+  // ── Helper: slugify a term name ──
+  const slugify = useCallback((text: string) => {
+    return text
+      .toLowerCase()
+      .trim()
+      .replace(/[^\w\s-]/g, "")
+      .replace(/[\s_]+/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$/g, "");
   }, []);
+
+  // ── Load taxonomy terms from registry ──
+  const loadTerms = useCallback(async () => {
+    const [catRes, tagRes] = await Promise.all([
+      supabase.rpc("get_taxonomy_terms", {
+        p_taxonomy: "category",
+        p_search: null,
+        p_page: 1,
+        p_page_size: null,
+      }),
+      supabase.rpc("get_taxonomy_terms", {
+        p_taxonomy: "post_tag",
+        p_search: null,
+        p_page: 1,
+        p_page_size: null,
+      }),
+    ]);
+
+    if (catRes.error) {
+      console.error("Failed to load category terms:", catRes.error);
+    } else if (catRes.data) {
+      const rows = (catRes.data as Array<{
+        id: string;
+        name: string;
+        slug: string;
+        [key: string]: unknown;
+      }>).map((t) => ({ id: t.id, name: t.name, slug: t.slug }));
+      setCategoryTermOptions(rows);
+      const map: Record<string, string> = {};
+      for (const r of rows) map[r.name] = r.slug;
+      setCategorySlugMap(map);
+      onCategorySlugMap?.(map);
+    }
+
+    if (tagRes.error) {
+      console.error("Failed to load tag terms:", tagRes.error);
+    } else if (tagRes.data) {
+      const rows = (tagRes.data as Array<{
+        id: string;
+        name: string;
+        slug: string;
+        [key: string]: unknown;
+      }>).map((t) => ({ id: t.id, name: t.name, slug: t.slug }));
+      setTagTermOptions(rows);
+      const map: Record<string, string> = {};
+      for (const r of rows) map[r.name] = r.slug;
+      setTagSlugMap(map);
+      onTagSlugMap?.(map);
+    }
+  }, [onCategorySlugMap, onTagSlugMap]);
+
+  useEffect(() => {
+    loadTerms();
+  }, [loadTerms]);
+
+  // ── Create a new taxonomy term in the registry ──
+  const createTaxonomyTerm = useCallback(async (name: string, taxonomy: "category" | "post_tag") => {
+    const slug = slugify(name);
+    if (!slug) return null;
+
+    const { data, error } = await supabase.rpc("create_taxonomy_term", {
+      p_taxonomy: taxonomy,
+      p_slug: slug,
+      p_name: name,
+      p_description: null,
+    });
+
+    if (error) {
+      // If the term already exists (duplicate slug), fetch it instead
+      if (error.message.includes("already exists")) {
+        const existing = taxonomy === "category"
+          ? categoryTermOptions.find((t) => t.slug === slug || t.name.toLowerCase() === name.toLowerCase())
+          : tagTermOptions.find((t) => t.slug === slug || t.name.toLowerCase() === name.toLowerCase());
+        return existing ?? null;
+      }
+      console.error(`Failed to create ${taxonomy} term:`, error);
+      return null;
+    }
+
+    const rows = data as Array<{ id: string; name: string; slug: string }> | null;
+    const created = rows?.[0];
+    if (created) {
+      // Refresh the full list to include the new term
+      await loadTerms();
+    }
+    return created ?? null;
+  }, [slugify, loadTerms, categoryTermOptions, tagTermOptions]);
 
   useEffect(() => {
     if (!categoryPickerOpen && !tagPickerOpen) return;
@@ -171,24 +272,65 @@ export function ArticleMetaPanel({
     ? tagTermOptions.filter((t) => t.name.toLowerCase().includes(tagSearch.toLowerCase()))
     : tagTermOptions.slice(0, 20);
 
-  const selectCategory = useCallback((name: string) => {
-    if (name && !categories.includes(name)) onCategoriesChange([...categories, name]);
-    setCategorySearch(""); setCategoryPickerOpen(false);
-  }, [categories, onCategoriesChange]);
+  const selectCategory = useCallback(async (name: string) => {
+    if (!name) return;
+    if (categories.includes(name)) {
+      setCategorySearch("");
+      setCategoryPickerOpen(false);
+      return;
+    }
+    // Check if the term exists in the loaded options
+    const existing = categoryTermOptions.find((c) => c.name.toLowerCase() === name.toLowerCase());
+    if (existing) {
+      onCategoriesChange([...categories, existing.name]);
+      setCategorySearch("");
+      setCategoryPickerOpen(false);
+      return;
+    }
+    // Not in registry — create it
+    const created = await createTaxonomyTerm(name, "category");
+    if (created) {
+      onCategoriesChange([...categories, created.name]);
+    } else {
+      // Fallback: add as plain string even if creation failed
+      onCategoriesChange([...categories, name]);
+    }
+    setCategorySearch("");
+    setCategoryPickerOpen(false);
+  }, [categories, onCategoriesChange, categoryTermOptions, createTaxonomyTerm]);
 
-  const selectTag = useCallback((name: string) => {
-    if (name && !tags.includes(name)) onTagsChange([...tags, name]);
-    setTagSearch(""); setTagPickerOpen(false);
-  }, [tags, onTagsChange]);
+  const selectTag = useCallback(async (name: string) => {
+    if (!name) return;
+    if (tags.includes(name)) {
+      setTagSearch("");
+      setTagPickerOpen(false);
+      return;
+    }
+    const existing = tagTermOptions.find((t) => t.name.toLowerCase() === name.toLowerCase());
+    if (existing) {
+      onTagsChange([...tags, existing.name]);
+      setTagSearch("");
+      setTagPickerOpen(false);
+      return;
+    }
+    const created = await createTaxonomyTerm(name, "post_tag");
+    if (created) {
+      onTagsChange([...tags, created.name]);
+    } else {
+      onTagsChange([...tags, name]);
+    }
+    setTagSearch("");
+    setTagPickerOpen(false);
+  }, [tags, onTagsChange, tagTermOptions, createTaxonomyTerm]);
 
   const removeCategory = useCallback((cat: string) => onCategoriesChange(categories.filter((c) => c !== cat)), [categories, onCategoriesChange]);
   const removeTag = useCallback((tag: string) => onTagsChange(tags.filter((t) => t !== tag)), [tags, onTagsChange]);
-
   const [seoOpen, setSeoOpen] = useState(false);
   const [seoAnalyzerOpen, setSeoAnalyzerOpen] = useState(false);
   const [timelineOpen, setTimelineOpen] = useState(false);
   const [seoPreviewOpen, setSeoPreviewOpen] = useState(false);
   const [revisionsOpen, setRevisionsOpen] = useState(false);
+  const [mediaLibraryOpen, setMediaLibraryOpen] = useState(false);
   const [heroUrlInput, setHeroUrlInput] = useState(heroImageUrl);
   const [heroPreviewError, setHeroPreviewError] = useState(false);
   const [slugEditOpen, setSlugEditOpen] = useState(false);
@@ -199,8 +341,26 @@ export function ArticleMetaPanel({
   const [authorList, setAuthorList] = useState<AuthorRow[]>([]);
   const [authorDropdownOpen, setAuthorDropdownOpen] = useState(false);
   const [authorSearch, setAuthorSearch] = useState("");
+  const [authorLoading, setAuthorLoading] = useState(true);
+  const [authorError, setAuthorError] = useState<string | null>(null);
 
-  useEffect(() => { fetchAllAuthors().then(setAuthorList); }, []);
+  const loadAuthors = useCallback(async () => {
+    setAuthorLoading(true);
+    setAuthorError(null);
+    try {
+      bustAuthorCache();
+      const list = await fetchAllAuthors();
+      setAuthorList(list);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to load authors";
+      setAuthorError(msg);
+      console.error("ArticleMetaPanel: failed to load authors", err);
+    } finally {
+      setAuthorLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadAuthors(); }, [loadAuthors]);
 
   useEffect(() => {
     if (!authorDropdownOpen) return;
@@ -285,15 +445,17 @@ export function ArticleMetaPanel({
                 <><WkIcon name="Save" size={13} /> Save Draft</>
               )}
             </button>
-            <a
-              href={`/magazine/${slug}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1.5 rounded-md border border-wk-border bg-wk-bg-subtle px-3 py-2 text-[12px] font-semibold text-wk-text hover:bg-wk-surface-raised transition-colors whitespace-nowrap"
+            <button
+              onClick={onMagazinePreview}
+              disabled={isGeneratingPreview}
+              className="flex items-center gap-1.5 rounded-md border border-wk-border bg-wk-bg-subtle px-3 py-2 text-[12px] font-semibold text-wk-text hover:bg-wk-surface-raised transition-colors disabled:opacity-50 whitespace-nowrap cursor-pointer"
             >
-              <WkIcon name="Eye" size={13} />
-              {isPublished ? "View" : "Preview"}
-            </a>
+              {isGeneratingPreview ? (
+                <><i className="ri-loader-4-line animate-spin text-[13px]" /> Generating…</>
+              ) : (
+                <><WkIcon name="Eye" size={13} /> {isPublished ? "View" : "Preview"}</>
+              )}
+            </button>
           </div>
 
           <div className="border-t border-wk-border" />
@@ -518,7 +680,7 @@ export function ArticleMetaPanel({
               label="Browse Library"
               title="Select Hero Image"
               className="flex-1 justify-center py-2 text-[12px] hover:bg-[var(--wk-surface-raised)]"
-              onSelect={(url) => { setHeroUrlInput(url); setHeroPreviewError(false); onHeroImageSave?.(url); }}
+              onSelect={(assetId, url) => { setHeroUrlInput(url); setHeroPreviewError(false); onHeroImageSave?.(url); }}
             />
             <button
               onClick={() => onHeroImageSave?.(heroUrlInput)}
@@ -534,6 +696,37 @@ export function ArticleMetaPanel({
           </div>
         </div>
       </WkSurface>
+
+      {/* Media Library Quick Access */}
+      <WkSurface className="p-4">
+        <h3 className="text-[11px] font-bold uppercase tracking-wider text-wk-text-muted mb-3 flex items-center gap-1.5">
+          <WkIcon name="Folder" size={12} className="text-wk-text-faint" />
+          Media Library
+        </h3>
+        <div className="space-y-2">
+          <button
+            onClick={() => setMediaLibraryOpen(true)}
+            className="w-full flex items-center justify-center gap-2 rounded-lg border border-[var(--wk-border)] bg-[var(--wk-surface)] py-2.5 text-[12px] font-semibold text-[var(--wk-text-soft)] hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)] hover:border-[var(--wk-brand)] transition-all cursor-pointer whitespace-nowrap"
+          >
+            <i className="ri-image-add-line text-[13px]" />
+            Browse Media Library
+          </button>
+          <p className="text-[11px] text-[var(--wk-text-faint)]">
+            Browse, upload, and manage images. Insert directly into your article content.
+          </p>
+        </div>
+      </WkSurface>
+
+      {/* Media Library Modal */}
+      <MediaPickerModal
+        open={mediaLibraryOpen}
+        onClose={() => setMediaLibraryOpen(false)}
+        onSelect={(_url) => {
+          // Just close — the user is browsing, not selecting for a specific field
+          setMediaLibraryOpen(false);
+        }}
+        title="Media Library"
+      />
 
       {/* Slug */}
       <WkSurface className="p-4">
@@ -603,7 +796,7 @@ export function ArticleMetaPanel({
 
           {authorDropdownOpen && (
             <div className="absolute z-30 left-0 right-0 top-full mt-1 max-h-[240px] overflow-y-auto rounded-lg border border-wk-border bg-wk-surface shadow-lg">
-              {authorSearch.trim() && !filteredAuthors.some((a) => a.name.toLowerCase() === authorSearch.trim().toLowerCase()) && (
+              {authorSearch.trim() && !filteredAuthors.some((a) => a.name.toLowerCase() === authorSearch.trim().toLowerCase()) && !authorLoading && !authorError && (
                 <button
                   onClick={() => { onAuthorChange(authorSearch.trim()); setAuthorDropdownOpen(false); setAuthorSearch(""); }}
                   className="flex w-full items-center gap-3 px-3 py-2.5 text-[13px] text-wk-text hover:bg-wk-surface-raised transition-colors text-left border-b border-wk-border cursor-pointer"
@@ -612,14 +805,33 @@ export function ArticleMetaPanel({
                     <WkIcon name="Pencil" size={12} />
                   </div>
                   <div>
-                    <span className="font-semibold">Use &quot;{authorSearch.trim()}&quot;</span>
+                    <span className="font-semibold">Use "{authorSearch.trim()}"</span>
                     <span className="block text-[10px] text-wk-text-faint">Custom byline</span>
                   </div>
                 </button>
               )}
-              {filteredAuthors.length === 0 ? (
+              {authorLoading ? (
+                <div className="px-3 py-5 text-center">
+                  <i className="ri-loader-4-line animate-spin text-[16px] text-wk-text-faint" />
+                  <span className="block mt-2 text-[12px] text-wk-text-faint">Loading authors…</span>
+                </div>
+              ) : authorError ? (
+                <div className="px-3 py-4 text-center">
+                  <div className="flex items-center justify-center gap-1.5 text-[12px] text-wk-danger mb-2">
+                    <WkIcon name="AlertTriangle" size={13} />
+                    <span>Failed to load authors</span>
+                  </div>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); loadAuthors(); }}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-wk-border bg-wk-bg-subtle px-3 py-1.5 text-[11px] font-semibold text-wk-brand hover:bg-wk-brand-soft transition-colors cursor-pointer whitespace-nowrap"
+                  >
+                    <WkIcon name="RefreshCw" size={11} />
+                    Retry
+                  </button>
+                </div>
+              ) : filteredAuthors.length === 0 ? (
                 <div className="px-3 py-4 text-center text-[12px] text-wk-text-faint">
-                  {authorList.length === 0 ? "Loading authors…" : "No authors match."}
+                  No authors match.
                 </div>
               ) : (
                 filteredAuthors.map((a) => (
@@ -684,7 +896,7 @@ export function ArticleMetaPanel({
                 {categorySearch.trim() && !categoryTermOptions.some((c) => c.name.toLowerCase() === categorySearch.trim().toLowerCase()) && (
                   <button onClick={() => selectCategory(categorySearch.trim())} className="flex w-full items-center gap-2 px-3 py-2.5 text-[13px] text-left hover:bg-wk-surface-raised transition-colors cursor-pointer border-b border-wk-border">
                     <div className="flex h-6 w-6 items-center justify-center rounded-full bg-wk-brand-soft text-wk-brand shrink-0"><WkIcon name="Plus" size={11} /></div>
-                    <span className="font-semibold">Create &quot;{categorySearch.trim()}&quot;</span>
+                    <span className="font-semibold">Create "{categorySearch.trim()}"</span>
                   </button>
                 )}
                 {filteredCategoryOptions.map((c) => (
@@ -739,7 +951,7 @@ export function ArticleMetaPanel({
                 {tagSearch.trim() && !tagTermOptions.some((t) => t.name.toLowerCase() === tagSearch.trim().toLowerCase()) && (
                   <button onClick={() => selectTag(tagSearch.trim())} className="flex w-full items-center gap-2 px-3 py-2.5 text-[13px] text-left hover:bg-wk-surface-raised transition-colors cursor-pointer border-b border-wk-border">
                     <div className="flex h-6 w-6 items-center justify-center rounded-full bg-wk-surface-raised text-wk-text-muted shrink-0"><WkIcon name="Plus" size={11} /></div>
-                    <span className="font-semibold">Create &quot;{tagSearch.trim()}&quot;</span>
+                    <span className="font-semibold">Create "{tagSearch.trim()}"</span>
                   </button>
                 )}
                 {filteredTagOptions.map((t) => (
@@ -761,6 +973,12 @@ export function ArticleMetaPanel({
         categories={categories}
         tags={tags}
         onInsertLink={onInsertLink}
+      />
+
+      {/* Registry Release Search — embed or link releases */}
+      <ArticleRegistrySearch
+        onInsertLink={onInsertLink}
+        onEmbedRelease={onEmbedRelease}
       />
 
       {/* SEO Panel */}
@@ -826,7 +1044,7 @@ export function ArticleMetaPanel({
         <button onClick={() => setSeoPreviewOpen(!seoPreviewOpen)} className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-wk-surface-raised transition-colors">
           <div className="flex items-center gap-2">
             <WkIcon name="Share2" size={14} className="text-wk-text-muted" />
-            <h3 className="text-[11px] font-bold uppercase tracking-wider text-wk-text-muted">SEO &amp; Social Preview</h3>
+            <h3 className="text-[11px] font-bold uppercase tracking-wider text-wk-text-muted">SEO & Social Preview</h3>
           </div>
           <WkIcon name={seoPreviewOpen ? "ChevronUp" : "ChevronDown"} size={14} className="text-wk-text-faint" />
         </button>

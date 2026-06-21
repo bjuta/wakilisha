@@ -177,7 +177,7 @@ export default function GenreDetailPage() {
           <WkIcon name="FileX" size={28} />
         </div>
         <h2 className="text-[18px] font-bold text-wk-text">Genre Not Found</h2>
-        <p className="text-[13px] text-wk-text-muted">No genre with slug &quot;{slug}&quot;</p>
+        <p className="text-[13px] text-wk-text-muted">No genre with slug "{slug}"</p>
         <button onClick={() => navigate("/admin/registry/genres")} className="wk-button wk-button-secondary wk-button-sm">
           <WkIcon name="ArrowLeft" size={14} /> Back to Genres
         </button>
@@ -281,7 +281,7 @@ export default function GenreDetailPage() {
               <WkIcon name="Trash2" size={22} />
             </div>
             <h3 className="text-[16px] font-bold text-wk-text mb-2">Archive Genre?</h3>
-            <p className="text-[13px] text-wk-text-muted mb-5">This will set the genre status to &quot;archived&quot;. You can restore it later.</p>
+            <p className="text-[13px] text-wk-text-muted mb-5">This will set the genre status to "archived". You can restore it later.</p>
             <div className="flex gap-3">
               <button onClick={() => setShowDelete(false)} className="wk-button wk-button-secondary wk-button-sm flex-1 whitespace-nowrap">Cancel</button>
               <button onClick={() => { setShowDelete(false); handleDelete(); }} className="wk-button wk-button-sm flex-1 whitespace-nowrap bg-wk-danger text-white hover:opacity-90 border border-wk-danger">Yes, Archive</button>

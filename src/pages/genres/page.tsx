@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
 import { ShareButton } from "@/components/design-system/share/ShareSheet";
 import { WkIcon } from "@/components/design-system/Icon";
@@ -10,137 +10,148 @@ import {
   type GenreCatalogStats,
 } from "@/services/publicContent/client";
 
-const filters = ["All", "High activity", "Artist-rich", "Track-rich", "Recently updated"];
-const PAGE_SIZE = 24;
+type SortKey = "activity" | "name";
 
-function useScrollReveal(deps: unknown[] = []) {
+const ALL = "All";
+const INITIAL_LIMIT = 24;
+const LOAD_MORE_LIMIT = 20;
+
+const activityFilters = ["All", "High activity", "Artist-rich", "Track-rich"] as const;
+
+function useDebouncedValue<T>(value: T, delay: number): T {
+  const [debounced, setDebounced] = useState(value);
   useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("genre43-reveal-visible");
-            observer.unobserve(entry.target);
-          }
-        });
-      },
-      { threshold: 0.06, rootMargin: "0px 0px -28px 0px" },
-    );
-    const els = document.querySelectorAll(".genre43-reveal");
-    els.forEach((el) => observer.observe(el));
-    return () => observer.disconnect();
-  }, deps);
+    const timer = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(timer);
+  }, [value, delay]);
+  return debounced;
 }
 
 export default function Genres() {
-  const [activeFilter, setActiveFilter] = useState("All");
-  const [query, setQuery] = useState("");
-  const [page, setPage] = useState(1);
-  const [genres, setGenres] = useState<PublicGenre[]>([]);
-  const [stats, setStats] = useState<GenreCatalogStats | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [activityFilter, setActivityFilter] = useState(ALL);
+  const [searchInput, setSearchInput] = useState("");
+  const [sortKey, setSortKey] = useState<SortKey>("activity");
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  const debouncedSearch = useDebouncedValue(searchInput, 350);
+
+  const [genres, setGenres] = useState<PublicGenre[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [stats, setStats] = useState<GenreCatalogStats>({ total: 0, totalArtists: 0, totalTracks: 0 });
+  const [featuredGenres, setFeaturedGenres] = useState<PublicGenre[]>([]);
+
+  const [pageLoading, setPageLoading] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [metaLoading, setMetaLoading] = useState(true);
+  const [pageError, setPageError] = useState<string | null>(null);
+  const [metaError, setMetaError] = useState<string | null>(null);
+
+  const [reloadKey, setReloadKey] = useState(0);
+
+  // Reset data when filters change
+  useEffect(() => {
+    setGenres([]);
+    setTotalCount(0);
+    setPageError(null);
+    setReloadKey((prev) => prev + 1);
+  }, [activityFilter, debouncedSearch, sortKey]);
+
+  const loadMeta = useCallback(async () => {
+    setMetaLoading(true);
+    setMetaError(null);
     try {
-      const [statsData, pageData] = await Promise.all([
+      const [statsData, topGenres] = await Promise.all([
         getGenreCatalogStats(),
-        listGenresPaginated({
-          page: 1,
-          pageSize: PAGE_SIZE,
-          search: query,
-          activityFilter: activeFilter,
-        }),
+        listGenresPaginated({ page: 1, pageSize: 10 }),
       ]);
       setStats(statsData);
-      setGenres(pageData.genres);
-      setPage(1);
+      setFeaturedGenres(topGenres.genres.filter((g) => g.artistImageUrl).slice(0, 10));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load genres.");
+      setMetaError(err instanceof Error ? err.message : "Could not load genre metadata.");
     } finally {
-      setLoading(false);
+      setMetaLoading(false);
     }
-  }, [query, activeFilter]);
-
-  const loadPage = useCallback(async (targetPage: number) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const pageData = await listGenresPaginated({
-        page: targetPage,
-        pageSize: PAGE_SIZE,
-        search: query,
-        activityFilter: activeFilter,
-      });
-      setGenres(pageData.genres);
-      setPage(targetPage);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load genres.");
-    } finally {
-      setLoading(false);
-    }
-  }, [query, activeFilter]);
+  }, []);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    loadMeta();
+  }, [loadMeta]);
 
-  useScrollReveal([loading, page]);
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      setPageLoading(true);
+      setPageError(null);
+      try {
+        const result = await listGenresPaginated({
+          page: 1,
+          pageSize: INITIAL_LIMIT,
+          search: debouncedSearch || undefined,
+          activityFilter: activityFilter === ALL ? undefined : activityFilter,
+        });
 
-  const totalArtists = stats?.totalArtists ?? 0;
-  const totalTracks = stats?.totalTracks ?? 0;
-  const totalGenres = stats?.total ?? 0;
-  const totalPages = Math.max(1, Math.ceil(totalGenres / PAGE_SIZE));
+        let sorted = [...result.genres];
+        if (sortKey === "name") {
+          sorted.sort((a, b) => a.name.localeCompare(b.name));
+        }
+        // "activity" is the default server sort (artistCount descending)
 
-  const sortedByActivity = useMemo(
-    () => [...genres].sort((a, b) => b.artistCount - a.artistCount),
-    [genres],
-  );
+        if (!cancelled) {
+          setGenres(sorted);
+          setTotalCount(result.totalCount);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setPageError(err instanceof Error ? err.message : "Could not load genres.");
+        }
+      } finally {
+        if (!cancelled) setPageLoading(false);
+      }
+    };
+    run();
+    return () => { cancelled = true; };
+  }, [reloadKey, activityFilter, debouncedSearch, sortKey]);
 
-  const spotlight = sortedByActivity[0];
-  const compactGenres = sortedByActivity.slice(1, 4);
-  const trendingGenres = sortedByActivity.slice(0, 8);
+  const loadMore = useCallback(async () => {
+    if (isLoadingMore || genres.length >= totalCount) return;
+    setIsLoadingMore(true);
+    setPageError(null);
+    try {
+      const nextPage = Math.floor(genres.length / LOAD_MORE_LIMIT) + 1;
+      const result = await listGenresPaginated({
+        page: nextPage,
+        pageSize: LOAD_MORE_LIMIT,
+        search: debouncedSearch || undefined,
+        activityFilter: activityFilter === ALL ? undefined : activityFilter,
+      });
 
-  const updateFilter = (next: string) => {
-    setActiveFilter(next);
-    setPage(1);
-  };
+      let sorted = [...result.genres];
+      if (sortKey === "name") {
+        sorted.sort((a, b) => a.name.localeCompare(b.name));
+      }
 
-  if (loading && genres.length === 0) {
-    return (
-      <main className="min-h-screen">
-        <div className="genre43-hero-skel">
-          <div className="h-4 w-32 rounded bg-white/10 animate-pulse" />
-          <div className="h-16 w-96 rounded bg-white/10 animate-pulse mt-6" />
-          <div className="h-5 w-[500px] rounded bg-white/10 animate-pulse mt-4" />
-        </div>
-        <div className="wk-container-wide px-4 py-10 md:px-6">
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] overflow-hidden">
-                <div className="h-32 bg-[var(--wk-surface-raised)] animate-pulse" />
-                <div className="p-3 space-y-2">
-                  <div className="h-4 w-3/4 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
-                  <div className="h-3 w-1/2 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </main>
-    );
+      setGenres((prev) => [...prev, ...sorted]);
+    } catch (err) {
+      setPageError(err instanceof Error ? err.message : "Could not load more genres.");
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [genres.length, totalCount, isLoadingMore, activityFilter, debouncedSearch, sortKey]);
+
+  const hasMore = genres.length < totalCount && totalCount > 0;
+  const showingTo = genres.length;
+
+  if (metaLoading) {
+    return <GenresLoading />;
   }
 
-  if (error && genres.length === 0) {
+  if (metaError && featuredGenres.length === 0) {
     return (
-      <main className="min-h-screen wk-container px-6 py-20">
+      <main className="min-h-screen wk-container px-6 py-20 bg-[var(--wk-bg)]">
         <div className="max-w-2xl mx-auto rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-8 text-center">
           <WkIcon name="Compass" size={42} className="mx-auto mb-4 text-[var(--wk-text-faint)]" />
           <h1 className="wk-h-section mb-2">Could not load genres</h1>
-          <p className="text-[var(--wk-text-muted)] mb-6">{error}</p>
-          <button onClick={() => loadData()} className="wk-button wk-button-primary">
+          <p className="text-[var(--wk-text-muted)] mb-6">{metaError}</p>
+          <button onClick={loadMeta} className="wk-button wk-button-primary cursor-pointer">
             <i className="ri-refresh-line" /> Retry
           </button>
         </div>
@@ -150,305 +161,412 @@ export default function Genres() {
 
   return (
     <main className="min-h-screen bg-[var(--wk-bg)]">
+      <FeaturedGenreCarousel genres={featuredGenres} catalogStats={stats} />
 
-      {/* ═══════════════════════ HERO ═══════════════════════ */}
-      <section className="genre43-hero">
-        <div className="genre43-hero-overlay" />
-        <div className="genre43-hero-content">
-          <div className="genre43-hero-badge">
-            <WkIcon name="Compass" size={12} /> Cultural territories
-          </div>
-          <h1 className="genre43-hero-title">Genres</h1>
-          <p className="genre43-hero-sub">
-            Browse WAKILISHA by genre as living cultural territory: artists, tracks,
-            activity, representative voices, and routes into discovery.
-          </p>
-          <div className="genre43-hero-row">
-            <div className="genre43-hero-search-wrap">
-              <i className="ri-search-line genre43-hero-search-icon" />
-              <input
-                className="genre43-hero-search"
-                value={query}
-                onChange={(e) => {
-                  setQuery(e.target.value);
-                  setPage(1);
-                }}
-                placeholder="Search genre or representative artist..."
-              />
+      <div className="wk-container-wide px-4 py-10 md:px-6">
+        <div className="chart-stats-strip mb-10">
+          <Stat value={stats.total} label="Genres" />
+          <Stat value={totalCount} label="Showing" />
+          <Stat value={stats.totalArtists.toLocaleString()} label="Artists" />
+          <Stat value={stats.totalTracks.toLocaleString()} label="Tracks" />
+        </div>
+
+        <section className="mb-10 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4 md:p-5">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between mb-5">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full border border-[var(--wk-brand)]/20 bg-[var(--wk-brand-soft)]/40 px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.18em] text-[var(--wk-brand)] mb-3">
+                <WkIcon name="Search" size={12} />
+                Discovery
+              </div>
+              <h2 className="text-[clamp(22px,3vw,32px)] font-black leading-[0.92] tracking-[-0.04em] text-[var(--wk-text)]">
+                Find genres
+              </h2>
             </div>
-            <ShareButton
-              item={{
-                title: "WAKILISHA Genre Directory",
-                subtitle: `${totalGenres} genres`,
-                description: "Browse the WAKILISHA cultural map by genre.",
-                type: "page",
-              }}
+            <FilterSelect label="Sort" value={sortKey} options={["activity", "name"]} onChange={(value) => setSortKey(value as SortKey)} />
+          </div>
+
+          <div className="flex items-center gap-2 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2.5 mb-3">
+            <WkIcon name="Search" size={15} className="text-[var(--wk-text-faint)]" />
+            <input
+              value={searchInput}
+              onChange={(event) => setSearchInput(event.target.value)}
+              placeholder="Search genres or representative artists..."
+              className="w-full bg-transparent text-[14px] font-semibold text-[var(--wk-text)] outline-none placeholder:text-[var(--wk-text-faint)]"
             />
+            {searchInput && (
+              <button
+                onClick={() => setSearchInput("")}
+                className="text-[var(--wk-text-faint)] hover:text-[var(--wk-text)] cursor-pointer"
+                aria-label="Clear search"
+              >
+                <WkIcon name="X" size={14} />
+              </button>
+            )}
           </div>
-          <div className="genre43-hero-stats">
-            <div className="genre43-hero-stat">
-              <span className="genre43-hero-stat-val">{totalGenres}</span>
-              <span className="genre43-hero-stat-lbl">Genres</span>
-            </div>
-            <div className="genre43-hero-stat">
-              <span className="genre43-hero-stat-val">{totalArtists.toLocaleString()}</span>
-              <span className="genre43-hero-stat-lbl">Artists</span>
-            </div>
-            <div className="genre43-hero-stat">
-              <span className="genre43-hero-stat-val">{totalTracks.toLocaleString()}</span>
-              <span className="genre43-hero-stat-lbl">Tracks</span>
-            </div>
-          </div>
-        </div>
-        <div className="genre43-hero-scroll-hint">
-          <div className="genre43-hero-scroll-line" />
-        </div>
-      </section>
 
-      {/* ═══════════════════════ STICKY NAV ═══════════════════════ */}
-      <div className="genre43-toolbar">
-        <div className="genre43-toolbar-inner">
-          <span className="genre43-toolbar-label">Filter</span>
-          <div className="genre43-filter-pills">
-            {filters.map((f) => (
+          <div className="flex flex-wrap gap-1.5">
+            {activityFilters.map((f) => (
               <button
                 key={f}
-                onClick={() => updateFilter(f)}
-                className={`genre43-filter-pill ${activeFilter === f ? "on" : ""}`}
+                onClick={() => setActivityFilter(f)}
+                className={`rounded-full px-3 py-1 text-[11px] font-bold transition-all whitespace-nowrap border cursor-pointer ${
+                  activityFilter === f
+                    ? "bg-[var(--wk-brand)] border-[var(--wk-brand)] text-white"
+                    : "border-[var(--wk-border)] bg-[var(--wk-bg)] text-[var(--wk-text-muted)] hover:text-[var(--wk-text)] hover:border-[var(--wk-border-2)]"
+                }`}
               >
                 {f}
               </button>
             ))}
           </div>
-        </div>
-      </div>
+        </section>
 
-      {/* ═══════════════════════ CONTENT BODY ═══════════════════════ */}
-      <div className="genre43-body">
-
-        {/* ── Spotlight · asymmetrical ── */}
-        {spotlight && (
-          <section className="genre43-reveal">
-            <SectionLabel>Spotlight</SectionLabel>
-            <div className="genre43-asym-grid">
-              <Link to={`/genres/${spotlight.slug}`} className="genre43-spot-card group">
-                <Chapter19FallbackImage
-                  slug={spotlight.slug}
-                  name={spotlight.name}
-                  className="genre43-spot-artwork"
-                />
-                <div className="genre43-spot-gradient" />
-                <div className="genre43-spot-info">
-                  <div className="genre43-spot-kicker">Most active genre</div>
-                  <h2 className="genre43-spot-title">{spotlight.name}</h2>
-                  <div className="genre43-spot-meta-row">
-                    <span>{spotlight.artistCount} artists</span>
-                    <span className="genre43-spot-dot" />
-                    <span>{spotlight.trackCount} tracks</span>
-                  </div>
-                  <p className="genre43-spot-desc">
-                    Representative voices:{" "}
-                    {spotlight.representativeArtists?.slice(0, 4).join(", ") ||
-                      "registry pending"}.
-                  </p>
-                </div>
-              </Link>
-              <div className="genre43-compact-stack">
-                {compactGenres.map((genre, i) => (
-                  <Link key={genre.slug} to={`/genres/${genre.slug}`} className="genre43-compact-card group">
-                    <div className="genre43-compact-artwork-wrap">
-                      <Chapter19FallbackImage
-                        slug={genre.slug}
-                        name={genre.name}
-                        className="genre43-compact-artwork"
-                      />
-                    </div>
-                    <div className="genre43-compact-body">
-                      <div className="genre43-compact-rank">#{i + 2}</div>
-                      <h4 className="genre43-compact-name">{genre.name}</h4>
-                      <div className="genre43-compact-meta">
-                        <span>{genre.artistCount} artists</span>
-                        <span className="genre43-compact-dot" />
-                        <span>{genre.trackCount} tracks</span>
-                      </div>
-                    </div>
-                  </Link>
-                ))}
+        <section>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between mb-6">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full border border-[var(--wk-brand)]/20 bg-[var(--wk-brand-soft)]/40 px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.18em] text-[var(--wk-brand)] mb-3">
+                <WkIcon name="Compass" size={12} />
+                Genre directory
               </div>
+              <h2 className="text-[clamp(22px,3vw,32px)] font-black leading-[0.92] tracking-[-0.04em] text-[var(--wk-text)]">
+                All genres
+              </h2>
             </div>
-          </section>
-        )}
+            <p className="text-[12px] font-semibold text-[var(--wk-text-muted)]">
+              {totalCount > 0
+                ? `Showing ${showingTo} of ${totalCount}`
+                : "No genres found"}
+            </p>
+          </div>
 
-        {/* ── Trending genres · symmetrical grid ── */}
-        {trendingGenres.length > 0 && (
-          <section className="genre43-reveal">
-            <SectionLabel count={trendingGenres.length}>Trending genres</SectionLabel>
-            <div className="genre43-grid">
-              {trendingGenres.map((genre) => (
-                <GenreCard key={genre.slug} genre={genre} />
+          {pageLoading ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 md:gap-5">
+              {Array.from({ length: INITIAL_LIMIT }).map((_, i) => (
+                <div key={i} className="space-y-3">
+                  <div className="aspect-square rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] animate-pulse" />
+                  <div className="h-3 w-3/4 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
+                  <div className="h-3 w-1/2 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
+                </div>
               ))}
             </div>
-          </section>
-        )}
-
-        {/* ── Pullquote ── */}
-        <div className="genre43-reveal genre43-pullquote">
-          <div className="genre43-pullquote-inner">
-            <div className="genre43-pullquote-line" />
-            <p className="genre43-pullquote-text">
-              Genres are portals, not people. Every territory is mapped through
-              texture, colour, density, and cultural context — because
-              sound deserves an ecosystem, not a headshot.
-            </p>
-            <div className="genre43-pullquote-line" />
-          </div>
-        </div>
-
-        {/* ── Full directory ── */}
-        <section className="genre43-reveal">
-          <SectionLabel count={genres.length}>Full directory</SectionLabel>
-
-          <div className="genre43-grid">
-            {genres.map((genre) => (
-              <GenreCard key={genre.slug} genre={genre} />
-            ))}
-          </div>
-
-          {genres.length === 0 && !loading && (
-            <div className="genre43-empty">
-              <WkIcon name="Compass" size={32} />
-              <span>No genres match this search.</span>
-            </div>
-          )}
-
-          {totalPages > 1 && (
-            <div className="genre43-pagination">
-              <button
-                className="genre43-page-btn"
-                disabled={page === 1}
-                onClick={() => loadPage(Math.max(1, page - 1))}
-              >
-                <WkIcon name="ArrowLeft" size={14} />
-              </button>
-              <span className="genre43-page-indicator">
-                Page {page} of {totalPages}
-              </span>
-              <button
-                className="genre43-page-btn"
-                disabled={page === totalPages}
-                onClick={() => loadPage(Math.min(totalPages, page + 1))}
-              >
-                <WkIcon name="ArrowRight" size={14} />
+          ) : pageError ? (
+            <div className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-12 text-center">
+              <WkIcon name="Compass" size={36} className="mx-auto text-[var(--wk-text-faint)]" />
+              <p className="mt-4 text-[15px] font-semibold text-[var(--wk-text-muted)]">{pageError}</p>
+              <button onClick={() => setReloadKey((k) => k + 1)} className="wk-button wk-button-sm wk-button-primary mt-5 cursor-pointer">
+                <i className="ri-refresh-line" /> Retry
               </button>
             </div>
-          )}
-        </section>
-
-        {/* ── Context block ── */}
-        <section className="genre43-reveal genre43-context">
-          <div className="genre43-context-inner">
-            <div className="genre43-context-block">
-              <span className="genre43-context-eyebrow">Recently active</span>
-              <div className="genre43-context-list">
-                {sortedByActivity.slice(0, 6).map((genre) => (
-                  <Link
-                    key={genre.slug}
-                    to={`/genres/${genre.slug}`}
-                    className="genre43-context-row group"
-                  >
-                    <div className="genre43-context-dot-brand" />
-                    <span className="genre43-context-row-name">{genre.name}</span>
-                    <span className="genre43-context-row-stat">{genre.artistCount} artists</span>
-                    <i className="ri-arrow-right-s-line genre43-context-row-arrow" />
-                  </Link>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 md:gap-5">
+                {genres.map((genre) => (
+                  <GenreCard key={genre.slug} genre={genre} />
                 ))}
               </div>
-            </div>
-            <div className="genre43-context-block">
-              <span className="genre43-context-eyebrow">Directory rule</span>
-              <h3 className="genre43-context-title">Genres are portals.</h3>
-              <p className="genre43-context-body">
-                This chapter uses abstract visual treatment, cultural density,
-                iconography, and geographical routing. Human photography belongs to
-                artist pages, not genre cards. Every genre here carries a unique
-                gradient identity derived from its name — a visual signature for
-                each cultural territory.
-              </p>
-              <div className="genre43-context-stats">
-                <div className="genre43-context-stat">
-                  <span className="genre43-context-stat-val">{totalGenres}</span>
-                  <span className="genre43-context-stat-lbl">Genres mapped</span>
-                </div>
-                <div className="genre43-context-stat">
-                  <span className="genre43-context-stat-val">{totalTracks.toLocaleString()}</span>
-                  <span className="genre43-context-stat-lbl">Tracks classified</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
 
-        {/* ── Footer ── */}
-        <footer className="genre43-reveal genre43-footer">
-          <span className="genre43-footer-brand">WAKILISHA Cultural Map</span>
-          <p className="genre43-footer-tagline">
-            {totalGenres} genres across the continent. Every territory mapped
-            as a living ecosystem.
-          </p>
-          <p className="genre43-footer-meta">
-            {totalArtists.toLocaleString()} artists &middot; {totalTracks.toLocaleString()} tracks
-          </p>
-        </footer>
+              {hasMore && (
+                <div className="mt-10 flex justify-center">
+                  <button
+                    onClick={loadMore}
+                    disabled={isLoadingMore}
+                    className="wk-button wk-button-primary cursor-pointer whitespace-nowrap disabled:opacity-50"
+                  >
+                    {isLoadingMore ? (
+                      <>
+                        <i className="ri-loader-4-line animate-spin" /> Loading...
+                      </>
+                    ) : (
+                      <>
+                        <i className="ri-arrow-down-line" /> Load more
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+
+              {genres.length === 0 && (
+                <div className="rounded-2xl border border-dashed border-[var(--wk-border)] p-20 text-center">
+                  <WkIcon name="Compass" size={36} className="mx-auto text-[var(--wk-text-faint)]" />
+                  <h3 className="mt-4 text-[20px] font-black text-[var(--wk-text)]">No genres match</h3>
+                  <p className="mx-auto mt-2 max-w-md text-[14px] font-semibold leading-relaxed text-[var(--wk-text-muted)]">
+                    Try a different search or clear the activity filter to see more genres.
+                  </p>
+                  <button
+                    onClick={() => { setSearchInput(""); setActivityFilter(ALL); setSortKey("activity"); }}
+                    className="wk-button wk-button-sm wk-button-primary mt-5 cursor-pointer"
+                  >
+                    <i className="ri-refresh-line" /> Clear filters
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </section>
       </div>
     </main>
   );
 }
 
-/* ── Section label ── */
-function SectionLabel({ children, count }: { children: string; count?: number }) {
+/* ── Featured Genre Carousel ── */
+function FeaturedGenreCarousel({
+  genres,
+  catalogStats,
+}: {
+  genres: PublicGenre[];
+  catalogStats: GenreCatalogStats;
+}) {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const active = genres[activeIndex] || genres[0];
+
+  useEffect(() => setActiveIndex(0), [genres]);
+
+  const scrollTo = (index: number) => {
+    const nextIndex = Math.max(0, Math.min(index, genres.length - 1));
+    setActiveIndex(nextIndex);
+    const slide = scrollerRef.current?.children[nextIndex] as HTMLElement | undefined;
+    slide?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+  };
+
+  if (!active) return null;
+
+  const representativeArtists = (active.representativeArtists || []).slice(0, 5);
+
   return (
-    <div className="genre43-section-label-row">
-      <div className="genre43-section-label-left">
-        <span className="genre43-section-label-text">{children}</span>
-        {count !== undefined && (
-          <span className="genre43-section-label-count">{count}</span>
-        )}
+    <section className="relative min-h-[78vh] overflow-hidden border-b border-[var(--wk-border)] bg-[#0d120a] text-white">
+      <CarouselBackground genre={active} />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_12%_20%,rgba(133,196,65,0.32),transparent_34%),linear-gradient(90deg,rgba(0,0,0,0.82)_0%,rgba(0,0,0,0.58)_42%,rgba(0,0,0,0.24)_100%)]" />
+      <div className="relative z-10 flex min-h-[78vh] flex-col justify-end">
+        <div className="wk-container-wide w-full px-4 pb-8 pt-24 md:px-6 lg:pb-12 lg:pt-32">
+          <div className="grid items-end gap-8 lg:grid-cols-[minmax(0,1fr)_420px]">
+            <div className="max-w-4xl">
+              <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-[0.18em] text-white/85 backdrop-blur">
+                <WkIcon name="Compass" size={13} /> Genre directory
+              </div>
+              <h1 className="font-[var(--wk-font-display)] text-[clamp(56px,9vw,128px)] font-black leading-[0.82] tracking-[-0.075em] text-white drop-shadow-2xl">
+                Genres
+              </h1>
+              <p className="mt-6 max-w-2xl text-[17px] font-semibold leading-[1.75] text-white/74 md:text-[19px]">
+                Browse WAKILISHA by genre as living cultural territory: artists, tracks, representative voices, and routes into discovery across the continent.
+              </p>
+              <div className="mt-7 flex flex-wrap items-center gap-3 text-[12px] font-extrabold text-white/82">
+                <span className="inline-flex items-center gap-2 rounded-full border border-white/16 bg-white/10 px-3 py-2 backdrop-blur">
+                  <WkIcon name="Compass" size={14} /> {catalogStats.total} genres
+                </span>
+                <span className="inline-flex items-center gap-2 rounded-full border border-white/16 bg-white/10 px-3 py-2 backdrop-blur">
+                  <WkIcon name="User2" size={14} /> {catalogStats.totalArtists.toLocaleString()} artists
+                </span>
+                <span className="inline-flex items-center gap-2 rounded-full border border-white/16 bg-white/10 px-3 py-2 backdrop-blur">
+                  <WkIcon name="Music" size={14} /> {catalogStats.totalTracks.toLocaleString()} tracks
+                </span>
+              </div>
+            </div>
+            <div className="rounded-[28px] border border-white/16 bg-black/24 p-4 shadow-2xl backdrop-blur-xl">
+              <div className="aspect-square overflow-hidden rounded-2xl bg-white/10">
+                {active.artistImageUrl ? (
+                  <img
+                    src={active.artistImageUrl}
+                    alt={active.name}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <Chapter19FallbackImage
+                    slug={active.slug}
+                    name={active.name}
+                    className="w-full h-full object-cover"
+                  />
+                )}
+              </div>
+              <div className="mt-4">
+                <div className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-[var(--wk-brand)]">Featured genre</div>
+                <h2 className="mt-1 line-clamp-2 text-[30px] font-black leading-[0.95] tracking-[-0.05em] text-white">{active.name}</h2>
+                <div className="mt-3 text-[13px] font-bold text-white/70">
+                  {active.artistCount} artists &middot; {active.trackCount} tracks
+                </div>
+                {representativeArtists.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {representativeArtists.map((artist) => (
+                      <span key={artist} className="rounded-full border border-white/15 bg-white/10 px-2.5 py-0.5 text-[10px] font-bold text-white/70 backdrop-blur">
+                        {artist}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Link to={`/genres/${active.slug}`} className="wk-button wk-button-primary cursor-pointer whitespace-nowrap">
+                    <WkIcon name="ArrowUpRight" size={15} /> Open
+                  </Link>
+                  <ShareButton item={{ title: active.name, subtitle: `${active.artistCount} artists`, description: `${active.name} \u2014 a WAKILISHA cultural territory with ${active.artistCount} artists and ${active.trackCount} tracks.`, type: "page" }} />
+                </div>
+              </div>
+            </div>
+          </div>
+          {genres.length > 1 && (
+            <div className="mt-10">
+              <div ref={scrollerRef} className="flex snap-x gap-3 overflow-x-auto pb-3 scrollbar-hide">
+                {genres.map((genre, index) => (
+                  <button
+                    key={genre.slug}
+                    onClick={() => scrollTo(index)}
+                    className={`group relative h-28 w-[220px] shrink-0 snap-start overflow-hidden rounded-2xl border text-left transition-all md:w-[260px] cursor-pointer ${
+                      activeIndex === index
+                        ? "border-[var(--wk-brand)] shadow-[0_0_0_1px_var(--wk-brand)]"
+                        : "border-white/16 hover:border-white/35"
+                    }`}
+                  >
+                    <div className="absolute inset-0">
+                      {genre.artistImageUrl ? (
+                        <img src={genre.artistImageUrl} alt={genre.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <Chapter19FallbackImage slug={genre.slug} name={genre.name} className="w-full h-full object-cover" />
+                      )}
+                    </div>
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/88 via-black/38 to-transparent" />
+                    <div className="absolute inset-x-0 bottom-0 p-3">
+                      <div className="line-clamp-1 text-[14px] font-black text-white">{genre.name}</div>
+                      <div className="line-clamp-1 text-[11px] font-bold text-white/70">{genre.artistCount} artists &middot; {genre.trackCount} tracks</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+              <div className="mt-3 flex items-center justify-between gap-4">
+                <div className="flex gap-2">
+                  {genres.map((genre, index) => (
+                    <button
+                      key={`dot-${genre.slug}-${index}`}
+                      aria-label={`Show ${genre.name}`}
+                      onClick={() => scrollTo(index)}
+                      className={`h-2 rounded-full transition-all cursor-pointer ${
+                        activeIndex === index ? "w-8 bg-[var(--wk-brand)]" : "w-2 bg-white/35 hover:bg-white/65"
+                      }`}
+                    />
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => scrollTo(activeIndex - 1)} className="rounded-full border border-white/18 bg-white/10 p-2 text-white backdrop-blur hover:bg-white/16 cursor-pointer" aria-label="Previous featured genre">
+                    <WkIcon name="ChevronLeft" size={18} />
+                  </button>
+                  <button onClick={() => scrollTo(activeIndex + 1)} className="rounded-full border border-white/18 bg-white/10 p-2 text-white backdrop-blur hover:bg-white/16 cursor-pointer" aria-label="Next featured genre">
+                    <WkIcon name="ChevronRight" size={18} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
+    </section>
+  );
+}
+
+/* ── Genre Card ── */
+function GenreCard({ genre }: { genre: PublicGenre }) {
+  const representativeArtists = (genre.representativeArtists || []).slice(0, 3);
+
+  return (
+    <div className="group flex flex-col">
+      <Link to={`/genres/${genre.slug}`} className="relative aspect-square rounded-xl overflow-hidden bg-[var(--wk-bg)] border border-[var(--wk-border)] mb-3">
+        {genre.artistImageUrl ? (
+          <img src={genre.artistImageUrl} alt={genre.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+        ) : (
+          <Chapter19FallbackImage slug={genre.slug} name={genre.name} className="w-full h-full object-cover" />
+        )}
+        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3 pt-8">
+          <div className="text-[13px] font-extrabold text-white leading-tight line-clamp-1">{genre.name}</div>
+        </div>
+      </Link>
+
+      <Link to={`/genres/${genre.slug}`} className="text-[13px] font-extrabold text-[var(--wk-text)] group-hover:text-[var(--wk-brand)] transition-colors leading-tight truncate">
+        {genre.name}
+      </Link>
+      <div className="text-[12px] font-bold text-[var(--wk-text-muted)] truncate mt-0.5">
+        {genre.artistCount} artists &middot; {genre.trackCount} tracks
+      </div>
+      {representativeArtists.length > 0 && (
+        <div className="mt-1.5 flex flex-wrap gap-1">
+          {representativeArtists.map((artist) => (
+            <span key={artist} className="text-[10px] font-semibold text-[var(--wk-text-faint)] truncate max-w-[80px]">
+              {artist}
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
-/* ── Genre card ── */
-function GenreCard({ genre }: { genre: PublicGenre }) {
+/* ── Loading skeleton ── */
+function GenresLoading() {
   return (
-    <Link to={`/genres/${genre.slug}`} className="genre43-card group">
-      <div className="genre43-card-artwork-wrap">
-        <Chapter19FallbackImage
-          slug={genre.slug}
-          name={genre.name}
-          className="genre43-card-artwork"
-        />
-        <div className="genre43-card-artwork-name">{genre.name}</div>
-      </div>
-      <div className="genre43-card-body">
-        <div className="genre43-card-stats-row">
-          <div className="genre43-card-stat-pill">
-            <strong>{genre.artistCount}</strong>
-            <span>Artists</span>
-          </div>
-          <div className="genre43-card-stat-pill">
-            <strong>{genre.trackCount}</strong>
-            <span>Tracks</span>
+    <main className="min-h-screen bg-[var(--wk-bg)]">
+      <section className="relative overflow-hidden border-b border-[var(--wk-border)] bg-[var(--wk-bg)]">
+        <div className="wk-container-wide px-4 py-20 md:px-6 lg:py-28">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="space-y-4">
+              <div className="h-4 w-40 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
+              <div className="h-16 w-3/4 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
+              <div className="h-4 w-1/2 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
+              <div className="h-4 w-2/3 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
+            </div>
+            <div className="h-72 rounded-2xl bg-[var(--wk-surface-raised)] animate-pulse" />
           </div>
         </div>
-        {genre.representativeArtists && genre.representativeArtists.length > 0 && (
-          <div className="genre43-card-roster">
-            {genre.representativeArtists.slice(0, 4).map((artist) => (
-              <span key={artist} className="genre43-card-roster-tag">{artist}</span>
-            ))}
-          </div>
-        )}
+      </section>
+      <div className="wk-container-wide px-4 py-10 md:px-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+          {Array.from({ length: 12 }).map((_, i) => (
+            <div key={i} className="space-y-3">
+              <div className="aspect-square rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] animate-pulse" />
+              <div className="h-3 w-3/4 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
+              <div className="h-3 w-1/2 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
+            </div>
+          ))}
+        </div>
       </div>
-    </Link>
+    </main>
+  );
+}
+
+/* ── Filter select ── */
+function FilterSelect({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (value: string) => void }) {
+  return (
+    <label className="block">
+      <span className="mb-1 block text-[10px] font-extrabold uppercase tracking-[0.16em] text-[var(--wk-text-faint)]">{label}</span>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2.5 text-[13px] font-bold text-[var(--wk-text)] outline-none cursor-pointer"
+      >
+        {options.map((option) => (
+          <option key={option} value={option}>{sortOptionLabel(option)}</option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+/* ── Stat pill ── */
+function Stat({ value, label }: { value: string | number; label: string }) {
+  return <div className="chart-stat-card"><div className="chart-stat-value">{value}</div><div className="chart-stat-label">{label}</div></div>;
+}
+
+/* ── Helpers ── */
+function sortOptionLabel(value: string): string {
+  if (value === "activity") return "Most active";
+  if (value === "name") return "Name A-Z";
+  return value;
+}
+
+function CarouselBackground({ genre }: { genre: PublicGenre }) {
+  const [failed, setFailed] = useState(false);
+  if (!genre.artistImageUrl || failed) {
+    return <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_75%,rgba(133,196,65,0.42),transparent_32%),radial-gradient(circle_at_82%_16%,rgba(255,255,255,0.20),transparent_30%),linear-gradient(135deg,#101510,#1d2f12)]" />;
+  }
+  return (
+    <>
+      <img src={genre.artistImageUrl} alt="" className="hidden" onError={() => setFailed(true)} />
+      <div className="absolute inset-0 scale-105 bg-cover bg-center opacity-75 blur-[2px]" style={{ backgroundImage: `url("${genre.artistImageUrl}")` }} />
+    </>
   );
 }

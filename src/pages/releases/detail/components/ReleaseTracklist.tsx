@@ -3,7 +3,7 @@ import { WkIcon } from "@/components/design-system/Icon";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
 import { usePlayer } from "@/context/PlayerContext";
 import { trackUrl } from "@/utils/trackUrl";
-import type { RepairedReleaseDetail } from "@/services/repairedContent/client";
+import type { PublicReleaseDetail } from "@/services/publicContent/client";
 
 function formatDuration(seconds: number): string {
   if (!seconds) return "—";
@@ -17,8 +17,8 @@ export default function ReleaseTracklist({
   tracks,
   artistSlug,
 }: {
-  release: RepairedReleaseDetail;
-  tracks: RepairedReleaseDetail["tracks"];
+  release: PublicReleaseDetail;
+  tracks: PublicReleaseDetail["tracks"];
   artistSlug: string;
 }) {
   const { currentTrack, isPlaying, playTrack, togglePlay } = usePlayer();
@@ -40,6 +40,8 @@ export default function ReleaseTracklist({
       duration: t.duration,
       previewUrl: t.previewUrl,
       album: release.title,
+      artistSlug,
+      trackSlug: t.slug,
     }));
 
     // Also include tracks before the clicked index (for a full queue)
@@ -51,11 +53,18 @@ export default function ReleaseTracklist({
       duration: t.duration,
       previewUrl: t.previewUrl,
       album: release.title,
+      artistSlug,
+      trackSlug: t.slug,
     }));
 
     const fullQueue = [...queueTracks, ...remainingTracks];
 
-    playTrack(queueTracks[0], fullQueue);
+    playTrack(queueTracks[0], fullQueue, {
+      pageType: "release_detail",
+      entitySlug: release.slug,
+      entityType: "release",
+      sourceSection: "tracklist",
+    });
   };
 
   return (

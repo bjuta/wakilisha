@@ -13,6 +13,7 @@ interface Song {
 
 interface ArtistTopSongsProps {
   songs: Song[];
+  artistSlug?: string;
 }
 
 /* ─────────────────────────────────────────────
@@ -22,9 +23,11 @@ interface ArtistTopSongsProps {
 function SongExpandedPanel({
   song,
   rank,
+  artistSlug,
 }: {
   song: Song;
   rank: number;
+  artistSlug?: string;
 }) {
   const { playTrack, currentTrack, isPlaying, togglePlay } = usePlayer();
   const artistList = song.artists
@@ -42,14 +45,23 @@ function SongExpandedPanel({
       togglePlay();
       return;
     }
-    playTrack({
-      id: trackId,
-      title: song.title,
-      artist: song.artists,
-      artworkUrl: song.image,
-      isPlayable: true,
-      previewUrl: song.songUrl,
-    });
+    playTrack(
+      {
+        id: trackId,
+        title: song.title,
+        artist: song.artists,
+        artworkUrl: song.image,
+        isPlayable: true,
+        previewUrl: song.songUrl,
+      },
+      undefined,
+      {
+        pageType: "artist_detail",
+        entitySlug: artistSlug,
+        entityType: "artist",
+        sourceSection: "top_songs_expanded",
+      },
+    );
   };
 
   return (
@@ -114,7 +126,7 @@ function SongExpandedPanel({
 /* ─────────────────────────────────────────────
    Single song row — mirrors ChartRow exactly
    ───────────────────────────────────────────── */
-function ArtistSongRow({ song, index }: { song: Song; index: number }) {
+function ArtistSongRow({ song, index, artistSlug }: { song: Song; index: number; artistSlug?: string }) {
   const { playTrack, currentTrack, isPlaying, togglePlay } = usePlayer();
   const [isExpanded, setIsExpanded] = useState(false);
   const rank = index + 1;
@@ -136,6 +148,11 @@ function ArtistSongRow({ song, index }: { song: Song; index: number }) {
       artworkUrl: song.image,
       isPlayable: true,
       previewUrl: song.songUrl,
+    }, undefined, {
+      pageType: "artist_detail",
+      entitySlug: artistSlug,
+      entityType: "artist",
+      sourceSection: "top_songs",
     });
   };
 
@@ -220,7 +237,7 @@ function ArtistSongRow({ song, index }: { song: Song; index: number }) {
           transition: "grid-template-rows 0.25s ease",
         }}
       >
-        <SongExpandedPanel song={song} rank={rank} />
+        <SongExpandedPanel song={song} rank={rank} artistSlug={artistSlug} />
       </div>
     </div>
   );
@@ -229,7 +246,7 @@ function ArtistSongRow({ song, index }: { song: Song; index: number }) {
 /* ─────────────────────────────────────────────
    Section
    ───────────────────────────────────────────── */
-export function ArtistTopSongs({ songs }: ArtistTopSongsProps) {
+export function ArtistTopSongs({ songs, artistSlug }: ArtistTopSongsProps) {
   const { ref, revealed } = useScrollReveal<HTMLElement>(0.1);
 
   return (
@@ -254,7 +271,7 @@ export function ArtistTopSongs({ songs }: ArtistTopSongsProps) {
 
         <div className="divide-y divide-[var(--wk-divider)]">
           {songs.map((song, index) => (
-            <ArtistSongRow key={`${index}-${song.title}`} song={song} index={index} />
+            <ArtistSongRow key={`${index}-${song.title}`} song={song} index={index} artistSlug={artistSlug} />
           ))}
         </div>
       </div>

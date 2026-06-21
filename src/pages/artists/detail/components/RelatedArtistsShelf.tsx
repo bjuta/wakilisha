@@ -88,7 +88,8 @@ export function RelatedArtistsShelf({ artists }: RelatedArtistsShelfProps) {
                   <img
                     src={artist.imageUrl}
                     alt={artist.name}
-                    className="h-full w-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
+                    loading="lazy"
+                    className="h-full w-full object-cover object-top transition-transform duration-[var(--wk-d-slow)] group-hover:scale-105"
                   />
                 ) : (
                   <Ch19GradientImage slug={artist.slug} name={artist.name} />

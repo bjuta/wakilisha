@@ -1,0 +1,440 @@
+/*
+ * ─── WAKILISHA ARTICLE PROSE TYPOGRAPHY ───────────────────────────────────────
+ *
+ * Commercial-grade vertical rhythm for article body content.
+ * Handles: paragraphs, headings (h1-h6), images/figures, blockquotes,
+ * WP-specific markup (aligncenter, wp-caption, wp-block-image),
+ * lists, HR rules, inline code, tables, embeds, and embed cards.
+ *
+ * Applied via `.article-content-v2` on HTML segments and
+ * `.article-content-v2-mobile` on mobile.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+
+/* ── Base prose defaults ─────────────────────────────────────────────────── */
+
+.article-content-v2 {
+  font: 400 17.5px / 1.85 var(--wk-font-body);
+  color: var(--wk-text-soft);
+  /* Prevent margin-collapse bleed out of the container */
+  overflow: hidden;
+}
+
+.article-content-v2-mobile {
+  font: 400 16px / 1.82 var(--wk-font-body);
+  color: var(--wk-text-soft);
+  overflow: hidden;
+}
+
+/* ── Paragraphs ──────────────────────────────────────────────────────────── */
+
+.article-content-v2 p,
+.article-content-v2-mobile p {
+  margin-top: 0;
+  margin-bottom: 1.55em;
+}
+
+/* Last paragraph in a segment — no trailing gap before an embed card */
+.article-content-v2 p:last-child,
+.article-content-v2-mobile p:last-child {
+  margin-bottom: 0;
+}
+
+/* Empty paragraphs from WordPress (used as spacers) — collapse them */
+.article-content-v2 p:empty,
+.article-content-v2-mobile p:empty {
+  display: none;
+}
+
+/* ── Headings ────────────────────────────────────────────────────────────── */
+
+.article-content-v2 h1,
+.article-content-v2 h2,
+.article-content-v2 h3,
+.article-content-v2 h4,
+.article-content-v2 h5,
+.article-content-v2 h6,
+.article-content-v2-mobile h1,
+.article-content-v2-mobile h2,
+.article-content-v2-mobile h3,
+.article-content-v2-mobile h4,
+.article-content-v2-mobile h5,
+.article-content-v2-mobile h6 {
+  font-family: var(--wk-font-display);
+  font-weight: 800;
+  color: var(--wk-text);
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+  /* Heading ABOVE gets more space (separates sections) */
+  /* Heading BELOW gets tighter (pulls intro text close) */
+  margin-top: 2.4em;
+  margin-bottom: 0.75em;
+}
+
+/* First heading in a segment — don't add top space if at start */
+.article-content-v2 :first-child,
+.article-content-v2-mobile :first-child {
+  margin-top: 0;
+}
+
+.article-content-v2 h1 { font-size: 34px; }
+.article-content-v2 h2 { font-size: 27px; }
+.article-content-v2 h3 { font-size: 22px; }
+.article-content-v2 h4 { font-size: 19px; }
+.article-content-v2 h5 { font-size: 16px; font-weight: 700; }
+.article-content-v2 h6 { font-size: 14px; font-weight: 700; color: var(--wk-text-muted); }
+
+.article-content-v2-mobile h1 { font-size: 28px; }
+.article-content-v2-mobile h2 { font-size: 23px; }
+.article-content-v2-mobile h3 { font-size: 19px; }
+.article-content-v2-mobile h4 { font-size: 17px; }
+.article-content-v2-mobile h5 { font-size: 15px; font-weight: 700; }
+.article-content-v2-mobile h6 { font-size: 13px; font-weight: 700; color: var(--wk-text-muted); }
+
+/* Paragraph that contains only a <strong> — WP often uses these as headings */
+.article-content-v2 p > strong:only-child,
+.article-content-v2-mobile p > strong:only-child {
+  display: block;
+  font-family: var(--wk-font-display);
+  font-size: 19px;
+  font-weight: 800;
+  color: var(--wk-text);
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  margin-top: 2em;
+  margin-bottom: 0.65em;
+}
+
+/* ── Drop cap — first letter of first paragraph ─────────────────────────── */
+
+.article-content-v2 > div:first-child > p:first-child::first-letter,
+.article-content-v2-mobile > div:first-child > p:first-child::first-letter {
+  float: left;
+  font: 900 76px / 0.78 var(--wk-font-display);
+  color: var(--wk-brand);
+  padding-right: 10px;
+  margin-top: 4px;
+}
+
+/* ── Strong / em ─────────────────────────────────────────────────────────── */
+
+.article-content-v2 strong,
+.article-content-v2-mobile strong {
+  color: var(--wk-text);
+  font-weight: 700;
+}
+
+.article-content-v2 em,
+.article-content-v2-mobile em {
+  font-style: italic;
+}
+
+/* ── Links ───────────────────────────────────────────────────────────────── */
+
+.article-content-v2 a,
+.article-content-v2-mobile a {
+  color: var(--wk-brand);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+  transition: color 0.15s ease, opacity 0.15s ease;
+}
+
+.article-content-v2 a:hover,
+.article-content-v2-mobile a:hover {
+  color: var(--wk-brand-2);
+  opacity: 0.85;
+}
+
+/* ── Blockquote ──────────────────────────────────────────────────────────── */
+
+.article-content-v2 blockquote,
+.article-content-v2-mobile blockquote {
+  position: relative;
+  border-left: 3.5px solid var(--wk-brand);
+  padding: 4px 0 4px 24px;
+  margin: 2.2em 0;
+  font: 800 1.35em / 1.3 var(--wk-font-display);
+  letter-spacing: -0.025em;
+  color: var(--wk-text);
+}
+
+.article-content-v2-mobile blockquote {
+  padding-left: 20px;
+  font-size: 1.2em;
+  margin: 2em 0;
+}
+
+.article-content-v2 blockquote p,
+.article-content-v2-mobile blockquote p {
+  margin: 0;
+}
+
+.article-content-v2 blockquote cite,
+.article-content-v2-mobile blockquote cite {
+  display: block;
+  margin-top: 10px;
+  font: 600 13px / 1.4 var(--wk-font-ui);
+  color: var(--wk-text-muted);
+  font-style: normal;
+  letter-spacing: 0;
+}
+
+/* ── Horizontal rule ─────────────────────────────────────────────────────── */
+
+.article-content-v2 hr,
+.article-content-v2-mobile hr {
+  border: none;
+  height: 1px;
+  background: var(--wk-border);
+  margin: 3em 0;
+}
+
+/* ── Lists ───────────────────────────────────────────────────────────────── */
+
+.article-content-v2 ul,
+.article-content-v2 ol,
+.article-content-v2-mobile ul,
+.article-content-v2-mobile ol {
+  margin-top: 0;
+  margin-bottom: 1.5em;
+  padding-left: 1.5em;
+}
+
+.article-content-v2 li,
+.article-content-v2-mobile li {
+  margin-bottom: 0.5em;
+  line-height: 1.75;
+}
+
+.article-content-v2 li:last-child,
+.article-content-v2-mobile li:last-child {
+  margin-bottom: 0;
+}
+
+/* ── Images ──────────────────────────────────────────────────────────────── */
+
+.article-content-v2 img,
+.article-content-v2-mobile img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 8px;
+  /* Generous breathing room above and below standalone images */
+  margin-top: 2em;
+  margin-bottom: 0.75em;
+}
+
+/* Images preceded by a paragraph — the paragraph already has margin-bottom,
+   so we reset the image margin-top to avoid double-gap */
+.article-content-v2 p + img,
+.article-content-v2-mobile p + img {
+  margin-top: 0.25em;
+}
+
+/* WP full-width images embedded inside paragraphs */
+.article-content-v2 p > img,
+.article-content-v2-mobile p > img {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+/* Inline entity link images — no decorative margins */
+.article-content-v2 img.wk-entity-img,
+.article-content-v2-mobile img.wk-entity-img {
+  display: inline;
+  margin: 0;
+  border-radius: 0;
+}
+
+/* ── Figures / WP captions ───────────────────────────────────────────────── */
+
+.article-content-v2 figure,
+.article-content-v2-mobile figure,
+.article-content-v2 .wp-block-image,
+.article-content-v2-mobile .wp-block-image,
+.article-content-v2 .wp-caption,
+.article-content-v2-mobile .wp-caption {
+  max-width: 100% !important;
+  width: auto !important;
+  margin: 2.2em auto 0.5em !important;
+  overflow: hidden;
+  border-radius: 10px;
+}
+
+.article-content-v2 figure img,
+.article-content-v2-mobile figure img,
+.article-content-v2 .wp-caption img,
+.article-content-v2-mobile .wp-caption img {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 0; /* radius already on parent figure */
+  margin: 0;
+}
+
+.article-content-v2 figcaption,
+.article-content-v2-mobile figcaption,
+.article-content-v2 .wp-caption-text,
+.article-content-v2-mobile .wp-caption-text {
+  font: 400 12.5px / 1.55 var(--wk-font-body);
+  color: var(--wk-text-muted);
+  text-align: center;
+  padding: 10px 8px 0;
+  font-style: italic;
+}
+
+/* ── WP alignment helpers ────────────────────────────────────────────────── */
+
+.article-content-v2 .aligncenter,
+.article-content-v2-mobile .aligncenter,
+.article-content-v2 .alignnone,
+.article-content-v2-mobile .alignnone {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  max-width: 100% !important;
+  width: auto !important;
+}
+
+.article-content-v2 .alignleft,
+.article-content-v2-mobile .alignleft {
+  float: left;
+  margin-right: 1.5em;
+  margin-bottom: 0.75em;
+  max-width: 45% !important;
+}
+
+.article-content-v2 .alignright,
+.article-content-v2-mobile .alignright {
+  float: right;
+  margin-left: 1.5em;
+  margin-bottom: 0.75em;
+  max-width: 45% !important;
+}
+
+/* Clearfix after floated images */
+.article-content-v2::after,
+.article-content-v2-mobile::after {
+  content: "";
+  display: table;
+  clear: both;
+}
+
+/* ── Inline code ─────────────────────────────────────────────────────────── */
+
+.article-content-v2 code,
+.article-content-v2-mobile code {
+  font-family: "SF Mono", "Fira Code", "Fira Mono", "Roboto Mono", monospace;
+  font-size: 0.875em;
+  background: color-mix(in srgb, var(--wk-brand) 10%, transparent);
+  color: var(--wk-brand);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.article-content-v2 pre,
+.article-content-v2-mobile pre {
+  background: var(--wk-surface-raised);
+  border: 1px solid var(--wk-border);
+  border-radius: 8px;
+  padding: 20px;
+  overflow-x: auto;
+  margin: 1.8em 0;
+}
+
+.article-content-v2 pre code,
+.article-content-v2-mobile pre code {
+  background: none;
+  padding: 0;
+  font-size: 0.875em;
+  color: var(--wk-text);
+}
+
+/* ── Tables ──────────────────────────────────────────────────────────────── */
+
+.article-content-v2 table,
+.article-content-v2-mobile table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.8em 0;
+  font-size: 0.9em;
+}
+
+.article-content-v2 th,
+.article-content-v2-mobile th {
+  text-align: left;
+  font-weight: 700;
+  padding: 10px 14px;
+  border-bottom: 2px solid var(--wk-border);
+  color: var(--wk-text);
+}
+
+.article-content-v2 td,
+.article-content-v2-mobile td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--wk-border);
+  color: var(--wk-text-soft);
+  vertical-align: top;
+}
+
+/* ── WP video/iframe embeds ──────────────────────────────────────────────── */
+
+.article-content-v2 .wk-embed,
+.article-content-v2-mobile .wk-embed {
+  margin: 2.2em 0 0.5em;
+}
+
+/* ── Gap between adjacent HTML segments (before/after embed cards) ──────── */
+/* The content renderer renders HTML → embed card → HTML.
+   These are separate React elements so we use the parent article element
+   to manage the space around each .article-content-v2 segment.
+
+   When two prose segments are adjacent, the second gets no extra top margin.
+   When an embed (.article-embed-spacing) is between them, the embed adds its
+   own margin and the following prose segment gets a top margin to re-establish
+   the reading rhythm.
+*/
+
+/* No extra space between consecutive prose blocks */
+.article-content-v2 + .article-content-v2 {
+  margin-top: 0;
+}
+
+/* Embed card wrapper — generous breathing room top+bottom */
+.article-embed-spacing {
+  margin-top: 2.5em;
+  margin-bottom: 2.5em;
+}
+
+/* Prose block that immediately follows an embed card */
+.article-embed-spacing + .article-content-v2 {
+  margin-top: 2em;
+}
+
+/* Prose block that immediately precedes an embed card (last-child p) */
+.article-content-v2:has(+ .article-embed-spacing) p:last-child {
+  margin-bottom: 0;
+}
+
+/* ── Responsive tweaks ───────────────────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  .article-content-v2 {
+    font-size: 16.5px;
+  }
+  .article-content-v2 h2 { font-size: 22px; }
+  .article-content-v2 h3 { font-size: 19px; }
+  .article-content-v2 h4 { font-size: 17px; }
+  .article-content-v2 blockquote {
+    font-size: 1.2em;
+    padding-left: 18px;
+  }
+  .article-content-v2 .alignleft,
+  .article-content-v2 .alignright {
+    float: none;
+    max-width: 100% !important;
+    margin-left: 0;
+    margin-right: 0;
+  }
+}

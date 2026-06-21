@@ -1,7 +1,15 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
 import { rewriteWpImageUrl } from "@/services/wpImageRewrite";
 import { useScrollLock } from "@/hooks/useScrollLock";
+import { transformReleaseShortcodes } from "@/utils/transformReleaseShortcodes";
+import { transformArtistShortcodes } from "@/utils/transformArtistShortcodes";
+import { transformTrackShortcodes } from "@/utils/transformTrackShortcodes";
+import { resolveRegistryReleaseMarkers } from "@/pages/magazine/article/components/ArticleReleaseEmbeds";
+import { resolveArtistMarkers } from "@/pages/magazine/article/components/ArticleArtistEmbeds";
+import { resolveTrackMarkers } from "@/pages/magazine/article/components/ArticleTrackEmbeds";
+import { buildContentSegments } from "@/pages/magazine/article/components/ArticleEmbedUtils";
+import { ArticleContentRenderer } from "@/pages/magazine/article/components/ArticleVideoEmbeds";
 
 interface ArticlePreviewModalProps {
   title: string;
@@ -29,12 +37,51 @@ export function ArticlePreviewModal({
   const [progress, setProgress] = useState(0);
   const [scrolled, setScrolled] = useState(false);
   const [copyDone, setCopyDone] = useState(false);
+  const [resolvedContent, setResolvedContent] = useState<{
+    html: string;
+    releases: import("@/pages/magazine/article/components/ArticleReleaseEmbeds").ReleaseEmbedData[];
+    artists: import("@/pages/magazine/article/components/ArticleArtistEmbeds").ArtistEmbedData[];
+    tracks: import("@/pages/magazine/article/components/ArticleTrackEmbeds").TrackEmbedData[];
+  } | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Lock background scroll while preview is open
   useScrollLock(true);
 
   const heroUrl = rewriteWpImageUrl(heroImageUrl);
+
+  // Resolve embed markers from shortcodes
+  useEffect(() => {
+    let alive = true;
+    async function resolve() {
+      // Apply shortcode transforms
+      let marked = transformTrackShortcodes(transformArtistShortcodes(transformReleaseShortcodes(content)));
+      // Resolve release markers (with no existing releases)
+      const releaseResolved = await resolveRegistryReleaseMarkers(marked, []);
+      if (!alive) return;
+      // Resolve artist markers
+      const artistResolved = await resolveArtistMarkers(releaseResolved.markedHtml);
+      if (!alive) return;
+      // Resolve track markers
+      const trackResolved = await resolveTrackMarkers(artistResolved.markedHtml);
+      if (!alive) return;
+      setResolvedContent({
+        html: trackResolved.markedHtml,
+        releases: releaseResolved.releases,
+        artists: artistResolved.artists,
+        tracks: trackResolved.tracks,
+      });
+    }
+    resolve();
+    return () => { alive = false; };
+  }, [content]);
+
+  const segments = useMemo(
+    () => resolvedContent
+      ? buildContentSegments(resolvedContent.html, [], resolvedContent.releases, resolvedContent.artists, resolvedContent.tracks)
+      : [],
+    [resolvedContent]
+  );
 
   useEffect(() => {
     const container = scrollContainerRef.current;
@@ -227,10 +274,20 @@ export function ArticlePreviewModal({
 
           {/* Article body */}
           <article className="max-w-[740px] mx-auto px-6 lg:px-8 pb-12">
-            <div
-              className="article-content-v2"
-              dangerouslySetInnerHTML={{ __html: content }}
-            />
+            {resolvedContent ? (
+              <ArticleContentRenderer
+                segments={segments}
+                videos={[]}
+                releases={resolvedContent.releases}
+                artists={resolvedContent.artists}
+                tracks={resolvedContent.tracks}
+                proseClass="article-content-v2"
+              />
+            ) : (
+              <div className="article-content-v2">
+                <div dangerouslySetInnerHTML={{ __html: content }} />
+              </div>
+            )}
           </article>
 
           {/* Tags + bottom share */}

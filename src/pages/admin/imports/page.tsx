@@ -673,7 +673,7 @@ function WelcomeStep({ onChoose, existingCounts }: { onChoose: (m: ImportMethod)
           </div>
           <h2 className="text-[16px] font-black text-wk-text">Connect to WordPress</h2>
           <p className="mt-2 text-[12px] text-wk-text-muted leading-5">
-            Enter your wakilisha.africa URL. We&apos;ll auto-discover all content, map entities, and stage records.
+            Enter your wakilisha.africa URL. We'll auto-discover all content, map entities, and stage records.
           </p>
           <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-wk-brand/30 bg-wk-brand-soft/50 px-3 py-1.5 text-[11px] font-bold text-wk-brand">
             For most content
@@ -1057,9 +1057,9 @@ node /home/bitnami/wk-import/stage.mjs --job ${cliRun.runId}`;
                 <WkIcon name="AlertCircle" size={20} className="text-wk-warning" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-[14px] font-black text-wk-text">Can&apos;t reach localhost from the cloud</p>
+                <p className="text-[14px] font-black text-wk-text">Can't reach localhost from the cloud</p>
                 <p className="mt-1.5 text-[12px] leading-5 text-wk-text-muted">
-                  Your database is on <strong>localhost</strong> inside your WordPress Lightsail instance. The edge function runs on Supabase&apos;s servers — they&apos;re on completely different networks. <strong>localhost means the same machine</strong>, and from Supabase that&apos;s not your WordPress box.
+                  Your database is on <strong>localhost</strong> inside your WordPress Lightsail instance. The edge function runs on Supabase's servers — they're on completely different networks. <strong>localhost means the same machine</strong>, and from Supabase that's not your WordPress box.
                 </p>
                 <div className="mt-3 rounded-lg border border-wk-warning/30 bg-white/60 p-3">
                   <p className="text-[11px] font-bold text-wk-text mb-2">Your options:</p>
@@ -1090,7 +1090,7 @@ node /home/bitnami/wk-import/stage.mjs --job ${cliRun.runId}`;
                               {cliCreating ? (
                                 <><WkIcon name="Loader2" size={14} className="animate-spin" /> Creating run...</>
                               ) : (
-                                <><WkIcon name="Terminal" size={14} /> Create Run &amp; Get Command</>
+                                <><WkIcon name="Terminal" size={14} /> Create Run & Get Command</>
                               )}
                             </button>
                           </div>
@@ -1128,7 +1128,7 @@ node /home/bitnami/wk-import/stage.mjs --job ${cliRun.runId}`;
                       <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-wk-accent/15 text-[10px] font-black text-wk-accent mt-0.5">2</span>
                       <div>
                         <p className="text-[12px] font-semibold text-wk-text">Use the WordPress REST API instead</p>
-                        <p className="mt-0.5 text-[11px] text-wk-text-muted">Go back and choose <strong>Connect to WordPress</strong> — it works over HTTP from anywhere and doesn&apos;t need direct database access.</p>
+                        <p className="mt-0.5 text-[11px] text-wk-text-muted">Go back and choose <strong>Connect to WordPress</strong> — it works over HTTP from anywhere and doesn't need direct database access.</p>
                       </div>
                     </div>
                     <div className="flex items-start gap-2">

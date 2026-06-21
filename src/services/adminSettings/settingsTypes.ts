@@ -310,7 +310,6 @@ export interface RegistrySettings {
   qualityThreshold: number;
   duplicateCandidateThreshold: number;
   canonicalMatchConfidenceThreshold: number;
-  autoCreateReleaseShells: boolean;
   autoSendNoMatchRowsToReview: boolean;
 }
 
@@ -321,7 +320,6 @@ export const DEFAULT_REGISTRY_SETTINGS: RegistrySettings = {
   qualityThreshold: 0.85,
   duplicateCandidateThreshold: 0.92,
   canonicalMatchConfidenceThreshold: 0.80,
-  autoCreateReleaseShells: true,
   autoSendNoMatchRowsToReview: false,
 };
 
@@ -362,14 +360,13 @@ export interface NavigationSettings {
 
 export const DEFAULT_SHARE_PLATFORMS: SharePlatform[] = [
   { id: "copy_link", label: "Copy Link", icon: "ri-link", enabled: true },
-  { id: "native_share", label: "Native Share", icon: "ri-share-line", enabled: true },
   { id: "whatsapp", label: "WhatsApp", icon: "ri-whatsapp-line", enabled: true, template: "Check out {title} on WAKILISHA: {url}" },
   { id: "x", label: "X (Twitter)", icon: "ri-twitter-x-line", enabled: true, template: "{title} {url} via @wakilisha" },
   { id: "facebook", label: "Facebook", icon: "ri-facebook-line", enabled: false },
   { id: "threads", label: "Threads", icon: "ri-threads-line", enabled: false, template: "{title} {url}" },
   { id: "linkedin", label: "LinkedIn", icon: "ri-linkedin-box-line", enabled: false },
   { id: "telegram", label: "Telegram", icon: "ri-telegram-line", enabled: true, template: "{title}: {url}" },
-  { id: "email", label: "Email", icon: "ri-mail-line", enabled: false, template: "I thought you&apos;d enjoy: {title} {url}" },
+  { id: "email", label: "Email", icon: "ri-mail-line", enabled: false, template: "I thought you'd enjoy: {title} {url}" },
   { id: "instagram", label: "Instagram", icon: "ri-instagram-line", enabled: false },
   { id: "tiktok", label: "TikTok", icon: "ri-tiktok-line", enabled: false },
 ];

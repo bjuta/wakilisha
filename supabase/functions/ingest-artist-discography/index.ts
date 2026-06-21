@@ -1,6 +1,5 @@
-
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
-import { SignJWT } from "https://esm.sh/jose@5";
+import { SignJWT } from "npm:jose@5.9.6";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,13 +7,7 @@ const corsHeaders = {
 };
 
 function slugify(s: string): string {
-  return s
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 160);
+  return s.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 160);
 }
 
 function parseReleaseTypeFromApple(attrs: Record<string, unknown>): string {
@@ -63,48 +56,44 @@ function formatDuration(ms: number): string {
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
 
+function splitArtistNames(raw: string): string[] {
+  if (!raw) return [];
+  return raw.split(/\s*,\s*|\s+&\s+|\s+and\s+|\s+x\s+|\s+\+\s+/i).map((s) => s.trim()).filter(Boolean);
+}
+
 function parseFeaturedFromTitle(title: string): string[] {
   if (!title) return [];
   const featured: string[] = [];
   const seen = new Set<string>();
 
   function addNames(inner: string) {
-    const names = inner.split(/\s*[,&]\s*|\s+and\s+/i).map(s => s.trim()).filter(Boolean);
+    const names = splitArtistNames(inner);
     for (const n of names) {
       const key = n.toLowerCase();
       if (!seen.has(key)) { seen.add(key); featured.push(n); }
     }
   }
 
-  // Parentheses: (feat. X), (ft. X), (featuring X), (with X), (w/ X)
   const parenMatch = title.match(/\((?:feat\.?|ft\.?|featuring|with|w\/)\s+([^)]+)\)/i);
   if (parenMatch) addNames(parenMatch[1]);
 
-  // Square brackets: [feat. X], [ft. X], [featuring X], [with X], [w/ X]
   const bracketMatch = title.match(/\[(?:feat\.?|ft\.?|featuring|with|w\/)\s+([^\]]+)\]/i);
   if (bracketMatch) addNames(bracketMatch[1]);
 
-  // Dash / em-dash / en-dash: — feat. X, - ft. X, — featuring X, — with X
   const dashMatch = title.match(/\s[-\u2013\u2014]\s*(?:feat\.?|ft\.?|featuring|with|w\/)\s+(.+)$/i);
   if (dashMatch) addNames(dashMatch[1]);
 
-  // x collaboration: "Song x Artist2" (colloquial collab marker, only when after space + capital)
-  const xMatch = title.match(/\s+x\s+([A-Z][^,(\[]+?)(?:\s*[,&]\s*[A-Z][^,(\[]+?)*)\s*$/i);
+  const xMatch = title.match(/\s+x\s+([A-Z][^,\(\[]+?)(?:\s*[,&]\s*[A-Z][^,\(\[]+?)*\s*$/i);
   if (!xMatch) {
-    const xMatch2 = title.match(/\s+x\s+([A-Z][^,(\[]+)$/i);
+    const xMatch2 = title.match(/\s+x\s+([A-Z][^,\(\[]+)$/i);
     if (xMatch2) addNames(xMatch2[1]);
-  } else {
-    addNames(xMatch[1]);
-  }
+  } else addNames(xMatch[1]);
 
-  // + collaboration: "Song + Artist2"
-  const plusMatch = title.match(/\s+\+\s+([A-Z][^,(\[]+?)(?:\s*[,&]\s*[A-Z][^,(\[]+?)*)\s*$/i);
+  const plusMatch = title.match(/\s+\+\s+([A-Z][^,\(\[]+?)(?:\s*[,&]\s*[A-Z][^,\(\[]+?)*\s*$/i);
   if (!plusMatch) {
-    const plusMatch2 = title.match(/\s+\+\s+([A-Z][^,(\[]+)$/i);
+    const plusMatch2 = title.match(/\s+\+\s+([A-Z][^,\(\[]+)$/i);
     if (plusMatch2) addNames(plusMatch2[1]);
-  } else {
-    addNames(plusMatch[1]);
-  }
+  } else addNames(plusMatch[1]);
 
   return featured;
 }
@@ -120,13 +109,8 @@ async function createAppleMusicToken(teamId: string, keyId: string, privateKeyRa
   let cryptoKey: CryptoKey;
   try {
     cryptoKey = await crypto.subtle.importKey("pkcs8", binaryKey, { name: "ECDSA", namedCurve: "P-256" }, false, ["sign"]);
-  } catch (e) {
-    throw new Error(`Crypto key import failed: ${e instanceof Error ? e.message : String(e)}`);
-  }
-  const token = await new SignJWT({})
-    .setProtectedHeader({ alg: "ES256", kid: keyId })
-    .setIssuer(teamId).setIssuedAt().setExpirationTime("30m")
-    .sign(cryptoKey);
+  } catch (e) { throw new Error(`Crypto key import failed: ${e instanceof Error ? e.message : String(e)}`); }
+  const token = await new SignJWT({}).setProtectedHeader({ alg: "ES256", kid: keyId }).setIssuer(teamId).setIssuedAt().setExpirationTime("30m").sign(cryptoKey);
   return token;
 }
 
@@ -206,9 +190,22 @@ interface PreviewAlbum {
   apple_music_id: string; title: string; slug: string; release_type: string; release_date: string | null; upc: string | null; record_label: string | null; genre_names: string[]; artwork_url: string | null; apple_music_url: string | null; track_count: number; tracks: PreviewTrack[]; match_status: "existing" | "new"; existing_release: { id: string; slug: string; title: string; source: string; } | null;
 }
 
+interface AdditionalPrimaryArtist {
+  artist_id: string;
+  artist_slug: string;
+  artist_name: string;
+}
+
 interface ApplySelection {
   apple_music_id: string;
   action: "merge" | "canonicalize" | "ignore";
+  additional_primary_artists?: AdditionalPrimaryArtist[];
+}
+
+function isArtistPrimaryForAlbum(albumArtistName: string, currentArtistName: string): boolean {
+  const albumArtist = albumArtistName.toLowerCase().trim();
+  const currentArtist = currentArtistName.toLowerCase().trim();
+  return albumArtist.includes(currentArtist) || currentArtist.includes(albumArtist);
 }
 
 Deno.serve(async (req: Request) => {
@@ -219,8 +216,8 @@ Deno.serve(async (req: Request) => {
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY") ?? "";
-    if (!supabaseUrl || !supabaseKey) return new Response(JSON.stringify({ ok: false, error: "Supabase config missing." }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    if (!supabaseUrl || !supabaseKey) return new Response(JSON.stringify({ ok: false, error: "Supabase service role key missing. This function requires SERVICE_ROLE_KEY to write registry data." }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     const db = createClient(supabaseUrl, supabaseKey);
 
@@ -376,11 +373,27 @@ Deno.serve(async (req: Request) => {
 
       const selections: ApplySelection[] = rawSelected.map((s: unknown) => {
         const item = s as Record<string, unknown>;
-        return { apple_music_id: String(item.apple_music_id ?? ""), action: String(item.action ?? "ignore") as ApplySelection["action"] };
+        const action = String(item.action ?? "ignore") as ApplySelection["action"];
+        const rawAdditional = item.additional_primary_artists;
+        const additionalPrimaryArtists: AdditionalPrimaryArtist[] | undefined = Array.isArray(rawAdditional)
+          ? rawAdditional.map((a: unknown) => {
+            const r = a as Record<string, unknown>;
+            return {
+              artist_id: String(r.artist_id ?? ""),
+              artist_slug: String(r.artist_slug ?? ""),
+              artist_name: String(r.artist_name ?? ""),
+            };
+          }).filter((a) => a.artist_id && a.artist_slug && a.artist_name)
+          : undefined;
+        return {
+          apple_music_id: String(item.apple_music_id ?? ""),
+          action,
+          additional_primary_artists: additionalPrimaryArtists,
+        };
       }).filter((s) => s.apple_music_id && ["merge", "canonicalize", "ignore"].includes(s.action));
 
       const toProcess = selections.filter((s) => s.action !== "ignore");
-      if (toProcess.length === 0) return new Response(JSON.stringify({ ok: true, mode: "apply", summary: { merged: 0, canonicalized: 0, ignored: selections.length, tracks_created: 0, errors: [] }, duration_ms: Date.now() - start }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      if (toProcess.length === 0) return new Response(JSON.stringify({ ok: true, mode: "apply", summary: { merged: 0, canonicalized: 0, ignored: selections.length, tracks_created: 0, featured_artist_links: 0, errors: [] }, duration_ms: Date.now() - start }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
       stage = "fetch_selected";
       const selectedIds = toProcess.map((s) => s.apple_music_id);
@@ -388,7 +401,6 @@ Deno.serve(async (req: Request) => {
       try { fetchedResults = await fetchAlbumsInParallel(token, storefront, selectedIds, 8); }
       catch (err) { return new Response(JSON.stringify({ ok: false, error: "album_fetch_failed", detail: err instanceof Error ? err.message : String(err) }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }); }
 
-      // Pre-load all active registry artists for featured artist resolution
       stage = "load_artists_for_featured";
       const { data: allRegistryArtists } = await db.from("registry_artists")
         .select("id, slug, display_name")
@@ -403,6 +415,12 @@ Deno.serve(async (req: Request) => {
 
       const albumById = new Map(fetchedResults.map((r) => [r.id, r.detail]));
       const actionById = new Map(toProcess.map((s) => [s.apple_music_id, s.action]));
+      const additionalPrimaryById = new Map<string, AdditionalPrimaryArtist[]>();
+      for (const s of toProcess) {
+        if (s.additional_primary_artists && s.additional_primary_artists.length > 0) {
+          additionalPrimaryById.set(s.apple_music_id, s.additional_primary_artists);
+        }
+      }
 
       const seenReleaseSlugs = new Set(existingReleaseSlugs);
       const seenTrackSlugs = new Set(existingTrackBySlug.keys());
@@ -420,6 +438,8 @@ Deno.serve(async (req: Request) => {
       let trackCount = 0;
       let featLinksCreated = 0;
 
+      const artistNameLower = artistName.toLowerCase();
+
       for (const sel of toProcess) {
         const album = albumById.get(sel.apple_music_id);
         if (!album) continue;
@@ -431,19 +451,23 @@ Deno.serve(async (req: Request) => {
         const releaseDate = parseDate(attrs.releaseDate ?? null);
         const upc = attrs.upc ? String(attrs.upc) : null;
 
+        const albumArtistName = (attrs.artistName ?? "").trim();
+        const artistIsAlbumPrimary = isArtistPrimaryForAlbum(albumArtistName, artistName);
+
         let releaseId: string;
         let releaseSlug: string;
-        let isMerge = false;
+        let releaseAlreadyExists = false;
 
-        if (action === "merge") {
-          const existingBySlug = existingArtistReleaseBySlug.get(rawSlug);
-          const existingByTitle = existingReleaseByTitle.get(rawTitle.toLowerCase().trim());
-          const existingMatch = existingBySlug || existingByTitle;
+        const existingBySlug = existingArtistReleaseBySlug.get(rawSlug);
+        const existingByTitle = existingReleaseByTitle.get(rawTitle.toLowerCase().trim());
+        const existingMatch = existingBySlug || existingByTitle;
+
+        if (action === "merge" || (action === "canonicalize" && existingMatch)) {
           if (existingMatch) {
             releaseId = existingMatch.id;
             releaseSlug = existingMatch.slug;
-            isMerge = true;
             mergeCount++;
+            releaseAlreadyExists = true;
           } else {
             releaseId = crypto.randomUUID();
             releaseSlug = dedupeSlug(rawSlug, seenReleaseSlugs);
@@ -461,19 +485,87 @@ Deno.serve(async (req: Request) => {
         let awUrl: string | null = null;
         if (attrs.artwork?.url) awUrl = artworkUrl(attrs.artwork.url, 800);
 
-        releaseRows.push({
-          id: releaseId, slug: releaseSlug, title: rawTitle,
-          normalized_title: slugify(rawTitle).replace(/-/g, " "),
-          release_type: releaseType, upc, release_date: releaseDate, artwork_url: awUrl, status: "active",
-          metadata: { apple_music_album_id: album.id, apple_music_url: attrs.url ?? null, genre_names: attrs.genreNames ?? [], record_label: attrs.recordLabel ?? null, source: "apple_music_ingest", ingested_at: new Date().toISOString() },
-        });
+        if (!releaseAlreadyExists) {
+          releaseRows.push({
+            id: releaseId, slug: releaseSlug, title: rawTitle,
+            normalized_title: slugify(rawTitle).replace(/-/g, " "),
+            release_type: releaseType, upc, release_date: releaseDate, artwork_url: awUrl, status: "active",
+            metadata: { apple_music_album_id: album.id, apple_music_url: attrs.url ?? null, genre_names: attrs.genreNames ?? [], record_label: attrs.recordLabel ?? null, source: "apple_music_ingest", ingested_at: new Date().toISOString() },
+          });
+        }
 
-        releaseArtistRows.push({
-          release_id: releaseId, artist_id: artistId, artist_slug: artistSlug, artist_name_text: artistName,
-          role: "primary_artist", is_primary: true, is_featured: false, credit_order: 1,
-          source: "apple_music_ingest", confidence: 90, status: "active",
-          metadata: { apple_music_album_id: album.id },
-        });
+        const addedReleaseArtistIds = new Set<string>();
+
+        if (artistIsAlbumPrimary) {
+          releaseArtistRows.push({
+            release_id: releaseId, artist_id: artistId, artist_slug: artistSlug, artist_name_text: artistName,
+            role: "primary_artist", is_primary: true, is_featured: false, credit_order: 1,
+            source: "apple_music_ingest", confidence: 90, status: "active",
+            metadata: { apple_music_album_id: album.id },
+          });
+          addedReleaseArtistIds.add(artistId);
+        } else {
+          releaseArtistRows.push({
+            release_id: releaseId, artist_id: artistId, artist_slug: artistSlug, artist_name_text: artistName,
+            role: "featured_artist", is_primary: false, is_featured: true, credit_order: 98,
+            source: "apple_music_ingest", confidence: 70, status: "active",
+            metadata: { apple_music_album_id: album.id, ingested_artist_is_featured: true },
+          });
+          addedReleaseArtistIds.add(artistId);
+        }
+
+        const additionalPrimary = additionalPrimaryById.get(sel.apple_music_id);
+        if (additionalPrimary) {
+          let order = 2;
+          for (const ap of additionalPrimary) {
+            releaseArtistRows.push({
+              release_id: releaseId,
+              artist_id: ap.artist_id,
+              artist_slug: ap.artist_slug,
+              artist_name_text: ap.artist_name,
+              role: "primary_artist",
+              is_primary: true,
+              is_featured: false,
+              credit_order: order,
+              source: "apple_music_ingest",
+              confidence: 90,
+              status: "active",
+              metadata: { apple_music_album_id: album.id, admin_selected: true },
+            });
+            addedReleaseArtistIds.add(ap.artist_id);
+            order++;
+          }
+        }
+
+        const albumArtistsFromApi = album.relationships?.artists?.data ?? [];
+        for (let ai = 0; ai < albumArtistsFromApi.length; ai++) {
+          const amArtist = albumArtistsFromApi[ai];
+          const amName = (amArtist.attributes?.name ?? "").trim();
+          if (!amName) continue;
+          const amNameKey = amName.toLowerCase().trim();
+          const amSlug = slugify(amName);
+          const matchedReg = artistByName.get(amNameKey) || artistBySlug.get(amSlug);
+          if (amNameKey === artistNameLower || amSlug === artistSlug) continue;
+          if (matchedReg && addedReleaseArtistIds.has(matchedReg.id)) continue;
+          if (matchedReg) addedReleaseArtistIds.add(matchedReg.id);
+
+          const isAlbumPrimary = isArtistPrimaryForAlbum(albumArtistName, amName);
+
+          releaseArtistRows.push({
+            release_id: releaseId,
+            artist_id: matchedReg?.id ?? null,
+            artist_slug: matchedReg?.slug ?? amSlug,
+            artist_name_text: matchedReg?.display_name ?? amName,
+            role: isAlbumPrimary ? "primary_artist" : "featured_artist",
+            is_primary: isAlbumPrimary,
+            is_featured: !isAlbumPrimary,
+            credit_order: isAlbumPrimary ? 2 : 99 + ai,
+            source: "apple_music_ingest",
+            confidence: matchedReg ? 85 : 50,
+            status: "active",
+            metadata: { apple_music_album_id: album.id, resolved_by: matchedReg ? "name_match" : "text_only" },
+          });
+        }
 
         const tracksData = album.relationships?.tracks?.data ?? [];
         for (const track of tracksData) {
@@ -529,27 +621,57 @@ Deno.serve(async (req: Request) => {
             metadata: { apple_music_track_id: track.id, apple_music_album_id: album.id },
           });
 
-          // Primary artist link
-          trackArtistRows.push({
-            track_id: trackId, artist_id: artistId, artist_slug: artistSlug, artist_name_text: artistName,
-            role: "primary_artist", is_primary: true, is_featured: false, credit_order: 1,
-            source: "apple_music_ingest", confidence: 90, status: "active",
-            metadata: { apple_music_track_id: track.id, apple_music_album_id: album.id },
-          });
+          const rawTrackArtistName = (tAttrs.artistName ?? "").trim();
+          const trackArtistNames = splitArtistNames(rawTrackArtistName || artistName);
+          const seenOnThisTrack = new Set<string>();
 
-          // --- RESOLVE FEATURED ARTISTS FROM TRACK TITLE ---
+          for (const tArtist of trackArtistNames) {
+            const taKey = tArtist.toLowerCase().trim();
+            const taSlug = slugify(tArtist);
+
+            if (taKey === artistNameLower || taSlug === artistSlug) {
+              trackArtistRows.push({
+                track_id: trackId, artist_id: artistId, artist_slug: artistSlug, artist_name_text: artistName,
+                role: "primary_artist", is_primary: true, is_featured: false, credit_order: 1,
+                source: "apple_music_ingest", confidence: 90, status: "active",
+                metadata: { apple_music_track_id: track.id, apple_music_album_id: album.id },
+              });
+              seenOnThisTrack.add(artistSlug);
+              continue;
+            }
+
+            const matchedArtist = artistByName.get(taKey) || artistBySlug.get(taSlug);
+            const resolvedSlug = matchedArtist?.slug ?? taSlug;
+            if (seenOnThisTrack.has(resolvedSlug)) continue;
+            seenOnThisTrack.add(resolvedSlug);
+
+            trackArtistRows.push({
+              track_id: trackId,
+              artist_id: matchedArtist?.id ?? null,
+              artist_slug: resolvedSlug,
+              artist_name_text: matchedArtist?.display_name ?? tArtist,
+              role: "featured_artist",
+              is_primary: false,
+              is_featured: true,
+              credit_order: 2 + seenOnThisTrack.size,
+              source: "apple_music_ingest",
+              confidence: matchedArtist ? 85 : 50,
+              status: "active",
+              metadata: { apple_music_track_id: track.id, apple_music_album_id: album.id, resolved_by: matchedArtist ? "name_match" : "text_only" },
+            });
+            featLinksCreated++;
+          }
+
           const featNames = parseFeaturedFromTitle(trackTitle);
-          const primaryNameKey = artistName.toLowerCase().trim();
-          const primarySlugKey = artistSlug;
           for (let fi = 0; fi < featNames.length; fi++) {
             const featName = featNames[fi];
             const featNameKey = featName.toLowerCase().trim();
             const featSlug = slugify(featName);
 
-            // Skip if featured artist is the same as the primary artist
-            if (featNameKey === primaryNameKey || featSlug === primarySlugKey) continue;
+            if (featNameKey === artistNameLower || featSlug === artistSlug) continue;
+            if (seenOnThisTrack.has(featSlug)) continue;
+            seenOnThisTrack.add(featSlug);
 
-            // Try lookup by exact name first, then by slug
             const matchedArtist = artistByName.get(featNameKey) || artistBySlug.get(featSlug);
 
             trackArtistRows.push({
@@ -560,7 +682,7 @@ Deno.serve(async (req: Request) => {
               role: "featured_artist",
               is_primary: false,
               is_featured: true,
-              credit_order: 2 + fi,
+              credit_order: 2 + seenOnThisTrack.size,
               source: "apple_music_ingest",
               confidence: matchedArtist ? 85 : 50,
               status: "active",
@@ -592,27 +714,84 @@ Deno.serve(async (req: Request) => {
       }
 
       if (releaseArtistRows.length > 0) {
+        const releaseArtistDedupeKey = (r: Record<string, unknown>) => {
+          if (r.artist_id === null || r.artist_id === undefined) return `${r.release_id}:${r.artist_slug}:${r.role}:${r.credit_order}`;
+          return `${r.release_id}:${r.artist_id}:${r.role}:${r.credit_order}`;
+        };
+        const seenReleaseArtists = new Set<string>();
+        const dedupedReleaseArtists = releaseArtistRows.filter((r) => {
+          const key = releaseArtistDedupeKey(r);
+          if (seenReleaseArtists.has(key)) return false;
+          seenReleaseArtists.add(key);
+          return true;
+        });
+
         const rIds = [...processedReleaseIds];
-        for (const idChunk of chunk(rIds, 100)) await db.from("registry_release_artists").delete().in("release_id", idChunk);
-        for (const batch of chunk(releaseArtistRows, BATCH)) {
-          const { error } = await db.from("registry_release_artists").insert(batch);
+        for (const idChunk of chunk(rIds, 100)) {
+          await db.from("registry_release_artists").delete().in("release_id", idChunk);
+        }
+        for (const batch of chunk(dedupedReleaseArtists, BATCH)) {
+          const { error } = await db.from("registry_release_artists").insert(batch, { ignoreDuplicates: true });
           if (error) summary.errors.push(`release_artists: ${error.message}`);
         }
       }
 
       if (releaseTrackRows.length > 0) {
+        const releaseTrackDedupeKey = (r: Record<string, unknown>) => `${r.release_id}:${r.track_id}`;
+        const seenReleaseTracks = new Set<string>();
+        const dedupedReleaseTracks = releaseTrackRows.filter((r) => {
+          const key = releaseTrackDedupeKey(r);
+          if (seenReleaseTracks.has(key)) return false;
+          seenReleaseTracks.add(key);
+          return true;
+        });
+
         const rIds = [...processedReleaseIds];
-        for (const idChunk of chunk(rIds, 100)) await db.from("registry_release_tracks").delete().in("release_id", idChunk);
-        for (const batch of chunk(releaseTrackRows, BATCH)) {
-          const { error } = await db.from("registry_release_tracks").insert(batch);
+        for (const idChunk of chunk(rIds, 100)) {
+          await db.from("registry_release_tracks").delete().in("release_id", idChunk);
+        }
+        for (const batch of chunk(dedupedReleaseTracks, BATCH)) {
+          const { error } = await db.from("registry_release_tracks").insert(batch, { ignoreDuplicates: true });
           if (error) summary.errors.push(`release_tracks: ${error.message}`);
         }
       }
 
       if (trackArtistRows.length > 0) {
-        const tIds = [...new Set(trackArtistRows.map((r) => String(r.track_id)))];
-        for (const idChunk of chunk(tIds, 100)) await db.from("registry_track_artists").delete().in("track_id", idChunk).eq("artist_id", artistId);
-        for (const batch of chunk(trackArtistRows, BATCH)) {
+        const trackArtistPrimaryKey = (r: Record<string, unknown>) => {
+          if (r.artist_id === null || r.artist_id === undefined) return `null:${r.track_id}:${r.artist_slug}:${r.role}:${r.credit_order}`;
+          return `id:${r.track_id}:${r.artist_id}:${r.role}:${r.credit_order}`;
+        };
+        const seenPrimary = new Set<string>();
+        const firstPassDeduped = trackArtistRows.filter((r) => {
+          const key = trackArtistPrimaryKey(r);
+          if (seenPrimary.has(key)) return false;
+          seenPrimary.add(key);
+          return true;
+        });
+
+        const trackSlugMap = new Map<string, Record<string, unknown>>();
+        for (const r of firstPassDeduped) {
+          const key = `${r.track_id}:${r.artist_slug}`;
+          const existing = trackSlugMap.get(key);
+          if (!existing) { trackSlugMap.set(key, r); } else {
+            const existingIsPrimary = existing.role === "primary_artist";
+            const newIsPrimary = r.role === "primary_artist";
+            const existingOrder = Number(existing.credit_order ?? 99);
+            const newOrder = Number(r.credit_order ?? 99);
+            if ((!existingIsPrimary && newIsPrimary) || (existingIsPrimary === newIsPrimary && newOrder < existingOrder)) {
+              trackSlugMap.set(key, r);
+            }
+          }
+        }
+        const dedupedTrackArtists = [...trackSlugMap.values()];
+
+        const tIds = [...new Set(dedupedTrackArtists.map((r) => String(r.track_id)))];
+        for (const idChunk of chunk(tIds, 100)) {
+          const { error: delError } = await db.from("registry_track_artists").delete().in("track_id", idChunk);
+          if (delError) summary.errors.push(`track_artists_delete: ${delError.message}`);
+        }
+
+        for (const batch of chunk(dedupedTrackArtists, BATCH)) {
           const { error } = await db.from("registry_track_artists").insert(batch);
           if (error) summary.errors.push(`track_artists: ${error.message}`);
         }

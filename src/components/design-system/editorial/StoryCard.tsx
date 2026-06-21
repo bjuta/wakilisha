@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { WkTag } from "@/components/design-system/primitives/Tag";
 import { getAuthorMeta } from "@/services/authorProfiles";
+import { trackEvent } from "@/services/analytics";
 
 export interface StoryCardProps {
   slug: string;
@@ -12,6 +13,9 @@ export interface StoryCardProps {
   dek?: string;
   author?: string;
   isFeatured?: boolean;
+  sourceSection?: string;
+  sourceEntity?: string;
+  clickPosition?: number;
 }
 
 export function StoryCard({
@@ -24,13 +28,31 @@ export function StoryCard({
   dek,
   author,
   isFeatured = false,
+  sourceSection,
+  sourceEntity,
+  clickPosition,
 }: StoryCardProps) {
   const authorUrl = author ? `/authors/${getAuthorMeta(author).slug}` : null;
+
+  const handleClick = () => {
+    if (sourceSection) {
+      trackEvent("card_click", {
+        entityType: "article",
+        entitySlug: slug,
+        context: {
+          source_section: sourceSection,
+          ...(sourceEntity ? { source_entity: sourceEntity } : {}),
+          ...(clickPosition !== undefined ? { click_position: clickPosition } : {}),
+        },
+      });
+    }
+  };
 
   if (isFeatured) {
     return (
       <Link
         to={`/magazine/${slug}`}
+        onClick={handleClick}
         className="group block overflow-hidden rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)]"
       >
         {heroUrl && (
@@ -76,6 +98,7 @@ export function StoryCard({
   return (
     <Link
       to={`/magazine/${slug}`}
+      onClick={handleClick}
       className="group flex gap-3 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-3 transition-all hover:border-[var(--wk-border-2)]"
     >
       {heroUrl && (

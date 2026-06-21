@@ -13,6 +13,9 @@ import { rewriteWpImageUrls } from "@/services/wpImageRewrite";
 import { embedRichMedia } from "@/utils/embedRichMedia";
 import { decodeHtmlEntities } from "@/utils/decodeHtmlEntities";
 import { generateExcerpt as generateExcerptUtil } from "@/utils/generateExcerpt";
+import { transformReleaseShortcodes, stripReleaseShortcodes } from "@/utils/transformReleaseShortcodes";
+import { transformArtistShortcodes, stripArtistShortcodes } from "@/utils/transformArtistShortcodes";
+import { transformTrackShortcodes, stripTrackShortcodes } from "@/utils/transformTrackShortcodes";
 
 /**
  * Full content processing pipeline for article body HTML.
@@ -24,6 +27,9 @@ export function processArticleContent(rawHtml: string | null | undefined): strin
   html = sanitizeVcShortcodes(html);
   html = decodeHtmlEntities(html);
   html = rewriteWpImageUrls(html);
+  html = transformReleaseShortcodes(html);
+  html = transformArtistShortcodes(html);
+  html = transformTrackShortcodes(html);
   html = embedRichMedia(html);
   return html;
 }
@@ -54,7 +60,10 @@ export function processText(raw: string | null | undefined): string {
  * Generate a clean plain-text excerpt from article HTML.
  */
 export function generateExcerpt(html: string | null | undefined, maxChars = 280): string {
-  return generateExcerptUtil(html, maxChars);
+  let stripped = stripReleaseShortcodes(html || "");
+  stripped = stripArtistShortcodes(stripped);
+  stripped = stripTrackShortcodes(stripped);
+  return generateExcerptUtil(stripped, maxChars);
 }
 
 /**

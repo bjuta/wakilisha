@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { usePlayer } from '@/context/PlayerContext';
+import { getTrack } from '@/services/publicApi/client';
+import { trackEvent, getAnalyticsSessionId, getCanonicalPageUrl } from '@/services/analytics';
 import { WkIcon } from '@/components/design-system/Icon';
-
-const TRACK_DETAILS: any[] = [];
-function getTrackBySlug(_slug: string): any { return undefined; }
 
 interface DraftLine {
   id: string;
@@ -23,11 +22,23 @@ function formatTime(seconds: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
+interface TrackData {
+  slug: string;
+  title: string;
+  artist: string;
+  artistSlug: string;
+  artworkUrl: string;
+  duration: number;
+  isPlayable: boolean;
+  previewUrl: string | null;
+}
+
 export default function LyricContribution() {
   const { artistSlug, trackSlug } = useParams<{ artistSlug: string; trackSlug: string }>();
-  const slug = trackSlug || '';
-  const { playTrack, currentTrack, isPlaying, togglePlay, currentTime, seek, pause } = usePlayer();
-  const track = getTrackBySlug(slug);
+  const { playTrack, currentTrack, isPlaying, togglePlay, currentTime } = usePlayer();
+  const [track, setTrack] = useState<TrackData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const [lines, setLines] = useState<DraftLine[]>([
     { id: nextLineId(), text: '', timestampSeconds: 0 },
@@ -37,19 +48,91 @@ export default function LyricContribution() {
   ]);
   const [sourceDescription, setSourceDescription] = useState('');
   const [submitted, setSubmitted] = useState(false);
-  const [error, setError] = useState('');
+  const [submitError, setSubmitError] = useState('');
 
-  const isThisTrackPlaying = currentTrack?.id === slug && isPlaying;
+  // Fetch track data
+  useEffect(() => {
+    let alive = true;
+    if (!artistSlug || !trackSlug) {
+      setLoading(false);
+      setError('Invalid track URL');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    getTrack(artistSlug, trackSlug)
+      .then((apiData) => {
+        if (!alive) return;
+        if (!apiData) {
+          setLoading(false);
+          setError('Track not found.');
+          return;
+        }
+        const trackData = apiData.track ?? apiData;
+        const artistData = apiData.artist ?? {};
+        const rawArtists = Array.isArray(apiData.artists) ? apiData.artists : [];
+        const primaryArtist = rawArtists.find((a: any) => a.isPrimary) || rawArtists[0] || artistData;
+        const artistName = primaryArtist?.name || artistData?.name || 'Unknown';
+        const duration = trackData.durationMs ? Math.round(trackData.durationMs / 1000) : (trackData.duration || 0);
+        const previewUrl: string | null = apiData.previewUrl || trackData.previewUrl || null;
+        setTrack({
+          slug: trackData.slug,
+          title: trackData.title,
+          artist: artistName,
+          artistSlug: primaryArtist?.slug || artistData?.slug || '',
+          artworkUrl: trackData.artworkUrl || '',
+          duration,
+          isPlayable: !!previewUrl,
+          previewUrl,
+        });
+        setLoading(false);
+      })
+      .catch((err) => {
+        if (!alive) return;
+        setLoading(false);
+        setError(err instanceof Error ? err.message : 'Could not load track.');
+      });
+    return () => { alive = false; };
+  }, [artistSlug, trackSlug]);
+
+  const isThisTrackPlaying = currentTrack?.id === trackSlug && isPlaying;
 
   // Auto-play the track when entering the page
   useEffect(() => {
-    if (track && track.isPlayable && currentTrack?.id !== slug) {
+    if (track && track.isPlayable && currentTrack?.id !== track.slug) {
       playTrack(
-        { id: track.slug, title: track.title, artist: track.artist, artworkUrl: track.artworkUrl, isPlayable: track.isPlayable, source: track.source, duration: track.duration },
-        TRACK_DETAILS.filter((t) => t.isPlayable).map((t) => ({ id: t.slug, title: t.title, artist: t.artist, artworkUrl: t.artworkUrl, isPlayable: t.isPlayable, source: t.source, duration: t.duration }))
+        {
+          id: track.slug,
+          title: track.title,
+          artist: track.artist,
+          artworkUrl: track.artworkUrl,
+          isPlayable: track.isPlayable,
+          source: 'WAKILISHA',
+          duration: track.duration,
+          previewUrl: track.previewUrl || undefined,
+        },
+        [
+          {
+            id: track.slug,
+            title: track.title,
+            artist: track.artist,
+            artworkUrl: track.artworkUrl,
+            isPlayable: track.isPlayable,
+            source: 'WAKILISHA',
+            duration: track.duration,
+            previewUrl: track.previewUrl || undefined,
+          },
+        ],
+        {
+          pageType: "track_detail",
+          entitySlug: trackSlug ?? track.slug,
+          entityType: "track",
+          sourceSection: "contribute_page",
+        },
       );
     }
-  }, [slug, track, playTrack, currentTrack]);
+  }, [track, playTrack, currentTrack]);
 
   const addLine = useCallback(() => {
     setLines((prev) => [...prev, { id: nextLineId(), text: '', timestampSeconds: null }]);
@@ -68,38 +151,70 @@ export default function LyricContribution() {
 
   const stampTimestamp = useCallback((lineId: string) => {
     setLines((prev) =>
-      prev.map((l) => (l.id === lineId ? { ...l, timestampSeconds: Math.round(currentTime * 10) / 10 } : l))
+      prev.map((l) => (l.id === lineId ? { ...l, timestampSeconds: Math.round(currentTime * 10) / 10 } : l)),
     );
   }, [currentTime]);
 
   const handleSubmit = useCallback(() => {
-    // Validate
     const filledLines = lines.filter((l) => l.text.trim() && l.timestampSeconds !== null);
     if (filledLines.length < 2) {
-      setError('Add at least 2 timed lines before submitting.');
+      setSubmitError('Add at least 2 timed lines before submitting.');
       return;
     }
-    // Sort by timestamp
-    const sorted = [...filledLines].sort((a, b) => (a.timestampSeconds ?? 0) - (b.timestampSeconds ?? 0));
+    setSubmitError('');
 
-    // In a real app, this would save to Supabase
-    // For now, show success
-    setError('');
+    if (track) {
+      trackEvent("lyrics_contribution", {
+        pageType: "track_detail",
+        entitySlug: trackSlug ?? "",
+        entityType: "track",
+        context: {
+          source_section: "contribute_page",
+          artist_slug: artistSlug ?? track.artistSlug,
+          track_title: track.title,
+          artist_name: track.artist,
+          timed_lines_count: filledLines.length,
+          total_lines_count: lines.length,
+          has_source_description: sourceDescription.trim().length > 0,
+        },
+      });
+    }
+
     setSubmitted(true);
-  }, [lines]);
+  }, [lines, track, trackSlug, artistSlug, sourceDescription]);
 
-  if (!track) {
+  if (loading) {
     return (
-      <main className="min-h-screen px-6 py-20 text-center">
-        <p className="text-[var(--wk-text-muted)]">Track not found.</p>
-        <Link to="/charts" className="mt-4 inline-block text-[14px] font-bold text-[var(--wk-brand)]">Back to charts</Link>
+      <main className="min-h-screen bg-[var(--wk-bg)] flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="mx-auto h-24 w-24 rounded-2xl bg-[var(--wk-surface-raised)] animate-pulse" />
+          <p className="text-[15px] font-semibold text-[var(--wk-text-muted)]">Loading track&hellip;</p>
+        </div>
+      </main>
+    );
+  }
+
+  if (error || !track) {
+    return (
+      <main className="min-h-screen bg-[var(--wk-bg)] px-6 py-24 text-center">
+        <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-[var(--wk-surface-raised)]">
+          <i className="ri-file-music-line text-[var(--wk-text-faint)] text-[32px]" />
+        </div>
+        <h1 className="mb-2 text-[28px] font-black text-[var(--wk-text)]">Track not found</h1>
+        <p className="mb-8 text-[15px] text-[var(--wk-text-muted)] max-w-[400px] mx-auto">
+          {error || 'We do not have this track page ready yet.'}
+        </p>
+        <Link to="/charts" className="inline-flex items-center gap-2 rounded-full bg-[var(--wk-brand)] px-6 py-3 text-[13px] font-extrabold text-[var(--wk-brand-on)] hover:opacity-90 whitespace-nowrap">
+          <i className="ri-bar-chart-2-line" />
+          Browse the charts
+        </Link>
       </main>
     );
   }
 
   if (submitted) {
     return (
-      <main className="min-h-screen">
+      <main className="min-h-screen bg-[var(--wk-bg)]">
         <div className="mx-auto max-w-[640px] px-6 py-20 text-center">
           <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500/10">
             <WkIcon name="Check" size={36} className="text-emerald-500" />
@@ -107,11 +222,11 @@ export default function LyricContribution() {
           <h1 className="mb-3 text-[28px] font-black text-[var(--wk-text)]">Lyrics submitted!</h1>
           <p className="mb-8 text-[15px] leading-relaxed text-[var(--wk-text-muted)]">
             Your timed lyrics for <strong className="text-[var(--wk-text)]">{track.title}</strong> are now pending community review.
-            Once more contributors upvote than downvote, they&apos;ll go live.
+            Once more contributors upvote than downvote, they'll go live.
           </p>
           <div className="flex items-center justify-center gap-4">
-            <Link to={`/tracks/${artistSlug}/${trackSlug}`} className="rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-6 py-3 text-[14px] font-bold text-[var(--wk-text)]">Back to track</Link>
-            <button onClick={() => setSubmitted(false)} className="rounded-xl bg-[var(--wk-brand)] px-6 py-3 text-[14px] font-bold text-[var(--wk-brand-on)]">Submit another</button>
+            <Link to={`/tracks/${artistSlug}/${trackSlug}`} className="rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-6 py-3 text-[14px] font-bold text-[var(--wk-text)] hover:bg-[var(--wk-surface-raised)] transition-colors">Back to track</Link>
+            <button onClick={() => setSubmitted(false)} className="rounded-xl bg-[var(--wk-brand)] px-6 py-3 text-[14px] font-bold text-[var(--wk-brand-on)] hover:opacity-90 transition-opacity">Submit another</button>
           </div>
         </div>
       </main>
@@ -123,7 +238,7 @@ export default function LyricContribution() {
       {/* Header */}
       <div className="border-b border-[var(--wk-border)] bg-[var(--wk-surface)]">
         <div className="mx-auto flex max-w-[900px] items-center gap-4 px-6 py-4">
-          <Link to={`/tracks/${artistSlug}/${trackSlug}`} className="flex items-center gap-2 text-[12px] font-bold text-[var(--wk-text-muted)] hover:text-[var(--wk-text)]">
+          <Link to={`/tracks/${artistSlug}/${trackSlug}`} className="flex items-center gap-2 text-[12px] font-bold text-[var(--wk-text-muted)] hover:text-[var(--wk-text)] transition-colors">
             <WkIcon name="ArrowLeft" size={16} />
             Back
           </Link>
@@ -223,9 +338,9 @@ export default function LyricContribution() {
         </div>
 
         {/* Error */}
-        {error && (
+        {submitError && (
           <div className="mt-4 rounded-xl border border-red-200 bg-red-500/5 px-4 py-3 text-[13px] text-red-600">
-            {error}
+            {submitError}
           </div>
         )}
 
@@ -248,23 +363,23 @@ export default function LyricContribution() {
           <h3 className="mb-3 text-[13px] font-black uppercase tracking-wider text-[var(--wk-text-muted)]">Guidelines</h3>
           <ul className="space-y-2 text-[13px] text-[var(--wk-text-soft)]">
             <li className="flex items-start gap-2">
-              <span className="mt-0.5 text-[var(--wk-brand)]">•</span>
+              <span className="mt-0.5 text-[var(--wk-brand)]">&#8226;</span>
               Play the track and click <strong>Set</strong> at the exact moment each line begins
             </li>
             <li className="flex items-start gap-2">
-              <span className="mt-0.5 text-[var(--wk-brand)]">•</span>
-              Include section markers like <strong>— Chorus —</strong> and <strong>— Verse 2 —</strong>
+              <span className="mt-0.5 text-[var(--wk-brand)]">&#8226;</span>
+              Include section markers like <strong>&#8212; Chorus &#8212;</strong> and <strong>&#8212; Verse 2 &#8212;</strong>
             </li>
             <li className="flex items-start gap-2">
-              <span className="mt-0.5 text-[var(--wk-brand)]">•</span>
-              Mark instrumental sections with <strong>♪ instrumental ♪</strong>
+              <span className="mt-0.5 text-[var(--wk-brand)]">&#8226;</span>
+              Mark instrumental sections with <strong>&#9834; instrumental &#9834;</strong>
             </li>
             <li className="flex items-start gap-2">
-              <span className="mt-0.5 text-[var(--wk-brand)]">•</span>
+              <span className="mt-0.5 text-[var(--wk-brand)]">&#8226;</span>
               Add a source description so other reviewers can verify accuracy
             </li>
             <li className="flex items-start gap-2">
-              <span className="mt-0.5 text-[var(--wk-brand)]">•</span>
+              <span className="mt-0.5 text-[var(--wk-brand)]">&#8226;</span>
               Your submission goes through community voting. If upvotes exceed downvotes, it goes live.
             </li>
           </ul>

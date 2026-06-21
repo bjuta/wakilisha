@@ -2,10 +2,10 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 serve(async (req: Request) => {
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
   if (!supabaseUrl || !serviceRoleKey) {
-    return new Response(JSON.stringify({ error: "Missing env vars" }), { status: 500 });
+    return new Response(JSON.stringify({ error: "Supabase service role key missing. This function requires SERVICE_ROLE_KEY to delete staging records." }), { status: 500 });
   }
 
   const baseUrl = supabaseUrl.replace(/\/$/, "");

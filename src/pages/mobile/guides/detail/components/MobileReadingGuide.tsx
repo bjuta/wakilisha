@@ -1,12 +1,32 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { trackEvent, getAnalyticsSessionId, getCanonicalPageUrl } from "@/services/analytics";
 import { readingGuide, prologueChapter } from "@/pages/guides/detail/readingData";
+import { MobileShareButton } from "@/components/design-system/share/ShareSheet";
 
 export default function MobileReadingGuide() {
   const [fontSize, setFontSize] = useState(17);
   const [tocOpen, setTocOpen] = useState(false);
   const [copyToast, setCopyToast] = useState(false);
   const [readingProgress, setReadingProgress] = useState(0);
+
+  const sessionId = getAnalyticsSessionId();
+  const pageUrl = getCanonicalPageUrl();
+  const guideSlug = "the-day-reading-changed";
+  const guideTitle = "The Day Reading Changed";
+
+  const handleNotifySubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    trackEvent("newsletter_signup", {
+      pageType: "guide_detail",
+      entitySlug: guideSlug,
+      entityType: "guide",
+      context: {
+        source_section: "notify_form_mobile",
+        guide_title: guideTitle,
+        guide_slug: guideSlug,
+      },
+    });
+  };
 
   // Reading progress tracking
   if (typeof window !== "undefined") {
@@ -91,9 +111,20 @@ export default function MobileReadingGuide() {
 
       {/* Hero */}
       <section className="relative pt-14 pb-8 px-5" style={{ background: "var(--wk-bg)" }}>
-        <Link to="/guides" className="inline-flex items-center gap-1.5 text-[12px] font-medium uppercase tracking-wider text-[var(--wk-text-muted)] mb-5">
-          <i className="ri-arrow-left-line" /> Guides
-        </Link>
+        <div className="flex items-center justify-between mb-5">
+          <Link to="/guides" className="inline-flex items-center gap-1.5 text-[12px] font-medium uppercase tracking-wider text-[var(--wk-text-muted)]">
+            <i className="ri-arrow-left-line" /> Guides
+          </Link>
+          <MobileShareButton
+            item={{
+              title: "The Day Reading Changed",
+              subtitle: readingGuide.publisher,
+              description: readingGuide.shareDescription,
+              type: "page",
+            }}
+            variant="light"
+          />
+        </div>
         <div className="mb-3">
           <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold tracking-widest uppercase text-[var(--wk-text-muted)]">
             <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: "#C4A35A" }} />
@@ -172,8 +203,13 @@ export default function MobileReadingGuide() {
             action="https://readdy.ai/api/form/d8m5rsojb57qogjbh760"
             method="POST"
             data-readdy-form=""
+            onSubmit={handleNotifySubmit}
             className="space-y-3"
           >
+            <input type="hidden" name="wk_session_id" value={sessionId} />
+            <input type="hidden" name="wk_page_url" value={pageUrl} />
+            <input type="hidden" name="wk_page_type" value="guide_detail" />
+            <input type="hidden" name="wk_source_section" value="notify_form_mobile" />
             <input
               type="email" name="email" placeholder="Your email address" required
               className="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-4 py-3 text-[13px] text-[var(--wk-text)] placeholder:text-[var(--wk-text-faint)] outline-none focus:border-[var(--wk-brand)]/40"

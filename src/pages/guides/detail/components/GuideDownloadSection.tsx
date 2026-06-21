@@ -1,13 +1,32 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
+import { trackEvent, getAnalyticsSessionId, getCanonicalPageUrl } from "@/services/analytics";
 import { inMinorKeysData } from "../data";
 
 export default function GuideDownloadSection() {
   const { download } = inMinorKeysData;
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
 
+  const sessionId = getAnalyticsSessionId();
+  const pageUrl = getCanonicalPageUrl();
+  const guideSlug = "in-minor-keys";
+  const guideTitle = `${download.title} ${download.titleItalic}`;
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setStatus("submitting");
+
+    trackEvent("newsletter_signup", {
+      pageType: "guide_detail",
+      entitySlug: guideSlug,
+      entityType: "guide",
+      context: {
+        source_section: "download_form",
+        guide_title: guideTitle,
+        guide_slug: guideSlug,
+      },
+    });
+
     try {
       const form = e.currentTarget;
       const data = new URLSearchParams(new FormData(form) as unknown as URLSearchParams);
@@ -53,6 +72,20 @@ export default function GuideDownloadSection() {
                 </li>
               ))}
             </ul>
+
+            {/* Field Guide Link */}
+            <div className="mt-8 pt-6 border-t border-[var(--wk-divider)]">
+              <p className="text-[12px] font-semibold text-[var(--wk-text)] mb-2">Prefer to read online?</p>
+              <p className="text-[13px] text-[var(--wk-text-soft)] mb-3">
+                View the full field guide as a beautiful, scrollable page. You can also print it to PDF.
+              </p>
+              <Link
+                to={`/guides/${guideSlug}/field-guide`}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-[var(--wk-border)] bg-[var(--wk-surface)] text-[var(--wk-text)] text-[13px] font-semibold hover:bg-[var(--wk-surface-raised)] transition-colors"
+              >
+                <i className="ri-book-open-line" /> Open the field guide
+              </Link>
+            </div>
           </div>
 
           {/* Form */}
@@ -82,6 +115,11 @@ export default function GuideDownloadSection() {
                     onSubmit={handleSubmit}
                     className="space-y-4"
                   >
+                    <input type="hidden" name="wk_session_id" value={sessionId} />
+                    <input type="hidden" name="wk_page_url" value={pageUrl} />
+                    <input type="hidden" name="wk_page_type" value="guide_detail" />
+                    <input type="hidden" name="wk_source_section" value="download_form" />
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-[12px] font-semibold text-[var(--wk-text)] mb-1.5">

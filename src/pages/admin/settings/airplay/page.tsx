@@ -10,6 +10,7 @@ import {
   DEFAULT_AIRPLAY_SETTINGS,
   type AirplaySettings,
 } from "@/services/adminSettings/settingsTypes";
+import { readAcrCloudCredentials } from "@/services/adminSettings/providerCredentialReader";
 
 interface AirplaySourceRow {
   id: string;
@@ -75,29 +76,14 @@ export default function AdminSettingsAirplay() {
     loadStations();
   }, []);
 
-  // Check which credentials exist in admin_settings_secrets
+  // Check credentials via providerCredentialReader (reads from localStorage, not DB directly)
   useEffect(() => {
-    async function checkCreds() {
-      try {
-        const { data } = await supabase
-          .from("admin_settings_secrets")
-          .select("setting_key")
-          .in("setting_key", [
-            "acr_host", "acr_access_key", "acr_access_secret",
-            "spotify_client_id", "spotify_client_secret",
-            "apple_music_team_id", "apple_music_key_id",
-          ]);
-        const keys = new Set((data || []).map((r: { setting_key: string }) => r.setting_key));
-        setCredStatus({
-          acr: keys.has("acr_host") && keys.has("acr_access_key") && keys.has("acr_access_secret"),
-          spotify: keys.has("spotify_client_id") && keys.has("spotify_client_secret"),
-          appleMusic: keys.has("apple_music_team_id") && keys.has("apple_music_key_id"),
-        });
-      } catch {
-        // ignore
-      }
-    }
-    checkCreds();
+    const acr = readAcrCloudCredentials();
+    setCredStatus({
+      acr: acr.configured,
+      spotify: false,
+      appleMusic: false,
+    });
   }, []);
 
   const handleTest = async () => {
@@ -326,7 +312,7 @@ export default function AdminSettingsAirplay() {
               <li>Airplay stations are configured in the <code className="bg-[var(--wk-bg)] px-1 rounded">airplay_sources</code> table with ACR stream IDs in <code className="bg-[var(--wk-bg)] px-1 rounded">metadata_json</code></li>
               <li>During ingest, the <strong>airplay_evidence</strong> stage calls ACRCloud with proper HMAC-SHA1 signing</li>
               <li>Results populate <code className="bg-[var(--wk-bg)] px-1 rounded">airplay_detections</code> and aggregate into <code className="bg-[var(--wk-bg)] px-1 rounded">airplay_evidence_weekly</code></li>
-              <li>The scoring engine reads evidence buckets and applies the airplay formula (§4.7)</li>
+              <li>The scoring engine reads evidence buckets and applies the airplay formula (&sect;4.7)</li>
             </ol>
           </div>
         </div>

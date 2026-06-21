@@ -1,61 +1,78 @@
-import { useEffect, useState, useRef, useMemo } from "react";
+import { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { Link, useParams, useSearchParams, useNavigate } from "react-router-dom";
 import {
   useMagazineArticle,
   useMagazineArticles,
   getRelatedArticles,
   type MagazineArticle,
-  type MediaAsset,
 } from "@/services/magazineArticles";
-import { buildMagazineIssues, issueUrl } from "@/services/magazineIssues";
-import { buildIssueEditorialSystem } from "@/services/magazineNlg";
+
+import { transformReleaseShortcodes } from "@/utils/transformReleaseShortcodes";
+import { transformArtistShortcodes } from "@/utils/transformArtistShortcodes";
 import { WkIcon } from "@/components/design-system/Icon";
 import { ArticleFloatHeader } from "./components/ArticleFloatHeader";
 import { ArticleRelated } from "./components/ArticleRelated";
+import { ArticleContentRenderer, transformArticleHtmlForVideoEmbeds } from "./components/ArticleVideoEmbeds";
+import { transformArticleHtmlForReleaseEmbeds, enrichAllReleasesFromRegistry, resolveRegistryReleaseMarkers } from "./components/ArticleReleaseEmbeds";
+import { resolveArtistMarkers } from "./components/ArticleArtistEmbeds";
+import { buildContentSegments } from "./components/ArticleEmbedUtils";
 import { SkeletonArticlePage } from "@/components/skeletons/Skeletons";
 import { Chapter19FallbackImage } from "@/components/media/Chapter19FallbackImage";
 import { MetaTags } from "@/components/seo/MetaTags";
 import { checkArticleScheduling, lookupSlugRedirect } from "@/services/articles/articleAdminService";
+import { resolveTrackMarkers } from "./components/ArticleTrackEmbeds";
+import { transformTrackShortcodes } from "@/utils/transformTrackShortcodes";
+import { injectMediaCaptions, buildAssetCaptionMap } from "@/utils/injectMediaCaptions";
+import { SharePopover } from "@/components/design-system/share/ShareSheet";
+import { getShareCounts, getTotalShareCount } from "@/services/shareTracking";
+import { useScrollDepthTracking } from "@/hooks/useScrollDepthTracking";
 
-function InlineMediaGallery({ assets }: { assets: MediaAsset[] }) {
-  const inlineAssets = assets.filter((a) => a.role !== "hero" && a.url);
-  if (!inlineAssets.length) return null;
-  return (
-    <div className="my-10 grid gap-5 sm:grid-cols-2">
-      {inlineAssets.map((asset) => (
-        <figure key={asset.id} className="flex flex-col overflow-hidden rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)]">
-          <div className="relative aspect-[4/3] overflow-hidden bg-[var(--wk-surface-raised)]">
-            <img src={asset.url} alt={asset.altText || ""} className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 hover:scale-105" loading="lazy" />
-          </div>
-          {asset.altText && <figcaption className="px-4 py-3 text-[11px] leading-relaxed text-[var(--wk-text-muted)]">{asset.altText}</figcaption>}
-        </figure>
-      ))}
-    </div>
-  );
-}
+/* Remove InlineMediaGallery — captions now render inline alongside their images */
 
 function ArticleBottomShare({ article, shareText }: { article: MagazineArticle; shareText: string }) {
-  const [copyDone, setCopyDone] = useState(false);
-  const handleCopy = () => {
-    navigator.clipboard?.writeText(window.location.href);
-    setCopyDone(true);
-    setTimeout(() => setCopyDone(false), 2500);
-  };
+  const [popoverOpen, setPopoverOpen] = useState(false);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const [totalShares, setTotalShares] = useState(0);
+  const pageUrl = typeof window !== "undefined" ? window.location.href : "";
+
+  useEffect(() => {
+    if (!pageUrl) return;
+    getShareCounts(pageUrl).then((counts) => {
+      setTotalShares(getTotalShareCount(counts));
+    }).catch(() => {});
+  }, [pageUrl]);
 
   return (
     <div className="rounded-2xl bg-[var(--wk-surface)] border border-[var(--wk-border)] p-6 lg:p-8 text-center">
       <p className="text-[15px] font-bold text-[var(--wk-text)] mb-1">Enjoyed this piece?</p>
       <p className="text-[13px] text-[var(--wk-text-muted)] mb-6">Share it with someone who cares about African creative life.</p>
-      <div className="flex items-center justify-center gap-3 flex-wrap">
-        <button onClick={handleCopy} className="h-9 px-5 rounded-full border border-[var(--wk-border)] bg-[var(--wk-bg)] text-[13px] font-bold text-[var(--wk-text-soft)] hover:border-[var(--wk-brand)] hover:text-[var(--wk-brand)] transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap">
-          <i className="ri-link-m" /> {copyDone ? "Copied!" : "Copy link"}
+      <div className="relative inline-block">
+        <button
+          ref={buttonRef as React.RefObject<HTMLButtonElement>}
+          onClick={() => setPopoverOpen(!popoverOpen)}
+          className="inline-flex items-center gap-2 h-11 px-6 rounded-full bg-[var(--wk-brand)] text-white text-[14px] font-bold hover:opacity-90 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
+        >
+          <i className="ri-share-forward-line text-[16px]" />
+          Share this article
+          {totalShares > 0 && (
+            <span className="inline-flex items-center justify-center min-w-[22px] h-[22px] px-[6px] rounded-full bg-white/20 text-white text-[11px] font-bold">
+              {totalShares.toLocaleString()}
+            </span>
+          )}
         </button>
-        <a href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(window.location.href)}`} target="_blank" rel="noopener noreferrer" className="h-9 px-5 rounded-full bg-[#000] text-white text-[13px] font-bold flex items-center gap-2 hover:opacity-85 transition-opacity whitespace-nowrap">
-          <i className="ri-twitter-x-line" /> Share on X
-        </a>
-        <a href={`https://wa.me/?text=${encodeURIComponent(`${shareText} ${window.location.href}`)}`} target="_blank" rel="noopener noreferrer" className="h-9 px-5 rounded-full bg-[#25D366] text-white text-[13px] font-bold flex items-center gap-2 hover:opacity-85 transition-opacity whitespace-nowrap">
-          <i className="ri-whatsapp-line" /> WhatsApp
-        </a>
+
+        <SharePopover
+          open={popoverOpen}
+          onClose={() => setPopoverOpen(false)}
+          item={{
+            title: article.title,
+            subtitle: article.dek,
+            url: pageUrl,
+            type: "article",
+            imageUrl: article.heroUrl,
+          }}
+          triggerRef={buttonRef as React.RefObject<HTMLElement>}
+        />
       </div>
     </div>
   );
@@ -67,6 +84,12 @@ export default function ArticlePage() {
   const previewNonce = searchParams.get("preview");
   const navigate = useNavigate();
   const { article, loading: articleLoading, error: articleError } = useMagazineArticle(slug, previewNonce);
+
+  useScrollDepthTracking({
+    pageType: "article",
+    entitySlug: slug,
+    entityType: "article",
+  });
   const { articles: allArticles } = useMagazineArticles();
   const [related, setRelated] = useState<MagazineArticle[]>([]);
   const [relatedLoading, setRelatedLoading] = useState(true);
@@ -74,24 +97,81 @@ export default function ArticlePage() {
   const [copyDone, setCopyDone] = useState(false);
   const progressBarRef = useRef<HTMLDivElement>(null);
   const lastScrollState = useRef(false);
-  const stableContentHtml = useMemo(() => article?.contentHtml ?? "", [article?.contentHtml]);
+  const rawContentHtml = useMemo(() => article?.contentHtml ?? "", [article?.contentHtml]);
+  const shortcodeMarked = useMemo(
+    () => transformTrackShortcodes(transformReleaseShortcodes(transformArtistShortcodes(rawContentHtml))),
+    [rawContentHtml]
+  );
+  const { markedHtml: videoMarked, videos: videoEmbeds } = useMemo(
+    () => transformArticleHtmlForVideoEmbeds(shortcodeMarked),
+    [shortcodeMarked]
+  );
+  const { markedHtml: finalMarked, releases: releaseEmbeds } = useMemo(
+    () => transformArticleHtmlForReleaseEmbeds(videoMarked),
+    [videoMarked]
+  );
+
+  // Combined processing: enrich WP-scraped embeds + resolve registry markers
+  const [finalHtml, setFinalHtml] = useState(finalMarked);
+  const [finalReleases, setFinalReleases] = useState(releaseEmbeds);
+  const [artistEmbeds, setArtistEmbeds] = useState<import("./components/ArticleArtistEmbeds").ArtistEmbedData[]>([]);
+  const [trackEmbeds, setTrackEmbeds] = useState<import("./components/ArticleTrackEmbeds").TrackEmbedData[]>([]);
+
+  useEffect(() => {
+    let alive = true;
+    async function process() {
+      // Step 1: Enrich WP-scraped releases from registry
+      let enriched = releaseEmbeds;
+      if (releaseEmbeds.length > 0) {
+        enriched = await enrichAllReleasesFromRegistry(releaseEmbeds);
+      }
+      if (!alive) return;
+
+      // Step 2: Resolve registry release markers (inserted from admin editor)
+      const resolved = await resolveRegistryReleaseMarkers(finalMarked, enriched);
+      if (!alive) return;
+
+      // Step 3: Resolve artist registry markers
+      const artistResolved = await resolveArtistMarkers(resolved.markedHtml);
+      if (!alive) return;
+
+      // Step 4: Resolve track registry markers
+      const trackResolved = await resolveTrackMarkers(artistResolved.markedHtml);
+      if (!alive) return;
+
+      setFinalHtml(trackResolved.markedHtml);
+      setFinalReleases(resolved.releases);
+      setArtistEmbeds(artistResolved.artists);
+      setTrackEmbeds(trackResolved.tracks);
+    }
+    process();
+    return () => { alive = false; };
+  }, [finalMarked, releaseEmbeds]);
+
+  const segments = useMemo(
+    () => buildContentSegments(finalHtml, videoEmbeds, finalReleases, artistEmbeds, trackEmbeds),
+    [finalHtml, videoEmbeds, finalReleases, artistEmbeds, trackEmbeds]
+  );
+
+  // Inject caption <figcaption> tags for images linked to media assets
+  // with stored captions, so captions render inline alongside their images.
+  const captionedHtml = useMemo(() => {
+    if (!article?.mediaAssets?.length) return null;
+    const assetMap = buildAssetCaptionMap(article.mediaAssets);
+    return injectMediaCaptions(finalHtml, assetMap);
+  }, [finalHtml, article?.mediaAssets]);
+
+  const captionedSegments = useMemo(() => {
+    if (!captionedHtml) return segments;
+    return buildContentSegments(captionedHtml, videoEmbeds, finalReleases, artistEmbeds, trackEmbeds);
+  }, [captionedHtml, videoEmbeds, finalReleases, artistEmbeds, trackEmbeds, segments]);
+
+  const displaySegments = captionedHtml ? captionedSegments : segments;
   const [isScheduled, setIsScheduled] = useState(false);
   const [scheduledDate, setScheduledDate] = useState<string | null>(null);
   const [checkingRedirect, setCheckingRedirect] = useState(false);
 
-  const issueContext = useMemo(() => {
-    if (!article) return undefined;
-    const issue = buildMagazineIssues(allArticles).find((item) => item.articles.some((issueArticle) => issueArticle.slug === article.slug));
-    if (!issue) return undefined;
-    const experience = buildIssueEditorialSystem(issue);
-    return {
-      href: issueUrl(issue),
-      label: `${issue.issueLabel} · ${experience.archetypeLabel}`,
-      blurb: experience.cardBlurb,
-      seoDescription: experience.seoDescription,
-      shareText: `${article.title} · ${experience.searchSnippet}`,
-    };
-  }, [allArticles, article]);
+
 
   useEffect(() => {
     if (!article) return;
@@ -177,25 +257,27 @@ export default function ArticlePage() {
     );
   }
 
-  const shareText = issueContext?.shareText ?? article.title;
+  const shareText = article.title;
 
   return (
     <main className="min-h-screen bg-[var(--wk-bg)]">
-      <MetaTags title={article.title} description={issueContext?.seoDescription || article.dek || `Read ${article.title} on WAKILISHA Magazine.`} imageUrl={article.heroUrl} url={typeof window !== "undefined" ? window.location.href : undefined} type="article" />
+      <MetaTags title={article.title} description={article.dek || `Read ${article.title} on WAKILISHA Magazine.`} imageUrl={article.heroUrl} url={typeof window !== "undefined" ? window.location.href : undefined} type="article" />
       <div className="article-progress" ref={progressBarRef}><span style={{ transform: "scaleX(0)" }} /></div>
       <div className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-full pointer-events-none"} bg-[var(--wk-bg)]/95 backdrop-blur-md border-b border-[var(--wk-border)]`}>
         <div className="max-w-[1180px] mx-auto px-6 h-14 flex items-center gap-4"><Link to="/magazine" className="flex items-center gap-1.5 text-[12px] font-bold text-[var(--wk-text-muted)] hover:text-[var(--wk-brand)] transition-colors whitespace-nowrap shrink-0"><WkIcon name="ArrowLeft" size={14} />Magazine</Link><div className="h-4 w-px bg-[var(--wk-border)] shrink-0" /><h2 className="text-[13px] font-bold text-[var(--wk-text)] flex-1 min-w-0 truncate">{article.title}</h2><button onClick={handleNavCopy} className="ml-auto shrink-0 h-8 px-3 rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] text-[11px] font-semibold text-[var(--wk-text-soft)] hover:border-[var(--wk-brand)] hover:text-[var(--wk-brand)] transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap"><i className="ri-link-m" />{copyDone ? "Copied!" : "Share"}</button></div>
       </div>
 
       <section className="relative overflow-hidden" style={{ height: "70vh", minHeight: "480px" }}>
-        {article.heroUrl ? <img src={article.heroUrl} alt={article.title} className="absolute inset-0 w-full h-full object-cover" style={{ objectPosition: "50% 30%" }} /> : <Chapter19FallbackImage id={article.id} slug={article.slug} name={article.title} />}
+        {article.heroUrl ? <img src={article.heroUrl} alt={article.title} loading="lazy" className="absolute inset-0 w-full h-full object-cover" style={{ objectPosition: "50% 30%" }} /> : <Chapter19FallbackImage id={article.id} slug={article.slug} name={article.title} />}
         <div className="absolute top-0 left-0 right-0 z-20 px-6 py-5 flex items-center justify-between"><Link to="/magazine" className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/25 backdrop-blur-sm px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-white/85 hover:bg-black/45 transition-all whitespace-nowrap"><WkIcon name="ArrowLeft" size={13} />Magazine</Link><button onClick={handleNavCopy} className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/25 backdrop-blur-sm px-3 py-2 text-[11px] font-bold text-white/80 hover:bg-black/45 transition-all cursor-pointer whitespace-nowrap"><i className="ri-share-line" />{copyDone ? "Copied!" : "Share"}</button></div>
       </section>
 
       <div className="relative z-10 rounded-t-[28px] bg-[var(--wk-bg)]" style={{ marginTop: "-64px", boxShadow: "0 -4px 32px -8px rgba(0,0,0,0.10), 0 4px 16px -4px rgba(0,0,0,0.06)" }}>
         <ArticleFloatHeader article={article} />
         <div className="max-w-[740px] mx-auto px-6 lg:px-8"><div className="h-px bg-[var(--wk-border)] mb-10" /></div>
-        <article className="max-w-[740px] mx-auto px-6 lg:px-8 pb-12"><div className="article-content-v2" dangerouslySetInnerHTML={{ __html: stableContentHtml }} /><InlineMediaGallery assets={article.mediaAssets} /></article>
+        <article className="max-w-[740px] mx-auto px-6 lg:px-8 pb-12">
+          <ArticleContentRenderer segments={displaySegments} videos={videoEmbeds} releases={finalReleases} artists={artistEmbeds} tracks={trackEmbeds} articleSlug={article.slug} />
+        </article>
         <div className="max-w-[740px] mx-auto px-6 lg:px-8 pb-16">
           {article.categories?.length > 0 && <TagBlock label="Categories" items={article.categories} basePath="/categories" />}
           {article.tags?.length > 0 && <TagBlock label="Topics" items={article.tags} basePath="/tags" />}
@@ -203,8 +285,8 @@ export default function ArticlePage() {
         </div>
       </div>
 
-      <ArticleRelated stories={related} loading={relatedLoading} issueContext={issueContext} />
-      <section className="bg-[var(--wk-surface)] border-t border-[var(--wk-border)] py-16 px-6 text-center"><div className="max-w-[480px] mx-auto"><p className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--wk-brand)] mb-3">WAKILISHA Magazine</p><h3 className="text-[24px] lg:text-[28px] font-black tracking-[-0.035em] text-[var(--wk-text)] mb-6 leading-snug">Stories that move African creative life forward.</h3><Link to="/magazine/issues" className="inline-flex items-center gap-2 rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] px-7 py-3.5 text-[14px] font-black transition-all hover:-translate-y-0.5 whitespace-nowrap">Open the issues<WkIcon name="ArrowRight" size={16} /></Link></div></section>
+      <ArticleRelated stories={related} loading={relatedLoading} />
+      <section className="bg-[var(--wk-surface)] border-t border-[var(--wk-border)] py-16 px-6 text-center"><div className="max-w-[480px] mx-auto"><p className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--wk-brand)] mb-3">WAKILISHA Magazine</p><h3 className="text-[24px] lg:text-[28px] font-black tracking-[-0.035em] text-[var(--wk-text)] mb-6 leading-snug">Stories that move African creative life forward.</h3><Link to="/magazine" className="inline-flex items-center gap-2 rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] px-7 py-3.5 text-[14px] font-black transition-all hover:-translate-y-0.5 whitespace-nowrap">Back to Magazine<WkIcon name="ArrowRight" size={16} /></Link></div></section>
     </main>
   );
 }

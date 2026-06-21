@@ -1,15 +1,17 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useParams, Link } from "react-router-dom";
 import { usePlayer } from "@/context/PlayerContext";
-import { getTrack, type RepairedTrackDetail } from "@/services/repaired/client";
+import { getTrack, type PublicTrackDetail } from "@/services/publicApi/client";
 import { buildTrackHeroIntro, buildTrackSeoDescription } from "@/services/cultureContext/trackAdapters";
 import { TrackChartSparkline } from "@/components/charts/TrackChartSparkline";
 import { MetaTags } from "@/components/seo/MetaTags";
 import TrackLyricsSection from "./components/TrackLyricsSection";
 import TrackRelatedTracks from "./components/TrackRelatedTracks";
+import TrackReleaseTracklist from "./components/TrackReleaseTracklist";
 import { releaseUrl } from "@/utils/releaseUrl";
 import { WkIcon } from "@/components/design-system/Icon";
 import { ShareButton } from "@/components/design-system/share/ShareSheet";
+import { useScrollDepthTracking } from "@/hooks/useScrollDepthTracking";
 
 type TrackChartAppearance = {
   editionSlug?: string;
@@ -36,6 +38,7 @@ type TrackViewModel = {
   }>;
   genre: string;
   genreSlug: string;
+  genres: string[];
   label: string;
   labelSlug: string;
   rank: number;
@@ -48,6 +51,7 @@ type TrackViewModel = {
   duration: number;
   releaseYear: string;
   releaseDate: string;
+  releaseType: string;
   isPlayable: boolean;
   previewUrl: string | null;
   albumTitle: string;
@@ -61,13 +65,23 @@ type TrackViewModel = {
   isrc: string | null;
   explicit: boolean;
   firstChartedDate: string;
+  releaseTracks: Array<{
+    id: string;
+    slug: string;
+    title: string;
+    artist: string;
+    duration: number;
+    trackNumber: number;
+    artworkUrl: string;
+    previewUrl?: string;
+  }>;
 };
 
 function clean(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function apiToViewModel(api: RepairedTrackDetail): TrackViewModel {
+function apiToViewModel(api: PublicTrackDetail): TrackViewModel {
   const raw = api as any;
   const trackData = raw.track ?? raw;
   const artistData = raw.artist ?? {};
@@ -122,8 +136,9 @@ function apiToViewModel(api: RepairedTrackDetail): TrackViewModel {
     }
   }
 
-  const primaryGenre = api.genres && api.genres.length > 0 ? api.genres[0].name : "";
-  const primaryGenreSlug = api.genres && api.genres.length > 0 ? api.genres[0].slug : "";
+  const allGenres = (api.genres || []).map((g: any) => clean(g.name)).filter(Boolean);
+  const primaryGenre = allGenres[0] || "";
+  const primaryGenreSlug = (api.genres || [])[0]?.slug || "";
   const duration = trackData.durationMs ? Math.round(trackData.durationMs / 1000) : (trackData.duration || 0);
   const artworkUrl = trackData.artworkUrl || releaseData?.artworkUrl || artistData?.imageUrl || "";
   const previewUrl: string | null = api.previewUrl || trackData.previewUrl || null;
@@ -133,6 +148,17 @@ function apiToViewModel(api: RepairedTrackDetail): TrackViewModel {
   const albumTrackNumber = Number(trackData.trackNumber || trackData.track_number || 0);
   const albumTotalTracks = Number(releaseData?.trackCount || 0);
   const releaseFullDate = releaseData?.releaseDate || "";
+  const releaseType = releaseData?.releaseType || "";
+  const releaseTracks = (releaseData?.tracks || []).map((t: any) => ({
+    id: String(t.id || ""),
+    slug: String(t.slug || ""),
+    title: String(t.title || ""),
+    artist: String(t.artist || ""),
+    duration: Number(t.duration || 0),
+    trackNumber: Number(t.trackNumber || 0),
+    artworkUrl: String(t.artworkUrl || ""),
+    previewUrl: t.previewUrl || undefined,
+  }));
 
   return {
     slug: trackData.slug,
@@ -142,6 +168,7 @@ function apiToViewModel(api: RepairedTrackDetail): TrackViewModel {
     artists,
     genre: primaryGenre,
     genreSlug: primaryGenreSlug,
+    genres: allGenres,
     label: labelData?.name || releaseData?.labelName || "",
     labelSlug: labelData?.slug || releaseData?.labelSlug || "",
     rank: currentRank,
@@ -154,6 +181,7 @@ function apiToViewModel(api: RepairedTrackDetail): TrackViewModel {
     duration,
     releaseYear: releaseFullDate ? releaseFullDate.split("-")[0] : "",
     releaseDate: releaseFullDate,
+    releaseType,
     isPlayable: Boolean(previewUrl),
     previewUrl,
     albumTitle,
@@ -167,6 +195,7 @@ function apiToViewModel(api: RepairedTrackDetail): TrackViewModel {
     isrc: trackData.isrc || null,
     explicit: Boolean(trackData.explicit),
     firstChartedDate: raw.firstChartedDate || "",
+    releaseTracks,
   };
 }
 
@@ -294,7 +323,7 @@ function TrackSidebar({ vm }: { vm: TrackViewModel }) {
           </div>
           <Link to={releaseUrl({ slug: vm.albumSlug, artist: vm.artist })} className="group flex items-center gap-3 p-2 -mx-2 rounded-xl hover:bg-[var(--wk-surface-raised)] transition-colors">
             <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0 bg-[var(--wk-bg)] border border-[var(--wk-border)]">
-              {vm.artworkUrl && <img src={vm.artworkUrl} alt="" className="w-full h-full object-cover" />}
+              {vm.artworkUrl && <img src={vm.artworkUrl} alt={vm.albumTitle} loading="lazy" className="w-full h-full object-cover" />}
             </div>
             <div className="min-w-0 flex-1">
               <div className="text-[13px] font-extrabold text-[var(--wk-text)] truncate group-hover:text-[var(--wk-brand)] transition-colors">
@@ -346,7 +375,7 @@ function ConnectedArtists({ artists, artworkUrl }: { artists: TrackViewModel["ar
               {group.items.map((artist) => (
                 <Link key={artist.slug || artist.name} to={artist.slug ? `/artists/${artist.slug}` : "#"} className="group flex items-center gap-4 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] p-4 transition-all duration-200 hover:border-[var(--wk-brand)]/30 hover:bg-[var(--wk-surface-raised)] hover:-translate-y-0.5">
                   <div className="relative shrink-0 h-12 w-12 rounded-full overflow-hidden bg-[var(--wk-surface-raised)] ring-2 ring-[var(--wk-border)] group-hover:ring-[var(--wk-brand)]/30 transition-all">
-                    {artist.isPrimary && artworkUrl ? <img src={artworkUrl} alt={artist.name} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center"><i className="ri-user-line text-[var(--wk-text-faint)] text-xl" /></div>}
+                    {artist.isPrimary && artworkUrl ? <img src={artworkUrl} alt={artist.name} loading="lazy" className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center"><i className="ri-user-line text-[var(--wk-text-faint)] text-xl" /></div>}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="font-bold text-[14px] text-[var(--wk-text)] truncate group-hover:text-[var(--wk-brand)] transition-colors">{artist.name}</div>
@@ -369,6 +398,12 @@ export default function TrackDetail() {
   const [track, setTrack] = useState<TrackViewModel | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  useScrollDepthTracking({
+    pageType: "track_detail",
+    entitySlug: trackSlug,
+    entityType: "track",
+  });
 
   useEffect(() => {
     let alive = true;
@@ -435,6 +470,12 @@ export default function TrackDetail() {
   const isTrackPlaying = isCurrentTrack && isPlaying;
   const minutes = track.duration ? Math.round(track.duration / 60) : 0;
 
+  const trackChips = [
+    track.releaseType && track.releaseType !== "Unknown" ? track.releaseType : "",
+    track.genre && track.genre !== "Unknown" ? track.genre : "",
+    track.label && track.label !== "Unknown" ? track.label : "",
+  ].filter(Boolean);
+
   const handlePlay = () => {
     if (!track.isPlayable) return;
     if (isCurrentTrack) {
@@ -451,7 +492,12 @@ export default function TrackDetail() {
       duration: track.duration,
       previewUrl: track.previewUrl || undefined,
     };
-    playTrack(playerTrack, [playerTrack]);
+    playTrack(playerTrack, [playerTrack], {
+      pageType: "track_detail",
+      entitySlug: trackSlug,
+      entityType: "track",
+      sourceSection: "track_hero",
+    });
   };
 
   return (
@@ -465,7 +511,7 @@ export default function TrackDetail() {
         releaseDate={track.releaseDate || track.releaseYear}
       />
 
-      <section className="relative overflow-hidden">
+      <section className="relative -mt-16 pt-16 overflow-hidden">
         {track.artworkUrl && (
           <div className="absolute inset-0 opacity-20 scale-110" style={{ backgroundImage: `url("${track.artworkUrl}")`, backgroundSize: "cover", backgroundPosition: "center", filter: "blur(90px) saturate(1.4)" }} />
         )}
@@ -473,8 +519,8 @@ export default function TrackDetail() {
 
         <div className="relative z-10 wk-container-wide px-6 py-16 md:py-24 lg:py-28">
           <div className="flex flex-col lg:flex-row gap-8 lg:gap-12 items-start lg:items-end">
-            <div className="relative shrink-0 w-[260px] md:w-[320px] lg:w-[360px] aspect-square rounded-2xl overflow-hidden border border-[var(--wk-border)] bg-[var(--wk-surface)]" style={{ boxShadow: "0 32px 80px rgba(0,0,0,0.28)" }}>
-              {track.artworkUrl ? <img src={track.artworkUrl} alt={track.title} className="w-full h-full object-cover" /> : <div className="relative h-full w-full bg-[linear-gradient(135deg,#f7f9f1_0%,#dfe8d6_54%,#7fa64a_100%)] flex items-center justify-center"><i className="ri-music-2-line text-6xl text-[#30451f]/40" /></div>}
+            <div className="relative shrink-0 w-[260px] md:w-[320px] lg:w-[360px] aspect-square overflow-hidden">
+              {track.artworkUrl ? <img src={track.artworkUrl} alt={`${track.title} artwork`} loading="lazy" className="w-full h-full object-cover" /> : <div className="relative h-full w-full bg-[linear-gradient(135deg,#f7f9f1_0%,#dfe8d6_54%,#7fa64a_100%)] flex items-center justify-center"><i className="ri-music-2-line text-6xl text-[#30451f]/40" /></div>}
               <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
             </div>
 
@@ -505,12 +551,6 @@ export default function TrackDetail() {
                 )}
               </div>
 
-              {trackIntro && (
-                <p className="mt-5 max-w-2xl text-[15px] md:text-[17px] leading-[1.7] text-[var(--wk-text-soft)]">
-                  {trackIntro}
-                </p>
-              )}
-
               <div className="flex flex-wrap items-center gap-5 mt-6 text-[12px] font-bold text-[var(--wk-text-muted)]">
                 {track.releaseDate ? <span className="inline-flex items-center gap-2"><WkIcon name="Calendar" size={14} />{formatDate(track.releaseDate)}</span> : track.releaseYear ? <span className="inline-flex items-center gap-2"><WkIcon name="Calendar" size={14} />{track.releaseYear}</span> : null}
                 {minutes > 0 && <span className="inline-flex items-center gap-2"><WkIcon name="Clock3" size={14} />{minutes} min</span>}
@@ -537,6 +577,50 @@ export default function TrackDetail() {
       <div className="wk-container-wide px-6 py-10 md:py-14">
         <div className="flex flex-col lg:flex-row gap-8 lg:gap-10">
           <div className="flex-1 min-w-0 space-y-10 md:space-y-14">
+            {/* Culture context — styled like ReleaseExcerpt */}
+            {trackIntro && (
+              <section>
+                <div className="relative border border-[var(--wk-border)] rounded-2xl bg-[var(--wk-surface)] overflow-hidden">
+                  <div className="absolute left-0 top-4 bottom-4 w-[3px] rounded-full bg-[var(--wk-brand)]" />
+                  <div className="px-6 py-5 pl-8">
+                    <div className="flex items-start justify-between gap-4 mb-4">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 flex items-center justify-center text-[var(--wk-brand)]">
+                          <i className="ri-compass-3-line text-[14px]" />
+                        </div>
+                        <span className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-[var(--wk-brand)]">
+                          Track context
+                        </span>
+                      </div>
+                      {trackChips.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 justify-end">
+                          {trackChips.map((chip) => (
+                            <span
+                              key={chip}
+                              className="inline-flex items-center rounded-full border border-[var(--wk-border)] bg-[var(--wk-bg)] px-2.5 py-0.5 text-[10px] font-bold text-[var(--wk-text-muted)] whitespace-nowrap"
+                            >
+                              {chip}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-[14px] leading-[1.8] text-[var(--wk-text-soft)]">
+                      {trackIntro}
+                    </p>
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {/* Tracklist from the release */}
+            <TrackReleaseTracklist
+              artistSlug={track.artistSlug}
+              currentTrackSlug={track.slug}
+              albumTitle={track.albumTitle}
+              tracks={track.releaseTracks}
+            />
+
             {(track.chartHistory.length > 0 || track.weeksOnChart > 0) && (
               <section>
                 <div className="flex items-center gap-3 mb-5">

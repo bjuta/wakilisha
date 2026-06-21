@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { ShareButton } from "@/components/design-system/share/ShareSheet";
 import { WkIcon } from "@/components/design-system/Icon";
 import { Chapter19FallbackImage } from "@/components/media/Chapter19FallbackImage";
-import { listGenres, type RepairedGenre } from "@/services/repairedContent/client";
+import { listGenres, type PublicGenre } from "@/services/publicContent/client";
 
 const filters = ["All", "High activity", "Artist-rich", "Track-rich"];
 
@@ -29,7 +29,7 @@ function useScrollReveal(deps: unknown[] = []) {
 export default function MobileGenres() {
   const [activeFilter, setActiveFilter] = useState("All");
   const [query, setQuery] = useState("");
-  const [genres, setGenres] = useState<RepairedGenre[]>([]);
+  const [genres, setGenres] = useState<PublicGenre[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -178,7 +178,7 @@ function SectionLabel({ children, count }: { children: string; count?: number })
   return (<div className="genre43-section-label-row"><div className="genre43-section-label-left"><span className="genre43-section-label-text">{children}</span>{count !== undefined && <span className="genre43-section-label-count">{count}</span>}</div></div>);
 }
 
-function GenreCard({ genre }: { genre: RepairedGenre }) {
+function GenreCard({ genre }: { genre: PublicGenre }) {
   return (
     <Link to={`/genres/${genre.slug}`} className="genre43-card group">
       <div className="genre43-card-artwork-wrap">

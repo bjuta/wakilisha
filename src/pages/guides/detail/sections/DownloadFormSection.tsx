@@ -1,14 +1,35 @@
 import { useState } from "react";
+import { Link, useParams } from "react-router-dom";
+import { trackEvent, getAnalyticsSessionId, getCanonicalPageUrl } from "@/services/analytics";
 import type { DownloadFormData } from "../sectionTypes";
 
 export default function DownloadFormSection({ data }: { data: DownloadFormData }) {
+  const { slug } = useParams<{ slug: string }>();
   const titleItalic = data.titleItalic || data.title_italic || "";
   const formAction = data.formAction || "https://readdy.ai/api/form/d8mnc3t0ihgem5t5p8v0";
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
 
+  const sessionId = getAnalyticsSessionId();
+  const pageUrl = getCanonicalPageUrl();
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setStatus("submitting");
+
+    const guideTitle = `${data.title}${titleItalic ? ` ${titleItalic}` : ""}`;
+
+    // Fire analytics before submission — fire-and-forget
+    trackEvent("newsletter_signup", {
+      pageType: "guide_detail",
+      entitySlug: slug,
+      entityType: "guide",
+      context: {
+        source_section: "download_form",
+        guide_title: guideTitle,
+        guide_slug: slug,
+      },
+    });
+
     try {
       const form = e.currentTarget;
       const formData = new URLSearchParams(new FormData(form) as unknown as URLSearchParams);
@@ -49,6 +70,20 @@ export default function DownloadFormSection({ data }: { data: DownloadFormData }
                 </li>
               ))}
             </ul>
+
+            {/* ── Field Guide Button ── */}
+            <div className="mt-8 pt-6 border-t border-[var(--wk-divider)]">
+              <p className="text-[12px] font-semibold text-[var(--wk-text)] mb-2">Prefer to read online?</p>
+              <p className="text-[13px] text-[var(--wk-text-soft)] mb-3">
+                Browse the full field guide as a rich, scrollable page — print-ready for your Venice visit.
+              </p>
+              <Link
+                to={`/guides/${slug}/field-guide`}
+                className="inline-flex items-center gap-2 px-5 py-3 rounded-lg border border-[var(--wk-border)] bg-[var(--wk-surface)] text-[var(--wk-text)] text-[13px] font-semibold hover:bg-[var(--wk-surface-raised)] hover:border-[var(--wk-border-2)] transition-all cursor-pointer whitespace-nowrap"
+              >
+                <i className="ri-book-open-line text-base" /> Open the field guide
+              </Link>
+            </div>
           </div>
 
           <div className="lg:w-[52%]">
@@ -69,6 +104,11 @@ export default function DownloadFormSection({ data }: { data: DownloadFormData }
                   </div>
 
                   <form data-readdy-form onSubmit={handleSubmit} className="space-y-4">
+                    <input type="hidden" name="wk_session_id" value={sessionId} />
+                    <input type="hidden" name="wk_page_url" value={pageUrl} />
+                    <input type="hidden" name="wk_page_type" value="guide_detail" />
+                    <input type="hidden" name="wk_source_section" value="download_form" />
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-[12px] font-semibold text-[var(--wk-text)] mb-1.5">What should we call you?</label>

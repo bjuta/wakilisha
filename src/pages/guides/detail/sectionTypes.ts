@@ -405,6 +405,16 @@ export interface GuidePageRecord {
   icon?: string;
   framing?: string;
   hero_url?: string;
+  hero_image_id?: string;
+  heroMediaAsset?: {
+    id: string;
+    slug: string | null;
+    title: string | null;
+    url: string;
+    mime_type: string | null;
+    media_kind: string | null;
+    metadata: Record<string, unknown> | null;
+  };
   sections: GuideSection[];
   status: string;
   published_at?: string;

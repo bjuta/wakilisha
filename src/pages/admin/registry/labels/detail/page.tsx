@@ -178,7 +178,7 @@ export default function LabelDetailPage() {
           <WkIcon name="FileX" size={28} />
         </div>
         <h2 className="text-[18px] font-bold text-wk-text">Label Not Found</h2>
-        <p className="text-[13px] text-wk-text-muted">No label with slug &quot;{slug}&quot;</p>
+        <p className="text-[13px] text-wk-text-muted">No label with slug "{slug}"</p>
         <button onClick={() => navigate("/admin/registry/labels")} className="wk-button wk-button-secondary wk-button-sm">
           <WkIcon name="ArrowLeft" size={14} /> Back to Labels
         </button>
@@ -282,7 +282,7 @@ export default function LabelDetailPage() {
               <WkIcon name="Trash2" size={22} />
             </div>
             <h3 className="text-[16px] font-bold text-wk-text mb-2">Archive Label?</h3>
-            <p className="text-[13px] text-wk-text-muted mb-5">This will set the label status to &quot;archived&quot;. You can restore it later.</p>
+            <p className="text-[13px] text-wk-text-muted mb-5">This will set the label status to "archived". You can restore it later.</p>
             <div className="flex gap-3">
               <button onClick={() => setShowDelete(false)} className="wk-button wk-button-secondary wk-button-sm flex-1 whitespace-nowrap">Cancel</button>
               <button onClick={() => { setShowDelete(false); handleDelete(); }} className="wk-button wk-button-sm flex-1 whitespace-nowrap bg-wk-danger text-white hover:opacity-90 border border-wk-danger">Yes, Archive</button>

@@ -210,7 +210,7 @@ export default function ArtistDetailPage() {
           <WkIcon name="FileX" size={28} />
         </div>
         <h2 className="text-[18px] font-bold text-wk-text">Artist Not Found</h2>
-        <p className="text-[13px] text-wk-text-muted">No artist with slug &quot;{slug}&quot;</p>
+        <p className="text-[13px] text-wk-text-muted">No artist with slug "{slug}"</p>
         <button
           onClick={() => navigate("/admin/registry/artists")}
           className="wk-button wk-button-secondary wk-button-sm"
@@ -454,7 +454,7 @@ export default function ArtistDetailPage() {
             </div>
             <h3 className="text-[16px] font-bold text-wk-text mb-2">Archive Artist?</h3>
             <p className="text-[13px] text-wk-text-muted mb-5">
-              This will set the artist status to &quot;archived&quot;. You can restore it later.
+              This will set the artist status to "archived". You can restore it later.
             </p>
             <div className="flex gap-3">
               <button onClick={() => setShowDelete(false)} className="wk-button wk-button-secondary wk-button-sm flex-1 whitespace-nowrap">

@@ -328,7 +328,7 @@ export default function AdminGuideDetailPage() {
           <WkIcon name="FileX" size={28} />
         </div>
         <h2 className="text-[18px] font-bold text-[var(--wk-text)]">Guide Not Found</h2>
-        <p className="text-[13px] text-[var(--wk-text-muted)]">No guide with slug &quot;{slug}&quot;</p>
+        <p className="text-[13px] text-[var(--wk-text-muted)]">No guide with slug "{slug}"</p>
         <WkButton variant="secondary" onClick={() => navigate("/admin/content/guides")}>
           <WkIcon name="ArrowLeft" size={14} />
           Back to Guides

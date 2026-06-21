@@ -53,8 +53,8 @@ export default function GuideSampleSection() {
                 <img
                   src={page.image}
                   alt={page.alt}
-                  className="w-full h-full object-cover"
                   loading="lazy"
+                  className="w-full h-full object-cover"
                 />
               </div>
             ))}

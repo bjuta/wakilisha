@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { WkButton } from "@/components/design-system/primitives/Button";
 import { MetaTags } from "@/components/seo/MetaTags";
-import { getArtist, getArtistAppearsOn, clearDiscographyCache, type RepairedArtistDetail, type RegistryAppearsOnRelease } from "@/services/repairedContent/client";
+import { getArtist, getArtistAppearsOn, clearDiscographyCache, type PublicArtistDetail, type RegistryAppearsOnRelease } from "@/services/publicContent/client";
+import { supabase } from "@/lib/supabase";
 import { buildArtistHeroIntro, buildArtistSeoDescription } from "@/services/cultureContext/artistAdapters";
 import { ArtistDetailHero } from "./components/ArtistDetailHero";
 import { ArtistChartSection } from "./components/ArtistChartSection";
@@ -11,10 +12,36 @@ import { RelatedArtistsShelf } from "./components/RelatedArtistsShelf";
 import { ArtistTopSongs } from "./components/ArtistTopSongs";
 import { ArtistBioSection, cleanBioExcerpt } from "./components/ArtistBioSection";
 import { ArtistVideos } from "./components/ArtistVideos";
+import { ArtistNewsletterSection } from "./components/ArtistNewsletterSection";
+import { ArtistTaggedArticles } from "./components/ArtistTaggedArticles";
+import { useScrollDepthTracking } from "@/hooks/useScrollDepthTracking";
+
+async function getArtistRegisteredGenres(slug: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("registry_artists")
+    .select("metadata")
+    .eq("slug", slug)
+    .eq("status", "active")
+    .maybeSingle();
+
+  if (error || !data) return [];
+
+  const metadata = (data.metadata || {}) as Record<string, unknown>;
+  const genres = Array.isArray(metadata.genres) ? metadata.genres : [];
+  return genres.map(String).filter(Boolean);
+}
 
 export default function ArtistDetail() {
   const { slug } = useParams<{ slug: string }>();
-  const [artist, setArtist] = useState<RepairedArtistDetail | null>(null);
+
+  useScrollDepthTracking({
+    pageType: "artist_detail",
+    entitySlug: slug,
+    entityType: "artist",
+  });
+
+  const [artist, setArtist] = useState<PublicArtistDetail | null>(null);
+  const [registeredGenres, setRegisteredGenres] = useState<string[]>([]);
   const [appearsOn, setAppearsOn] = useState<RegistryAppearsOnRelease[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [error, setError] = useState<string | null>(null);
@@ -34,8 +61,9 @@ export default function ArtistDetail() {
     Promise.all([
       getArtist(slug),
       getArtistAppearsOn(slug).catch(() => [] as RegistryAppearsOnRelease[]),
+      getArtistRegisteredGenres(slug),
     ])
-      .then(([data, registryAppearsOn]) => {
+      .then(([data, registryAppearsOn, genres]) => {
         if (!alive) return;
         if (!data) {
           setStatus("error");
@@ -45,6 +73,7 @@ export default function ArtistDetail() {
 
         setAppearsOn(registryAppearsOn);
         setArtist(data);
+        setRegisteredGenres(genres);
         setStatus("ready");
       })
       .catch((err) => {
@@ -112,7 +141,7 @@ export default function ArtistDetail() {
         spotifyUrl={artist.spotifyUrl}
         artistType={artist.artistType}
         country={artist.country}
-        genres={artist.genres}
+        genres={registeredGenres}
         trackCount={artist.trackCount}
         releaseCount={artist.releaseCount}
         chartEntryCount={artist.chartEntries.length}
@@ -134,7 +163,7 @@ export default function ArtistDetail() {
           )}
 
           {hasTopSongs && (
-            <ArtistTopSongs songs={artist.topSongs} />
+            <ArtistTopSongs songs={artist.topSongs} artistSlug={artist.slug} />
           )}
 
           {hasReleases && (
@@ -153,18 +182,22 @@ export default function ArtistDetail() {
               releases={appearsOn}
               artistName={artist.name}
               eyebrow="Appears On"
-              title="Features &amp; appearances"
+              title="Features & appearances"
               emptyTitle="No appearances"
               emptyDescription="No appearances match the selected filter."
             />
           )}
 
           {hasVideos && (
-            <ArtistVideos videos={artist.videos} />
+            <ArtistVideos videos={artist.videos} artistSlug={artist.slug} />
           )}
 
+          <ArtistNewsletterSection artistName={artist.name} artistSlug={artist.slug} />
+
+          <ArtistTaggedArticles artistName={artist.name} artistSlug={artist.slug} />
+
           {hasChartEntries && (
-            <ArtistChartSection entries={artist.chartEntries} />
+            <ArtistChartSection entries={artist.chartEntries} artistSlug={artist.slug} />
           )}
         </div>
 

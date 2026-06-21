@@ -7,10 +7,6 @@
 .phn-nav-tab.on::after{content:'';position:absolute;bottom:8px;width:4px;height:4px;border-radius:50%;background:var(--wk-brand)}
 .phn-nav-tab .pnl{font:600 10px/1 var(--wk-font-ui);letter-spacing:.04em;color:currentColor}
 .phn-nav-tab i{font-size:22px}
-.phn-nav-more{flex:0 0 64px;height:72px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:var(--wk-text-muted);border-left:1px solid var(--wk-divider);position:relative;transition:color 0.15s ease;-webkit-tap-highlight-color:transparent}
-.phn-nav-more:active{color:var(--wk-brand)}
-.phn-nav-more .pnl{font:600 10px/1 var(--wk-font-ui);letter-spacing:.04em;color:currentColor}
-.phn-nav-more i{font-size:22px}
 
 /* ========== More menu bottom sheet ========== */
 .phn-more-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.50);z-index:60;backdrop-filter:blur(4px);animation:fadeIn 0.2s ease-out;transition:opacity 0.3s ease}

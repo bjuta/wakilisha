@@ -137,7 +137,6 @@ async function spotifySearchTrack(
   if (cached) return cached.track;
 
   try {
-    // Build search query — use stripped versions for broader matching
     const qTitle = title.replace(/\([^)]*\)/g,"").replace(/\[[^\]]*\]/g,"").trim();
     const qArtist = artist.split(/\s*,\s*/)[0].trim();
     const q = encodeURIComponent(`track:${qTitle} artist:${qArtist}`);
@@ -148,7 +147,6 @@ async function spotifySearchTrack(
     const items = d.tracks?.items || [];
     if (items.length === 0) { cache.set(cacheKey, { track: null, searched: true }); return null; }
 
-    // Pick best match: prefer exact title match after normalization
     const nt = normalize_title(title);
     const na = normalize_artist(artist);
     let best:SpotifyTrack|null = null;
@@ -162,7 +160,7 @@ async function spotifySearchTrack(
       else if (tn.includes(nt) || nt.includes(tn)) score += 5;
       if (an === na) score += 5;
       else if (an.includes(na) || na.includes(an)) score += 3;
-      score += t.popularity / 100; // tiny popularity boost as tiebreaker
+      score += t.popularity / 100;
       if (score > bestScore) {
         bestScore = score;
         const al = t.artists.map(a=>a.name).join(", ");
@@ -223,8 +221,9 @@ Deno.serve(async (req:Request) => {
   if(req.method==="OPTIONS") return new Response("ok",{headers:corsHeaders});
   const start=Date.now();
   try{
-    const su=Deno.env.get("SUPABASE_URL")??"",sk=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")??Deno.env.get("SUPABASE_ANON_KEY")??"";
-    if(!su||!sk) return new Response(JSON.stringify({error:"Supabase config missing."}),{status:500,headers:{...corsHeaders,"Content-Type":"application/json"}});
+    const su=Deno.env.get("SUPABASE_URL")??"";
+    const sk=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")??"";
+    if(!su||!sk) return new Response(JSON.stringify({error:"Supabase service role key missing. This function requires SERVICE_ROLE_KEY to write to wk_chart_entries_v2."}),{status:500,headers:{...corsHeaders,"Content-Type":"application/json"}});
     const db=createClient(su,sk);
     let body:Record<string,unknown>;
     try{body=await req.json();}catch{return new Response(JSON.stringify({error:"invalid_json"}),{status:400,headers:{...corsHeaders,"Content-Type":"application/json"}});}
@@ -258,7 +257,6 @@ Deno.serve(async (req:Request) => {
     for(const r of allUrls){const s=r.source_urls_seen;if(!s)continue;for(const u of s){const m=u.match(/spotify\.com\/playlist\/([a-zA-Z0-9]+)/);if(m)pids.add(m[1]);}}
     if(pids.size===0) return new Response(JSON.stringify({ok:true,message:"No Spotify playlist URLs found."}),{headers:{...corsHeaders,"Content-Type":"application/json"}});
 
-    // Three indices: primary (key), title-only, title-no-brackets
     const ki=new Map<string,SpotifyTrack>();
     const ti=new Map<string,SpotifyTrack>();
     const bi=new Map<string,SpotifyTrack>();
@@ -270,10 +268,6 @@ Deno.serve(async (req:Request) => {
         if(t.title_no_br_key && !bi.has(t.title_no_br_key)) bi.set(t.title_no_br_key, t);
       }
     }
-
-    // Also add Spotify tracks we already successfully matched from previous runs to the indices.
-    // Query all entries that already have artwork for their spotify_metadata, so we can reuse them.
-    // (Deferred to avoid extra DB roundtrips — only applied when dry run shows need)
 
     const entries=await fetchEntriesMissingArtwork(db);
     if(entries.length===0) return new Response(JSON.stringify({ok:true,message:"No entries need updating."}),{headers:{...corsHeaders,"Content-Type":"application/json"}});
@@ -288,12 +282,10 @@ Deno.serve(async (req:Request) => {
 
     for(const e of entries){
       const nk=e.normalized_key||"";
-      // Pass 1: exact key match
       let t=ki.get(nk);
       let pass="primary";
       if(t?.artwork_url){pm++;}
 
-      // Pass 2: title-only fallback
       if(!t?.artwork_url){
         const etk=normalized_title_only(e.track_title||"");
         if(etk){
@@ -302,7 +294,6 @@ Deno.serve(async (req:Request) => {
         }
       }
 
-      // Pass 3: title without bracket content
       if(!t?.artwork_url){
         const enb=normalized_title_no_brackets(e.track_title||"");
         if(enb){
@@ -311,7 +302,6 @@ Deno.serve(async (req:Request) => {
         }
       }
 
-      // Pass 4: Spotify search API fallback
       if(!t?.artwork_url){
         const st = await spotifySearchTrack(e.track_title||"", e.artist_name||"", at, market, searchCache);
         if (st) { searchCalls++; }

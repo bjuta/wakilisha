@@ -805,7 +805,7 @@ export default function TaxonomyTermsPage({ title, subtitle, taxonomy, icon }: T
               Delete {title}?
             </h3>
             <p className="text-[13px] text-wk-text-muted mb-5">
-              Are you sure you want to delete &quot;{showDelete.name}&quot;? This cannot be undone.
+              Are you sure you want to delete "{showDelete.name}"? This cannot be undone.
             </p>
             <div className="flex gap-3">
               <button

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { WkTag } from "@/components/design-system/primitives/Tag";
-import { usePlayer } from "@/context/PlayerContext";
+import { usePlayer, type PlaySource } from "@/context/PlayerContext";
 import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 import { ChartRowExpandedPanel } from "@/components/design-system/music/ChartRowExpandedPanel";
 import { trackUrl } from "@/utils/trackUrl";
@@ -31,6 +31,7 @@ export interface ChartRowProps {
   duration?: number;
   compact?: boolean;
   previewUrl?: string;
+  playSource?: PlaySource;
 }
 
 
@@ -63,6 +64,7 @@ export function ChartRow({
   duration,
   compact,
   previewUrl,
+  playSource,
 }: ChartRowProps) {
   const { currentTrack, isPlaying, playTrack } = usePlayer();
   const [isExpanded, setIsExpanded] = useState(false);
@@ -79,7 +81,7 @@ export function ChartRow({
     if (!playable) return;
     if (onPlay) { onPlay(); return; }
     const track = { id: trackId, title, artist, artworkUrl, isPlayable: playable, source, previewUrl };
-    playTrack(track, [track]);
+    playTrack(track, [track], playSource);
   };
 
   const toggleExpand = () => {

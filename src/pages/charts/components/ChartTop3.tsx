@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { usePlayer } from "@/context/PlayerContext";
+import { usePlayer, type PlaySource } from "@/context/PlayerContext";
 import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 
 export interface Top3Entry {
@@ -66,9 +66,11 @@ const RANK_STYLES: Record<
 export function ChartTop3({
   entries,
   onPlayTrack,
+  playSource,
 }: {
   entries: Top3Entry[];
   onPlayTrack?: (entry: Top3Entry) => void;
+  playSource?: PlaySource;
 }) {
   const { currentTrack, isPlaying, playTrack } = usePlayer();
   const [hoveredRank, setHoveredRank] = useState<number | null>(null);
@@ -88,7 +90,7 @@ export function ChartTop3({
       source: entry.source,
       previewUrl: entry.previewUrl,
     };
-    playTrack(track, [track]);
+    playTrack(track, [track], playSource);
   };
 
   return (

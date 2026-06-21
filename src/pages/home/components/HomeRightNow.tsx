@@ -1,11 +1,11 @@
 import { Link } from "react-router-dom";
 import type { ChartEditionEntry } from "@/services/chartsPublic/types";
-import type { RepairedStory } from "@/services/repairedContent/client";
+import type { PublicStory } from "@/services/publicContent/client";
 import { trackUrl } from "@/utils/trackUrl";
 
 interface Props {
   chartEntries: ChartEditionEntry[];
-  stories: RepairedStory[];
+  stories: PublicStory[];
   loading: boolean;
 }
 
@@ -44,7 +44,7 @@ export function HomeRightNow({ chartEntries, stories, loading }: Props) {
                   className="font-black tracking-[-0.03em] text-[var(--wk-text)]"
                   style={{ fontSize: "clamp(1.6rem,3vw,2.2rem)", lineHeight: 1.05 }}
                 >
-                  What&apos;s charting right now
+                  What's charting right now
                 </h2>
               </div>
               <Link

@@ -69,11 +69,15 @@ function preventTouchMove(event: TouchEvent) {
       } else if (isAtBottom && event.touches[0].clientY < (event as any)._startY) {
         event.preventDefault();
       }
-      return;
     }
+    // If it's inside a scroll-lock container, always allow the touch event
+    // (the container handles its own scroll)
+    return;
   }
+  // Only block touch events on the document body
   event.preventDefault();
 }
+
 
 let touchStartListener: ((e: TouchEvent) => void) | null = null;
 let touchMoveListener: ((e: TouchEvent) => void) | null = null;

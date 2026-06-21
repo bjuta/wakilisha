@@ -10,15 +10,8 @@ const corsHeaders = {
 const BATCH_SIZE = 100;
 
 const ALLOWED_WP_POST_TYPES = new Set([
-  "post",
-  "page",
-  "attachment",
-  "wakilisha_artist",
-  "wk_genre_page",
-  "wk_field_guide",
-  "wk_chart_series",
-  "wk_chart_edition",
-  "wk_methodology",
+  "post", "page", "attachment", "wakilisha_artist", "wk_genre_page",
+  "wk_field_guide", "wk_chart_series", "wk_chart_edition", "wk_methodology",
 ]);
 
 const CPT_MAP: Record<string, { target_entity: string; canonical_kind: string; ready_policy: string }> = {
@@ -40,62 +33,14 @@ const CPT_MAP: Record<string, { target_entity: string; canonical_kind: string; r
 };
 
 const WAKILISHA_PLUGIN_TABLE_MAP = [
-  {
-    table: "wkcharts_tracks", target_entity: "tracks", canonical_kind: "track",
-    id_column: "id", title_column: "title", slug_column: "slug", status_column: "status",
-    body_column: null, excerpt_column: null, date_column: "created_at", author_column: null, url_column: null,
-    extra_columns: ["artist_id", "release_id", "duration", "genre_id", "spotify_id", "apple_music_id", "youtube_id", "isrc", "explicit", "track_number"],
-    ready_policy: "published_only",
-  },
-  {
-    table: "wkcharts_releases", target_entity: "releases", canonical_kind: "release",
-    id_column: "id", title_column: "title", slug_column: "slug", status_column: "status",
-    body_column: "description", excerpt_column: null, date_column: "release_date", author_column: null, url_column: null,
-    extra_columns: ["label_id", "artist_id", "type", "cover_url", "upc", "catalog_number", "track_count"],
-    ready_policy: "published_only",
-  },
-  {
-    table: "wkcharts_labels", target_entity: "labels", canonical_kind: "label",
-    id_column: "id", title_column: "name", slug_column: "slug", status_column: "status",
-    body_column: "description", excerpt_column: null, date_column: "created_at", author_column: null, url_column: "website",
-    extra_columns: ["logo_url", "country", "founded_year", "parent_label_id"],
-    ready_policy: "published_only",
-  },
-  {
-    table: "wkcharts_artists", target_entity: "artists", canonical_kind: "artist",
-    id_column: "id", title_column: "name", slug_column: "slug", status_column: "status",
-    body_column: "bio", excerpt_column: null, date_column: "created_at", author_column: null, url_column: "website",
-    extra_columns: ["image_url", "origin", "artist_type", "spotify_id", "apple_music_id", "instagram_handle", "twitter_handle"],
-    ready_policy: "published_only",
-  },
-  {
-    table: "wkcharts_genres", target_entity: "genres", canonical_kind: "genre",
-    id_column: "id", title_column: "name", slug_column: "slug", status_column: null,
-    body_column: "description", excerpt_column: null, date_column: "created_at", author_column: null, url_column: null,
-    extra_columns: ["parent_id", "color", "icon"],
-    ready_policy: "always_ready",
-  },
-  {
-    table: "wkcharts_charts", target_entity: "chart_series", canonical_kind: "chart_series",
-    id_column: "id", title_column: "name", slug_column: "slug", status_column: "status",
-    body_column: "description", excerpt_column: null, date_column: "created_at", author_column: null, url_column: null,
-    extra_columns: ["chart_type", "frequency", "market_scope_id", "methodology_id"],
-    ready_policy: "published_only",
-  },
-  {
-    table: "wkcharts_editions", target_entity: "chart_editions", canonical_kind: "chart_edition",
-    id_column: "id", title_column: "title", slug_column: "slug", status_column: "status",
-    body_column: null, excerpt_column: null, date_column: "edition_date", author_column: null, url_column: null,
-    extra_columns: ["chart_id", "week_number", "year", "entry_count"],
-    ready_policy: "published_only",
-  },
-  {
-    table: "wkcharts_edition_items", target_entity: "chart_entries", canonical_kind: "chart_entry",
-    id_column: "id", title_column: null, slug_column: null, status_column: null,
-    body_column: null, excerpt_column: null, date_column: "created_at", author_column: null, url_column: null,
-    extra_columns: ["edition_id", "track_id", "rank", "previous_rank", "weeks_on_chart", "peak_position", "is_new_entry", "is_re_entry"],
-    ready_policy: "always_ready",
-  },
+  { table: "wkcharts_tracks", target_entity: "tracks", canonical_kind: "track", id_column: "id", title_column: "title", slug_column: "slug", status_column: "status", body_column: null, excerpt_column: null, date_column: "created_at", author_column: null, url_column: null, extra_columns: ["artist_id", "release_id", "duration", "genre_id", "spotify_id", "apple_music_id", "youtube_id", "isrc", "explicit", "track_number"], ready_policy: "published_only" },
+  { table: "wkcharts_releases", target_entity: "releases", canonical_kind: "release", id_column: "id", title_column: "title", slug_column: "slug", status_column: "status", body_column: "description", excerpt_column: null, date_column: "release_date", author_column: null, url_column: null, extra_columns: ["label_id", "artist_id", "type", "cover_url", "upc", "catalog_number", "track_count"], ready_policy: "published_only" },
+  { table: "wkcharts_labels", target_entity: "labels", canonical_kind: "label", id_column: "id", title_column: "name", slug_column: "slug", status_column: "status", body_column: "description", excerpt_column: null, date_column: "created_at", author_column: null, url_column: "website", extra_columns: ["logo_url", "country", "founded_year", "parent_label_id"], ready_policy: "published_only" },
+  { table: "wkcharts_artists", target_entity: "artists", canonical_kind: "artist", id_column: "id", title_column: "name", slug_column: "slug", status_column: "status", body_column: "bio", excerpt_column: null, date_column: "created_at", author_column: null, url_column: "website", extra_columns: ["image_url", "origin", "artist_type", "spotify_id", "apple_music_id", "instagram_handle", "twitter_handle"], ready_policy: "published_only" },
+  { table: "wkcharts_genres", target_entity: "genres", canonical_kind: "genre", id_column: "id", title_column: "name", slug_column: "slug", status_column: null, body_column: "description", excerpt_column: null, date_column: "created_at", author_column: null, url_column: null, extra_columns: ["parent_id", "color", "icon"], ready_policy: "always_ready" },
+  { table: "wkcharts_charts", target_entity: "chart_series", canonical_kind: "chart_series", id_column: "id", title_column: "name", slug_column: "slug", status_column: "status", body_column: "description", excerpt_column: null, date_column: "created_at", author_column: null, url_column: null, extra_columns: ["chart_type", "frequency", "market_scope_id", "methodology_id"], ready_policy: "published_only" },
+  { table: "wkcharts_editions", target_entity: "chart_editions", canonical_kind: "chart_edition", id_column: "id", title_column: "title", slug_column: "slug", status_column: "status", body_column: null, excerpt_column: null, date_column: "edition_date", author_column: null, url_column: null, extra_columns: ["chart_id", "week_number", "year", "entry_count"], ready_policy: "published_only" },
+  { table: "wkcharts_edition_items", target_entity: "chart_entries", canonical_kind: "chart_entry", id_column: "id", title_column: null, slug_column: null, status_column: null, body_column: null, excerpt_column: null, date_column: "created_at", author_column: null, url_column: null, extra_columns: ["edition_id", "track_id", "rank", "previous_rank", "weeks_on_chart", "peak_position", "is_new_entry", "is_re_entry"], ready_policy: "always_ready" },
 ];
 
 const WAKILISHA_PLUGIN_RELATIONSHIP_TABLES = [
@@ -112,7 +57,6 @@ const WAKILISHA_PLUGIN_TAXONOMIES = ["wk_artist_genre", "wk_artist_origin"];
 
 function cptEntry(postType: string) { return CPT_MAP[postType] || null; }
 function isAllowedPostType(postType: string): boolean { return ALLOWED_WP_POST_TYPES.has(postType); }
-
 function targetEntityForPostType(postType: string): string {
   if (postType === "attachment") return "media_assets";
   const entry = cptEntry(postType);
@@ -120,16 +64,13 @@ function targetEntityForPostType(postType: string): string {
   if (isAllowedPostType(postType)) return postType === "post" ? "articles" : postType === "page" ? "pages" : postType;
   return "ignored_post_types";
 }
-
 function canonicalKindForPostType(postType: string): string { return cptEntry(postType)?.canonical_kind ?? postType; }
-
 function shouldReady(postType: string, status: string, title: string): boolean {
   const entry = cptEntry(postType);
   if (!title || !["publish", "published"].includes(status.toLowerCase())) return false;
   if (!entry) return postType === "post" || postType === "page";
   return entry.ready_policy === "published_only";
 }
-
 function clean(value: unknown): string { return String(value ?? "").trim(); }
 function slugify(value: string): string { return value.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 160); }
 function parseDate(value: string): string | null { if (!value) return null; const date = new Date(value); return Number.isNaN(date.getTime()) ? null : date.toISOString(); }
@@ -148,10 +89,10 @@ function mapPost(runId: string, row: Record<string, unknown>): Record<string, un
   const needsReview = title || entry || isAttachment;
   const blocked = !allowed && !entry;
   const warnings: string[] = [];
-  if (blocked) { warnings.push(`Unknown post_type "${type}" quarantined as ignored_post_types.`); }
-  else if (entry && !ready) { warnings.push(`WAKILISHA CPT ${type} mapped to ${target}; review metadata/relationships.`); }
-  else if (!ready && isAttachment) { warnings.push("Attachment staged as media asset; file copy policy required."); }
-  else if (!ready && title) { warnings.push(`Post type/status requires review: ${type}/${status}`); }
+  if (blocked) warnings.push(`Unknown post_type "${type}" quarantined as ignored_post_types.`);
+  else if (entry && !ready) warnings.push(`WAKILISHA CPT ${type} mapped to ${target}; review metadata/relationships.`);
+  else if (!ready && isAttachment) warnings.push("Attachment staged as media asset; file copy policy required.");
+  else if (!ready && title) warnings.push(`Post type/status requires review: ${type}/${status}`);
   const wpPostAuthor = clean(row.post_author);
   return {
     ingestion_run_id: runId, source_kind: "wordpress_database", source_file: "mysql.wp_posts",
@@ -176,8 +117,7 @@ function mapEditorialUser(runId: string, row: Record<string, unknown>): Record<s
     source_entity: "mysql.users", source_record_id: clean(row.ID) || null, source_slug: slug,
     target_entity: "authors", target_status: name ? "ready" : "blocked", target_slug: slug,
     title: name || null, body: null, excerpt: null, published_at: null, author_name: name || null, source_url: clean(row.user_url) || null,
-    raw_record: row,
-    mapped_record: { email: clean(row.user_email) || null, url: clean(row.user_url) || null, editorial_author: true },
+    raw_record: row, mapped_record: { email: clean(row.user_email) || null, url: clean(row.user_url) || null, editorial_author: true },
     mapping_candidate_ids: ["mysql-users-editorial"],
     warnings: clean(row.user_email) ? ["Author email staged in mapped_record only; review privacy."] : [],
     errors: name ? [] : ["Missing author name"],
@@ -194,8 +134,7 @@ function mapTerm(runId: string, row: Record<string, unknown>): Record<string, un
     source_entity: `mysql.${taxonomy}`, source_record_id: clean(row.term_id) || null, source_slug: slug,
     target_entity: isWakilishaTax ? "artist_taxonomy_terms" : "taxonomy_terms", target_status: name ? "ready" : "blocked", target_slug: slug,
     title: name || null, body: clean(row.description) || null, excerpt: null, published_at: null, author_name: null, source_url: null,
-    raw_record: row,
-    mapped_record: { taxonomy, slug, parent: row.parent ?? null, count: row.count ?? null, wakilisha_taxonomy: isWakilishaTax },
+    raw_record: row, mapped_record: { taxonomy, slug, parent: row.parent ?? null, count: row.count ?? null, wakilisha_taxonomy: isWakilishaTax },
     mapping_candidate_ids: [isWakilishaTax ? `wakilisha-tax-${taxonomy}` : "mysql-terms"],
     warnings: [], errors: name ? [] : ["Missing term name"],
   };
@@ -281,9 +220,7 @@ function makeFailure(runId: string, sourceFile: string, stage: string, err: unkn
   return { ingestion_run_id: runId, source_file: sourceFile, failure_stage: stage, message: err instanceof Error ? err.message : String(err), raw_record: extra };
 }
 
-async function stageAll(
-  client: Client, supabase: ReturnType<typeof createClient>, prefix: string, runId: string, maxPostmeta: number,
-) {
+async function stageAll(client: Client, supabase: ReturnType<typeof createClient>, prefix: string, runId: string, maxPostmeta: number) {
   const records: Record<string, unknown>[] = [];
   const failures: Record<string, unknown>[] = [];
   const ignoredPostTypeCounts: Record<string, number> = {};
@@ -318,17 +255,13 @@ async function stageAll(
   } catch (err) { failures.push(makeFailure(runId, "mysql.wp_postmeta", "fetch", err)); }
 
   for (const pt of WAKILISHA_PLUGIN_TABLE_MAP) {
-    try {
-      const result = await client.execute(`SELECT * FROM \`${prefix}${pt.table}\``);
-      for (const row of result.rows as Array<Record<string, unknown>>) records.push(mapPluginRow(runId, row, pt));
-    } catch (err) { failures.push(makeFailure(runId, `mysql.wp_${pt.table}`, "fetch", err)); }
+    try { const result = await client.execute(`SELECT * FROM \`${prefix}${pt.table}\``); for (const row of result.rows as Array<Record<string, unknown>>) records.push(mapPluginRow(runId, row, pt)); }
+    catch (err) { failures.push(makeFailure(runId, `mysql.wp_${pt.table}`, "fetch", err)); }
   }
 
   for (const rel of WAKILISHA_PLUGIN_RELATIONSHIP_TABLES) {
-    try {
-      const result = await client.execute(`SELECT * FROM \`${prefix}${rel.table}\``);
-      for (const row of result.rows as Array<Record<string, unknown>>) records.push(mapRelationshipRow(runId, row, rel));
-    } catch (err) { failures.push(makeFailure(runId, `mysql.wp_${rel.table}`, "fetch", err)); }
+    try { const result = await client.execute(`SELECT * FROM \`${prefix}${rel.table}\``); for (const row of result.rows as Array<Record<string, unknown>>) records.push(mapRelationshipRow(runId, row, rel)); }
+    catch (err) { failures.push(makeFailure(runId, `mysql.wp_${rel.table}`, "fetch", err)); }
   }
 
   for (let i = 0; i < records.length; i += BATCH_SIZE) {
@@ -353,8 +286,8 @@ serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-  const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY") ?? "";
-  if (!supabaseUrl || !supabaseKey) return jsonResponse({ success: false, error: "Supabase config missing." }, 500);
+  const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  if (!supabaseUrl || !supabaseKey) return jsonResponse({ success: false, error: "Supabase service role key missing. This function requires SERVICE_ROLE_KEY to write staging records." }, 500);
   const supabase = createClient(supabaseUrl, supabaseKey);
 
   try {
@@ -393,15 +326,15 @@ serve(async (req: Request) => {
 
     if (action === "stage") {
       const effectiveRunId = runId || crypto.randomUUID();
-      if (!runId) { await supabase.from("wk_ingestion_runs").insert({ id: effectiveRunId, source_name: `${host}/${database}`, source_kind: "wordpress_database", status: "staging", started_at: new Date().toISOString(), errors: [], warnings: ["v5 — post_author extraction enabled."] }); }
+      if (!runId) { await supabase.from("wk_ingestion_runs").insert({ id: effectiveRunId, source_name: `${host}/${database}`, source_kind: "wordpress_database", status: "staging", started_at: new Date().toISOString(), errors: [], warnings: ["v6 — post_author extraction enabled; no anon key fallback."] }); }
       else { await supabase.from("wk_ingestion_runs").update({ status: "staging", started_at: new Date().toISOString(), errors: [] }).eq("id", runId); }
       await supabase.from("wk_import_staging_records").delete().eq("ingestion_run_id", effectiveRunId);
       await supabase.from("wk_import_staging_failures").delete().eq("ingestion_run_id", effectiveRunId);
       const maxPostmeta = Number(body.maxPostmeta ?? 20000);
       const result = await stageAll(client, supabase, prefix, effectiveRunId, maxPostmeta);
       await client.close();
-      const summary = { staged_at: new Date().toISOString(), processor: "wp-db-stage", version: "5.0.0", records: result.records, failures: result.failures, counts_by_target_entity: result.counts, counts_by_status: result.statusCounts, postmeta_limit: maxPostmeta, plugin_tables: WAKILISHA_PLUGIN_TABLE_MAP.map(t => t.table), ignored_post_types: result.ignoredPostTypeCounts };
-      await supabase.from("wk_ingestion_runs").update({ status: "staged", finished_at: new Date().toISOString(), imported_counts: result.counts, source_manifest: { staging: summary }, warnings: [`v5 staging: ${result.records} records. post_author preserved in mapped_record and raw_record.`], errors: result.failures > 0 ? [`${result.failures} failures.`] : [] }).eq("id", effectiveRunId);
+      const summary = { staged_at: new Date().toISOString(), processor: "wp-db-stage", version: "6.0.0", records: result.records, failures: result.failures, counts_by_target_entity: result.counts, counts_by_status: result.statusCounts, postmeta_limit: maxPostmeta, plugin_tables: WAKILISHA_PLUGIN_TABLE_MAP.map(t => t.table), ignored_post_types: result.ignoredPostTypeCounts };
+      await supabase.from("wk_ingestion_runs").update({ status: "staged", finished_at: new Date().toISOString(), imported_counts: result.counts, source_manifest: { staging: summary }, warnings: [`v6 staging: ${result.records} records. post_author preserved in mapped_record and raw_record. No anon key fallback.`], errors: result.failures > 0 ? [`${result.failures} failures.`] : [] }).eq("id", effectiveRunId);
       return jsonResponse({ success: true, runId: effectiveRunId, stats: { total: result.records, ready: result.statusCounts.ready ?? 0, needs_review: result.statusCounts.needs_review ?? 0, blocked: result.statusCounts.blocked ?? 0, failed: result.failures }, entityCounts: result.counts, ignoredPostTypes: result.ignoredPostTypeCounts });
     }
 

@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
 import { usePlayer } from "@/context/PlayerContext";
 import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 
@@ -17,7 +16,6 @@ export function PlayerDock() {
     canGoPrev,
     isFullPlayerOpen,
   } = usePlayer();
-  const navigate = useNavigate();
 
   if (!currentTrack) return null;
 
@@ -26,14 +24,13 @@ export function PlayerDock() {
   const handleExpandToggle = () => {
     if (isFullPlayerOpen) {
       closeFullPlayer();
-      navigate(-1);
     } else {
       openFullPlayer();
     }
   };
 
   return (
-    <div className="sticky bottom-0 z-[80] border-t border-[var(--wk-border)] bg-[var(--wk-surface)]">
+    <div className={`sticky bottom-0 border-t border-[var(--wk-border)] bg-[var(--wk-surface)] ${isFullPlayerOpen ? 'z-[100]' : 'z-[80]'}`}>
       {/* Progress bar */}
       <div className="h-1 w-full bg-[var(--wk-surface-raised)]">
         <div
@@ -109,24 +106,13 @@ export function PlayerDock() {
         </div>
 
         {/* Expand / Collapse toggle */}
-        {isFullPlayerOpen ? (
-          <button
-            onClick={handleExpandToggle}
-            aria-label="Close full player"
-            className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--wk-text-muted)] transition-all hover:bg-[var(--wk-surface-raised)]"
-          >
-            <i className="ri-arrow-down-s-line" />
-          </button>
-        ) : (
-          <Link
-            to="/player"
-            onClick={() => openFullPlayer()}
-            aria-label="Open full player"
-            className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--wk-text-muted)] transition-all hover:bg-[var(--wk-surface-raised)]"
-          >
-            <i className="ri-arrow-up-s-line" />
-          </Link>
-        )}
+        <button
+          onClick={handleExpandToggle}
+          aria-label={isFullPlayerOpen ? "Close full player" : "Open full player"}
+          className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--wk-text-muted)] transition-all hover:bg-[var(--wk-surface-raised)]"
+        >
+          <i className={isFullPlayerOpen ? "ri-arrow-down-s-line" : "ri-arrow-up-s-line"} />
+        </button>
       </div>
     </div>
   );

@@ -1,8 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { getAuthorMeta, resolveAuthorMeta, type AuthorMeta } from "@/services/authorProfiles";
+import { getShareCounts, getTotalShareCount } from "@/services/shareTracking";
 import type { MagazineArticle } from "@/services/magazineArticles";
+import { SharePopover } from "@/components/design-system/share/ShareSheet";
 
 const SECTION_COLORS: Record<string, string> = {
   Analysis: "#C44A3B",
@@ -26,8 +28,10 @@ interface ArticleFloatHeaderProps {
 }
 
 export function ArticleFloatHeader({ article }: ArticleFloatHeaderProps) {
-  const [copyDone, setCopyDone] = useState(false);
   const [authorMeta, setAuthorMeta] = useState<AuthorMeta | null>(null);
+  const [shareCounts, setShareCounts] = useState<Record<string, number>>({});
+  const [sharePopoverOpen, setSharePopoverOpen] = useState(false);
+  const shareBtnRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     let alive = true;
@@ -42,14 +46,14 @@ export function ArticleFloatHeader({ article }: ArticleFloatHeaderProps) {
     return () => { alive = false; };
   }, [article.author]);
 
-  const handleCopy = () => {
-    navigator.clipboard?.writeText(window.location.href);
-    setCopyDone(true);
-    setTimeout(() => setCopyDone(false), 2500);
-  };
+  // Fetch share counts on mount
+  useEffect(() => {
+    const baseUrl = window.location.href;
+    getShareCounts(baseUrl).then(setShareCounts).catch(() => {});
+  }, []);
 
-  const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(article.title)}&url=${encodeURIComponent(typeof window !== "undefined" ? window.location.href : "")}`;
-  const waUrl = `https://wa.me/?text=${encodeURIComponent(`${article.title} ${typeof window !== "undefined" ? window.location.href : ""}`)}`;
+  const totalShares = getTotalShareCount(shareCounts);
+  const pageUrl = typeof window !== "undefined" ? window.location.href : "";
 
   // Use resolved author meta when available, fall back to synchronous generation
   const meta = authorMeta ?? getAuthorMeta(article.author);
@@ -118,41 +122,35 @@ export function ArticleFloatHeader({ article }: ArticleFloatHeaderProps) {
         </div>
 
         {/* Share actions */}
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleCopy}
-            className="h-8 px-3.5 rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] text-[12px] font-semibold text-[var(--wk-text-soft)] hover:border-[var(--wk-brand)] hover:text-[var(--wk-brand)] transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer"
-          >
-            <i className="ri-link-m text-[13px]" />
-            {copyDone ? "Copied!" : "Copy link"}
-          </button>
-          <a
-            href={tweetUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="h-8 w-8 rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] flex items-center justify-center text-[var(--wk-text-soft)] hover:border-[#000] hover:text-[#000] transition-all"
-            aria-label="Share on X"
-          >
-            <i className="ri-twitter-x-line text-[12px]" />
-          </a>
-          <a
-            href={waUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="h-8 w-8 rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] flex items-center justify-center text-[var(--wk-text-soft)] hover:border-[#25D366] hover:text-[#25D366] transition-all"
-            aria-label="Share on WhatsApp"
-          >
-            <i className="ri-whatsapp-line text-[12px]" />
-          </a>
-          <a
-            href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(typeof window !== "undefined" ? window.location.href : "")}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="h-8 w-8 rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] flex items-center justify-center text-[var(--wk-text-soft)] hover:border-[#1877F2] hover:text-[#1877F2] transition-all"
-            aria-label="Share on Facebook"
-          >
-            <i className="ri-facebook-circle-line text-[12px]" />
-          </a>
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <button
+              ref={shareBtnRef}
+              onClick={() => setSharePopoverOpen(!sharePopoverOpen)}
+              className="inline-flex items-center gap-2 h-10 px-5 rounded-full bg-[var(--wk-brand)] text-white text-[13px] font-bold hover:opacity-90 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
+            >
+              <i className="ri-share-forward-line text-[15px]" />
+              Share
+              {totalShares > 0 && (
+                <span className="inline-flex items-center justify-center min-w-[22px] h-[22px] px-[6px] rounded-full bg-white/20 text-white text-[11px] font-bold">
+                  {totalShares.toLocaleString()}
+                </span>
+              )}
+            </button>
+
+            <SharePopover
+              open={sharePopoverOpen}
+              onClose={() => setSharePopoverOpen(false)}
+              item={{
+                title: article.title,
+                subtitle: article.dek,
+                url: pageUrl,
+                type: "article",
+                imageUrl: article.heroUrl,
+              }}
+              triggerRef={shareBtnRef as React.RefObject<HTMLElement>}
+            />
+          </div>
         </div>
       </div>
     </div>

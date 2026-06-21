@@ -14,25 +14,43 @@ interface ArtistCsvRow {
   popularity: string;
   followers: string;
   genres: string;
+  image_url: string;
+  biography: string;
+  profile_url: string;
+  latest_release: string;
+  top_tracks: string;
+}
+
+function detectDelimiter(text: string): string {
+  const firstLine = text.split(/\r?\n/)[0] || "";
+  const tabCount = (firstLine.match(/\t/g) || []).length;
+  const commaCount = (firstLine.match(/,/g) || []).length;
+  return tabCount > commaCount ? "\t" : ",";
 }
 
 function parseCsv(text: string): ArtistCsvRow[] {
   const lines = text.split(/\r?\n/).filter((l) => l.trim());
   if (lines.length < 2) return [];
-  const headers = lines[0].split(",").map((h) => h.trim().toLowerCase().replace(/^"|"$/g, ""));
+  const delimiter = detectDelimiter(text);
+  const headers = lines[0].split(delimiter).map((h) => h.trim().toLowerCase().replace(/^"|"$/g, ""));
   const rows: ArtistCsvRow[] = [];
   for (let i = 1; i < lines.length; i++) {
-    const values = lines[i].split(",").map((v) => v.trim().replace(/^"|"$/g, ""));
+    const values = lines[i].split(delimiter).map((v) => v.trim().replace(/^"|"$/g, ""));
     const row: Record<string, string> = {};
     headers.forEach((h, idx) => { row[h] = values[idx] || ""; });
     rows.push({
-      artist_name: row.artist_name || "",
-      spotify_id: row.spotify_id || "",
-      spotify_uri: row.spotify_uri || "",
-      origin_iso2: row.origin_iso2 || "",
+      artist_name: row.artist_name || row.name || "",
+      spotify_id: row.artist_id || row.spotify_id || "",
+      spotify_uri: row.spotify_uri || row.profile_url || "",
+      origin_iso2: row.origin_country || row.origin_iso2 || row.country || "",
       popularity: row.popularity || "",
       followers: row.followers || "",
       genres: row.genres || "",
+      image_url: row.image_url || "",
+      biography: row.biography || row.bio || row.description || "",
+      profile_url: row.profile_url || row.spotify_url || "",
+      latest_release: row.latest_release || "",
+      top_tracks: row.top_tracks || "",
     });
   }
   return rows;
@@ -68,9 +86,6 @@ serve(async (req) => {
     const body = await req.json();
     const { action } = body;
 
-    // ─────────────────────────────────────────────────────────────
-    // ACTION: upload_csv
-    // ─────────────────────────────────────────────────────────────
     if (action === "upload_csv") {
       const { csvText, actor } = body;
       if (!csvText) throw new Error("csvText is required");
@@ -95,22 +110,30 @@ serve(async (req) => {
 
       if (runError || !run) throw new Error(`Failed to create intake run: ${runError?.message}`);
 
-      const stagingRecords = rows.map((row) => ({
-        intake_run_id: run.id,
-        source_artist_name: row.artist_name.trim(),
-        source_normalized_name: normaliseName(row.artist_name),
-        source_spotify_id: row.spotify_id || null,
-        source_spotify_uri: row.spotify_uri || null,
-        source_origin_iso2: row.origin_iso2 || null,
-        source_popularity: row.popularity ? parseInt(row.popularity, 10) : null,
-        source_followers: row.followers ? parseInt(row.followers, 10) : null,
-        source_genres: parseGenres(row.genres),
-        source_metadata: {
-          raw_popularity: row.popularity,
-          raw_followers: row.followers,
-          raw_genres: row.genres,
-        },
-      }));
+      const stagingRecords = rows.map((row) => {
+        const images = row.image_url ? { primary: row.image_url, all: [row.image_url] } : null;
+        return {
+          intake_run_id: run.id,
+          source_artist_name: row.artist_name.trim(),
+          source_normalized_name: normaliseName(row.artist_name),
+          source_spotify_id: row.spotify_id || null,
+          source_spotify_uri: row.spotify_uri || null,
+          source_origin_iso2: row.origin_iso2 || null,
+          source_popularity: row.popularity ? parseInt(row.popularity, 10) : null,
+          source_followers: row.followers ? parseInt(row.followers, 10) : null,
+          source_genres: parseGenres(row.genres),
+          source_images: images,
+          source_metadata: {
+            raw_popularity: row.popularity,
+            raw_followers: row.followers,
+            raw_genres: row.genres,
+            biography: row.biography,
+            profile_url: row.profile_url,
+            latest_release: row.latest_release,
+            top_tracks: row.top_tracks,
+          },
+        };
+      });
 
       const { error: insertError } = await supabase
         .from("provider_intake_artist_staging")
@@ -126,9 +149,6 @@ serve(async (req) => {
       });
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // ACTION: get_staging_results
-    // ─────────────────────────────────────────────────────────────
     if (action === "get_staging_results") {
       const { runId, status } = body;
       if (!runId) throw new Error("runId is required");
@@ -144,6 +164,8 @@ serve(async (req) => {
           source_popularity,
           source_followers,
           source_genres,
+          source_images,
+          source_metadata,
           match_status,
           matched_registry_artist_id,
           matched_registry_artist_name,
@@ -154,7 +176,8 @@ serve(async (req) => {
           action_taken,
           target_registry_artist_id,
           created_at,
-          registry_artists!matched_registry_artist_id(id, display_name, origin_iso2, public_image_url, status)
+          registry_artists!matched_registry_artist_id(id, display_name, origin_iso2, public_image_url, bio, status),
+          target_artist:registry_artists!target_registry_artist_id(id, display_name, origin_iso2, public_image_url, bio, status)
         `)
         .eq("intake_run_id", runId);
 
@@ -170,9 +193,6 @@ serve(async (req) => {
       });
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // ACTION: get_run_summary
-    // ─────────────────────────────────────────────────────────────
     if (action === "get_run_summary") {
       const { runId } = body;
       if (!runId) throw new Error("runId is required");
@@ -197,9 +217,6 @@ serve(async (req) => {
       });
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // ACTION: review_decision
-    // ─────────────────────────────────────────────────────────────
     if (action === "review_decision") {
       const { runId, decisions, actor } = body;
       if (!runId || !decisions || !Array.isArray(decisions)) throw new Error("runId and decisions array are required");
@@ -238,15 +255,11 @@ serve(async (req) => {
       });
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // ACTION: apply_approved
-    // ─────────────────────────────────────────────────────────────
     if (action === "apply_approved") {
       const { runId, actor } = body;
       if (!runId) throw new Error("runId is required");
 
       const { data: user } = await supabase.auth.getUser();
-      const reviewerId = actor || user?.user?.id || null;
 
       const { data: approved, error: fetchError } = await supabase
         .from("provider_intake_artist_staging")
@@ -268,11 +281,18 @@ serve(async (req) => {
       const processedIds: string[] = [];
 
       for (const record of approved) {
+        const targetId = record.matched_registry_artist_id || record.target_registry_artist_id;
+
         const { data: existing } = await supabase
           .from("registry_artists")
-          .select("id, origin_iso2, metadata, normalized_name")
-          .eq("id", record.matched_registry_artist_id || record.target_registry_artist_id)
+          .select("id, origin_iso2, bio, public_image_url, metadata, normalized_name")
+          .eq("id", targetId)
           .maybeSingle();
+
+        const sourceMetadata = (record.source_metadata as Record<string, unknown>) || {};
+        const sourceImages = (record.source_images as Record<string, unknown>) || {};
+        const imageUrl = (sourceImages?.primary as string) || (sourceImages?.all as string[])?.[0] || "";
+        const biography = (sourceMetadata?.biography as string) || "";
 
         if (existing) {
           const updateData: Record<string, unknown> = {
@@ -284,34 +304,41 @@ serve(async (req) => {
             updateData.origin_confidence = 0.85;
           }
 
-          const currentMetadata = (existing.metadata as Record<string, unknown>) || {};
-          if (record.source_spotify_id) {
-            updateData.metadata = {
-              ...currentMetadata,
-              spotify_id: record.source_spotify_id,
-              spotify_uri: record.source_spotify_uri,
-              source_provider: "csv_manual_upload",
-              source_intake_run_id: runId,
-            };
+          if (!existing.bio && biography) {
+            updateData.bio = biography;
           }
+
+          if (!existing.public_image_url && imageUrl) {
+            updateData.public_image_url = imageUrl;
+            updateData.image_source_provider = "csv_manual_upload";
+          }
+
+          const currentMetadata = (existing.metadata as Record<string, unknown>) || {};
+          const mergedMetadata: Record<string, unknown> = {
+            ...currentMetadata,
+            spotify_id: record.source_spotify_id || currentMetadata.spotify_id,
+            spotify_uri: record.source_spotify_uri || currentMetadata.spotify_uri,
+            source_provider: "csv_manual_upload",
+            source_intake_run_id: runId,
+          };
+          if (record.source_genres && (record.source_genres as string[]).length > 0) {
+            mergedMetadata.source_genres = record.source_genres;
+          }
+          if (record.source_popularity) mergedMetadata.source_popularity = record.source_popularity;
+          if (record.source_followers) mergedMetadata.source_followers = record.source_followers;
+          if (biography) mergedMetadata.biography = biography;
+          updateData.metadata = mergedMetadata;
 
           const { error: updateError } = await supabase
             .from("registry_artists")
             .update(updateData)
             .eq("id", existing.id);
 
-          if (updateError) {
-            skipped++;
-            continue;
-          }
-
+          if (updateError) { skipped++; continue; }
           updated++;
           processedIds.push(record.id);
         } else {
-          if (record.match_status !== "no_match") {
-            skipped++;
-            continue;
-          }
+          if (record.match_status !== "no_match") { skipped++; continue; }
 
           const displayName = record.source_artist_name;
           const normalized = normaliseName(displayName);
@@ -323,10 +350,7 @@ serve(async (req) => {
             .eq("normalized_name", normalized)
             .maybeSingle();
 
-          if (dupeCheck) {
-            skipped++;
-            continue;
-          }
+          if (dupeCheck) { skipped++; continue; }
 
           const { error: insertError } = await supabase
             .from("registry_artists")
@@ -336,8 +360,9 @@ serve(async (req) => {
               normalized_name: normalized,
               origin_iso2: record.source_origin_iso2,
               origin_confidence: record.source_origin_iso2 ? 0.85 : null,
-              public_image_url: null,
-              image_source_provider: null,
+              public_image_url: imageUrl || null,
+              image_source_provider: imageUrl ? "csv_manual_upload" : null,
+              bio: biography || null,
               status: "active",
               metadata: {
                 spotify_id: record.source_spotify_id,
@@ -347,14 +372,14 @@ serve(async (req) => {
                 source_genres: record.source_genres,
                 source_popularity: record.source_popularity,
                 source_followers: record.source_followers,
+                biography: biography || undefined,
+                profile_url: sourceMetadata.profile_url || undefined,
+                latest_release: sourceMetadata.latest_release || undefined,
+                top_tracks: sourceMetadata.top_tracks || undefined,
               },
             });
 
-          if (insertError) {
-            skipped++;
-            continue;
-          }
-
+          if (insertError) { skipped++; continue; }
           created++;
           processedIds.push(record.id);
         }
@@ -363,10 +388,7 @@ serve(async (req) => {
       if (processedIds.length > 0) {
         await supabase
           .from("provider_intake_artist_staging")
-          .update({
-            action_taken: "processed",
-            updated_at: new Date().toISOString(),
-          })
+          .update({ action_taken: "processed", updated_at: new Date().toISOString() })
           .in("id", processedIds);
       }
 
@@ -375,12 +397,7 @@ serve(async (req) => {
         .update({
           status: "completed",
           completed_at: new Date().toISOString(),
-          summary_json: {
-            created,
-            updated,
-            skipped,
-            processedCount: processedIds.length,
-          },
+          summary_json: { created, updated, skipped, processedCount: processedIds.length },
         })
         .eq("id", runId);
 

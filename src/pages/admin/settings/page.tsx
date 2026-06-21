@@ -17,7 +17,7 @@ export default function AdminSettingsHub() {
         </div>
         <p className="text-[13px] text-[var(--wk-text-muted)] max-w-[640px]">
           Settings belong to WAKILISHA Admin, not WAKILISHA Charts.
-          Charts is one operating domain. The settings system is ready for music, film, fashion, food, language, dance, places, audience, and future WAKILISHA verticals.
+          Charts is one operating domain. The settings system is ready for music, audience, and future WAKILISHA domains.
         </p>
       </div>
 

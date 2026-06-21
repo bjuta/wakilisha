@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { WkTag } from "@/components/design-system/primitives/Tag";
+import { trackEvent } from "@/services/analytics";
 
 export interface LabelCardProps {
   slug: string;
@@ -9,6 +10,9 @@ export interface LabelCardProps {
   releaseCount?: number;
   logoUrl?: string;
   isFeatured?: boolean;
+  sourceSection?: string;
+  sourceEntity?: string;
+  clickPosition?: number;
 }
 
 export function LabelCard({
@@ -19,12 +23,30 @@ export function LabelCard({
   releaseCount,
   logoUrl,
   isFeatured,
+  sourceSection,
+  sourceEntity,
+  clickPosition,
 }: LabelCardProps) {
   const monogram = name.split(/[\s&]/)[0].charAt(0);
+
+  const handleClick = () => {
+    if (sourceSection) {
+      trackEvent("card_click", {
+        entityType: "label",
+        entitySlug: slug,
+        context: {
+          source_section: sourceSection,
+          ...(sourceEntity ? { source_entity: sourceEntity } : {}),
+          ...(clickPosition !== undefined ? { click_position: clickPosition } : {}),
+        },
+      });
+    }
+  };
 
   return (
     <Link
       to={`/labels/${slug}`}
+      onClick={handleClick}
       className="group block overflow-hidden rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] transition-all hover:border-[var(--wk-border-2)]"
     >
       {/* Top bar with color */}

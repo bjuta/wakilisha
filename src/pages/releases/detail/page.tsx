@@ -4,7 +4,8 @@ import { WkIcon } from "@/components/design-system/Icon";
 import { WkButton } from "@/components/design-system/primitives/Button";
 import { MetaTags } from "@/components/seo/MetaTags";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
-import { getRelease, listReleases, releaseUrl, slugify, type RepairedReleaseDetail, type RepairedRelease } from "@/services/repairedContent/client";
+import { useScrollDepthTracking } from "@/hooks/useScrollDepthTracking";
+import { getRelease, listReleases, releaseUrl, slugify, type PublicReleaseDetail, type PublicRelease } from "@/services/publicContent/client";
 import { buildReleaseSeoDescription, releaseEmptyStateCopy } from "@/services/cultureContext/releaseAdapters";
 import ReleaseDetailHero from "./components/ReleaseDetailHero";
 import ReleaseTracklist from "./components/ReleaseTracklist";
@@ -15,8 +16,15 @@ import ReleaseFeaturedArtists from "./components/ReleaseFeaturedArtists";
 
 export default function ReleaseDetail() {
   const { artistSlug, releaseSlug } = useParams<{ artistSlug: string; releaseSlug: string }>();
-  const [release, setRelease] = useState<RepairedReleaseDetail | null>(null);
-  const [related, setRelated] = useState<RepairedRelease[]>([]);
+
+  useScrollDepthTracking({
+    pageType: "release_detail",
+    entitySlug: releaseSlug,
+    entityType: "release",
+  });
+
+  const [release, setRelease] = useState<PublicReleaseDetail | null>(null);
+  const [related, setRelated] = useState<PublicRelease[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [error, setError] = useState<string | null>(null);
 

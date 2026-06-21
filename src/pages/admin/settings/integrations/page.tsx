@@ -61,6 +61,16 @@ export default function AdminSettingsIntegrations() {
   const [acrTesting, setAcrTesting] = useState(false);
   const [acrHealthResult, setAcrHealthResult] = useState<AcrcloudHealthResult | null>(null);
 
+  // ── Google Analytics & Search Console state ──
+  const [gaMeasurementId, setGaMeasurementId] = useState(() =>
+    localStorage.getItem("wk_ga_measurement_id") || ""
+  );
+  const [gscVerificationCode, setGscVerificationCode] = useState(() =>
+    localStorage.getItem("wk_gsc_verification_code") || ""
+  );
+  const [gaSaved, setGaSaved] = useState(false);
+  const [gscSaved, setGscSaved] = useState(false);
+
   const providerSchemas = useMemo(
     () => new Map(settings.providers.map((provider) => [provider.key, getProviderCredentialSchema(provider.key)])),
     [settings.providers]
@@ -177,6 +187,18 @@ export default function AdminSettingsIntegrations() {
     setSyncResults((prev) => ({ ...prev, [providerKey]: sr }));
     setSyncing((prev) => ({ ...prev, [providerKey]: false }));
     refreshSettings();
+  };
+
+  const handleSaveGa = () => {
+    localStorage.setItem("wk_ga_measurement_id", gaMeasurementId);
+    setGaSaved(true);
+    setTimeout(() => setGaSaved(false), 3000);
+  };
+
+  const handleSaveGsc = () => {
+    localStorage.setItem("wk_gsc_verification_code", gscVerificationCode);
+    setGscSaved(true);
+    setTimeout(() => setGscSaved(false), 3000);
   };
 
   const handleApiMode = async (mode: RuntimeMode) => {
@@ -423,6 +445,181 @@ export default function AdminSettingsIntegrations() {
             </WkSurface>
           );
         })}
+      </div>
+
+      {/* ── Third-Party Analytics Services ──────────────────────────── */}
+      <div className="space-y-4 pt-4 border-t border-[var(--wk-border)]">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--wk-accent-100)] text-[var(--wk-accent-500)]">
+            <WkIcon name="BarChart3" size={18} />
+          </div>
+          <div>
+            <h2 className="text-[14px] font-bold text-[var(--wk-text)]">Analytics Services</h2>
+            <p className="text-[12px] text-[var(--wk-text-muted)]">
+              Connect third-party analytics and search tools. Codes are stored in your browser's local storage.
+            </p>
+          </div>
+        </div>
+
+        {/* Google Analytics 4 */}
+        <WkSurface className="p-5">
+          <div className="mb-4 flex items-start justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--wk-warning-soft)] text-[var(--wk-warning)]">
+                <WkIcon name="TrendingUp" size={18} />
+              </div>
+              <div>
+                <h3 className="text-[14px] font-bold text-[var(--wk-text)]">Google Analytics 4</h3>
+                <p className="text-[12px] text-[var(--wk-text-muted)]">
+                  Enter your GA4 Measurement ID to track page views, events, and conversions across WAKILISHA.
+                </p>
+              </div>
+            </div>
+            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+              gaMeasurementId
+                ? "bg-[var(--wk-success-soft)] text-[var(--wk-success)]"
+                : "bg-[var(--wk-surface-raised)] text-[var(--wk-text-muted)]"
+            }`}>
+              {gaMeasurementId ? "Configured" : "Not Configured"}
+            </span>
+          </div>
+
+          <div className="mb-4 grid gap-4 md:grid-cols-2">
+            <div>
+              <label htmlFor="ga-measurement-id" className="mb-1.5 block text-[12px] font-semibold text-[var(--wk-text-muted)]">
+                Measurement ID
+              </label>
+              <div className="flex gap-2">
+                <input
+                  id="ga-measurement-id"
+                  type="text"
+                  value={gaMeasurementId}
+                  onChange={(e) => setGaMeasurementId(e.target.value)}
+                  placeholder="G-XXXXXXXXXX"
+                  className="min-w-0 flex-1 rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none focus:ring-1 focus:ring-[var(--wk-brand)] font-mono"
+                />
+              </div>
+              <p className="mt-1 text-[11px] text-[var(--wk-text-faint)]">
+                Found in Admin {">"} Data Streams {">"} your stream {">"} Measurement ID. Format: G-XXXXXXXXXX.
+              </p>
+            </div>
+            <div className="flex items-end">
+              <button
+                onClick={handleSaveGa}
+                className="wk-button wk-button-primary wk-button-sm flex items-center gap-1.5 whitespace-nowrap"
+              >
+                <WkIcon name={gaSaved ? "CheckCircle2" : "Save"} size={14} className={gaSaved ? "text-white" : ""} />
+                {gaSaved ? "Saved!" : "Save GA4 ID"}
+              </button>
+            </div>
+          </div>
+
+          {gaMeasurementId && (
+            <div className="rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] p-4">
+              <div className="mb-2 flex items-center gap-2">
+                <WkIcon name="Code2" size={14} className="text-[var(--wk-text-muted)]" />
+                <span className="text-[12px] font-bold text-[var(--wk-text)]">Integration snippet</span>
+              </div>
+              <p className="mb-3 text-[12px] text-[var(--wk-text-muted)]">
+                Add this snippet to your <code className="rounded bg-[var(--wk-surface-raised)] px-1.5 py-0.5 text-[11px] font-mono">index.html</code> to enable Google Analytics tracking:
+              </p>
+              <pre className="overflow-x-auto rounded-lg bg-[var(--wk-surface-raised)] p-4 text-[11px] font-mono text-[var(--wk-text-soft)] leading-relaxed whitespace-pre-wrap">
+{`<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=${gaMeasurementId || 'G-XXXXXXXXXX'}"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', '${gaMeasurementId || 'G-XXXXXXXXXX'}');
+</script>`}
+              </pre>
+            </div>
+          )}
+        </WkSurface>
+
+        {/* Google Search Console */}
+        <WkSurface className="p-5">
+          <div className="mb-4 flex items-start justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--wk-success-soft)] text-[var(--wk-success)]">
+                <WkIcon name="Search" size={18} />
+              </div>
+              <div>
+                <h3 className="text-[14px] font-bold text-[var(--wk-text)]">Google Search Console</h3>
+                <p className="text-[12px] text-[var(--wk-text-muted)]">
+                  Enter your Search Console verification code to prove site ownership and unlock search analytics.
+                </p>
+              </div>
+            </div>
+            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+              gscVerificationCode
+                ? "bg-[var(--wk-success-soft)] text-[var(--wk-success)]"
+                : "bg-[var(--wk-surface-raised)] text-[var(--wk-text-muted)]"
+            }`}>
+              {gscVerificationCode ? "Verified" : "Not Verified"}
+            </span>
+          </div>
+
+          <div className="mb-4 grid gap-4 md:grid-cols-2">
+            <div>
+              <label htmlFor="gsc-verification-code" className="mb-1.5 block text-[12px] font-semibold text-[var(--wk-text-muted)]">
+                Verification Code
+              </label>
+              <div className="flex gap-2">
+                <input
+                  id="gsc-verification-code"
+                  type="text"
+                  value={gscVerificationCode}
+                  onChange={(e) => setGscVerificationCode(e.target.value)}
+                  placeholder="google-site-verification=..."
+                  className="min-w-0 flex-1 rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none focus:ring-1 focus:ring-[var(--wk-brand)] font-mono"
+                />
+              </div>
+              <p className="mt-1 text-[11px] text-[var(--wk-text-faint)]">
+                From Search Console {">"} Settings {">"} Ownership verification {">"} HTML tag. Copy the full content attribute value.
+              </p>
+            </div>
+            <div className="flex items-end">
+              <button
+                onClick={handleSaveGsc}
+                className="wk-button wk-button-primary wk-button-sm flex items-center gap-1.5 whitespace-nowrap"
+              >
+                <WkIcon name={gscSaved ? "CheckCircle2" : "Save"} size={14} className={gscSaved ? "text-white" : ""} />
+                {gscSaved ? "Saved!" : "Save GSC Code"}
+              </button>
+            </div>
+          </div>
+
+          {gscVerificationCode && (
+            <div className="rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] p-4">
+              <div className="mb-2 flex items-center gap-2">
+                <WkIcon name="FileCode" size={14} className="text-[var(--wk-text-muted)]" />
+                <span className="text-[12px] font-bold text-[var(--wk-text)]">Verification meta tag</span>
+              </div>
+              <p className="mb-3 text-[12px] text-[var(--wk-text-muted)]">
+                Add this meta tag to your <code className="rounded bg-[var(--wk-surface-raised)] px-1.5 py-0.5 text-[11px] font-mono">index.html</code> &lt;head&gt; section to verify ownership:
+              </p>
+              <pre className="overflow-x-auto rounded-lg bg-[var(--wk-surface-raised)] p-4 text-[11px] font-mono text-[var(--wk-text-soft)] leading-relaxed whitespace-pre-wrap">
+{`<meta name="google-site-verification" content="${gscVerificationCode || 'YOUR_CODE'}" />`}
+              </pre>
+            </div>
+          )}
+        </WkSurface>
+
+        {/* GSC Integration Note */}
+        {gscVerificationCode && (
+          <div className="rounded-lg bg-[var(--wk-success-soft)] p-4 text-[12px] text-[var(--wk-success)]">
+            <div className="flex items-center gap-2 font-semibold mb-1">
+              <WkIcon name="Zap" size={14} />
+              GSC data pipeline
+            </div>
+            <p>
+              WAKILISHA already imports GSC search analytics data via the <strong>gsc_import_runs</strong> and <strong>gsc_query_page_metrics</strong> tables.
+              The edge functions <code className="rounded bg-[var(--wk-success)]/10 px-1 py-0.5 text-[11px] font-mono">gsc-oauth-callback</code> and <code className="rounded bg-[var(--wk-success)]/10 px-1 py-0.5 text-[11px] font-mono">gsc-import-metrics</code>
+              handle OAuth and data ingestion. Make sure your GSC property is connected and the OAuth flow is complete to see search performance data in the admin dashboard.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

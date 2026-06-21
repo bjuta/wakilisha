@@ -4,11 +4,12 @@ import { WkIcon } from "@/components/design-system/Icon";
 import { Chapter19FallbackImage } from "@/components/media/Chapter19FallbackImage";
 import { MetaTags } from "@/components/seo/MetaTags";
 import { ch19Background } from "@/utils/ch19";
-import { getGenre, type RepairedGenreDetail } from "@/services/repaired/client";
+import { getGenre, type PublicGenreDetail } from "@/services/publicApi/client";
 import { buildGenreHeroIntro, buildGenreSeoDescription } from "@/services/cultureContext/genreAdapters";
 import { trackUrl } from "@/utils/trackUrl";
 import { releaseUrl } from "@/utils/releaseUrl";
-import { slugify } from "@/services/repairedContent/client";
+import { slugify } from "@/services/publicContent/client";
+import { NewsletterSubscribe } from "@/components/feature/NewsletterSubscribe";
 
 function formatArtistCount(n: number): string {
   if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
@@ -25,7 +26,7 @@ function releaseTypeBadge(type: string) {
 
 export default function GenreDetail() {
   const { slug } = useParams<{ slug: string }>();
-  const [detail, setDetail] = useState<RepairedGenreDetail | null>(null);
+  const [detail, setDetail] = useState<PublicGenreDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -85,6 +86,12 @@ export default function GenreDetail() {
   const genreIntro = buildGenreHeroIntro(detail) || genre.description || "";
   const seoDescription = buildGenreSeoDescription(detail);
 
+  // Pick a random roster artist image for the hero (deterministic by slug)
+  const artistsWithImages = (artists || []).filter((a) => a.imageUrl);
+  const heroArtistImage = artistsWithImages.length > 0
+    ? artistsWithImages[genre.slug.length % artistsWithImages.length].imageUrl
+    : null;
+
   return (
     <main className="min-h-screen bg-[var(--wk-bg)]">
       <MetaTags
@@ -95,6 +102,12 @@ export default function GenreDetail() {
 
       <section className="relative -mt-16 pt-16 flex min-h-[380px] items-end overflow-hidden md:min-h-[520px]">
         <div className="absolute inset-0" style={{ background: heroBg }} />
+        {heroArtistImage && (
+          <div className="absolute inset-0">
+            <img src={heroArtistImage} alt="" className="h-full w-full object-cover" />
+            <div className="absolute inset-0 bg-black/55" />
+          </div>
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
         <div className="relative w-full px-4 pb-8 pt-20 md:px-8 md:pb-14 md:pt-28">
           <div className="mx-auto max-w-[1100px]">
@@ -142,7 +155,7 @@ export default function GenreDetail() {
                   >
                     <div className="relative aspect-square bg-[var(--wk-surface-raised)]">
                       {artist.imageUrl ? (
-                        <img src={artist.imageUrl} alt={artist.name} className="h-full w-full object-cover" />
+                        <img src={artist.imageUrl} alt={artist.name} loading="lazy" className="h-full w-full object-cover" />
                       ) : (
                         <Chapter19FallbackImage slug={artist.slug} name={artist.name} className="h-full" />
                       )}
@@ -174,7 +187,7 @@ export default function GenreDetail() {
                     <span className="w-6 text-center text-[12px] font-bold tabular-nums text-[var(--wk-text-faint)]">{i + 1}</span>
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[var(--wk-surface-raised)]">
                       {track.artworkUrl ? (
-                        <img src={track.artworkUrl} alt={track.title} className="h-full w-full object-cover" />
+                        <img src={track.artworkUrl} alt={track.title} loading="lazy" className="h-full w-full object-cover" />
                       ) : (
                         <WkIcon name="Music2" size={16} className="text-[var(--wk-text-faint)]" />
                       )}
@@ -205,7 +218,7 @@ export default function GenreDetail() {
                   >
                     <div className="relative aspect-square bg-[var(--wk-surface-raised)]">
                       {release.artworkUrl ? (
-                        <img src={release.artworkUrl} alt={release.title} className="h-full w-full object-cover" />
+                        <img src={release.artworkUrl} alt={release.title} loading="lazy" className="h-full w-full object-cover" />
                       ) : (
                         <Chapter19FallbackImage slug={release.slug} name={release.title} className="h-full" />
                       )}
@@ -282,6 +295,23 @@ export default function GenreDetail() {
               </div>
             </div>
           </div>
+
+          {/* ── Newsletter ── */}
+          <section>
+            <NewsletterSubscribe
+              formAction="https://readdy.ai/api/form/d8qhqude8ise6dlc8d7g"
+              formId="genre-newsletter-form"
+              headline={`Stay on the ${genre.name} pulse.`}
+              description={`Get updates on ${genre.name} releases, chart movements, and new artists as they break through.`}
+              contextFields={{ wk_page_type: "genre_detail", genre_slug: genre.slug, genre_name: genre.name }}
+              analytics={{
+                pageType: "genre_detail",
+                entitySlug: slug,
+                entityType: "genre",
+                context: { genre_name: genre.name },
+              }}
+            />
+          </section>
         </div>
       </div>
     </main>

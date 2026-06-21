@@ -27,14 +27,6 @@ function whyThisStoryMatters(story: MagazineArticle) {
   return "This story gives the issue another way in.";
 }
 
-function StartHere() {
-  return (
-    <span className="mt-3 inline-flex max-w-max translate-y-1 items-center gap-1 rounded-full bg-[var(--wk-brand)] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-[var(--wk-brand-on)] opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:translate-y-0 group-focus-visible:opacity-100">
-      Start here <i className="ri-arrow-right-line text-[12px]" />
-    </span>
-  );
-}
-
 export function MagazineCard({ story, variant = "standard", rank }: MagazineCardProps) {
   const authorMeta = getAuthorMeta(story.author);
   const url = `/magazine/${story.slug}`;
@@ -53,6 +45,7 @@ export function MagazineCard({ story, variant = "standard", rank }: MagazineCard
           <img
             src={story.heroUrl}
             alt={story.title}
+            loading="lazy"
             className="absolute inset-0 h-full w-full object-cover object-top opacity-90 transition-transform duration-700 group-hover:scale-105 group-hover:rotate-[0.35deg] group-focus-visible:scale-105"
           />
         ) : (
@@ -85,7 +78,6 @@ export function MagazineCard({ story, variant = "standard", rank }: MagazineCard
           <p className="max-w-[52ch] text-[13px] leading-relaxed text-white/55 line-clamp-2 lg:text-[14px]">
             {why}
           </p>
-          <StartHere />
           <div className="mt-4 flex items-center gap-2.5 text-[12px] text-white/45">
             <Link
               to={authorUrl}
@@ -114,7 +106,8 @@ export function MagazineCard({ story, variant = "standard", rank }: MagazineCard
           {story.heroUrl ? (
             <img
               src={story.heroUrl}
-              alt=""
+              alt={story.title}
+              loading="lazy"
               className="h-full w-full object-cover object-top transition-transform duration-500 group-hover:scale-105 group-hover:rotate-[0.3deg]"
             />
           ) : (
@@ -136,7 +129,6 @@ export function MagazineCard({ story, variant = "standard", rank }: MagazineCard
           <p className="line-clamp-2 text-[12px] leading-relaxed text-[var(--wk-text-soft)] lg:text-[13px]">
             {why}
           </p>
-          <StartHere />
           <div className="mt-auto flex items-center gap-2 pt-1 text-[11px] text-[var(--wk-text-faint)]">
             <Link
               to={authorUrl}
@@ -191,7 +183,8 @@ export function MagazineCard({ story, variant = "standard", rank }: MagazineCard
           {story.heroUrl ? (
             <img
               src={story.heroUrl}
-              alt=""
+              alt={story.title}
+              loading="lazy"
               className="h-full w-full object-cover object-top transition-transform duration-400 group-hover:scale-110 group-hover:rotate-[1deg]"
             />
           ) : (
@@ -216,7 +209,8 @@ export function MagazineCard({ story, variant = "standard", rank }: MagazineCard
         {story.heroUrl ? (
           <img
             src={story.heroUrl}
-            alt=""
+            alt={story.title}
+            loading="lazy"
             className="h-full w-full object-cover object-top transition-transform duration-500 group-hover:scale-105 group-hover:rotate-[0.35deg]"
           />
         ) : (
@@ -244,7 +238,6 @@ export function MagazineCard({ story, variant = "standard", rank }: MagazineCard
         <p className="hidden text-[12px] leading-relaxed text-[var(--wk-text-soft)] line-clamp-2 lg:block">
           {why}
         </p>
-        <StartHere />
         <div className="mt-auto flex items-center gap-2 pt-1 text-[11px] text-[var(--wk-text-faint)]">
           <Link
             to={authorUrl}

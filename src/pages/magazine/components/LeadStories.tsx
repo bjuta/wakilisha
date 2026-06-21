@@ -21,7 +21,7 @@ export function LeadStories({ stories }: LeadStoriesProps) {
             className="mag-lead-v2-primary"
           >
             <div className="mag-lead-v2-primary-image">
-              <img src={primary.heroUrl} alt="" />
+              <img src={primary.heroUrl} alt={primary.title} loading="lazy" className="w-full h-full object-cover object-top" />
               <div className="mag-lead-v2-primary-overlay" />
             </div>
             <div className="mag-lead-v2-primary-content">
@@ -54,7 +54,7 @@ export function LeadStories({ stories }: LeadStoriesProps) {
             className="mag-lead-v2-secondary"
           >
             <div className="mag-lead-v2-secondary-image">
-              <img src={secondary.heroUrl} alt="" />
+              <img src={secondary.heroUrl} alt={secondary.title} loading="lazy" className="w-full h-full object-cover object-top" />
             </div>
             <div className="mag-lead-v2-secondary-content">
               <span className="mag-lead-v2-secondary-section">

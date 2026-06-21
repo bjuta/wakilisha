@@ -1,78 +1,101 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { useAuthUser } from "@/hooks/useAuthUser";
 import { useTheme } from "@/components/design-system/theme/ThemeProvider";
 import { WkIcon } from "@/components/design-system/Icon";
-import { slugify } from "@/services/repairedContent/client";
-const HOME_FEATURED_ARTISTS: any[] = [];
-const HOME_TRENDING_TRACKS: any[] = [];
 import { useMagazineArticles } from "@/services/magazineArticles";
+import { supabase } from "@/lib/supabase";
 
-type Tab = "Likes" | "Tracks" | "Reads" | "Settings";
-const tabs: Tab[] = ["Likes", "Tracks", "Reads", "Settings"];
-
-const profile = {
-  name: "Akinyi Odhiambo",
-  handle: "@akinyi",
-  role: "Senior Writer",
-  bio: "Music journalist based in Nairobi. Writing about East African music, culture, and the stories behind the sounds since 2019. Believes the music comes first.",
-  cover: "https://readdy.ai/api/search-image?query=African%20music%20culture%20landscape%2C%20Nairobi%20city%20skyline%20at%20golden%20hour%2C%20warm%20earth%20tones%2C%20dramatic%20sky%2C%20editorial%20photography%2C%20cinematic%20wide%20shot%2C%20warm%20orange%20and%20amber%20lighting%2C%20professional%20documentary%20style%2C%20no%20text&width=1600&height=400&seq=profile-hero-1&orientation=landscape",
-  avatar: "https://picsum.photos/seed/profile-ava-1/240/240",
-  location: "Nairobi, Kenya",
-  website: "wakilisha.africa/contributors/akinyi",
-  followers: "2,410",
-  following: 318,
-  articles: 84,
-  streams: "12.4K",
-};
+type Tab = "Reads" | "Settings";
+const tabs: Tab[] = ["Reads", "Settings"];
 
 export default function ProfilePage() {
   const { theme, toggle } = useTheme();
-  const savedTracks = HOME_TRENDING_TRACKS.slice(0, 10);
-  const followedArtists = HOME_FEATURED_ARTISTS.slice(0, 8);
+  const authUser = useAuthUser();
   const { articles: savedStories, loading: storiesLoading, error: storiesError } = useMagazineArticles();
-  const displayStories = savedStories.slice(0, 6);
-  const likesGrid = [...savedTracks, ...displayStories].slice(0, 15);
+  const displayStories = savedStories.slice(0, 9);
   const [showThemeSheet, setShowThemeSheet] = useState(false);
-  const [tab, setTab] = useState<Tab>("Likes");
+  const [tab, setTab] = useState<Tab>("Reads");
+
+  const isSignedIn = !authUser.loading && !!authUser.id;
+  const userDisplayName =
+    authUser.name || authUser.email?.split("@")[0] || "Reader";
+  const userEmail = authUser.email || "";
+  const userInitial = userDisplayName[0]?.toUpperCase() || "W";
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+  };
 
   return (
     <main className="profile-dt-shell">
-      {/* Full-width hero */}
+      {/* Hero */}
       <section className="profile-dt-hero">
         <div className="profile-dt-cover">
-          <img src={profile.cover} alt="" className="h-full w-full object-cover" />
+          <div className="h-full w-full bg-[linear-gradient(135deg,#1a3a0a,#2a5a1a)]" />
         </div>
       </section>
 
-      {/* Profile header with avatar + info */}
+      {/* Profile header */}
       <div className="profile-dt-content">
         <div className="profile-dt-header">
           <div className="profile-dt-avatar-wrap">
             <div className="profile-dt-avatar">
-              <img src={profile.avatar} alt="" className="h-full w-full object-cover" />
+              {authUser.avatarUrl ? (
+                <img src={authUser.avatarUrl} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-[28px] font-black bg-[var(--wk-surface)] text-[var(--wk-brand)]">
+                  {userInitial}
+                </div>
+              )}
             </div>
-            <div className="profile-dt-badge">
-              <WkIcon name="Check" size={12} />
-            </div>
+            {isSignedIn && (
+              <div className="profile-dt-badge">
+                <WkIcon name="Check" size={12} />
+              </div>
+            )}
           </div>
 
           <div className="profile-dt-header-main">
             <div className="profile-dt-header-top">
               <div className="profile-dt-header-info">
-                <h1 className="profile-dt-name">{profile.name}</h1>
-                <div className="profile-dt-handle">
-                  {profile.handle}
-                  <span className="profile-dt-role">
-                    <WkIcon name="PenLine" size={13} /> {profile.role}
-                  </span>
-                </div>
-                <p className="profile-dt-bio">{profile.bio}</p>
+                {authUser.loading ? (
+                  <>
+                    <div className="h-[36px] w-48 rounded bg-[var(--wk-surface-raised)] animate-pulse mb-[6px]" />
+                    <div className="h-[18px] w-32 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
+                  </>
+                ) : (
+                  <>
+                    <h1 className="profile-dt-name">
+                      {isSignedIn ? userDisplayName : "WAKILISHA Reader"}
+                    </h1>
+                    <div className="profile-dt-handle">
+                      {isSignedIn ? userEmail : "Sign in to customize your profile"}
+                      {isSignedIn && (
+                        <span className="profile-dt-role">
+                          <WkIcon name="User" size={13} /> Reader
+                        </span>
+                      )}
+                    </div>
+                    <p className="profile-dt-bio">
+                      {isSignedIn
+                        ? "Your profile saves reading history, followed artists, and chart preferences across devices."
+                        : "Sign in to track your reading, follow artists, and personalize your charts experience."}
+                    </p>
+                  </>
+                )}
               </div>
               <div className="profile-dt-header-actions">
-                <Link to="/settings" className="profile-dt-btn-edit">
-                  <WkIcon name="Pencil" size={14} /> Edit profile
-                </Link>
-                <Link to="/search" className="profile-dt-btn-ghost">
+                {isSignedIn ? (
+                  <Link to="/settings" className="profile-dt-btn-edit whitespace-nowrap">
+                    <WkIcon name="Pencil" size={14} /> Edit profile
+                  </Link>
+                ) : (
+                  <Link to="/auth" className="profile-dt-btn-edit whitespace-nowrap">
+                    <WkIcon name="LogIn" size={14} /> Sign in
+                  </Link>
+                )}
+                <Link to="/search" className="profile-dt-btn-ghost whitespace-nowrap">
                   <WkIcon name="Search" size={14} /> Discover
                 </Link>
               </div>
@@ -80,28 +103,22 @@ export default function ProfilePage() {
 
             <div className="profile-dt-stats">
               <div className="profile-dt-stat">
-                <div className="profile-dt-stat-val">{profile.articles}</div>
-                <div className="profile-dt-stat-lbl">Articles</div>
+                <div className="profile-dt-stat-val">{displayStories.length}</div>
+                <div className="profile-dt-stat-lbl">Reading List</div>
               </div>
               <div className="profile-dt-stat">
-                <div className="profile-dt-stat-val">{profile.followers}</div>
-                <div className="profile-dt-stat-lbl">Followers</div>
+                <div className="profile-dt-stat-val">{savedStories.length}</div>
+                <div className="profile-dt-stat-lbl">Stories</div>
               </div>
               <div className="profile-dt-stat">
-                <div className="profile-dt-stat-val">{profile.following}</div>
-                <div className="profile-dt-stat-lbl">Following</div>
+                <div className="profile-dt-stat-val">{isSignedIn ? 1 : 0}</div>
+                <div className="profile-dt-stat-lbl">Devices</div>
               </div>
               <div className="profile-dt-stat">
-                <div className="profile-dt-stat-val">{profile.streams}</div>
-                <div className="profile-dt-stat-lbl">Streams</div>
-              </div>
-              <div className="profile-dt-stat">
-                <div className="profile-dt-stat-val">{followedArtists.length}</div>
-                <div className="profile-dt-stat-lbl">Artists</div>
-              </div>
-              <div className="profile-dt-stat">
-                <div className="profile-dt-stat-val">{savedTracks.length}</div>
-                <div className="profile-dt-stat-lbl">Saved</div>
+                <div className="profile-dt-stat-val">
+                  {savedStories.reduce((acc, s) => acc + (s.readingTime || 0), 0) || "—"}
+                </div>
+                <div className="profile-dt-stat-lbl">Min Read</div>
               </div>
             </div>
           </div>
@@ -113,7 +130,7 @@ export default function ProfilePage() {
             <button
               key={item}
               onClick={() => setTab(item)}
-              className={`profile-dt-tab ${tab === item ? "active" : ""}`}
+              className={`profile-dt-tab ${tab === item ? "active" : ""} cursor-pointer`}
             >
               {item}
             </button>
@@ -122,59 +139,6 @@ export default function ProfilePage() {
 
         {/* Tab content */}
         <div className="profile-dt-body">
-          {tab === "Likes" && (
-            <div>
-              <div className="profile-dt-section-head">
-                <div className="profile-dt-section-kicker">Likes</div>
-                <h2 className="profile-dt-section-title">Saved tracks & stories</h2>
-              </div>
-              <div className="profile-dt-likes-grid">
-                {likesGrid.map((item: any, index) => {
-                  const img = item.artworkUrl || item.heroUrl;
-                  const to =
-                    item.slug && item.artworkUrl
-                      ? `/tracks/${slugify(item.artist || '')}/${item.slug}`
-                      : item.slug
-                        ? `/magazine/${item.slug}`
-                        : "/search";
-                  return (
-                    <Link key={`${item.slug}-${index}`} to={to} className="profile-dt-like">
-                      {img ? <img src={img} alt="" className="h-full w-full object-cover" /> : null}
-                    </Link>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {tab === "Tracks" && (
-            <div>
-              <div className="profile-dt-section-head">
-                <div className="profile-dt-section-kicker">Tracks</div>
-                <h2 className="profile-dt-section-title">Saved tracks</h2>
-              </div>
-              <div className="profile-dt-track-list">
-                {savedTracks.map((track, index) => (
-                  <Link key={track.slug} to={`/tracks/${slugify(track.artist)}/${track.slug}`} className="profile-dt-track-row">
-                    <div className="profile-dt-track-num">{index + 1}</div>
-                    <div className="profile-dt-track-art">
-                      {track.artworkUrl ? <img src={track.artworkUrl} alt="" className="h-full w-full object-cover" /> : <WkIcon name="Music2" size={20} />}
-                    </div>
-                    <div className="profile-dt-track-info">
-                      <div className="profile-dt-track-title">{track.title}</div>
-                      <div className="profile-dt-track-artist">{track.artist}</div>
-                    </div>
-                    <div className="profile-dt-track-meta">{track.streamCount}</div>
-                    <div className="profile-dt-track-meta">{track.source}</div>
-                    <div className="profile-dt-track-play">
-                      <WkIcon name="Play" size={16} />
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          )}
-
           {tab === "Reads" && (
             <div>
               <div className="profile-dt-section-head">
@@ -195,7 +159,23 @@ export default function ProfilePage() {
                   ))}
                 </div>
               ) : storiesError ? (
-                <div className="text-[var(--wk-text-muted)]">{storiesError}</div>
+                <div className="text-[var(--wk-text-muted)] py-8 text-center">
+                  <WkIcon name="AlertTriangle" size={24} className="mx-auto mb-3 text-[var(--wk-text-faint)]" />
+                  <p className="font-bold text-sm">{storiesError}</p>
+                </div>
+              ) : displayStories.length === 0 ? (
+                <div className="py-16 text-center border border-dashed border-[var(--wk-border)] rounded-2xl">
+                  <WkIcon name="BookOpen" size={32} className="mx-auto mb-4 text-[var(--wk-text-faint)]" />
+                  <p className="font-bold text-sm text-[var(--wk-text-muted)] mb-3">
+                    No stories in your reading list yet
+                  </p>
+                  <Link
+                    to="/magazine"
+                    className="inline-flex items-center gap-2 text-xs font-bold text-[var(--wk-brand)] hover:underline"
+                  >
+                    Browse magazine <i className="ri-arrow-right-line" />
+                  </Link>
+                </div>
               ) : (
                 <div className="profile-dt-reads-grid">
                   {displayStories.map((story) => (
@@ -206,7 +186,9 @@ export default function ProfilePage() {
                       <div className="profile-dt-read-body">
                         <div className="profile-dt-read-tag">{story.section}</div>
                         <div className="profile-dt-read-title">{story.title}</div>
-                        <div className="profile-dt-read-meta">{story.readingTime} min read · {story.date || "Undated"}</div>
+                        <div className="profile-dt-read-meta">
+                          {story.readingTime} min read · {story.date || "Undated"}
+                        </div>
                       </div>
                     </Link>
                   ))}
@@ -225,13 +207,18 @@ export default function ProfilePage() {
                 <div className="profile-dt-settings-col">
                   <div className="profile-dt-settings-group">
                     <div className="profile-dt-settings-group-title">Preferences</div>
-                    <button onClick={() => setShowThemeSheet(true)} className="profile-dt-settings-row">
+                    <button
+                      onClick={() => setShowThemeSheet(true)}
+                      className="profile-dt-settings-row cursor-pointer"
+                    >
                       <div className="profile-dt-settings-icon">
                         <WkIcon name={theme === "dark" ? "Moon" : "Sun"} size={18} />
                       </div>
                       <div className="profile-dt-settings-row-text">
                         <div className="profile-dt-settings-label">Appearance</div>
-                        <div className="profile-dt-settings-sub">Dark mode is {theme === "dark" ? "on" : "off"}</div>
+                        <div className="profile-dt-settings-sub">
+                          Dark mode is {theme === "dark" ? "on" : "off"}
+                        </div>
                       </div>
                       <WkIcon name="ChevronRight" size={16} />
                     </button>
@@ -248,16 +235,32 @@ export default function ProfilePage() {
                   </div>
                   <div className="profile-dt-settings-group">
                     <div className="profile-dt-settings-group-title">Account</div>
-                    <Link to="/auth" className="profile-dt-settings-row">
-                      <div className="profile-dt-settings-icon">
-                        <WkIcon name="LogIn" size={18} />
-                      </div>
-                      <div className="profile-dt-settings-row-text">
-                        <div className="profile-dt-settings-label">Sign in</div>
-                        <div className="profile-dt-settings-sub">Sync profile and saves</div>
-                      </div>
-                      <WkIcon name="ChevronRight" size={16} />
-                    </Link>
+                    {isSignedIn ? (
+                      <button
+                        onClick={handleSignOut}
+                        className="profile-dt-settings-row cursor-pointer"
+                      >
+                        <div className="profile-dt-settings-icon">
+                          <WkIcon name="LogOut" size={18} />
+                        </div>
+                        <div className="profile-dt-settings-row-text">
+                          <div className="profile-dt-settings-label">Sign out</div>
+                          <div className="profile-dt-settings-sub">{userEmail}</div>
+                        </div>
+                        <WkIcon name="ChevronRight" size={16} />
+                      </button>
+                    ) : (
+                      <Link to="/auth" className="profile-dt-settings-row">
+                        <div className="profile-dt-settings-icon">
+                          <WkIcon name="LogIn" size={18} />
+                        </div>
+                        <div className="profile-dt-settings-row-text">
+                          <div className="profile-dt-settings-label">Sign in</div>
+                          <div className="profile-dt-settings-sub">Sync profile and saves</div>
+                        </div>
+                        <WkIcon name="ChevronRight" size={16} />
+                      </Link>
+                    )}
                   </div>
                 </div>
                 <div className="profile-dt-settings-col">
@@ -265,16 +268,18 @@ export default function ProfilePage() {
                     <div className="profile-dt-settings-group-title">Profile info</div>
                     <div className="profile-dt-settings-info">
                       <div className="profile-dt-info-row">
-                        <WkIcon name="MapPin" size={15} />
-                        <span>{profile.location}</span>
+                        <WkIcon name="AtSign" size={15} />
+                        <span>
+                          {isSignedIn ? userEmail : "Sign in to see profile details"}
+                        </span>
                       </div>
                       <div className="profile-dt-info-row">
                         <WkIcon name="Globe" size={15} />
-                        <span>{profile.website}</span>
+                        <span>wakilisha.africa</span>
                       </div>
                       <div className="profile-dt-info-row">
-                        <WkIcon name="AtSign" size={15} />
-                        <span>Contributor profile</span>
+                        <WkIcon name="User" size={15} />
+                        <span>{isSignedIn ? "Contributor profile" : "Reader profile"}</span>
                       </div>
                     </div>
                   </div>
@@ -282,16 +287,20 @@ export default function ProfilePage() {
                     <div className="profile-dt-settings-group-title">Activity</div>
                     <div className="profile-dt-activity-summary">
                       <div className="profile-dt-activity-item">
-                        <div className="profile-dt-activity-val">6</div>
-                        <div className="profile-dt-activity-lbl">Published this month</div>
+                        <div className="profile-dt-activity-val">{savedStories.length}</div>
+                        <div className="profile-dt-activity-lbl">Total stories</div>
                       </div>
                       <div className="profile-dt-activity-item">
-                        <div className="profile-dt-activity-val">Afrobeats</div>
-                        <div className="profile-dt-activity-lbl">Top genre</div>
+                        <div className="profile-dt-activity-val">
+                          {isSignedIn ? "Active" : "Guest"}
+                        </div>
+                        <div className="profile-dt-activity-lbl">Status</div>
                       </div>
                       <div className="profile-dt-activity-item">
-                        <div className="profile-dt-activity-val">{followedArtists[0]?.name ?? "—"}</div>
-                        <div className="profile-dt-activity-lbl">Top artist</div>
+                        <div className="profile-dt-activity-val">
+                          {displayStories[0]?.section ?? "—"}
+                        </div>
+                        <div className="profile-dt-activity-lbl">Top section</div>
                       </div>
                       <div className="profile-dt-activity-item">
                         <div className="profile-dt-activity-val">Today</div>
@@ -318,7 +327,9 @@ export default function ProfilePage() {
                 if (theme !== "light") toggle();
                 setShowThemeSheet(false);
               }}
-              className={`profile-dt-theme-option ${theme === "light" ? "profile-dt-theme-option-active" : ""}`}
+              className={`profile-dt-theme-option cursor-pointer ${
+                theme === "light" ? "profile-dt-theme-option-active" : ""
+              }`}
             >
               <WkIcon name="Sun" size={18} />
               <div className="profile-dt-theme-option-label">Light</div>
@@ -329,7 +340,9 @@ export default function ProfilePage() {
                 if (theme !== "dark") toggle();
                 setShowThemeSheet(false);
               }}
-              className={`profile-dt-theme-option ${theme === "dark" ? "profile-dt-theme-option-active" : ""}`}
+              className={`profile-dt-theme-option cursor-pointer ${
+                theme === "dark" ? "profile-dt-theme-option-active" : ""
+              }`}
             >
               <WkIcon name="Moon" size={18} />
               <div className="profile-dt-theme-option-label">Dark</div>

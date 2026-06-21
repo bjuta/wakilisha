@@ -4,7 +4,6 @@ import { ResponsiveAppLayout } from "@/components/mobile/ResponsiveAppLayout";
 import { ResponsivePage } from "@/components/mobile/ResponsivePage";
 import { MobileFullPlayer } from "@/components/mobile/MobileFullPlayer";
 import NotFound from "../pages/NotFound";
-import Home from "../pages/home/page";
 import AdminLoginPage from "../pages/admin/login/page";
 import ResetPasswordPage from "../pages/auth/reset-password/page";
 
@@ -22,7 +21,6 @@ import AdminRegistryOverview from "../pages/admin/registry/page";
 import AdminArtistsPage from "../pages/admin/registry/artists/page";
 import AdminTracksPage from "../pages/admin/registry/tracks/page";
 import AdminReleasesPage from "../pages/admin/registry/releases/page";
-import AdminRegistryReleaseShells from "../pages/admin/registry/release-shells/page";
 import AdminArtistAliasesPage from "../pages/admin/registry/artist-aliases/page";
 import AdminLabelsPage from "../pages/admin/registry/labels/page";
 import AdminGenresPage from "../pages/admin/registry/genres/page";
@@ -51,17 +49,16 @@ import AdminPublishingDashboardPage from "../pages/admin/content/publishing/page
 import AdminContentArchivePage from "../pages/admin/content/archive/page";
 import AdminLyricsPage from "../pages/admin/content/lyrics/page";
 import AdminUsersPage from "../pages/admin/users/page";
-import AdminMagazineVisualsPage from "../pages/admin/magazine/visuals/page";
-import AdminMagazineIssuesPage from "../pages/admin/magazine/issues/page";
 import AdminTrashPage from "../pages/admin/content/articles/trash/page";
 import AdminCategoriesPage from "../pages/admin/content/categories/page";
 import AdminTagsPage from "../pages/admin/content/tags/page";
+import AdminFeaturedArtistsPage from "../pages/admin/magazine/featured-artists/page";
+import AdminFeaturedGuidesPage from "../pages/admin/magazine/featured-guides/page";
 
 // Section-level admin guards
 import {
   AdminContentLayout,
   AdminUsersLayout,
-  AdminMagazineLayout,
   AdminRegistryLayout,
   AdminMediaLayout,
   AdminReviewLayout,
@@ -87,6 +84,9 @@ import AdminChartsIngestRunDetail from "../pages/admin/charts/ingest-run-detail/
 import AdminChartsScoringRuns from "../pages/admin/charts/scoring-runs/page";
 import AdminChartsEditionDetail from "../pages/admin/charts/edition-detail/page";
 import AdminChartsIngestHealth from "../pages/admin/charts/ingest-health/page";
+
+// Admin Share Analytics (redirected to main analytics)
+import AdminAnalyticsPage from "../pages/admin/analytics/page";
 
 // Admin Settings
 import { AdminSettingsLayout } from "../pages/admin/settings/AdminSettingsLayout";
@@ -132,8 +132,6 @@ import LabelDetail from "../pages/labels/detail/page";
 import Magazine from "../pages/magazine/page";
 import ArticlePage from "../pages/magazine/article/page";
 import PreviewPage from "../pages/preview/page";
-import MagazineIssuePage from "../pages/magazine/issue/page";
-import AllIssuesPage from "../pages/magazine/issues/page";
 import TrackDetail from "../pages/tracks/detail/page";
 import LyricContribution from "../pages/tracks/lyrics/contribute/page";
 import ProfilePage from "../pages/profile/page";
@@ -145,14 +143,7 @@ import Search from "../pages/search/page";
 // Guides
 import GuidesPage from "../pages/guides/page";
 import GuideDetailPage from "../pages/guides/detail/page";
-
-// Vertical pages
-import FilmPage from "../pages/film/page";
-import FashionPage from "../pages/fashion/page";
-import FoodPage from "../pages/food/page";
-import LanguagePage from "../pages/language/page";
-import PlacesPage from "../pages/places/page";
-import { MobileFilm, MobileFashion, MobileFood, MobileLanguage, MobilePlaces } from "../pages/mobile/verticals/page";
+import VeniceFieldGuidePage from "../pages/guides/field-guide/page";
 
 // Desktop player
 import DesktopPlayerPage from "../pages/player/page";
@@ -161,22 +152,11 @@ import DesktopPlayerPage from "../pages/player/page";
 import MobileHome from "../pages/mobile/home/page";
 import MobileChartsDirectory from "../pages/mobile/charts/directory/page";
 import MobileChartEdition from "../pages/mobile/charts/edition/page";
-import MobileArtists from "../pages/mobile/artists/page";
-import MobileArtistDetail from "../pages/mobile/artists/detail/page";
 import MobileGenres from "../pages/mobile/genres/page";
-import MobileGenreDetail from "../pages/mobile/genres/detail/page";
 import MobileLabels from "../pages/mobile/labels/page";
-import MobileLabelDetail from "../pages/mobile/labels/detail/page";
 import MobileMagazine from "../pages/mobile/magazine/page";
 import MobileArticlePage from "../pages/mobile/magazine/article/page";
-import MobileMagazineIssuePage from "../pages/magazine/issue/page";
-import MobileAllIssuesPage from "../pages/mobile/magazine/issues/page";
-import MobileSearch from "../pages/mobile/search/page";
-import MobileTrackDetail from "../pages/mobile/tracks/detail/page";
 import MobileLyricContribution from "../pages/mobile/tracks/lyrics/contribute/page";
-import MobileAuth from "../pages/mobile/auth/page";
-import MobileProfile from "../pages/mobile/profile/page";
-import MobileAuthorProfile from "../pages/mobile/authors/detail/page";
 import AuthPage from "../pages/auth/page";
 
 // Public taxonomy archive pages
@@ -185,51 +165,56 @@ import CategoryDetail from "../pages/categories/detail/page";
 import TagsIndex from "../pages/tags/page";
 import TagDetail from "../pages/tags/detail/page";
 
+// Housekeeping pages
+import AboutPage from "../pages/about/page";
+import ContactPage from "../pages/contact/page";
+import FaqsPage from "../pages/faqs/page";
+import PrivacyPage from "../pages/privacy/page";
+import TermsPage from "../pages/terms/page";
+
 const routes: RouteObject[] = [
   { path: "/admin/login", element: <AdminLoginPage /> },
   { path: "/auth/reset-password", element: <ResetPasswordPage /> },
   {
     element: <ResponsiveAppLayout />,
     children: [
-      { path: "/", element: <ResponsivePage mobile={<MobileHome />} desktop={<Home />} /> },
+      { path: "/", element: <ResponsivePage mobile={<MobileMagazine />} desktop={<Magazine />} /> },
+      { path: "/magazine", element: <Navigate to="/" replace /> },
+      { path: "/magazine/:slug", element: <ResponsivePage mobile={<MobileArticlePage />} desktop={<ArticlePage />} /> },
       { path: "/charts", element: <ResponsivePage mobile={<ChartsDirectory />} desktop={<ChartsDirectory />} /> },
       { path: "/charts/:family/:market/:series/:edition", element: <ResponsivePage mobile={<MobileChartEdition />} desktop={<ChartEdition />} /> },
       { path: "/charts/:family/:market/:series", element: <ResponsivePage mobile={<MobileChartEdition />} desktop={<ChartEdition />} /> },
       { path: "/charts/:series", element: <ResponsivePage mobile={<MobileChartEdition />} desktop={<ChartEdition />} /> },
       { path: "/charts/:series/:edition", element: <ResponsivePage mobile={<MobileChartEdition />} desktop={<ChartEdition />} /> },
-      { path: "/artists", element: <ResponsivePage mobile={<MobileArtists />} desktop={<Artists />} /> },
-      { path: "/artists/:slug", element: <ResponsivePage mobile={<MobileArtistDetail />} desktop={<ArtistDetail />} /> },
-      { path: "/tracks/:artistSlug/:trackSlug", element: <ResponsivePage mobile={<MobileTrackDetail />} desktop={<TrackDetail />} /> },
+      { path: "/artists", element: <ResponsivePage mobile={<Artists />} desktop={<Artists />} /> },
+      { path: "/artists/:slug", element: <ResponsivePage mobile={<ArtistDetail />} desktop={<ArtistDetail />} /> },
+      { path: "/tracks/:artistSlug/:trackSlug", element: <ResponsivePage mobile={<TrackDetail />} desktop={<TrackDetail />} /> },
       { path: "/tracks/:artistSlug/:trackSlug/lyrics/contribute", element: <LyricContribution /> },
       { path: "/releases", element: <ResponsivePage mobile={<Releases />} desktop={<Releases />} /> },
       { path: "/releases/:artistSlug/:releaseSlug", element: <ResponsivePage mobile={<MobileReleaseDetail />} desktop={<ReleaseDetail />} /> },
-      { path: "/genres/:slug", element: <ResponsivePage mobile={<MobileGenreDetail />} desktop={<GenreDetail />} /> },
+      { path: "/genres/:slug", element: <ResponsivePage mobile={<GenreDetail />} desktop={<GenreDetail />} /> },
       { path: "/genres", element: <ResponsivePage mobile={<MobileGenres />} desktop={<Genres />} /> },
-      { path: "/labels/:slug", element: <ResponsivePage mobile={<MobileLabelDetail />} desktop={<LabelDetail />} /> },
+      { path: "/labels/:slug", element: <ResponsivePage mobile={<LabelDetail />} desktop={<LabelDetail />} /> },
       { path: "/labels", element: <ResponsivePage mobile={<MobileLabels />} desktop={<Labels />} /> },
-      { path: "/magazine", element: <ResponsivePage mobile={<MobileMagazine />} desktop={<Magazine />} /> },
-      { path: "/magazine/issues", element: <ResponsivePage mobile={<MobileAllIssuesPage />} desktop={<AllIssuesPage />} /> },
-      { path: "/magazine/issues/:issueKey", element: <ResponsivePage mobile={<MobileMagazineIssuePage />} desktop={<MagazineIssuePage />} /> },
-      { path: "/magazine/issue/:issueKey", element: <ResponsivePage mobile={<MobileMagazineIssuePage />} desktop={<MagazineIssuePage />} /> },
-      { path: "/magazine/:slug", element: <ResponsivePage mobile={<MobileArticlePage />} desktop={<ArticlePage />} /> },
       { path: "/preview/:nonce", element: <PreviewPage /> },
       { path: "/categories", element: <ResponsivePage mobile={<CategoriesIndex />} desktop={<CategoriesIndex />} /> },
       { path: "/categories/:slug", element: <ResponsivePage mobile={<CategoryDetail />} desktop={<CategoryDetail />} /> },
       { path: "/tags", element: <ResponsivePage mobile={<TagsIndex />} desktop={<TagsIndex />} /> },
       { path: "/tags/:slug", element: <ResponsivePage mobile={<TagDetail />} desktop={<TagDetail />} /> },
       { path: "/guides/:slug", element: <ResponsivePage mobile={<GuideDetailPage />} desktop={<GuideDetailPage />} /> },
+      { path: "/guides/:slug/field-guide", element: <ResponsivePage mobile={<VeniceFieldGuidePage />} desktop={<VeniceFieldGuidePage />} /> },
       { path: "/guides", element: <ResponsivePage mobile={<GuidesPage />} desktop={<GuidesPage />} /> },
-      { path: "/film", element: <ResponsivePage mobile={<MobileFilm />} desktop={<FilmPage />} /> },
-      { path: "/fashion", element: <ResponsivePage mobile={<MobileFashion />} desktop={<FashionPage />} /> },
-      { path: "/food", element: <ResponsivePage mobile={<MobileFood />} desktop={<FoodPage />} /> },
-      { path: "/language", element: <ResponsivePage mobile={<MobileLanguage />} desktop={<LanguagePage />} /> },
-      { path: "/places", element: <ResponsivePage mobile={<MobilePlaces />} desktop={<PlacesPage />} /> },
-      { path: "/search", element: <ResponsivePage mobile={<MobileSearch />} desktop={<Search />} /> },
+      { path: "/search", element: <ResponsivePage mobile={<Search />} desktop={<Search />} /> },
       { path: "/player", element: <ResponsivePage mobile={<MobileHome />} desktop={<DesktopPlayerPage />} /> },
-      { path: "/auth", element: <ResponsivePage mobile={<MobileAuth />} desktop={<AuthPage />} /> },
-      { path: "/profile", element: <ResponsivePage mobile={<MobileProfile />} desktop={<ProfilePage />} /> },
-      { path: "/authors/:slug", element: <ResponsivePage mobile={<MobileAuthorProfile />} desktop={<AuthorProfilePage />} /> },
+      { path: "/auth", element: <ResponsivePage mobile={<AuthPage />} desktop={<AuthPage />} /> },
+      { path: "/profile", element: <ResponsivePage mobile={<ProfilePage />} desktop={<ProfilePage />} /> },
+      { path: "/authors/:slug", element: <ResponsivePage mobile={<AuthorProfilePage />} desktop={<AuthorProfilePage />} /> },
       { path: "/settings", element: <ResponsivePage mobile={<SettingsPage />} desktop={<SettingsPage />} /> },
+      { path: "/about", element: <ResponsivePage mobile={<AboutPage />} desktop={<AboutPage />} /> },
+      { path: "/contact", element: <ResponsivePage mobile={<ContactPage />} desktop={<ContactPage />} /> },
+      { path: "/faqs", element: <ResponsivePage mobile={<FaqsPage />} desktop={<FaqsPage />} /> },
+      { path: "/privacy", element: <ResponsivePage mobile={<PrivacyPage />} desktop={<PrivacyPage />} /> },
+      { path: "/terms", element: <ResponsivePage mobile={<TermsPage />} desktop={<TermsPage />} /> },
     ],
   },
   {
@@ -237,6 +222,7 @@ const routes: RouteObject[] = [
     element: <AdminShell />,
     children: [
       { index: true, element: <AdminDashboardPage /> },
+      { path: "analytics", element: <AdminAnalyticsPage /> },
       {
         path: "content",
         element: <AdminContentLayout />,
@@ -253,6 +239,8 @@ const routes: RouteObject[] = [
           { path: "lyrics", element: <AdminLyricsPage /> },
           { path: "categories", element: <AdminCategoriesPage /> },
           { path: "tags", element: <AdminTagsPage /> },
+          { path: "magazine/featured-artists", element: <AdminFeaturedArtistsPage /> },
+          { path: "magazine/featured-guides", element: <AdminFeaturedGuidesPage /> },
         ],
       },
       {
@@ -260,14 +248,6 @@ const routes: RouteObject[] = [
         element: <AdminUsersLayout />,
         children: [
           { index: true, element: <AdminUsersPage /> },
-        ],
-      },
-      {
-        path: "magazine",
-        element: <AdminMagazineLayout />,
-        children: [
-          { path: "visuals", element: <AdminMagazineVisualsPage /> },
-          { path: "issues", element: <AdminMagazineIssuesPage /> },
         ],
       },
       {
@@ -281,8 +261,6 @@ const routes: RouteObject[] = [
           { path: "tracks", element: <AdminTracksPage /> },
           { path: "tracks/:slug", element: <AdminTrackDetailPage /> },
           { path: "releases", element: <AdminReleasesPage /> },
-          { path: "release-shells", element: <AdminRegistryReleaseShells /> },
-          { path: "release-shells/intake", element: <AdminRegistryReleaseShells /> },
           { path: "artist-aliases", element: <AdminArtistAliasesPage /> },
           { path: "releases/:slug", element: <AdminReleaseDetailPage /> },
           { path: "labels", element: <AdminLabelsPage /> },
@@ -340,13 +318,14 @@ const routes: RouteObject[] = [
         { path: "public-api-qa", element: <AdminChartsPublicApiQa /> },
         { path: "review-queue", element: <AdminChartsReviewQueue /> },
         { path: "no-match", element: <AdminChartsNoMatch /> },
-        { path: "release-shells", element: <Navigate to="/admin/registry/release-shells" replace /> },
         { path: "canon-gaps", element: <AdminChartsCanonGaps /> },
         { path: "ingest-runs", element: <AdminChartsIngestRuns /> },
         { path: "ingest-runs/:runId", element: <AdminChartsIngestRunDetail /> },
         { path: "ingest-health", element: <AdminChartsIngestHealth /> },
         { path: "scoring-runs", element: <AdminChartsScoringRuns /> },
         { path: "editions/:editionId", element: <AdminChartsEditionDetail /> },
+        { path: "share-analytics", element: <AdminAnalyticsPage /> },
+        { path: "analytics", element: <AdminAnalyticsPage /> },
       ] },
       { path: "api-docs", element: <AdminApiDocsPage /> },
       { path: "settings", element: <AdminSettingsLayout />, children: [
@@ -359,7 +338,6 @@ const routes: RouteObject[] = [
         { path: "frontend-appearance", element: <AdminSettingsFrontendAppearance /> },
         { path: "player-playback", element: <AdminSettingsPlayerPlayback /> },
         { path: "registry", element: <AdminSettingsRegistry /> },
-        { path: "registry/release-shells", element: <Navigate to="/admin/registry/release-shells" replace /> },
         { path: "airplay", element: <AdminSettingsAirplay /> },
         { path: "audience", element: <AdminSettingsAudience /> },
         { path: "email-briefings", element: <AdminSettingsEmailBriefings /> },
@@ -373,7 +351,6 @@ const routes: RouteObject[] = [
   { path: "/api-docs", element: <PublicApiDocsPage /> },
   { path: "/player/full", element: <MobileFullPlayer /> },
   { path: "*", element: <NotFound /> },
-  { path: "/m", element: <Navigate to="/" replace /> },
 ];
 
 export default routes;

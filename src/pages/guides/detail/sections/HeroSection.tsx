@@ -90,6 +90,7 @@ function VeniceHero({ data }: { data: HeroData }) {
           <img
             src={heroSrc}
             alt={data.title}
+            loading="lazy"
             className={`w-full h-full object-cover transition-opacity duration-700 ${imageLoaded ? "opacity-100" : "opacity-0"}`}
             onLoad={() => setImageLoaded(true)}
           />
@@ -162,7 +163,7 @@ function DossierHero({ data }: { data: HeroData }) {
     <header className="relative w-full min-h-[85vh] md:min-h-[90vh] flex flex-col justify-end overflow-hidden">
       <div className="absolute inset-0 z-0">
         {heroSrc && (
-          <img src={heroSrc} alt={data.title} className="w-full h-full object-cover" width={1920} height={1072} />
+          <img src={heroSrc} alt={data.title} loading="lazy" className="w-full h-full object-cover" width={1920} height={1072} />
         )}
         <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/50 to-black/80" />
       </div>
@@ -279,6 +280,7 @@ function LiteraryHero({ data }: { data: HeroData }) {
                   <img
                     src={data.coverImage || data.cover_image}
                     alt={`${data.title} cover`}
+                    loading="lazy"
                     className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${imageLoaded ? "opacity-100" : "opacity-0"}`}
                     onLoad={() => setImageLoaded(true)}
                   />

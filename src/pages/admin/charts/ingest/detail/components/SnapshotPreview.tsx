@@ -168,7 +168,7 @@ export function SnapshotPreview({
       {/* Readiness summary */}
       <WkSurface className="p-5">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-[14px] font-bold text-[var(--wk-text)]">Snapshot Preview &amp; Publish</h2>
+          <h2 className="text-[14px] font-bold text-[var(--wk-text)]">Snapshot Preview & Publish</h2>
           <button
             onClick={handleExportJson}
             className="wk-button wk-button-sm wk-button-ghost whitespace-nowrap"

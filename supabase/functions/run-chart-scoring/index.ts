@@ -1,25 +1,12 @@
 /**
- * WAKILISHA Chart Scoring Runner
- * Supabase Edge Function — runs the full §2 scoring pipeline
- *
- * Accepts: { program_id, edition_date }
- * Does: fetch config → fetch evidence → run pipeline → write results
- * Returns: { edition_id, summary }
- *
- * v2: Reads airplay evidence from airplay_evidence_weekly (populated by chart-ingest-api run_airplay_detection).
- *     Column mapping: source_id→station_id, total_played_duration_seconds→total_played_duration.
+ * WAKILISHA Chart Scoring Runner — v3 (no anon key fallback)
  */
-
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
-
-// ═══════════════════════════════════════════════════════════════════════════
-// TYPES (mirrors scoringTypes.ts)
-// ═══════════════════════════════════════════════════════════════════════════
 
 type CrossSourceMode = "off" | "standard" | "strong";
 type AirplayStationScope = "all" | "selected";
@@ -155,37 +142,10 @@ interface ScoredRow {
   release_recency_days: number | null;
 }
 
-const DEFAULT_CONFIG: ScoringConfig = {
-  chart_size: 20,
-  streaming_min_sources: 1,
-  cross_source_mode: "standard",
-  cross_source_weight: 1.0,
-  continuity_weight: 1.0,
-  carry_forward_weight: 1.0,
-  airplay_enabled: false,
-  airplay_station_scope: "all",
-  airplay_min_duration: 20,
-  airplay_weight: 1.0,
-  airplay_min_stations: 1,
-  airplay_min_detections: 1,
-  airplay_max_score: 24,
-  airplay_rescue_mode: "allow_rescue",
-  anti_gaming_max_tracks_per_lead_artist: 3,
-  anti_gaming_overlap_bonus_cap: 10,
-  anti_gaming_artist_overflow_penalty: 8,
-  anti_gaming_demote_carry_forward_without_current: false,
-  missing_policy: "review",
-  override_mode: "metadata_and_matching_only",
-};
-
 const SCORING_POLICY_VERSION = "1.0.1";
 const METHODOLOGY_VERSION = "v1.0.1";
 const ELIGIBILITY_VERSION = "v1.0";
 const SOURCE_POLICY_VERSION = "v1.0";
-
-// ═══════════════════════════════════════════════════════════════════════════
-// PURE HELPERS
-// ═══════════════════════════════════════════════════════════════════════════
 
 function round4(v: number): number {
   if (!Number.isFinite(v)) return 0;
@@ -204,10 +164,6 @@ function daysBetween(a: string, b: string): number | null {
 }
 
 const LN = Math.log;
-
-// ═══════════════════════════════════════════════════════════════════════════
-// NORMALIZATION (mirrors normalize.ts)
-// ═══════════════════════════════════════════════════════════════════════════
 
 function collapseWhitespace(text: string): string {
   return text.replace(/[\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000]/g, " ")
@@ -255,10 +211,6 @@ function buildNormalizedKey(title: string, artistLine: string): string {
   if (!nt || !lk) return "";
   return `${nt}::${lk}`;
 }
-
-// ═══════════════════════════════════════════════════════════════════════════
-// SCORING ENGINE (mirrors scoringEngine.ts)
-// ═══════════════════════════════════════════════════════════════════════════
 
 function sourceScore(sourceCount: number): number {
   return round4(Math.min(72, sourceCount * 24));
@@ -358,10 +310,6 @@ function scoreEvidenceRow(
   };
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// ANTI-GAMING (mirrors scoringEngine.ts)
-// ═══════════════════════════════════════════════════════════════════════════
-
 interface ScoredTrack {
   normalized_key: string;
   lead_artist_key: string;
@@ -431,10 +379,6 @@ function applyAntiGamingAndFinalize(
   });
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// AIRPLAY ENGINE (mirrors airplayEngine.ts — minimal subset needed)
-// ═══════════════════════════════════════════════════════════════════════════
-
 function buildAirplayContextMap(
   buckets: AirplayEvidenceBucket[],
   rescueMode: AirplayRescueMode,
@@ -498,10 +442,6 @@ function identifyAirplayRescueCandidates(
   return candidates;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// ELIGIBILITY ENGINE (mirrors eligibilityEngine.ts)
-// ═══════════════════════════════════════════════════════════════════════════
-
 function evaluateEligibility(
   row: ScoringInputRow,
   airplayContext: AirplayContext | null,
@@ -534,10 +474,6 @@ function evaluateEligibility(
   const status = warnings.length > 0 && config.missing_policy === "exclude" ? "excluded" : warnings.length > 0 ? "review" : "eligible";
   return { status, warnings, reasons };
 }
-
-// ═══════════════════════════════════════════════════════════════════════════
-// PIPELINE (mirrors scoringPipeline.ts)
-// ═══════════════════════════════════════════════════════════════════════════
 
 interface RawEvidenceRecord {
   track_title: string;
@@ -748,18 +684,14 @@ function runFullPipeline(
   };
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// MAIN HANDLER
-// ═══════════════════════════════════════════════════════════════════════════
-
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-  const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+  const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
   if (!supabaseUrl || !supabaseKey) {
-    return new Response(JSON.stringify({ error: "Supabase config missing." }), {
+    return new Response(JSON.stringify({ error: "Supabase service role key missing. This function requires SERVICE_ROLE_KEY to write chart scores." }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
@@ -776,7 +708,6 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // ═══ 1. FETCH PROGRAM CONFIG ═══
     const { data: program, error: progErr } = await supabase
       .from("wk_chart_programs_v2").select("*").eq("id", program_id).maybeSingle();
 
@@ -809,7 +740,6 @@ Deno.serve(async (req: Request) => {
       override_mode: (program.override_mode as OverrideMode) ?? "metadata_and_matching_only",
     };
 
-    // ═══ 2. CREATE SCORING RUN ═══
     const { data: run, error: runErr } = await supabase
       .from("wk_chart_scoring_runs")
       .insert({
@@ -835,7 +765,6 @@ Deno.serve(async (req: Request) => {
     const runId = run.id;
 
     try {
-      // ═══ 3. FETCH STAGING EVIDENCE ═══
       const { data: stagingRows, error: stagingErr } = await supabase
         .from("wk_import_staging_records")
         .select("title, raw_record, mapped_record, source_url, target_slug")
@@ -846,9 +775,6 @@ Deno.serve(async (req: Request) => {
 
       if (stagingErr) throw new Error(`Staging fetch failed: ${stagingErr.message}`);
 
-      // ═══ 4. FETCH AIRPLAY EVIDENCE ═══
-      // v2: Reads from airplay_evidence_weekly (populated by chart-ingest-api run_airplay_detection).
-      // Column mapping: source_id→station_id, total_played_duration_seconds→total_played_duration.
       let airplayBuckets: AirplayEvidenceBucket[] = [];
       if (config.airplay_enabled) {
         const { data: airplayRows, error: airplayErr } = await supabase
@@ -870,7 +796,6 @@ Deno.serve(async (req: Request) => {
         }
       }
 
-      // ═══ 5. FETCH PREVIOUS EDITION ═══
       const { data: prevEdition, error: prevErr } = await supabase
         .from("wk_chart_editions_v2")
         .select("id")
@@ -904,7 +829,6 @@ Deno.serve(async (req: Request) => {
         }
       }
 
-      // ═══ 6. BUILD RAW EVIDENCE ═══
       const rawEvidence: RawEvidenceRecord[] = (stagingRows ?? []).map((sr: Record<string, unknown>) => {
         const rawRec = (sr.raw_record ?? {}) as Record<string, unknown>;
         const mappedRec = (sr.mapped_record ?? {}) as Record<string, unknown>;
@@ -917,10 +841,8 @@ Deno.serve(async (req: Request) => {
         };
       }).filter((r: RawEvidenceRecord) => r.track_title);
 
-      // ═══ 7. RUN PIPELINE ═══
       const result = runFullPipeline(rawEvidence, airplayBuckets, previousEdition, prevMeta, config, editionDate);
 
-      // ═══ 8. CREATE/UPSERT EDITION ═══
       const editionSlug = `${program.public_slug ?? "chart"}-${editionDate}`;
       const editionLabel = `${program.public_label ?? "Chart"} — ${editionDate}`;
 
@@ -952,7 +874,6 @@ Deno.serve(async (req: Request) => {
 
       if (editionErr || !edition) throw new Error(`Edition upsert failed: ${editionErr?.message}`);
 
-      // ═══ 9. WRITE ENTRIES ═══
       await supabase.from("wk_chart_entries_v2").delete().eq("edition_id", edition.id);
 
       const entryRows = result.scoredRows.map((row) => ({
@@ -1012,7 +933,6 @@ Deno.serve(async (req: Request) => {
         if (insertErr) throw new Error(`Entry insert batch ${i} failed: ${insertErr.message}`);
       }
 
-      // ═══ 10. UPDATE SCORING RUN ═══
       await supabase.from("wk_chart_scoring_runs").update({
         status: "completed",
         total_rows: rawEvidence.length,

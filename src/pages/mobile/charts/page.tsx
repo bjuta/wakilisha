@@ -66,13 +66,13 @@ export default function MobileCharts() {
   const handlePlayChart = (idx: number) => {
     const track = chartTracks[idx];
     if (!track) return;
-    playTrack(track, chartTracks);
+    playTrack(track, chartTracks, { pageType: "charts_directory", sourceSection: "leaderboard" });
   };
 
   const handlePlayTop10 = () => {
     const top10 = chartTracks.slice(0, 10);
     if (top10.length > 0) {
-      playTrack(top10[0], top10);
+      playTrack(top10[0], top10, { pageType: "charts_directory", sourceSection: "hero" });
     }
   };
 
@@ -93,7 +93,7 @@ export default function MobileCharts() {
     : data?.meta.dataSource === "cache"
     ? `Loaded from cache · ${new Date(data.meta.fetchedAt).toLocaleString()}`
     : data?.meta
-    ? `Loaded from ${data.meta.dataSource === "mock" ? "mock data" : "WordPress API"}`
+    ? `Loaded from ${data.meta.dataSource === "cache" ? "cache" : "API"}`
     : "";
 
   if (loading) {

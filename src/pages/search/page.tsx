@@ -1,9 +1,9 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { usePlayer } from "@/context/PlayerContext";
 import { ArtistCard } from "@/components/design-system/registry/ArtistCard";
 import { ReleaseCard } from "@/components/design-system/registry/ReleaseCard";
-import { slugify } from "@/services/repairedContent/client";
+import { slugify } from "@/services/publicContent/client";
 import { useArtistSearchSuggestions } from "@/hooks/useArtistSearchSuggestions";
 import { useArtistSearchData, type ArtistSearchItem } from "@/hooks/useArtistSearchData";
 import { useTrackSearchData, type TrackSearchItem } from "@/hooks/useTrackSearchData";
@@ -11,17 +11,15 @@ import { useGenreSearchData, type GenreSearchItem } from "@/hooks/useGenreSearch
 import { useLabelSearchData, type LabelSearchItem } from "@/hooks/useLabelSearchData";
 import { useChartSearchData, type ChartSearchItem } from "@/hooks/useChartSearchData";
 import { SkeletonBlock } from "@/components/skeletons/Skeletons";
-import { listReleases, type RepairedRelease } from "@/services/repairedContent/client";
+import { listReleases, type PublicRelease } from "@/services/publicContent/client";
 import { buildReleaseSearchSnippet } from "@/services/cultureContext/releaseAdapters";
-import { useMagazineArticles } from "@/services/magazineArticles";
-import { buildMagazineIssues, issueUrl, type MagazineIssue } from "@/services/magazineIssues";
-import { buildIssueEditorialSystem } from "@/services/magazineNlg";
-import type { MagazineIssueExperience } from "@/services/magazineIssueEngine";
+import { trackEvent } from "@/services/analytics";
 
-const TABS = ["All", "Artists", "Tracks", "Releases", "Genres", "Labels", "Charts", "Magazine"] as const;
+
+const TABS = ["All", "Artists", "Tracks", "Releases", "Genres", "Labels", "Charts"] as const;
 
 type Tab = (typeof TABS)[number];
-type MagazineIssueSearchItem = { issue: MagazineIssue; experience: MagazineIssueExperience };
+
 
 function highlight(text: string, query: string) {
   if (!text) return null;
@@ -49,35 +47,13 @@ function SectionHeader({ title, count, onViewAll }: { title: string; count: numb
   );
 }
 
-function MagazineIssueResult({ item, query }: { item: MagazineIssueSearchItem; query: string }) {
-  const { issue, experience } = item;
-  return (
-    <Link to={issueUrl(issue)} className="group relative overflow-hidden rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-5 transition-all hover:border-[var(--wk-brand)] hover:bg-[var(--wk-surface-raised)]">
-      <div className="mb-2 flex items-center gap-2">
-        <span className="rounded-full bg-[var(--wk-brand-soft)] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-[var(--wk-brand)]">
-          {experience.archetypeLabel}
-        </span>
-        <span className="text-[11px] font-semibold text-[var(--wk-text-faint)]">{issue.issueLabel}</span>
-      </div>
-      <h3 className="text-[18px] font-black tracking-tight text-[var(--wk-text)] group-hover:text-[var(--wk-brand)] transition-colors">
-        {highlight(issue.title, query)}
-      </h3>
-      <p className="mt-2 line-clamp-2 text-[13px] leading-snug text-[var(--wk-text-soft)]">
-        {highlight(experience.searchSnippet, query)}
-      </p>
-      <p className="mt-3 line-clamp-2 text-[12px] leading-snug text-[var(--wk-text-muted)]">
-        {highlight(experience.archiveBlurb, query)}
-      </p>
-      <span className="mag-start-here mt-4 inline-flex text-[11px] font-black uppercase tracking-[0.16em] text-[var(--wk-brand)]">Start here</span>
-    </Link>
-  );
-}
+
 
 export default function Search() {
   const [query, setQuery] = useState("");
   const [activeTab, setActiveTab] = useState<Tab>("All");
   const [loading, setLoading] = useState(false);
-  const [releases, setReleases] = useState<RepairedRelease[]>([]);
+  const [releases, setReleases] = useState<PublicRelease[]>([]);
   const [releasesLoading, setReleasesLoading] = useState(true);
   const { playTrack } = usePlayer();
   const { suggestions: trendingArtists, loading: trendingLoading } = useArtistSearchSuggestions(12);
@@ -86,7 +62,9 @@ export default function Search() {
   const { data: genreData } = useGenreSearchData();
   const { data: labelData } = useLabelSearchData();
   const { data: chartData } = useChartSearchData();
-  const { articles: magazineArticles } = useMagazineArticles();
+  const prevTabRef = useRef<Tab>("All");
+  const hasTrackedQueryRef = useRef(false);
+
 
   const q = query.trim().toLowerCase();
 
@@ -115,12 +93,39 @@ export default function Search() {
     return () => clearTimeout(t);
   }, [q]);
 
-  const magazineIssueData = useMemo<MagazineIssueSearchItem[]>(() => {
-    return buildMagazineIssues(magazineArticles).map((issue) => ({ issue, experience: buildIssueEditorialSystem(issue) }));
-  }, [magazineArticles]);
+  useEffect(() => {
+    if (!q) {
+      hasTrackedQueryRef.current = false;
+      return;
+    }
+    const timer = setTimeout(() => {
+      if (hasTrackedQueryRef.current) return;
+      hasTrackedQueryRef.current = true;
+      trackEvent("search_query", {
+        pageType: "search",
+        context: {
+          search_query: query.trim(),
+          results_count: total,
+          artists: results.artists.length,
+          tracks: results.tracks.length,
+          releases: results.releases.length,
+          genres: results.genres.length,
+          labels: results.labels.length,
+          charts: results.charts.length,
+        },
+      });
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [q]);
+
+  useEffect(() => {
+    if (q) hasTrackedQueryRef.current = false;
+  }, [q]);
+
+
 
   const results = useMemo(() => {
-    if (!q) return { artists: [] as ArtistSearchItem[], tracks: [] as TrackSearchItem[], releases: [] as RepairedRelease[], genres: [] as GenreSearchItem[], labels: [] as LabelSearchItem[], charts: [] as ChartSearchItem[], magazine: [] as MagazineIssueSearchItem[] };
+    if (!q) return { artists: [] as ArtistSearchItem[], tracks: [] as TrackSearchItem[], releases: [] as PublicRelease[], genres: [] as GenreSearchItem[], labels: [] as LabelSearchItem[], charts: [] as ChartSearchItem[] };
 
     const artists = artistData.filter((a) => a.name.toLowerCase().includes(q) || a.genres.some((g) => g.toLowerCase().includes(q)) || (a.country || "").toLowerCase().includes(q) || a.contextText.toLowerCase().includes(q));
     const tracks = trackData.filter((t) => t.title.toLowerCase().includes(q) || t.artist.toLowerCase().includes(q) || t.genre.toLowerCase().includes(q) || t.label.toLowerCase().includes(q) || t.contextText.toLowerCase().includes(q));
@@ -128,18 +133,47 @@ export default function Search() {
     const filteredGenres = genreData.filter((g) => g.name.toLowerCase().includes(q) || g.representativeArtists?.some((a) => a.toLowerCase().includes(q)) || g.contextText.toLowerCase().includes(q));
     const filteredLabels = labelData.filter((l) => l.name.toLowerCase().includes(q) || (l.country || "").toLowerCase().includes(q) || l.contextText.toLowerCase().includes(q));
     const filteredCharts = chartData.filter((c) => c.title.toLowerCase().includes(q) || c.artist.toLowerCase().includes(q) || c.contextText.toLowerCase().includes(q));
-    const magazine = magazineIssueData.filter(({ issue, experience }) => [issue.title, issue.issueLabel, experience.archetypeLabel, experience.searchSnippet, experience.archiveBlurb, experience.cardBlurb].join(" ").toLowerCase().includes(q));
 
-    return { artists, tracks, releases: filteredReleases, genres: filteredGenres, labels: filteredLabels, charts: filteredCharts, magazine };
-  }, [q, artistData, trackData, releases, releasesLoading, genreData, labelData, chartData, magazineIssueData]);
+    return { artists, tracks, releases: filteredReleases, genres: filteredGenres, labels: filteredLabels, charts: filteredCharts };
+  }, [q, artistData, trackData, releases, releasesLoading, genreData, labelData, chartData]);
 
-  const total = results.artists.length + results.tracks.length + results.releases.length + results.genres.length + results.labels.length + results.charts.length + results.magazine.length;
+  const total = results.artists.length + results.tracks.length + results.releases.length + results.genres.length + results.labels.length + results.charts.length;
 
   const handlePlayTrack = (track: TrackSearchItem) => {
     playTrack(
       { id: track.slug, title: track.title, artist: track.artist, artworkUrl: track.artworkUrl, isPlayable: track.isPlayable, source: track.source },
-      [{ id: track.slug, title: track.title, artist: track.artist, artworkUrl: track.artworkUrl, isPlayable: track.isPlayable, source: track.source }]
+      [{ id: track.slug, title: track.title, artist: track.artist, artworkUrl: track.artworkUrl, isPlayable: track.isPlayable, source: track.source }],
+      { pageType: "search", sourceSection: "search_results" }
     );
+  };
+
+  const handleResultClick = (entityType: string, entitySlug: string, position: number) => {
+    trackEvent("search_result_click", {
+      pageType: "search",
+      entityType,
+      entitySlug,
+      context: {
+        search_query: query.trim(),
+        click_position: position,
+        active_tab: activeTab,
+      },
+    });
+  };
+
+  const handleTabSwitch = (tab: Tab) => {
+    if (prevTabRef.current !== tab) {
+      trackEvent("search_tab_switch", {
+        pageType: "search",
+        context: {
+          from_tab: prevTabRef.current,
+          to_tab: tab,
+          search_query: query.trim(),
+          total_results: total,
+        },
+      });
+      prevTabRef.current = tab;
+    }
+    setActiveTab(tab);
   };
 
   const showArtists = activeTab === "All" || activeTab === "Artists";
@@ -148,7 +182,7 @@ export default function Search() {
   const showGenres = activeTab === "All" || activeTab === "Genres";
   const showLabels = activeTab === "All" || activeTab === "Labels";
   const showCharts = activeTab === "All" || activeTab === "Charts";
-  const showMagazine = activeTab === "All" || activeTab === "Magazine";
+
 
   return (
     <div className="min-h-screen">
@@ -162,7 +196,7 @@ export default function Search() {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search artists, songs, releases, genres, labels, charts, issues..."
+            placeholder="Search artists, songs, releases, genres, labels, charts..."
             className="w-full rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] py-3.5 pl-12 pr-4 text-[15px] text-[var(--wk-text)] placeholder:text-[var(--wk-text-faint)] outline-none focus:border-[var(--wk-brand)]"
             autoFocus
           />
@@ -178,9 +212,9 @@ export default function Search() {
         <div className="border-b border-[var(--wk-border)] sticky top-0 z-10" style={{ background: "var(--wk-bg)" }}>
           <div className="wk-container-wide flex gap-1 overflow-x-auto px-6 py-2 scrollbar-hide">
             {TABS.map((tab) => {
-              const count = tab === "All" ? total : tab === "Artists" ? results.artists.length : tab === "Tracks" ? results.tracks.length : tab === "Releases" ? results.releases.length : tab === "Genres" ? results.genres.length : tab === "Labels" ? results.labels.length : tab === "Charts" ? results.charts.length : results.magazine.length;
+              const count = tab === "All" ? total : tab === "Artists" ? results.artists.length : tab === "Tracks" ? results.tracks.length : tab === "Releases" ? results.releases.length : tab === "Genres" ? results.genres.length : tab === "Labels" ? results.labels.length : results.charts.length;
               return (
-                <button key={tab} onClick={() => setActiveTab(tab)} className={`flex-none rounded-full px-4 py-2 text-[13px] font-semibold transition-all whitespace-nowrap ${activeTab === tab ? "bg-[var(--wk-brand)] text-[var(--wk-brand-on)]" : "border border-[var(--wk-border)] text-[var(--wk-text-soft)] hover:bg-[var(--wk-surface-raised)]"}`}>
+                <button key={tab} onClick={() => handleTabSwitch(tab)} className={`flex-none rounded-full px-4 py-2 text-[13px] font-semibold transition-all whitespace-nowrap ${activeTab === tab ? "bg-[var(--wk-brand)] text-[var(--wk-brand-on)]" : "border border-[var(--wk-border)] text-[var(--wk-text-soft)] hover:bg-[var(--wk-surface-raised)]"}`}>
                   {tab}{count > 0 && <span className="ml-1.5 text-[11px] opacity-80">{count}</span>}
                 </button>
               );
@@ -201,7 +235,7 @@ export default function Search() {
                   { icon: "ri-album-line", label: "Releases", to: "/releases", desc: "Albums, EPs and singles" },
                   { icon: "ri-folder-music-line", label: "Genres", to: "/genres", desc: "Sounds and scenes" },
                   { icon: "ri-building-2-line", label: "Labels", to: "/labels", desc: "Labels and collectives" },
-                  { icon: "ri-article-line", label: "Magazine", to: "/magazine/issues", desc: "Issues and stories" },
+                  { icon: "ri-article-line", label: "Magazine", to: "/magazine", desc: "Stories and culture" },
                 ].map((cat) => (
                   <Link key={cat.to} to={cat.to} className="group flex flex-col gap-2 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4 transition-all hover:border-[var(--wk-border-2)] hover:bg-[var(--wk-surface-raised)]">
                     <div className="flex items-center gap-2"><i className={`${cat.icon} text-[var(--wk-brand)]`} /><span className="text-[14px] font-bold text-[var(--wk-text)]">{cat.label}</span></div>
@@ -232,34 +266,27 @@ export default function Search() {
           <div className="py-20 text-center text-[var(--wk-text-muted)]">
             <i className="ri-search-line mb-4 block text-5xl" />
             <div className="text-[18px] font-bold text-[var(--wk-text)] mb-2">Nothing came up for "{query}"</div>
-            <div className="text-[14px]">Try another spelling, another name, or open a magazine issue from the sections below.</div>
+            <div className="text-[14px]">Try another spelling, another name, or browse a different section below.</div>
           </div>
         )}
 
         {q && !loading && (
           <div className="space-y-10">
-            {showMagazine && results.magazine.length > 0 && (
-              <section>
-                <SectionHeader title="Magazine issues" count={results.magazine.length} onViewAll={activeTab === "All" && results.magazine.length > 4 ? () => setActiveTab("Magazine") : undefined} />
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {results.magazine.slice(0, activeTab === "All" ? 4 : undefined).map((item) => <MagazineIssueResult key={item.issue.slug} item={item} query={query} />)}
-                </div>
-              </section>
-            )}
 
-            {showArtists && results.artists.length > 0 && <section><SectionHeader title="Artists" count={results.artists.length} onViewAll={activeTab === "All" && results.artists.length > 4 ? () => setActiveTab("Artists") : undefined} /><div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">{results.artists.slice(0, activeTab === "All" ? 4 : undefined).map((artist) => <ArtistCard key={artist.slug} {...artist} contextText={artist.contextText} />)}</div></section>}
+
+            {showArtists && results.artists.length > 0 && <section><SectionHeader title="Artists" count={results.artists.length} onViewAll={activeTab === "All" && results.artists.length > 4 ? () => setActiveTab("Artists") : undefined} /><div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">{results.artists.slice(0, activeTab === "All" ? 4 : undefined).map((artist, idx) => <div key={artist.slug} onClick={() => handleResultClick("artist", artist.slug, idx + 1)}><ArtistCard {...artist} contextText={artist.contextText} sourceSection="search" clickPosition={idx + 1} /></div>)}</div></section>}
 
             {showTracks && results.tracks.length > 0 && (
-              <section><SectionHeader title="Tracks" count={results.tracks.length} onViewAll={activeTab === "All" && results.tracks.length > 6 ? () => setActiveTab("Tracks") : undefined} /><div className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] overflow-hidden"><div className="divide-y divide-[var(--wk-divider)]">{results.tracks.slice(0, activeTab === "All" ? 6 : undefined).map((track) => { const meta = [track.artist, track.genre, track.label].filter(Boolean).join(" · "); return <div key={track.slug} className="group flex items-center gap-3 px-5 py-3 transition-colors hover:bg-[var(--wk-surface-raised)]"><div className="h-12 w-12 shrink-0 overflow-hidden rounded-md bg-[var(--wk-surface-raised)]"><img src={track.artworkUrl} alt="" className="h-full w-full object-cover" /></div><div className="min-w-0 flex-1"><Link to={`/tracks/${slugify(track.artist)}/${track.slug}`} className="text-[13px] font-bold text-[var(--wk-text)] hover:underline">{highlight(track.title, query)}</Link>{meta && <div className="text-[11px] text-[var(--wk-text-muted)]">{highlight(meta, query)}</div>}{track.contextText && <p className="mt-1 line-clamp-2 text-[12px] leading-snug text-[var(--wk-text-soft)]">{highlight(track.contextText, query)}</p>}</div><button onClick={() => handlePlayTrack(track)} disabled={!track.isPlayable} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] opacity-0 transition-all group-hover:opacity-100 disabled:opacity-0" aria-label="Play"><i className="ri-play-mini-fill text-sm" /></button></div>; })}</div></div></section>
+              <section><SectionHeader title="Tracks" count={results.tracks.length} onViewAll={activeTab === "All" && results.tracks.length > 6 ? () => setActiveTab("Tracks") : undefined} /><div className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] overflow-hidden"><div className="divide-y divide-[var(--wk-divider)]">{results.tracks.slice(0, activeTab === "All" ? 6 : undefined).map((track, idx) => { const meta = [track.artist, track.genre, track.label].filter(Boolean).join(" · "); return <div key={track.slug} className="group flex items-center gap-3 px-5 py-3 transition-colors hover:bg-[var(--wk-surface-raised)]"><div className="h-12 w-12 shrink-0 overflow-hidden rounded-md bg-[var(--wk-surface-raised)]"><img src={track.artworkUrl} alt="" className="h-full w-full object-cover" /></div><div className="min-w-0 flex-1"><Link to={`/tracks/${slugify(track.artist)}/${track.slug}`} onClick={() => handleResultClick("track", track.slug, idx + 1)} className="text-[13px] font-bold text-[var(--wk-text)] hover:underline">{highlight(track.title, query)}</Link>{meta && <div className="text-[11px] text-[var(--wk-text-muted)]">{highlight(meta, query)}</div>}{track.contextText && <p className="mt-1 line-clamp-2 text-[12px] leading-snug text-[var(--wk-text-soft)]">{highlight(track.contextText, query)}</p>}</div><button onClick={() => handlePlayTrack(track)} disabled={!track.isPlayable} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] opacity-0 transition-all group-hover:opacity-100 disabled:opacity-0" aria-label="Play"><i className="ri-play-mini-fill text-sm" /></button></div>; })}</div></div></section>
             )}
 
-            {showReleases && results.releases.length > 0 && <section><SectionHeader title="Releases" count={results.releases.length} onViewAll={activeTab === "All" && results.releases.length > 4 ? () => setActiveTab("Releases") : undefined} /><div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">{results.releases.slice(0, activeTab === "All" ? 4 : undefined).map((release) => <ReleaseCard key={release.slug} {...release} contextText={buildReleaseSearchSnippet(release)} />)}</div></section>}
+            {showReleases && results.releases.length > 0 && <section><SectionHeader title="Releases" count={results.releases.length} onViewAll={activeTab === "All" && results.releases.length > 4 ? () => setActiveTab("Releases") : undefined} /><div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">{results.releases.slice(0, activeTab === "All" ? 4 : undefined).map((release, idx) => <div key={release.slug} onClick={() => handleResultClick("release", release.slug, idx + 1)}><ReleaseCard {...release} contextText={buildReleaseSearchSnippet(release)} sourceSection="search" clickPosition={idx + 1} /></div>)}</div></section>}
 
-            {showGenres && results.genres.length > 0 && <section><SectionHeader title="Genres" count={results.genres.length} /><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{results.genres.map((genre) => <Link key={genre.slug} to={`/genres/${genre.slug}`} className="group relative overflow-hidden rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-5 transition-all hover:border-[var(--wk-border-2)]"><div className="absolute right-0 top-0 h-32 w-32 rounded-bl-full opacity-[0.08] transition-opacity group-hover:opacity-[0.14]" style={{ background: genre.accentVar }} /><div className="mb-1 text-[11px] font-black uppercase tracking-[0.18em]" style={{ color: genre.accentVar }}>Genre</div><h3 className="text-[18px] font-black tracking-tight text-[var(--wk-text)]">{highlight(genre.name, query)}</h3>{genre.contextText && <p className="relative mt-2 line-clamp-2 text-[13px] leading-snug text-[var(--wk-text-soft)]">{highlight(genre.contextText, query)}</p>}</Link>)}</div></section>}
+            {showGenres && results.genres.length > 0 && <section><SectionHeader title="Genres" count={results.genres.length} /><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{results.genres.map((genre, idx) => <Link key={genre.slug} to={`/genres/${genre.slug}`} onClick={() => handleResultClick("genre", genre.slug, idx + 1)} className="group relative overflow-hidden rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-5 transition-all hover:border-[var(--wk-border-2)]"><div className="absolute right-0 top-0 h-32 w-32 rounded-bl-full opacity-[0.08] transition-opacity group-hover:opacity-[0.14]" style={{ background: genre.accentVar }} /><div className="mb-1 text-[11px] font-black uppercase tracking-[0.18em]" style={{ color: genre.accentVar }}>Genre</div><h3 className="text-[18px] font-black tracking-tight text-[var(--wk-text)]">{highlight(genre.name, query)}</h3>{genre.contextText && <p className="relative mt-2 line-clamp-2 text-[13px] leading-snug text-[var(--wk-text-soft)]">{highlight(genre.contextText, query)}</p>}</Link>)}</div></section>}
 
-            {showLabels && results.labels.length > 0 && <section><SectionHeader title="Labels" count={results.labels.length} /><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{results.labels.map((label) => <Link key={label.slug} to={`/labels/${label.slug}`} className="block rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-5 transition-all hover:border-[var(--wk-border-2)] hover:bg-[var(--wk-surface-raised)]"><div className="flex items-center justify-between mb-2"><h3 className="text-[16px] font-bold text-[var(--wk-text)]">{highlight(label.name, query)}</h3>{label.country && <span className="text-[11px] text-[var(--wk-text-muted)]">{label.country}</span>}</div>{label.contextText && <p className="mb-3 line-clamp-2 text-[13px] leading-snug text-[var(--wk-text-soft)]">{highlight(label.contextText, query)}</p>}</Link>)}</div></section>}
+            {showLabels && results.labels.length > 0 && <section><SectionHeader title="Labels" count={results.labels.length} /><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{results.labels.map((label, idx) => <Link key={label.slug} to={`/labels/${label.slug}`} onClick={() => handleResultClick("label", label.slug, idx + 1)} className="block rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-5 transition-all hover:border-[var(--wk-border-2)] hover:bg-[var(--wk-surface-raised)]"><div className="flex items-center justify-between mb-2"><h3 className="text-[16px] font-bold text-[var(--wk-text)]">{highlight(label.name, query)}</h3>{label.country && <span className="text-[11px] text-[var(--wk-text-muted)]">{label.country}</span>}</div>{label.contextText && <p className="mb-3 line-clamp-2 text-[13px] leading-snug text-[var(--wk-text-soft)]">{highlight(label.contextText, query)}</p>}</Link>)}</div></section>}
 
-            {showCharts && results.charts.length > 0 && <section><SectionHeader title="Chart entries" count={results.charts.length} /><div className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] overflow-hidden"><div className="divide-y divide-[var(--wk-divider)]">{results.charts.map((entry) => <div key={`${entry.rank}-${entry.slug}`} className="flex items-center gap-3 px-5 py-3"><div className="w-6 text-right text-[14px] font-black text-[var(--wk-brand)]">{entry.rank}</div><div className="h-10 w-10 shrink-0 overflow-hidden rounded-md bg-[var(--wk-surface-raised)]"><img src={entry.artworkUrl} alt="" className="h-full w-full object-cover" /></div><div className="min-w-0 flex-1"><Link to={`/tracks/${slugify(entry.artist)}/${entry.slug}`} className="text-[13px] font-bold text-[var(--wk-text)] hover:underline">{highlight(entry.title, query)}</Link><div className="text-[11px] text-[var(--wk-text-muted)]">{highlight(entry.artist, query)}</div>{entry.contextText && <p className="mt-1 line-clamp-2 text-[12px] leading-snug text-[var(--wk-text-soft)]">{highlight(entry.contextText, query)}</p>}</div></div>)}</div></div></section>}
+            {showCharts && results.charts.length > 0 && <section><SectionHeader title="Chart entries" count={results.charts.length} /><div className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] overflow-hidden"><div className="divide-y divide-[var(--wk-divider)]">{results.charts.map((entry, idx) => <div key={`${entry.rank}-${entry.slug}`} className="flex items-center gap-3 px-5 py-3"><div className="w-6 text-right text-[14px] font-black text-[var(--wk-brand)]">{entry.rank}</div><div className="h-10 w-10 shrink-0 overflow-hidden rounded-md bg-[var(--wk-surface-raised)]"><img src={entry.artworkUrl} alt="" className="h-full w-full object-cover" /></div><div className="min-w-0 flex-1"><Link to={`/tracks/${slugify(entry.artist)}/${entry.slug}`} onClick={() => handleResultClick("chart_entry", entry.slug, idx + 1)} className="text-[13px] font-bold text-[var(--wk-text)] hover:underline">{highlight(entry.title, query)}</Link><div className="text-[11px] text-[var(--wk-text-muted)]">{highlight(entry.artist, query)}</div>{entry.contextText && <p className="mt-1 line-clamp-2 text-[12px] leading-snug text-[var(--wk-text-soft)]">{highlight(entry.contextText, query)}</p>}</div></div>)}</div></div></section>}
           </div>
         )}
       </div>

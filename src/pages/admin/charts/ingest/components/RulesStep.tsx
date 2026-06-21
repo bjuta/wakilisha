@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
+import DateRangePicker, { type DateRangeValue } from "@/components/base/DateRangePicker";
 import type { ChartEligibilityProfile, ArtistGenderEligibilityMode, ArtistTypeEligibilityMode, ReleaseTypeEligibility } from "@/services/chartsEligibility/eligibilityTypes";
 import { createEligibilityProfile, getEligibilityProfiles } from "@/services/chartsEligibility/eligibilityStore";
 import { DEFAULT_INGEST_ENRICHMENT_OPTIONS, type IngestEnrichmentOptions } from "@/services/chartsEnrichment/enrichmentOptions";
@@ -44,8 +45,12 @@ export function RulesStep({ profiles, selectedEligibilityProfileId, onSelectElig
   const [originCountries, setOriginCountries] = useState<string[]>(["KE"]);
   const [genderMode, setGenderMode] = useState<ArtistGenderEligibilityMode>("any");
   const [artistTypeMode, setArtistTypeMode] = useState<ArtistTypeEligibilityMode>("any");
-  const [releaseWindowFrom, setReleaseWindowFrom] = useState("");
-  const [releaseWindowTo, setReleaseWindowTo] = useState("");
+  const [enableReleaseWindow, setEnableReleaseWindow] = useState(false);
+  const [releaseWindowRange, setReleaseWindowRange] = useState<DateRangeValue>(() => {
+    const end = new Date().toISOString().split("T")[0];
+    const start = new Date(Date.now() - 90 * 86400000).toISOString().split("T")[0];
+    return { mode: "custom", start, end };
+  });
   const [releaseTypes, setReleaseTypes] = useState<ReleaseTypeEligibility[]>(["single", "ep", "album", "mixtape", "compilation"]);
   const [requireIsrc, setRequireIsrc] = useState(false);
   const [requirePreview, setRequirePreview] = useState(false);
@@ -75,7 +80,9 @@ export function RulesStep({ profiles, selectedEligibilityProfileId, onSelectElig
     if (originMode !== "any") parts.push(`artist origin ${originCountries.join(" + ")}`);
     if (genderMode !== "any") parts.push(genderMode.replace(/_/g, " "));
     if (artistTypeMode !== "any") parts.push(artistTypeMode.replace(/_/g, " "));
-    if (releaseWindowFrom || releaseWindowTo) parts.push(`release window ${releaseWindowFrom || "…"} to ${releaseWindowTo || "…"}`);
+    if (enableReleaseWindow && releaseWindowRange.mode === "custom") {
+      parts.push(`release window ${releaseWindowRange.start} to ${releaseWindowRange.end}`);
+    }
     if (releaseTypes.length) parts.push(`release types: ${releaseTypes.join(", ")}`);
     if (enrichmentOptions.ingestWithPreviewData) parts.push("preview data requested");
     return parts.length ? `Custom eligibility profile: ${parts.join("; ")}.` : "Custom eligibility profile with no restrictive filters.";
@@ -105,8 +112,8 @@ export function RulesStep({ profiles, selectedEligibilityProfileId, onSelectElig
         },
         releaseEligibility: {
           releaseTypes,
-          releaseWindowFrom: releaseWindowFrom || undefined,
-          releaseWindowTo: releaseWindowTo || undefined,
+          releaseWindowFrom: enableReleaseWindow && releaseWindowRange.mode === "custom" ? releaseWindowRange.start : undefined,
+          releaseWindowTo: enableReleaseWindow && releaseWindowRange.mode === "custom" ? releaseWindowRange.end : undefined,
           includeReissues: true,
           includeRemixes: true,
           includeAcousticVersions: true,
@@ -174,7 +181,7 @@ export function RulesStep({ profiles, selectedEligibilityProfileId, onSelectElig
       </div>
 
       <div className="mb-5 grid gap-4 lg:grid-cols-2">
-        <div className="rounded-xl border border-wk-border bg-wk-surface-raised p-4"><h3 className="mb-3 text-[13px] font-bold text-wk-text">Track/release eligibility</h3><p className="mb-3 text-[11px] text-wk-text-muted">Release window: only tracks released within these dates will be eligible.</p><div className="grid gap-3 sm:grid-cols-2"><div><label className={LABEL_CLASS}>Window from</label><input type="date" value={releaseWindowFrom} onChange={(event) => setReleaseWindowFrom(event.target.value)} className={INPUT_CLASS} /></div><div><label className={LABEL_CLASS}>Window to</label><input type="date" value={releaseWindowTo} onChange={(event) => setReleaseWindowTo(event.target.value)} className={INPUT_CLASS} /></div></div><div className="mt-3 flex flex-wrap gap-2">{RELEASE_TYPES.map((type) => <button key={type} type="button" onClick={() => toggleReleaseType(type)} className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${releaseTypes.includes(type) ? "border-wk-brand bg-wk-brand text-wk-brand-on" : "border-wk-border bg-wk-surface text-wk-text-soft"}`}>{type}</button>)}</div></div>
+        <div className="rounded-xl border border-wk-border bg-wk-surface-raised p-4"><h3 className="mb-3 text-[13px] font-bold text-wk-text">Track/release eligibility</h3><p className="mb-3 text-[11px] text-wk-text-muted">Release window: only tracks released within these dates will be eligible.</p><div className="mb-3"><label className="flex w-fit cursor-pointer items-center gap-2 rounded-lg border border-wk-border bg-wk-surface px-3 py-2 transition-colors hover:bg-wk-surface-raised"><input type="checkbox" checked={enableReleaseWindow} onChange={(event) => setEnableReleaseWindow(event.target.checked)} className="h-4 w-4 rounded border-wk-border accent-wk-brand" /><span className="text-[12px] font-semibold text-wk-text-soft">Enable release window</span></label>{enableReleaseWindow && <div className="mt-3"><DateRangePicker value={releaseWindowRange} onChange={setReleaseWindowRange} presets={[]} /></div>}</div><div className="mt-3 flex flex-wrap gap-2">{RELEASE_TYPES.map((type) => <button key={type} type="button" onClick={() => toggleReleaseType(type)} className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${releaseTypes.includes(type) ? "border-wk-brand bg-wk-brand text-wk-brand-on" : "border-wk-border bg-wk-surface text-wk-text-soft"}`}>{type}</button>)}</div></div>
         <div className="rounded-xl border border-wk-border bg-wk-surface-raised p-4"><h3 className="mb-3 text-[13px] font-bold text-wk-text">Evidence and collaboration policy</h3><div className="grid gap-2"><Toggle checked={requireIsrc} onChange={setRequireIsrc} label="Require ISRC" help="Rows without ISRC should be blocked or sent to review." /><Toggle checked={requirePreview} onChange={setRequirePreview} label="Require preview" help="Use only for charts where playable preview is part of eligibility." /><Toggle checked={explicitAllowed} onChange={setExplicitAllowed} label="Allow explicit tracks" /><Toggle checked={allowFeaturedArtists} onChange={setAllowFeaturedArtists} label="Allow featured artists" /><Toggle checked={primaryArtistMustMatch} onChange={setPrimaryArtistMustMatch} label="Primary artist must match eligibility" /><Toggle checked={allArtistsMustMatch} onChange={setAllArtistsMustMatch} label="All credited artists must match eligibility" help="Use for strict country/gender/type charts." /></div></div>
       </div>
 

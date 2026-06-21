@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { trackUrl } from "@/utils/trackUrl";
-import { slugify } from "@/services/repairedContent/client";
+import { slugify } from "@/services/publicContent/client";
 import { ArtistCard } from "@/components/design-system/registry/ArtistCard";
 import { ReleaseCard } from "@/components/design-system/registry/ReleaseCard";
 import type { MagazineSiteArtist, MagazineSiteRelease, MagazineSiteChartEntry } from "@/services/magazineSiteContent";
@@ -49,6 +49,7 @@ export function ArtistSpotlightSpread({ artists, mood, sectionColor }: { artists
               name={artist.title}
               imageUrl={artist.heroUrl || undefined}
               country={artist.originIso2 || undefined}
+              sourceSection="magazine_artist_spotlight"
             />
           ))}
         </div>
@@ -92,6 +93,7 @@ export function ReleaseSpotlightSpread({ releases, mood, sectionColor }: { relea
               artist="Registry artist"
               artworkUrl={release.heroUrl || undefined}
               releaseType={release.releaseType as "Album" | "EP" | "Single" | "Compilation" | undefined}
+              sourceSection="magazine_release_spotlight"
             />
           ))}
         </div>

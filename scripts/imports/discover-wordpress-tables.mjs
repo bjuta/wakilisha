@@ -9,11 +9,11 @@
 import mysql from "mysql2/promise";
 
 const CONFIG = {
-  host: "127.0.0.1",
-  port: 3306,
-  user: "bn_wordpress",
-  password: "236407f4e9404d1cd2215f9759d1ddc198d04fa6aaffc7d61fb98f1422c4eb0b",
-  database: "bitnami_wordpress",
+  host: process.env.WP_DB_HOST || "127.0.0.1",
+  port: parseInt(process.env.WP_DB_PORT || "3306", 10),
+  user: process.env.WP_DB_USER || "bn_wordpress",
+  password: process.env.WP_DB_PASSWORD || "",
+  database: process.env.WP_DB_NAME || "bitnami_wordpress",
   connectTimeout: 15000,
 };
 

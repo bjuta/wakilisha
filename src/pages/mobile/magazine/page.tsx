@@ -5,6 +5,7 @@ import { getAuthorMeta } from "@/services/authorProfiles";
 import { MagazineCard } from "@/pages/magazine/components/MagazineCard";
 import { SkeletonMagazinePage } from "@/components/skeletons/Skeletons";
 import { Chapter19FallbackImage } from "@/components/media/Chapter19FallbackImage";
+import { trackEvent } from "@/services/analytics";
 
 function useScrollReveal(deps: unknown[] = []) {
   useEffect(() => {
@@ -138,34 +139,6 @@ export default function MobileMagazine() {
     return topSections.filter((s) => s === activeSection);
   }, [topSections, activeSection]);
 
-  const pastIssues = useMemo(() => {
-    const grouped: Record<string, { articles: MagazineArticle[]; coverArticle: MagazineArticle }> = {};
-    for (const article of stories) {
-      const parsed = new Date(article.date);
-      if (Number.isNaN(parsed.getTime())) continue;
-      const key = `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}`;
-      if (!grouped[key]) {
-        grouped[key] = { articles: [], coverArticle: article };
-      }
-      grouped[key].articles.push(article);
-    }
-    const sorted = Object.entries(grouped)
-      .sort((a, b) => b[0].localeCompare(a[0]))
-      .map(([key, val], idx, arr) => {
-        const [y, m] = key.split('-');
-        const monthName = new Date(Number(y), Number(m) - 1).toLocaleDateString('en', { month: 'long', year: 'numeric' });
-        return {
-          key,
-          monthName,
-          issueNumber: arr.length - idx,
-          coverUrl: val.coverArticle.heroUrl,
-          articleCount: val.articles.length,
-          firstSlug: val.coverArticle.slug,
-        };
-      });
-    return sorted.slice(1);
-  }, [stories]);
-
   if (status === "loading") {
     return <SkeletonMagazinePage />;
   }
@@ -263,7 +236,7 @@ export default function MobileMagazine() {
         {/* ── Editor's Picks ── */}
         {filteredPicks.length > 0 && (
           <section className="mag-reveal">
-            <MobileSectionLabel>Editor&apos;s Picks</MobileSectionLabel>
+            <MobileSectionLabel>Editor's Picks</MobileSectionLabel>
             <div className="flex flex-col gap-3">
               <MagazineCard variant="hero" story={filteredPicks[0]} rank={1} />
               {filteredPicks.slice(1, 3).map((story, i) => (
@@ -323,64 +296,6 @@ export default function MobileMagazine() {
             <div className="w-10 h-0.5 rounded-full bg-[var(--wk-brand)] mx-auto mt-5" />
           </div>
         </div>
-
-        {/* ── Past Issues Archive ── */}
-        {pastIssues.length > 0 && (
-          <section className="mag-reveal">
-            <div className="flex items-end justify-between mb-5 gap-3">
-              <div className="flex items-center gap-2.5">
-                <span className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--wk-brand)]">
-                  Past Issues
-                </span>
-                <span className="text-[10px] font-bold text-[var(--wk-text-faint)] bg-[var(--wk-surface)] border border-[var(--wk-border)] px-2 py-0.5 rounded-full">
-                  {pastIssues.length}
-                </span>
-              </div>
-              <Link to="/magazine/issues" className="text-[11px] font-bold text-[var(--wk-text-muted)] hover:text-[var(--wk-brand)] transition-colors flex items-center gap-1 whitespace-nowrap">
-                All <i className="ri-arrow-right-line text-[10px]" />
-              </Link>
-            </div>
-            <div
-              className="flex gap-3 overflow-x-auto scrollbar-none snap-x snap-mandatory -mx-4 px-4"
-              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-            >
-              {pastIssues.map((issue) => (
-                <Link
-                  key={issue.key}
-                  to={`/magazine/issue/${issue.key}`}
-                  className="group relative shrink-0 snap-start w-[160px] aspect-[3/4] rounded-xl overflow-hidden bg-[#0a0a0a]"
-                >
-                  {issue.coverUrl ? (
-                    <img
-                      src={issue.coverUrl}
-                      alt={issue.monthName}
-                      className="absolute inset-0 w-full h-full object-cover object-top transition-transform duration-600 group-hover:scale-105"
-                    />
-                  ) : (
-                    <Chapter19FallbackImage
-                      slug={issue.key}
-                      name={issue.monthName}
-                    />
-                  )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-black/10" />
-                  <div className="absolute top-2.5 right-2.5 z-10">
-                    <span className="inline-flex items-center rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-white/80 text-[9px] font-black tracking-[0.12em] px-2 py-0.5">
-                      No. {issue.issueNumber}
-                    </span>
-                  </div>
-                  <div className="absolute bottom-0 left-0 right-0 z-10 p-3">
-                    <p className="text-[11px] font-bold text-white/50 tracking-[0.06em] uppercase mb-0.5">
-                      {issue.monthName}
-                    </p>
-                    <p className="text-[9px] text-white/35">
-                      {issue.articleCount} {issue.articleCount === 1 ? 'story' : 'stories'}
-                    </p>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </section>
-        )}
 
         {/* ── Section Blocks ── */}
         {filteredTopSections.length > 0 ? (
@@ -679,7 +594,14 @@ export default function MobileMagazine() {
 function MobileNewsletterCTA() {
   const [email, setEmail] = useState("");
   const [done, setDone] = useState(false);
-  const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); if (email.trim()) setDone(true); };
+  const handleSubmit = (e: React.FormEvent) => {
+    if (!email.trim()) return;
+    trackEvent("newsletter_signup", {
+      pageType: "magazine",
+      context: { sourceSection: "mobile_footer", formId: "magazine-newsletter-mobile" },
+    });
+    setDone(true);
+  };
 
   return (
     <section className="mag-reveal rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] overflow-hidden">
@@ -688,7 +610,7 @@ function MobileNewsletterCTA() {
           <div className="w-12 h-12 rounded-full bg-[var(--wk-brand)] flex items-center justify-center mx-auto mb-4">
             <i className="ri-check-line text-[24px] text-[var(--wk-brand-on)]" />
           </div>
-          <h3 className="text-[20px] font-black tracking-[-0.03em] text-[var(--wk-text)] mb-2">You&apos;re on the list</h3>
+          <h3 className="text-[20px] font-black tracking-[-0.03em] text-[var(--wk-text)] mb-2">You're on the list</h3>
           <p className="text-[13px] text-[var(--wk-text-muted)] max-w-[320px] mx-auto leading-relaxed">
             Expect WAKILISHA stories, charts, and cultural dispatches — no noise.
           </p>
@@ -703,11 +625,14 @@ function MobileNewsletterCTA() {
           <p className="text-[13px] text-[var(--wk-text-muted)] leading-relaxed mb-6">
             Get weekly analysis, chart commentary, and industry signals delivered to your inbox.
           </p>
-          <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+          <form onSubmit={handleSubmit} action="https://readdy.ai/api/form/d8mnmb50ihgem5t5p940" method="POST" data-readdy-form="" className="flex flex-col gap-3">
+            <input type="hidden" name="wk_page_type" value="magazine" />
+            <input type="hidden" name="wk_source_section" value="mobile_footer" />
             <div className="relative">
               <i className="ri-mail-line absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--wk-text-faint)] text-[16px] pointer-events-none" />
               <input
                 type="email"
+                name="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="your@email.com"

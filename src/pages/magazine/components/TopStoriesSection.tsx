@@ -47,6 +47,7 @@ export function TopStoriesSection({ stories }: TopStoriesSectionProps) {
           <img
             src={primary.heroUrl}
             alt={primary.title}
+            loading="lazy"
             className="absolute inset-0 w-full h-full object-cover object-top opacity-80 transition-transform duration-700 group-hover:scale-105"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent" />
@@ -141,7 +142,8 @@ export function TopStoriesSection({ stories }: TopStoriesSectionProps) {
               <div className="shrink-0 w-16 h-16 rounded-xl overflow-hidden bg-[var(--wk-surface-raised)]">
                 <img
                   src={story.heroUrl}
-                  alt=""
+                  alt={story.title}
+                  loading="lazy"
                   className="w-full h-full object-cover object-top transition-transform duration-400 group-hover:scale-110"
                 />
               </div>

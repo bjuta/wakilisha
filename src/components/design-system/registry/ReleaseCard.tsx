@@ -1,8 +1,9 @@
 import { Link } from "react-router-dom";
 import { WkTag } from "@/components/design-system/primitives/Tag";
-import { releaseUrl } from "@/services/repairedContent/client";
+import { releaseUrl } from "@/services/publicContent/client";
 import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 import { buildReleaseCardBlurb } from "@/services/cultureContext/releaseAdapters";
+import { trackEvent } from "@/services/analytics";
 
 export interface ReleaseCardProps {
   slug: string;
@@ -16,6 +17,9 @@ export interface ReleaseCardProps {
   labelName?: string;
   contextText?: string;
   onQuickView?: () => void;
+  sourceSection?: string;
+  sourceEntity?: string;
+  clickPosition?: number;
 }
 
 export function ReleaseCard({
@@ -30,6 +34,9 @@ export function ReleaseCard({
   labelName,
   contextText,
   onQuickView,
+  sourceSection,
+  sourceEntity,
+  clickPosition,
 }: ReleaseCardProps) {
   const blurb = contextText || buildReleaseCardBlurb({
     slug,
@@ -42,9 +49,23 @@ export function ReleaseCard({
     artworkUrl: artworkUrl || "",
   });
 
+  const handleClick = () => {
+    if (sourceSection) {
+      trackEvent("card_click", {
+        entityType: "release",
+        entitySlug: slug,
+        context: {
+          source_section: sourceSection,
+          ...(sourceEntity ? { source_entity: sourceEntity } : {}),
+          ...(clickPosition !== undefined ? { click_position: clickPosition } : {}),
+        },
+      });
+    }
+  };
+
   return (
     <div className="group relative rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] overflow-hidden transition-all hover:border-[var(--wk-border-2)]">
-      <Link to={releaseUrl({ slug, artist })} className="block">
+      <Link to={releaseUrl({ slug, artist })} onClick={handleClick} className="block">
         <div className="relative aspect-square bg-[var(--wk-surface-raised)]">
           {artworkUrl ? (
             <img

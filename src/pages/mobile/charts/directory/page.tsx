@@ -153,7 +153,7 @@ export default function MobileChartsDirectory() {
   const allRows = allEntries.slice(3);
   const top10 = chartTracks.slice(0, 10);
   const handlePlayTop10 = () => {
-    if (top10.length > 0) playTrack(top10[0], top10);
+    if (top10.length > 0) playTrack(top10[0], top10, { pageType: "charts_directory", sourceSection: "hero" });
   };
   const latestEditionHref = featured?.latestEditionSlug
     ? `/charts/${featured.slug}/${featured.latestEditionSlug}`
@@ -179,7 +179,7 @@ export default function MobileChartsDirectory() {
     ? `Loaded from cache (stale) · ${new Date(data.meta.fetchedAt).toLocaleString()}`
     : data.meta.dataSource === "cache"
     ? `Loaded from cache · ${new Date(data.meta.fetchedAt).toLocaleString()}`
-    : `Loaded from ${data.meta.dataSource === "mock" ? "mock data" : "WordPress API"}`;
+    : `Loaded from API`;
 
   return (
     <div className="wk-mobile-v5">
@@ -233,7 +233,7 @@ export default function MobileChartsDirectory() {
               <div className="charts-hero-no1-artist">{topTrack.artist}</div>
             </div>
             <button
-              onClick={() => playTrack(chartTracks[0], chartTracks)}
+              onClick={() => playTrack(chartTracks[0], chartTracks, { pageType: "charts_directory", sourceSection: "hero" })}
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)]"
               aria-label={`Play ${topTrack.title}`}
             >
@@ -301,7 +301,7 @@ export default function MobileChartsDirectory() {
               <button
                 onClick={(e) => {
                   e.preventDefault();
-                  playTrack(chartTracks[idx], chartTracks);
+                  playTrack(chartTracks[idx], chartTracks, { pageType: "charts_directory", sourceSection: "top3" });
                 }}
                 className="phn-mp-btn phn-mp-play"
                 aria-label={`Play ${entry.title}`}

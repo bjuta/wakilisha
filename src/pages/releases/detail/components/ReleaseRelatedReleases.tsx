@@ -2,10 +2,10 @@ import { Link } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
 import { releaseUrl } from "@/utils/releaseUrl";
-import type { RepairedRelease } from "@/services/repairedContent/client";
+import type { PublicRelease } from "@/services/publicContent/client";
 
 interface ReleaseRelatedReleasesProps {
-  releases: RepairedRelease[];
+  releases: PublicRelease[];
   currentReleaseSlug: string;
   artistName: string;
 }
@@ -32,7 +32,7 @@ export default function ReleaseRelatedReleases({
             Related releases
           </div>
           <h2 className="text-[18px] md:text-[22px] font-black text-[var(--wk-text)] tracking-[-0.02em]">
-            From {artistName}&apos;s catalog
+            From {artistName}'s catalog
           </h2>
         </div>
 

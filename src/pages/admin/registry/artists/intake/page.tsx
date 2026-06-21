@@ -1,9 +1,18 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { WkIcon } from "@/components/design-system/Icon";
 
 const INTAKE_API = `${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/artist-registry-intake`;
+
+interface RegistryArtistHit {
+  id: string;
+  display_name: string;
+  origin_iso2: string | null;
+  public_image_url: string | null;
+  bio: string | null;
+  status: string;
+}
 
 interface StagingRecord {
   id: string;
@@ -14,6 +23,13 @@ interface StagingRecord {
   source_popularity: number | null;
   source_followers: number | null;
   source_genres: string[];
+  source_images: { primary?: string; all?: string[] } | null;
+  source_metadata: {
+    biography?: string;
+    profile_url?: string;
+    latest_release?: string;
+    top_tracks?: string;
+  } | null;
   match_status: string;
   matched_registry_artist_id: string | null;
   matched_registry_artist_name: string | null;
@@ -23,13 +39,8 @@ interface StagingRecord {
   review_notes: string | null;
   action_taken: string | null;
   target_registry_artist_id: string | null;
-  registry_artists?: {
-    id: string;
-    display_name: string;
-    origin_iso2: string | null;
-    public_image_url: string | null;
-    status: string;
-  } | null;
+  registry_artists?: RegistryArtistHit | null;
+  target_artist?: RegistryArtistHit | null;
 }
 
 interface MatchSummary {
@@ -68,6 +79,126 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+// ── Inline artist search component ──
+function ArtistLinkSearch({
+  recordName,
+  onSelect,
+  onCancel,
+}: {
+  recordName: string;
+  onSelect: (artist: RegistryArtistHit) => void;
+  onCancel: () => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<RegistryArtistHit[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [picked, setPicked] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+
+  const doSearch = useCallback(async (q: string) => {
+    if (!q.trim()) { setResults([]); return; }
+    setSearching(true);
+    try {
+      const { data } = await supabase
+        .from("registry_artists")
+        .select("id, display_name, origin_iso2, public_image_url, bio, status")
+        .ilike("display_name", `%${q}%`)
+        .order("display_name")
+        .limit(12);
+      setResults((data as RegistryArtistHit[]) || []);
+    } catch {
+      setResults([]);
+    } finally {
+      setSearching(false);
+    }
+  }, []);
+
+  const handleInput = (v: string) => {
+    setQuery(v);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => doSearch(v), 250);
+  };
+
+  const handlePick = (artist: RegistryArtistHit) => {
+    setPicked(true);
+    onSelect(artist);
+  };
+
+  return (
+    <div className="relative w-full max-w-xs">
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1">
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => handleInput(e.target.value)}
+            placeholder={`Search registry for "${recordName}"…`}
+            disabled={picked}
+            autoFocus
+            className="w-full rounded-lg border border-[#dfe4d8] bg-[#f8f9f4] px-3 py-1.5 text-[12px] outline-none transition focus:border-[#85c441] focus:bg-white disabled:opacity-50"
+          />
+          {searching && (
+            <WkIcon name="Loader2" size={12} className="animate-spin absolute right-2.5 top-1/2 -translate-y-1/2 text-[#858c7e]" />
+          )}
+        </div>
+        <button onClick={onCancel} disabled={picked} className="shrink-0 text-[11px] font-semibold text-[#858c7e] hover:text-[#171712] disabled:opacity-30 whitespace-nowrap">
+          Cancel
+        </button>
+      </div>
+      {results.length > 0 && !picked && (
+        <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-52 overflow-y-auto rounded-xl border border-[#dfe4d8] bg-white shadow-lg">
+          {results.map((artist) => (
+            <button
+              key={artist.id}
+              onClick={() => handlePick(artist)}
+              className="flex w-full items-center gap-2.5 px-3 py-2 text-left hover:bg-[#f0f3ec] transition"
+            >
+              {artist.public_image_url ? (
+                <img src={artist.public_image_url} alt="" className="h-7 w-7 shrink-0 rounded-full object-cover" />
+              ) : (
+                <div className="h-7 w-7 shrink-0 rounded-full bg-[#e0e5d8] flex items-center justify-center">
+                  <WkIcon name="Mic2" size={11} className="text-[#858c7e]" />
+                </div>
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="text-[12px] font-bold text-[#171712] truncate">{artist.display_name}</p>
+                <p className="text-[10px] text-[#858c7e]">{artist.origin_iso2 || "—"} · {artist.status}</p>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+      {query && !searching && results.length === 0 && !picked && (
+        <div className="absolute left-0 right-0 top-full z-30 mt-1 rounded-xl border border-[#dfe4d8] bg-white px-3 py-3 text-center text-[12px] text-[#858c7e] shadow-lg">
+          No artists found
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Linked target display ──
+function LinkedTarget({ artist }: { artist: RegistryArtistHit }) {
+  return (
+    <div className="shrink-0 rounded-xl border border-[#85c441]/30 bg-[#5f8f2f]/5 p-3 min-w-[180px] max-w-[220px]">
+      <p className="text-[10px] font-black uppercase tracking-wide text-[#5f8f2f] mb-1">Linked Target</p>
+      <div className="flex items-center gap-2">
+        {artist.public_image_url ? (
+          <img src={artist.public_image_url} alt="" className="h-8 w-8 rounded-full object-cover" />
+        ) : (
+          <div className="h-8 w-8 rounded-full bg-[#e0e5d8] flex items-center justify-center">
+            <WkIcon name="Mic2" size={12} className="text-[#858c7e]" />
+          </div>
+        )}
+        <div className="min-w-0">
+          <p className="text-[13px] font-bold text-[#171712] truncate">{artist.display_name}</p>
+          <p className="text-[10px] text-[#858c7e]">{artist.origin_iso2 || "No country"} · {artist.status}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ArtistIntakePage() {
   const navigate = useNavigate();
   const [csvText, setCsvText] = useState("");
@@ -80,11 +211,40 @@ export default function ArtistIntakePage() {
   const [toast, setToast] = useState<string | null>(null);
   const [applyLoading, setApplyLoading] = useState(false);
   const [decisions, setDecisions] = useState<Record<string, { status: string; notes: string }>>({});
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkLoading, setBulkLoading] = useState(false);
+  // Track which record is in "link" mode
+  const [linkingId, setLinkingId] = useState<string | null>(null);
+  // Cache linked target artists resolved from target_registry_artist_id
+  const [linkedTargets, setLinkedTargets] = useState<Record<string, RegistryArtistHit>>({});
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 3000);
   }, []);
+
+  // ── selection helpers ──
+  const pendingRecords = useMemo(() => records.filter((r) => !decisions[r.id]?.status && r.review_status === "pending"), [records, decisions]);
+
+  const allPendingSelected = pendingRecords.length > 0 && pendingRecords.every((r) => selectedIds.has(r.id));
+
+  const toggleSelectAll = () => {
+    if (allPendingSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(pendingRecords.map((r) => r.id)));
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) { next.delete(id); } else { next.add(id); }
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
 
   async function handleUpload() {
     if (!csvText.trim()) return;
@@ -106,10 +266,21 @@ export default function ArtistIntakePage() {
 
   async function loadResults(id: string, status: string) {
     setLoading(true);
+    clearSelection();
+    setLinkingId(null);
     try {
       const result = await invokeIntakeApi("get_staging_results", { runId: id, status });
       if (!result.ok) throw new Error(result.error || "Failed to load results");
-      setRecords(result.data || []);
+      const data = (result.data || []) as StagingRecord[];
+      setRecords(data);
+      // Pre-populate linked targets from target_artist join
+      const targets: Record<string, RegistryArtistHit> = {};
+      for (const r of data) {
+        if (r.target_artist) {
+          targets[r.id] = r.target_artist;
+        }
+      }
+      setLinkedTargets(targets);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load results");
     } finally {
@@ -132,16 +303,72 @@ export default function ArtistIntakePage() {
   async function handleDecision(stagingId: string, decision: string, notes?: string) {
     if (!runId) return;
     try {
-      const result = await invokeIntakeApi("review_decision", {
+      const payload: Record<string, unknown> = {
         runId,
         decisions: [{ stagingId, decision, notes: notes || "" }],
-      });
+      };
+      const result = await invokeIntakeApi("review_decision", payload);
       if (!result.ok) throw new Error(result.error);
       setDecisions((prev) => ({ ...prev, [stagingId]: { status: decision, notes: notes || "" } }));
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(stagingId);
+        return next;
+      });
       showToast(`${decision === "accepted" ? "Accepted" : "Rejected"} — ${records.find((r) => r.id === stagingId)?.source_artist_name}`);
       await loadSummary(runId);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Decision failed");
+    }
+  }
+
+  async function handleLinkArtist(stagingId: string, targetArtist: RegistryArtistHit) {
+    if (!runId) return;
+    try {
+      const result = await invokeIntakeApi("review_decision", {
+        runId,
+        decisions: [{ stagingId, decision: "accepted", notes: "", targetRegistryArtistId: targetArtist.id }],
+      });
+      if (!result.ok) throw new Error(result.error);
+      setDecisions((prev) => ({ ...prev, [stagingId]: { status: "accepted", notes: "" } }));
+      setLinkedTargets((prev) => ({ ...prev, [stagingId]: targetArtist }));
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(stagingId);
+        return next;
+      });
+      setLinkingId(null);
+      showToast(`Linked → ${targetArtist.display_name}`);
+      await loadSummary(runId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Link failed");
+    }
+  }
+
+  async function handleBulkDecision(decision: string) {
+    if (!runId || selectedIds.size === 0) return;
+    setBulkLoading(true);
+    setError(null);
+    try {
+      const batch = Array.from(selectedIds).map((stagingId) => ({
+        stagingId,
+        decision,
+        notes: "",
+      }));
+      const result = await invokeIntakeApi("review_decision", { runId, decisions: batch });
+      if (!result.ok) throw new Error(result.error);
+      const newDecisions: Record<string, { status: string; notes: string }> = {};
+      for (const id of selectedIds) {
+        newDecisions[id] = { status: decision, notes: "" };
+      }
+      setDecisions((prev) => ({ ...prev, ...newDecisions }));
+      showToast(`Bulk ${decision === "accepted" ? "approved" : "rejected"} ${result.processed} artists`);
+      clearSelection();
+      await loadSummary(runId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Bulk decision failed");
+    } finally {
+      setBulkLoading(false);
     }
   }
 
@@ -157,6 +384,8 @@ export default function ArtistIntakePage() {
       setSummary(null);
       setRecords([]);
       setDecisions({});
+      setSelectedIds(new Set());
+      setLinkedTargets({});
       setCsvText("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Apply failed");
@@ -197,7 +426,7 @@ export default function ArtistIntakePage() {
             </p>
             <h1 className="text-3xl font-black tracking-tight">Artist Intake</h1>
             <p className="mt-2 max-w-2xl text-sm text-[#697062]">
-              Import artists from CSV. The registry owns the truth — no duplicates allowed.
+              Import artists from CSV or TSV. The registry owns the truth — no duplicates allowed.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -221,17 +450,31 @@ export default function ArtistIntakePage() {
         {/* Upload area */}
         {!runId && (
           <section className="mb-6 rounded-2xl border border-[#dfe4d8] bg-white p-6">
-            <h2 className="mb-3 text-lg font-bold text-[#171712]">Upload Artist CSV</h2>
-            <p className="mb-4 text-[13px] text-[#697062]">
-              CSV must have columns: <strong>artist_name, spotify_id, spotify_uri, origin_iso2, popularity, followers, genres</strong>
-              <br />
-              Only new artists are created. Existing artists are updated only if missing origin data.
-            </p>
+            <h2 className="mb-3 text-lg font-bold text-[#171712]">Upload Artist CSV / TSV</h2>
+            <div className="mb-4 rounded-xl border border-[#dfe4d8] bg-[#f8f9f4] p-4 text-[12px] text-[#697062] leading-relaxed">
+              <p className="font-bold text-[#171712] mb-2">Supported column names (tab or comma delimited):</p>
+              <div className="grid grid-cols-2 gap-x-6 gap-y-1 sm:grid-cols-3">
+                <span><strong>artist_id</strong> — Spotify ID</span>
+                <span><strong>artist_name</strong> — Display name</span>
+                <span><strong>origin_country</strong> — ISO2 code (e.g. KE)</span>
+                <span><strong>followers</strong> — Follower count</span>
+                <span><strong>popularity</strong> — 0–100 score</span>
+                <span><strong>genres</strong> — Comma-separated</span>
+                <span><strong>image_url</strong> — Profile photo</span>
+                <span><strong>biography</strong> — Bio text</span>
+                <span><strong>profile_url</strong> — Spotify URL</span>
+                <span><strong>latest_release</strong> — Latest album/track</span>
+                <span><strong>top_tracks</strong> — Spotify track IDs</span>
+              </div>
+              <p className="mt-2 text-[#858c7e]">
+                Images, bios, and genres from this file will be merged into existing artist records. New artists will be created with all available data.
+              </p>
+            </div>
             <textarea
               value={csvText}
               onChange={(e) => setCsvText(e.target.value)}
-              placeholder={`artist_name,spotify_id,spotify_uri,origin_iso2,popularity,followers,genres\nBurna Boy,123,spotify:artist:123,NG,85,5000000,"afrobeats, dancehall"`}
-              className="mb-4 h-48 w-full rounded-xl border border-[#dfe4d8] bg-[#f8f9f4] p-4 text-sm font-mono outline-none transition focus:border-[#85c441] focus:bg-white resize-y"
+              placeholder={`artist_id\tartist_name\torigin_country\tfollowers\tpopularity\tgenres\timage_url\tbiography\n2qUHKed63B8\tBurna Boy\tNG\t13000000\t85\tafrobeats, dancehall\thttps://...\tNigerian artist known for...`}
+              className="mb-4 h-52 w-full rounded-xl border border-[#dfe4d8] bg-[#f8f9f4] p-4 text-sm font-mono outline-none transition focus:border-[#85c441] focus:bg-white resize-y"
             />
             <div className="flex items-center gap-3">
               <button
@@ -243,7 +486,7 @@ export default function ArtistIntakePage() {
                 {loading ? "Matching..." : "Upload & Match"}
               </button>
               <span className="text-[12px] text-[#858c7e]">
-                {csvText.trim() ? `${csvText.split("\n").filter((l) => l.trim()).length - 1} rows detected` : "Paste CSV above"}
+                {csvText.trim() ? `${csvText.split("\n").filter((l) => l.trim()).length - 1} rows detected` : "Paste CSV or TSV above"}
               </span>
             </div>
           </section>
@@ -290,18 +533,65 @@ export default function ArtistIntakePage() {
               ))}
             </section>
 
+            {/* Bulk selection bar */}
+            {selectedIds.size > 0 && (
+              <div className="mb-4 flex items-center justify-between rounded-2xl border border-[#c88b1a]/30 bg-[#c88b1a]/5 p-4">
+                <div className="flex items-center gap-3">
+                  <span className="text-[13px] font-bold text-[#171712]">
+                    {selectedIds.size} artist{selectedIds.size !== 1 ? "s" : ""} selected
+                  </span>
+                  <button onClick={clearSelection} className="text-[12px] font-semibold text-[#858c7e] hover:text-[#171712]">
+                    Clear selection
+                  </button>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleBulkDecision("rejected")}
+                    disabled={bulkLoading}
+                    className="rounded-xl border border-[#dfe4d8] bg-white px-4 py-2 text-[13px] font-bold text-[#71796b] hover:bg-[#f0f3ec] disabled:opacity-40 flex items-center gap-2 whitespace-nowrap"
+                  >
+                    {bulkLoading ? <WkIcon name="Loader2" size={14} className="animate-spin" /> : <WkIcon name="X" size={14} />}
+                    Reject All Selected
+                  </button>
+                  <button
+                    onClick={() => handleBulkDecision("accepted")}
+                    disabled={bulkLoading}
+                    className="rounded-xl bg-[#5f8f2f] px-4 py-2 text-[13px] font-bold text-white hover:bg-[#4d7a26] disabled:opacity-40 flex items-center gap-2 whitespace-nowrap"
+                  >
+                    {bulkLoading ? <WkIcon name="Loader2" size={14} className="animate-spin" /> : <WkIcon name="Check" size={14} />}
+                    Approve All Selected
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Apply bar */}
             <div className="mb-4 flex items-center justify-between rounded-2xl border border-[#dfe4d8] bg-white p-4">
-              <div className="flex items-center gap-3">
-                <span className="text-[13px] text-[#697062]">
-                  <strong className="text-[#171712]">{approvedCount}</strong> approved
-                  <span className="mx-2 text-[#c8d0be]">|</span>
-                  <strong className="text-[#171712]">{pendingCount}</strong> pending review
-                </span>
+              <div className="flex items-center gap-4">
+                {records.length > 0 && (
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={allPendingSelected}
+                      onChange={toggleSelectAll}
+                      className="h-4 w-4 cursor-pointer rounded border-[#c8d0be] text-[#5f8f2f] focus:ring-[#85c441]"
+                    />
+                    <span className="text-[13px] font-semibold text-[#697062]">
+                      {allPendingSelected ? "Deselect all" : "Select all pending"}
+                    </span>
+                  </label>
+                )}
+                <div className="flex items-center gap-3">
+                  <span className="text-[13px] text-[#697062]">
+                    <strong className="text-[#171712]">{approvedCount}</strong> approved
+                    <span className="mx-2 text-[#c8d0be]">|</span>
+                    <strong className="text-[#171712]">{pendingCount}</strong> pending review
+                  </span>
+                </div>
               </div>
               <div className="flex gap-2">
                 <button
-                  onClick={() => { setRunId(null); setSummary(null); setRecords([]); setDecisions({}); setCsvText(""); }}
+                  onClick={() => { setRunId(null); setSummary(null); setRecords([]); setDecisions({}); setSelectedIds(new Set()); setLinkedTargets({}); setCsvText(""); }}
                   className="rounded-xl border border-[#dfe4d8] px-4 py-2 text-[13px] font-bold text-[#71796b] hover:bg-[#f0f3ec]"
                 >
                   Cancel
@@ -335,100 +625,185 @@ export default function ArtistIntakePage() {
                     <p className="text-[16px] font-black text-[#171712]">No records in this category</p>
                   </div>
                 ) : (
-                  records.map((record) => (
-                    <div
-                      key={record.id}
-                      className={`rounded-2xl border bg-white p-4 transition ${
-                        decisions[record.id]?.status === "accepted" || record.review_status === "accepted"
-                          ? "border-[#5f8f2f]/30 bg-[#5f8f2f]/5"
-                          : decisions[record.id]?.status === "rejected" || record.review_status === "rejected"
-                          ? "border-[#c44242]/30 bg-[#c44242]/5"
-                          : "border-[#dfe4d8]"
-                      }`}
-                    >
-                      <div className="flex items-start gap-4">
-                        {/* Source info */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <h3 className="text-[15px] font-bold text-[#171712]">{record.source_artist_name}</h3>
-                            <StatusBadge status={record.match_status} />
-                            {(decisions[record.id]?.status || record.review_status) !== "pending" && (
-                              <StatusBadge status={decisions[record.id]?.status || record.review_status} />
-                            )}
-                          </div>
-                          <div className="flex flex-wrap items-center gap-3 text-[12px] text-[#858c7e]">
-                            {record.source_origin_iso2 && (
-                              <span className="rounded-full bg-[#f0f3ec] px-2 py-0.5 text-[10px] font-bold text-[#71796b]">
-                                {record.source_origin_iso2}
-                              </span>
-                            )}
-                            {record.source_spotify_id && (
-                              <span className="font-mono text-[10px]">Spotify: {record.source_spotify_id.slice(0, 12)}…</span>
-                            )}
-                            {record.source_popularity !== null && (
-                              <span>Popularity: {record.source_popularity}</span>
-                            )}
-                            {record.source_followers !== null && (
-                              <span>Followers: {record.source_followers.toLocaleString()}</span>
-                            )}
-                            {record.source_genres && record.source_genres.length > 0 && (
-                              <span className="truncate max-w-[200px]">Genres: {record.source_genres.join(", ")}</span>
-                            )}
-                          </div>
-                          {record.match_reason && (
-                            <p className="mt-1 text-[11px] text-[#a8ad9e]">{record.match_reason}</p>
-                          )}
-                        </div>
+                  records.map((record) => {
+                    const imageUrl = record.source_images?.primary || record.source_images?.all?.[0] || "";
+                    const bio = record.source_metadata?.biography || "";
+                    const isAccepted = decisions[record.id]?.status === "accepted" || record.review_status === "accepted";
+                    const isRejected = decisions[record.id]?.status === "rejected" || record.review_status === "rejected";
+                    const isPending = !isAccepted && !isRejected;
+                    const isSelected = selectedIds.has(record.id);
+                    const isLinking = linkingId === record.id;
+                    const linkedTarget = linkedTargets[record.id];
 
-                        {/* Registry match */}
-                        {record.registry_artists && (
-                          <div className="shrink-0 rounded-xl border border-[#dfe4d8] bg-[#f8f9f4] p-3 min-w-[200px]">
-                            <p className="text-[10px] font-black uppercase tracking-wide text-[#71796b] mb-1">Registry Match</p>
-                            <div className="flex items-center gap-2">
-                              {record.registry_artists.public_image_url ? (
-                                <img src={record.registry_artists.public_image_url} alt="" className="h-8 w-8 rounded-full object-cover" />
-                              ) : (
-                                <div className="h-8 w-8 rounded-full bg-[#e0e5d8] flex items-center justify-center">
-                                  <WkIcon name="Mic2" size={12} className="text-[#858c7e]" />
-                                </div>
+                    // Determine which registry artist to show
+                    const matchArtist = record.registry_artists;
+                    const displayTarget = linkedTarget || record.target_artist;
+
+                    return (
+                      <div
+                        key={record.id}
+                        className={`rounded-2xl border bg-white p-4 transition ${
+                          isSelected
+                            ? "border-[#c88b1a] ring-1 ring-[#c88b1a]/30"
+                            : isAccepted
+                            ? "border-[#5f8f2f]/30 bg-[#5f8f2f]/5"
+                            : isRejected
+                            ? "border-[#c44242]/30 bg-[#c44242]/5"
+                            : "border-[#dfe4d8]"
+                        }`}
+                      >
+                        <div className="flex items-start gap-4">
+                          {/* Selection checkbox */}
+                          <div className="shrink-0 pt-1">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleSelect(record.id)}
+                              disabled={!isPending}
+                              className={`h-4 w-4 cursor-pointer rounded border-[#c8d0be] text-[#5f8f2f] focus:ring-[#85c441] ${!isPending ? "opacity-30 cursor-not-allowed" : ""}`}
+                            />
+                          </div>
+
+                          {/* Artist image */}
+                          <div className="shrink-0">
+                            {imageUrl ? (
+                              <img src={imageUrl} alt={record.source_artist_name} className="h-14 w-14 rounded-xl object-cover" />
+                            ) : (
+                              <div className="h-14 w-14 rounded-xl bg-[#e0e5d8] flex items-center justify-center">
+                                <WkIcon name="Mic2" size={20} className="text-[#858c7e]" />
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Source info */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h3 className="text-[15px] font-bold text-[#171712]">{record.source_artist_name}</h3>
+                              <StatusBadge status={record.match_status} />
+                              {(decisions[record.id]?.status || record.review_status) !== "pending" && (
+                                <StatusBadge status={decisions[record.id]?.status || record.review_status} />
                               )}
-                              <div className="min-w-0">
-                                <p className="text-[13px] font-bold text-[#171712] truncate">{record.registry_artists.display_name}</p>
-                                <p className="text-[10px] text-[#858c7e]">{record.registry_artists.origin_iso2 || "No country"}</p>
+                              {displayTarget && (
+                                <span className="inline-flex rounded-full border border-[#5f8f2f]/20 bg-[#5f8f2f]/10 px-2 py-0.5 text-[10px] font-bold text-[#5f8f2f]">
+                                  Linked
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2 text-[12px] text-[#858c7e] mb-1.5">
+                              {record.source_origin_iso2 && (
+                                <span className="rounded-full bg-[#f0f3ec] px-2 py-0.5 text-[10px] font-bold text-[#71796b]">
+                                  {record.source_origin_iso2}
+                                </span>
+                              )}
+                              {record.source_spotify_id && (
+                                <span className="font-mono text-[10px]">ID: {record.source_spotify_id.slice(0, 14)}…</span>
+                              )}
+                              {record.source_popularity !== null && (
+                                <span>Pop: {record.source_popularity}</span>
+                              )}
+                              {record.source_followers !== null && (
+                                <span>{record.source_followers.toLocaleString()} followers</span>
+                              )}
+                            </div>
+                            {/* Genres */}
+                            {record.source_genres && record.source_genres.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mb-1.5">
+                                {record.source_genres.slice(0, 4).map((g) => (
+                                  <span key={g} className="rounded-full bg-[#f0f3ec] px-2 py-0.5 text-[10px] font-semibold text-[#71796b]">{g}</span>
+                                ))}
+                                {record.source_genres.length > 4 && (
+                                  <span className="text-[10px] text-[#a8ad9e]">+{record.source_genres.length - 4} more</span>
+                                )}
+                              </div>
+                            )}
+                            {/* Bio preview */}
+                            {bio && (
+                              <p className="text-[12px] text-[#858c7e] line-clamp-2 max-w-lg">{bio}</p>
+                            )}
+                            {record.match_reason && (
+                              <p className="mt-1 text-[11px] text-[#a8ad9e]">{record.match_reason}</p>
+                            )}
+                          </div>
+
+                          {/* Registry match or Linked target */}
+                          {displayTarget ? (
+                            <LinkedTarget artist={displayTarget} />
+                          ) : matchArtist ? (
+                            <div className="shrink-0 rounded-xl border border-[#dfe4d8] bg-[#f8f9f4] p-3 min-w-[180px] max-w-[220px]">
+                              <p className="text-[10px] font-black uppercase tracking-wide text-[#71796b] mb-1">Registry Match</p>
+                              <div className="flex items-center gap-2">
+                                {matchArtist.public_image_url ? (
+                                  <img src={matchArtist.public_image_url} alt="" className="h-8 w-8 rounded-full object-cover" />
+                                ) : (
+                                  <div className="h-8 w-8 rounded-full bg-[#e0e5d8] flex items-center justify-center">
+                                    <WkIcon name="Mic2" size={12} className="text-[#858c7e]" />
+                                  </div>
+                                )}
+                                <div className="min-w-0">
+                                  <p className="text-[13px] font-bold text-[#171712] truncate">{matchArtist.display_name}</p>
+                                  <p className="text-[10px] text-[#858c7e]">{matchArtist.origin_iso2 || "No country"}</p>
+                                  {!matchArtist.public_image_url && imageUrl && (
+                                    <p className="text-[9px] text-[#85c441] font-semibold mt-0.5">Will add image</p>
+                                  )}
+                                  {!matchArtist.bio && bio && (
+                                    <p className="text-[9px] text-[#85c441] font-semibold">Will add bio</p>
+                                  )}
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        )}
+                          ) : null}
 
-                        {/* Actions */}
-                        <div className="shrink-0 flex flex-col gap-2">
-                          {(decisions[record.id]?.status || record.review_status) === "pending" ? (
-                            <>
+                          {/* Actions */}
+                          <div className="shrink-0 flex flex-col gap-2">
+                            {(decisions[record.id]?.status || record.review_status) === "pending" ? (
+                              <>
+                                {/* Link button — only show for no_match records that aren't already linking */}
+                                {record.match_status === "no_match" && !isLinking && (
+                                  <button
+                                    onClick={() => setLinkingId(record.id)}
+                                    className="rounded-lg border border-[#c88b1a]/30 bg-[#c88b1a]/5 px-3 py-2 text-[12px] font-bold text-[#c88b1a] hover:bg-[#c88b1a]/10 flex items-center gap-1.5 whitespace-nowrap"
+                                  >
+                                    <WkIcon name="Link" size={12} /> Link
+                                  </button>
+                                )}
+                                {/* Inline search when linking */}
+                                {isLinking && (
+                                  <ArtistLinkSearch
+                                    recordName={record.source_artist_name}
+                                    onSelect={(artist) => handleLinkArtist(record.id, artist)}
+                                    onCancel={() => setLinkingId(null)}
+                                  />
+                                )}
+                                {!isLinking && (
+                                  <>
+                                    <button
+                                      onClick={() => handleDecision(record.id, "accepted")}
+                                      className="rounded-lg bg-[#5f8f2f] px-3 py-2 text-[12px] font-bold text-white hover:bg-[#4d7a26] flex items-center gap-1.5 whitespace-nowrap"
+                                    >
+                                      <WkIcon name="Check" size={12} /> Accept
+                                    </button>
+                                    <button
+                                      onClick={() => handleDecision(record.id, "rejected")}
+                                      className="rounded-lg border border-[#dfe4d8] px-3 py-2 text-[12px] font-bold text-[#71796b] hover:bg-[#f0f3ec] flex items-center gap-1.5 whitespace-nowrap"
+                                    >
+                                      <WkIcon name="X" size={12} /> Reject
+                                    </button>
+                                  </>
+                                )}
+                              </>
+                            ) : (
                               <button
-                                onClick={() => handleDecision(record.id, "accepted")}
-                                className="rounded-lg bg-[#5f8f2f] px-3 py-2 text-[12px] font-bold text-white hover:bg-[#4d7a26] flex items-center gap-1.5"
+                                onClick={() => handleDecision(record.id, "pending")}
+                                className="rounded-lg border border-[#dfe4d8] px-3 py-2 text-[12px] font-bold text-[#71796b] hover:bg-[#f0f3ec] whitespace-nowrap"
                               >
-                                <WkIcon name="Check" size={12} /> Accept
+                                Undo
                               </button>
-                              <button
-                                onClick={() => handleDecision(record.id, "rejected")}
-                                className="rounded-lg border border-[#dfe4d8] px-3 py-2 text-[12px] font-bold text-[#71796b] hover:bg-[#f0f3ec] flex items-center gap-1.5"
-                              >
-                                <WkIcon name="X" size={12} /> Reject
-                              </button>
-                            </>
-                          ) : (
-                            <button
-                              onClick={() => handleDecision(record.id, "pending")}
-                              className="rounded-lg border border-[#dfe4d8] px-3 py-2 text-[12px] font-bold text-[#71796b] hover:bg-[#f0f3ec]"
-                            >
-                              Undo
-                            </button>
-                          )}
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             )}

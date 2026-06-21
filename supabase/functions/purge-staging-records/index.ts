@@ -7,11 +7,11 @@ serve(async (req: Request) => {
   }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
   if (!supabaseUrl || !serviceRoleKey) {
     return new Response(
-      JSON.stringify({ error: "Missing env vars", url: supabaseUrl ? "ok" : "missing", key: serviceRoleKey ? "ok" : "missing" }),
+      JSON.stringify({ error: "Supabase service role key missing. This function requires SERVICE_ROLE_KEY to purge staging records." }),
       { status: 500 }
     );
   }

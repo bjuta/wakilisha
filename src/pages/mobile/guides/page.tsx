@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { trackEvent, getAnalyticsSessionId, getCanonicalPageUrl } from "@/services/analytics";
 
 const guideEntries = [
   {
@@ -48,8 +49,15 @@ export default function MobileGuides() {
   const [subscribed, setSubscribed] = useState(false);
 
   const handleSubscribe = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (email.trim()) setSubscribed(true);
+    if (!email.trim()) {
+      e.preventDefault();
+      return;
+    }
+    trackEvent("newsletter_signup", {
+      pageType: "guides_listing",
+      context: { sourceSection: "newsletter_footer", formId: "guides-newsletter-mobile" },
+    });
+    setSubscribed(true);
   };
 
   return (
@@ -198,7 +206,7 @@ export default function MobileGuides() {
         <div className="border-y border-[var(--wk-border)] py-10 text-center">
           <div className="w-8 h-0.5 rounded-full bg-[var(--wk-brand)] mx-auto mb-4" />
           <p className="text-[22px] font-black tracking-[-0.035em] leading-[0.96] text-[var(--wk-text)]">
-            Culture doesn&apos;t need more noise. It needs signal.
+            Culture doesn't need more noise. It needs signal.
           </p>
           <p className="mt-3 text-[13px] text-[var(--wk-text-muted)] max-w-[280px] mx-auto leading-relaxed">
             Each guide is built to be useful, not just beautiful.
@@ -216,7 +224,7 @@ export default function MobileGuides() {
                 <i className="ri-check-line text-[24px] text-[var(--wk-brand-on)]" />
               </div>
               <h3 className="text-[20px] font-black tracking-[-0.03em] text-[var(--wk-text)] mb-1">
-                You&apos;re on the list
+                You're on the list
               </h3>
               <p className="text-[13px] text-[var(--wk-text-muted)]">
                 Guides delivered straight to your inbox.
@@ -241,6 +249,10 @@ export default function MobileGuides() {
                 data-readdy-form=""
                 className="flex flex-col gap-3"
               >
+                <input type="hidden" name="wk_session_id" value={getAnalyticsSessionId()} />
+                <input type="hidden" name="wk_page_url" value={getCanonicalPageUrl()} />
+                <input type="hidden" name="wk_page_type" value="guides_listing" />
+                <input type="hidden" name="wk_source_section" value="newsletter_footer" />
                 <div className="relative">
                   <i className="ri-mail-line absolute left-4 top-1/2 -translate-y-1/2 text-[var(--wk-text-faint)] text-[16px] pointer-events-none" />
                   <input

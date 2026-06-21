@@ -1,10 +1,30 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { trackEvent, getAnalyticsSessionId, getCanonicalPageUrl } from "@/services/analytics";
 import { inMinorKeysData } from "@/pages/guides/detail/data";
+import { MobileShareButton } from "@/components/design-system/share/ShareSheet";
 
 export default function MobileVeniceGuide() {
   const { heroImage, issueBadge, title, curatorName, eventDate, locations, stats, quote, context, preview, curator, pavilions, focus, sample, download } = inMinorKeysData;
   const [showPavilion, setShowPavilion] = useState<number | null>(null);
+
+  const sessionId = getAnalyticsSessionId();
+  const pageUrl = getCanonicalPageUrl();
+  const guideSlug = "in-minor-keys";
+  const guideTitle = `${download.title} ${download.titleItalic}`;
+
+  const handleDownloadSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    trackEvent("newsletter_signup", {
+      pageType: "guide_detail",
+      entitySlug: guideSlug,
+      entityType: "guide",
+      context: {
+        source_section: "download_form_mobile",
+        guide_title: guideTitle,
+        guide_slug: guideSlug,
+      },
+    });
+  };
 
   return (
     <div className="min-h-screen" style={{ background: "var(--wk-bg)" }}>
@@ -18,7 +38,17 @@ export default function MobileVeniceGuide() {
           <Link to="/guides" className="flex items-center gap-1.5 rounded-full border border-white/20 bg-black/25 backdrop-blur-sm px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-white/85 whitespace-nowrap">
             <i className="ri-arrow-left-line text-[12px]" /> Guides
           </Link>
-          <span className="rounded-full bg-[var(--wk-v-intel)] px-3 py-1 text-[9px] font-black uppercase tracking-wider text-white">{issueBadge}</span>
+          <div className="flex items-center gap-2">
+            <span className="rounded-full bg-[var(--wk-v-intel)] px-3 py-1 text-[9px] font-black uppercase tracking-wider text-white">{issueBadge}</span>
+            <MobileShareButton
+              item={{
+                title: "In Minor Keys",
+                subtitle: "Venice Biennale Arte 2026 Guide",
+                description: "WAKILISHA guide to the 2026 Venice Biennale Arte, curated by Koyo Kouoh.",
+                type: "page",
+              }}
+            />
+          </div>
         </div>
         <div className="relative z-10 px-4 py-8">
           <h1 className="text-[clamp(40px,11vw,72px)] font-black leading-[0.94] tracking-[-0.04em] text-white">
@@ -252,8 +282,13 @@ export default function MobileVeniceGuide() {
             action="https://readdy.ai/api/form/d8m5rsojb57qogjbh760"
             method="POST"
             data-readdy-form=""
+            onSubmit={handleDownloadSubmit}
             className="space-y-3"
           >
+            <input type="hidden" name="wk_session_id" value={sessionId} />
+            <input type="hidden" name="wk_page_url" value={pageUrl} />
+            <input type="hidden" name="wk_page_type" value="guide_detail" />
+            <input type="hidden" name="wk_source_section" value="download_form_mobile" />
             <input
               type="email"
               name="email"

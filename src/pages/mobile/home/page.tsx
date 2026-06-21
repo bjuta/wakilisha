@@ -5,13 +5,14 @@ import { HomeMarquee } from "@/pages/home/components/HomeMarquee";
 import { HomeRightNow } from "@/pages/home/components/HomeRightNow";
 import { HomeExplore } from "@/pages/home/components/HomeExplore";
 import { HomeMission } from "@/pages/home/components/HomeMission";
-import { listMagazineStories, type RepairedStory } from "@/services/repairedContent/client";
+import { listMagazineStories, type PublicStory } from "@/services/publicContent/client";
 import { getChartFamilies, getLatestChartEdition, getChartEditionEntries, type ChartEditionEntry } from "@/services/chartsPublic/client";
+import { trackEvent, getAnalyticsSessionId, getCanonicalPageUrl } from "@/services/analytics";
 
 export default function MobileHome() {
   const [loading, setLoading] = useState(true);
   const [chartEntries, setChartEntries] = useState<ChartEditionEntry[]>([]);
-  const [stories, setStories] = useState<RepairedStory[]>([]);
+  const [stories, setStories] = useState<PublicStory[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
@@ -87,7 +88,17 @@ export default function MobileHome() {
                   action="https://readdy.ai/api/form/d8m5rsojb57qogjbh760"
                   method="POST"
                   data-readdy-form=""
+                  onSubmit={() => {
+                    trackEvent("newsletter_signup", {
+                      pageType: "home",
+                      context: { sourceSection: "newsletter_footer", formId: "homepage-newsletter-mobile" },
+                    });
+                  }}
                 >
+                  <input type="hidden" name="wk_session_id" value={getAnalyticsSessionId()} />
+                  <input type="hidden" name="wk_page_url" value={getCanonicalPageUrl()} />
+                  <input type="hidden" name="wk_page_type" value="home" />
+                  <input type="hidden" name="wk_source_section" value="newsletter_footer" />
                   <div className="flex-1">
                     <input
                       type="email"

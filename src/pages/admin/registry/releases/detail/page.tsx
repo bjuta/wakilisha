@@ -335,7 +335,7 @@ export default function ReleaseDetailPage() {
           <WkIcon name="FileX" size={28} />
         </div>
         <h2 className="text-[18px] font-bold text-[var(--wk-text)]">Release Not Found</h2>
-        <p className="text-[13px] text-[var(--wk-text-muted)]">No release with slug &quot;{slug}&quot;</p>
+        <p className="text-[13px] text-[var(--wk-text-muted)]">No release with slug "{slug}"</p>
         <button onClick={() => navigate("/admin/registry/releases")} className="wk-button wk-button-secondary wk-button-sm whitespace-nowrap">
           <WkIcon name="ArrowLeft" size={14} /> Back to Releases
         </button>
@@ -523,7 +523,7 @@ export default function ReleaseDetailPage() {
               <WkIcon name="Trash2" size={22} />
             </div>
             <h3 className="text-[16px] font-bold text-[var(--wk-text)] mb-2">Archive Release?</h3>
-            <p className="text-[13px] text-[var(--wk-text-muted)] mb-5">This will set the release status to &quot;archived&quot;. You can restore it later.</p>
+            <p className="text-[13px] text-[var(--wk-text-muted)] mb-5">This will set the release status to "archived". You can restore it later.</p>
             <div className="flex gap-3">
               <button onClick={() => setShowDelete(false)} className="flex-1 rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-4 py-2.5 text-[13px] font-bold text-[var(--wk-text)] hover:bg-[var(--wk-surface-raised)] transition-colors whitespace-nowrap cursor-pointer">Cancel</button>
               <button onClick={() => { setShowDelete(false); handleDelete(); }} className="flex-1 rounded-lg bg-red-600 text-white px-4 py-2.5 text-[13px] font-bold hover:bg-red-700 transition-colors whitespace-nowrap cursor-pointer">Yes, Archive</button>

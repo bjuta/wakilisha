@@ -12,6 +12,7 @@ export default function GuideHeroSection() {
         <img
           src={heroImage}
           alt="In Minor Keys guide hero"
+          loading="lazy"
           className={`w-full h-full object-cover transition-opacity duration-700 ${imageLoaded ? "opacity-100" : "opacity-0"}`}
           onLoad={() => setImageLoaded(true)}
         />

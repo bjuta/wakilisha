@@ -20,7 +20,6 @@ function makeLayout(capabilities: Capability[], label: string) {
 
 export const AdminContentLayout = makeLayout(["edit_own_articles", "edit_others_articles"], "content");
 export const AdminUsersLayout = makeLayout(["manage_users"], "users");
-export const AdminMagazineLayout = makeLayout(["edit_own_articles", "edit_others_articles"], "magazine");
 export const AdminRegistryLayout = makeLayout(["view_registry", "manage_registry"], "registry");
 export const AdminMediaLayout = makeLayout(["upload_media", "manage_media_library"], "media");
 export const AdminReviewLayout = makeLayout(["view_review_queue", "manage_review_queue"], "review");

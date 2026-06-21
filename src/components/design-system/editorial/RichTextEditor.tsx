@@ -1,12 +1,18 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
 import LinkExtension from "@tiptap/extension-link";
-import ImageExtension from "@tiptap/extension-image";
 import Placeholder from "@tiptap/extension-placeholder";
 import { WkIcon } from "@/components/design-system/Icon";
 import { MediaPickerModal } from "@/components/admin/MediaPickerModal";
+import { ExtendedImage } from "@/components/admin/editor/ExtendedImage";
+import { FloatingImageToolbar } from "@/components/admin/editor/FloatingImageToolbar";
+import { ImageEditDialog } from "@/components/admin/editor/ImageEditDialog";
+import { SlashCommandExtension } from "@/components/admin/editor/SlashCommandSuggestion";
+import { useReleaseSearchData } from "@/hooks/useReleaseSearchData";
+import { useArtistSearchData } from "@/hooks/useArtistSearchData";
+import { useTrackSearchData } from "@/hooks/useTrackSearchData";
 
 /* ─── Types ─── */
 
@@ -76,10 +82,45 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 500 }
     y: 0,
   });
   const [imagePickerOpen, setImagePickerOpen] = useState(false);
+  const [imagePickerMeta, setImagePickerMeta] = useState<{
+    src: string;
+    alt: string;
+    caption: string;
+    title: string;
+    assetId?: string;
+  } | null>(null);
+  const [releasePickerOpen, setReleasePickerOpen] = useState(false);
+  const [releaseSearch, setReleaseSearch] = useState("");
+  const [artistPickerOpen, setArtistPickerOpen] = useState(false);
+  const [artistSearch, setArtistSearch] = useState("");
+  const [trackPickerOpen, setTrackPickerOpen] = useState(false);
+  const [trackSearch, setTrackSearch] = useState("");
 
   const htmlRef = useRef<HTMLTextAreaElement>(null);
   const isInternalUpdate = useRef(false);
   const toolbarRef = useRef<HTMLDivElement>(null);
+
+  const { data: releases, loading: releasesLoading } = useReleaseSearchData();
+  const { data: artists, loading: artistsLoading } = useArtistSearchData();
+  const { data: tracks, loading: tracksLoading } = useTrackSearchData();
+
+  const filteredReleases = useMemo(() => {
+    if (!releaseSearch.trim()) return releases;
+    const q = releaseSearch.toLowerCase();
+    return releases.filter((r) => r.title.toLowerCase().includes(q) || r.artistName.toLowerCase().includes(q));
+  }, [releases, releaseSearch]);
+
+  const filteredArtists = useMemo(() => {
+    if (!artistSearch.trim()) return artists;
+    const q = artistSearch.toLowerCase();
+    return artists.filter((a) => a.name.toLowerCase().includes(q) || (a.country && a.country.toLowerCase().includes(q)));
+  }, [artists, artistSearch]);
+
+  const filteredTracks = useMemo(() => {
+    if (!trackSearch.trim()) return tracks;
+    const q = trackSearch.toLowerCase();
+    return tracks.filter((t) => t.title.toLowerCase().includes(q) || t.artist.toLowerCase().includes(q));
+  }, [tracks, trackSearch]);
 
   /* ─── TipTap Editor ─── */
 
@@ -99,7 +140,7 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 500 }
           class: "wk-rich-link",
         },
       }),
-      ImageExtension.configure({
+      ExtendedImage.configure({
         HTMLAttributes: {
           class: "wk-rich-image",
         },
@@ -107,6 +148,7 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 500 }
       Placeholder.configure({
         placeholder: placeholder || "Start writing your article...",
       }),
+      SlashCommandExtension,
     ],
     content: value || "",
     editorProps: {
@@ -128,6 +170,27 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 500 }
       onChange(ed.getHTML());
     },
   });
+
+  /* ─── Listen for slash command events ─── */
+
+  useEffect(() => {
+    const onSlashCommand = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { command: string };
+      switch (detail.command) {
+        case "release":
+          setReleasePickerOpen(true);
+          break;
+        case "artist":
+          setArtistPickerOpen(true);
+          break;
+        case "track":
+          setTrackPickerOpen(true);
+          break;
+      }
+    };
+    window.addEventListener("wk-slash-command", onSlashCommand);
+    return () => window.removeEventListener("wk-slash-command", onSlashCommand);
+  }, []);
 
   /* ─── Sync external value changes into editor ─── */
 
@@ -243,10 +306,69 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 500 }
   /* ─── Image insertion ─── */
 
   const handleInsertImage = useCallback(
-    (url: string) => {
+    (assetId: string | null, url: string) => {
       if (!editor || !url) return;
-      editor.chain().focus().setImage({ src: url, alt: "" }).run();
+      // Open the image edit dialog after insertion so the user can set alt/caption
+      setImagePickerMeta({
+        src: url,
+        alt: "",
+        caption: "",
+        title: "",
+        assetId: assetId ?? undefined,
+      });
       setImagePickerOpen(false);
+    },
+    [editor]
+  );
+
+  const handleSaveImageMeta = useCallback(
+    (meta: { src: string; alt: string; caption: string; title: string; assetId?: string }) => {
+      if (!editor || !meta.src) return;
+      editor
+        .chain()
+        .focus()
+        .setImage({
+          src: meta.src,
+          alt: meta.alt,
+          caption: meta.caption,
+          title: meta.title,
+          "data-asset-id": meta.assetId || null,
+        })
+        .run();
+      setImagePickerMeta(null);
+    },
+    [editor]
+  );
+
+  const handleInsertReleaseShortcode = useCallback(
+    (slug: string) => {
+      if (!editor) return;
+      const shortcode = `\n\n[wk-release slug="${slug}"]\n\n`;
+      editor.chain().focus().insertContent(shortcode).run();
+      setReleasePickerOpen(false);
+      setReleaseSearch("");
+    },
+    [editor]
+  );
+
+  const handleInsertArtistShortcode = useCallback(
+    (slug: string) => {
+      if (!editor) return;
+      const shortcode = `\n\n[wk-artist slug="${slug}"]\n\n`;
+      editor.chain().focus().insertContent(shortcode).run();
+      setArtistPickerOpen(false);
+      setArtistSearch("");
+    },
+    [editor]
+  );
+
+  const handleInsertTrackShortcode = useCallback(
+    (slug: string) => {
+      if (!editor) return;
+      const shortcode = `\n\n[wk-track slug="${slug}"]\n\n`;
+      editor.chain().focus().insertContent(shortcode).run();
+      setTrackPickerOpen(false);
+      setTrackSearch("");
     },
     [editor]
   );
@@ -541,6 +663,30 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 500 }
           onClick={() => setImagePickerOpen(true)}
         />
 
+        {/* Release Shortcode Insert */}
+        <ToolbarBtn
+          icon="Album"
+          label="Insert Release"
+          active={false}
+          onClick={() => setReleasePickerOpen(true)}
+        />
+
+        {/* Artist Shortcode Insert */}
+        <ToolbarBtn
+          icon="UserPlus"
+          label="Insert Artist"
+          active={false}
+          onClick={() => setArtistPickerOpen(true)}
+        />
+
+        {/* Track Shortcode Insert */}
+        <ToolbarBtn
+          icon="Music"
+          label="Insert Track"
+          active={false}
+          onClick={() => setTrackPickerOpen(true)}
+        />
+
         <div className="w-px h-6 bg-[var(--wk-border)] mx-1 hidden sm:block" />
 
         {/* Undo/Redo */}
@@ -643,13 +789,229 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 500 }
         </div>
       )}
 
-      {/* Media Picker Modal */}
+      {/* Floating Image Toolbar */}
+      <FloatingImageToolbar editor={editor} />
+
+      {/* Image Edit Dialog (post-insertion) */}
+      <ImageEditDialog
+        open={!!imagePickerMeta}
+        meta={imagePickerMeta ?? { src: "", alt: "", caption: "", title: "" }}
+        onClose={() => setImagePickerMeta(null)}
+        onSave={handleSaveImageMeta}
+      />
+
       <MediaPickerModal
         open={imagePickerOpen}
         onClose={() => setImagePickerOpen(false)}
         onSelect={handleInsertImage}
         title="Insert Image"
       />
+
+      {/* Release Picker Modal */}
+      {releasePickerOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-full max-w-md mx-4 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] shadow-lg overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--wk-border)]">
+              <span className="text-[12px] font-bold text-[var(--wk-text)]">Insert Release Shortcode</span>
+              <button
+                onClick={() => { setReleasePickerOpen(false); setReleaseSearch(""); }}
+                className="flex items-center justify-center w-7 h-7 rounded-md text-[var(--wk-text-muted)] hover:text-[var(--wk-text)] hover:bg-[var(--wk-bg-subtle)] cursor-pointer"
+              >
+                <WkIcon name="X" size={14} />
+              </button>
+            </div>
+            <div className="p-4">
+              <input
+                type="text"
+                value={releaseSearch}
+                onChange={(e) => setReleaseSearch(e.target.value)}
+                placeholder="Search releases by title or artist..."
+                className="w-full rounded-md border border-[var(--wk-border)] bg-[var(--wk-bg-subtle)] px-3 py-2 text-[13px] text-[var(--wk-text)] placeholder:text-[var(--wk-text-faint)] outline-none focus:border-[var(--wk-brand)] mb-3"
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") { setReleasePickerOpen(false); setReleaseSearch(""); }
+                }}
+              />
+              <div className="max-h-[320px] overflow-y-auto space-y-2">
+                {releasesLoading ? (
+                  <div className="flex items-center justify-center py-8 gap-2 text-[var(--wk-text-faint)]">
+                    <i className="ri-loader-4-line animate-spin text-[16px]" />
+                    <span className="text-[12px]">Loading releases...</span>
+                  </div>
+                ) : filteredReleases.length === 0 ? (
+                  <div className="py-6 text-center text-[12px] text-[var(--wk-text-faint)]">
+                    {releaseSearch.trim() ? "No releases match your search." : "No releases found in registry."}
+                  </div>
+                ) : (
+                  filteredReleases.map((release) => (
+                    <button
+                      key={release.slug}
+                      onClick={() => handleInsertReleaseShortcode(release.slug)}
+                      className="w-full flex items-center gap-3 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg-subtle)] p-3 text-left hover:border-[var(--wk-brand)] hover:bg-[var(--wk-surface-raised)] transition-all cursor-pointer"
+                    >
+                      <div className="w-12 h-12 rounded-lg overflow-hidden shrink-0 bg-[var(--wk-surface-raised)]">
+                        {release.artworkUrl ? (
+                          <img src={release.artworkUrl} alt={release.title} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <i className="ri-album-line text-[var(--wk-text-faint)]" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-[13px] font-bold text-[var(--wk-text)] truncate">{release.title}</div>
+                        <div className="text-[11px] text-[var(--wk-text-muted)] truncate">{release.artistName}</div>
+                        <div className="mt-0.5 flex items-center gap-2 text-[10px] text-[var(--wk-text-faint)]">
+                          <span className="rounded-full bg-[var(--wk-brand-soft)]/40 px-1.5 py-0.5 text-[var(--wk-brand)] font-bold">{release.releaseType}</span>
+                          <span>{release.trackCount} {release.trackCount === 1 ? "track" : "tracks"}</span>
+                        </div>
+                      </div>
+                      <i className="ri-add-circle-line text-[var(--wk-brand)] text-[18px] shrink-0" />
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Artist Picker Modal */}
+      {artistPickerOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-full max-w-md mx-4 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] shadow-lg overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--wk-border)]">
+              <span className="text-[12px] font-bold text-[var(--wk-text)]">Insert Artist Shortcode</span>
+              <button
+                onClick={() => { setArtistPickerOpen(false); setArtistSearch(""); }}
+                className="flex items-center justify-center w-7 h-7 rounded-md text-[var(--wk-text-muted)] hover:text-[var(--wk-text)] hover:bg-[var(--wk-bg-subtle)] cursor-pointer"
+              >
+                <WkIcon name="X" size={14} />
+              </button>
+            </div>
+            <div className="p-4">
+              <input
+                type="text"
+                value={artistSearch}
+                onChange={(e) => setArtistSearch(e.target.value)}
+                placeholder="Search artists by name or country..."
+                className="w-full rounded-md border border-[var(--wk-border)] bg-[var(--wk-bg-subtle)] px-3 py-2 text-[13px] text-[var(--wk-text)] placeholder:text-[var(--wk-text-faint)] outline-none focus:border-[var(--wk-brand)] mb-3"
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") { setArtistPickerOpen(false); setArtistSearch(""); }
+                }}
+              />
+              <div className="max-h-[320px] overflow-y-auto space-y-2">
+                {artistsLoading ? (
+                  <div className="flex items-center justify-center py-8 gap-2 text-[var(--wk-text-faint)]">
+                    <i className="ri-loader-4-line animate-spin text-[16px]" />
+                    <span className="text-[12px]">Loading artists...</span>
+                  </div>
+                ) : filteredArtists.length === 0 ? (
+                  <div className="py-6 text-center text-[12px] text-[var(--wk-text-faint)]">
+                    {artistSearch.trim() ? "No artists match your search." : "No artists found in registry."}
+                  </div>
+                ) : (
+                  filteredArtists.map((artist) => (
+                    <button
+                      key={artist.slug}
+                      onClick={() => handleInsertArtistShortcode(artist.slug)}
+                      className="w-full flex items-center gap-3 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg-subtle)] p-3 text-left hover:border-[var(--wk-brand)] hover:bg-[var(--wk-surface-raised)] transition-all cursor-pointer"
+                    >
+                      <div className="w-12 h-12 rounded-lg overflow-hidden shrink-0 bg-[var(--wk-surface-raised)]">
+                        {artist.imageUrl ? (
+                          <img src={artist.imageUrl} alt={artist.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <i className="ri-user-line text-[var(--wk-text-faint)]" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-[13px] font-bold text-[var(--wk-text)] truncate">{artist.name}</div>
+                        <div className="text-[11px] text-[var(--wk-text-muted)] truncate">
+                          {[artist.country, ...artist.genres.slice(0, 2)].filter(Boolean).join(" · ")}
+                        </div>
+                      </div>
+                      <i className="ri-add-circle-line text-[var(--wk-brand)] text-[18px] shrink-0" />
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Track Picker Modal */}
+      {trackPickerOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-full max-w-md mx-4 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] shadow-lg overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--wk-border)]">
+              <span className="text-[12px] font-bold text-[var(--wk-text)]">Insert Track Shortcode</span>
+              <button
+                onClick={() => { setTrackPickerOpen(false); setTrackSearch(""); }}
+                className="flex items-center justify-center w-7 h-7 rounded-md text-[var(--wk-text-muted)] hover:text-[var(--wk-text)] hover:bg-[var(--wk-bg-subtle)] cursor-pointer"
+              >
+                <WkIcon name="X" size={14} />
+              </button>
+            </div>
+            <div className="p-4">
+              <input
+                type="text"
+                value={trackSearch}
+                onChange={(e) => setTrackSearch(e.target.value)}
+                placeholder="Search tracks by title or artist..."
+                className="w-full rounded-md border border-[var(--wk-border)] bg-[var(--wk-bg-subtle)] px-3 py-2 text-[13px] text-[var(--wk-text)] placeholder:text-[var(--wk-text-faint)] outline-none focus:border-[var(--wk-brand)] mb-3"
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") { setTrackPickerOpen(false); setTrackSearch(""); }
+                }}
+              />
+              <div className="max-h-[320px] overflow-y-auto space-y-2">
+                {tracksLoading ? (
+                  <div className="flex items-center justify-center py-8 gap-2 text-[var(--wk-text-faint)]">
+                    <i className="ri-loader-4-line animate-spin text-[16px]" />
+                    <span className="text-[12px]">Loading tracks...</span>
+                  </div>
+                ) : filteredTracks.length === 0 ? (
+                  <div className="py-6 text-center text-[12px] text-[var(--wk-text-faint)]">
+                    {trackSearch.trim() ? "No tracks match your search." : "No tracks found in registry."}
+                  </div>
+                ) : (
+                  filteredTracks.map((track) => (
+                    <button
+                      key={track.slug}
+                      onClick={() => handleInsertTrackShortcode(track.slug)}
+                      className="w-full flex items-center gap-3 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg-subtle)] p-3 text-left hover:border-[var(--wk-brand)] hover:bg-[var(--wk-surface-raised)] transition-all cursor-pointer"
+                    >
+                      <div className="w-12 h-12 rounded-lg overflow-hidden shrink-0 bg-[var(--wk-surface-raised)]">
+                        {track.artworkUrl ? (
+                          <img src={track.artworkUrl} alt={track.title} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <i className="ri-music-line text-[var(--wk-text-faint)]" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-[13px] font-bold text-[var(--wk-text)] truncate">{track.title}</div>
+                        <div className="text-[11px] text-[var(--wk-text-muted)] truncate">{track.artist}</div>
+                        <div className="mt-0.5 flex items-center gap-2 text-[10px] text-[var(--wk-text-faint)]">
+                          {track.genre && <span>{track.genre}</span>}
+                          {track.isPlayable && (
+                            <span className="rounded-full bg-[var(--wk-brand-soft)]/40 px-1.5 py-0.5 text-[var(--wk-brand)] font-bold">
+                              Playable
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <i className="ri-add-circle-line text-[var(--wk-brand)] text-[18px] shrink-0" />
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Editor Area */}
       <div

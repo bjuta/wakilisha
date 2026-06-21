@@ -1,7 +1,7 @@
 import { buildCultureContext, type CultureContextSurface } from "./index";
-import type { RepairedArtist, RepairedArtistDetail } from "@/services/repairedContent/client";
+import type { PublicArtist, PublicArtistDetail } from "@/services/publicContent/client";
 
-type ArtistLike = Partial<RepairedArtist> & Partial<RepairedArtistDetail> & Partial<{
+type ArtistLike = Partial<PublicArtist> & Partial<PublicArtistDetail> & Partial<{
   chartEntryCount: number;
   peakChartPosition: number;
   collaborations: Array<{ name: string; count?: number }>;

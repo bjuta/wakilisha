@@ -1,5 +1,5 @@
 import { buildCultureContext, type CultureContextSurface } from "./index";
-import type { RepairedLabelDetail } from "@/services/repaired/client";
+import type { PublicLabelDetail } from "@/services/publicApi/client";
 
 type LabelLike = Partial<{
   name: string;
@@ -24,9 +24,9 @@ function numberValue(value: unknown): number | undefined {
   return Number.isFinite(number) && number > 0 ? number : undefined;
 }
 
-export function labelContextData(input: LabelLike | RepairedLabelDetail) {
+export function labelContextData(input: LabelLike | PublicLabelDetail) {
   if ("label" in input && input.label) {
-    const detail = input as RepairedLabelDetail;
+    const detail = input as PublicLabelDetail;
     return {
       name: clean(detail.label.name),
       country: clean(detail.label.countryCode),
@@ -53,7 +53,7 @@ export function labelContextData(input: LabelLike | RepairedLabelDetail) {
   };
 }
 
-export function buildLabelCultureText(input: LabelLike | RepairedLabelDetail, surface: CultureContextSurface): string {
+export function buildLabelCultureText(input: LabelLike | PublicLabelDetail, surface: CultureContextSurface): string {
   return buildCultureContext({
     entityType: "label",
     surface,
@@ -61,18 +61,18 @@ export function buildLabelCultureText(input: LabelLike | RepairedLabelDetail, su
   }).text;
 }
 
-export function buildLabelHeroIntro(input: LabelLike | RepairedLabelDetail): string {
+export function buildLabelHeroIntro(input: LabelLike | PublicLabelDetail): string {
   return buildLabelCultureText(input, "heroIntro");
 }
 
-export function buildLabelCardBlurb(input: LabelLike | RepairedLabelDetail): string {
+export function buildLabelCardBlurb(input: LabelLike | PublicLabelDetail): string {
   return buildLabelCultureText(input, "cardBlurb");
 }
 
-export function buildLabelSearchSnippet(input: LabelLike | RepairedLabelDetail): string {
+export function buildLabelSearchSnippet(input: LabelLike | PublicLabelDetail): string {
   return buildLabelCultureText(input, "searchSnippet");
 }
 
-export function buildLabelSeoDescription(input: LabelLike | RepairedLabelDetail): string {
+export function buildLabelSeoDescription(input: LabelLike | PublicLabelDetail): string {
   return buildLabelCultureText(input, "seoDescription");
 }

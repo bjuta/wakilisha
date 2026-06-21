@@ -625,4 +625,137 @@ CREATE OR REPLACE VIEW wk_chart_eligibility_rules_v2 AS
 SELECT id::text, version AS eligibility_version, rules AS eligibility_payload, created_at, updated_at
 FROM chart_eligibility_profiles;
 
+CREATE OR REPLACE FUNCTION public.public_get_taxonomy_index(
+  p_taxonomy text,
+  p_limit integer DEFAULT 50,
+  p_offset integer DEFAULT 0
+)
+ RETURNS TABLE(
+  name text,
+  slug text,
+  description text,
+  article_count bigint,
+  taxonomy text
+)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+AS $function$
+  SELECT
+    t.name,
+    t.slug,
+    t.description,
+    COUNT(DISTINCT articles.id) AS article_count,
+    t.taxonomy
+  FROM public.registry_taxonomy_terms t
+  LEFT JOIN public.wk_articles articles ON articles.wp_status = 'publish'
+    AND (
+      EXISTS (
+        SELECT 1 FROM jsonb_array_elements(articles.categories) AS elem
+        WHERE elem->>'name' = t.name
+          OR (jsonb_typeof(elem) = 'string' AND elem #>> '{}' = t.name)
+      )
+      OR (
+        p_taxonomy = 'post_tag'
+        AND EXISTS (
+          SELECT 1 FROM jsonb_array_elements(articles.tags) AS elem
+          WHERE elem->>'name' = t.name
+            OR (jsonb_typeof(elem) = 'string' AND elem #>> '{}' = t.name)
+        )
+      )
+    )
+  WHERE t.taxonomy = p_taxonomy
+    AND t.status = 'active'
+  GROUP BY t.id, t.name, t.slug, t.description, t.taxonomy
+  ORDER BY article_count DESC, t.name ASC
+  LIMIT CASE WHEN p_limit > 0 THEN p_limit END
+  OFFSET p_offset;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.public_get_articles_by_term(
+  p_taxonomy text,
+  p_term_name text,
+  p_limit integer DEFAULT 20,
+  p_offset integer DEFAULT 0
+)
+ RETURNS TABLE(
+  id uuid,
+  slug text,
+  title text,
+  excerpt text,
+  content_html text,
+  author text,
+  published_at timestamptz,
+  categories jsonb,
+  tags jsonb,
+  seo jsonb,
+  wp_status text,
+  hero_image_url text,
+  created_at timestamptz,
+  updated_at timestamptz
+)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+AS $function$
+  SELECT
+    a.id,
+    a.slug,
+    a.title,
+    a.excerpt,
+    a.content_html,
+    a.author,
+    a.published_at,
+    a.categories,
+    a.tags,
+    a.seo,
+    a.wp_status,
+    a.hero_image_url,
+    a.created_at,
+    a.updated_at
+  FROM public.wk_articles a
+  WHERE a.wp_status = 'publish'
+    AND (
+      (p_taxonomy = 'category' AND EXISTS (
+        SELECT 1 FROM jsonb_array_elements(a.categories) AS elem
+        WHERE elem->>'name' = p_term_name
+          OR (jsonb_typeof(elem) = 'string' AND elem #>> '{}' = p_term_name)
+      ))
+      OR (p_taxonomy = 'post_tag' AND EXISTS (
+        SELECT 1 FROM jsonb_array_elements(a.tags) AS elem
+        WHERE elem->>'name' = p_term_name
+          OR (jsonb_typeof(elem) = 'string' AND elem #>> '{}' = p_term_name)
+      ))
+    )
+  ORDER BY a.published_at DESC NULLS LAST
+  LIMIT CASE WHEN p_limit > 0 THEN p_limit END
+  OFFSET p_offset;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.get_taxonomy_article_counts(p_taxonomy text)
+ RETURNS TABLE(term_name text, article_count bigint)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+AS $function$
+  SELECT
+    t.name AS term_name,
+    COUNT(DISTINCT a.id) AS article_count
+  FROM public.registry_taxonomy_terms t
+  LEFT JOIN public.wk_articles a ON a.wp_status = 'publish'
+    AND (
+      (p_taxonomy = 'category' AND EXISTS (
+        SELECT 1 FROM jsonb_array_elements(a.categories) AS elem
+        WHERE elem->>'name' = t.name
+          OR (jsonb_typeof(elem) = 'string' AND elem #>> '{}' = t.name)
+      ))
+      OR (p_taxonomy = 'post_tag' AND EXISTS (
+        SELECT 1 FROM jsonb_array_elements(a.tags) AS elem
+        WHERE elem->>'name' = t.name
+          OR (jsonb_typeof(elem) = 'string' AND elem #>> '{}' = t.name)
+      ))
+    )
+  WHERE t.taxonomy = p_taxonomy
+    AND t.status = 'active'
+  GROUP BY t.name
+  ORDER BY article_count DESC;
+$function$;
+
 COMMIT;

@@ -2,11 +2,18 @@ import { useParams, Link } from "react-router-dom";
 import MobileVeniceGuide from "./components/MobileVeniceGuide";
 import MobileDakarGuide from "./components/MobileDakarGuide";
 import MobileReadingGuide from "./components/MobileReadingGuide";
+import { useScrollDepthTracking } from "@/hooks/useScrollDepthTracking";
 
 const SUPPORTED_SLUGS = ["in-minor-keys", "dakar-biennale-2026", "the-day-reading-changed"];
 
 export default function MobileGuideDetail() {
   const { slug } = useParams<{ slug: string }>();
+
+  useScrollDepthTracking({
+    pageType: "guide_detail",
+    entitySlug: slug,
+    entityType: "guide",
+  });
 
   if (!slug || !SUPPORTED_SLUGS.includes(slug)) {
     return (

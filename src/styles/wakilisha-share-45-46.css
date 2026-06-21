@@ -1,1 +1,397 @@
-.share-sheet-backdrop{position:fixed;inset:0;z-index:260;display:flex;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.56);backdrop-filter:blur(12px)}.share-sheet{max-width:620px;border-radius:30px 30px 0 0;background:var(--wk-surface);border:1px solid var(--wk-border);padding:22px;box-shadow:0 -24px 96px rgba(0,0,0,.42)}.share-handle{width:44px;height:4px;border-radius:999px;background:var(--wk-border-strong);margin:0 auto 18px}.share-title{font:900 24px/1 var(--wk-font-display);letter-spacing:-.04em;color:var(--wk-text)}.share-sub{font:400 12px/1.45 var(--wk-font-body);color:var(--wk-text-muted);margin-top:6px;max-width:44ch}.share-preview{display:grid;grid-template-columns:74px 1fr;gap:13px;align-items:center;padding:12px;border:1px solid var(--wk-border);border-radius:18px;background:var(--wk-bg-subtle);margin:16px 0}.share-preview-art{width:74px;height:74px;border-radius:14px;background:linear-gradient(135deg,#1a2a10,#0d0d0a);overflow:hidden;display:flex;align-items:center;justify-content:center}.share-preview-art:empty:before{content:'W';font:900 26px/1 var(--wk-font-display);color:var(--wk-brand)}.share-preview-art img,.share-og-img img{width:100%;height:100%;object-fit:cover}.share-preview-title{font:900 16px/1.1 var(--wk-font-ui);color:var(--wk-text);letter-spacing:-.02em}.share-preview-sub{font:600 12px/1.35 var(--wk-font-ui);color:var(--wk-text-muted);margin-top:5px}.share-destinations{display:grid;grid-template-columns:repeat(8,1fr);gap:6px;margin:14px 0}.share-dest{display:flex;flex-direction:column;align-items:center;gap:4px;border:1px solid var(--wk-border);border-radius:14px;background:var(--wk-surface);padding:8px 4px;color:var(--wk-text-muted);transition:border-color .16s ease,transform .16s ease,color .16s ease;position:relative}.share-dest:hover{transform:translateY(-2px);border-color:var(--wk-brand);color:var(--wk-text)}.share-dest-icon{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--wk-bg-subtle)}.share-dest-label{font:800 8px/1 var(--wk-font-ui);letter-spacing:.04em;text-transform:uppercase}.share-dest-count{position:absolute;top:-4px;right:-4px;min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:var(--wk-brand);color:var(--wk-brand-on);font:700 9px/1 var(--wk-font-ui);display:flex;align-items:center;justify-content:center}.share-dest-pending{position:absolute;top:-2px;right:-2px;width:14px;height:14px;border-radius:50%;background:var(--wk-bg-subtle);display:flex;align-items:center;justify-content:center;color:var(--wk-brand)}.share-link-row{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:12px}.share-link-input{min-width:0;height:38px;border:1px solid var(--wk-border);border-radius:999px;background:var(--wk-bg-subtle);padding:0 13px;font:600 12px/1 var(--wk-font-ui);color:var(--wk-text-muted)}.share-og-card{display:grid;grid-template-columns:132px 1fr;gap:0;margin-top:16px;border:1px solid var(--wk-border);border-radius:18px;overflow:hidden;background:var(--wk-bg-subtle)}.share-og-img{height:132px;background:radial-gradient(circle at 18% 18%,rgba(132,194,65,.35),transparent 42%),linear-gradient(135deg,#10150d,#050605);display:flex;align-items:center;justify-content:center}.share-og-img:empty:before{content:'WAKILISHA';font:900 11px/1 var(--wk-font-ui);letter-spacing:.18em;color:var(--wk-brand)}.share-og-body{padding:14px}.share-og-url{font:900 9px/1 var(--wk-font-ui);letter-spacing:.14em;text-transform:uppercase;color:var(--wk-brand);margin-bottom:8px}.share-og-title{font:900 18px/1.05 var(--wk-font-display);letter-spacing:-.035em;color:var(--wk-text)}.share-og-desc{font:400 12px/1.45 var(--wk-font-body);color:var(--wk-text-muted);margin-top:7px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}.share-timestamp{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:10px 0;padding:10px;border-radius:14px;background:var(--wk-bg-subtle);border:1px solid var(--wk-border)}.share-timestamp-label{font:800 10px/1 var(--wk-font-ui);letter-spacing:.14em;text-transform:uppercase;color:var(--wk-text-faint)}.share-timestamp-toggle{display:flex;align-items:center;gap:6px;font:800 12px/1 var(--wk-font-ui);color:var(--wk-brand)}.wk-lucide-note{display:inline-flex;align-items:center;gap:6px;font:800 9px/1 var(--wk-font-ui);letter-spacing:.14em;text-transform:uppercase;color:var(--wk-text-faint)}.wk-lucide-note svg{stroke-width:2;stroke-linecap:round;stroke-linejoin:round}@media(max-width:720px){.share-sheet{max-width:100%;padding:18px}.share-destinations{grid-template-columns:repeat(4,1fr)}.share-og-card{grid-template-columns:96px 1fr}.share-og-img{height:96px}.share-link-row{grid-template-columns:1fr}.share-sheet-backdrop{align-items:flex-end}}
+/* ── Wakilisha Share — Unified across popover and sheet ── */
+
+/* ═══════════════════════════════════════════════════════════════
+   BACKDROP + SHEET SHELL
+   z-index must exceed all app chrome (nav: 80, miniplayer: 82,
+   full-player: 90, more-menu: 61). Use 300 to stay well above.
+   ═══════════════════════════════════════════════════════════════ */
+
+.share-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.56);
+  backdrop-filter: blur(12px);
+  animation: share-backdrop-in 0.2s ease;
+}
+
+@keyframes share-backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.share-sheet {
+  max-width: 620px;
+  width: 100%;
+  border-radius: 30px 30px 0 0;
+  background: var(--wk-surface);
+  border: 1px solid var(--wk-border);
+  box-shadow: 0 -24px 96px rgba(0, 0, 0, 0.42);
+  animation: share-sheet-in 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+  display: flex;
+  flex-direction: column;
+  /* Leave room for the bottom nav + safe-area so content never hides behind it */
+  max-height: calc(100dvh - 80px);
+}
+
+@keyframes share-sheet-in {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+/* Drag handle */
+.share-handle {
+  flex-shrink: 0;
+  padding: 14px 0 8px;
+  display: flex;
+  justify-content: center;
+  cursor: grab;
+  touch-action: none;
+}
+
+.share-handle:active {
+  cursor: grabbing;
+}
+
+.share-handle-bar {
+  width: 40px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--wk-border-strong);
+  opacity: 0.6;
+}
+
+/* Scrollable content area — bottom padding accounts for nav + safe-area */
+.share-sheet-scroll {
+  overflow-y: auto;
+  padding: 0 20px 24px;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   HEADER
+   ═══════════════════════════════════════════════════════════════ */
+
+.share-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding-top: 2px;
+}
+
+.share-close-btn {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--wk-surface-raised);
+  color: var(--wk-text-muted);
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.share-close-btn:hover {
+  background: var(--wk-border);
+}
+
+.share-title {
+  font: 900 22px/1.1 var(--wk-font-display);
+  letter-spacing: -0.04em;
+  color: var(--wk-text);
+}
+
+.share-sub {
+  font: 400 12px/1.45 var(--wk-font-body);
+  color: var(--wk-text-muted);
+  margin-top: 6px;
+  max-width: 44ch;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   COMPACT PREVIEW — shared across popover + sheet
+   ═══════════════════════════════════════════════════════════════ */
+
+.share-preview {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--wk-border);
+  border-radius: 14px;
+  background: var(--wk-bg-subtle);
+  margin-bottom: 14px;
+}
+
+.share-preview-art {
+  flex-shrink: 0;
+  width: 52px;
+  height: 52px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #1a2a10, #0d0d0a);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.share-preview-art:empty::before {
+  content: 'W';
+  font: 900 24px/1 var(--wk-font-display);
+  color: var(--wk-brand);
+}
+
+.share-preview-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.share-preview-text {
+  min-width: 0;
+}
+
+.share-preview-title {
+  font: 900 15px/1.2 var(--wk-font-ui);
+  color: var(--wk-text);
+  letter-spacing: -0.02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.share-preview-sub {
+  font: 600 12px/1.35 var(--wk-font-ui);
+  color: var(--wk-text-muted);
+  margin-top: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   TIMESTAMP
+   ═══════════════════════════════════════════════════════════════ */
+
+.share-timestamp {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--wk-bg-subtle);
+  border: 1px solid var(--wk-border);
+}
+
+.share-timestamp-label {
+  font: 800 10px/1 var(--wk-font-ui);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--wk-text-faint);
+}
+
+.share-timestamp-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font: 800 12px/1 var(--wk-font-ui);
+  color: var(--wk-brand);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   PLATFORM GRID — solid brand colors, white icons
+   Shared across popover and sheet
+   ═══════════════════════════════════════════════════════════════ */
+
+.share-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.share-sheet-grid-wrap {
+  margin-bottom: 16px;
+}
+
+.share-grid-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  border-radius: 14px;
+  background: transparent;
+  padding: 6px 2px;
+  color: var(--wk-text-muted);
+  transition: transform 0.16s ease, color 0.16s ease;
+  position: relative;
+  cursor: pointer;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.share-grid-item:hover {
+  transform: translateY(-2px);
+  color: var(--wk-text);
+}
+
+.share-grid-item:active {
+  transform: scale(0.95);
+}
+
+.share-grid-icon {
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.10);
+}
+
+.share-grid-item:hover .share-grid-icon {
+  transform: scale(1.06);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.16);
+}
+
+.share-grid-badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--wk-brand);
+  color: var(--wk-brand-on);
+  font: 700 9px/1 var(--wk-font-ui);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.share-grid-pending {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--wk-bg-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--wk-brand);
+  font-size: 10px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   COPY LINK ROW
+   ═══════════════════════════════════════════════════════════════ */
+
+.share-copy-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+
+.share-copy-input {
+  min-width: 0;
+  height: 44px;
+  border: 1px solid var(--wk-border);
+  border-radius: 12px;
+  background: var(--wk-bg-subtle);
+  padding: 0 14px;
+  font: 600 12px/1 var(--wk-font-ui);
+  color: var(--wk-text-muted);
+  outline: none;
+}
+
+.share-copy-btn {
+  height: 44px;
+  padding: 0 18px;
+  border-radius: 12px;
+  background: var(--wk-brand);
+  color: var(--wk-brand-on);
+  font: 700 13px/1 var(--wk-font-ui);
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.share-copy-btn:hover {
+  opacity: 0.9;
+}
+
+.share-copy-btn:active {
+  transform: scale(0.97);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MOBILE
+   ═══════════════════════════════════════════════════════════════ */
+
+@media (max-width: 720px) {
+  .share-sheet {
+    max-width: 100%;
+    border-radius: 24px 24px 0 0;
+    /* Ensure the sheet never extends behind the bottom nav (64px + safe-area) */
+    max-height: calc(100dvh - 64px - max(env(safe-area-inset-bottom), 8px) - 16px);
+  }
+
+  .share-sheet-scroll {
+    /* Extra bottom padding so the last row of icons / copy button isn't hidden */
+    padding: 0 16px calc(20px + 64px + max(env(safe-area-inset-bottom), 8px));
+  }
+
+  .share-title {
+    font-size: 20px;
+  }
+
+  .share-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+
+  .share-grid-item {
+    padding: 6px 2px;
+    gap: 6px;
+  }
+
+  .share-preview {
+    padding: 8px 10px;
+    gap: 10px;
+  }
+
+  .share-preview-art {
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+  }
+
+  .share-preview-title {
+    font-size: 14px;
+  }
+
+  .share-copy-row {
+    grid-template-columns: 1fr;
+  }
+
+  .share-copy-btn {
+    justify-content: center;
+  }
+}

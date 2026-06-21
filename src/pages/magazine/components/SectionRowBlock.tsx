@@ -82,8 +82,9 @@ function LargeVariant({ stories }: { stories: MagazineArticle[] }) {
             <div className="w-16 h-16 shrink-0 rounded-xl overflow-hidden bg-[var(--wk-surface-raised)]">
               <img
                 src={story.heroUrl}
-                alt=""
-                className="w-full h-full object-cover object-top transition-transform duration-400 group-hover:scale-110"
+                alt={story.title}
+                loading="lazy"
+                className="w-full h-full object-cover object-top"
               />
             </div>
             <div className="min-w-0 flex-1 flex flex-col gap-1">
@@ -116,8 +117,9 @@ function ListVariant({ stories }: { stories: MagazineArticle[] }) {
           <div className="relative aspect-[4/3] overflow-hidden bg-[var(--wk-surface-raised)]">
             <img
               src={story.heroUrl}
-              alt=""
-              className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
+              alt={story.title}
+              loading="lazy"
+              className="w-full h-full object-cover object-top"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
             {/* Rank dot for top 3 */}
@@ -169,8 +171,9 @@ function GridVariant({ stories }: { stories: MagazineArticle[] }) {
           <div className="relative aspect-[16/10] overflow-hidden bg-[var(--wk-surface-raised)]">
             <img
               src={primary.heroUrl}
-              alt=""
-              className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
+              alt={primary.title}
+              loading="lazy"
+              className="w-full h-full object-cover object-top"
             />
           </div>
           <div className="p-5 flex flex-col gap-2 flex-1">
@@ -202,8 +205,9 @@ function GridVariant({ stories }: { stories: MagazineArticle[] }) {
             <div className="w-16 h-16 shrink-0 rounded-xl overflow-hidden bg-[var(--wk-surface-raised)]">
               <img
                 src={story.heroUrl}
-                alt=""
-                className="w-full h-full object-cover object-top transition-transform duration-400 group-hover:scale-110"
+                alt={story.title}
+                loading="lazy"
+                className="w-full h-full object-cover object-top"
               />
             </div>
             <div className="min-w-0 flex-1 flex flex-col gap-1">

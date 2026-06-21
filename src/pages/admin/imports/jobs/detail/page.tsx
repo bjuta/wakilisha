@@ -679,7 +679,7 @@ function OverviewTab({ run, summary, onProcess, processing }: { run: IngestionRu
               Import Review Flags
             </h3>
             <p className="mb-4 text-[12px] text-wk-text-muted">
-              <span className="font-bold text-wk-text">{(reviewItems.total_fields_flagged as number)} fields</span> were imported into metadata JSONB because they don&apos;t have dedicated UI columns yet. Review these and decide if new columns or admin fields are needed.
+              <span className="font-bold text-wk-text">{(reviewItems.total_fields_flagged as number)} fields</span> were imported into metadata JSONB because they don't have dedicated UI columns yet. Review these and decide if new columns or admin fields are needed.
             </p>
 
             {/* By entity summary */}

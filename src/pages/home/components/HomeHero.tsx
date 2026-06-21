@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import type { ChartEditionEntry } from "@/services/chartsPublic/types";
-import type { RepairedStory } from "@/services/repairedContent/client";
+import type { PublicStory } from "@/services/publicContent/client";
 
 interface Props {
   chartEntries: ChartEditionEntry[];
-  stories: RepairedStory[];
+  stories: PublicStory[];
   loading: boolean;
 }
 
@@ -47,7 +47,7 @@ function ChartPortalCard({ entries, loading }: { entries: ChartEditionEntry[]; l
             <div key={entry.trackSlug || i} className="flex items-center gap-3 py-1.5">
               <span className="w-5 text-[11px] font-bold text-white/40 tabular-nums shrink-0">{String(i + 1).padStart(2, "0")}</span>
               {entry.artworkUrl ? (
-                <img src={entry.artworkUrl} alt="" className="w-9 h-9 rounded-md object-cover shrink-0" loading="lazy" />
+                <img src={entry.artworkUrl} alt={entry.title} loading="lazy" className="w-9 h-9 rounded-md object-cover shrink-0" />
               ) : (
                 <div className="w-9 h-9 rounded-md bg-white/5 shrink-0 flex items-center justify-center">
                   <i className="ri-music-line text-white/25 text-sm" />
@@ -70,7 +70,7 @@ function ChartPortalCard({ entries, loading }: { entries: ChartEditionEntry[]; l
   );
 }
 
-function MagazinePortalCard({ stories, loading }: { stories: RepairedStory[]; loading: boolean }) {
+function MagazinePortalCard({ stories, loading }: { stories: PublicStory[]; loading: boolean }) {
   const latest = stories[0];
 
   return (
@@ -99,7 +99,7 @@ function MagazinePortalCard({ stories, loading }: { stories: RepairedStory[]; lo
         <div className="relative z-10 flex-1">
           {latest.heroUrl && (
             <div className="relative aspect-[16/9] rounded-lg overflow-hidden mb-3">
-              <img src={latest.heroUrl} alt="" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" />
+              <img src={latest.heroUrl} alt={latest.title} loading="lazy" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
               <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
               {latest.section && (
                 <span className="absolute top-2 left-2 text-[9px] font-black uppercase tracking-[0.14em] px-2 py-0.5 rounded-full bg-[var(--wk-v-film)]/20 text-[var(--wk-v-film)] border border-[var(--wk-v-film)]/25">

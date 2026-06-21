@@ -1,3 +1,4 @@
+// ... existing imports ...
 import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
@@ -49,8 +50,9 @@ function DiscographyCard({ release, artistName }: { release: DiscoRelease; artis
         {release.artworkUrl ? (
           <img
             src={release.artworkUrl}
-            alt={release.title}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            alt={`${release.title} artwork`}
+            loading="lazy"
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-[var(--wk-surface-raised)]">
@@ -86,6 +88,8 @@ function DiscographyCard({ release, artistName }: { release: DiscoRelease; artis
   );
 }
 
+const INITIAL_COUNT = 20;
+
 export function ArtistDiscography({
   releases,
   eyebrow = "Discography",
@@ -95,6 +99,7 @@ export function ArtistDiscography({
   artistName,
 }: ArtistDiscographyProps) {
   const [filter, setFilter] = useState<Filter>("All");
+  const [visibleCount, setVisibleCount] = useState(INITIAL_COUNT);
   const { ref, revealed } = useScrollReveal<HTMLElement>(0.1);
 
   const sortedReleases = useMemo(() => {
@@ -113,12 +118,24 @@ export function ArtistDiscography({
     return true;
   });
 
+  const visible = filtered.slice(0, visibleCount);
+  const hasMore = filtered.length > visibleCount;
+
   const filters: Filter[] = ["All", "Albums", "EPs", "Singles"];
   const counts: Record<Filter, number> = {
     All: sortedReleases.length,
     Albums: sortedReleases.filter((r) => (r.releaseType || "").toLowerCase() === "album").length,
     EPs: sortedReleases.filter((r) => (r.releaseType || "").toLowerCase() === "ep").length,
     Singles: sortedReleases.filter((r) => (r.releaseType || "").toLowerCase() === "single").length,
+  };
+
+  const handleFilterChange = (f: Filter) => {
+    setFilter(f);
+    setVisibleCount(INITIAL_COUNT);
+  };
+
+  const handleLoadMore = () => {
+    setVisibleCount((prev) => prev + INITIAL_COUNT);
   };
 
   return (
@@ -139,7 +156,7 @@ export function ArtistDiscography({
           {filters.map((f) => (
             <button
               key={f}
-              onClick={() => setFilter(f)}
+              onClick={() => handleFilterChange(f)}
               className={`rounded-full px-4 py-1.5 text-[12px] font-bold transition-all whitespace-nowrap ${
                 filter === f
                   ? "bg-[var(--wk-brand)] text-white"
@@ -164,11 +181,28 @@ export function ArtistDiscography({
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-5">
-          {filtered.map((release) => (
-            <DiscographyCard key={release.slug} release={release} artistName={artistName} />
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 gap-4 md:gap-5">
+            {visible.map((release) => (
+              <DiscographyCard key={release.slug} release={release} artistName={artistName} />
+            ))}
+          </div>
+
+          {hasMore && (
+            <div className="mt-10 flex justify-center">
+              <button
+                onClick={handleLoadMore}
+                className="inline-flex items-center gap-2 rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] px-6 py-2.5 text-[13px] font-bold text-[var(--wk-text)] hover:bg-[var(--wk-surface-raised)] hover:border-[var(--wk-brand)]/30 transition-all whitespace-nowrap"
+              >
+                <i className="ri-add-line text-[var(--wk-brand)]" />
+                Load more
+                <span className="text-[11px] font-semibold text-[var(--wk-text-faint)] ml-1">
+                  ({filtered.length - visibleCount} remaining)
+                </span>
+              </button>
+            </div>
+          )}
+        </>
       )}
     </section>
   );

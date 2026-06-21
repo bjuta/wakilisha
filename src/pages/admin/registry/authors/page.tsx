@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { fetchAllAuthors, type AuthorRow } from "@/services/authorProfiles";
@@ -12,12 +12,22 @@ export default function AuthorsPage() {
   const [query, setQuery] = useState("");
   const [sortMode, setSortMode] = useState<SortMode>("recent");
 
-  useEffect(() => {
-    fetchAllAuthors().then((data) => {
+  const [error, setError] = useState<string | null>(null);
+
+  const loadAuthors = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await fetchAllAuthors();
       setAuthors(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load authors");
+    } finally {
       setLoading(false);
-    });
+    }
   }, []);
+
+  useEffect(() => { loadAuthors(); }, [loadAuthors]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -101,6 +111,17 @@ export default function AuthorsPage() {
         <section className="overflow-hidden rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)]">
           {loading ? (
             <div className="p-8 text-sm text-[var(--wk-text-muted)] animate-pulse">Loading authors…</div>
+          ) : error ? (
+            <div className="p-8 text-center">
+              <p className="text-sm text-[var(--wk-danger)] mb-3">Failed to load authors: {error}</p>
+              <button
+                onClick={loadAuthors}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-4 py-2 text-sm font-bold text-[var(--wk-brand)] hover:bg-[var(--wk-brand-soft)] transition-colors cursor-pointer"
+              >
+                <WkIcon name="RefreshCw" size={13} />
+                Retry
+              </button>
+            </div>
           ) : filtered.length === 0 ? (
             <div className="p-8 text-sm text-[var(--wk-text-muted)]">
               {query ? "No authors match your search." : "No authors in the registry yet."}

@@ -13,9 +13,6 @@ const MORE_NETWORKS = [
   { id: "telegram", label: "Telegram", icon: "ri-telegram-line" },
   { id: "reddit", label: "Reddit", icon: "ri-reddit-line" },
   { id: "pinterest", label: "Pinterest", icon: "ri-pinterest-line" },
-  { id: "tumblr", label: "Tumblr", icon: "ri-tumblr-fill" },
-  { id: "pocket", label: "Pocket", icon: "ri-bookmark-line" },
-  { id: "line", label: "Line", icon: "ri-chat-1-line" },
   { id: "messenger", label: "Messenger", icon: "ri-messenger-line" },
 ];
 
@@ -60,16 +57,6 @@ export default function DakarShareSection({ position = "top" }: { position?: "to
     }
   }, [share.url]);
 
-  const handleNativeShare = useCallback(async () => {
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: share.title, text: share.description, url: share.url });
-      } catch {
-        // user cancelled
-      }
-    }
-  }, [share]);
-
   return (
     <section className="w-full py-6 border-b border-[var(--wk-divider)]" style={{ background: "var(--wk-bg)" }}>
       <div className="wk-container-wide px-6 flex flex-wrap items-center gap-3">
@@ -98,17 +85,6 @@ export default function DakarShareSection({ position = "top" }: { position?: "to
           >
             <i className={`${copied ? "ri-check-line" : "ri-link"} text-sm`} />
           </button>
-          {navigator.share && (
-            <button
-              type="button"
-              onClick={handleNativeShare}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-[var(--wk-text-muted)] hover:text-[var(--wk-text)] transition-colors rounded-md hover:bg-[var(--wk-surface-raised)]"
-              aria-label="Share"
-              title="Share"
-            >
-              <i className="ri-share-line text-sm" />
-            </button>
-          )}
           <button
             type="button"
             onClick={() => setShowMore(true)}

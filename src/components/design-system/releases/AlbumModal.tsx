@@ -3,8 +3,8 @@ import { Link } from "react-router-dom";
 import { useScrollLock } from "@/hooks/useScrollLock";
 import { ShareButton } from "@/components/design-system/share/ShareSheet";
 import { WkIcon } from "@/components/design-system/Icon";
-import { usePlayer } from "@/context/PlayerContext";
-import { releaseUrl } from "@/services/repairedContent/client";
+import { usePlayer, type PlaySource } from "@/context/PlayerContext";
+import { releaseUrl } from "@/services/publicContent/client";
 
 export interface ModalRelease {
   slug: string;
@@ -22,6 +22,7 @@ interface AlbumModalProps {
   release: ModalRelease | null;
   open: boolean;
   onClose: () => void;
+  playSource?: PlaySource;
 }
 
 function resolveTracks(release: ModalRelease): Array<{ title: string; artist: string; duration: string; featuredArtists: string; previewUrl?: string }> {
@@ -43,7 +44,7 @@ function resolveTracks(release: ModalRelease): Array<{ title: string; artist: st
   return [];
 }
 
-export function AlbumModal({ release, open, onClose }: AlbumModalProps) {
+export function AlbumModal({ release, open, onClose, playSource }: AlbumModalProps) {
   useScrollLock(open);
   const { currentTrack, isPlaying, playTrack, togglePlay } = usePlayer();
 
@@ -69,7 +70,7 @@ export function AlbumModal({ release, open, onClose }: AlbumModalProps) {
       return;
     }
 
-    playTrack(queueTracks[0], queueTracks);
+    playTrack(queueTracks[0], queueTracks, playSource);
   };
 
   const handlePlayTrack = (trackIndex: number) => {
@@ -103,7 +104,7 @@ export function AlbumModal({ release, open, onClose }: AlbumModalProps) {
       return;
     }
 
-    playTrack(queueTracks[0], fullQueue);
+    playTrack(queueTracks[0], fullQueue, playSource);
   };
 
   const isThisReleasePlaying = currentTrack?.album === release.title && isPlaying;

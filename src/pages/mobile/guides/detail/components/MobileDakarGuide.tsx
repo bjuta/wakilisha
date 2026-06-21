@@ -1,11 +1,31 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { trackEvent, getAnalyticsSessionId, getCanonicalPageUrl } from "@/services/analytics";
 import { dakarData } from "@/pages/guides/detail/dakarData";
+import { MobileShareButton } from "@/components/design-system/share/ShareSheet";
 
 export default function MobileDakarGuide() {
   const { hero, share, argument, anatomy, disciplines, watchlist, timeline, follow } = dakarData;
   const [shareOpen, setShareOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  const sessionId = getAnalyticsSessionId();
+  const pageUrl = getCanonicalPageUrl();
+  const guideSlug = "dakar-biennale-2026";
+  const guideTitle = `${follow.title} ${follow.titleItalic || ""}`;
+
+  const handleFollowSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    trackEvent("newsletter_signup", {
+      pageType: "guide_detail",
+      entitySlug: guideSlug,
+      entityType: "guide",
+      context: {
+        source_section: "follow_form_mobile",
+        guide_title: guideTitle,
+        guide_slug: guideSlug,
+      },
+    });
+  };
 
   const handleCopy = () => {
     navigator.clipboard?.writeText(share.url);
@@ -25,9 +45,6 @@ export default function MobileDakarGuide() {
     { icon: "ri-telegram-line", label: "Telegram", href: `https://t.me/share/url?url=${encodeURIComponent(share.url)}&text=${encodeURIComponent(share.title)}`, color: "#26A5E4" },
     { icon: "ri-reddit-line", label: "Reddit", href: `https://www.reddit.com/submit?url=${encodeURIComponent(share.url)}&title=${encodeURIComponent(share.title)}`, color: "#FF4500" },
     { icon: "ri-pinterest-line", label: "Pinterest", href: `https://pinterest.com/pin/create/button/?url=${encodeURIComponent(share.url)}`, color: "#BD081C" },
-    { icon: "ri-tumblr-line", label: "Tumblr", href: `https://www.tumblr.com/share/link?url=${encodeURIComponent(share.url)}`, color: "#35465C" },
-    { icon: "ri-bookmark-line", label: "Pocket", href: `https://getpocket.com/save?url=${encodeURIComponent(share.url)}`, color: "#EF4056" },
-    { icon: "ri-line-line", label: "Line", href: `https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(share.url)}`, color: "#00B900" },
     { icon: "ri-messenger-line", label: "Messenger", href: `https://www.facebook.com/dialog/send?link=${encodeURIComponent(share.url)}&app_id=0`, color: "#00B2FF" },
   ];
 
@@ -85,7 +102,17 @@ export default function MobileDakarGuide() {
           <Link to="/guides" className="flex items-center gap-1.5 rounded-full border border-white/20 bg-black/25 backdrop-blur-sm px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-white/85 whitespace-nowrap">
             <i className="ri-arrow-left-line text-[12px]" /> Guides
           </Link>
-          <span className="rounded-full bg-white/10 backdrop-blur-sm border border-white/20 px-3 py-1 text-[9px] font-semibold uppercase tracking-wider text-white">{hero.badge}</span>
+          <div className="flex items-center gap-2">
+            <span className="rounded-full bg-white/10 backdrop-blur-sm border border-white/20 px-3 py-1 text-[9px] font-semibold uppercase tracking-wider text-white">{hero.badge}</span>
+            <MobileShareButton
+              item={{
+                title: "Dakar Biennale 2026",
+                subtitle: share.description,
+                description: share.description,
+                type: "page",
+              }}
+            />
+          </div>
         </div>
         <div className="relative z-10 px-4 pt-8 pb-6">
           <p className="text-[11px] font-medium uppercase tracking-wider text-white/80 mb-2">{hero.kicker}</p>
@@ -245,8 +272,13 @@ export default function MobileDakarGuide() {
               action="https://readdy.ai/api/form/d8m5rsojb57qogjbh760"
               method="POST"
               data-readdy-form=""
+              onSubmit={handleFollowSubmit}
               className="space-y-3"
             >
+              <input type="hidden" name="wk_session_id" value={sessionId} />
+              <input type="hidden" name="wk_page_url" value={pageUrl} />
+              <input type="hidden" name="wk_page_type" value="guide_detail" />
+              <input type="hidden" name="wk_source_section" value="follow_form_mobile" />
               <div>
                 <label className="block text-[11px] font-bold text-[var(--wk-text)] mb-1">{follow.form.emailLabel}</label>
                 <input

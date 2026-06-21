@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import {
   useMagazineArticle,
@@ -6,13 +6,27 @@ import {
   type MagazineArticle,
 } from "@/services/magazineArticles";
 import { getAuthorMeta } from "@/services/authorProfiles";
+import { getShareCounts, getTotalShareCount } from "@/services/shareTracking";
+import { transformReleaseShortcodes } from "@/utils/transformReleaseShortcodes";
+import { transformArtistShortcodes } from "@/utils/transformArtistShortcodes";
+import { transformTrackShortcodes } from "@/utils/transformTrackShortcodes";
 import { SkeletonArticlePage } from "@/components/skeletons/Skeletons";
 import { Chapter19FallbackImage } from "@/components/media/Chapter19FallbackImage";
+import { ArticleContentRenderer, transformArticleHtmlForVideoEmbeds } from "@/pages/magazine/article/components/ArticleVideoEmbeds";
+import { transformArticleHtmlForReleaseEmbeds } from "@/pages/magazine/article/components/ArticleReleaseEmbeds";
+import { resolveArtistMarkers } from "@/pages/magazine/article/components/ArticleArtistEmbeds";
+import { resolveTrackMarkers } from "@/pages/magazine/article/components/ArticleTrackEmbeds";
+import { buildContentSegments } from "@/pages/magazine/article/components/ArticleEmbedUtils";
+import { injectMediaCaptions, buildAssetCaptionMap } from "@/utils/injectMediaCaptions";
+import { MobileShareButton } from "@/components/design-system/share/ShareSheet";
+import { useScrollDepthTracking } from "@/hooks/useScrollDepthTracking";
 
 function formatReadCount(count: number): string {
   if (count >= 1000) return `${(count / 1000).toFixed(1)}k`;
   return String(count);
 }
+
+
 
 const SECTION_COLORS: Record<string, string> = {
   Analysis: "#C44A3B", Focus: "#D97706", Industry: "#78716C",
@@ -63,13 +77,78 @@ export default function MobileArticle() {
   const [searchParams] = useSearchParams();
   const previewNonce = searchParams.get("preview");
 
+  useScrollDepthTracking({
+    pageType: "article",
+    entitySlug: slug,
+    entityType: "article",
+  });
+
   const { article, loading, error } = useMagazineArticle(slug, previewNonce);
   const { articles: allArticles } = useMagazineArticles();
 
   const [copyToast, setCopyToast] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [shareCounts, setShareCounts] = useState<Record<string, number>>({});
+
+  const contentHtml = article?.contentHtml ?? "";
+  const shortcodeMarked = useMemo(
+    () => transformTrackShortcodes(transformReleaseShortcodes(transformArtistShortcodes(contentHtml))),
+    [contentHtml]
+  );
+  const { markedHtml: videoMarked, videos: videoEmbeds } = useMemo(
+    () => transformArticleHtmlForVideoEmbeds(shortcodeMarked),
+    [shortcodeMarked]
+  );
+  const { markedHtml: releaseMarked, releases: releaseEmbeds } = useMemo(
+    () => transformArticleHtmlForReleaseEmbeds(videoMarked),
+    [videoMarked]
+  );
+
+  const [finalHtml, setFinalHtml] = useState(releaseMarked);
+  const [artistEmbeds, setArtistEmbeds] = useState<import("@/pages/magazine/article/components/ArticleArtistEmbeds").ArtistEmbedData[]>([]);
+  const [trackEmbeds, setTrackEmbeds] = useState<import("@/pages/magazine/article/components/ArticleTrackEmbeds").TrackEmbedData[]>([]);
+
+  useEffect(() => {
+    let alive = true;
+    async function process() {
+      const resolved = await resolveArtistMarkers(releaseMarked);
+      if (!alive) return;
+      const trackResolved = await resolveTrackMarkers(resolved.markedHtml);
+      if (!alive) return;
+      setFinalHtml(trackResolved.markedHtml);
+      setArtistEmbeds(resolved.artists);
+      setTrackEmbeds(trackResolved.tracks);
+    }
+    process();
+    return () => { alive = false; };
+  }, [releaseMarked]);
+
+  const segments = useMemo(
+    () => buildContentSegments(finalHtml, videoEmbeds, releaseEmbeds, artistEmbeds, trackEmbeds),
+    [finalHtml, videoEmbeds, releaseEmbeds, artistEmbeds, trackEmbeds]
+  );
+
+  // Inject caption <figcaption> tags for images linked to media assets
+  const captionedHtml = useMemo(() => {
+    if (!article?.mediaAssets?.length) return null;
+    const assetMap = buildAssetCaptionMap(article.mediaAssets);
+    return injectMediaCaptions(finalHtml, assetMap);
+  }, [finalHtml, article?.mediaAssets]);
+
+  const captionedSegments = useMemo(() => {
+    if (!captionedHtml) return segments;
+    return buildContentSegments(captionedHtml, videoEmbeds, releaseEmbeds, artistEmbeds, trackEmbeds);
+  }, [captionedHtml, videoEmbeds, releaseEmbeds, artistEmbeds, trackEmbeds, segments]);
+
+  const displaySegments = captionedHtml ? captionedSegments : segments;
 
   useEffect(() => { setCopyToast(false); }, [slug]);
+
+  // Fetch share counts on mount
+  useEffect(() => {
+    const baseUrl = window.location.href;
+    getShareCounts(baseUrl).then(setShareCounts).catch(() => {});
+  }, []);
 
   useEffect(() => {
     const onScroll = () => {
@@ -82,11 +161,7 @@ export default function MobileArticle() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const handleShare = () => {
-    navigator.clipboard?.writeText(window.location.href);
-    setCopyToast(true);
-    setTimeout(() => setCopyToast(false), 2500);
-  };
+  const totalShares = getTotalShareCount(shareCounts);
 
   if (loading) {
     return <SkeletonArticlePage />;
@@ -119,7 +194,7 @@ export default function MobileArticle() {
         />
       </div>
 
-      {/* Full-bleed hero — shorter on mobile */}
+      {/* Full-bleed hero */}
       <section className="relative overflow-hidden" style={{ height: "62dvh", minHeight: "380px" }}>
         {article.heroUrl ? (
           <img
@@ -143,13 +218,15 @@ export default function MobileArticle() {
             <i className="ri-arrow-left-line text-[12px]" />
             Magazine
           </Link>
-          <button
-            onClick={handleShare}
-            className="flex items-center gap-1.5 rounded-full border border-white/20 bg-black/25 backdrop-blur-sm px-3 py-2 text-[10px] font-bold text-white/85 cursor-pointer whitespace-nowrap"
-          >
-            <i className="ri-share-line text-[12px]" />
-            {copyToast ? "Copied!" : "Share"}
-          </button>
+          <MobileShareButton
+            item={{
+              title: article.title,
+              subtitle: article.author,
+              description: article.dek || article.title,
+              imageUrl: article.heroUrl,
+              type: "article",
+            }}
+          />
         </div>
       </section>
 
@@ -198,7 +275,7 @@ export default function MobileArticle() {
           {/* Divider */}
           <div className="h-px bg-[var(--wk-border)] mb-5" />
 
-          {/* Author + inline share */}
+          {/* Author row — avatar, name, share action */}
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
               <Link
@@ -218,25 +295,18 @@ export default function MobileArticle() {
               </div>
             </div>
 
-            {/* Quick share row */}
-            <div className="flex items-center gap-1.5 shrink-0">
-              <a
-                href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(article.title)}&url=${encodeURIComponent(window.location.href)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-8 h-8 rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] flex items-center justify-center text-[var(--wk-text-soft)] active:scale-90 transition-transform"
-              >
-                <i className="ri-twitter-x-line text-[11px]" />
-              </a>
-              <a
-                href={`https://wa.me/?text=${encodeURIComponent(`${article.title} ${window.location.href}`)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-8 h-8 rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] flex items-center justify-center text-[#25D366] active:scale-90 transition-transform"
-              >
-                <i className="ri-whatsapp-line text-[11px]" />
-              </a>
-            </div>
+            {/* Share button — opens the full share sheet */}
+            <MobileShareButton
+              item={{
+                title: article.title,
+                subtitle: article.author,
+                description: article.dek || article.title,
+                imageUrl: article.heroUrl,
+                type: "article",
+              }}
+              variant="light"
+              size="sm"
+            />
           </div>
         </div>
 
@@ -245,10 +315,7 @@ export default function MobileArticle() {
 
         {/* Article body */}
         <div className="px-5 pb-10">
-          <div
-            className="article-content-v2-mobile"
-            dangerouslySetInnerHTML={{ __html: article.contentHtml }}
-          />
+          <ArticleContentRenderer segments={displaySegments} videos={videoEmbeds} releases={releaseEmbeds} artists={artistEmbeds} tracks={trackEmbeds} proseClass="article-content-v2-mobile" articleSlug={article.slug} />
         </div>
 
         {/* Tags */}
@@ -272,30 +339,19 @@ export default function MobileArticle() {
         <div className="mx-5 mb-10 rounded-2xl bg-[var(--wk-surface)] border border-[var(--wk-border)] p-5 text-center">
           <p className="text-[14px] font-bold text-[var(--wk-text)] mb-1">Enjoyed this piece?</p>
           <p className="text-[12px] text-[var(--wk-text-muted)] mb-4">Share it with someone.</p>
-          <div className="flex items-center justify-center gap-2.5 flex-wrap">
-            <button
-              onClick={handleShare}
-              className="h-9 px-4 rounded-full border border-[var(--wk-border)] bg-[var(--wk-bg)] text-[12px] font-bold text-[var(--wk-text-soft)] flex items-center gap-1.5 active:scale-[0.97] transition-transform cursor-pointer whitespace-nowrap"
-            >
-              <i className="ri-link-m" />
-              {copyToast ? "Copied!" : "Copy link"}
-            </button>
-            <a
-              href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(article.title)}&url=${encodeURIComponent(window.location.href)}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="h-9 px-4 rounded-full bg-[#000] text-white text-[12px] font-bold flex items-center gap-1.5 active:scale-[0.97] transition-transform whitespace-nowrap"
-            >
-              <i className="ri-twitter-x-line" /> X
-            </a>
-            <a
-              href={`https://wa.me/?text=${encodeURIComponent(`${article.title} ${window.location.href}`)}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="h-9 px-4 rounded-full bg-[#25D366] text-white text-[12px] font-bold flex items-center gap-1.5 active:scale-[0.97] transition-transform whitespace-nowrap"
-            >
-              <i className="ri-whatsapp-line" /> WhatsApp
-            </a>
+          <div className="flex items-center justify-center">
+            <MobileShareButton
+              item={{
+                title: article.title,
+                subtitle: article.author,
+                description: article.dek || article.title,
+                imageUrl: article.heroUrl,
+                type: "article",
+              }}
+              variant="light"
+              size="lg"
+              className="bg-[var(--wk-brand)] text-white hover:opacity-90 rounded-full px-5"
+            />
           </div>
         </div>
       </div>

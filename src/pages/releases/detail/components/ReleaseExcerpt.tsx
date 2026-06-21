@@ -1,22 +1,21 @@
 import { useScrollReveal } from "@/hooks/useScrollReveal";
-import type { RepairedReleaseDetail } from "@/services/repairedContent/client";
-import { buildReleaseStartHere, buildReleaseCultureText } from "@/services/cultureContext/releaseAdapters";
+import type { PublicReleaseDetail } from "@/services/publicContent/client";
+import { buildReleaseCultureText } from "@/services/cultureContext/releaseAdapters";
 
 interface ReleaseExcerptProps {
-  release: RepairedReleaseDetail;
+  release: PublicReleaseDetail;
 }
 
 export default function ReleaseExcerpt({ release }: ReleaseExcerptProps) {
   const { ref, revealed } = useScrollReveal<HTMLElement>(0.1);
   const whyItMatters = buildReleaseCultureText(release, "whyItMatters");
-  const startHere = buildReleaseStartHere(release);
 
   const chips: string[] = [
     release.trackCount > 0 ? `${release.trackCount} track${release.trackCount === 1 ? "" : "s"}` : "",
     release.labelName && release.labelName !== "WAKILISHA Registry" && release.labelName !== "WAKILISHA" && release.labelName !== "Independent" && release.labelName !== "Unknown" ? release.labelName : "",
   ].filter(Boolean);
 
-  if (!whyItMatters && !startHere) return null;
+  if (!whyItMatters) return null;
 
   return (
     <section
@@ -53,17 +52,6 @@ export default function ReleaseExcerpt({ release }: ReleaseExcerptProps) {
             <p className="text-[14px] leading-[1.8] text-[var(--wk-text-soft)]">
               {whyItMatters}
             </p>
-          )}
-
-          {startHere && (
-            <div className="mt-4 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] p-4">
-              <div className="mb-1 text-[10px] font-extrabold uppercase tracking-[0.18em] text-[var(--wk-text-faint)]">
-                Start here
-              </div>
-              <p className="text-[13px] font-semibold leading-relaxed text-[var(--wk-text)]">
-                {startHere}
-              </p>
-            </div>
           )}
         </div>
       </div>

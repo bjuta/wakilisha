@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { usePlayer } from '@/context/PlayerContext';
+import { getTrack } from '@/services/publicApi/client';
+import { trackEvent, getAnalyticsSessionId, getCanonicalPageUrl } from '@/services/analytics';
 import { WkIcon } from '@/components/design-system/Icon';
-
-const TRACK_DETAILS: any[] = [];
-function getTrackBySlug(_slug: string): any { return undefined; }
 
 interface DraftLine {
   id: string;
@@ -23,11 +22,23 @@ function formatTime(seconds: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
+interface TrackData {
+  slug: string;
+  title: string;
+  artist: string;
+  artistSlug: string;
+  artworkUrl: string;
+  duration: number;
+  isPlayable: boolean;
+  previewUrl: string | null;
+}
+
 export default function MobileLyricContribution() {
   const { artistSlug, trackSlug } = useParams<{ artistSlug: string; trackSlug: string }>();
-  const slug = trackSlug || '';
   const { playTrack, currentTrack, isPlaying, togglePlay, currentTime } = usePlayer();
-  const track = getTrackBySlug(slug);
+  const [track, setTrack] = useState<TrackData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const [lines, setLines] = useState<DraftLine[]>([
     { id: nextLineId(), text: '', timestampSeconds: 0 },
@@ -36,18 +47,90 @@ export default function MobileLyricContribution() {
   ]);
   const [sourceDescription, setSourceDescription] = useState('');
   const [submitted, setSubmitted] = useState(false);
-  const [error, setError] = useState('');
+  const [submitError, setSubmitError] = useState('');
 
-  const isThisTrackPlaying = currentTrack?.id === slug && isPlaying;
+  // Fetch track data
+  useEffect(() => {
+    let alive = true;
+    if (!artistSlug || !trackSlug) {
+      setLoading(false);
+      setError('Invalid track URL');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    getTrack(artistSlug, trackSlug)
+      .then((apiData) => {
+        if (!alive) return;
+        if (!apiData) {
+          setLoading(false);
+          setError('Track not found.');
+          return;
+        }
+        const trackData = apiData.track ?? apiData;
+        const artistData = apiData.artist ?? {};
+        const rawArtists = Array.isArray(apiData.artists) ? apiData.artists : [];
+        const primaryArtist = rawArtists.find((a: any) => a.isPrimary) || rawArtists[0] || artistData;
+        const artistName = primaryArtist?.name || artistData?.name || 'Unknown';
+        const duration = trackData.durationMs ? Math.round(trackData.durationMs / 1000) : (trackData.duration || 0);
+        const previewUrl: string | null = apiData.previewUrl || trackData.previewUrl || null;
+        setTrack({
+          slug: trackData.slug,
+          title: trackData.title,
+          artist: artistName,
+          artistSlug: primaryArtist?.slug || artistData?.slug || '',
+          artworkUrl: trackData.artworkUrl || '',
+          duration,
+          isPlayable: !!previewUrl,
+          previewUrl,
+        });
+        setLoading(false);
+      })
+      .catch((err) => {
+        if (!alive) return;
+        setLoading(false);
+        setError(err instanceof Error ? err.message : 'Could not load track.');
+      });
+    return () => { alive = false; };
+  }, [artistSlug, trackSlug]);
+
+  const isThisTrackPlaying = currentTrack?.id === trackSlug && isPlaying;
 
   useEffect(() => {
-    if (track && track.isPlayable && currentTrack?.id !== slug) {
+    if (track && track.isPlayable && currentTrack?.id !== track.slug) {
       playTrack(
-        { id: track.slug, title: track.title, artist: track.artist, artworkUrl: track.artworkUrl, isPlayable: track.isPlayable, source: track.source, duration: track.duration },
-        TRACK_DETAILS.filter((t) => t.isPlayable).map((t) => ({ id: t.slug, title: t.title, artist: t.artist, artworkUrl: t.artworkUrl, isPlayable: t.isPlayable, source: t.source, duration: t.duration }))
+        {
+          id: track.slug,
+          title: track.title,
+          artist: track.artist,
+          artworkUrl: track.artworkUrl,
+          isPlayable: track.isPlayable,
+          source: 'WAKILISHA',
+          duration: track.duration,
+          previewUrl: track.previewUrl || undefined,
+        },
+        [
+          {
+            id: track.slug,
+            title: track.title,
+            artist: track.artist,
+            artworkUrl: track.artworkUrl,
+            isPlayable: track.isPlayable,
+            source: 'WAKILISHA',
+            duration: track.duration,
+            previewUrl: track.previewUrl || undefined,
+          },
+        ],
+        {
+          pageType: "track_detail",
+          entitySlug: trackSlug ?? track.slug,
+          entityType: "track",
+          sourceSection: "contribute_page_mobile",
+        },
       );
     }
-  }, [slug, track, playTrack, currentTrack]);
+  }, [track, playTrack, currentTrack]);
 
   const addLine = useCallback(() => {
     setLines((prev) => [...prev, { id: nextLineId(), text: '', timestampSeconds: null }]);
@@ -66,25 +149,57 @@ export default function MobileLyricContribution() {
 
   const stampTimestamp = useCallback((lineId: string) => {
     setLines((prev) =>
-      prev.map((l) => (l.id === lineId ? { ...l, timestampSeconds: Math.round(currentTime * 10) / 10 } : l))
+      prev.map((l) => (l.id === lineId ? { ...l, timestampSeconds: Math.round(currentTime * 10) / 10 } : l)),
     );
   }, [currentTime]);
 
   const handleSubmit = useCallback(() => {
     const filledLines = lines.filter((l) => l.text.trim() && l.timestampSeconds !== null);
     if (filledLines.length < 2) {
-      setError('Add at least 2 timed lines before submitting.');
+      setSubmitError('Add at least 2 timed lines before submitting.');
       return;
     }
-    setError('');
-    setSubmitted(true);
-  }, [lines]);
+    setSubmitError('');
 
-  if (!track) {
+    if (track) {
+      trackEvent("lyrics_contribution", {
+        pageType: "track_detail",
+        entitySlug: trackSlug ?? "",
+        entityType: "track",
+        context: {
+          source_section: "contribute_page_mobile",
+          artist_slug: artistSlug ?? track.artistSlug,
+          track_title: track.title,
+          artist_name: track.artist,
+          timed_lines_count: filledLines.length,
+          total_lines_count: lines.length,
+          has_source_description: sourceDescription.trim().length > 0,
+        },
+      });
+    }
+
+    setSubmitted(true);
+  }, [lines, track, trackSlug, artistSlug, sourceDescription]);
+
+  if (loading) {
+    return (
+      <div className="wk-mobile-v5 min-h-screen flex items-center justify-center">
+        <div className="text-center space-y-3">
+          <div className="mx-auto h-16 w-16 rounded-2xl bg-[var(--wk-surface-raised)] animate-pulse" />
+          <p className="text-[13px] font-semibold text-[var(--wk-text-muted)]">Loading track&hellip;</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !track) {
     return (
       <div className="wk-mobile-v5 px-5 py-20 text-center">
-        <p className="text-[var(--wk-text-muted)]">Track not found.</p>
-        <Link to="/charts" className="mt-4 inline-block text-[14px] font-bold text-[var(--wk-brand)]">Back</Link>
+        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[var(--wk-surface-raised)]">
+          <i className="ri-file-music-line text-[var(--wk-text-faint)] text-[24px]" />
+        </div>
+        <p className="text-[var(--wk-text-muted)] mb-3">{error || 'Track not found.'}</p>
+        <Link to="/charts" className="mt-4 inline-block text-[14px] font-bold text-[var(--wk-brand)]">Back to charts</Link>
       </div>
     );
   }
@@ -177,7 +292,7 @@ export default function MobileLyricContribution() {
           />
         </div>
 
-        {error && <div className="mt-3 rounded-lg border border-red-200 bg-red-500/5 px-3 py-2 text-[12px] text-red-600">{error}</div>}
+        {submitError && <div className="mt-3 rounded-lg border border-red-200 bg-red-500/5 px-3 py-2 text-[12px] text-red-600">{submitError}</div>}
 
         <button onClick={handleSubmit} className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--wk-brand)] py-3 text-[14px] font-bold text-white">
           <WkIcon name="Check" size={16} /> Submit for review

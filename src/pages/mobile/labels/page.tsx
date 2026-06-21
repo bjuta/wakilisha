@@ -6,9 +6,9 @@ import { Chapter19FallbackImage } from "@/components/media/Chapter19FallbackImag
 import {
   listLabels,
   listReleases,
-  type RepairedLabel,
-  type RepairedRelease,
-} from "@/services/repairedContent/client";
+  type PublicLabel,
+  type PublicRelease,
+} from "@/services/publicContent/client";
 
 const PAGE_SIZE = 24;
 
@@ -35,8 +35,8 @@ export default function MobileLabels() {
   const [query, setQuery] = useState("");
   const [country, setCountry] = useState("All");
   const [page, setPage] = useState(1);
-  const [labels, setLabels] = useState<RepairedLabel[]>([]);
-  const [releases, setReleases] = useState<RepairedRelease[]>([]);
+  const [labels, setLabels] = useState<PublicLabel[]>([]);
+  const [releases, setReleases] = useState<PublicRelease[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const heroRef = useRef<HTMLDivElement>(null);
@@ -442,7 +442,7 @@ function CountryCarousel({ groups, onSelect }: { groups: { name: string; count: 
   );
 }
 
-function LabelCard({ label, variant = "standard" }: { label: RepairedLabel; variant?: "standard" | "hero" }) {
+function LabelCard({ label, variant = "standard" }: { label: PublicLabel; variant?: "standard" | "hero" }) {
   const roster = (label.featuredArtists || []).slice(0, 5);
   if (variant === "hero") {
     return (

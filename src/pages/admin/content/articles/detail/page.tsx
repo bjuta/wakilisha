@@ -104,6 +104,10 @@ export default function ArticleDetailPage() {
     return { canView, canEdit, canDelete, canPublish, canAutosave, reason };
   }, [article, adminUser, isAdmin, userCanEditOthers, userCanPublish]);
 
+  // ── Taxonomy slug maps (from ArticleMetaPanel) ──
+  const [categorySlugMap, setCategorySlugMap] = useState<Record<string, string>>();
+  const [tagSlugMap, setTagSlugMap] = useState<Record<string, string>>();
+
   // ── Draft state ──
   const [draft, setDraft] = useState<Draft>({
     title: "",
@@ -174,6 +178,13 @@ export default function ArticleDetailPage() {
         articleUpdatedAtRef.current = data.updatedAt ?? null;
         setArticle(data);
         setPreviewNonce(data.previewNonce ?? null);
+
+        // Auto-generate preview nonce for non-published articles so Preview works immediately
+        if (data.wpStatus !== "publish" && !data.previewNonce) {
+          generatePreviewNonce(data.id).then((nonce) => {
+            if (nonce && alive) setPreviewNonce(nonce);
+          }).catch(() => {});
+        }
 
         setDraft({
           title: data.title,
@@ -327,6 +338,29 @@ export default function ArticleDetailPage() {
     setIsDirty(true);
   }
 
+  function handleEmbedRelease(marker: string) {
+    setDraft((prev) => ({ ...prev, content: prev.content + "\n\n" + marker }));
+    setIsDirty(true);
+  }
+
+  // ── Helper: convert string names to taxonomy objects with slugs ──
+  const slugify = useCallback((text: string) => {
+    return text
+      .toLowerCase()
+      .trim()
+      .replace(/[^\w\s-]/g, "")
+      .replace(/[\s_]+/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$/g, "");
+  }, []);
+
+  function buildTaxonomyObjects(names: string[], slugMap?: Record<string, string>): Array<{ name: string; slug: string }> {
+    return names.map((name) => ({
+      name,
+      slug: slugMap?.[name] || slugify(name),
+    }));
+  }
+
   /* ─── Save helpers ─── */
 
   function buildSavePayload(extraFields: Partial<ArticleSavePayload> = {}): ArticleSavePayload {
@@ -335,8 +369,8 @@ export default function ArticleDetailPage() {
       excerpt: draft.excerpt || null,
       content_html: draft.content || null,
       author: draft.author || null,
-      categories: JSON.stringify(draft.categories),
-      tags: JSON.stringify(draft.tags),
+      categories: JSON.stringify(buildTaxonomyObjects(draft.categories, categorySlugMap)),
+      tags: JSON.stringify(buildTaxonomyObjects(draft.tags, tagSlugMap)),
       published_at: draft.publishedAt || null,
       seo: draft.seo,
       ...extraFields,
@@ -629,6 +663,27 @@ export default function ArticleDetailPage() {
     }
   }
 
+  /** Open the magazine preview in a new tab, generating a nonce on-the-fly if needed. */
+  async function handleMagazinePreview() {
+    if (!article) return;
+    let nonce = previewNonce;
+
+    // If article isn't published and there's no nonce yet, generate one now
+    if (article.wpStatus !== "publish" && !nonce) {
+      setIsGeneratingPreview(true);
+      nonce = await generatePreviewNonce(article.id);
+      if (nonce) setPreviewNonce(nonce);
+      setIsGeneratingPreview(false);
+    }
+
+    const isPublished = article.wpStatus === "publish";
+    const url = isPublished || !nonce
+      ? `/magazine/${article.slug}`
+      : `/magazine/${article.slug}?preview=${nonce}`;
+
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+
   const previewUrl = previewNonce
     ? `${window.location.origin}/preview/${previewNonce}`
     : null;
@@ -680,7 +735,7 @@ export default function ArticleDetailPage() {
           <WkIcon name="FileX" size={28} />
         </div>
         <h2 className="text-[18px] font-bold text-[var(--wk-text)]">Article Not Found</h2>
-        <p className="text-[13px] text-[var(--wk-text-muted)]">No article with slug &quot;{slug}&quot;</p>
+        <p className="text-[13px] text-[var(--wk-text-muted)]">No article with slug "{slug}"</p>
         <button
           onClick={() => navigate("/admin/content/articles")}
           className="wk-button wk-button-secondary wk-button-sm"
@@ -772,6 +827,7 @@ export default function ArticleDetailPage() {
             onRestoreDraft={handleRestoreDraft}
             onSlugChange={handleSlugChange}
             onInsertLink={handleInsertLink}
+            onEmbedRelease={handleEmbedRelease}
             onSaveDraft={handleSaveDraft}
             onPublish={handlePublish}
             onUnpublish={handleUnpublish}
@@ -780,6 +836,10 @@ export default function ArticleDetailPage() {
             previewUrl={previewUrl}
             isGeneratingPreview={isGeneratingPreview}
             onGeneratePreviewLink={handleGeneratePreviewLink}
+            onMagazinePreview={handleMagazinePreview}
+            previewNonce={previewNonce}
+            onCategorySlugMap={setCategorySlugMap}
+            onTagSlugMap={setTagSlugMap}
           />
         </div>
       </div>
@@ -831,7 +891,7 @@ export default function ArticleDetailPage() {
             </p>
             <p className="text-[12px] text-wk-text-soft bg-wk-bg-subtle rounded-lg px-3 py-2 mb-5 border border-wk-border/50">
               <strong>What happened:</strong> The article was modified on the server after you opened this page.
-              If you save now, you might overwrite someone else&apos;s changes.
+              If you save now, you might overwrite someone else's changes.
             </p>
             <div className="flex flex-col gap-2">
               <button
@@ -839,7 +899,7 @@ export default function ArticleDetailPage() {
                 className="wk-button wk-button-secondary wk-button-sm w-full whitespace-nowrap"
               >
                 <WkIcon name="RotateCcw" size={14} />
-                Discard My Changes &amp; Reload Latest
+                Discard My Changes & Reload Latest
               </button>
               <button
                 onClick={handleConflictOverwrite}
@@ -919,7 +979,7 @@ export default function ArticleDetailPage() {
             </div>
             <h3 className="text-[16px] font-bold text-[var(--wk-text)] mb-2">Move to Trash?</h3>
             <p className="text-[13px] text-[var(--wk-text-muted)] mb-5">
-              This will set the article status to &quot;trash&quot;. You can restore it later from the
+              This will set the article status to "trash". You can restore it later from the
               database if needed.
             </p>
             <div className="flex gap-3">

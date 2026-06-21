@@ -1,16 +1,7 @@
 /**
  * WAKILISHA Chart Score Backfill
  * Supabase Edge Function — recomputes scoring for already-imported editions
- *
- * Reads entries from wk_chart_entries_v2, reconstructs scoring inputs,
- * runs the full §2 pipeline chronologically per program, and writes back
- * scores, movement, eligibility flags, and edition summaries.
- *
- * Also backfills lead_artist_key for legacy entries where it's null.
- *
- * Accepts: { program_id? } — omit to backfill all programs
  */
-
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
 const corsHeaders = {
@@ -186,11 +177,6 @@ function scoreEvidenceRow(
   };
 }
 
-// ════════════════════════════════════════════════════════════════
-// ANTI-GAMING (§3.3) — groups by lead_artist_key, caps per-artist
-// tracks, applies overflow penalty to excess tracks.
-// ════════════════════════════════════════════════════════════════
-
 function applyAntiGamingAndFinalize(
   scored: Array<{ normalized_key: string; lead_artist_key: string; provisional_breakdown: ProvisionalBreakdown }>,
   config: ScoringConfig,
@@ -200,8 +186,6 @@ function applyAntiGamingAndFinalize(
 
   const groups = new Map<string, typeof scored>();
   for (const s of scored) {
-    // When lead_artist_key is empty, derive from normalized_key (last segment)
-    // so every null-keyed track gets its own unique anti-gaming group
     const key = s.lead_artist_key || s.normalized_key.split("::")[1] || `__anon__${s.normalized_key}`;
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key)!.push(s);
@@ -239,10 +223,6 @@ function applyAntiGamingAndFinalize(
   });
 }
 
-// ════════════════════════════════════════════════════════════════
-// MOVEMENT CLASSIFICATION
-// ════════════════════════════════════════════════════════════════
-
 function classifyMovement(
   currentRank: number,
   previousRank: number | null,
@@ -256,10 +236,6 @@ function classifyMovement(
   if (currentRank === previousRank) return "same";
   return currentRank < previousRank ? "up" : "down";
 }
-
-// ════════════════════════════════════════════════════════════════
-// MAIN BACKFILL LOGIC
-// ════════════════════════════════════════════════════════════════
 
 interface BackfillEditionResult {
   edition_id: string;
@@ -279,10 +255,10 @@ Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-  const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+  const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
   if (!supabaseUrl || !supabaseKey) {
-    return new Response(JSON.stringify({ error: "Supabase config missing." }), {
+    return new Response(JSON.stringify({ error: "Supabase service role key missing. This function requires SERVICE_ROLE_KEY to write chart scores." }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
@@ -290,11 +266,6 @@ Deno.serve(async (req: Request) => {
   const supabase = createClient(supabaseUrl, supabaseKey);
 
   try {
-    // ════════════════════════════════════════════════════════════
-    // STEP 0 — Backfill lead_artist_key for legacy entries where it's null
-    // Legacy WP imports omitted this column; derive from normalized_key
-    // which follows the format "track-title::artist-slug"
-    // ════════════════════════════════════════════════════════════
     console.log("STEP 0: Backfilling lead_artist_key for null entries...");
 
     const { data: nullKeyRows, error: nullKeyErr } = await supabase
@@ -307,7 +278,6 @@ Deno.serve(async (req: Request) => {
     } else if (nullKeyRows && nullKeyRows.length > 0) {
       console.log(`Found ${nullKeyRows.length} entries with null lead_artist_key — fixing...`);
 
-      // Batch-update in chunks of 500 to stay within payload limits
       const chunkSize = 500;
       let fixed = 0;
       for (let i = 0; i < nullKeyRows.length; i += chunkSize) {
@@ -317,7 +287,6 @@ Deno.serve(async (req: Request) => {
           lead_artist_key: (row.normalized_key as string).split("::")[1] || "",
         }));
 
-        // Use upsert to patch just the id + lead_artist_key columns
         const { error: updateErr } = await supabase
           .from("wk_chart_entries_v2")
           .upsert(updates, { onConflict: "id" });
@@ -333,7 +302,6 @@ Deno.serve(async (req: Request) => {
       console.log("No null lead_artist_key entries — column is clean");
     }
 
-    // ── Fetch programs ──
     let programIdParam: string | null = null;
     try {
       const body = await req.json();
@@ -359,7 +327,6 @@ Deno.serve(async (req: Request) => {
     for (const program of (programs as Record<string, unknown>[])) {
       const progId = String(program.id ?? "");
 
-      // ── Build scoring config from program settings ──
       const config: ScoringConfig = {
         chart_size: Number(program.chart_size ?? 20),
         streaming_min_sources: Number(program.streaming_min_sources ?? 1),
@@ -382,7 +349,6 @@ Deno.serve(async (req: Request) => {
         missing_policy: "review",
       };
 
-      // ── Fetch editions for this program, chronologically ──
       const { data: editions, error: edErr } = await supabase
         .from("wk_chart_editions_v2")
         .select("id, edition_date, entry_count")
@@ -403,7 +369,6 @@ Deno.serve(async (req: Request) => {
         const editionId = String(edition.id ?? "");
         const editionDate = String(edition.edition_date ?? "");
 
-        // ── Fetch entries for this edition ──
         const { data: entries, error: entriesErr } = await supabase
           .from("wk_chart_entries_v2")
           .select("*")
@@ -417,9 +382,6 @@ Deno.serve(async (req: Request) => {
 
         if (entries.length === 0) continue;
 
-        // ── Build scoring input rows from entries ──
-        // lead_artist_key is now guaranteed populated from STEP 0,
-        // but keep the fallback as a safety net
         const inputRows: ScoringInputRow[] = (entries as Record<string, unknown>[]).map((e) => {
           const sourceUrls = (e.source_urls_seen as string[]) ?? [];
           const sourceCount = Number(e.source_count ?? sourceUrls.length);
@@ -444,7 +406,6 @@ Deno.serve(async (req: Request) => {
           };
         });
 
-        // ── Score each row ──
         const provisionals = inputRows.map((row) => {
           const bd = scoreEvidenceRow(row, previousEdition, config, editionDate);
           return { normalized_key: row.normalized_key, lead_artist_key: row.lead_artist_key, provisional_breakdown: bd };
@@ -454,7 +415,6 @@ Deno.serve(async (req: Request) => {
         finalized.sort((a, b) => b.final_total - a.final_total);
         const shortlist = finalized.slice(0, chartSize);
 
-        // ── Update entries ──
         const prevMap = new Map(previousEdition.map((p) => [p.normalized_key, p.position]));
         const inputMap = new Map(inputRows.map((r) => [r.normalized_key, r]));
 
@@ -529,7 +489,6 @@ Deno.serve(async (req: Request) => {
           }).eq("id", String(matchEntry.id));
         }
 
-        // ── Update edition summary ──
         const newEntries = shortlist.filter((s) => {
           const pk = prevMap.get(s.normalized_key);
           return pk === undefined || pk === null;
@@ -552,7 +511,6 @@ Deno.serve(async (req: Request) => {
           updated_at: new Date().toISOString(),
         }).eq("id", editionId);
 
-        // ── Prepare for next edition ──
         previousEdition = shortlist.map((s, idx) => ({
           normalized_key: s.normalized_key,
           position: idx + 1,

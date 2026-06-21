@@ -4,7 +4,7 @@ import { useScrollReveal } from "@/hooks/useScrollReveal";
 import { usePlayer } from "@/context/PlayerContext";
 import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 import { trackUrl } from "@/utils/trackUrl";
-import { slugify } from "@/services/repairedContent/client";
+import { slugify } from "@/services/publicContent/client";
 
 interface ChartEntry {
   rank: number;
@@ -231,10 +231,12 @@ function TrackChartRow({
   track,
   isExpanded,
   onToggle,
+  artistSlug,
 }: {
   track: TrackChartSummary;
   isExpanded: boolean;
   onToggle: () => void;
+  artistSlug?: string;
 }) {
   const { currentTrack, isPlaying, playTrack } = usePlayer();
   const trackSlug = track.slug || track.title.toLowerCase().replace(/\s+/g, "-");
@@ -247,6 +249,12 @@ function TrackChartRow({
     playTrack(
       { id: trackId, title: track.title, artist: track.artist, artworkUrl: track.artworkUrl, isPlayable: playable },
       [],
+      {
+        pageType: "artist_detail",
+        entitySlug: artistSlug,
+        entityType: "artist",
+        sourceSection: "chart_journey",
+      },
     );
   };
 
@@ -275,7 +283,7 @@ function TrackChartRow({
         {/* Artwork */}
         <div className="relative h-12 w-12 md:h-14 md:w-14 shrink-0 overflow-hidden rounded-lg bg-[var(--wk-surface-raised)]">
           {track.artworkUrl ? (
-            <img src={track.artworkUrl} alt="" className="h-full w-full object-cover object-top" />
+            <img src={track.artworkUrl} alt={track.title} loading="lazy" className="h-full w-full object-cover object-top" />
           ) : (
             <Ch19GradientImage slug={trackSlug} name={track.title} />
           )}
@@ -380,7 +388,7 @@ function TrackChartRow({
   );
 }
 
-export function ArtistChartSection({ entries }: { entries: ChartEntry[] }) {
+export function ArtistChartSection({ entries, artistSlug }: { entries: ChartEntry[]; artistSlug?: string }) {
   const { ref: ref1, revealed: r1 } = useScrollReveal<HTMLElement>(0.1);
   const { ref: ref2, revealed: r2 } = useScrollReveal<HTMLElement>(0.1);
   const [expandedTracks, setExpandedTracks] = useState<Set<string>>(new Set());
@@ -520,6 +528,7 @@ export function ArtistChartSection({ entries }: { entries: ChartEntry[] }) {
                 track={track}
                 isExpanded={expandedTracks.has(track.title)}
                 onToggle={() => toggleTrack(track.title)}
+                artistSlug={artistSlug}
               />
             ))}
           </div>

@@ -4,9 +4,17 @@ import { WkButton } from "@/components/design-system/primitives/Button";
 import { fetchGuidePage } from "@/services/guidePages";
 import type { GuidePageRecord } from "./sectionTypes";
 import GuideSectionRenderer from "./sections/GuideSectionRenderer";
+import { useScrollDepthTracking } from "@/hooks/useScrollDepthTracking";
 
 export default function GuideDetailPage() {
   const { slug } = useParams<{ slug: string }>();
+
+  useScrollDepthTracking({
+    pageType: "guide_detail",
+    entitySlug: slug,
+    entityType: "guide",
+  });
+
   const [guide, setGuide] = useState<GuidePageRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

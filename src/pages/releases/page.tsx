@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { AlbumModal } from "@/components/design-system/releases/AlbumModal";
 import type { ModalRelease } from "@/components/design-system/releases/AlbumModal";
@@ -12,22 +12,22 @@ import {
   getRelease,
   releaseUrl,
   slugify,
-  type RepairedRelease,
+  type PublicRelease,
   type ReleaseCatalogStats,
-} from "@/services/repairedContent/client";
+} from "@/services/publicContent/client";
 import {
-  buildReleaseCardBlurb,
   buildReleaseHeroIntro,
   buildReleaseSeoDescription,
   releaseEmptyStateCopy,
 } from "@/services/cultureContext/releaseAdapters";
 
-type Release = RepairedRelease;
+type Release = PublicRelease;
 type SortKey = "newest" | "updated" | "artist" | "title";
 type ReleaseTypeFilter = "All" | "Album" | "EP" | "Single";
 
 const ALL = "All";
-const PAGE_SIZE = 48;
+const INITIAL_LIMIT = 30;
+const LOAD_MORE_LIMIT = 20;
 
 function useDebouncedValue<T>(value: T, delay: number): T {
   const [debounced, setDebounced] = useState(value);
@@ -44,7 +44,6 @@ export default function Releases() {
   const [artistFilter, setArtistFilter] = useState(ALL);
   const [searchInput, setSearchInput] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("newest");
-  const [page, setPage] = useState(1);
 
   const debouncedSearch = useDebouncedValue(searchInput, 350);
 
@@ -56,6 +55,7 @@ export default function Releases() {
   const [featuredReleases, setFeaturedReleases] = useState<Release[]>([]);
 
   const [pageLoading, setPageLoading] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [metaLoading, setMetaLoading] = useState(true);
   const [pageError, setPageError] = useState<string | null>(null);
   const [metaError, setMetaError] = useState<string | null>(null);
@@ -63,20 +63,14 @@ export default function Releases() {
   const [modalRelease, setModalRelease] = useState<Release | null>(null);
   const [modalReleaseDetail, setModalReleaseDetail] = useState<ModalRelease | null>(null);
 
-  const prevFiltersRef = useRef({ typeFilter, yearFilter, artistFilter, search: debouncedSearch, sortKey });
+  const [reloadKey, setReloadKey] = useState(0);
 
+  // Reset data when filters change
   useEffect(() => {
-    const prev = prevFiltersRef.current;
-    if (
-      prev.typeFilter !== typeFilter ||
-      prev.yearFilter !== yearFilter ||
-      prev.artistFilter !== artistFilter ||
-      prev.search !== debouncedSearch ||
-      prev.sortKey !== sortKey
-    ) {
-      setPage(1);
-    }
-    prevFiltersRef.current = { typeFilter, yearFilter, artistFilter, search: debouncedSearch, sortKey };
+    setReleases([]);
+    setTotalCount(0);
+    setPageError(null);
+    setReloadKey((prev) => prev + 1);
   }, [typeFilter, yearFilter, artistFilter, debouncedSearch, sortKey]);
 
   const loadMeta = useCallback(async () => {
@@ -87,7 +81,7 @@ export default function Releases() {
         getReleaseCatalogStats(),
         getReleaseFilterArtists(30),
         getReleaseFilterYears(),
-        listReleasesPaginated({ page: 1, pageSize: 20, sortKey: "newest" }),
+        listReleasesPaginated({ offset: 0, limit: 20, sortKey: "newest" }),
       ]);
       setStats(statsData);
       setFilterArtists(artists);
@@ -107,13 +101,13 @@ export default function Releases() {
     loadMeta();
   }, [loadMeta]);
 
-  const loadPage = useCallback(async () => {
+  const loadInitial = useCallback(async () => {
     setPageLoading(true);
     setPageError(null);
     try {
       const result = await listReleasesPaginated({
-        page,
-        pageSize: PAGE_SIZE,
+        offset: 0,
+        limit: INITIAL_LIMIT,
         typeFilter: typeFilter === "All" ? undefined : typeFilter,
         yearFilter: yearFilter === ALL ? undefined : yearFilter,
         artistFilter: artistFilter === ALL ? undefined : artistFilter,
@@ -127,11 +121,38 @@ export default function Releases() {
     } finally {
       setPageLoading(false);
     }
-  }, [page, typeFilter, yearFilter, artistFilter, debouncedSearch, sortKey]);
+  }, [reloadKey, typeFilter, yearFilter, artistFilter, debouncedSearch, sortKey]);
 
   useEffect(() => {
-    loadPage();
-  }, [loadPage]);
+    let cancelled = false;
+    const run = async () => {
+      setPageLoading(true);
+      setPageError(null);
+      try {
+        const result = await listReleasesPaginated({
+          offset: 0,
+          limit: INITIAL_LIMIT,
+          typeFilter: typeFilter === "All" ? undefined : typeFilter,
+          yearFilter: yearFilter === ALL ? undefined : yearFilter,
+          artistFilter: artistFilter === ALL ? undefined : artistFilter,
+          search: debouncedSearch || undefined,
+          sortKey,
+        });
+        if (!cancelled) {
+          setReleases(result.releases);
+          setTotalCount(result.totalCount);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setPageError(err instanceof Error ? err.message : "Could not load releases.");
+        }
+      } finally {
+        if (!cancelled) setPageLoading(false);
+      }
+    };
+    run();
+    return () => { cancelled = true; };
+  }, [reloadKey, typeFilter, yearFilter, artistFilter, debouncedSearch, sortKey]);
 
   useEffect(() => {
     if (!modalRelease) {
@@ -171,6 +192,28 @@ export default function Releases() {
     return () => { cancelled = true; };
   }, [modalRelease]);
 
+  const loadMore = useCallback(async () => {
+    if (isLoadingMore || releases.length >= totalCount) return;
+    setIsLoadingMore(true);
+    setPageError(null);
+    try {
+      const result = await listReleasesPaginated({
+        offset: releases.length,
+        limit: LOAD_MORE_LIMIT,
+        typeFilter: typeFilter === "All" ? undefined : typeFilter,
+        yearFilter: yearFilter === ALL ? undefined : yearFilter,
+        artistFilter: artistFilter === ALL ? undefined : artistFilter,
+        search: debouncedSearch || undefined,
+        sortKey,
+      });
+      setReleases((prev) => [...prev, ...result.releases]);
+    } catch (err) {
+      setPageError(err instanceof Error ? err.message : "Could not load more releases.");
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [releases.length, totalCount, isLoadingMore, typeFilter, yearFilter, artistFilter, debouncedSearch, sortKey]);
+
   const releaseTypes: ReleaseTypeFilter[] = useMemo(() => ["All", "Album", "EP", "Single"], []);
 
   const typeCounts: Record<ReleaseTypeFilter, number> = useMemo(() => ({
@@ -180,10 +223,8 @@ export default function Releases() {
     Single: stats.singles,
   }), [stats]);
 
-  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
-  const safePage = Math.min(page, totalPages);
-  const showingFrom = totalCount ? (safePage - 1) * PAGE_SIZE + 1 : 0;
-  const showingTo = Math.min(safePage * PAGE_SIZE, totalCount);
+  const hasMore = releases.length < totalCount && totalCount > 0;
+  const showingTo = releases.length;
 
   const catalogStats = useMemo(() => ({
     total: stats.total,
@@ -314,14 +355,14 @@ export default function Releases() {
             </div>
             <p className="text-[12px] font-semibold text-[var(--wk-text-muted)]">
               {totalCount > 0
-                ? `Showing ${showingFrom} to ${showingTo} of ${totalCount}`
+                ? `Showing ${showingTo} of ${totalCount}`
                 : "No releases found"}
             </p>
           </div>
 
           {pageLoading ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-5">
-              {Array.from({ length: PAGE_SIZE }).map((_, i) => (
+              {Array.from({ length: INITIAL_LIMIT }).map((_, i) => (
                 <div key={i} className="space-y-3">
                   <div className="aspect-square rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] animate-pulse" />
                   <div className="h-3 w-3/4 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
@@ -333,7 +374,7 @@ export default function Releases() {
             <div className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-12 text-center">
               <WkIcon name="Disc3" size={36} className="mx-auto text-[var(--wk-text-faint)]" />
               <p className="mt-4 text-[15px] font-semibold text-[var(--wk-text-muted)]">{pageError}</p>
-              <button onClick={loadPage} className="wk-button wk-button-sm wk-button-primary mt-5 cursor-pointer">
+              <button onClick={loadInitial} className="wk-button wk-button-sm wk-button-primary mt-5 cursor-pointer">
                 <i className="ri-refresh-line" /> Retry
               </button>
             </div>
@@ -349,8 +390,24 @@ export default function Releases() {
                 ))}
               </div>
 
-              {totalCount > PAGE_SIZE && (
-                <Pagination page={safePage} totalPages={totalPages} onPageChange={setPage} loading={pageLoading} />
+              {hasMore && (
+                <div className="mt-10 flex justify-center">
+                  <button
+                    onClick={loadMore}
+                    disabled={isLoadingMore}
+                    className="wk-button wk-button-primary cursor-pointer whitespace-nowrap disabled:opacity-50"
+                  >
+                    {isLoadingMore ? (
+                      <>
+                        <i className="ri-loader-4-line animate-spin" /> Loading...
+                      </>
+                    ) : (
+                      <>
+                        <i className="ri-arrow-down-line" /> Load more
+                      </>
+                    )}
+                  </button>
+                </div>
               )}
 
               {releases.length === 0 && (
@@ -383,7 +440,6 @@ function ReleaseArtworkCard({ release, onPreview }: { release: Release; onPrevie
   const displayYear = yearValue(release.year);
   const typeLabel = release.releaseType || "Release";
   const href = releaseUrl(release);
-  const blurb = buildReleaseCardBlurb(release);
 
   return (
     <div className="group flex flex-col">
@@ -415,12 +471,9 @@ function ReleaseArtworkCard({ release, onPreview }: { release: Release; onPrevie
       <Link to={href} className="text-[13px] font-extrabold text-[var(--wk-text)] group-hover:text-[var(--wk-brand)] transition-colors leading-tight truncate">
         {release.title}
       </Link>
-      <div className="text-[11px] font-semibold text-[var(--wk-text-muted)] truncate mt-0.5">
-        {release.artist}{displayYear ? ` · ${displayYear}` : ""}
+      <div className="text-[12px] font-bold text-[var(--wk-text)] truncate mt-0.5">
+        {release.artist}{displayYear ? ` \u00b7 ${displayYear}` : ""}
       </div>
-      <p className="mt-1 line-clamp-2 text-[11px] font-semibold leading-snug text-[var(--wk-text-soft)]">
-        {blurb}
-      </p>
     </div>
   );
 }
@@ -503,7 +556,7 @@ function FeaturedReleaseCarousel({ releases, catalogStats, onPreview }: { releas
                 <WkIcon name="Sparkles" size={13} /> Release shelf
               </div>
               <h1 className="font-[var(--wk-font-display)] text-[clamp(56px,9vw,128px)] font-black leading-[0.82] tracking-[-0.075em] text-white drop-shadow-2xl">
-                Albums, EPs &amp; singles
+                Albums, EPs & singles
               </h1>
               <p className="mt-6 max-w-2xl text-[17px] font-semibold leading-[1.75] text-white/74 md:text-[19px]">
                 Browse the records moving through WAKILISHA. New drops, older gems, and releases that deserve more love.
@@ -531,7 +584,7 @@ function FeaturedReleaseCarousel({ releases, catalogStats, onPreview }: { releas
                 <div className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-[var(--wk-brand)]">Featured release</div>
                 <h2 className="mt-1 line-clamp-2 text-[30px] font-black leading-[0.95] tracking-[-0.05em] text-white">{active.title}</h2>
                 <div className="mt-3 text-[13px] font-bold text-white/70">
-                  {active.artist} · {yearValue(active.year) || "Unknown year"} · {trackCountLabel(active.trackCount)}
+                  {active.artist} \u00b7 {yearValue(active.year) || "Unknown year"} \u00b7 {trackCountLabel(active.trackCount)}
                 </div>
                 <p className="mt-3 line-clamp-3 text-[13px] font-semibold leading-relaxed text-white/72">
                   {activeIntro}
@@ -629,61 +682,6 @@ function ReleasesLoading() {
   );
 }
 
-function Pagination({ page, totalPages, onPageChange, loading }: { page: number; totalPages: number; onPageChange: (page: number) => void; loading?: boolean }) {
-  const pages = paginationWindow(page, totalPages);
-  return (
-    <nav className="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-3" aria-label="Release directory pagination">
-      <button
-        disabled={page <= 1 || loading}
-        onClick={() => onPageChange(page - 1)}
-        className="wk-button wk-button-sm wk-button-ghost disabled:opacity-40 cursor-pointer whitespace-nowrap"
-      >
-        <WkIcon name="ChevronLeft" size={14} /> Previous
-      </button>
-      <div className="flex flex-wrap items-center gap-2">
-        {pages.map((item, index) =>
-          item === "..." ? (
-            <span key={`ellipsis-${index}`} className="px-1 text-[var(--wk-text-faint)]">...</span>
-          ) : (
-            <button
-              key={item}
-              onClick={() => onPageChange(item)}
-              disabled={loading}
-              className={`h-9 min-w-9 rounded-xl border px-3 text-[12px] font-black cursor-pointer transition-colors disabled:opacity-50 ${
-                page === item
-                  ? "border-[var(--wk-brand)] bg-[var(--wk-brand)] text-white"
-                  : "border-[var(--wk-border)] bg-[var(--wk-bg)] text-[var(--wk-text)] hover:border-[var(--wk-border-2)]"
-              }`}
-            >
-              {item}
-            </button>
-          )
-        )}
-      </div>
-      <button
-        disabled={page >= totalPages || loading}
-        onClick={() => onPageChange(page + 1)}
-        className="wk-button wk-button-sm wk-button-ghost disabled:opacity-40 cursor-pointer whitespace-nowrap"
-      >
-        Next <WkIcon name="ChevronRight" size={14} />
-      </button>
-    </nav>
-  );
-}
-
-function CarouselBackground({ release }: { release: Release }) {
-  const [failed, setFailed] = useState(false);
-  if (!release.artworkUrl || failed) {
-    return <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_75%,rgba(133,196,65,0.42),transparent_32%),radial-gradient(circle_at_82%_16%,rgba(255,255,255,0.20),transparent_30%),linear-gradient(135deg,#101510,#1d2f12)]" />;
-  }
-  return (
-    <>
-      <img src={release.artworkUrl} alt="" className="hidden" onError={() => setFailed(true)} />
-      <div className="absolute inset-0 scale-105 bg-cover bg-center opacity-75 blur-[2px]" style={{ backgroundImage: `url("${release.artworkUrl}")` }} />
-    </>
-  );
-}
-
 function FilterSelect({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (value: string) => void }) {
   return (
     <label className="block">
@@ -723,11 +721,17 @@ function trackCountLabel(count: number): string {
   return `${count} track${count === 1 ? "" : "s"}`;
 }
 
-function paginationWindow(page: number, totalPages: number): Array<number | "..."> {
-  if (totalPages <= 7) return Array.from({ length: totalPages }, (_, index) => index + 1);
-  const pages = new Set([1, totalPages, page - 1, page, page + 1].filter((item) => item >= 1 && item <= totalPages));
-  const sorted = Array.from(pages).sort((a, b) => a - b);
-  return sorted.flatMap((item, index) => (index > 0 && item - sorted[index - 1] > 1 ? ["..." as const, item] : [item]));
+function CarouselBackground({ release }: { release: Release }) {
+  const [failed, setFailed] = useState(false);
+  if (!release.artworkUrl || failed) {
+    return <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_75%,rgba(133,196,65,0.42),transparent_32%),radial-gradient(circle_at_82%_16%,rgba(255,255,255,0.20),transparent_30%),linear-gradient(135deg,#101510,#1d2f12)]" />;
+  }
+  return (
+    <>
+      <img src={release.artworkUrl} alt="" className="hidden" onError={() => setFailed(true)} />
+      <div className="absolute inset-0 scale-105 bg-cover bg-center opacity-75 blur-[2px]" style={{ backgroundImage: `url("${release.artworkUrl}")` }} />
+    </>
+  );
 }
 
 function formatDurationSeconds(seconds: number): string {

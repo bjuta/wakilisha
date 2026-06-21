@@ -2,6 +2,7 @@ import { supabase } from "@/lib/supabase";
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { usePlayer } from "@/context/PlayerContext";
+import { trackEvent } from "@/services/analytics";
 import {
   getChartFamily,
   getLatestChartEditionWithEntries,
@@ -35,6 +36,7 @@ import { ChartRow } from "@/components/design-system/music/ChartRow";
 import { ArtistRolodex } from "@/pages/charts/directory/components/ArtistRolodex";
 import { SkeletonChartEdition } from "@/components/skeletons/Skeletons";
 import { trackUrl } from "@/utils/trackUrl";
+import { NewsletterSubscribe } from "@/components/feature/NewsletterSubscribe";
 
 const rankTone = (rank: number) =>
   rank === 1 ? "gold" : rank === 2 ? "silver" : rank === 3 ? "bronze" : "";
@@ -320,8 +322,13 @@ export default function ChartEdition() {
   const playAt = useCallback((idx: number) => {
     const track = chartTracks[idx];
     if (!track) return;
-    playTrack(track, chartTracks);
-  }, [chartTracks, playTrack]);
+    playTrack(track, chartTracks, {
+      pageType: "charts_edition",
+      entitySlug: editionSlug,
+      entityType: "chart_edition",
+      sourceSection: "chart_leaderboard",
+    });
+  }, [chartTracks, playTrack, editionSlug]);
 
   // ─── Parallax hero scroll ───
   const heroImgRef = useRef<HTMLImageElement>(null);
@@ -430,7 +437,7 @@ export default function ChartEdition() {
   }
 
   // ─── Loaded state ───
-  const { edition, entries, familyLabel, publicSlug, archive, meta, requestedSlug, canonicalized, sourceFamilySlug } = state;
+  const { edition, entries, familyLabel, familySlug, publicSlug, archive, meta, requestedSlug, canonicalized, sourceFamilySlug } = state;
   const topTrack = entries[0];
   const top3 = entries.slice(0, 3);
   const rows = entries.slice(3);
@@ -988,37 +995,30 @@ export default function ChartEdition() {
         />
 
         {/* ── Newsletter ── */}
-        <section className="chart-reveal chart-newsletter-v2">
-          <div className="chart-newsletter-v2-inner">
-            <div className="chart-newsletter-v2-icon">
-              <i className="ri-mail-line" />
-            </div>
-            <h2 className="chart-newsletter-v2-heading">Stay in the loop</h2>
-            <p className="chart-newsletter-v2-body">
-              Weekly roundups of {familyLabel} chart movements, new entries, and analysis. No spam, ever.
-            </p>
-            <form
-              data-readdy-form
-              action="https://readdy.ai/api/form/d8gpjt4gel9neuviahfg"
-              method="POST"
-              className="chart-newsletter-v2-form"
-            >
-              <div className="chart-newsletter-v2-input-wrap">
-                <i className="ri-mail-line chart-newsletter-v2-input-icon" />
-                <input
-                  type="email"
-                  name="email"
-                  placeholder="your@email.com"
-                  required
-                  className="chart-newsletter-v2-input"
-                />
-              </div>
-              <button type="submit" className="chart-newsletter-v2-submit">
-                Subscribe
-              </button>
-            </form>
-            <p className="chart-newsletter-v2-footer">Unsubscribe anytime. We respect your inbox.</p>
-          </div>
+        <section className="chart-reveal">
+          <NewsletterSubscribe
+            formAction="https://readdy.ai/api/form/d8qhqude8ise6dlc8d9g"
+            formId="charts-edition-newsletter-form"
+            headline="Stay in the loop"
+            description={`Weekly roundups of ${familyLabel} chart movements, new entries, and analysis. No spam, ever.`}
+            contextFields={{
+              wk_page_type: "charts_edition",
+              wk_source_section: "edition_newsletter",
+              wk_entity_slug: edition.slug,
+              wk_entity_type: "chart_edition",
+              chart_family_slug: familySlug,
+              chart_program: familyLabel,
+            }}
+            analytics={{
+              pageType: "charts_edition",
+              entitySlug: edition.slug,
+              entityType: "chart_edition",
+              context: {
+                chart_family_slug: familySlug,
+                chart_program: familyLabel,
+              },
+            }}
+          />
         </section>
       </div>
 

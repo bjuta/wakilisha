@@ -118,7 +118,7 @@ export default function AdminSettingsPlayerPlayback() {
           <div>
             <h3 className="text-[13px] font-bold text-[var(--wk-text)]">Note</h3>
             <p className="text-[12px] text-[var(--wk-text-muted)] mt-1">
-              Player settings power real playback/preview behavior across charts, tracks, releases, artists, and eventually other culture verticals.
+              Player settings power real playback/preview behavior across charts, tracks, releases, artists, and other WAKILISHA domains.
               <strong> /play is not coming back.</strong> Player settings feed the real platform player.
             </p>
           </div>

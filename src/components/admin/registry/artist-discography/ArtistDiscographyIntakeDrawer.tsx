@@ -6,6 +6,12 @@ import { WkIcon } from "@/components/design-system/Icon";
 
 type AlbumAction = "merge" | "canonicalize" | "ignore";
 
+interface AdditionalPrimaryArtist {
+  artist_id: string;
+  artist_slug: string;
+  artist_name: string;
+}
+
 interface PreviewTrack {
   apple_music_id: string;
   title: string;
@@ -39,6 +45,7 @@ interface PreviewAlbum {
     title: string;
     source: string;
   } | null;
+  album_artist_name: string;
 }
 
 interface PreviewResponse {
@@ -67,6 +74,12 @@ interface ApplyResponse {
   };
   duration_ms: number;
   error?: string;
+}
+
+interface RegistryArtistOption {
+  id: string;
+  slug: string;
+  display_name: string;
 }
 
 /* ── Helpers ──────────────────────────────────────────────────────────────── */
@@ -131,6 +144,162 @@ function TrackRow({ track, index }: { track: PreviewTrack; index: number }) {
   );
 }
 
+/* ── Artist Search Dropdown ───────────────────────────────────────────────── */
+
+function ArtistSearchDropdown({
+  currentArtistSlug,
+  selectedArtists,
+  onAdd,
+  onRemove,
+}: {
+  currentArtistSlug: string;
+  selectedArtists: AdditionalPrimaryArtist[];
+  onAdd: (artist: AdditionalPrimaryArtist) => void;
+  onRemove: (artistSlug: string) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<RegistryArtistOption[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!query.trim() || query.length < 2) {
+      setResults([]);
+      setShowDropdown(false);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const { data } = await supabase
+          .from("registry_artists")
+          .select("id, slug, display_name")
+          .eq("status", "active")
+          .ilike("display_name", `%${query}%`)
+          .neq("slug", currentArtistSlug)
+          .order("display_name")
+          .limit(8);
+        const filtered = (data || []).filter(
+          (a) => !selectedArtists.some((sa) => sa.artist_slug === a.slug)
+        );
+        setResults(filtered as RegistryArtistOption[]);
+        setShowDropdown(true);
+      } catch {
+        setResults([]);
+      } finally {
+        setSearching(false);
+      }
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [query, currentArtistSlug, selectedArtists]);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target as Node) &&
+        inputRef.current &&
+        !inputRef.current.contains(e.target as Node)
+      ) {
+        setShowDropdown(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  return (
+    <div className="mt-2">
+      {/* Selected artists chips */}
+      {selectedArtists.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-2">
+          {selectedArtists.map((a) => (
+            <span
+              key={a.artist_slug}
+              className="inline-flex items-center gap-1.5 rounded-full bg-[#5f8f2f]/10 border border-[#5f8f2f]/30 px-2.5 py-1 text-[11px] font-bold text-[#5f8f2f]"
+            >
+              <i className="ri-user-line text-[10px]" />
+              {a.artist_name}
+              <button
+                type="button"
+                onClick={() => onRemove(a.artist_slug)}
+                className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#5f8f2f]/20 hover:bg-[#5f8f2f]/40 transition-colors cursor-pointer"
+              >
+                <WkIcon name="X" size={9} />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Search input */}
+      <div className="relative">
+        <div className="flex items-center gap-2 rounded-lg border border-[#dfe4d8] bg-[#fbfcf8] px-3 py-1.5">
+          {searching ? (
+            <WkIcon name="Loader2" size={12} className="animate-spin text-[#97a290] shrink-0" />
+          ) : (
+            <WkIcon name="Search" size={12} className="text-[#97a290] shrink-0" />
+          )}
+          <input
+            ref={inputRef}
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onFocus={() => results.length > 0 && setShowDropdown(true)}
+            placeholder="Search registry for co-primary artist…"
+            className="flex-1 bg-transparent text-[11px] text-[#171712] placeholder:text-[#b8bfb2] outline-none"
+          />
+          {query && (
+            <button
+              type="button"
+              onClick={() => { setQuery(""); setResults([]); setShowDropdown(false); }}
+              className="flex h-4 w-4 items-center justify-center rounded-full text-[#97a290] hover:text-[#171712] transition-colors cursor-pointer"
+            >
+              <WkIcon name="X" size={10} />
+            </button>
+          )}
+        </div>
+        {showDropdown && results.length > 0 && (
+          <div
+            ref={dropdownRef}
+            className="absolute left-0 top-full z-50 mt-1 w-full rounded-xl border border-[#dfe4d8] bg-white shadow-lg overflow-hidden"
+          >
+            {results.map((artist) => (
+              <button
+                key={artist.id}
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  onAdd({ artist_id: artist.id, artist_slug: artist.slug, artist_name: artist.display_name });
+                  setQuery("");
+                  setResults([]);
+                  setShowDropdown(false);
+                }}
+                className="flex w-full items-center gap-2.5 px-3 py-2 text-left hover:bg-[#f0f7e8] transition-colors cursor-pointer"
+              >
+                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#f0f3ec] shrink-0">
+                  <i className="ri-user-line text-[10px] text-[#97a290]" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[12px] font-semibold text-[#171712] truncate">{artist.display_name}</p>
+                  <p className="text-[10px] font-mono text-[#97a290]">{artist.slug}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+        {showDropdown && !searching && results.length === 0 && query.length >= 2 && (
+          <div className="absolute left-0 top-full z-50 mt-1 w-full rounded-xl border border-[#dfe4d8] bg-white shadow-lg px-3 py-2.5">
+            <p className="text-[11px] text-[#97a290] italic">No artists found for &ldquo;{query}&rdquo;</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ── Album Card ───────────────────────────────────────────────────────────── */
 
 interface AlbumCardProps {
@@ -138,10 +307,15 @@ interface AlbumCardProps {
   action: AlbumAction | null;
   onAction: (albumId: string, action: AlbumAction) => void;
   applying: boolean;
+  additionalPrimaryArtists: AdditionalPrimaryArtist[];
+  onAddPrimaryArtist: (albumId: string, artist: AdditionalPrimaryArtist) => void;
+  onRemovePrimaryArtist: (albumId: string, artistSlug: string) => void;
+  currentArtistSlug: string;
 }
 
-function AlbumCard({ album, action, onAction, applying }: AlbumCardProps) {
+function AlbumCard({ album, action, onAction, applying, additionalPrimaryArtists, onAddPrimaryArtist, onRemovePrimaryArtist, currentArtistSlug }: AlbumCardProps) {
   const [expanded, setExpanded] = useState(false);
+  const [showPrimaryArtistPanel, setShowPrimaryArtistPanel] = useState(false);
   const isExisting = album.match_status === "existing";
 
   return (
@@ -261,6 +435,32 @@ function AlbumCard({ album, action, onAction, applying }: AlbumCardProps) {
         </div>
       )}
 
+      {/* Primary Artists Panel */}
+      {showPrimaryArtistPanel && action !== "ignore" && (
+        <div className="border-t border-[#eef1ea] bg-[#fafcf5] px-4 py-3">
+          <div className="flex items-center gap-2 mb-2">
+            <WkIcon name="Users" size={13} className="text-[#5f8f2f] shrink-0" />
+            <p className="text-[11px] font-bold text-[#171712]">
+              Additional Primary Artists
+            </p>
+            <span className="text-[10px] text-[#97a290]">
+              &mdash; co-primary artists who own this release alongside the current artist
+            </span>
+          </div>
+          <ArtistSearchDropdown
+            currentArtistSlug={currentArtistSlug}
+            selectedArtists={additionalPrimaryArtists}
+            onAdd={(artist) => onAddPrimaryArtist(album.apple_music_id, artist)}
+            onRemove={(slug) => onRemovePrimaryArtist(album.apple_music_id, slug)}
+          />
+          {additionalPrimaryArtists.length > 0 && (
+            <p className="mt-2 text-[10px] text-[#697062]">
+              These artists will be written as <strong>is_primary = true</strong> on this release and all its tracks.
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Actions */}
       <div className="flex flex-wrap items-center gap-2 border-t border-[#eef1ea] px-4 py-3">
         {isExisting && (
@@ -301,6 +501,23 @@ function AlbumCard({ album, action, onAction, applying }: AlbumCardProps) {
           <WkIcon name={action === "ignore" ? "MinusCircle" : "XCircle"} size={13} />
           {action === "ignore" ? "Ignored" : "Ignore"}
         </button>
+        {action !== "ignore" && (
+          <button
+            onClick={() => setShowPrimaryArtistPanel((v) => !v)}
+            disabled={applying}
+            className={`flex items-center gap-1.5 rounded-xl px-3 py-2 text-[11px] font-bold whitespace-nowrap transition-all cursor-pointer ${
+              showPrimaryArtistPanel || additionalPrimaryArtists.length > 0
+                ? "border border-[#5f8f2f]/40 bg-[#f0f7e8] text-[#5f8f2f]"
+                : "border border-[#dfe4d8] bg-white text-[#71796b] hover:border-[#85c441]"
+            } disabled:opacity-50`}
+            title="Set additional primary artists for multi-artist releases"
+          >
+            <WkIcon name="Users" size={12} />
+            {additionalPrimaryArtists.length > 0
+              ? `${additionalPrimaryArtists.length} co-primary`
+              : "Co-primary"}
+          </button>
+        )}
         {album.apple_music_url && (
           <a
             href={album.apple_music_url}
@@ -339,9 +556,12 @@ export function ArtistDiscographyIntakeDrawer({
   const [duration, setDuration] = useState(0);
   const [failedCount, setFailedCount] = useState(0);
   const [actions, setActions] = useState<Record<string, AlbumAction>>({});
+  const [additionalPrimaryArtists, setAdditionalPrimaryArtists] = useState<Record<string, AdditionalPrimaryArtist[]>>({});
   const [applying, setApplying] = useState(false);
   const [applyResult, setApplyResult] = useState<ApplyResponse["summary"] | null>(null);
   const [applyError, setApplyError] = useState<string | null>(null);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [pendingApply, setPendingApply] = useState(false);
 
   const hasFetched = useRef(false);
 
@@ -383,14 +603,20 @@ export function ArtistDiscographyIntakeDrawer({
           return;
         }
 
-        setAlbums(response.albums);
+        // Enrich albums with album_artist_name from Apple Music data
+        const enrichedAlbums = response.albums.map((a: any) => ({
+          ...a,
+          album_artist_name: a.album_artist_name || "",
+        })) as PreviewAlbum[];
+
+        setAlbums(enrichedAlbums);
         setStorefront(response.storefront);
         setDuration(response.duration_ms);
         setFailedCount(response.albums_failed.length);
 
         // Auto-select actions: existing -> merge, new -> canonicalize
         const autoActions: Record<string, AlbumAction> = {};
-        for (const album of response.albums) {
+        for (const album of enrichedAlbums) {
           autoActions[album.apple_music_id] = album.match_status === "existing" ? "merge" : "canonicalize";
         }
         setActions(autoActions);
@@ -414,10 +640,26 @@ export function ArtistDiscographyIntakeDrawer({
     });
   }, []);
 
+  const handleAddPrimaryArtist = useCallback((albumId: string, artist: AdditionalPrimaryArtist) => {
+    setAdditionalPrimaryArtists((prev) => {
+      const existing = prev[albumId] || [];
+      if (existing.some((a) => a.artist_slug === artist.artist_slug)) return prev;
+      return { ...prev, [albumId]: [...existing, artist] };
+    });
+  }, []);
+
+  const handleRemovePrimaryArtist = useCallback((albumId: string, artistSlug: string) => {
+    setAdditionalPrimaryArtists((prev) => {
+      const existing = prev[albumId] || [];
+      return { ...prev, [albumId]: existing.filter((a) => a.artist_slug !== artistSlug) };
+    });
+  }, []);
+
   const handleApply = async () => {
     const selectedAlbums = Object.entries(actions).map(([apple_music_id, action]) => ({
       apple_music_id,
       action,
+      additional_primary_artists: additionalPrimaryArtists[apple_music_id] || [],
     }));
 
     if (selectedAlbums.length === 0) {
@@ -481,6 +723,10 @@ export function ArtistDiscographyIntakeDrawer({
   const canonCount = Object.values(actions).filter((a) => a === "canonicalize").length;
   const ignoreCount = Object.values(actions).filter((a) => a === "ignore").length;
   const unsetCount = albums.length - mergeCount - canonCount - ignoreCount;
+
+  const hasTrackArtistErrors = applyResult?.errors.some((e) => e.includes("track_artists")) ?? false;
+  const hasErrors = applyResult?.errors.length ?? 0 > 0;
+  const isPartialSuccess = applyResult && hasErrors;
 
   return (
     <div className="fixed inset-0 z-50 flex" role="dialog" aria-modal="true" aria-label="Discography intake">
@@ -549,43 +795,51 @@ export function ArtistDiscographyIntakeDrawer({
               </div>
               <p className="text-[16px] font-black text-[#171712]">No albums found</p>
               <p className="max-w-sm text-[13px] text-[#697062]">
-                Apple Music returned no albums for &quot;{artistName}&quot; in storefront {storefront.toUpperCase()}.
+                Apple Music returned no albums for "{artistName}" in storefront {storefront.toUpperCase()}.
               </p>
             </div>
           )}
 
-          {/* Apply success */}
+          {/* Apply result — success or partial success */}
           {applyResult && (
-            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 mb-4">
+            <div className={`rounded-2xl border p-5 mb-4 ${
+              hasErrors
+                ? "border-amber-200 bg-amber-50"
+                : "border-emerald-200 bg-emerald-50"
+            }`}>
               <div className="flex items-center gap-3 mb-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100">
-                  <WkIcon name="CheckCircle" size={22} className="text-emerald-600" />
+                <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${
+                  hasErrors ? "bg-amber-100" : "bg-emerald-100"
+                }`}>
+                  <WkIcon name={hasErrors ? "AlertTriangle" : "CheckCircle"} size={22} className={hasErrors ? "text-amber-600" : "text-emerald-600"} />
                 </div>
                 <div>
-                  <p className="text-[15px] font-black text-emerald-800">Applied successfully</p>
-                  <p className="text-[11px] text-emerald-700">
-                    {applyResult.errors.length > 0
-                      ? "Some errors occurred — review below and retry."
+                  <p className={`text-[15px] font-black ${hasErrors ? "text-amber-800" : "text-emerald-800"}`}>
+                    {hasErrors ? "Applied with warnings" : "Applied successfully"}
+                  </p>
+                  <p className={`text-[11px] ${hasErrors ? "text-amber-700" : "text-emerald-700"}`}>
+                    {hasErrors
+                      ? `${applyResult.errors.length} error${applyResult.errors.length !== 1 ? "s" : ""} occurred. Review below and retry if needed.`
                       : "Discography will refresh…"}
                   </p>
                 </div>
               </div>
               <div className="grid grid-cols-4 gap-2">
-                <div className="rounded-xl bg-white border border-emerald-200 p-3 text-center">
-                  <p className="text-[20px] font-black text-emerald-700">{applyResult.merged}</p>
-                  <p className="text-[10px] font-bold text-emerald-600">Merged</p>
+                <div className={`rounded-xl bg-white border p-3 text-center ${hasErrors ? "border-amber-200" : "border-emerald-200"}`}>
+                  <p className={`text-[20px] font-black ${hasErrors ? "text-amber-700" : "text-emerald-700"}`}>{applyResult.merged}</p>
+                  <p className={`text-[10px] font-bold ${hasErrors ? "text-amber-600" : "text-emerald-600"}`}>Merged</p>
                 </div>
-                <div className="rounded-xl bg-white border border-emerald-200 p-3 text-center">
-                  <p className="text-[20px] font-black text-emerald-700">{applyResult.canonicalized}</p>
-                  <p className="text-[10px] font-bold text-emerald-600">Canonicalized</p>
+                <div className={`rounded-xl bg-white border p-3 text-center ${hasErrors ? "border-amber-200" : "border-emerald-200"}`}>
+                  <p className={`text-[20px] font-black ${hasErrors ? "text-amber-700" : "text-emerald-700"}`}>{applyResult.canonicalized}</p>
+                  <p className={`text-[10px] font-bold ${hasErrors ? "text-amber-600" : "text-emerald-600"}`}>Canonicalized</p>
                 </div>
-                <div className="rounded-xl bg-white border border-emerald-200 p-3 text-center">
-                  <p className="text-[20px] font-black text-emerald-700">{applyResult.ignored}</p>
-                  <p className="text-[10px] font-bold text-emerald-600">Ignored</p>
+                <div className={`rounded-xl bg-white border p-3 text-center ${hasErrors ? "border-amber-200" : "border-emerald-200"}`}>
+                  <p className={`text-[20px] font-black ${hasErrors ? "text-amber-700" : "text-emerald-700"}`}>{applyResult.ignored}</p>
+                  <p className={`text-[10px] font-bold ${hasErrors ? "text-amber-600" : "text-emerald-600"}`}>Ignored</p>
                 </div>
-                <div className="rounded-xl bg-white border border-emerald-200 p-3 text-center">
-                  <p className="text-[20px] font-black text-emerald-700">{applyResult.tracks_created}</p>
-                  <p className="text-[10px] font-bold text-emerald-600">Tracks</p>
+                <div className={`rounded-xl bg-white border p-3 text-center ${hasErrors ? "border-amber-200" : "border-emerald-200"}`}>
+                  <p className={`text-[20px] font-black ${hasErrors ? "text-amber-700" : "text-emerald-700"}`}>{applyResult.tracks_created}</p>
+                  <p className={`text-[10px] font-bold ${hasErrors ? "text-amber-600" : "text-emerald-600"}`}>Tracks</p>
                 </div>
               </div>
               {applyResult.errors.length > 0 && (
@@ -596,6 +850,65 @@ export function ArtistDiscographyIntakeDrawer({
                   ))}
                 </div>
               )}
+              {hasErrors && (
+                <div className="mt-3 flex gap-2">
+                  <button
+                    onClick={() => {
+                      setApplyResult(null);
+                      setApplyError(null);
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-[11px] font-bold text-amber-700 hover:bg-amber-100 cursor-pointer"
+                  >
+                    <WkIcon name="RefreshCw" size={12} />
+                    Retry
+                  </button>
+                  <button
+                    onClick={onClose}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-[#dfe4d8] bg-white px-3 py-1.5 text-[11px] font-bold text-[#71796b] hover:bg-[#f7f7f2] cursor-pointer"
+                  >
+                    Close
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Pre-apply confirmation dialog */}
+          {showConfirm && (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 mb-4">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100">
+                  <WkIcon name="AlertTriangle" size={22} className="text-amber-600" />
+                </div>
+                <div>
+                  <p className="text-[15px] font-black text-amber-800">Confirm overwrite</p>
+                  <p className="text-[11px] text-amber-700">
+                    {mergeCount > 0
+                      ? `You selected ${mergeCount} album${mergeCount !== 1 ? "s" : ""} to merge. This will overwrite existing release, track, and artist relationships.`
+                      : "This will overwrite existing track-artist relationships for the selected albums."}
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    setShowConfirm(false);
+                    handleApply();
+                  }}
+                  disabled={applying}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-600 px-4 py-2 text-[12px] font-bold text-white hover:bg-amber-700 disabled:opacity-50 cursor-pointer"
+                >
+                  <WkIcon name="Check" size={12} />
+                  Yes, overwrite
+                </button>
+                <button
+                  onClick={() => setShowConfirm(false)}
+                  disabled={applying}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-[#dfe4d8] bg-white px-4 py-2 text-[12px] font-bold text-[#71796b] hover:bg-[#f7f7f2] disabled:opacity-50 cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           )}
 
@@ -664,6 +977,10 @@ export function ArtistDiscographyIntakeDrawer({
                   action={actions[album.apple_music_id] ?? null}
                   onAction={handleAction}
                   applying={applying}
+                  additionalPrimaryArtists={additionalPrimaryArtists[album.apple_music_id] || []}
+                  onAddPrimaryArtist={handleAddPrimaryArtist}
+                  onRemovePrimaryArtist={handleRemovePrimaryArtist}
+                  currentArtistSlug={artistSlug}
                 />
               ))}
             </div>
@@ -711,7 +1028,13 @@ export function ArtistDiscographyIntakeDrawer({
                   Clear all
                 </button>
                 <button
-                  onClick={handleApply}
+                  onClick={() => {
+                    if (mergeCount > 0) {
+                      setShowConfirm(true);
+                    } else {
+                      handleApply();
+                    }
+                  }}
                   disabled={applying || mergeCount + canonCount === 0}
                   className="flex items-center gap-2 rounded-xl bg-[#5f8f2f] px-6 py-2.5 text-[13px] font-bold text-white hover:bg-[#4d7526] disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap cursor-pointer"
                 >

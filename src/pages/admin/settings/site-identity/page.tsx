@@ -115,7 +115,7 @@ export default function AdminSettingsSiteIdentity() {
 
       <WkSurface className="p-5">
         <h2 className="text-[14px] font-bold text-[var(--wk-text)] mb-1 flex items-center gap-2">
-          <WkIcon name="Type" size={16} /> Name &amp; Tagline
+          <WkIcon name="Type" size={16} /> Name & Tagline
         </h2>
         <p className="text-[12px] text-[var(--wk-text-muted)] mb-4">
           The site name appears in the navbar fallback, browser tab title, and SEO metadata.
@@ -147,7 +147,7 @@ export default function AdminSettingsSiteIdentity() {
             <label className="block text-[12px] font-semibold text-[var(--wk-text-muted)] mb-1.5">Favicon URL</label>
             <div className="flex gap-2">
               <input type="text" value={settings.faviconUrl} onChange={(e) => update("faviconUrl", e.target.value)} placeholder="https://your-cdn.com/favicon-512.png" className={`flex-1 rounded-lg border px-3 py-2.5 text-[13px] font-mono text-[var(--wk-text)] bg-[var(--wk-bg)] focus:outline-none focus:ring-1 ${faviconError ? "border-[var(--wk-danger)] focus:ring-[var(--wk-danger)]" : "border-[var(--wk-border)] focus:border-[var(--wk-brand)] focus:ring-[var(--wk-brand)]"}`} />
-              <MediaPickerButton onSelect={(url) => update("faviconUrl", url)} title="Select Favicon" label="Library" />
+              <MediaPickerButton onSelect={(_assetId, url) => update("faviconUrl", url)} title="Select Favicon" label="Library" />
             </div>
             {faviconError && <p className="mt-1.5 text-[11px] text-[var(--wk-danger)] flex items-center gap-1"><i className="ri-error-warning-line" /> Could not load favicon from this URL</p>}
           </div>
@@ -191,7 +191,7 @@ function LogoField({ label, description, value, fallbackValue = "", onChange, on
       <p className="mb-2 text-[11px] leading-5 text-[var(--wk-text-faint)]">{description}</p>
       <div className="flex gap-2">
         <input type="text" value={value} onChange={(e) => onChange(e.target.value)} placeholder="https://your-cdn.com/logo.svg" className={`min-w-0 flex-1 rounded-lg border px-3 py-2.5 text-[12px] font-mono text-[var(--wk-text)] bg-[var(--wk-bg)] focus:outline-none focus:ring-1 ${error ? "border-[var(--wk-danger)] focus:ring-[var(--wk-danger)]" : "border-[var(--wk-border)] focus:border-[var(--wk-brand)] focus:ring-[var(--wk-brand)]"}`} />
-        <MediaPickerButton onSelect={onSelect} title={`Select ${label}`} label="Library" />
+        <MediaPickerButton onSelect={(_assetId, url) => onSelect(url)} title={`Select ${label}`} label="Library" />
       </div>
       {error && <p className="mt-1.5 text-[11px] text-[var(--wk-danger)] flex items-center gap-1"><i className="ri-error-warning-line" /> Could not load this logo</p>}
     </div>

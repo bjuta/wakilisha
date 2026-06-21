@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { WkTag } from "@/components/design-system/primitives/Tag";
+import { trackEvent } from "@/services/analytics";
 
 export interface GenreCardProps {
   slug: string;
@@ -8,6 +9,9 @@ export interface GenreCardProps {
   trackCount?: number;
   accentVar?: string;
   representativeArtists?: string[];
+  sourceSection?: string;
+  sourceEntity?: string;
+  clickPosition?: number;
 }
 
 export function GenreCard({
@@ -17,10 +21,28 @@ export function GenreCard({
   trackCount,
   accentVar = "--wk-v-music",
   representativeArtists = [],
+  sourceSection,
+  sourceEntity,
+  clickPosition,
 }: GenreCardProps) {
+  const handleClick = () => {
+    if (sourceSection) {
+      trackEvent("card_click", {
+        entityType: "genre",
+        entitySlug: slug,
+        context: {
+          source_section: sourceSection,
+          ...(sourceEntity ? { source_entity: sourceEntity } : {}),
+          ...(clickPosition !== undefined ? { click_position: clickPosition } : {}),
+        },
+      });
+    }
+  };
+
   return (
     <Link
       to={`/genres/${slug}`}
+      onClick={handleClick}
       className="group relative block overflow-hidden rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-5 transition-all hover:border-[var(--wk-border-2)]"
     >
       <div

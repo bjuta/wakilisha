@@ -211,6 +211,7 @@
   color: var(--wk-text-muted);
   padding: 10px 4px 4px;
   text-align: center;
+  font-style: italic;
 }
 
 .article-content-v2 .wp-caption,
@@ -400,6 +401,7 @@
   color: var(--wk-text-muted);
   padding: 8px 2px 2px;
   text-align: center;
+  font-style: italic;
 }
 
 .article-content-v2-mobile .wp-caption,

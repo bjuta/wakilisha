@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { WkButton } from "@/components/design-system/primitives/Button";
+import { NewsletterSubscribe } from "@/components/feature/NewsletterSubscribe";
 import { HomeHero } from "./components/HomeHero";
 import { HomeMarquee } from "./components/HomeMarquee";
 import { HomeRightNow } from "./components/HomeRightNow";
@@ -7,8 +7,8 @@ import { HomeExplore } from "./components/HomeExplore";
 import { HomeMission } from "./components/HomeMission";
 import {
   listMagazineStories,
-  type RepairedStory,
-} from "@/services/repairedContent/client";
+  type PublicStory,
+} from "@/services/publicContent/client";
 import {
   getChartFamilies,
   getLatestChartEdition,
@@ -19,7 +19,7 @@ import {
 export default function Home() {
   const [loading, setLoading] = useState(true);
   const [chartEntries, setChartEntries] = useState<ChartEditionEntry[]>([]);
-  const [stories, setStories] = useState<RepairedStory[]>([]);
+  const [stories, setStories] = useState<PublicStory[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
@@ -82,69 +82,16 @@ export default function Home() {
         {/* 6. Newsletter */}
         <section className="py-16 md:py-24 border-t border-[var(--wk-divider)]" style={{ background: "var(--wk-bg-subtle)" }}>
           <div style={{ maxWidth: 1180, margin: "0 auto", padding: "0 clamp(20px,4vw,40px)" }}>
-            <div
-              className="relative rounded-2xl overflow-hidden border border-[var(--wk-border)]"
-              style={{ background: "var(--wk-surface)" }}
-            >
-              <div
-                aria-hidden="true"
-                className="pointer-events-none absolute -bottom-20 -right-20 w-[400px] h-[400px] rounded-full"
-                style={{ background: "var(--wk-brand)", opacity: 0.03 }}
-              />
-
-              <div className="relative z-10 p-8 md:p-12 max-w-[620px]">
-                <div className="flex items-center gap-3 mb-4">
-                  <span
-                    className="w-6 h-[2px] rounded-full"
-                    style={{ background: "var(--wk-brand)", opacity: 0.6 }}
-                  />
-                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--wk-brand)]">
-                    Stay Connected
-                  </span>
-                </div>
-
-                <h2
-                  className="font-black tracking-[-0.03em] text-[var(--wk-text)] mb-3"
-                  style={{ fontSize: "clamp(22px,2.5vw,32px)", lineHeight: 1.05 }}
-                >
-                  The culture, in your inbox.
-                </h2>
-
-                <p className="text-[14px] leading-relaxed text-[var(--wk-text-muted)] mb-6">
-                  Chart updates, new guides, editorial deep-dives, and early access to
-                  new sections as they launch across WAKILISHA.
-                </p>
-
-                <form
-                  className="flex flex-col sm:flex-row gap-3"
-                  action="https://readdy.ai/api/form/d8m5rsojb57qogjbh760"
-                  method="POST"
-                  data-readdy-form=""
-                >
-                  <div className="flex-1">
-                    <input
-                      type="email"
-                      name="email"
-                      placeholder="Enter your email"
-                      required
-                      className="w-full rounded-full border border-[var(--wk-border)] bg-[var(--wk-bg)] px-5 py-3.5 text-[14px] text-[var(--wk-text)] placeholder:text-[var(--wk-text-faint)] outline-none focus:border-[var(--wk-brand)]/40 transition-colors"
-                    />
-                  </div>
-                  <WkButton variant="primary">
-                    <i className="ri-mail-send-line" /> Subscribe
-                  </WkButton>
-                </form>
-
-                <div className="mt-4 flex items-center gap-4 text-[11px] text-[var(--wk-text-faint)]">
-                  <span className="inline-flex items-center gap-1">
-                    <i className="ri-shield-check-line text-xs" /> No spam, ever
-                  </span>
-                  <span className="inline-flex items-center gap-1">
-                    <i className="ri-close-circle-line text-xs" /> Unsubscribe anytime
-                  </span>
-                </div>
-              </div>
-            </div>
+            <NewsletterSubscribe
+              formAction="https://readdy.ai/api/form/d8qhqude8ise6dlc8da0"
+              formId="homepage-newsletter-form"
+              headline="The culture, in your inbox."
+              description="Chart updates, new guides, editorial deep-dives, and early access to new sections as they launch across WAKILISHA."
+              contextFields={{ wk_page_type: "home", wk_source_section: "newsletter_footer" }}
+              analytics={{
+                pageType: "home",
+              }}
+            />
           </div>
         </section>
       </div>

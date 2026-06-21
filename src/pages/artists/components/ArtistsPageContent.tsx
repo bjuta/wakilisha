@@ -7,7 +7,7 @@ import { OriginBento } from "./OriginBento";
 import { GenreRows } from "./GenreRows";
 import { RisingStars } from "./RisingStars";
 import { normalizeCountry, getCountryFlagUrl, getCountryLabel } from "@/utils/countries";
-import { listArtists, type RepairedArtist } from "@/services/repairedContent/client";
+import { listArtists, type PublicArtist } from "@/services/publicContent/client";
 import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 
 /* ── Viewport-responsive column count (consistent canvas ↔ production) ── */
@@ -64,7 +64,7 @@ function seededRandom(seed: string) {
   return (min: number, max: number) => min + (s % 1) * (max - min);
 }
 
-function enrichArtist(artist: RepairedArtist) {
+function enrichArtist(artist: PublicArtist) {
   const rng = seededRandom(artist.slug);
   const bioSnippets = [
     "Redefining the sound of a generation with fearless originality.",
@@ -88,7 +88,7 @@ function enrichArtist(artist: RepairedArtist) {
 type ViewMode = "grid" | "list";
 
 export default function ArtistsPageContent() {
-  const [artists, setArtists] = useState<RepairedArtist[]>([]);
+  const [artists, setArtists] = useState<PublicArtist[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState("All");
@@ -171,7 +171,7 @@ export default function ArtistsPageContent() {
 
   /* genre shelves */
   const genreShelves = useMemo(() => {
-    const map = new Map<string, RepairedArtist[]>();
+    const map = new Map<string, PublicArtist[]>();
     enriched.forEach((a) => {
       a.genres.slice(0, 2).forEach((g) => {
         if (!map.has(g)) map.set(g, []);
@@ -186,7 +186,7 @@ export default function ArtistsPageContent() {
 
   /* origin groups */
   const originGroups = useMemo(() => {
-    const map = new Map<string, RepairedArtist[]>();
+    const map = new Map<string, PublicArtist[]>();
     enriched.forEach((a) => {
       const c = normalizeCountry(a.country) || "Unknown";
       if (!map.has(c)) map.set(c, []);
@@ -392,8 +392,8 @@ export default function ArtistsPageContent() {
                   className="group relative block overflow-hidden rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] transition-all duration-[var(--wk-d-standard)] hover:-translate-y-1 hover:border-[var(--wk-border-2)]"
                 >
                   <div className="relative aspect-square overflow-hidden bg-[var(--wk-surface-raised)]">
-                    {artist.imageUrl ? (
-                      <img src={artist.imageUrl} alt={artist.name} className="h-full w-full object-cover object-top transition-transform duration-[var(--wk-d-slow)] group-hover:scale-105" />
+                    {artist.imageUrl && String(artist.imageUrl).startsWith("http") ? (
+                      <img src={artist.imageUrl} alt={artist.name} loading="lazy" className="h-full w-full object-cover object-top transition-transform duration-[var(--wk-d-slow)] group-hover:scale-105" />
                     ) : (
                       <Ch19GradientImage slug={artist.slug} name={artist.name} />
                     )}
@@ -410,7 +410,7 @@ export default function ArtistsPageContent() {
                     <h3 className="text-[14px] font-bold text-[var(--wk-text)] leading-tight md:text-[15px]">{artist.name}</h3>
                     <div className="mt-1.5 flex items-center gap-2 text-[11px] text-[var(--wk-text-muted)]">
                       {flagUrl && (
-                        <img src={flagUrl} alt="" className="h-3.5 w-5 shrink-0 rounded-[2px] object-cover" />
+                        <img src={flagUrl} alt="" loading="lazy" className="h-3.5 w-5 shrink-0 rounded-[2px] object-cover" />
                       )}
                       <span>{getCountryLabel(artist.country)}</span>
                       <span>·</span>
@@ -439,8 +439,8 @@ export default function ArtistsPageContent() {
                   className="group flex items-center gap-4 px-5 py-4 transition-colors hover:bg-[var(--wk-bg-subtle)] md:gap-5 md:px-6 border-b border-[var(--wk-divider)] last:border-b-0"
                 >
                   <div className="h-12 w-12 shrink-0 overflow-hidden rounded-full bg-[var(--wk-surface-raised)] md:h-14 md:w-14">
-                    {artist.imageUrl ? (
-                      <img src={artist.imageUrl} alt={artist.name} className="h-full w-full object-cover object-top" />
+                    {artist.imageUrl && String(artist.imageUrl).startsWith("http") ? (
+                      <img src={artist.imageUrl} alt={artist.name} loading="lazy" className="h-full w-full object-cover object-top" />
                     ) : (
                       <Ch19GradientImage slug={artist.slug} name={artist.name} />
                     )}
@@ -457,7 +457,7 @@ export default function ArtistsPageContent() {
                     </div>
                     <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[12px] text-[var(--wk-text-muted)]">
                       {flagUrl && (
-                        <img src={flagUrl} alt="" className="h-3.5 w-5 shrink-0 rounded-[2px] object-cover" />
+                        <img src={flagUrl} alt="" loading="lazy" className="h-3.5 w-5 shrink-0 rounded-[2px] object-cover" />
                       )}
                       <span>{getCountryLabel(artist.country)}</span>
                       <span className="opacity-40">·</span>
@@ -524,8 +524,12 @@ function SplitHeroWrapper(props: SplitHeroProps) {
 }
 
 function SplitHero({ artists }: SplitHeroProps) {
-  // All artists with images — tiling handles sparse counts; no arbitrary cap
-  const collageArtists = useMemo(() => artists.filter((a) => a.imageUrl), [artists]);
+  // All artists with valid HTTP image URLs — tiling handles sparse counts; no arbitrary cap
+  // Filter out non-URL values (like genre names from bad CSV data) so the collage stays clean
+  const collageArtists = useMemo(
+    () => artists.filter((a) => a.imageUrl && String(a.imageUrl).startsWith("http")),
+    [artists]
+  );
   // Column count is viewport-driven → identical in canvas and production
   const columnCount = useHeroColumnCount();
   const isSingleImage = collageArtists.length <= 1;
@@ -697,7 +701,7 @@ function SplitHero({ artists }: SplitHeroProps) {
         >
           <span className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-3.5 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.2em] text-white backdrop-blur-md">
             <span className="h-1.5 w-1.5 rounded-full bg-[var(--wk-brand)] animate-pulse" />
-            The continent&apos;s voices
+            The continent's voices
           </span>
 
           <h1 className="hero-text-reveal-d1 font-black text-[clamp(42px,9vw,130px)] leading-[0.85] tracking-[-0.06em] text-white drop-shadow-[0_2px_24px_rgba(0,0,0,0.7)]">

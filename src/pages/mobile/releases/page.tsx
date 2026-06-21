@@ -4,13 +4,13 @@ import {
   listReleases,
   listLabels,
   releaseUrl,
-  type RepairedRelease,
-  type RepairedLabel,
-} from "@/services/repairedContent/client";
+  type PublicRelease,
+  type PublicLabel,
+} from "@/services/publicContent/client";
 
 export default function MobileReleases() {
-  const [releases, setReleases] = useState<RepairedRelease[]>([]);
-  const [labels, setLabels] = useState<RepairedLabel[]>([]);
+  const [releases, setReleases] = useState<PublicRelease[]>([]);
+  const [labels, setLabels] = useState<PublicLabel[]>([]);
   const [filter, setFilter] = useState("All");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -59,12 +59,11 @@ export default function MobileReleases() {
     thisMonth: releases.filter((r) => {
       try {
         const y = Number(r.year);
-        return y >= 2026;
+        return y >= 2025;
       } catch {
         return false;
       }
     }).length,
-    chartConnected: Math.min(releases.length, 6),
     labelsRepresented: labels.length,
   };
 
@@ -184,10 +183,6 @@ export default function MobileReleases() {
           <div className="rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-3 py-3">
             <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--wk-text-muted)]">This month</div>
             <div className="mt-0.5 text-[20px] font-black text-[var(--wk-brand)]">{catalogStats.thisMonth}</div>
-          </div>
-          <div className="rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-3 py-3">
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--wk-text-muted)]">On charts</div>
-            <div className="mt-0.5 text-[20px] font-black text-[var(--wk-brand)]">{catalogStats.chartConnected}</div>
           </div>
           <div className="rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-3 py-3">
             <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--wk-text-muted)]">Labels</div>

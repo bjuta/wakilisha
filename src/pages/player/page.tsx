@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { usePlayer } from "@/context/PlayerContext";
 import { WkIcon } from "@/components/design-system/Icon";
 
@@ -17,7 +17,6 @@ function VolumeIcon({ volume }: { volume: number }) {
 }
 
 export default function DesktopPlayerPage() {
-  const nav = useNavigate();
   const {
     currentTrack,
     isPlaying,
@@ -39,6 +38,7 @@ export default function DesktopPlayerPage() {
     volume,
     setVolume,
     playFromQueue,
+    closeFullPlayer,
   } = usePlayer();
 
   const [liked, setLiked] = useState(false);
@@ -85,7 +85,7 @@ export default function DesktopPlayerPage() {
           Start playing a track from anywhere on the site.
         </p>
         <button
-          onClick={() => nav(-1)}
+          onClick={() => closeFullPlayer()}
           className="mt-8 inline-flex items-center gap-2 rounded-full bg-[var(--wk-brand)] px-6 py-3 text-[14px] font-bold text-[var(--wk-brand-on)] transition-all hover:opacity-90"
         >
           <WkIcon name="ArrowLeft" size={16} /> Go back
@@ -119,7 +119,7 @@ export default function DesktopPlayerPage() {
         {/* Top bar */}
         <div className="flex items-center justify-between px-6 py-4 lg:px-10 lg:py-5">
           <button
-            onClick={() => nav(-1)}
+            onClick={() => closeFullPlayer()}
             className="flex items-center gap-2 rounded-full px-4 py-2 text-[13px] font-semibold text-[var(--wk-text-muted)] transition-all hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]"
           >
             <WkIcon name="ChevronLeft" size={18} /> Back

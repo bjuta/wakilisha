@@ -49,7 +49,6 @@ export function ArticleRelated({ stories, loading, issueContext }: ArticleRelate
           <Link to={issueContext.href} className="group mb-6 block rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-5 transition-all hover:-translate-y-0.5 hover:border-[var(--wk-brand)]">
             <div className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--wk-brand)] mb-2">{issueContext.label}</div>
             <p className="text-[15px] leading-relaxed text-[var(--wk-text-soft)] max-w-[74ch]">{issueContext.blurb}</p>
-            <span className="mt-4 inline-flex text-[11px] font-black uppercase tracking-[0.16em] text-[var(--wk-brand)]">Start here</span>
           </Link>
         )}
 
@@ -84,7 +83,7 @@ export function ArticleRelated({ stories, loading, issueContext }: ArticleRelate
                   <div className="flex flex-col gap-1.5 min-w-0 flex-1">
                     <span className="text-[9px] font-black uppercase tracking-[0.18em] text-[var(--wk-brand)]">{story.section}</span>
                     <h4 className="text-[16px] font-bold tracking-[-0.02em] leading-snug text-[var(--wk-text)] group-hover:text-[var(--wk-brand)] transition-colors line-clamp-2">{story.title}</h4>
-                    {story.dek && <p className="text-[12px] text-[var(--wk-text-muted)] line-clamp-1">{story.dek}</p>}
+                    {story.dek && <p className="text-[12px] text-[var(--wk-text-muted)] line-clamp-2">{story.dek}</p>}
                     <div className="flex items-center gap-2 text-[11px] text-[var(--wk-text-faint)] mt-auto"><span className="font-semibold">{story.author}</span><span>·</span><span>{story.readingTime} min</span></div>
                   </div>
                 </Link>

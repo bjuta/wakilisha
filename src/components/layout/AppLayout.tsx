@@ -1,17 +1,9 @@
 import { Link, Outlet } from "react-router-dom";
 import { useTheme } from "@/components/design-system/theme/ThemeProvider";
+import { usePlayer } from "@/context/PlayerContext";
 import { PlayerDock } from "@/components/design-system/music/PlayerDock";
 import { AppTopBar } from "./AppTopBar";
-
-const FOOTER_PILLARS = [
-  { label: "Music", to: "/charts" },
-  { label: "Guides", to: "/guides" },
-  { label: "Film", to: "/film" },
-  { label: "Fashion", to: "/fashion" },
-  { label: "Food", to: "/food" },
-  { label: "Language", to: "/language" },
-  { label: "Places", to: "/places" },
-];
+import DesktopPlayerPage from "@/pages/player/page";
 
 const FOOTER_DISCOVER = [
   { label: "Charts", to: "/charts" },
@@ -26,8 +18,17 @@ const FOOTER_READ = [
   { label: "Guides", to: "/guides" },
 ];
 
+const FOOTER_ABOUT = [
+  { label: "About", to: "/about" },
+  { label: "Contact", to: "/contact" },
+  { label: "FAQs", to: "/faqs" },
+  { label: "Privacy", to: "/privacy" },
+  { label: "Terms", to: "/terms" },
+];
+
 export function AppLayout() {
   const { theme } = useTheme();
+  const { isFullPlayerOpen } = usePlayer();
 
   return (
     <div className="wk-app-shell min-h-screen flex flex-col">
@@ -36,6 +37,13 @@ export function AppLayout() {
         <Outlet />
       </main>
       <PlayerDock />
+
+      {/* Full player overlay — rendered in-place so the page underneath never unmounts */}
+      {isFullPlayerOpen && (
+        <div className="fixed inset-0 z-[90] bg-[var(--wk-bg)]">
+          <DesktopPlayerPage />
+        </div>
+      )}
       <footer className="border-t border-[var(--wk-border)] bg-[var(--wk-surface-raised)]">
         <div className="wk-container-wide px-6 py-12">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-8">
@@ -45,26 +53,8 @@ export function AppLayout() {
                 WAKILISHA<span className="text-[var(--wk-brand)]">.</span>
               </div>
               <p className="mt-2 text-[13px] leading-relaxed text-[var(--wk-text-muted)]">
-                A home for African creative life. Music first, then stories, artists, places, and everything that moves the culture forward.
+                A home for African creative life. Music first, then stories, artists, and everything that moves the culture forward.
               </p>
-            </div>
-
-            {/* Verticals */}
-            <div>
-              <h4 className="text-[11px] font-black uppercase tracking-[0.18em] text-[var(--wk-text-faint)] mb-4">
-                Verticals
-              </h4>
-              <nav className="flex flex-col gap-2">
-                {FOOTER_PILLARS.map((link) => (
-                  <Link
-                    key={link.to}
-                    to={link.to}
-                    className="text-[13px] text-[var(--wk-text-muted)] hover:text-[var(--wk-text)] transition-colors whitespace-nowrap"
-                  >
-                    {link.label}
-                  </Link>
-                ))}
-              </nav>
             </div>
 
             {/* Discover */}
@@ -92,6 +82,24 @@ export function AppLayout() {
               </h4>
               <nav className="flex flex-col gap-2">
                 {FOOTER_READ.map((link) => (
+                  <Link
+                    key={link.to}
+                    to={link.to}
+                    className="text-[13px] text-[var(--wk-text-muted)] hover:text-[var(--wk-text)] transition-colors whitespace-nowrap"
+                  >
+                    {link.label}
+                  </Link>
+                ))}
+              </nav>
+            </div>
+
+            {/* About */}
+            <div>
+              <h4 className="text-[11px] font-black uppercase tracking-[0.18em] text-[var(--wk-text-faint)] mb-4">
+                About
+              </h4>
+              <nav className="flex flex-col gap-2">
+                {FOOTER_ABOUT.map((link) => (
                   <Link
                     key={link.to}
                     to={link.to}

@@ -1,5 +1,5 @@
 import { buildCultureContext, type CultureContextSurface } from "./index";
-import type { RepairedGenreDetail } from "@/services/repaired/client";
+import type { PublicGenreDetail } from "@/services/publicApi/client";
 
 type GenreLike = Partial<{
   name: string;
@@ -21,9 +21,9 @@ function numberValue(value: unknown): number | undefined {
   return Number.isFinite(number) && number > 0 ? number : undefined;
 }
 
-export function genreContextData(input: GenreLike | RepairedGenreDetail) {
+export function genreContextData(input: GenreLike | PublicGenreDetail) {
   if ("genre" in input && input.genre) {
-    const detail = input as RepairedGenreDetail;
+    const detail = input as PublicGenreDetail;
     return {
       name: clean(detail.genre.name),
       artistCount: detail.artists?.length || undefined,
@@ -51,7 +51,7 @@ export function genreContextData(input: GenreLike | RepairedGenreDetail) {
   };
 }
 
-export function buildGenreCultureText(input: GenreLike | RepairedGenreDetail, surface: CultureContextSurface): string {
+export function buildGenreCultureText(input: GenreLike | PublicGenreDetail, surface: CultureContextSurface): string {
   return buildCultureContext({
     entityType: "genre",
     surface,
@@ -59,18 +59,18 @@ export function buildGenreCultureText(input: GenreLike | RepairedGenreDetail, su
   }).text;
 }
 
-export function buildGenreHeroIntro(input: GenreLike | RepairedGenreDetail): string {
+export function buildGenreHeroIntro(input: GenreLike | PublicGenreDetail): string {
   return buildGenreCultureText(input, "heroIntro");
 }
 
-export function buildGenreCardBlurb(input: GenreLike | RepairedGenreDetail): string {
+export function buildGenreCardBlurb(input: GenreLike | PublicGenreDetail): string {
   return buildGenreCultureText(input, "cardBlurb");
 }
 
-export function buildGenreSearchSnippet(input: GenreLike | RepairedGenreDetail): string {
+export function buildGenreSearchSnippet(input: GenreLike | PublicGenreDetail): string {
   return buildGenreCultureText(input, "searchSnippet");
 }
 
-export function buildGenreSeoDescription(input: GenreLike | RepairedGenreDetail): string {
+export function buildGenreSeoDescription(input: GenreLike | PublicGenreDetail): string {
   return buildGenreCultureText(input, "seoDescription");
 }

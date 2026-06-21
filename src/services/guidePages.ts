@@ -1,8 +1,11 @@
 import { supabase } from "@/lib/supabase";
 import type { GuidePageRecord, GuideSection } from "@/pages/guides/detail/sectionTypes";
+import { batchGetMediaAssetsByUrl } from "@/utils/mediaAssetProps";
 
 /**
  * Fetch a single guide page by slug from the guide_pages table.
+ * Also enriches the result with registry_media_assets metadata
+ * for the hero image (via hero_url matching).
  */
 export async function fetchGuidePage(slug: string): Promise<GuidePageRecord | null> {
   const { data, error } = await supabase
@@ -19,7 +22,7 @@ export async function fetchGuidePage(slug: string): Promise<GuidePageRecord | nu
 
   if (!data) return null;
 
-  return mapGuideRow(data);
+  return await enrichGuideWithMedia(mapGuideRow(data));
 }
 
 /**
@@ -37,7 +40,8 @@ export async function fetchPublishedGuides(): Promise<GuidePageRecord[]> {
     return [];
   }
 
-  return (data || []).map(mapGuideRow);
+  const guides = (data || []).map(mapGuideRow);
+  return await enrichGuidesWithMedia(guides);
 }
 
 /**
@@ -75,13 +79,13 @@ export async function fetchGuideForAdmin(slug: string): Promise<GuidePageRecord 
 
   if (!data) return null;
 
-  return mapGuideRow(data);
+  return await enrichGuideWithMedia(mapGuideRow(data));
 }
 
 /**
  * Update any fields on a guide page record.
  */
-export async function updateGuidePage(slug: string, updates: Partial<Pick<GuidePageRecord, "title" | "subtitle" | "excerpt" | "sections" | "guide_format" | "color_var" | "icon" | "framing" | "hero_url">>): Promise<boolean> {
+export async function updateGuidePage(slug: string, updates: Partial<Pick<GuidePageRecord, "title" | "subtitle" | "excerpt" | "sections" | "guide_format" | "color_var" | "icon" | "framing" | "hero_url" | "hero_image_id" | "heroMediaAsset">>): Promise<boolean> {
   const { error } = await supabase
     .from("guide_pages")
     .update({ ...updates, updated_at: new Date().toISOString() })
@@ -140,9 +144,65 @@ function mapGuideRow(d: any): GuidePageRecord {
     icon: d.icon,
     framing: d.framing,
     hero_url: d.hero_url,
+    hero_image_id: d.hero_image_id,
     sections: (d.sections || []) as GuideSection[],
     status: d.status,
     published_at: d.published_at,
     updated_at: d.updated_at,
   };
+}
+
+// ─── Media enrichment ─────────────────────────────────────────
+
+async function enrichGuideWithMedia(guide: GuidePageRecord): Promise<GuidePageRecord> {
+  const heroUrl = guide.hero_url;
+  if (!heroUrl) return guide;
+
+  try {
+    const assets = await batchGetMediaAssetsByUrl([heroUrl]);
+    const asset = assets.get(heroUrl);
+    if (asset) {
+      guide.heroMediaAsset = {
+        id: asset.id,
+        slug: asset.slug,
+        title: asset.title,
+        url: asset.url,
+        mime_type: asset.mime_type,
+        media_kind: asset.media_kind,
+        metadata: asset.metadata,
+      };
+    }
+  } catch {
+    // Silently continue — enrichment is best-effort
+  }
+
+  return guide;
+}
+
+async function enrichGuidesWithMedia(guides: GuidePageRecord[]): Promise<GuidePageRecord[]> {
+  const urls = guides.map((g) => g.hero_url).filter(Boolean) as string[];
+  if (urls.length === 0) return guides;
+
+  try {
+    const assets = await batchGetMediaAssetsByUrl(urls);
+    for (const guide of guides) {
+      if (!guide.hero_url) continue;
+      const asset = assets.get(guide.hero_url);
+      if (asset) {
+        guide.heroMediaAsset = {
+          id: asset.id,
+          slug: asset.slug,
+          title: asset.title,
+          url: asset.url,
+          mime_type: asset.mime_type,
+          media_kind: asset.media_kind,
+          metadata: asset.metadata,
+        };
+      }
+    }
+  } catch {
+    // Silently continue
+  }
+
+  return guides;
 }

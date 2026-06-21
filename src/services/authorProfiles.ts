@@ -51,15 +51,47 @@ export function bustAuthorCache() {
 }
 
 export async function fetchAllAuthors(): Promise<AuthorRow[]> {
-  if (cachedAuthors && Date.now() - cacheTimestamp < CACHE_TTL) return cachedAuthors;
+  // Return fresh cache if available
+  if (cachedAuthors && Date.now() - cacheTimestamp < CACHE_TTL) {
+    return cachedAuthors;
+  }
 
-  const { data, error } = await supabase
-    .from("registry_authors")
-    .select("id, slug, name, email, url, source_kind, bio, avatar_url, cover_url, role, location, social_links, joined_date");
+  let data: unknown[] | null = null;
+  let error: { message: string } | null = null;
 
-  if (error || !data) {
-    console.warn("Failed to fetch authors from registry_authors:", error?.message);
-    return cachedAuthors ?? [];
+  // Single attempt — the caller (component) handles retries
+  try {
+    const result = await supabase
+      .from("registry_authors")
+      .select("id, slug, name, email, url, source_kind, bio, avatar_url, cover_url, role, location, social_links, joined_date");
+    data = result.data;
+    error = result.error;
+  } catch (err) {
+    console.error("fetchAllAuthors: Supabase query threw", err);
+    // If we have a stale cache, return it as fallback
+    if (cachedAuthors && cachedAuthors.length > 0) {
+      console.warn("fetchAllAuthors: returning stale cached data after query failure");
+      return cachedAuthors;
+    }
+    // No cache, no data — throw so the UI can show error + retry
+    throw err;
+  }
+
+  if (error) {
+    console.error("fetchAllAuthors: Supabase returned error", error.message, error);
+    if (cachedAuthors && cachedAuthors.length > 0) {
+      console.warn("fetchAllAuthors: returning stale cached data after Supabase error");
+      return cachedAuthors;
+    }
+    throw new Error(`Failed to load authors: ${error.message}`);
+  }
+
+  if (!data || data.length === 0) {
+    // Empty table — this is a valid state, cache it and return
+    console.warn("fetchAllAuthors: registry_authors returned 0 rows");
+    cachedAuthors = [];
+    cacheTimestamp = Date.now();
+    return [];
   }
 
   cachedAuthors = data as AuthorRow[];
@@ -68,8 +100,13 @@ export async function fetchAllAuthors(): Promise<AuthorRow[]> {
 }
 
 export async function fetchAuthorBySlug(slug: string): Promise<AuthorRow | null> {
-  const authors = await fetchAllAuthors();
-  return authors.find((a) => a.slug === slug) ?? null;
+  try {
+    const authors = await fetchAllAuthors();
+    return authors.find((a) => a.slug === slug) ?? null;
+  } catch {
+    // fetchAllAuthors already logged the error — gracefully return null
+    return null;
+  }
 }
 
 /** Update an author profile directly in registry_authors */

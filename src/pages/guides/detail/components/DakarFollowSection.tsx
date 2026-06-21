@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import { trackEvent  } from "@/services/analytics";
 import { dakarData } from "../dakarData";
 
 export default function DakarFollowSection() {
@@ -9,6 +10,9 @@ export default function DakarFollowSection() {
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+
+  const guideSlug = "dakar-biennale-2026";
+  const guideTitle = `${follow.title} ${follow.titleItalic || ""}`;
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,6 +28,18 @@ export default function DakarFollowSection() {
     }
 
     setSubmitting(true);
+
+    trackEvent("newsletter_signup", {
+      pageType: "guide_detail",
+      entitySlug: guideSlug,
+      entityType: "guide",
+      context: {
+        source_section: "follow_form",
+        guide_title: guideTitle,
+        guide_slug: guideSlug,
+      },
+    });
+
     // Simulate submission — in production this would POST to an endpoint
     await new Promise((r) => setTimeout(r, 800));
     setSubmitting(false);

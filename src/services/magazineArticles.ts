@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
-import { listMagazineStories, getArticle, type RepairedStory } from '@/services/repairedContent/client';
+import { listMagazineStories, getArticle, type PublicStory } from '@/services/publicContent/client';
 import { processArticleContent, generateExcerpt } from '@/services/articles/contentPipeline';
 import { fetchAllSiteContent, type SiteContentResponse, type MagazineSiteArtist, type MagazineSiteRelease } from '@/services/magazineSiteContent';
+import { supabase } from '@/lib/supabase';
 
 export type MediaAsset = {
   id: string;
@@ -10,6 +11,8 @@ export type MediaAsset = {
   role: string;
   url: string;
   altText: string | null;
+  caption: string | null;
+  title: string | null;
   source: string | null;
 };
 
@@ -33,7 +36,7 @@ export type MagazineArticle = {
   mediaAssets: MediaAsset[];
 };
 
-export type { RepairedStory };
+export type { PublicStory };
 
 function articleHeroUrl(article: any): string {
   return String(
@@ -49,7 +52,7 @@ function articleHeroUrl(article: any): string {
 }
 
 
-function storyToArticle(story: RepairedStory): MagazineArticle {
+function storyToArticle(story: PublicStory): MagazineArticle {
   return {
     id: story.id,
     slug: story.slug,
@@ -77,13 +80,16 @@ export async function listMagazineArticles(): Promise<MagazineArticle[]> {
 
 export async function getMagazineArticleBySlug(
   slug: string | undefined,
-  _previewNonce?: string | null
+  previewNonce?: string | null
 ): Promise<MagazineArticle | null> {
   if (!slug) return null;
-  const detail = await getArticle(slug);
+  const detail = await getArticle(slug, previewNonce);
   if (!detail) return null;
   const processedContent = processArticleContent(detail.contentHtml);
   const excerpt = detail.dek?.trim() || generateExcerpt(detail.contentHtml, 280);
+
+  // Resolve inline media assets from content HTML
+  const mediaAssets = await resolveInlineMediaAssets(detail.contentHtml);
 
   return {
     id: detail.id,
@@ -101,8 +107,60 @@ export async function getMagazineArticleBySlug(
     relatedEntities: [],
     isFeatured: false,
     readCount: 0,
-    mediaAssets: [],
+    mediaAssets,
   };
+}
+
+/**
+ * Scans article HTML content for <img data-asset-id="..."> tags,
+ * looks up the corresponding registry_media_assets rows, and returns
+ * enriched MediaAsset objects with caption, alt, title metadata.
+ */
+async function resolveInlineMediaAssets(contentHtml: string): Promise<MediaAsset[]> {
+  if (!contentHtml) return [];
+
+  // Extract data-asset-id values from img tags
+  const assetIds: string[] = [];
+  const idRegex = /<img[^>]+data-asset-id="([^"]+)"[^>]*>/gi;
+  let match: RegExpExecArray | null;
+  while ((match = idRegex.exec(contentHtml)) !== null) {
+    if (match[1] && !assetIds.includes(match[1])) {
+      assetIds.push(match[1]);
+    }
+  }
+
+  if (assetIds.length === 0) return [];
+
+  try {
+    const { data, error } = await supabase
+      .from("registry_media_assets")
+      .select("id, slug, title, url, media_kind, source_kind, metadata")
+      .in("id", assetIds);
+
+    if (error || !data) return [];
+
+    return (data as Array<{
+      id: string;
+      slug: string;
+      title: string | null;
+      url: string;
+      media_kind: string | null;
+      source_kind: string | null;
+      metadata: Record<string, unknown> | null;
+    }>).map((row) => ({
+      id: row.id,
+      entityType: "media",
+      entitySlug: row.slug,
+      role: "inline",
+      url: row.url,
+      altText: (row.metadata?.alt_text as string) || row.title || null,
+      caption: (row.metadata?.caption as string) || null,
+      title: row.title || null,
+      source: row.source_kind || null,
+    }));
+  } catch {
+    return [];
+  }
 }
 
 export async function getRelatedArticles(article: MagazineArticle, limit = 3): Promise<MagazineArticle[]> {
@@ -110,7 +168,7 @@ export async function getRelatedArticles(article: MagazineArticle, limit = 3): P
   return articles.filter((item) => item.slug !== article.slug).slice(0, limit);
 }
 
-export function toRepairedStory(article: MagazineArticle): RepairedStory {
+export function toPublicStory(article: MagazineArticle): PublicStory {
   return {
     id: article.id,
     slug: article.slug,

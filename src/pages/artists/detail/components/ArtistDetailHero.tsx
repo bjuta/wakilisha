@@ -82,7 +82,8 @@ export function ArtistDetailHero({
                 <div className="relative overflow-hidden rounded-2xl border border-white/20 shadow-2xl">
                   <img
                     src={avatarSrc}
-                    alt={name}
+                    alt={`${name} portrait`}
+                    loading="lazy"
                     className="h-56 w-44 object-cover object-top"
                   />
                 </div>
@@ -105,7 +106,7 @@ export function ArtistDetailHero({
               <div className="hero-text-reveal hero-text-reveal-d2 flex md:hidden items-center gap-2 flex-wrap">
                 {countryFlagUrl && (
                   <span className="flex items-center gap-1.5 rounded-full border border-white/30 bg-white/10 px-3.5 py-1.5 text-[12px] font-bold text-white backdrop-blur-sm whitespace-nowrap">
-                    <img src={countryFlagUrl} alt="" className="h-3.5 w-5 rounded-[2px] object-cover" />
+                    <img src={countryFlagUrl} alt={`${countryLabel} flag`} loading="lazy" className="h-3.5 w-5 rounded-[2px] object-cover" />
                     {countryLabel}
                   </span>
                 )}
@@ -137,7 +138,7 @@ export function ArtistDetailHero({
               <div className="hero-text-reveal hero-text-reveal-d2 hidden md:flex mb-5 flex-wrap items-center gap-3">
                 {countryFlagUrl && (
                   <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[11px] font-bold text-white/90 backdrop-blur-sm uppercase tracking-wider">
-                    <img src={countryFlagUrl} alt="" className="h-3.5 w-5 rounded-[2px] object-cover" />
+                    <img src={countryFlagUrl} alt={`${countryLabel} flag`} loading="lazy" className="h-3.5 w-5 rounded-[2px] object-cover" />
                     {countryLabel}
                   </span>
                 )}

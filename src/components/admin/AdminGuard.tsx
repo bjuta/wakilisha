@@ -37,7 +37,7 @@ export function AdminGuard({ children, capabilities, fallback }: AdminGuardProps
         </div>
         <h2 className="text-[18px] font-bold text-wk-text mb-1">No Access Role</h2>
         <p className="text-[13px] text-wk-text-muted max-w-md mb-4">
-          Your account doesn&apos;t have an assigned role yet. Contact an administrator to get access to the production engine.
+          Your account doesn't have an assigned role yet. Contact an administrator to get access to the production engine.
         </p>
         <a href="/" className="text-[13px] font-semibold text-wk-brand hover:underline">
           Back to site

@@ -67,7 +67,7 @@ export default function AdminArticlesPage() {
             {articles.length} articles loaded.{" "}
             {articles.filter((a) => !a.title || !a.excerpt).length} need review.
             {!canEditOthers && (
-              <span className="ml-1 text-wk-brand">Showing {adminUser.name}&apos;s articles.</span>
+              <span className="ml-1 text-wk-brand">Showing {adminUser.name}'s articles.</span>
             )}
           </p>
         </div>

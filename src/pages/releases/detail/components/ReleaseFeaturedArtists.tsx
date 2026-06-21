@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
@@ -6,6 +7,7 @@ import { slugify } from "@/services/publicContent/client";
 interface FeaturedArtist {
   name: string;
   slug: string;
+  imageUrl?: string | null;
 }
 
 export default function ReleaseFeaturedArtists({
@@ -49,12 +51,8 @@ export default function ReleaseFeaturedArtists({
                 to={`/artists/${artistSlug}`}
                 className="group flex flex-col items-center gap-2.5 p-4 rounded-xl bg-[var(--wk-bg)] border border-[var(--wk-border)] hover:border-[var(--wk-brand)]/40 hover:bg-[var(--wk-surface-raised)] transition-all duration-200"
               >
-                <div className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-[var(--wk-brand-soft)] flex items-center justify-center group-hover:bg-[var(--wk-brand)]/10 transition-colors">
-                  <WkIcon
-                    name="User"
-                    size={22}
-                    className="text-[var(--wk-brand)] group-hover:text-[var(--wk-brand)] transition-colors"
-                  />
+                <div className="w-14 h-14 md:w-16 md:h-16 rounded-full overflow-hidden bg-[var(--wk-brand-soft)] flex items-center justify-center group-hover:bg-[var(--wk-brand)]/10 transition-colors">
+                  <ArtistAvatar imageUrl={artist.imageUrl} name={artist.name} />
                 </div>
                 <span className="text-[13px] font-extrabold text-[var(--wk-text)] text-center leading-tight group-hover:text-[var(--wk-brand)] transition-colors">
                   {artist.name}
@@ -69,5 +67,29 @@ export default function ReleaseFeaturedArtists({
         </div>
       </section>
     </div>
+  );
+}
+
+function ArtistAvatar({ imageUrl, name }: { imageUrl?: string | null; name: string }) {
+  const [failed, setFailed] = useState(false);
+
+  if (imageUrl && !failed) {
+    return (
+      <img
+        src={imageUrl}
+        alt={name}
+        className="w-full h-full object-cover"
+        loading="lazy"
+        onError={() => setFailed(true)}
+      />
+    );
+  }
+
+  return (
+    <WkIcon
+      name="User"
+      size={22}
+      className="text-[var(--wk-brand)] group-hover:text-[var(--wk-brand)] transition-colors"
+    />
   );
 }

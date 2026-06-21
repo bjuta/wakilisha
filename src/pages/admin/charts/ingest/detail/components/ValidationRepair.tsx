@@ -98,7 +98,7 @@ export function ValidationRepair({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-[14px] font-bold text-[var(--wk-text)]">Validation &amp; Repair</h2>
+          <h2 className="text-[14px] font-bold text-[var(--wk-text)]">Validation & Repair</h2>
           <p className="mt-0.5 text-[11px] text-[var(--wk-text-muted)]">
             Inspect and fix validation issues before candidate creation.
           </p>

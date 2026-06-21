@@ -156,7 +156,7 @@ export default function AdminSettingsFrontendAppearance() {
                   className="flex-1 rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none focus:ring-1 focus:ring-[var(--wk-brand)]"
                 />
                 <MediaPickerButton
-                  onSelect={(url) => update(key, url as FrontendAppearanceSettings[typeof key])}
+                  onSelect={(assetId, url) => update(key, url as FrontendAppearanceSettings[typeof key])}
                   title={`Select ${label}`}
                   iconOnly
                 />
@@ -185,7 +185,7 @@ export default function AdminSettingsFrontendAppearance() {
         </h2>
         <p className="text-[12px] text-[var(--wk-text-muted)] mb-5">
           Controls how many artist images appear in the full-bleed masonry collage on the Artists page hero.
-          At 1, it&apos;s a fullwidth single portrait. At 200, it&apos;s a 20-column mural.
+          At 1, it's a fullwidth single portrait. At 200, it's a 20-column mural.
         </p>
 
         {/* Slider */}

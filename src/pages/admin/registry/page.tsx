@@ -547,7 +547,7 @@ function OrphanAlerts({ orphans }: { orphans: OrphanStat[] }) {
     <WkSurface className="p-5 bg-white border-[#dfe4d8]">
       <div className="mb-4 flex items-center gap-2">
         <WkIcon name="AlertTriangle" size={16} className="text-amber-600" />
-        <h2 className="text-[14px] font-bold text-[#171712]">Orphaned &amp; At-Risk</h2>
+        <h2 className="text-[14px] font-bold text-[#171712]">Orphaned & At-Risk</h2>
         <span className="ml-auto rounded-full bg-red-50 px-2.5 py-0.5 text-[10px] font-bold text-red-700">
           {orphans.filter((o) => o.count > 0).length} issues
         </span>

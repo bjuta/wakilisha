@@ -15,6 +15,8 @@ import { PlayerProvider } from "./context/PlayerContext";
 import { RecoveryRedirectGuard } from "./components/auth/RecoveryRedirectGuard";
 import { PageTitle } from "./components/seo/PageTitle";
 import ScrollRestoration from "./components/base/ScrollRestoration";
+import { PageViewTracker } from "./hooks/usePageViewTracking";
+import GtagInjector from "./components/analytics/GtagInjector";
 
 function App() {
   return (
@@ -25,6 +27,8 @@ function App() {
             <RecoveryRedirectGuard />
             <PageTitle />
             <ScrollRestoration />
+            <PageViewTracker />
+            <GtagInjector />
             <AppRoutes />
           </PlayerProvider>
         </ThemeProvider>

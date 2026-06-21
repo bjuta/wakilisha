@@ -841,95 +841,37 @@ The 3 published guides ("In Minor Keys", "Dakar Biennale 2026", "The Day Reading
 - **Admin editor** — CRUD sections, reorder, preview, publish. The `updateGuideSections()` service function exists and is ready for the admin UI.
 - **Old hardcoded files** — `data.ts`, `dakarData.ts`, `readingData.ts`, and the old siloed section components in `src/pages/guides/detail/components/` are now unused by the rendering path but retained for reference during admin editor build-out.
 
-## Release Shells Infrastructure Refactor — June 2026 ✅
-**Status:** COMPLETE
-**Goal:** Simplify the release shells system. Two parallel backends collapsed into one; tracks stored on shell rows; full canonicalization that writes tracks, artist roles, and provider links.
+## Release Shells Architecture — DEMOLISHED (June 2026)
 
-### What was changed:
+**Status:** FULLY REMOVED. The release shells layer was an abandoned experiment — zero shell rows in the database, dead provider-intake + enrichment-review edge functions, unused admin pages and components. All shell code, services, routes, nav links, DB tables, and edge functions have been removed. The public API now serves releases directly from `registry_releases` + `registry_release_tracks` + `registry_tracks` with no shell fallback.
 
-**Phase A: Dead code removal**
-- Removed `src/pages/admin/charts/release-shells/page.tsx` — disconnected page reading from chart ingestion runs
-- Removed `scripts/registry/provider-intake/` (5 files) — redundant Node.js backend for intake
-- Removed `src/services/registry/provider-enrichment/` (4 files) — unused PG-based enrichment code
-- Removed `src/services/registry/providerIntake/types.ts` — duplicate type file
-- Stripped intake routes from `scripts/registry/serve-registry-admin-api.ts` — now only handles enrichment-review
-- Updated all navigation links to point to `/admin/registry/release-shells`
+### What was demolished (June 2026)
 
-**Phase B: Tracks storage**
-- Added `tracks` JSONB column to `registry_release_shells`
-- `provider-intake-api` v2 stores full track data (title, ISRC, duration, track number, artist, artwork, preview URL) on shell creation and refresh
+**Frontend (13 files deleted, 8 files edited):**
+- Deleted: `src/pages/admin/registry/release-shells/page.tsx`, `src/pages/admin/settings/registry/release-shells/page.tsx`
+- Deleted: 6 release shell components (`src/components/admin/registry/release-shells/`)
+- Deleted: `src/services/registry/provider-intake/client.ts`, `types.ts`
+- Deleted: `src/services/registry/enrichment-review/client.ts`
+- Stripped: `src/services/publicContent/client.ts` — removed `ReleaseShellRow` type, `mapShellToRelease()`, `getReleaseFromShell()`, `listReleasesFromShells()`, `resolveLabelsForReleases()`, `resolveArtistsForReleases()`, and all shell fallback branches in `listReleases()`, `getRelease()`, `listReleasesPaginated()`, `getReleaseCatalogStats()`, `getReleaseFilterArtists()`, `getReleaseFilterYears()`
+- Cleaned: `src/router/config.tsx` — removed 3 shell routes + 1 import
+- Cleaned: `src/pages/admin/AdminShell.tsx` — removed Release Shells nav item
+- Cleaned: `src/pages/admin/charts/AdminChartsLayout.tsx` — removed Release Shells nav item
+- Cleaned: `src/data/adminSearchIndex.ts` — removed shell search entry
+- Cleaned: `src/services/adminSettings/settingsTypes.ts` — removed `autoCreateReleaseShells`
+- Cleaned: `src/pages/admin/settings/maintenance/page.tsx` — removed Orphaned Shell Scan
 
-**Phase C: Duplicate detection**
-- `provider-intake-api` v2 checks `provider_entity_links` for existing provider entity IDs before creating shells
+**Edge Functions (to delete in Supabase dashboard):**
+- `provider-intake-api` v7
+- `registry-enrichment-review` v11
 
-**Phase D: Full canonicalization**
-- `registry-enrichment-review` v2 `apply-approved` handler now:
-  - Writes release fields (title, release_date, artwork_url)
-  - Reads shell.tracks JSONB
-  - Upserts tracks into `registry_tracks` (ISRC dedup)
-  - Creates `registry_release_tracks` joins with disc/track numbers
-  - Creates `registry_track_artists` roles for matching artists
-  - Creates `registry_release_artists` roles for the primary artist
-  - Sets release status to "active" after tracks are written
-  - Marks suggestions as "applied"
-  - Creates audit events
-
-**Phase E: Client update**
-- `ReleaseShellEnrichmentContext` now includes `tracks` array
-- `getLiveReleaseShellReviewRows` populates tracks from the shell row
-- `RegistryReleaseShellReviewRow` includes tracks from context
-
-### Architecture (after refactor):
-```
-Apple Music API
-     ↓
-provider-intake-api (Supabase Edge Function)
-     ↓
-registry_release_shells (with tracks JSONB)
-     ↓
-registry-enrichment-review (review workflow)
-     ↓
-registry_releases + registry_tracks + registry_release_tracks
-  + registry_track_artists + registry_release_artists
+**Database (run in Supabase SQL editor):**
+```sql
+DROP TABLE IF EXISTS registry_release_shells CASCADE;
+DROP TABLE IF EXISTS registry_release_shell_lifecycle_events CASCADE;
+DROP TABLE IF EXISTS provider_items CASCADE;
 ```
 
-### What was kept:
-- `src/services/registry/provider-intake/client.ts` — frontend client (calls edge function)
-- `src/services/registry/provider-intake/types.ts` — frontend types
-- `src/components/admin/registry/release-shells/` — intake drawer components
-- `src/pages/admin/registry/release-shells/page.tsx` — main review page
-- `src/services/registry/enrichment-review/client.ts` — enrichment review client
-
-## Release Shells (Simplified v3 — 2026-06-16)
-After user feedback that the Phase 8C enrichment workflow was too complex, the release shells flow was rebuilt to match the old WordPress simplicity:
-
-**Backend:**
-- `registry-enrichment-review` edge function v3 adds:
-  - `POST /canonicalize` — canonicalizes a shell directly (no suggestion workflow required). Writes release fields, creates/upserts tracks with ISRC dedup, writes release-track joins, track-artist roles, release-artist roles, updates shell status to `canonicalized`.
-  - `POST /check-duplicate` — checks for existing releases with similar title + artist.
-  - `POST /save-shell` — saves edits to shell metadata and linked release.
-  - `POST /reject-shell` — marks shell and linked release as rejected.
-
-**Frontend:**
-- Intake drawer kept as-is (search Apple Music → inspect → create shell).
-- New `ShellReviewDrawer` component replaces the complex inline enrichment panel. It shows:
-  - Editable shell metadata form (title, artist, release date, artwork URL, review notes)
-  - Track list with ISRC, duration, preview links
-  - Duplicate detection results (if any)
-  - Actions: Save, Canonicalize, Reject
-- Main page rewritten from 1502 lines to ~200 lines:
-  - Simple table: artwork, title, artist, provider, status, tracks, action
-  - Search + 4 status filters (All, Pending, Canonicalized, Rejected)
-  - No KPIs, no activity feed, no bulk ops, no suggestion lanes, no audit panels
-
-**Mental model:**
-```
-Apple Music → provider-intake-api → registry_release_shells (with tracks JSONB)
-                                         ↓
-                                   Review drawer (edit + tracks + canonicalize)
-                                         ↓
-                                   Canonicalize → writes everything to canonical tables
-```
+**What stays:** The chart ingestion pipeline uses "shell" as a match-status term (`MatchStatus = "canonical" | "shell" | ...`) for unmatched rows that need entity creation. This is a pipeline-internal taxonomy with zero connection to the `registry_release_shells` table — it was never changed and doesn't need to be.
 
 ## Phase 10: API Naming & Architecture Harmonization 🔄 IN PROGRESS
 
@@ -985,3 +927,380 @@ Apple Music → provider-intake-api → registry_release_shells (with tracks JSO
    - `/api-docs` — public API reference page (Redoc standalone, renders from TypeScript spec object)
    - `/admin/api-docs` — admin API docs with tab switcher (Public API / Admin API), renders both specs
 6. ✅ Admin nav — "Developer" section with "API Docs" link visible to all admin users
+
+---
+
+## Phase 11: Unified Analytics Layer 🔄 IN PROGRESS
+
+**Status:** Phase 11A-11I COMPLETE (June 19, 2026). All phases complete.
+**Goal:** Build a first-party analytics system that captures every meaningful user action across WAKILISHA — page views, form submissions (with full entity context), search behavior, entity card clicks, video plays, scroll depth, and player interactions. Own the data. No dependency on Google Analytics (GA4 can be layered on later as a secondary channel).
+
+### Audit Summary: What's Tracked vs. What's Missing
+
+#### Already Tracked ✅
+
+| Surface | What's Captured | Service |
+|---------|----------------|---------|
+| Article shares | `page_url`, `platform`, `article_slug`, `article_title`, `created_at` | `shareTracking.ts` → `share_events` table |
+| Share counts | Materialized `share_counts` table for fast reads | `shareTracking.ts` |
+| Admin share analytics | Dashboard at `/admin/share-analytics` with charts, top articles, timelines, KPIs | `src/pages/admin/share-analytics/page.tsx` |
+
+#### NOT Tracked — The Full Gap List
+
+**1. Forms & Newsletter Subscriptions (15 surfaces, ZERO context)**
+
+Every form on the site submits directly to Readdy's form endpoint with no hidden context fields. When a user subscribes, we have no idea where they came from.
+
+| # | Surface | File | Missing Context |
+|---|---------|------|-----------------|
+| F1 | Homepage newsletter (desktop) | `src/pages/home/page.tsx` | ✅ DONE — `pageType: home`, `sourceSection: newsletter_footer`, session_id, canonical URL |
+| F2 | Homepage newsletter (mobile) | `src/pages/mobile/home/page.tsx` | ✅ DONE — same as F1, formId: `homepage-newsletter-mobile` |
+| F3 | Magazine newsletter (desktop panel) | `src/pages/magazine/components/NewsletterCTA.tsx` | ✅ DONE — `pageType: magazine`, `sourceSection: sidebar`, `formId: magazine-newsletter-cta` |
+| F4 | Magazine newsletter (desktop section) | `src/pages/magazine/components/MagazineNewsletter.tsx` | ✅ DONE — `pageType: magazine`, `sourceSection: magazine_page`, `formId: magazine-newsletter-section` |
+| F5 | Magazine newsletter (mobile) | `src/pages/mobile/magazine/page.tsx` → `MobileNewsletterCTA` | ✅ DONE — `pageType: magazine`, `sourceSection: mobile_footer`, `formId: magazine-newsletter-mobile` |
+| F6 | Guides listing newsletter (desktop) | `src/pages/guides/page.tsx` → `GuidesNewsletter` | ✅ DONE — **Bug fixed**: form now actually submits (was `e.preventDefault()` blocking). `pageType: guides_listing`, hidden fields, `formId: guides-newsletter-desktop` |
+| F7 | Guides listing newsletter (mobile) | `src/pages/mobile/guides/page.tsx` | ✅ DONE — **Bug fixed**: form now actually submits. `pageType: guides_listing`, hidden fields, `formId: guides-newsletter-mobile` |
+| F8 | Guide detail — Send the Guide form | `src/pages/guides/detail/sections/DownloadFormSection.tsx` | ✅ DONE — `trackEvent("newsletter_signup")` with `pageType: guide_detail`, `entitySlug` from URL params, `entityType: guide`, `context: { source_section: download_form, guide_title, guide_slug }`. Hidden fields: `wk_session_id`, `wk_page_url`, `wk_page_type`, `wk_source_section` |
+| F9 | Venice guide download (legacy component) | `src/pages/guides/detail/components/GuideDownloadSection.tsx` | ✅ DONE — Same pattern, hardcoded `guide_slug: in-minor-keys`. Hidden fields + tracking |
+| F10 | Dakar follow/updates form | `src/pages/guides/detail/components/DakarFollowSection.tsx` | ✅ DONE — `trackEvent("newsletter_signup")` with `guide_slug: dakar-biennale-2026`, `source_section: follow_form`. Form is simulated (no backend endpoint), but analytics fire on submit |
+| F11 | Mobile guide forms (3 components) | `src/pages/mobile/guides/detail/components/MobileVeniceGuide.tsx`, `MobileDakarGuide.tsx`, `MobileReadingGuide.tsx` | ✅ DONE — All three mobile forms fire `trackEvent` on submit (without blocking native form POST). Hidden fields added. Source sections: `download_form_mobile`, `follow_form_mobile`, `notify_form_mobile` |
+| F12 | Charts edition newsletter | `src/pages/charts/edition/page.tsx` | ✅ DONE — `trackEvent("newsletter_signup")` with `pageType: charts_edition`, `entitySlug: edition.slug`, `context: { source_section: edition_newsletter, chart_program, chart_family_slug, form_id }`. Hidden fields: `wk_session_id`, `wk_page_url`, `wk_page_type`, `wk_source_section`, `wk_entity_slug`, `wk_entity_type` |
+| F13 | Lyrics contribution form | `src/pages/tracks/lyrics/contribute/page.tsx` + mobile | ✅ DONE — `trackEvent("lyrics_contribution")` with `pageType: track_detail`, `entitySlug: trackSlug`, `context: { source_section: contribute_page, artist_slug, track_title, artist_name, timed_lines_count, total_lines_count, has_source_description }`. Desktop + mobile variants fire identical events with distinct `source_section` |
+| F14 | Guide download (legacy component) | `src/pages/guides/detail/components/GuideDownloadSection.tsx` | `guide_slug`, `guide_title` |
+| F15 | Magazine article — no newsletter form exists on article page, but `NewsletterCTA` component is available for placement | N/A (component unused on article pages) |
+
+**2. Page Views (ZERO tracking)**
+
+No route change listener, no session tracking, no referrer capture, no time-on-page measurement. We are completely blind to:
+- How many people visit each page type
+- Which articles/artists/guides get the most traffic
+- Where traffic comes from (referrer)
+- How long people spend on content
+- Bounce patterns
+
+**3. Search Behavior (now TRACKED ✅)**
+
+The `/search` page (`src/pages/search/page.tsx`) now fires:
+- `search_query` — debounced 800ms after typing stops, carries query text + per-type result counts
+- `search_result_click` — on any result click (artist/track/release/genre/label/chart_entry), carries entity type, entity slug, click position, active tab, and search query
+- `search_tab_switch` — on tab change, carries from_tab, to_tab, query, and total results
+- Mobile search (`src/pages/mobile/search/page.tsx`) fires `search_query` + `search_result_click` (no tabs on mobile)
+- Zero-result queries are tracked (results_count: 0 in the query event) so you can identify dead-end searches
+
+**4. Entity Card Clicks (now TRACKED ✅)**
+
+These shared components now fire `card_click` events with source-section context:
+- `ArtistCard` — fires on click, carries `entity_type: "artist"`, `entity_slug`, and `source_section`. Used in: search (`source_section: "search"`), magazine artist spotlights (`source_section: "magazine_artist_spotlight"`).
+- `ReleaseCard` — fires on click, carries `entity_type: "release"`, `entity_slug`, and `source_section`. Used in: search (`source_section: "search"`), magazine release spotlights (`source_section: "magazine_release_spotlight"`).
+- `GenreCard` — tracking-ready (unused in current pages, but fires when imported with `sourceSection`)
+- `LabelCard` — tracking-ready (unused in current pages, but fires when imported with `sourceSection`)
+- `StoryCard` — tracking-ready (unused in current pages, but fires when imported with `sourceSection`)
+
+All 5 cards accept optional `sourceSection`, `sourceEntity`, and `clickPosition` props. Tracking is fire-and-forget (no navigation delay).
+
+**5. Video Plays ✅ TRACKED**
+
+The video system (`VideoCard` → `useVideoPlayer` → `VideoOverlay`) now fires `video_play` events on open/close via an `onPlayEvent` callback:
+- `video_play` event with `action: "open"|"close"`, `video_url`, `platform`, `video_title`, `video_index`, `total_videos`, `opened_at` (for watch duration calculation)
+- `opened_at` timestamp on open events allows calculating watch duration on close
+- Both article pages (desktop + mobile) and artist detail pages (desktop + mobile) wired
+- Navigate (prev/next video) fires close for current + open for next in sequence
+- Article pages carry `pageType: article`, `entitySlug`, `source_section: article_body`
+- Artist detail pages carry `pageType: artist_detail`, `entitySlug`, `source_section: artist_videos`
+
+**6. Scroll Depth (article page has listener, but ZERO events fired)**
+
+The article page (`src/pages/magazine/article/page.tsx`) already has an RAF-based scroll listener for the progress bar. Could easily extend to fire `scroll_25`, `scroll_50`, `scroll_75`, `scroll_100` events. Other long-form surfaces with zero scroll tracking:
+- Guide detail pages (all 3 guides)
+- Artist detail pages (bio section)
+- Release detail pages
+- Track detail pages
+
+**7. Player Interactions (ZERO tracking)**
+
+`PlayerContext` (`src/context/PlayerContext.tsx`) handles all audio playback:
+- No `track_play` event when a track starts
+- No `track_pause` event
+- No `track_complete` event (track finished playing)
+- No `track_skip` event
+- No tracking of which page/surface the play originated from
+
+**8. External Link Clicks (ZERO tracking)**
+
+Links to Spotify, Apple Music, YouTube, etc. from track/release/artist pages are not tracked. We don't know:
+- How many people click through to streaming platforms
+- Which platform gets the most clicks
+- Whether embedding playback sources increases streaming clicks
+
+---
+
+### Architecture: The Plan
+
+#### Phase 11A: Foundation — `analytics_events` Table + `trackEvent()` Service
+
+**Database table: `analytics_events`**
+
+```sql
+CREATE TABLE analytics_events (
+  id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  event_name  TEXT NOT NULL,              -- page_view, newsletter_signup, search_query, card_click, video_play, scroll_25, track_play, etc.
+  page_url    TEXT NOT NULL,              -- Canonical URL (no query params, no hash)
+  page_type   TEXT,                        -- article, artist_detail, guide_detail, release_detail, genre_detail, label_detail, track_detail, home, search, magazine, charts_edition, guides_listing, etc.
+  entity_slug TEXT,                        -- The slug of whatever entity this page or action is about
+  entity_type TEXT,                        -- article, artist, guide, release, genre, label, track, chart_edition
+  context     JSONB DEFAULT '{}',         -- Arbitrary extra data: { artist_slug, source_section, platform, search_query, results_count, video_url, scroll_percent, referrer, ... }
+  session_id  TEXT,                        -- Anonymous session fingerprint (generated client-side, stored in sessionStorage)
+  user_id     UUID,                        -- Nullable — if logged in (references auth.users)
+  referrer    TEXT,                        -- document.referrer
+  created_at  TIMESTAMPTZ DEFAULT now()
+);
+
+-- Indexes for query performance
+CREATE INDEX idx_analytics_event_name ON analytics_events(event_name);
+CREATE INDEX idx_analytics_page_type ON analytics_events(page_type);
+CREATE INDEX idx_analytics_entity ON analytics_events(entity_type, entity_slug);
+CREATE INDEX idx_analytics_created_at ON analytics_events(created_at);
+CREATE INDEX idx_analytics_session ON analytics_events(session_id);
+```
+
+**Service: `src/services/analytics.ts`**
+
+```typescript
+// trackEvent() — the single entry point for all analytics
+// Fires to Supabase analytics_events table (non-blocking, fire-and-forget)
+// Accepts: eventName, optional pageType, entitySlug, entityType, context (JSONB), userId (if logged in)
+// Session ID: generated once per browser session, stored in sessionStorage as wk_session_id
+// Page URL: canonicalized via URL constructor (no query params, no hash)
+```
+
+**RLS Policy:** Authenticated users can INSERT their own events. Anonymous events are inserted via a helper edge function or service_role RPC to avoid RLS complexity for public visitors. (The `analytics_events` table is write-only from the client perspective — no SELECT for public users.)
+
+#### Phase 11B: Page View Tracking
+
+**Implementation:**
+1. Create `usePageViewTracking()` hook that fires `page_view` event on route change
+2. Hook into the app's route change mechanism — either via a wrapper in `AppRoutes` or a `useEffect` with `useLocation()` in a top-level component
+3. Each `page_view` event carries: `page_url`, `page_type`, `entity_slug`, `entity_type`, `referrer`, `session_id`
+4. `page_type` + `entity_slug` inference: parse the URL pattern to determine what kind of page it is and extract the entity slug
+
+**Route → page_type mapping:**
+| URL Pattern | page_type | entity_type | entity_slug extraction |
+|---|---|---|---|
+| `/` | `home` | — | — |
+| `/magazine` | `magazine` | — | — |
+| `/magazine/:slug` | `article` | `article` | `:slug` |
+| `/artists` | `artist_listing` | — | — |
+| `/artists/:slug` | `artist_detail` | `artist` | `:slug` |
+| `/releases/:artistSlug/:slug` | `release_detail` | `release` | `:slug` |
+| `/tracks/:artistSlug/:slug` | `track_detail` | `track` | `:slug` |
+| `/genres` | `genre_listing` | — | — |
+| `/genres/:slug` | `genre_detail` | `genre` | `:slug` |
+| `/labels` | `label_listing` | — | — |
+| `/labels/:slug` | `label_detail` | `label` | `:slug` |
+| `/charts` | `charts_directory` | — | — |
+| `/charts/:slug` | `charts_edition` | `chart_edition` | `:slug` |
+| `/guides` | `guides_listing` | — | — |
+| `/guides/:slug` | `guide_detail` | `guide` | `:slug` |
+| `/search` | `search` | — | — |
+| `/magazine/issue/:slug` | `magazine_issue` | `magazine_issue` | `:slug` |
+
+#### Phase 11C: Form Context Injection
+
+**For every form on the site (F1–F15 above), add hidden input fields:**
+
+```html
+<input type="hidden" name="wk_page_type" value="artist_detail" />
+<input type="hidden" name="wk_entity_slug" value="nikita-kering" />
+<input type="hidden" name="wk_entity_type" value="artist" />
+<input type="hidden" name="wk_session_id" value="..." />
+```
+
+**AND fire a `newsletter_signup` / `guide_download` / `lyrics_contribution` event:**
+
+When a form submits successfully (or even on submit attempt), call:
+```typescript
+trackEvent("newsletter_signup", {
+  pageType: "artist_detail",
+  entitySlug: "nikita-kering",
+  entityType: "artist",
+  context: { sourceSection: "footer", formId: "homepage-newsletter" }
+});
+```
+
+**This also applies to forms that use `data-readdy-form` (Readdy form endpoint).** The hidden context fields travel with the form submission to Readdy, AND we also fire our own `analytics_events` row so we own the data.
+
+**Forms to update:**
+
+| Form | Hidden Fields to Add |
+|------|---------------------|
+| Homepage newsletter (desktop + mobile) | `wk_page_type: home`, `wk_session_id` |
+| Magazine newsletter (all 3 variants) | `wk_page_type: magazine`, `wk_session_id` |
+| Magazine article (if NewsletterCTA added) | `wk_page_type: article`, `wk_entity_slug`, `wk_entity_type: article` |
+| Guides listing newsletter | `wk_page_type: guides_listing`, `wk_session_id` |
+| Guide download (all 5 variants) | `wk_page_type: guide_detail`, `wk_entity_slug`, `wk_entity_type: guide`, `wk_guide_title`, `wk_session_id` |
+| Charts edition newsletter | `wk_page_type: charts_edition`, `wk_entity_slug`, `wk_entity_type: chart_edition`, `wk_session_id` |
+| Lyrics contribution | `wk_page_type: track_detail`, `wk_entity_slug`, `wk_entity_type: track`, `wk_artist_slug`, `wk_session_id` |
+
+#### Phase 11D: Search Tracking
+
+**Surface:** `src/pages/search/page.tsx`
+
+**Events to add:**
+1. `search_query` — fired 300ms after user stops typing (debounced), carries `{ search_query, results_count_per_type: { artists, tracks, releases, genres, labels, charts }, total_results }`
+2. `search_result_click` — fired when user clicks any search result, carries `{ search_query, entity_type, entity_slug, click_position }`
+3. `search_tab_switch` — fired when user switches tabs, carries `{ from_tab, to_tab }`
+
+#### Phase 11E: Entity Card Click Tracking
+
+**Surfaces:** `ArtistCard`, `ReleaseCard`, `GenreCard`, `LabelCard`, `StoryCard`
+
+**Approach:** Add an optional `trackClick` prop to each card component. When the card is clicked (before navigation), fire a `card_click` event:
+
+```typescript
+trackEvent("card_click", {
+  entityType: "artist",
+  entitySlug: "nikita-kering",
+  context: { sourceSection: "genre_detail", sourceEntity: "afrobeat", clickPosition: 3 }
+});
+```
+
+Components to update:
+- `ArtistCard` — add `sourceSection` and `sourceEntity` props
+- `ReleaseCard` — same
+- `GenreCard` — same
+- `LabelCard` — same
+- `StoryCard` — same
+
+Callers to update (pass through source context):
+- Search page (source: "search")
+- Genre detail page (source: "genre_detail")
+- Label detail page (source: "label_detail")
+- Artist listing (source: "artist_listing")
+- Magazine sections (source: "magazine", with section name)
+- Homepage sections (source: "home", with section name)
+- Registry spotlights (source: "registry_spotlight")
+- Chart editions (source: "charts_edition")
+
+#### Phase 11F: Video Play Tracking
+
+**Surfaces:** `VideoCard` + `useVideoPlayer` + `VideoOverlay`
+
+**Approach:** Extend `useVideoPlayer` to accept an optional `onPlayEvent` callback:
+
+```typescript
+// In useVideoPlayer:
+handlePlay calls onPlayEvent?.({
+  videoUrl: videos[idx].url,
+  platform: videos[idx].platform,
+  videoTitle: videos[idx].title,
+  index: idx,
+});
+```
+
+Then in the article page (where videos are embedded), wire that callback to:
+```typescript
+trackEvent("video_play", {
+  pageType: "article",
+  entitySlug: article.slug,
+  entityType: "article",
+  context: { videoUrl, platform, videoTitle, index, totalVideos: videos.length }
+});
+```
+
+Also track `video_close` with a rough watch-percentage estimate (time between play and close).
+
+#### Phase 11G: Scroll Depth Tracking
+
+**Surfaces:** Article pages, guide detail pages, artist bio sections, release detail pages
+
+**Approach:** Create a reusable `useScrollDepthTracking()` hook:
+
+```typescript
+// Fires events at 25%, 50%, 75%, 100% scroll depth
+// Each event fires only once per session per page
+// Carries: page_type, entity_slug, entity_type, scroll_percent
+```
+
+Wire it into:
+- `src/pages/magazine/article/page.tsx` (already has scroll listener — extend it)
+- `src/pages/guides/detail/page.tsx`
+- `src/pages/artists/detail/page.tsx`
+- `src/pages/releases/detail/page.tsx`
+- `src/pages/tracks/detail/page.tsx`
+
+#### Phase 11H: Player Interaction Tracking
+
+**Surface:** `src/context/PlayerContext.tsx`
+
+**Events:**
+1. `track_play` — when a new track starts, carries `{ track_slug, artist_slug, source_page_type, source_entity_slug, source_section }`
+2. `track_pause` — carries `{ track_slug, play_duration_seconds }`
+3. `track_complete` — when a track finishes naturally
+4. `track_skip` — when user skips to next/previous
+
+The player context already knows what track is playing. We need to thread through the "where did this play originate from" context — pass it when `playTrack()` is called.
+
+#### Phase 11I: Admin Analytics Dashboard ✅ COMPLETE (June 19, 2026)
+
+**Page:** `/admin/analytics` (new)
+
+**What was built:**
+- `src/services/adminAnalytics.ts` — 12 query functions for the dashboard (KPIs, timelines, top pages, top entities, event distribution, page type distribution, search queries, newsletter sources, scroll depth, video engagement, referrer breakdown, funnel analysis, CSV export)
+- `src/pages/admin/analytics/page.tsx` — Full dashboard with 4 tabbed views:
+  1. **Overview tab** — Page views timeline (stacked area chart by page type), top pages + top entities side-by-side, event distribution (donut chart), traffic by page type (horizontal bar chart)
+  2. **Search tab** — Unique queries KPI, total searches KPI, zero-result query count, top search queries table with status badges
+  3. **Engagement tab** — Scroll depth distribution (bar chart), video plays by platform, newsletter signup sources, top referrers
+  4. **Funnel tab** — Session-level conversion funnel (Page View → Scroll 50% → Scroll 100% → Card Click → Newsletter Signup)
+- Date range selector (1d, 7d, 14d, 30d, 60d, 90d)
+- CSV export button for raw event data
+- Admin navigation link in Dashboard group with `BarChart3` icon
+- Route at `/admin/analytics` with `view_dashboard` capability check
+
+**Files:**
+- `src/services/adminAnalytics.ts` — new
+- `src/pages/admin/analytics/page.tsx` — new
+- `src/router/config.tsx` — route added
+- `src/pages/admin/AdminShell.tsx` — nav item added
+
+### Phase 11 Sprint Breakdown
+
+| Sub-phase | What | Est. Complexity |
+|-----------|------|----------------|
+| 11A | `analytics_events` table + `trackEvent()` service + RLS | ✅ COMPLETE (June 19, 2026) |
+| 11B | `usePageViewTracking()` + route-level page type inference | ✅ COMPLETE (June 19, 2026) |
+| 11C | Form context injection (15 surfaces) | ✅ COMPLETE (June 19, 2026) |
+| 11D | Search tracking (query, result click, tab switch) | ✅ COMPLETE (June 19, 2026) |
+| 11E | Entity card click tracking (5 card types × 3 callers) | ✅ COMPLETE (June 19, 2026) |
+| 11F | Video play tracking | ✅ COMPLETE (June 19, 2026) |
+| 11G | Scroll depth tracking + hook | ✅ COMPLETE (June 19, 2026) |
+| 11H | Player interaction tracking | ✅ COMPLETE (June 19, 2026) |
+| 11I | Admin analytics dashboard | Large (new page, charts) |
+
+### Dependency Graph
+
+```
+Phase 11A (Foundation: table + service)
+    │
+    ├──→ Phase 11B (Page views) ── independent, can run in parallel
+    ├──→ Phase 11C (Form context) ── independent, can run in parallel
+    ├──→ Phase 11D (Search) ── independent, can run in parallel
+    ├──→ Phase 11E (Card clicks) ── independent, can run in parallel
+    ├──→ Phase 11F (Video plays) ── independent, can run in parallel
+    ├──→ Phase 11G (Scroll depth) ── independent, can run in parallel
+    ├──→ Phase 11H (Player) ── independent, can run in parallel
+    │
+    ▼
+Phase 11I (Admin dashboard) ← needs 11A-11H data flowing
+```
+
+**Parallelizable:** Once 11A (the foundation) is in place, Phases 11B–11H can all be built simultaneously since they're independent surfaces.
+
+### What We're NOT Doing (Yet)
+
+1. **Google Analytics 4** — GA4 can be layered on later as a secondary channel. Our own `analytics_events` table is the source of truth. When we do add GA4, we push events to `dataLayer` from within `trackEvent()`.
+2. **User identity stitching** — Session-level tracking only for now. `user_id` column exists in the schema for future Auth integration.
+3. **Real-time dashboard** — The admin dashboard queries the DB directly. WebSocket/real-time updates are future polish.
+4. **A/B testing framework** — Out of scope for this sprint.
+5. **Funnel analysis engine** — The data will be there; the admin dashboard will show basic funnels. Advanced funnel analysis is a separate project.
+
+---

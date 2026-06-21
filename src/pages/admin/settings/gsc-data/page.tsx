@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
+import DateRangePicker, { type DateRangeValue } from "@/components/base/DateRangePicker";
 import { supabase } from "@/lib/supabase";
 
 interface GscConnection {
@@ -73,12 +74,11 @@ export default function AdminSettingsGscData() {
 
   // Import state
   const [importRunning, setImportRunning] = useState(false);
-  const [importDateStart, setImportDateStart] = useState(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 30);
-    return d.toISOString().slice(0, 10);
+  const [importDateRange, setImportDateRange] = useState<DateRangeValue>(() => {
+    const end = new Date().toISOString().slice(0, 10);
+    const start = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+    return { mode: "custom", start, end };
   });
-  const [importDateEnd, setImportDateEnd] = useState(() => new Date().toISOString().slice(0, 10));
   const [importError, setImportError] = useState<string | null>(null);
   const [importResult, setImportResult] = useState<string | null>(null);
 
@@ -253,6 +253,10 @@ export default function AdminSettingsGscData() {
       setImportError("Connect to Google Search Console first.");
       return;
     }
+    if (importDateRange.mode !== "custom" || !importDateRange.start || !importDateRange.end) {
+      setImportError("Please select a date range.");
+      return;
+    }
     setImportRunning(true);
     setImportError(null);
     setImportResult(null);
@@ -260,8 +264,8 @@ export default function AdminSettingsGscData() {
       const result = await callEdgeFunction("gsc-import-metrics", {
         action: "import",
         connectionId: connection.id,
-        dateRangeStart: importDateStart,
-        dateRangeEnd: importDateEnd,
+        dateRangeStart: importDateRange.start,
+        dateRangeEnd: importDateRange.end,
         rowLimit: 5000,
       });
 
@@ -457,24 +461,12 @@ export default function AdminSettingsGscData() {
             <div className="flex flex-wrap items-end gap-3">
               <div>
                 <label className="block text-[11px] font-black uppercase tracking-wider text-[var(--wk-text-faint)] mb-1.5">
-                  Date range start
+                  Date range
                 </label>
-                <input
-                  type="date"
-                  value={importDateStart}
-                  onChange={(e) => setImportDateStart(e.target.value)}
-                  className="rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)] outline-none focus:border-[var(--wk-brand)] cursor-pointer"
-                />
-              </div>
-              <div>
-                <label className="block text-[11px] font-black uppercase tracking-wider text-[var(--wk-text-faint)] mb-1.5">
-                  Date range end
-                </label>
-                <input
-                  type="date"
-                  value={importDateEnd}
-                  onChange={(e) => setImportDateEnd(e.target.value)}
-                  className="rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)] outline-none focus:border-[var(--wk-brand)] cursor-pointer"
+                <DateRangePicker
+                  value={importDateRange}
+                  onChange={setImportDateRange}
+                  presets={[]}
                 />
               </div>
               <button

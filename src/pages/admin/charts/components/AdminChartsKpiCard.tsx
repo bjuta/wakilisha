@@ -9,6 +9,7 @@ interface AdminChartsKpiCardProps {
   positive?: boolean;
   icon?: WkIconName;
   accent?: "brand" | "success" | "warning" | "danger" | "info" | "muted";
+  compareDelta?: { text: string; up: boolean } | null;
 }
 
 const ACCENT_MAP: Record<string, { text: string; bg: string; trendUp: string; trendDown: string }> = {
@@ -27,6 +28,7 @@ export function AdminChartsKpiCard({
   positive = true,
   icon,
   accent = "muted",
+  compareDelta,
 }: AdminChartsKpiCardProps) {
   const colors = ACCENT_MAP[accent] ?? ACCENT_MAP.muted;
   const trendClass = positive ? colors.trendUp : colors.trendDown;
@@ -36,7 +38,16 @@ export function AdminChartsKpiCard({
       <div className="flex items-start justify-between">
         <div>
           <p className="text-[11px] font-bold uppercase tracking-wider text-wk-text-faint">{label}</p>
-          <p className={`mt-1 text-[24px] font-black tracking-tight ${colors.text}`}>{value}</p>
+          <p className={`mt-1 text-[24px] font-black tracking-tight ${colors.text}`}>{value}
+            {compareDelta && (
+              <span className={`ml-2 inline-flex items-center gap-0.5 text-[12px] font-bold align-middle ${
+                compareDelta.up ? "text-wk-success" : "text-wk-danger"
+              }`}>
+                <WkIcon name={compareDelta.up ? "ArrowUp" : "ArrowDown"} size={11} />
+                {compareDelta.text}
+              </span>
+            )}
+          </p>
           {trend && (
             <div className={`mt-1 flex items-center gap-1 text-[12px] font-semibold ${trendClass}`}>
               {positive ? <WkIcon name="ArrowUp" size={12} /> : <WkIcon name="ArrowDown" size={12} />}

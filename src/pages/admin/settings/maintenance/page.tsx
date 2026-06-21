@@ -140,16 +140,6 @@ export default function AdminSettingsMaintenance() {
             running={running === "duplicate_scan"}
           />
           <MaintenanceActionButton
-            label="Run Orphaned Shell Scan"
-            icon="Search"
-            description="Find orphaned release shells"
-            lastRun={settings.lastOrphanedScan}
-            onClick={() => runAction("orphaned_shell_scan", () => {
-              return { ok: true, message: "Orphaned shell scan complete. 0 orphaned shells found.", itemsAffected: 0 };
-            })}
-            running={running === "orphaned_shell_scan"}
-          />
-          <MaintenanceActionButton
             label="Run Snapshot Integrity Check"
             icon="Camera"
             description="Verify snapshot data integrity"

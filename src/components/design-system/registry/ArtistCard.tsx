@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 import { buildArtistCardBlurb } from "@/services/cultureContext/artistAdapters";
+import { trackEvent } from "@/services/analytics";
 
 export interface ArtistCardProps {
   slug: string;
@@ -14,6 +15,9 @@ export interface ArtistCardProps {
   topChartPosition?: number | null;
   chartEntryCount?: number;
   contextText?: string;
+  sourceSection?: string;
+  sourceEntity?: string;
+  clickPosition?: number;
 }
 
 export function ArtistCard({
@@ -28,6 +32,9 @@ export function ArtistCard({
   topChartPosition,
   chartEntryCount,
   contextText,
+  sourceSection,
+  sourceEntity,
+  clickPosition,
 }: ArtistCardProps) {
   const blurb = contextText || buildArtistCardBlurb({
     name,
@@ -40,9 +47,24 @@ export function ArtistCard({
     chartEntryCount,
   });
 
+  const handleClick = () => {
+    if (sourceSection) {
+      trackEvent("card_click", {
+        entityType: "artist",
+        entitySlug: slug,
+        context: {
+          source_section: sourceSection,
+          ...(sourceEntity ? { source_entity: sourceEntity } : {}),
+          ...(clickPosition !== undefined ? { click_position: clickPosition } : {}),
+        },
+      });
+    }
+  };
+
   return (
     <Link
       to={`/artists/${slug}`}
+      onClick={handleClick}
       className="group relative block overflow-hidden rounded-xl border border-[var(--wk-border)] transition-all hover:border-[var(--wk-border-2)]"
       style={{ aspectRatio: "3/4" }}
     >

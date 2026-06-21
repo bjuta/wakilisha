@@ -1,5 +1,5 @@
 import { buildCultureContext, type CultureContextSurface } from "./index";
-import type { RepairedTrackDetail } from "@/services/repaired/types";
+import type { PublicTrackDetail } from "@/services/publicApi/types";
 
 type TrackLike = Partial<{
   title: string;
@@ -40,7 +40,7 @@ function fallbackPrimaryFlag(hasPrimary: boolean, hasNonFeatured: boolean, isPri
   return index === 0;
 }
 
-function artistRolesFromDetail(track: RepairedTrackDetail): Array<{ name: string; slug: string; isPrimary: boolean; isFeatured: boolean; creditOrder: number }> {
+function artistRolesFromDetail(track: PublicTrackDetail): Array<{ name: string; slug: string; isPrimary: boolean; isFeatured: boolean; creditOrder: number }> {
   const roles = Array.isArray(track.artists) ? track.artists : [];
   if (roles.length > 0) {
     const sorted = [...roles].sort((a, b) => (a.creditOrder ?? 0) - (b.creditOrder ?? 0));
@@ -81,11 +81,11 @@ function artistRolesFromLike(track: TrackLike): Array<{ name: string; isPrimary:
   return artist ? [{ name: artist, isPrimary: true, isFeatured: false, creditOrder: 0 }] : [];
 }
 
-export function trackContextData(track: RepairedTrackDetail | TrackLike) {
+export function trackContextData(track: PublicTrackDetail | TrackLike) {
   if ("track" in track && track.track) {
     return {
       title: clean(track.track.title),
-      artists: artistRolesFromDetail(track as RepairedTrackDetail),
+      artists: artistRolesFromDetail(track as PublicTrackDetail),
       releaseTitle: clean(track.release?.title),
       releaseDate: clean(track.release?.releaseDate),
       releaseType: clean(track.release?.releaseType),
@@ -119,7 +119,7 @@ export function trackContextData(track: RepairedTrackDetail | TrackLike) {
   };
 }
 
-export function buildTrackCultureText(track: RepairedTrackDetail | TrackLike, surface: CultureContextSurface): string {
+export function buildTrackCultureText(track: PublicTrackDetail | TrackLike, surface: CultureContextSurface): string {
   return buildCultureContext({
     entityType: "track",
     surface,
@@ -127,18 +127,18 @@ export function buildTrackCultureText(track: RepairedTrackDetail | TrackLike, su
   }).text;
 }
 
-export function buildTrackHeroIntro(track: RepairedTrackDetail | TrackLike): string {
+export function buildTrackHeroIntro(track: PublicTrackDetail | TrackLike): string {
   return buildTrackCultureText(track, "heroIntro");
 }
 
-export function buildTrackCardBlurb(track: RepairedTrackDetail | TrackLike): string {
+export function buildTrackCardBlurb(track: PublicTrackDetail | TrackLike): string {
   return buildTrackCultureText(track, "cardBlurb");
 }
 
-export function buildTrackSearchSnippet(track: RepairedTrackDetail | TrackLike): string {
+export function buildTrackSearchSnippet(track: PublicTrackDetail | TrackLike): string {
   return buildTrackCultureText(track, "searchSnippet");
 }
 
-export function buildTrackSeoDescription(track: RepairedTrackDetail | TrackLike): string {
+export function buildTrackSeoDescription(track: PublicTrackDetail | TrackLike): string {
   return buildTrackCultureText(track, "seoDescription");
 }

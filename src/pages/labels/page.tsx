@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
 import { ShareButton } from "@/components/design-system/share/ShareSheet";
 import { WkIcon } from "@/components/design-system/Icon";
@@ -10,152 +10,154 @@ import {
   type LabelCatalogStats,
 } from "@/services/publicContent/client";
 
-const PAGE_SIZE = 24;
+type SortKey = "prominence" | "name" | "artists" | "releases";
 
-/* ── Scroll reveal ── */
-function useScrollReveal(deps: unknown[] = []) {
+const ALL = "All";
+const INITIAL_LIMIT = 24;
+const LOAD_MORE_LIMIT = 20;
+
+function useDebouncedValue<T>(value: T, delay: number): T {
+  const [debounced, setDebounced] = useState(value);
   useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("label43-reveal-visible");
-            observer.unobserve(entry.target);
-          }
-        });
-      },
-      { threshold: 0.06, rootMargin: "0px 0px -28px 0px" },
-    );
-    const els = document.querySelectorAll(".label43-reveal");
-    els.forEach((el) => observer.observe(el));
-    return () => observer.disconnect();
-  }, deps);
+    const timer = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(timer);
+  }, [value, delay]);
+  return debounced;
 }
 
 export default function Labels() {
-  const [query, setQuery] = useState("");
-  const [country, setCountry] = useState("All");
-  const [page, setPage] = useState(1);
-  const [labels, setLabels] = useState<PublicLabel[]>([]);
-  const [stats, setStats] = useState<LabelCatalogStats | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const heroRef = useRef<HTMLDivElement>(null);
+  const [country, setCountry] = useState(ALL);
+  const [searchInput, setSearchInput] = useState("");
+  const [sortKey, setSortKey] = useState<SortKey>("prominence");
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  const debouncedSearch = useDebouncedValue(searchInput, 350);
+
+  const [labels, setLabels] = useState<PublicLabel[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [stats, setStats] = useState<LabelCatalogStats>({ total: 0, totalArtists: 0, totalReleases: 0, featuredCount: 0, countries: [] });
+  const [featuredLabels, setFeaturedLabels] = useState<PublicLabel[]>([]);
+
+  const [pageLoading, setPageLoading] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [metaLoading, setMetaLoading] = useState(true);
+  const [pageError, setPageError] = useState<string | null>(null);
+  const [metaError, setMetaError] = useState<string | null>(null);
+
+  const [reloadKey, setReloadKey] = useState(0);
+
+  // Reset data when filters change
+  useEffect(() => {
+    setLabels([]);
+    setTotalCount(0);
+    setPageError(null);
+    setReloadKey((prev) => prev + 1);
+  }, [country, debouncedSearch, sortKey]);
+
+  const loadMeta = useCallback(async () => {
+    setMetaLoading(true);
+    setMetaError(null);
     try {
-      const [statsData, pageData] = await Promise.all([
+      const [statsData, topLabels] = await Promise.all([
         getLabelCatalogStats(),
-        listLabelsPaginated({
-          page: 1,
-          pageSize: PAGE_SIZE,
-          countryFilter: country,
-          search: query,
-        }),
+        listLabelsPaginated({ page: 1, pageSize: 10, countryFilter: undefined, search: undefined }),
       ]);
       setStats(statsData);
-      setLabels(pageData.labels);
-      setPage(1);
+      setFeaturedLabels(topLabels.labels.filter((l) => l.artistImageUrl).slice(0, 10));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load labels.");
+      setMetaError(err instanceof Error ? err.message : "Could not load label metadata.");
     } finally {
-      setLoading(false);
+      setMetaLoading(false);
     }
-  }, [query, country]);
-
-  const loadPage = useCallback(async (targetPage: number) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const pageData = await listLabelsPaginated({
-        page: targetPage,
-        pageSize: PAGE_SIZE,
-        countryFilter: country,
-        search: query,
-      });
-      setLabels(pageData.labels);
-      setPage(targetPage);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load labels.");
-    } finally {
-      setLoading(false);
-    }
-  }, [query, country]);
+  }, []);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    loadMeta();
+  }, [loadMeta]);
 
-  useScrollReveal([loading, page]);
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      setPageLoading(true);
+      setPageError(null);
+      try {
+        const result = await listLabelsPaginated({
+          page: 1,
+          pageSize: INITIAL_LIMIT,
+          countryFilter: country === ALL ? undefined : country,
+          search: debouncedSearch || undefined,
+        });
 
-  const totalPages = useMemo(() => {
-    if (!stats) return 1;
-    // Approximate total from filtered count — we need to refetch on filter change
-    return Math.max(1, Math.ceil((stats?.total || 0) / PAGE_SIZE));
-  }, [stats]);
+        let sorted = [...result.labels];
+        if (sortKey === "name") {
+          sorted.sort((a, b) => a.name.localeCompare(b.name));
+        } else if (sortKey === "artists") {
+          sorted.sort((a, b) => b.artistCount - a.artistCount);
+        } else if (sortKey === "releases") {
+          sorted.sort((a, b) => b.releaseCount - a.releaseCount);
+        }
+        // "prominence" is default server sort (artistCount + releaseCount)
 
-  // Use current page for display sections
-  const sortedByProminence = useMemo(
-    () => [...labels].sort(
-      (a, b) => b.artistCount + b.releaseCount - (a.artistCount + a.releaseCount),
-    ),
-    [labels],
-  );
+        if (!cancelled) {
+          setLabels(sorted);
+          setTotalCount(result.totalCount);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setPageError(err instanceof Error ? err.message : "Could not load labels.");
+        }
+      } finally {
+        if (!cancelled) setPageLoading(false);
+      }
+    };
+    run();
+    return () => { cancelled = true; };
+  }, [reloadKey, country, debouncedSearch, sortKey]);
 
-  const spotlight = sortedByProminence[0];
-  const compactLabels = sortedByProminence.slice(1, 4);
-  const featuredLabels = labels.filter((l) => l.isFeatured);
-  const totalArtists = stats?.totalArtists ?? 0;
-  const totalReleases = stats?.totalReleases ?? 0;
-  const featuredCount = stats?.featuredCount ?? 0;
-  const countries = stats?.countries ?? [];
-  const totalLabels = stats?.total ?? 0;
+  const loadMore = useCallback(async () => {
+    if (isLoadingMore || labels.length >= totalCount) return;
+    setIsLoadingMore(true);
+    setPageError(null);
+    try {
+      const nextPage = Math.floor(labels.length / LOAD_MORE_LIMIT) + 1;
+      const result = await listLabelsPaginated({
+        page: nextPage,
+        pageSize: LOAD_MORE_LIMIT,
+        countryFilter: country === ALL ? undefined : country,
+        search: debouncedSearch || undefined,
+      });
 
-  const countryGroups = countries.map((name) => ({
-    name,
-    count: labels.filter((l) => l.country === name).length,
-  }));
+      let sorted = [...result.labels];
+      if (sortKey === "name") {
+        sorted.sort((a, b) => a.name.localeCompare(b.name));
+      } else if (sortKey === "artists") {
+        sorted.sort((a, b) => b.artistCount - a.artistCount);
+      } else if (sortKey === "releases") {
+        sorted.sort((a, b) => b.releaseCount - a.releaseCount);
+      }
 
-  const updateCountry = (next: string) => {
-    setCountry(next);
-    setPage(1);
-  };
+      setLabels((prev) => [...prev, ...sorted]);
+    } catch (err) {
+      setPageError(err instanceof Error ? err.message : "Could not load more labels.");
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [labels.length, totalCount, isLoadingMore, country, debouncedSearch, sortKey]);
 
-  if (loading && labels.length === 0) {
-    return (
-      <main className="min-h-screen">
-        <div className="label43-hero-skel">
-          <div className="h-4 w-32 rounded bg-white/10 animate-pulse" />
-          <div className="h-16 w-96 rounded bg-white/10 animate-pulse mt-6" />
-          <div className="h-5 w-[500px] rounded bg-white/10 animate-pulse mt-4" />
-        </div>
-        <div className="wk-container-wide px-4 py-10 md:px-6">
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] overflow-hidden">
-                <div className="h-32 bg-[var(--wk-surface-raised)] animate-pulse" />
-                <div className="p-3 space-y-2">
-                  <div className="h-4 w-3/4 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
-                  <div className="h-3 w-1/2 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </main>
-    );
+  const hasMore = labels.length < totalCount && totalCount > 0;
+  const showingTo = labels.length;
+
+  if (metaLoading) {
+    return <LabelsLoading />;
   }
 
-  if (error && labels.length === 0) {
+  if (metaError && featuredLabels.length === 0) {
     return (
-      <main className="min-h-screen wk-container px-6 py-20">
+      <main className="min-h-screen wk-container px-6 py-20 bg-[var(--wk-bg)]">
         <div className="max-w-2xl mx-auto rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-8 text-center">
           <WkIcon name="Building2" size={42} className="mx-auto mb-4 text-[var(--wk-text-faint)]" />
           <h1 className="wk-h-section mb-2">Could not load labels</h1>
-          <p className="text-[var(--wk-text-muted)] mb-6">{error}</p>
-          <button onClick={() => loadData()} className="wk-button wk-button-primary">
+          <p className="text-[var(--wk-text-muted)] mb-6">{metaError}</p>
+          <button onClick={loadMeta} className="wk-button wk-button-primary cursor-pointer">
             <i className="ri-refresh-line" /> Retry
           </button>
         </div>
@@ -165,436 +167,432 @@ export default function Labels() {
 
   return (
     <main className="min-h-screen bg-[var(--wk-bg)]">
+      <FeaturedLabelCarousel labels={featuredLabels} catalogStats={stats} />
 
-      {/* ═══════════════════════ HERO ═══════════════════════ */}
-      <section ref={heroRef} className="label43-hero-v2">
-        <div className="label43-hero-overlay" />
-        <div className="label43-hero-content">
-          <div className="label43-hero-badge">
-            <WkIcon name="Building2" size={12} /> Institutions
-          </div>
-          <h1 className="label43-hero-title">Labels</h1>
-          <p className="label43-hero-sub">
-            Record labels, imprints, distributors, and music institutions mapped as
-            ecosystems — rosters, releases, chart presence, country footprint, and
-            catalog relationships.
-          </p>
-          <div className="label43-hero-row">
-            <div className="label43-hero-search-wrap">
-              <i className="ri-search-line label43-hero-search-icon" />
-              <input
-                className="label43-hero-search"
-                value={query}
-                onChange={(e) => {
-                  setQuery(e.target.value);
-                  setPage(1);
-                }}
-                placeholder="Search labels, countries, or roster artists..."
-              />
+      <div className="wk-container-wide px-4 py-10 md:px-6">
+        <div className="chart-stats-strip mb-10">
+          <Stat value={stats.total} label="Labels" />
+          <Stat value={totalCount} label="Showing" />
+          <Stat value={stats.totalArtists.toLocaleString()} label="Artists" />
+          <Stat value={stats.totalReleases.toLocaleString()} label="Releases" />
+        </div>
+
+        <section className="mb-10 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4 md:p-5">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between mb-5">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full border border-[var(--wk-brand)]/20 bg-[var(--wk-brand-soft)]/40 px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.18em] text-[var(--wk-brand)] mb-3">
+                <WkIcon name="Search" size={12} />
+                Discovery
+              </div>
+              <h2 className="text-[clamp(22px,3vw,32px)] font-black leading-[0.92] tracking-[-0.04em] text-[var(--wk-text)]">
+                Find labels
+              </h2>
             </div>
-            <ShareButton
-              item={{
-                title: "WAKILISHA Labels",
-                subtitle: `${totalLabels} labels`,
-                description:
-                  "Browse WAKILISHA labels and music institutions by country, roster, catalog and chart presence.",
-                type: "page",
-              }}
+            <FilterSelect label="Sort" value={sortKey} options={["prominence", "name", "artists", "releases"]} onChange={(value) => setSortKey(value as SortKey)} />
+          </div>
+
+          <div className="flex items-center gap-2 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2.5 mb-3">
+            <WkIcon name="Search" size={15} className="text-[var(--wk-text-faint)]" />
+            <input
+              value={searchInput}
+              onChange={(event) => setSearchInput(event.target.value)}
+              placeholder="Search labels or countries..."
+              className="w-full bg-transparent text-[14px] font-semibold text-[var(--wk-text)] outline-none placeholder:text-[var(--wk-text-faint)]"
             />
+            {searchInput && (
+              <button
+                onClick={() => setSearchInput("")}
+                className="text-[var(--wk-text-faint)] hover:text-[var(--wk-text)] cursor-pointer"
+                aria-label="Clear search"
+              >
+                <WkIcon name="X" size={14} />
+              </button>
+            )}
           </div>
-          <div className="label43-hero-stats">
-            <div className="label43-hero-stat">
-              <span className="label43-hero-stat-val">{totalLabels}</span>
-              <span className="label43-hero-stat-lbl">Labels</span>
-            </div>
-            <div className="label43-hero-stat">
-              <span className="label43-hero-stat-val">{totalArtists.toLocaleString()}</span>
-              <span className="label43-hero-stat-lbl">Artists</span>
-            </div>
-            <div className="label43-hero-stat">
-              <span className="label43-hero-stat-val">{totalReleases.toLocaleString()}</span>
-              <span className="label43-hero-stat-lbl">Releases</span>
-            </div>
-            <div className="label43-hero-stat">
-              <span className="label43-hero-stat-val">{featuredCount}</span>
-              <span className="label43-hero-stat-lbl">Featured</span>
-            </div>
-          </div>
-        </div>
-        {/* Scroll hint */}
-        <div className="label43-hero-scroll-hint">
-          <div className="label43-hero-scroll-line" />
-        </div>
-      </section>
 
-      {/* ═══════════════════════ STICKY NAV ═══════════════════════ */}
-      <div className="label43-toolbar-v2">
-        <div className="label43-toolbar-inner">
-          <span className="label43-toolbar-label">Countries</span>
-          <div className="label43-country-pills">
+          <div className="flex flex-wrap gap-1.5">
             <button
-              onClick={() => updateCountry("All")}
-              className={`label43-country-pill ${country === "All" ? "on" : ""}`}
+              onClick={() => setCountry(ALL)}
+              className={`rounded-full px-3 py-1 text-[11px] font-bold transition-all whitespace-nowrap border cursor-pointer ${
+                country === ALL
+                  ? "bg-[var(--wk-brand)] border-[var(--wk-brand)] text-white"
+                  : "border-[var(--wk-border)] bg-[var(--wk-bg)] text-[var(--wk-text-muted)] hover:text-[var(--wk-text)] hover:border-[var(--wk-border-2)]"
+              }`}
             >
               All
             </button>
-            {countries.slice(0, 13).map((item) => (
+            {stats.countries.slice(0, 14).map((name) => (
               <button
-                key={item}
-                onClick={() => updateCountry(item)}
-                className={`label43-country-pill ${country === item ? "on" : ""}`}
+                key={name}
+                onClick={() => setCountry(name)}
+                className={`rounded-full px-3 py-1 text-[11px] font-bold transition-all whitespace-nowrap border cursor-pointer ${
+                  country === name
+                    ? "bg-[var(--wk-brand)] border-[var(--wk-brand)] text-white"
+                    : "border-[var(--wk-border)] bg-[var(--wk-bg)] text-[var(--wk-text-muted)] hover:text-[var(--wk-text)] hover:border-[var(--wk-border-2)]"
+                }`}
               >
-                {item}
+                {name}
               </button>
             ))}
           </div>
-        </div>
-      </div>
-
-      {/* ═══════════════════════ CONTENT BODY ═══════════════════════ */}
-      <div className="label43-body">
-
-        {/* ── Spotlight · asymmetrical (1 large + 3 compact) ── */}
-        {spotlight && (
-          <section className="label43-reveal">
-            <SectionLabel>Spotlight</SectionLabel>
-            <div className="label43-asym-grid">
-              <Link to={`/labels/${spotlight.slug}`} className="label43-spot-card-v2 group">
-                <Chapter19FallbackImage
-                  slug={spotlight.slug}
-                  name={spotlight.name}
-                  className="label43-spot-artwork"
-                />
-                <div className="label43-spot-gradient" />
-                <div className="label43-spot-info">
-                  <div className="label43-spot-kicker">Most prominent label</div>
-                  <h2 className="label43-spot-title">{spotlight.name}</h2>
-                  <div className="label43-spot-meta-row">
-                    <span>{spotlight.country || "Global"}</span>
-                    <span className="label43-spot-dot" />
-                    <span>{spotlight.artistCount} artists</span>
-                    <span className="label43-spot-dot" />
-                    <span>{spotlight.releaseCount} releases</span>
-                  </div>
-                  <p className="label43-spot-desc">
-                    {spotlight.description ||
-                      `${spotlight.name} is represented on WAKILISHA as a label with roster, catalog and chart relationships.`}
-                  </p>
-                </div>
-              </Link>
-              <div className="label43-compact-stack">
-                {compactLabels.map((label, i) => (
-                  <Link key={label.slug} to={`/labels/${label.slug}`} className="label43-compact-card group">
-                    <div className="label43-compact-artwork-wrap">
-                      <Chapter19FallbackImage
-                        slug={label.slug}
-                        name={label.name}
-                        className="label43-compact-artwork"
-                      />
-                    </div>
-                    <div className="label43-compact-body">
-                      <div className="label43-compact-rank">#{i + 2}</div>
-                      <h4 className="label43-compact-name">{label.name}</h4>
-                      <div className="label43-compact-meta">
-                        <span>{label.country || "Global"}</span>
-                        <span className="label43-compact-dot" />
-                        <span>{label.artistCount} artists</span>
-                        <span className="label43-compact-dot" />
-                        <span>{label.releaseCount} releases</span>
-                      </div>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          </section>
-        )}
-
-        {/* ── Featured labels · symmetrical grid ── */}
-        {featuredLabels.length > 0 && (
-          <section className="label43-reveal">
-            <SectionLabel count={featuredLabels.length}>Featured institutions</SectionLabel>
-            <div className="label43-grid-v2">
-              {featuredLabels.slice(0, 8).map((label) => (
-                <LabelCard key={label.slug} label={label} />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* ── Pullquote · visual rhythm break ── */}
-        <div className="label43-reveal label43-pullquote">
-          <div className="label43-pullquote-inner">
-            <div className="label43-pullquote-line" />
-            <p className="label43-pullquote-text">
-              Labels are not logos. They are systems of influence — rosters,
-              catalogs, countries, and chart presence. Every institution carries
-              its own character.
-            </p>
-            <div className="label43-pullquote-line" />
-          </div>
-        </div>
-
-        {/* ── Country footprint · horizontal carousel ── */}
-        {countryGroups.length > 0 && (
-          <section className="label43-reveal">
-            <SectionLabel count={countryGroups.length}>Country footprint</SectionLabel>
-            <CountryCarousel groups={countryGroups} onSelect={updateCountry} />
-          </section>
-        )}
-
-        {/* ── Full directory · section blocks ── */}
-        <section id="label-directory" className="label43-reveal">
-          <SectionLabel count={labels.length} href="#label-directory">
-            Full directory
-          </SectionLabel>
-
-          {/* First row: asymmetrical if we have enough labels */}
-          {labels.length >= 4 && page === 1 ? (
-            <div className="label43-asym-grid mb-6">
-              <LabelCard variant="hero" label={labels[0]} />
-              <div className="label43-compact-stack">
-                {labels.slice(1, 4).map((label) => (
-                  <Link key={label.slug} to={`/labels/${label.slug}`} className="label43-compact-card group">
-                    <div className="label43-compact-artwork-wrap">
-                      <Chapter19FallbackImage
-                        slug={label.slug}
-                        name={label.name}
-                        className="label43-compact-artwork"
-                      />
-                    </div>
-                    <div className="label43-compact-body">
-                      <h4 className="label43-compact-name">{label.name}</h4>
-                      <div className="label43-compact-meta">
-                        <span>{label.country || "Global"}</span>
-                        <span className="label43-compact-dot" />
-                        <span>{label.artistCount} artists</span>
-                      </div>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          ) : null}
-
-          {/* Remaining grid */}
-          <div className="label43-grid-v2">
-            {(page === 1 ? labels.slice(labels.length >= 4 ? 4 : 0) : labels).map((label) => (
-              <LabelCard key={label.slug} label={label} />
-            ))}
-          </div>
-
-          {labels.length === 0 && !loading && (
-            <div className="label43-empty">
-              <WkIcon name="Building2" size={32} />
-              <span>No labels match this search.</span>
-            </div>
-          )}
-
-          {totalPages > 1 && (
-            <div className="label43-pagination">
-              <button
-                className="label43-page-btn"
-                disabled={page === 1}
-                onClick={() => loadPage(Math.max(1, page - 1))}
-              >
-                <WkIcon name="ArrowLeft" size={14} />
-              </button>
-              <span className="label43-page-indicator">
-                Page {page} of {totalPages}
-              </span>
-              <button
-                className="label43-page-btn"
-                disabled={page === totalPages}
-                onClick={() => loadPage(Math.min(totalPages, page + 1))}
-              >
-                <WkIcon name="ArrowRight" size={14} />
-              </button>
-            </div>
-          )}
         </section>
 
-        {/* ── Footer ── */}
-        <footer className="label43-reveal label43-footer">
-          <span className="label43-footer-brand">WAKILISHA</span>
-          <p className="label43-footer-tagline">
-            {totalLabels} labels across {countries.length} countries.
-            Every institution mapped as an ecosystem.
-          </p>
-          <p className="label43-footer-meta">
-            {totalArtists.toLocaleString()} artists &middot; {totalReleases.toLocaleString()} releases &middot; {featuredCount} featured
-          </p>
-        </footer>
+        <section>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between mb-6">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full border border-[var(--wk-brand)]/20 bg-[var(--wk-brand-soft)]/40 px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.18em] text-[var(--wk-brand)] mb-3">
+                <WkIcon name="Building2" size={12} />
+                Label directory
+              </div>
+              <h2 className="text-[clamp(22px,3vw,32px)] font-black leading-[0.92] tracking-[-0.04em] text-[var(--wk-text)]">
+                All labels
+              </h2>
+            </div>
+            <p className="text-[12px] font-semibold text-[var(--wk-text-muted)]">
+              {totalCount > 0
+                ? `Showing ${showingTo} of ${totalCount}`
+                : "No labels found"}
+            </p>
+          </div>
+
+          {pageLoading ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 md:gap-5">
+              {Array.from({ length: INITIAL_LIMIT }).map((_, i) => (
+                <div key={i} className="space-y-3">
+                  <div className="aspect-square rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] animate-pulse" />
+                  <div className="h-3 w-3/4 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
+                  <div className="h-3 w-1/2 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
+                </div>
+              ))}
+            </div>
+          ) : pageError ? (
+            <div className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-12 text-center">
+              <WkIcon name="Building2" size={36} className="mx-auto text-[var(--wk-text-faint)]" />
+              <p className="mt-4 text-[15px] font-semibold text-[var(--wk-text-muted)]">{pageError}</p>
+              <button onClick={() => setReloadKey((k) => k + 1)} className="wk-button wk-button-sm wk-button-primary mt-5 cursor-pointer">
+                <i className="ri-refresh-line" /> Retry
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 md:gap-5">
+                {labels.map((label) => (
+                  <LabelCard key={label.slug} label={label} />
+                ))}
+              </div>
+
+              {hasMore && (
+                <div className="mt-10 flex justify-center">
+                  <button
+                    onClick={loadMore}
+                    disabled={isLoadingMore}
+                    className="wk-button wk-button-primary cursor-pointer whitespace-nowrap disabled:opacity-50"
+                  >
+                    {isLoadingMore ? (
+                      <>
+                        <i className="ri-loader-4-line animate-spin" /> Loading...
+                      </>
+                    ) : (
+                      <>
+                        <i className="ri-arrow-down-line" /> Load more
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+
+              {labels.length === 0 && (
+                <div className="rounded-2xl border border-dashed border-[var(--wk-border)] p-20 text-center">
+                  <WkIcon name="Building2" size={36} className="mx-auto text-[var(--wk-text-faint)]" />
+                  <h3 className="mt-4 text-[20px] font-black text-[var(--wk-text)]">No labels match</h3>
+                  <p className="mx-auto mt-2 max-w-md text-[14px] font-semibold leading-relaxed text-[var(--wk-text-muted)]">
+                    Try a different search or clear the country filter to see more labels.
+                  </p>
+                  <button
+                    onClick={() => { setSearchInput(""); setCountry(ALL); setSortKey("prominence"); }}
+                    className="wk-button wk-button-sm wk-button-primary mt-5 cursor-pointer"
+                  >
+                    <i className="ri-refresh-line" /> Clear filters
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </section>
       </div>
     </main>
   );
 }
 
-/* ── Section label ── */
-function SectionLabel({
-  children,
-  count,
-  href,
+/* ── Featured Label Carousel ── */
+function FeaturedLabelCarousel({
+  labels,
+  catalogStats,
 }: {
-  children: string;
-  count?: number;
-  href?: string;
+  labels: PublicLabel[];
+  catalogStats: LabelCatalogStats;
 }) {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const active = labels[activeIndex] || labels[0];
+
+  useEffect(() => setActiveIndex(0), [labels]);
+
+  const scrollTo = (index: number) => {
+    const nextIndex = Math.max(0, Math.min(index, labels.length - 1));
+    setActiveIndex(nextIndex);
+    const slide = scrollerRef.current?.children[nextIndex] as HTMLElement | undefined;
+    slide?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+  };
+
+  if (!active) return null;
+
+  const roster = (active.featuredArtists || []).slice(0, 5);
+
   return (
-    <div className="label43-section-label-row">
-      <div className="label43-section-label-left">
-        <span className="label43-section-label-text">{children}</span>
-        {count !== undefined && (
-          <span className="label43-section-label-count">{count}</span>
-        )}
+    <section className="relative min-h-[78vh] overflow-hidden border-b border-[var(--wk-border)] bg-[#0d120a] text-white">
+      <CarouselBackground label={active} />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_12%_20%,rgba(133,196,65,0.32),transparent_34%),linear-gradient(90deg,rgba(0,0,0,0.82)_0%,rgba(0,0,0,0.58)_42%,rgba(0,0,0,0.24)_100%)]" />
+      <div className="relative z-10 flex min-h-[78vh] flex-col justify-end">
+        <div className="wk-container-wide w-full px-4 pb-8 pt-24 md:px-6 lg:pb-12 lg:pt-32">
+          <div className="grid items-end gap-8 lg:grid-cols-[minmax(0,1fr)_420px]">
+            <div className="max-w-4xl">
+              <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-[0.18em] text-white/85 backdrop-blur">
+                <WkIcon name="Building2" size={13} /> Label directory
+              </div>
+              <h1 className="font-[var(--wk-font-display)] text-[clamp(56px,9vw,128px)] font-black leading-[0.82] tracking-[-0.075em] text-white drop-shadow-2xl">
+                Labels
+              </h1>
+              <p className="mt-6 max-w-2xl text-[17px] font-semibold leading-[1.75] text-white/74 md:text-[19px]">
+                Record labels, imprints, distributors, and music institutions mapped as ecosystems — rosters, releases, chart presence, and country footprint.
+              </p>
+              <div className="mt-7 flex flex-wrap items-center gap-3 text-[12px] font-extrabold text-white/82">
+                <span className="inline-flex items-center gap-2 rounded-full border border-white/16 bg-white/10 px-3 py-2 backdrop-blur">
+                  <WkIcon name="Building2" size={14} /> {catalogStats.total} labels
+                </span>
+                <span className="inline-flex items-center gap-2 rounded-full border border-white/16 bg-white/10 px-3 py-2 backdrop-blur">
+                  <WkIcon name="User2" size={14} /> {catalogStats.totalArtists.toLocaleString()} artists
+                </span>
+                <span className="inline-flex items-center gap-2 rounded-full border border-white/16 bg-white/10 px-3 py-2 backdrop-blur">
+                  <WkIcon name="Disc3" size={14} /> {catalogStats.totalReleases.toLocaleString()} releases
+                </span>
+                <span className="inline-flex items-center gap-2 rounded-full border border-white/16 bg-white/10 px-3 py-2 backdrop-blur">
+                  <WkIcon name="Globe" size={14} /> {catalogStats.countries.length} countries
+                </span>
+              </div>
+            </div>
+            <div className="rounded-[28px] border border-white/16 bg-black/24 p-4 shadow-2xl backdrop-blur-xl">
+              <div className="aspect-square overflow-hidden rounded-2xl bg-white/10">
+                {active.artistImageUrl ? (
+                  <img
+                    src={active.artistImageUrl}
+                    alt={active.name}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <Chapter19FallbackImage
+                    slug={active.slug}
+                    name={active.name}
+                    className="w-full h-full object-cover"
+                  />
+                )}
+              </div>
+              <div className="mt-4">
+                <div className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-[var(--wk-brand)]">Featured label</div>
+                <h2 className="mt-1 line-clamp-2 text-[30px] font-black leading-[0.95] tracking-[-0.05em] text-white">{active.name}</h2>
+                <div className="mt-3 text-[13px] font-bold text-white/70">
+                  {active.country || "Global"} &middot; {active.artistCount} artists &middot; {active.releaseCount} releases
+                </div>
+                {roster.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {roster.map((artist) => (
+                      <span key={artist} className="rounded-full border border-white/15 bg-white/10 px-2.5 py-0.5 text-[10px] font-bold text-white/70 backdrop-blur">
+                        {artist}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Link to={`/labels/${active.slug}`} className="wk-button wk-button-primary cursor-pointer whitespace-nowrap">
+                    <WkIcon name="ArrowUpRight" size={15} /> Open
+                  </Link>
+                  <ShareButton item={{ title: active.name, subtitle: `${active.artistCount} artists`, description: `${active.name} \u2014 ${active.country || "Global"} label with ${active.artistCount} artists and ${active.releaseCount} releases.`, type: "page" }} />
+                </div>
+              </div>
+            </div>
+          </div>
+          {labels.length > 1 && (
+            <div className="mt-10">
+              <div ref={scrollerRef} className="flex snap-x gap-3 overflow-x-auto pb-3 scrollbar-hide">
+                {labels.map((label, index) => (
+                  <button
+                    key={label.slug}
+                    onClick={() => scrollTo(index)}
+                    className={`group relative h-28 w-[220px] shrink-0 snap-start overflow-hidden rounded-2xl border text-left transition-all md:w-[260px] cursor-pointer ${
+                      activeIndex === index
+                        ? "border-[var(--wk-brand)] shadow-[0_0_0_1px_var(--wk-brand)]"
+                        : "border-white/16 hover:border-white/35"
+                    }`}
+                  >
+                    <div className="absolute inset-0">
+                      {label.artistImageUrl ? (
+                        <img src={label.artistImageUrl} alt={label.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <Chapter19FallbackImage slug={label.slug} name={label.name} className="w-full h-full object-cover" />
+                      )}
+                    </div>
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/88 via-black/38 to-transparent" />
+                    <div className="absolute inset-x-0 bottom-0 p-3">
+                      <div className="line-clamp-1 text-[14px] font-black text-white">{label.name}</div>
+                      <div className="line-clamp-1 text-[11px] font-bold text-white/70">{label.country || "Global"} &middot; {label.artistCount} artists</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+              <div className="mt-3 flex items-center justify-between gap-4">
+                <div className="flex gap-2">
+                  {labels.map((label, index) => (
+                    <button
+                      key={`dot-${label.slug}-${index}`}
+                      aria-label={`Show ${label.name}`}
+                      onClick={() => scrollTo(index)}
+                      className={`h-2 rounded-full transition-all cursor-pointer ${
+                        activeIndex === index ? "w-8 bg-[var(--wk-brand)]" : "w-2 bg-white/35 hover:bg-white/65"
+                      }`}
+                    />
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => scrollTo(activeIndex - 1)} className="rounded-full border border-white/18 bg-white/10 p-2 text-white backdrop-blur hover:bg-white/16 cursor-pointer" aria-label="Previous featured label">
+                    <WkIcon name="ChevronLeft" size={18} />
+                  </button>
+                  <button onClick={() => scrollTo(activeIndex + 1)} className="rounded-full border border-white/18 bg-white/10 p-2 text-white backdrop-blur hover:bg-white/16 cursor-pointer" aria-label="Next featured label">
+                    <WkIcon name="ChevronRight" size={18} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
-      {href && (
-        <Link to={href} className="label43-section-label-link">
-          View all <i className="ri-arrow-right-line text-[11px]" />
-        </Link>
+    </section>
+  );
+}
+
+/* ── Label Card ── */
+function LabelCard({ label }: { label: PublicLabel }) {
+  const roster = (label.featuredArtists || []).slice(0, 3);
+
+  return (
+    <div className="group flex flex-col">
+      <Link to={`/labels/${label.slug}`} className="relative aspect-square rounded-xl overflow-hidden bg-[var(--wk-bg)] border border-[var(--wk-border)] mb-3">
+        {label.artistImageUrl ? (
+          <img src={label.artistImageUrl} alt={label.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+        ) : (
+          <Chapter19FallbackImage slug={label.slug} name={label.name} className="w-full h-full object-cover" />
+        )}
+        <div className="absolute top-2.5 left-2.5">
+          <span className="inline-flex items-center rounded-full bg-black/50 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-[0.12em] text-white backdrop-blur-sm">
+            {label.country || "Global"}
+          </span>
+        </div>
+        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3 pt-8">
+          <div className="text-[13px] font-extrabold text-white leading-tight line-clamp-1">{label.name}</div>
+        </div>
+      </Link>
+
+      <Link to={`/labels/${label.slug}`} className="text-[13px] font-extrabold text-[var(--wk-text)] group-hover:text-[var(--wk-brand)] transition-colors leading-tight truncate">
+        {label.name}
+      </Link>
+      <div className="text-[12px] font-bold text-[var(--wk-text-muted)] truncate mt-0.5">
+        {label.artistCount} artists &middot; {label.releaseCount} releases
+      </div>
+      {roster.length > 0 && (
+        <div className="mt-1.5 flex flex-wrap gap-1">
+          {roster.map((artist) => (
+            <span key={artist} className="text-[10px] font-semibold text-[var(--wk-text-faint)] truncate max-w-[80px]">
+              {artist}
+            </span>
+          ))}
+        </div>
       )}
     </div>
   );
 }
 
-/* ── Country carousel ── */
-function CountryCarousel({
-  groups,
-  onSelect,
-}: {
-  groups: { name: string; count: number }[];
-  onSelect: (name: string) => void;
-}) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-
+/* ── Loading skeleton ── */
+function LabelsLoading() {
   return (
-    <div className="label43-carousel-wrap">
-      <div
-        ref={scrollRef}
-        className="label43-carousel"
-      >
-        {groups.map((group) => (
-          <button
-            key={group.name}
-            onClick={() => onSelect(group.name)}
-            className="label43-carousel-card group"
-          >
-            <div className="label43-carousel-artwork">
-              <Chapter19FallbackImage
-                slug={`country-${group.name.toLowerCase().replace(/\s+/g, "-")}`}
-                name={group.name}
-                className="label43-carousel-img"
-              />
-              <div className="label43-carousel-gradient" />
-              <div className="label43-carousel-content">
-                <span className="label43-carousel-name">{group.name}</span>
-                <span className="label43-carousel-count">
-                  {group.count} label{group.count === 1 ? "" : "s"}
-                </span>
-              </div>
+    <main className="min-h-screen bg-[var(--wk-bg)]">
+      <section className="relative overflow-hidden border-b border-[var(--wk-border)] bg-[var(--wk-bg)]">
+        <div className="wk-container-wide px-4 py-20 md:px-6 lg:py-28">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="space-y-4">
+              <div className="h-4 w-40 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
+              <div className="h-16 w-3/4 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
+              <div className="h-4 w-1/2 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
+              <div className="h-4 w-2/3 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
             </div>
-          </button>
-        ))}
+            <div className="h-72 rounded-2xl bg-[var(--wk-surface-raised)] animate-pulse" />
+          </div>
+        </div>
+      </section>
+      <div className="wk-container-wide px-4 py-10 md:px-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+          {Array.from({ length: 12 }).map((_, i) => (
+            <div key={i} className="space-y-3">
+              <div className="aspect-square rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] animate-pulse" />
+              <div className="h-3 w-3/4 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
+              <div className="h-3 w-1/2 rounded bg-[var(--wk-surface-raised)] animate-pulse" />
+            </div>
+          ))}
+        </div>
       </div>
-    </div>
+    </main>
   );
 }
 
-/* ── Label card · ch19 gradient artwork ── */
-function LabelCard({
-  label,
-  variant = "standard",
-}: {
-  label: PublicLabel;
-  variant?: "standard" | "hero";
-}) {
-  const roster = (label.featuredArtists || []).slice(0, 5);
-
-  if (variant === "hero") {
-    return (
-      <Link to={`/labels/${label.slug}`} className="label43-card-hero group">
-        <Chapter19FallbackImage
-          slug={label.slug}
-          name={label.name}
-          className="label43-card-hero-artwork"
-        />
-        <div className="label43-card-hero-overlay" />
-        <div className="label43-card-hero-info">
-          {label.isFeatured && (
-            <span className="label43-card-hero-badge">
-              <i className="ri-star-fill text-[9px]" /> Featured
-            </span>
-          )}
-          <h3 className="label43-card-hero-name">{label.name}</h3>
-          <div className="label43-card-hero-meta">
-            <span>{label.country || "Global"}</span>
-            <span className="label43-hero-meta-dot" />
-            <span>{label.artistCount} artists</span>
-            <span className="label43-hero-meta-dot" />
-            <span>{label.releaseCount} releases</span>
-          </div>
-          {roster.length > 0 && (
-            <div className="label43-card-hero-roster">
-              {roster.map((artist) => (
-                <span key={artist} className="label43-card-hero-roster-tag">
-                  {artist}
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
-      </Link>
-    );
-  }
-
+/* ── Filter select ── */
+function FilterSelect({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (value: string) => void }) {
   return (
-    <Link to={`/labels/${label.slug}`} className="label43-card-v2 group">
-      <div className="label43-card-artwork-wrap">
-        <Chapter19FallbackImage
-          slug={label.slug}
-          name={label.name}
-          className="label43-card-artwork"
-        />
-        {label.isFeatured && (
-          <span className="label43-card-featured-badge">
-            <i className="ri-star-fill text-[9px]" /> Featured
-          </span>
-        )}
-        <div className="label43-card-artwork-name">{label.name}</div>
-      </div>
-      <div className="label43-card-body">
-        <div className="label43-card-meta">
-          <span className="label43-card-country">
-            <i className="ri-map-pin-line text-[10px]" />
-            {label.country || "Global"}
-          </span>
-          <span className="label43-card-dot" />
-          <span>{label.releaseCount} releases</span>
-        </div>
-        <div className="label43-card-stats-row">
-          <div className="label43-card-stat-pill">
-            <strong>{label.artistCount}</strong>
-            <span>Artists</span>
-          </div>
-          <div className="label43-card-stat-pill">
-            <strong>{label.releaseCount}</strong>
-            <span>Releases</span>
-          </div>
-          <div className="label43-card-stat-pill">
-            <strong>{roster.length}</strong>
-            <span>Roster</span>
-          </div>
-        </div>
-        {roster.length > 0 && (
-          <div className="label43-card-roster">
-            {roster.map((artist) => (
-              <span key={artist} className="label43-card-roster-tag">
-                {artist}
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
-    </Link>
+    <label className="block">
+      <span className="mb-1 block text-[10px] font-extrabold uppercase tracking-[0.16em] text-[var(--wk-text-faint)]">{label}</span>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2.5 text-[13px] font-bold text-[var(--wk-text)] outline-none cursor-pointer"
+      >
+        {options.map((option) => (
+          <option key={option} value={option}>{sortOptionLabel(option)}</option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+/* ── Stat pill ── */
+function Stat({ value, label }: { value: string | number; label: string }) {
+  return <div className="chart-stat-card"><div className="chart-stat-value">{value}</div><div className="chart-stat-label">{label}</div></div>;
+}
+
+/* ── Helpers ── */
+function sortOptionLabel(value: string): string {
+  if (value === "prominence") return "Most prominent";
+  if (value === "name") return "Name A-Z";
+  if (value === "artists") return "Most artists";
+  if (value === "releases") return "Most releases";
+  return value;
+}
+
+function CarouselBackground({ label }: { label: PublicLabel }) {
+  const [failed, setFailed] = useState(false);
+  if (!label.artistImageUrl || failed) {
+    return <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_75%,rgba(133,196,65,0.42),transparent_32%),radial-gradient(circle_at_82%_16%,rgba(255,255,255,0.20),transparent_30%),linear-gradient(135deg,#101510,#1d2f12)]" />;
+  }
+  return (
+    <>
+      <img src={label.artistImageUrl} alt="" className="hidden" onError={() => setFailed(true)} />
+      <div className="absolute inset-0 scale-105 bg-cover bg-center opacity-75 blur-[2px]" style={{ backgroundImage: `url("${label.artistImageUrl}")` }} />
+    </>
   );
 }

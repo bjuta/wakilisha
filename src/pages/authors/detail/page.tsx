@@ -424,9 +424,11 @@ export default function AuthorProfilePage() {
               className="w-full h-full object-cover"
               onError={() => setAvatarFailed(true)}
             />
-            <div className="author-profile-hero-portrait-badge">
-              <WkIcon name="PenLine" size={12} />
-            </div>
+            {isOwner && ownershipChecked && (
+              <div className="author-profile-hero-portrait-badge">
+                <WkIcon name="PenLine" size={12} />
+              </div>
+            )}
           </div>
 
           {/* Details */}

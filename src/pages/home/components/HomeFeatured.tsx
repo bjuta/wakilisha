@@ -45,7 +45,7 @@ export function HomeFeatured({ chartEntries, loading }: Props) {
             className="font-bold tracking-[-0.02em] text-[var(--wk-text)]"
             style={{ fontSize: "clamp(1.5rem,2.8vw,2.1rem)", lineHeight: 1.05 }}
           >
-            What&apos;s charting now
+            What's charting now
           </h2>
         </div>
         <Link
@@ -133,7 +133,10 @@ export function HomeFeatured({ chartEntries, loading }: Props) {
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          playTrack(chartTracks[i], chartTracks);
+                          playTrack(chartTracks[i], chartTracks, {
+                          pageType: "home",
+                          sourceSection: "home_featured",
+                        });
                         }}
                         className="absolute bottom-3 right-3 flex h-10 w-10 items-center justify-center rounded-full opacity-0 scale-75 transition-all duration-200 group-hover:opacity-100 group-hover:scale-100 cursor-pointer"
                         style={{ background: "var(--wk-brand)", color: "var(--wk-brand-on)" }}

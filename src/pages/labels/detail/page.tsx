@@ -4,9 +4,10 @@ import { WkIcon } from "@/components/design-system/Icon";
 import { Chapter19FallbackImage } from "@/components/media/Chapter19FallbackImage";
 import { MetaTags } from "@/components/seo/MetaTags";
 import { ch19Background } from "@/utils/ch19";
-import { getLabel, type RepairedLabelDetail } from "@/services/repaired/client";
+import { getLabel, type PublicLabelDetail } from "@/services/publicApi/client";
 import { buildLabelHeroIntro, buildLabelSeoDescription } from "@/services/cultureContext/labelAdapters";
 import { releaseUrl } from "@/utils/releaseUrl";
+import { NewsletterSubscribe } from "@/components/feature/NewsletterSubscribe";
 
 function releaseTypeBadge(type: string) {
   const t = type.toLowerCase();
@@ -23,7 +24,7 @@ function formatYear(date: string): string {
 
 export default function LabelDetail() {
   const { slug } = useParams<{ slug: string }>();
-  const [detail, setDetail] = useState<RepairedLabelDetail | null>(null);
+  const [detail, setDetail] = useState<PublicLabelDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"releases" | "roster">("releases");
@@ -80,6 +81,8 @@ export default function LabelDetail() {
 
   const { label, roster, releases, relatedLabels } = detail;
   const heroBg = ch19Background({ slug: label.slug, name: label.name });
+  const rosterImageIndex = roster.length > 0 ? (label.slug.length % roster.length) : 0;
+  const heroRosterImage = roster.length > 0 ? roster[rosterImageIndex].artworkUrl : null;
   const sortedReleases = [...releases].sort((a, b) => (b.releaseDate || "").localeCompare(a.releaseDate || ""));
   const labelIntro = buildLabelHeroIntro(detail) || label.description || "";
   const seoDescription = buildLabelSeoDescription(detail);
@@ -93,7 +96,11 @@ export default function LabelDetail() {
       />
 
       <section className="relative -mt-16 pt-16 flex min-h-[320px] items-end overflow-hidden md:min-h-[460px]">
-        <div className="absolute inset-0" style={{ background: heroBg }} />
+        {heroRosterImage ? (
+          <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${heroRosterImage})` }} />
+        ) : (
+          <div className="absolute inset-0" style={{ background: heroBg }} />
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/35 to-transparent" />
         <div className="absolute left-8 top-8 hidden opacity-10 md:block">
           <WkIcon name="Building2" size={180} style={{ color: "white" }} />
@@ -168,7 +175,7 @@ export default function LabelDetail() {
                     >
                       <div className="relative aspect-square bg-[var(--wk-surface-raised)]">
                         {release.artworkUrl ? (
-                          <img src={release.artworkUrl} alt={release.title} className="h-full w-full object-cover" />
+                          <img src={release.artworkUrl} alt={release.title} loading="lazy" className="h-full w-full object-cover" />
                         ) : (
                           <Chapter19FallbackImage slug={release.slug} name={release.title} className="h-full" />
                         )}
@@ -213,7 +220,7 @@ export default function LabelDetail() {
                     >
                       <div className="relative aspect-square bg-[var(--wk-surface-raised)]">
                         {artist.artworkUrl ? (
-                          <img src={artist.artworkUrl} alt={artist.name} className="h-full w-full object-cover" />
+                          <img src={artist.artworkUrl} alt={artist.name} loading="lazy" className="h-full w-full object-cover" />
                         ) : (
                           <Chapter19FallbackImage slug={artist.slug} name={artist.name} className="h-full" />
                         )}
@@ -286,6 +293,23 @@ export default function LabelDetail() {
               </div>
             </div>
           </div>
+
+          {/* ── Newsletter ── */}
+          <section>
+            <NewsletterSubscribe
+              formAction="https://readdy.ai/api/form/d8qhqude8ise6dlc8d80"
+              formId="label-newsletter-form"
+              headline={`Follow ${label.name}.`}
+              description={`Get updates on ${label.name} releases, roster moves, and new catalog drops as they land.`}
+              contextFields={{ wk_page_type: "label_detail", label_slug: label.slug, label_name: label.name }}
+              analytics={{
+                pageType: "label_detail",
+                entitySlug: slug,
+                entityType: "label",
+                context: { label_name: label.name },
+              }}
+            />
+          </section>
         </div>
       </div>
     </main>

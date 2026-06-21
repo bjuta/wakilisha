@@ -14,9 +14,6 @@ const moreNetworks = [
   { key: "sms", label: "SMS", icon: "ri-message-3-line" },
   { key: "reddit", label: "Reddit", icon: "ri-reddit-line" },
   { key: "pinterest", label: "Pinterest", icon: "ri-pinterest-line" },
-  { key: "tumblr", label: "Tumblr", icon: "ri-tumblr-line" },
-  { key: "pocket", label: "Pocket", icon: "ri-bookmark-line" },
-  { key: "line", label: "Line", icon: "ri-line-line" },
   { key: "messenger", label: "Messenger", icon: "ri-messenger-line" },
 ];
 
@@ -70,16 +67,6 @@ export default function ReadingShareSection({ position }: { position: "top" | "b
     });
   }, []);
 
-  const handleNativeShare = useCallback(() => {
-    if (navigator.share) {
-      navigator.share({
-        title: readingGuide.shareTitle,
-        text: readingGuide.shareDescription,
-        url: readingGuide.shareUrl,
-      });
-    }
-  }, []);
-
   return (
     <section className="relative" style={{ background: "var(--wk-bg)" }}>
       <div className="max-w-[720px] mx-auto px-6 md:px-8 py-4">
@@ -112,16 +99,6 @@ export default function ReadingShareSection({ position }: { position: "top" | "b
               title={copied ? "Copied!" : "Copy link"}
             >
               <i className={copied ? "ri-check-line" : "ri-link"} />
-            </button>
-            <button
-              type="button"
-              onClick={handleNativeShare}
-              className="w-8 h-8 flex items-center justify-center rounded-md text-[16px] transition-colors hover:opacity-80"
-              style={{ color: "var(--wk-text-muted)" }}
-              aria-label="Share"
-              title="Share"
-            >
-              <i className="ri-share-line" />
             </button>
             <button
               type="button"

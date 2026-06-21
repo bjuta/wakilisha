@@ -650,13 +650,19 @@ export default function ChartsDirectory() {
   );
 
   const handlePlayTop10 = useCallback(() => {
-    if (playerTop10.length > 0) playTrack(playerTop10[0], playerTop10);
+    if (playerTop10.length > 0) playTrack(playerTop10[0], playerTop10, {
+      pageType: "charts_directory",
+      sourceSection: "hero",
+    });
   }, [playerTop10, playTrack]);
 
   const handlePlayEntry = useCallback(
     (idx: number) => {
       const t = playerTracks[idx];
-      if (t) playTrack(t, playerTracks);
+      if (t) playTrack(t, playerTracks, {
+        pageType: "charts_directory",
+        sourceSection: "leaderboard",
+      });
     },
     [playerTracks, playTrack]
   );
