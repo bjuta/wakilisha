@@ -9,6 +9,7 @@ import ResetPasswordPage from "../pages/auth/reset-password/page";
 
 // Author profiles
 import AuthorProfilePage from "../pages/authors/detail/page";
+import LegacyArticleRedirect from "../pages/LegacyArticleRedirect";
 
 // Admin Shell — WordPress-like production engine
 import { AdminShell } from "../pages/admin/AdminShell";
@@ -225,6 +226,7 @@ const routes: RouteObject[] = [
       { path: "/briefing/unsubscribe", element: <ResponsivePage mobile={<BriefingUnsubscribePage />} desktop={<BriefingUnsubscribePage />} /> },
       { path: "/briefing/preferences", element: <ResponsivePage mobile={<BriefingPreferencesPage />} desktop={<BriefingPreferencesPage />} /> },
       { path: "/briefing/issue/:issueId", element: <BriefingIssuePage /> },
+      { path: "/:slug", element: <LegacyArticleRedirect /> },
     ],
   },
   {

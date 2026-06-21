@@ -201,7 +201,9 @@ export function ArtistBioSection({
     return parseBioSections(fullBio);
   }, [expanded, fullBio]);
 
-  const displayBio = cleanBioExcerpt(fullBio || bio || `${name} is an artist on WAKILISHA.`);
+  const displayBio = cleanBioExcerpt(fullBio || bio || "");
+  
+  const showBio = displayBio.length > 0;
 
   const metaItems = [
     ...(artistType ? [{ icon: "ri-user-line", label: artistType }] : []),
@@ -282,9 +284,11 @@ export function ArtistBioSection({
           </div>
         ) : (
           /* Collapsed state — plain text with drop cap */
-          <p className="bio-collapsed-text">
-            {displayBio}
-          </p>
+          showBio && (
+            <p className="bio-collapsed-text">
+              {displayBio}
+            </p>
+          )
         )}
       </div>
 

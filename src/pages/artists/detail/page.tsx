@@ -4,7 +4,6 @@ import { WkButton } from "@/components/design-system/primitives/Button";
 import { MetaTags } from "@/components/seo/MetaTags";
 import { getArtist, getArtistAppearsOn, clearDiscographyCache, type PublicArtistDetail, type RegistryAppearsOnRelease } from "@/services/publicContent/client";
 import { supabase } from "@/lib/supabase";
-import { buildArtistHeroIntro, buildArtistSeoDescription } from "@/services/cultureContext/artistAdapters";
 import { ArtistDetailHero } from "./components/ArtistDetailHero";
 import { ArtistChartSection } from "./components/ArtistChartSection";
 import { ArtistDiscography } from "./components/ArtistDiscography";
@@ -120,8 +119,9 @@ export default function ArtistDetail() {
   const hasTopSongs = artist.topSongs.length > 0;
   const hasBio = artist.bio || artist.fullBio;
   const hasVideos = artist.videos && artist.videos.length > 0;
-  const heroBio = buildArtistHeroIntro(artist) || cleanBioExcerpt(artist.fullBio || artist.bio || "");
-  const seoDescription = buildArtistSeoDescription(artist);
+  const heroBio = cleanBioExcerpt(artist.fullBio || artist.bio || "");
+  const bioForSeo = cleanBioExcerpt(artist.fullBio || artist.bio || "");
+  const seoDescription = bioForSeo || `Explore ${artist.name} on WAKILISHA — songs, releases, chart moments, and more.`;
 
   return (
     <div className="wk-app-shell">

@@ -39,6 +39,9 @@ const idCache = new Map<string, MediaAssetLite | null>();
 
 // ─── Batch Lookup ─────────────────────────────────────────────
 
+/** Chunk URLs to avoid hitting Supabase REST URL length limits */
+const BATCH_SIZE = 40;
+
 /**
  * Look up multiple media assets by URL in a single query.
  * Deduplicates URLs and caches results.
@@ -56,31 +59,43 @@ export async function batchGetMediaAssetsByUrl(urls: string[]): Promise<Map<stri
 
   if (uncached.length === 0) return result;
 
-  try {
-    const { data } = await supabase
-      .from("registry_media_assets")
-      .select("id, slug, title, url, mime_type, media_kind, metadata")
-      .in("url", uncached)
-      .eq("status", "active")
-      .eq("media_kind", "image");
+  // Process in chunks to avoid PostgREST URL length limits
+  const chunks: string[][] = [];
+  for (let i = 0; i < uncached.length; i += BATCH_SIZE) {
+    chunks.push(uncached.slice(i, i + BATCH_SIZE));
+  }
 
-    const rows = (data ?? []) as MediaAssetLite[];
+  for (const chunk of chunks) {
+    try {
+      const { data, error } = await supabase
+        .from("registry_media_assets")
+        .select("id, slug, title, url, mime_type, media_kind, metadata")
+        .in("url", chunk)
+        .eq("status", "active")
+        .eq("media_kind", "image");
 
-    // Build lookup by URL
-    const byUrl = new Map<string, MediaAssetLite>();
-    for (const row of rows) {
-      if (row.url) byUrl.set(row.url, row);
+      if (error) {
+        console.warn("WAKILISHA media asset lookup error:", error.message);
+        // Cache misses as null for this chunk
+        for (const u of chunk) urlCache.set(u, null);
+        continue;
+      }
+
+      const rows = (data ?? []) as MediaAssetLite[];
+      const byUrl = new Map<string, MediaAssetLite>();
+      for (const row of rows) {
+        if (row.url) byUrl.set(row.url, row);
+      }
+
+      for (const u of chunk) {
+        const asset = byUrl.get(u) ?? null;
+        urlCache.set(u, asset);
+        if (asset) result.set(u, asset);
+      }
+    } catch {
+      // On failure, cache as null so we don't retry
+      for (const u of chunk) urlCache.set(u, null);
     }
-
-    // Populate cache and result
-    for (const u of uncached) {
-      const asset = byUrl.get(u) ?? null;
-      urlCache.set(u, asset);
-      if (asset) result.set(u, asset);
-    }
-  } catch {
-    // On failure, cache as null so we don't retry
-    for (const u of uncached) urlCache.set(u, null);
   }
 
   return result;
@@ -101,26 +116,39 @@ export async function batchGetMediaAssetsById(ids: string[]): Promise<Map<string
 
   if (uncached.length === 0) return result;
 
-  try {
-    const { data } = await supabase
-      .from("registry_media_assets")
-      .select("id, slug, title, url, mime_type, media_kind, metadata")
-      .in("id", uncached)
-      .eq("status", "active");
+  // Process in chunks to avoid PostgREST URL length limits
+  const chunks: string[][] = [];
+  for (let i = 0; i < uncached.length; i += BATCH_SIZE) {
+    chunks.push(uncached.slice(i, i + BATCH_SIZE));
+  }
 
-    const rows = (data ?? []) as MediaAssetLite[];
+  for (const chunk of chunks) {
+    try {
+      const { data, error } = await supabase
+        .from("registry_media_assets")
+        .select("id, slug, title, url, mime_type, media_kind, metadata")
+        .in("id", chunk)
+        .eq("status", "active");
 
-    for (const row of rows) {
-      idCache.set(row.id, row);
-      result.set(row.id, row);
+      if (error) {
+        console.warn("WAKILISHA media asset ID lookup error:", error.message);
+        for (const i of chunk) idCache.set(i, null);
+        continue;
+      }
+
+      const rows = (data ?? []) as MediaAssetLite[];
+      for (const row of rows) {
+        idCache.set(row.id, row);
+        result.set(row.id, row);
+      }
+
+      // Cache misses as null
+      for (const i of chunk) {
+        if (!idCache.has(i)) idCache.set(i, null);
+      }
+    } catch {
+      for (const i of chunk) idCache.set(i, null);
     }
-
-    // Cache misses as null
-    for (const i of uncached) {
-      if (!idCache.has(i)) idCache.set(i, null);
-    }
-  } catch {
-    for (const i of uncached) idCache.set(i, null);
   }
 
   return result;
