@@ -19,9 +19,11 @@ type QualityFilter =
   | "complete"
   | "incomplete"
   | "missing_country"
+  | "missing_origin"
   | "missing_image"
   | "missing_bio"
   | "missing_genre"
+  | "missing_type"
   | "blocked";
 
 type StatusFilter = "all" | "active" | "draft";
@@ -265,6 +267,8 @@ function ArtistCard({
   selected,
   onToggleSelect,
   onDelete,
+  onEnrich,
+  enriching,
 }: {
   artist: EnrichedArtist;
   onOpen: (artist: EnrichedArtist) => void;
@@ -272,6 +276,8 @@ function ArtistCard({
   selected: boolean;
   onToggleSelect: (id: string) => void;
   onDelete?: (artist: EnrichedArtist) => void;
+  onEnrich?: (artist: EnrichedArtist) => void;
+  enriching?: boolean;
 }) {
   const [hovered, setHovered] = useState(false);
   const q = artist._quality;
@@ -321,7 +327,7 @@ function ArtistCard({
             hovered ? "opacity-100" : "opacity-0"
           }`}
         >
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap justify-center px-2">
             <button
               onClick={() => onOpen(artist)}
               className="rounded-xl bg-white px-4 py-2 text-[12px] font-bold text-[#171712] hover:bg-[#f0f3ec]"
@@ -334,6 +340,20 @@ function ArtistCard({
             >
               Details
             </button>
+            {onEnrich && (
+              <button
+                onClick={() => onEnrich(artist)}
+                disabled={enriching}
+                className="rounded-xl bg-[#5f8f2f] px-4 py-2 text-[12px] font-bold text-white hover:bg-[#4d7a26] disabled:opacity-50 flex items-center gap-1.5"
+              >
+                {enriching ? (
+                  <WkIcon name="Loader2" size={13} className="animate-spin" />
+                ) : (
+                  <i className="ri-sparkling-line text-[13px]" />
+                )}
+                Enrich
+              </button>
+            )}
             {String(artist.status) === "draft" && onDelete && (
               <button
                 onClick={() => onDelete(artist)}
@@ -472,7 +492,755 @@ function ConfirmModal({
   );
 }
 
-/* ─────────────── Spotify Backfill Panel ─────────────── */
+/* ─────────────── Artist Enrich Panel ─────────────── */
+
+type EnrichResultItem = {
+  slug: string;
+  name: string;
+  status: "updated" | "skipped" | "no_data" | "error";
+  providersTried: string[];
+  providersFound: string[];
+  changes: {
+    image?: { old: string | null; new: string | null; source: string };
+    bio?: { old: string | null; new: string | null; source: string };
+    genres?: { old: string[]; new: string[]; source: string };
+  };
+  message?: string;
+  debug?: Record<string, unknown>;
+};
+
+type EnrichResult = {
+  ok: boolean;
+  dry_run: boolean;
+  force: boolean;
+  total_found: number;
+  updated: number;
+  skipped: number;
+  no_data: number;
+  errors: number;
+  provider_status: Record<string, { connected: boolean; error?: string }>;
+  results: EnrichResultItem[];
+};
+
+function ArtistEnrichPanel({ onDone }: { onDone: () => void }) {
+  const [phase, setPhase] = useState<"idle" | "running" | "done" | "error">("idle");
+  const [result, setResult] = useState<EnrichResult | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false);
+  const [filterMode, setFilterMode] = useState<string>("missing_image");
+  const [providers, setProviders] = useState<string[]>(["spotify", "apple_music"]);
+  const [force, setForce] = useState(false);
+  const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
+
+  const CHUNK_SIZE = 20;
+
+  async function runEnrich(dryRun: boolean) {
+    setPhase("running");
+    setResult(null);
+    setErrorMsg(null);
+    setProgress(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) { setPhase("error"); setErrorMsg("Not authenticated."); return; }
+      const supabaseUrl = (import.meta.env.VITE_PUBLIC_SUPABASE_URL as string) || "";
+
+      const callEnrich = async () => {
+        const res = await fetch(`${supabaseUrl}/functions/v1/registry-enrich-artist`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+            apikey: (import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY as string) || "",
+          },
+          body: JSON.stringify({
+            dry_run: dryRun,
+            batch_size: CHUNK_SIZE,
+            filter: filterMode,
+            providers,
+            force,
+          }),
+        });
+        return await res.json() as EnrichResult & { error?: string; message?: string };
+      };
+
+      if (dryRun) {
+        const data = await callEnrich();
+        if (!data.ok || data.error) { setPhase("error"); setErrorMsg(data.message || data.error || `HTTP error`); return; }
+        setResult({ ...data, results: data.results ?? [] });
+        setPhase("done");
+        return;
+      }
+
+      // Non-dry-run: loop in chunks until all artists processed
+      let allResults: EnrichResultItem[] = [];
+      let totalUpdated = 0;
+      let totalSkipped = 0;
+      let totalNoData = 0;
+      let totalErrors = 0;
+      let totalFound = 0;
+      let lastProviderStatus: Record<string, { connected: boolean; error?: string }> = {};
+
+      while (true) {
+        const data = await callEnrich();
+        if (!data.ok || data.error) { setPhase("error"); setErrorMsg(data.message || data.error || `HTTP error`); return; }
+
+        const chunkResults = data.results ?? [];
+        allResults = [...allResults, ...chunkResults];
+        totalUpdated += data.updated ?? 0;
+        totalSkipped += data.skipped ?? 0;
+        totalNoData += data.no_data ?? 0;
+        totalErrors += data.errors ?? 0;
+        totalFound += data.total_found ?? 0;
+        if (data.provider_status) lastProviderStatus = data.provider_status;
+
+        setResult({
+          ok: true,
+          dry_run: false,
+          force,
+          total_found: totalFound,
+          updated: totalUpdated,
+          skipped: totalSkipped,
+          no_data: totalNoData,
+          errors: totalErrors,
+          provider_status: lastProviderStatus,
+          results: allResults.slice(-500),
+        });
+        setProgress({ current: totalUpdated + totalSkipped + totalNoData + totalErrors, total: -1 });
+
+        if ((data.total_found ?? 0) === 0 || chunkResults.length === 0) break;
+      }
+
+      setProgress(null);
+      setPhase("done");
+      if (totalUpdated > 0) onDone();
+    } catch (err) {
+      setPhase("error");
+      setErrorMsg(err instanceof Error ? err.message : "Unknown error");
+    }
+  }
+
+  const providerDot = (connected: boolean) => (
+    <span className={`inline-block h-2 w-2 rounded-full ${connected ? "bg-[#5f8f2f]" : "bg-[#f0a020]"}`} />
+  );
+
+  return (
+    <div className="rounded-2xl border border-[#dfe4d8] bg-white p-4">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#f0f3ec]">
+            <i className="ri-sparkling-line text-[18px] text-[#5f8f2f]" />
+          </div>
+          <div>
+            <p className="text-[13px] font-black text-[#171712]">Enrich Artists</p>
+            <p className="text-[11px] text-[#858c7e]">Backfill images, bio, and genres from Spotify &amp; Apple Music</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Provider toggles */}
+          <div className="flex items-center gap-1.5 rounded-xl border border-[#dfe4d8] bg-[#f8f9f4] px-2 py-1.5">
+            <button
+              onClick={() => setProviders((prev) => prev.includes("spotify") ? prev.filter((p) => p !== "spotify") : [...prev, "spotify"])}
+              className={`flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold transition ${providers.includes("spotify") ? "bg-[#1DB954]/10 text-[#1DB954]" : "text-[#a8ad9e]"}`}
+              title="Toggle Spotify"
+            >
+              <i className="ri-spotify-line text-[13px]" />
+              Spotify
+            </button>
+            <button
+              onClick={() => setProviders((prev) => prev.includes("apple_music") ? prev.filter((p) => p !== "apple_music") : [...prev, "apple_music"])}
+              className={`flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold transition ${providers.includes("apple_music") ? "bg-[#fa2d48]/10 text-[#fa2d48]" : "text-[#a8ad9e]"}`}
+              title="Toggle Apple Music"
+            >
+              <i className="ri-apple-line text-[13px]" />
+              Apple
+            </button>
+          </div>
+          {/* Filter */}
+          <select
+            value={filterMode}
+            onChange={(e) => setFilterMode(e.target.value)}
+            className="h-8 rounded-lg border border-[#dfe4d8] bg-[#f8f9f4] px-2 text-[11px] font-bold text-[#697062] outline-none"
+          >
+            <option value="missing_image">Missing image</option>
+            <option value="missing_bio">Missing bio</option>
+            <option value="all">All artists</option>
+          </select>
+          {/* Force */}
+          <button
+            onClick={() => setForce((v) => !v)}
+            className={`flex items-center gap-1 rounded-lg border px-2 py-1.5 text-[11px] font-bold transition ${force ? "border-[#5f8f2f] bg-[#e8f5dc] text-[#5f8f2f]" : "border-[#dfe4d8] bg-[#f8f9f4] text-[#a8ad9e]"}`}
+            title="Force re-enrich even if data already exists"
+          >
+            <WkIcon name="RotateCcw" size={12} />
+            Force
+          </button>
+          <button
+            onClick={() => runEnrich(true)}
+            disabled={phase === "running"}
+            className="rounded-xl border border-[#dfe4d8] bg-[#f8f9f4] px-3 py-2 text-[12px] font-bold text-[#697062] hover:border-[#85c441] hover:text-[#5f8f2f] disabled:opacity-50 flex items-center gap-1.5 whitespace-nowrap"
+          >
+            <WkIcon name="Eye" size={13} />
+            Preview
+          </button>
+          <button
+            onClick={() => runEnrich(false)}
+            disabled={phase === "running"}
+            className="rounded-xl bg-[#5f8f2f] px-3 py-2 text-[12px] font-black text-white hover:bg-[#4d7a26] disabled:opacity-50 flex items-center gap-1.5 whitespace-nowrap"
+          >
+            {phase === "running" ? (
+              <><WkIcon name="Loader2" size={13} className="animate-spin" /> {progress ? `Processing… (${progress.current} done)` : "Running…"}</>
+            ) : (
+              <><i className="ri-sparkling-line text-[13px]" /> Enrich</>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Provider status */}
+      {result && (
+        <div className="mt-2 flex gap-3 flex-wrap">
+          {Object.entries(result.provider_status).map(([key, status]) => (
+            <div key={key} className="flex items-center gap-1.5 text-[11px]">
+              {providerDot(status.connected)}
+              <span className="font-bold text-[#697062] capitalize">{key.replace("_", " ")}</span>
+              <span className={status.connected ? "text-[#5f8f2f]" : "text-[#f0a020]"}>
+                {status.connected ? "connected" : "disconnected"}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {phase === "error" && errorMsg && (
+        <div className="mt-3 rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-[12px] font-bold text-red-700">
+          {errorMsg}
+        </div>
+      )}
+
+      {phase === "done" && result && (
+        <div className="mt-3 space-y-3">
+          <div className="grid grid-cols-5 gap-2">
+            {[
+              ["Found", result.total_found, "text-[#697062]"],
+              ["Updated", result.updated, "text-[#5f8f2f]"],
+              ["Skipped", result.skipped, "text-[#858c7e]"],
+              ["No data", result.no_data, "text-[#f0a020]"],
+              ["Errors", result.errors, "text-red-600"],
+            ].map(([label, value, cls]) => (
+              <div key={label as string} className="rounded-xl border border-[#dfe4d8] p-2.5 text-center">
+                <p className={`text-[18px] font-black ${cls}`}>{value as number}</p>
+                <p className="text-[10px] font-bold text-[#a8ad9e] uppercase tracking-wide">{label}</p>
+              </div>
+            ))}
+          </div>
+          {result.dry_run && (
+            <div className="rounded-xl bg-amber-50 border border-amber-200 px-3 py-2 text-[12px] font-bold text-amber-700">
+              Preview mode — no changes were written. Click "Enrich" to apply.
+            </div>
+          )}
+          {result.results?.length > 0 && (
+            <div>
+              <button
+                onClick={() => setExpanded((v) => !v)}
+                className="text-[11px] font-bold text-[#5f8f2f] hover:underline flex items-center gap-1"
+              >
+                <WkIcon name={expanded ? "ChevronUp" : "ChevronDown"} size={12} />
+                {expanded ? "Hide" : "Show"} details ({result.results.length} artists)
+              </button>
+              {expanded && (
+                <div className="mt-2 max-h-[500px] overflow-y-auto rounded-xl border border-[#dfe4d8]">
+                  {result.results.map((r, i) => (
+                    <EnrichResultRow key={r.slug + i} item={r} />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─────────────── Artist Origin Panel ─────────────── */
+
+type OriginResultItem = {
+  slug: string;
+  name: string;
+  previousIso2: string | null;
+  newIso2: string | null;
+  countryName: string | null;
+  confidence: number;
+  source: "metadata_normalization" | "musicbrainz" | "skipped";
+  debug?: string;
+};
+
+type OriginResult = {
+  ok: boolean;
+  dry_run: boolean;
+  total_found: number;
+  normalized_from_metadata: number;
+  from_musicbrainz: number;
+  skipped: number;
+  results: OriginResultItem[];
+};
+
+function ArtistOriginPanel({ onDone }: { onDone: () => void }) {
+  const [phase, setPhase] = useState<"idle" | "running" | "done" | "error">("idle");
+  const [result, setResult] = useState<OriginResult | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false);
+  const [useMusicBrainz, setUseMusicBrainz] = useState(true);
+  const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
+
+  const CHUNK_SIZE = 25;
+
+  async function runOriginBackfill(dryRun: boolean) {
+    setPhase("running");
+    setResult(null);
+    setErrorMsg(null);
+    setProgress(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) { setPhase("error"); setErrorMsg("Not authenticated."); return; }
+      const supabaseUrl = (import.meta.env.VITE_PUBLIC_SUPABASE_URL as string) || "";
+
+      const callBackfill = async () => {
+        const res = await fetch(`${supabaseUrl}/functions/v1/backfill-artist-origin`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+            apikey: (import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY as string) || "",
+          },
+          body: JSON.stringify({ dry_run: dryRun, use_musicbrainz: useMusicBrainz, batch_size: CHUNK_SIZE }),
+        });
+        return await res.json() as (OriginResult & { error?: string; message?: string });
+      };
+
+      if (dryRun) {
+        const data = await callBackfill();
+        if (data.error) { setPhase("error"); setErrorMsg(data.message || data.error); return; }
+        setResult({ ...data, results: data.results ?? [] });
+        setPhase("done");
+        return;
+      }
+
+      // Non-dry-run: loop in chunks until all artists processed
+      let allResults: OriginResultItem[] = [];
+      let totalNormalized = 0;
+      let totalMb = 0;
+      let totalSkipped = 0;
+      let totalFound = 0;
+      let chunkCount = 0;
+
+      while (true) {
+        chunkCount++;
+        const data = await callBackfill();
+        if (data.error) { setPhase("error"); setErrorMsg(data.message || data.error); return; }
+
+        const chunkResults = data.results ?? [];
+        allResults = [...allResults, ...chunkResults];
+        totalNormalized += data.normalized_from_metadata ?? 0;
+        totalMb += data.from_musicbrainz ?? 0;
+        totalSkipped += data.skipped ?? 0;
+        totalFound += data.total_found ?? 0;
+
+        setResult({
+          ok: true,
+          dry_run: false,
+          total_found: totalFound,
+          normalized_from_metadata: totalNormalized,
+          from_musicbrainz: totalMb,
+          skipped: totalSkipped,
+          results: allResults.slice(-500),
+        });
+        setProgress({ current: totalNormalized + totalMb + totalSkipped, total: -1 });
+
+        if ((data.total_found ?? 0) === 0 || chunkResults.length === 0) break;
+      }
+
+      setProgress(null);
+      setPhase("done");
+      if (totalNormalized + totalMb > 0) onDone();
+    } catch (err) {
+      setPhase("error");
+      setErrorMsg(err instanceof Error ? err.message : "Unknown error");
+    }
+  }
+
+  return (
+    <div className="rounded-2xl border border-[#dfe4d8] bg-white p-4">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-50">
+            <i className="ri-earth-line text-[18px] text-amber-600" />
+          </div>
+          <div>
+            <p className="text-[13px] font-black text-[#171712]">Enrich Origin</p>
+            <p className="text-[11px] text-[#858c7e]">Normalize country metadata &amp; look up ISO origin via MusicBrainz</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => setUseMusicBrainz((v) => !v)}
+            className={`flex items-center gap-1 rounded-lg border px-2 py-1.5 text-[11px] font-bold transition ${useMusicBrainz ? "border-[#5f8f2f] bg-[#e8f5dc] text-[#5f8f2f]" : "border-[#dfe4d8] bg-[#f8f9f4] text-[#a8ad9e]"}`}
+            title="Use MusicBrainz to look up artists without country metadata"
+          >
+            <i className="ri-database-2-line text-[12px]" />
+            MusicBrainz
+          </button>
+          <button
+            onClick={() => runOriginBackfill(true)}
+            disabled={phase === "running"}
+            className="rounded-xl border border-[#dfe4d8] bg-[#f8f9f4] px-3 py-2 text-[12px] font-bold text-[#697062] hover:border-[#85c441] hover:text-[#5f8f2f] disabled:opacity-50 flex items-center gap-1.5 whitespace-nowrap"
+          >
+            <WkIcon name="Eye" size={13} />
+            Preview
+          </button>
+          <button
+            onClick={() => runOriginBackfill(false)}
+            disabled={phase === "running"}
+            className="rounded-xl bg-[#5f8f2f] px-3 py-2 text-[12px] font-black text-white hover:bg-[#4d7a26] disabled:opacity-50 flex items-center gap-1.5 whitespace-nowrap"
+          >
+            {phase === "running" ? (
+              <><WkIcon name="Loader2" size={13} className="animate-spin" /> {progress ? `Processing chunk… (${progress.current} done)` : "Running…"}</>
+            ) : (
+              <><i className="ri-earth-line text-[13px]" /> Backfill Origin</>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {phase === "error" && errorMsg && (
+        <div className="mt-3 rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-[12px] font-bold text-red-700">
+          {errorMsg}
+        </div>
+      )}
+
+      {phase === "done" && result && (
+        <div className="mt-3 space-y-3">
+          <div className="grid grid-cols-4 gap-2">
+            {[
+              ["Found", result.total_found, "text-[#697062]"],
+              ["From metadata", result.normalized_from_metadata, "text-[#5f8f2f]"],
+              ["From MusicBrainz", result.from_musicbrainz, "text-[#5f8f2f]"],
+              ["Skipped", result.skipped, "text-[#858c7e]"],
+            ].map(([label, value, cls]) => (
+              <div key={label as string} className="rounded-xl border border-[#dfe4d8] p-2.5 text-center">
+                <p className={`text-[18px] font-black ${cls}`}>{value as number}</p>
+                <p className="text-[10px] font-bold text-[#a8ad9e] uppercase tracking-wide">{label}</p>
+              </div>
+            ))}
+          </div>
+          {result.dry_run && (
+            <div className="rounded-xl bg-amber-50 border border-amber-200 px-3 py-2 text-[12px] font-bold text-amber-700">
+              Preview mode — no changes were written. Click "Backfill Origin" to apply.
+            </div>
+          )}
+          {result.results?.length > 0 && (
+            <div>
+              <button
+                onClick={() => setExpanded((v) => !v)}
+                className="text-[11px] font-bold text-[#5f8f2f] hover:underline flex items-center gap-1"
+              >
+                <WkIcon name={expanded ? "ChevronUp" : "ChevronDown"} size={12} />
+                {expanded ? "Hide" : "Show"} details ({result.results.length} artists)
+              </button>
+              {expanded && (
+                <div className="mt-2 max-h-[500px] overflow-y-auto rounded-xl border border-[#dfe4d8]">
+                  {result.results.map((r, i) => (
+                    <div key={r.slug + i} className="flex items-center gap-3 border-b border-[#f0f3ec] px-3 py-2.5 last:border-b-0">
+                      <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 text-[10px] font-black ${
+                        r.source === "musicbrainz" ? "bg-[#e8f5dc] text-[#5f8f2f]" :
+                        r.source === "metadata_normalization" ? "bg-amber-50 text-amber-600" :
+                        "bg-[#f0f3ec] text-[#858c7e]"
+                      }`}>
+                        {r.newIso2 || "—"}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[12px] font-bold text-[#171712] truncate">{r.name}</p>
+                        <p className="text-[10px] text-[#a8ad9e] truncate">
+                          {r.source === "metadata_normalization" ? r.debug :
+                           r.source === "musicbrainz" ? `${r.countryName} (${Math.round(r.confidence * 100)}% confidence)` :
+                           r.debug || "No origin found"}
+                        </p>
+                      </div>
+                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${
+                        r.source === "musicbrainz" ? "bg-[#e8f5dc] text-[#5f8f2f]" :
+                        r.source === "metadata_normalization" ? "bg-amber-50 text-amber-600" :
+                        "bg-[#f0f3ec] text-[#858c7e]"
+                      }`}>{r.source === "musicbrainz" ? "MB" : r.source === "metadata_normalization" ? "norm" : "skip"}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─────────────── Artist Type Panel ─────────────── */
+
+type TypeResultItem = {
+  slug: string;
+  name: string;
+  previousType: string | null;
+  newType: string | null;
+  heuristic: string;
+  source: "name_heuristic" | "musicbrainz" | "skipped";
+  mbType?: string | null;
+  confidence?: number;
+};
+
+type TypeBackfillResult = {
+  ok: boolean;
+  dry_run: boolean;
+  force: boolean;
+  total_found: number;
+  from_heuristic: number;
+  from_musicbrainz: number;
+  skipped: number;
+  results: TypeResultItem[];
+};
+
+function ArtistTypePanel({ onDone }: { onDone: () => void }) {
+  const [phase, setPhase] = useState<"idle" | "running" | "done" | "error">("idle");
+  const [result, setResult] = useState<TypeBackfillResult | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false);
+  const [useMusicBrainz, setUseMusicBrainz] = useState(true);
+  const [force, setForce] = useState(false);
+  const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
+
+  const CHUNK_SIZE = 25;
+
+  async function runTypeBackfill(dryRun: boolean) {
+    setPhase("running");
+    setResult(null);
+    setErrorMsg(null);
+    setProgress(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) { setPhase("error"); setErrorMsg("Not authenticated."); return; }
+      const supabaseUrl = (import.meta.env.VITE_PUBLIC_SUPABASE_URL as string) || "";
+
+      const callBackfill = async () => {
+        const res = await fetch(`${supabaseUrl}/functions/v1/backfill-artist-type`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+            apikey: (import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY as string) || "",
+          },
+          body: JSON.stringify({ dry_run: dryRun, use_musicbrainz: useMusicBrainz, force, batch_size: CHUNK_SIZE }),
+        });
+        return await res.json() as (TypeBackfillResult & { error?: string; message?: string });
+      };
+
+      if (dryRun) {
+        const data = await callBackfill();
+        if (data.error) { setPhase("error"); setErrorMsg(data.message || data.error); return; }
+        setResult({ ...data, results: data.results ?? [] });
+        setPhase("done");
+        return;
+      }
+
+      // Non-dry-run: loop in chunks until all artists processed
+      let allResults: TypeResultItem[] = [];
+      let totalHeuristic = 0;
+      let totalMb = 0;
+      let totalSkipped = 0;
+      let totalFound = 0;
+
+      while (true) {
+        const data = await callBackfill();
+        if (data.error) { setPhase("error"); setErrorMsg(data.message || data.error); return; }
+
+        const chunkResults = data.results ?? [];
+        allResults = [...allResults, ...chunkResults];
+        totalHeuristic += data.from_heuristic ?? 0;
+        totalMb += data.from_musicbrainz ?? 0;
+        totalSkipped += data.skipped ?? 0;
+        totalFound += data.total_found ?? 0;
+
+        setResult({
+          ok: true,
+          dry_run: false,
+          force,
+          total_found: totalFound,
+          from_heuristic: totalHeuristic,
+          from_musicbrainz: totalMb,
+          skipped: totalSkipped,
+          results: allResults.slice(-500),
+        });
+        setProgress({ current: totalHeuristic + totalMb + totalSkipped, total: -1 });
+
+        if ((data.total_found ?? 0) === 0 || chunkResults.length === 0) break;
+      }
+
+      setProgress(null);
+      setPhase("done");
+      if (totalHeuristic + totalMb > 0) onDone();
+    } catch (err) {
+      setPhase("error");
+      setErrorMsg(err instanceof Error ? err.message : "Unknown error");
+    }
+  }
+
+  const typeBadge = (type: string | null) => {
+    if (!type) return null;
+    const colors: Record<string, string> = {
+      solo: "bg-[#e8f5dc] text-[#5f8f2f]",
+      group: "bg-[#ede9fe] text-[#7c3aed]",
+      band: "bg-amber-50 text-amber-700",
+      duo: "bg-rose-50 text-rose-600",
+      collective: "bg-sky-50 text-sky-600",
+    };
+    return (
+      <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${colors[type] || "bg-[#f0f3ec] text-[#858c7e]"}`}>
+        {type}
+      </span>
+    );
+  };
+
+  return (
+    <div className="rounded-2xl border border-[#dfe4d8] bg-white p-4">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-50">
+            <i className="ri-user-voice-line text-[18px] text-sky-600" />
+          </div>
+          <div>
+            <p className="text-[13px] font-black text-[#171712]">Enrich Type</p>
+            <p className="text-[11px] text-[#858c7e]">Classify artists as solo, group, band, duo, or collective using name heuristics &amp; MusicBrainz</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => setUseMusicBrainz((v) => !v)}
+            className={`flex items-center gap-1 rounded-lg border px-2 py-1.5 text-[11px] font-bold transition ${useMusicBrainz ? "border-[#5f8f2f] bg-[#e8f5dc] text-[#5f8f2f]" : "border-[#dfe4d8] bg-[#f8f9f4] text-[#a8ad9e]"}`}
+            title="Use MusicBrainz to verify artist type"
+          >
+            <i className="ri-database-2-line text-[12px]" />
+            MusicBrainz
+          </button>
+          <button
+            onClick={() => setForce((v) => !v)}
+            className={`flex items-center gap-1 rounded-lg border px-2 py-1.5 text-[11px] font-bold transition ${force ? "border-[#5f8f2f] bg-[#e8f5dc] text-[#5f8f2f]" : "border-[#dfe4d8] bg-[#f8f9f4] text-[#a8ad9e]"}`}
+            title="Re-classify artists that already have a type"
+          >
+            <WkIcon name="RotateCcw" size={12} />
+            Force
+          </button>
+          <button
+            onClick={() => runTypeBackfill(true)}
+            disabled={phase === "running"}
+            className="rounded-xl border border-[#dfe4d8] bg-[#f8f9f4] px-3 py-2 text-[12px] font-bold text-[#697062] hover:border-[#85c441] hover:text-[#5f8f2f] disabled:opacity-50 flex items-center gap-1.5 whitespace-nowrap"
+          >
+            <WkIcon name="Eye" size={13} />
+            Preview
+          </button>
+          <button
+            onClick={() => runTypeBackfill(false)}
+            disabled={phase === "running"}
+            className="rounded-xl bg-[#5f8f2f] px-3 py-2 text-[12px] font-black text-white hover:bg-[#4d7a26] disabled:opacity-50 flex items-center gap-1.5 whitespace-nowrap"
+          >
+            {phase === "running" ? (
+              <><WkIcon name="Loader2" size={13} className="animate-spin" /> {progress ? `Processing chunk… (${progress.current} done)` : "Running…"}</>
+            ) : (
+              <><i className="ri-user-voice-line text-[13px]" /> Backfill Type</>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {phase === "error" && errorMsg && (
+        <div className="mt-3 rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-[12px] font-bold text-red-700">
+          {errorMsg}
+        </div>
+      )}
+
+      {phase === "done" && result && (
+        <div className="mt-3 space-y-3">
+          <div className="grid grid-cols-4 gap-2">
+            {[
+              ["Found", result.total_found, "text-[#697062]"],
+              ["Name heuristic", result.from_heuristic, "text-[#5f8f2f]"],
+              ["MusicBrainz", result.from_musicbrainz, "text-[#7c3aed]"],
+              ["Skipped", result.skipped, "text-[#858c7e]"],
+            ].map(([label, value, cls]) => (
+              <div key={label as string} className="rounded-xl border border-[#dfe4d8] p-2.5 text-center">
+                <p className={`text-[18px] font-black ${cls}`}>{value as number}</p>
+                <p className="text-[10px] font-bold text-[#a8ad9e] uppercase tracking-wide">{label}</p>
+              </div>
+            ))}
+          </div>
+          {result.dry_run && (
+            <div className="rounded-xl bg-amber-50 border border-amber-200 px-3 py-2 text-[12px] font-bold text-amber-700">
+              Preview mode — no changes were written. Click "Backfill Type" to apply.
+            </div>
+          )}
+          {/* Quick type distribution */}
+          {(() => {
+            const dist = new Map<string, number>();
+            result.results.forEach((r) => {
+              if (r.newType) dist.set(r.newType, (dist.get(r.newType) ?? 0) + 1);
+            });
+            if (dist.size === 0) return null;
+            return (
+              <div className="flex flex-wrap gap-2">
+                {Array.from(dist.entries()).sort((a, b) => b[1] - a[1]).map(([type, count]) => (
+                  <div key={type} className="flex items-center gap-1.5 rounded-lg border border-[#dfe4d8] bg-[#f8f9f4] px-2.5 py-1">
+                    {typeBadge(type)}
+                    <span className="text-[12px] font-black text-[#171712]">{count}</span>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+          {result.results?.length > 0 && (
+            <div>
+              <button
+                onClick={() => setExpanded((v) => !v)}
+                className="text-[11px] font-bold text-[#5f8f2f] hover:underline flex items-center gap-1"
+              >
+                <WkIcon name={expanded ? "ChevronUp" : "ChevronDown"} size={12} />
+                {expanded ? "Hide" : "Show"} details ({result.results.length} artists)
+              </button>
+              {expanded && (
+                <div className="mt-2 max-h-[500px] overflow-y-auto rounded-xl border border-[#dfe4d8]">
+                  {result.results.map((r, i) => (
+                    <div key={r.slug + i} className="flex items-center gap-3 border-b border-[#f0f3ec] px-3 py-2.5 last:border-b-0">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[12px] font-bold text-[#171712] truncate">{r.name}</p>
+                        <p className="text-[10px] text-[#a8ad9e] truncate">{r.heuristic}</p>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {r.source === "musicbrainz" && (
+                          <span className="rounded-full bg-[#ede9fe] px-1.5 py-0.5 text-[10px] font-black text-[#7c3aed] uppercase">MB</span>
+                        )}
+                        {typeBadge(r.newType)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─────────────── Spotify Backfill Panel (legacy) ─────────────── */
 
 type BackfillResultItem = {
   slug: string;
@@ -636,6 +1404,59 @@ function SpotifyBackfillPanel({ onDone }: { onDone: () => void }) {
   );
 }
 
+/* ─────────────── Enrich Result Row ─────────────── */
+
+function EnrichResultRow({ item: r }: { item: EnrichResultItem }) {
+  const [rowExpanded, setRowExpanded] = useState(false);
+
+  return (
+    <div className="border-b border-[#f0f3ec] last:border-b-0">
+      <button
+        onClick={() => setRowExpanded((v) => !v)}
+        className="flex items-center gap-3 px-3 py-2.5 w-full text-left hover:bg-[#f8f9f4] transition-colors"
+      >
+        {r.changes.image?.new ? (
+          <img src={r.changes.image.new} alt={r.name} className="h-9 w-9 rounded-full object-cover shrink-0" />
+        ) : (
+          <div className="h-9 w-9 rounded-full bg-[#f0f3ec] shrink-0 flex items-center justify-center">
+            <WkIcon name="Mic2" size={14} className="text-[#c8d0be]" />
+          </div>
+        )}
+        <div className="min-w-0 flex-1">
+          <p className="text-[12px] font-bold text-[#171712] truncate">{r.name}</p>
+          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+            {r.providersFound.map((p) => (
+              <span key={p} className="text-[10px] font-bold text-[#5f8f2f] bg-[#e8f5dc] rounded-full px-1.5 py-0.5">
+                {p}
+              </span>
+            ))}
+            {r.changes.bio && (
+              <span className="text-[10px] font-bold text-[#697062] bg-[#f0f3ec] rounded-full px-1.5 py-0.5">bio</span>
+            )}
+            {r.changes.genres && (
+              <span className="text-[10px] font-bold text-[#697062] bg-[#f0f3ec] rounded-full px-1.5 py-0.5">genres</span>
+            )}
+            {r.message && <span className="text-[10px] text-[#a8ad9e] truncate">{r.message}</span>}
+          </div>
+        </div>
+        <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${
+          r.status === "updated" ? "bg-[#e8f5dc] text-[#5f8f2f]" :
+          r.status === "error" ? "bg-red-50 text-red-600" :
+          r.status === "no_data" ? "bg-amber-50 text-amber-600" :
+          "bg-[#f0f3ec] text-[#858c7e]"
+        }`}>{r.status}</span>
+      </button>
+      {rowExpanded && r.debug && (
+        <div className="px-3 pb-3 pl-14">
+          <pre className="text-[10px] text-[#697062] font-mono bg-[#f8f9f4] rounded-lg p-2 overflow-x-auto max-h-60 overflow-y-auto whitespace-pre-wrap">
+            {JSON.stringify(r.debug, null, 2)}
+          </pre>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ─────────────── Page ─────────────── */
 
 export default function ArtistsPage() {
@@ -670,6 +1491,9 @@ export default function ArtistsPage() {
   const [deleting, setDeleting] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [singleDeleteTarget, setSingleDeleteTarget] = useState<EnrichedArtist | null>(null);
+
+  // Single enrich state
+  const [enrichingSlug, setEnrichingSlug] = useState<string | null>(null);
 
   const showToast = useCallback((message: string) => {
     setToast(message);
@@ -747,10 +1571,11 @@ export default function ArtistsPage() {
     const activeOnly = enrichedArtists.filter((a) => String(a.status) === "active").length;
     const missingCountry = enrichedArtists.filter((a) => !a._displayCountry).length;
     const missingImage = enrichedArtists.filter((a) => !a._displayImage).length;
+    const missingType = enrichedArtists.filter((a) => !a.artist_type || a.artist_type === "unknown").length;
     const averageCompleteness = enrichedArtists.length
       ? Math.round(enrichedArtists.reduce((sum, a) => sum + a._quality.completeness, 0) / enrichedArtists.length)
       : 0;
-    return { total, complete, draftOnly, activeOnly, missingCountry, missingImage, averageCompleteness };
+    return { total, complete, draftOnly, activeOnly, missingCountry, missingImage, missingType, averageCompleteness };
   }, [enrichedArtists, dbTotal]);
 
   const filteredArtists = useMemo(() => {
@@ -770,9 +1595,11 @@ export default function ArtistsPage() {
       if (qualityFilter === "complete") return artist._quality.completeness >= 85;
       if (qualityFilter === "incomplete") return artist._quality.completeness < 85;
       if (qualityFilter === "missing_country") return !artist._displayCountry;
+      if (qualityFilter === "missing_origin") return !artist.origin_iso2 || String(artist.origin_iso2).trim() === "";
       if (qualityFilter === "missing_image") return !artist._displayImage;
       if (qualityFilter === "missing_bio") return !artist.bio;
       if (qualityFilter === "missing_genre") return !genreSlugs.has(String(artist.slug));
+      if (qualityFilter === "missing_type") return !artist.artist_type || artist.artist_type === "unknown";
       if (qualityFilter === "blocked") return artist._quality.state === "blocked";
       return true;
     });
@@ -1007,6 +1834,43 @@ export default function ArtistsPage() {
     fetchArtists();
   }
 
+  async function enrichSingle(artist: EnrichedArtist) {
+    setEnrichingSlug(artist.slug);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) { showToast("Not authenticated."); return; }
+      const supabaseUrl = (import.meta.env.VITE_PUBLIC_SUPABASE_URL as string) || "";
+      const res = await fetch(`${supabaseUrl}/functions/v1/registry-enrich-artist`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+          apikey: (import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY as string) || "",
+        },
+        body: JSON.stringify({ artist_slug: artist.slug, providers: ["spotify", "apple_music"] }),
+      });
+      const data = await res.json() as EnrichResult & { error?: string; message?: string };
+      if (!res.ok || data.error) {
+        showToast(data.message || data.error || "Enrich failed");
+        return;
+      }
+      const r = data.results?.[0];
+      if (r?.status === "updated") {
+        showToast(`${artist._displayName} enriched — ${r.providersFound.join(", ")}`);
+        fetchArtists();
+      } else if (r?.status === "no_data") {
+        showToast(`${artist._displayName}: no data found`);
+      } else {
+        showToast(`${artist._displayName}: ${r?.message || r?.status || "skipped"}`);
+      }
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Enrich failed");
+    } finally {
+      setEnrichingSlug(null);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-[#f7f7f2] px-5 py-6 text-[#171712]">
       {toast && (
@@ -1081,7 +1945,7 @@ export default function ArtistsPage() {
         </header>
 
         {/* KPI stats */}
-        <section className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+        <section className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
           {[
             ["Total in DB", summary.total],
             ["Active", summary.activeOnly],
@@ -1090,6 +1954,7 @@ export default function ArtistsPage() {
             ["Near complete", summary.complete],
             ["Missing country", summary.missingCountry],
             ["Missing image", summary.missingImage],
+            ["Missing type", summary.missingType],
           ].map(([label, value]) => (
             <div key={label as string} className="rounded-2xl border border-[#dfe4d8] bg-white p-4">
               <p className="text-[11px] font-black uppercase tracking-wide text-[#71796b]">{label}</p>
@@ -1100,7 +1965,17 @@ export default function ArtistsPage() {
 
         {/* Spotify Backfill */}
         <section className="mb-5">
-          <SpotifyBackfillPanel onDone={fetchArtists} />
+          <ArtistEnrichPanel onDone={fetchArtists} />
+        </section>
+
+        {/* Artist Origin Enrichment */}
+        <section className="mb-5">
+          <ArtistOriginPanel onDone={fetchArtists} />
+        </section>
+
+        {/* Artist Type Backfill */}
+        <section className="mb-5">
+          <ArtistTypePanel onDone={fetchArtists} />
         </section>
 
         {/* Filter bar */}
@@ -1136,9 +2011,11 @@ export default function ArtistsPage() {
               <option value="complete">Near complete</option>
               <option value="incomplete">Incomplete</option>
               <option value="missing_country">Missing country</option>
+              <option value="missing_origin">Missing origin ISO</option>
               <option value="missing_image">Missing image</option>
               <option value="missing_bio">Missing bio</option>
               <option value="missing_genre">Missing genre</option>
+              <option value="missing_type">Missing type</option>
               <option value="blocked">Blocked</option>
             </select>
             <select
@@ -1229,6 +2106,8 @@ export default function ArtistsPage() {
                       selected={selectedIds.has(String(artist.id))}
                       onToggleSelect={toggleSelect}
                       onDelete={openConfirmSingleDelete}
+                      onEnrich={enrichSingle}
+                      enriching={enrichingSlug === artist.slug}
                     />
                   ))}
                 </div>

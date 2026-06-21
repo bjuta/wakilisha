@@ -211,28 +211,49 @@ const FNT = `Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-se
 function genStoryCardRows(items: SectionItem[], origin: string, accent: string): string {
   const s = eH;
   const rows: string[] = [];
-  for (let i = 0; i < items.length; i += 2) {
-    const a = items[i]; const b = items[i + 1]; const cells: string[] = [];
-    [a, b].filter(Boolean).forEach((it: any) => {
-      const img = resolveImg(it); const title = resolveTitle(it); const cat = it.section || "";
-      const link = it.url || it.link || getEntityUrl(origin, "articles", it);
-      const imgHtml = img
-        ? `<div style="width:100%;aspect-ratio:16/9;border-radius:12px 12px 0 0;overflow:hidden;background:#EEF1E8;"><img src="${s(img)}" alt="${s(title)}" width="100%" style="display:block;border:0;outline:none;width:100%;height:100%;object-fit:cover;"></div>`
-        : `<div style="width:100%;aspect-ratio:16/9;border-radius:12px 12px 0 0;background:#EEF1E8;display:flex;align-items:center;justify-content:center;"><span style="font-size:36px;font-weight:900;color:#C4C8BC;">${s(title.charAt(0).toUpperCase())}</span></div>`;
-      cells.push(`<td class="wk-stack-pad" width="${b ? "50%" : "100%"}" style="vertical-align:top;padding-right:${b ? "8px" : "0"};padding-bottom:${b ? "0" : "8px"};">
-<table role="presentation" width="100%" class="wk-card" style="border:1px solid rgba(12,13,10,.10);border-radius:14px;overflow:hidden;background:#FFFFFF;">
+  for (const it of items) {
+    const img = resolveImg(it); const title = resolveTitle(it); const cat = it.section || "";
+    const link = it.url || it.link || getEntityUrl(origin, "articles", it);
+    const imgHtml = img
+      ? `<div style="width:100%;aspect-ratio:16/9;border-radius:12px 12px 0 0;overflow:hidden;background:#EEF1E8;"><img src="${s(img)}" alt="${s(title)}" width="100%" style="display:block;border:0;outline:none;width:100%;height:100%;object-fit:cover;"></div>`
+      : `<div style="width:100%;aspect-ratio:16/9;border-radius:12px 12px 0 0;background:#EEF1E8;display:flex;align-items:center;justify-content:center;"><span style="font-size:36px;font-weight:900;color:#C4C8BC;">${s(title.charAt(0).toUpperCase())}</span></div>`;
+    rows.push(`<table role="presentation" width="100%" class="wk-card" style="border:1px solid rgba(12,13,10,.14);border-radius:14px;overflow:hidden;background:#FFFFFF;">
 <tr><td style="padding:0;">${imgHtml}</td></tr>
 <tr><td style="padding:16px;">
 ${cat ? `<div class="wk-eyebrow" style="font-family:${FNT};font-size:10px;line-height:1;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:${s(accent)};display:flex;align-items:center;gap:8px;margin-bottom:10px;"><span style="display:inline-block;width:20px;height:1px;background:${s(accent)};flex:none;"></span>${s(cat)}</div>` : ""}
 <h3 class="wk-h3" style="margin:0 0 6px;font-family:${FNT};font-size:18px;line-height:1.15;font-weight:800;letter-spacing:-.02em;color:#0C0D0A;"><a href="${s(link)}" style="color:#0C0D0A;text-decoration:none;">${s(title)}</a></h3>
 <p class="wk-muted" style="margin:0;font-family:${FNT};font-size:12px;line-height:1.5;color:#6B6E62;">${s(dateLabel(it))}${readingTimeLabel(it) ? ` &middot; ${s(readingTimeLabel(it))}` : ""}</p>
 </td></tr>
-</table>
-</td>`);
-    });
-    if (!b) cells.push(`<td class="wk-stack-pad" width="50%" style="vertical-align:top;padding-right:0;">&nbsp;</td>`);
-    rows.push(`<tr>${cells.join("")}</tr>`);
-    if (i + 2 < items.length) rows.push(`<tr><td colspan="2" style="height:16px;"></td></tr>`);
+</table>`);
+    if (items.indexOf(it) < items.length - 1) rows.push(`<div style="height:16px;"></div>`);
+  }
+  return rows.join("");
+}
+
+function genStoryFeaturedRows(items: SectionItem[], origin: string, accent: string): string {
+  const s = eH;
+  const rows: string[] = [];
+  for (const it of items) {
+    const img = resolveImg(it); const title = resolveTitle(it); const cat = it.section || "";
+    const deck = (it.excerpt || it.description || "").replace(/<[^>]+>/g, "").slice(0, 120);
+    const link = it.url || it.link || getEntityUrl(origin, "articles", it);
+    const imgHtml = img
+      ? `<img src="${s(img)}" alt="${s(title)}" style="display:block;border:0;outline:none;width:100%;height:100%;object-fit:cover;">`
+      : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#EEF1E8;"><span style="font-size:36px;font-weight:900;color:#C4C8BC;">${s(title.charAt(0).toUpperCase())}</span></div>`;
+    rows.push(`<table role="presentation" width="100%" class="wk-card" style="border:1px solid rgba(12,13,10,.14);border-radius:14px;overflow:hidden;background:#FFFFFF;">
+<tr>
+<td class="wk-stack" width="42%" style="padding:0;vertical-align:top;">
+<div style="width:100%;aspect-ratio:4/3;overflow:hidden;border-radius:12px 0 0 12px;background:#EEF1E8;">${imgHtml}</div>
+</td>
+<td class="wk-stack" style="padding:22px 24px;vertical-align:top;">
+${cat ? `<div class="wk-eyebrow" style="font-family:${FNT};font-size:10px;line-height:1;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:${s(accent)};display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span style="display:inline-block;width:20px;height:1px;background:${s(accent)};flex:none;"></span>${s(cat)}</div>` : ""}
+<h3 style="margin:0 0 6px;font-family:${FNT};font-size:17px;line-height:1.2;font-weight:800;letter-spacing:-.02em;color:#0C0D0A;"><a href="${s(link)}" style="color:#0C0D0A;text-decoration:none;">${s(title)}</a></h3>
+${deck ? `<p style="margin:0 0 8px;font-family:${FNT};font-size:13px;line-height:1.5;color:#6B6E62;">${s(deck)}</p>` : ""}
+<p style="margin:0;font-family:${FNT};font-size:12px;line-height:1.4;color:#9A9C8E;">${s(dateLabel(it))}${readingTimeLabel(it) ? ` &middot; ${s(readingTimeLabel(it))}` : ""}</p>
+</td>
+</tr>
+</table>`);
+    if (items.indexOf(it) < items.length - 1) rows.push(`<div style="height:14px;"></div>`);
   }
   return rows.join("");
 }
@@ -250,7 +271,7 @@ function genChartTrackTileRows(items: SectionItem[], origin: string, accent: str
         ? `<div style="width:100%;aspect-ratio:1/1;border-radius:14px 14px 0 0;overflow:hidden;background:#EEF1E8;position:relative;">${rankNum}<img src="${s(img)}" alt="${s(title)}" width="100%" style="display:block;border:0;outline:none;width:100%;height:100%;object-fit:cover;"></div>`
         : `<div style="width:100%;aspect-ratio:1/1;border-radius:14px 14px 0 0;background:#EEF1E8;display:flex;align-items:center;justify-content:center;position:relative;">${rankNum}<span style="font-size:32px;font-weight:900;color:#C4C8BC;">${s(title.charAt(0).toUpperCase())}</span></div>`;
       cells.push(`<td class="wk-stack-pad" width="${b ? "50%" : "100%"}" style="vertical-align:top;padding-right:${b ? "8px" : "0"};padding-bottom:${b ? "0" : "8px"};">
-<table role="presentation" width="100%" class="wk-card" style="border:1px solid rgba(12,13,10,.10);border-radius:14px;overflow:hidden;background:#FFFFFF;">
+<table role="presentation" width="100%" class="wk-card" style="border:1px solid rgba(12,13,10,.14);border-radius:14px;overflow:hidden;background:#FFFFFF;">
 <tr><td style="padding:0;">${imgHtml}</td></tr>
 <tr><td style="padding:14px 16px;">
 <h3 class="wk-h3" style="margin:0 0 3px;font-family:${FNT};font-size:14px;line-height:1.2;font-weight:700;letter-spacing:-.01em;color:#0C0D0A;"><a href="${s(link)}" style="color:#0C0D0A;text-decoration:none;">${s(title)}</a></h3>
@@ -277,7 +298,7 @@ function genArtistImageCardRows(items: SectionItem[], origin: string, accent: st
       const link = it.url || it.link || getEntityUrl(origin, "artists", it);
       const padRight = idx < batch.length - 1 ? "padding-right:8px;" : "";
       cells.push(`<td class="wk-stack-pad" width="25%" style="vertical-align:top;${padRight}">
-<table role="presentation" width="100%" class="wk-card" style="border:1px solid rgba(12,13,10,.10);border-radius:14px;overflow:hidden;background:#FFFFFF;position:relative;">
+<table role="presentation" width="100%" class="wk-card" style="border:1px solid rgba(12,13,10,.14);border-radius:14px;overflow:hidden;background:#FFFFFF;position:relative;">
 <tr><td style="padding:0;">
 <div style="position:relative;width:100%;aspect-ratio:3/4;overflow:hidden;background:#EEF1E8;">
 ${img ? `<img src="${s(img)}" alt="${s(name)}" width="100%" style="display:block;border:0;outline:none;width:100%;height:100%;object-fit:cover;object-position:top;">` : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;"><span style="font-size:40px;font-weight:900;color:#C4C8BC;">${s(name.charAt(0).toUpperCase())}</span></div>`}
@@ -308,7 +329,7 @@ function genRouteTileRows(items: SectionItem[], origin: string, accent: string):
       const link = it.url || it.link || getEntityUrl(origin, it.type || "articles", it);
       const padRight = idx < batch.length - 1 ? "padding-right:10px;" : "";
       cells.push(`<td class="wk-route-cell" width="33%" style="vertical-align:top;${padRight}">
-<table role="presentation" width="100%" class="wk-card" style="border:1px solid rgba(12,13,10,.10);border-radius:14px;overflow:hidden;background:#FFFFFF;">
+<table role="presentation" width="100%" class="wk-card" style="border:1px solid rgba(12,13,10,.14);border-radius:14px;overflow:hidden;background:#FFFFFF;">
 <tr><td style="padding:0;">
 <div style="width:100%;aspect-ratio:16/9;overflow:hidden;background:#EEF1E8;">
 ${img ? `<img src="${s(img)}" alt="${s(title)}" width="100%" style="display:block;border:0;outline:none;width:100%;height:100%;object-fit:cover;">` : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;"><span style="font-size:32px;font-weight:900;color:#C4C8BC;">${s(title.charAt(0).toUpperCase())}</span></div>`}
@@ -344,7 +365,7 @@ function renderModule(
   const firstType = sectionTypes[0];
   const linkUrl = `${origin}${SPECIAL.has(moduleName) ? sl(firstType, "").replace(origin, "") : ""}`;
   const linkLabel = SPECIAL.has(moduleName) ? sll(firstType) : "";
-  const bgStyle = BG.has(moduleName) ? "background:#FAFBF6;" : "";
+  const bgStyle = "background:#EEF1E8;"; // All sections get subtle tint for card-background contrast
 
   // Render section header with eyebrow
   function sectionHeader(): string {
@@ -370,9 +391,9 @@ function renderModule(
     const imgCell = fsImg
       ? `<td class="wk-stack" width="52%"><div style="width:100%;aspect-ratio:16/9;border-radius:12px 0 0 12px;overflow:hidden;background:#EEF1E8;"><img src="${s(fsImg)}" alt="${s(fsTitle)}" style="display:block;border:0;outline:none;width:100%;height:100%;object-fit:cover;"></div></td>`
       : `<td class="wk-stack" width="52%"><div style="width:100%;aspect-ratio:16/9;border-radius:12px 0 0 12px;background:#EEF1E8;display:flex;align-items:center;justify-content:center;"><span style="font-size:48px;font-weight:900;color:#C4C8BC;">${s(fsTitle.charAt(0).toUpperCase())}</span></div></td>`;
-    let parts = `<tr><td class="wk-pad" style="padding:32px 48px;border-bottom:1px solid rgba(12,13,10,.08);">
+    let parts = `<tr><td class="wk-pad" style="padding:32px 48px;border-bottom:1px solid rgba(12,13,10,.08);background:#EEF1E8;">
 ${sectionHeader()}
-<table role="presentation" width="100%" class="wk-card" style="border:1px solid rgba(12,13,10,.10);border-radius:14px;overflow:hidden;background:#FFFFFF;">
+<table role="presentation" width="100%" class="wk-card" style="border:1px solid rgba(12,13,10,.14);border-radius:14px;overflow:hidden;background:#FFFFFF;">
 <tr>
 ${imgCell}
 <td class="wk-stack" style="padding:24px;vertical-align:top;">
@@ -385,7 +406,7 @@ ${imgCell}
 </tr>
 </table>`;
     if (rest.length > 0) {
-      parts += `<div style="height:20px"></div><table role="presentation" width="100%">${genStoryCardRows(rest, origin, accent)}</table>`;
+      parts += `<div style="height:20px"></div>${genStoryFeaturedRows(rest, origin, accent)}`;
     }
     parts += `</td></tr>`;
     return parts;
@@ -406,11 +427,11 @@ ${imgCell}
     const clTitle = resolveTitle(lead);
     const clArtist = resolveSubtitle(lead);
     const rColor = chartRankColor(lead.rank, accent);
-    let parts = `<tr><td class="wk-pad" style="padding:32px 48px;background:#FAFBF6;border-bottom:1px solid rgba(12,13,10,.08);">
+    let parts = `<tr><td class="wk-pad" style="padding:32px 48px;background:#EEF1E8;border-bottom:1px solid rgba(12,13,10,.08);">
 ${sectionHeader()}
 <h2 class="wk-h2" style="margin:0 0 10px;font-family:${FNT};font-size:30px;line-height:1.02;font-weight:900;letter-spacing:-.038em;color:#0C0D0A;">${s(chartTitle)}</h2>
 <p class="wk-body" style="margin:0 0 20px;font-family:${FNT};font-size:15px;line-height:1.55;color:#3F4138;">${s(clArtist)} &mdash; ${s(clTitle)}</p>
-<table role="presentation" width="100%" class="wk-card" style="border:1px solid rgba(12,13,10,.10);border-radius:14px;overflow:hidden;background:#FFFFFF;">
+<table role="presentation" width="100%" class="wk-card" style="border:1px solid rgba(12,13,10,.14);border-radius:14px;overflow:hidden;background:#FFFFFF;">
 <tr>
 <td class="wk-stack" width="260">${clImg ? `<div style="width:260px;aspect-ratio:1/1;border-radius:14px 0 0 14px;overflow:hidden;"><img src="${s(clImg)}" alt="${s(clTitle)}" width="260" style="display:block;border:0;outline:none;width:100%;height:100%;object-fit:cover;"></div>` : `<div style="width:260px;aspect-ratio:1/1;border-radius:14px 0 0 14px;background:#EEF1E8;display:flex;align-items:center;justify-content:center;"><span style="font-size:56px;font-weight:900;color:#C4C8BC;">${s(clTitle.charAt(0).toUpperCase())}</span></div>`}</td>
 <td class="wk-stack" style="padding:28px;vertical-align:bottom;">
@@ -440,9 +461,9 @@ ${sectionHeader()}
     const hTitle = resolveTitle(hero);
     const hSub = resolveSubtitle(hero);
     const hUrl = hero.url || hero.link || getEntityUrl(origin, "guides", hero);
-    return `<tr><td class="wk-pad" style="padding:32px 48px;border-bottom:1px solid rgba(12,13,10,.08);background:#FAFBF6;">
+    return `<tr><td class="wk-pad" style="padding:32px 48px;border-bottom:1px solid rgba(12,13,10,.08);background:#EEF1E8;">
 ${sectionHeader()}
-<table role="presentation" width="100%" class="wk-card" style="margin-top:18px;border:1px solid rgba(12,13,10,.10);border-radius:14px;overflow:hidden;background:#FFFFFF;">
+<table role="presentation" width="100%" class="wk-card" style="margin-top:18px;border:1px solid rgba(12,13,10,.14);border-radius:14px;overflow:hidden;background:#FFFFFF;">
 <tr>
 ${hImg ? `<td class="wk-stack" width="45%"><div style="width:100%;aspect-ratio:16/9;border-radius:12px 0 0 12px;overflow:hidden;"><img src="${s(hImg)}" alt="${s(hTitle)}" style="display:block;border:0;outline:none;width:100%;height:100%;object-fit:cover;"></div></td>` : `<td class="wk-stack" width="45%"><div style="width:100%;aspect-ratio:16/9;border-radius:12px 0 0 12px;background:#EEF1E8;display:flex;align-items:center;justify-content:center;"><span style="font-size:48px;font-weight:900;color:#C4C8BC;">${s(hTitle.charAt(0).toUpperCase())}</span></div></td>`}
 <td class="wk-stack" width="55%" style="padding:24px;vertical-align:middle;">
@@ -487,7 +508,6 @@ function generateRichEmailHtml(
 ): string {
   const s = eH;
   const accent = templateProfile?.accentColor || visualConfig?.accent_color || "#5C8E25";
-  const effectiveTitle = ""; // determined below
   const primaryModules = templateProfile?.primaryModules || ["featured_routes", "chart_pulse", "artist_motion", "archive_routes", "keep_going"];
   const headlinePattern = templateProfile?.headlinePattern || "";
   const deckPattern = templateProfile?.deckPattern || "";
@@ -495,23 +515,20 @@ function generateRichEmailHtml(
   const displayDate = formatDisplayDate(date);
   const dateLabelStr = `${displayDate} &middot; Week ${isoWeek}`;
 
-  // Derive catalog title from briefing slug (use caller-provided title or slug-based fallback)
+  // Derive catalog title from briefing slug
   const effectiveTitle = briefingSlug ? briefingSlug.replace(/-/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()) : "Culture Dispatch";
   const headline = curated.intro ? curated.intro.split(".")[0] + "." : headlinePattern || effectiveTitle;
   const deck = curated.intro || deckPattern || `Your weekly briefing from WAKILISHA.`;
 
-  const parts: string[] = [];
-  parts.push(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="x-apple-disable-message-reformatting"><title>${s(effectiveTitle)}</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-<style>
-body,table,td,a{-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%}table,td{mso-table-lspace:0pt;mso-table-rspace:0pt;border-collapse:collapse}img{-ms-interpolation-mode:bicubic;border:0;outline:none;text-decoration:none;display:block}body{margin:0!important;padding:0!important;width:100%!important;background:#F7F8F3;color:#0C0D0A;font-family:${FNT}}a{color:${s(accent)};text-decoration:none}.wk-shell{width:760px;max-width:760px}.wk-card{border:1px solid rgba(12,13,10,.10);border-radius:14px;overflow:hidden;background:#FFFFFF}.wk-eyebrow{font-family:${FNT};font-size:10px;line-height:1;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:${s(accent)};display:flex;align-items:center;gap:8px}.wk-h1{font-family:${FNT};font-size:52px;line-height:.94;font-weight:900;letter-spacing:-.045em;color:#0C0D0A}.wk-h2{font-family:${FNT};font-size:30px;line-height:1.02;font-weight:900;letter-spacing:-.038em;color:#0C0D0A}.wk-h3{font-family:${FNT};font-size:20px;line-height:1.15;font-weight:800;letter-spacing:-.02em;color:#0C0D0A}.wk-body{font-family:${FNT};font-size:15px;line-height:1.55;color:#3F4138}.wk-muted{font-family:${FNT};font-size:13px;line-height:1.5;color:#6B6E62}.wk-faint{font-family:${FNT};font-size:12px;line-height:1.4;color:#9A9C8E}.wk-rank{font-family:${FNT};font-size:52px;line-height:1;font-weight:900;letter-spacing:-.04em}.wk-button{display:inline-flex;align-items:center;gap:8px;border:1px solid ${s(accent)}44;border-radius:6px;padding:11px 18px;font-family:${FNT};font-size:13px;line-height:1;font-weight:700;letter-spacing:-.005em;color:${s(accent)};background:#fff;text-decoration:none}@media screen and (max-width:640px){.wk-shell{width:100%!important;max-width:100%!important}.wk-pad{padding-left:18px!important;padding-right:18px!important}.wk-stack{display:block!important;width:100%!important}.wk-stack-pad{display:block!important;width:100%!important;padding-left:0!important;padding-right:0!important;padding-bottom:16px!important}.wk-h1{font-size:36px!important;line-height:.95!important}.wk-h2{font-size:26px!important;line-height:1.05!important}.wk-h3{font-size:18px!important;line-height:1.2!important}.wk-rank{font-size:42px!important}.wk-route-cell{display:block!important;width:100%!important;padding-right:0!important;padding-bottom:10px!important}}</style></head><body style="margin:0;padding:0;background:#F7F8F3;font-family:${FNT};"><center role="article" aria-roledescription="email" lang="en" style="width:100%;background:#F7F8F3;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F7F8F3;"><tr><td align="center" style="padding:24px 10px;"><table role="presentation" class="wk-shell" width="760" cellpadding="0" cellspacing="0" style="width:760px;max-width:760px;background:#FFFFFF;border:1px solid rgba(12,13,10,.12);border-radius:20px;overflow:hidden;">`);
+  // Row accumulator – returned as raw body content, to be wrapped by wrapBriefingHtml
+  const rows: string[] = [];
 
-  parts.push(`<tr><td class="wk-pad wk-topbar" style="padding:14px 34px;background:#EEF1E8;font-family:${FNT};font-size:12px;line-height:1;font-weight:600;color:#6B6E62;"><table role="presentation" width="100%"><tr><td>${s(dateLabelStr)}</td><td align="right"><a href="${s(webViewUrl)}" style="color:${s(accent)};font-weight:800;">Read on web</a></td></tr></table></td></tr>`);
+  rows.push(`<tr><td class="wk-pad wk-topbar" style="padding:14px 34px;background:#EEF1E8;font-family:${FNT};font-size:12px;line-height:1;font-weight:600;color:#6B6E62;"><table role="presentation" width="100%"><tr><td>${s(dateLabelStr)}</td><td align="right"><a href="${s(webViewUrl)}" style="color:${s(accent)};font-weight:800;">Read on web</a></td></tr></table></td></tr>`);
 
   const logoImg = branding.brandLogoUrl
     ? `<img src="${s(branding.brandLogoUrl)}" alt="${s(branding.brandName)}" width="180" style="display:block;width:180px;max-width:180px;height:auto;margin:0 0 32px;">`
     : `<div style="font-weight:900;letter-spacing:-0.04em;font-size:22px;color:#0C0D0A;margin:0 0 32px;font-family:${FNT};">${s(branding.brandName)}</div>`;
-  parts.push(`<tr><td class="wk-pad" style="padding:40px 48px 44px;background:#FFFFFF;border-bottom:1px solid rgba(12,13,10,.08);">${logoImg}
+  rows.push(`<tr><td class="wk-pad" style="padding:40px 48px 44px;background:#F7F8F3;border-bottom:1px solid rgba(12,13,10,.08);">${logoImg}
 <div style="display:flex;align-items:center;gap:8px;margin-bottom:18px;"><span style="display:inline-block;width:24px;height:1px;background:${s(accent)};flex:none;"></span><span style="font-family:${FNT};font-size:10px;line-height:1;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:${s(accent)};">${s(effectiveTitle)}</span></div>
 <h1 class="wk-h1" style="margin:0 0 16px;font-family:${FNT};font-size:52px;line-height:.94;font-weight:900;letter-spacing:-.045em;color:#0C0D0A;">${s(headline)}</h1>
 <p class="wk-body" style="margin:0;font-family:${FNT};font-size:16px;line-height:1.55;color:#3F4138;">${s(deck)}</p>
@@ -521,17 +538,16 @@ body,table,td,a{-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%}table,td
   const consumedSections = new Set<number>();
   for (const moduleName of primaryModules) {
     const html = renderModule(moduleName, curated, origin, accent, branding, consumedSections);
-    if (html) parts.push(html);
+    if (html) rows.push(html);
   }
 
-  parts.push(`<tr><td class="wk-pad" style="padding:32px 48px;background:#EEF1E8;font-family:${FNT};font-size:13px;line-height:1.6;color:#6B6E62;">
+  rows.push(`<tr><td class="wk-pad" style="padding:32px 48px;background:#EEF1E8;font-family:${FNT};font-size:13px;line-height:1.6;color:#6B6E62;">
 ${branding.brandLogoUrl ? `<img src="${s(branding.brandLogoUrl)}" alt="${s(branding.brandName)}" width="140" style="display:block;width:140px;height:auto;margin:0 0 12px;">` : `<div style="font-weight:900;font-size:16px;color:#0C0D0A;margin:0 0 12px;">${s(branding.brandName)}</div>`}
 <p style="margin:0 0 12px;">Culture, charts, stories and the wider creative record.</p>
 <p style="margin:0;"><a href="{{preferences_url}}" style="color:${s(accent)};font-weight:700;">Manage preferences</a> &middot; <a href="{{unsubscribe_url}}" style="color:${s(accent)};font-weight:700;">Unsubscribe</a> &middot; <a href="https://wakilisha.africa/privacy" style="color:${s(accent)};font-weight:700;">Privacy</a></p>
 </td></tr>`);
 
-  parts.push(`</table></td></tr></table></center></body></html>`);
-  return parts.join("");
+  return rows.join("");
 }
 
 function getEntityUrl(origin: string, type: string, item: SectionItem): string {
@@ -1095,7 +1111,15 @@ function getIsoWeek(d: Date): string { const tmp = new Date(d.getTime()); tmp.se
 
 function wrapBriefingHtml(bodyHtml: string, title: string, email: string, unsubToken: string, origin: string, branding: Branding = defaultBranding): string {
   const s = eH; const unsubUrl = `${origin}/briefing/unsubscribe?token=${unsubToken}`; const prefsUrl = `${origin}/briefing/preferences?token=${unsubToken}`;
-  return `<!doctype html><html><body style="margin:0;background:#F7F8F3;font-family:${FNT};color:#0C0D0A"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#F7F8F3;padding:32px 16px"><tr><td align="center"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:780px;background:#FFFFFF;border-radius:14px;overflow:hidden;border:1px solid rgba(12,13,10,.12)"><tr><td style="padding:24px 28px;background:#EEF1E8;border-bottom:1px solid rgba(12,13,10,.12)">${logoHtml(branding.brandLogoUrl, branding.brandName, 22)}<div style="font-family:${FNT};font-size:13px;color:#6B6E62;margin-top:4px">${s(title)}</div></td></tr><tr><td style="padding:0">${bodyHtml}</td></tr><tr><td style="padding:18px 28px;background:#EEF1E8;border-top:1px solid rgba(12,13,10,.12)"><p style="margin:0 0 8px;font-size:12px;line-height:1.6;color:#6B6E62;font-family:${FNT};">You received this because you subscribed to <strong>${s(title)}</strong> as ${s(email)}.</p><p style="margin:0;font-size:12px;line-height:1.6;color:#6B6E62;font-family:${FNT};"><a href="${s(unsubUrl)}" style="color:#5C8E25;font-weight:700;">Unsubscribe</a> &middot; <a href="${s(prefsUrl)}" style="color:#5C8E25;font-weight:700;">Manage preferences</a></p></td></tr></table></td></tr></table></body></html>`;
+  const accent = "#5C8E25";
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="x-apple-disable-message-reformatting"><title>${s(title)}</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+body,table,td,a{-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%}table,td{mso-table-lspace:0pt;mso-table-rspace:0pt;border-collapse:collapse}img{-ms-interpolation-mode:bicubic;border:0;outline:none;text-decoration:none;display:block}body{margin:0!important;padding:0!important;width:100%!important;background:#F7F8F3;color:#0C0D0A;font-family:${FNT}}a{color:${s(accent)};text-decoration:none}.wk-shell{width:760px;max-width:760px}.wk-card{border:1px solid rgba(12,13,10,.14);border-radius:14px;overflow:hidden;background:#FFFFFF}.wk-eyebrow{font-family:${FNT};font-size:10px;line-height:1;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:${s(accent)};display:flex;align-items:center;gap:8px}.wk-h1{font-family:${FNT};font-size:52px;line-height:.94;font-weight:900;letter-spacing:-.045em;color:#0C0D0A}.wk-h2{font-family:${FNT};font-size:30px;line-height:1.02;font-weight:900;letter-spacing:-.038em;color:#0C0D0A}.wk-h3{font-family:${FNT};font-size:20px;line-height:1.15;font-weight:800;letter-spacing:-.02em;color:#0C0D0A}.wk-body{font-family:${FNT};font-size:15px;line-height:1.55;color:#3F4138}.wk-muted{font-family:${FNT};font-size:13px;line-height:1.5;color:#6B6E62}.wk-faint{font-family:${FNT};font-size:12px;line-height:1.4;color:#9A9C8E}.wk-rank{font-family:${FNT};font-size:52px;line-height:1;font-weight:900;letter-spacing:-.04em}.wk-button{display:inline-flex;align-items:center;gap:8px;border:1px solid ${s(accent)}44;border-radius:6px;padding:11px 18px;font-family:${FNT};font-size:13px;line-height:1;font-weight:700;letter-spacing:-.005em;color:${s(accent)};background:#fff;text-decoration:none}@media screen and (max-width:640px){.wk-shell{width:100%!important;max-width:100%!important}.wk-pad{padding-left:18px!important;padding-right:18px!important}.wk-stack{display:block!important;width:100%!important}.wk-stack-pad{display:block!important;width:100%!important;padding-left:0!important;padding-right:0!important;padding-bottom:16px!important}.wk-h1{font-size:36px!important;line-height:.95!important}.wk-h2{font-size:26px!important;line-height:1.05!important}.wk-h3{font-size:18px!important;line-height:1.2!important}.wk-rank{font-size:42px!important}.wk-route-cell{display:block!important;width:100%!important;padding-right:0!important;padding-bottom:10px!important}}</style></head><body style="margin:0;padding:0;background:#F7F8F3;font-family:${FNT};"><center role="article" aria-roledescription="email" lang="en" style="width:100%;background:#F7F8F3;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F7F8F3;"><tr><td align="center" style="padding:24px 10px;"><table role="presentation" class="wk-shell" width="760" cellpadding="0" cellspacing="0" style="width:760px;max-width:760px;background:#F7F8F3;border:1px solid rgba(12,13,10,.16);border-radius:20px;overflow:hidden;">
+<tr><td style="padding:24px 34px;background:#EEF1E8;border-bottom:1px solid rgba(12,13,10,.12)">${logoHtml(branding.brandLogoUrl, branding.brandName, 22)}<div style="font-family:${FNT};font-size:13px;color:#6B6E62;margin-top:4px">${s(title)}</div></td></tr>
+${bodyHtml}
+<tr><td style="padding:20px 34px;background:#EEF1E8;border-top:1px solid rgba(12,13,10,.12);font-family:${FNT};font-size:12px;line-height:1.6;color:#6B6E62;"><p style="margin:0 0 8px;">You received this because you subscribed to <strong>${s(title)}</strong> as ${s(email)}.</p><p style="margin:0;"><a href="${s(unsubUrl)}" style="color:${s(accent)};font-weight:700;">Unsubscribe</a> &middot; <a href="${s(prefsUrl)}" style="color:${s(accent)};font-weight:700;">Manage preferences</a></p></td></tr>
+</table></td></tr></table></center></body></html>`;
 }
 
 Deno.serve(async (req) => {
