@@ -9,12 +9,15 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
 }
 
 const ALLOWED_ORIGINS = [
-  "http://localhost:5173",
-  "http://localhost:3000",
+  "https://wakilisha.africa",
+  "https://www.wakilisha.africa",
+  "https://staging.wakilisha.africa",
   "https://wakilisha.com",
   "https://www.wakilisha.com",
   "https://wakilisha.vercel.app",
   "https://wakilisha.netlify.app",
+  "http://localhost:5173",
+  "http://localhost:3000",
 ];
 
 const ALLOWED_FORM_TYPES = [
@@ -25,12 +28,17 @@ const ALLOWED_FORM_TYPES = [
   "lyrics_contribution",
 ];
 
-const corsHeaders = (origin: string) => ({
-  "Access-Control-Allow-Origin": origin,
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
-  "Access-Control-Max-Age": "86400",
-});
+// Honeypot field names — bots auto-fill these hidden fields
+const HONEYPOT_FIELDS = ["website", "url", "hp_field", "_gotcha", "fax"];
+
+function corsHeaders(origin: string): Record<string, string> {
+  return {
+    "Access-Control-Allow-Origin": origin,
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Access-Control-Max-Age": "86400",
+  };
+}
 
 function getClientIp(request: Request): string {
   const forwarded = request.headers.get("x-forwarded-for");
@@ -47,6 +55,14 @@ interface RateLimitEntry {
 
 const rateLimitMap = new Map<string, RateLimitEntry>();
 
+// Clean stale entries every 5 minutes to prevent memory leaks
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, entry] of rateLimitMap) {
+    if (now > entry.resetAt) rateLimitMap.delete(ip);
+  }
+}, 300_000);
+
 function checkRateLimit(ip: string): boolean {
   const now = Date.now();
   const entry = rateLimitMap.get(ip);
@@ -62,18 +78,38 @@ function checkRateLimit(ip: string): boolean {
   return true;
 }
 
+function validateEmail(email: string): boolean {
+  // Basic RFC-compliant check — catches most invalid addresses
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
 serve(async (request: Request) => {
   const origin = request.headers.get("origin") ?? "";
-  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+
+  // Reject requests from unknown origins
+  if (!ALLOWED_ORIGINS.includes(origin)) {
+    return new Response(
+      JSON.stringify({ success: false, error: "Origin not allowed" }),
+      {
+        status: 403,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": ALLOWED_ORIGINS.includes("https://wakilisha.africa")
+            ? "https://wakilisha.africa"
+            : ALLOWED_ORIGINS[0],
+        },
+      }
+    );
+  }
 
   if (request.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: corsHeaders(allowedOrigin) });
+    return new Response(null, { status: 204, headers: corsHeaders(origin) });
   }
 
   if (request.method !== "POST") {
     return new Response(
       JSON.stringify({ success: false, error: "Method not allowed" }),
-      { status: 405, headers: { ...corsHeaders(allowedOrigin), "Content-Type": "application/json" } }
+      { status: 405, headers: { ...corsHeaders(origin), "Content-Type": "application/json" } }
     );
   }
 
@@ -82,7 +118,7 @@ serve(async (request: Request) => {
   if (!checkRateLimit(clientIp)) {
     return new Response(
       JSON.stringify({ success: false, error: "Too many requests. Please try again in a minute." }),
-      { status: 429, headers: { ...corsHeaders(allowedOrigin), "Content-Type": "application/json" } }
+      { status: 429, headers: { ...corsHeaders(origin), "Content-Type": "application/json" } }
     );
   }
 
@@ -103,8 +139,21 @@ serve(async (request: Request) => {
   } catch {
     return new Response(
       JSON.stringify({ success: false, error: "Invalid form data" }),
-      { status: 400, headers: { ...corsHeaders(allowedOrigin), "Content-Type": "application/json" } }
+      { status: 400, headers: { ...corsHeaders(origin), "Content-Type": "application/json" } }
     );
+  }
+
+  // ── Honeypot check: reject if any honeypot field is filled ──
+  for (const field of HONEYPOT_FIELDS) {
+    const value = (formData[field] ?? "").trim();
+    if (value.length > 0) {
+      // Silently accept — don't tell bots they were caught
+      console.log(`Honeypot triggered: field="${field}" ip="${clientIp}"`);
+      return new Response(
+        JSON.stringify({ success: true, message: "Submission received" }),
+        { status: 200, headers: { ...corsHeaders(origin), "Content-Type": "application/json" } }
+      );
+    }
   }
 
   const formType = formData["wk_form_type"] ?? formData["form_type"] ?? "";
@@ -112,14 +161,36 @@ serve(async (request: Request) => {
   if (!ALLOWED_FORM_TYPES.includes(formType)) {
     return new Response(
       JSON.stringify({ success: false, error: `Invalid form type: "${formType}"` }),
-      { status: 400, headers: { ...corsHeaders(allowedOrigin), "Content-Type": "application/json" } }
+      { status: 400, headers: { ...corsHeaders(origin), "Content-Type": "application/json" } }
     );
+  }
+
+  // ── Email validation for newsletter / contact forms ──
+  const emailField = formData["email"] ?? "";
+  if (emailField && !validateEmail(String(emailField))) {
+    return new Response(
+      JSON.stringify({ success: false, error: "Invalid email address" }),
+      { status: 400, headers: { ...corsHeaders(origin), "Content-Type": "application/json" } }
+    );
+  }
+
+  // ── Block submissions that arrive too fast (sub-2-second form fill = bot) ──
+  const timestampField = formData["_timestamp"] ?? "";
+  if (timestampField) {
+    const elapsed = Date.now() - Number(timestampField);
+    if (elapsed < 2000) {
+      console.log(`Speed check failed: elapsed=${elapsed}ms ip="${clientIp}"`);
+      return new Response(
+        JSON.stringify({ success: true, message: "Submission received" }),
+        { status: 200, headers: { ...corsHeaders(origin), "Content-Type": "application/json" } }
+      );
+    }
   }
 
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     return new Response(
       JSON.stringify({ success: false, error: "Server configuration error" }),
-      { status: 500, headers: { ...corsHeaders(allowedOrigin), "Content-Type": "application/json" } }
+      { status: 500, headers: { ...corsHeaders(origin), "Content-Type": "application/json" } }
     );
   }
 
@@ -135,12 +206,12 @@ serve(async (request: Request) => {
     console.error("Insert error:", error.message);
     return new Response(
       JSON.stringify({ success: false, error: "Failed to save submission" }),
-      { status: 500, headers: { ...corsHeaders(allowedOrigin), "Content-Type": "application/json" } }
+      { status: 500, headers: { ...corsHeaders(origin), "Content-Type": "application/json" } }
     );
   }
 
   return new Response(
     JSON.stringify({ success: true, message: "Submission received" }),
-    { status: 200, headers: { ...corsHeaders(allowedOrigin), "Content-Type": "application/json" } }
+    { status: 200, headers: { ...corsHeaders(origin), "Content-Type": "application/json" } }
   );
 });
