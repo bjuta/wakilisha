@@ -5,8 +5,12 @@ import type {
   PublicTrackDetail,
 } from "./types";
 
+const SUPABASE_URL = import.meta.env.VITE_PUBLIC_SUPABASE_URL || "";
+const SUPABASE_ANON_KEY = import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY || "";
+
 export const PUBLIC_API_BASE =
-  import.meta.env.VITE_PUBLIC_API_BASE || "/api/v1";
+  import.meta.env.VITE_PUBLIC_API_BASE ||
+  (SUPABASE_URL ? `${SUPABASE_URL}/functions/v1/public-content-read` : "/api/v1");
 
 export class PublicApiError extends Error {
   status: number;
@@ -23,8 +27,14 @@ export class PublicApiError extends Error {
 async function fetchPublic<T>(path: string): Promise<T> {
   const base = PUBLIC_API_BASE.replace(/\/$/, "");
   const target = `${base}${path.startsWith("/") ? path : `/${path}`}`;
+  const isSupabaseFunction = target.includes(SUPABASE_URL);
   const response = await fetch(target, {
-    headers: { Accept: "application/json" },
+    headers: {
+      Accept: "application/json",
+      ...(isSupabaseFunction && SUPABASE_ANON_KEY
+        ? { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
+        : {}),
+    },
   });
 
   if (!response.ok) {

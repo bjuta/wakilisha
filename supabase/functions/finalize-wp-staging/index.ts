@@ -2,18 +2,91 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+const ALLOWED_ORIGINS = [
+  "https://wakilisha.africa",
+  "https://www.wakilisha.africa",
+  "https://staging.wakilisha.africa",
+  "http://localhost:5173",
+  "http://localhost:3000",
+];
+
+function getCorsHeaders(req: Request): Record<string, string> {
+  const origin = req.headers.get("Origin") ?? "";
+  const allowed = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  return {
+    "Access-Control-Allow-Origin": allowed,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Vary": "Origin",
+  };
+}
 
 function slugify(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 }
 
+async function verifyAdmin(req: Request): Promise<{ userId: string } | null> {
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader || !authHeader.startsWith("Bearer ")) return null;
+
+  const token = authHeader.replace("Bearer ", "");
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+
+  if (!supabaseUrl || !serviceKey) return null;
+
+  const authClient = createClient(supabaseUrl, serviceKey, {
+    global: { headers: { Authorization: `Bearer ${token}` } },
+  });
+
+  const { data: { user }, error } = await authClient.auth.getUser(token);
+  if (error || !user) return null;
+
+  // Verify admin capability
+  const { data: roles } = await authClient
+    .from("user_role_assignments")
+    .select("role_key, role_definitions!inner(role_capabilities(capability_key))")
+    .eq("user_id", user.id)
+    .eq("status", "active")
+    .or("expires_at.is.null,expires_at.gt.now()");
+
+  if (!roles || roles.length === 0) return null;
+
+  const isAdmin = roles.some((r: { role_key: string }) => r.role_key === "administrator");
+  if (isAdmin) return { userId: user.id };
+
+  const allCaps = new Set<string>();
+  for (const r of roles) {
+    const caps = (r.role_definitions as { role_capabilities?: Array<{ capability_key: string }> } | null)
+      ?.role_capabilities ?? [];
+    for (const c of caps) allCaps.add(c.capability_key);
+  }
+  if (!allCaps.has("manage_charts")) return null;
+
+  return { userId: user.id };
+}
+
 Deno.serve(async (req: Request) => {
+  const corsHeaders = getCorsHeaders(req);
+
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
+  }
+
+  if (req.method !== "GET") {
+    return new Response(JSON.stringify({ error: "Method not allowed" }), {
+      status: 405,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  // Require admin authentication
+  const admin = await verifyAdmin(req);
+  if (!admin) {
+    return new Response(JSON.stringify({ error: "Unauthorized: admin access required" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 
   const supabaseClient = createClient(
@@ -50,7 +123,7 @@ Deno.serve(async (req: Request) => {
     const chartSlug = program.series_slug;
     const marketSlug = program.market_slug;
 
-    console.log(`Finalizing program: ${programId} (chart_slug=${chartSlug}, market=${marketSlug})`);
+    console.log(`Finalizing program: ${programId} (chart_slug=${chartSlug}, market=${marketSlug}) by user ${admin.userId}`);
 
     // 2. Find edition staging records for this chart_slug
     const { data: editionStaging, error: edErr } = await supabaseClient

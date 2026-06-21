@@ -14,7 +14,9 @@ build
 
 # Environment
 .env
-.env.local
+.env.*
+!.env.example
+!.env.local.template
 
 # OS
 .DS_Store

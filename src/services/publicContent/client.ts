@@ -265,9 +265,12 @@ export async function getArtistAppearsOn(
   }
 }
 
+const SUPABASE_URL = (import.meta.env.VITE_PUBLIC_SUPABASE_URL as string) || "";
+const SUPABASE_ANON_KEY = (import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY as string) || "";
+
 const API_BASE =
   (import.meta.env.VITE_PUBLIC_API_BASE as string | undefined) ||
-  "/api/v1";
+  (SUPABASE_URL ? `${SUPABASE_URL}/functions/v1/public-content-read` : "/api/v1");
 
 type Envelope<T> = {
   data: T;
@@ -299,8 +302,14 @@ type RegistryMediaAsset = {
 async function apiGet<T>(path: string): Promise<T> {
   const base = API_BASE.replace(/\/$/, "");
   const url = `${base}${path.startsWith("/") ? path : `/${path}`}`;
+  const isSupabaseFunction = url.includes(SUPABASE_URL);
   const response = await fetch(url, {
-    headers: { Accept: "application/json" },
+    headers: {
+      Accept: "application/json",
+      ...(isSupabaseFunction && SUPABASE_ANON_KEY
+        ? { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
+        : {}),
+    },
     cache: "no-store",
   });
 
