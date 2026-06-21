@@ -1145,14 +1145,30 @@ async function handleCronGenerate(body: any, c: Record<string, string>) {
 }
 
 function convertLegacyContentToCurated(content: BriefingContent): CuratedContent {
-  return {
-    sections: [
-      content.articles.length > 0 ? { title: "Latest Stories", type: "articles", layout: "list", items: content.articles.map((a: any) => ({ slug: a.slug, title: a.title, excerpt: a.excerpt, heroUrl: a.image_url, author: a.author, published_at: a.published_at })) } : null,
-      content.chartHighlights.length > 0 ? { title: "Chart Watch", type: "charts", layout: "list", items: content.chartHighlights.map((ch: any) => ({ track_title: ch.track_title, artist_name: ch.artist_name, rank: ch.rank, movement: ch.movement, edition_slug: ch.edition_slug, chart_name: ch.chart_name })) } : null,
-      content.newReleases.length > 0 ? { title: "Fresh Drops", type: "releases", layout: "grid", items: content.newReleases.map((r: any) => ({ slug: r.slug, title: r.title, artist_name: r.artist_name, type: r.type, artwork_url: r.artwork_url, release_date: r.release_date })) } : null,
-      content.featuredArtists.length > 0 ? { title: "Artists to Watch", type: "artists", layout: "grid", items: content.featuredArtists.map((a: any) => ({ slug: a.slug, display_name: a.display_name, bio_excerpt: a.bio_excerpt, image_url: a.image_url })) } : null,
-    ].filter(Boolean) as ContentSection[]
-  };
+  const sections: ContentSection[] = [];
+
+  if (content.articles.length > 0) {
+    sections.push({ title: "Latest Stories", type: "articles", layout: "list", items: content.articles.map((a: any) => ({ slug: a.slug, title: a.title, excerpt: a.excerpt, heroUrl: a.image_url, author: a.author, published_at: a.published_at })) });
+  }
+
+  if (content.chartHighlights.length > 0) {
+    sections.push({ title: "Chart Watch", type: "charts", layout: "list", items: content.chartHighlights.map((ch: any) => ({ track_title: ch.track_title, artist_name: ch.artist_name, rank: ch.rank, movement: ch.movement, edition_slug: ch.edition_slug, chart_name: ch.chart_name })) });
+  }
+
+  if (content.newReleases.length > 0) {
+    sections.push({ title: "Fresh Drops", type: "releases", layout: "grid", items: content.newReleases.map((r: any) => ({ slug: r.slug, title: r.title, artist_name: r.artist_name, type: r.type, artwork_url: r.artwork_url, release_date: r.release_date })) });
+  }
+
+  if (content.featuredArtists.length > 0) {
+    sections.push({ title: "Artists to Watch", type: "artists", layout: "grid", items: content.featuredArtists.map((a: any) => ({ slug: a.slug, display_name: a.display_name, bio_excerpt: a.bio_excerpt, image_url: a.image_url })) });
+  }
+
+  // v8: Clone articles as "guides" section so archive_routes & guide_hero modules find content
+  if (content.articles.length > 0) {
+    sections.push({ title: "From the Archive", type: "guides", layout: "list", items: content.articles.map((a: any) => ({ slug: a.slug, title: a.title, excerpt: a.excerpt, heroUrl: a.image_url, author: a.author, published_at: a.published_at })) });
+  }
+
+  return { sections };
 }
 
 // ════════════════════════════════════════════════
