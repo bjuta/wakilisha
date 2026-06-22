@@ -184,14 +184,14 @@ function SharePreview({ item }: { item: ShareObject }) {
 
 function SharePlatformGrid({
   platforms,
-  shareCounts,
+  shareCounts = {},
   pendingPlatforms,
   onShare,
   onCopy,
   size = "md",
 }: {
   platforms: SharePlatform[];
-  shareCounts: Record<string, number>;
+  shareCounts?: Record<string, number>;
   pendingPlatforms: Set<string>;
   onShare: (p: SharePlatform) => void;
   onCopy: () => void;
@@ -408,7 +408,7 @@ export function SharePopover({
         <div className="px-5 py-4">
           <SharePlatformGrid
             platforms={SHARE_PLATFORMS}
-            shareCounts={shareCounts}
+            shareCounts={shareCounts ?? {}}
             pendingPlatforms={pendingPlatforms}
             onShare={handleShare}
             onCopy={handleCopy}

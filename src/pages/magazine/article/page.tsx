@@ -29,18 +29,29 @@ import { useScrollDepthTracking } from "@/hooks/useScrollDepthTracking";
 
 /* Remove InlineMediaGallery — captions now render inline alongside their images */
 
-function ArticleBottomShare({ article, shareText }: { article: MagazineArticle; shareText: string }) {
-  const [popoverOpen, setPopoverOpen] = useState(false);
-  const buttonRef = useRef<HTMLButtonElement>(null);
+// ── Inline share count badge (reused in hero and bottom) ─────────────────
+
+function useArticleShareCount(pageUrl: string) {
   const [totalShares, setTotalShares] = useState(0);
-  const pageUrl = typeof window !== "undefined" ? window.location.href : "";
 
   useEffect(() => {
     if (!pageUrl) return;
+    let cancelled = false;
     getShareCounts(pageUrl).then((counts) => {
+      if (cancelled) return;
       setTotalShares(getTotalShareCount(counts));
     }).catch(() => {});
+    return () => { cancelled = true; };
   }, [pageUrl]);
+
+  return totalShares;
+}
+
+function ArticleBottomShare({ article, shareText }: { article: MagazineArticle; shareText: string }) {
+  const [popoverOpen, setPopoverOpen] = useState(false);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const pageUrl = typeof window !== "undefined" ? window.location.href : "";
+  const totalShares = useArticleShareCount(pageUrl);
 
   return (
     <div className="rounded-2xl bg-[var(--wk-surface)] border border-[var(--wk-border)] p-6 lg:p-8 text-center">
@@ -238,6 +249,10 @@ export default function ArticlePage() {
     setTimeout(() => setCopyDone(false), 2500);
   };
 
+  const shareText = article?.title ?? "";
+  const pageUrl = typeof window !== "undefined" ? window.location.href : "";
+  const heroShareCount = useArticleShareCount(pageUrl);
+
   if (articleLoading) return <SkeletonArticlePage />;
   if (checkingRedirect) return <div className="min-h-screen flex items-center justify-center"><div className="flex items-center gap-3 text-[var(--wk-text-muted)]"><i className="ri-loader-4-line animate-spin text-[20px]" /><span className="text-[14px]">Checking for updated link…</span></div></div>;
   if (articleError) return <div className="min-h-screen flex items-center justify-center"><div className="text-center"><WkIcon name="AlertCircle" size={32} className="mx-auto mb-3 text-[var(--wk-danger)]" /><p className="text-sm text-[var(--wk-text-muted)]">{articleError}</p></div></div>;
@@ -257,8 +272,6 @@ export default function ArticlePage() {
     );
   }
 
-  const shareText = article.title;
-
   return (
     <main className="min-h-screen bg-[var(--wk-bg)]">
       <MetaTags title={article.title} description={article.dek || `Read ${article.title} on WAKILISHA Magazine.`} imageUrl={article.heroUrl} url={typeof window !== "undefined" ? window.location.href : undefined} type="article" />
@@ -269,7 +282,19 @@ export default function ArticlePage() {
 
       <section className="relative overflow-hidden" style={{ height: "70vh", minHeight: "480px" }}>
         {article.heroUrl ? <img src={article.heroUrl} alt={article.title} loading="lazy" className="absolute inset-0 w-full h-full object-cover" style={{ objectPosition: "50% 30%" }} /> : <Chapter19FallbackImage id={article.id} slug={article.slug} name={article.title} />}
-        <div className="absolute top-0 left-0 right-0 z-20 px-6 py-5 flex items-center justify-between"><Link to="/magazine" className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/25 backdrop-blur-sm px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-white/85 hover:bg-black/45 transition-all whitespace-nowrap"><WkIcon name="ArrowLeft" size={13} />Magazine</Link><button onClick={handleNavCopy} className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/25 backdrop-blur-sm px-3 py-2 text-[11px] font-bold text-white/80 hover:bg-black/45 transition-all cursor-pointer whitespace-nowrap"><i className="ri-share-line" />{copyDone ? "Copied!" : "Share"}</button></div>
+        <div className="absolute top-0 left-0 right-0 z-20 px-6 py-5 flex items-center justify-between">
+          <Link to="/magazine" className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/25 backdrop-blur-sm px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-white/85 hover:bg-black/45 transition-all whitespace-nowrap"><WkIcon name="ArrowLeft" size={13} />Magazine</Link>
+          <div className="flex items-center gap-2">
+            <button onClick={handleNavCopy} className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/25 backdrop-blur-sm px-3 py-2 text-[11px] font-bold text-white/80 hover:bg-black/45 transition-all cursor-pointer whitespace-nowrap">
+              <i className="ri-share-line" />{copyDone ? "Copied!" : "Share"}
+              {heroShareCount > 0 && (
+                <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-[4px] rounded-full bg-white/20 text-white text-[10px] font-bold">
+                  {heroShareCount.toLocaleString()}
+                </span>
+              )}
+            </button>
+          </div>
+        </div>
       </section>
 
       <div className="relative z-10 rounded-t-[28px] bg-[var(--wk-bg)]" style={{ marginTop: "-64px", boxShadow: "0 -4px 32px -8px rgba(0,0,0,0.10), 0 4px 16px -4px rgba(0,0,0,0.06)" }}>

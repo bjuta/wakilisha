@@ -17,12 +17,19 @@ function normalizeUrl(raw: string): string {
     u.hash = "";
     // Strip trailing slash for consistency
     let path = u.pathname.replace(/\/+$/, "") || "/";
+    // Strip Readdy preview version segments so shares aggregate across deploys.
+    // Preview URLs look like: /preview/PROJECT_ID/VERSION_NUM/actual/path
+    // Production URLs are already canonical and won't match this pattern.
+    path = path.replace(/^\/preview\/[^/]+\/\d+/, "");
+    if (!path || path === "/") path = "/";
     // Normalize www prefix off
     let host = u.hostname.replace(/^www\./, "");
     return `${u.protocol}//${host}${path}`;
   } catch {
-    // Fallback: strip query/hash manually
-    return raw.split("?")[0].split("#")[0].replace(/\/+$/, "") || "/";
+    // Fallback: strip query/hash manually, also strip preview segments
+    const cleaned = raw.split("?")[0].split("#")[0];
+    const stripped = cleaned.replace(/\/preview\/[^/]+\/\d+/g, "");
+    return stripped.replace(/\/+$/, "") || "/";
   }
 }
 
@@ -32,6 +39,14 @@ function normalizeUrl(raw: string): string {
 // (new JS context) but holds within a session.
 
 const cachedCounts = new Map<string, number>();
+
+// ── Debounce guard ─────────────────────────────────────────────────
+// Prevents rapid duplicate increments from React re-render chains or
+// accidental double-clicks. Once a share is in-flight for a given
+// URL+platform pair, subsequent calls within the window are ignored.
+
+const inflightShares = new Set<string>();
+const INFLIGHT_WINDOW_MS = 2000;
 
 function cacheKey(url: string, platform: string): string {
   return `${normalizeUrl(url)}::${platform}`;
@@ -68,6 +83,15 @@ export async function incrementShareCount(
 ): Promise<number> {
   const normalized = normalizeUrl(url);
   const key = cacheKey(normalized, platform);
+
+  // Debounce guard: if a share for this URL+platform pair is already
+  // in-flight, ignore the duplicate. This prevents React re-render chains
+  // and accidental double-taps from spamming the database.
+  if (inflightShares.has(key)) {
+    return cachedCounts.get(key) || 0;
+  }
+  inflightShares.add(key);
+  setTimeout(() => inflightShares.delete(key), INFLIGHT_WINDOW_MS);
 
   try {
     const { data, error } = await supabase.rpc("increment_share_count", {
