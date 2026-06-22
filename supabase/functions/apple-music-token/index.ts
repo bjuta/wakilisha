@@ -1,10 +1,28 @@
 // ── Apple Music Developer Token Generator ──
-// Returns a JWT developer token for MusicKit JS client authorization
+// Returns a JWT developer token for MusicKit JS client authorization.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
+const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+
+interface AppleMusicTokenResponse {
+  developerToken: string | null;
+  configured: boolean;
+  error?: string;
+}
+
+function jsonResponse(payload: AppleMusicTokenResponse, status = 200, headers: HeadersInit = {}) {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: { ...headers, "Content-Type": "application/json" },
+  });
+}
+
+function notConfigured(message: string, headers: HeadersInit) {
+  console.warn(JSON.stringify({ source: "apple-music-token", stage: "not_configured", message }));
+  return jsonResponse({ developerToken: null, configured: false, error: message }, 200, headers);
+}
 
 // ── b64u helper ──
 function b64u(s: string): string {
@@ -49,6 +67,10 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    if (!SUPABASE_URL || !SERVICE_KEY) {
+      return notConfigured("Apple Music connection is not configured yet.", corsHeaders);
+    }
+
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
     const { data: pkRow, error: pkErr } = await supabase
@@ -57,11 +79,13 @@ Deno.serve(async (req: Request) => {
       .eq("setting_key", "apple_music_private_key")
       .maybeSingle();
 
-    if (pkErr || !pkRow?.setting_value) {
-      return new Response(
-        JSON.stringify({ error: "Apple Music private key not configured. An admin must upload the .p8 file first." }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+    if (pkErr) {
+      console.error(JSON.stringify({ source: "apple-music-token", stage: "read_private_key", error: pkErr.message }));
+      return notConfigured("Apple Music credentials could not be read. Ask an admin to check the integration settings.", corsHeaders);
+    }
+
+    if (!pkRow?.setting_value) {
+      return notConfigured("Apple Music is not configured yet. An admin must upload the Apple Music .p8 key first.", corsHeaders);
     }
 
     const privateKey = pkRow.setting_value as string;
@@ -69,24 +93,18 @@ Deno.serve(async (req: Request) => {
     const musicKeyId = Deno.env.get("APPLE_MUSIC_KEY_ID") || "";
 
     if (!teamId || !musicKeyId) {
-      return new Response(
-        JSON.stringify({
-          error: "Apple Music Team ID or Key ID not configured. Set APPLE_TEAM_ID and APPLE_MUSIC_KEY_ID env vars.",
-        }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+      return notConfigured("Apple Music Team ID or Key ID is missing. Ask an admin to finish the Apple Music integration setup.", corsHeaders);
     }
 
     const developerToken = await createAppleMusicJWT(privateKey, teamId, musicKeyId);
 
-    return new Response(
-      JSON.stringify({ developerToken }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-    );
+    return jsonResponse({ developerToken, configured: true }, 200, corsHeaders);
   } catch (e) {
-    return new Response(
-      JSON.stringify({ error: "Token generation failed: " + (e instanceof Error ? e.message : String(e)) }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-    );
+    console.error(JSON.stringify({
+      source: "apple-music-token",
+      stage: "token_generation",
+      error: e instanceof Error ? e.message : String(e),
+    }));
+    return notConfigured("Apple Music credentials are invalid. Ask an admin to check the .p8 key, Team ID, and Key ID.", corsHeaders);
   }
 });
