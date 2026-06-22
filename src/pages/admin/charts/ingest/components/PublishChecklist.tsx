@@ -26,6 +26,7 @@ async function buildChecklist(run: IngestRun): Promise<ChecklistItem[]> {
   const failedStages = run.stages.filter((s) => s.status === "failed");
   const fetchStage = run.stages.find((s) => s.stage === "source_fetch");
   const canonicalStage = run.stages.find((s) => s.stage === "canonical_match");
+  const eligibilityStage = run.stages.find((s) => s.stage === "eligibility_execution");
   const enrichmentStage = run.stages.find((s) => s.stage === "enrichment");
   const noMatchRows = run.rows.filter((r) => r.matchStatus === "no_match");
   const shells = run.rows.filter((r) => r.matchStatus === "shell");
@@ -34,6 +35,13 @@ async function buildChecklist(run: IngestRun): Promise<ChecklistItem[]> {
 
   const programId = run.existingSeriesId || "";
   const program = await resolveV2Program(programId);
+
+  // In the production pipeline, canonical_match is not a separate stage.
+  // The eligibility_execution stage creates candidates with normalized_key,
+  // which is the canonical matching step. So we use eligibility as proxy.
+  const canonicalMatchDone =
+    canonicalStage?.status === "done" || canonicalStage?.status === "warning" ||
+    eligibilityStage?.status === "done" || eligibilityStage?.status === "warning";
 
   return [
     {
@@ -92,11 +100,11 @@ async function buildChecklist(run: IngestRun): Promise<ChecklistItem[]> {
     },
     {
       label: "Canonical matching done",
-      pass: canonicalStage?.status === "done" || canonicalStage?.status === "warning",
+      pass: canonicalMatchDone,
       required: true,
       blocking: true,
       detail:
-        canonicalStage?.status !== "done" && canonicalStage?.status !== "warning"
+        !canonicalMatchDone
           ? "Canonical match stage has not run"
           : `Match rate: ${matchRate.toFixed(1)}% · ${run.summary.canonicalMatches} canonical`,
     },
@@ -189,7 +197,6 @@ export function PublishChecklist({
   const requiredFail = required.filter((c) => !c.pass);
   const allRequiredPass = requiredFail.length === 0;
 
-  // Also run the full validation to get specific error messages
   const canCommit = validation?.canCommit;
 
   return (
@@ -267,15 +274,15 @@ export function PublishChecklist({
       </div>
 
       {/* Validation errors from service */}
-      {!canCommit && validation?.errors.length > 0 && (
+      {!canCommit && (validation?.errors ?? []).length > 0 && (
         <div className="mb-3 rounded-lg border border-wk-danger/20 bg-wk-danger-soft p-3">
           <p className="text-[12px] font-bold text-wk-danger mb-1.5">
             <i className="ri-lock-line mr-1" />
-            Cannot commit — {validation.errors.length} issue
-            {validation.errors.length > 1 ? "s" : ""}
+            Cannot commit &mdash; {validation!.errors.length} issue
+            {validation!.errors.length > 1 ? "s" : ""}
           </p>
           <ul className="space-y-1">
-            {validation.errors.slice(0, 4).map((err, i) => (
+            {validation!.errors.slice(0, 4).map((err, i) => (
               <li key={i} className="text-[11px] text-wk-danger/90 flex items-start gap-1">
                 <i className="ri-error-warning-line shrink-0 mt-0.5" />
                 {err.message}
@@ -286,17 +293,17 @@ export function PublishChecklist({
       )}
 
       {/* Warnings */}
-      {canCommit && validation?.warnings.length > 0 && (
+      {canCommit && (validation?.warnings ?? []).length > 0 && (
         <div className="mb-3 rounded-lg border border-wk-warning/20 bg-wk-warning-soft p-3">
           <p className="text-[11px] font-bold text-wk-warning mb-1">
             <i className="ri-alert-line mr-1" />
-            {validation.warnings.length} warning
-            {validation.warnings.length > 1 ? "s" : ""} — edition will commit with these notes
+            {validation!.warnings.length} warning
+            {validation!.warnings.length > 1 ? "s" : ""} &mdash; edition will commit with these notes
           </p>
           <ul className="space-y-0.5">
-            {validation.warnings.slice(0, 3).map((w, i) => (
+            {validation!.warnings.slice(0, 3).map((w, i) => (
               <li key={i} className="text-[11px] text-wk-text-soft">
-                · {w}
+                &middot; {w}
               </li>
             ))}
           </ul>
@@ -333,7 +340,7 @@ export function PublishChecklist({
           {commitLoading ? (
             <span className="flex items-center justify-center gap-2">
               <i className="ri-loader-4-line animate-spin" />
-              Committing…
+              Committing&hellip;
             </span>
           ) : canCommit ? (
             <span className="flex items-center justify-center gap-1.5">

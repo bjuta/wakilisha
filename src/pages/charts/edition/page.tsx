@@ -80,7 +80,7 @@ export default function ChartEdition() {
     | { status: "loading" }
     | { status: "error"; error: string; diagnostics?: string; retryable?: boolean }
     | { status: "family_not_found" }
-    | { status: "edition_not_found"; familySlug: string; familyLabel: string; latestEditionSlug?: string }
+    | { status: "edition_not_found"; familySlug: string; familyLabel: string; marketSlug: string; latestEditionSlug?: string }
     | { status: "empty" }
     | {
         status: "loaded";
@@ -89,6 +89,7 @@ export default function ChartEdition() {
         familyLabel: string;
         familySlug: string;
         publicSlug: string;
+        marketSlug: string;
         sourceFamilySlug: string;
         archive: ChartArchiveViewModel;
         meta: { dataSource: "mock" | "wordpress" | "cache"; fetchedAt: string; isStale: boolean };
@@ -111,15 +112,23 @@ export default function ChartEdition() {
       }
 
       const publicSlug = family.publicSlug ?? family.slug ?? family.familyKey;
+      const marketSlug = (family.marketSlug ?? "").toLowerCase();
       const sourceFamilySlug = getSourceFamilySlug(family);
-      const canonicalized = isLegacyChartSlug(series);
 
+      // Redirect legacy slugs to canonical family slug
+      const canonicalized = isLegacyChartSlug(series);
       if (canonicalized) {
         const redirectTarget = getLegacyRedirectTarget(rawChartProgramSlug, editionSlug);
         if (redirectTarget) {
           navigate(redirectTarget, { replace: true });
           return;
         }
+      }
+
+      // Redirect 2-segment URLs to canonical 3-segment when market is available
+      if (!market && editionSlug && (family.marketSlug)) {
+        navigate(`/charts/${publicSlug}/${marketSlug.toLowerCase()}/${editionSlug}`, { replace: true });
+        return;
       }
 
       let editionResult: Awaited<ReturnType<typeof getChartEdition>>;
@@ -154,6 +163,7 @@ export default function ChartEdition() {
           status: "edition_not_found",
           familySlug: chartProgramSlug,
           familyLabel: family.label,
+          marketSlug: (family.marketSlug ?? "").toLowerCase(),
           latestEditionSlug: latestResult.edition?.slug,
         });
         return;
@@ -166,27 +176,72 @@ export default function ChartEdition() {
 
       // Entries are auto-enriched with real movement data by getChartEditionEntries
 
-      // Enrich entries with previewUrl from registry_tracks
+      // ═══ Enrich entries with previewUrl + artworkUrl from registry_tracks ═══
+      // Stage 1: direct slug match (fast, exact)
+      const enrichedSlugs = new Set<string>();
       const trackSlugs = rawEntries.map((e) => e.trackSlug).filter(Boolean);
       if (trackSlugs.length > 0) {
         try {
           const { data: previewRows } = await supabase
             .from("registry_tracks")
-            .select("slug, preview_url")
-            .in("slug", trackSlugs)
-            .not("preview_url", "is", null);
+            .select("slug, preview_url, artwork_url")
+            .in("slug", trackSlugs);
 
           if (previewRows && previewRows.length > 0) {
-            const previewMap = new Map(previewRows.map((row: { slug: string; preview_url: string | null }) => [row.slug, row.preview_url]));
-            rawEntries.forEach((entry) => {
-              const pv = previewMap.get(entry.trackSlug);
-              if (pv) {
-                (entry as ChartEditionEntry & { previewUrl?: string }).previewUrl = pv;
+            for (const row of previewRows as Array<{ slug: string; preview_url: string | null; artwork_url: string | null }>) {
+              const entry = rawEntries.find((e: ChartEditionEntry) => e.trackSlug === row.slug);
+              if (entry) {
+                if (row.preview_url) (entry as ChartEditionEntry & { previewUrl?: string }).previewUrl = row.preview_url;
+                if (row.artwork_url && !(entry as ChartEditionEntry & { artworkUrl?: string }).artworkUrl) {
+                  (entry as ChartEditionEntry & { artworkUrl?: string }).artworkUrl = row.artwork_url;
+                }
+                enrichedSlugs.add(row.slug);
               }
-            });
+            }
           }
         } catch {
           // Non-critical — entries work without previewUrl
+        }
+      }
+
+      // Stage 2: title-based fallback for entries still missing preview
+      const stillMissing = rawEntries.filter(
+        (e) => !(e as ChartEditionEntry & { previewUrl?: string }).previewUrl
+      );
+      if (stillMissing.length > 0) {
+        const titles = [...new Set(stillMissing.map((e) => e.trackTitle).filter(Boolean))];
+        for (let i = 0; i < titles.length; i += 4) {
+          const batch = titles.slice(i, i + 4);
+          try {
+            const safeTitles = batch.map((t) => t.replace(/'/g, "''"));
+            const orFilter = safeTitles.map((t) => `title.ilike.%25${t}%25`).join(",");
+            const { data: matches } = await supabase
+              .from("registry_tracks")
+              .select("slug, title, preview_url, artwork_url")
+              .or(orFilter)
+              .not("preview_url", "is", null)
+              .limit(25);
+
+            if (matches && matches.length > 0) {
+              for (const entry of stillMissing.filter((e) => batch.includes(e.trackTitle))) {
+                const entryTitle = (entry.trackTitle || "").toLowerCase();
+                const match = (matches as Array<{ slug: string; title: string; preview_url: string | null; artwork_url: string | null }>).find(
+                  (m) => {
+                    const mt = (m.title || "").toLowerCase();
+                    return mt.includes(entryTitle) || entryTitle.includes(mt);
+                  }
+                );
+                if (match) {
+                  if (match.preview_url) (entry as ChartEditionEntry & { previewUrl?: string }).previewUrl = match.preview_url;
+                  if (match.artwork_url && !(entry as ChartEditionEntry & { artworkUrl?: string }).artworkUrl) {
+                    (entry as ChartEditionEntry & { artworkUrl?: string }).artworkUrl = match.artwork_url;
+                  }
+                }
+              }
+            }
+          } catch {
+            // Non-critical
+          }
         }
       }
 
@@ -227,6 +282,7 @@ export default function ChartEdition() {
         familyLabel: family.label,
         familySlug: chartProgramSlug,
         publicSlug,
+        marketSlug: family.marketSlug ?? "",
         sourceFamilySlug,
         archive,
         meta: editionMeta,
@@ -402,7 +458,7 @@ export default function ChartEdition() {
           </p>
           <div className="flex items-center justify-center gap-3">
             {state.latestEditionSlug && (
-              <Link to={getCanonicalChartPathFromSlugs(state.familySlug, state.latestEditionSlug)} className="chart-hero-v2-cta">
+              <Link to={getCanonicalChartPathFromSlugs(state.familySlug, state.latestEditionSlug, state.marketSlug)} className="chart-hero-v2-cta">
                 <i className="ri-arrow-right-line" /> Latest edition
               </Link>
             )}
@@ -437,7 +493,7 @@ export default function ChartEdition() {
   }
 
   // ─── Loaded state ───
-  const { edition, entries, familyLabel, familySlug, publicSlug, archive, meta, requestedSlug, canonicalized, sourceFamilySlug } = state;
+  const { edition, entries, familyLabel, familySlug, publicSlug, marketSlug, archive, meta, requestedSlug, canonicalized, sourceFamilySlug } = state;
   const topTrack = entries[0];
   const top3 = entries.slice(0, 3);
   const rows = entries.slice(3);
@@ -577,7 +633,7 @@ export default function ChartEdition() {
             <div className="chart-archive-carousel">
               {archive.latest && (
                 <Link
-                  to={`/charts/${publicSlug}/${archive.latest.slug}`}
+                  to={`/charts/${publicSlug}/${marketSlug}/${archive.latest.slug}`}
                   className={`chart-archive-card ${archive.latest.slug === edition.slug ? "active" : ""}`}
                 >
                   <span className="chart-archive-card-badge">Latest</span>
@@ -619,7 +675,7 @@ export default function ChartEdition() {
               {archive.previous.slice(0, 8).map((item) => (
                 <Link
                   key={item.slug}
-                  to={`/charts/${publicSlug}/${item.slug}`}
+                  to={`/charts/${publicSlug}/${marketSlug}/${item.slug}`}
                   className={`chart-archive-card ${item.slug === edition.slug ? "active" : ""}`}
                 >
                   <span className="chart-archive-card-label">{item.label}</span>
@@ -948,7 +1004,7 @@ export default function ChartEdition() {
                   <span>All charts</span>
                   <WkIcon name="ArrowRight" size={14} />
                 </Link>
-                <Link to={getCanonicalChartPath(publicSlug)} className="chart-sidebox-v2-link">
+                <Link to={`/charts/${publicSlug}`} className="chart-sidebox-v2-link">
                   <span>Latest edition</span>
                   <WkIcon name="ArrowRight" size={14} />
                 </Link>

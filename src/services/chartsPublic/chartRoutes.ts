@@ -21,16 +21,17 @@ import type { ChartFamily } from "./types";
  */
 
 const LEGACY_CHART_ROUTE_MAP: Record<string, string> = {
-  "charts": "top-songs-kenya",
-  "charts-kenya": "top-songs-kenya",
-  "kenya": "top-songs-kenya",
-  "kenya-kenya": "top-songs-kenya",
-  "rnb": "rnb-kenya",
-  "rnb-kenya": "rnb-kenya",
-  "gengetone": "gengetone-kenya",
-  "gengetone-kenya": "gengetone-kenya",
-  "2026": "2026-kenya",
-  "2026-kenya": "2026-kenya",
+  "charts": "top100",
+  "charts-kenya": "top100",
+  "kenya": "top100",
+  "kenya-kenya": "top100",
+  "rnb": "top100",
+  "rnb-kenya": "top100",
+  "gengetone": "top100",
+  "gengetone-kenya": "top100",
+  "2026": "top100",
+  "2026-kenya": "top100",
+  "top-songs-kenya": "top100",
 };
 
 export function normalizeChartProgramSlug(slug?: string | null): string {
@@ -57,14 +58,16 @@ export function isLegacyChartSlug(inputSlug: string): boolean {
 
 /**
  * Build the canonical chart path for a family, optionally with an edition.
+ * Includes market slug for proper URL structure.
  */
 export function getCanonicalChartPath(
   family: ChartFamily,
   editionSlug?: string
 ): string {
   const publicSlug = family.publicSlug ?? family.slug ?? family.familyKey;
+  const marketSlug = (family.marketSlug ?? "").toLowerCase();
   if (editionSlug) {
-    return `/charts/${publicSlug}/${editionSlug}`;
+    return `/charts/${publicSlug}/${marketSlug}/${editionSlug}`;
   }
   return `/charts/${publicSlug}`;
 }
@@ -78,27 +81,29 @@ export function getLegacyRedirectTarget(
   editionSlug?: string
 ): string | null {
   if (!isLegacyChartSlug(inputSlug)) return null;
-
-  const sourceSlug = resolveSourceFamilySlug(inputSlug);
-  const presentation = getPresentationBySource(sourceSlug);
-  if (!presentation) return null;
-
+  const canonicalSlug = normalizeChartProgramSlug(inputSlug);
   if (editionSlug) {
-    return `/charts/${presentation.publicSlug}/${editionSlug}`;
+    return `/charts/${canonicalSlug}/${editionSlug}`;
   }
-  return `/charts/${presentation.publicSlug}`;
+  return `/charts/${canonicalSlug}`;
 }
 
 /**
  * Build a canonical chart path from raw identifiers.
  * Useful for components that only have slug strings, not the full family object.
+ * Includes market slug when available for proper 3-segment URL structure.
  */
 export function getCanonicalChartPathFromSlugs(
   familySlug: string,
-  editionSlug?: string
+  editionSlug?: string,
+  marketSlug?: string
 ): string {
   const canonicalFamilySlug = resolveChartRouteSlug(familySlug);
+  const market = (marketSlug ?? "").toLowerCase();
   if (editionSlug) {
+    if (market) {
+      return `/charts/${canonicalFamilySlug}/${market}/${editionSlug}`;
+    }
     return `/charts/${canonicalFamilySlug}/${editionSlug}`;
   }
   return `/charts/${canonicalFamilySlug}`;

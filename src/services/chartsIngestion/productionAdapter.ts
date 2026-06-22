@@ -130,7 +130,7 @@ function mapDbRunToUi(dbRun: DbRun): IngestRun {
     if (!db) return { stage: name as IngestStageStatus["stage"], status: "idle" };
     // Map DB status 'completed' to UI status 'done' so PipelinePanel recognizes finished stages
     const uiStatus: IngestStageStatus["status"] =
-      db.status === "completed" ? "done"
+      db.status === "completed" || db.status === "done" ? "done"
       : db.status === "running" ? "running"
       : db.status === "failed" ? "failed"
       : db.status === "warning" ? "warning"

@@ -240,6 +240,14 @@ export function toChartEntryRowViewModel(
       ? Math.abs(effectivePreviousRank - entry.rank)
       : null);
 
+  // Normalize slug for URLs: replace spaces with hyphens, strip non-URL chars
+  const normalizedSlug = entry.trackSlug
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .replace(/-+/g, "-");
+
   return {
     rank: entry.rank,
     previousRank: effectivePreviousRank,
@@ -250,7 +258,7 @@ export function toChartEntryRowViewModel(
     artistNames: entry.artistNames,
     artistSlugs: entry.artistSlugs ?? [],
     artworkUrl: entry.artworkUrl,
-    slug: entry.trackSlug,
+    slug: normalizedSlug || entry.trackSlug,
     genre: rich.genre ?? null,
     peakPosition: entry.peakPosition ?? entry.rank,
     weeksOnChart: entry.weeksOnChart ?? 1,

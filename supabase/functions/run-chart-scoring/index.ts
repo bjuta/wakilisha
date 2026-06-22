@@ -1,5 +1,5 @@
 /**
- * WAKILISHA Chart Scoring Runner — v3 (no anon key fallback)
+ * WAKILISHA Chart Scoring Runner — v4 (artist origin filter)
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
@@ -475,6 +475,86 @@ function evaluateEligibility(
   return { status, warnings, reasons };
 }
 
+// ── Artist Origin Filter (v4) ──
+
+function parseIndividualArtistNames(artistLine: string): string[] {
+  if (!artistLine || !artistLine.trim()) return [];
+  const parts = artistLine.split(/\s*,\s*/);
+  const names: string[] = [];
+  for (const part of parts) {
+    const subs = part.split(/\s+(?:feat\.?|ft\.?|featuring)\s+/i);
+    for (const sub of subs) {
+      const xs = sub.split(/\s+x\s+/i);
+      for (const x of xs) {
+        const amps = x.split(/\s+&\s+/);
+        for (const a of amps) {
+          const trimmed = a.trim();
+          if (trimmed) names.push(trimmed);
+        }
+      }
+    }
+  }
+  return names;
+}
+
+async function checkArtistOrigin(
+  artistName: string,
+  targetCountry: string,
+  db: ReturnType<typeof createClient>,
+): Promise<{ hasEligible: boolean; eligibleArtist: string | null; allOrigins: string[] }> {
+  const individualNames = parseIndividualArtistNames(artistName);
+  if (individualNames.length === 0) return { hasEligible: false, eligibleArtist: null, allOrigins: [] };
+
+  const targetUpper = targetCountry.toUpperCase();
+  const allOrigins: string[] = [];
+
+  // Batch exact display_name match
+  const { data: exactMatches } = await db
+    .from("registry_artists")
+    .select("display_name, origin_iso2")
+    .in("display_name", individualNames)
+    .eq("status", "active");
+
+  const foundNames = new Set<string>();
+  if (exactMatches) {
+    for (const m of exactMatches) {
+      const iso2 = ((m.origin_iso2 as string) || "").toUpperCase();
+      allOrigins.push(`${m.display_name}:${iso2 || "unknown"}`);
+      foundNames.add(((m.display_name as string) || "").toLowerCase());
+      if (iso2 === targetUpper) {
+        return { hasEligible: true, eligibleArtist: m.display_name as string, allOrigins };
+      }
+    }
+  }
+
+  // Fuzzy lookup for unresolved names
+  const unresolved = individualNames.filter((n) => !foundNames.has(n.toLowerCase()));
+  for (const name of unresolved) {
+    const { data: fuzzy } = await db
+      .from("registry_artists")
+      .select("display_name, origin_iso2")
+      .ilike("display_name", name)
+      .eq("status", "active")
+      .limit(3);
+    if (fuzzy && fuzzy.length > 0) {
+      const best = fuzzy.find(
+        (r) => ((r.display_name as string) || "").toLowerCase() === name.toLowerCase()
+      ) || fuzzy[0];
+      const iso2 = ((best.origin_iso2 as string) || "").toUpperCase();
+      allOrigins.push(`${best.display_name}:${iso2 || "unknown"}`);
+      if (iso2 === targetUpper) {
+        return { hasEligible: true, eligibleArtist: best.display_name as string, allOrigins };
+      }
+    } else {
+      allOrigins.push(`${name}:not_found`);
+    }
+  }
+
+  return { hasEligible: false, eligibleArtist: null, allOrigins };
+}
+
+// ── Pipeline ──
+
 interface RawEvidenceRecord {
   track_title: string;
   artist_name: string;
@@ -543,17 +623,20 @@ function classifyMovement(
 interface PipelineResult {
   scoredRows: ScoredRow[];
   excludedCount: number;
+  originExcludedCount: number;
   summary: Record<string, number>;
 }
 
-function runFullPipeline(
+async function runFullPipeline(
   rawEvidence: RawEvidenceRecord[],
   airplayBuckets: AirplayEvidenceBucket[],
   previousEdition: PreviousEditionEntry[],
   prevMeta: Map<string, { track_title: string; artist_name: string }>,
   config: ScoringConfig,
   editionDate: string,
-): PipelineResult {
+  targetCountry: string | null,
+  db: ReturnType<typeof createClient> | null,
+): Promise<PipelineResult> {
   let inputRows = buildScoringInputRows(rawEvidence);
 
   const rescueMode: AirplayRescueMode = config.airplay_rescue_mode ?? "allow_rescue";
@@ -570,10 +653,23 @@ function runFullPipeline(
   const cfCount = merged.filter((r) => r.carry_forward_only).length;
 
   const eligible: ScoringInputRow[] = [];
+  let originExcludedCount = 0;
+
   for (const row of merged) {
     const ctx = airplayContexts.get(row.normalized_key) ?? null;
     const outcome = evaluateEligibility(row, ctx, config);
-    if (outcome.status !== "excluded") eligible.push(row);
+    if (outcome.status === "excluded") continue;
+
+    // ── Artist origin filter (v4) ──
+    if (targetCountry && db && row.artist_name) {
+      const originCheck = await checkArtistOrigin(row.artist_name, targetCountry, db);
+      if (!originCheck.hasEligible) {
+        originExcludedCount++;
+        continue;
+      }
+    }
+
+    eligible.push(row);
   }
 
   const provisionals = eligible.map((row) => {
@@ -672,17 +768,21 @@ function runFullPipeline(
   return {
     scoredRows,
     excludedCount: 0,
+    originExcludedCount,
     summary: {
       total_input: rawEvidence.length,
       eligible: eligible.length,
       carry_forward: cfCount,
       airplay_rescue: rescueCount,
+      origin_excluded: originExcludedCount,
       chart_size: chartSize,
       new_entries: scoredRows.filter((r) => r.movement === "new").length,
       re_entries: scoredRows.filter((r) => r.movement === "reentry").length,
     },
   };
 }
+
+// ── Request Handler ──
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -691,7 +791,7 @@ Deno.serve(async (req: Request) => {
   const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
   if (!supabaseUrl || !supabaseKey) {
-    return new Response(JSON.stringify({ error: "Supabase service role key missing. This function requires SERVICE_ROLE_KEY to write chart scores." }), {
+    return new Response(JSON.stringify({ error: "Supabase service role key missing." }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
@@ -739,6 +839,10 @@ Deno.serve(async (req: Request) => {
       missing_policy: (program.missing_policy as MissingPolicy) ?? "review",
       override_mode: (program.override_mode as OverrideMode) ?? "metadata_and_matching_only",
     };
+
+    // Extract target country from program's market_slug
+    const marketSlug = (program.market_slug as string) || "";
+    const targetCountry = marketSlug.toUpperCase() || null;
 
     const { data: run, error: runErr } = await supabase
       .from("wk_chart_scoring_runs")
@@ -841,7 +945,7 @@ Deno.serve(async (req: Request) => {
         };
       }).filter((r: RawEvidenceRecord) => r.track_title);
 
-      const result = runFullPipeline(rawEvidence, airplayBuckets, previousEdition, prevMeta, config, editionDate);
+      const result = await runFullPipeline(rawEvidence, airplayBuckets, previousEdition, prevMeta, config, editionDate, targetCountry, supabase);
 
       const editionSlug = `${program.public_slug ?? "chart"}-${editionDate}`;
       const editionLabel = `${program.public_label ?? "Chart"} — ${editionDate}`;
@@ -866,7 +970,7 @@ Deno.serve(async (req: Request) => {
           carry_forward_count: result.summary.carry_forward as number,
           new_entries_count: result.summary.new_entries as number,
           re_entries_count: result.summary.re_entries as number,
-          exclusion_summary: {},
+          exclusion_summary: { origin_excluded: result.originExcludedCount },
           override_mode: config.override_mode,
         }, { onConflict: "program_id,edition_date" })
         .select("id")
@@ -937,7 +1041,7 @@ Deno.serve(async (req: Request) => {
         status: "completed",
         total_rows: rawEvidence.length,
         eligible_rows: result.summary.eligible as number,
-        excluded_rows: result.excludedCount,
+        excluded_rows: result.excludedCount + result.originExcludedCount,
         carry_forward_rows: result.summary.carry_forward as number,
         airplay_rescue_rows: result.summary.airplay_rescue as number,
         source_urls: [...new Set(rawEvidence.flatMap((r) => r.source_urls))],
@@ -949,6 +1053,8 @@ Deno.serve(async (req: Request) => {
         run_id: runId,
         edition_id: edition.id,
         edition_slug: editionSlug,
+        target_country: targetCountry,
+        origin_excluded: result.originExcludedCount,
         summary: result.summary,
         top5: result.scoredRows.slice(0, 5).map((r) => ({
           rank: r.rank, title: r.track_title, artist: r.artist_name, score: r.total_score,

@@ -99,6 +99,19 @@ type V2Health = {
   counts?: Record<string, number>;
 };
 
+const SUPABASE_ANON_KEY = import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY || "";
+const SUPABASE_URL = import.meta.env.VITE_PUBLIC_SUPABASE_URL || "";
+
+function buildAuthHeaders(): Record<string, string> {
+  if (SUPABASE_ANON_KEY && PUBLIC_V2_API_BASE.includes(SUPABASE_URL)) {
+    return {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+    };
+  }
+  return {};
+}
+
 async function v2Request<T>(path: string): Promise<T> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 30000);
@@ -106,9 +119,8 @@ async function v2Request<T>(path: string): Promise<T> {
   try {
     const response = await fetch(`${PUBLIC_V2_API_BASE}${path}`, {
       method: "GET",
-      headers: { Accept: "application/json" },
+      headers: { Accept: "application/json", ...buildAuthHeaders() },
       signal: controller.signal,
-      credentials: "same-origin",
     });
 
     clearTimeout(timeoutId);
