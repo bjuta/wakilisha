@@ -36,6 +36,7 @@ export interface CommunityProfile {
   username: string;
   displayName: string | null;
   avatarUrl: string | null;
+  coverUrl: string | null;
   bio: string | null;
   country: string | null;
   city: string | null;

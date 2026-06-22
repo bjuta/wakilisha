@@ -25,15 +25,6 @@ const ACCENTS = [
   { label: "Teal", value: "#4AB8A0" },
 ];
 
-const COVER_COLORS = [
-  { label: "Forest", value: "#1a3a0a" },
-  { label: "Midnight", value: "#0a1a2e" },
-  { label: "Burgundy", value: "#2e0a0a" },
-  { label: "Charcoal", value: "#1a1a1a" },
-  { label: "Olive", value: "#2e2a0a" },
-  { label: "Slate", value: "#1a1e2a" },
-];
-
 export default function MobileSettingsPage() {
   const [active, setActive] = useState<SettingsTab>("Account");
   const navigate = useNavigate();
@@ -63,6 +54,7 @@ export default function MobileSettingsPage() {
     discardChanges,
     resetAll,
     uploadAvatar,
+    uploadCover,
     checkUsernameAvailability,
   } = useUserSettings();
 
@@ -71,6 +63,8 @@ export default function MobileSettingsPage() {
   const [connectError, setConnectError] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [coverUploading, setCoverUploading] = useState(false);
+  const [coverUploadError, setCoverUploadError] = useState<string | null>(null);
   const [usernameAvailability, setUsernameAvailability] = useState({
     status: "idle",
     available: false,
@@ -165,10 +159,33 @@ export default function MobileSettingsPage() {
     updatePlayback({ appleMusicConnected: false, appleMusicToken: null, preferApplePreviews: false });
   };
 
+  const handleCoverUpload = useCallback(async () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/jpeg,image/png,image/webp";
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      setCoverUploading(true);
+      setCoverUploadError(null);
+      try {
+        const url = await uploadCover(file);
+        if (url) updateProfile({ coverUrl: url });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Cover upload failed";
+        setCoverUploadError(message);
+        alert(message);
+      } finally {
+        setCoverUploading(false);
+      }
+    };
+    input.click();
+  }, [uploadCover, updateProfile]);
+
   const handleAvatarUpload = useCallback(async () => {
     const input = document.createElement("input");
     input.type = "file";
-    input.accept = "image/jpeg,image/png";
+    input.accept = "image/jpeg,image/png,image/webp";
     input.onchange = async (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
@@ -269,22 +286,46 @@ export default function MobileSettingsPage() {
               </div>
             </div>
 
-            {/* Cover color */}
+            {/* Cover photo */}
             <div>
-              <div className="text-[11px] font-bold text-[var(--wk-text-faint)] uppercase tracking-wider mb-2">Cover color</div>
-              <div className="flex gap-2 flex-wrap">
-                {COVER_COLORS.map((c) => (
-                  <button
-                    key={c.value}
-                    onClick={() => updateAppearance({ coverColor: c.value })}
-                    className={`w-9 h-9 rounded-full cursor-pointer transition-transform hover:scale-110 border-2 ${
-                      appearance.coverColor === c.value ? "border-[var(--wk-text)]" : "border-transparent"
-                    }`}
-                    style={{ background: c.value }}
-                    aria-label={c.label}
-                  />
-                ))}
-              </div>
+              <div className="text-[11px] font-bold text-[var(--wk-text-faint)] uppercase tracking-wider mb-2">Cover photo</div>
+              <button
+                onClick={handleCoverUpload}
+                disabled={coverUploading || !isSignedIn}
+                className="relative block w-full aspect-[8/3] min-h-[124px] overflow-hidden rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface-raised)] text-left"
+                style={{
+                  background: profile.coverUrl
+                    ? "var(--wk-surface-raised)"
+                    : "linear-gradient(135deg, #123908 0%, #245714 45%, #86c343 100%)",
+                }}
+              >
+                {profile.coverUrl && (
+                  <img src={profile.coverUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                )}
+                <div className="absolute inset-0 bg-gradient-to-b from-black/5 via-transparent to-black/40" />
+                <div className="absolute bottom-3 left-3 right-3 flex items-end justify-between gap-3">
+                  <div>
+                    <div className="text-[10px] font-black uppercase tracking-[0.14em] text-white/85">
+                      {coverUploading ? "Uploading..." : profile.coverUrl ? "Change cover" : "Upload cover"}
+                    </div>
+                    <p className="mt-1 text-[10px] leading-snug text-white/75">
+                      Min 1600×600. Recommended 2400×900. Ratio 2.4:1–3.2:1. Max 8MB.
+                    </p>
+                  </div>
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-black">
+                    <i className="ri-camera-line text-sm" />
+                  </span>
+                </div>
+              </button>
+              {profile.coverUrl && (
+                <button
+                  onClick={() => updateProfile({ coverUrl: null })}
+                  className="mt-2 text-[11px] font-bold text-[var(--wk-text-faint)] hover:text-[var(--wk-danger)]"
+                >
+                  Remove cover
+                </button>
+              )}
+              {coverUploadError && <p className="mt-2 text-[10px] font-bold text-[var(--wk-danger)]">{coverUploadError}</p>}
             </div>
 
             {/* Fields */}

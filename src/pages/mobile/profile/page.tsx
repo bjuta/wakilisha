@@ -139,18 +139,22 @@ export default function MobileProfilePage() {
     if (tab !== "Account") loadTabData(tab);
   }, [tab, loadTabData]);
 
-  const statsCommentCount = commProfile?.commentCount ?? 0;
+  const statsCommentCount = Math.max(commProfile?.commentCount ?? 0, comments.length);
   const statsSaveCount = saves.length;
   const statsFollowCount = follows.length;
+  const profileCoverUrl = commProfile?.coverUrl || null;
 
   return (
     <div className="min-h-[100dvh]" style={{ background: "var(--wk-bg)", color: "var(--wk-text)" }}>
       {/* Cover */}
       <div
         className="w-full h-[140px] relative overflow-hidden"
-        style={{ background: coverGradient(coverColor) }}
+        style={{ background: profileCoverUrl ? "var(--wk-surface-raised)" : coverGradient(coverColor) }}
       >
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/20" />
+        {profileCoverUrl && (
+          <img src={profileCoverUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/25" />
         {/* Back chevron */}
         <button
           onClick={() => navigate(-1)}
@@ -198,7 +202,7 @@ export default function MobileProfilePage() {
                 {isSignedIn ? userDisplayName : "WAKILISHA Reader"}
               </h1>
               <p className="text-[13px] font-semibold mt-0.5" style={{ color: "var(--wk-text-muted)" }}>
-                {commProfile ? `@${commProfile.username}` : (isSignedIn ? userEmail : "Sign in to customize")}
+                {commProfile?.username ? `@${commProfile.username}` : (isSignedIn ? userEmail : "Sign in to customize")}
               </p>
             </>
           )}
@@ -226,7 +230,7 @@ export default function MobileProfilePage() {
               >
                 <i className="ri-pencil-line text-[13px]" /> Edit profile
               </Link>
-              {commProfile && (
+              {commProfile?.username && (
                 <Link
                   to={`/u/${commProfile.username}`}
                   className="inline-flex items-center gap-1.5 h-[34px] px-4 rounded-lg text-xs font-bold whitespace-nowrap cursor-pointer"

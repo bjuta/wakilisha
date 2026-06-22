@@ -80,14 +80,19 @@ export default function PublicProfilePage() {
   }
 
   const avatarUrl = profile.avatarUrl;
+  const coverUrl = profile.coverUrl;
   const displayName = profile.displayName || profile.username;
   const initial = displayName[0]?.toUpperCase() || "U";
+  const visibleCommentCount = Math.max(profile.commentCount || 0, comments.length);
 
   return (
     <main className="min-h-screen bg-[var(--wk-bg)]">
       {/* Hero cover */}
-      <div className="w-full h-[200px] bg-[linear-gradient(135deg,#1a3a0a,#2a5a1a)] relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/20" />
+      <div className="w-full h-[clamp(180px,24vw,320px)] bg-[linear-gradient(135deg,#1a3a0a,#2a5a1a)] relative overflow-hidden">
+        {coverUrl && (
+          <img src={coverUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-b from-black/5 via-transparent to-black/30" />
       </div>
 
       <div className="max-w-[860px] mx-auto px-6 md:px-8 pb-16">
@@ -134,7 +139,7 @@ export default function PublicProfilePage() {
         {/* Stats row */}
         <div className="flex gap-8 flex-wrap pb-6 mb-6 border-b border-[var(--wk-border)]">
           <div className="flex flex-col gap-1">
-            <span className="text-[22px] font-black text-[var(--wk-text)] tabular-nums">{profile.commentCount}</span>
+            <span className="text-[22px] font-black text-[var(--wk-text)] tabular-nums">{visibleCommentCount}</span>
             <span className="text-[10px] font-black uppercase tracking-wider text-[var(--wk-text-faint)]">Comments</span>
           </div>
           <div className="flex flex-col gap-1">

@@ -9,17 +9,11 @@ interface Props {
   isSignedIn: boolean;
   updateProfile: (patch: Partial<UserProfileFields>) => void;
   uploadAvatar: (file: File) => Promise<string | null>;
+  uploadCover: (file: File) => Promise<string | null>;
   checkUsernameAvailability: (value: string) => Promise<UsernameAvailability>;
 }
 
-const coverSwatches = [
-  { label: "Forest", value: "#1a3a0a" },
-  { label: "Midnight", value: "#0a1a2a" },
-  { label: "Burgundy", value: "#2a0a1a" },
-  { label: "Charcoal", value: "#1a1a1a" },
-  { label: "Olive", value: "#2a3a0a" },
-  { label: "Slate", value: "#0a1a2a" },
-];
+const coverFallback = "linear-gradient(135deg, #123908 0%, #245714 45%, #86c343 100%)";
 
 export function AccountSettingsPane({
   profile,
@@ -28,23 +22,20 @@ export function AccountSettingsPane({
   isSignedIn,
   updateProfile,
   uploadAvatar,
+  uploadCover,
   checkUsernameAvailability,
 }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
+  const coverFileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const [coverUploading, setCoverUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [coverUploadError, setCoverUploadError] = useState<string | null>(null);
   const [usernameAvailability, setUsernameAvailability] = useState<UsernameAvailability>({
     status: "idle",
     available: false,
     normalized: "",
     message: "Choose a public handle.",
-  });
-  const [coverColor, setCoverColor] = useState(() => {
-    try {
-      return localStorage.getItem("wk-cover-color") || "#1a3a0a";
-    } catch {
-      return "#1a3a0a";
-    }
   });
 
   useEffect(() => {
@@ -67,9 +58,11 @@ export function AccountSettingsPane({
   }, [profile.username, isSignedIn, checkUsernameAvailability]);
 
   const handleAvatarClick = () => fileRef.current?.click();
+  const handleCoverClick = () => coverFileRef.current?.click();
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = "";
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) {
       setUploadError("Image must be under 5MB");
@@ -87,9 +80,21 @@ export function AccountSettingsPane({
     }
   };
 
-  const handleCoverColorChange = (color: string) => {
-    setCoverColor(color);
-    try { localStorage.setItem("wk-cover-color", color); } catch { /* noop */ }
+  const handleCoverFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    setCoverUploading(true);
+    setCoverUploadError(null);
+    try {
+      const url = await uploadCover(file);
+      if (url) updateProfile({ coverUrl: url });
+    } catch (err) {
+      setCoverUploadError(err instanceof Error ? err.message : "Cover upload failed");
+    } finally {
+      setCoverUploading(false);
+    }
   };
 
   const handleUsernameChange = (value: string) => {
@@ -105,24 +110,60 @@ export function AccountSettingsPane({
 
   return (
     <div>
-      {/* Cover color picker */}
+      {/* Cover photo */}
       <div className="mb-6">
-        <div className="text-[10px] font-black uppercase tracking-[0.14em] text-[var(--wk-text-faint)] mb-2">Cover color</div>
-        <div className="flex items-center gap-2.5 flex-wrap">
-          {coverSwatches.map((sw) => (
-            <button
-              key={sw.value}
-              onClick={() => handleCoverColorChange(sw.value)}
-              className="w-10 h-10 rounded-full border-2 cursor-pointer transition-transform hover:scale-110"
-              style={{
-                background: sw.value,
-                borderColor: coverColor === sw.value ? "var(--wk-text)" : sw.value,
-              }}
-              aria-label={`Cover color: ${sw.label}`}
-            />
-          ))}
+        <div className="text-[10px] font-black uppercase tracking-[0.14em] text-[var(--wk-text-faint)] mb-2">
+          Cover photo
         </div>
-        <p className="text-[11px] text-[var(--wk-text-faint)] mt-2">Changes apply immediately to your profile cover. Pick a vibe.</p>
+        <div
+          className="relative aspect-[8/3] min-h-[190px] overflow-hidden rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface-raised)]"
+          style={{ background: profile.coverUrl ? undefined : coverFallback }}
+        >
+          {profile.coverUrl && (
+            <img
+              src={profile.coverUrl}
+              alt=""
+              className="absolute inset-0 h-full w-full object-cover"
+            />
+          )}
+          <div className="absolute inset-0 bg-gradient-to-b from-black/5 via-transparent to-black/35" />
+          <div className="absolute bottom-4 left-4 right-4 flex flex-wrap items-end justify-between gap-3">
+            <div className="max-w-[520px]">
+              <div className="text-[11px] font-black uppercase tracking-[0.16em] text-white/80">
+                Public profile cover
+              </div>
+              <p className="mt-1 text-xs font-medium leading-relaxed text-white/80">
+                Recommended 2400×900px. Minimum 1600×600px. Accepted aspect ratio 2.4:1 to 3.2:1. JPG, PNG, or WebP. Max 8MB.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={handleCoverClick}
+                disabled={coverUploading || !isSignedIn}
+                className="h-9 rounded-full bg-white px-4 text-xs font-black text-black shadow-sm disabled:opacity-60"
+              >
+                {coverUploading ? "Uploading..." : profile.coverUrl ? "Change cover" : "Upload cover"}
+              </button>
+              {profile.coverUrl && (
+                <button
+                  onClick={() => updateProfile({ coverUrl: null })}
+                  disabled={coverUploading || !isSignedIn}
+                  className="h-9 rounded-full bg-black/45 px-4 text-xs font-black text-white backdrop-blur disabled:opacity-60"
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+        <input
+          ref={coverFileRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          onChange={handleCoverFileChange}
+          className="hidden"
+        />
+        {coverUploadError && <p className="mt-2 text-[11px] font-bold text-[var(--wk-danger)]">{coverUploadError}</p>}
       </div>
 
       {/* Avatar */}
@@ -161,7 +202,7 @@ export function AccountSettingsPane({
                 Remove photo
               </button>
             )}
-            <p className="text-[10px] text-[var(--wk-text-faint)] mt-1">JPG, PNG. Max 5MB.</p>
+            <p className="text-[10px] text-[var(--wk-text-faint)] mt-1">JPG, PNG, WebP. Max 5MB.</p>
           </div>
           <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={handleFileChange} className="hidden" />
         </div>

@@ -11,6 +11,7 @@ export interface UserProfileFields {
   country: string;
   city: string;
   avatarUrl: string | null;
+  coverUrl: string | null;
   isPublic: boolean;
 }
 
@@ -80,6 +81,7 @@ export const DEFAULT_PROFILE: UserProfileFields = {
   country: "",
   city: "",
   avatarUrl: null,
+  coverUrl: null,
   isPublic: true,
 };
 
@@ -125,6 +127,13 @@ const LS_PRIVACY = "wk-privacy-v2";
 const LS_SAVED_AT = "wk-settings-saved-v2";
 
 const AVATAR_BUCKET = "avatars";
+const COVER_BUCKET = "profile-covers";
+const COVER_MAX_BYTES = 8 * 1024 * 1024;
+const COVER_MIN_WIDTH = 1600;
+const COVER_MIN_HEIGHT = 600;
+const COVER_MIN_RATIO = 2.4;
+const COVER_MAX_RATIO = 3.2;
+const COVER_RECOMMENDED = "2400×900";
 const AVATAR_EXTENSION_BY_MIME = {
   "image/jpeg": "jpg",
   "image/png": "png",
@@ -186,6 +195,45 @@ function getAvatarContentType(file: File, ext: AvatarExtension): string {
   if (AVATAR_EXTENSION_BY_MIME[file.type as keyof typeof AVATAR_EXTENSION_BY_MIME]) return file.type;
   if (ext === "jpg") return "image/jpeg";
   return `image/${ext}`;
+}
+
+function getImageDimensions(file: File): Promise<{ width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const image = new Image();
+
+    image.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve({ width: image.naturalWidth, height: image.naturalHeight });
+    };
+
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Could not read image dimensions."));
+    };
+
+    image.src = url;
+  });
+}
+
+async function validateCoverImage(file: File): Promise<void> {
+  const ext = getAvatarExtension(file);
+  if (!ext) throw new Error("Use a JPG, PNG, or WEBP cover image.");
+
+  if (file.size > COVER_MAX_BYTES) {
+    throw new Error("Cover image must be 8MB or smaller.");
+  }
+
+  const { width, height } = await getImageDimensions(file);
+  const ratio = width / height;
+
+  if (width < COVER_MIN_WIDTH || height < COVER_MIN_HEIGHT) {
+    throw new Error(`Cover image must be at least ${COVER_MIN_WIDTH}×${COVER_MIN_HEIGHT}px. Recommended: ${COVER_RECOMMENDED}px.`);
+  }
+
+  if (ratio < COVER_MIN_RATIO || ratio > COVER_MAX_RATIO) {
+    throw new Error("Cover image must be wide: accepted aspect ratio is 2.4:1 to 3.2:1. Recommended: 8:3.");
+  }
 }
 
 // ─── Hook ─────────────────────────────────────────────────────────────────
@@ -262,6 +310,7 @@ export function useUserSettings() {
           country: data.country || "",
           city: data.city || "",
           avatarUrl: data.avatar_url || null,
+          coverUrl: data.cover_url || null,
           isPublic: data.is_public ?? true,
         };
         setSavedUsername(supabaseProfile.username);
@@ -439,6 +488,8 @@ export function useUserSettings() {
         p_is_public: profileToPersist.isPublic,
         p_avatar_url: profileToPersist.avatarUrl,
         p_clear_avatar: profileToPersist.avatarUrl === null,
+        p_cover_url: profileToPersist.coverUrl,
+        p_clear_cover: profileToPersist.coverUrl === null,
       });
       if (profileErr) throw new Error(`Profile save failed: ${profileErr.message}`);
 
@@ -555,6 +606,28 @@ export function useUserSettings() {
     return `${urlData.publicUrl}?v=${Date.now()}`;
   }, [userId]);
 
+  // ─── Cover photo upload helper ───
+  const uploadCover = useCallback(async (file: File): Promise<string | null> => {
+    if (!userId) return null;
+
+    await validateCoverImage(file);
+
+    const ext = getAvatarExtension(file);
+    if (!ext) throw new Error("Use a JPG, PNG, or WEBP cover image.");
+
+    const path = `${userId}/cover.${ext}`;
+    const contentType = getAvatarContentType(file, ext);
+
+    const { error: uploadErr } = await supabase.storage
+      .from(COVER_BUCKET)
+      .upload(path, file, { upsert: true, contentType });
+
+    if (uploadErr) throw new Error(uploadErr.message);
+
+    const { data: urlData } = supabase.storage.from(COVER_BUCKET).getPublicUrl(path);
+    return `${urlData.publicUrl}?v=${Date.now()}`;
+  }, [userId]);
+
   return {
     // State
     profile,
@@ -586,6 +659,7 @@ export function useUserSettings() {
     discardChanges,
     resetAll,
     uploadAvatar,
+    uploadCover,
     checkUsernameAvailability,
   };
 }

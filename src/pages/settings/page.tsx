@@ -72,6 +72,7 @@ export default function SettingsPage() {
     discardChanges,
     resetAll,
     uploadAvatar,
+    uploadCover,
     checkUsernameAvailability,
   } = useUserSettings();
 
@@ -232,6 +233,7 @@ export default function SettingsPage() {
                   isSignedIn={isSignedIn}
                   updateProfile={updateProfile}
                   uploadAvatar={uploadAvatar}
+                  uploadCover={uploadCover}
                   checkUsernameAvailability={checkUsernameAvailability}
                 />
               )}
