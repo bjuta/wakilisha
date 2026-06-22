@@ -80,9 +80,11 @@ export function MobileFullPlayer() {
   const [liked, setLiked] = useState(false);
   const [actionMenuOpen, setActionMenuOpen] = useState(false);
 
+  const collapsePlayer = () => closeFullPlayer();
+
   if (!currentTrack) {
     return (
-      <div className="full-player mobile-full-player flex min-h-screen flex-col items-center justify-center px-6 text-center">
+      <div className="full-player mobile-full-player flex h-[100dvh] flex-col items-center justify-center overflow-y-auto px-6 text-center">
         <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[var(--wk-surface-raised)]">
           <WkIcon name="Music2" size={26} className="text-[var(--wk-text-faint)]" />
         </div>
@@ -106,7 +108,18 @@ export function MobileFullPlayer() {
   const hasQueue = queue.length > 1;
 
   return (
-    <div className="full-player mobile-full-player">
+    <div
+      data-scroll-lock="container"
+      className="full-player mobile-full-player"
+      style={{
+        height: "100dvh",
+        minHeight: "100dvh",
+        overflowY: "auto",
+        WebkitOverflowScrolling: "touch",
+        overscrollBehaviorY: "contain",
+        touchAction: "pan-y",
+      }}
+    >
       <div
         className="fp-ambient"
         style={{
@@ -115,10 +128,14 @@ export function MobileFullPlayer() {
           backgroundPosition: "center",
         }}
       />
-      <div className="fp-topbar">
+      <div className="fp-topbar" style={{ position: "sticky", top: 0 }}>
         <button
           className="fp-topbar-btn mobile-pressable"
-          onClick={() => closeFullPlayer()}
+          onClick={collapsePlayer}
+          onTouchEnd={(e) => {
+            e.preventDefault();
+            collapsePlayer();
+          }}
           aria-label="Collapse player"
         >
           <WkIcon name="ChevronDown" size={22} />

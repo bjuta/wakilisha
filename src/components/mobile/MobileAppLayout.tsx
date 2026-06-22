@@ -105,7 +105,8 @@ function MobileBottomNav() {
 export function MobileAppLayout() {
   const location = useLocation();
   const { currentTrack, isFullPlayerOpen } = usePlayer();
-  const showMiniPlayer = !!currentTrack && location.pathname !== "/auth";
+  const showMobileChrome = !isFullPlayerOpen && location.pathname !== "/auth";
+  const showMiniPlayer = !!currentTrack && showMobileChrome;
 
   useScrollLock(isFullPlayerOpen);
 
@@ -123,9 +124,11 @@ export function MobileAppLayout() {
     <div
       className="wk-app-shell min-h-[100dvh] flex flex-col relative"
       style={{
-        paddingBottom: showMiniPlayer
-          ? "calc(52px + max(env(safe-area-inset-bottom), 8px) + 12px + 60px + 12px)"
-          : "calc(52px + max(env(safe-area-inset-bottom), 8px) + 12px)",
+        paddingBottom: isFullPlayerOpen
+          ? "0px"
+          : showMiniPlayer
+            ? "calc(52px + max(env(safe-area-inset-bottom), 8px) + 12px + 60px + 12px)"
+            : "calc(52px + max(env(safe-area-inset-bottom), 8px) + 12px)",
       }}
     >
       <main className="flex-1">
@@ -134,16 +137,24 @@ export function MobileAppLayout() {
       {isFullPlayerOpen && (
         <div
           data-scroll-lock="container"
-          className="fixed inset-0 z-[90] overflow-y-auto bg-[var(--wk-bg)]"
-          style={{ minHeight: "100dvh", animation: "slideUp 0.35s cubic-bezier(.16,1,.3,1)" }}
+          className="fixed inset-0 z-[90] h-[100dvh] overflow-y-auto overscroll-contain bg-[var(--wk-bg)]"
+          style={{
+            height: "100dvh",
+            maxHeight: "100dvh",
+            WebkitOverflowScrolling: "touch",
+            touchAction: "pan-y",
+            animation: "slideUp 0.35s cubic-bezier(.16,1,.3,1)",
+          }}
         >
           <MobileFullPlayer />
         </div>
       )}
-      <Portal>
-        {showMiniPlayer && <MobileMiniPlayer />}
-        <MobileBottomNav />
-      </Portal>
+      {showMobileChrome && (
+        <Portal>
+          {showMiniPlayer && <MobileMiniPlayer />}
+          <MobileBottomNav />
+        </Portal>
+      )}
     </div>
   );
 }
