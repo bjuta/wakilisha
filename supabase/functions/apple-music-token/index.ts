@@ -1,10 +1,17 @@
 // ── Apple Music Developer Token Generator ──
-// Returns a JWT developer token for MusicKit JS client authorization.
+// Returns a WAKILISHA developer token used by MusicKit JS to start
+// the end-user Apple Music authorization flow. This is not a user token.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+
+const SECRET_KEYS = {
+  privateKey: "apple_music_private_key",
+  teamId: "apple_music_team_id",
+  keyId: "apple_music_key_id",
+} as const;
 
 interface AppleMusicTokenResponse {
   developerToken: string | null;
@@ -22,6 +29,45 @@ function jsonResponse(payload: AppleMusicTokenResponse, status = 200, headers: H
 function notConfigured(message: string, headers: HeadersInit) {
   console.warn(JSON.stringify({ source: "apple-music-token", stage: "not_configured", message }));
   return jsonResponse({ developerToken: null, configured: false, error: message }, 200, headers);
+}
+
+function normalizeSecret(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+async function readAdminSecret(
+  supabase: ReturnType<typeof createClient>,
+  settingKey: string,
+): Promise<string> {
+  const { data, error } = await supabase
+    .from("admin_settings_secrets")
+    .select("setting_value")
+    .eq("setting_key", settingKey)
+    .maybeSingle();
+
+  if (error) {
+    console.error(JSON.stringify({
+      source: "apple-music-token",
+      stage: "read_admin_secret",
+      settingKey,
+      error: error.message,
+    }));
+    return "";
+  }
+
+  return normalizeSecret(data?.setting_value);
+}
+
+function isPlaceholderSecret(value: string): boolean {
+  return value === "__server_stored__" || value === "uploaded:server" || value.startsWith("uploaded:");
+}
+
+function looksLikePemPrivateKey(value: string): boolean {
+  return value.includes("-----BEGIN PRIVATE KEY-----") && value.includes("-----END PRIVATE KEY-----");
+}
+
+function looksLikeAppleId(value: string): boolean {
+  return /^[A-Z0-9]{10}$/.test(value);
 }
 
 // ── b64u helper ──
@@ -73,27 +119,35 @@ Deno.serve(async (req: Request) => {
 
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
-    const { data: pkRow, error: pkErr } = await supabase
-      .from("admin_settings_secrets")
-      .select("setting_value")
-      .eq("setting_key", "apple_music_private_key")
-      .maybeSingle();
+    const [dbPrivateKey, dbTeamId, dbKeyId] = await Promise.all([
+      readAdminSecret(supabase, SECRET_KEYS.privateKey),
+      readAdminSecret(supabase, SECRET_KEYS.teamId),
+      readAdminSecret(supabase, SECRET_KEYS.keyId),
+    ]);
 
-    if (pkErr) {
-      console.error(JSON.stringify({ source: "apple-music-token", stage: "read_private_key", error: pkErr.message }));
-      return notConfigured("Apple Music credentials could not be read. Ask an admin to check the integration settings.", corsHeaders);
+    const privateKey = normalizeSecret(Deno.env.get("APPLE_MUSIC_PRIVATE_KEY")) || dbPrivateKey;
+    const teamId = normalizeSecret(Deno.env.get("APPLE_TEAM_ID")) || dbTeamId;
+    const musicKeyId = normalizeSecret(Deno.env.get("APPLE_MUSIC_KEY_ID")) || dbKeyId;
+
+    if (!privateKey || isPlaceholderSecret(privateKey)) {
+      return notConfigured(
+        "Apple Music is not configured yet. An admin must upload the Apple Music .p8 key first.",
+        corsHeaders,
+      );
     }
 
-    if (!pkRow?.setting_value) {
-      return notConfigured("Apple Music is not configured yet. An admin must upload the Apple Music .p8 key first.", corsHeaders);
+    if (!looksLikePemPrivateKey(privateKey)) {
+      return notConfigured(
+        "Apple Music private key is malformed. Ask an admin to re-upload the Apple Music .p8 key.",
+        corsHeaders,
+      );
     }
 
-    const privateKey = pkRow.setting_value as string;
-    const teamId = Deno.env.get("APPLE_TEAM_ID") || "";
-    const musicKeyId = Deno.env.get("APPLE_MUSIC_KEY_ID") || "";
-
-    if (!teamId || !musicKeyId) {
-      return notConfigured("Apple Music Team ID or Key ID is missing. Ask an admin to finish the Apple Music integration setup.", corsHeaders);
+    if (!looksLikeAppleId(teamId) || !looksLikeAppleId(musicKeyId)) {
+      return notConfigured(
+        "Apple Music Team ID or Key ID is missing or invalid. Ask an admin to finish the Apple Music integration setup.",
+        corsHeaders,
+      );
     }
 
     const developerToken = await createAppleMusicJWT(privateKey, teamId, musicKeyId);
