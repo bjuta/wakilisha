@@ -25,6 +25,10 @@ const ENV_PREFIX = "env_";
 const PROVIDER_CONFIG_PREFIX = "wk_provider_config_";
 const PROVIDER_SAVED_AT_PREFIX = "wk_provider_saved_at_";
 
+function isServerStoredSecretMarker(value: string): boolean {
+  return value === "__server_stored__" || value.startsWith("uploaded:");
+}
+
 export function envStorageKey(envVar: string): string {
   return `${ENV_PREFIX}${envVar}`;
 }
@@ -147,13 +151,21 @@ export async function syncProviderCredentialsToServer(
 
   const credentials: Record<string, string> = {};
   for (const field of schema.fields) {
-    if (field.envVar) {
-      const val = values[field.key] ?? getDefaultFieldValue(field);
-      const strVal = typeof val === "boolean" || typeof val === "number" ? String(val) : val;
-      if (strVal && String(strVal).trim()) {
-        credentials[field.envVar] = String(strVal).trim();
-      }
-    }
+    if (!field.envVar) continue;
+
+    const val = values[field.key] ?? getDefaultFieldValue(field);
+    const strVal = typeof val === "boolean" || typeof val === "number" ? String(val) : val;
+    const trimmed = String(strVal ?? "").trim();
+
+    if (!trimmed) continue;
+
+    // secretFile values are server-side upload markers such as "__server_stored__".
+    // They are not the secret itself, and must never be pushed through the generic
+    // credentials sync because that overwrites admin_settings_secrets with the marker.
+    if (field.type === "secretFile") continue;
+    if (isServerStoredSecretMarker(trimmed)) continue;
+
+    credentials[field.envVar] = trimmed;
   }
 
   if (Object.keys(credentials).length === 0) {
