@@ -19,6 +19,7 @@ import { buildContentSegments } from "./components/ArticleEmbedUtils";
 import { SkeletonArticlePage } from "@/components/skeletons/Skeletons";
 import { Chapter19FallbackImage } from "@/components/media/Chapter19FallbackImage";
 import { MetaTags } from "@/components/seo/MetaTags";
+import { SchemaOrg } from "@/components/seo/SchemaOrg";
 import { checkArticleScheduling, lookupSlugRedirect } from "@/services/articles/articleAdminService";
 import { resolveTrackMarkers } from "./components/ArticleTrackEmbeds";
 import { transformTrackShortcodes } from "@/utils/transformTrackShortcodes";
@@ -26,6 +27,9 @@ import { injectMediaCaptions, buildAssetCaptionMap } from "@/utils/injectMediaCa
 import { SharePopover } from "@/components/design-system/share/ShareSheet";
 import { getShareCounts, getTotalShareCount } from "@/services/shareTracking";
 import { useScrollDepthTracking } from "@/hooks/useScrollDepthTracking";
+import { useAuthUser } from "@/hooks/useAuthUser";
+import { CommunitySection } from "./components/CommunitySection";
+import { CommunityActionSheet } from "@/components/feature/community/CommunityActionSheet";
 
 /* Remove InlineMediaGallery — captions now render inline alongside their images */
 
@@ -47,7 +51,7 @@ function useArticleShareCount(pageUrl: string) {
   return totalShares;
 }
 
-function ArticleBottomShare({ article, shareText }: { article: MagazineArticle; shareText: string }) {
+function ArticleBottomShare({ article, shareText, onComment }: { article: MagazineArticle; shareText: string; onComment?: () => void }) {
   const [popoverOpen, setPopoverOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const pageUrl = typeof window !== "undefined" ? window.location.href : "";
@@ -83,6 +87,7 @@ function ArticleBottomShare({ article, shareText }: { article: MagazineArticle; 
             imageUrl: article.heroUrl,
           }}
           triggerRef={buttonRef as React.RefObject<HTMLElement>}
+          onComment={onComment}
         />
       </div>
     </div>
@@ -95,6 +100,8 @@ export default function ArticlePage() {
   const previewNonce = searchParams.get("preview");
   const navigate = useNavigate();
   const { article, loading: articleLoading, error: articleError } = useMagazineArticle(slug, previewNonce);
+  const authUser = useAuthUser();
+  const isLoggedIn = !authUser.loading && authUser.id.length > 0;
 
   useScrollDepthTracking({
     pageType: "article",
@@ -249,9 +256,43 @@ export default function ArticlePage() {
     setTimeout(() => setCopyDone(false), 2500);
   };
 
+  const [communitySheetOpen, setCommunitySheetOpen] = useState(false);
+
+  const scrollToCommunity = useCallback(() => {
+    const el = document.getElementById("community-section");
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, []);
+
   const shareText = article?.title ?? "";
   const pageUrl = typeof window !== "undefined" ? window.location.href : "";
   const heroShareCount = useArticleShareCount(pageUrl);
+
+  // Memoize community entities so useCommunityThread doesn't re-fetch on every scroll
+  const communityEntity = useMemo(() => {
+    if (!article) return null;
+    return {
+      type: "article" as const,
+      slug: article.slug,
+      id: article.id,
+      url: typeof window !== "undefined" ? window.location.href : "",
+      title: article.title,
+    };
+  }, [article?.slug, article?.id, article?.title]);
+
+  const actionEntity = useMemo(() => {
+    if (!article) return null;
+    return {
+      type: "article" as const,
+      slug: article.slug,
+      id: article.id,
+      url: typeof window !== "undefined" ? window.location.href : "",
+      title: article.title,
+      subtitle: article.dek,
+      imageUrl: article.heroUrl,
+    };
+  }, [article?.slug, article?.id, article?.title, article?.dek, article?.heroUrl]);
 
   if (articleLoading) return <SkeletonArticlePage />;
   if (checkingRedirect) return <div className="min-h-screen flex items-center justify-center"><div className="flex items-center gap-3 text-[var(--wk-text-muted)]"><i className="ri-loader-4-line animate-spin text-[20px]" /><span className="text-[14px]">Checking for updated link…</span></div></div>;
@@ -275,6 +316,18 @@ export default function ArticlePage() {
   return (
     <main className="min-h-screen bg-[var(--wk-bg)]">
       <MetaTags title={article.title} description={article.dek || `Read ${article.title} on WAKILISHA Magazine.`} imageUrl={article.heroUrl} url={typeof window !== "undefined" ? window.location.href : undefined} type="article" />
+      <SchemaOrg
+        data={{
+          "@type": "Article",
+          headline: article.title,
+          description: article.dek || undefined,
+          image: article.heroUrl,
+          datePublished: article.date,
+          author: article.author ? { "@type": "Person", name: article.author } : undefined,
+          publisher: { "@type": "Organization", name: "WAKILISHA" },
+          url: typeof window !== "undefined" ? window.location.href : undefined,
+        }}
+      />
       <div className="article-progress" ref={progressBarRef}><span style={{ transform: "scaleX(0)" }} /></div>
       <div className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-full pointer-events-none"} bg-[var(--wk-bg)]/95 backdrop-blur-md border-b border-[var(--wk-border)]`}>
         <div className="max-w-[1180px] mx-auto px-6 h-14 flex items-center gap-4"><Link to="/magazine" className="flex items-center gap-1.5 text-[12px] font-bold text-[var(--wk-text-muted)] hover:text-[var(--wk-brand)] transition-colors whitespace-nowrap shrink-0"><WkIcon name="ArrowLeft" size={14} />Magazine</Link><div className="h-4 w-px bg-[var(--wk-border)] shrink-0" /><h2 className="text-[13px] font-bold text-[var(--wk-text)] flex-1 min-w-0 truncate">{article.title}</h2><button onClick={handleNavCopy} className="ml-auto shrink-0 h-8 px-3 rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] text-[11px] font-semibold text-[var(--wk-text-soft)] hover:border-[var(--wk-brand)] hover:text-[var(--wk-brand)] transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap"><i className="ri-link-m" />{copyDone ? "Copied!" : "Share"}</button></div>
@@ -285,6 +338,12 @@ export default function ArticlePage() {
         <div className="absolute top-0 left-0 right-0 z-20 px-6 py-5 flex items-center justify-between">
           <Link to="/magazine" className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/25 backdrop-blur-sm px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-white/85 hover:bg-black/45 transition-all whitespace-nowrap"><WkIcon name="ArrowLeft" size={13} />Magazine</Link>
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCommunitySheetOpen(true)}
+              className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/25 backdrop-blur-sm px-3 py-2 text-[11px] font-bold text-white/80 hover:bg-black/45 transition-all cursor-pointer whitespace-nowrap"
+            >
+              <i className="ri-more-2-line text-[16px]" />
+            </button>
             <button onClick={handleNavCopy} className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/25 backdrop-blur-sm px-3 py-2 text-[11px] font-bold text-white/80 hover:bg-black/45 transition-all cursor-pointer whitespace-nowrap">
               <i className="ri-share-line" />{copyDone ? "Copied!" : "Share"}
               {heroShareCount > 0 && (
@@ -306,8 +365,26 @@ export default function ArticlePage() {
         <div className="max-w-[740px] mx-auto px-6 lg:px-8 pb-16">
           {article.categories?.length > 0 && <TagBlock label="Categories" items={article.categories} basePath="/categories" />}
           {article.tags?.length > 0 && <TagBlock label="Topics" items={article.tags} basePath="/tags" />}
-          <ArticleBottomShare article={article} shareText={shareText} />
+          <ArticleBottomShare article={article} shareText={shareText} onComment={scrollToCommunity} />
         </div>
+
+        {communityEntity && (
+          <CommunitySection
+            entity={communityEntity}
+            user={isLoggedIn ? authUser : null}
+          />
+        )}
+
+        {/* Community Action Sheet */}
+        {actionEntity && (
+          <CommunityActionSheet
+            entity={actionEntity}
+            open={communitySheetOpen}
+            onClose={() => setCommunitySheetOpen(false)}
+            userId={isLoggedIn ? authUser.id : undefined}
+            onComment={scrollToCommunity}
+          />
+        )}
       </div>
 
       <ArticleRelated stories={related} loading={relatedLoading} />

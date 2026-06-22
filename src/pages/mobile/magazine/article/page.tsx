@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import {
   useMagazineArticle,
@@ -19,7 +19,11 @@ import { resolveTrackMarkers } from "@/pages/magazine/article/components/Article
 import { buildContentSegments } from "@/pages/magazine/article/components/ArticleEmbedUtils";
 import { injectMediaCaptions, buildAssetCaptionMap } from "@/utils/injectMediaCaptions";
 import { MobileShareButton } from "@/components/design-system/share/ShareSheet";
+import { CommunityActionSheet } from "@/components/feature/community/CommunityActionSheet";
+import { CommunitySection } from "@/pages/magazine/article/components/CommunitySection";
+import { SchemaOrg } from "@/components/seo/SchemaOrg";
 import { useScrollDepthTracking } from "@/hooks/useScrollDepthTracking";
+import { useAuthUser } from "@/hooks/useAuthUser";
 
 function formatReadCount(count: number): string {
   if (count >= 1000) return `${(count / 1000).toFixed(1)}k`;
@@ -85,10 +89,20 @@ export default function MobileArticle() {
 
   const { article, loading, error } = useMagazineArticle(slug, previewNonce);
   const { articles: allArticles } = useMagazineArticles();
+  const authUser = useAuthUser();
+  const isLoggedIn = !authUser.loading && authUser.id.length > 0;
 
   const [copyToast, setCopyToast] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [shareCounts, setShareCounts] = useState<Record<string, number>>({});
+  const [shareCounts, setShareCounts] = useState<Record<string, number>>();
+  const [communitySheetOpen, setCommunitySheetOpen] = useState(false);
+
+  const scrollToCommunity = useCallback(() => {
+    const el = document.getElementById("community-section");
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, []);
 
   const contentHtml = article?.contentHtml ?? "";
   const shortcodeMarked = useMemo(
@@ -163,6 +177,31 @@ export default function MobileArticle() {
 
   const totalShares = getTotalShareCount(shareCounts);
 
+  // Memoize community entities so useCommunityThread doesn't re-fetch on every scroll
+  const communityEntity = useMemo(() => {
+    if (!article) return null;
+    return {
+      type: "article" as const,
+      slug: article.slug,
+      id: article.id,
+      url: typeof window !== "undefined" ? window.location.href : "",
+      title: article.title,
+    };
+  }, [article?.slug, article?.id, article?.title]);
+
+  const actionEntity = useMemo(() => {
+    if (!article) return null;
+    return {
+      type: "article" as const,
+      slug: article.slug,
+      id: article.id,
+      url: typeof window !== "undefined" ? window.location.href : "",
+      title: article.title,
+      subtitle: article.author,
+      imageUrl: article.heroUrl,
+    };
+  }, [article?.slug, article?.id, article?.title, article?.author, article?.heroUrl]);
+
   if (loading) {
     return <SkeletonArticlePage />;
   }
@@ -195,6 +234,18 @@ export default function MobileArticle() {
       </div>
 
       {/* Full-bleed hero */}
+      <SchemaOrg
+        data={{
+          "@type": "Article",
+          headline: article.title,
+          description: article.dek || undefined,
+          image: article.heroUrl,
+          datePublished: article.date,
+          author: article.author ? { "@type": "Person", name: article.author } : undefined,
+          publisher: { "@type": "Organization", name: "WAKILISHA" },
+          url: typeof window !== "undefined" ? window.location.href : undefined,
+        }}
+      />
       <section className="relative overflow-hidden" style={{ height: "62dvh", minHeight: "380px" }}>
         {article.heroUrl ? (
           <img
@@ -218,15 +269,24 @@ export default function MobileArticle() {
             <i className="ri-arrow-left-line text-[12px]" />
             Magazine
           </Link>
-          <MobileShareButton
-            item={{
-              title: article.title,
-              subtitle: article.author,
-              description: article.dek || article.title,
-              imageUrl: article.heroUrl,
-              type: "article",
-            }}
-          />
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCommunitySheetOpen(true)}
+              className="flex items-center justify-center w-8 h-8 rounded-full border border-white/20 bg-black/25 backdrop-blur-sm text-white/80 hover:bg-black/45 transition-all cursor-pointer"
+              aria-label="Actions"
+            >
+              <i className="ri-more-2-line text-[16px]" />
+            </button>
+            <MobileShareButton
+              item={{
+                title: article.title,
+                subtitle: article.author,
+                description: article.dek || article.title,
+                imageUrl: article.heroUrl,
+                type: "article",
+              }}
+            />
+          </div>
         </div>
       </section>
 
@@ -356,6 +416,14 @@ export default function MobileArticle() {
         </div>
       </div>
 
+      {/* Community Section */}
+      {communityEntity && (
+        <CommunitySection
+          entity={communityEntity}
+          user={isLoggedIn ? authUser : null}
+        />
+      )}
+
       {/* Read next */}
       {relatedStories.length > 0 && (
         <section className="border-t border-[var(--wk-border)] bg-[var(--wk-bg-subtle)] py-10">
@@ -390,6 +458,17 @@ export default function MobileArticle() {
           <i className="ri-arrow-right-line" />
         </Link>
       </section>
+
+      {/* Community Action Sheet */}
+      {actionEntity && (
+        <CommunityActionSheet
+          entity={actionEntity}
+          open={communitySheetOpen}
+          onClose={() => setCommunitySheetOpen(false)}
+          userId={isLoggedIn ? authUser.id : undefined}
+          onComment={scrollToCommunity}
+        />
+      )}
     </div>
   );
 }

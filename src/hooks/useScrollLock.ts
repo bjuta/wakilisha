@@ -1,107 +1,54 @@
 import { useEffect, useRef } from "react";
 
-let lockCount = 0;
-let originalStyles: {
-  overflow: string;
-  paddingRight: string;
-  touchAction: string;
-} | null = null;
-let scrollY = 0;
+/**
+ * iOS-safe scroll lock using position:fixed technique.
+ *
+ * WHY: `overflow: hidden` on body in iOS Safari causes `position: fixed` elements
+ * (like the bottom nav, mini-player) to visually jump or lose their anchor because
+ * the browser re-computes the fixed viewport when body scroll is locked. It also
+ * causes the sheet's entrance animation to glitch.
+ *
+ * FIX: Use the `position: fixed; top: -scrollY` technique. This prevents scroll
+ * without changing the stacking context for fixed elements, so the nav stays put
+ * and sheets animate in correctly.
+ */
 
-function getScrollbarWidth() {
-  return window.innerWidth - document.documentElement.clientWidth;
-}
+let lockCount = 0;
+let savedScrollY = 0;
 
 function lock() {
   if (lockCount === 0) {
-    const body = document.body;
-    const html = document.documentElement;
-    const scrollbarWidth = getScrollbarWidth();
-
-    scrollY = window.scrollY || html.scrollTop || body.scrollTop || 0;
-
-    originalStyles = {
-      overflow: body.style.overflow,
-      paddingRight: body.style.paddingRight,
-      touchAction: body.style.touchAction,
-    };
-
-    body.style.paddingRight = scrollbarWidth > 0 ? `${scrollbarWidth}px` : "";
-    body.style.overflow = "hidden";
-    body.style.touchAction = "none";
-    html.style.overflow = "hidden";
+    savedScrollY = window.scrollY;
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+    document.body.style.position = "fixed";
+    document.body.style.top = `-${savedScrollY}px`;
+    document.body.style.left = "0";
+    document.body.style.right = "0";
+    document.body.style.width = "100%";
+    if (scrollbarWidth > 0) {
+      document.body.style.paddingRight = `${scrollbarWidth}px`;
+    }
+    // Do NOT set overflow:hidden — it breaks fixed children on iOS
   }
   lockCount++;
 }
 
 function unlock() {
-  if (lockCount <= 0) return;
-  lockCount--;
-
-  if (lockCount === 0 && originalStyles) {
-    const body = document.body;
-    const html = document.documentElement;
-
-    body.style.overflow = originalStyles.overflow;
-    body.style.paddingRight = originalStyles.paddingRight;
-    body.style.touchAction = originalStyles.touchAction;
-    html.style.overflow = "";
-
-    // Restore scroll position in case the browser reset it
-    window.scrollTo({ top: scrollY, left: 0, behavior: "auto" });
-    originalStyles = null;
-  }
-}
-
-function preventTouchMove(event: TouchEvent) {
-  const target = event.target as HTMLElement;
-  const scrollableParent = target.closest('[data-scroll-lock="container"]');
-  if (scrollableParent) {
-    const style = window.getComputedStyle(scrollableParent);
-    const overflowY = style.overflowY;
-    if (overflowY === "auto" || overflowY === "scroll") {
-      const isAtTop = scrollableParent.scrollTop <= 0;
-      const isAtBottom =
-        scrollableParent.scrollTop + scrollableParent.clientHeight >= scrollableParent.scrollHeight;
-
-      if (isAtTop && event.touches[0].clientY > (event as any)._startY) {
-        event.preventDefault();
-      } else if (isAtBottom && event.touches[0].clientY < (event as any)._startY) {
-        event.preventDefault();
-      }
-    }
-    // If it's inside a scroll-lock container, always allow the touch event
-    // (the container handles its own scroll)
+  if (lockCount <= 0) {
+    lockCount = 0;
     return;
   }
-  // Only block touch events on the document body
-  event.preventDefault();
-}
+  lockCount--;
 
-
-let touchStartListener: ((e: TouchEvent) => void) | null = null;
-let touchMoveListener: ((e: TouchEvent) => void) | null = null;
-
-function addTouchBlockers() {
-  if (touchStartListener) return;
-
-  touchStartListener = (e: TouchEvent) => {
-    (e as any)._startY = e.touches[0].clientY;
-  };
-  touchMoveListener = preventTouchMove;
-
-  document.addEventListener("touchstart", touchStartListener, { passive: true });
-  document.addEventListener("touchmove", touchMoveListener, { passive: false });
-}
-
-function removeTouchBlockers() {
-  if (touchStartListener) {
-    document.removeEventListener("touchstart", touchStartListener);
-    touchStartListener = null;
-  }
-  if (touchMoveListener) {
-    document.removeEventListener("touchmove", touchMoveListener);
-    touchMoveListener = null;
+  if (lockCount === 0) {
+    document.body.style.position = "";
+    document.body.style.top = "";
+    document.body.style.left = "";
+    document.body.style.right = "";
+    document.body.style.width = "";
+    document.body.style.paddingRight = "";
+    // Restore scroll position silently
+    window.scrollTo({ top: savedScrollY, behavior: "instant" });
   }
 }
 
@@ -111,18 +58,15 @@ export function useScrollLock(locked: boolean) {
   useEffect(() => {
     if (locked && !wasLocked.current) {
       lock();
-      addTouchBlockers();
       wasLocked.current = true;
     } else if (!locked && wasLocked.current) {
       unlock();
-      removeTouchBlockers();
       wasLocked.current = false;
     }
 
     return () => {
       if (wasLocked.current) {
         unlock();
-        removeTouchBlockers();
         wasLocked.current = false;
       }
     };

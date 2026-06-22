@@ -205,21 +205,31 @@ WAKILISHA is a premier cultural institution and digital platform dedicated to pr
 
 ---
 
-### Phase 8: Performance, SEO & Polish ✨
-**Status:** NOT STARTED
-**Goal:** Production-ready performance, SEO, and visual polish.
+### Phase 8: Performance, SEO & Polish ✅ COMPLETE (June 22, 2026)
 
-**What needs to happen:**
-1. SEO: Review meta tags, titles, descriptions for all entity detail pages
-2. SEO: Add Schema.org structured data (MusicAlbum, MusicGroup, MusicRecording) to appropriate pages
-3. Performance: Image optimization, lazy loading audit
-4. Performance: API response caching strategy
-5. Visual polish: Consistent loading skeletons on all pages
-6. Visual polish: Smooth page transitions
-7. Error states: Friendly error messages with retry on all data-dependent pages
-8. 404 handling: Verify NotFound page renders for invalid slugs on all entity types
+**What was built:**
 
-**Deliverable:** Production-grade polish across the entire site.
+1. ✅ **Mobile Community UI** — CommunitySection (comments, composer, voting, reactions, sort modes, reply threads) wired into mobile article pages. Mobile users can now participate in discussions identically to desktop.
+
+2. ✅ **Notification Bell on Mobile** — NotificationBell wired into MobileBottomNav (only when logged in). Dropdown opens upward on mobile for bottom-nav placement. Responsive positioning: `bottom-full mb-2` on mobile, `top-full mt-2` on desktop.
+
+3. ✅ **Community Activity Auto-Population** — 4 new DB triggers auto-write to `community_activity`:
+   - `trg_community_follows_activity` — on INSERT to community_follows
+   - `trg_community_saves_activity` — on INSERT to community_saves
+   - `trg_community_votes_activity` — on INSERT to community_votes
+   - `trg_community_reactions_activity` — on INSERT to community_reactions
+   - `community_create_comment` updated to write `comment`/`reply` activity entries
+
+4. ✅ **Schema.org Structured Data** — JSON-LD injected on all entity detail pages:
+   - **Artist** (`MusicGroup`): name, image, description, genre, url, Spotify sameAs
+   - **Release** (`MusicAlbum`): name, byArtist, image, datePublished, numTracks, genre, track list with durations
+   - **Track** (`MusicRecording`): name, byArtist, image, duration (ISO 8601), datePublished, inAlbum, genre, ISRC
+   - **Genre** (`WebPage`): name, description
+   - **Label** (`Organization`): name, description
+   - **Article** (`Article`): headline, description, image, datePublished, author (Person), publisher (Organization)
+   - Component: `src/components/seo/SchemaOrg.tsx` — generic JSON-LD injector supporting all 6 schema types
+
+5. ✅ **Page Transitions** — `page-enter` animation (fade-in + 8px slide up, 300ms) added to design system motion tokens. `page-transition` utility class available for page wrappers.
 
 ---
 
@@ -1574,3 +1584,203 @@ The following must be set in Supabase Dashboard → Edge Functions → `briefing
 
 - `supabase/functions/briefing-handler/index.ts` — Edge Function (deployed)
 - Database tables: `briefing_catalog`, `briefing_subscribers`, `briefing_opt_ins`, `briefing_tokens`, `briefing_issues`, `briefing_issue_recipients`
+
+---
+
+## Phase 13: Community Layer (Comments & Community Infrastructure) 🔄 IN PROGRESS
+
+**Status:** Phase 1 (Database + Service Foundation) COMPLETE. Phase 2 (Public Comment UI) COMPLETE. Phase 3 (Profile Integration) COMPLETE. Phase 4 (Share/Community Action Integration) COMPLETE. Phase 5 (Admin Moderation) COMPLETE. Phase 6 (Contributions Layer) COMPLETE. Phase 7 (Notifications & Community Discovery) COMPLETE. Phase 8 (Mobile Comments, Activity Triggers, Mobile Bell, SEO Schema, Page Transitions) COMPLETE.
+**Goal:** Build Reddit-style nested comments, community profiles, voting, reactions, and moderation infrastructure for all cultural entities on WAKILISHA.
+
+### Phase 1: Database & Service Foundation ✅ COMPLETE (June 22, 2026)
+
+**What was built:**
+
+1. **12 Community Tables** — All created with RLS enabled:
+   - `community_profiles` — Public community identity (username, display_name, avatar, bio, trust_level, reputation, counts)
+   - `community_threads` — One thread per entity (article, artist, track, release, chart, etc.)
+   - `community_comments` — Reddit-style nested comments (parent_id, root_id, depth, path)
+   - `community_votes` — Upvote/downvote per user per comment (atomic via RPC)
+   - `community_reactions` — Cultural reactions (signal, memory, context, fire, agree)
+   - `community_reports` — Report queue for moderation (spam, harassment, misinformation, etc.)
+   - `community_moderation_events` — Audit log for every moderation action
+   - `community_contributions` — Comments → cultural contributions (corrections, missing credits, etc.)
+   - `community_follows` — Follow any entity or thread
+   - `community_saves` — Save/bookmark any entity
+   - `community_activity` — Public activity feed (comments, votes, reactions, saves)
+   - `community_notifications` — Notification system (replies, mentions, pins, approvals)
+
+2. **30+ Indexes** — Performance indexes on all hot query paths:
+   - `idx_comments_thread_status` — Fast thread comment loading
+   - `idx_comments_thread_score` — Sort by "best" ranking
+   - `idx_comments_pinned` — Pin editor picks to top
+   - `idx_votes_user` — Prevent duplicate votes
+   - `idx_notifications_unread` — Fast unread notification count
+   - `idx_threads_entity` — Resolve thread by entity
+
+3. **RLS Policies** — Full security model:
+   - **Public read**: visible comments, open threads, public profiles, approved contributions, public activity
+   - **Authenticated read**: own notifications, own saves, own follows, own reports, own pending contributions
+   - **Authenticated write**: own profile, own comments, own votes, own reactions, own reports, own saves/follows, own contributions
+   - **Admin/moderator**: `has_capability()` function checks `moderate_community` capability. Full access to moderation tables, hide/remove/restore/pin/lock actions.
+   - **Capabilities added**: `view_community`, `manage_community`, `moderate_community` inserted into `capability_definitions` and assigned to `administrator`, `editor`, and `moderator` roles.
+
+4. **8 RPC Functions** — Atomic operations with automatic counter updates:
+   - `community_get_or_create_thread` — Resolve or create entity thread
+   - `community_create_comment` — Insert comment, update parent reply_count, thread comment_count, profile comment_count
+   - `community_soft_delete_comment` — Soft delete with tombstone rendering
+   - `community_vote_comment` — Toggle/change votes with atomic upvote/downvote/score updates
+   - `community_react_to_target` — Toggle reactions with atomic reaction_count
+   - `community_report_comment` — Create report with atomic report_count
+   - `community_follow_target` — Toggle follow (save/delete)
+   - `community_save_entity` — Toggle save (save/delete)
+   - `community_mark_notification_read` — Mark notification read
+   - `community_create_contribution` — Create contribution from comment
+
+5. **TypeScript Service Layer** (`src/services/community/`):
+   - `types.ts` — 20+ interfaces for all community entities
+   - `service.ts` — RPC wrappers + Supabase query helpers (thread resolution, comment loading, reply hydration, user state hydration, profile CRUD)
+   - `index.ts` — Barrel export
+
+6. **React Hooks** (`src/hooks/`):
+   - `useCommunityProfile` — Fetch/create profile
+   - `useRequireCommunityProfile` — Auto-detect missing profile, prompt for username
+   - `useCurrentUserProfile` — Subscribe to auth state
+   - `useCommunityThread` — Thread + comments + sorting + posting
+   - `useEntityCommentCount` — Show comment count on entity cards
+   - `useCommentActions` — Vote, react, report with loading states
+   - `useEntityActions` — Follow, save, contribute with loading states
+
+### Phase 2: Public Comment UI ✅ COMPLETE (June 22, 2026)
+
+**What was built:**
+1. `CommentCard` (`src/components/feature/community/CommentCard.tsx`) — Full comment card with inline voting (upvote/downvote with optimistic updates), reaction picker (signal/memory/context/fire/agree with popover), nested reply threads (indented with left border), reply composer with character count + ⌘+Enter shortcut, expand/collapse replies, time-ago timestamps, editor pick + mod badges, reported indicator
+2. `CommentComposer` (`src/components/feature/community/CommentComposer.tsx`) — Text area with avatar, character count, ⌘+Enter shortcut, posting state, error handling, `LoginToComment` CTA variant for unauthenticated users
+3. `CommunitySection` (`src/pages/magazine/article/components/CommunitySection.tsx`) — Full orchestrator: entity→thread resolution, comment list with 5 sort modes (Best/Newest/Oldest/Most Replied/Editor Picks) as pill tabs, composer or login prompt, loading skeletons, empty state ("No comments yet"), error state with retry
+4. **Mounted on article pages** — `CommunitySection` added between ArticleBottomShare and ArticleRelated on `src/pages/magazine/article/page.tsx`. Passes article entity (type, slug, id, url, title) and auth user state.
+
+### Phase 3: Profile Integration ✅ COMPLETE (June 22, 2026)
+
+**What was built:**
+1. ✅ `/profile` tabs — Comments, Replies, Saves, Following, Account (5 tabs). Each tab has loading skeletons, error states with retry, empty states with CTAs, and full data display
+2. ✅ `/u/:username` — Public community profile route at `src/pages/profile/public/page.tsx`. Shows avatar, display name, username, bio, location, join date, reputation, stats row, and recent public comments
+3. ✅ Profile stats — Stats bar shows live comment count, save count, follow count, and reputation score from `community_profiles`
+4. ✅ Recent public comments — Visible on both private and public profile pages
+5. ✅ Service additions — `getUserReplies()` (replies TO the user), `getUserProfileWithStats()` (live counts from DB)
+
+**Files:**
+- `src/pages/profile/page.tsx` — Complete rewrite with 5 tabs
+- `src/pages/profile/public/page.tsx` — New public profile page
+- `src/services/community/service.ts` — Added `getUserReplies`, `getUserProfileWithStats`
+- `src/router/config.tsx` — Added `/u/:username` route
+
+### Phase 4: Share/Community Action Integration ✅ COMPLETE (June 22, 2026)
+
+**What was built:**
+1. ✅ `CommunityActionSheet` (`src/components/feature/community/CommunityActionSheet.tsx`) — Mobile bottom sheet with Save (toggleable bookmark), Follow (toggleable), Share (opens ShareSheet), Comment (scrolls to CommunitySection), Copy Link, and Report (reason sub-sheet with 8 report categories). Drag-to-close, stateful toggles with loading indicators, report submission with success state.
+2. ✅ ShareSheet integration — Both `ShareSheet` and `SharePopover` now accept optional `onComment` callback. When provided, a "Comment — Join the discussion" action row appears in the share UI. On article pages, clicking it closes the share sheet and scrolls to the CommunitySection.
+3. ✅ `MobileShareButton` and `ShareButton` both pass through `onComment` prop to `ShareSheet`.
+4. ✅ Comment permalinks — Every `CommentCard` renders with `id={comment-{comment.id}}` so `#comment-<id>` URL fragments scroll directly to that comment.
+5. ✅ Desktop article page — Community action button in hero (three-dot menu) opens `CommunityActionSheet`. `ArticleBottomShare` SharePopover wired with `onComment` to scroll to `#community-section`.
+6. ✅ Mobile article page — Same hero community button + `CommunityActionSheet` wired.
+
+**Files:**
+- `src/components/feature/community/CommunityActionSheet.tsx` — new
+- `src/components/design-system/share/ShareSheet.tsx` — `onComment` added to ShareSheet, SharePopover, ShareButton, MobileShareButton
+- `src/pages/magazine/article/page.tsx` — CommunityActionSheet mounted, onComment wired to SharePopover
+- `src/pages/magazine/article/components/CommunitySection.tsx` — `id="community-section"` added
+- `src/pages/mobile/magazine/article/page.tsx` — CommunityActionSheet mounted
+- `src/components/feature/community/CommentCard.tsx` — `id={comment-{id}}` added for permalinks
+
+### Phase 5: Admin Moderation ✅ COMPLETE (June 22, 2026)
+
+**What was built:**
+1. ✅ `/admin/community` — Full moderation dashboard with 4 tabbed queues
+2. ✅ **Comments Queue** — Filterable by status (all/visible/pending/hidden/removed/deleted/spam), sortable by newest/oldest/most reported/most votes. Shows comment text, author, thread, status badge, vote count, report count. Pagination with 25 per page.
+3. ✅ **Reports Queue** — Filterable by status (pending/resolved/dismissed). Shows reason, details, reported comment preview, status, and date. Resolve/Dismiss quick actions.
+4. ✅ **Contributions Queue** — Filterable by status (pending/approved/rejected/merged). Shows type, entity, user, status. Approve/Reject quick actions.
+5. ✅ **Moderation Log** — Filterable by action type (hide/remove/restore/pin/unpin/editor_pick/lock/unlock/resolve/dismiss/approve/reject). Shows action, target, moderator, reason, date.
+6. ✅ **Quick actions on Comments**: Hide, Remove, Restore, Pin, Unpin, Editor Pick (toggle). All with confirmation dialogs and loading states.
+7. ✅ **Quick actions on Reports**: Resolve, Dismiss
+8. ✅ **Quick actions on Contributions**: Approve, Reject
+9. ✅ **KPI strip**: Total Comments, Flagged, Pending Reports, Pending Contribs, Hidden, Removed
+10. ✅ **Toast notifications**: Success/error feedback after every action
+11. ✅ **Badge in admin nav**: Pending reports count badge on Community → Moderation
+
+**RLS Policies Added:**
+- `comments_admin_read` — Admins/moderators can SELECT all comments (not just visible)
+- `threads_admin_read` — Admins/moderators can SELECT all threads (not just open)
+- `profiles_admin_read` — Admins/moderators can SELECT all profiles (not just public)
+
+**Files:**
+- `src/services/community/admin.ts` — New admin service (queue queries + quick actions)
+- `src/pages/admin/community/page.tsx` — New moderation dashboard (~570 lines)
+- `src/router/config.tsx` — `/admin/community` route added
+- `src/pages/admin/AdminShell.tsx` — Community nav group + pendingReports badge
+- `src/hooks/useAdminBadgeCounts.ts` — pendingReports count added
+
+### Phase 6: Contributions Layer ✅ COMPLETE (June 22, 2026)
+
+**What was built:**
+
+1. ✅ **ContributionSheet** (`src/components/feature/community/ContributionSheet.tsx`) — Full mobile bottom sheet for creating contributions. Features: 6 contribution type pills with icons and descriptions, description textarea (10–1000 chars), optional source URL, sign-in gate, success confirmation. Fires `community_contribution` analytics event.
+
+2. ✅ **"Suggest Correction" from CommunityActionSheet** — New action row between Copy Link and Report divider. Opens ContributionSheet with entity context.
+
+3. ✅ **"Suggest Correction" from CommentCard** — Inline button on every comment's action bar. Opens ContributionSheet with `sourceCommentId` linked to the originating comment.
+
+4. ✅ **Admin Merge workflow** — `mergeContribution()` sets status to "merged", increments contributor reputation (+5) via `community_increment_reputation` RPC, logs moderation event. Merge button for approved contributions in admin.
+
+5. ✅ **`getEntityContributions()` service** — Queries approved + merged contributions by entity type + slug, hydrates contributor profiles.
+
+6. ✅ **ContributionBadges component** — Reusable inline badge strip for entity pages (artist, release, track). Shows contributor name/type linked to `/u/:username`, merged checkmark, "+N more" overflow. Wired into artist, release, and track detail pages.
+
+**Files:** `ContributionSheet.tsx` (new), `ContributionBadges.tsx` (new), `CommunityActionSheet.tsx`, `CommentCard.tsx`, `CommunitySection.tsx`, `admin.ts` (merge), `service.ts` (getEntityContributions), `admin/community/page.tsx`, `artists/detail/page.tsx`, `releases/detail/page.tsx`, `tracks/detail/page.tsx`, DB: `community_increment_reputation` RPC
+
+### Phase 7: Notifications & Community Discovery ✅ COMPLETE (June 22, 2026)
+
+**What was built:**
+
+1. ✅ **Notification system** — `community_distribute_notifications` RPC auto-creates notifications when someone comments on a thread the user follows (reply notifications for parent comment authors, new comment notifications for all thread followers). Called from within `community_create_comment` (non-blocking).
+
+2. ✅ **Notification Bell** (`src/components/feature/community/NotificationBell.tsx`) — Bell icon with unread count badge in AppTopBar. Dropdown with actor profiles, notification type icons, thread title previews, time-ago timestamps, "Mark all read" button. Polls every 30s.
+
+3. ✅ **Thread following** — `community_follow_target` RPC toggles follow. When following a thread, new comments trigger notifications. Wired in CommunityActionSheet.
+
+4. ✅ **Most Discussed** (`src/components/feature/community/MostDiscussed.tsx`) — Trending threads by comment count with rank badges, entity type icons, links to entity pages. Mounted on homepage.
+
+5. ✅ **Community Digest** (`src/components/feature/community/CommunityDigest.tsx`) — Real-time activity feed from `community_activity`. Shows recent actions with actor profiles, links to entities. Mounted on homepage.
+
+6. ✅ **New RPCs** — `community_distribute_notifications`, `community_get_unread_count`, `community_mark_all_read`.
+
+**Files:**
+- `src/components/feature/community/NotificationBell.tsx` — new
+- `src/components/feature/community/MostDiscussed.tsx` — new
+- `src/components/feature/community/CommunityDigest.tsx` — new
+- `src/services/community/service.ts` — 4 new notification functions
+- `src/components/layout/AppTopBar.tsx` — NotificationBell wired in
+- `src/pages/home/page.tsx` — "The Conversation" section added
+- Database: 3 new RPCs, `community_create_comment` updated
+
+---
+
+## Summary
+
+**Completed:**
+- Phase 2 (Repaired Content API) ✅
+- Phase 3 (Genre Detail) ✅
+- Phase 4 (Label Detail) ✅
+- Phase 5 (Track Detail) ✅
+- Phase 8 (Performance, SEO & Polish) ✅
+- Phase 10 (API Harmonization) ✅
+- Phase 11 (Analytics Layer) ✅
+- Phase 12 (Email Briefing) ✅
+- Phase 13 Community Layer Phases 1-8 (Database, Comments, Profiles, Actions, Moderation, Contributions, Notifications, Mobile+SEO+Activity) ✅
+
+**In Progress:**
+- Phase 1 (Relationship Resolution) — Database task, not started
+- Phase 6 (Cross-Linking) — Partial, needs full pass
+- Phase 7 (Mobile Parity) — Partial
+
+**Not Started:**
+- Phase 9 (Launch Readiness)

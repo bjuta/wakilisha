@@ -17,6 +17,9 @@ const NAV_GROUPS: NavGroup[] = [
     { path: "/admin", label: "Overview", icon: "LayoutDashboard", requiredCapability: "view_dashboard" },
     { path: "/admin/analytics", label: "Analytics", icon: "BarChart3", requiredCapability: "view_dashboard" },
   ] },
+  { label: "Community", visible: (can) => can("moderate_community"), items: [
+    { path: "/admin/community", label: "Moderation", icon: "MessageSquare", requiredCapability: "moderate_community", badgeKey: "pendingReports" },
+  ] },
   { label: "Content & Editorial", visible: (can) => can("edit_own_articles"), items: [
     { path: "/admin/content/articles", label: "Articles", icon: "FileText", requiredCapability: "edit_own_articles" },
     { path: "/admin/content/guides", label: "Guides", icon: "BookOpen", requiredCapability: "edit_guides" },
@@ -94,6 +97,7 @@ function getNavBadge(key: string, counts: ReturnType<typeof useAdminBadgeCounts>
     case "brokenLinks": return counts.brokenLinks > 0 ? counts.brokenLinks : undefined;
     case "reviewQueue": return counts.reviewQueue > 0 ? counts.reviewQueue : undefined;
     case "failedImports": return counts.failedImports > 0 ? counts.failedImports : undefined;
+    case "pendingReports": return counts.pendingReports > 0 ? counts.pendingReports : undefined;
     default: return undefined;
   }
 }

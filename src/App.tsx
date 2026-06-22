@@ -29,7 +29,9 @@ function App() {
             <ScrollRestoration />
             <PageViewTracker />
             <GtagInjector />
-            <AppRoutes />
+            <div className="page-transition">
+              <AppRoutes />
+            </div>
           </PlayerProvider>
         </ThemeProvider>
       </BrowserRouter>

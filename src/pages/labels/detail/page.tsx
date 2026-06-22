@@ -3,6 +3,8 @@ import { useParams, Link } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { Chapter19FallbackImage } from "@/components/media/Chapter19FallbackImage";
 import { MetaTags } from "@/components/seo/MetaTags";
+import { SchemaOrg } from "@/components/seo/SchemaOrg";
+import type { OrganizationSchema } from "@/components/seo/SchemaOrg";
 import { ch19Background } from "@/utils/ch19";
 import { getLabel, type PublicLabelDetail } from "@/services/publicApi/client";
 import { buildLabelHeroIntro, buildLabelSeoDescription } from "@/services/cultureContext/labelAdapters";
@@ -93,6 +95,15 @@ export default function LabelDetail() {
         title={`${label.name} on WAKILISHA`}
         description={seoDescription}
         type="website"
+      />
+
+      <SchemaOrg
+        data={{
+          "@type": "Organization",
+          name: label.name,
+          description: seoDescription,
+          url: typeof window !== "undefined" ? window.location.href : undefined,
+        }}
       />
 
       <section className="relative -mt-16 pt-16 flex min-h-[320px] items-end overflow-hidden md:min-h-[460px]">

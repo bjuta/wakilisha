@@ -3,6 +3,8 @@ import { Link, useLocation } from "react-router-dom";
 import { useTheme } from "@/components/design-system/theme/ThemeProvider";
 import { getSiteIdentitySettings } from "@/services/adminSettings/settingsStore";
 import type { SiteIdentitySettings } from "@/services/adminSettings/settingsTypes";
+import { NotificationBell } from "@/components/feature/community/NotificationBell";
+import { useAuthUser } from "@/hooks/useAuthUser";
 
 function useSiteIdentity(): SiteIdentitySettings {
   const [identity, setIdentity] = useState<SiteIdentitySettings>(getSiteIdentitySettings);
@@ -38,6 +40,7 @@ export function AppTopBar() {
   const location = useLocation();
   const identity = useSiteIdentity();
   const { theme, toggle } = useTheme();
+  const authUser = useAuthUser();
   const [logoError, setLogoError] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -159,6 +162,9 @@ export function AppTopBar() {
           <Link to="/search" aria-label="Search" className={`flex h-9 w-9 items-center justify-center rounded-full transition-all duration-200 ${isActive("/search") ? "text-[var(--wk-brand)] bg-[var(--wk-brand-soft)]" : iconColor}`}>
             <i className="ri-search-line text-[17px]" />
           </Link>
+          {authUser.id && (
+            <NotificationBell userId={authUser.id} />
+          )}
           <button onClick={toggle} aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"} className={`flex h-9 w-9 items-center justify-center rounded-full transition-all duration-200 ${iconColor}`}>
             <i className={theme === "dark" ? "ri-sun-line text-[17px]" : "ri-moon-line text-[17px]"} />
           </button>

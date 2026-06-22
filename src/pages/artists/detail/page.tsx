@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { WkButton } from "@/components/design-system/primitives/Button";
 import { MetaTags } from "@/components/seo/MetaTags";
+import { SchemaOrg } from "@/components/seo/SchemaOrg";
+import type { MusicGroupSchema } from "@/components/seo/SchemaOrg";
 import { getArtist, getArtistAppearsOn, clearDiscographyCache, type PublicArtistDetail, type RegistryAppearsOnRelease } from "@/services/publicContent/client";
 import { supabase } from "@/lib/supabase";
 import { ArtistDetailHero } from "./components/ArtistDetailHero";
@@ -13,6 +15,9 @@ import { ArtistBioSection, cleanBioExcerpt } from "./components/ArtistBioSection
 import { ArtistVideos } from "./components/ArtistVideos";
 import { ArtistNewsletterSection } from "./components/ArtistNewsletterSection";
 import { ArtistTaggedArticles } from "./components/ArtistTaggedArticles";
+import { ContributionBadges } from "@/components/feature/community/ContributionBadges";
+import { CommunitySection } from "@/pages/magazine/article/components/CommunitySection";
+import { useAuthUser } from "@/hooks/useAuthUser";
 import { useScrollDepthTracking } from "@/hooks/useScrollDepthTracking";
 
 async function getArtistRegisteredGenres(slug: string): Promise<string[]> {
@@ -32,6 +37,7 @@ async function getArtistRegisteredGenres(slug: string): Promise<string[]> {
 
 export default function ArtistDetail() {
   const { slug } = useParams<{ slug: string }>();
+  const user = useAuthUser();
 
   useScrollDepthTracking({
     pageType: "artist_detail",
@@ -123,6 +129,15 @@ export default function ArtistDetail() {
   const bioForSeo = cleanBioExcerpt(artist.fullBio || artist.bio || "");
   const seoDescription = bioForSeo || `Explore ${artist.name} on WAKILISHA — songs, releases, chart moments, and more.`;
 
+  const communityEntity = {
+    type: "artist" as const,
+    id: artist.slug,
+    slug: artist.slug,
+    url: typeof window !== "undefined" ? window.location.href : `/artists/${artist.slug}`,
+    title: artist.name,
+    imageUrl: artist.profileImageUrl || artist.imageUrl,
+  };
+
   return (
     <div className="wk-app-shell">
       <MetaTags
@@ -130,6 +145,18 @@ export default function ArtistDetail() {
         description={seoDescription}
         imageUrl={artist.profileImageUrl || artist.imageUrl}
         type="website"
+      />
+
+      <SchemaOrg
+        data={{
+          "@type": "MusicGroup",
+          name: artist.name,
+          image: artist.profileImageUrl || artist.imageUrl,
+          description: bioForSeo,
+          genre: registeredGenres,
+          url: typeof window !== "undefined" ? window.location.href : undefined,
+          sameAs: artist.spotifyUrl ? [artist.spotifyUrl] : undefined,
+        }}
       />
 
       <ArtistDetailHero
@@ -146,6 +173,10 @@ export default function ArtistDetail() {
         releaseCount={artist.releaseCount}
         chartEntryCount={artist.chartEntries.length}
       />
+
+      <div className="wk-container px-6 pb-4">
+        <ContributionBadges entityType="artist" entitySlug={artist.slug} />
+      </div>
 
       <div className="wk-container px-6 py-10 md:py-14">
         <div className="space-y-14 md:space-y-16 max-w-5xl">
@@ -207,6 +238,8 @@ export default function ArtistDetail() {
           </div>
         )}
       </div>
+
+      <CommunitySection entity={communityEntity} user={user} />
     </div>
   );
 }

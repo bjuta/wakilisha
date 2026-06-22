@@ -3,8 +3,10 @@ import { Link, useLocation, Outlet } from "react-router-dom";
 import { usePlayer } from "@/context/PlayerContext";
 import { useTheme } from "@/components/design-system/theme/ThemeProvider";
 import { useScrollLock } from "@/hooks/useScrollLock";
+import { useAuthUser } from "@/hooks/useAuthUser";
 import { WkIcon } from "@/components/design-system/Icon";
 import { MobileFullPlayer } from "./MobileFullPlayer";
+import { NotificationBell } from "@/components/feature/community/NotificationBell";
 
 const PRIMARY_NAV = [
   { label: "Home", to: "/", icon: "Home" },
@@ -43,11 +45,13 @@ function MobileMiniPlayer() {
 function MobileBottomNav() {
   const location = useLocation();
   const { theme, toggle } = useTheme();
+  const authUser = useAuthUser();
+  const isLoggedIn = !authUser.loading && authUser.id.length > 0;
   const isActive = (path: string) => path === "/" ? location.pathname === "/" : location.pathname.startsWith(path);
   if (location.pathname === "/auth") return null;
 
   return (
-    <nav className="phn-nav" aria-label="Primary mobile navigation">
+    <nav className="phn-nav" style={{ overflow: 'visible' }} aria-label="Primary mobile navigation">
       {PRIMARY_NAV.map((item) => {
         const active = isActive(item.to);
         return (
@@ -57,6 +61,9 @@ function MobileBottomNav() {
           </Link>
         );
       })}
+      {isLoggedIn && (
+        <NotificationBell userId={authUser.id} className="phn-nav-tab" />
+      )}
       <button
         className="phn-nav-tab phn-nav-theme"
         onClick={toggle}

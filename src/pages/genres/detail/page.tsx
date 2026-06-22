@@ -3,6 +3,8 @@ import { useParams, Link } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { Chapter19FallbackImage } from "@/components/media/Chapter19FallbackImage";
 import { MetaTags } from "@/components/seo/MetaTags";
+import { SchemaOrg } from "@/components/seo/SchemaOrg";
+import type { WebPageSchema } from "@/components/seo/SchemaOrg";
 import { ch19Background } from "@/utils/ch19";
 import { getGenre, type PublicGenreDetail } from "@/services/publicApi/client";
 import { buildGenreHeroIntro, buildGenreSeoDescription } from "@/services/cultureContext/genreAdapters";
@@ -98,6 +100,15 @@ export default function GenreDetail() {
         title={`${genre.name} on WAKILISHA`}
         description={seoDescription}
         type="website"
+      />
+
+      <SchemaOrg
+        data={{
+          "@type": "WebPage",
+          name: `${genre.name} — WAKILISHA Genre`,
+          description: seoDescription,
+          url: typeof window !== "undefined" ? window.location.href : undefined,
+        }}
       />
 
       <section className="relative -mt-16 pt-16 flex min-h-[380px] items-end overflow-hidden md:min-h-[520px]">

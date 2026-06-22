@@ -3,6 +3,8 @@ import { useParams, Link } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkButton } from "@/components/design-system/primitives/Button";
 import { MetaTags } from "@/components/seo/MetaTags";
+import { SchemaOrg } from "@/components/seo/SchemaOrg";
+import type { MusicAlbumSchema } from "@/components/seo/SchemaOrg";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
 import { useScrollDepthTracking } from "@/hooks/useScrollDepthTracking";
 import { getRelease, listReleases, releaseUrl, slugify, type PublicReleaseDetail, type PublicRelease } from "@/services/publicContent/client";
@@ -13,9 +15,13 @@ import ReleaseMetadata from "./components/ReleaseMetadata";
 import ReleaseRelatedReleases from "./components/ReleaseRelatedReleases";
 import ReleaseExcerpt from "./components/ReleaseExcerpt";
 import ReleaseFeaturedArtists from "./components/ReleaseFeaturedArtists";
+import { ContributionBadges } from "@/components/feature/community/ContributionBadges";
+import { CommunitySection } from "@/pages/magazine/article/components/CommunitySection";
+import { useAuthUser } from "@/hooks/useAuthUser";
 
 export default function ReleaseDetail() {
   const { artistSlug, releaseSlug } = useParams<{ artistSlug: string; releaseSlug: string }>();
+  const user = useAuthUser();
 
   useScrollDepthTracking({
     pageType: "release_detail",
@@ -98,6 +104,16 @@ export default function ReleaseDetail() {
   const chartStats = release.chartStats;
   const seoDescription = buildReleaseSeoDescription(release);
 
+  const communityEntity = {
+    type: "release" as const,
+    id: releaseSlug || undefined,
+    slug: releaseSlug || undefined,
+    url: typeof window !== "undefined" ? window.location.href : `/releases/${artistSlug}/${releaseSlug}`,
+    title: release.title,
+    subtitle: release.artist,
+    imageUrl: release.artworkUrl,
+  };
+
   return (
     <main className="min-h-screen bg-[var(--wk-bg)]">
       {/* SEO */}
@@ -110,8 +126,32 @@ export default function ReleaseDetail() {
         releaseDate={release.releaseDate}
       />
 
+      <SchemaOrg
+        data={{
+          "@type": "MusicAlbum",
+          name: release.title,
+          byArtist: { "@type": "MusicGroup", name: release.artist, url: release.artist ? `/artists/${slugify(release.artist)}` : undefined },
+          image: release.artworkUrl,
+          datePublished: release.releaseDate,
+          numTracks: release.trackCount,
+          genre: release.genres,
+          url: typeof window !== "undefined" ? window.location.href : undefined,
+          track: release.tracks?.map((t, i) => ({
+            "@type": "MusicRecording" as const,
+            name: t.title,
+            duration: t.duration ? `PT${String(Math.floor(t.duration / 60))}M${String(t.duration % 60)}S` : undefined,
+            position: i + 1,
+          })),
+        }}
+      />
+
       {/* Hero */}
       <ReleaseDetailHero release={release} minutes={minutes} />
+
+      {/* Contribution Badges */}
+      <div className="wk-container-wide px-6 pb-2">
+        <ContributionBadges entityType="release" entitySlug={releaseSlug} />
+      </div>
 
       {/* Content */}
       <div className="wk-container-wide px-6 py-10 md:py-14">
@@ -215,6 +255,8 @@ export default function ReleaseDetail() {
           </div>
         </div>
       </div>
+
+      <CommunitySection entity={communityEntity} user={user} />
     </main>
   );
 }

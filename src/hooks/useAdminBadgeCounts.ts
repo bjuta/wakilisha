@@ -6,6 +6,7 @@ interface BadgeCounts {
   brokenLinks: number;
   reviewQueue: number;
   failedImports: number;
+  pendingReports: number;
   loading: boolean;
 }
 
@@ -15,13 +16,14 @@ export function useAdminBadgeCounts(): BadgeCounts {
     brokenLinks: 0,
     reviewQueue: 0,
     failedImports: 0,
+    pendingReports: 0,
     loading: true,
   });
 
   const fetchCounts = useCallback(async () => {
     try {
       // Missing Images: artists without public_image_url + articles without hero_image_url
-      const [{ count: missingArtists }, { count: missingArticles }, { count: mediaAssets }, { count: reviewItems }, { count: failedRecords }] = await Promise.all([
+      const [{ count: missingArtists }, { count: missingArticles }, { count: mediaAssets }, { count: reviewItems }, { count: failedRecords }, { count: pendingReports }] = await Promise.all([
         supabase
           .from("registry_artists")
           .select("*", { count: "exact", head: true })
@@ -42,6 +44,10 @@ export function useAdminBadgeCounts(): BadgeCounts {
           .from("wk_ingestion_runs")
           .select("*", { count: "exact", head: true })
           .not("errors", "is", null),
+        supabase
+          .from("community_reports")
+          .select("*", { count: "exact", head: true })
+          .eq("status", "pending"),
       ]);
 
       setCounts({
@@ -49,6 +55,7 @@ export function useAdminBadgeCounts(): BadgeCounts {
         brokenLinks: mediaAssets ?? 0,
         reviewQueue: reviewItems ?? 0,
         failedImports: failedRecords ?? 0,
+        pendingReports: pendingReports ?? 0,
         loading: false,
       });
     } catch {

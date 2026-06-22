@@ -8,7 +8,10 @@
 
 .share-sheet-backdrop {
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100dvh;
   z-index: 300;
   display: flex;
   align-items: flex-end;
@@ -349,13 +352,13 @@
   .share-sheet {
     max-width: 100%;
     border-radius: 24px 24px 0 0;
-    /* Ensure the sheet never extends behind the bottom nav (64px + safe-area) */
-    max-height: calc(100dvh - 64px - max(env(safe-area-inset-bottom), 8px) - 16px);
+    /* Ensure the sheet never extends behind the bottom nav (52px + safe-area) */
+    max-height: calc(100dvh - 52px - max(env(safe-area-inset-bottom), 6px) - 16px);
   }
 
   .share-sheet-scroll {
     /* Extra bottom padding so the last row of icons / copy button isn't hidden */
-    padding: 0 16px calc(20px + 64px + max(env(safe-area-inset-bottom), 8px));
+    padding: 0 16px calc(20px + 52px + max(env(safe-area-inset-bottom), 6px));
   }
 
   .share-title {

@@ -7,6 +7,8 @@ import { getRelease, slugify, listReleases, type PublicReleaseDetail, type Publi
 import { trackUrl } from "@/utils/trackUrl";
 import { useScrollDepthTracking } from "@/hooks/useScrollDepthTracking";
 import { MobileShareButton } from "@/components/design-system/share/ShareSheet";
+import { CommunitySection } from "@/pages/magazine/article/components/CommunitySection";
+import { useAuthUser } from "@/hooks/useAuthUser";
 
 function formatDuration(seconds: number): string {
   if (!seconds) return "—";
@@ -103,6 +105,7 @@ function buildDescription(opts: {
 
 export default function MobileReleaseDetail() {
   const { artistSlug, releaseSlug } = useParams<{ artistSlug: string; releaseSlug: string }>();
+  const user = useAuthUser();
 
   useScrollDepthTracking({
     pageType: "release_detail",
@@ -231,6 +234,16 @@ export default function MobileReleaseDetail() {
   const previewSentences = sentences.slice(0, 2).join(". ") + ".";
   const restSentences = sentences.slice(2).join(". ").trim();
   const hasMoreDescription = restSentences.length > 0;
+
+  const communityEntity = {
+    type: "release" as const,
+    id: releaseSlug || undefined,
+    slug: releaseSlug || undefined,
+    url: typeof window !== "undefined" ? window.location.href : `/releases/${artistSlug}/${releaseSlug}`,
+    title: release.title,
+    subtitle: release.artist,
+    imageUrl: release.artworkUrl,
+  };
 
   return (
     <div className="min-h-screen bg-[var(--wk-bg)]">
@@ -524,6 +537,11 @@ export default function MobileReleaseDetail() {
             All releases
           </Link>
         </div>
+      </div>
+
+      {/* Community Section */}
+      <div className="px-5 pb-6">
+        <CommunitySection entity={communityEntity} user={user} />
       </div>
 
     </div>

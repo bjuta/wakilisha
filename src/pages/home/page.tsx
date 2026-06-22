@@ -5,6 +5,8 @@ import { HomeMarquee } from "./components/HomeMarquee";
 import { HomeRightNow } from "./components/HomeRightNow";
 import { HomeExplore } from "./components/HomeExplore";
 import { HomeMission } from "./components/HomeMission";
+import { MostDiscussed } from "@/components/feature/community/MostDiscussed";
+import { CommunityDigest } from "@/components/feature/community/CommunityDigest";
 import {
   listMagazineStories,
   type PublicStory,
@@ -66,6 +68,25 @@ export default function Home() {
         {/* 5. Mission + Stats */}
         <HomeMission />
 
+        {/* 6. Community Hub — most discussed + activity feed */}
+        <section className="py-14 md:py-20 border-t border-[var(--wk-divider)]" style={{ background: "var(--wk-bg)" }}>
+          <div style={{ maxWidth: 1180, margin: "0 auto", padding: "0 clamp(20px,4vw,40px)" }}>
+            <div className="text-center mb-10">
+              <h2 className="text-[28px] md:text-[36px] font-black tracking-tight text-[var(--wk-text)]">
+                The Conversation
+              </h2>
+              <p className="mt-2 text-[14px] text-[var(--wk-text-muted)] max-w-[480px] mx-auto">
+                Jump into the most active discussions across the culture. Share your perspective, vote on takes, and connect with the community.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <MostDiscussed limit={6} />
+              <CommunityDigest limit={8} />
+            </div>
+          </div>
+        </section>
+
         {/* Error banner */}
         {loadError && (
           <div className="border-t border-[var(--wk-danger)]/20 bg-[var(--wk-danger-soft)] px-6 py-3.5">
@@ -79,7 +100,7 @@ export default function Home() {
           </div>
         )}
 
-        {/* 6. Newsletter */}
+        {/* 7. Newsletter */}
         <section className="py-16 md:py-24 border-t border-[var(--wk-divider)]" style={{ background: "var(--wk-bg-subtle)" }}>
           <div style={{ maxWidth: 1180, margin: "0 auto", padding: "0 clamp(20px,4vw,40px)" }}>
             <NewsletterSubscribe

@@ -5,12 +5,17 @@ import { getTrack, type PublicTrackDetail } from "@/services/publicApi/client";
 import { buildTrackHeroIntro, buildTrackSeoDescription } from "@/services/cultureContext/trackAdapters";
 import { TrackChartSparkline } from "@/components/charts/TrackChartSparkline";
 import { MetaTags } from "@/components/seo/MetaTags";
+import { SchemaOrg } from "@/components/seo/SchemaOrg";
+import type { MusicRecordingSchema } from "@/components/seo/SchemaOrg";
 import TrackLyricsSection from "./components/TrackLyricsSection";
 import TrackRelatedTracks from "./components/TrackRelatedTracks";
 import TrackReleaseTracklist from "./components/TrackReleaseTracklist";
 import { releaseUrl } from "@/utils/releaseUrl";
 import { WkIcon } from "@/components/design-system/Icon";
 import { ShareButton } from "@/components/design-system/share/ShareSheet";
+import { ContributionBadges } from "@/components/feature/community/ContributionBadges";
+import { CommunitySection } from "@/pages/magazine/article/components/CommunitySection";
+import { useAuthUser } from "@/hooks/useAuthUser";
 import { useScrollDepthTracking } from "@/hooks/useScrollDepthTracking";
 
 type TrackChartAppearance = {
@@ -395,6 +400,7 @@ function ConnectedArtists({ artists, artworkUrl }: { artists: TrackViewModel["ar
 export default function TrackDetail() {
   const { artistSlug, trackSlug } = useParams<{ artistSlug: string; trackSlug: string }>();
   const { playTrack, currentTrack, isPlaying, togglePlay } = usePlayer();
+  const user = useAuthUser();
   const [track, setTrack] = useState<TrackViewModel | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -500,6 +506,16 @@ export default function TrackDetail() {
     });
   };
 
+  const communityEntity = {
+    type: "track" as const,
+    id: trackSlug || undefined,
+    slug: trackSlug || undefined,
+    url: typeof window !== "undefined" ? window.location.href : `/tracks/${artistSlug}/${trackSlug}`,
+    title: track.title,
+    subtitle: track.artist,
+    imageUrl: track.artworkUrl,
+  };
+
   return (
     <main className="min-h-screen bg-[var(--wk-bg)]">
       <MetaTags
@@ -509,6 +525,21 @@ export default function TrackDetail() {
         type="music.song"
         artistName={track.artist}
         releaseDate={track.releaseDate || track.releaseYear}
+      />
+
+      <SchemaOrg
+        data={{
+          "@type": "MusicRecording",
+          name: track.title,
+          byArtist: { "@type": "MusicGroup", name: track.artist, url: track.artistSlug ? `/artists/${track.artistSlug}` : undefined },
+          image: track.artworkUrl,
+          duration: track.duration > 0 ? `PT${String(Math.floor(track.duration / 60))}M${String(track.duration % 60)}S` : undefined,
+          datePublished: track.releaseDate || track.releaseYear,
+          inAlbum: track.albumTitle ? { "@type": "MusicAlbum", name: track.albumTitle, url: `/releases/${track.artistSlug}/${track.albumSlug}` } : undefined,
+          genre: track.genres.length > 0 ? track.genres : undefined,
+          isrcCode: track.isrc || undefined,
+          url: typeof window !== "undefined" ? window.location.href : undefined,
+        }}
       />
 
       <section className="relative -mt-16 pt-16 overflow-hidden">
@@ -573,6 +604,10 @@ export default function TrackDetail() {
           </div>
         </div>
       </section>
+
+      <div className="wk-container-wide px-6 pb-2">
+        <ContributionBadges entityType="track" entitySlug={trackSlug} />
+      </div>
 
       <div className="wk-container-wide px-6 py-10 md:py-14">
         <div className="flex flex-col lg:flex-row gap-8 lg:gap-10">
@@ -693,6 +728,8 @@ export default function TrackDetail() {
           </div>
         </div>
       </div>
+
+      <CommunitySection entity={communityEntity} user={user} />
     </main>
   );
 }

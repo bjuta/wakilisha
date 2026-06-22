@@ -111,8 +111,13 @@ import AdminSettingsDesignSystem from "../pages/admin/settings/design-system/pag
 // Admin API Docs
 import AdminApiDocsPage from "../pages/admin/api-docs/page";
 
+// Admin Community Moderation
+import AdminCommunityPage from "../pages/admin/community/page";
+
 // Public API Docs
 import PublicApiDocsPage from "../pages/api-docs/page";
+
+import PublicProfilePage from "../pages/profile/public/page";
 
 // Briefing public pages
 import BriefingConfirmPage from "../pages/briefing/confirm/page";
@@ -214,6 +219,7 @@ const routes: RouteObject[] = [
       { path: "/player", element: <ResponsivePage mobile={<MobileHome />} desktop={<DesktopPlayerPage />} /> },
       { path: "/auth", element: <ResponsivePage mobile={<AuthPage />} desktop={<AuthPage />} /> },
       { path: "/profile", element: <ResponsivePage mobile={<ProfilePage />} desktop={<ProfilePage />} /> },
+      { path: "/u/:username", element: <ResponsivePage mobile={<PublicProfilePage />} desktop={<PublicProfilePage />} /> },
       { path: "/authors/:slug", element: <ResponsivePage mobile={<AuthorProfilePage />} desktop={<AuthorProfilePage />} /> },
       { path: "/settings", element: <ResponsivePage mobile={<SettingsPage />} desktop={<SettingsPage />} /> },
       { path: "/about", element: <ResponsivePage mobile={<AboutPage />} desktop={<AboutPage />} /> },
@@ -234,6 +240,7 @@ const routes: RouteObject[] = [
     children: [
       { index: true, element: <AdminDashboardPage /> },
       { path: "analytics", element: <AdminAnalyticsPage /> },
+      { path: "community", element: <AdminCommunityPage /> },
       {
         path: "content",
         element: <AdminContentLayout />,
