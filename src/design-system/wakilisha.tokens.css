@@ -140,7 +140,7 @@ html{scroll-behavior:smooth;-webkit-font-smoothing:antialiased;-moz-osx-font-smo
 body{font-family:var(--wk-font-body);background:var(--wk-bg);color:var(--wk-text);line-height:1.55;font-size:15px;letter-spacing:-.005em}
 ::selection{background:rgba(var(--wk-brand-rgb),.30);color:var(--wk-text)}
 
-.wk-app-shell{min-height:100vh;background:var(--wk-bg);color:var(--wk-text);font-family:var(--wk-font-body)}
+.wk-app-shell{min-height:100dvh;background:var(--wk-bg);color:var(--wk-text);font-family:var(--wk-font-body)}
 .wk-container{width:min(100% - 32px,var(--wk-w-content));margin-inline:auto}
 .wk-container-wide{width:min(100% - 32px,var(--wk-w-wide));margin-inline:auto}
 .wk-container-max{width:min(100% - 32px,var(--wk-w-max));margin-inline:auto}

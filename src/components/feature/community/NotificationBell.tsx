@@ -17,6 +17,7 @@ interface NotificationWithActor extends CommunityNotification {
 interface NotificationBellProps {
   userId: string;
   className?: string;
+  placement?: 'top' | 'bottom' | 'auto';
 }
 
 const NOTIFICATION_ICONS: Record<string, string> = {
@@ -52,7 +53,7 @@ function timeAgo(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-export function NotificationBell({ userId, className = '' }: NotificationBellProps) {
+export function NotificationBell({ userId, className = '', placement = 'auto' }: NotificationBellProps) {
   const [unreadCount, setUnreadCount] = useState(0);
   const [notifications, setNotifications] = useState<NotificationWithActor[]>([]);
   const [open, setOpen] = useState(false);
@@ -150,6 +151,23 @@ export function NotificationBell({ userId, className = '' }: NotificationBellPro
     return null;
   };
 
+  const getDropdownClasses = () => {
+    if (placement === 'top') return 'top-full mt-2';
+    if (placement === 'bottom') return 'bottom-full mb-2';
+    if (isMobileNav) return 'bottom-full mb-2';
+    return 'bottom-full mb-2 md:bottom-auto md:top-full md:mt-2 md:mb-0';
+  };
+
+  const getDropdownWidth = () => {
+    if (isMobileNav) return 'w-[340px]';
+    return 'w-[340px] md:w-[380px]';
+  };
+
+  const getDropdownMaxHeight = () => {
+    if (isMobileNav) return 'max-h-[340px]';
+    return 'max-h-[408px]';
+  };
+
   // Mobile nav button style
   if (isMobileNav) {
     return (
@@ -167,12 +185,17 @@ export function NotificationBell({ userId, className = '' }: NotificationBellPro
               </span>
             )}
           </div>
-          <span className="pnl">Bell</span>
+          <span className="pnl">Alerts</span>
         </button>
 
-        {/* Dropdown - opens upward on mobile */}
+        {/* Dropdown - opens upward on mobile nav, full-width within viewport */}
         {open && (
-          <div className="absolute right-0 bottom-full mb-2 w-[340px] max-h-[420px] rounded-2xl bg-[var(--wk-surface)] border border-[var(--wk-border)] shadow-lg overflow-hidden z-[70] animate-[fadeIn_0.15s_ease-out]">
+          <div className="fixed left-3 right-3 z-[85] rounded-t-2xl bg-[var(--wk-surface)] border border-[var(--wk-border)] shadow-[0_-4px_24px_rgba(0,0,0,.12)] overflow-hidden animate-[slideUp_0.2s_cubic-bezier(.16,1,.3,1)]"
+            style={{
+              bottom: 'calc(52px + max(env(safe-area-inset-bottom), 8px) + 8px)',
+              maxHeight: 'min(60vh, 420px)',
+            }}
+          >
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--wk-border)]">
               <h3 className="text-[14px] font-bold text-[var(--wk-text)]">Notifications</h3>
@@ -187,7 +210,7 @@ export function NotificationBell({ userId, className = '' }: NotificationBellPro
             </div>
 
             {/* List */}
-            <div className="overflow-y-auto max-h-[340px]">
+            <div className="overflow-y-auto" style={{ maxHeight: 'min(52vh, 340px)' }}>
               {loading && notifications.length === 0 ? (
                 <div className="flex items-center justify-center py-12">
                   <i className="ri-loader-4-line animate-spin text-[20px] text-[var(--wk-text-muted)]" />
@@ -279,7 +302,7 @@ export function NotificationBell({ userId, className = '' }: NotificationBellPro
     );
   }
 
-  // Desktop top bar style
+  // Desktop / top-bar style
   return (
     <div ref={containerRef} className={`relative ${className}`}>
       <button
@@ -297,7 +320,7 @@ export function NotificationBell({ userId, className = '' }: NotificationBellPro
 
       {/* Dropdown */}
       {open && (
-        <div className="absolute right-0 bottom-full mb-2 md:bottom-auto md:top-full md:mt-2 md:mb-0 w-[340px] md:w-[380px] max-h-[420px] md:max-h-[480px] rounded-2xl bg-[var(--wk-surface)] border border-[var(--wk-border)] shadow-lg overflow-hidden z-[70] animate-[fadeIn_0.15s_ease-out]">
+        <div className={`absolute right-0 ${getDropdownClasses()} ${getDropdownWidth()} ${getDropdownMaxHeight()} rounded-2xl bg-[var(--wk-surface)] border border-[var(--wk-border)] shadow-lg overflow-hidden z-[70] animate-[fadeIn_0.15s_ease-out]`}>
           {/* Header */}
           <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--wk-border)]">
             <h3 className="text-[14px] font-bold text-[var(--wk-text)]">Notifications</h3>

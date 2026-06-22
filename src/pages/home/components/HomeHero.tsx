@@ -193,7 +193,7 @@ export function HomeHero({ chartEntries, stories, loading }: Props) {
   }, []);
 
   return (
-    <section className="relative overflow-hidden -mt-16" style={{ minHeight: "100vh" }}>
+    <section className="relative overflow-hidden md:-mt-16" style={{ minHeight: "100vh" }}>
       {/* Background image */}
       <div className="absolute inset-0">
         <img
@@ -210,6 +210,20 @@ export function HomeHero({ chartEntries, stories, loading }: Props) {
       {/* Overlay */}
       <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/50 to-[var(--wk-bg)]" />
       <div className="absolute inset-0 bg-black/25" />
+
+      {/* Mobile inline header — logo + tagline */}
+      <div className="absolute top-0 left-0 right-0 z-10 md:hidden pt-[calc(16px+env(safe-area-inset-top))] px-5">
+        <div className="flex items-start justify-between">
+          <div>
+            <div className="text-white font-bold text-[22px] tracking-tight" style={{ fontFamily: "var(--wk-font-display)" }}>
+              WAKILISHA
+            </div>
+            <span className="text-[11px] text-white/60 font-medium tracking-wide">
+              Culture. Music. Charts. Editorial.
+            </span>
+          </div>
+        </div>
+      </div>
 
       {/* Content */}
       <div className="relative z-10 flex flex-col justify-center" style={{ minHeight: "100vh", padding: "clamp(80px,12vh,140px) clamp(20px,4vw,40px) clamp(40px,6vh,80px)" }}>

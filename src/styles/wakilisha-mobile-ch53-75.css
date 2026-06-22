@@ -18,33 +18,28 @@
   .wk-mobile-v5 input,.wk-mobile-v5 textarea,.wk-mobile-v5 select{min-height:44px;font-size:16px;}
   .wk-mobile-v5 .chart-row,.wk-mobile-v5 .lbl-row,.wk-mobile-v5 .atrow,.wk-mobile-v5 .mag-card,.wk-mobile-v5 .mob-card-horiz{min-height:56px;}
 
-  /* CH57: five-tab persistent navigation — safe-area aware, fixed to device bottom */
+  /* CH57: six-tab persistent navigation — fixed, floating pill */
   .phn-nav{
     position:fixed;
-    left:0;
-    right:0;
     bottom:0;
+    left:12px;
+    right:12px;
     z-index:80;
-    /* Use transform to create a new stacking context and force GPU compositing */
-    transform:translateZ(0);
-    -webkit-transform:translateZ(0);
-    /* Height: base 64px icon+label area + safe-area inset */
+    margin:0;
     min-height:52px;
-    padding:0 4px max(env(safe-area-inset-bottom), 6px);
+    padding:0 4px max(env(safe-area-inset-bottom), 8px);
     display:grid;
     grid-template-columns:repeat(6,1fr);
     align-items:end;
     background:color-mix(in srgb,var(--wk-surface) 96%,transparent);
     backdrop-filter:blur(22px);
     -webkit-backdrop-filter:blur(22px);
-    border-top:1px solid var(--wk-divider);
-    /* No box-shadow — shadows float on iPhone chrome collapse */
+    border:1px solid var(--wk-divider);
+    border-radius:24px;
+    transform:translateZ(0);
+    -webkit-transform:translateZ(0);
   }
-  /* Page content must clear the full nav + safe area */
-  .wk-app-shell main{
-    scroll-behavior:smooth;
-    -webkit-overflow-scrolling:touch;
-  }
+  .wk-app-shell main{min-height:0;}
   .phn-nav-tab{height:52px;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:var(--wk-text-faint);position:relative;border-radius:10px;font:700 8px/1 var(--wk-font-ui);letter-spacing:.02em;}
   .phn-nav-tab svg{width:18px;height:18px;stroke:currentColor;stroke-width:2;}
   .phn-nav-tab.on{color:var(--wk-brand);}
@@ -54,13 +49,22 @@
   .phn-nav-theme:active{color:var(--wk-brand);}
   .phn-nav-theme svg{width:18px;height:18px;stroke:currentColor;stroke-width:2;}
 
+  /* Spacer for fixed nav + mini player so last content isn't hidden */
+  .mobile-bottom-spacer{
+    flex-shrink:0;
+    height:calc(52px + max(env(safe-area-inset-bottom), 8px));
+  }
+  .mobile-bottom-spacer.has-mini{
+    height:calc(52px + max(env(safe-area-inset-bottom), 8px) + 12px + 60px);
+  }
+
   /* CH57/58: mini player, permanent above nav — respects safe-area */
   .phn-miniplayer{
     position:fixed;
-    left:10px;
-    right:10px;
-    /* Sits directly above nav height (52px base) + safe-area + 4px gap */
-    bottom:calc(52px + max(env(safe-area-inset-bottom), 6px) + 4px);
+    left:12px;
+    right:12px;
+    /* Sits directly above nav height (52px base) + safe-area + 12px gap */
+    bottom:calc(52px + max(env(safe-area-inset-bottom), 8px) + 12px);
     z-index:82;
     height:60px;
     display:grid;
