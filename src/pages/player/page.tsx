@@ -76,7 +76,7 @@ export default function DesktopPlayerPage() {
 
   if (!currentTrack) {
     return (
-      <main className="flex min-h-screen flex-col items-center justify-center px-6 text-center">
+      <main className="flex h-screen flex-col items-center justify-center px-6 text-center">
         <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-[var(--wk-surface-raised)]">
           <WkIcon name="Music2" size={32} className="text-[var(--wk-text-faint)]" />
         </div>
@@ -100,7 +100,7 @@ export default function DesktopPlayerPage() {
   const hasQueue = queue.length > 1;
 
   return (
-    <main className="relative flex min-h-screen overflow-hidden bg-[var(--wk-bg)]">
+    <main className="relative flex h-screen overflow-hidden bg-[var(--wk-bg)]">
       {/* Ambient background */}
       <div
         className="absolute inset-0 opacity-20"

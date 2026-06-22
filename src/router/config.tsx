@@ -159,8 +159,6 @@ import GuidesPage from "../pages/guides/page";
 import GuideDetailPage from "../pages/guides/detail/page";
 import VeniceFieldGuidePage from "../pages/guides/field-guide/page";
 
-// Desktop player
-import DesktopPlayerPage from "../pages/player/page";
 
 // Mobile pages
 import MobileHome from "../pages/mobile/home/page";
@@ -218,7 +216,7 @@ const routes: RouteObject[] = [
       { path: "/guides/:slug/field-guide", element: <ResponsivePage mobile={<VeniceFieldGuidePage />} desktop={<VeniceFieldGuidePage />} /> },
       { path: "/guides", element: <ResponsivePage mobile={<GuidesPage />} desktop={<GuidesPage />} /> },
       { path: "/search", element: <ResponsivePage mobile={<Search />} desktop={<Search />} /> },
-      { path: "/player", element: <ResponsivePage mobile={<MobileHome />} desktop={<DesktopPlayerPage />} /> },
+      { path: "/player", element: <Navigate to="/" replace /> },
       { path: "/auth", element: <ResponsivePage mobile={<AuthPage />} desktop={<AuthPage />} /> },
       { path: "/profile", element: <ResponsivePage mobile={<MobileProfilePage />} desktop={<ProfilePage />} /> },
       { path: "/u/:username", element: <ResponsivePage mobile={<PublicProfilePage />} desktop={<PublicProfilePage />} /> },

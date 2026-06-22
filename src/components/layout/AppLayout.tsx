@@ -34,29 +34,36 @@ export function AppLayout() {
   useEffect(() => {
     if (!isFullPlayerOpen) return;
 
-    const previousOverflow = document.body.style.overflow;
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
     const previousOverscrollBehavior = document.body.style.overscrollBehavior;
 
     document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
     document.body.style.overscrollBehavior = "none";
 
     return () => {
-      document.body.style.overflow = previousOverflow;
+      document.body.style.overflow = previousBodyOverflow;
+      document.documentElement.style.overflow = previousHtmlOverflow;
       document.body.style.overscrollBehavior = previousOverscrollBehavior;
     };
   }, [isFullPlayerOpen]);
 
   return (
     <div className={`wk-app-shell flex flex-col ${isFullPlayerOpen ? "h-screen overflow-hidden" : "min-h-screen"}`}>
-      <AppTopBar />
-      <main className={`flex-1 ${isFullPlayerOpen ? "overflow-hidden" : ""}`}>
+      {!isFullPlayerOpen && <AppTopBar />}
+      <main className={isFullPlayerOpen ? "hidden" : "flex-1"}>
         <Outlet />
       </main>
       {!isFullPlayerOpen && <PlayerDock />}
 
-      {/* Full player overlay — rendered in-place so the page underneath never unmounts */}
+      {/* Full player overlay — global feature layer, not a page destination */}
       {isFullPlayerOpen && (
-        <div className="fixed inset-0 z-[90] h-screen overflow-hidden bg-[var(--wk-bg)]">
+        <div
+          role="dialog"
+          aria-label="Now playing"
+          className="fixed inset-0 z-[90] h-screen overflow-hidden bg-[var(--wk-bg)]"
+        >
           <DesktopPlayerPage />
         </div>
       )}
