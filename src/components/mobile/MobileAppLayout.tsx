@@ -135,19 +135,21 @@ export function MobileAppLayout() {
         <Outlet />
       </main>
       {isFullPlayerOpen && (
-        <div
-          data-scroll-lock="container"
-          className="fixed inset-0 z-[90] h-[100dvh] overflow-y-auto overscroll-contain bg-[var(--wk-bg)]"
-          style={{
-            height: "100dvh",
-            maxHeight: "100dvh",
-            WebkitOverflowScrolling: "touch",
-            touchAction: "pan-y",
-            animation: "slideUp 0.35s cubic-bezier(.16,1,.3,1)",
-          }}
-        >
-          <MobileFullPlayer />
-        </div>
+        <Portal>
+          <div
+            data-scroll-lock="container"
+            className="fixed inset-0 z-[90] h-[100dvh] overflow-y-auto overscroll-contain bg-[var(--wk-bg)]"
+            style={{
+              height: "100dvh",
+              maxHeight: "100dvh",
+              WebkitOverflowScrolling: "touch",
+              touchAction: "pan-y",
+              animation: "slideUp 0.35s cubic-bezier(.16,1,.3,1)",
+            }}
+          >
+            <MobileFullPlayer />
+          </div>
+        </Portal>
       )}
       {showMobileChrome && (
         <Portal>
