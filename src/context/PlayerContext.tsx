@@ -9,10 +9,46 @@ export interface PlayerTrack {
   album?: string;
   duration?: number; // seconds
   isPlayable?: boolean;
+  isExplicit?: boolean;
   source?: string; // e.g. "YouTube", "Spotify", "SoundCloud"
   previewUrl?: string; // actual audio URL for playback
   artistSlug?: string; // for deep-linking (contribute lyrics, etc.)
   trackSlug?: string; // for deep-linking (contribute lyrics, etc.)
+}
+
+// ─── Read playback prefs from localStorage ───
+function readPlaybackPrefs(): { autoplay: boolean; explicitFilter: boolean } {
+  try {
+    const raw = localStorage.getItem("wk-playback-v2");
+    if (!raw) return { autoplay: false, explicitFilter: false };
+    const prefs = JSON.parse(raw);
+    return {
+      autoplay: prefs.autoplay === true,
+      explicitFilter: prefs.explicitFilter === true,
+    };
+  } catch {
+    return { autoplay: false, explicitFilter: false };
+  }
+}
+
+function usePlaybackPrefs() {
+  const [prefs, setPrefs] = useState(readPlaybackPrefs);
+
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "wk-playback-v2") setPrefs(readPlaybackPrefs());
+    };
+    window.addEventListener("storage", onStorage);
+    // Also listen for same-tab changes
+    const onCustom = () => setPrefs(readPlaybackPrefs());
+    window.addEventListener("wk-playback-changed", onCustom);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("wk-playback-changed", onCustom);
+    };
+  }, []);
+
+  return prefs;
 }
 
 export type RepeatMode = "off" | "all" | "one";
@@ -75,6 +111,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const skipFlagRef = useRef(false);
   const currentTrackRef = useRef<PlayerTrack | null>(null);
   const isPlayingRef = useRef(false);
+
+  // ─── Read user playback preferences ───
+  const playbackPrefs = usePlaybackPrefs();
 
   // ─── Create audio element once ───
   useEffect(() => {
@@ -151,7 +190,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => { currentTrackRef.current = currentTrack; }, [currentTrack]);
   useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
 
-  // ─── Handle track end (auto-advance) ───
+  // ─── Handle track end (auto-advance) — respects autoplay pref ───
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio || !currentTrack) return;
@@ -180,6 +219,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       if (repeatMode === "one") {
         audio.currentTime = 0;
         audio.play().catch(() => {});
+      } else if (!playbackPrefs.autoplay) {
+        // Autoplay disabled — just stop, don't advance
+        setIsPlaying(false);
+        return;
       } else {
         const hasNext =
           repeatMode === "all" ||
@@ -188,23 +231,39 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
             : queueIndex < queue.length - 1);
 
         if (hasNext) {
-          const nextIdx = isShuffle
+          // Find next non-explicit track if filter is on
+          let nextIdx = isShuffle
             ? shuffledOrderRef.current[shuffledOrderRef.current.indexOf(queueIndex) + 1]
             : queueIndex + 1;
 
+          if (playbackPrefs.explicitFilter) {
+            // Skip explicit tracks in the queue
+            const maxIter = queue.length;
+            let iter = 0;
+            while (nextIdx !== undefined && nextIdx < queue.length && queue[nextIdx]?.isExplicit && iter < maxIter) {
+              iter++;
+              if (isShuffle) {
+                const pos = shuffledOrderRef.current.indexOf(nextIdx);
+                nextIdx = pos + 1 < shuffledOrderRef.current.length ? shuffledOrderRef.current[pos + 1] : undefined;
+              } else {
+                nextIdx++;
+                if (nextIdx >= queue.length && repeatMode === "all") nextIdx = 0;
+              }
+            }
+          }
+
           if (nextIdx !== undefined && nextIdx < queue.length) {
             const nextTrack = queue[nextIdx];
+            if (!nextTrack) return;
             setCurrentTrack(nextTrack);
             setQueueIndex(nextIdx);
             setCurrentTime(0);
             setDuration(nextTrack.duration || 0);
-            // Load and play the next track
             if (nextTrack.previewUrl) {
               audio.src = nextTrack.previewUrl;
               audio.play().catch(() => {});
             }
 
-            // Fire player_play for auto-advanced track
             trackEvent("player_play", {
               pageType: sourceContextRef.current?.pageType,
               entitySlug: nextTrack.id,
@@ -222,6 +281,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           } else if (repeatMode === "all" && queue.length > 0) {
             const firstIdx = isShuffle ? shuffledOrderRef.current[0] : 0;
             const firstTrack = queue[firstIdx];
+            if (!firstTrack) return;
             setCurrentTrack(firstTrack);
             setQueueIndex(firstIdx);
             setCurrentTime(0);
@@ -231,7 +291,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
               audio.play().catch(() => {});
             }
 
-            // Fire player_play for wrap-around track
             trackEvent("player_play", {
               pageType: sourceContextRef.current?.pageType,
               entitySlug: firstTrack.id,
@@ -251,7 +310,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         }
       }
     }
-  }, [audioRef.current?.ended, currentTrack, queue, queueIndex, repeatMode, isShuffle]);
+  }, [audioRef.current?.ended, currentTrack, queue, queueIndex, repeatMode, isShuffle, playbackPrefs.autoplay, playbackPrefs.explicitFilter]);
 
   // ─── Play a track ───
   const playTrack = useCallback((track: PlayerTrack, newQueue?: PlayerTrack[], playSource?: PlaySource) => {

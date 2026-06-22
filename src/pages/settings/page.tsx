@@ -1,134 +1,290 @@
-import { useEffect, useMemo, useState } from "react";
-import { useTheme, type ThemeMode } from "@/components/design-system/theme/ThemeProvider";
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import { useUserSettings } from "@/hooks/useUserSettings";
 import { WkIcon } from "@/components/design-system/Icon";
+import { AccountSettingsPane } from "./components/AccountSettingsPane";
+import { AppearanceSettingsPane } from "./components/AppearanceSettingsPane";
+import { NotificationsSettingsPane } from "./components/NotificationsSettingsPane";
+import { PlaybackSettingsPane } from "./components/PlaybackSettingsPane";
+import { PrivacySettingsPane } from "./components/PrivacySettingsPane";
+import { DangerSettingsPane } from "./components/DangerSettingsPane";
 
 type SettingsTab = "Account" | "Appearance" | "Notifications" | "Privacy" | "Playback" | "Danger";
 
-type SettingsState = {
-  displayName: string;
-  handle: string;
-  bio: string;
-  email: string;
-  theme: ThemeMode;
-  density: "Comfortable" | "Compact";
-  accent: string;
-  emailDigest: boolean;
-  chartAlerts: boolean;
-  artistDrops: boolean;
-  privateListening: boolean;
-  publicProfile: boolean;
-  analyticsConsent: boolean;
-  autoplay: boolean;
-  explicitFilter: boolean;
-  playbackQuality: "Auto" | "High" | "Data saver";
-};
-
-const STORAGE_KEY = "wk-user-settings-v1";
-const tabs: { key: SettingsTab; icon: any }[] = [
-  { key: "Account", icon: "UserRound" },
-  { key: "Appearance", icon: "Palette" },
-  { key: "Notifications", icon: "Bell" },
-  { key: "Privacy", icon: "ShieldCheck" },
-  { key: "Playback", icon: "Headphones" },
-  { key: "Danger", icon: "TriangleAlert" },
+const tabs: { key: SettingsTab; icon: string; desc: string }[] = [
+  {
+    key: "Account",
+    icon: "ri-user-3-line",
+    desc: "Public identity and profile information shown across WAKILISHA.",
+  },
+  {
+    key: "Appearance",
+    icon: "ri-palette-line",
+    desc: "Theme, accent color, and density preferences for the interface.",
+  },
+  {
+    key: "Notifications",
+    icon: "ri-notification-3-line",
+    desc: "Decide which cultural signals deserve to reach you.",
+  },
+  {
+    key: "Privacy",
+    icon: "ri-shield-check-line",
+    desc: "Control profile visibility, listening history, and analytics consent.",
+  },
+  {
+    key: "Playback",
+    icon: "ri-headphone-line",
+    desc: "Apple Music connection, player behavior, and audio quality.",
+  },
+  {
+    key: "Danger",
+    icon: "ri-error-warning-line",
+    desc: "Reset preferences and destructive actions live here, away from everyday settings.",
+  },
 ];
 
-const defaultSettings: SettingsState = {
-  displayName: "Akinyi Odhiambo",
-  handle: "akinyi",
-  bio: "Music journalist based in Nairobi. Writing about East African music, culture, and the stories behind the sounds.",
-  email: "akinyi@wakilisha.africa",
-  theme: "dark",
-  density: "Comfortable",
-  accent: "#84C241",
-  emailDigest: true,
-  chartAlerts: true,
-  artistDrops: true,
-  privateListening: true,
-  publicProfile: true,
-  analyticsConsent: false,
-  autoplay: false,
-  explicitFilter: false,
-  playbackQuality: "Auto",
-};
-
-const accentOptions = ["#84C241", "#D6766A", "#C7A06D", "#E8A23A", "#6BA8F5", "#9C8FF5"];
-
-function loadSettings(theme: ThemeMode): SettingsState {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return { ...defaultSettings, ...JSON.parse(raw), theme };
-  } catch {
-    /* storage unavailable */
-  }
-  return { ...defaultSettings, theme };
-}
-
 export default function SettingsPage() {
-  const { theme, setTheme } = useTheme();
   const [active, setActive] = useState<SettingsTab>("Account");
-  const [settings, setSettings] = useState<SettingsState>(() => loadSettings(theme));
-  const [savedSettings, setSavedSettings] = useState<SettingsState>(() => loadSettings(theme));
 
-  useEffect(() => {
-    setSettings((current) => ({ ...current, theme }));
-    setSavedSettings((current) => ({ ...current, theme }));
-  }, [theme]);
+  const {
+    profile,
+    appearance,
+    notifications,
+    playback,
+    privacy,
+    loading,
+    saving,
+    error,
+    saveStatus,
+    dirty,
+    isSignedIn,
+    userId,
+    userEmail,
+    userInitial,
+    authLoading,
+    updateProfile,
+    updateAppearance,
+    updateNotifications,
+    updatePlayback,
+    updatePrivacy,
+    saveAll,
+    discardChanges,
+    resetAll,
+    uploadAvatar,
+  } = useUserSettings();
 
-  const dirty = useMemo(() => JSON.stringify(settings) !== JSON.stringify(savedSettings), [settings, savedSettings]);
+  const activeTab = tabs.find((t) => t.key === active)!;
 
-  const update = <K extends keyof SettingsState>(key: K, value: SettingsState[K]) => {
-    setSettings((current) => ({ ...current, [key]: value }));
-    if (key === "theme") setTheme(value as ThemeMode);
+  const handleSave = async () => {
+    await saveAll();
   };
 
-  const save = () => {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(settings)); } catch { /* storage unavailable */ }
-    setSavedSettings(settings);
+  // ─── Save status pill ───
+  const savePill = () => {
+    if (saveStatus === "saving") {
+      return (
+        <span className="flex items-center gap-1.5 text-[11px] font-bold text-[var(--wk-text-muted)]">
+          <i className="ri-loader-4-line animate-spin text-[13px]" /> Saving...
+        </span>
+      );
+    }
+    if (saveStatus === "saved") {
+      return (
+        <span className="flex items-center gap-1.5 text-[11px] font-bold text-[var(--wk-success)]">
+          <i className="ri-checkbox-circle-fill text-[13px]" /> Saved to Supabase
+        </span>
+      );
+    }
+    if (saveStatus === "error") {
+      return (
+        <span className="flex items-center gap-1.5 text-[11px] font-bold text-[var(--wk-danger)]">
+          <i className="ri-close-circle-fill text-[13px]" /> {error || "Save failed"}
+        </span>
+      );
+    }
+    if (!dirty) {
+      return (
+        <span className="flex items-center gap-1.5 text-[11px] font-bold text-[var(--wk-text-faint)]">
+          <i className="ri-check-line text-[13px]" /> Up to date
+        </span>
+      );
+    }
+    return (
+      <span className="flex items-center gap-1.5 text-[11px] font-bold text-[var(--wk-warning)]">
+        <i className="ri-edit-line text-[13px]" /> Unsaved changes
+      </span>
+    );
   };
 
-  const reset = () => {
-    const next = { ...defaultSettings, theme };
-    setSettings(next);
-    setSavedSettings(next);
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch { /* storage unavailable */ }
+  // ─── Account info card ───
+  const profilePreview = () => {
+    if (authLoading) {
+      return (
+        <div className="flex items-center gap-3 p-4 border border-[var(--wk-border)] rounded-xl bg-[var(--wk-bg-subtle)] animate-pulse">
+          <div className="w-12 h-12 rounded-full bg-[var(--wk-surface-raised)]" />
+          <div className="space-y-1.5 flex-1">
+            <div className="h-4 w-28 bg-[var(--wk-surface-raised)] rounded" />
+            <div className="h-3 w-20 bg-[var(--wk-surface-raised)] rounded" />
+          </div>
+        </div>
+      );
+    }
+
+    const displayName = profile.displayName || userEmail?.split("@")[0] || "Reader";
+    const sub = isSignedIn ? userEmail : "Sign in to save preferences to your account";
+
+    return (
+      <div className="flex items-center gap-3 p-4 border border-[var(--wk-border)] rounded-xl bg-[var(--wk-bg-subtle)]">
+        <div className="w-12 h-12 rounded-full overflow-hidden shrink-0 bg-[var(--wk-surface-raised)] flex items-center justify-center">
+          {profile.avatarUrl ? (
+            <img src={profile.avatarUrl} alt="" className="w-full h-full object-cover" />
+          ) : (
+            <span className="text-lg font-black text-[var(--wk-brand)]">{userInitial}</span>
+          )}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-[13px] font-black text-[var(--wk-text)] truncate">{displayName}</div>
+          <div className="text-[11px] text-[var(--wk-text-muted)] truncate">{sub}</div>
+        </div>
+        {!isSignedIn && (
+          <Link
+            to="/auth"
+            className="inline-flex items-center gap-1 h-[32px] px-4 rounded-lg text-[11px] font-bold bg-[var(--wk-brand)] text-[var(--wk-brand-on)] hover:opacity-90 transition-opacity cursor-pointer whitespace-nowrap"
+          >
+            Sign in
+          </Link>
+        )}
+      </div>
+    );
   };
+
+  if (loading) {
+    return (
+      <main className="settings49-shell">
+        <div className="settings49-wrap">
+          <div className="animate-pulse space-y-4">
+            <div className="h-10 w-48 bg-[var(--wk-surface-raised)] rounded" />
+            <div className="h-6 w-96 bg-[var(--wk-surface-raised)] rounded" />
+            <div className="grid grid-cols-[260px_1fr] gap-5">
+              <div className="h-80 bg-[var(--wk-surface-raised)] rounded-xl" />
+              <div className="h-80 bg-[var(--wk-surface-raised)] rounded-xl" />
+            </div>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="settings49-shell">
       <div className="settings49-wrap">
+        {/* Hero */}
         <section className="settings49-hero">
           <div className="settings49-kicker"><WkIcon name="Settings" size={14} /> Account controls</div>
           <h1 className="settings49-title">Settings</h1>
-          <p className="settings49-sub">Manage profile identity, appearance, notifications, privacy, playback, and account actions from one place. Changes persist locally now and can be wired to authenticated user preferences later.</p>
+          <p className="settings49-sub">
+            Manage profile identity, appearance, notifications, playback, privacy, and account actions.
+            Changes persist locally and sync to your WAKILISHA account when signed in.
+          </p>
         </section>
 
+        {/* Layout */}
         <div className="settings49-layout">
+          {/* Sidebar nav */}
           <nav className="settings49-nav" aria-label="Settings sections">
+            <div className="mb-3 px-2">{profilePreview()}</div>
             {tabs.map((tab) => (
-              <button key={tab.key} className={`settings49-nav-item ${active === tab.key ? "active" : ""}`} onClick={() => setActive(tab.key)}>
-                <span className="settings49-nav-icon"><WkIcon name={tab.icon} size={16} /></span>
+              <button
+                key={tab.key}
+                className={`settings49-nav-item ${active === tab.key ? "active" : ""}`}
+                onClick={() => setActive(tab.key)}
+              >
+                <span className="settings49-nav-icon">
+                  <i className={`${tab.icon} text-[15px]`} />
+                </span>
                 {tab.key}
               </button>
             ))}
           </nav>
 
+          {/* Main pane */}
           <section className="settings49-pane">
-            <PaneHead active={active} />
-            {active === "Account" && <AccountPane settings={settings} update={update} />}
-            {active === "Appearance" && <AppearancePane settings={settings} update={update} />}
-            {active === "Notifications" && <NotificationsPane settings={settings} update={update} />}
-            {active === "Privacy" && <PrivacyPane settings={settings} update={update} />}
-            {active === "Playback" && <PlaybackPane settings={settings} update={update} />}
-            {active === "Danger" && <DangerPane reset={reset} />}
-
-            <div className="settings49-savebar">
-              <div className={dirty ? "settings49-unsaved" : "settings49-saved"}>
-                <WkIcon name={dirty ? "CircleAlert" : "CircleCheck"} size={14} /> {dirty ? "Unsaved changes" : "Saved"}
+            {/* Pane header */}
+            <div className="settings49-pane-head">
+              <div>
+                <div className="flex items-center gap-3 mb-1">
+                  <i className={`${activeTab.icon} text-lg text-[var(--wk-brand)]`} />
+                  <h2 className="settings49-pane-title">{activeTab.key}</h2>
+                </div>
+                <p className="settings49-pane-desc">{activeTab.desc}</p>
               </div>
-              <div className="flex gap-2">
-                <button className="wk-button wk-button-sm wk-button-ghost" onClick={() => setSettings(savedSettings)} disabled={!dirty}>Discard</button>
-                <button className="wk-button wk-button-sm wk-button-primary" onClick={save} disabled={!dirty}>Save changes</button>
+            </div>
+
+            {/* Pane body */}
+            <div className="mb-8">
+              {active === "Account" && (
+                <AccountSettingsPane
+                  profile={profile}
+                  userId={userId}
+                  userInitial={userInitial}
+                  isSignedIn={isSignedIn}
+                  updateProfile={updateProfile}
+                  uploadAvatar={uploadAvatar}
+                />
+              )}
+              {active === "Appearance" && (
+                <AppearanceSettingsPane
+                  appearance={appearance}
+                  updateAppearance={updateAppearance}
+                />
+              )}
+              {active === "Notifications" && (
+                <NotificationsSettingsPane
+                  notifications={notifications}
+                  isSignedIn={isSignedIn}
+                  updateNotifications={updateNotifications}
+                />
+              )}
+              {active === "Privacy" && (
+                <PrivacySettingsPane
+                  privacy={privacy}
+                  profile={profile}
+                  isSignedIn={isSignedIn}
+                  updatePrivacy={updatePrivacy}
+                  updateProfile={updateProfile}
+                />
+              )}
+              {active === "Playback" && (
+                <PlaybackSettingsPane
+                  playback={playback}
+                  isSignedIn={isSignedIn}
+                  updatePlayback={updatePlayback}
+                />
+              )}
+              {active === "Danger" && (
+                <DangerSettingsPane onReset={resetAll} />
+              )}
+            </div>
+
+            {/* Save bar */}
+            <div className="settings49-savebar">
+              <div>{savePill()}</div>
+              <div className="flex items-center gap-2">
+                <button
+                  className="wk-button wk-button-sm wk-button-ghost"
+                  onClick={discardChanges}
+                  disabled={!dirty || saving}
+                >
+                  Discard
+                </button>
+                <button
+                  className="wk-button wk-button-sm wk-button-primary"
+                  onClick={handleSave}
+                  disabled={!dirty || saving}
+                >
+                  {saving ? "Saving..." : "Save changes"}
+                </button>
               </div>
             </div>
           </section>
@@ -136,52 +292,4 @@ export default function SettingsPage() {
       </div>
     </main>
   );
-}
-
-function PaneHead({ active }: { active: SettingsTab }) {
-  const desc: Record<SettingsTab, string> = {
-    Account: "Public identity and profile information shown around WAKILISHA.",
-    Appearance: "Theme, density, and color preferences for the product interface.",
-    Notifications: "Decide which cultural signals deserve to interrupt you.",
-    Privacy: "Control profile visibility, listening history, and analytics consent.",
-    Playback: "Tune the player behavior for chart listening and source playback.",
-    Danger: "Account reset and destructive actions live here, away from everyday settings.",
-  };
-  return <div className="settings49-pane-head"><div><h2 className="settings49-pane-title">{active}</h2><p className="settings49-pane-desc">{desc[active]}</p></div></div>;
-}
-
-function AccountPane({ settings, update }: { settings: SettingsState; update: <K extends keyof SettingsState>(key: K, value: SettingsState[K]) => void }) {
-  return <div><div className="settings49-profile-card"><div className="settings49-profile-avatar"><img src="https://picsum.photos/seed/profile-ava-1/160/160" alt="" /></div><div><div className="settings49-profile-name">{settings.displayName}</div><div className="settings49-profile-sub">@{settings.handle} · {settings.email}</div></div></div><div className="settings49-input-grid"><Field label="Display name" value={settings.displayName} onChange={(v) => update("displayName", v)} /><Field label="Handle" value={settings.handle} onChange={(v) => update("handle", v.replace(/^@/, ""))} /><Field label="Email" value={settings.email} onChange={(v) => update("email", v)} /><div className="settings49-field full"><label className="settings49-label">Bio</label><textarea className="settings49-textarea" value={settings.bio} onChange={(e) => update("bio", e.target.value)} /></div></div></div>;
-}
-
-function AppearancePane({ settings, update }: { settings: SettingsState; update: <K extends keyof SettingsState>(key: K, value: SettingsState[K]) => void }) {
-  return <div><div className="settings49-section"><div className="settings49-section-title">Theme</div><p className="settings49-section-desc">Theme updates the actual app theme immediately through the existing ThemeProvider.</p><div className="settings49-option-grid"><button className={`settings49-option ${settings.theme === "dark" ? "active" : ""}`} onClick={() => update("theme", "dark")}><div className="settings49-option-title">Dark</div><div className="settings49-option-desc">Default cinematic WAKILISHA interface.</div></button><button className={`settings49-option ${settings.theme === "light" ? "active" : ""}`} onClick={() => update("theme", "light")}><div className="settings49-option-title">Light</div><div className="settings49-option-desc">Readable daytime surface using light tokens.</div></button></div></div><div className="settings49-section"><div className="settings49-section-title">Accent color</div><p className="settings49-section-desc">Stored preference for future sub-brand personalization.</p><div className="settings49-color-row">{accentOptions.map((color) => <button key={color} className={`settings49-color ${settings.accent === color ? "active" : ""}`} style={{ background: color }} onClick={() => update("accent", color)} aria-label={`Use accent ${color}`} />)}</div></div><Row label="Interface density" desc="Choose how tightly content rows and editorial cards should render."><select className="settings49-select" value={settings.density} onChange={(e) => update("density", e.target.value as SettingsState["density"])}><option>Comfortable</option><option>Compact</option></select></Row></div>;
-}
-
-function NotificationsPane({ settings, update }: { settings: SettingsState; update: <K extends keyof SettingsState>(key: K, value: SettingsState[K]) => void }) {
-  return <div><ToggleRow label="Weekly email digest" desc="A calm weekly summary of charts, essays, releases, and artist movements." checked={settings.emailDigest} onChange={(v) => update("emailDigest", v)} /><ToggleRow label="Chart movement alerts" desc="Notify when followed artists enter, climb, or top a WAKILISHA chart." checked={settings.chartAlerts} onChange={(v) => update("chartAlerts", v)} /><ToggleRow label="Artist release alerts" desc="Notify when followed artists or labels publish new tracks/releases." checked={settings.artistDrops} onChange={(v) => update("artistDrops", v)} /></div>;
-}
-
-function PrivacyPane({ settings, update }: { settings: SettingsState; update: <K extends keyof SettingsState>(key: K, value: SettingsState[K]) => void }) {
-  return <div><ToggleRow label="Private listening history" desc="Keep listening activity hidden unless explicitly shared." checked={settings.privateListening} onChange={(v) => update("privateListening", v)} /><ToggleRow label="Public profile" desc="Allow people to view public articles, playlists, and followed artists." checked={settings.publicProfile} onChange={(v) => update("publicProfile", v)} /><ToggleRow label="Analytics consent" desc="Allow anonymized product analytics to improve recommendations and interface quality." checked={settings.analyticsConsent} onChange={(v) => update("analyticsConsent", v)} /></div>;
-}
-
-function PlaybackPane({ settings, update }: { settings: SettingsState; update: <K extends keyof SettingsState>(key: K, value: SettingsState[K]) => void }) {
-  return <div><ToggleRow label="Autoplay next track" desc="Continue through chart editions and playlist queues automatically." checked={settings.autoplay} onChange={(v) => update("autoplay", v)} /><ToggleRow label="Explicit content filter" desc="Hide tracks marked explicit from public or family-safe modes." checked={settings.explicitFilter} onChange={(v) => update("explicitFilter", v)} /><Row label="Playback quality" desc="Choose the default stream quality for embedded/source playback."><select className="settings49-select" value={settings.playbackQuality} onChange={(e) => update("playbackQuality", e.target.value as SettingsState["playbackQuality"])}><option>Auto</option><option>High</option><option>Data saver</option></select></Row></div>;
-}
-
-function DangerPane({ reset }: { reset: () => void }) {
-  return <div className="settings49-danger"><div className="settings49-danger-title">Reset local settings</div><p className="settings49-danger-copy">This clears the settings stored in this browser and returns everything to the default WAKILISHA state. It does not delete an account.</p><button className="wk-button wk-button-sm wk-button-danger" onClick={reset}><WkIcon name="RotateCcw" size={14} /> Reset local settings</button></div>;
-}
-
-function Field({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
-  return <div className="settings49-field"><label className="settings49-label">{label}</label><input className="settings49-input" value={value} onChange={(e) => onChange(e.target.value)} /></div>;
-}
-
-function Row({ label, desc, children }: { label: string; desc: string; children: React.ReactNode }) {
-  return <div className="settings49-row"><div className="settings49-row-left"><div className="settings49-row-label">{label}</div><div className="settings49-row-desc">{desc}</div></div>{children}</div>;
-}
-
-function ToggleRow({ label, desc, checked, onChange }: { label: string; desc: string; checked: boolean; onChange: (value: boolean) => void }) {
-  return <Row label={label} desc={desc}><button className={`settings49-toggle ${checked ? "on" : ""}`} onClick={() => onChange(!checked)} aria-pressed={checked} /></Row>;
 }

@@ -147,7 +147,9 @@ import PreviewPage from "../pages/preview/page";
 import TrackDetail from "../pages/tracks/detail/page";
 import LyricContribution from "../pages/tracks/lyrics/contribute/page";
 import ProfilePage from "../pages/profile/page";
+import MobileProfilePage from "../pages/mobile/profile/page";
 import SettingsPage from "../pages/settings/page";
+import MobileSettingsPage from "../pages/mobile/settings/page";
 
 // Search
 import Search from "../pages/search/page";
@@ -218,10 +220,10 @@ const routes: RouteObject[] = [
       { path: "/search", element: <ResponsivePage mobile={<Search />} desktop={<Search />} /> },
       { path: "/player", element: <ResponsivePage mobile={<MobileHome />} desktop={<DesktopPlayerPage />} /> },
       { path: "/auth", element: <ResponsivePage mobile={<AuthPage />} desktop={<AuthPage />} /> },
-      { path: "/profile", element: <ResponsivePage mobile={<ProfilePage />} desktop={<ProfilePage />} /> },
+      { path: "/profile", element: <ResponsivePage mobile={<MobileProfilePage />} desktop={<ProfilePage />} /> },
       { path: "/u/:username", element: <ResponsivePage mobile={<PublicProfilePage />} desktop={<PublicProfilePage />} /> },
       { path: "/authors/:slug", element: <ResponsivePage mobile={<AuthorProfilePage />} desktop={<AuthorProfilePage />} /> },
-      { path: "/settings", element: <ResponsivePage mobile={<SettingsPage />} desktop={<SettingsPage />} /> },
+      { path: "/settings", element: <ResponsivePage mobile={<MobileSettingsPage />} desktop={<SettingsPage />} /> },
       { path: "/about", element: <ResponsivePage mobile={<AboutPage />} desktop={<AboutPage />} /> },
       { path: "/contact", element: <ResponsivePage mobile={<ContactPage />} desktop={<ContactPage />} /> },
       { path: "/faqs", element: <ResponsivePage mobile={<FaqsPage />} desktop={<FaqsPage />} /> },

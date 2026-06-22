@@ -1,0 +1,419 @@
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { useAuthUser } from "@/hooks/useAuthUser";
+import { supabase } from "@/lib/supabase";
+
+// ─── Types ────────────────────────────────────────────────────────────────
+
+export interface UserProfileFields {
+  displayName: string;
+  bio: string;
+  country: string;
+  city: string;
+  avatarUrl: string | null;
+  isPublic: boolean;
+}
+
+export interface UserAppearancePrefs {
+  theme: "dark" | "light" | "system";
+  density: "Comfortable" | "Compact";
+  accent: string;
+  coverColor: string;
+}
+
+export interface UserNotificationPrefs {
+  emailDigest: boolean;
+  chartAlerts: boolean;
+  artistDrops: boolean;
+  replyNotifications: boolean;
+  mentionNotifications: boolean;
+  followNotifications: boolean;
+  contributionNotifications: boolean;
+  marketingEmails: boolean;
+}
+
+export interface UserPlaybackPrefs {
+  autoplay: boolean;
+  explicitFilter: boolean;
+  playbackQuality: "Auto" | "High" | "Data saver";
+  appleMusicConnected: boolean;
+  appleMusicToken: string | null;
+  preferApplePreviews: boolean;
+}
+
+export interface UserPrivacyPrefs {
+  privateListening: boolean;
+  analyticsConsent: boolean;
+}
+
+export interface AllUserSettings {
+  profile: UserProfileFields;
+  appearance: UserAppearancePrefs;
+  notifications: UserNotificationPrefs;
+  playback: UserPlaybackPrefs;
+  privacy: UserPrivacyPrefs;
+}
+
+// ─── Defaults ─────────────────────────────────────────────────────────────
+
+export const DEFAULT_PROFILE: UserProfileFields = {
+  displayName: "",
+  bio: "",
+  country: "",
+  city: "",
+  avatarUrl: null,
+  isPublic: true,
+};
+
+const DEFAULT_APPEARANCE: UserAppearancePrefs = {
+  theme: "dark",
+  density: "Comfortable",
+  accent: "#84C241",
+  coverColor: "#1a3a0a",
+};
+
+const DEFAULT_NOTIFICATIONS: UserNotificationPrefs = {
+  emailDigest: true,
+  chartAlerts: true,
+  artistDrops: true,
+  replyNotifications: true,
+  mentionNotifications: true,
+  followNotifications: false,
+  contributionNotifications: false,
+  marketingEmails: false,
+};
+
+const DEFAULT_PLAYBACK: UserPlaybackPrefs = {
+  autoplay: false,
+  explicitFilter: false,
+  playbackQuality: "Auto",
+  appleMusicConnected: false,
+  appleMusicToken: null,
+  preferApplePreviews: false,
+};
+
+const DEFAULT_PRIVACY: UserPrivacyPrefs = {
+  privateListening: true,
+  analyticsConsent: false,
+};
+
+// ─── Storage Keys ─────────────────────────────────────────────────────────
+
+const LS_PROFILE = "wk-profile-v2";
+const LS_APPEARANCE = "wk-appearance-v2";
+const LS_NOTIFICATIONS = "wk-notifications-v2";
+const LS_PLAYBACK = "wk-playback-v2";
+const LS_PRIVACY = "wk-privacy-v2";
+const LS_SAVED_AT = "wk-settings-saved-v2";
+
+// ─── Hook ─────────────────────────────────────────────────────────────────
+
+export function useUserSettings() {
+  const auth = useAuthUser();
+  const userId = auth.id;
+
+  const [profile, setProfile] = useState<UserProfileFields>(DEFAULT_PROFILE);
+  const [appearance, setAppearance] = useState<UserAppearancePrefs>(DEFAULT_APPEARANCE);
+  const [notifications, setNotifications] = useState<UserNotificationPrefs>(DEFAULT_NOTIFICATIONS);
+  const [playback, setPlayback] = useState<UserPlaybackPrefs>(DEFAULT_PLAYBACK);
+  const [privacy, setPrivacy] = useState<UserPrivacyPrefs>(DEFAULT_PRIVACY);
+  const [savedAt, setSavedAt] = useState<string | null>(null);
+
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+
+  // ─── Dirty tracking ───
+  const [savedSnapshot, setSavedSnapshot] = useState<string>("");
+
+  const dirty = useMemo(() => {
+    const current = JSON.stringify({ profile, appearance, notifications, playback, privacy });
+    return current !== savedSnapshot;
+  }, [profile, appearance, notifications, playback, privacy, savedSnapshot]);
+
+  // ─── Load from localStorage on mount ───
+  useEffect(() => {
+    try {
+      const p = localStorage.getItem(LS_PROFILE);
+      const a = localStorage.getItem(LS_APPEARANCE);
+      const n = localStorage.getItem(LS_NOTIFICATIONS);
+      const pb = localStorage.getItem(LS_PLAYBACK);
+      const pr = localStorage.getItem(LS_PRIVACY);
+      const sa = localStorage.getItem(LS_SAVED_AT);
+
+      if (p) setProfile({ ...DEFAULT_PROFILE, ...JSON.parse(p) });
+      if (a) setAppearance({ ...DEFAULT_APPEARANCE, ...JSON.parse(a) });
+      if (n) setNotifications({ ...DEFAULT_NOTIFICATIONS, ...JSON.parse(n) });
+      if (pb) setPlayback({ ...DEFAULT_PLAYBACK, ...JSON.parse(pb) });
+      if (pr) setPrivacy({ ...DEFAULT_PRIVACY, ...JSON.parse(pr) });
+      if (sa) setSavedAt(sa);
+
+      setSavedSnapshot(
+        JSON.stringify({
+          profile: p ? { ...DEFAULT_PROFILE, ...JSON.parse(p) } : DEFAULT_PROFILE,
+          appearance: a ? { ...DEFAULT_APPEARANCE, ...JSON.parse(a) } : DEFAULT_APPEARANCE,
+          notifications: n ? { ...DEFAULT_NOTIFICATIONS, ...JSON.parse(n) } : DEFAULT_NOTIFICATIONS,
+          playback: pb ? { ...DEFAULT_PLAYBACK, ...JSON.parse(pb) } : DEFAULT_PLAYBACK,
+          privacy: pr ? { ...DEFAULT_PRIVACY, ...JSON.parse(pr) } : DEFAULT_PRIVACY,
+        })
+      );
+    } catch { /* storage unavailable */ }
+
+    setLoading(false);
+  }, []);
+
+  // ─── Sync FROM Supabase (community_profile + notification_prefs) ───
+  useEffect(() => {
+    if (!userId) return;
+
+    // Load profile from Supabase
+    supabase
+      .rpc("community_get_user_profile", { p_user_id: userId })
+      .then(({ data, error: rpcErr }) => {
+        if (rpcErr || !data) return;
+        const supabaseProfile: UserProfileFields = {
+          displayName: data.display_name || "",
+          bio: data.bio || "",
+          country: data.country || "",
+          city: data.city || "",
+          avatarUrl: data.avatar_url || null,
+          isPublic: data.is_public ?? true,
+        };
+        setProfile((prev) => {
+          const merged = { ...DEFAULT_PROFILE, ...prev, ...supabaseProfile };
+          try { localStorage.setItem(LS_PROFILE, JSON.stringify(merged)); } catch { /* noop */ }
+          return merged;
+        });
+      })
+      .catch(() => { /* silent */ });
+
+    // Load notification prefs from Supabase
+    supabase
+      .rpc("community_get_notification_prefs", { p_user_id: userId })
+      .then(({ data, error: rpcErr }) => {
+        if (rpcErr || !data) return;
+        const supabaseNotifs: Partial<UserNotificationPrefs> = {
+          emailDigest: data.email_digest ?? true,
+          chartAlerts: data.chart_alerts ?? true,
+          artistDrops: data.artist_drops ?? true,
+          replyNotifications: data.reply_notifications ?? true,
+          mentionNotifications: data.mention_notifications ?? true,
+          followNotifications: data.follow_notifications ?? false,
+          contributionNotifications: data.contribution_notifications ?? false,
+          marketingEmails: data.marketing_emails ?? false,
+        };
+        setNotifications((prev) => {
+          const merged = { ...DEFAULT_NOTIFICATIONS, ...prev, ...supabaseNotifs };
+          try { localStorage.setItem(LS_NOTIFICATIONS, JSON.stringify(merged)); } catch { /* noop */ }
+          return merged;
+        });
+      })
+      .catch(() => { /* silent */ });
+  }, [userId]);
+
+  // ─── Updaters ───
+  const updateProfile = useCallback((patch: Partial<UserProfileFields>) => {
+    setProfile((prev) => {
+      const next = { ...prev, ...patch };
+      try { localStorage.setItem(LS_PROFILE, JSON.stringify(next)); } catch { /* noop */ }
+      return next;
+    });
+  }, []);
+
+  const updateAppearance = useCallback((patch: Partial<UserAppearancePrefs>) => {
+    setAppearance((prev) => {
+      const next = { ...prev, ...patch };
+      try { localStorage.setItem(LS_APPEARANCE, JSON.stringify(next)); } catch { /* noop */ }
+      // Notify AccentProvider of changes
+      window.dispatchEvent(new CustomEvent("wk-accent-changed"));
+      return next;
+    });
+  }, []);
+
+  const updateNotifications = useCallback((patch: Partial<UserNotificationPrefs>) => {
+    setNotifications((prev) => {
+      const next = { ...prev, ...patch };
+      try { localStorage.setItem(LS_NOTIFICATIONS, JSON.stringify(next)); } catch { /* noop */ }
+      return next;
+    });
+  }, []);
+
+  const updatePlayback = useCallback((patch: Partial<UserPlaybackPrefs>) => {
+    setPlayback((prev) => {
+      const next = { ...prev, ...patch };
+      try { localStorage.setItem(LS_PLAYBACK, JSON.stringify(next)); } catch { /* noop */ }
+      // Notify PlayerContext of changes
+      window.dispatchEvent(new CustomEvent("wk-playback-changed"));
+      return next;
+    });
+  }, []);
+
+  const updatePrivacy = useCallback((patch: Partial<UserPrivacyPrefs>) => {
+    setPrivacy((prev) => {
+      const next = { ...prev, ...patch };
+      try { localStorage.setItem(LS_PRIVACY, JSON.stringify(next)); } catch { /* noop */ }
+      return next;
+    });
+  }, []);
+
+  // ─── Save to Supabase ───
+  const saveAll = useCallback(async (): Promise<boolean> => {
+    if (!userId) return false;
+    setSaving(true);
+    setSaveStatus("saving");
+    setError(null);
+
+    try {
+      // Save profile to Supabase
+      const { error: profileErr } = await supabase.rpc("community_update_profile", {
+        p_user_id: userId,
+        p_display_name: profile.displayName || null,
+        p_bio: profile.bio || null,
+        p_country: profile.country || null,
+        p_city: profile.city || null,
+        p_is_public: profile.isPublic,
+      });
+      if (profileErr) throw new Error(`Profile save failed: ${profileErr.message}`);
+
+      // Save notification prefs to Supabase
+      const { error: notifErr } = await supabase.rpc("community_update_notification_prefs", {
+        p_user_id: userId,
+        p_email_digest: notifications.emailDigest,
+        p_chart_alerts: notifications.chartAlerts,
+        p_artist_drops: notifications.artistDrops,
+        p_reply_notifications: notifications.replyNotifications,
+        p_mention_notifications: notifications.mentionNotifications,
+        p_follow_notifications: notifications.followNotifications,
+        p_contribution_notifications: notifications.contributionNotifications,
+        p_marketing_emails: notifications.marketingEmails,
+      });
+      if (notifErr) throw new Error(`Notification prefs save failed: ${notifErr.message}`);
+
+      // Save everything to localStorage
+      const now = new Date().toISOString();
+      try {
+        localStorage.setItem(LS_PROFILE, JSON.stringify(profile));
+        localStorage.setItem(LS_APPEARANCE, JSON.stringify(appearance));
+        localStorage.setItem(LS_NOTIFICATIONS, JSON.stringify(notifications));
+        localStorage.setItem(LS_PLAYBACK, JSON.stringify(playback));
+        localStorage.setItem(LS_PRIVACY, JSON.stringify(privacy));
+        localStorage.setItem(LS_SAVED_AT, now);
+      } catch { /* noop */ }
+
+      const snapshot = JSON.stringify({ profile, appearance, notifications, playback, privacy });
+      setSavedSnapshot(snapshot);
+      setSavedAt(now);
+      setSaveStatus("saved");
+      setSaving(false);
+      return true;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Save failed";
+      setError(msg);
+      setSaveStatus("error");
+      setSaving(false);
+      return false;
+    }
+  }, [userId, profile, appearance, notifications, playback, privacy]);
+
+  const discardChanges = useCallback(() => {
+    try {
+      const p = localStorage.getItem(LS_PROFILE);
+      const a = localStorage.getItem(LS_APPEARANCE);
+      const n = localStorage.getItem(LS_NOTIFICATIONS);
+      const pb = localStorage.getItem(LS_PLAYBACK);
+      const pr = localStorage.getItem(LS_PRIVACY);
+
+      if (p) setProfile({ ...DEFAULT_PROFILE, ...JSON.parse(p) });
+      else setProfile(DEFAULT_PROFILE);
+
+      if (a) setAppearance({ ...DEFAULT_APPEARANCE, ...JSON.parse(a) });
+      else setAppearance(DEFAULT_APPEARANCE);
+
+      if (n) setNotifications({ ...DEFAULT_NOTIFICATIONS, ...JSON.parse(n) });
+      else setNotifications(DEFAULT_NOTIFICATIONS);
+
+      if (pb) setPlayback({ ...DEFAULT_PLAYBACK, ...JSON.parse(pb) });
+      else setPlayback(DEFAULT_PLAYBACK);
+
+      if (pr) setPrivacy({ ...DEFAULT_PRIVACY, ...JSON.parse(pr) });
+      else setPrivacy(DEFAULT_PRIVACY);
+    } catch { /* noop */ }
+    setSavedSnapshot(
+      JSON.stringify({ profile, appearance, notifications, playback, privacy })
+    );
+    setSaveStatus("idle");
+  }, [profile, appearance, notifications, playback, privacy]);
+
+  const resetAll = useCallback(() => {
+    setProfile(DEFAULT_PROFILE);
+    setAppearance(DEFAULT_APPEARANCE);
+    setNotifications(DEFAULT_NOTIFICATIONS);
+    setPlayback(DEFAULT_PLAYBACK);
+    setPrivacy(DEFAULT_PRIVACY);
+    setSavedSnapshot(JSON.stringify({
+      profile: DEFAULT_PROFILE,
+      appearance: DEFAULT_APPEARANCE,
+      notifications: DEFAULT_NOTIFICATIONS,
+      playback: DEFAULT_PLAYBACK,
+      privacy: DEFAULT_PRIVACY,
+    }));
+    try {
+      localStorage.removeItem(LS_PROFILE);
+      localStorage.removeItem(LS_APPEARANCE);
+      localStorage.removeItem(LS_NOTIFICATIONS);
+      localStorage.removeItem(LS_PLAYBACK);
+      localStorage.removeItem(LS_PRIVACY);
+      localStorage.removeItem(LS_SAVED_AT);
+    } catch { /* noop */ }
+    setSaveStatus("idle");
+  }, []);
+
+  // ─── Avatar upload helper ───
+  const uploadAvatar = useCallback(async (file: File): Promise<string | null> => {
+    if (!userId) return null;
+    const ext = file.name.split(".").pop() || "jpg";
+    const path = `avatars/${userId}.${ext}`;
+
+    const { error: uploadErr } = await supabase.storage
+      .from("avatars")
+      .upload(path, file, { upsert: true, contentType: file.type });
+
+    if (uploadErr) throw new Error(uploadErr.message);
+
+    const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(path);
+    return urlData.publicUrl;
+  }, [userId]);
+
+  return {
+    // State
+    profile,
+    appearance,
+    notifications,
+    playback,
+    privacy,
+    loading,
+    saving,
+    error,
+    saveStatus,
+    dirty,
+    savedAt,
+    isSignedIn: !!userId,
+    userId,
+    userEmail: auth.email || "",
+    userInitial: (auth.name || auth.email || "W")[0]?.toUpperCase() || "W",
+    authLoading: auth.loading,
+
+    // Updaters
+    updateProfile,
+    updateAppearance,
+    updateNotifications,
+    updatePlayback,
+    updatePrivacy,
+
+    // Actions
+    saveAll,
+    discardChanges,
+    resetAll,
+    uploadAvatar,
+  };
+}

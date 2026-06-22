@@ -14,6 +14,19 @@ import {
 } from "@/services/community";
 import type { CommunityComment, CommunityProfile } from "@/services/community";
 
+function getCoverColor(): string {
+  try { return localStorage.getItem("wk-cover-color") || "#1a3a0a"; } catch { return "#1a3a0a"; }
+}
+function coverGradientStyle(): string {
+  const c = getCoverColor();
+  const n = parseInt(c.replace("#", ""), 16);
+  const r = Math.min(255, (n >> 16) + 30);
+  const g = Math.min(255, ((n >> 8) & 0xFF) + 30);
+  const b = Math.min(255, (n & 0xFF) + 30);
+  const brighter = `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, "0")}`;
+  return `linear-gradient(135deg, ${c}, ${brighter})`;
+}
+
 type Tab = "Comments" | "Replies" | "Saves" | "Following" | "Account";
 const tabs: Tab[] = ["Comments", "Replies", "Saves", "Following", "Account"];
 
@@ -133,7 +146,7 @@ export default function ProfilePage() {
       {/* Hero */}
       <section className="profile-dt-hero">
         <div className="profile-dt-cover">
-          <div className="h-full w-full bg-[linear-gradient(135deg,#1a3a0a,#2a5a1a)]" />
+          <div className="h-full w-full" style={{ background: coverGradientStyle() }} />
         </div>
       </section>
 

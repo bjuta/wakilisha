@@ -11,6 +11,7 @@ import "./design-system/wakilisha.elements.mobile.css";
 import "./design-system/wakilisha.elements.motion.css";
 import "./pages/admin/design-system/adminDesignSystemLayout.css";
 import { ThemeProvider } from "./components/design-system/theme/ThemeProvider";
+import { AccentProvider } from "./components/design-system/theme/AccentProvider";
 import { PlayerProvider } from "./context/PlayerContext";
 import { RecoveryRedirectGuard } from "./components/auth/RecoveryRedirectGuard";
 import { PageTitle } from "./components/seo/PageTitle";
@@ -23,16 +24,18 @@ function App() {
     <I18nextProvider i18n={i18n}>
       <BrowserRouter basename={__BASE_PATH__}>
         <ThemeProvider>
-          <PlayerProvider>
-            <RecoveryRedirectGuard />
-            <PageTitle />
-            <ScrollRestoration />
-            <PageViewTracker />
-            <GtagInjector />
-            <div className="page-transition">
-              <AppRoutes />
-            </div>
-          </PlayerProvider>
+          <AccentProvider>
+            <PlayerProvider>
+              <RecoveryRedirectGuard />
+              <PageTitle />
+              <ScrollRestoration />
+              <PageViewTracker />
+              <GtagInjector />
+              <div className="page-transition">
+                <AppRoutes />
+              </div>
+            </PlayerProvider>
+          </AccentProvider>
         </ThemeProvider>
       </BrowserRouter>
     </I18nextProvider>
