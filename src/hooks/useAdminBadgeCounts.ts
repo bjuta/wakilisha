@@ -1,5 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
+import { useAdminUser } from "@/hooks/useAdminUser";
+import { roleCanAccessAdmin, type Capability } from "@/services/userRoles";
 
 interface BadgeCounts {
   missingImages: number;
@@ -10,62 +12,96 @@ interface BadgeCounts {
   loading: boolean;
 }
 
+type CountQueryResult = {
+  count: number | null;
+  error: { message: string } | null;
+};
+
+const emptyCounts: BadgeCounts = {
+  missingImages: 0,
+  brokenLinks: 0,
+  reviewQueue: 0,
+  failedImports: 0,
+  pendingReports: 0,
+  loading: false,
+};
+
+function hasAnyCapability(userCapabilities: Capability[], required: Capability[]): boolean {
+  return required.some((capability) => userCapabilities.includes(capability));
+}
+
+async function safeCount(
+  shouldFetch: boolean,
+  queryFactory: () => PromiseLike<CountQueryResult>
+): Promise<number> {
+  if (!shouldFetch) return 0;
+  const { count, error } = await queryFactory();
+  if (error) return 0;
+  return count ?? 0;
+}
+
 export function useAdminBadgeCounts(): BadgeCounts {
-  const [counts, setCounts] = useState<BadgeCounts>({
-    missingImages: 0,
-    brokenLinks: 0,
-    reviewQueue: 0,
-    failedImports: 0,
-    pendingReports: 0,
-    loading: true,
-  });
+  const user = useAdminUser();
+  const [counts, setCounts] = useState<BadgeCounts>(emptyCounts);
 
   const fetchCounts = useCallback(async () => {
-    try {
-      // Missing Images: artists without public_image_url + articles without hero_image_url
-      const [{ count: missingArtists }, { count: missingArticles }, { count: mediaAssets }, { count: reviewItems }, { count: failedRecords }, { count: pendingReports }] = await Promise.all([
-        supabase
+    const canFetchBadges = !user.loading && Boolean(user.id) && roleCanAccessAdmin(user.role);
+
+    if (!canFetchBadges) {
+      setCounts(emptyCounts);
+      return;
+    }
+
+    setCounts((prev) => ({ ...prev, loading: true }));
+
+    const capabilities = user.capabilities;
+    const canViewMissingImages = hasAnyCapability(capabilities, ["view_missing_images", "manage_media_library"]);
+    const canViewBrokenLinks = hasAnyCapability(capabilities, ["view_broken_links", "manage_media_library"]);
+    const canViewReviewQueue = hasAnyCapability(capabilities, ["view_review_queue", "manage_review_queue"]);
+
+    const [missingArtists, missingArticles, mediaAssets, reviewItems] = await Promise.all([
+      safeCount(
+        canViewMissingImages,
+        () => supabase
           .from("registry_artists")
           .select("*", { count: "exact", head: true })
-          .is("public_image_url", null),
-        supabase
+          .is("public_image_url", null)
+      ),
+      safeCount(
+        canViewMissingImages,
+        () => supabase
           .from("wk_articles")
           .select("*", { count: "exact", head: true })
-          .or("hero_image_url.is.null,wp_status.neq.publish"),
-        supabase
+          .or("hero_image_url.is.null,wp_status.neq.publish")
+      ),
+      safeCount(
+        canViewBrokenLinks,
+        () => supabase
           .from("registry_media_assets")
           .select("*", { count: "exact", head: true })
-          .eq("media_kind", "image"),
-        supabase
-          .from("entity_resolution_decisions")
+          .eq("media_kind", "image")
+      ),
+      safeCount(
+        canViewReviewQueue,
+        () => supabase
+          .from("registry_review_items")
           .select("*", { count: "exact", head: true })
-          .eq("review_required", true),
-        supabase
-          .from("wk_ingestion_runs")
-          .select("*", { count: "exact", head: true })
-          .not("errors", "is", null),
-        supabase
-          .from("community_reports")
-          .select("*", { count: "exact", head: true })
-          .eq("status", "pending"),
-      ]);
+          .eq("status", "open")
+      ),
+    ]);
 
-      setCounts({
-        missingImages: (missingArtists ?? 0) + (missingArticles ?? 0),
-        brokenLinks: mediaAssets ?? 0,
-        reviewQueue: reviewItems ?? 0,
-        failedImports: failedRecords ?? 0,
-        pendingReports: pendingReports ?? 0,
-        loading: false,
-      });
-    } catch {
-      setCounts((prev) => ({ ...prev, loading: false }));
-    }
-  }, []);
+    setCounts({
+      missingImages: missingArtists + missingArticles,
+      brokenLinks: mediaAssets,
+      reviewQueue: reviewItems,
+      failedImports: 0,
+      pendingReports: 0,
+      loading: false,
+    });
+  }, [user.loading, user.id, user.role, user.capabilities]);
 
   useEffect(() => {
     fetchCounts();
-    // Refresh every 60 seconds
     const interval = setInterval(fetchCounts, 60000);
     return () => clearInterval(interval);
   }, [fetchCounts]);
