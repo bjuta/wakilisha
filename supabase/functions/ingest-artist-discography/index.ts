@@ -6,6 +6,29 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const PREVIEW_ALBUM_LIMIT = 25;
+const APPLE_ALBUM_FETCH_CONCURRENCY = 4;
+
+function json(payload: Record<string, unknown>, status = 200): Response {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+function fail(
+  stage: string,
+  error: string,
+  detail?: string,
+  extra: Record<string, unknown> = {},
+): Response {
+  return json({ ok: false, error, detail, stage, ...extra });
+}
+
+function logStage(stage: string, data: Record<string, unknown> = {}) {
+  console.log(JSON.stringify({ source: "ingest-artist-discography", stage, ...data }));
+}
+
 function slugify(s: string): string {
   return s.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 160);
 }
@@ -137,7 +160,7 @@ interface AppleAlbumDetail {
   relationships?: { tracks?: { data: Array<{ id: string; type: string; attributes: AppleTrackAttributes; }>; }; artists?: { data: Array<{ id: string; type: string; attributes: { name: string; url?: string; }; }>; }; };
 }
 
-async function searchAlbums(token: string, storefront: string, artistName: string, limit = 50): Promise<AppleAlbumSearchResult[]> {
+async function searchAlbums(token: string, storefront: string, artistName: string, limit = PREVIEW_ALBUM_LIMIT): Promise<AppleAlbumSearchResult[]> {
   const allAlbums: AppleAlbumSearchResult[] = [];
   let offset = 0;
   const pageSize = 25;
@@ -167,9 +190,11 @@ async function fetchAlbumDetail(token: string, storefront: string, albumId: stri
   return json?.data?.[0] ?? json?.data ?? null;
 }
 
-async function fetchAlbumsInParallel(token: string, storefront: string, albumIds: string[], concurrency = 8): Promise<{ detail: AppleAlbumDetail; id: string }[]> {
+async function fetchAlbumsInParallel(token: string, storefront: string, albumIds: string[], concurrency = APPLE_ALBUM_FETCH_CONCURRENCY): Promise<{ detail: AppleAlbumDetail; id: string }[]> {
   const results: { detail: AppleAlbumDetail; id: string }[] = [];
   const queue = [...albumIds];
+  if (queue.length === 0) return results;
+  const workerCount = Math.min(concurrency, queue.length);
   async function worker() {
     while (queue.length > 0) {
       const id = queue.shift();
@@ -178,7 +203,7 @@ async function fetchAlbumsInParallel(token: string, storefront: string, albumIds
       if (detail) results.push({ detail, id });
     }
   }
-  await Promise.all(Array.from({ length: concurrency }, () => worker()));
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
   return results;
 }
 
@@ -187,7 +212,7 @@ interface PreviewTrack {
 }
 
 interface PreviewAlbum {
-  apple_music_id: string; title: string; slug: string; release_type: string; release_date: string | null; upc: string | null; record_label: string | null; genre_names: string[]; artwork_url: string | null; apple_music_url: string | null; track_count: number; tracks: PreviewTrack[]; match_status: "existing" | "new"; existing_release: { id: string; slug: string; title: string; source: string; } | null;
+  apple_music_id: string; title: string; slug: string; release_type: string; release_date: string | null; upc: string | null; record_label: string | null; genre_names: string[]; artwork_url: string | null; apple_music_url: string | null; track_count: number; tracks: PreviewTrack[]; match_status: "existing" | "new"; existing_release: { id: string; slug: string; title: string; source: string; } | null; album_artist_name: string;
 }
 
 interface AdditionalPrimaryArtist {
@@ -217,18 +242,19 @@ Deno.serve(async (req: Request) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-    if (!supabaseUrl || !supabaseKey) return new Response(JSON.stringify({ ok: false, error: "Supabase service role key missing. This function requires SERVICE_ROLE_KEY to write registry data." }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    if (!supabaseUrl || !supabaseKey) return fail("init", "missing_service_role", "Supabase service role key missing. This function requires SERVICE_ROLE_KEY to write registry data.", { duration_ms: Date.now() - start });
 
     const db = createClient(supabaseUrl, supabaseKey);
 
     let body: Record<string, unknown>;
     try { body = await req.json(); }
-    catch { return new Response(JSON.stringify({ ok: false, error: "invalid_json" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }); }
+    catch { return fail("parse_body", "invalid_json", "Request body must be valid JSON.", { duration_ms: Date.now() - start }); }
 
     const artistSlug = String(body.artistSlug ?? "").trim();
-    if (!artistSlug) return new Response(JSON.stringify({ ok: false, error: "Missing artistSlug" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    if (!artistSlug) return fail("parse_body", "missing_artist_slug", "Missing artistSlug.", { duration_ms: Date.now() - start });
 
     const mode = String(body.mode ?? "preview").trim();
+    logStage("request", { mode, artistSlug });
 
     stage = "credentials";
     const [teamId, keyId, privateKey, storefrontRaw] = await Promise.all([
@@ -236,11 +262,11 @@ Deno.serve(async (req: Request) => {
       readCredential(db, "apple_music_private_key"), readCredential(db, "apple_music_storefront"),
     ]);
     const storefront = storefrontRaw || "ke";
-    if (!teamId || !keyId || !privateKey) return new Response(JSON.stringify({ ok: false, error: "Apple Music credentials not configured." }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    if (!teamId || !keyId || !privateKey) return fail(stage, "missing_apple_music_credentials", "Apple Music credentials are not fully configured. Required: team ID, key ID, and .p8 private key.", { mode, artistSlug, storefront, duration_ms: Date.now() - start });
 
     stage = "artist_lookup";
     const { data: artistRow, error: artistErr } = await db.from("registry_artists").select("id, slug, display_name, metadata").eq("slug", artistSlug).maybeSingle();
-    if (artistErr || !artistRow) return new Response(JSON.stringify({ ok: false, error: artistErr ? artistErr.message : `Artist not found: ${artistSlug}` }), { status: artistErr ? 500 : 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    if (artistErr || !artistRow) return fail(stage, artistErr ? "artist_lookup_failed" : "artist_not_found", artistErr ? artistErr.message : `Artist not found: ${artistSlug}`, { mode, artistSlug, storefront, duration_ms: Date.now() - start });
 
     const artistId = artistRow.id as string;
     const artistName = artistRow.display_name as string;
@@ -249,15 +275,17 @@ Deno.serve(async (req: Request) => {
     stage = "jwt";
     let token: string;
     try { token = await createAppleMusicToken(teamId, keyId, privateKey); }
-    catch (err) { return new Response(JSON.stringify({ ok: false, error: "apple_music_jwt_failed", detail: err instanceof Error ? err.message : String(err), stage: "jwt" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }); }
+    catch (err) { return fail(stage, "apple_music_jwt_failed", err instanceof Error ? err.message : String(err), { mode, artistSlug, storefront, duration_ms: Date.now() - start }); }
 
     stage = "load_existing";
+    logStage(stage, { mode, artistSlug });
     const [existingReleasesRes, existingTracksRes, artistReleaseIdsRes] = await Promise.all([
       db.from("registry_releases").select("id, slug, title, metadata").eq("status", "active"),
       db.from("registry_tracks").select("id, slug, isrc"),
       db.from("registry_release_artists").select("release_id").eq("artist_id", artistId).eq("status", "active"),
     ]);
-    if (existingReleasesRes.error || existingTracksRes.error || artistReleaseIdsRes.error) return new Response(JSON.stringify({ ok: false, error: "Failed to load existing registry data." }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const loadError = existingReleasesRes.error?.message ?? existingTracksRes.error?.message ?? artistReleaseIdsRes.error?.message;
+    if (loadError) return fail(stage, "registry_preload_failed", loadError, { mode, artistSlug, storefront, duration_ms: Date.now() - start });
 
     const allActiveReleases = existingReleasesRes.data ?? [];
 
@@ -298,9 +326,9 @@ Deno.serve(async (req: Request) => {
     if (mode === "preview") {
       stage = "search";
       let searchResults: AppleAlbumSearchResult[];
-      try { searchResults = await searchAlbums(token, storefront, artistName, 50); }
-      catch (err) { return new Response(JSON.stringify({ ok: false, error: "apple_music_search_failed", detail: err instanceof Error ? err.message : String(err) }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }); }
-      if (searchResults.length === 0) return new Response(JSON.stringify({ ok: true, mode: "preview", artist: { id: artistId, slug: artistSlug, name: artistName }, storefront, albums_searched: 0, albums_fetched: 0, albums: [], duration_ms: Date.now() - start }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      try { searchResults = await searchAlbums(token, storefront, artistName, PREVIEW_ALBUM_LIMIT); }
+      catch (err) { return fail(stage, "apple_music_search_failed", err instanceof Error ? err.message : String(err), { mode, artistSlug, storefront, duration_ms: Date.now() - start }); }
+      if (searchResults.length === 0) return json({ ok: true, mode: "preview", artist: { id: artistId, slug: artistSlug, name: artistName }, storefront, albums_searched: 0, albums_fetched: 0, albums_failed: [], albums: [], duration_ms: Date.now() - start });
 
       const artistNameLower = artistName.toLowerCase();
       const matchingAlbums = searchResults.filter((a) => {
@@ -310,9 +338,10 @@ Deno.serve(async (req: Request) => {
 
       stage = "fetch_albums";
       const albumIds = matchingAlbums.map((a) => a.id);
+      logStage(stage, { mode, artistSlug, searched: searchResults.length, matching: albumIds.length, limit: PREVIEW_ALBUM_LIMIT, concurrency: APPLE_ALBUM_FETCH_CONCURRENCY });
       let fetchedResults: { detail: AppleAlbumDetail; id: string }[];
-      try { fetchedResults = await fetchAlbumsInParallel(token, storefront, albumIds, 8); }
-      catch (err) { return new Response(JSON.stringify({ ok: false, error: "album_fetch_failed", detail: err instanceof Error ? err.message : String(err) }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }); }
+      try { fetchedResults = await fetchAlbumsInParallel(token, storefront, albumIds, APPLE_ALBUM_FETCH_CONCURRENCY); }
+      catch (err) { return fail(stage, "album_fetch_failed", err instanceof Error ? err.message : String(err), { mode, artistSlug, storefront, albums_searched: matchingAlbums.length, duration_ms: Date.now() - start }); }
 
       const albumDetails = fetchedResults.map((r) => r.detail);
       const failedIds = albumIds.filter((id) => !fetchedResults.find((r) => r.id === id));
@@ -353,6 +382,7 @@ Deno.serve(async (req: Request) => {
           tracks: previewTracks,
           match_status: existingMatch ? "existing" : "new",
           existing_release: existingMatch ? { id: existingMatch.id, slug: existingMatch.slug, title: existingMatch.title, source: existingMatch.metadata?.source ? String(existingMatch.metadata.source) : "registry" } : null,
+          album_artist_name: attrs.artistName ?? "",
         };
       });
 
@@ -364,12 +394,12 @@ Deno.serve(async (req: Request) => {
         return b.release_date.localeCompare(a.release_date);
       });
 
-      return new Response(JSON.stringify({ ok: true, mode: "preview", artist: { id: artistId, slug: artistSlug, name: artistName }, storefront, albums_searched: matchingAlbums.length, albums_fetched: albumDetails.length, albums_failed: failedIds, albums: previewAlbums, duration_ms: Date.now() - start }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return json({ ok: true, mode: "preview", artist: { id: artistId, slug: artistSlug, name: artistName }, storefront, albums_searched: matchingAlbums.length, albums_fetched: albumDetails.length, albums_failed: failedIds, albums: previewAlbums, duration_ms: Date.now() - start });
     }
 
     if (mode === "apply") {
       const rawSelected = body.selected_albums;
-      if (!Array.isArray(rawSelected) || rawSelected.length === 0) return new Response(JSON.stringify({ ok: false, error: "Missing or empty selected_albums array." }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      if (!Array.isArray(rawSelected) || rawSelected.length === 0) return fail("apply_input", "missing_selected_albums", "Missing or empty selected_albums array.", { mode, artistSlug, storefront, duration_ms: Date.now() - start });
 
       const selections: ApplySelection[] = rawSelected.map((s: unknown) => {
         const item = s as Record<string, unknown>;
@@ -393,13 +423,14 @@ Deno.serve(async (req: Request) => {
       }).filter((s) => s.apple_music_id && ["merge", "canonicalize", "ignore"].includes(s.action));
 
       const toProcess = selections.filter((s) => s.action !== "ignore");
-      if (toProcess.length === 0) return new Response(JSON.stringify({ ok: true, mode: "apply", summary: { merged: 0, canonicalized: 0, ignored: selections.length, tracks_created: 0, featured_artist_links: 0, errors: [] }, duration_ms: Date.now() - start }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      if (toProcess.length === 0) return json({ ok: true, mode: "apply", summary: { merged: 0, canonicalized: 0, ignored: selections.length, tracks_created: 0, featured_artist_links: 0, errors: [] }, duration_ms: Date.now() - start });
 
       stage = "fetch_selected";
       const selectedIds = toProcess.map((s) => s.apple_music_id);
+      logStage(stage, { mode, artistSlug, selected: selectedIds.length, concurrency: APPLE_ALBUM_FETCH_CONCURRENCY });
       let fetchedResults: { detail: AppleAlbumDetail; id: string }[];
-      try { fetchedResults = await fetchAlbumsInParallel(token, storefront, selectedIds, 8); }
-      catch (err) { return new Response(JSON.stringify({ ok: false, error: "album_fetch_failed", detail: err instanceof Error ? err.message : String(err) }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }); }
+      try { fetchedResults = await fetchAlbumsInParallel(token, storefront, selectedIds, APPLE_ALBUM_FETCH_CONCURRENCY); }
+      catch (err) { return fail(stage, "album_fetch_failed", err instanceof Error ? err.message : String(err), { mode, artistSlug, storefront, selected: selectedIds.length, duration_ms: Date.now() - start }); }
 
       stage = "load_artists_for_featured";
       const { data: allRegistryArtists } = await db.from("registry_artists")
@@ -800,12 +831,12 @@ Deno.serve(async (req: Request) => {
       const appleAlbumIds = selections.map((s) => s.apple_music_id);
       await db.from("registry_artists").update({ metadata: { ...artistMeta, apple_music_album_ids: appleAlbumIds, apple_music_discography_ingested_at: new Date().toISOString() }, updated_at: new Date().toISOString() }).eq("id", artistId);
 
-      return new Response(JSON.stringify({ ok: true, mode: "apply", summary, duration_ms: Date.now() - start }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return json({ ok: true, mode: "apply", summary, duration_ms: Date.now() - start });
     }
 
-    return new Response(JSON.stringify({ ok: false, error: `Unknown mode: "${mode}". Use "preview" or "apply".` }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    return fail("mode", "unknown_mode", `Unknown mode: "${mode}". Use "preview" or "apply".`, { mode, artistSlug, duration_ms: Date.now() - start });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    return new Response(JSON.stringify({ ok: false, error: "internal_error", detail: `[${stage}] ${msg.slice(0, 300)}`, stage }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    return fail(stage, "internal_error", `[${stage}] ${msg.slice(0, 300)}`, { duration_ms: Date.now() - start });
   }
 });
