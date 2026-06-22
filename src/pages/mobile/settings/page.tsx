@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { useTheme, type ThemeMode } from "@/components/design-system/theme/ThemeProvider";
@@ -63,6 +63,7 @@ export default function MobileSettingsPage() {
     discardChanges,
     resetAll,
     uploadAvatar,
+    checkUsernameAvailability,
   } = useUserSettings();
 
   const { theme, setTheme } = useTheme();
@@ -70,6 +71,42 @@ export default function MobileSettingsPage() {
   const [connectError, setConnectError] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [usernameAvailability, setUsernameAvailability] = useState({
+    status: "idle",
+    available: false,
+    normalized: "",
+    message: "Choose a public handle.",
+  });
+
+  useEffect(() => {
+    if (!isSignedIn) return;
+
+    const value = profile.username || "";
+    setUsernameAvailability((prev) => ({
+      ...prev,
+      status: value ? "checking" : "idle",
+      normalized: value.trim().replace(/^@+/, "").toLowerCase(),
+      message: value ? "Checking handle..." : "Choose a public handle.",
+    }));
+
+    const timer = window.setTimeout(async () => {
+      const result = await checkUsernameAvailability(value);
+      setUsernameAvailability(result);
+    }, 350);
+
+    return () => window.clearTimeout(timer);
+  }, [profile.username, isSignedIn, checkUsernameAvailability]);
+
+  const handleUsernameChange = (value: string) => {
+    updateProfile({ username: value.trim().replace(/^@+/, "").toLowerCase() });
+  };
+
+  const usernameStatusClass =
+    usernameAvailability.status === "available" || usernameAvailability.status === "current"
+      ? "text-[var(--wk-success)]"
+      : usernameAvailability.status === "checking" || usernameAvailability.status === "idle"
+        ? "text-[var(--wk-text-faint)]"
+        : "text-[var(--wk-danger)]";
 
   const handleSave = async () => {
     await saveAll();
@@ -260,6 +297,32 @@ export default function MobileSettingsPage() {
                   onChange={(e) => updateProfile({ displayName: e.target.value })}
                   placeholder="Your display name"
                 />
+              </div>
+              <div>
+                <div className="text-[11px] font-bold text-[var(--wk-text-faint)] uppercase tracking-wider mb-1">Handle</div>
+                <div className="flex h-[44px] overflow-hidden rounded-xl bg-[var(--wk-surface)] border border-[var(--wk-border)] focus-within:border-[var(--wk-brand)]">
+                  <span className="flex items-center px-3 text-sm font-black text-[var(--wk-text-faint)]">@</span>
+                  <input
+                    className="min-w-0 flex-1 bg-transparent pr-3 text-sm font-bold text-[var(--wk-text)] focus:outline-none"
+                    value={profile.username}
+                    onChange={(e) => handleUsernameChange(e.target.value)}
+                    placeholder="your_handle"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    disabled={!isSignedIn}
+                  />
+                </div>
+                <div className="mt-1 flex items-center justify-between gap-2">
+                  <p className={`text-[10px] font-bold ${usernameStatusClass}`}>
+                    {usernameAvailability.message}
+                  </p>
+                  {usernameAvailability.normalized && (
+                    <span className="shrink-0 text-[10px] text-[var(--wk-text-faint)]">
+                      /u/{usernameAvailability.normalized}
+                    </span>
+                  )}
+                </div>
               </div>
               <div>
                 <div className="text-[11px] font-bold text-[var(--wk-text-faint)] uppercase tracking-wider mb-1">Bio</div>

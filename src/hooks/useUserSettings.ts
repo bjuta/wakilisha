@@ -5,12 +5,30 @@ import { supabase } from "@/lib/supabase";
 // ─── Types ────────────────────────────────────────────────────────────────
 
 export interface UserProfileFields {
+  username: string;
   displayName: string;
   bio: string;
   country: string;
   city: string;
   avatarUrl: string | null;
   isPublic: boolean;
+}
+
+export type UsernameAvailabilityStatus =
+  | "idle"
+  | "checking"
+  | "available"
+  | "current"
+  | "invalid"
+  | "taken"
+  | "reserved"
+  | "error";
+
+export interface UsernameAvailability {
+  status: UsernameAvailabilityStatus;
+  available: boolean;
+  normalized: string;
+  message: string;
 }
 
 export interface UserAppearancePrefs {
@@ -56,6 +74,7 @@ export interface AllUserSettings {
 // ─── Defaults ─────────────────────────────────────────────────────────────
 
 export const DEFAULT_PROFILE: UserProfileFields = {
+  username: "",
   displayName: "",
   bio: "",
   country: "",
@@ -114,6 +133,45 @@ const AVATAR_EXTENSION_BY_MIME = {
 
 type AvatarExtension = typeof AVATAR_EXTENSION_BY_MIME[keyof typeof AVATAR_EXTENSION_BY_MIME];
 
+const USERNAME_PATTERN = /^[a-z0-9]([a-z0-9_]{1,28}[a-z0-9])$/;
+
+export function normalizeUsernameInput(value: string): string {
+  return value.trim().replace(/^@+/, "").toLowerCase();
+}
+
+function localUsernameAvailability(value: string, currentUsername: string): UsernameAvailability | null {
+  const normalized = normalizeUsernameInput(value);
+
+  if (!normalized) {
+    return {
+      status: "idle",
+      available: false,
+      normalized,
+      message: "Choose a public handle.",
+    };
+  }
+
+  if (!USERNAME_PATTERN.test(normalized)) {
+    return {
+      status: "invalid",
+      available: false,
+      normalized,
+      message: "Use 3-30 lowercase letters, numbers, or underscores. Start and end with a letter or number.",
+    };
+  }
+
+  if (currentUsername && normalized === currentUsername) {
+    return {
+      status: "current",
+      available: true,
+      normalized,
+      message: "This is your current handle.",
+    };
+  }
+
+  return null;
+}
+
 function getAvatarExtension(file: File): AvatarExtension | null {
   const byMime = AVATAR_EXTENSION_BY_MIME[file.type as keyof typeof AVATAR_EXTENSION_BY_MIME];
   if (byMime) return byMime;
@@ -142,6 +200,7 @@ export function useUserSettings() {
   const [playback, setPlayback] = useState<UserPlaybackPrefs>(DEFAULT_PLAYBACK);
   const [privacy, setPrivacy] = useState<UserPrivacyPrefs>(DEFAULT_PRIVACY);
   const [savedAt, setSavedAt] = useState<string | null>(null);
+  const [savedUsername, setSavedUsername] = useState("");
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -197,6 +256,7 @@ export function useUserSettings() {
       .then(({ data, error: rpcErr }) => {
         if (rpcErr || !data) return;
         const supabaseProfile: UserProfileFields = {
+          username: data.username || data.username_normalized || "",
           displayName: data.display_name || "",
           bio: data.bio || "",
           country: data.country || "",
@@ -204,6 +264,7 @@ export function useUserSettings() {
           avatarUrl: data.avatar_url || null,
           isPublic: data.is_public ?? true,
         };
+        setSavedUsername(supabaseProfile.username);
         setProfile((prev) => {
           const merged = { ...DEFAULT_PROFILE, ...prev, ...supabaseProfile };
           try { localStorage.setItem(LS_PROFILE, JSON.stringify(merged)); } catch { /* noop */ }
@@ -281,6 +342,65 @@ export function useUserSettings() {
     });
   }, []);
 
+  const checkUsernameAvailability = useCallback(async (value: string): Promise<UsernameAvailability> => {
+    const localResult = localUsernameAvailability(value, savedUsername);
+    if (localResult) return localResult;
+
+    const normalized = normalizeUsernameInput(value);
+
+    try {
+      const { data, error: rpcErr } = await supabase.rpc("community_username_available", {
+        p_username: normalized,
+      });
+
+      if (rpcErr) {
+        return {
+          status: "error",
+          available: false,
+          normalized,
+          message: rpcErr.message || "Could not check handle availability.",
+        };
+      }
+
+      const result = data as Record<string, unknown> | null;
+      const available = Boolean(result?.available);
+      const reason = String(result?.reason || result?.status || "").toLowerCase();
+      const message = String(result?.message || "");
+
+      if (available) {
+        return {
+          status: "available",
+          available: true,
+          normalized,
+          message: message || "Handle is available.",
+        };
+      }
+
+      if (reason.includes("reserved")) {
+        return {
+          status: "reserved",
+          available: false,
+          normalized,
+          message: message || "This handle is reserved.",
+        };
+      }
+
+      return {
+        status: "taken",
+        available: false,
+        normalized,
+        message: message || "This handle is already taken.",
+      };
+    } catch (err) {
+      return {
+        status: "error",
+        available: false,
+        normalized,
+        message: err instanceof Error ? err.message : "Could not check handle availability.",
+      };
+    }
+  }, [savedUsername]);
+
   // ─── Save to Supabase ───
   const saveAll = useCallback(async (): Promise<boolean> => {
     if (!userId) return false;
@@ -289,16 +409,36 @@ export function useUserSettings() {
     setError(null);
 
     try {
+      let profileToPersist = profile;
+      const normalizedUsername = normalizeUsernameInput(profile.username);
+
+      if (normalizedUsername && normalizedUsername !== savedUsername) {
+        const localResult = localUsernameAvailability(normalizedUsername, savedUsername);
+        if (localResult && !localResult.available) {
+          throw new Error(localResult.message);
+        }
+
+        const { error: usernameErr } = await supabase.rpc("community_update_username", {
+          p_username: normalizedUsername,
+        });
+
+        if (usernameErr) throw new Error(`Handle save failed: ${usernameErr.message}`);
+
+        profileToPersist = { ...profileToPersist, username: normalizedUsername };
+        setProfile(profileToPersist);
+        setSavedUsername(normalizedUsername);
+      }
+
       // Save profile to Supabase
       const { error: profileErr } = await supabase.rpc("community_update_profile", {
         p_user_id: userId,
-        p_display_name: profile.displayName || null,
-        p_bio: profile.bio || null,
-        p_country: profile.country || null,
-        p_city: profile.city || null,
-        p_is_public: profile.isPublic,
-        p_avatar_url: profile.avatarUrl,
-        p_clear_avatar: profile.avatarUrl === null,
+        p_display_name: profileToPersist.displayName || null,
+        p_bio: profileToPersist.bio || null,
+        p_country: profileToPersist.country || null,
+        p_city: profileToPersist.city || null,
+        p_is_public: profileToPersist.isPublic,
+        p_avatar_url: profileToPersist.avatarUrl,
+        p_clear_avatar: profileToPersist.avatarUrl === null,
       });
       if (profileErr) throw new Error(`Profile save failed: ${profileErr.message}`);
 
@@ -319,7 +459,7 @@ export function useUserSettings() {
       // Save everything to localStorage
       const now = new Date().toISOString();
       try {
-        localStorage.setItem(LS_PROFILE, JSON.stringify(profile));
+        localStorage.setItem(LS_PROFILE, JSON.stringify(profileToPersist));
         localStorage.setItem(LS_APPEARANCE, JSON.stringify(appearance));
         localStorage.setItem(LS_NOTIFICATIONS, JSON.stringify(notifications));
         localStorage.setItem(LS_PLAYBACK, JSON.stringify(playback));
@@ -327,7 +467,7 @@ export function useUserSettings() {
         localStorage.setItem(LS_SAVED_AT, now);
       } catch { /* noop */ }
 
-      const snapshot = JSON.stringify({ profile, appearance, notifications, playback, privacy });
+      const snapshot = JSON.stringify({ profile: profileToPersist, appearance, notifications, playback, privacy });
       setSavedSnapshot(snapshot);
       setSavedAt(now);
       setSaveStatus("saved");
@@ -340,7 +480,7 @@ export function useUserSettings() {
       setSaving(false);
       return false;
     }
-  }, [userId, profile, appearance, notifications, playback, privacy]);
+  }, [userId, profile, appearance, notifications, playback, privacy, savedUsername]);
 
   const discardChanges = useCallback(() => {
     try {
@@ -446,5 +586,6 @@ export function useUserSettings() {
     discardChanges,
     resetAll,
     uploadAvatar,
+    checkUsernameAvailability,
   };
 }

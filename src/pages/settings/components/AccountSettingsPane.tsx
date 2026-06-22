@@ -1,5 +1,6 @@
-import { useRef, useState } from "react";
-import type { UserProfileFields } from "@/hooks/useUserSettings";
+import { useEffect, useRef, useState } from "react";
+import type { UserProfileFields, UsernameAvailability } from "@/hooks/useUserSettings";
+import { normalizeUsernameInput } from "@/hooks/useUserSettings";
 
 interface Props {
   profile: UserProfileFields;
@@ -8,6 +9,7 @@ interface Props {
   isSignedIn: boolean;
   updateProfile: (patch: Partial<UserProfileFields>) => void;
   uploadAvatar: (file: File) => Promise<string | null>;
+  checkUsernameAvailability: (value: string) => Promise<UsernameAvailability>;
 }
 
 const coverSwatches = [
@@ -19,10 +21,24 @@ const coverSwatches = [
   { label: "Slate", value: "#0a1a2a" },
 ];
 
-export function AccountSettingsPane({ profile, userId, userInitial, isSignedIn, updateProfile, uploadAvatar }: Props) {
+export function AccountSettingsPane({
+  profile,
+  userId,
+  userInitial,
+  isSignedIn,
+  updateProfile,
+  uploadAvatar,
+  checkUsernameAvailability,
+}: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [usernameAvailability, setUsernameAvailability] = useState<UsernameAvailability>({
+    status: "idle",
+    available: false,
+    normalized: "",
+    message: "Choose a public handle.",
+  });
   const [coverColor, setCoverColor] = useState(() => {
     try {
       return localStorage.getItem("wk-cover-color") || "#1a3a0a";
@@ -30,6 +46,25 @@ export function AccountSettingsPane({ profile, userId, userInitial, isSignedIn, 
       return "#1a3a0a";
     }
   });
+
+  useEffect(() => {
+    if (!isSignedIn) return;
+
+    const value = profile.username || "";
+    setUsernameAvailability((prev) => ({
+      ...prev,
+      status: value ? "checking" : "idle",
+      normalized: normalizeUsernameInput(value),
+      message: value ? "Checking handle..." : "Choose a public handle.",
+    }));
+
+    const timer = window.setTimeout(async () => {
+      const result = await checkUsernameAvailability(value);
+      setUsernameAvailability(result);
+    }, 350);
+
+    return () => window.clearTimeout(timer);
+  }, [profile.username, isSignedIn, checkUsernameAvailability]);
 
   const handleAvatarClick = () => fileRef.current?.click();
 
@@ -56,6 +91,17 @@ export function AccountSettingsPane({ profile, userId, userInitial, isSignedIn, 
     setCoverColor(color);
     try { localStorage.setItem("wk-cover-color", color); } catch { /* noop */ }
   };
+
+  const handleUsernameChange = (value: string) => {
+    updateProfile({ username: normalizeUsernameInput(value) });
+  };
+
+  const usernameStatusClass =
+    usernameAvailability.status === "available" || usernameAvailability.status === "current"
+      ? "text-[var(--wk-success)]"
+      : usernameAvailability.status === "checking" || usernameAvailability.status === "idle"
+        ? "text-[var(--wk-text-faint)]"
+        : "text-[var(--wk-danger)]";
 
   return (
     <div>
@@ -133,6 +179,32 @@ export function AccountSettingsPane({ profile, userId, userInitial, isSignedIn, 
             placeholder="Your public name"
             disabled={!isSignedIn}
           />
+        </div>
+        <div className="col-span-2 sm:col-span-1">
+          <label className="text-[10px] font-black uppercase tracking-[0.14em] text-[var(--wk-text-faint)] block mb-1.5">Handle</label>
+          <div className="flex h-[42px] overflow-hidden rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg-subtle)] focus-within:border-[var(--wk-brand)] transition-colors">
+            <span className="flex items-center px-3 text-sm font-black text-[var(--wk-text-faint)]">@</span>
+            <input
+              className="min-w-0 flex-1 bg-transparent pr-3 text-sm font-medium text-[var(--wk-text)] focus:outline-none"
+              value={profile.username}
+              onChange={(e) => handleUsernameChange(e.target.value)}
+              placeholder="your_handle"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              disabled={!isSignedIn}
+            />
+          </div>
+          <div className="mt-1.5 flex items-center justify-between gap-3">
+            <p className={`text-[10px] font-bold ${usernameStatusClass}`}>
+              {usernameAvailability.message}
+            </p>
+            {usernameAvailability.normalized && (
+              <span className="shrink-0 text-[10px] text-[var(--wk-text-faint)]">
+                /u/{usernameAvailability.normalized}
+              </span>
+            )}
+          </div>
         </div>
         <div className="col-span-2 sm:col-span-1">
           <label className="text-[10px] font-black uppercase tracking-[0.14em] text-[var(--wk-text-faint)] block mb-1.5">Country</label>

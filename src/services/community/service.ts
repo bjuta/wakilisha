@@ -372,9 +372,16 @@ export async function getEntityContributions(
 
 // Mappers
 function mapProfile(row: Record<string, unknown>): CommunityProfile {
+  const username =
+    typeof row.username === "string" && row.username
+      ? row.username
+      : typeof row.username_normalized === "string"
+        ? row.username_normalized
+        : "";
+
   return {
     userId: String(row.user_id),
-    username: String(row.username),
+    username,
     displayName: row.display_name as string | null,
     avatarUrl: row.avatar_url as string | null,
     bio: row.bio as string | null,
