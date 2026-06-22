@@ -72,6 +72,7 @@ export default function SettingsPage() {
     discardChanges,
     resetAll,
     uploadAvatar,
+    checkUsernameAvailability,
   } = useUserSettings();
 
   const activeTab = tabs.find((t) => t.key === active)!;
@@ -132,7 +133,7 @@ export default function SettingsPage() {
     }
 
     const displayName = profile.displayName || userEmail?.split("@")[0] || "Reader";
-    const sub = isSignedIn ? userEmail : "Sign in to save preferences to your account";
+    const sub = isSignedIn && profile.username ? `@${profile.username}` : isSignedIn ? userEmail : "Sign in to save preferences to your account";
 
     return (
       <div className="flex items-center gap-3 p-4 border border-[var(--wk-border)] rounded-xl bg-[var(--wk-bg-subtle)]">
@@ -231,6 +232,7 @@ export default function SettingsPage() {
                   isSignedIn={isSignedIn}
                   updateProfile={updateProfile}
                   uploadAvatar={uploadAvatar}
+                  checkUsernameAvailability={checkUsernameAvailability}
                 />
               )}
               {active === "Appearance" && (

@@ -140,6 +140,10 @@ export default function ProfilePage() {
   const statsCommentCount = commProfile?.commentCount ?? 0;
   const statsSaveCount = saves.length || 0;
   const statsFollowCount = follows.length || 0;
+  const profileUsername =
+    commProfile?.username && commProfile.username !== "undefined"
+      ? commProfile.username
+      : "";
 
   return (
     <main className="profile-dt-shell">
@@ -208,8 +212,8 @@ export default function ProfilePage() {
               <div className="profile-dt-header-actions">
                 {isSignedIn ? (
                   <>
-                    {commProfile && (
-                      <Link to={`/u/${commProfile.username}`} className="profile-dt-btn-ghost whitespace-nowrap">
+                    {profileUsername && (
+                      <Link to={`/u/${profileUsername}`} className="profile-dt-btn-ghost whitespace-nowrap">
                         <WkIcon name="ExternalLink" size={14} /> Public profile
                       </Link>
                     )}
