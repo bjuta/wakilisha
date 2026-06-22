@@ -9,6 +9,12 @@ interface Props {
   updatePlayback: (patch: Partial<UserPlaybackPrefs>) => void;
 }
 
+interface AppleMusicTokenResponse {
+  developerToken?: string | null;
+  configured?: boolean;
+  error?: string;
+}
+
 export function PlaybackSettingsPane({ playback, isSignedIn, updatePlayback }: Props) {
   const [connecting, setConnecting] = useState(false);
   const [connectError, setConnectError] = useState<string | null>(null);
@@ -20,9 +26,12 @@ export function PlaybackSettingsPane({ playback, isSignedIn, updatePlayback }: P
 
     try {
       // Request a developer token from the edge function
-      const { data, error } = await supabase.functions.invoke("apple-music-token", {});
+      const { data, error } = await supabase.functions.invoke<AppleMusicTokenResponse>("apple-music-token", {});
 
       if (error) throw new Error(error.message || "Failed to get developer token");
+      if (data?.configured === false) {
+        throw new Error(data.error || "Apple Music is not configured yet.");
+      }
 
       const devToken = data?.developerToken;
       if (!devToken) throw new Error(data?.error || "No developer token returned");

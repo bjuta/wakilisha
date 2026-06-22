@@ -105,6 +105,31 @@ const LS_PLAYBACK = "wk-playback-v2";
 const LS_PRIVACY = "wk-privacy-v2";
 const LS_SAVED_AT = "wk-settings-saved-v2";
 
+const AVATAR_BUCKET = "avatars";
+const AVATAR_EXTENSION_BY_MIME = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+} as const;
+
+type AvatarExtension = typeof AVATAR_EXTENSION_BY_MIME[keyof typeof AVATAR_EXTENSION_BY_MIME];
+
+function getAvatarExtension(file: File): AvatarExtension | null {
+  const byMime = AVATAR_EXTENSION_BY_MIME[file.type as keyof typeof AVATAR_EXTENSION_BY_MIME];
+  if (byMime) return byMime;
+
+  const rawExt = file.name.includes(".") ? file.name.split(".").pop()?.toLowerCase() : null;
+  if (rawExt === "jpeg") return "jpg";
+  if (rawExt === "jpg" || rawExt === "png" || rawExt === "webp") return rawExt;
+  return null;
+}
+
+function getAvatarContentType(file: File, ext: AvatarExtension): string {
+  if (AVATAR_EXTENSION_BY_MIME[file.type as keyof typeof AVATAR_EXTENSION_BY_MIME]) return file.type;
+  if (ext === "jpg") return "image/jpeg";
+  return `image/${ext}`;
+}
+
 // ─── Hook ─────────────────────────────────────────────────────────────────
 
 export function useUserSettings() {
@@ -272,6 +297,8 @@ export function useUserSettings() {
         p_country: profile.country || null,
         p_city: profile.city || null,
         p_is_public: profile.isPublic,
+        p_avatar_url: profile.avatarUrl,
+        p_clear_avatar: profile.avatarUrl === null,
       });
       if (profileErr) throw new Error(`Profile save failed: ${profileErr.message}`);
 
@@ -371,17 +398,21 @@ export function useUserSettings() {
   // ─── Avatar upload helper ───
   const uploadAvatar = useCallback(async (file: File): Promise<string | null> => {
     if (!userId) return null;
-    const ext = file.name.split(".").pop() || "jpg";
-    const path = `avatars/${userId}.${ext}`;
+
+    const ext = getAvatarExtension(file);
+    if (!ext) throw new Error("Use a JPG, PNG, or WEBP image.");
+
+    const path = `${userId}/avatar.${ext}`;
+    const contentType = getAvatarContentType(file, ext);
 
     const { error: uploadErr } = await supabase.storage
-      .from("avatars")
-      .upload(path, file, { upsert: true, contentType: file.type });
+      .from(AVATAR_BUCKET)
+      .upload(path, file, { upsert: true, contentType });
 
     if (uploadErr) throw new Error(uploadErr.message);
 
-    const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(path);
-    return urlData.publicUrl;
+    const { data: urlData } = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(path);
+    return `${urlData.publicUrl}?v=${Date.now()}`;
   }, [userId]);
 
   return {
