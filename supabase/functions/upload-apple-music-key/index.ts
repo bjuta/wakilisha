@@ -4,6 +4,8 @@ const ALLOWED_ORIGINS = [
   "https://wakilisha.africa",
   "https://www.wakilisha.africa",
   "https://staging.wakilisha.africa",
+  "https://readdy.cc",
+  "https://www.readdy.cc",
   "https://readdy.ai",
   "https://readdy-site.link",
   "https://readdy-site.com",
@@ -14,11 +16,12 @@ const ALLOWED_ORIGINS = [
 
 function corsHeaders(req: Request): Record<string, string> {
   const origin = req.headers.get("Origin") ?? "";
-  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  const isReaddyPreview = origin === "https://readdy.cc" || origin.endsWith(".readdy.cc");
+  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) || isReaddyPreview ? origin : ALLOWED_ORIGINS[0];
   return {
     "Access-Control-Allow-Origin": allowedOrigin,
     "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
     "Vary": "Origin",
   };
 }
@@ -61,7 +64,6 @@ Deno.serve(async (req) => {
     });
   }
 
-  // Check admin role
   const adminClient = createClient(supabaseUrl, supabaseKey);
 
   const { data: roles } = await adminClient
@@ -86,7 +88,6 @@ Deno.serve(async (req) => {
     }
   }
 
-  // Parse multipart form data to extract the .p8 file
   const contentType = req.headers.get("content-type") ?? "";
   if (!contentType.includes("multipart/form-data")) {
     return new Response(JSON.stringify({ ok: false, error: "Expected multipart/form-data with a .p8 file." }), {
@@ -107,7 +108,6 @@ Deno.serve(async (req) => {
 
   const keyContent = await file.text();
 
-  // Validate that it looks like a private key
   if (!keyContent.includes("-----BEGIN PRIVATE KEY-----")) {
     return new Response(JSON.stringify({
       ok: false,
@@ -142,7 +142,6 @@ Deno.serve(async (req) => {
   const now = new Date().toISOString();
   const fileName = file.name || "uploaded.p8";
 
-  // ── PRIMARY: Store in admin_settings_secrets (read by ingest function) ──
   const { error: upsertErr } = await adminClient
     .from("admin_settings_secrets")
     .upsert({
@@ -171,7 +170,6 @@ Deno.serve(async (req) => {
 
   console.log(`[upload-key] Apple Music .p8 stored in admin_settings_secrets: ${keyLength} chars`);
 
-  // ── SECONDARY: Try Supabase Vault (encrypted at rest) for extra security ──
   let vaultAction = "none";
   let vaultError: string | null = null;
 
@@ -203,7 +201,6 @@ Deno.serve(async (req) => {
     vaultError = `Vault RPC exception: ${err instanceof Error ? err.message : String(err)}`;
   }
 
-  // Audit event
   await adminClient.from("chart_ingest_audit_events").insert({
     run_id: null,
     actor: user.id,
