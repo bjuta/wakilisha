@@ -115,6 +115,102 @@
   }
 }
 
+/* Admin shell layout hardening
+   Readdy preview/full-page capture can occasionally drop Tailwind's critical
+   layout utilities on dense admin routes. Keep the admin nav out of normal
+   document flow even when breakpoint utilities are not applied. */
+@media screen {
+  aside[class~="inset-y-0"][class~="left-0"][class~="border-wk-border"][class~="bg-wk-surface"] {
+    position: fixed !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    z-index: 50 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 100dvh !important;
+    max-height: 100dvh !important;
+    overflow: hidden !important;
+    background: var(--wk-surface) !important;
+    border-right: 1px solid var(--wk-border) !important;
+  }
+
+  aside[class~="inset-y-0"][class~="left-0"][class~="border-wk-border"][class~="bg-wk-surface"][class~="w-64"] {
+    width: 16rem !important;
+  }
+
+  aside[class~="inset-y-0"][class~="left-0"][class~="border-wk-border"][class~="bg-wk-surface"][class~="w-16"] {
+    width: 4rem !important;
+  }
+
+  aside[class~="inset-y-0"][class~="left-0"][class~="border-wk-border"][class~="bg-wk-surface"] > nav {
+    flex: 1 1 auto !important;
+    overflow-y: auto !important;
+  }
+
+  aside[class~="inset-y-0"][class~="left-0"][class~="border-wk-border"][class~="bg-wk-surface"] > div:first-child,
+  aside[class~="inset-y-0"][class~="left-0"][class~="border-wk-border"][class~="bg-wk-surface"] > div:last-child {
+    flex-shrink: 0 !important;
+  }
+
+  main[class~="min-h-screen"][class~="transition-all"][class~="duration-300"] {
+    min-height: 100dvh !important;
+    width: 100% !important;
+  }
+
+  button[class~="fixed"][class~="left-4"][class~="top-4"][class~="lg:hidden"] {
+    position: fixed !important;
+    left: 1rem !important;
+    top: 1rem !important;
+    z-index: 50 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  div[class~="fixed"][class~="inset-0"][class~="z-40"][class~="bg-black/50"] {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 40 !important;
+    background: rgb(0 0 0 / 0.5) !important;
+  }
+}
+
+@media screen and (max-width: 1023.98px) {
+  aside[class~="inset-y-0"][class~="left-0"][class~="border-wk-border"][class~="bg-wk-surface"][class~="-translate-x-full"] {
+    pointer-events: none !important;
+    transform: translateX(-100%) !important;
+  }
+
+  aside[class~="inset-y-0"][class~="left-0"][class~="border-wk-border"][class~="bg-wk-surface"][class~="translate-x-0"] {
+    pointer-events: auto !important;
+    transform: translateX(0) !important;
+  }
+
+  main[class~="min-h-screen"][class~="transition-all"][class~="duration-300"] {
+    padding-left: 0 !important;
+  }
+}
+
+@media screen and (min-width: 1024px) {
+  aside[class~="inset-y-0"][class~="left-0"][class~="border-wk-border"][class~="bg-wk-surface"] {
+    pointer-events: auto !important;
+    transform: translateX(0) !important;
+  }
+
+  main[class~="min-h-screen"][class~="transition-all"][class~="duration-300"][class~="lg:pl-64"] {
+    padding-left: 16rem !important;
+  }
+
+  main[class~="min-h-screen"][class~="transition-all"][class~="duration-300"][class~="lg:pl-16"] {
+    padding-left: 4rem !important;
+  }
+
+  button[class~="fixed"][class~="left-4"][class~="top-4"][class~="lg:hidden"] {
+    display: none !important;
+  }
+}
+
 /* ── Utility: hide scrollbars while keeping scroll functionality ── */
 .scrollbar-none {
   -ms-overflow-style: none;
