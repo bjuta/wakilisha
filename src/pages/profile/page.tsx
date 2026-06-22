@@ -137,20 +137,25 @@ export default function ProfilePage() {
     if (tab !== "Account") loadTabData(tab);
   }, [tab, loadTabData]);
 
-  const statsCommentCount = commProfile?.commentCount ?? 0;
+  const statsCommentCount = Math.max(commProfile?.commentCount ?? 0, comments.length);
   const statsSaveCount = saves.length || 0;
   const statsFollowCount = follows.length || 0;
   const profileUsername =
     commProfile?.username && commProfile.username !== "undefined"
       ? commProfile.username
       : "";
+  const profileCoverUrl = commProfile?.coverUrl || null;
 
   return (
     <main className="profile-dt-shell">
       {/* Hero */}
       <section className="profile-dt-hero">
-        <div className="profile-dt-cover">
-          <div className="h-full w-full" style={{ background: coverGradientStyle() }} />
+        <div className="profile-dt-cover" style={{ background: profileCoverUrl ? undefined : coverGradientStyle() }}>
+          {profileCoverUrl ? (
+            <img src={profileCoverUrl} alt="" />
+          ) : (
+            <div className="h-full w-full" style={{ background: coverGradientStyle() }} />
+          )}
         </div>
       </section>
 

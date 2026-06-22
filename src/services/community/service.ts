@@ -384,6 +384,7 @@ function mapProfile(row: Record<string, unknown>): CommunityProfile {
     username,
     displayName: row.display_name as string | null,
     avatarUrl: row.avatar_url as string | null,
+    coverUrl: row.cover_url as string | null,
     bio: row.bio as string | null,
     country: row.country as string | null,
     city: row.city as string | null,
