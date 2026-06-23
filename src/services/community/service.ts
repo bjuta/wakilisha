@@ -8,6 +8,9 @@ import type {
   CommunityActivity,
   CreateCommentInput,
   CreateTrackMomentCommentInput,
+  CreateContextAnchorCommentInput,
+  ContextAnchorCommentQuery,
+  ContextAnchorSummaryItem,
   TrackMomentSummaryItem,
   VoteInput,
   ReactInput,
@@ -95,6 +98,62 @@ export async function getTrackMomentSummary(
   return (data || []).map((row: any) => ({
     anchorTimeMs: Number(row.anchor_time_ms) || 0,
     anchorLabel: String(row.anchor_label || ''),
+    commentCount: Number(row.comment_count) || 0,
+    reactionCount: Number(row.reaction_count) || 0,
+    score: Number(row.score) || 0,
+    latestCommentAt: String(row.latest_comment_at || ''),
+  }));
+}
+
+export async function createContextAnchorComment(input: CreateContextAnchorCommentInput): Promise<CommentResult> {
+  const { data, error } = await supabase.rpc('community_create_context_anchor_comment', {
+    p_thread_id: input.threadId,
+    p_body_markdown: input.bodyMarkdown,
+    p_body_plain: input.bodyPlain || input.bodyMarkdown,
+    p_body_html: input.bodyHtml || null,
+    p_anchor_type: input.anchorType,
+    p_context_entity_type: input.contextEntityType,
+    p_context_entity_id: input.contextEntityId || null,
+    p_context_entity_slug: input.contextEntitySlug || null,
+    p_context_label: input.contextLabel || null,
+    p_anchor_label: input.anchorLabel || input.contextLabel || null,
+  });
+  if (error) throw error;
+  return { comment: mapComment(data.comment) };
+}
+
+export async function getContextAnchorComments(input: ContextAnchorCommentQuery): Promise<CommunityComment[]> {
+  const { data, error } = await supabase.rpc('community_get_context_anchor_comments', {
+    p_thread_id: input.threadId,
+    p_anchor_type: input.anchorType,
+    p_context_entity_type: input.contextEntityType || null,
+    p_context_entity_id: input.contextEntityId || null,
+    p_context_entity_slug: input.contextEntitySlug || null,
+    p_limit: input.limit || 30,
+  });
+  if (error) throw error;
+  return (data || []).map((row: any) => mapComment(row));
+}
+
+export async function getContextAnchorSummary(
+  threadId: string,
+  anchorType?: 'release_track' | 'chart_entry' | null,
+  limit: number = 8
+): Promise<ContextAnchorSummaryItem[]> {
+  const { data, error } = await supabase.rpc('community_get_context_anchor_summary', {
+    p_thread_id: threadId,
+    p_anchor_type: anchorType || null,
+    p_limit: limit,
+  });
+  if (error) throw error;
+
+  return (data || []).map((row: any) => ({
+    anchorType: row.anchor_type as ContextAnchorSummaryItem['anchorType'],
+    contextEntityType: row.context_entity_type ? String(row.context_entity_type) : null,
+    contextEntityId: row.context_entity_id ? String(row.context_entity_id) : null,
+    contextEntitySlug: row.context_entity_slug ? String(row.context_entity_slug) : null,
+    contextLabel: String(row.context_label || row.anchor_label || ''),
+    anchorLabel: String(row.anchor_label || row.context_label || ''),
     commentCount: Number(row.comment_count) || 0,
     reactionCount: Number(row.reaction_count) || 0,
     score: Number(row.score) || 0,
@@ -525,6 +584,10 @@ function mapComment(row: Record<string, unknown>): CommunityComment {
     anchorTimeMs: row.anchor_time_ms == null ? null : Number(row.anchor_time_ms),
     anchorEndTimeMs: row.anchor_end_time_ms == null ? null : Number(row.anchor_end_time_ms),
     anchorLabel: row.anchor_label ? String(row.anchor_label) : null,
+    contextEntityType: row.context_entity_type ? String(row.context_entity_type) : null,
+    contextEntityId: row.context_entity_id ? String(row.context_entity_id) : null,
+    contextEntitySlug: row.context_entity_slug ? String(row.context_entity_slug) : null,
+    contextLabel: row.context_label ? String(row.context_label) : null,
   };
 }
 
