@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { getAttributionContext } from "@/services/attribution";
 
 // ── Session ID ────────────────────────────────────────────────────
 // Generated once per browser tab session, stored in sessionStorage.
@@ -65,12 +66,19 @@ export function trackEvent(
   eventName: string,
   options: TrackEventOptions = {},
 ): void {
-  const pageUrl = normalizeUrl(
-    typeof window !== "undefined" ? window.location.href : "",
-  );
+  const rawPageUrl =
+    typeof window !== "undefined" ? window.location.href : "";
+  const pageUrl = normalizeUrl(rawPageUrl);
   const sessionId = getSessionId();
   const referrer =
     typeof document !== "undefined" ? document.referrer || undefined : undefined;
+
+  const enrichedContext = {
+    ...(options.context ?? {}),
+    attribution: getAttributionContext(rawPageUrl, referrer),
+    raw_page_url: rawPageUrl || null,
+    canonical_page_url: pageUrl || null,
+  };
 
   const payload = {
     p_event_name: eventName,
@@ -78,7 +86,7 @@ export function trackEvent(
     p_page_type: options.pageType ?? null,
     p_entity_slug: options.entitySlug ?? null,
     p_entity_type: options.entityType ?? null,
-    p_context: options.context ?? null,
+    p_context: enrichedContext,
     p_session_id: sessionId,
     p_user_id: options.userId ?? null,
     p_referrer: referrer ?? null,

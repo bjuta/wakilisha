@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useScrollLock } from "@/hooks/useScrollLock";
 import { incrementShareCount, getShareCounts, getTotalShareCount } from "@/services/shareTracking";
 import { trackEvent } from "@/services/analytics";
+import { buildUtmUrl, getUtmContextForUrl } from "@/services/attribution";
 import { Portal } from "@/components/base/Portal";
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -274,6 +275,13 @@ export function SharePopover({
   const baseUrl = item.url || (typeof window !== "undefined" ? window.location.href : "");
   const finalUrl = useMemo(() => getFinalUrl(baseUrl, timestamp), [baseUrl, timestamp]);
   const shareText = item.description || item.subtitle || item.title;
+  const shareContent = item.type ?? "page";
+  const getTrackedShareUrl = useCallback((platformKey: string) => buildUtmUrl(finalUrl, {
+    source: platformKey,
+    medium: "share",
+    campaign: "wakilisha_share",
+    content: shareContent,
+  }), [finalUrl, shareContent]);
 
   // Load counts
   useEffect(() => {
@@ -283,7 +291,10 @@ export function SharePopover({
       pageType: item.type ?? "page",
       entitySlug: item.url ? (() => { try { return new URL(item.url).pathname.split("/").filter(Boolean).slice(-1)[0]; } catch { return undefined; } })() : undefined,
       entityType: item.type ?? undefined,
-      context: { share_title: item.title, share_type: item.type ?? "page" },
+      context: {
+        share_title: item.title,
+        share_type: item.type ?? "page",
+      },
     });
   }, [open, baseUrl, item]);
 
@@ -327,29 +338,43 @@ export function SharePopover({
   }, [open, onClose, triggerRef]);
 
   const handleCopy = useCallback(async () => {
-    try { await navigator.clipboard.writeText(finalUrl); } catch { /* no-op */ }
+    const trackedUrl = getTrackedShareUrl("copy");
+    try { await navigator.clipboard.writeText(trackedUrl); } catch { /* no-op */ }
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
     trackEvent("share_copy", {
       pageType: item.type ?? "page",
       entitySlug: item.url ? (() => { try { return new URL(item.url).pathname.split("/").filter(Boolean).slice(-1)[0]; } catch { return undefined; } })() : undefined,
       entityType: item.type ?? undefined,
-      context: { share_title: item.title, share_type: item.type ?? "page" },
+      context: {
+        share_platform: "copy",
+        share_title: item.title,
+        share_type: item.type ?? "page",
+        outbound_url: trackedUrl,
+        outbound_utm: getUtmContextForUrl(trackedUrl),
+      },
     });
     incrementShareCount(baseUrl, "copy", item.url ? (() => { try { return new URL(item.url).pathname.split("/").filter(Boolean).slice(-1)[0]; } catch { return undefined; } })() : undefined, item.title).then((count) => {
       setShareCounts((prev) => ({ ...prev, copy: count }));
     }).catch(() => {});
-  }, [finalUrl, baseUrl, item]);
+  }, [getTrackedShareUrl, baseUrl, item]);
 
   const handleShare = useCallback(async (platform: SharePlatform) => {
-    const encodedUrl = encodeURIComponent(finalUrl);
+    const trackedUrl = getTrackedShareUrl(platform.key);
+    const encodedUrl = encodeURIComponent(trackedUrl);
     const encodedText = encodeURIComponent(shareText);
 
     trackEvent("share_click", {
       pageType: item.type ?? "page",
       entitySlug: item.url ? (() => { try { return new URL(item.url).pathname.split("/").filter(Boolean).slice(-1)[0]; } catch { return undefined; } })() : undefined,
       entityType: item.type ?? undefined,
-      context: { share_platform: platform.key, share_title: item.title, share_type: item.type ?? "page" },
+      context: {
+        share_platform: platform.key,
+        share_title: item.title,
+        share_type: item.type ?? "page",
+        outbound_url: trackedUrl,
+        outbound_utm: getUtmContextForUrl(trackedUrl),
+      },
     });
 
     setPendingPlatforms((prev) => new Set(prev).add(platform.key));
@@ -363,7 +388,7 @@ export function SharePopover({
     const shareUrl = platform.buildUrl(encodedUrl, encodedText);
     if (platform.key === "email") window.location.href = shareUrl;
     else openPopup(shareUrl);
-  }, [finalUrl, shareText, baseUrl, item]);
+  }, [getTrackedShareUrl, shareText, baseUrl, item]);
 
   const totalShares = getTotalShareCount(shareCounts);
 
@@ -472,6 +497,13 @@ export function ShareSheet({ item, open, onClose, timestamp, onComment }: ShareS
   const baseUrl = item.url || (typeof window !== "undefined" ? window.location.href : "");
   const finalUrl = useMemo(() => getFinalUrl(baseUrl, timestamp), [baseUrl, timestamp]);
   const shareText = item.description || item.subtitle || item.title;
+  const shareContent = item.type ?? "page";
+  const getTrackedShareUrl = useCallback((platformKey: string) => buildUtmUrl(finalUrl, {
+    source: platformKey,
+    medium: "share",
+    campaign: "wakilisha_share",
+    content: shareContent,
+  }), [finalUrl, shareContent]);
 
   useScrollLock(open);
 
@@ -482,7 +514,13 @@ export function ShareSheet({ item, open, onClose, timestamp, onComment }: ShareS
       pageType: item.type ?? "page",
       entitySlug: item.url ? (() => { try { return new URL(item.url).pathname.split("/").filter(Boolean).slice(-1)[0]; } catch { return undefined; } })() : undefined,
       entityType: item.type ?? undefined,
-      context: { share_title: item.title, share_type: item.type ?? "page" },
+      context: {
+        share_platform: "copy",
+        share_title: item.title,
+        share_type: item.type ?? "page",
+        outbound_url: trackedUrl,
+        outbound_utm: getUtmContextForUrl(trackedUrl),
+      },
     });
   }, [open, baseUrl, item]);
 
@@ -526,7 +564,8 @@ export function ShareSheet({ item, open, onClose, timestamp, onComment }: ShareS
   if (!open) return null;
 
   const handleCopy = async () => {
-    try { await navigator.clipboard.writeText(finalUrl); } catch { /* no-op */ }
+    const trackedUrl = getTrackedShareUrl("copy");
+    try { await navigator.clipboard.writeText(trackedUrl); } catch { /* no-op */ }
     trackEvent("share_copy", {
       pageType: item.type ?? "page",
       entitySlug: item.url ? (() => { try { return new URL(item.url).pathname.split("/").filter(Boolean).slice(-1)[0]; } catch { return undefined; } })() : undefined,
@@ -539,14 +578,21 @@ export function ShareSheet({ item, open, onClose, timestamp, onComment }: ShareS
   };
 
   const handleShare = async (platform: SharePlatform) => {
-    const encodedUrl = encodeURIComponent(finalUrl);
+    const trackedUrl = getTrackedShareUrl(platform.key);
+    const encodedUrl = encodeURIComponent(trackedUrl);
     const encodedText = encodeURIComponent(shareText);
 
     trackEvent("share_click", {
       pageType: item.type ?? "page",
       entitySlug: item.url ? (() => { try { return new URL(item.url).pathname.split("/").filter(Boolean).slice(-1)[0]; } catch { return undefined; } })() : undefined,
       entityType: item.type ?? undefined,
-      context: { share_platform: platform.key, share_title: item.title, share_type: item.type ?? "page" },
+      context: {
+        share_platform: platform.key,
+        share_title: item.title,
+        share_type: item.type ?? "page",
+        outbound_url: trackedUrl,
+        outbound_utm: getUtmContextForUrl(trackedUrl),
+      },
     });
 
     setPendingPlatforms((prev) => new Set(prev).add(platform.key));
