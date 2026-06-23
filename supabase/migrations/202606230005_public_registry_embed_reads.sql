@@ -9,8 +9,6 @@ grant select (
   display_name,
   public_image_url,
   metadata,
-  chart_entry_count,
-  top_chart_position,
   status
 ) on table public.registry_artists to anon, authenticated;
 
