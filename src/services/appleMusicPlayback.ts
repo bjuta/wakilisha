@@ -15,18 +15,38 @@ function loadMusicKitScript(): Promise<void> {
 
   if (!scriptPromise) {
     scriptPromise = new Promise<void>((resolve, reject) => {
+      let settled = false;
+
+      const finish = () => {
+        if (settled) return;
+        if (!window.MusicKit) return;
+        settled = true;
+        document.removeEventListener("musickitloaded", finish);
+        resolve();
+      };
+
+      const fail = () => {
+        if (settled) return;
+        settled = true;
+        document.removeEventListener("musickitloaded", finish);
+        reject(new Error("Failed to load MusicKit JS"));
+      };
+
+      document.addEventListener("musickitloaded", finish);
+
       const existing = document.querySelector<HTMLScriptElement>('script[src*="musickit"]');
       if (existing) {
-        existing.addEventListener("load", () => resolve(), { once: true });
-        existing.addEventListener("error", () => reject(new Error("Failed to load MusicKit JS")), { once: true });
+        existing.addEventListener("load", () => window.setTimeout(finish, 0), { once: true });
+        existing.addEventListener("error", fail, { once: true });
+        window.setTimeout(finish, 0);
         return;
       }
 
       const script = document.createElement("script");
       script.src = "https://js-cdn.music.apple.com/musickit/v3/musickit.js";
       script.async = true;
-      script.onload = () => resolve();
-      script.onerror = () => reject(new Error("Failed to load MusicKit JS"));
+      script.onload = () => window.setTimeout(finish, 0);
+      script.onerror = fail;
       document.head.appendChild(script);
     });
   }
@@ -96,11 +116,16 @@ export function getExistingMusicKit(): any | null {
 
 export async function playAppleMusicCatalogSong(catalogId: string, userToken?: string | null): Promise<void> {
   const music = await getAuthorizedMusicKit(userToken);
+  const songId = String(catalogId).trim();
+
+  if (!songId) {
+    throw new Error("Missing Apple Music catalog song id");
+  }
 
   try {
-    await music.setQueue({ songs: [catalogId] });
+    await music.setQueue({ song: songId });
   } catch {
-    await music.setQueue({ song: catalogId });
+    await music.setQueue({ songs: [songId] });
   }
 
   await music.play();
