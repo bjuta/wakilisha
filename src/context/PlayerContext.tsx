@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useCallback, useRef, useEffect } f
 import { trackEvent } from "@/services/analytics";
 import {
   getAppleMusicPlaybackSnapshot,
+  getAuthorizedMusicKit,
   pauseAppleMusic,
   playAppleMusicCatalogSong,
   resumeAppleMusic,
@@ -149,6 +150,20 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   // ─── Read user playback preferences ───
   const playbackPrefs = usePlaybackPrefs();
+
+  useEffect(() => {
+    if (!playbackPrefs.appleMusicConnected) return;
+
+    getAuthorizedMusicKit(playbackPrefs.appleMusicToken)
+      .then(() => {
+        if (localStorage.getItem("wk-debug-player") === "1") {
+          console.info("[WAKILISHA] MusicKit ready");
+        }
+      })
+      .catch((err) => {
+        console.warn("[WAKILISHA] MusicKit prewarm failed:", err);
+      });
+  }, [playbackPrefs.appleMusicConnected, playbackPrefs.appleMusicToken]);
 
   const stopApplePolling = useCallback(() => {
     if (applePollRef.current !== null) {
