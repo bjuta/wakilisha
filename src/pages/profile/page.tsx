@@ -61,9 +61,8 @@ export default function ProfilePage() {
 
   const isSignedIn = !authUser.loading && !!authUser.id;
   const userId = authUser.id;
-  const userDisplayName = authUser.name || authUser.email?.split("@")[0] || "Reader";
+  const fallbackDisplayName = authUser.name || authUser.email?.split("@")[0] || "Reader";
   const userEmail = authUser.email || "";
-  const userInitial = userDisplayName[0]?.toUpperCase() || "W";
 
   // Community profile
   const [commProfile, setCommProfile] = useState<CommunityProfile | null>(null);
@@ -144,6 +143,9 @@ export default function ProfilePage() {
     commProfile?.username && commProfile.username !== "undefined"
       ? commProfile.username
       : "";
+  const profileDisplayName = commProfile?.displayName || fallbackDisplayName;
+  const profileAvatarUrl = commProfile?.avatarUrl || authUser.avatarUrl || null;
+  const profileInitial = profileDisplayName[0]?.toUpperCase() || "W";
   const profileCoverUrl = commProfile?.coverUrl || null;
 
   return (
@@ -164,11 +166,11 @@ export default function ProfilePage() {
         <div className="profile-dt-header">
           <div className="profile-dt-avatar-wrap">
             <div className="profile-dt-avatar">
-              {authUser.avatarUrl ? (
-                <img src={authUser.avatarUrl} alt="" className="h-full w-full object-cover" />
+              {profileAvatarUrl ? (
+                <img src={profileAvatarUrl} alt="" className="h-full w-full object-cover" />
               ) : (
                 <div className="flex h-full w-full items-center justify-center text-[28px] font-black bg-[var(--wk-surface)] text-[var(--wk-brand)]">
-                  {userInitial}
+                  {profileInitial}
                 </div>
               )}
             </div>
@@ -190,7 +192,7 @@ export default function ProfilePage() {
                 ) : (
                   <>
                     <h1 className="profile-dt-name">
-                      {isSignedIn ? userDisplayName : "WAKILISHA Reader"}
+                      {isSignedIn ? profileDisplayName : "WAKILISHA Reader"}
                     </h1>
                     <div className="profile-dt-handle">
                       {commProfile ? (
