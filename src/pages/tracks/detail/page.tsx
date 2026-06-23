@@ -17,6 +17,7 @@ import { ContributionBadges } from "@/components/feature/community/ContributionB
 import { CommunitySection } from "@/pages/magazine/article/components/CommunitySection";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { useEntityActions } from "@/hooks/useCommunityActions";
+import { getApplePlaybackPrefsSnapshot } from "@/services/appleMusicConnection";
 import { useScrollDepthTracking } from "@/hooks/useScrollDepthTracking";
 
 type TrackChartAppearance = {
@@ -408,7 +409,7 @@ function ConnectedArtists({ artists, artworkUrl }: { artists: TrackViewModel["ar
 
 export default function TrackDetail() {
   const { artistSlug, trackSlug } = useParams<{ artistSlug: string; trackSlug: string }>();
-  const { playTrack, currentTrack, isPlaying, togglePlay } = usePlayer();
+  const { playTrack, currentTrack, isPlaying, togglePlay, playbackBackend } = usePlayer();
   const user = useAuthUser();
   const { save: saveEntityAction, loading: entityActionLoading } = useEntityActions(user.id || undefined);
   const [track, setTrack] = useState<TrackViewModel | null>(null);
@@ -416,12 +417,30 @@ export default function TrackDetail() {
   const [error, setError] = useState<string | null>(null);
   const [trackSaved, setTrackSaved] = useState(false);
   const [trackSaveError, setTrackSaveError] = useState<string | null>(null);
+  const [applePlaybackConnected, setApplePlaybackConnected] = useState(
+    () => getApplePlaybackPrefsSnapshot().appleMusicConnected
+  );
 
   useScrollDepthTracking({
     pageType: "track_detail",
     entitySlug: trackSlug,
     entityType: "track",
   });
+
+  useEffect(() => {
+    const syncApplePlaybackState = () => {
+      setApplePlaybackConnected(getApplePlaybackPrefsSnapshot().appleMusicConnected);
+    };
+
+    syncApplePlaybackState();
+    window.addEventListener("wk-playback-changed", syncApplePlaybackState);
+    window.addEventListener("wk-apple-music-connected", syncApplePlaybackState);
+
+    return () => {
+      window.removeEventListener("wk-playback-changed", syncApplePlaybackState);
+      window.removeEventListener("wk-apple-music-connected", syncApplePlaybackState);
+    };
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -489,6 +508,18 @@ export default function TrackDetail() {
   const isCurrentTrack = currentTrack?.id === track.slug;
   const isTrackPlaying = isCurrentTrack && isPlaying;
   const minutes = track.duration ? Math.round(track.duration / 60) : 0;
+  const hasAppleCatalog = Boolean(track.appleMusicCatalogId || track.appleMusicId);
+  const canPlayFullTrack = hasAppleCatalog && applePlaybackConnected;
+  const hasPlayableSource = track.isPlayable || canPlayFullTrack;
+  const playButtonLabel = isTrackPlaying
+    ? (playbackBackend === "apple" ? "Pause" : "Pause preview")
+    : canPlayFullTrack
+      ? "Play full track"
+      : track.isPlayable
+        ? "Play preview"
+        : hasAppleCatalog
+          ? "Connect Apple Music"
+          : "No playback";
 
   const trackChips = [
     track.releaseType && track.releaseType !== "Unknown" ? track.releaseType : "",
@@ -497,7 +528,7 @@ export default function TrackDetail() {
   ].filter(Boolean);
 
   const handlePlay = () => {
-    if (!track.isPlayable) return;
+    if (!hasPlayableSource) return;
     if (isCurrentTrack) {
       togglePlay();
       return;
@@ -507,7 +538,7 @@ export default function TrackDetail() {
       title: track.title,
       artist: track.artist,
       artworkUrl: track.artworkUrl,
-      isPlayable: track.isPlayable,
+      isPlayable: hasPlayableSource,
       source: "WAKILISHA",
       duration: track.duration,
       previewUrl: track.previewUrl || undefined,
@@ -635,9 +666,16 @@ export default function TrackDetail() {
               </div>
 
               <div className="flex flex-wrap gap-3 mt-8">
-                <button onClick={handlePlay} disabled={!track.isPlayable} className="inline-flex items-center gap-2.5 rounded-xl bg-[var(--wk-brand)] text-white px-6 py-3 text-[14px] font-extrabold hover:bg-[var(--wk-brand)]/90 transition-colors disabled:opacity-30 disabled:cursor-not-allowed whitespace-nowrap">
+                <button
+                  type="button"
+                  onClick={handlePlay}
+                  disabled={!hasPlayableSource}
+                  aria-label={playButtonLabel}
+                  title={playButtonLabel}
+                  className="inline-flex items-center gap-2.5 rounded-xl bg-[var(--wk-brand)] text-white px-6 py-3 text-[14px] font-extrabold hover:bg-[var(--wk-brand)]/90 transition-colors disabled:opacity-30 disabled:cursor-not-allowed whitespace-nowrap"
+                >
                   <WkIcon name={isTrackPlaying ? "Pause" : "Play"} size={18} />
-                  {isTrackPlaying ? "Pause" : track.isPlayable ? "Play preview" : "No preview"}
+                  {playButtonLabel}
                 </button>
                 <Link to={`/tracks/${artistSlug}/${trackSlug}/lyrics/contribute`} className="inline-flex items-center gap-2.5 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] text-[var(--wk-text)] px-5 py-3 text-[13px] font-bold hover:bg-[var(--wk-surface-raised)] transition-colors whitespace-nowrap">
                   <WkIcon name="Edit3" size={16} />
