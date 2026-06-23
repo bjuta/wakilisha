@@ -24,6 +24,7 @@ import {
   fetchScrollDepth,
   fetchVideoEngagement,
   fetchReferrerBreakdown,
+  fetchAttributionSummary,
   fetchConversionFunnel,
   fetchExportEvents,
 } from "@/services/adminAnalytics";
@@ -39,6 +40,7 @@ import type {
   ScrollDepthBucket,
   VideoStat,
   FunnelStep,
+  AttributionSummary,
   DateRange,
 } from "@/services/adminAnalytics";
 import {
@@ -146,6 +148,23 @@ function rangeDayLabel(dr: DateRangeValue): string {
   return "Custom Range";
 }
 
+function csvCell(value: unknown): string {
+  const text = value === null || value === undefined ? "" : String(value);
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+function labelize(value: string): string {
+  if (!value) return "—";
+  return value
+    .replace(/[_-]/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function attributionPct(part: number, total: number): string {
+  if (!total) return "0%";
+  return `${Math.round((part / total) * 100)}%`;
+}
+
 // ── Main page ─────────────────────────────────────────────────────
 
 function getPreviousPeriod(primary: DateRangeValue): DateRangeValue {
@@ -169,7 +188,7 @@ function getPreviousPeriod(primary: DateRangeValue): DateRangeValue {
 export default function AdminAnalyticsPage() {
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState<DateRangeValue>({ mode: "preset", days: 30 });
-  const [tab, setTab] = useState<"overview" | "search" | "engagement" | "funnel" | "shares">("overview");
+  const [tab, setTab] = useState<"overview" | "search" | "engagement" | "attribution" | "shares" | "funnel">("overview");
 
   // ── Compare periods ─────────────────────────────────────────
   const [compareEnabled, setCompareEnabled] = useState(false);
@@ -191,6 +210,7 @@ export default function AdminAnalyticsPage() {
   const [scrollDepth, setScrollDepth] = useState<ScrollDepthBucket[]>([]);
   const [videoEngagement, setVideoEngagement] = useState<VideoStat[]>([]);
   const [referrerBreakdown, setReferrerBreakdown] = useState<Array<{ referrer: string; count: number }>>([]);
+  const [attribution, setAttribution] = useState<AttributionSummary | null>(null);
   const [funnel, setFunnel] = useState<FunnelStep[]>([]);
   const [exporting, setExporting] = useState(false);
 
@@ -221,7 +241,7 @@ export default function AdminAnalyticsPage() {
     setLoading(true);
     const range = toRange(dr);
     try {
-      const [today, period, tl, tp, te, ed, ptd, sq, ns, sd, ve, rb, f] = await Promise.all([
+        const [today, period, tl, tp, te, ed, ptd, sq, ns, sd, ve, rb, attr, f] = await Promise.all([
         fetchTodayKpis(),
         fetchDashboardKpis(range),
         fetchPageViewsTimeline(range),
@@ -234,6 +254,7 @@ export default function AdminAnalyticsPage() {
         fetchScrollDepth(range),
         fetchVideoEngagement(range),
         fetchReferrerBreakdown(range),
+        fetchAttributionSummary(range),
         fetchConversionFunnel(range),
       ]);
       setTodayKpis(today);
@@ -248,6 +269,7 @@ export default function AdminAnalyticsPage() {
       setScrollDepth(sd);
       setVideoEngagement(ve);
       setReferrerBreakdown(rb);
+      setAttribution(attr);
       setFunnel(f);
     } catch {
       // silent
@@ -319,10 +341,34 @@ export default function AdminAnalyticsPage() {
     try {
       const range = toRange(dateRange);
       const rows = await fetchExportEvents(range);
-      const csv = ["event_name,page_url,page_type,entity_slug,entity_type,session_id,referrer,created_at"];
+      const csv = ["event_name,page_url,page_type,entity_slug,entity_type,session_id,referrer,created_at,utm_source,utm_medium,utm_campaign,utm_content,utm_term,first_utm_source,first_utm_medium,first_utm_campaign,referrer_domain,raw_page_url,context_json"];
       rows.forEach((r: any) => {
-        const ctx = r.context ? JSON.stringify(r.context).replace(/"/g, '""') : "";
-        csv.push(`"${r.event_name}","${r.page_url}","${r.page_type || ""}","${r.entity_slug || ""}","${r.entity_type || ""}","${r.session_id || ""}","${r.referrer || ""}","${r.created_at}"`);
+        const ctx = (r.context || {}) as Record<string, any>;
+        const attr = (ctx.attribution || {}) as Record<string, any>;
+        const current = (attr.current || {}) as Record<string, any>;
+        const first = (attr.first_touch || {}) as Record<string, any>;
+        const cells = [
+          r.event_name,
+          r.page_url,
+          r.page_type || "",
+          r.entity_slug || "",
+          r.entity_type || "",
+          r.session_id || "",
+          r.referrer || "",
+          r.created_at,
+          current.utm_source || "",
+          current.utm_medium || "",
+          current.utm_campaign || "",
+          current.utm_content || "",
+          current.utm_term || "",
+          first?.utm_source || "",
+          first?.utm_medium || "",
+          first?.utm_campaign || "",
+          current.referrer_domain || first?.referrer_domain || "",
+          ctx.raw_page_url || current.landing_url || "",
+          JSON.stringify(ctx),
+        ];
+        csv.push(cells.map(csvCell).join(","));
       });
       const blob = new Blob([csv.join("\n")], { type: "text/csv" });
       const url = URL.createObjectURL(blob);
@@ -362,6 +408,7 @@ export default function AdminAnalyticsPage() {
     { key: "overview" as const, label: "Overview", icon: "LayoutDashboard" },
     { key: "search" as const, label: "Search", icon: "Search" },
     { key: "engagement" as const, label: "Engagement", icon: "Heart" },
+    { key: "attribution" as const, label: "Attribution", icon: "BarChart3" },
     { key: "shares" as const, label: "Shares", icon: "Share2" },
     { key: "funnel" as const, label: "Funnel", icon: "GitBranch" },
   ];
@@ -518,6 +565,10 @@ export default function AdminAnalyticsPage() {
           newsletterSources={newsletterSources}
           referrerBreakdown={referrerBreakdown}
         />
+      )}
+
+      {tab === "attribution" && (
+        <AttributionTab summary={attribution} />
       )}
 
       {tab === "shares" && (
@@ -989,6 +1040,232 @@ function FunnelTab({ funnel }: { funnel: FunnelStep[] }) {
                 </div>
               );
             })}
+          </div>
+        )}
+      </WkSurface>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Attribution Tab
+// ═══════════════════════════════════════════════════════════════════
+
+function AttributionTab({ summary }: { summary: AttributionSummary | null }) {
+  if (!summary) {
+    return (
+      <WkSurface className="p-10 text-center">
+        <WkIcon name="BarChart3" size={28} className="mx-auto mb-3 text-[var(--wk-text-faint)]" />
+        <p className="text-[12px] text-[var(--wk-text-muted)]">No attribution data loaded yet.</p>
+      </WkSurface>
+    );
+  }
+
+  const attributedRate = attributionPct(summary.attributedPageViews, summary.totalPageViews);
+  const topSource = summary.sources.find((s) => s.label !== "direct / unknown") || summary.sources[0];
+  const topCampaign = summary.campaigns[0];
+
+  return (
+    <div className="space-y-5">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <AdminChartsKpiCard
+          value={summary.attributedPageViews.toLocaleString()}
+          label={`Attributed Page Views (${attributedRate})`}
+          icon="BarChart3"
+          accent="brand"
+        />
+        <AdminChartsKpiCard
+          value={summary.attributedSessions.toLocaleString()}
+          label="Attributed Sessions"
+          icon="Users"
+          accent="muted"
+        />
+        <AdminChartsKpiCard
+          value={topSource ? labelize(topSource.label) : "—"}
+          label="Top Source"
+          icon="Share2"
+          accent="success"
+        />
+        <AdminChartsKpiCard
+          value={topCampaign ? labelize(topCampaign.label) : "—"}
+          label="Top Campaign"
+          icon="TrendingUp"
+          accent="warning"
+        />
+      </div>
+
+      <div className="grid gap-5 lg:grid-cols-2">
+        <WkSurface className="p-5">
+          <div className="mb-4 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <WkIcon name="Share2" size={16} className="text-[var(--wk-brand)]" />
+              <h2 className="text-[14px] font-bold text-[var(--wk-text)]">Traffic Sources</h2>
+            </div>
+            <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--wk-text-faint)]">
+              Events
+            </span>
+          </div>
+          {summary.sources.length === 0 ? (
+            <EmptyChart message="No source attribution yet." compact />
+          ) : (
+            <DataList
+              items={summary.sources}
+              getLabel={(r) => labelize(r.label)}
+              getMeta={(r) => `${r.sessions} sessions · ${r.pageViews} page views · ${r.percentage}%`}
+              getValue={(r) => r.events}
+              maxValue={summary.sources[0]?.events ?? 1}
+            />
+          )}
+        </WkSurface>
+
+        <WkSurface className="p-5">
+          <div className="mb-4 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <WkIcon name="Layers" size={16} className="text-[var(--wk-brand)]" />
+              <h2 className="text-[14px] font-bold text-[var(--wk-text)]">Mediums</h2>
+            </div>
+            <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--wk-text-faint)]">
+              Events
+            </span>
+          </div>
+          {summary.mediums.length === 0 ? (
+            <EmptyChart message="No medium attribution yet." compact />
+          ) : (
+            <DataList
+              items={summary.mediums}
+              getLabel={(r) => labelize(r.label)}
+              getMeta={(r) => `${r.sessions} sessions · ${r.pageViews} page views · ${r.percentage}%`}
+              getValue={(r) => r.events}
+              maxValue={summary.mediums[0]?.events ?? 1}
+            />
+          )}
+        </WkSurface>
+      </div>
+
+      <div className="grid gap-5 lg:grid-cols-2">
+        <WkSurface className="p-5">
+          <div className="mb-4 flex items-center gap-2">
+            <WkIcon name="TrendingUp" size={16} className="text-[var(--wk-brand)]" />
+            <h2 className="text-[14px] font-bold text-[var(--wk-text)]">Campaigns</h2>
+          </div>
+          {summary.campaigns.length === 0 ? (
+            <EmptyChart message="No UTM campaigns captured yet. New shared links will populate this." compact />
+          ) : (
+            <DataList
+              items={summary.campaigns}
+              getLabel={(r) => labelize(r.label)}
+              getMeta={(r) => `${r.sessions} sessions · ${r.pageViews} page views`}
+              getValue={(r) => r.events}
+              maxValue={summary.campaigns[0]?.events ?? 1}
+            />
+          )}
+        </WkSurface>
+
+        <WkSurface className="p-5">
+          <div className="mb-4 flex items-center gap-2">
+            <WkIcon name="FileText" size={16} className="text-[var(--wk-brand)]" />
+            <h2 className="text-[14px] font-bold text-[var(--wk-text)]">Content Tags</h2>
+          </div>
+          {summary.contents.length === 0 ? (
+            <EmptyChart message="No UTM content values captured yet." compact />
+          ) : (
+            <DataList
+              items={summary.contents}
+              getLabel={(r) => labelize(r.label)}
+              getMeta={(r) => `${r.sessions} sessions · ${r.pageViews} page views`}
+              getValue={(r) => r.events}
+              maxValue={summary.contents[0]?.events ?? 1}
+            />
+          )}
+        </WkSurface>
+      </div>
+
+      <div className="grid gap-5 lg:grid-cols-[1fr_420px]">
+        <WkSurface className="p-5">
+          <div className="mb-4 flex items-center gap-2">
+            <WkIcon name="Link" size={16} className="text-[var(--wk-brand)]" />
+            <h2 className="text-[14px] font-bold text-[var(--wk-text)]">Attributed Landing Pages</h2>
+          </div>
+          {summary.landingPages.length === 0 ? (
+            <EmptyChart message="No attributed landing page views yet." compact />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="border-b border-[var(--wk-border)]">
+                    <th className="pb-2 text-[10px] font-black uppercase tracking-[0.14em] text-[var(--wk-text-faint)]">Landing page</th>
+                    <th className="pb-2 text-[10px] font-black uppercase tracking-[0.14em] text-[var(--wk-text-faint)]">Source</th>
+                    <th className="pb-2 text-[10px] font-black uppercase tracking-[0.14em] text-[var(--wk-text-faint)]">Campaign</th>
+                    <th className="pb-2 text-right text-[10px] font-black uppercase tracking-[0.14em] text-[var(--wk-text-faint)]">Views</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {summary.landingPages.map((row) => (
+                    <tr key={`${row.page_url}-${row.source}-${row.campaign}`} className="border-b border-[var(--wk-border)]">
+                      <td className="py-2.5 text-[12px] font-semibold text-[var(--wk-text)] max-w-[360px] truncate">{row.page_url}</td>
+                      <td className="py-2.5 text-[12px] text-[var(--wk-text-muted)]">{labelize(row.source)}</td>
+                      <td className="py-2.5 text-[12px] text-[var(--wk-text-muted)]">{labelize(row.campaign)}</td>
+                      <td className="py-2.5 text-right text-[13px] font-bold text-[var(--wk-text)]">{row.pageViews.toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </WkSurface>
+
+        <WkSurface className="p-5">
+          <div className="mb-4 flex items-center gap-2">
+            <WkIcon name="Globe" size={16} className="text-[var(--wk-brand)]" />
+            <h2 className="text-[14px] font-bold text-[var(--wk-text)]">Referrer Domains</h2>
+          </div>
+          {summary.referrers.length === 0 ? (
+            <EmptyChart message="No referrer domains captured yet." compact />
+          ) : (
+            <DataList
+              items={summary.referrers}
+              getLabel={(r) => r.label}
+              getMeta={(r) => `${r.sessions} sessions · ${r.pageViews} page views`}
+              getValue={(r) => r.events}
+              maxValue={summary.referrers[0]?.events ?? 1}
+            />
+          )}
+        </WkSurface>
+      </div>
+
+      <WkSurface className="p-5">
+        <div className="mb-4 flex items-center gap-2">
+          <WkIcon name="Share2" size={16} className="text-[var(--wk-brand)]" />
+          <h2 className="text-[14px] font-bold text-[var(--wk-text)]">Outbound Share UTMs</h2>
+        </div>
+        {summary.shareOutbounds.length === 0 ? (
+          <EmptyChart message="No outbound share UTM events captured yet. Use the share sheet after the UTM patch is live." compact />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="border-b border-[var(--wk-border)]">
+                  <th className="pb-2 text-[10px] font-black uppercase tracking-[0.14em] text-[var(--wk-text-faint)]">Platform</th>
+                  <th className="pb-2 text-[10px] font-black uppercase tracking-[0.14em] text-[var(--wk-text-faint)]">Source</th>
+                  <th className="pb-2 text-[10px] font-black uppercase tracking-[0.14em] text-[var(--wk-text-faint)]">Medium</th>
+                  <th className="pb-2 text-[10px] font-black uppercase tracking-[0.14em] text-[var(--wk-text-faint)]">Campaign</th>
+                  <th className="pb-2 text-[10px] font-black uppercase tracking-[0.14em] text-[var(--wk-text-faint)]">Content</th>
+                  <th className="pb-2 text-right text-[10px] font-black uppercase tracking-[0.14em] text-[var(--wk-text-faint)]">Shares</th>
+                </tr>
+              </thead>
+              <tbody>
+                {summary.shareOutbounds.map((row) => (
+                  <tr key={`${row.platform}-${row.source}-${row.campaign}-${row.content}`} className="border-b border-[var(--wk-border)]">
+                    <td className="py-2.5 text-[12px] font-bold text-[var(--wk-text)]">{PLATFORM_LABELS[row.platform] || labelize(row.platform)}</td>
+                    <td className="py-2.5 text-[12px] text-[var(--wk-text-muted)]">{row.source}</td>
+                    <td className="py-2.5 text-[12px] text-[var(--wk-text-muted)]">{row.medium}</td>
+                    <td className="py-2.5 text-[12px] text-[var(--wk-text-muted)]">{row.campaign}</td>
+                    <td className="py-2.5 text-[12px] text-[var(--wk-text-muted)]">{labelize(row.content)}</td>
+                    <td className="py-2.5 text-right text-[13px] font-bold text-[var(--wk-text)]">{row.shares.toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </WkSurface>
