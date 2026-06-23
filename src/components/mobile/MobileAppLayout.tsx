@@ -8,6 +8,7 @@ import { useTheme } from "@/components/design-system/theme/ThemeProvider";
 import { Portal } from "@/components/base/Portal";
 import { MobileFullPlayer } from "./MobileFullPlayer";
 import { NotificationBell } from "@/components/feature/community/NotificationBell";
+import { usePendingCommunityActionReplay } from "@/hooks/usePendingCommunityActionReplay";
 
 const PRIMARY_NAV = [
   { label: "Home", to: "/", icon: "Home" },
@@ -116,10 +117,12 @@ function MobileBottomNav() {
 export function MobileAppLayout() {
   const location = useLocation();
   const { currentTrack, isFullPlayerOpen } = usePlayer();
+  const authUser = useAuthUser();
   const showMobileChrome = !isFullPlayerOpen && location.pathname !== "/auth";
   const showMiniPlayer = !!currentTrack && showMobileChrome;
 
   useScrollLock(isFullPlayerOpen);
+  usePendingCommunityActionReplay(!authUser.loading ? authUser.id : undefined);
 
   if (location.pathname === "/auth") {
     return (

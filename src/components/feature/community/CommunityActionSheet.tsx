@@ -5,6 +5,7 @@ import type { CommunityEntity, ReportReason } from "@/services/community";
 import { followTarget, saveEntity, reportComment } from "@/services/community";
 import { ShareSheet } from "@/components/design-system/share/ShareSheet";
 import { ContributionSheet } from "@/components/feature/community/ContributionSheet";
+import { buildCommunityAuthUrl, stashPendingCommunityAction } from "@/services/community/authIntent";
 import { Portal } from "@/components/base/Portal";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -159,8 +160,24 @@ export function CommunityActionSheet({
 
   // ── Handlers ──────────────────────────────────────────────────────
 
+  const redirectToAuthForAction = useCallback((action: "save" | "follow") => {
+    stashPendingCommunityAction({ action, entity });
+    trackEvent("community_auth_required", {
+      pageType: "community",
+      entitySlug: entity.slug,
+      entityType: entity.type,
+      context: { action, entity_title: entity.title },
+    });
+    onClose();
+    window.location.assign(buildCommunityAuthUrl());
+  }, [entity, onClose]);
+
   const handleSave = useCallback(async () => {
-    if (!userId || savePending) return;
+    if (!userId) {
+      redirectToAuthForAction("save");
+      return;
+    }
+    if (savePending) return;
     setSavePending(true);
     try {
       const result = await saveEntity({
@@ -182,10 +199,14 @@ export function CommunityActionSheet({
       });
     } catch { /* no-op */ }
     finally { setSavePending(false); }
-  }, [userId, savePending, saved, entity]);
+  }, [userId, savePending, saved, entity, redirectToAuthForAction]);
 
   const handleFollow = useCallback(async () => {
-    if (!userId || followPending) return;
+    if (!userId) {
+      redirectToAuthForAction("follow");
+      return;
+    }
+    if (followPending) return;
     setFollowPending(true);
     try {
       const result = await followTarget({
@@ -203,7 +224,7 @@ export function CommunityActionSheet({
       });
     } catch { /* no-op */ }
     finally { setFollowPending(false); }
-  }, [userId, followPending, following, entity]);
+  }, [userId, followPending, following, entity, redirectToAuthForAction]);
 
   const handleCopy = useCallback(async () => {
     try { await navigator.clipboard.writeText(entity.url); } catch { /* no-op */ }

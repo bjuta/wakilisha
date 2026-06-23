@@ -5,6 +5,8 @@ import { usePlayer } from "@/context/PlayerContext";
 import { PlayerDock } from "@/components/design-system/music/PlayerDock";
 import { AppTopBar } from "./AppTopBar";
 import DesktopPlayerPage from "@/pages/player/page";
+import { useAuthUser } from "@/hooks/useAuthUser";
+import { usePendingCommunityActionReplay } from "@/hooks/usePendingCommunityActionReplay";
 
 const FOOTER_DISCOVER = [
   { label: "Charts", to: "/charts" },
@@ -30,6 +32,9 @@ const FOOTER_ABOUT = [
 export function AppLayout() {
   const { theme } = useTheme();
   const { isFullPlayerOpen } = usePlayer();
+  const authUser = useAuthUser();
+
+  usePendingCommunityActionReplay(!authUser.loading ? authUser.id : undefined);
 
   useEffect(() => {
     if (!isFullPlayerOpen) return;

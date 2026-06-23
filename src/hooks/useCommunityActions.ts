@@ -8,6 +8,7 @@ import {
   saveEntity,
   createContribution,
 } from '@/services/community';
+import { buildCommunityAuthUrl, stashPendingCommunityAction } from '@/services/community/authIntent';
 
 export function useCommentActions(userId?: string) {
   const [votingCommentId, setVotingCommentId] = useState<string | null>(null);
@@ -75,7 +76,20 @@ export function useEntityActions(userId?: string) {
 
   const follow = useCallback(
     async (targetType: string, targetId: string, targetSlug?: string) => {
-      if (!userId) return null;
+      if (!userId) {
+        stashPendingCommunityAction({
+          action: 'follow',
+          entity: {
+            type: targetType as CommunityEntity['type'],
+            id: targetId,
+            slug: targetSlug,
+            url: typeof window !== 'undefined' ? window.location.href : '/',
+            title: targetSlug || targetId,
+          },
+        });
+        if (typeof window !== 'undefined') window.location.assign(buildCommunityAuthUrl());
+        return null;
+      }
       setLoading(true);
       try {
         const result = await followTarget({ targetType, targetId, targetSlug });
@@ -97,7 +111,22 @@ export function useEntityActions(userId?: string) {
       subtitle?: string;
       imageUrl?: string;
     }) => {
-      if (!userId) return null;
+      if (!userId) {
+        stashPendingCommunityAction({
+          action: 'save',
+          entity: {
+            type: entity.entityType as CommunityEntity['type'],
+            id: entity.entityId,
+            slug: entity.entitySlug,
+            url: entity.entityUrl || (typeof window !== 'undefined' ? window.location.href : '/'),
+            title: entity.title,
+            subtitle: entity.subtitle,
+            imageUrl: entity.imageUrl,
+          },
+        });
+        if (typeof window !== 'undefined') window.location.assign(buildCommunityAuthUrl());
+        return null;
+      }
       setLoading(true);
       try {
         const result = await saveEntity({
@@ -126,7 +155,22 @@ export function useEntityActions(userId?: string) {
       contributionType: string;
       payload?: Record<string, unknown>;
     }) => {
-      if (!userId) return null;
+      if (!userId) {
+        stashPendingCommunityAction({
+          action: 'save',
+          entity: {
+            type: entity.entityType as CommunityEntity['type'],
+            id: entity.entityId,
+            slug: entity.entitySlug,
+            url: entity.entityUrl || (typeof window !== 'undefined' ? window.location.href : '/'),
+            title: entity.title,
+            subtitle: entity.subtitle,
+            imageUrl: entity.imageUrl,
+          },
+        });
+        if (typeof window !== 'undefined') window.location.assign(buildCommunityAuthUrl());
+        return null;
+      }
       setLoading(true);
       try {
         const result = await createContribution({
