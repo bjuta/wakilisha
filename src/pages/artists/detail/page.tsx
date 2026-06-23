@@ -161,6 +161,8 @@ export default function ArtistDetail() {
 
       <ArtistDetailHero
         name={artist.name}
+        slug={artist.slug}
+        userId={!user.loading ? user.id : undefined}
         imageUrl={artist.imageUrl}
         profileImageUrl={artist.profileImageUrl || artist.imageUrl}
         bio={heroBio}
