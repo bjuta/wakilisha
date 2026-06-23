@@ -282,13 +282,6 @@ export function SharePopover({
     campaign: "wakilisha_share",
     content: shareContent,
   }), [finalUrl, shareContent]);
-  const shareContent = item.type ?? "page";
-  const getTrackedShareUrl = useCallback((platformKey: string) => buildUtmUrl(finalUrl, {
-    source: platformKey,
-    medium: "share",
-    campaign: "wakilisha_share",
-    content: shareContent,
-  }), [finalUrl, shareContent]);
 
   // Load counts
   useEffect(() => {
@@ -299,11 +292,8 @@ export function SharePopover({
       entitySlug: item.url ? (() => { try { return new URL(item.url).pathname.split("/").filter(Boolean).slice(-1)[0]; } catch { return undefined; } })() : undefined,
       entityType: item.type ?? undefined,
       context: {
-        share_platform: "copy",
         share_title: item.title,
         share_type: item.type ?? "page",
-        outbound_url: trackedUrl,
-        outbound_utm: getUtmContextForUrl(trackedUrl),
       },
     });
   }, [open, baseUrl, item]);
@@ -507,6 +497,13 @@ export function ShareSheet({ item, open, onClose, timestamp, onComment }: ShareS
   const baseUrl = item.url || (typeof window !== "undefined" ? window.location.href : "");
   const finalUrl = useMemo(() => getFinalUrl(baseUrl, timestamp), [baseUrl, timestamp]);
   const shareText = item.description || item.subtitle || item.title;
+  const shareContent = item.type ?? "page";
+  const getTrackedShareUrl = useCallback((platformKey: string) => buildUtmUrl(finalUrl, {
+    source: platformKey,
+    medium: "share",
+    campaign: "wakilisha_share",
+    content: shareContent,
+  }), [finalUrl, shareContent]);
 
   useScrollLock(open);
 
@@ -517,7 +514,13 @@ export function ShareSheet({ item, open, onClose, timestamp, onComment }: ShareS
       pageType: item.type ?? "page",
       entitySlug: item.url ? (() => { try { return new URL(item.url).pathname.split("/").filter(Boolean).slice(-1)[0]; } catch { return undefined; } })() : undefined,
       entityType: item.type ?? undefined,
-      context: { share_title: item.title, share_type: item.type ?? "page" },
+      context: {
+        share_platform: "copy",
+        share_title: item.title,
+        share_type: item.type ?? "page",
+        outbound_url: trackedUrl,
+        outbound_utm: getUtmContextForUrl(trackedUrl),
+      },
     });
   }, [open, baseUrl, item]);
 
