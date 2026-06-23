@@ -492,6 +492,88 @@
   }
 
 
+
+
+  /* Apple Music full-track education and one-tap connect */
+  .mobile-full-player .fp-fulltrack-card{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:14px;
+    margin:14px 0 16px;
+    padding:14px;
+    border:1px solid color-mix(in srgb, var(--wk-brand) 34%, var(--wk-border));
+    border-radius:22px;
+    background:
+      radial-gradient(circle at 0% 0%, rgba(var(--wk-brand-rgb), .22), transparent 42%),
+      color-mix(in srgb, var(--wk-surface-raised) 82%, transparent);
+    box-shadow:0 16px 38px rgba(0,0,0,.10);
+  }
+  .mobile-full-player .fp-fulltrack-copy{
+    min-width:0;
+  }
+  .mobile-full-player .fp-fulltrack-eyebrow{
+    display:block;
+    margin-bottom:4px;
+    color:var(--wk-brand);
+    font:950 9px/1 var(--wk-font-ui);
+    letter-spacing:.16em;
+    text-transform:uppercase;
+  }
+  .mobile-full-player .fp-fulltrack-copy strong{
+    display:block;
+    color:var(--wk-text);
+    font:950 14px/1.05 var(--wk-font-ui);
+    letter-spacing:-.02em;
+  }
+  .mobile-full-player .fp-fulltrack-copy p{
+    margin-top:5px;
+    color:var(--wk-text-muted);
+    font:650 11px/1.35 var(--wk-font-ui);
+  }
+  .mobile-full-player .fp-fulltrack-copy em{
+    display:block;
+    margin-top:6px;
+    color:rgb(239,68,68);
+    font:800 10px/1.25 var(--wk-font-ui);
+    font-style:normal;
+  }
+  .mobile-full-player .fp-fulltrack-btn{
+    min-height:42px;
+    flex:0 0 auto;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:7px;
+    border-radius:999px;
+    padding:0 14px;
+    background:var(--wk-text);
+    color:var(--wk-bg);
+    font:950 11px/1 var(--wk-font-ui);
+    letter-spacing:-.01em;
+    box-shadow:0 14px 30px rgba(0,0,0,.22);
+  }
+  .mobile-full-player .fp-fulltrack-btn:disabled{
+    opacity:.68;
+  }
+
+  .phn-miniplayer .phn-mp-unlock{
+    flex:0 0 auto;
+    min-width:52px;
+    height:30px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:4px;
+    border-radius:999px;
+    border:1px solid color-mix(in srgb, var(--wk-brand) 34%, var(--wk-border));
+    background:var(--wk-brand-soft);
+    color:var(--wk-brand);
+    font:950 10px/1 var(--wk-font-ui);
+    letter-spacing:-.02em;
+  }
+
+
   /* CH75 search */
   .search-bar-zone{position:sticky;top:0;z-index:22;background:color-mix(in srgb,var(--wk-bg) 88%,transparent);backdrop-filter:blur(16px);padding:12px 20px;}
   .search-input{height:46px;border-radius:14px;background:var(--wk-surface);border:1px solid var(--wk-border);}
