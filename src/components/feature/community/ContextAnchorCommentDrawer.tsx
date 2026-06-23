@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { useCommunityThread } from "@/hooks/useCommunityThread";
 import { useCommentActions } from "@/hooks/useCommunityActions";
@@ -89,6 +90,17 @@ export function ContextAnchorCommentDrawer({
     loadAnchorComments();
   }, [open, loadAnchorComments]);
 
+  useEffect(() => {
+    if (!open || typeof document === "undefined") return;
+
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [open]);
+
   const handlePost = useCallback(
     async (body: string) => {
       if (!thread?.id || !target) return null;
@@ -155,8 +167,10 @@ export function ContextAnchorCommentDrawer({
 
   const eyebrow = target.anchorType === "release_track" ? "Release track discussion" : "Chart entry discussion";
 
-  return (
-    <div className="fixed inset-0 z-[120]">
+  if (typeof document === "undefined") return null;
+
+  const drawer = (
+    <div className="fixed inset-0 z-[120] flex items-end justify-center md:items-center md:p-6">
       <button
         type="button"
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
@@ -164,7 +178,10 @@ export function ContextAnchorCommentDrawer({
         onClick={onClose}
       />
 
-      <div className="absolute inset-x-0 bottom-0 max-h-[88dvh] overflow-y-auto rounded-t-[30px] border border-[var(--wk-border)] bg-[var(--wk-bg)] shadow-2xl md:left-1/2 md:right-auto md:w-[720px] md:-translate-x-1/2 md:rounded-[30px] md:bottom-6">
+      <div
+        className="relative z-10 max-h-[88dvh] w-full overflow-y-auto rounded-t-[30px] border border-[var(--wk-border)] bg-[var(--wk-bg)] shadow-2xl md:max-h-[82dvh] md:max-w-[720px] md:rounded-[30px]"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="sticky top-0 z-10 border-b border-[var(--wk-border)] bg-[var(--wk-bg)]/95 px-5 py-4 backdrop-blur">
           <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-[var(--wk-border)] md:hidden" />
 
@@ -264,6 +281,8 @@ export function ContextAnchorCommentDrawer({
       </div>
     </div>
   );
+
+  return createPortal(drawer, document.body);
 }
 
 export function ContextAnchorSummary({
