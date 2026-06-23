@@ -83,6 +83,8 @@ export function MobileFullPlayer() {
     toggleRepeat,
     closeFullPlayer,
     playFromQueue,
+    playbackBackend,
+    playbackSourceLabel,
   } = usePlayer();
   const { save: saveEntityAction, loading: savePending } = useEntityActions();
   const [liked, setLiked] = useState(false);
@@ -143,6 +145,8 @@ export function MobileFullPlayer() {
 
   const formatTime = (seconds: number) =>
     `${Math.floor(seconds / 60)}:${Math.floor(seconds % 60).toString().padStart(2, "0")}`;
+  const activeSourceLabel = playbackSourceLabel || currentTrack.source || null;
+  const activeSourceIcon = playbackBackend === "apple" ? "Music2" : "Radio";
   const pct = Math.max(0, Math.min(1, progress || 0));
 
   const remainingCount = queue.length - queueIndex - 1;
@@ -182,7 +186,9 @@ export function MobileFullPlayer() {
         >
           <WkIcon name="ChevronDown" size={22} />
         </button>
-        <div className="fp-topbar-title">Now Playing</div>
+        <div className="fp-topbar-title">
+          {playbackBackend === "apple" ? "Playing via Apple Music" : "Now Playing"}
+        </div>
         <button
           className="fp-topbar-btn mobile-pressable"
           onClick={() => setActionMenuOpen(true)}
@@ -206,7 +212,7 @@ export function MobileFullPlayer() {
             <h1 className="fp-track-name">{currentTrack.title}</h1>
             <div className="fp-track-artist">
               {currentTrack.artist}
-              {currentTrack.source ? ` · ${currentTrack.source}` : ""}
+              {activeSourceLabel ? ` · ${activeSourceLabel}` : ""}
             </div>
           </div>
           <button
@@ -226,9 +232,9 @@ export function MobileFullPlayer() {
         )}
 
         <div className="fp-meta-pills">
-          {currentTrack.source && (
+          {activeSourceLabel && (
             <span className="fp-meta-pill">
-              <WkIcon name="Radio" size={12} /> {currentTrack.source}
+              <WkIcon name={activeSourceIcon} size={12} /> {activeSourceLabel}
             </span>
           )}
           <span className="fp-meta-pill">

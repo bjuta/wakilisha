@@ -18,12 +18,13 @@ const PRIMARY_NAV = [
 ];
 
 function MobileMiniPlayer() {
-  const { currentTrack, isPlaying, togglePlay, next, openFullPlayer, progress } = usePlayer();
+  const { currentTrack, isPlaying, togglePlay, next, openFullPlayer, progress, playbackSourceLabel } = usePlayer();
   const location = useLocation();
   const navVisible = useScrollDirection();
 
   if (!currentTrack) return null;
   if (location.pathname === "/auth") return null;
+  const activeSourceLabel = playbackSourceLabel || currentTrack.source || null;
   const isPlayable = currentTrack.isPlayable !== false;
 
   return (
@@ -43,7 +44,7 @@ function MobileMiniPlayer() {
       </button>
       <div className="phn-mp-info" onClick={() => openFullPlayer()}>
         <div className="phn-mp-title">{currentTrack.title}</div>
-        <div className="phn-mp-sub">{currentTrack.artist}{currentTrack.source ? ` · ${currentTrack.source}` : ""}</div>
+        <div className="phn-mp-sub">{currentTrack.artist}{activeSourceLabel ? ` · ${activeSourceLabel}` : ""}</div>
       </div>
       <button onClick={(e) => { e.stopPropagation(); togglePlay(); }} disabled={!isPlayable} className="phn-mp-btn phn-mp-play" aria-label={isPlaying ? "Pause" : "Play"}>
         <WkIcon name={isPlaying ? "Pause" : "Play"} size={16} />

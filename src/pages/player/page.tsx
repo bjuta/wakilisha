@@ -40,6 +40,8 @@ export default function DesktopPlayerPage() {
     setVolume,
     playFromQueue,
     closeFullPlayer,
+    playbackBackend,
+    playbackSourceLabel,
   } = usePlayer();
 
   const { save: saveEntityAction, loading: savePending } = useEntityActions();
@@ -131,6 +133,8 @@ export default function DesktopPlayerPage() {
   }
 
   const pct = Math.max(0, Math.min(1, progress || 0));
+  const activeSourceLabel = playbackSourceLabel || currentTrack.source || null;
+  const activeSourceIcon = playbackBackend === "apple" ? "Music2" : "Radio";
   const remainingCount = queue.length - queueIndex - 1;
   const upcoming = queue.slice(queueIndex + 1);
   const hasQueue = queue.length > 1;
@@ -161,7 +165,7 @@ export default function DesktopPlayerPage() {
             <WkIcon name="ChevronLeft" size={18} /> Back
           </button>
           <span className="text-[12px] font-bold uppercase tracking-[0.18em] text-[var(--wk-text-faint)]">
-            Now Playing
+            {playbackBackend === "apple" ? "Playing via Apple Music" : "Now Playing"}
           </span>
           <div className="flex items-center gap-2">
             <button
@@ -213,11 +217,11 @@ export default function DesktopPlayerPage() {
               </h1>
               <div className="mt-2 flex items-center justify-center gap-2 text-[14px] text-[var(--wk-text-muted)]">
                 <span className="font-semibold text-[var(--wk-text-soft)]">{currentTrack.artist}</span>
-                {currentTrack.source && (
+                {activeSourceLabel && (
                   <>
                     <span className="text-[var(--wk-text-faint)]">·</span>
                     <span className="inline-flex items-center gap-1 rounded-full bg-[var(--wk-brand-soft)] px-2.5 py-0.5 text-[11px] font-bold text-[var(--wk-brand)]">
-                      <WkIcon name="Radio" size={10} /> {currentTrack.source}
+                      <WkIcon name={activeSourceIcon} size={10} /> {activeSourceLabel}
                     </span>
                   </>
                 )}

@@ -23,6 +23,8 @@ export default function MobilePlayer() {
     repeatMode,
     toggleShuffle,
     toggleRepeat,
+    playbackBackend,
+    playbackSourceLabel,
   } = usePlayer();
   const [liked, setLiked] = useState(false);
 
@@ -38,6 +40,8 @@ export default function MobilePlayer() {
   }
 
   const formatTime = (seconds: number) => `${Math.floor(seconds / 60)}:${Math.floor(seconds % 60).toString().padStart(2, "0")}`;
+  const activeSourceLabel = playbackSourceLabel || currentTrack.source || null;
+  const activeSourceIcon = playbackBackend === "apple" ? "Music2" : "Radio";
   const pct = Math.max(0, Math.min(1, progress || 0));
   const upcoming = queue.slice(queueIndex + 1, queueIndex + 4);
 
@@ -46,7 +50,7 @@ export default function MobilePlayer() {
       <div className="fp-ambient" style={{ backgroundImage: currentTrack.artworkUrl ? `url(${currentTrack.artworkUrl})` : undefined, backgroundSize: "cover", backgroundPosition: "center" }} />
       <div className="fp-topbar">
         <button className="fp-topbar-btn mobile-pressable" onClick={() => nav(-1)} aria-label="Collapse player"><WkIcon name="ChevronDown" size={22} /></button>
-        <div className="fp-topbar-title">Now Playing</div>
+        <div className="fp-topbar-title">{playbackBackend === "apple" ? "Playing via Apple Music" : "Now Playing"}</div>
         <button className="fp-topbar-btn mobile-pressable" aria-label="More player actions"><WkIcon name="MoreHorizontal" size={20} /></button>
       </div>
 
@@ -58,13 +62,13 @@ export default function MobilePlayer() {
         <div className="fp-track-info">
           <div className="min-w-0">
             <h1 className="fp-track-name">{currentTrack.title}</h1>
-            <div className="fp-track-artist">{currentTrack.artist}{currentTrack.source ? ` · ${currentTrack.source}` : ""}</div>
+            <div className="fp-track-artist">{currentTrack.artist}{activeSourceLabel ? ` · ${activeSourceLabel}` : ""}</div>
           </div>
           <button onClick={() => setLiked((v) => !v)} className={`fp-like mobile-pressable ${liked ? "text-[var(--wk-brand)]" : ""}`} aria-label="Save track"><WkIcon name="Heart" size={23} fill={liked ? "currentColor" : "none"} /></button>
         </div>
 
         <div className="fp-meta-pills">
-          {currentTrack.source && <span className="fp-meta-pill"><WkIcon name="Radio" size={12} /> {currentTrack.source}</span>}
+          {activeSourceLabel && <span className="fp-meta-pill"><WkIcon name={activeSourceIcon} size={12} /> {activeSourceLabel}</span>}
           <span className="fp-meta-pill"><WkIcon name="Clock3" size={12} /> {formatTime(duration || currentTrack.duration || 0)}</span>
           <span className="fp-meta-pill"><WkIcon name="ListMusic" size={12} /> {queue.length || 1} in queue</span>
         </div>

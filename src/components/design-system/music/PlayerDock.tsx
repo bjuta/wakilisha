@@ -15,11 +15,14 @@ export function PlayerDock() {
     canGoNext,
     canGoPrev,
     isFullPlayerOpen,
+    playbackSourceLabel,
   } = usePlayer();
 
   if (!currentTrack) return null;
 
-  const isPlayable = currentTrack.isPlayable !== false && !!currentTrack.previewUrl;
+  const activeSourceLabel = playbackSourceLabel || currentTrack.source || null;
+  const hasAppleCatalog = Boolean(currentTrack.appleMusicCatalogId || currentTrack.appleMusicId);
+  const isPlayable = currentTrack.isPlayable !== false && (!!currentTrack.previewUrl || hasAppleCatalog);
 
   const handleExpandToggle = () => {
     if (isFullPlayerOpen) {
@@ -66,9 +69,9 @@ export function PlayerDock() {
               <div className="truncate text-[11px] text-[var(--wk-text-muted)]">
                 {currentTrack.artist}
               </div>
-              {currentTrack.source && (
+              {activeSourceLabel && (
                 <span className="shrink-0 rounded-full bg-[var(--wk-brand-soft)] px-2 py-0.5 text-[10px] font-bold text-[var(--wk-brand)]">
-                  {currentTrack.source}
+                  {activeSourceLabel}
                 </span>
               )}
             </div>
