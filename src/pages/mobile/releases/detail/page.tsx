@@ -120,7 +120,7 @@ export default function MobileReleaseDetail() {
   const [artworkFailed, setArtworkFailed] = useState(false);
   const [expandedDescription, setExpandedDescription] = useState(false);
 
-  const { currentTrack, isPlaying, playTrack, togglePlay } = usePlayer();
+  const { currentTrack, isPlaying, playTrack, togglePlay, toggleShuffle, isShuffle } = usePlayer();
 
   useEffect(() => {
     let alive = true;
@@ -158,34 +158,80 @@ export default function MobileReleaseDetail() {
     setArtworkFailed(false);
   }, [release?.artworkUrl]);
 
+  const buildPlayerTrack = (track: PublicReleaseDetail["tracks"][number]) => ({
+    id: track.id,
+    title: track.title,
+    artist: track.artist,
+    artworkUrl: track.artworkUrl,
+    duration: track.duration,
+    previewUrl: track.previewUrl,
+    appleMusicId: track.appleMusicId || track.appleMusicCatalogId || null,
+    appleMusicCatalogId: track.appleMusicCatalogId || track.appleMusicId || null,
+    album: release?.title,
+    artistSlug: release ? slugify(release.artist) : artistSlug,
+    trackSlug: track.slug,
+  });
+
+  const buildReleaseQueue = (startIndex = 0) => {
+    if (!release) return [];
+    const tracks = release.tracks;
+    return [
+      ...tracks.slice(startIndex).map(buildPlayerTrack),
+      ...tracks.slice(0, startIndex).map(buildPlayerTrack),
+    ];
+  };
+
+  const isThisReleasePlaying = Boolean(release?.tracks.some((track) => track.id === currentTrack?.id));
+
+  const handlePlayRelease = () => {
+    if (!release?.tracks.length) return;
+
+    if (isThisReleasePlaying) {
+      togglePlay();
+      return;
+    }
+
+    const queue = buildReleaseQueue(0);
+    if (!queue.length) return;
+
+    playTrack(queue[0], queue, {
+      pageType: "release_detail",
+      entitySlug: releaseSlug || "",
+      entityType: "release",
+      sourceSection: "release_hero",
+    });
+  };
+
+  const handleShuffleRelease = () => {
+    if (!release?.tracks.length) return;
+
+    if (!isShuffle) {
+      toggleShuffle();
+    }
+
+    const randomIndex = Math.floor(Math.random() * release.tracks.length);
+    const queue = buildReleaseQueue(randomIndex);
+    if (!queue.length) return;
+
+    playTrack(queue[0], queue, {
+      pageType: "release_detail",
+      entitySlug: releaseSlug || "",
+      entityType: "release",
+      sourceSection: "release_hero_shuffle",
+    });
+  };
+
   const handlePlayTrack = (track: PublicReleaseDetail["tracks"][number], trackIndex: number) => {
     if (!release) return;
     if (currentTrack?.id === track.id) { togglePlay(); return; }
 
-    const tracks = release.tracks;
-    const queueTracks = tracks.slice(trackIndex).map((t) => ({
-      id: t.id,
-      title: t.title,
-      artist: t.artist,
-      artworkUrl: t.artworkUrl,
-      duration: t.duration,
-      previewUrl: t.previewUrl,
-      album: release.title,
-      artistSlug: slugify(release.artist),
-      trackSlug: t.slug,
-    }));
-    const remaining = tracks.slice(0, trackIndex).map((t) => ({
-      id: t.id,
-      title: t.title,
-      artist: t.artist,
-      artworkUrl: t.artworkUrl,
-      duration: t.duration,
-      previewUrl: t.previewUrl,
-      album: release.title,
-      artistSlug: slugify(release.artist),
-      trackSlug: t.slug,
-    }));
-    playTrack(queueTracks[0], [...queueTracks, ...remaining], { pageType: "release_detail", entitySlug: releaseSlug || "", entityType: "release", sourceSection: "tracklist" });
+    const queue = buildReleaseQueue(trackIndex);
+    playTrack(queue[0], queue, {
+      pageType: "release_detail",
+      entitySlug: releaseSlug || "",
+      entityType: "release",
+      sourceSection: "tracklist",
+    });
   };
 
   if (status === "loading") {
@@ -311,11 +357,21 @@ export default function MobileReleaseDetail() {
             </div>
           </div>
           <div className="mt-4 flex items-center gap-3">
-            <button className="inline-flex items-center gap-2 rounded-full bg-[var(--wk-brand)] px-5 py-2.5 text-[12px] font-bold text-white active:scale-[0.97] transition-transform whitespace-nowrap">
-              <i className="ri-play-fill text-base" />
-              Play
+            <button
+              type="button"
+              onClick={handlePlayRelease}
+              disabled={!release.tracks.length}
+              className="inline-flex items-center gap-2 rounded-full bg-[var(--wk-brand)] px-5 py-2.5 text-[12px] font-bold text-white active:scale-[0.97] transition-transform whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <i className={`${isThisReleasePlaying && isPlaying ? "ri-pause-fill" : "ri-play-fill"} text-base`} />
+              {isThisReleasePlaying && isPlaying ? "Pause" : "Play"}
             </button>
-            <button className="inline-flex items-center gap-2 rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)]/80 backdrop-blur px-5 py-2.5 text-[12px] font-semibold text-[var(--wk-text)] active:scale-[0.97] transition-transform whitespace-nowrap">
+            <button
+              type="button"
+              onClick={handleShuffleRelease}
+              disabled={!release.tracks.length}
+              className="inline-flex items-center gap-2 rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)]/80 backdrop-blur px-5 py-2.5 text-[12px] font-semibold text-[var(--wk-text)] active:scale-[0.97] transition-transform whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50"
+            >
               <i className="ri-shuffle-line text-base" />
               Shuffle
             </button>
