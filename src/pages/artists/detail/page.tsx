@@ -131,7 +131,7 @@ export default function ArtistDetail() {
 
   const communityEntity = {
     type: "artist" as const,
-    id: artist.slug,
+    id: artist.id,
     slug: artist.slug,
     url: typeof window !== "undefined" ? window.location.href : `/artists/${artist.slug}`,
     title: artist.name,
@@ -161,6 +161,7 @@ export default function ArtistDetail() {
 
       <ArtistDetailHero
         name={artist.name}
+        artistId={artist.id}
         slug={artist.slug}
         userId={!user.loading ? user.id : undefined}
         imageUrl={artist.imageUrl}
