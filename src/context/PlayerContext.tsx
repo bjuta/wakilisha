@@ -1,5 +1,12 @@
 import { createContext, useContext, useState, useCallback, useRef, useEffect } from "react";
 import { trackEvent } from "@/services/analytics";
+import {
+  getAppleMusicPlaybackSnapshot,
+  pauseAppleMusic,
+  playAppleMusicCatalogSong,
+  resumeAppleMusic,
+  seekAppleMusic,
+} from "@/services/appleMusicPlayback";
 
 export interface PlayerTrack {
   id: string;
@@ -11,23 +18,49 @@ export interface PlayerTrack {
   isPlayable?: boolean;
   isExplicit?: boolean;
   source?: string; // e.g. "YouTube", "Spotify", "SoundCloud"
-  previewUrl?: string; // actual audio URL for playback
-  artistSlug?: string; // for deep-linking (contribute lyrics, etc.)
-  trackSlug?: string; // for deep-linking (contribute lyrics, etc.)
+  previewUrl?: string; // preview audio URL
+  appleMusicId?: string | null; // Apple Music catalog song id
+  appleMusicCatalogId?: string | null; // Apple Music catalog song id alias
+  artistSlug?: string; // for deep-linking
+  trackSlug?: string; // for deep-linking
 }
 
 // ─── Read playback prefs from localStorage ───
-function readPlaybackPrefs(): { autoplay: boolean; explicitFilter: boolean } {
+function readPlaybackPrefs(): {
+  autoplay: boolean;
+  explicitFilter: boolean;
+  appleMusicConnected: boolean;
+  appleMusicToken: string | null;
+  preferApplePreviews: boolean;
+} {
   try {
     const raw = localStorage.getItem("wk-playback-v2");
-    if (!raw) return { autoplay: false, explicitFilter: false };
+    if (!raw) {
+      return {
+        autoplay: false,
+        explicitFilter: false,
+        appleMusicConnected: false,
+        appleMusicToken: null,
+        preferApplePreviews: false,
+      };
+    }
+
     const prefs = JSON.parse(raw);
     return {
       autoplay: prefs.autoplay === true,
       explicitFilter: prefs.explicitFilter === true,
+      appleMusicConnected: prefs.appleMusicConnected === true,
+      appleMusicToken: typeof prefs.appleMusicToken === "string" ? prefs.appleMusicToken : null,
+      preferApplePreviews: prefs.preferApplePreviews === true,
     };
   } catch {
-    return { autoplay: false, explicitFilter: false };
+    return {
+      autoplay: false,
+      explicitFilter: false,
+      appleMusicConnected: false,
+      appleMusicToken: null,
+      preferApplePreviews: false,
+    };
   }
 }
 
@@ -104,6 +137,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const shuffledOrderRef = useRef<number[]>([]);
+  const playbackBackendRef = useRef<"audio" | "apple">("audio");
+  const applePollRef = useRef<number | null>(null);
   const hasUserInteractedRef = useRef(false);
   const pendingPlayRef = useRef(false);
   const sourceContextRef = useRef<PlaySource | null>(null);
@@ -114,6 +149,82 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   // ─── Read user playback preferences ───
   const playbackPrefs = usePlaybackPrefs();
+
+  const stopApplePolling = useCallback(() => {
+    if (applePollRef.current !== null) {
+      window.clearInterval(applePollRef.current);
+      applePollRef.current = null;
+    }
+  }, []);
+
+  const startApplePolling = useCallback(() => {
+    stopApplePolling();
+
+    applePollRef.current = window.setInterval(() => {
+      const snapshot = getAppleMusicPlaybackSnapshot();
+      if (!snapshot) return;
+
+      setCurrentTime(snapshot.currentTime);
+      if (snapshot.duration > 0) setDuration(snapshot.duration);
+      setIsPlaying(snapshot.isPlaying);
+    }, 750);
+  }, [stopApplePolling]);
+
+  useEffect(() => {
+    return () => stopApplePolling();
+  }, [stopApplePolling]);
+
+  const playViaHtmlAudio = useCallback((track: PlayerTrack, audio: HTMLAudioElement) => {
+    stopApplePolling();
+    playbackBackendRef.current = "audio";
+
+    if (!track.previewUrl) {
+      setIsPlaying(false);
+      return;
+    }
+
+    audio.src = track.previewUrl;
+    pendingPlayRef.current = true;
+    audio.play().catch((err) => {
+      console.warn("Audio autoplay blocked:", err.message);
+      pendingPlayRef.current = false;
+    });
+  }, [stopApplePolling]);
+
+  const playTrackSource = useCallback((track: PlayerTrack, audio: HTMLAudioElement) => {
+    const appleMusicId = track.appleMusicCatalogId || track.appleMusicId || null;
+    const shouldUseAppleMusic =
+      playbackPrefs.appleMusicConnected &&
+      playbackPrefs.preferApplePreviews &&
+      Boolean(playbackPrefs.appleMusicToken) &&
+      Boolean(appleMusicId);
+
+    if (!shouldUseAppleMusic || !appleMusicId) {
+      playViaHtmlAudio(track, audio);
+      return;
+    }
+
+    playAppleMusicCatalogSong(appleMusicId, playbackPrefs.appleMusicToken)
+      .then(() => {
+        audio.pause();
+        audio.removeAttribute("src");
+        playbackBackendRef.current = "apple";
+        setCurrentTime(0);
+        setDuration(track.duration || 0);
+        setIsPlaying(true);
+        startApplePolling();
+      })
+      .catch((err) => {
+        console.warn("Apple Music playback failed, falling back to preview:", err);
+        playViaHtmlAudio(track, audio);
+      });
+  }, [
+    playbackPrefs.appleMusicConnected,
+    playbackPrefs.preferApplePreviews,
+    playbackPrefs.appleMusicToken,
+    playViaHtmlAudio,
+    startApplePolling,
+  ]);
 
   // ─── Create audio element once ───
   useEffect(() => {
@@ -259,10 +370,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
             setQueueIndex(nextIdx);
             setCurrentTime(0);
             setDuration(nextTrack.duration || 0);
-            if (nextTrack.previewUrl) {
-              audio.src = nextTrack.previewUrl;
-              audio.play().catch(() => {});
-            }
+            playTrackSource(nextTrack, audio);
 
             trackEvent("player_play", {
               pageType: sourceContextRef.current?.pageType,
@@ -286,10 +394,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
             setQueueIndex(firstIdx);
             setCurrentTime(0);
             setDuration(firstTrack.duration || 0);
-            if (firstTrack.previewUrl) {
-              audio.src = firstTrack.previewUrl;
-              audio.play().catch(() => {});
-            }
+            playTrackSource(firstTrack, audio);
 
             trackEvent("player_play", {
               pageType: sourceContextRef.current?.pageType,
@@ -310,7 +415,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         }
       }
     }
-  }, [audioRef.current?.ended, currentTrack, queue, queueIndex, repeatMode, isShuffle, playbackPrefs.autoplay, playbackPrefs.explicitFilter]);
+  }, [audioRef.current?.ended, currentTrack, queue, queueIndex, repeatMode, isShuffle, playbackPrefs.autoplay, playbackPrefs.explicitFilter, playTrackSource]);
 
   // ─── Play a track ───
   const playTrack = useCallback((track: PlayerTrack, newQueue?: PlayerTrack[], playSource?: PlaySource) => {
@@ -362,15 +467,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     }
 
     // Load audio source
-    if (track.previewUrl) {
-      audio.src = track.previewUrl;
-      pendingPlayRef.current = true;
-      audio.play().catch((err) => {
-        // Autoplay blocked - that's OK, user can click play
-        console.warn("Audio autoplay blocked:", err.message);
-        pendingPlayRef.current = false;
-      });
-    }
+    playTrackSource(track, audio);
 
     // Fire player_play event
     trackEvent("player_play", {
@@ -386,12 +483,26 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         queue_size: fullQueue.length,
       },
     });
-  }, [isShuffle]);
+  }, [isShuffle, playTrackSource]);
 
   // ─── Toggle play/pause ───
   const togglePlay = useCallback(() => {
     const audio = audioRef.current;
     if (!audio || !currentTrack) return;
+
+    if (playbackBackendRef.current === "apple") {
+      const snapshot = getAppleMusicPlaybackSnapshot();
+      if (snapshot?.isPlaying || isPlaying) {
+        pauseAppleMusic().catch(() => {});
+        setIsPlaying(false);
+      } else {
+        resumeAppleMusic().catch(() => {});
+        setIsPlaying(true);
+        startApplePolling();
+      }
+      return;
+    }
+
     if (!currentTrack.previewUrl) return;
 
     if (audio.paused || audio.ended) {
@@ -402,7 +513,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     } else {
       audio.pause();
     }
-  }, [currentTrack]);
+  }, [currentTrack, isPlaying, startApplePolling]);
 
   // ─── Pause ───
   const pause = useCallback(() => {
@@ -421,6 +532,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           source_section: sourceContextRef.current?.sourceSection,
         },
       });
+    }
+
+    if (playbackBackendRef.current === "apple") {
+      pauseAppleMusic().catch(() => {});
+      setIsPlaying(false);
+      return;
     }
 
     audio.pause();
@@ -515,10 +632,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     setCurrentTime(0);
     setDuration(nextTrack.duration || 0);
 
-    if (nextTrack.previewUrl) {
-      audio.src = nextTrack.previewUrl;
-      audio.play().catch(() => {});
-    }
+    playTrackSource(nextTrack, audio);
 
     // Fire player_play for the new track
     trackEvent("player_play", {
@@ -534,7 +648,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         queue_size: queue.length,
       },
     });
-  }, [queue, queueIndex, isShuffle, repeatMode]);
+  }, [queue, queueIndex, isShuffle, repeatMode, playTrackSource]);
 
   // ─── Previous track ───
   const prev = useCallback(() => {
@@ -623,10 +737,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     setCurrentTime(0);
     setDuration(targetTrack.duration || 0);
 
-    if (targetTrack.previewUrl) {
-      audio.src = targetTrack.previewUrl;
-      audio.play().catch(() => {});
-    }
+    playTrackSource(targetTrack, audio);
 
     // Fire player_play for the new track
     trackEvent("player_play", {
@@ -642,7 +753,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         queue_size: queue.length,
       },
     });
-  }, [queue, queueIndex, isShuffle]);
+  }, [queue, queueIndex, isShuffle, playTrackSource]);
 
   // ─── Play from queue ───
   const playFromQueue = useCallback((index: number) => {
@@ -675,10 +786,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     setCurrentTime(0);
     setDuration(track.duration || 0);
 
-    if (track.previewUrl) {
-      audio.src = track.previewUrl;
-      audio.play().catch(() => {});
-    }
+    playTrackSource(track, audio);
 
     // Fire player_play
     trackEvent("player_play", {
@@ -694,17 +802,26 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         queue_size: queue.length,
       },
     });
-  }, [queue]);
+  }, [queue, playTrackSource]);
 
   // ─── Seek ───
   const seek = useCallback((time: number) => {
     const audio = audioRef.current;
     if (!audio) return;
-    const max = audio.duration && Number.isFinite(audio.duration) ? audio.duration : 0;
+    const max = playbackBackendRef.current === "apple"
+      ? (duration || time)
+      : (audio.duration && Number.isFinite(audio.duration) ? audio.duration : 0);
+
     const clamped = Math.max(0, Math.min(time, max || time));
-    audio.currentTime = clamped;
+
+    if (playbackBackendRef.current === "apple") {
+      seekAppleMusic(clamped).catch(() => {});
+    } else {
+      audio.currentTime = clamped;
+    }
+
     setCurrentTime(clamped);
-  }, []);
+  }, [duration]);
 
   // ─── Volume ───
   const handleSetVolume = useCallback((vol: number) => {

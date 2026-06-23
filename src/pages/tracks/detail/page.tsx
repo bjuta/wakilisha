@@ -60,6 +60,8 @@ type TrackViewModel = {
   releaseType: string;
   isPlayable: boolean;
   previewUrl: string | null;
+  appleMusicId: string | null;
+  appleMusicCatalogId: string | null;
   albumTitle: string;
   albumSlug: string;
   albumTrackNumber: number;
@@ -80,6 +82,8 @@ type TrackViewModel = {
     trackNumber: number;
     artworkUrl: string;
     previewUrl?: string;
+    appleMusicId?: string | null;
+    appleMusicCatalogId?: string | null;
   }>;
 };
 
@@ -164,6 +168,8 @@ function apiToViewModel(api: PublicTrackDetail): TrackViewModel {
     trackNumber: Number(t.trackNumber || 0),
     artworkUrl: String(t.artworkUrl || ""),
     previewUrl: t.previewUrl || undefined,
+    appleMusicId: t.appleMusicId || t.appleMusicCatalogId || null,
+    appleMusicCatalogId: t.appleMusicCatalogId || t.appleMusicId || null,
   }));
 
   return {
@@ -190,6 +196,8 @@ function apiToViewModel(api: PublicTrackDetail): TrackViewModel {
     releaseType,
     isPlayable: Boolean(previewUrl),
     previewUrl,
+    appleMusicId: trackData.appleMusicId || trackData.appleMusicCatalogId || raw.appleMusicId || raw.appleMusicCatalogId || null,
+    appleMusicCatalogId: trackData.appleMusicCatalogId || trackData.appleMusicId || raw.appleMusicCatalogId || raw.appleMusicId || null,
     albumTitle,
     albumSlug,
     albumTrackNumber,
@@ -503,6 +511,8 @@ export default function TrackDetail() {
       source: "WAKILISHA",
       duration: track.duration,
       previewUrl: track.previewUrl || undefined,
+      appleMusicId: track.appleMusicId,
+      appleMusicCatalogId: track.appleMusicCatalogId,
       artistSlug: track.artistSlug || artistSlug || undefined,
       trackSlug: track.slug || trackSlug || undefined,
     };
