@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { getAuthorMeta } from "@/services/authorProfiles";
 import type { MagazineArticle } from "@/services/magazineArticles";
 import { Chapter19FallbackImage } from "@/components/media/Chapter19FallbackImage";
@@ -32,6 +32,20 @@ export function MagazineCard({ story, variant = "standard", rank }: MagazineCard
   const url = `/magazine/${story.slug}`;
   const authorUrl = `/authors/${authorMeta.slug}`;
   const why = whyThisStoryMatters(story);
+  const navigate = useNavigate();
+
+  const handleAuthorClick = (event: React.MouseEvent<HTMLElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    navigate(authorUrl);
+  };
+
+  const handleAuthorKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    event.stopPropagation();
+    navigate(authorUrl);
+  };
 
   /* ── hero: large dark-overlay card, for primary featured spots ── */
   if (variant === "hero") {
@@ -79,14 +93,16 @@ export function MagazineCard({ story, variant = "standard", rank }: MagazineCard
             {why}
           </p>
           <div className="mt-4 flex items-center gap-2.5 text-[12px] text-white/45">
-            <Link
-              to={authorUrl}
-              className="flex items-center gap-2 transition-colors hover:text-white/80"
-              onClick={(e) => e.stopPropagation()}
+            <span
+              role="link"
+              tabIndex={0}
+              className="flex items-center gap-2 transition-colors hover:text-white/80 cursor-pointer"
+              onClick={handleAuthorClick}
+              onKeyDown={handleAuthorKeyDown}
             >
               <AuthorBadge author={story.author} />
               <span className="font-semibold text-white/70">{story.author}</span>
-            </Link>
+            </span>
             <span className="text-white/20">·</span>
             <span>{story.readingTime} min read</span>
           </div>
@@ -130,13 +146,15 @@ export function MagazineCard({ story, variant = "standard", rank }: MagazineCard
             {why}
           </p>
           <div className="mt-auto flex items-center gap-2 pt-1 text-[11px] text-[var(--wk-text-faint)]">
-            <Link
-              to={authorUrl}
-              className="font-semibold transition-colors hover:text-[var(--wk-brand)]"
-              onClick={(e) => e.stopPropagation()}
+            <span
+              role="link"
+              tabIndex={0}
+              className="font-semibold transition-colors hover:text-[var(--wk-brand)] cursor-pointer"
+              onClick={handleAuthorClick}
+              onKeyDown={handleAuthorKeyDown}
             >
               {story.author}
-            </Link>
+            </span>
             <span className="text-[var(--wk-border-strong)]">·</span>
             <span>{story.readingTime} min</span>
           </div>
@@ -168,13 +186,15 @@ export function MagazineCard({ story, variant = "standard", rank }: MagazineCard
             Why it matters: {why}
           </span>
           <div className="flex items-center gap-1.5 text-[10px] text-[var(--wk-text-faint)]">
-            <Link
-              to={authorUrl}
-              className="font-semibold transition-colors hover:text-[var(--wk-brand)]"
-              onClick={(e) => e.stopPropagation()}
+            <span
+              role="link"
+              tabIndex={0}
+              className="font-semibold transition-colors hover:text-[var(--wk-brand)] cursor-pointer"
+              onClick={handleAuthorClick}
+              onKeyDown={handleAuthorKeyDown}
             >
               {story.author}
-            </Link>
+            </span>
             <span className="text-[var(--wk-border-strong)]">·</span>
             <span>{story.readingTime} min</span>
           </div>
@@ -239,13 +259,15 @@ export function MagazineCard({ story, variant = "standard", rank }: MagazineCard
           {why}
         </p>
         <div className="mt-auto flex items-center gap-2 pt-1 text-[11px] text-[var(--wk-text-faint)]">
-          <Link
-            to={authorUrl}
-            className="font-semibold transition-colors hover:text-[var(--wk-brand)]"
-            onClick={(e) => e.stopPropagation()}
+          <span
+            role="link"
+            tabIndex={0}
+            className="font-semibold transition-colors hover:text-[var(--wk-brand)] cursor-pointer"
+            onClick={handleAuthorClick}
+            onKeyDown={handleAuthorKeyDown}
           >
             {story.author}
-          </Link>
+          </span>
           <span className="text-[var(--wk-border-strong)]">·</span>
           <span>{story.readingTime} min</span>
         </div>
