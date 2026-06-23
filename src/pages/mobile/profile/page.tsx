@@ -176,14 +176,14 @@ async function enrichFollowEntities(rows: ProfileEntityRecord[]): Promise<Profil
 
   const { data, error } = await supabase
     .from("registry_artists")
-    .select("slug, name, public_image_url")
+    .select("slug, display_name, public_image_url")
     .eq("status", "active")
     .in("slug", artistSlugs);
 
   if (error || !data) return rows;
 
   const artistBySlug = new Map(
-    (data as Array<{ slug: string; name: string | null; public_image_url: string | null }>)
+    (data as Array<{ slug: string; display_name: string | null; public_image_url: string | null }>)
       .map((artist) => [artist.slug, artist])
   );
 
@@ -194,7 +194,7 @@ async function enrichFollowEntities(rows: ProfileEntityRecord[]): Promise<Profil
 
     return {
       ...row,
-      target_title: recordText(row, ["target_title"]) || artist.name || titleFromSlug(slug),
+      target_title: recordText(row, ["target_title"]) || artist.display_name || titleFromSlug(slug),
       target_image_url: entityImage(row) || artist.public_image_url || "",
     };
   });
