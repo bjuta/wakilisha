@@ -13,8 +13,8 @@ import {
 } from "@/services/community";
 import type { CommunityComment, CommunityProfile } from "@/services/community";
 
-type Tab = "Comments" | "Replies" | "Saves" | "Following" | "Account";
-const tabs: Tab[] = ["Comments", "Replies", "Saves", "Following", "Account"];
+type Tab = "Following" | "Saves" | "Comments" | "Replies" | "Account";
+const tabs: Tab[] = ["Following", "Saves", "Comments", "Replies", "Account"];
 
 function timeAgo(dateStr: string): string {
   const seconds = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
@@ -36,6 +36,103 @@ function entityLabel(type: string): string {
     profile: "Profile", comment: "Comment",
   };
   return map[type] || type;
+}
+
+
+type ProfileEntityRecord = Record<string, unknown>;
+
+function recordText(row: ProfileEntityRecord, keys: string[], fallback = ""): string {
+  for (const key of keys) {
+    const value = row[key];
+    if (value === null || value === undefined) continue;
+    const text = String(value).trim();
+    if (text && text !== "null" && text !== "undefined") return text;
+  }
+  return fallback;
+}
+
+function titleFromSlug(slug: string): string {
+  return slug
+    .replace(/[-_]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function entityTitle(row: ProfileEntityRecord, slugKey = "entity_slug"): string {
+  return recordText(row, ["title", "entity_title", "target_title", "name"], "") ||
+    titleFromSlug(recordText(row, [slugKey, "target_slug", "slug"], "Saved item"));
+}
+
+function entityImage(row: ProfileEntityRecord): string {
+  return recordText(row, [
+    "image_url",
+    "imageUrl",
+    "target_image_url",
+    "targetImageUrl",
+    "public_image_url",
+    "artwork_url",
+    "cover_url",
+    "avatar_url",
+  ]);
+}
+
+function entityCreatedAt(row: ProfileEntityRecord): string {
+  return recordText(row, ["created_at", "createdAt"]);
+}
+
+function followUrl(row: ProfileEntityRecord): string {
+  const type = recordText(row, ["target_type"]);
+  const slug = recordText(row, ["target_slug"]);
+  const urlMap: Record<string, string> = {
+    article: `/magazine/${slug}`,
+    artist: `/artists/${slug}`,
+    track: `/tracks/${slug}`,
+    release: `/releases/${slug}`,
+    label: `/labels/${slug}`,
+    genre: `/genres/${slug}`,
+    chart: `/charts/${slug}`,
+    chart_edition: `/charts/${slug}`,
+    field_guide: `/guides/${slug}`,
+    magazine_issue: `/magazine/issue/${slug}`,
+  };
+  return urlMap[type] || "#";
+}
+
+async function enrichFollowEntities(rows: ProfileEntityRecord[]): Promise<ProfileEntityRecord[]> {
+  const artistSlugs = Array.from(new Set(
+    rows
+      .filter((row) => recordText(row, ["target_type"]) === "artist")
+      .map((row) => recordText(row, ["target_slug"]))
+      .filter(Boolean)
+  ));
+
+  if (artistSlugs.length === 0) return rows;
+
+  const { data, error } = await supabase
+    .from("registry_artists")
+    .select("slug, name, public_image_url")
+    .eq("status", "active")
+    .in("slug", artistSlugs);
+
+  if (error || !data) return rows;
+
+  const artistBySlug = new Map(
+    (data as Array<{ slug: string; name: string | null; public_image_url: string | null }>)
+      .map((artist) => [artist.slug, artist])
+  );
+
+  return rows.map((row) => {
+    const slug = recordText(row, ["target_slug"]);
+    const artist = artistBySlug.get(slug);
+    if (!artist) return row;
+
+    return {
+      ...row,
+      target_title: recordText(row, ["target_title"]) || artist.name || titleFromSlug(slug),
+      target_image_url: entityImage(row) || artist.public_image_url || "",
+    };
+  });
 }
 
 function getCoverColor(): string {
@@ -62,7 +159,7 @@ export default function MobileProfilePage() {
   const authUser = useAuthUser();
   const navigate = useNavigate();
 
-  const [tab, setTab] = useState<Tab>("Comments");
+  const [tab, setTab] = useState<Tab>("Following");
   const [coverColor] = useState(() => getCoverColor());
 
   const isSignedIn = !authUser.loading && !!authUser.id;
@@ -95,6 +192,32 @@ export default function MobileProfilePage() {
       .finally(() => setProfileLoading(false));
   }, [userId]);
 
+  useEffect(() => {
+    if (!userId) {
+      setSaves([]);
+      setFollows([]);
+      return;
+    }
+
+    let alive = true;
+
+    Promise.all([
+      getUserSaves(userId).catch(() => []),
+      getUserFollows(userId)
+        .then((rows) => enrichFollowEntities(rows as ProfileEntityRecord[]))
+        .catch(() => []),
+    ]).then(([saveRows, followRows]) => {
+      if (!alive) return;
+      setSaves(saveRows as ProfileEntityRecord[]);
+      setFollows(followRows as ProfileEntityRecord[]);
+    });
+
+    return () => {
+      alive = false;
+    };
+  }, [userId]);
+
+
   const loadTabData = useCallback(
     async (activeTab: Tab) => {
       if (!userId) return;
@@ -121,7 +244,8 @@ export default function MobileProfilePage() {
           }
           case "Following": {
             const data = await getUserFollows(userId);
-            setFollows(data);
+            const enriched = await enrichFollowEntities(data as ProfileEntityRecord[]);
+            setFollows(enriched);
             break;
           }
         }
@@ -437,15 +561,58 @@ function MobileRepliesTab({
   );
 }
 
-/* ─── Saves Tab (Mobile — IG 3-column grid) ─── */
+/* ─── Image-led profile entity cards ─── */
+function MobileEntityArtwork({
+  imageUrl,
+  title,
+  type,
+  tall = false,
+}: {
+  imageUrl: string;
+  title: string;
+  type: string;
+  tall?: boolean;
+}) {
+  const initials = title
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((word) => word[0]?.toUpperCase())
+    .join("") || "WK";
+
+  return (
+    <div className={`relative overflow-hidden rounded-[22px] ${tall ? "aspect-[3/4]" : "aspect-[4/5]"}`} style={{ background: "var(--wk-surface-raised)" }}>
+      {imageUrl ? (
+        <img src={imageUrl} alt={title} className="absolute inset-0 h-full w-full object-cover" />
+      ) : (
+        <div
+          className="absolute inset-0 flex flex-col items-center justify-center gap-3"
+          style={{
+            background: "linear-gradient(135deg, var(--wk-brand-soft) 0%, var(--wk-surface-raised) 52%, var(--wk-bg) 100%)",
+            color: "var(--wk-brand)",
+          }}
+        >
+          <i className={`${iconForTargetType(type)} text-3xl`} />
+          <span className="text-2xl font-black tracking-[-0.04em]">{initials}</span>
+        </div>
+      )}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/18 to-transparent" />
+      <div className="absolute left-3 top-3 rounded-full bg-black/35 px-2 py-1 text-[9px] font-black uppercase tracking-[0.12em] text-white/85 backdrop-blur-md">
+        {entityLabel(type)}
+      </div>
+    </div>
+  );
+}
+
+/* ─── Saves Tab (Mobile — image-first culture shelf) ─── */
 function MobileSavesTab({
   saves, loading, error, onRetry,
 }: { saves: Record<string, unknown>[]; loading: boolean; error: string | null; onRetry: () => void }) {
   if (loading) {
     return (
-      <div className="grid grid-cols-3 gap-1">
-        {Array.from({ length: 9 }).map((_, i) => (
-          <div key={i} className="aspect-square rounded-sm animate-pulse" style={{ background: "var(--wk-surface-raised)" }} />
+      <div className="grid grid-cols-2 gap-3">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="aspect-[4/5] rounded-[22px] animate-pulse" style={{ background: "var(--wk-surface-raised)" }} />
         ))}
       </div>
     );
@@ -456,105 +623,154 @@ function MobileSavesTab({
       <MobileEmptyState
         icon="ri-bookmark-line"
         title="No saved items"
+        subtitle="Save artists, releases, tracks, and stories to build your culture shelf."
         action={{ label: "Browse magazine", to: "/magazine" }}
       />
     );
   }
-  return (
-    <div className="grid grid-cols-3 gap-1">
-      {saves.map((s) => {
-        const save = s as Record<string, unknown>;
-        const entityUrl = String(save.entity_url || "#");
-        const imageUrl = save.image_url ? String(save.image_url) : null;
-        const title = String(save.title || "");
-        const entityType = String(save.entity_type || "");
 
-        return (
-          <Link
-            key={String(save.id)}
-            to={entityUrl || "#"}
-            className="block aspect-square rounded-sm overflow-hidden relative group cursor-pointer"
-            style={{ background: "var(--wk-surface-raised)" }}
-          >
-            {imageUrl ? (
-              <img src={imageUrl} alt={title} className="w-full h-full object-cover" />
-            ) : (
-              <div className="w-full h-full flex flex-col items-center justify-center gap-1 p-2">
-                <i className="ri-bookmark-line text-xl" style={{ color: "var(--wk-text-faint)" }} />
-                <span className="text-[8px] font-black uppercase tracking-wider text-center leading-tight" style={{ color: "var(--wk-text-faint)" }}>
-                  {entityLabel(entityType)}
-                </span>
+  return (
+    <div className="space-y-4">
+      <div>
+        <p className="text-[10px] font-black uppercase tracking-[0.16em] mb-1" style={{ color: "var(--wk-brand)" }}>
+          Saved shelf
+        </p>
+        <p className="text-[12px] leading-relaxed" style={{ color: "var(--wk-text-muted)" }}>
+          Things you kept close for later.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        {saves.map((raw) => {
+          const save = raw as ProfileEntityRecord;
+          const entityUrl = recordText(save, ["entity_url"], "#");
+          const entityType = recordText(save, ["entity_type"]);
+          const title = entityTitle(save);
+          const imageUrl = entityImage(save);
+          const createdAt = entityCreatedAt(save);
+
+          return (
+            <Link
+              key={String(save.id)}
+              to={entityUrl || "#"}
+              className="group block min-w-0 cursor-pointer"
+            >
+              <MobileEntityArtwork imageUrl={imageUrl} title={title} type={entityType} />
+              <div className="pt-2 px-1">
+                <div className="text-[13px] font-black leading-tight line-clamp-2" style={{ color: "var(--wk-text)" }}>
+                  {title}
+                </div>
+                <div className="mt-1 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.08em]" style={{ color: "var(--wk-text-faint)" }}>
+                  <span>{entityLabel(entityType)}</span>
+                  {createdAt && (
+                    <>
+                      <span>·</span>
+                      <span>{timeAgo(createdAt)}</span>
+                    </>
+                  )}
+                </div>
               </div>
-            )}
-            {/* Overlay on tap */}
-            <div className="absolute inset-0 bg-black/0 group-active:bg-black/30 transition-colors flex items-end p-2">
-              <span className="text-[9px] font-bold text-white opacity-0 group-active:opacity-100 line-clamp-2">{title}</span>
-            </div>
-          </Link>
-        );
-      })}
+            </Link>
+          );
+        })}
+      </div>
     </div>
   );
 }
 
-/* ─── Following Tab (Mobile) ─── */
+/* ─── Following Tab (Mobile — image-first people/entities) ─── */
 function MobileFollowingTab({
   follows, loading, error, onRetry,
 }: { follows: Record<string, unknown>[]; loading: boolean; error: string | null; onRetry: () => void }) {
-  if (loading) return <MobileSkeletonList count={5} />;
+  if (loading) {
+    return (
+      <div className="grid grid-cols-2 gap-3">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="aspect-[3/4] rounded-[24px] animate-pulse" style={{ background: "var(--wk-surface-raised)" }} />
+        ))}
+      </div>
+    );
+  }
   if (error) return <MobileErrorState message={error} onRetry={onRetry} />;
   if (follows.length === 0) {
     return (
       <MobileEmptyState
         icon="ri-user-add-line"
         title="Not following yet"
-        subtitle="Follow articles, artists, and charts to stay updated."
+        subtitle="Follow artists, labels, charts, and scenes to shape your WAKILISHA feed."
+        action={{ label: "Find artists", to: "/artists" }}
       />
     );
   }
+
+  const [lead, ...rest] = follows as ProfileEntityRecord[];
+
+  const renderFollowCard = (follow: ProfileEntityRecord, featured = false) => {
+    const targetType = recordText(follow, ["target_type"]);
+    const targetSlug = recordText(follow, ["target_slug"]);
+    const createdAt = entityCreatedAt(follow);
+    const title = entityTitle(follow, "target_slug") || titleFromSlug(targetSlug);
+    const imageUrl = entityImage(follow);
+    const url = followUrl(follow);
+
+    return (
+      <Link
+        key={String(follow.id)}
+        to={url}
+        className={`group block min-w-0 cursor-pointer ${featured ? "col-span-2" : ""}`}
+      >
+        <div className="relative">
+          <MobileEntityArtwork imageUrl={imageUrl} title={title} type={targetType} tall={featured} />
+          {featured && (
+            <div className="absolute bottom-4 left-4 right-4">
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/65">
+                Recently followed
+              </p>
+              <h3 className="mt-1 text-2xl font-black tracking-[-0.05em] leading-none text-white">
+                {title}
+              </h3>
+              <p className="mt-2 text-[11px] font-bold uppercase tracking-[0.12em] text-white/65">
+                {entityLabel(targetType)}{createdAt ? ` · ${timeAgo(createdAt)}` : ""}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {!featured && (
+          <div className="pt-2 px-1">
+            <div className="text-[13px] font-black leading-tight line-clamp-2" style={{ color: "var(--wk-text)" }}>
+              {title}
+            </div>
+            <div className="mt-1 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.08em]" style={{ color: "var(--wk-text-faint)" }}>
+              <span>{entityLabel(targetType)}</span>
+              {createdAt && (
+                <>
+                  <span>·</span>
+                  <span>{timeAgo(createdAt)}</span>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+      </Link>
+    );
+  };
+
   return (
-    <div className="space-y-1">
-      {follows.map((f) => {
-        const follow = f as Record<string, unknown>;
-        const targetType = String(follow.target_type || "");
-        const targetSlug = String(follow.target_slug || "");
-        const createdAt = String(follow.created_at || "");
-        const urlMap: Record<string, string> = {
-          article: `/magazine/${targetSlug}`,
-          artist: `/artists/${targetSlug}`,
-          track: `/tracks/${targetSlug}`,
-          release: `/releases/${targetSlug}`,
-          label: `/labels/${targetSlug}`,
-          genre: `/genres/${targetSlug}`,
-          chart: `/charts/${targetSlug}`,
-          chart_edition: `/charts/${targetSlug}`,
-          field_guide: `/guides/${targetSlug}`,
-          magazine_issue: `/magazine/issue/${targetSlug}`,
-        };
-        return (
-          <Link
-            key={String(follow.id)}
-            to={urlMap[targetType] || "#"}
-            className="flex items-center gap-3 p-3 rounded-xl border cursor-pointer"
-            style={{ borderColor: "var(--wk-border)", background: "var(--wk-surface)" }}
-          >
-            <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: "var(--wk-surface-raised)" }}>
-              <i className={`${iconForTargetType(targetType)} text-sm`} style={{ color: "var(--wk-text-muted)" }} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-[13px] font-bold truncate" style={{ color: "var(--wk-text)" }}>
-                {targetSlug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
-              </div>
-              <div className="flex items-center gap-1.5 text-[11px]" style={{ color: "var(--wk-text-muted)" }}>
-                <span>{entityLabel(targetType)}</span>
-                <span>·</span>
-                <span>{timeAgo(createdAt)}</span>
-              </div>
-            </div>
-            <i className="ri-arrow-right-s-line" style={{ color: "var(--wk-text-faint)" }} />
-          </Link>
-        );
-      })}
+    <div className="space-y-4">
+      <div>
+        <p className="text-[10px] font-black uppercase tracking-[0.16em] mb-1" style={{ color: "var(--wk-brand)" }}>
+          Your circle
+        </p>
+        <p className="text-[12px] leading-relaxed" style={{ color: "var(--wk-text-muted)" }}>
+          Artists and culture threads you want WAKILISHA to remember.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        {lead && renderFollowCard(lead, true)}
+        {rest.map((follow) => renderFollowCard(follow))}
+      </div>
     </div>
   );
 }
