@@ -8,6 +8,7 @@ import {
   resumeAppleMusic,
   seekAppleMusic,
 } from "@/services/appleMusicPlayback";
+import { recordListeningEvent } from "@/services/listeningHistory";
 
 export type PlaybackBackend = "audio" | "apple";
 
@@ -149,6 +150,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const pendingPlayRef = useRef(false);
   const sourceContextRef = useRef<PlaySource | null>(null);
   const playedAtRef = useRef<number>(0);
+  const listeningHistoryWriteRef = useRef<number>(0);
   const skipFlagRef = useRef(false);
   const currentTrackRef = useRef<PlayerTrack | null>(null);
   const isPlayingRef = useRef(false);
@@ -325,6 +327,26 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => { currentTrackRef.current = currentTrack; }, [currentTrack]);
   useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
 
+  // ─── Local listening history / continue listening ───
+  useEffect(() => {
+    if (!currentTrack || !isPlaying) return;
+
+    const now = Date.now();
+    const nearEnd = duration > 0 && currentTime >= duration - 2;
+
+    if (!nearEnd && now - listeningHistoryWriteRef.current < 5000) return;
+
+    listeningHistoryWriteRef.current = now;
+
+    recordListeningEvent(currentTrack, {
+      kind: nearEnd ? "complete" : "progress",
+      backend: playbackBackend,
+      currentTime,
+      duration,
+      playSource: sourceContextRef.current,
+    });
+  }, [currentTrack, isPlaying, currentTime, duration, playbackBackend]);
+
   // ─── Handle track end (auto-advance) — respects autoplay pref ───
   useEffect(() => {
     const audio = audioRef.current;
@@ -466,6 +488,14 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
     sourceContextRef.current = playSource ?? null;
     playedAtRef.current = Date.now();
+
+    recordListeningEvent(track, {
+      kind: "start",
+      backend: playbackBackendRef.current,
+      currentTime: 0,
+      duration: track.duration || 0,
+      playSource,
+    });
 
     const fullQueue = newQueue && newQueue.length > 0 ? newQueue : [track];
     const idx = fullQueue.findIndex((t) => t.id === track.id);

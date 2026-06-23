@@ -18,6 +18,11 @@ import { CommunitySection } from "@/pages/magazine/article/components/CommunityS
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { useEntityActions } from "@/hooks/useCommunityActions";
 import { getApplePlaybackPrefsSnapshot } from "@/services/appleMusicConnection";
+import {
+  formatListeningProgress,
+  getListeningHistoryForTrack,
+  type ListeningHistoryItem,
+} from "@/services/listeningHistory";
 import { useScrollDepthTracking } from "@/hooks/useScrollDepthTracking";
 
 type TrackChartAppearance = {
@@ -221,7 +226,19 @@ function formatDuration(seconds: number): string {
   return `${minutes}:${remainder.toString().padStart(2, "0")}`;
 }
 
-function formatDate(dateStr: string): string {
+function timeAgoShort(dateStr: string): string {
+  const seconds = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+  if (seconds < 60) return "just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+function formatDate(dateStr: string) {
   if (!dateStr) return "";
   try {
     const date = new Date(dateStr);
@@ -238,6 +255,42 @@ function InfoRow({ label, value }: { label: string; value: ReactNode }) {
       <span>{label}</span>
       <span className="text-right font-extrabold capitalize text-[var(--wk-text)]">{value}</span>
     </div>
+  );
+}
+
+function TrackListeningSignalPanel({ signal }: { signal: ListeningHistoryItem | null }) {
+  if (!signal) return null;
+
+  const progress = Math.round(Math.min(1, Math.max(0, signal.progress || 0)) * 100);
+  const source = signal.backend === "apple" ? "Apple Music full playback" : "Preview playback";
+
+  return (
+    <section className="border border-[var(--wk-border)] rounded-2xl bg-[var(--wk-surface)] p-5 md:p-6">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <div className="inline-flex items-center gap-2 rounded-full border border-[var(--wk-brand)]/20 bg-[var(--wk-brand-soft)]/40 px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.18em] text-[var(--wk-brand)]">
+            <WkIcon name="Headphones" size={12} />
+            Your listening
+          </div>
+          <h2 className="mt-3 text-[22px] font-black tracking-[-0.03em] text-[var(--wk-text)]">
+            {signal.playCount} play{signal.playCount === 1 ? "" : "s"} on WAKILISHA
+          </h2>
+          <p className="mt-1 text-[13px] font-semibold text-[var(--wk-text-muted)]">
+            Last played {timeAgoShort(signal.lastPlayedAt)} · {source}
+          </p>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2 md:w-[320px]">
+          <StatCard value={formatListeningProgress(signal)} label="Progress" />
+          <StatCard value={signal.fullPlayCount || 0} label="Full plays" />
+          <StatCard value={signal.completedCount || 0} label="Finished" />
+        </div>
+      </div>
+
+      <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-[var(--wk-bg)]">
+        <div className="h-full rounded-full bg-[var(--wk-brand)]" style={{ width: `${progress}%` }} />
+      </div>
+    </section>
   );
 }
 
@@ -417,6 +470,7 @@ export default function TrackDetail() {
   const [error, setError] = useState<string | null>(null);
   const [trackSaved, setTrackSaved] = useState(false);
   const [trackSaveError, setTrackSaveError] = useState<string | null>(null);
+  const [listeningSignal, setListeningSignal] = useState<ListeningHistoryItem | null>(null);
   const [applePlaybackConnected, setApplePlaybackConnected] = useState(
     () => getApplePlaybackPrefsSnapshot().appleMusicConnected
   );
@@ -441,6 +495,24 @@ export default function TrackDetail() {
       window.removeEventListener("wk-apple-music-connected", syncApplePlaybackState);
     };
   }, []);
+
+  useEffect(() => {
+    if (!track?.slug) {
+      setListeningSignal(null);
+      return;
+    }
+
+    const syncListeningSignal = () => {
+      setListeningSignal(getListeningHistoryForTrack(track.slug));
+    };
+
+    syncListeningSignal();
+    window.addEventListener("wk-listening-history-changed", syncListeningSignal);
+
+    return () => {
+      window.removeEventListener("wk-listening-history-changed", syncListeningSignal);
+    };
+  }, [track?.slug]);
 
   useEffect(() => {
     let alive = true;
@@ -756,6 +828,8 @@ export default function TrackDetail() {
               albumTitle={track.albumTitle}
               tracks={track.releaseTracks}
             />
+
+            <TrackListeningSignalPanel signal={listeningSignal} />
 
             {(track.chartHistory.length > 0 || track.weeksOnChart > 0) && (
               <section>

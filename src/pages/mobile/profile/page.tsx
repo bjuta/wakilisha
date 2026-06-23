@@ -14,9 +14,14 @@ import {
   updateComment,
 } from "@/services/community";
 import type { CommunityComment, CommunityProfile } from "@/services/community";
+import {
+  formatListeningProgress,
+  getListeningHistory,
+  type ListeningHistoryItem,
+} from "@/services/listeningHistory";
 
-type Tab = "Following" | "Saves" | "Comments" | "Replies" | "Account";
-const tabs: Tab[] = ["Following", "Saves", "Comments", "Replies", "Account"];
+type Tab = "Listening" | "Following" | "Saves" | "Comments" | "Replies" | "Account";
+const tabs: Tab[] = ["Listening", "Following", "Saves", "Comments", "Replies", "Account"];
 
 function timeAgo(dateStr: string): string {
   const seconds = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
@@ -224,7 +229,7 @@ export default function MobileProfilePage() {
   const authUser = useAuthUser();
   const navigate = useNavigate();
 
-  const [tab, setTab] = useState<Tab>("Following");
+  const [tab, setTab] = useState<Tab>("Listening");
   const [coverColor] = useState(() => getCoverColor());
 
   const isSignedIn = !authUser.loading && !!authUser.id;
@@ -239,6 +244,7 @@ export default function MobileProfilePage() {
   const [replies, setReplies] = useState<CommunityComment[]>([]);
   const [saves, setSaves] = useState<Record<string, unknown>[]>([]);
   const [follows, setFollows] = useState<Record<string, unknown>[]>([]);
+  const [listeningHistory, setListeningHistory] = useState<ListeningHistoryItem[]>(() => getListeningHistory());
   const [tabLoading, setTabLoading] = useState(false);
   const [tabError, setTabError] = useState<string | null>(null);
 
@@ -290,6 +296,10 @@ export default function MobileProfilePage() {
       setTabError(null);
       try {
         switch (activeTab) {
+          case "Listening": {
+            setListeningHistory(getListeningHistory());
+            break;
+          }
           case "Comments": {
             const raw = await getUserComments(userId, 30);
             const hydrated = await hydrateCommentsWithUserState(raw, userId);
@@ -322,6 +332,17 @@ export default function MobileProfilePage() {
     },
     [userId]
   );
+
+  useEffect(() => {
+    const syncListeningHistory = () => setListeningHistory(getListeningHistory());
+
+    syncListeningHistory();
+    window.addEventListener("wk-listening-history-changed", syncListeningHistory);
+
+    return () => {
+      window.removeEventListener("wk-listening-history-changed", syncListeningHistory);
+    };
+  }, []);
 
   useEffect(() => {
     if (tab !== "Account") loadTabData(tab);
@@ -450,10 +471,10 @@ export default function MobileProfilePage() {
         <div className="flex items-center justify-center gap-8 pb-4 mb-1 border-b" style={{ borderColor: "var(--wk-divider)" }}>
           <div className="flex flex-col items-center gap-0.5">
             <span className="text-lg font-black tabular-nums" style={{ color: "var(--wk-text)" }}>
-              {statsCommentCount}
+              {listeningHistory.length}
             </span>
             <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--wk-text-faint)" }}>
-              Comments
+              Plays
             </span>
           </div>
           <div className="flex flex-col items-center gap-0.5">
@@ -509,7 +530,7 @@ export default function MobileProfilePage() {
 
       {/* Tab content */}
       <div className="px-4 pt-3 pb-24">
-        {!isSignedIn && tab !== "Account" ? (
+        {!isSignedIn && tab !== "Account" && tab !== "Listening" ? (
           <div className="py-16 text-center">
             <div className="w-14 h-14 mx-auto mb-4 rounded-2xl flex items-center justify-center" style={{ background: "var(--wk-surface-raised)" }}>
               <i className="ri-chat-3-line text-2xl" style={{ color: "var(--wk-text-faint)" }} />
@@ -525,6 +546,8 @@ export default function MobileProfilePage() {
               Sign in <i className="ri-arrow-right-line" />
             </Link>
           </div>
+        ) : tab === "Listening" ? (
+          <MobileListeningTab history={listeningHistory} />
         ) : tab === "Comments" ? (
           <MobileCommentsTab comments={comments} loading={tabLoading} error={tabError} onRetry={() => loadTabData("Comments")} />
         ) : tab === "Replies" ? (
@@ -540,6 +563,121 @@ export default function MobileProfilePage() {
     </div>
   );
 }
+
+
+/* ─── Listening Tab (Mobile — continue listening shelf) ─── */
+function MobileListeningTab({ history }: { history: ListeningHistoryItem[] }) {
+  if (history.length === 0) {
+    return (
+      <MobileEmptyState
+        icon="ri-headphone-line"
+        title="Nothing played yet"
+        subtitle="Play tracks, charts, and article sessions to build your listening shelf."
+        action={{ label: "Browse charts", to: "/charts" }}
+      />
+    );
+  }
+
+  const [lead, ...rest] = history;
+  const leadProgress = Math.round(Math.min(1, Math.max(0, lead.progress || 0)) * 100);
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <p className="text-[10px] font-black uppercase tracking-[0.16em] mb-1" style={{ color: "var(--wk-brand)" }}>
+          Continue listening
+        </p>
+        <p className="text-[12px] leading-relaxed" style={{ color: "var(--wk-text-muted)" }}>
+          Your recent WAKILISHA plays, previews, and full Apple Music sessions.
+        </p>
+      </div>
+
+      <Link
+        to={lead.trackUrl}
+        className="block overflow-hidden rounded-[28px] border"
+        style={{ borderColor: "var(--wk-border)", background: "var(--wk-surface)" }}
+      >
+        <div className="relative aspect-[16/10] overflow-hidden" style={{ background: "var(--wk-surface-raised)" }}>
+          {lead.artworkUrl ? (
+            <img src={lead.artworkUrl} alt={lead.title} className="absolute inset-0 h-full w-full object-cover" />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <i className="ri-music-2-line text-4xl" style={{ color: "var(--wk-brand)" }} />
+            </div>
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
+          <div className="absolute left-4 right-4 bottom-4">
+            <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-black/45 px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-white backdrop-blur">
+              <i className={lead.backend === "apple" ? "ri-music-2-line" : "ri-radio-2-line"} />
+              {lead.backend === "apple" ? "Apple Music" : "Preview"}
+            </div>
+            <h3 className="text-2xl font-black tracking-[-0.05em] leading-none text-white">
+              {lead.title}
+            </h3>
+            <p className="mt-1 text-[12px] font-bold text-white/72">{lead.artist}</p>
+          </div>
+        </div>
+
+        <div className="p-4">
+          <div className="flex items-center justify-between gap-3 text-[11px] font-bold" style={{ color: "var(--wk-text-muted)" }}>
+            <span>{formatListeningProgress(lead)}</span>
+            <span>{lead.playCount} play{lead.playCount === 1 ? "" : "s"}</span>
+          </div>
+          <div className="mt-3 h-1.5 overflow-hidden rounded-full" style={{ background: "var(--wk-surface-raised)" }}>
+            <div className="h-full rounded-full" style={{ width: `${leadProgress}%`, background: "var(--wk-brand)" }} />
+          </div>
+        </div>
+      </Link>
+
+      {rest.length > 0 && (
+        <div className="space-y-2">
+          {rest.slice(0, 20).map((item) => {
+            const progress = Math.round(Math.min(1, Math.max(0, item.progress || 0)) * 100);
+
+            return (
+              <Link
+                key={item.id}
+                to={item.trackUrl}
+                className="flex items-center gap-3 rounded-2xl border p-2.5"
+                style={{ borderColor: "var(--wk-border)", background: "var(--wk-surface)" }}
+              >
+                <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl" style={{ background: "var(--wk-surface-raised)" }}>
+                  {item.artworkUrl ? (
+                    <img src={item.artworkUrl} alt={item.title} className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center">
+                      <i className="ri-music-2-line" style={{ color: "var(--wk-brand)" }} />
+                    </div>
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[13px] font-black" style={{ color: "var(--wk-text)" }}>
+                    {item.title}
+                  </div>
+                  <div className="mt-0.5 truncate text-[11px] font-semibold" style={{ color: "var(--wk-text-muted)" }}>
+                    {item.artist} · {item.backend === "apple" ? "Apple Music" : "Preview"}
+                  </div>
+                  <div className="mt-2 h-1 overflow-hidden rounded-full" style={{ background: "var(--wk-surface-raised)" }}>
+                    <div className="h-full rounded-full" style={{ width: `${progress}%`, background: "var(--wk-brand)" }} />
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-[11px] font-black tabular-nums" style={{ color: "var(--wk-text)" }}>
+                    {item.playCount}x
+                  </div>
+                  <div className="mt-1 text-[9px] font-black uppercase tracking-[0.12em]" style={{ color: "var(--wk-text-faint)" }}>
+                    {formatListeningProgress(item)}
+                  </div>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 
 /* ─── Comments Tab (Mobile) ─── */
 function MobileCommentsTab({
