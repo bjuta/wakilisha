@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useRef, useCallback } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useMagazineArticles, type MagazineArticle } from "@/services/magazineArticles";
 import { getAuthorMeta } from "@/services/authorProfiles";
 import { MagazineCard } from "./components/MagazineCard";
@@ -141,7 +141,7 @@ export default function Magazine() {
 
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [activeSection, setActiveSection] = useState("All");
-  const heroRef = useRef<HTMLAnchorElement>(null);
+  const heroRef = useRef<HTMLDivElement>(null);
   const heroImgRef = useRef<HTMLImageElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const { id: userId, loading: authLoading } = useAuthUser();
@@ -195,6 +195,23 @@ export default function Magazine() {
     () => Object.entries(sectionMap).sort((a, b) => b[1].length - a[1].length).slice(0, 3).map(([n]) => n),
     [sectionMap],
   );
+
+  const navigate = useNavigate();
+  const heroArticleUrl = heroStory ? `/magazine/${heroStory.slug}` : "/magazine";
+
+  const handleHeroOpen = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (target?.closest("a,button")) return;
+    navigate(heroArticleUrl);
+  }, [navigate, heroArticleUrl]);
+
+  const handleHeroKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    const target = event.target instanceof Element ? event.target : null;
+    if (target?.closest("a,button")) return;
+    event.preventDefault();
+    navigate(heroArticleUrl);
+  }, [navigate, heroArticleUrl]);
 
   /* ── Search results when ?search= is present ── */
   const searchResults = useMemo(() => {
@@ -508,9 +525,13 @@ export default function Magazine() {
     <main className="min-h-screen bg-[var(--wk-bg)]">
 
       {/* ═══════════════════════ HERO ═══════════════════════ */}
-      <Link
-        to={`/magazine/${heroStory.slug}`}
+      <div
         ref={heroRef}
+        role="link"
+        tabIndex={0}
+        onClick={handleHeroOpen}
+        onKeyDown={handleHeroKeyDown}
+        aria-label={`Read ${heroStory.title}`}
         className="relative min-h-[88vh] flex items-end overflow-hidden bg-[#0a0a0a] block group cursor-pointer -mt-16"
       >
         {heroStory.heroUrl ? (
@@ -559,7 +580,7 @@ export default function Magazine() {
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 hidden lg:flex flex-col items-center gap-2">
           <div className="w-px h-12 bg-gradient-to-b from-white/40 to-transparent" />
         </div>
-      </Link>
+      </div>
 
       {/* ═══════════════════════ STICKY SECTION NAV ═══════════════════════ */}
       <div className="sticky top-0 z-40 border-b border-[var(--wk-border)] bg-[color-mix(in_srgb,var(--wk-surface)_92%,transparent)] backdrop-blur-[20px]">
