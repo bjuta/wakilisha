@@ -98,6 +98,7 @@ export function MobileFullPlayer() {
   const [appleConnected, setAppleConnected] = useState(() => getApplePlaybackPrefsSnapshot().appleMusicConnected);
   const [appleConnecting, setAppleConnecting] = useState(false);
   const [appleConnectError, setAppleConnectError] = useState<string | null>(null);
+  const [showFullPlaybackToast, setShowFullPlaybackToast] = useState(false);
 
   const collapsePlayer = () => closeFullPlayer();
 
@@ -119,6 +120,28 @@ export function MobileFullPlayer() {
       window.removeEventListener("wk-apple-music-connected", syncAppleState);
     };
   }, [currentTrack?.id]);
+
+  useEffect(() => {
+    if (!currentTrack?.id || playbackBackend !== "apple") {
+      setShowFullPlaybackToast(false);
+      return;
+    }
+
+    const toastKey = `wk-full-playback-toast:${currentTrack.id}`;
+    if (sessionStorage.getItem(toastKey) === "seen") {
+      setShowFullPlaybackToast(false);
+      return;
+    }
+
+    sessionStorage.setItem(toastKey, "seen");
+    setShowFullPlaybackToast(true);
+
+    const timeout = window.setTimeout(() => {
+      setShowFullPlaybackToast(false);
+    }, 3600);
+
+    return () => window.clearTimeout(timeout);
+  }, [currentTrack?.id, playbackBackend]);
 
   const handleConnectFullPlayback = async () => {
     if (!currentTrack || appleConnecting) return;
@@ -194,7 +217,7 @@ export function MobileFullPlayer() {
     `${Math.floor(seconds / 60)}:${Math.floor(seconds % 60).toString().padStart(2, "0")}`;
   const activeSourceLabel = playbackSourceLabel || currentTrack.source || null;
   const activeSourceIcon = playbackBackend === "apple" ? "Music2" : "Radio";
-  const playbackEyebrow = playbackBackend === "apple" ? "Full playback unlocked" : "Preview playback";
+  const playbackEyebrow = playbackBackend === "apple" ? "Now playing" : "Preview";
   const hasAppleCatalog = Boolean(currentTrack.appleMusicCatalogId || currentTrack.appleMusicId);
   const showFullTrackUnlock = hasAppleCatalog && playbackBackend !== "apple" && !appleConnected;
   const pct = Math.max(0, Math.min(1, progress || 0));
@@ -284,6 +307,16 @@ export function MobileFullPlayer() {
 
       <div className="fp-controls">
         <section className="fp-control-deck">
+        {showFullPlaybackToast && (
+          <div className="fp-fullplayback-toast" role="status" aria-live="polite">
+            <span className="fp-fullplayback-dot" />
+            <div>
+              <strong>Full track playing</strong>
+              <p>Unlocked through Apple Music.</p>
+            </div>
+          </div>
+        )}
+
         <div className="fp-track-info">
           <div className="min-w-0">
             <div className="fp-kicker">{playbackEyebrow}</div>
