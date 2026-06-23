@@ -147,6 +147,7 @@ export function MobileFullPlayer() {
     `${Math.floor(seconds / 60)}:${Math.floor(seconds % 60).toString().padStart(2, "0")}`;
   const activeSourceLabel = playbackSourceLabel || currentTrack.source || null;
   const activeSourceIcon = playbackBackend === "apple" ? "Music2" : "Radio";
+  const playbackEyebrow = playbackBackend === "apple" ? "Full playback unlocked" : "Preview playback";
   const pct = Math.max(0, Math.min(1, progress || 0));
 
   const remainingCount = queue.length - queueIndex - 1;
@@ -187,7 +188,8 @@ export function MobileFullPlayer() {
           <WkIcon name="ChevronDown" size={22} />
         </button>
         <div className="fp-topbar-title">
-          {playbackBackend === "apple" ? "Playing via Apple Music" : "Now Playing"}
+          <span>Now playing</span>
+          <strong>{playbackBackend === "apple" ? "Apple Music" : "WAKILISHA"}</strong>
         </div>
         <button
           className="fp-topbar-btn mobile-pressable"
@@ -199,20 +201,46 @@ export function MobileFullPlayer() {
       </div>
 
       <div className="fp-art-zone">
-        {currentTrack.artworkUrl ? (
-          <img src={currentTrack.artworkUrl} alt={currentTrack.title} />
-        ) : (
-          <div className="aspect-square bg-[var(--wk-surface-raised)]" />
-        )}
+        <div className="fp-art-shell">
+          <div
+            className="fp-art-glow"
+            style={{
+              backgroundImage: currentTrack.artworkUrl ? `url(${currentTrack.artworkUrl})` : undefined,
+            }}
+          />
+          <div className="fp-art-card">
+            {currentTrack.artworkUrl ? (
+              <img src={currentTrack.artworkUrl} alt={currentTrack.title} />
+            ) : (
+              <div className="fp-art-placeholder">
+                <WkIcon name="Music2" size={40} />
+              </div>
+            )}
+            <div className="fp-art-shine" />
+            <div className="fp-art-badges">
+              {activeSourceLabel && (
+                <span className={`fp-source-pill ${playbackBackend === "apple" ? "apple" : ""}`}>
+                  <WkIcon name={activeSourceIcon} size={12} /> {activeSourceLabel}
+                </span>
+              )}
+              {isPlaying && (
+                <span className="fp-live-pill">
+                  <span /> Live
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="fp-controls">
+        <section className="fp-control-deck">
         <div className="fp-track-info">
           <div className="min-w-0">
+            <div className="fp-kicker">{playbackEyebrow}</div>
             <h1 className="fp-track-name">{currentTrack.title}</h1>
             <div className="fp-track-artist">
               {currentTrack.artist}
-              {activeSourceLabel ? ` · ${activeSourceLabel}` : ""}
             </div>
           </div>
           <button
@@ -304,6 +332,8 @@ export function MobileFullPlayer() {
         </div>
 
 
+
+        </section>
 
         {hasQueue && (
           <div className="fp-queue-strip">
