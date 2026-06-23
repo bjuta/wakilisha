@@ -36,7 +36,6 @@ function MobileMiniPlayer() {
         transform: navVisible ? "translateY(0) translateZ(0)" : "translateY(16px) translateZ(0)",
         transition: "opacity 0.28s cubic-bezier(.16,1,.3,1), transform 0.28s cubic-bezier(.16,1,.3,1), visibility 0.28s",
       }}
-      onTouchStart={() => openFullPlayer()}
     >
       <div className="phn-mp-progress"><span style={{ transform: `scaleX(${progress})` }} /></div>
       <button onClick={() => openFullPlayer()} className="phn-mp-art">
@@ -46,10 +45,27 @@ function MobileMiniPlayer() {
         <div className="phn-mp-title">{currentTrack.title}</div>
         <div className="phn-mp-sub">{currentTrack.artist}{activeSourceLabel ? ` · ${activeSourceLabel}` : ""}</div>
       </div>
-      <button onClick={(e) => { e.stopPropagation(); togglePlay(); }} disabled={!isPlayable} className="phn-mp-btn phn-mp-play" aria-label={isPlaying ? "Pause" : "Play"}>
+      <button
+        type="button"
+        onPointerDown={(e) => e.stopPropagation()}
+        onTouchStart={(e) => e.stopPropagation()}
+        onClick={(e) => { e.stopPropagation(); togglePlay(); }}
+        disabled={!isPlayable}
+        className="phn-mp-btn phn-mp-play"
+        aria-label={isPlaying ? "Pause" : "Play"}
+      >
         <WkIcon name={isPlaying ? "Pause" : "Play"} size={16} />
       </button>
-      <button onClick={(e) => { e.stopPropagation(); next(); }} className="phn-mp-btn" aria-label="Next track"><WkIcon name="SkipForward" size={16} /></button>
+      <button
+        type="button"
+        onPointerDown={(e) => e.stopPropagation()}
+        onTouchStart={(e) => e.stopPropagation()}
+        onClick={(e) => { e.stopPropagation(); next(); }}
+        className="phn-mp-btn"
+        aria-label="Next track"
+      >
+        <WkIcon name="SkipForward" size={16} />
+      </button>
     </div>
   );
 }

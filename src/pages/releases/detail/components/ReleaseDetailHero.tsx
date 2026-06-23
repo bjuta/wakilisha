@@ -38,6 +38,8 @@ export default function ReleaseDetailHero({
       artworkUrl: t.artworkUrl,
       duration: t.duration,
       previewUrl: t.previewUrl,
+      appleMusicId: t.appleMusicId || t.appleMusicCatalogId || null,
+      appleMusicCatalogId: t.appleMusicCatalogId || t.appleMusicId || null,
       album: release.title,
       artistSlug,
       trackSlug: t.slug,
@@ -219,14 +221,16 @@ export default function ReleaseDetailHero({
             <div className="flex flex-wrap gap-3 mt-8">
               <button
                 onClick={handlePlay}
-                className="inline-flex items-center gap-2.5 rounded-xl bg-[var(--wk-brand)] text-white px-6 py-3 text-[14px] font-extrabold hover:bg-[var(--wk-brand)]/90 transition-colors whitespace-nowrap cursor-pointer"
+                disabled={!tracks.length}
+                className="inline-flex items-center gap-2.5 rounded-xl bg-[var(--wk-brand)] text-white px-6 py-3 text-[14px] font-extrabold hover:bg-[var(--wk-brand)]/90 transition-colors whitespace-nowrap cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <WkIcon name={isThisReleasePlaying && isPlaying ? "Pause" : "Play"} size={18} />
                 {isThisReleasePlaying && isPlaying ? "Pause" : "Play"}
               </button>
               <button
                 onClick={handleShuffle}
-                className="inline-flex items-center gap-2.5 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] text-[var(--wk-text)] px-5 py-3 text-[13px] font-bold hover:bg-[var(--wk-surface-raised)] transition-colors whitespace-nowrap cursor-pointer"
+                disabled={!tracks.length}
+                className="inline-flex items-center gap-2.5 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] text-[var(--wk-text)] px-5 py-3 text-[13px] font-bold hover:bg-[var(--wk-surface-raised)] transition-colors whitespace-nowrap cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <WkIcon name="Shuffle" size={16} />
                 Shuffle
