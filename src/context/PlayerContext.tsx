@@ -192,11 +192,13 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, [stopApplePolling]);
 
   const playTrackSource = useCallback((track: PlayerTrack, audio: HTMLAudioElement) => {
-    const appleMusicId = track.appleMusicCatalogId || track.appleMusicId || null;
+    const rawAppleMusicId = track.appleMusicCatalogId || track.appleMusicId || null;
+    const appleMusicId = rawAppleMusicId ? String(rawAppleMusicId).trim() : null;
+
+    // Once a user has connected Apple Music, Apple catalog playback should be tried
+    // whenever the track has a catalog song id. If anything fails, we fall back to preview.
     const shouldUseAppleMusic =
       playbackPrefs.appleMusicConnected &&
-      playbackPrefs.preferApplePreviews &&
-      Boolean(playbackPrefs.appleMusicToken) &&
       Boolean(appleMusicId);
 
     if (!shouldUseAppleMusic || !appleMusicId) {
