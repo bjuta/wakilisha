@@ -58,6 +58,23 @@ export async function softDeleteComment(commentId: string): Promise<CommentResul
   return { comment: mapComment(data.comment) };
 }
 
+export async function updateComment(input: {
+  commentId: string;
+  bodyMarkdown: string;
+  bodyPlain?: string;
+  bodyHtml?: string | null;
+}): Promise<CommentResult> {
+  const body = input.bodyMarkdown.trim();
+  const { data, error } = await supabase.rpc('community_update_comment', {
+    p_comment_id: input.commentId,
+    p_body_markdown: body,
+    p_body_plain: input.bodyPlain?.trim() || body,
+    p_body_html: input.bodyHtml || null,
+  });
+  if (error) throw error;
+  return { comment: mapComment(data.comment) };
+}
+
 export async function voteComment(input: VoteInput): Promise<VoteResult> {
   const { data, error } = await supabase.rpc('community_vote_comment', {
     p_comment_id: input.commentId,
@@ -447,6 +464,11 @@ function mapComment(row: Record<string, unknown>): CommunityComment {
     updatedAt: String(row.updated_at),
     editedAt: row.edited_at as string | null,
     deletedAt: row.deleted_at as string | null,
+    threadTitle: row.thread_title ? String(row.thread_title) : null,
+    threadEntityType: (row.thread_entity_type as CommunityComment['threadEntityType']) ?? null,
+    threadEntityId: row.thread_entity_id ? String(row.thread_entity_id) : null,
+    threadEntitySlug: row.thread_entity_slug ? String(row.thread_entity_slug) : null,
+    threadEntityUrl: row.thread_entity_url ? String(row.thread_entity_url) : null,
   };
 }
 

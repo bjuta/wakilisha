@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { WkIcon } from "@/components/design-system/Icon";
@@ -10,6 +10,8 @@ import {
   getUserFollows,
   getUserProfileWithStats,
   hydrateCommentsWithUserState,
+  softDeleteComment,
+  updateComment,
 } from "@/services/community";
 import type { CommunityComment, CommunityProfile } from "@/services/community";
 
@@ -36,6 +38,69 @@ function entityLabel(type: string): string {
     profile: "Profile", comment: "Comment",
   };
   return map[type] || type;
+}
+
+function formatExactTimestamp(dateStr: string): string {
+  try {
+    return new Intl.DateTimeFormat("en-KE", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(new Date(dateStr));
+  } catch {
+    return new Date(dateStr).toLocaleString();
+  }
+}
+
+function canEditComment(comment: CommunityComment): boolean {
+  if (comment.deletedAt || comment.status === "deleted" || comment.status === "removed" || comment.status === "spam") return false;
+  return Date.now() - new Date(comment.createdAt).getTime() <= 60 * 60 * 1000;
+}
+
+function editWindowLabel(comment: CommunityComment): string {
+  const remainingMs = 60 * 60 * 1000 - (Date.now() - new Date(comment.createdAt).getTime());
+  if (remainingMs <= 0) return "Edit window closed";
+  const minutes = Math.max(1, Math.ceil(remainingMs / 60000));
+  return `${minutes}m left to edit`;
+}
+
+function entityContextUrl(type?: string | null, slug?: string | null, rawUrl?: string | null, commentId?: string): string {
+  let base = rawUrl || "";
+
+  if (!base && type && slug) {
+    const map: Record<string, string> = {
+      article: `/magazine/${slug}`,
+      artist: `/artists/${slug}`,
+      track: `/tracks/${slug}`,
+      release: `/releases/${slug}`,
+      label: `/labels/${slug}`,
+      genre: `/genres/${slug}`,
+      chart: `/charts/${slug}`,
+      chart_edition: `/charts/${slug}`,
+      field_guide: `/guides/${slug}`,
+      magazine_issue: `/magazine/issue/${slug}`,
+    };
+    base = map[type] || "";
+  }
+
+  if (!base) return "#";
+
+  try {
+    if (base.startsWith("http://") || base.startsWith("https://")) {
+      const url = new URL(base);
+      if (typeof window !== "undefined" && url.origin === window.location.origin) {
+        base = `${url.pathname}${url.search}`;
+      }
+    }
+  } catch {
+    // keep base
+  }
+
+  if (commentId && !base.includes("#")) return `${base}#comment-${commentId}`;
+  return base;
+}
+
+function commentContextTitle(comment: CommunityComment): string {
+  return comment.threadTitle || "Original discussion";
 }
 
 
@@ -480,43 +545,19 @@ export default function MobileProfilePage() {
 function MobileCommentsTab({
   comments, loading, error, onRetry,
 }: { comments: CommunityComment[]; loading: boolean; error: string | null; onRetry: () => void }) {
-  if (loading) {
-    return <MobileSkeletonList count={4} />;
-  }
-  if (error) {
-    return <MobileErrorState message={error} onRetry={onRetry} />;
-  }
-  if (comments.length === 0) {
-    return (
-      <MobileEmptyState
-        icon="ri-chat-3-line"
-        title="No comments yet"
-        action={{ label: "Browse articles", to: "/magazine" }}
-      />
-    );
-  }
   return (
-    <div className="space-y-1.5">
-      {comments.map((c) => (
-        <div key={c.id} className="p-3.5 rounded-xl border" style={{ borderColor: "var(--wk-border)", background: "var(--wk-surface)" }}>
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-[11px]" style={{ color: "var(--wk-text-faint)" }}>{timeAgo(c.createdAt)}</span>
-            {c.isEditorPick && (
-              <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded" style={{ background: "var(--wk-warning-soft)", color: "var(--wk-warning)" }}>
-                Editor Pick
-              </span>
-            )}
-          </div>
-          <p className="text-[13px] leading-relaxed whitespace-pre-wrap break-words line-clamp-4" style={{ color: "var(--wk-text-soft)" }}>
-            {c.bodyMarkdown}
-          </p>
-          <div className="flex items-center gap-4 mt-2 text-[11px]" style={{ color: "var(--wk-text-muted)" }}>
-            <span className="flex items-center gap-1"><i className="ri-arrow-up-line text-xs" /> {c.upvoteCount}</span>
-            <span className="flex items-center gap-1"><i className="ri-chat-3-line text-xs" /> {c.replyCount} {c.replyCount === 1 ? "reply" : "replies"}</span>
-          </div>
-        </div>
-      ))}
-    </div>
+    <MobileUserCommentList
+      comments={comments}
+      loading={loading}
+      error={error}
+      onRetry={onRetry}
+      empty={{
+        icon: "ri-chat-3-line",
+        title: "No comments yet",
+        subtitle: "When you join a discussion, your comments will appear here with context.",
+        action: { label: "Browse articles", to: "/magazine" },
+      }}
+    />
   );
 }
 
@@ -524,39 +565,430 @@ function MobileCommentsTab({
 function MobileRepliesTab({
   replies, loading, error, onRetry,
 }: { replies: CommunityComment[]; loading: boolean; error: string | null; onRetry: () => void }) {
-  if (loading) return <MobileSkeletonList count={3} />;
+  return (
+    <MobileUserCommentList
+      comments={replies}
+      loading={loading}
+      error={error}
+      onRetry={onRetry}
+      empty={{
+        icon: "ri-reply-line",
+        title: "No replies yet",
+        subtitle: "When you reply to someone, those replies will appear here with context.",
+      }}
+      isReplyList
+    />
+  );
+}
+
+function MobileUserCommentList({
+  comments,
+  loading,
+  error,
+  onRetry,
+  empty,
+  isReplyList = false,
+}: {
+  comments: CommunityComment[];
+  loading: boolean;
+  error: string | null;
+  onRetry: () => void;
+  empty: { icon: string; title: string; subtitle?: string; action?: { label: string; to: string } };
+  isReplyList?: boolean;
+}) {
+  const [items, setItems] = useState<CommunityComment[]>(comments);
+  const [activeComment, setActiveComment] = useState<CommunityComment | null>(null);
+
+  useEffect(() => {
+    setItems(comments);
+  }, [comments]);
+
+  if (loading) return <MobileSkeletonList count={4} />;
   if (error) return <MobileErrorState message={error} onRetry={onRetry} />;
-  if (replies.length === 0) {
+  if (items.length === 0) {
     return (
       <MobileEmptyState
-        icon="ri-reply-line"
-        title="No replies yet"
-        subtitle="When someone replies to your comments, they'll show up here."
+        icon={empty.icon}
+        title={empty.title}
+        subtitle={empty.subtitle}
+        action={empty.action}
       />
     );
   }
+
+  const handleUpdated = (comment: CommunityComment) => {
+    setItems((current) => current.map((item) => item.id === comment.id ? { ...item, ...comment } : item));
+  };
+
+  const handleDeleted = (commentId: string) => {
+    setItems((current) => current.filter((item) => item.id !== commentId));
+  };
+
   return (
-    <div className="space-y-1.5">
-      {replies.map((r) => (
-        <div key={r.id} className="p-3.5 rounded-xl border" style={{ borderColor: "var(--wk-border)", background: "var(--wk-surface)" }}>
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-5 h-5 rounded-full overflow-hidden shrink-0 flex items-center justify-center" style={{ background: "var(--wk-surface-raised)" }}>
-              {r.author?.avatarUrl ? (
-                <img src={r.author.avatarUrl} alt="" className="w-full h-full object-cover" />
-              ) : (
-                <i className="ri-user-line text-[9px]" style={{ color: "var(--wk-text-faint)" }} />
-              )}
-            </div>
-            <span className="text-xs font-bold" style={{ color: "var(--wk-text)" }}>
-              {r.author?.displayName || r.author?.username || "Anonymous"}
-            </span>
-            <span className="text-[11px]" style={{ color: "var(--wk-text-faint)" }}>replied {timeAgo(r.createdAt)}</span>
+    <>
+      <div className="space-y-3">
+        {items.map((comment) => {
+          const contextUrl = entityContextUrl(
+            comment.threadEntityType,
+            comment.threadEntitySlug,
+            comment.threadEntityUrl,
+            comment.id
+          );
+          const editable = canEditComment(comment);
+
+          return (
+            <article
+              key={comment.id}
+              className="overflow-hidden rounded-2xl border"
+              style={{ borderColor: "var(--wk-border)", background: "var(--wk-surface)" }}
+            >
+              <div className="p-4">
+                <div className="mb-3 flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em]" style={{ color: "var(--wk-brand)" }}>
+                      {isReplyList ? "Reply on" : "Commented on"}
+                    </p>
+                    {contextUrl !== "#" ? (
+                      <Link
+                        to={contextUrl}
+                        className="mt-1 block truncate text-[14px] font-black tracking-[-0.02em]"
+                        style={{ color: "var(--wk-text)" }}
+                      >
+                        {commentContextTitle(comment)}
+                      </Link>
+                    ) : (
+                      <p className="mt-1 truncate text-[14px] font-black tracking-[-0.02em]" style={{ color: "var(--wk-text)" }}>
+                        {commentContextTitle(comment)}
+                      </p>
+                    )}
+                    <p className="mt-1 text-[11px] leading-snug" style={{ color: "var(--wk-text-faint)" }}>
+                      {formatExactTimestamp(comment.createdAt)}
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveComment(comment)}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full cursor-pointer"
+                    style={{ background: "var(--wk-surface-raised)", color: "var(--wk-text-muted)" }}
+                    aria-label="Manage comment"
+                  >
+                    <i className="ri-more-2-fill text-base" />
+                  </button>
+                </div>
+
+                <p className="text-[13px] leading-relaxed whitespace-pre-wrap break-words" style={{ color: "var(--wk-text-soft)" }}>
+                  {comment.bodyMarkdown}
+                </p>
+
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  {contextUrl !== "#" && (
+                    <Link
+                      to={contextUrl}
+                      className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-black"
+                      style={{ background: "var(--wk-brand-soft)", color: "var(--wk-brand)" }}
+                    >
+                      View context <i className="ri-arrow-right-up-line" />
+                    </Link>
+                  )}
+
+                  {editable ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold" style={{ background: "var(--wk-surface-raised)", color: "var(--wk-text-muted)" }}>
+                      <i className="ri-time-line" /> {editWindowLabel(comment)}
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold" style={{ background: "var(--wk-surface-raised)", color: "var(--wk-text-faint)" }}>
+                      <i className="ri-lock-line" /> Edit closed
+                    </span>
+                  )}
+
+                  <span className="inline-flex items-center gap-1.5 text-[11px]" style={{ color: "var(--wk-text-muted)" }}>
+                    <i className="ri-arrow-up-line text-xs" /> {comment.upvoteCount}
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 text-[11px]" style={{ color: "var(--wk-text-muted)" }}>
+                    <i className="ri-chat-3-line text-xs" /> {comment.replyCount}
+                  </span>
+                </div>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+
+      {activeComment && (
+        <MobileCommentActionDrawer
+          comment={activeComment}
+          onClose={() => setActiveComment(null)}
+          onUpdated={handleUpdated}
+          onDeleted={handleDeleted}
+        />
+      )}
+    </>
+  );
+}
+
+function MobileCommentActionDrawer({
+  comment,
+  onClose,
+  onUpdated,
+  onDeleted,
+}: {
+  comment: CommunityComment;
+  onClose: () => void;
+  onUpdated: (comment: CommunityComment) => void;
+  onDeleted: (commentId: string) => void;
+}) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const [draft, setDraft] = useState(comment.bodyMarkdown);
+  const [mode, setMode] = useState<"actions" | "edit">("actions");
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const editable = canEditComment(comment);
+  const contextUrl = entityContextUrl(
+    comment.threadEntityType,
+    comment.threadEntitySlug,
+    comment.threadEntityUrl,
+    comment.id
+  );
+
+  useEffect(() => {
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const dialog = dialogRef.current;
+    const focusable = dialog?.querySelector<HTMLElement>("button, a, textarea");
+    focusable?.focus();
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+
+      if (event.key !== "Tab" || !dialog) return;
+
+      const nodes = Array.from(
+        dialog.querySelectorAll<HTMLElement>("button:not(:disabled), a[href], textarea:not(:disabled)")
+      ).filter((node) => node.offsetParent !== null);
+
+      if (nodes.length === 0) return;
+
+      const first = nodes[0];
+      const last = nodes[nodes.length - 1];
+
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = "";
+      previous?.focus();
+    };
+  }, [onClose]);
+
+  const handleSave = async () => {
+    const nextBody = draft.trim();
+    if (!nextBody) {
+      setError("Comment cannot be empty.");
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+
+    try {
+      const result = await updateComment({
+        commentId: comment.id,
+        bodyMarkdown: nextBody,
+        bodyPlain: nextBody,
+        bodyHtml: null,
+      });
+      onUpdated({
+        ...comment,
+        ...result.comment,
+        threadTitle: comment.threadTitle,
+        threadEntityType: comment.threadEntityType,
+        threadEntityId: comment.threadEntityId,
+        threadEntitySlug: comment.threadEntitySlug,
+        threadEntityUrl: comment.threadEntityUrl,
+      });
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not edit comment.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    const confirmed = window.confirm("Delete this comment? This cannot be undone.");
+    if (!confirmed) return;
+
+    setDeleting(true);
+    setError(null);
+
+    try {
+      await softDeleteComment(comment.id);
+      onDeleted(comment.id);
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not delete comment.");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[120] flex items-end bg-black/55 px-3 pb-3"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="mobile-comment-actions-title"
+        className="w-full rounded-[28px] border p-4 shadow-2xl"
+        style={{
+          background: "var(--wk-surface)",
+          borderColor: "var(--wk-border)",
+          color: "var(--wk-text)",
+        }}
+      >
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div>
+            <p id="mobile-comment-actions-title" className="text-lg font-black tracking-[-0.04em]">
+              Comment options
+            </p>
+            <p className="mt-1 text-[12px]" style={{ color: "var(--wk-text-muted)" }}>
+              Posted {formatExactTimestamp(comment.createdAt)}
+            </p>
           </div>
-          <p className="text-[13px] leading-relaxed whitespace-pre-wrap break-words line-clamp-3" style={{ color: "var(--wk-text-soft)" }}>
-            {r.bodyMarkdown}
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-9 w-9 items-center justify-center rounded-full cursor-pointer"
+            style={{ background: "var(--wk-surface-raised)", color: "var(--wk-text-muted)" }}
+            aria-label="Close comment options"
+          >
+            <i className="ri-close-line text-lg" />
+          </button>
+        </div>
+
+        <div className="mb-4 rounded-2xl border p-3" style={{ borderColor: "var(--wk-border)", background: "var(--wk-bg)" }}>
+          <p className="text-[10px] font-black uppercase tracking-[0.14em]" style={{ color: "var(--wk-brand)" }}>
+            Appeared on
+          </p>
+          <p className="mt-1 text-sm font-black" style={{ color: "var(--wk-text)" }}>
+            {commentContextTitle(comment)}
+          </p>
+          <p className="mt-1 text-[11px]" style={{ color: "var(--wk-text-faint)" }}>
+            {editable ? editWindowLabel(comment) : "Editing is only available for 1 hour after posting."}
           </p>
         </div>
-      ))}
+
+        {mode === "edit" ? (
+          <div className="space-y-3">
+            <label className="block">
+              <span className="mb-2 block text-[11px] font-black uppercase tracking-[0.14em]" style={{ color: "var(--wk-text-muted)" }}>
+                Edit comment
+              </span>
+              <textarea
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                rows={5}
+                className="w-full resize-none rounded-2xl border p-3 text-sm outline-none"
+                style={{
+                  background: "var(--wk-bg)",
+                  borderColor: "var(--wk-border)",
+                  color: "var(--wk-text)",
+                }}
+              />
+            </label>
+
+            {error && <p className="text-xs font-bold text-red-500">{error}</p>}
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setMode("actions")}
+                className="rounded-full px-4 py-3 text-sm font-black cursor-pointer"
+                style={{ background: "var(--wk-surface-raised)", color: "var(--wk-text)" }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={saving || !draft.trim()}
+                className="rounded-full px-4 py-3 text-sm font-black cursor-pointer disabled:opacity-60"
+                style={{ background: "var(--wk-brand)", color: "var(--wk-brand-on)" }}
+              >
+                {saving ? "Saving..." : "Save edit"}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {contextUrl !== "#" && (
+              <Link
+                to={contextUrl}
+                onClick={onClose}
+                className="flex w-full items-center justify-between rounded-2xl px-4 py-3 text-sm font-black"
+                style={{ background: "var(--wk-surface-raised)", color: "var(--wk-text)" }}
+              >
+                <span className="inline-flex items-center gap-2">
+                  <i className="ri-arrow-right-up-line" /> View context
+                </span>
+                <i className="ri-arrow-right-s-line" />
+              </Link>
+            )}
+
+            <button
+              type="button"
+              onClick={() => editable && setMode("edit")}
+              disabled={!editable}
+              className="flex w-full items-center justify-between rounded-2xl px-4 py-3 text-sm font-black cursor-pointer disabled:cursor-not-allowed disabled:opacity-45"
+              style={{ background: "var(--wk-surface-raised)", color: "var(--wk-text)" }}
+            >
+              <span className="inline-flex items-center gap-2">
+                <i className="ri-pencil-line" /> Edit comment
+              </span>
+              <span className="text-[11px]" style={{ color: "var(--wk-text-faint)" }}>
+                {editable ? editWindowLabel(comment) : "Closed"}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={deleting}
+              className="flex w-full items-center justify-between rounded-2xl px-4 py-3 text-sm font-black cursor-pointer disabled:opacity-60"
+              style={{ background: "rgba(239, 68, 68, 0.12)", color: "rgb(239, 68, 68)" }}
+            >
+              <span className="inline-flex items-center gap-2">
+                <i className="ri-delete-bin-line" /> Delete comment
+              </span>
+              <span>{deleting ? "Deleting..." : "Anytime"}</span>
+            </button>
+
+            {error && <p className="px-1 pt-2 text-xs font-bold text-red-500">{error}</p>}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
