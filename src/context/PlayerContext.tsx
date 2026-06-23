@@ -9,6 +9,8 @@ import {
   seekAppleMusic,
 } from "@/services/appleMusicPlayback";
 
+export type PlaybackBackend = "audio" | "apple";
+
 export interface PlayerTrack {
   id: string;
   title: string;
@@ -105,6 +107,8 @@ interface PlayerContextValue {
   repeatMode: RepeatMode;
   isShuffle: boolean;
   isFullPlayerOpen: boolean;
+  playbackBackend: PlaybackBackend;
+  playbackSourceLabel: string | null;
   playTrack: (track: PlayerTrack, queue?: PlayerTrack[], playSource?: PlaySource) => void;
   togglePlay: () => void;
   pause: () => void;
@@ -135,10 +139,11 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [repeatMode, setRepeatMode] = useState<RepeatMode>("off");
   const [isShuffle, setIsShuffle] = useState(false);
   const [isFullPlayerOpen, setIsFullPlayerOpen] = useState(false);
+  const [playbackBackend, setPlaybackBackend] = useState<PlaybackBackend>("audio");
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const shuffledOrderRef = useRef<number[]>([]);
-  const playbackBackendRef = useRef<"audio" | "apple">("audio");
+  const playbackBackendRef = useRef<PlaybackBackend>("audio");
   const applePollRef = useRef<number | null>(null);
   const hasUserInteractedRef = useRef(false);
   const pendingPlayRef = useRef(false);
@@ -192,6 +197,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const playViaHtmlAudio = useCallback((track: PlayerTrack, audio: HTMLAudioElement) => {
     stopApplePolling();
     playbackBackendRef.current = "audio";
+    setPlaybackBackend("audio");
 
     if (!track.previewUrl) {
       setIsPlaying(false);
@@ -226,6 +232,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         audio.pause();
         audio.removeAttribute("src");
         playbackBackendRef.current = "apple";
+        setPlaybackBackend("apple");
         setCurrentTime(0);
         setDuration(track.duration || 0);
         setIsPlaying(true);
@@ -904,6 +911,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   );
 
   const progress = duration > 0 ? currentTime / duration : 0;
+  const playbackSourceLabel = playbackBackend === "apple"
+    ? "Apple Music"
+    : (currentTrack?.source ?? null);
 
   const value: PlayerContextValue = {
     currentTrack,
@@ -916,6 +926,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     repeatMode,
     isShuffle,
     isFullPlayerOpen,
+    playbackBackend,
+    playbackSourceLabel,
     playTrack,
     togglePlay,
     pause,
