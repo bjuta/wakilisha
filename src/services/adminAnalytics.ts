@@ -69,6 +69,49 @@ export interface FunnelStep {
   count: number;
 }
 
+export interface AttributionBreakdown {
+  label: string;
+  events: number;
+  pageViews: number;
+  signups: number;
+  shareEvents: number;
+  sessions: number;
+  percentage: number;
+}
+
+export interface AttributionLandingPage {
+  page_url: string;
+  source: string;
+  campaign: string;
+  pageViews: number;
+  sessions: number;
+}
+
+export interface ShareAttributionRow {
+  platform: string;
+  source: string;
+  medium: string;
+  campaign: string;
+  content: string;
+  shares: number;
+}
+
+export interface AttributionSummary {
+  totalEvents: number;
+  totalPageViews: number;
+  attributedEvents: number;
+  attributedPageViews: number;
+  unattributedPageViews: number;
+  attributedSessions: number;
+  sources: AttributionBreakdown[];
+  mediums: AttributionBreakdown[];
+  campaigns: AttributionBreakdown[];
+  contents: AttributionBreakdown[];
+  referrers: AttributionBreakdown[];
+  landingPages: AttributionLandingPage[];
+  shareOutbounds: ShareAttributionRow[];
+}
+
 // ── Helpers ────────────────────────────────────────────────────────
 
 function daysAgo(days: number): string {
@@ -110,6 +153,99 @@ function rangeToDayCount(range: DateRange | number): number {
 function rangeToDaysNumber(range: DateRange | number): number {
   if (typeof range === "number") return range;
   return 0; // sentinel for "custom range"
+}
+
+function readString(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function domainFromReferrer(raw: unknown): string {
+  const ref = readString(raw);
+  if (!ref) return "";
+  try {
+    return new URL(ref).hostname.replace(/^www\./, "");
+  } catch {
+    return ref;
+  }
+}
+
+function getCurrentAttribution(row: any): {
+  source: string;
+  medium: string;
+  campaign: string;
+  content: string;
+  term: string;
+  referrerDomain: string;
+  landingUrl: string;
+} {
+  const ctx = (row.context || {}) as Record<string, any>;
+  const attr = (ctx.attribution || {}) as Record<string, any>;
+  const current = (attr.current || {}) as Record<string, any>;
+  const firstTouch = (attr.first_touch || {}) as Record<string, any>;
+
+  return {
+    source: readString(current.utm_source) || readString(firstTouch.utm_source),
+    medium: readString(current.utm_medium) || readString(firstTouch.utm_medium),
+    campaign: readString(current.utm_campaign) || readString(firstTouch.utm_campaign),
+    content: readString(current.utm_content) || readString(firstTouch.utm_content),
+    term: readString(current.utm_term) || readString(firstTouch.utm_term),
+    referrerDomain:
+      readString(current.referrer_domain) ||
+      readString(firstTouch.referrer_domain) ||
+      domainFromReferrer(row.referrer),
+    landingUrl:
+      readString(current.landing_url) ||
+      readString(firstTouch.landing_url) ||
+      readString(ctx.raw_page_url) ||
+      readString(row.page_url),
+  };
+}
+
+type MutableAttributionBucket = Omit<AttributionBreakdown, "sessions" | "percentage"> & {
+  sessionSet: Set<string>;
+};
+
+function addAttributionBucket(
+  map: Map<string, MutableAttributionBucket>,
+  label: string,
+  row: any,
+): void {
+  const cleanLabel = label || "unknown";
+  const existing = map.get(cleanLabel) || {
+    label: cleanLabel,
+    events: 0,
+    pageViews: 0,
+    signups: 0,
+    shareEvents: 0,
+    sessionSet: new Set<string>(),
+  };
+
+  existing.events += 1;
+  if (row.event_name === "page_view") existing.pageViews += 1;
+  if (row.event_name === "newsletter_signup" || row.event_name === "briefing_subscribe") existing.signups += 1;
+  if (row.event_name === "share_click" || row.event_name === "share_copy") existing.shareEvents += 1;
+  if (row.session_id) existing.sessionSet.add(row.session_id);
+
+  map.set(cleanLabel, existing);
+}
+
+function finalizeAttributionBuckets(
+  map: Map<string, MutableAttributionBucket>,
+  totalEvents: number,
+  limit: number,
+): AttributionBreakdown[] {
+  return Array.from(map.values())
+    .map((b) => ({
+      label: b.label,
+      events: b.events,
+      pageViews: b.pageViews,
+      signups: b.signups,
+      shareEvents: b.shareEvents,
+      sessions: b.sessionSet.size,
+      percentage: totalEvents > 0 ? Math.round((b.events / totalEvents) * 100) : 0,
+    }))
+    .sort((a, b) => b.events - a.events)
+    .slice(0, limit);
 }
 
 // ── KPI Queries ───────────────────────────────────────────────────
@@ -532,6 +668,108 @@ export async function fetchConversionFunnel(range: DateRange | number = 30): Pro
     { step: "Card Click", count: [...clickSessions].filter((s) => pvSessions.has(s)).length },
     { step: "Newsletter Signup", count: [...signupSessions].filter((s) => pvSessions.has(s)).length },
   ];
+}
+
+// ── UTM / Attribution Breakdown ────────────────────────────────────
+
+export async function fetchAttributionSummary(range: DateRange | number = 30, limit: number = 12): Promise<AttributionSummary> {
+  const since = rangeToSince(range);
+  const until = rangeToUntil(range);
+
+  const { data } = await supabase
+    .from("analytics_events")
+    .select("event_name, page_url, page_type, context, session_id, referrer, created_at")
+    .gte("created_at", since)
+    .lte("created_at", until)
+    .order("created_at", { ascending: false })
+    .limit(10000);
+
+  const rows = data || [];
+  const totalEvents = rows.length;
+  let totalPageViews = 0;
+  let attributedEvents = 0;
+  let attributedPageViews = 0;
+  const attributedSessionSet = new Set<string>();
+
+  const sourceMap = new Map<string, MutableAttributionBucket>();
+  const mediumMap = new Map<string, MutableAttributionBucket>();
+  const campaignMap = new Map<string, MutableAttributionBucket>();
+  const contentMap = new Map<string, MutableAttributionBucket>();
+  const referrerMap = new Map<string, MutableAttributionBucket>();
+
+  const landingMap = new Map<string, { page_url: string; source: string; campaign: string; pageViews: number; sessionSet: Set<string> }>();
+  const shareOutboundMap = new Map<string, ShareAttributionRow>();
+
+  for (const row of rows) {
+    const att = getCurrentAttribution(row);
+    const isPageView = row.event_name === "page_view";
+    if (isPageView) totalPageViews += 1;
+
+    const hasUtm = Boolean(att.source || att.medium || att.campaign || att.content || att.term);
+
+    if (hasUtm) {
+      attributedEvents += 1;
+      if (isPageView) attributedPageViews += 1;
+      if (row.session_id) attributedSessionSet.add(row.session_id);
+    }
+
+    addAttributionBucket(sourceMap, att.source || "direct / unknown", row);
+    addAttributionBucket(mediumMap, att.medium || "none / direct", row);
+
+    if (att.campaign) addAttributionBucket(campaignMap, att.campaign, row);
+    if (att.content) addAttributionBucket(contentMap, att.content, row);
+    if (att.referrerDomain) addAttributionBucket(referrerMap, att.referrerDomain, row);
+
+    if (isPageView && hasUtm) {
+      const pageUrl = att.landingUrl || row.page_url || "unknown";
+      const key = `${pageUrl}::${att.source || "unknown"}::${att.campaign || "none"}`;
+      const existing = landingMap.get(key) || {
+        page_url: pageUrl,
+        source: att.source || "unknown",
+        campaign: att.campaign || "none",
+        pageViews: 0,
+        sessionSet: new Set<string>(),
+      };
+      existing.pageViews += 1;
+      if (row.session_id) existing.sessionSet.add(row.session_id);
+      landingMap.set(key, existing);
+    }
+
+    if (row.event_name === "share_click" || row.event_name === "share_copy") {
+      const ctx = (row.context || {}) as Record<string, any>;
+      const outbound = (ctx.outbound_utm || {}) as Record<string, any>;
+      const platform = readString(ctx.share_platform) || readString(outbound.utm_source) || "unknown";
+      const source = readString(outbound.utm_source) || platform;
+      const medium = readString(outbound.utm_medium) || "share";
+      const campaign = readString(outbound.utm_campaign) || "unknown";
+      const content = readString(outbound.utm_content) || readString(ctx.share_type) || "unknown";
+      const key = `${platform}::${source}::${medium}::${campaign}::${content}`;
+      const existing = shareOutboundMap.get(key) || { platform, source, medium, campaign, content, shares: 0 };
+      existing.shares += 1;
+      shareOutboundMap.set(key, existing);
+    }
+  }
+
+  return {
+    totalEvents,
+    totalPageViews,
+    attributedEvents,
+    attributedPageViews,
+    unattributedPageViews: Math.max(0, totalPageViews - attributedPageViews),
+    attributedSessions: attributedSessionSet.size,
+    sources: finalizeAttributionBuckets(sourceMap, totalEvents, limit),
+    mediums: finalizeAttributionBuckets(mediumMap, totalEvents, limit),
+    campaigns: finalizeAttributionBuckets(campaignMap, totalEvents, limit),
+    contents: finalizeAttributionBuckets(contentMap, totalEvents, limit),
+    referrers: finalizeAttributionBuckets(referrerMap, totalEvents, limit),
+    landingPages: Array.from(landingMap.values())
+      .map((r) => ({ page_url: r.page_url, source: r.source, campaign: r.campaign, pageViews: r.pageViews, sessions: r.sessionSet.size }))
+      .sort((a, b) => b.pageViews - a.pageViews)
+      .slice(0, limit),
+    shareOutbounds: Array.from(shareOutboundMap.values())
+      .sort((a, b) => b.shares - a.shares)
+      .slice(0, limit),
+  };
 }
 
 // ── Referrer Breakdown ────────────────────────────────────────────
