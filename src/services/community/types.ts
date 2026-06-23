@@ -30,6 +30,7 @@ export type ContributionStatus = 'pending' | 'approved' | 'rejected' | 'merged';
 export type ReportReason = 'spam' | 'harassment' | 'hate_or_abuse' | 'misinformation' | 'privacy' | 'copyright' | 'off_topic' | 'other';
 export type ReactionType = 'signal' | 'memory' | 'context' | 'fire' | 'agree';
 export type SortMode = 'best' | 'newest' | 'oldest' | 'most_replied' | 'editor_picks';
+export type CommentAnchorType = 'whole_entity' | 'timestamp' | 'time_range';
 
 export interface CommunityProfile {
   userId: string;
@@ -97,6 +98,10 @@ export interface CommunityComment {
   threadEntityId?: string | null;
   threadEntitySlug?: string | null;
   threadEntityUrl?: string | null;
+  anchorType?: CommentAnchorType | null;
+  anchorTimeMs?: number | null;
+  anchorEndTimeMs?: number | null;
+  anchorLabel?: string | null;
   children?: CommunityComment[];
 }
 
@@ -216,6 +221,25 @@ export interface CreateCommentInput {
   bodyPlain?: string;
   bodyHtml?: string;
   status?: 'visible' | 'pending';
+}
+
+export interface CreateTrackMomentCommentInput {
+  threadId: string;
+  bodyMarkdown: string;
+  bodyPlain?: string;
+  bodyHtml?: string;
+  anchorTimeMs: number;
+  anchorEndTimeMs?: number | null;
+  anchorLabel?: string | null;
+}
+
+export interface TrackMomentSummaryItem {
+  anchorTimeMs: number;
+  anchorLabel: string;
+  commentCount: number;
+  reactionCount: number;
+  score: number;
+  latestCommentAt: string;
 }
 
 export interface VoteInput {
