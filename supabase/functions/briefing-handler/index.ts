@@ -1029,7 +1029,39 @@ function wrapBriefingHtml(bodyHtml: string, title: string, email: string, unsubT
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="x-apple-disable-message-reformatting"><title>${s(title)}</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
-body,table,td,a{-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%}table,td{mso-table-lspace:0pt;mso-table-rspace:0pt;border-collapse:collapse}img{-ms-interpolation-mode:bicubic;border:0;outline:none;text-decoration:none;display:block}body{margin:0!important;padding:0!important;width:100%!important;background:#F7F8F3;color:#0C0D0A;font-family:${FNT}}a{color:${s(accent)};text-decoration:none}.wk-shell{width:760px;max-width:760px}.wk-card{border:1px solid rgba(12,13,10,.14);border-radius:14px;overflow:hidden;background:#FFFFFF}.wk-eyebrow{font-family:${FNT};font-size:10px;line-height:1;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:${s(accent)};display:flex;align-items:center;gap:8px}.wk-h1{font-family:${FNT};font-size:52px;line-height:.94;font-weight:900;letter-spacing:-.045em;color:#0C0D0A}.wk-h2{font-family:${FNT};font-size:30px;line-height:1.02;font-weight:900;letter-spacing:-.038em;color:#0C0D0A}.wk-h3{font-family:${FNT};font-size:20px;line-height:1.15;font-weight:800;letter-spacing:-.02em;color:#0C0D0A}.wk-body{font-family:${FNT};font-size:15px;line-height:1.55;color:#3F4138}.wk-muted{font-family:${FNT};font-size:13px;line-height:1.5;color:#6B6E62}.wk-faint{font-family:${FNT};font-size:12px;line-height:1.4;color:#9A9C8E}.wk-rank{font-family:${FNT};font-size:52px;line-height:1;font-weight:900;letter-spacing:-.04em}.wk-button{display:inline-flex;align-items:center;gap:8px;border:1px solid ${s(accent)}44;border-radius:6px;padding:11px 18px;font-family:${FNT};font-size:13px;line-height:1;font-weight:700;letter-spacing:-.005em;color:${s(accent)};background:#fff;text-decoration:none}@media screen and (max-width:640px){.wk-shell{width:100%!important;max-width:100%!important}.wk-pad{padding-left:18px!important;padding-right:18px!important}.wk-stack{display:block!important;width:100%!important}.wk-stack-pad{display:block!important;width:100%!important;padding-left:0!important;padding-right:0!important;padding-bottom:16px!important}.wk-h1{font-size:36px!important;line-height:.95!important}.wk-h2{font-size:26px!important;line-height:1.05!important}.wk-h3{font-size:18px!important;line-height:1.2!important}.wk-rank{font-size:42px!important}.wk-route-cell{display:block!important;width:100%!important;padding-right:0!important;padding-bottom:10px!important}}</style></head><body style="margin:0;padding:0;background:#F7F8F3;font-family:${FNT};"><center role="article" aria-roledescription="email" lang="en" style="width:100%;background:#F7F8F3;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F7F8F3;"><tr><td align="center" style="padding:24px 10px;"><table role="presentation" class="wk-shell" width="760" cellpadding="0" cellspacing="0" style="width:760px;max-width:760px;background:#F7F8F3;border:1px solid rgba(12,13,10,.16);border-radius:20px;overflow:hidden;">
+body,table,td,a{-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%}
+*{box-sizing:border-box}
+table,td{mso-table-lspace:0pt;mso-table-rspace:0pt;border-collapse:collapse}
+table{max-width:100%;table-layout:fixed}
+img{-ms-interpolation-mode:bicubic;border:0;outline:none;text-decoration:none;display:block;max-width:100%;height:auto}
+body{margin:0!important;padding:0!important;width:100%!important;background:#F7F8F3;color:#0C0D0A;font-family:${FNT}}
+a{color:${s(accent)};text-decoration:none;overflow-wrap:anywhere;word-break:break-word}
+.wk-shell{width:100%!important;max-width:760px!important}
+.wk-card{width:100%!important;max-width:100%!important;table-layout:fixed!important;border:1px solid rgba(12,13,10,.14);border-radius:14px;overflow:hidden;background:#FFFFFF}
+.wk-card td{max-width:100%!important;min-width:0!important}
+.wk-eyebrow{font-family:${FNT};font-size:10px;line-height:1;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:${s(accent)};display:flex;align-items:center;gap:8px;overflow-wrap:anywhere;word-break:break-word}
+.wk-h1{font-family:${FNT};font-size:52px;line-height:.94;font-weight:900;letter-spacing:-.045em;color:#0C0D0A}
+.wk-h2{font-family:${FNT};font-size:30px;line-height:1.02;font-weight:900;letter-spacing:-.038em;color:#0C0D0A}
+.wk-h3{font-family:${FNT};font-size:20px;line-height:1.15;font-weight:800;letter-spacing:-.02em;color:#0C0D0A}
+.wk-h1,.wk-h2,.wk-h3,h1,h2,h3,p,div,span{max-width:100%;overflow-wrap:anywhere;word-break:break-word}
+.wk-body{font-family:${FNT};font-size:15px;line-height:1.55;color:#3F4138}
+.wk-muted{font-family:${FNT};font-size:13px;line-height:1.5;color:#6B6E62}
+.wk-faint{font-family:${FNT};font-size:12px;line-height:1.4;color:#9A9C8E}
+.wk-rank{font-family:${FNT};font-size:52px;line-height:1;font-weight:900;letter-spacing:-.04em}
+.wk-button{display:inline-flex;align-items:center;gap:8px;border:1px solid ${s(accent)}44;border-radius:6px;padding:11px 18px;font-family:${FNT};font-size:13px;line-height:1;font-weight:700;letter-spacing:-.005em;color:${s(accent)};background:#fff;text-decoration:none}
+@media screen and (max-width:640px){
+  .wk-shell{width:100%!important;max-width:100%!important}
+  .wk-pad{padding-left:18px!important;padding-right:18px!important}
+  .wk-topbar td{display:block!important;width:100%!important;text-align:left!important;padding-bottom:8px!important}
+  .wk-stack,.wk-stack-pad,.wk-route-cell{display:block!important;width:100%!important;max-width:100%!important;padding-left:0!important;padding-right:0!important;padding-bottom:16px!important}
+  .wk-card,.wk-card tbody,.wk-card tr,.wk-card td{width:100%!important;max-width:100%!important}
+  .wk-card img{width:100%!important;max-width:100%!important;height:auto!important}
+  .wk-h1{font-size:34px!important;line-height:.98!important}
+  .wk-h2{font-size:25px!important;line-height:1.08!important}
+  .wk-h3{font-size:18px!important;line-height:1.22!important}
+  .wk-rank{font-size:42px!important}
+  .wk-button{display:block!important;text-align:center!important}
+}</style></head><body style="margin:0;padding:0;background:#F7F8F3;font-family:${FNT};"><center role="article" aria-roledescription="email" lang="en" style="width:100%;background:#F7F8F3;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F7F8F3;"><tr><td align="center" style="padding:24px 10px;"><table role="presentation" class="wk-shell" width="100%" cellpadding="0" cellspacing="0" style="width:100%;max-width:760px;background:#F7F8F3;border:1px solid rgba(12,13,10,.16);border-radius:20px;overflow:hidden;">
 <tr><td style="padding:24px 34px;background:#EEF1E8;border-bottom:1px solid rgba(12,13,10,.12)">${logoHtml(branding.brandLogoUrl, branding.brandName, 22)}<div style="font-family:${FNT};font-size:13px;color:#6B6E62;margin-top:4px">${s(title)}</div></td></tr>
 ${bodyHtml}
 <tr><td style="padding:20px 34px;background:#EEF1E8;border-top:1px solid rgba(12,13,10,.12);font-family:${FNT};font-size:12px;line-height:1.6;color:#6B6E62;"><p style="margin:0 0 8px;">You received this because you subscribed to <strong>${s(title)}</strong> as ${s(email)}.</p><p style="margin:0;"><a href="${s(unsubUrl)}" style="color:${s(accent)};font-weight:700;">Unsubscribe</a> &middot; <a href="${s(prefsUrl)}" style="color:${s(accent)};font-weight:700;">Manage preferences</a></p></td></tr>
