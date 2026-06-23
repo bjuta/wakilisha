@@ -16,6 +16,8 @@ export interface TrackEmbedData {
   artistSlug?: string;
   durationMs?: number;
   previewUrl?: string;
+  appleMusicId?: string | null;
+  appleMusicCatalogId?: string | null;
   artworkUrl?: string;
   primaryGenre?: string;
   labelName?: string;
@@ -28,6 +30,42 @@ export interface TrackEmbedData {
 export const TRACK_MARKER_PREFIX = "WK_TRACK_";
 
 const REGISTRY_MARKER_RE = /<!--WK_REGISTRY_TRACK:([^:>]+)-->/g;
+
+function firstString(...values: unknown[]): string | null {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) return value.trim();
+    if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  }
+  return null;
+}
+
+function readNested(record: Record<string, unknown>, path: string[]): unknown {
+  return path.reduce<unknown>((acc, key) => {
+    if (!acc || typeof acc !== "object") return undefined;
+    return (acc as Record<string, unknown>)[key];
+  }, record);
+}
+
+function readAppleMusicCatalogId(row: { metadata?: unknown }): string | null {
+  const meta = (row.metadata || {}) as Record<string, unknown>;
+
+  return firstString(
+    meta.apple_music_track_id,
+    meta.apple_music_id,
+    meta.appleMusicId,
+    meta.apple_music_catalog_id,
+    meta.appleMusicCatalogId,
+    readNested(meta, ["apple_music", "id"]),
+    readNested(meta, ["apple_music", "catalog_id"]),
+    readNested(meta, ["appleMusic", "id"]),
+    readNested(meta, ["appleMusic", "catalogId"]),
+    readNested(meta, ["providers", "apple_music", "id"]),
+    readNested(meta, ["providers", "apple_music", "catalog_id"]),
+    readNested(meta, ["provider_ids", "apple_music"]),
+    readNested(meta, ["source_ids", "apple_music"])
+  );
+}
+
 
 /* ------------------------------------------------------------------ */
 /*  Registry marker resolver                                           */
@@ -132,6 +170,8 @@ export async function resolveTrackMarkers(
     const artistSlug = artistInfo?.slug || "";
     const primaryGenre = artistGenreMap[artistSlug] || "";
 
+    const appleMusicCatalogId = readAppleMusicCatalogId(row);
+
     const trackData: TrackEmbedData = {
       slug: row.slug,
       title: row.title,
@@ -139,6 +179,8 @@ export async function resolveTrackMarkers(
       artistSlug,
       durationMs: row.duration_ms || undefined,
       previewUrl: row.preview_url || undefined,
+      appleMusicId: appleMusicCatalogId,
+      appleMusicCatalogId,
       artworkUrl: row.artwork_url || undefined,
       primaryGenre,
       labelName: row.release_id ? (releaseLabelMap[row.release_id] || undefined) : undefined,
@@ -175,9 +217,11 @@ export function TrackEmbedCard({ track, articleSlug }: { track: TrackEmbedData; 
 
   const trackUrl = track.slug ? `/tracks/${track.slug}` : undefined;
   const artistUrl = track.artistSlug ? `/artists/${track.artistSlug}` : undefined;
+  const hasAppleCatalog = Boolean(track.appleMusicCatalogId || track.appleMusicId);
+  const hasPlayableSource = Boolean(track.previewUrl || hasAppleCatalog);
 
   const handlePlayTrack = () => {
-    if (!track.previewUrl) return;
+    if (!hasPlayableSource) return;
 
     const playerTrack = {
       id: track.slug,
@@ -186,9 +230,12 @@ export function TrackEmbedCard({ track, articleSlug }: { track: TrackEmbedData; 
       artworkUrl: track.artworkUrl || "",
       duration: track.durationMs ? Math.round(track.durationMs / 1000) : 0,
       previewUrl: track.previewUrl,
+      appleMusicId: track.appleMusicId || track.appleMusicCatalogId || null,
+      appleMusicCatalogId: track.appleMusicCatalogId || track.appleMusicId || null,
       album: track.labelName || "",
       artistSlug: track.artistSlug,
       trackSlug: track.slug,
+      isPlayable: hasPlayableSource,
     };
 
     if (currentTrack?.id === playerTrack.id) {
@@ -240,6 +287,11 @@ export function TrackEmbedCard({ track, articleSlug }: { track: TrackEmbedData; 
             )}
           </div>
           <div className="flex items-center gap-2 mt-1 text-[10px] text-[var(--wk-text-faint)]">
+            {hasAppleCatalog && (
+              <span className="rounded-full bg-[var(--wk-brand-soft)]/40 px-2 py-0.5 text-[var(--wk-brand)] font-bold">
+                Full track
+              </span>
+            )}
             {track.primaryGenre && (
               <span className="rounded-full bg-[var(--wk-brand-soft)]/40 px-2 py-0.5 text-[var(--wk-brand)] font-bold">
                 {track.primaryGenre}
@@ -252,15 +304,16 @@ export function TrackEmbedCard({ track, articleSlug }: { track: TrackEmbedData; 
 
         {/* Play button + link */}
         <div className="flex items-center gap-1.5 shrink-0">
-          {track.previewUrl && (
+          {hasPlayableSource && (
             <button
+              type="button"
               onClick={handlePlayTrack}
               className={`flex items-center justify-center w-9 h-9 md:w-10 md:h-10 rounded-full transition-all cursor-pointer ${
                 isPlayingThis
                   ? "bg-[var(--wk-brand)] text-[var(--wk-brand-on)]"
                   : "bg-[var(--wk-brand-soft)]/30 text-[var(--wk-brand)] hover:bg-[var(--wk-brand)] hover:text-[var(--wk-brand-on)]"
               }`}
-              aria-label={isPlayingThis ? `Pause ${track.title}` : `Play ${track.title}`}
+              aria-label={isPlayingThis ? `Pause ${track.title}` : hasAppleCatalog ? `Play full track: ${track.title}` : `Play preview: ${track.title}`}
             >
               <i className={`${isPlayingThis ? "ri-pause-fill" : "ri-play-fill"} text-[15px]`} />
             </button>

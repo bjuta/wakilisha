@@ -29,6 +29,7 @@ import {
 import { ChartRefreshButton } from "@/components/charts/ChartRefreshButton";
 import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 import { trackUrl } from "@/utils/trackUrl";
+import { enrichChartEntriesWithPlaybackData } from "@/services/chartsPublic/playbackEnrichment";
 
 // ─── Constants ───
 const INITIAL_COUNT = 15;
@@ -230,13 +231,14 @@ export default function MobileChartEdition() {
 
       setMeta(edResult.meta);
       const { data: rawEntries } = await getChartEditionEntries(chartProgramSlug, edResult.data.slug);
-      setEdition(toChartEditionViewModel(edResult.data, family, rawEntries));
-      setEntries(rawEntries.map(toChartEntryRowViewModel));
+      const enrichedEntries = await enrichChartEntriesWithPlaybackData(rawEntries);
+      setEdition(toChartEditionViewModel(edResult.data, family, enrichedEntries));
+      setEntries(enrichedEntries.map(toChartEntryRowViewModel));
 
       const { data: allEditions } = await getChartEditionsForFamily(chartProgramSlug);
       const sorted = [...allEditions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       const archiveEditions = sorted.slice(0, 4);
-      const entriesMap: Record<string, import("@/services/chartsPublic/types").ChartEditionEntry[]> = { [edResult.data.slug]: rawEntries };
+      const entriesMap: Record<string, import("@/services/chartsPublic/types").ChartEditionEntry[]> = { [edResult.data.slug]: enrichedEntries };
       await Promise.all(
         archiveEditions
           .filter((e) => e.slug !== edResult.data!.slug)
@@ -359,6 +361,7 @@ export default function MobileChartEdition() {
   }
 
   const topTrack = entries[0];
+  const hasApplePlaybackTracks = chartTracks.some((track) => Boolean(track.appleMusicCatalogId || track.appleMusicId));
 
   return (
     <div className="min-h-screen pb-28">
@@ -416,6 +419,13 @@ export default function MobileChartEdition() {
               <i className="ri-archive-line" /> Archive
             </Link>
           </div>
+
+          {hasApplePlaybackTracks && (
+            <div className="mt-3 rounded-2xl border border-[var(--wk-brand)]/25 bg-[var(--wk-brand)]/10 px-3 py-2.5 text-[11px] font-semibold leading-snug text-[var(--wk-text-soft)]">
+              <span className="font-black text-[var(--wk-brand)]">Full tracks available.</span>{" "}
+              Connect Apple Music from the player to listen through this chart on WAKILISHA.
+            </div>
+          )}
 
           {/* #1 track card */}
           <div className="mt-5 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)]/80 backdrop-blur-sm p-3.5">
