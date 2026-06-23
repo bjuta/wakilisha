@@ -1,18 +1,25 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { usePlayer } from "@/context/PlayerContext";
 import { WkIcon } from "@/components/design-system/Icon";
 import { ShareSheet } from "@/components/design-system/share/ShareSheet";
 import { useScrollLock } from "@/hooks/useScrollLock";
+import { useEntityActions } from "@/hooks/useCommunityActions";
 
 function ActionMenu({
   open,
   onClose,
   track,
+  saved,
+  savePending,
+  onSave,
 }: {
   open: boolean;
   onClose: () => void;
   track: { title: string; artist: string; artworkUrl?: string };
+  saved: boolean;
+  savePending: boolean;
+  onSave: () => void;
 }) {
   useScrollLock(open);
   const [shareOpen, setShareOpen] = useState(false);
@@ -22,7 +29,7 @@ function ActionMenu({
   const actions = [
     { label: "Share", icon: "Share2" as const, onClick: () => setShareOpen(true) },
     { label: "View artist", icon: "User" as const, onClick: () => onClose() },
-    { label: "Add to favorites", icon: "Heart" as const, onClick: () => onClose() },
+    { label: saved ? "Saved" : savePending ? "Saving..." : "Save track", icon: "Heart" as const, onClick: onSave },
     { label: "Go to album", icon: "Album" as const, onClick: () => onClose() },
   ];
 
@@ -77,10 +84,45 @@ export function MobileFullPlayer() {
     closeFullPlayer,
     playFromQueue,
   } = usePlayer();
+  const { save: saveEntityAction, loading: savePending } = useEntityActions();
   const [liked, setLiked] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [actionMenuOpen, setActionMenuOpen] = useState(false);
 
   const collapsePlayer = () => closeFullPlayer();
+
+  useEffect(() => {
+    setLiked(false);
+    setSaveError(null);
+  }, [currentTrack?.id]);
+
+  const handleSaveCurrentTrack = async () => {
+    if (!currentTrack || savePending) return;
+
+    const trackSlug = currentTrack.trackSlug || currentTrack.id;
+    const entityUrl = currentTrack.artistSlug && trackSlug
+      ? `/tracks/${currentTrack.artistSlug}/${trackSlug}`
+      : `/tracks/${trackSlug}`;
+
+    setSaveError(null);
+
+    try {
+      const result = await saveEntityAction({
+        entityType: "track",
+        entityId: currentTrack.id,
+        entitySlug: trackSlug,
+        entityUrl,
+        title: currentTrack.title,
+        subtitle: currentTrack.artist,
+        imageUrl: currentTrack.artworkUrl,
+      });
+
+      if (result) setLiked(result.saved);
+    } catch (err) {
+      console.error("Could not save current track", err);
+      setSaveError(err instanceof Error ? err.message : "Could not save this track.");
+    }
+  };
 
   if (!currentTrack) {
     return (
@@ -168,13 +210,20 @@ export function MobileFullPlayer() {
             </div>
           </div>
           <button
-            onClick={() => setLiked((v) => !v)}
+            onClick={handleSaveCurrentTrack}
+            disabled={savePending}
             className={`fp-like mobile-pressable ${liked ? "text-[var(--wk-brand)]" : ""}`}
-            aria-label={liked ? "Remove from favorites" : "Save track"}
+            aria-label={liked ? "Remove from saved tracks" : "Save track"}
           >
             <WkIcon name="Heart" size={23} fill={liked ? "currentColor" : "none"} />
           </button>
         </div>
+
+        {saveError && (
+          <p className="mt-2 text-center text-[11px] font-bold text-red-500">
+            {saveError}
+          </p>
+        )}
 
         <div className="fp-meta-pills">
           {currentTrack.source && (
@@ -340,6 +389,9 @@ export function MobileFullPlayer() {
           artist: currentTrack.artist,
           artworkUrl: currentTrack.artworkUrl,
         }}
+        saved={liked}
+        savePending={savePending}
+        onSave={handleSaveCurrentTrack}
       />
     </div>
   );
