@@ -16,6 +16,7 @@ import { ShareButton } from "@/components/design-system/share/ShareSheet";
 import { ContributionBadges } from "@/components/feature/community/ContributionBadges";
 import { CommunitySection } from "@/pages/magazine/article/components/CommunitySection";
 import { useAuthUser } from "@/hooks/useAuthUser";
+import { useEntityActions } from "@/hooks/useCommunityActions";
 import { useScrollDepthTracking } from "@/hooks/useScrollDepthTracking";
 
 type TrackChartAppearance = {
@@ -401,9 +402,12 @@ export default function TrackDetail() {
   const { artistSlug, trackSlug } = useParams<{ artistSlug: string; trackSlug: string }>();
   const { playTrack, currentTrack, isPlaying, togglePlay } = usePlayer();
   const user = useAuthUser();
+  const { save: saveEntityAction, loading: entityActionLoading } = useEntityActions(user.id || undefined);
   const [track, setTrack] = useState<TrackViewModel | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [trackSaved, setTrackSaved] = useState(false);
+  const [trackSaveError, setTrackSaveError] = useState<string | null>(null);
 
   useScrollDepthTracking({
     pageType: "track_detail",
@@ -421,6 +425,8 @@ export default function TrackDetail() {
 
     setLoading(true);
     setError(null);
+    setTrackSaved(false);
+    setTrackSaveError(null);
     getTrack(artistSlug, trackSlug)
       .then((apiData) => {
         if (!alive) return;
@@ -497,6 +503,8 @@ export default function TrackDetail() {
       source: "WAKILISHA",
       duration: track.duration,
       previewUrl: track.previewUrl || undefined,
+      artistSlug: track.artistSlug || artistSlug || undefined,
+      trackSlug: track.slug || trackSlug || undefined,
     };
     playTrack(playerTrack, [playerTrack], {
       pageType: "track_detail",
@@ -504,6 +512,33 @@ export default function TrackDetail() {
       entityType: "track",
       sourceSection: "track_hero",
     });
+  };
+
+  const handleSaveTrack = async () => {
+    if (!track) return;
+
+    const canonicalPath = artistSlug && trackSlug
+      ? `/tracks/${artistSlug}/${trackSlug}`
+      : `/tracks/${track.slug}`;
+
+    setTrackSaveError(null);
+
+    try {
+      const result = await saveEntityAction({
+        entityType: "track",
+        entityId: track.slug,
+        entitySlug: track.slug,
+        entityUrl: canonicalPath,
+        title: track.title,
+        subtitle: track.artist,
+        imageUrl: track.artworkUrl,
+      });
+
+      if (result) setTrackSaved(result.saved);
+    } catch (err) {
+      console.error("Could not save track", err);
+      setTrackSaveError(err instanceof Error ? err.message : "Could not save this track.");
+    }
   };
 
   const communityEntity = {
@@ -598,8 +633,26 @@ export default function TrackDetail() {
                   <WkIcon name="Edit3" size={16} />
                   Contribute lyrics
                 </Link>
+                <button
+                  type="button"
+                  onClick={handleSaveTrack}
+                  disabled={entityActionLoading}
+                  className={`inline-flex items-center gap-2.5 rounded-xl border px-5 py-3 text-[13px] font-bold transition-colors whitespace-nowrap disabled:opacity-60 ${
+                    trackSaved
+                      ? "border-[var(--wk-brand)] bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]"
+                      : "border-[var(--wk-border)] bg-[var(--wk-surface)] text-[var(--wk-text)] hover:bg-[var(--wk-surface-raised)]"
+                  }`}
+                >
+                  <WkIcon name="Heart" size={16} fill={trackSaved ? "currentColor" : "none"} />
+                  {entityActionLoading ? "Saving..." : trackSaved ? "Saved" : "Save track"}
+                </button>
                 <ShareButton item={{ title: track.title, subtitle: track.artist, description: trackIntro || seoDescription, imageUrl: track.artworkUrl, type: "track" }} />
               </div>
+              {trackSaveError && (
+                <p className="mt-3 text-[12px] font-bold text-red-500">
+                  {trackSaveError}
+                </p>
+              )}
             </div>
           </div>
         </div>

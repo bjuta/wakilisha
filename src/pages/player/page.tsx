@@ -1,7 +1,8 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { usePlayer } from "@/context/PlayerContext";
 import { WkIcon } from "@/components/design-system/Icon";
+import { useEntityActions } from "@/hooks/useCommunityActions";
 
 function formatTime(seconds: number) {
   const m = Math.floor(seconds / 60);
@@ -41,7 +42,9 @@ export default function DesktopPlayerPage() {
     closeFullPlayer,
   } = usePlayer();
 
+  const { save: saveEntityAction, loading: savePending } = useEntityActions();
   const [liked, setLiked] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [scrubbing, setScrubbing] = useState(false);
   const [showQueue, setShowQueue] = useState(false);
   const [showLyrics, setShowLyrics] = useState(false);
@@ -73,6 +76,39 @@ export default function DesktopPlayerPage() {
     },
     [setVolume]
   );
+
+  useEffect(() => {
+    setLiked(false);
+    setSaveError(null);
+  }, [currentTrack?.id]);
+
+  const handleSaveCurrentTrack = useCallback(async () => {
+    if (!currentTrack || savePending) return;
+
+    const trackSlug = currentTrack.trackSlug || currentTrack.id;
+    const entityUrl = currentTrack.artistSlug && trackSlug
+      ? `/tracks/${currentTrack.artistSlug}/${trackSlug}`
+      : `/tracks/${trackSlug}`;
+
+    setSaveError(null);
+
+    try {
+      const result = await saveEntityAction({
+        entityType: "track",
+        entityId: currentTrack.id,
+        entitySlug: trackSlug,
+        entityUrl,
+        title: currentTrack.title,
+        subtitle: currentTrack.artist,
+        imageUrl: currentTrack.artworkUrl,
+      });
+
+      if (result) setLiked(result.saved);
+    } catch (err) {
+      console.error("Could not save current track", err);
+      setSaveError(err instanceof Error ? err.message : "Could not save this track.");
+    }
+  }, [currentTrack, saveEntityAction, savePending]);
 
   if (!currentTrack) {
     return (
@@ -288,13 +324,20 @@ export default function DesktopPlayerPage() {
                 </span>
               </div>
               <button
-                onClick={() => setLiked((v) => !v)}
-                className={`flex h-10 w-10 items-center justify-center rounded-full transition-all hover:bg-[var(--wk-surface-raised)] ${liked ? "text-[var(--wk-brand)]" : "text-[var(--wk-text-muted)]"}`}
-                aria-label={liked ? "Unlike" : "Like"}
+                onClick={handleSaveCurrentTrack}
+                disabled={savePending}
+                className={`flex h-10 w-10 items-center justify-center rounded-full transition-all hover:bg-[var(--wk-surface-raised)] disabled:opacity-60 ${liked ? "text-[var(--wk-brand)]" : "text-[var(--wk-text-muted)]"}`}
+                aria-label={liked ? "Remove from saved tracks" : "Save track"}
+                title={liked ? "Saved" : "Save track"}
               >
                 <WkIcon name="Heart" size={22} fill={liked ? "currentColor" : "none"} />
               </button>
             </div>
+            {saveError && (
+              <p className="mt-2 text-right text-[11px] font-bold text-red-500">
+                {saveError}
+              </p>
+            )}
 
             {/* Lyrics panel */}
             {showLyrics && (

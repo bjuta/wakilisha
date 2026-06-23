@@ -187,6 +187,8 @@ export function TrackEmbedCard({ track, articleSlug }: { track: TrackEmbedData; 
       duration: track.durationMs ? Math.round(track.durationMs / 1000) : 0,
       previewUrl: track.previewUrl,
       album: track.labelName || "",
+      artistSlug: track.artistSlug,
+      trackSlug: track.slug,
     };
 
     if (currentTrack?.id === playerTrack.id) {
