@@ -92,6 +92,11 @@ export interface CommunityComment {
   updatedAt: string;
   editedAt: string | null;
   deletedAt: string | null;
+  threadTitle?: string | null;
+  threadEntityType?: CommunityEntityType | null;
+  threadEntityId?: string | null;
+  threadEntitySlug?: string | null;
+  threadEntityUrl?: string | null;
   children?: CommunityComment[];
 }
 
