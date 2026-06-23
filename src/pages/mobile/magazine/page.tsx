@@ -372,16 +372,27 @@ export default function MobileMagazine() {
                             </p>
                           )}
                           <div className="flex items-center gap-2 text-[10px] sm:text-[11px] text-white/40">
-                            <Link
-                              to={`/authors/${getAuthorMeta(story.author).slug}`}
-                              className="flex items-center gap-1.5 font-semibold text-white/60 hover:text-white/90 transition-colors"
-                              onClick={(e) => e.stopPropagation()}
+                            <span
+                              role="link"
+                              tabIndex={0}
+                              className="flex items-center gap-1.5 font-semibold text-white/60 hover:text-white/90 transition-colors cursor-pointer"
+                              onClick={(event) => {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                navigate(`/authors/${getAuthorMeta(story.author).slug}`);
+                              }}
+                              onKeyDown={(event) => {
+                                if (event.key !== "Enter" && event.key !== " ") return;
+                                event.preventDefault();
+                                event.stopPropagation();
+                                navigate(`/authors/${getAuthorMeta(story.author).slug}`);
+                              }}
                             >
                               <span className="w-4 h-4 rounded-full bg-[var(--wk-brand)] flex items-center justify-center text-[7px] font-black text-[var(--wk-brand-on)] shrink-0">
                                 {story.author.split(' ').map((n) => n[0]).join('').slice(0, 2)}
                               </span>
                               {story.author}
-                            </Link>
+                            </span>
                             <span className="text-white/15">·</span>
                             <span>{story.readingTime} min</span>
                           </div>
