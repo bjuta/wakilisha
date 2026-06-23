@@ -42,6 +42,46 @@ function formatCount(n: number): string {
   return String(n);
 }
 
+function formatAnchorTime(ms?: number | null): string | null {
+  if (ms == null || !Number.isFinite(ms)) return null;
+  const safeSeconds = Math.max(0, Math.floor(ms / 1000));
+  const minutes = Math.floor(safeSeconds / 60);
+  const seconds = safeSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+function getCommentAnchorBadge(comment: CommunityComment): { label: string; icon: string } | null {
+  if (!comment.anchorType || comment.anchorType === "whole_entity") return null;
+
+  if (comment.anchorType === "timestamp" || comment.anchorType === "time_range") {
+    const start = formatAnchorTime(comment.anchorTimeMs);
+    const end = formatAnchorTime(comment.anchorEndTimeMs);
+
+    if (!start) return null;
+
+    return {
+      label: comment.anchorType === "time_range" && end ? `${start}-${end}` : start,
+      icon: "ri-time-line",
+    };
+  }
+
+  if (comment.anchorType === "release_track") {
+    return {
+      label: comment.contextLabel || comment.anchorLabel || "Release track",
+      icon: "ri-album-line",
+    };
+  }
+
+  if (comment.anchorType === "chart_entry") {
+    return {
+      label: comment.contextLabel || comment.anchorLabel || "Chart entry",
+      icon: "ri-bar-chart-grouped-line",
+    };
+  }
+
+  return null;
+}
+
 export function CommentCard({
   comment,
   currentUserId,
@@ -66,6 +106,7 @@ export function CommentCard({
   const userVote = optimisticVote ?? comment.userVote;
   const voteScore = comment.upvoteCount - comment.downvoteCount + (optimisticVote !== null ? optimisticVote - (comment.userVote ?? 0) : 0);
   const activeReactions = [...new Set([...comment.userReactions, ...optimisticReactions])];
+  const anchorBadge = getCommentAnchorBadge(comment);
 
   const handleVote = useCallback(
     async (value: number) => {
@@ -187,6 +228,12 @@ export function CommentCard({
                 </span>
               )}
               <span className="text-[11px] text-[var(--wk-text-faint)]">{timeAgo(comment.createdAt)}</span>
+              {anchorBadge && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-[var(--wk-brand-soft)] px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.08em] text-[var(--wk-brand)]">
+                  <i className={`${anchorBadge.icon} text-[11px]`} />
+                  {anchorBadge.label}
+                </span>
+              )}
               {comment.editedAt && (
                 <span className="text-[10px] text-[var(--wk-text-faint)] italic">(edited)</span>
               )}
