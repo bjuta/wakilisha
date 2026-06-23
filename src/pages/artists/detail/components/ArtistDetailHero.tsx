@@ -6,6 +6,7 @@ import { getCountryFlagUrl, getCountryLabel } from "@/utils/countries";
 
 export interface ArtistDetailHeroProps {
   name: string;
+  artistId: string;
   slug: string;
   userId?: string;
   imageUrl?: string;
@@ -23,6 +24,7 @@ export interface ArtistDetailHeroProps {
 
 export function ArtistDetailHero({
   name,
+  artistId,
   slug,
   userId,
   imageUrl,
@@ -48,7 +50,7 @@ export function ArtistDetailHero({
   const visibleGenres = genres.slice(0, 3);
 
   const handleFollow = async () => {
-    const result = await follow("artist", slug, slug);
+    const result = await follow("artist", artistId, slug);
     if (result) setFollowing(result.followed ?? true);
   };
 
