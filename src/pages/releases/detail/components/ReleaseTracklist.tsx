@@ -16,10 +16,12 @@ export default function ReleaseTracklist({
   release,
   tracks,
   artistSlug,
+  onDiscussTrack,
 }: {
   release: PublicReleaseDetail;
   tracks: PublicReleaseDetail["tracks"];
   artistSlug: string;
+  onDiscussTrack?: (track: PublicReleaseDetail["tracks"][number], index: number) => void;
 }) {
   const { currentTrack, isPlaying, playTrack, togglePlay } = usePlayer();
   const { ref, revealed } = useScrollReveal<HTMLDivElement>(0.1);
@@ -93,7 +95,7 @@ export default function ReleaseTracklist({
               <div
                 key={track.id}
                 className="group grid items-center gap-3 px-4 py-3.5 border-b border-[var(--wk-divider)] last:border-b-0 transition-colors hover:bg-[var(--wk-surface-raised)]"
-                style={{ gridTemplateColumns: "44px 1fr 72px 40px" }}
+                style={{ gridTemplateColumns: "44px 1fr 72px 40px 40px" }}
               >
                 {/* Track number / play button */}
                 <div className="flex items-center justify-center w-8 h-8 rounded-full text-[13px] font-extrabold text-[var(--wk-text-faint)] group-hover:text-[var(--wk-brand)] transition-colors">
@@ -143,6 +145,17 @@ export default function ReleaseTracklist({
                 <div className="text-[12px] font-bold text-[var(--wk-text-faint)] text-right tabular-nums">
                   {formatDuration(track.duration)}
                 </div>
+
+                {/* Discussion anchor */}
+                <button
+                  type="button"
+                  onClick={() => onDiscussTrack?.(track, index)}
+                  className="flex h-8 w-8 items-center justify-center rounded-full border border-[var(--wk-border)] bg-[var(--wk-bg)] text-[var(--wk-text-muted)] transition-colors hover:border-[var(--wk-brand)]/35 hover:text-[var(--wk-brand)]"
+                  aria-label={`Discuss ${track.title} on this release`}
+                  title={`Discuss ${track.title}`}
+                >
+                  <WkIcon name="MessageCircle" size={13} />
+                </button>
 
                 {/* Chevron to detail page */}
                 <Link

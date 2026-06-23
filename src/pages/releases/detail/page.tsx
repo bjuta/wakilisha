@@ -17,6 +17,12 @@ import ReleaseExcerpt from "./components/ReleaseExcerpt";
 import ReleaseFeaturedArtists from "./components/ReleaseFeaturedArtists";
 import { ContributionBadges } from "@/components/feature/community/ContributionBadges";
 import { CommunitySection } from "@/pages/magazine/article/components/CommunitySection";
+import {
+  ContextAnchorCommentDrawer,
+  ContextAnchorSummary,
+  type ContextAnchorTarget,
+} from "@/components/feature/community/ContextAnchorCommentDrawer";
+import type { ContextAnchorSummaryItem } from "@/services/community";
 import { useAuthUser } from "@/hooks/useAuthUser";
 
 export default function ReleaseDetail() {
@@ -31,6 +37,7 @@ export default function ReleaseDetail() {
 
   const [release, setRelease] = useState<PublicReleaseDetail | null>(null);
   const [related, setRelated] = useState<PublicRelease[]>([]);
+  const [selectedAnchor, setSelectedAnchor] = useState<ContextAnchorTarget | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [error, setError] = useState<string | null>(null);
 
@@ -112,6 +119,36 @@ export default function ReleaseDetail() {
     title: release.title,
     subtitle: release.artist,
     imageUrl: release.artworkUrl,
+  };
+
+  const openReleaseTrackDiscussion = (track: PublicReleaseDetail["tracks"][number], index: number) => {
+    setSelectedAnchor({
+      anchorType: "release_track",
+      contextEntityType: "release_track",
+      contextEntityId: track.id || track.slug || `${release.slug}-${index + 1}`,
+      contextEntitySlug: track.slug || undefined,
+      contextLabel: `Track ${index + 1}: ${track.title}`,
+      anchorLabel: `Track ${index + 1}`,
+      title: track.title,
+      subtitle: `${release.title} · ${release.artist}`,
+      imageUrl: track.artworkUrl || release.artworkUrl,
+      placeholder: `Talk about ${track.title} on ${release.title}...`,
+    });
+  };
+
+  const openReleaseSummaryDiscussion = (item: ContextAnchorSummaryItem) => {
+    setSelectedAnchor({
+      anchorType: "release_track",
+      contextEntityType: item.contextEntityType || "release_track",
+      contextEntityId: item.contextEntityId,
+      contextEntitySlug: item.contextEntitySlug,
+      contextLabel: item.contextLabel || item.anchorLabel,
+      anchorLabel: item.anchorLabel,
+      title: item.contextLabel || item.anchorLabel,
+      subtitle: `${release.title} · ${release.artist}`,
+      imageUrl: release.artworkUrl,
+      placeholder: `Add to the conversation about ${item.contextLabel || item.anchorLabel}...`,
+    });
   };
 
   return (
@@ -205,7 +242,21 @@ export default function ReleaseDetail() {
             )}
 
             {/* Tracklist */}
-            <ReleaseTracklist release={release} tracks={release.tracks} artistSlug={artistSlug} />
+            <ReleaseTracklist
+              release={release}
+              tracks={release.tracks}
+              artistSlug={artistSlug}
+              onDiscussTrack={openReleaseTrackDiscussion}
+            />
+
+            <ContextAnchorSummary
+              entity={communityEntity}
+              anchorType="release_track"
+              eyebrow="Release conversations"
+              title="Track-by-track discussion"
+              subtitle="Focused conversations around specific tracks on this release."
+              onSelect={openReleaseSummaryDiscussion}
+            />
 
             {/* Featured Artists Grid */}
             <ReleaseFeaturedArtists
@@ -257,6 +308,13 @@ export default function ReleaseDetail() {
       </div>
 
       <CommunitySection entity={communityEntity} user={user} />
+
+      <ContextAnchorCommentDrawer
+        open={Boolean(selectedAnchor)}
+        onClose={() => setSelectedAnchor(null)}
+        entity={communityEntity}
+        target={selectedAnchor}
+      />
     </main>
   );
 }

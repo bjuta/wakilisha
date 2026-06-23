@@ -37,6 +37,12 @@ import { SkeletonChartEdition } from "@/components/skeletons/Skeletons";
 import { trackUrl } from "@/utils/trackUrl";
 import { NewsletterSubscribe } from "@/components/feature/NewsletterSubscribe";
 import { enrichChartEntriesWithPlaybackData } from "@/services/chartsPublic/playbackEnrichment";
+import {
+  ContextAnchorCommentDrawer,
+  ContextAnchorSummary,
+  type ContextAnchorTarget,
+} from "@/components/feature/community/ContextAnchorCommentDrawer";
+import type { ContextAnchorSummaryItem } from "@/services/community";
 
 const rankTone = (rank: number) =>
   rank === 1 ? "gold" : rank === 2 ? "silver" : rank === 3 ? "bronze" : "";
@@ -299,6 +305,7 @@ export default function ChartEdition() {
   const [displayedCount, setDisplayedCount] = useState(20);
   const PAGE_SIZE = 12;
   const [highlightedSlug, setHighlightedSlug] = useState<string | null>(null);
+  const [selectedChartAnchor, setSelectedChartAnchor] = useState<ContextAnchorTarget | null>(null);
 
   const handleJumpTo = useCallback((slug: string) => {
     setHighlightedSlug(slug);
@@ -329,6 +336,33 @@ export default function ChartEdition() {
       sourceSection,
     });
   }, [chartTracks, playTrack, editionSlug]);
+
+  const openChartEntryDiscussion = useCallback((
+    entry: ChartEntryRowViewModel,
+    chartLabel?: string,
+  ) => {
+    const movement =
+      entry.movement === "new"
+        ? "New entry"
+        : entry.movement === "up"
+          ? `Up ${entry.movementAmount ?? 0}`
+          : entry.movement === "down"
+            ? `Down ${entry.movementAmount ?? 0}`
+            : "Holding";
+
+    setSelectedChartAnchor({
+      anchorType: "chart_entry",
+      contextEntityType: "chart_entry",
+      contextEntityId: `${editionSlug || "latest"}:${entry.rank}:${entry.slug}`,
+      contextEntitySlug: `${editionSlug || "latest"}-${entry.slug}`,
+      contextLabel: `#${entry.rank} · ${entry.title}`,
+      anchorLabel: `#${entry.rank}`,
+      title: `${entry.title} at #${entry.rank}`,
+      subtitle: `${chartLabel || "Chart edition"} · ${entry.artist} · ${movement}`,
+      imageUrl: entry.artworkUrl || undefined,
+      placeholder: `Talk about why ${entry.title} is #${entry.rank}...`,
+    });
+  }, [editionSlug]);
 
   // ─── Parallax hero scroll ───
   const heroImgRef = useRef<HTMLImageElement>(null);
@@ -466,6 +500,33 @@ export default function ChartEdition() {
     );
   }
 
+  const chartCommunityEntity = {
+    type: "chart_edition" as const,
+    id: edition.slug,
+    slug: edition.slug,
+    url: typeof window !== "undefined"
+      ? window.location.href
+      : getCanonicalChartPathFromSlugs(publicSlug, edition.slug, marketSlug),
+    title: edition.publicLabel,
+    subtitle: edition.label,
+    imageUrl: topTrack.artworkUrl,
+  };
+
+  const openChartSummaryDiscussion = (item: ContextAnchorSummaryItem) => {
+    setSelectedChartAnchor({
+      anchorType: "chart_entry",
+      contextEntityType: item.contextEntityType || "chart_entry",
+      contextEntityId: item.contextEntityId,
+      contextEntitySlug: item.contextEntitySlug,
+      contextLabel: item.contextLabel || item.anchorLabel,
+      anchorLabel: item.anchorLabel,
+      title: item.contextLabel || item.anchorLabel,
+      subtitle: edition.publicLabel,
+      imageUrl: topTrack.artworkUrl,
+      placeholder: `Add to the discussion about ${item.contextLabel || item.anchorLabel}...`,
+    });
+  };
+
   const metaLine = meta.isStale
     ? `Updated ${new Date(meta.fetchedAt).toLocaleString()}`
     : meta.dataSource === "cache"
@@ -527,6 +588,9 @@ export default function ChartEdition() {
             </button>
             <button onClick={() => playAt(0, "chart_no1")} className="chart-hero-v2-cta chart-hero-v2-cta-ghost">
               <WkIcon name="Play" size={16} /> Play #1
+            </button>
+            <button onClick={() => openChartEntryDiscussion(topTrack, edition.publicLabel)} className="chart-hero-v2-cta chart-hero-v2-cta-ghost">
+              <WkIcon name="MessageCircle" size={16} /> Discuss #1
             </button>
             <Link to="/charts" className="chart-hero-v2-cta chart-hero-v2-cta-ghost">
               <WkIcon name="Archive" size={16} /> Archive
@@ -689,12 +753,20 @@ export default function ChartEdition() {
                     {entry.artist}
                     {entry.movement === "new" ? " · NEW" : entry.movement === "up" ? ` · +${entry.movementAmount ?? 0}` : entry.movement === "down" ? ` · -${entry.movementAmount ?? 0}` : ""}
                   </div>
-                  <button
-                    onClick={(e) => { e.preventDefault(); playAt(idx); }}
-                    className="chart-podium-v2-play"
-                  >
-                    <WkIcon name="Play" size={13} /> Play
-                  </button>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={(e) => { e.preventDefault(); playAt(idx); }}
+                      className="chart-podium-v2-play"
+                    >
+                      <WkIcon name="Play" size={13} /> Play
+                    </button>
+                    <button
+                      onClick={(e) => { e.preventDefault(); openChartEntryDiscussion(entry, edition.publicLabel); }}
+                      className="chart-podium-v2-play"
+                    >
+                      <WkIcon name="MessageCircle" size={13} /> Discuss
+                    </button>
+                  </div>
                 </div>
               </Link>
             ))}
@@ -872,6 +944,16 @@ export default function ChartEdition() {
                     duration={entry.duration}
                     onPlay={() => playAt(idx + 3)}
                   />
+                  <div className="flex justify-end px-2 pb-2">
+                    <button
+                      type="button"
+                      onClick={() => openChartEntryDiscussion(entry, edition.publicLabel)}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-[var(--wk-text-muted)] transition-colors hover:border-[var(--wk-brand)]/35 hover:text-[var(--wk-brand)]"
+                    >
+                      <WkIcon name="MessageCircle" size={11} />
+                      Discuss entry
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -902,6 +984,15 @@ export default function ChartEdition() {
                   <p className="text-[12px] text-[var(--wk-text-faint)] py-2">No new entries this week.</p>
                 )}
               </div>
+
+              <ContextAnchorSummary
+                entity={chartCommunityEntity}
+                anchorType="chart_entry"
+                eyebrow="Chart conversations"
+                title="Entry discussions"
+                subtitle="Where listeners are talking about chart movement."
+                onSelect={openChartSummaryDiscussion}
+              />
 
               {/* Biggest climbers */}
               <div className="chart-sidebox-v2">
@@ -1026,6 +1117,13 @@ export default function ChartEdition() {
           />
         </section>
       </div>
+
+      <ContextAnchorCommentDrawer
+        open={Boolean(selectedChartAnchor)}
+        onClose={() => setSelectedChartAnchor(null)}
+        entity={chartCommunityEntity}
+        target={selectedChartAnchor}
+      />
 
       {/* data freshness bar */}
       <div className="chart-meta-bar">

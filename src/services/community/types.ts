@@ -30,7 +30,12 @@ export type ContributionStatus = 'pending' | 'approved' | 'rejected' | 'merged';
 export type ReportReason = 'spam' | 'harassment' | 'hate_or_abuse' | 'misinformation' | 'privacy' | 'copyright' | 'off_topic' | 'other';
 export type ReactionType = 'signal' | 'memory' | 'context' | 'fire' | 'agree';
 export type SortMode = 'best' | 'newest' | 'oldest' | 'most_replied' | 'editor_picks';
-export type CommentAnchorType = 'whole_entity' | 'timestamp' | 'time_range';
+export type CommentAnchorType =
+  | 'whole_entity'
+  | 'timestamp'
+  | 'time_range'
+  | 'release_track'
+  | 'chart_entry';
 
 export interface CommunityProfile {
   userId: string;
@@ -102,6 +107,10 @@ export interface CommunityComment {
   anchorTimeMs?: number | null;
   anchorEndTimeMs?: number | null;
   anchorLabel?: string | null;
+  contextEntityType?: string | null;
+  contextEntityId?: string | null;
+  contextEntitySlug?: string | null;
+  contextLabel?: string | null;
   children?: CommunityComment[];
 }
 
@@ -235,6 +244,41 @@ export interface CreateTrackMomentCommentInput {
 
 export interface TrackMomentSummaryItem {
   anchorTimeMs: number;
+  anchorLabel: string;
+  commentCount: number;
+  reactionCount: number;
+  score: number;
+  latestCommentAt: string;
+}
+
+export interface CreateContextAnchorCommentInput {
+  threadId: string;
+  bodyMarkdown: string;
+  bodyPlain?: string;
+  bodyHtml?: string;
+  anchorType: Extract<CommentAnchorType, 'release_track' | 'chart_entry'>;
+  contextEntityType: string;
+  contextEntityId?: string | null;
+  contextEntitySlug?: string | null;
+  contextLabel?: string | null;
+  anchorLabel?: string | null;
+}
+
+export interface ContextAnchorCommentQuery {
+  threadId: string;
+  anchorType: Extract<CommentAnchorType, 'release_track' | 'chart_entry'>;
+  contextEntityType?: string | null;
+  contextEntityId?: string | null;
+  contextEntitySlug?: string | null;
+  limit?: number;
+}
+
+export interface ContextAnchorSummaryItem {
+  anchorType: Extract<CommentAnchorType, 'release_track' | 'chart_entry'>;
+  contextEntityType: string | null;
+  contextEntityId: string | null;
+  contextEntitySlug: string | null;
+  contextLabel: string;
   anchorLabel: string;
   commentCount: number;
   reactionCount: number;
