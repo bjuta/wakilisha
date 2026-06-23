@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Link, useLocation, Outlet } from "react-router-dom";
 import { usePlayer } from "@/context/PlayerContext";
 import { useScrollLock } from "@/hooks/useScrollLock";
@@ -9,6 +10,10 @@ import { Portal } from "@/components/base/Portal";
 import { MobileFullPlayer } from "./MobileFullPlayer";
 import { NotificationBell } from "@/components/feature/community/NotificationBell";
 import { usePendingCommunityActionReplay } from "@/hooks/usePendingCommunityActionReplay";
+import {
+  connectAppleMusicForPlayback,
+  getApplePlaybackPrefsSnapshot,
+} from "@/services/appleMusicConnection";
 
 const PRIMARY_NAV = [
   { label: "Home", to: "/", icon: "Home" },
@@ -18,14 +23,71 @@ const PRIMARY_NAV = [
 ];
 
 function MobileMiniPlayer() {
-  const { currentTrack, isPlaying, togglePlay, next, openFullPlayer, progress, playbackSourceLabel } = usePlayer();
+  const {
+    currentTrack,
+    isPlaying,
+    togglePlay,
+    next,
+    openFullPlayer,
+    progress,
+    playbackSourceLabel,
+    playbackBackend,
+    playTrack,
+    queue,
+  } = usePlayer();
   const location = useLocation();
   const navVisible = useScrollDirection();
 
+  const [appleConnected, setAppleConnected] = useState(() => getApplePlaybackPrefsSnapshot().appleMusicConnected);
+  const [appleConnecting, setAppleConnecting] = useState(false);
+
+  useEffect(() => {
+    const syncAppleState = () => {
+      setAppleConnected(getApplePlaybackPrefsSnapshot().appleMusicConnected);
+    };
+
+    syncAppleState();
+    window.addEventListener("wk-playback-changed", syncAppleState);
+    window.addEventListener("wk-apple-music-connected", syncAppleState);
+
+    return () => {
+      window.removeEventListener("wk-playback-changed", syncAppleState);
+      window.removeEventListener("wk-apple-music-connected", syncAppleState);
+    };
+  }, [currentTrack?.id]);
+
   if (!currentTrack) return null;
   if (location.pathname === "/auth") return null;
+
   const activeSourceLabel = playbackSourceLabel || currentTrack.source || null;
+  const hasAppleCatalog = Boolean(currentTrack.appleMusicCatalogId || currentTrack.appleMusicId);
+  const showUnlockFullTrack = hasAppleCatalog && playbackBackend !== "apple" && !appleConnected;
   const isPlayable = currentTrack.isPlayable !== false;
+
+  const handleUnlockFullTrack = async (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    if (appleConnecting) return;
+
+    setAppleConnecting(true);
+
+    try {
+      await connectAppleMusicForPlayback();
+      setAppleConnected(true);
+
+      const nextQueue = queue.length ? queue : [currentTrack];
+      playTrack(currentTrack, nextQueue, {
+        pageType: "player",
+        entityType: "track",
+        entitySlug: currentTrack.trackSlug || currentTrack.id,
+        sourceSection: "mini_player_full_track_cta",
+      });
+    } catch (err) {
+      console.error("Could not connect Apple Music from mini player", err);
+      openFullPlayer();
+    } finally {
+      setAppleConnecting(false);
+    }
+  };
 
   return (
     <div
@@ -45,6 +107,19 @@ function MobileMiniPlayer() {
         <div className="phn-mp-title">{currentTrack.title}</div>
         <div className="phn-mp-sub">{currentTrack.artist}{activeSourceLabel ? ` · ${activeSourceLabel}` : ""}</div>
       </div>
+      {showUnlockFullTrack && (
+        <button
+          type="button"
+          onPointerDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+          onClick={handleUnlockFullTrack}
+          className="phn-mp-unlock"
+          aria-label="Connect Apple Music to play the full track"
+        >
+          <WkIcon name={appleConnecting ? "Loader2" : "Music2"} size={13} />
+          <span>{appleConnecting ? "..." : "Full"}</span>
+        </button>
+      )}
       <button
         type="button"
         onPointerDown={(e) => e.stopPropagation()}

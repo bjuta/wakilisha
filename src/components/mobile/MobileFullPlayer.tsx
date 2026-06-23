@@ -5,6 +5,10 @@ import { WkIcon } from "@/components/design-system/Icon";
 import { ShareSheet } from "@/components/design-system/share/ShareSheet";
 import { useScrollLock } from "@/hooks/useScrollLock";
 import { useEntityActions } from "@/hooks/useCommunityActions";
+import {
+  connectAppleMusicForPlayback,
+  getApplePlaybackPrefsSnapshot,
+} from "@/services/appleMusicConnection";
 
 function ActionMenu({
   open,
@@ -83,6 +87,7 @@ export function MobileFullPlayer() {
     toggleRepeat,
     closeFullPlayer,
     playFromQueue,
+    playTrack,
     playbackBackend,
     playbackSourceLabel,
   } = usePlayer();
@@ -90,13 +95,55 @@ export function MobileFullPlayer() {
   const [liked, setLiked] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [actionMenuOpen, setActionMenuOpen] = useState(false);
+  const [appleConnected, setAppleConnected] = useState(() => getApplePlaybackPrefsSnapshot().appleMusicConnected);
+  const [appleConnecting, setAppleConnecting] = useState(false);
+  const [appleConnectError, setAppleConnectError] = useState<string | null>(null);
 
   const collapsePlayer = () => closeFullPlayer();
 
   useEffect(() => {
     setLiked(false);
     setSaveError(null);
+    setAppleConnectError(null);
+
+    const syncAppleState = () => {
+      setAppleConnected(getApplePlaybackPrefsSnapshot().appleMusicConnected);
+    };
+
+    syncAppleState();
+    window.addEventListener("wk-playback-changed", syncAppleState);
+    window.addEventListener("wk-apple-music-connected", syncAppleState);
+
+    return () => {
+      window.removeEventListener("wk-playback-changed", syncAppleState);
+      window.removeEventListener("wk-apple-music-connected", syncAppleState);
+    };
   }, [currentTrack?.id]);
+
+  const handleConnectFullPlayback = async () => {
+    if (!currentTrack || appleConnecting) return;
+
+    setAppleConnecting(true);
+    setAppleConnectError(null);
+
+    try {
+      await connectAppleMusicForPlayback();
+      setAppleConnected(true);
+
+      const nextQueue = queue.length ? queue : [currentTrack];
+      playTrack(currentTrack, nextQueue, {
+        pageType: "player",
+        entityType: "track",
+        entitySlug: currentTrack.trackSlug || currentTrack.id,
+        sourceSection: "apple_music_full_track_cta",
+      });
+    } catch (err) {
+      console.error("Could not connect Apple Music from player", err);
+      setAppleConnectError(err instanceof Error ? err.message : "Could not connect Apple Music.");
+    } finally {
+      setAppleConnecting(false);
+    }
+  };
 
   const handleSaveCurrentTrack = async () => {
     if (!currentTrack || savePending) return;
@@ -148,6 +195,8 @@ export function MobileFullPlayer() {
   const activeSourceLabel = playbackSourceLabel || currentTrack.source || null;
   const activeSourceIcon = playbackBackend === "apple" ? "Music2" : "Radio";
   const playbackEyebrow = playbackBackend === "apple" ? "Full playback unlocked" : "Preview playback";
+  const hasAppleCatalog = Boolean(currentTrack.appleMusicCatalogId || currentTrack.appleMusicId);
+  const showFullTrackUnlock = hasAppleCatalog && playbackBackend !== "apple" && !appleConnected;
   const pct = Math.max(0, Math.min(1, progress || 0));
 
   const remainingCount = queue.length - queueIndex - 1;
@@ -257,6 +306,26 @@ export function MobileFullPlayer() {
           <p className="mt-2 text-center text-[11px] font-bold text-red-500">
             {saveError}
           </p>
+        )}
+
+        {showFullTrackUnlock && (
+          <div className="fp-fulltrack-card">
+            <div className="fp-fulltrack-copy">
+              <span className="fp-fulltrack-eyebrow">Full track available</span>
+              <strong>Play the whole song on WAKILISHA</strong>
+              <p>Connect Apple Music once. Keep listening here without leaving the app.</p>
+              {appleConnectError && <em>{appleConnectError}</em>}
+            </div>
+            <button
+              type="button"
+              onClick={handleConnectFullPlayback}
+              disabled={appleConnecting}
+              className="fp-fulltrack-btn mobile-pressable"
+            >
+              <WkIcon name={appleConnecting ? "Loader2" : "Music2"} size={15} />
+              {appleConnecting ? "Connecting..." : "Play full track"}
+            </button>
+          </div>
         )}
 
         <div className="fp-meta-pills">
