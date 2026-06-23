@@ -67,9 +67,8 @@ export default function MobileProfilePage() {
 
   const isSignedIn = !authUser.loading && !!authUser.id;
   const userId = authUser.id;
-  const userDisplayName = authUser.name || authUser.email?.split("@")[0] || "Reader";
+  const fallbackDisplayName = authUser.name || authUser.email?.split("@")[0] || "Reader";
   const userEmail = authUser.email || "";
-  const userInitial = userDisplayName[0]?.toUpperCase() || "W";
 
   const [commProfile, setCommProfile] = useState<CommunityProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
@@ -142,6 +141,13 @@ export default function MobileProfilePage() {
   const statsCommentCount = Math.max(commProfile?.commentCount ?? 0, comments.length);
   const statsSaveCount = saves.length;
   const statsFollowCount = follows.length;
+  const profileUsername =
+    commProfile?.username && commProfile.username !== "undefined"
+      ? commProfile.username
+      : "";
+  const profileDisplayName = commProfile?.displayName || fallbackDisplayName;
+  const profileAvatarUrl = commProfile?.avatarUrl || authUser.avatarUrl || null;
+  const profileInitial = profileDisplayName[0]?.toUpperCase() || "W";
   const profileCoverUrl = commProfile?.coverUrl || null;
 
   return (
@@ -179,11 +185,11 @@ export default function MobileProfilePage() {
             className="w-[96px] h-[96px] rounded-full border-[4px] overflow-hidden shrink-0"
             style={{ borderColor: "var(--wk-bg)", background: "var(--wk-surface-raised)" }}
           >
-            {authUser.avatarUrl ? (
-              <img src={authUser.avatarUrl} alt="" className="w-full h-full object-cover" />
+            {profileAvatarUrl ? (
+              <img src={profileAvatarUrl} alt="" className="w-full h-full object-cover" />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-[32px] font-black" style={{ color: "var(--wk-brand)" }}>
-                {userInitial}
+                {profileInitial}
               </div>
             )}
           </div>
@@ -199,10 +205,10 @@ export default function MobileProfilePage() {
           ) : (
             <>
               <h1 className="text-xl font-black tracking-[-0.02em]" style={{ color: "var(--wk-text)" }}>
-                {isSignedIn ? userDisplayName : "WAKILISHA Reader"}
+                {isSignedIn ? profileDisplayName : "WAKILISHA Reader"}
               </h1>
               <p className="text-[13px] font-semibold mt-0.5" style={{ color: "var(--wk-text-muted)" }}>
-                {commProfile?.username ? `@${commProfile.username}` : (isSignedIn ? userEmail : "Sign in to customize")}
+                {profileUsername ? `@${profileUsername}` : (isSignedIn ? userEmail : "Sign in to customize")}
               </p>
             </>
           )}
@@ -230,9 +236,9 @@ export default function MobileProfilePage() {
               >
                 <i className="ri-pencil-line text-[13px]" /> Edit profile
               </Link>
-              {commProfile?.username && (
+              {profileUsername && (
                 <Link
-                  to={`/u/${commProfile.username}`}
+                  to={`/u/${profileUsername}`}
                   className="inline-flex items-center gap-1.5 h-[34px] px-4 rounded-lg text-xs font-bold whitespace-nowrap cursor-pointer"
                   style={{ background: "var(--wk-surface-raised)", color: "var(--wk-text)", border: "1px solid var(--wk-border)" }}
                 >
