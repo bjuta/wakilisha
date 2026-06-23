@@ -63,8 +63,8 @@ export async function fetchAllAuthors(): Promise<AuthorRow[]> {
   try {
     const result = await supabase
       .from("registry_authors")
-      .select("id, slug, name, email, url, source_kind, bio, avatar_url, cover_url, role, location, social_links, joined_date");
-    data = result.data;
+      .select("id, slug, name, url, source_kind, bio, avatar_url, cover_url, role, location, social_links, joined_date");
+    data = (result.data ?? []).map((row: Record<string, unknown>) => ({ ...row, email: null }));
     error = result.error;
   } catch (err) {
     console.error("fetchAllAuthors: Supabase query threw", err);
