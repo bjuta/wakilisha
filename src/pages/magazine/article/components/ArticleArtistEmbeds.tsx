@@ -54,7 +54,7 @@ export async function resolveArtistMarkers(
   const slugs = markers.map((mk) => mk.slug);
   const { data: artistRows } = await supabase
     .from("registry_artists")
-    .select("slug, display_name, public_image_url, metadata, chart_entry_count, top_chart_position")
+    .select("slug, display_name, public_image_url, metadata")
     .eq("status", "active")
     .in("slug", slugs);
 
