@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState, useRef } from "react";
-import { Link } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { useMagazineArticles, type MagazineArticle } from "@/services/magazineArticles";
 import { getAuthorMeta } from "@/services/authorProfiles";
 import { MagazineCard } from "@/pages/magazine/components/MagazineCard";
@@ -140,6 +140,23 @@ export default function MobileMagazine() {
     return topSections.filter((s) => s === activeSection);
   }, [topSections, activeSection]);
 
+  const navigate = useNavigate();
+  const heroArticleUrl = heroStory ? `/magazine/${heroStory.slug}` : "/magazine";
+
+  const handleHeroOpen = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (target?.closest("a,button")) return;
+    navigate(heroArticleUrl);
+  }, [navigate, heroArticleUrl]);
+
+  const handleHeroKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    const target = event.target instanceof Element ? event.target : null;
+    if (target?.closest("a,button")) return;
+    event.preventDefault();
+    navigate(heroArticleUrl);
+  }, [navigate, heroArticleUrl]);
+
   if (status === "loading") {
     return <SkeletonMagazinePage />;
   }
@@ -159,10 +176,14 @@ export default function MobileMagazine() {
     <div className="wk-mobile-v5 min-h-screen bg-[var(--wk-bg)]">
 
       {/* ═══════════════════════ HERO ═══════════════════════ */}
-      <Link
-        to={`/magazine/${heroStory.slug}`}
+      <div
         ref={heroRef}
-        className="relative h-screen flex items-end overflow-hidden bg-[#0a0a0a] block -mt-16"
+        role="link"
+        tabIndex={0}
+        onClick={handleHeroOpen}
+        onKeyDown={handleHeroKeyDown}
+        aria-label={`Read ${heroStory.title}`}
+        className="relative h-screen flex items-end overflow-hidden bg-[#0a0a0a] block -mt-16 cursor-pointer"
       >
         {heroStory.heroUrl ? (
           <img
@@ -207,7 +228,7 @@ export default function MobileMagazine() {
             </span>
           </div>
         </div>
-      </Link>
+      </div>
 
       {/* ═══════════════════════ STICKY SECTION NAV ═══════════════════════ */}
       <div className="sticky top-0 z-40 border-b border-[var(--wk-border)] bg-[color-mix(in_srgb,var(--wk-surface)_92%,transparent)] backdrop-blur-[20px]" style={{ WebkitBackdropFilter: "blur(20px)" }}>
