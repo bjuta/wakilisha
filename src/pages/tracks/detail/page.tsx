@@ -15,6 +15,7 @@ import { WkIcon } from "@/components/design-system/Icon";
 import { ShareButton } from "@/components/design-system/share/ShareSheet";
 import { ContributionBadges } from "@/components/feature/community/ContributionBadges";
 import { CommunitySection } from "@/pages/magazine/article/components/CommunitySection";
+import { TrackMomentSummary } from "@/components/feature/community/TrackMomentDrawer";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { useEntityActions } from "@/hooks/useCommunityActions";
 import { getApplePlaybackPrefsSnapshot } from "@/services/appleMusicConnection";
@@ -830,6 +831,7 @@ export default function TrackDetail() {
             />
 
             <TrackListeningSignalPanel signal={listeningSignal} />
+            <TrackMomentSummary entity={communityEntity} />
 
             {(track.chartHistory.length > 0 || track.weeksOnChart > 0) && (
               <section>

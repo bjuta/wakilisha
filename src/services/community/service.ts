@@ -7,6 +7,8 @@ import type {
   CommunityContribution,
   CommunityActivity,
   CreateCommentInput,
+  CreateTrackMomentCommentInput,
+  TrackMomentSummaryItem,
   VoteInput,
   ReactInput,
   ReportInput,
@@ -48,6 +50,56 @@ export async function createComment(input: CreateCommentInput): Promise<CommentR
   });
   if (error) throw error;
   return { comment: mapComment(data.comment) };
+}
+
+export async function createTrackMomentComment(input: CreateTrackMomentCommentInput): Promise<CommentResult> {
+  const { data, error } = await supabase.rpc('community_create_track_moment_comment', {
+    p_thread_id: input.threadId,
+    p_body_markdown: input.bodyMarkdown,
+    p_body_plain: input.bodyPlain || input.bodyMarkdown,
+    p_body_html: input.bodyHtml || null,
+    p_anchor_time_ms: Math.max(0, Math.round(input.anchorTimeMs)),
+    p_anchor_end_time_ms: input.anchorEndTimeMs != null ? Math.max(0, Math.round(input.anchorEndTimeMs)) : null,
+    p_anchor_label: input.anchorLabel || null,
+  });
+  if (error) throw error;
+  return { comment: mapComment(data.comment) };
+}
+
+export async function getTrackMomentComments(
+  threadId: string,
+  anchorTimeMs?: number | null,
+  windowMs: number = 2500,
+  limit: number = 30
+): Promise<CommunityComment[]> {
+  const { data, error } = await supabase.rpc('community_get_track_moment_comments', {
+    p_thread_id: threadId,
+    p_anchor_time_ms: anchorTimeMs == null ? null : Math.max(0, Math.round(anchorTimeMs)),
+    p_window_ms: Math.max(0, Math.round(windowMs)),
+    p_limit: limit,
+  });
+  if (error) throw error;
+  return (data || []).map((row: any) => mapComment(row));
+}
+
+export async function getTrackMomentSummary(
+  threadId: string,
+  limit: number = 6
+): Promise<TrackMomentSummaryItem[]> {
+  const { data, error } = await supabase.rpc('community_get_track_moment_summary', {
+    p_thread_id: threadId,
+    p_limit: limit,
+  });
+  if (error) throw error;
+
+  return (data || []).map((row: any) => ({
+    anchorTimeMs: Number(row.anchor_time_ms) || 0,
+    anchorLabel: String(row.anchor_label || ''),
+    commentCount: Number(row.comment_count) || 0,
+    reactionCount: Number(row.reaction_count) || 0,
+    score: Number(row.score) || 0,
+    latestCommentAt: String(row.latest_comment_at || ''),
+  }));
 }
 
 export async function softDeleteComment(commentId: string): Promise<CommentResult> {
@@ -469,6 +521,10 @@ function mapComment(row: Record<string, unknown>): CommunityComment {
     threadEntityId: row.thread_entity_id ? String(row.thread_entity_id) : null,
     threadEntitySlug: row.thread_entity_slug ? String(row.thread_entity_slug) : null,
     threadEntityUrl: row.thread_entity_url ? String(row.thread_entity_url) : null,
+    anchorType: (row.anchor_type as CommunityComment['anchorType']) ?? null,
+    anchorTimeMs: row.anchor_time_ms == null ? null : Number(row.anchor_time_ms),
+    anchorEndTimeMs: row.anchor_end_time_ms == null ? null : Number(row.anchor_end_time_ms),
+    anchorLabel: row.anchor_label ? String(row.anchor_label) : null,
   };
 }
 

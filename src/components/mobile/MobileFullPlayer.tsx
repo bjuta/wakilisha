@@ -9,6 +9,7 @@ import {
   connectAppleMusicForPlayback,
   getApplePlaybackPrefsSnapshot,
 } from "@/services/appleMusicConnection";
+import { TrackMomentDrawer } from "@/components/feature/community/TrackMomentDrawer";
 
 function ActionMenu({
   open,
@@ -95,6 +96,7 @@ export function MobileFullPlayer() {
   const [liked, setLiked] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [actionMenuOpen, setActionMenuOpen] = useState(false);
+  const [momentDrawerOpen, setMomentDrawerOpen] = useState(false);
   const [appleConnected, setAppleConnected] = useState(() => getApplePlaybackPrefsSnapshot().appleMusicConnected);
   const [appleConnecting, setAppleConnecting] = useState(false);
   const [appleConnectError, setAppleConnectError] = useState<string | null>(null);
@@ -373,6 +375,14 @@ export function MobileFullPlayer() {
           <span className="fp-meta-pill">
             <WkIcon name="ListMusic" size={12} /> {queue.length} in queue
           </span>
+          <button
+            type="button"
+            className="fp-meta-pill mobile-pressable"
+            onClick={() => setMomentDrawerOpen(true)}
+            aria-label="Open moment comments"
+          >
+            <WkIcon name="MessageCircle" size={12} /> Moments
+          </button>
         </div>
 
         <div className="fp-scrub">
@@ -518,6 +528,15 @@ export function MobileFullPlayer() {
           </div>
         </div>
       </div>
+
+      <TrackMomentDrawer
+        open={momentDrawerOpen}
+        onClose={() => setMomentDrawerOpen(false)}
+        track={currentTrack}
+        currentTime={currentTime}
+        duration={duration || currentTrack.duration || 0}
+        onSeek={seek}
+      />
 
       <ActionMenu
         open={actionMenuOpen}
