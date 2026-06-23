@@ -377,10 +377,13 @@ export function useUserSettings() {
     setPlayback((prev) => {
       const next = { ...prev, ...patch };
       try { localStorage.setItem(LS_PLAYBACK, JSON.stringify(next)); } catch { /* noop */ }
-      // Notify PlayerContext of changes
-      window.dispatchEvent(new CustomEvent("wk-playback-changed"));
       return next;
     });
+
+    // Notify PlayerContext after this React update cycle.
+    window.setTimeout(() => {
+      window.dispatchEvent(new CustomEvent("wk-playback-changed"));
+    }, 0);
   }, []);
 
   const updatePrivacy = useCallback((patch: Partial<UserPrivacyPrefs>) => {

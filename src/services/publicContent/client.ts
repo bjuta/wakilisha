@@ -90,6 +90,8 @@ export type PublicReleaseDetail = PublicRelease & {
     trackNumber: number;
     artworkUrl: string;
     previewUrl?: string;
+    appleMusicId?: string | null;
+    appleMusicCatalogId?: string | null;
   }>;
   metadata: Record<string, unknown>;
   featuredArtists: Array<{ name: string; slug: string; imageUrl?: string | null }>;

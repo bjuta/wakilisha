@@ -91,6 +91,8 @@ export interface PublicTrackRecord {
   metadata: Record<string, unknown>;
   status: string;
   previewUrl?: string | null;
+  appleMusicId?: string | null;
+  appleMusicCatalogId?: string | null;
 }
 
 export interface PublicTrackArtist {
@@ -127,6 +129,8 @@ export interface PublicTrackRelease {
     trackNumber: number;
     artworkUrl: string;
     previewUrl?: string;
+    appleMusicId?: string | null;
+    appleMusicCatalogId?: string | null;
   }>;
 }
 
@@ -167,6 +171,8 @@ export interface PublicTrackDetail {
   movement?: string;
   movementAmount?: number;
   previewUrl?: string | null;
+  appleMusicId?: string | null;
+  appleMusicCatalogId?: string | null;
   // v28: additional context for NLG
   firstChartedDate?: string;
   editionLabels?: string[];
