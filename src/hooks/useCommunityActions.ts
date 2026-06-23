@@ -8,16 +8,35 @@ import {
   saveEntity,
   createContribution,
 } from '@/services/community';
+import { useAuthUser } from '@/hooks/useAuthUser';
 import { buildCommunityAuthUrl, stashPendingCommunityAction } from '@/services/community/authIntent';
+import { buildVerifyEmailUrl } from '@/services/auth/accountVerification';
+
+function redirectTo(url: string): void {
+  if (typeof window !== 'undefined') window.location.assign(url);
+}
 
 export function useCommentActions(userId?: string) {
+  const authUser = useAuthUser();
+  const effectiveUserId = userId || authUser.id;
   const [votingCommentId, setVotingCommentId] = useState<string | null>(null);
   const [reactingCommentId, setReactingCommentId] = useState<string | null>(null);
   const [reportingCommentId, setReportingCommentId] = useState<string | null>(null);
 
+  const requireVerified = useCallback(() => {
+    if (!effectiveUserId || authUser.loading) return false;
+
+    if (!authUser.isEmailVerified) {
+      redirectTo(buildVerifyEmailUrl(undefined, authUser.email));
+      return false;
+    }
+
+    return true;
+  }, [effectiveUserId, authUser.loading, authUser.isEmailVerified, authUser.email]);
+
   const vote = useCallback(
     async (commentId: string, value: number) => {
-      if (!userId) return null;
+      if (!requireVerified()) return null;
       setVotingCommentId(commentId);
       try {
         const result = await voteComment({ commentId, voteValue: value });
@@ -26,12 +45,12 @@ export function useCommentActions(userId?: string) {
         setVotingCommentId(null);
       }
     },
-    [userId]
+    [requireVerified]
   );
 
   const react = useCallback(
     async (commentId: string, reactionType: ReactionType) => {
-      if (!userId) return null;
+      if (!requireVerified()) return null;
       setReactingCommentId(commentId);
       try {
         const result = await reactToTarget({
@@ -44,12 +63,12 @@ export function useCommentActions(userId?: string) {
         setReactingCommentId(null);
       }
     },
-    [userId]
+    [requireVerified]
   );
 
   const report = useCallback(
     async (commentId: string, reason: ReportReason, details?: string) => {
-      if (!userId) return null;
+      if (!requireVerified()) return null;
       setReportingCommentId(commentId);
       try {
         const result = await reportComment({ commentId, reason, details });
@@ -58,7 +77,7 @@ export function useCommentActions(userId?: string) {
         setReportingCommentId(null);
       }
     },
-    [userId]
+    [requireVerified]
   );
 
   return {
@@ -72,24 +91,40 @@ export function useCommentActions(userId?: string) {
 }
 
 export function useEntityActions(userId?: string) {
+  const authUser = useAuthUser();
+  const effectiveUserId = userId || authUser.id;
   const [loading, setLoading] = useState(false);
+
+  const requireVerified = useCallback((pending?: { action: 'save' | 'follow'; entity: CommunityEntity }) => {
+    if (!effectiveUserId || authUser.loading) return false;
+
+    if (!authUser.isEmailVerified) {
+      if (pending) stashPendingCommunityAction(pending);
+      redirectTo(buildVerifyEmailUrl(undefined, authUser.email));
+      return false;
+    }
+
+    return true;
+  }, [effectiveUserId, authUser.loading, authUser.isEmailVerified, authUser.email]);
 
   const follow = useCallback(
     async (targetType: string, targetId: string, targetSlug?: string) => {
-      if (!userId) {
-        stashPendingCommunityAction({
-          action: 'follow',
-          entity: {
-            type: targetType as CommunityEntity['type'],
-            id: targetId,
-            slug: targetSlug,
-            url: typeof window !== 'undefined' ? window.location.href : '/',
-            title: targetSlug || targetId,
-          },
-        });
-        if (typeof window !== 'undefined') window.location.assign(buildCommunityAuthUrl());
+      const pendingEntity: CommunityEntity = {
+        type: targetType as CommunityEntity['type'],
+        id: targetId,
+        slug: targetSlug,
+        url: typeof window !== 'undefined' ? window.location.href : '/',
+        title: targetSlug || targetId,
+      };
+
+      if (!effectiveUserId) {
+        stashPendingCommunityAction({ action: 'follow', entity: pendingEntity });
+        redirectTo(buildCommunityAuthUrl());
         return null;
       }
+
+      if (!requireVerified({ action: 'follow', entity: pendingEntity })) return null;
+
       setLoading(true);
       try {
         const result = await followTarget({ targetType, targetId, targetSlug });
@@ -98,7 +133,7 @@ export function useEntityActions(userId?: string) {
         setLoading(false);
       }
     },
-    [userId]
+    [effectiveUserId, requireVerified]
   );
 
   const save = useCallback(
@@ -111,22 +146,24 @@ export function useEntityActions(userId?: string) {
       subtitle?: string;
       imageUrl?: string;
     }) => {
-      if (!userId) {
-        stashPendingCommunityAction({
-          action: 'save',
-          entity: {
-            type: entity.entityType as CommunityEntity['type'],
-            id: entity.entityId,
-            slug: entity.entitySlug,
-            url: entity.entityUrl || (typeof window !== 'undefined' ? window.location.href : '/'),
-            title: entity.title,
-            subtitle: entity.subtitle,
-            imageUrl: entity.imageUrl,
-          },
-        });
-        if (typeof window !== 'undefined') window.location.assign(buildCommunityAuthUrl());
+      const pendingEntity: CommunityEntity = {
+        type: entity.entityType as CommunityEntity['type'],
+        id: entity.entityId,
+        slug: entity.entitySlug,
+        url: entity.entityUrl || (typeof window !== 'undefined' ? window.location.href : '/'),
+        title: entity.title,
+        subtitle: entity.subtitle,
+        imageUrl: entity.imageUrl,
+      };
+
+      if (!effectiveUserId) {
+        stashPendingCommunityAction({ action: 'save', entity: pendingEntity });
+        redirectTo(buildCommunityAuthUrl());
         return null;
       }
+
+      if (!requireVerified({ action: 'save', entity: pendingEntity })) return null;
+
       setLoading(true);
       try {
         const result = await saveEntity({
@@ -143,7 +180,7 @@ export function useEntityActions(userId?: string) {
         setLoading(false);
       }
     },
-    [userId]
+    [effectiveUserId, requireVerified]
   );
 
   const contribute = useCallback(
@@ -155,22 +192,13 @@ export function useEntityActions(userId?: string) {
       contributionType: string;
       payload?: Record<string, unknown>;
     }) => {
-      if (!userId) {
-        stashPendingCommunityAction({
-          action: 'save',
-          entity: {
-            type: entity.entityType as CommunityEntity['type'],
-            id: entity.entityId,
-            slug: entity.entitySlug,
-            url: entity.entityUrl || (typeof window !== 'undefined' ? window.location.href : '/'),
-            title: entity.title,
-            subtitle: entity.subtitle,
-            imageUrl: entity.imageUrl,
-          },
-        });
-        if (typeof window !== 'undefined') window.location.assign(buildCommunityAuthUrl());
+      if (!effectiveUserId) {
+        redirectTo(buildCommunityAuthUrl());
         return null;
       }
+
+      if (!requireVerified()) return null;
+
       setLoading(true);
       try {
         const result = await createContribution({
@@ -186,7 +214,7 @@ export function useEntityActions(userId?: string) {
         setLoading(false);
       }
     },
-    [userId]
+    [effectiveUserId, requireVerified]
   );
 
   return {

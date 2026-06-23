@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useAuthUser } from '@/hooks/useAuthUser';
+import { buildVerifyEmailUrl } from '@/services/auth/accountVerification';
 import type { CommunityEntity, CommunityThread, CommunityComment, SortMode } from '@/services/community';
 import {
   getOrCreateThread,
@@ -10,6 +12,8 @@ import {
 } from '@/services/community';
 
 export function useCommunityThread(entity: CommunityEntity, userId?: string) {
+  const authUser = useAuthUser();
+  const effectiveUserId = userId || authUser.id;
   const [thread, setThread] = useState<CommunityThread | null>(null);
   const [comments, setComments] = useState<CommunityComment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,6 +44,13 @@ export function useCommunityThread(entity: CommunityEntity, userId?: string) {
   const postComment = useCallback(
     async (body: string, parentId?: string) => {
       if (!thread) return null;
+      if (!effectiveUserId || authUser.loading) return null;
+      if (!authUser.isEmailVerified) {
+        if (typeof window !== "undefined") {
+          window.location.assign(buildVerifyEmailUrl(undefined, authUser.email));
+        }
+        return null;
+      }
       const result = await createComment({
         threadId: thread.id,
         parentId: parentId || null,
@@ -49,7 +60,7 @@ export function useCommunityThread(entity: CommunityEntity, userId?: string) {
       await loadThread();
       return result.comment;
     },
-    [thread, loadThread]
+    [thread, loadThread, effectiveUserId, authUser.loading, authUser.isEmailVerified, authUser.email]
   );
 
   const loadReplies = useCallback(
