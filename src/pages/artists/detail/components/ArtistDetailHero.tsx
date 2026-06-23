@@ -1,8 +1,13 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
+import { ShareSheet } from "@/components/design-system/share/ShareSheet";
+import { useEntityActions } from "@/hooks/useCommunityActions";
 import { getCountryFlagUrl, getCountryLabel } from "@/utils/countries";
 
 export interface ArtistDetailHeroProps {
   name: string;
+  slug: string;
+  userId?: string;
   imageUrl?: string;
   profileImageUrl?: string;
   bio: string;
@@ -18,6 +23,8 @@ export interface ArtistDetailHeroProps {
 
 export function ArtistDetailHero({
   name,
+  slug,
+  userId,
   imageUrl,
   profileImageUrl,
   bio,
@@ -30,12 +37,25 @@ export function ArtistDetailHero({
   releaseCount = 0,
   chartEntryCount = 0,
 }: ArtistDetailHeroProps) {
+  const [shareOpen, setShareOpen] = useState(false);
+  const [following, setFollowing] = useState(false);
+  const { follow, loading: actionLoading } = useEntityActions(userId);
+
   const avatarSrc = profileImageUrl || imageUrl;
+  const artistUrl = typeof window !== "undefined" ? window.location.href : `/artists/${slug}`;
   const countryFlagUrl = getCountryFlagUrl(country, 40);
   const countryLabel = getCountryLabel(country);
   const visibleGenres = genres.slice(0, 3);
 
+  const handleFollow = async () => {
+    const result = await follow("artist", slug, slug);
+    if (result) setFollowing(result.followed ?? true);
+  };
+
+  const handleShare = () => setShareOpen(true);
+
   return (
+    <>
     <section className="relative -mt-16 pt-16 min-h-[420px] md:min-h-[600px] flex items-end overflow-hidden">
 
       {/* Background image — full bleed, acts as artist photo on mobile */}
@@ -122,12 +142,22 @@ export function ArtistDetailHero({
                   </a>
                 )}
 
-                <button className="flex items-center gap-1.5 rounded-full border border-white/30 bg-white/10 px-3.5 py-1.5 text-[12px] font-bold text-white backdrop-blur-sm whitespace-nowrap transition-all active:scale-95">
-                  <i className="ri-user-add-line text-[12px]" />
-                  Follow
+                <button
+                  type="button"
+                  onClick={handleFollow}
+                  disabled={actionLoading}
+                  className="flex items-center gap-1.5 rounded-full border border-white/30 bg-white/10 px-3.5 py-1.5 text-[12px] font-bold text-white backdrop-blur-sm whitespace-nowrap transition-all active:scale-95 disabled:opacity-60"
+                >
+                  <i className={following ? "ri-user-follow-line text-[12px]" : "ri-user-add-line text-[12px]"} />
+                  {following ? "Following" : "Follow"}
                 </button>
 
-                <button className="flex h-7 w-7 items-center justify-center rounded-full border border-white/30 bg-white/10 text-white backdrop-blur-sm transition-all active:scale-95">
+                <button
+                  type="button"
+                  onClick={handleShare}
+                  className="flex h-7 w-7 items-center justify-center rounded-full border border-white/30 bg-white/10 text-white backdrop-blur-sm transition-all active:scale-95"
+                  aria-label={`Share ${name}`}
+                >
                   <i className="ri-share-line text-[13px]" />
                 </button>
               </div>
@@ -198,11 +228,21 @@ export function ArtistDetailHero({
                     Listen on Spotify
                   </a>
                 )}
-                <button className="flex items-center gap-2 rounded-full border border-white/30 bg-white/10 px-6 py-3.5 text-[13px] font-bold text-white backdrop-blur-sm transition-all hover:bg-white/20 hover:scale-[1.02] whitespace-nowrap">
-                  <i className="ri-user-add-line text-[15px]" />
-                  Follow
+                <button
+                  type="button"
+                  onClick={handleFollow}
+                  disabled={actionLoading}
+                  className="flex items-center gap-2 rounded-full border border-white/30 bg-white/10 px-6 py-3.5 text-[13px] font-bold text-white backdrop-blur-sm transition-all hover:bg-white/20 hover:scale-[1.02] whitespace-nowrap disabled:opacity-60"
+                >
+                  <i className={following ? "ri-user-follow-line text-[15px]" : "ri-user-add-line text-[15px]"} />
+                  {following ? "Following" : "Follow"}
                 </button>
-                <button className="flex h-12 w-12 items-center justify-center rounded-full border border-white/30 bg-white/10 text-white backdrop-blur-sm transition-all hover:bg-white/20 hover:scale-[1.02]">
+                <button
+                  type="button"
+                  onClick={handleShare}
+                  className="flex h-12 w-12 items-center justify-center rounded-full border border-white/30 bg-white/10 text-white backdrop-blur-sm transition-all hover:bg-white/20 hover:scale-[1.02]"
+                  aria-label={`Share ${name}`}
+                >
                   <i className="ri-share-line text-[16px]" />
                 </button>
               </div>
@@ -212,5 +252,18 @@ export function ArtistDetailHero({
         </div>
       </div>
     </section>
+    <ShareSheet
+      item={{
+        title: name,
+        subtitle: countryLabel || "Artist",
+        description: bio || `Explore ${name} on WAKILISHA.`,
+        imageUrl: avatarSrc,
+        url: artistUrl,
+        type: "artist",
+      }}
+      open={shareOpen}
+      onClose={() => setShareOpen(false)}
+    />
+    </>
   );
 }
