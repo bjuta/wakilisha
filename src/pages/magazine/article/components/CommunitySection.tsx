@@ -21,6 +21,10 @@ const SORT_OPTIONS: { value: SortMode; label: string }[] = [
   { value: "editor_picks", label: "Editor Picks" },
 ];
 
+function isWholeEntityComment(comment: CommunityComment): boolean {
+  return !comment.anchorType || comment.anchorType === "whole_entity";
+}
+
 export function CommunitySection({ entity, user }: CommunitySectionProps) {
   const userId = user?.id || (user && !user.loading ? user.id : undefined);
   const isLoggedIn = !!userId && userId.length > 0;
@@ -39,6 +43,11 @@ export function CommunitySection({ entity, user }: CommunitySectionProps) {
   } = useCommunityThread(entity, userId);
 
   const { vote, react, votingCommentId, reactingCommentId } = useCommentActions(userId);
+  const visibleComments = useMemo(
+    () => comments.filter(isWholeEntityComment),
+    [comments]
+  );
+  const visibleCommentCount = visibleComments.length;
   const [contributionOpen, setContributionOpen] = useState(false);
   const [contribSourceCommentId, setContribSourceCommentId] = useState<string | undefined>(undefined);
 
@@ -173,13 +182,13 @@ export function CommunitySection({ entity, user }: CommunitySectionProps) {
             </h2>
             {!loading && (
               <span className="text-[12px] font-bold text-[var(--wk-text-muted)] bg-[var(--wk-surface)] border border-[var(--wk-border)] px-2.5 py-0.5 rounded-full">
-                {commentCount} {commentCount === 1 ? "comment" : "comments"}
+                {visibleCommentCount} {visibleCommentCount === 1 ? "comment" : "comments"}
               </span>
             )}
           </div>
 
           {/* Sort selector */}
-          {!loading && comments.length > 0 && (
+          {!loading && visibleComments.length > 0 && (
             <div className="flex items-center gap-1 bg-[var(--wk-surface)] border border-[var(--wk-border)] rounded-full p-1 overflow-x-auto max-w-full">
               {SORT_OPTIONS.map((opt) => (
                 <button
@@ -220,11 +229,11 @@ export function CommunitySection({ entity, user }: CommunitySectionProps) {
           loadingSkeleton
         ) : error ? (
           errorState
-        ) : comments.length === 0 ? (
+        ) : visibleComments.length === 0 ? (
           emptyState
         ) : (
           <div className="space-y-1">
-            {comments.map((comment) => (
+            {visibleComments.map((comment) => (
               <div
                 key={comment.id}
                 className="py-3"
