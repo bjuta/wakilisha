@@ -4,6 +4,7 @@ import { useScrollLock } from "@/hooks/useScrollLock";
 import { useScrollDirection } from "@/hooks/useScrollDirection";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { WkIcon } from "@/components/design-system/Icon";
+import { useTheme } from "@/components/design-system/theme/ThemeProvider";
 import { Portal } from "@/components/base/Portal";
 import { MobileFullPlayer } from "./MobileFullPlayer";
 import { NotificationBell } from "@/components/feature/community/NotificationBell";
@@ -54,6 +55,7 @@ function MobileMiniPlayer() {
 function MobileBottomNav() {
   const location = useLocation();
   const authUser = useAuthUser();
+  const { theme, toggle } = useTheme();
   const isLoggedIn = !authUser.loading && authUser.id.length > 0;
   const navVisible = useScrollDirection();
   const isActive = (path: string) => path === "/" ? location.pathname === "/" : location.pathname.startsWith(path);
@@ -87,6 +89,15 @@ function MobileBottomNav() {
           placement="bottom"
         />
       )}
+      <button
+        type="button"
+        onClick={toggle}
+        className="phn-nav-tab"
+        aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+      >
+        <WkIcon name={theme === "dark" ? "Sun" : "Moon"} size={16} />
+        <span className="pnl">{theme === "dark" ? "Light" : "Dark"}</span>
+      </button>
       <Link
         to={isLoggedIn ? "/profile" : "/auth"}
         className={`phn-nav-tab ${isActive("/profile") ? "on" : ""}`}
