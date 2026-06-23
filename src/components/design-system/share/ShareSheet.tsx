@@ -347,11 +347,8 @@ export function SharePopover({
       entitySlug: item.url ? (() => { try { return new URL(item.url).pathname.split("/").filter(Boolean).slice(-1)[0]; } catch { return undefined; } })() : undefined,
       entityType: item.type ?? undefined,
       context: {
-        share_platform: "copy",
         share_title: item.title,
         share_type: item.type ?? "page",
-        outbound_url: trackedUrl,
-        outbound_utm: getUtmContextForUrl(trackedUrl),
       },
     });
     incrementShareCount(baseUrl, "copy", item.url ? (() => { try { return new URL(item.url).pathname.split("/").filter(Boolean).slice(-1)[0]; } catch { return undefined; } })() : undefined, item.title).then((count) => {
