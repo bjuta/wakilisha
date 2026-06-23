@@ -149,7 +149,11 @@ export default function ReleaseTracklist({
                 {/* Discussion anchor */}
                 <button
                   type="button"
-                  onClick={() => onDiscussTrack?.(track, index)}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onDiscussTrack?.(track, index);
+                  }}
                   className="flex h-8 w-8 items-center justify-center rounded-full border border-[var(--wk-border)] bg-[var(--wk-bg)] text-[var(--wk-text-muted)] transition-colors hover:border-[var(--wk-brand)]/35 hover:text-[var(--wk-brand)]"
                   aria-label={`Discuss ${track.title} on this release`}
                   title={`Discuss ${track.title}`}
