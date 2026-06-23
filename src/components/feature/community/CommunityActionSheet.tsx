@@ -6,6 +6,8 @@ import { followTarget, saveEntity, reportComment } from "@/services/community";
 import { ShareSheet } from "@/components/design-system/share/ShareSheet";
 import { ContributionSheet } from "@/components/feature/community/ContributionSheet";
 import { buildCommunityAuthUrl, stashPendingCommunityAction } from "@/services/community/authIntent";
+import { buildVerifyEmailUrl } from "@/services/auth/accountVerification";
+import { useAuthUser } from "@/hooks/useAuthUser";
 import { Portal } from "@/components/base/Portal";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -96,6 +98,7 @@ export function CommunityActionSheet({
   actionState = { saved: false, following: false },
   onComment,
 }: CommunityActionSheetProps) {
+  const authUser = useAuthUser();
   const [saved, setSaved] = useState(actionState.saved);
   const [following, setFollowing] = useState(actionState.following);
   const [copied, setCopied] = useState(false);
@@ -172,11 +175,40 @@ export function CommunityActionSheet({
     window.location.assign(buildCommunityAuthUrl());
   }, [entity, onClose]);
 
+  const redirectToVerificationForAction = useCallback((action?: "save" | "follow" | "comment" | "report") => {
+    if (action === "save" || action === "follow") {
+      stashPendingCommunityAction({ action, entity });
+    }
+
+    trackEvent("community_email_verification_required", {
+      pageType: "community",
+      entitySlug: entity.slug,
+      entityType: entity.type,
+      context: { action, entity_title: entity.title },
+    });
+
+    onClose();
+    window.location.assign(buildVerifyEmailUrl(undefined, authUser.email));
+  }, [authUser.email, entity, onClose]);
+
+  const requireVerifiedForAction = useCallback((action?: "save" | "follow" | "comment" | "report") => {
+    if (!userId) return false;
+    if (authUser.loading) return false;
+
+    if (!authUser.isEmailVerified) {
+      redirectToVerificationForAction(action);
+      return false;
+    }
+
+    return true;
+  }, [userId, authUser.loading, authUser.isEmailVerified, redirectToVerificationForAction]);
+
   const handleSave = useCallback(async () => {
     if (!userId) {
       redirectToAuthForAction("save");
       return;
     }
+    if (!requireVerifiedForAction("save")) return;
     if (savePending) return;
     setSavePending(true);
     try {
@@ -199,13 +231,14 @@ export function CommunityActionSheet({
       });
     } catch { /* no-op */ }
     finally { setSavePending(false); }
-  }, [userId, savePending, saved, entity, redirectToAuthForAction]);
+  }, [userId, savePending, saved, entity, redirectToAuthForAction, requireVerifiedForAction]);
 
   const handleFollow = useCallback(async () => {
     if (!userId) {
       redirectToAuthForAction("follow");
       return;
     }
+    if (!requireVerifiedForAction("follow")) return;
     if (followPending) return;
     setFollowPending(true);
     try {
@@ -224,7 +257,7 @@ export function CommunityActionSheet({
       });
     } catch { /* no-op */ }
     finally { setFollowPending(false); }
-  }, [userId, followPending, following, entity, redirectToAuthForAction]);
+  }, [userId, followPending, following, entity, redirectToAuthForAction, requireVerifiedForAction]);
 
   const handleCopy = useCallback(async () => {
     try { await navigator.clipboard.writeText(entity.url); } catch { /* no-op */ }
@@ -243,12 +276,26 @@ export function CommunityActionSheet({
   }, []);
 
   const handleComment = useCallback(() => {
+    if (!userId) {
+      onClose();
+      window.location.assign(buildCommunityAuthUrl());
+      return;
+    }
+
+    if (!requireVerifiedForAction("comment")) return;
+
     onClose();
     setTimeout(() => onComment?.(), 300);
-  }, [onClose, onComment]);
+  }, [userId, onClose, onComment, requireVerifiedForAction]);
 
   const handleReport = useCallback(async (reason: ReportReason) => {
-    if (!userId || reporting) return;
+    if (!userId) {
+      onClose();
+      window.location.assign(buildCommunityAuthUrl());
+      return;
+    }
+    if (reporting) return;
+    if (!requireVerifiedForAction("report")) return;
     setReporting(true);
     try {
       await reportComment({

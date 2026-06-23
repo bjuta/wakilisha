@@ -3,11 +3,11 @@ import { followTarget, saveEntity } from "@/services/community";
 import { consumePendingCommunityAction } from "@/services/community/authIntent";
 import { trackEvent } from "@/services/analytics";
 
-export function usePendingCommunityActionReplay(userId?: string): void {
+export function usePendingCommunityActionReplay(userId?: string, canReplay = true): void {
   const replayingRef = useRef(false);
 
   useEffect(() => {
-    if (!userId || replayingRef.current) return;
+    if (!userId || !canReplay || replayingRef.current) return;
 
     const pending = consumePendingCommunityAction();
     if (!pending) return;
@@ -53,5 +53,5 @@ export function usePendingCommunityActionReplay(userId?: string): void {
         replayingRef.current = false;
       }
     })();
-  }, [userId]);
+  }, [userId, canReplay]);
 }

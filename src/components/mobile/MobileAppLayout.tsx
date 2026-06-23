@@ -122,7 +122,10 @@ export function MobileAppLayout() {
   const showMiniPlayer = !!currentTrack && showMobileChrome;
 
   useScrollLock(isFullPlayerOpen);
-  usePendingCommunityActionReplay(!authUser.loading ? authUser.id : undefined);
+  usePendingCommunityActionReplay(
+    !authUser.loading ? authUser.id : undefined,
+    !authUser.loading && authUser.isEmailVerified
+  );
 
   if (location.pathname === "/auth") {
     return (

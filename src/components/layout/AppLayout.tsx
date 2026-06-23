@@ -34,7 +34,10 @@ export function AppLayout() {
   const { isFullPlayerOpen } = usePlayer();
   const authUser = useAuthUser();
 
-  usePendingCommunityActionReplay(!authUser.loading ? authUser.id : undefined);
+  usePendingCommunityActionReplay(
+    !authUser.loading ? authUser.id : undefined,
+    !authUser.loading && authUser.isEmailVerified
+  );
 
   useEffect(() => {
     if (!isFullPlayerOpen) return;

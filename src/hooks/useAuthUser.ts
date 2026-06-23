@@ -1,37 +1,56 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
+import type { Session, User } from "@supabase/supabase-js";
 
 export interface AuthUser {
   id: string;
   email: string | null;
   name: string | null;
   avatarUrl: string | null;
+  emailConfirmedAt: string | null;
+  isEmailVerified: boolean;
   loading: boolean;
 }
 
+const EMPTY_USER: AuthUser = {
+  id: "",
+  email: null,
+  name: null,
+  avatarUrl: null,
+  emailConfirmedAt: null,
+  isEmailVerified: false,
+  loading: false,
+};
+
+type SupabaseUserWithConfirmation = User & {
+  email_confirmed_at?: string | null;
+  confirmed_at?: string | null;
+};
+
+function mapSessionUser(session: Session | null): AuthUser {
+  if (!session?.user) return EMPTY_USER;
+
+  const user = session.user as SupabaseUserWithConfirmation;
+  const metadata = user.user_metadata as Record<string, unknown> | undefined;
+  const emailConfirmedAt = user.email_confirmed_at ?? user.confirmed_at ?? null;
+
+  return {
+    id: user.id,
+    email: user.email ?? null,
+    name: (metadata?.full_name as string) || (metadata?.name as string) || user.email?.split("@")[0] || null,
+    avatarUrl: (metadata?.avatar_url as string) ?? null,
+    emailConfirmedAt,
+    isEmailVerified: Boolean(emailConfirmedAt),
+    loading: false,
+  };
+}
+
 export function useAuthUser(): AuthUser & { refresh: () => void } {
-  const [user, setUser] = useState<AuthUser>({
-    id: "",
-    email: null,
-    name: null,
-    avatarUrl: null,
-    loading: true,
-  });
+  const [user, setUser] = useState<AuthUser>({ ...EMPTY_USER, loading: true });
 
   const refresh = useCallback(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        const metadata = session.user.user_metadata as Record<string, unknown> | undefined;
-        setUser({
-          id: session.user.id,
-          email: session.user.email ?? null,
-          name: (metadata?.full_name as string) || (metadata?.name as string) || session.user.email?.split("@")[0] || null,
-          avatarUrl: (metadata?.avatar_url as string) ?? null,
-          loading: false,
-        });
-      } else {
-        setUser({ id: "", email: null, name: null, avatarUrl: null, loading: false });
-      }
+      setUser(mapSessionUser(session));
     });
   }, []);
 
@@ -39,18 +58,7 @@ export function useAuthUser(): AuthUser & { refresh: () => void } {
     refresh();
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        const metadata = session.user.user_metadata as Record<string, unknown> | undefined;
-        setUser({
-          id: session.user.id,
-          email: session.user.email ?? null,
-          name: (metadata?.full_name as string) || (metadata?.name as string) || session.user.email?.split("@")[0] || null,
-          avatarUrl: (metadata?.avatar_url as string) ?? null,
-          loading: false,
-        });
-      } else {
-        setUser({ id: "", email: null, name: null, avatarUrl: null, loading: false });
-      }
+      setUser(mapSessionUser(session));
     });
 
     return () => { listener.subscription.unsubscribe(); };
