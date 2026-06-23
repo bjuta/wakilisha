@@ -52,6 +52,27 @@ export default function AuthPage() {
     setSuccess(null);
   }
 
+  function resolveReturnTo(): string {
+    const raw = new URLSearchParams(window.location.search).get("returnTo");
+    if (!raw) return CHOICE_ROUTES[choice];
+
+    try {
+      if (raw.startsWith("http://") || raw.startsWith("https://")) {
+        const url = new URL(raw);
+        if (url.origin !== window.location.origin) return CHOICE_ROUTES[choice];
+        return `${url.pathname}${url.search}${url.hash}` || CHOICE_ROUTES[choice];
+      }
+
+      if (!raw.startsWith("/") || raw.startsWith("//") || raw.startsWith("/auth")) {
+        return CHOICE_ROUTES[choice];
+      }
+
+      return raw;
+    } catch {
+      return CHOICE_ROUTES[choice];
+    }
+  }
+
   async function handleRecoveryPassword(e: FormEvent) {
     e.preventDefault();
     clearMessages();
@@ -107,7 +128,7 @@ export default function AuthPage() {
     const { error: magicError } = await supabase.auth.signInWithOtp({
       email: email.trim(),
       options: {
-        emailRedirectTo: `${window.location.origin}${CHOICE_ROUTES[choice]}`,
+        emailRedirectTo: `${window.location.origin}${resolveReturnTo()}`,
         shouldCreateUser: true,
       },
     });
@@ -144,14 +165,14 @@ export default function AuthPage() {
           },
         });
         if (signUpError) throw signUpError;
-        navigate(CHOICE_ROUTES[choice]);
+        navigate(resolveReturnTo());
       } else {
         const { error: signInError } = await supabase.auth.signInWithPassword({
           email: email.trim(),
           password,
         });
         if (signInError) throw signInError;
-        navigate(CHOICE_ROUTES[choice]);
+        navigate(resolveReturnTo());
       }
     } catch (err: any) {
       setError(err?.message ?? "Authentication failed. Please try again.");
@@ -166,7 +187,7 @@ export default function AuthPage() {
     try {
       const { error: googleError } = await supabase.auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo: `${window.location.origin}${CHOICE_ROUTES[choice]}` },
+        options: { redirectTo: `${window.location.origin}${resolveReturnTo()}` },
       });
       if (googleError) throw googleError;
     } catch (err: any) {
