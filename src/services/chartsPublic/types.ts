@@ -70,6 +70,9 @@ export interface ChartEditionEntry {
   isPlayable?: boolean;
   duration?: number;
   movementAmount?: number;
+  previewUrl?: string;
+  appleMusicId?: string | null;
+  appleMusicCatalogId?: string | null;
 }
 
 export interface ChartEntry {

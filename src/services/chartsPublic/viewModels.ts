@@ -92,6 +92,8 @@ export interface ChartEntryRowViewModel {
   score: number;
   duration?: number;
   previewUrl?: string;
+  appleMusicId?: string | null;
+  appleMusicCatalogId?: string | null;
 }
 
 export interface ChartDirectoryViewModel {
@@ -117,6 +119,10 @@ export interface ChartTrackPlayerModel {
   source?: string;
   duration?: number;
   previewUrl?: string;
+  appleMusicId?: string | null;
+  appleMusicCatalogId?: string | null;
+  trackSlug?: string;
+  artistSlug?: string;
 }
 
 // ─── Archive view models ───
@@ -225,6 +231,8 @@ export function toChartEntryRowViewModel(
     duration?: number;
     movementAmount?: number;
     previewUrl?: string;
+    appleMusicId?: string | null;
+    appleMusicCatalogId?: string | null;
   };
 
   // previousRank of 0 means no prior comparison data exists (first ingest or broken pipeline).
@@ -262,11 +270,13 @@ export function toChartEntryRowViewModel(
     genre: rich.genre ?? null,
     peakPosition: entry.peakPosition ?? entry.rank,
     weeksOnChart: entry.weeksOnChart ?? 1,
-    isPlayable: rich.isPlayable ?? true,
+    isPlayable: rich.isPlayable ?? Boolean(rich.previewUrl || rich.appleMusicCatalogId || rich.appleMusicId),
     source: rich.source ?? "WAKILISHA chart data",
     score: entry.score,
     duration: rich.duration ?? 180 + ((entry.trackTitle.length * 7) % 120),
     previewUrl: rich.previewUrl,
+    appleMusicId: rich.appleMusicId ?? rich.appleMusicCatalogId ?? null,
+    appleMusicCatalogId: rich.appleMusicCatalogId ?? rich.appleMusicId ?? null,
   };
 }
 
@@ -503,6 +513,10 @@ export function toChartTrackPlayerModel(entry: ChartEntryRowViewModel): ChartTra
     source: entry.source,
     duration: entry.duration,
     previewUrl: entry.previewUrl,
+    appleMusicId: entry.appleMusicId ?? entry.appleMusicCatalogId ?? null,
+    appleMusicCatalogId: entry.appleMusicCatalogId ?? entry.appleMusicId ?? null,
+    trackSlug: entry.slug,
+    artistSlug: entry.artistSlugs?.[0],
   };
 }
 

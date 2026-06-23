@@ -1,4 +1,3 @@
-import { supabase } from "@/lib/supabase";
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { usePlayer } from "@/context/PlayerContext";
@@ -37,6 +36,7 @@ import { ArtistRolodex } from "@/pages/charts/directory/components/ArtistRolodex
 import { SkeletonChartEdition } from "@/components/skeletons/Skeletons";
 import { trackUrl } from "@/utils/trackUrl";
 import { NewsletterSubscribe } from "@/components/feature/NewsletterSubscribe";
+import { enrichChartEntriesWithPlaybackData } from "@/services/chartsPublic/playbackEnrichment";
 
 const rankTone = (rank: number) =>
   rank === 1 ? "gold" : rank === 2 ? "silver" : rank === 3 ? "bronze" : "";
@@ -176,74 +176,7 @@ export default function ChartEdition() {
 
       // Entries are auto-enriched with real movement data by getChartEditionEntries
 
-      // ═══ Enrich entries with previewUrl + artworkUrl from registry_tracks ═══
-      // Stage 1: direct slug match (fast, exact)
-      const enrichedSlugs = new Set<string>();
-      const trackSlugs = rawEntries.map((e) => e.trackSlug).filter(Boolean);
-      if (trackSlugs.length > 0) {
-        try {
-          const { data: previewRows } = await supabase
-            .from("registry_tracks")
-            .select("slug, preview_url, artwork_url")
-            .in("slug", trackSlugs);
-
-          if (previewRows && previewRows.length > 0) {
-            for (const row of previewRows as Array<{ slug: string; preview_url: string | null; artwork_url: string | null }>) {
-              const entry = rawEntries.find((e: ChartEditionEntry) => e.trackSlug === row.slug);
-              if (entry) {
-                if (row.preview_url) (entry as ChartEditionEntry & { previewUrl?: string }).previewUrl = row.preview_url;
-                if (row.artwork_url && !(entry as ChartEditionEntry & { artworkUrl?: string }).artworkUrl) {
-                  (entry as ChartEditionEntry & { artworkUrl?: string }).artworkUrl = row.artwork_url;
-                }
-                enrichedSlugs.add(row.slug);
-              }
-            }
-          }
-        } catch {
-          // Non-critical — entries work without previewUrl
-        }
-      }
-
-      // Stage 2: title-based fallback for entries still missing preview
-      const stillMissing = rawEntries.filter(
-        (e) => !(e as ChartEditionEntry & { previewUrl?: string }).previewUrl
-      );
-      if (stillMissing.length > 0) {
-        const titles = [...new Set(stillMissing.map((e) => e.trackTitle).filter(Boolean))];
-        for (let i = 0; i < titles.length; i += 4) {
-          const batch = titles.slice(i, i + 4);
-          try {
-            const safeTitles = batch.map((t) => t.replace(/'/g, "''"));
-            const orFilter = safeTitles.map((t) => `title.ilike.%25${t}%25`).join(",");
-            const { data: matches } = await supabase
-              .from("registry_tracks")
-              .select("slug, title, preview_url, artwork_url")
-              .or(orFilter)
-              .not("preview_url", "is", null)
-              .limit(25);
-
-            if (matches && matches.length > 0) {
-              for (const entry of stillMissing.filter((e) => batch.includes(e.trackTitle))) {
-                const entryTitle = (entry.trackTitle || "").toLowerCase();
-                const match = (matches as Array<{ slug: string; title: string; preview_url: string | null; artwork_url: string | null }>).find(
-                  (m) => {
-                    const mt = (m.title || "").toLowerCase();
-                    return mt.includes(entryTitle) || entryTitle.includes(mt);
-                  }
-                );
-                if (match) {
-                  if (match.preview_url) (entry as ChartEditionEntry & { previewUrl?: string }).previewUrl = match.preview_url;
-                  if (match.artwork_url && !(entry as ChartEditionEntry & { artworkUrl?: string }).artworkUrl) {
-                    (entry as ChartEditionEntry & { artworkUrl?: string }).artworkUrl = match.artwork_url;
-                  }
-                }
-              }
-            }
-          } catch {
-            // Non-critical
-          }
-        }
-      }
+      rawEntries = await enrichChartEntriesWithPlaybackData(rawEntries);
 
       const entries = rawEntries.map(toChartEntryRowViewModel);
       const editionVM = toChartEditionViewModel(editionResult.data, family, rawEntries);
@@ -375,14 +308,25 @@ export default function ChartEdition() {
     setTimeout(() => setHighlightedSlug(null), 2600);
   }, []);
 
-  const playAt = useCallback((idx: number) => {
+  const playAt = useCallback((idx: number, sourceSection = "chart_leaderboard") => {
     const track = chartTracks[idx];
     if (!track) return;
     playTrack(track, chartTracks, {
       pageType: "charts_edition",
       entitySlug: editionSlug,
       entityType: "chart_edition",
-      sourceSection: "chart_leaderboard",
+      sourceSection,
+    });
+  }, [chartTracks, playTrack, editionSlug]);
+
+  const playChart = useCallback((sourceSection = "chart_hero") => {
+    const firstPlayable = chartTracks.find((track) => track.isPlayable !== false);
+    if (!firstPlayable) return;
+    playTrack(firstPlayable, chartTracks, {
+      pageType: "charts_edition",
+      entitySlug: editionSlug,
+      entityType: "chart_edition",
+      sourceSection,
     });
   }, [chartTracks, playTrack, editionSlug]);
 
@@ -425,6 +369,11 @@ export default function ChartEdition() {
               Back to charts
             </Link>
           </div>
+          {hasApplePlaybackTracks && (
+            <p className="mt-3 max-w-xl text-[12px] font-semibold text-white/72">
+              Full tracks available. Connect Apple Music from the player to listen through this chart without leaving WAKILISHA.
+            </p>
+          )}
         </div>
       </main>
     );
@@ -495,6 +444,7 @@ export default function ChartEdition() {
   // ─── Loaded state ───
   const { edition, entries, familyLabel, familySlug, publicSlug, marketSlug, archive, meta, requestedSlug, canonicalized, sourceFamilySlug } = state;
   const topTrack = entries[0];
+  const hasApplePlaybackTracks = chartTracks.some((track) => Boolean(track.appleMusicCatalogId || track.appleMusicId));
   const top3 = entries.slice(0, 3);
   const rows = entries.slice(3);
   const INITIAL_DISPLAY_COUNT = 20;
@@ -572,11 +522,11 @@ export default function ChartEdition() {
 
           {/* CTAs */}
           <div className="chart-hero-v2-actions">
-            <button onClick={() => playAt(0)} className="chart-hero-v2-cta">
-              <WkIcon name="Play" size={16} /> Play #1
-            </button>
-            <button onClick={() => playAt(0)} className="chart-hero-v2-cta chart-hero-v2-cta-ghost">
+            <button onClick={() => playChart("chart_hero")} className="chart-hero-v2-cta">
               <WkIcon name="ListMusic" size={16} /> Play chart
+            </button>
+            <button onClick={() => playAt(0, "chart_no1")} className="chart-hero-v2-cta chart-hero-v2-cta-ghost">
+              <WkIcon name="Play" size={16} /> Play #1
             </button>
             <Link to="/charts" className="chart-hero-v2-cta chart-hero-v2-cta-ghost">
               <WkIcon name="Archive" size={16} /> Archive
@@ -608,8 +558,8 @@ export default function ChartEdition() {
             {familyLabel} · {edition.date}
           </div>
           <div className="chart-subnav-actions">
-            <button onClick={() => playAt(0)} className="chart-subnav-btn">
-              <WkIcon name="Play" size={13} /> Play
+            <button onClick={() => playChart("chart_subnav")} className="chart-subnav-btn">
+              <WkIcon name="ListMusic" size={13} /> Play chart
             </button>
             <Link to="/charts" className="chart-subnav-btn">
               <WkIcon name="Archive" size={13} /> All charts
