@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { useCommunityThread } from "@/hooks/useCommunityThread";
 import { useCommentActions } from "@/hooks/useCommunityActions";
@@ -65,7 +66,17 @@ export function TrackMomentDrawer({
   const user = useAuthUser();
   const userId = user.id || undefined;
   const isLoggedIn = Boolean(userId);
-  const entity = useMemo(() => buildTrackEntity(track), [track]);
+  const entity = useMemo(
+    () => buildTrackEntity(track),
+    [
+      track.id,
+      track.trackSlug,
+      track.artistSlug,
+      track.title,
+      track.artist,
+      track.artworkUrl,
+    ],
+  );
   const {
     thread,
     postComment,
@@ -74,39 +85,71 @@ export function TrackMomentDrawer({
   } = useCommunityThread(entity, userId);
 
   const { vote, react } = useCommentActions(userId);
+  const seededOpenRef = useRef(false);
+  const loadSeqRef = useRef(0);
   const [selectedTimeMs, setSelectedTimeMs] = useState(() => Math.max(0, Math.round(currentTime * 1000)));
   const [comments, setComments] = useState<CommunityComment[]>([]);
   const [loading, setLoading] = useState(false);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const selectedLabel = formatMomentTimeFromMs(selectedTimeMs);
   const totalDurationMs = Math.max(0, Math.round((duration || track.duration || 0) * 1000));
 
   useEffect(() => {
-    if (open) setSelectedTimeMs(Math.max(0, Math.round(currentTime * 1000)));
+    if (!open) {
+      seededOpenRef.current = false;
+      return;
+    }
+
+    if (seededOpenRef.current) return;
+
+    seededOpenRef.current = true;
+    setSelectedTimeMs(Math.max(0, Math.round(currentTime * 1000)));
   }, [open, currentTime]);
 
-  const loadMomentComments = useCallback(async () => {
+  const loadMomentComments = useCallback(async (options?: { quiet?: boolean }) => {
     if (!thread?.id) return;
 
-    setLoading(true);
+    const seq = loadSeqRef.current + 1;
+    loadSeqRef.current = seq;
+
+    if (!options?.quiet) setLoading(true);
     setError(null);
+
     try {
       const raw = await getTrackMomentComments(thread.id, selectedTimeMs, 3000, 30);
       const hydrated = await hydrateCommentsWithUserState(raw, userId);
+
+      if (loadSeqRef.current !== seq) return;
+
       setComments(hydrated);
+      setHasLoadedOnce(true);
     } catch (err) {
+      if (loadSeqRef.current !== seq) return;
+
       console.error("Could not load moment comments", err);
       setError(err instanceof Error ? err.message : "Could not load comments for this moment.");
     } finally {
-      setLoading(false);
+      if (loadSeqRef.current === seq) setLoading(false);
     }
   }, [thread?.id, selectedTimeMs, userId]);
 
   useEffect(() => {
     if (!open) return;
-    loadMomentComments();
-  }, [open, loadMomentComments]);
+    loadMomentComments({ quiet: hasLoadedOnce });
+  }, [open, loadMomentComments, hasLoadedOnce]);
+
+  useEffect(() => {
+    if (!open || typeof document === "undefined") return;
+
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [open]);
 
   const handlePostMoment = useCallback(
     async (body: string) => {
@@ -126,7 +169,8 @@ export function TrackMomentDrawer({
         anchorLabel: selectedLabel,
       });
 
-      await Promise.all([loadMomentComments(), refresh()]);
+      await loadMomentComments({ quiet: true });
+      refresh();
       return result.comment;
     },
     [
@@ -145,7 +189,7 @@ export function TrackMomentDrawer({
   const handleReply = useCallback(
     async (commentId: string, body: string) => {
       await postComment(body, commentId);
-      await loadMomentComments();
+      await loadMomentComments({ quiet: true });
     },
     [postComment, loadMomentComments],
   );
@@ -167,12 +211,14 @@ export function TrackMomentDrawer({
 
   if (!open) return null;
 
+  if (typeof document === "undefined") return null;
+
   const pct = totalDurationMs > 0
     ? Math.max(0, Math.min(100, (selectedTimeMs / totalDurationMs) * 100))
     : 0;
 
-  return (
-    <div className="fixed inset-0 z-[120]">
+  const drawer = (
+    <div className="fixed inset-0 z-[140]">
       <button
         type="button"
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
@@ -255,7 +301,7 @@ export function TrackMomentDrawer({
             </div>
           )}
 
-          {loading ? (
+          {loading && !hasLoadedOnce ? (
             <div className="space-y-3">
               {[1, 2].map((item) => (
                 <div key={item} className="h-20 animate-pulse rounded-2xl bg-[var(--wk-surface)]" />
@@ -291,6 +337,8 @@ export function TrackMomentDrawer({
       </div>
     </div>
   );
+
+  return createPortal(drawer, document.body);
 }
 
 export function TrackMomentSummary({
