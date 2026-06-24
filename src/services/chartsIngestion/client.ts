@@ -282,3 +282,5 @@ export {
   assertCandidateArray,
   assertIssueArray,
 } from "./contracts";
+export { getChartPlaybackReadiness } from "./playbackReadiness";
+export type { ChartPlaybackReadiness, ChartPlaybackMissingRow } from "./playbackReadiness";
