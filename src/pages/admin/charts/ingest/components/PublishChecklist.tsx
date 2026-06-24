@@ -25,6 +25,9 @@ interface ChecklistItem {
 async function buildChecklist(run: IngestRun): Promise<ChecklistItem[]> {
   const failedStages = run.stages.filter((s) => s.status === "failed");
   const fetchStage = run.stages.find((s) => s.stage === "source_fetch");
+  const rawPersistStage = run.stages.find((s) => s.stage === "raw_persist");
+  const normalizeStage = run.stages.find((s) => s.stage === "normalize");
+  const candidateBuildStage = run.stages.find((s) => s.stage === "release_candidate_build");
   const canonicalStage = run.stages.find((s) => s.stage === "canonical_match");
   const eligibilityStage = run.stages.find((s) => s.stage === "eligibility_execution");
   const enrichmentStage = run.stages.find((s) => s.stage === "enrichment");
@@ -42,6 +45,14 @@ async function buildChecklist(run: IngestRun): Promise<ChecklistItem[]> {
   const canonicalMatchDone =
     canonicalStage?.status === "done" || canonicalStage?.status === "warning" ||
     eligibilityStage?.status === "done" || eligibilityStage?.status === "warning";
+
+  const sourceFetchDone =
+    fetchStage?.status === "done" ||
+    fetchStage?.status === "warning" ||
+    rawPersistStage?.status === "done" ||
+    normalizeStage?.status === "done" ||
+    candidateBuildStage?.status === "done" ||
+    run.summary.totalRows > 0;
 
   return [
     {
@@ -78,7 +89,7 @@ async function buildChecklist(run: IngestRun): Promise<ChecklistItem[]> {
     },
     {
       label: "Sources fetched",
-      pass: fetchStage?.status === "done" || fetchStage?.status === "warning",
+      pass: sourceFetchDone,
       required: true,
       blocking: true,
       detail:
@@ -86,7 +97,9 @@ async function buildChecklist(run: IngestRun): Promise<ChecklistItem[]> {
           ? `Source fetch failed: ${fetchStage.message || "check credentials"}`
           : fetchStage?.status === "warning"
           ? "Partial source failure — some rows may be missing"
-          : "All sources fetched",
+          : sourceFetchDone
+          ? "Sources fetched and rows persisted"
+          : "Source fetch has not completed",
     },
     {
       label: "No failed pipeline stages",
