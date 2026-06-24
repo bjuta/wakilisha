@@ -7,37 +7,119 @@ import { AdminChartsStatusBadge } from "../components/AdminChartsStatusBadge";
 import { AdminChartsEmptyState } from "../components/AdminChartsEmptyState";
 import { AdminChartsLoadingState } from "../components/AdminChartsLoadingState";
 import { WkIcon } from "@/components/design-system/Icon";
-import { getSupabaseChartFamilies, getSupabaseChartEditionsForFamily } from "@/services/chartsPublic/client";
-import type { ChartEdition, ChartFamily } from "@/services/chartsPublic/client";
-import { getAllV2Editions, refreshV2EditionStore } from "@/services/chartsIngestion/v2EditionStore";
-import type { V2Edition } from "@/services/chartsIngestion/commitTypes";
+import { supabase } from "@/lib/supabase";
+import { getSupabaseChartFamilies } from "@/services/chartsPublic/client";
+import type { ChartFamily } from "@/services/chartsPublic/client";
 import { reingestEdition } from "@/services/chartsIngestion/client";
 import type { ReingestEditionResult } from "@/services/chartsIngestion/client";
 
-// Augment with admin metadata (in production this comes from the backend)
-interface AdminEdition extends ChartEdition {
+type AdminEditionStatus = "draft" | "published" | "archived" | "superseded" | "failed" | "cancelled" | "unknown";
+
+interface AdminEdition {
+  id: string;
+  familyId: string;
+  familySlug: string;
+  familyLabel: string;
+  marketSlug: string | null;
+  slug: string;
+  label: string;
+  date: string;
+  periodStart: string;
+  periodEnd: string;
+  status: AdminEditionStatus;
   ingestRunId: string | null;
   ingestJobId: string | null;
+  publishedAt: string | null;
   publishedBy: string | null;
+  entryCount: number;
+  newEntries: number;
+  reEntries: number;
   publicUrl: string | null;
 }
 
-function toAdminEdition(edition: ChartEdition, family: ChartFamily): AdminEdition {
-  // Derive public URL from family slug and edition slug
-  const familySlug = (family as ChartFamily & { sourceFamilySlug?: string }).sourceFamilySlug ?? family.familyKey;
+type DbRow = Record<string, unknown>;
+
+function asString(value: unknown, fallback = ""): string {
+  if (typeof value === "string" && value.trim()) return value.trim();
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return fallback;
+}
+
+function asNumber(value: unknown, fallback = 0): number {
+  const parsed = Number(value ?? fallback);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function dateOnly(value: unknown): string {
+  const raw = asString(value);
+  return raw ? raw.slice(0, 10) : "";
+}
+
+function slugify(value: string, fallback = "item"): string {
+  const slug = value
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+  return slug || fallback;
+}
+
+function normalizeEditionStatus(value: unknown): AdminEditionStatus {
+  const status = asString(value, "unknown").toLowerCase();
+  if (
+    status === "draft" ||
+    status === "published" ||
+    status === "archived" ||
+    status === "superseded" ||
+    status === "failed" ||
+    status === "cancelled"
+  ) {
+    return status;
+  }
+  return "unknown";
+}
+
+function toAdminEdition(row: DbRow, programById: Map<string, DbRow>): AdminEdition {
+  const programId = asString(row.program_id);
+  const program = programById.get(programId) ?? {};
+  const programSlug = slugify(
+    asString(program.public_slug ?? program.series_slug ?? row.program_id, "charts"),
+    "charts"
+  );
+  const programLabel = asString(program.public_label ?? program.short_label, programSlug.replaceAll("-", " "));
+  const status = normalizeEditionStatus(row.status);
+  const id = asString(row.id);
+  const slug = slugify(asString(row.edition_slug ?? row.slug, dateOnly(row.edition_date) || id), id);
+  const date = dateOnly(row.edition_date ?? row.published_at ?? row.created_at);
+  const isPublic = status === "published";
+
   return {
-    ...edition,
-    ingestRunId: null,
-    ingestJobId: null,
-    publishedBy: "system",
-    publicUrl: `/charts/${familySlug}/${edition.slug}`,
+    id,
+    familyId: asString(row.program_id, programSlug),
+    familySlug: programSlug,
+    familyLabel: programLabel,
+    marketSlug: asString(program.market_slug) || null,
+    slug,
+    label: `${programLabel} — ${date || slug}`,
+    date,
+    periodStart: dateOnly(row.period_start) || date,
+    periodEnd: dateOnly(row.period_end) || date,
+    status,
+    ingestRunId: asString(row.ingest_run_id) || null,
+    ingestJobId: asString(row.ingest_job_id) || null,
+    publishedAt: asString(row.published_at) || null,
+    publishedBy: asString(row.published_by) || null,
+    entryCount: asNumber(row.entry_count, 0),
+    newEntries: asNumber(row.new_entries_count ?? row.new_entries, 0),
+    reEntries: asNumber(row.re_entries_count ?? row.re_entries, 0),
+    publicUrl: isPublic ? `/charts/${programSlug}/${slug}` : null,
   };
 }
 
 export default function AdminChartsEditions() {
   const navigate = useNavigate();
   const [editions, setEditions] = useState<AdminEdition[]>([]);
-  const [committedV2Editions, setCommittedV2Editions] = useState<V2Edition[]>([]);
   const [families, setFamilies] = useState<ChartFamily[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>("all");
@@ -90,28 +172,61 @@ export default function AdminChartsEditions() {
 
   useEffect(() => {
     async function load() {
+      setLoading(true);
+
       const families = await getSupabaseChartFamilies();
       setFamilies(families);
       setDataSource("database");
 
-      // Load editions for all families in parallel
-      const editionPromises = families.map((family) =>
-        getSupabaseChartEditionsForFamily(family.familyKey)
-          .then((editions) => editions.map((e) => toAdminEdition(e, family)))
-          .catch(() => [] as AdminEdition[])
-      );
-      const results = await Promise.all(editionPromises);
-      const allEditions = results.flat();
-      // Sort by date descending
-      allEditions.sort((a, b) => b.date.localeCompare(a.date));
-      setEditions(allEditions);
+      const { data: editionRows, error: editionError } = await supabase
+        .from("wk_chart_editions_v2")
+        .select("*")
+        .order("edition_date", { ascending: false })
+        .limit(500);
+
+      if (editionError) {
+        setToastMsg(`Failed to load editions: ${editionError.message}`);
+        setEditions([]);
+      } else {
+        const rows = (editionRows ?? []) as DbRow[];
+        const programIds = Array.from(
+          new Set(rows.map((row) => asString(row.program_id)).filter(Boolean))
+        );
+
+        let programRows: DbRow[] = [];
+
+        if (programIds.length > 0) {
+          const { data: programs, error: programError } = await supabase
+            .from("wk_chart_programs_v2")
+            .select("*")
+            .in("id", programIds);
+
+          if (programError) {
+            setToastMsg(`Loaded editions, but failed to load chart programs: ${programError.message}`);
+          }
+
+          programRows = (programs ?? []) as DbRow[];
+        }
+
+        const programById = new Map(
+          programRows.map((program) => [asString(program.id), program])
+        );
+
+        setEditions(rows.map((row) => toAdminEdition(row, programById)));
+      }
+
       setLoading(false);
     }
+
     load();
   }, []);
 
-  const familyNames = Array.from(new Set(editions.map((e) => e.familyId)));
-  const familyLabel = (id: string) => families.find((f) => f.id === id || f.familyKey === id)?.label ?? id;
+  const familyNames = Array.from(new Set(editions.map((e) => e.familySlug)));
+  const statusFilters = ["all", ...Array.from(new Set(editions.map((e) => e.status)))];
+  const familyLabel = (id: string) =>
+    editions.find((e) => e.familySlug === id || e.familyId === id)?.familyLabel ??
+    families.find((f) => f.id === id || f.familyKey === id)?.label ??
+    id;
 
   const filtered = editions.filter((e) => {
     const matchStatus = filter === "all" || e.status === filter;
@@ -146,9 +261,9 @@ export default function AdminChartsEditions() {
       )}
 
       <AdminChartsPageHeader
-        eyebrow="Published Charts"
+        eyebrow="Chart Operations"
         title="Chart Editions"
-        description="Committed chart outputs from all chart programs. Source: live database."
+        description="Admin edition registry with run links, audit links, and true database statuses."
       >
         <button
           onClick={() => navigate("/admin/charts/ingest")}
@@ -230,7 +345,7 @@ export default function AdminChartsEditions() {
           ))}
         </select>
         <div className="flex gap-1">
-          {["all", "published", "draft"].map((s) => (
+          {statusFilters.map((s) => (
             <button
               key={s}
               onClick={() => setFilter(s)}
@@ -238,7 +353,7 @@ export default function AdminChartsEditions() {
                 filter === s ? "bg-wk-brand text-wk-brand-on" : "bg-wk-surface text-wk-text-soft border border-wk-border hover:bg-wk-surface-raised"
               }`}
             >
-              {s === "all" ? "All" : s.charAt(0).toUpperCase() + s.slice(1)}
+              {s === "all" ? "All" : s.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
             </button>
           ))}
         </div>
@@ -262,7 +377,12 @@ export default function AdminChartsEditions() {
                     <div className="font-semibold text-wk-text">{edition.label}</div>
                     <div className="text-[11px] font-mono text-wk-text-muted">{edition.slug}</div>
                   </td>
-                  <td className="px-4 py-3 text-wk-text-soft text-[12px]">{familyLabel(edition.familyId)}</td>
+                  <td className="px-4 py-3 text-wk-text-soft text-[12px]">
+                    <div>{edition.familyLabel}</div>
+                    {edition.marketSlug && (
+                      <div className="mt-0.5 font-mono text-[10px] text-wk-text-faint">{edition.marketSlug}</div>
+                    )}
+                  </td>
                   <td className="px-4 py-3">
                     <AdminChartsStatusBadge status={edition.status} size="sm" />
                   </td>
@@ -286,13 +406,29 @@ export default function AdminChartsEditions() {
                       </button>
                     ) : (
                       <span className="flex items-center gap-1 text-[11px] text-wk-text-faint">
-                        <WkIcon name="Globe" size={11} />
-                        V2 API
+                        <WkIcon name="MinusCircle" size={11} />
+                        No run
                       </span>
                     )}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => navigate(`/admin/charts/editions/${edition.id}`)}
+                        className="flex h-7 w-7 items-center justify-center rounded text-wk-info hover:bg-wk-info-soft transition-colors"
+                        title="Open edition audit"
+                      >
+                        <WkIcon name="SearchCheck" size={14} />
+                      </button>
+                      {edition.ingestRunId && (
+                        <button
+                          onClick={() => navigate(`/admin/charts/ingest-runs/${edition.ingestRunId}`)}
+                          className="flex h-7 w-7 items-center justify-center rounded text-wk-brand hover:bg-wk-brand-soft transition-colors"
+                          title={`Open ingest run ${edition.ingestRunId}`}
+                        >
+                          <WkIcon name="Database" size={14} />
+                        </button>
+                      )}
                       {edition.publicUrl && (
                         <a
                           href={edition.publicUrl}
