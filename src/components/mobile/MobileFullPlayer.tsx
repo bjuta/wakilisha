@@ -10,6 +10,8 @@ import {
   getApplePlaybackPrefsSnapshot,
 } from "@/services/appleMusicConnection";
 import { TrackMomentDrawer } from "@/components/feature/community/TrackMomentDrawer";
+import { TrackMomentPlaybackOverlay } from "@/components/feature/community/TrackMomentPlaybackOverlay";
+import { useUserSettings } from "@/hooks/useUserSettings";
 
 function ActionMenu({
   open,
@@ -92,11 +94,13 @@ export function MobileFullPlayer() {
     playbackBackend,
     playbackSourceLabel,
   } = usePlayer();
+  const { playback } = useUserSettings();
   const { save: saveEntityAction, loading: savePending } = useEntityActions();
   const [liked, setLiked] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [actionMenuOpen, setActionMenuOpen] = useState(false);
   const [momentDrawerOpen, setMomentDrawerOpen] = useState(false);
+  const [momentDrawerTimeMs, setMomentDrawerTimeMs] = useState<number | null>(null);
   const [appleConnected, setAppleConnected] = useState(() => getApplePlaybackPrefsSnapshot().appleMusicConnected);
   const [appleConnecting, setAppleConnecting] = useState(false);
   const [appleConnectError, setAppleConnectError] = useState<string | null>(null);
@@ -377,12 +381,29 @@ export function MobileFullPlayer() {
           <button
             type="button"
             className="fp-meta-pill mobile-pressable"
-            onClick={() => setMomentDrawerOpen(true)}
+            onClick={() => {
+              setMomentDrawerTimeMs(null);
+              setMomentDrawerOpen(true);
+            }}
             aria-label="Open moment comments"
           >
             <WkIcon name="MessageCircle" size={12} /> Moments
           </button>
         </div>
+
+        <TrackMomentPlaybackOverlay
+          track={currentTrack}
+          currentTime={currentTime}
+          duration={duration || currentTrack.duration || 0}
+          isPlaying={isPlaying}
+          enabled={playback.showCommunityMoments !== false}
+          limit={10}
+          onOpenMoment={(anchorTimeMs) => {
+            setMomentDrawerTimeMs(anchorTimeMs);
+            seek(anchorTimeMs / 1000);
+            setMomentDrawerOpen(true);
+          }}
+        />
 
         <div className="fp-scrub">
           <div
@@ -535,6 +556,7 @@ export function MobileFullPlayer() {
         currentTime={currentTime}
         duration={duration || currentTrack.duration || 0}
         onSeek={seek}
+        initialTimeMs={momentDrawerTimeMs}
       />
 
       <ActionMenu

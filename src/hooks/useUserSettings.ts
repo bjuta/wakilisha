@@ -57,6 +57,7 @@ export interface UserPlaybackPrefs {
   appleMusicConnected: boolean;
   appleMusicToken: string | null;
   preferApplePreviews: boolean;
+  showCommunityMoments: boolean;
 }
 
 export interface UserPrivacyPrefs {
@@ -110,6 +111,7 @@ const DEFAULT_PLAYBACK: UserPlaybackPrefs = {
   appleMusicConnected: false,
   appleMusicToken: null,
   preferApplePreviews: false,
+  showCommunityMoments: true,
 };
 
 const DEFAULT_PRIVACY: UserPrivacyPrefs = {
