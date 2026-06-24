@@ -185,6 +185,29 @@ function unwrap<T>(envelope: ApiEnvelope<T> | T): T {
   return envelope as T;
 }
 
+function chartPath(programSlug: string, marketSlug?: string | null, tail?: string): string {
+  const program = String(programSlug || "").replace(/^\/+|\/+$/g, "");
+  const market = String(marketSlug || "").trim().toLowerCase().replace(/^\/+|\/+$/g, "");
+  const suffix = tail ? `/${String(tail).replace(/^\/+|\/+$/g, "")}` : "";
+  return market ? `/charts/${program}/${market}${suffix}` : `/charts/${program}${suffix}`;
+}
+
+async function v2GetWithLegacy<T>(primaryPath: string, legacyPath?: string): Promise<T> {
+  try {
+    return await v2Get<T>(primaryPath);
+  } catch (err) {
+    if (
+      legacyPath &&
+      legacyPath !== primaryPath &&
+      err instanceof PublicV2ApiError &&
+      err.status === 404
+    ) {
+      return await v2Get<T>(legacyPath);
+    }
+    throw err;
+  }
+}
+
 function toFamily(program: V2Program): ChartFamily {
   const period = program.periodType ?? "weekly";
   return {
@@ -275,40 +298,70 @@ export async function getV2ChartFamilies(): Promise<{ families: ChartFamily[]; e
   return { families, editions };
 }
 
-export async function getV2ChartFamily(programSlug: string): Promise<ChartFamily | null> {
-  const data = unwrap<V2ProgramData>(await v2Get<ApiEnvelope<V2ProgramData> | V2ProgramData>(`/charts/${programSlug}`));
+export async function getV2ChartFamily(programSlug: string, marketSlug?: string | null): Promise<ChartFamily | null> {
+  const data = unwrap<V2ProgramData>(
+    await v2GetWithLegacy<ApiEnvelope<V2ProgramData> | V2ProgramData>(
+      chartPath(programSlug, marketSlug),
+      marketSlug ? chartPath(programSlug) : undefined
+    )
+  );
   const program = "program" in data ? data.program : data;
   return program ? toFamily(program) : null;
 }
 
-export async function getV2ChartEditionsForFamily(programSlug: string): Promise<ChartEdition[]> {
-  const data = unwrap<V2ProgramData>(await v2Get<ApiEnvelope<V2ProgramData> | V2ProgramData>(`/charts/${programSlug}`));
+export async function getV2ChartEditionsForFamily(programSlug: string, marketSlug?: string | null): Promise<ChartEdition[]> {
+  const data = unwrap<V2ProgramData>(
+    await v2GetWithLegacy<ApiEnvelope<V2ProgramData> | V2ProgramData>(
+      chartPath(programSlug, marketSlug),
+      marketSlug ? chartPath(programSlug) : undefined
+    )
+  );
   const program = "program" in data ? data.program : data;
   return (program.archive ?? []).map((edition) => toEdition(edition, program.publicSlug));
 }
 
-export async function getV2LatestChartEdition(programSlug: string): Promise<ChartEdition | null> {
-  const data = unwrap<V2EditionData>(await v2Get<ApiEnvelope<V2EditionData> | V2EditionData>(`/charts/${programSlug}/latest`));
+export async function getV2LatestChartEdition(programSlug: string, marketSlug?: string | null): Promise<ChartEdition | null> {
+  const data = unwrap<V2EditionData>(
+    await v2GetWithLegacy<ApiEnvelope<V2EditionData> | V2EditionData>(
+      chartPath(programSlug, marketSlug, "latest"),
+      marketSlug ? chartPath(programSlug, null, "latest") : undefined
+    )
+  );
   const familyId = data.program?.publicSlug ?? programSlug;
   return data.edition ? toEdition(data.edition, familyId) : null;
 }
 
-export async function getV2LatestChartEditionWithEntries(programSlug: string): Promise<{ edition: ChartEdition | null; entries: ChartEditionEntry[] }> {
-  const data = unwrap<V2EditionData>(await v2Get<ApiEnvelope<V2EditionData> | V2EditionData>(`/charts/${programSlug}/latest`));
+export async function getV2LatestChartEditionWithEntries(programSlug: string, marketSlug?: string | null): Promise<{ edition: ChartEdition | null; entries: ChartEditionEntry[] }> {
+  const data = unwrap<V2EditionData>(
+    await v2GetWithLegacy<ApiEnvelope<V2EditionData> | V2EditionData>(
+      chartPath(programSlug, marketSlug, "latest"),
+      marketSlug ? chartPath(programSlug, null, "latest") : undefined
+    )
+  );
   const familyId = data.program?.publicSlug ?? programSlug;
   const edition = data.edition ? toEdition(data.edition, familyId) : null;
   const entries = (data.entries ?? []).map((entry) => toEntry(entry, data.edition?.slug ?? programSlug));
   return { edition, entries };
 }
 
-export async function getV2ChartEdition(programSlug: string, editionSlug: string): Promise<ChartEdition | null> {
-  const data = unwrap<V2EditionData>(await v2Get<ApiEnvelope<V2EditionData> | V2EditionData>(`/charts/${programSlug}/${editionSlug}`));
+export async function getV2ChartEdition(programSlug: string, editionSlug: string, marketSlug?: string | null): Promise<ChartEdition | null> {
+  const data = unwrap<V2EditionData>(
+    await v2GetWithLegacy<ApiEnvelope<V2EditionData> | V2EditionData>(
+      chartPath(programSlug, marketSlug, editionSlug),
+      marketSlug ? chartPath(programSlug, null, editionSlug) : undefined
+    )
+  );
   const familyId = data.program?.publicSlug ?? programSlug;
   return data.edition ? toEdition(data.edition, familyId) : null;
 }
 
-export async function getV2ChartEditionEntries(programSlug: string, editionSlug: string): Promise<ChartEditionEntry[]> {
-  const data = unwrap<V2EntriesData>(await v2Get<ApiEnvelope<V2EntriesData> | V2EntriesData>(`/charts/${programSlug}/${editionSlug}/entries`));
+export async function getV2ChartEditionEntries(programSlug: string, editionSlug: string, marketSlug?: string | null): Promise<ChartEditionEntry[]> {
+  const data = unwrap<V2EntriesData>(
+    await v2GetWithLegacy<ApiEnvelope<V2EntriesData> | V2EntriesData>(
+      chartPath(programSlug, marketSlug, `${editionSlug}/entries`),
+      marketSlug ? chartPath(programSlug, null, `${editionSlug}/entries`) : undefined
+    )
+  );
   const entries = Array.isArray(data) ? data : data.entries;
   return (entries ?? []).map((entry) => toEntry(entry, editionSlug));
 }
