@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, Outlet } from "react-router-dom";
 import { usePlayer } from "@/context/PlayerContext";
 import { useScrollLock } from "@/hooks/useScrollLock";
@@ -148,15 +148,26 @@ function MobileMiniPlayer() {
 function MobileBottomNav() {
   const location = useLocation();
   const authUser = useAuthUser();
+  const navRef = useRef<HTMLElement | null>(null);
   const { theme, toggle } = useTheme();
   const isLoggedIn = !authUser.loading && authUser.id.length > 0;
   const navVisible = useScrollDirection();
   const isActive = (path: string) => path === "/" ? location.pathname === "/" : location.pathname.startsWith(path);
 
+  useEffect(() => {
+    const activeTab = navRef.current?.querySelector<HTMLElement>(".phn-nav-tab.on");
+    activeTab?.scrollIntoView({
+      behavior: "smooth",
+      inline: "center",
+      block: "nearest",
+    });
+  }, [location.pathname, isLoggedIn]);
+
   if (location.pathname === "/auth") return null;
 
   return (
     <nav
+      ref={navRef}
       className="phn-nav"
       aria-label="Primary mobile navigation"
       style={{

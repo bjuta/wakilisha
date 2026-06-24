@@ -18,7 +18,7 @@
   .wk-mobile-v5 input,.wk-mobile-v5 textarea,.wk-mobile-v5 select{min-height:44px;font-size:16px;}
   .wk-mobile-v5 .chart-row,.wk-mobile-v5 .lbl-row,.wk-mobile-v5 .atrow,.wk-mobile-v5 .mag-card,.wk-mobile-v5 .mob-card-horiz{min-height:56px;}
 
-  /* CH57: six-tab persistent navigation — fixed, floating pill */
+  /* CH57: single-row persistent navigation — fixed, floating, horizontally scrollable */
   .phn-nav{
     position:fixed;
     bottom:0;
@@ -26,11 +26,20 @@
     right:12px;
     z-index:80;
     margin:0;
-    min-height:52px;
-    padding:0 4px max(env(safe-area-inset-bottom), 8px);
-    display:grid;
-    grid-template-columns:repeat(6,1fr);
+    height:calc(52px + max(env(safe-area-inset-bottom), 8px));
+    min-height:calc(52px + max(env(safe-area-inset-bottom), 8px));
+    padding:0 8px max(env(safe-area-inset-bottom), 8px);
+    display:flex;
+    flex-wrap:nowrap;
     align-items:end;
+    gap:2px;
+    overflow-x:auto;
+    overflow-y:hidden;
+    overscroll-behavior-x:contain;
+    scroll-snap-type:x proximity;
+    scroll-padding-inline:8px;
+    scrollbar-width:none;
+    -webkit-overflow-scrolling:touch;
     background:color-mix(in srgb,var(--wk-surface) 96%,transparent);
     backdrop-filter:blur(22px);
     -webkit-backdrop-filter:blur(22px);
@@ -39,8 +48,9 @@
     transform:translateZ(0);
     -webkit-transform:translateZ(0);
   }
+  .phn-nav::-webkit-scrollbar{display:none;}
   .wk-app-shell main{min-height:0;}
-  .phn-nav-tab{height:52px;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:var(--wk-text-faint);position:relative;border-radius:10px;font:700 8px/1 var(--wk-font-ui);letter-spacing:.02em;}
+  .phn-nav-tab{height:52px;min-width:56px;flex:0 0 clamp(56px,16vw,66px);scroll-snap-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:var(--wk-text-faint);position:relative;border-radius:10px;font:700 8px/1 var(--wk-font-ui);letter-spacing:.02em;}
   .phn-nav-tab svg{width:18px;height:18px;stroke:currentColor;stroke-width:2;}
   .phn-nav-tab.on{color:var(--wk-brand);}
   .phn-nav-tab.on:before{content:"";position:absolute;top:4px;right:calc(50% - 10px);width:4px;height:4px;border-radius:50%;background:var(--wk-brand);}
