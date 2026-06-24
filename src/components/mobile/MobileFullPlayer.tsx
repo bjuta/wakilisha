@@ -494,11 +494,15 @@ export function MobileFullPlayer() {
               </div>
 
               {/* Upcoming tracks */}
-              {upcoming.map((track, idx) => (
+              {upcoming.map((track, idx) => {
+                const absoluteIndex = queueStartIndex + idx;
+                const queueKey = `${absoluteIndex}:${track.id || track.trackSlug || track.title}`;
+
+                return (
                 <button
-                  key={track.id}
+                  key={queueKey}
                   className="fp-queue-row"
-                  onClick={() => playFromQueue(queueStartIndex + idx)}
+                  onClick={() => playFromQueue(absoluteIndex)}
                   aria-label={`Play ${track.title} by ${track.artist}`}
                 >
                   <div className="fp-queue-art">
@@ -514,7 +518,8 @@ export function MobileFullPlayer() {
                   </div>
                   <WkIcon name="Play" size={14} className="text-[var(--wk-text-faint)]" />
                 </button>
-              ))}
+              );
+              })}
             </div>
           </div>
         )}

@@ -27,7 +27,22 @@ import type {
   ReactionType,
 } from './types';
 
+function isDuplicateThreadConflict(error: unknown): boolean {
+  const err = error as { code?: string; message?: string; details?: string } | null;
+  const text = `${err?.message || ""} ${err?.details || ""}`.toLowerCase();
+
+  return err?.code === "23505" || text.includes("duplicate key") || text.includes("community_threads_entity_type_entity_id_key");
+}
+
 export async function getOrCreateThread(entity: CommunityEntity): Promise<ThreadResult> {
+  const existing = await getThreadByEntity(entity.type, entity.id || undefined, entity.slug || undefined);
+  if (existing) {
+    return {
+      thread: existing,
+      created: false,
+    };
+  }
+
   const { data, error } = await supabase.rpc('community_get_or_create_thread', {
     p_entity_type: entity.type,
     p_entity_id: entity.id || null,
@@ -35,7 +50,21 @@ export async function getOrCreateThread(entity: CommunityEntity): Promise<Thread
     p_entity_url: entity.url,
     p_title: entity.title,
   });
-  if (error) throw error;
+
+  if (error) {
+    if (isDuplicateThreadConflict(error)) {
+      const recovered = await getThreadByEntity(entity.type, entity.id || undefined, entity.slug || undefined);
+      if (recovered) {
+        return {
+          thread: recovered,
+          created: false,
+        };
+      }
+    }
+
+    throw error;
+  }
+
   return {
     thread: mapThread(data.thread),
     created: data.created,

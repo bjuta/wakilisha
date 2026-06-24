@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   getOrCreateThread,
+  getThreadByEntity,
   getTrackMomentComments,
   type CommunityComment,
   type CommunityEntity,
@@ -32,9 +33,20 @@ function truncateMoment(text: string, max = 86): string {
   return `${clean.slice(0, max - 1).trim()}…`;
 }
 
-function buildTrackEntity(track: PlayerTrack): CommunityEntity {
-  const trackSlug = track.trackSlug || track.id;
-  const url = track.artistSlug && trackSlug
+function stableTrackSlug(track: PlayerTrack): string {
+  const slug = String(track.trackSlug || track.id || "").trim();
+
+  if (!slug) return "";
+  if (slug.startsWith("chart-entry-")) return "";
+
+  return slug;
+}
+
+function buildTrackEntity(track: PlayerTrack): CommunityEntity | null {
+  const trackSlug = stableTrackSlug(track);
+  if (!trackSlug) return null;
+
+  const url = track.artistSlug
     ? `/tracks/${track.artistSlug}/${trackSlug}`
     : `/tracks/${trackSlug}`;
 
@@ -147,7 +159,14 @@ export function TrackMomentPlaybackOverlay({
 
     async function loadMoments() {
       try {
-        const { thread } = await getOrCreateThread(buildTrackEntity(track));
+        const entity = buildTrackEntity(track);
+        if (!entity) {
+          setMoments([]);
+          return;
+        }
+
+        const existingThread = await getThreadByEntity(entity.type, entity.id || undefined, entity.slug || undefined);
+        const thread = existingThread || (await getOrCreateThread(entity)).thread;
         const comments = await getTrackMomentComments(thread.id, null, 0, 60);
         if (cancelled) return;
 
