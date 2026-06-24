@@ -41,7 +41,18 @@ interface ReviewItem {
   loadingSuggestions: boolean;
 }
 
-type TabKey = "review" | "confirmed";
+type TabKey = "review" | "merge" | "confirmed";
+
+interface RegistryArtistSearchResult {
+  artist_id: string;
+  artist_slug: string;
+  display_name: string;
+  status: string;
+  origin_iso2: string | null;
+  public_image_url: string | null;
+  track_credit_count: number;
+  release_credit_count: number;
+}
 
 /* ──────────────────────── Helpers ──────────────────────── */
 
@@ -93,6 +104,19 @@ export default function ArtistAliasesPage() {
   // Confirmed aliases state
   const [aliases, setAliases] = useState<AliasRecord[]>([]);
   const [loadingAliases, setLoadingAliases] = useState(true);
+
+  // Manual merge state
+  const [sourceQuery, setSourceQuery] = useState("");
+  const [canonicalQuery, setCanonicalQuery] = useState("");
+  const [sourceResults, setSourceResults] = useState<RegistryArtistSearchResult[]>([]);
+  const [canonicalResults, setCanonicalResults] = useState<RegistryArtistSearchResult[]>([]);
+  const [sourceArtist, setSourceArtist] = useState<RegistryArtistSearchResult | null>(null);
+  const [canonicalArtist, setCanonicalArtist] = useState<RegistryArtistSearchResult | null>(null);
+  const [mergeNote, setMergeNote] = useState("");
+  const [archiveSource, setArchiveSource] = useState(true);
+  const [searchingSource, setSearchingSource] = useState(false);
+  const [searchingCanonical, setSearchingCanonical] = useState(false);
+  const [mergeLoading, setMergeLoading] = useState(false);
 
   // Toast
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
@@ -295,6 +319,100 @@ export default function ArtistAliasesPage() {
     }
   }, [loadAliases, loadUnknownSlugs, showToast]);
 
+  /* ──── Manual registry search ──── */
+  const searchRegistryArtists = useCallback(async (
+    query: string,
+    side: "source" | "canonical",
+  ) => {
+    const clean = query.trim();
+    if (!clean) {
+      if (side === "source") setSourceResults([]);
+      else setCanonicalResults([]);
+      return;
+    }
+
+    if (side === "source") setSearchingSource(true);
+    else setSearchingCanonical(true);
+
+    try {
+      const { data, error } = await supabase.rpc("admin_search_registry_artists", {
+        p_query: clean,
+        p_limit: 20,
+      });
+
+      if (error) throw error;
+
+      const rows = (data as RegistryArtistSearchResult[]) ?? [];
+      if (side === "source") setSourceResults(rows);
+      else setCanonicalResults(rows);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Artist search failed", "error");
+      if (side === "source") setSourceResults([]);
+      else setCanonicalResults([]);
+    } finally {
+      if (side === "source") setSearchingSource(false);
+      else setSearchingCanonical(false);
+    }
+  }, [showToast]);
+
+  /* ──── Manual artist merge ──── */
+  const mergeArtists = useCallback(async () => {
+    if (!sourceArtist || !canonicalArtist) {
+      showToast("Select both the source artist and the canonical artist.", "error");
+      return;
+    }
+
+    if (sourceArtist.artist_id === canonicalArtist.artist_id) {
+      showToast("You cannot merge an artist into itself.", "error");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Merge "${sourceArtist.display_name}" (${sourceArtist.artist_slug}) into "${canonicalArtist.display_name}" (${canonicalArtist.artist_slug})?`
+    );
+
+    if (!confirmed) return;
+
+    setMergeLoading(true);
+
+    try {
+      const { data, error } = await supabase.rpc("admin_merge_registry_artists", {
+        p_source_artist_id: sourceArtist.artist_id,
+        p_canonical_artist_id: canonicalArtist.artist_id,
+        p_note: mergeNote || null,
+        p_archive_source: archiveSource,
+      });
+
+      if (error) throw error;
+
+      const result = (data ?? {}) as {
+        chartEntriesUpdated?: number;
+        trackArtistRowsUpdated?: number;
+        releaseArtistRowsUpdated?: number;
+        aliasRowsTouched?: number;
+      };
+
+      showToast(
+        `Merged artists · ${result.trackArtistRowsUpdated ?? 0} track credits, ${result.releaseArtistRowsUpdated ?? 0} release credits, ${result.chartEntriesUpdated ?? 0} chart rows repaired`,
+        "success"
+      );
+
+      setSourceQuery("");
+      setCanonicalQuery("");
+      setSourceResults([]);
+      setCanonicalResults([]);
+      setSourceArtist(null);
+      setCanonicalArtist(null);
+      setMergeNote("");
+      loadAliases();
+      loadUnknownSlugs();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Artist merge failed", "error");
+    } finally {
+      setMergeLoading(false);
+    }
+  }, [sourceArtist, canonicalArtist, mergeNote, archiveSource, loadAliases, loadUnknownSlugs, showToast]);
+
   /* ──── Stats ──── */
   const stats = useMemo(() => ({
     pending: unknownSlugs.length,
@@ -357,8 +475,9 @@ export default function ArtistAliasesPage() {
       <div className="flex gap-1 rounded-2xl border border-[#dfe4d8] bg-white p-1 w-fit">
         {([
           ["review", "Review Queue", stats.pending],
+          ["merge", "Manual Merge", null],
           ["confirmed", "Confirmed Aliases", stats.confirmed],
-        ] as Array<[TabKey, string, number]>).map(([key, label, count]) => (
+        ] as Array<[TabKey, string, number | null]>).map(([key, label, count]) => (
           <button
             key={key}
             onClick={() => setTab(key)}
@@ -368,10 +487,159 @@ export default function ArtistAliasesPage() {
                 : "text-[#71796b] hover:text-[#171712] hover:bg-[#f0f3ec]"
             }`}
           >
-            {label} · {count}
+            {label}{count === null ? "" : ` · ${count}`}
           </button>
         ))}
       </div>
+
+      {/* ──────── MANUAL MERGE TAB ──────── */}
+      {tab === "merge" && (
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-[#dfe4d8] bg-white p-5">
+            <div className="mb-4">
+              <p className="text-[15px] font-black text-[#171712]">Merge any two registry artists</p>
+              <p className="mt-1 max-w-2xl text-[13px] text-[#697062]">
+                Search the full registry directly. Use this when the duplicate is not in the alias radar, or when both artists already exist as draft, needs review, or active records.
+              </p>
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div className="rounded-2xl border border-[#e8ece2] bg-[#fbfcf8] p-4">
+                <p className="mb-2 text-[11px] font-black uppercase tracking-wider text-[#71796b]">Source duplicate</p>
+                <div className="flex gap-2">
+                  <input
+                    value={sourceQuery}
+                    onChange={(event) => setSourceQuery(event.target.value)}
+                    onKeyDown={(event) => { if (event.key === "Enter") searchRegistryArtists(sourceQuery, "source"); }}
+                    placeholder="Search artist to merge away…"
+                    className="min-w-0 flex-1 rounded-xl border border-[#dfe4d8] bg-white px-3 py-2 text-[13px] outline-none focus:border-[#85c441]"
+                  />
+                  <button
+                    onClick={() => searchRegistryArtists(sourceQuery, "source")}
+                    className="rounded-xl bg-[#171712] px-3 py-2 text-[12px] font-bold text-white disabled:opacity-50"
+                    disabled={searchingSource}
+                  >
+                    {searchingSource ? "..." : "Search"}
+                  </button>
+                </div>
+
+                {sourceArtist && (
+                  <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
+                    <p className="text-[12px] font-black text-amber-900">Selected source</p>
+                    <p className="text-[14px] font-bold text-[#171712]">{sourceArtist.display_name}</p>
+                    <p className="text-[11px] text-[#71796b]">{sourceArtist.artist_slug} · {sourceArtist.status}</p>
+                  </div>
+                )}
+
+                <div className="mt-3 space-y-2">
+                  {sourceResults.map((artist) => (
+                    <button
+                      key={artist.artist_id}
+                      onClick={() => setSourceArtist(artist)}
+                      className={`w-full rounded-xl border p-3 text-left transition-colors ${
+                        sourceArtist?.artist_id === artist.artist_id
+                          ? "border-amber-400 bg-amber-50"
+                          : "border-[#e8ece2] bg-white hover:border-[#85c441]"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-[13px] font-bold text-[#171712]">{artist.display_name}</p>
+                          <p className="truncate text-[11px] text-[#858c7e]">{artist.artist_slug}</p>
+                        </div>
+                        <span className="rounded-full bg-[#f0f3ec] px-2 py-0.5 text-[10px] font-bold text-[#5d6557]">{artist.status}</span>
+                      </div>
+                      <p className="mt-1 text-[10px] text-[#858c7e]">
+                        {artist.track_credit_count} track credits · {artist.release_credit_count} release credits
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-[#e8ece2] bg-[#fbfcf8] p-4">
+                <p className="mb-2 text-[11px] font-black uppercase tracking-wider text-[#71796b]">Canonical artist</p>
+                <div className="flex gap-2">
+                  <input
+                    value={canonicalQuery}
+                    onChange={(event) => setCanonicalQuery(event.target.value)}
+                    onKeyDown={(event) => { if (event.key === "Enter") searchRegistryArtists(canonicalQuery, "canonical"); }}
+                    placeholder="Search artist to keep…"
+                    className="min-w-0 flex-1 rounded-xl border border-[#dfe4d8] bg-white px-3 py-2 text-[13px] outline-none focus:border-[#85c441]"
+                  />
+                  <button
+                    onClick={() => searchRegistryArtists(canonicalQuery, "canonical")}
+                    className="rounded-xl bg-[#5f8f2f] px-3 py-2 text-[12px] font-bold text-white disabled:opacity-50"
+                    disabled={searchingCanonical}
+                  >
+                    {searchingCanonical ? "..." : "Search"}
+                  </button>
+                </div>
+
+                {canonicalArtist && (
+                  <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                    <p className="text-[12px] font-black text-emerald-900">Selected canonical</p>
+                    <p className="text-[14px] font-bold text-[#171712]">{canonicalArtist.display_name}</p>
+                    <p className="text-[11px] text-[#71796b]">{canonicalArtist.artist_slug} · {canonicalArtist.status}</p>
+                  </div>
+                )}
+
+                <div className="mt-3 space-y-2">
+                  {canonicalResults.map((artist) => (
+                    <button
+                      key={artist.artist_id}
+                      onClick={() => setCanonicalArtist(artist)}
+                      className={`w-full rounded-xl border p-3 text-left transition-colors ${
+                        canonicalArtist?.artist_id === artist.artist_id
+                          ? "border-emerald-400 bg-emerald-50"
+                          : "border-[#e8ece2] bg-white hover:border-[#85c441]"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-[13px] font-bold text-[#171712]">{artist.display_name}</p>
+                          <p className="truncate text-[11px] text-[#858c7e]">{artist.artist_slug}</p>
+                        </div>
+                        <span className="rounded-full bg-[#f0f3ec] px-2 py-0.5 text-[10px] font-bold text-[#5d6557]">{artist.status}</span>
+                      </div>
+                      <p className="mt-1 text-[10px] text-[#858c7e]">
+                        {artist.track_credit_count} track credits · {artist.release_credit_count} release credits
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 rounded-2xl border border-[#e8ece2] bg-[#fbfcf8] p-4">
+              <label className="mb-1 block text-[11px] font-black uppercase tracking-wider text-[#71796b]">Merge note</label>
+              <textarea
+                value={mergeNote}
+                onChange={(event) => setMergeNote(event.target.value)}
+                placeholder="Why are these artists being merged?"
+                className="min-h-[80px] w-full rounded-xl border border-[#dfe4d8] bg-white px-3 py-2 text-[13px] outline-none focus:border-[#85c441]"
+              />
+
+              <label className="mt-3 flex items-center gap-2 text-[12px] font-bold text-[#5d6557]">
+                <input
+                  type="checkbox"
+                  checked={archiveSource}
+                  onChange={(event) => setArchiveSource(event.target.checked)}
+                />
+                Archive the source duplicate after merge
+              </label>
+
+              <button
+                onClick={mergeArtists}
+                disabled={mergeLoading || !sourceArtist || !canonicalArtist || sourceArtist?.artist_id === canonicalArtist?.artist_id}
+                className="mt-4 rounded-xl bg-[#5f8f2f] px-5 py-2.5 text-[13px] font-black text-white disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {mergeLoading ? "Merging…" : "Merge artists"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ──────── REVIEW QUEUE TAB ──────── */}
       {tab === "review" && (

@@ -943,3 +943,100 @@ export async function getOriginCountryOptions(includeIso2?: string): Promise<Ori
 export async function resetAfterOriginResolution(runId: string): Promise<void> {
   await invokeApi("reset_after_origin_resolution", { runId });
 }
+
+export interface ChartBackfillPresetConfig {
+  chartTitle: string;
+  chartSlug: string;
+  chartSize: number;
+  market: string;
+  chartKind: "tracks" | "releases";
+  coverStyle: string;
+  eligibilityProfileId: string;
+  marketScopeId: string;
+  sourceUrlsTemplate: string;
+  releaseWindowStart: string;
+  releaseWindowEndMode: "day_before_edition";
+  cadence: "weekly_monday";
+  playbackProvider: "apple_music";
+  playbackStorefront: string;
+  minAutoAccept: number;
+}
+
+export interface ChartBackfillPreset {
+  familyId: string;
+  config: ChartBackfillPresetConfig;
+  updatedAt: string;
+  updatedBy?: string | null;
+}
+
+interface DbBackfillPreset {
+  family_id: string;
+  config_json: ChartBackfillPresetConfig;
+  updated_at: string;
+  updated_by?: string | null;
+}
+
+export interface WeeklyBackfillPlanRow {
+  editionDate: string;
+  releaseWindowStart: string;
+  releaseWindowEnd: string;
+  existingEditionId: string | null;
+  existingEditionStatus: string | null;
+  existingEntryCount: number | null;
+  latestRunId: string | null;
+  latestRunStatus: string | null;
+  latestRunUpdatedAt: string | null;
+  recommendedAction: "create_run" | "open_run" | "wait_for_run" | "rerun" | "edition_exists" | "published" | string;
+}
+
+interface DbWeeklyBackfillPlanRow {
+  edition_date: string;
+  release_window_start: string;
+  release_window_end: string;
+  existing_edition_id: string | null;
+  existing_edition_status: string | null;
+  existing_entry_count: number | null;
+  latest_run_id: string | null;
+  latest_run_status: string | null;
+  latest_run_updated_at: string | null;
+  recommended_action: string;
+}
+
+export async function getChartBackfillPresets(): Promise<ChartBackfillPreset[]> {
+  const { presets } = await invokeApi<{ presets: DbBackfillPreset[] }>("get_family_ingest_presets");
+
+  return (presets ?? []).map((preset) => ({
+    familyId: preset.family_id,
+    config: preset.config_json,
+    updatedAt: preset.updated_at,
+    updatedBy: preset.updated_by,
+  }));
+}
+
+export async function saveChartBackfillPreset(input: {
+  familyId: string;
+  config: ChartBackfillPresetConfig;
+}): Promise<void> {
+  await invokeApi("save_family_ingest_preset", input);
+}
+
+export async function getWeeklyBackfillPlan(input: {
+  familyId: string;
+  startDate: string;
+  endDate: string;
+}): Promise<WeeklyBackfillPlanRow[]> {
+  const { plan } = await invokeApi<{ plan: DbWeeklyBackfillPlanRow[] }>("get_weekly_backfill_plan", input);
+
+  return (plan ?? []).map((row) => ({
+    editionDate: row.edition_date,
+    releaseWindowStart: row.release_window_start,
+    releaseWindowEnd: row.release_window_end,
+    existingEditionId: row.existing_edition_id,
+    existingEditionStatus: row.existing_edition_status,
+    existingEntryCount: row.existing_entry_count,
+    latestRunId: row.latest_run_id,
+    latestRunStatus: row.latest_run_status,
+    latestRunUpdatedAt: row.latest_run_updated_at,
+    recommendedAction: row.recommended_action,
+  }));
+}

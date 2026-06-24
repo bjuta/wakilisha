@@ -22,8 +22,8 @@ function json(req: Request, body: unknown, status = 200): Response { const cors 
 function safeError(req: Request, action: string, err: unknown): Response { const m = err instanceof Error ? err.message : String(err); console.error("[chart-ingest-api] "+action+" error:", m); const cors = corsRestricted(req); return new Response(JSON.stringify({ error: "internal_error", requestId: rid() }), { status: 500, headers: { ...cors, "Content-Type": "application/json" } }); }
 
 const ACTION_CAPABILITIES: Record<string, string> = {
-  list_runs:"view_charts_admin",get_run:"view_charts_admin",get_stages:"view_charts_admin",get_sources:"view_charts_admin",get_candidates:"view_charts_admin",get_normalized:"view_charts_admin",get_kpis:"view_charts_admin",get_activity:"view_charts_admin",get_resource_guard:"view_charts_admin",get_review_issues:"view_charts_admin",get_matches_for_run:"view_charts_admin",validate_commit:"view_charts_admin",preflight:"view_charts_admin",csv_list:"view_charts_admin",get_origin_review_queue:"view_charts_admin",get_origin_country_options:"view_charts_admin",
-  create_dry_run:"manage_ingest",source_fetch:"manage_ingest",normalize_run:"manage_ingest",run_eligibility:"manage_ingest",run_carry_forward:"manage_ingest",run_scoring:"manage_ingest",run_shortlist:"manage_ingest",run_airplay_detection:"manage_ingest",run_full_pipeline:"manage_ingest",send_gaps_to_review:"manage_ingest",apply_row_decision:"manage_ingest",cancel_run:"manage_ingest",retry_run:"manage_ingest",reset_pipeline:"manage_ingest",csv_upload:"manage_ingest",csv_normalize:"manage_ingest",set_artist_origin_for_run:"manage_registry",create_origin_artist_shell:"manage_registry",reset_after_origin_resolution:"manage_ingest",commit_run:"publish_charts",fix_chart_artist_slugs:"publish_charts",reingest_edition:"publish_charts"};
+  list_runs:"view_charts_admin",get_run:"view_charts_admin",get_stages:"view_charts_admin",get_sources:"view_charts_admin",get_candidates:"view_charts_admin",get_normalized:"view_charts_admin",get_kpis:"view_charts_admin",get_activity:"view_charts_admin",get_resource_guard:"view_charts_admin",get_review_issues:"view_charts_admin",get_matches_for_run:"view_charts_admin",validate_commit:"view_charts_admin",preflight:"view_charts_admin",csv_list:"view_charts_admin",get_origin_review_queue:"view_charts_admin",get_origin_country_options:"view_charts_admin",get_family_ingest_presets:"view_charts_admin",get_weekly_backfill_plan:"view_charts_admin",
+  create_dry_run:"manage_ingest",source_fetch:"manage_ingest",normalize_run:"manage_ingest",run_eligibility:"manage_ingest",run_carry_forward:"manage_ingest",run_scoring:"manage_ingest",run_shortlist:"manage_ingest",run_airplay_detection:"manage_ingest",run_full_pipeline:"manage_ingest",send_gaps_to_review:"manage_ingest",apply_row_decision:"manage_ingest",cancel_run:"manage_ingest",retry_run:"manage_ingest",reset_pipeline:"manage_ingest",csv_upload:"manage_ingest",csv_normalize:"manage_ingest",set_artist_origin_for_run:"manage_registry",create_origin_artist_shell:"manage_registry",reset_after_origin_resolution:"manage_ingest",save_family_ingest_preset:"manage_ingest",commit_run:"publish_charts",fix_chart_artist_slugs:"publish_charts",reingest_edition:"publish_charts"};
 
 Deno.serve(async (req) => {
   const cors = corsRestricted(req);
@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
     if (action === "get_normalized") return handleGetNormalized(req, db, params);
     if (action === "normalize_run") return handleNormalizeRun(req, db, params, auth);
     if (action === "source_fetch") return handleSourceFetch(req, db, params, auth);
-    if (action === "run_eligibility") return handleRunEligibility(req, db, params, auth);
+    if (action === "run_eligibility") return handleRunEligibilityWithReleaseWindow(req, db, params, auth);
     if (action === "run_carry_forward") return handleRunCarryForward(req, db, params, auth);
     if (action === "run_scoring") return handleRunScoring(req, db, params, auth);
     if (action === "run_shortlist") return handleRunShortlist(req, db, params, auth);
@@ -65,6 +65,9 @@ Deno.serve(async (req) => {
     if (action === "get_matches_for_run") return handleGetMatchesForRun(req, db, params);
     if (action === "get_origin_review_queue") return handleGetOriginReviewQueue(req, db, params);
     if (action === "get_origin_country_options") return handleGetOriginCountryOptions(req, db, params);
+    if (action === "get_family_ingest_presets") return handleGetFamilyIngestPresets(req, db);
+    if (action === "save_family_ingest_preset") return handleSaveFamilyIngestPreset(req, db, params, auth);
+    if (action === "get_weekly_backfill_plan") return handleGetWeeklyBackfillPlan(req, db, params);
     if (action === "set_artist_origin_for_run") return handleSetArtistOriginForRun(req, db, params, auth);
     if (action === "create_origin_artist_shell") return handleCreateOriginArtistShell(req, db, params, auth);
     if (action === "reset_after_origin_resolution") return handleResetAfterOriginResolution(req, db, params);
@@ -1037,7 +1040,7 @@ async function handleRunShortlist(req: Request, db: ReturnType<typeof createClie
 
 
 // FULL PIPELINE
-async function handleRunFullPipeline(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { const { runId } = params as { runId: string }; if (!runId) return json(req, { error: "runId_required" }, 400); const start = Date.now(); const pss: Array<{ stage: string; result: string }> = []; const sfR = await handleSourceFetch(req, db, params, user); const sfB = await sfR.json() as { ok: boolean; rawRowCount: number; error?: string }; pss.push({ stage: "source_fetch", result: sfB.ok ? sfB.rawRowCount+" rows" : "FAILED: "+(sfB.error||"unknown") }); if (!sfB.ok || sfB.rawRowCount === 0) { await db.from("chart_ingest_runs").update({ status: "failed", error_message: "Pipeline stopped at source_fetch", updated_at: new Date().toISOString() }).eq("id", runId); return json(req, { ok: false, runId, status: "failed", pipelineStages: pss, durationMs: Date.now() - start }); } const nrR = await handleNormalizeRun(req, db, params, user); const nrB = await nrR.json() as { ok: boolean; uniqueCount: number; candidateCount: number }; pss.push({ stage: "normalize", result: nrB.ok ? nrB.candidateCount+" from "+nrB.uniqueCount : "FAILED" }); if (!nrB.ok || nrB.candidateCount === 0) { await db.from("chart_ingest_runs").update({ status: "failed", error_message: "Pipeline stopped at normalize", updated_at: new Date().toISOString() }).eq("id", runId); return json(req, { ok: false, runId, status: "failed", pipelineStages: pss, durationMs: Date.now() - start }); } const cfR = await handleRunCarryForward(req, db, params, user); const cfB = await cfR.json() as { carryForwardCount: number }; pss.push({ stage: "carry_forward", result: cfB.carryForwardCount+" carry-forward" }); const elR = await handleRunEligibility(req, db, params, user); const elB = await elR.json() as { candidateCount: number; excludedCount: number; originExcludedCount?: number }; pss.push({ stage: "eligibility", result: elB.candidateCount+" total, "+elB.excludedCount+" excluded"+(elB.originExcludedCount?" ("+elB.originExcludedCount+" origin-filtered)":"") }); const scR = await handleRunScoring(req, db, params, user); const scB = await scR.json() as { ok: boolean; scoredCount: number }; pss.push({ stage: "scoring", result: scB.ok ? scB.scoredCount+" scored" : "FAILED" }); if (!scB.ok || scB.scoredCount === 0) { await db.from("chart_ingest_runs").update({ status: "failed", error_message: "Pipeline stopped at scoring", updated_at: new Date().toISOString() }).eq("id", runId); return json(req, { ok: false, runId, status: "failed", pipelineStages: pss, durationMs: Date.now() - start }); } const slR = await handleRunShortlist(req, db, params, user); const slB = await slR.json() as { shortlistedCount: number }; pss.push({ stage: "shortlist", result: slB.shortlistedCount+" shortlisted" }); if (slB.shortlistedCount === 0) { await db.from("chart_ingest_runs").update({ status: "failed", error_message: "Pipeline stopped at shortlist", updated_at: new Date().toISOString() }).eq("id", runId); return json(req, { ok: false, runId, status: "failed", pipelineStages: pss, durationMs: Date.now() - start }); } const td = Date.now() - start; await db.from("chart_ingest_runs").update({ status: "dry_run_complete", dry_run_completed_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("id", runId); await db.from("chart_ingest_audit_events").insert({ run_id: runId, actor: user.id, actor_email: user.email || null, action: "dry_run_complete", new_status: "dry_run_complete", payload_json: { pipelineStages: pss, totalDurationMs: td } }); return json(req, { ok: true, runId, status: "dry_run_complete", pipelineStages: pss, totalDurationMs: td }); }
+async function handleRunFullPipeline(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { const { runId } = params as { runId: string }; if (!runId) return json(req, { error: "runId_required" }, 400); const start = Date.now(); const pss: Array<{ stage: string; result: string }> = []; const sfR = await handleSourceFetch(req, db, params, user); const sfB = await sfR.json() as { ok: boolean; rawRowCount: number; error?: string }; pss.push({ stage: "source_fetch", result: sfB.ok ? sfB.rawRowCount+" rows" : "FAILED: "+(sfB.error||"unknown") }); if (!sfB.ok || sfB.rawRowCount === 0) { await db.from("chart_ingest_runs").update({ status: "failed", error_message: "Pipeline stopped at source_fetch", updated_at: new Date().toISOString() }).eq("id", runId); return json(req, { ok: false, runId, status: "failed", pipelineStages: pss, durationMs: Date.now() - start }); } const nrR = await handleNormalizeRun(req, db, params, user); const nrB = await nrR.json() as { ok: boolean; uniqueCount: number; candidateCount: number }; pss.push({ stage: "normalize", result: nrB.ok ? nrB.candidateCount+" from "+nrB.uniqueCount : "FAILED" }); if (!nrB.ok || nrB.candidateCount === 0) { await db.from("chart_ingest_runs").update({ status: "failed", error_message: "Pipeline stopped at normalize", updated_at: new Date().toISOString() }).eq("id", runId); return json(req, { ok: false, runId, status: "failed", pipelineStages: pss, durationMs: Date.now() - start }); } const cfR = await handleRunCarryForward(req, db, params, user); const cfB = await cfR.json() as { carryForwardCount: number }; pss.push({ stage: "carry_forward", result: cfB.carryForwardCount+" carry-forward" }); const elR = await handleRunEligibilityWithReleaseWindow(req, db, params, user); const elB = await elR.json() as { candidateCount: number; excludedCount: number; originExcludedCount?: number }; pss.push({ stage: "eligibility", result: elB.candidateCount+" total, "+elB.excludedCount+" excluded"+(elB.originExcludedCount?" ("+elB.originExcludedCount+" origin-filtered)":"") }); const scR = await handleRunScoring(req, db, params, user); const scB = await scR.json() as { ok: boolean; scoredCount: number }; pss.push({ stage: "scoring", result: scB.ok ? scB.scoredCount+" scored" : "FAILED" }); if (!scB.ok || scB.scoredCount === 0) { await db.from("chart_ingest_runs").update({ status: "failed", error_message: "Pipeline stopped at scoring", updated_at: new Date().toISOString() }).eq("id", runId); return json(req, { ok: false, runId, status: "failed", pipelineStages: pss, durationMs: Date.now() - start }); } const slR = await handleRunShortlist(req, db, params, user); const slB = await slR.json() as { shortlistedCount: number }; pss.push({ stage: "shortlist", result: slB.shortlistedCount+" shortlisted" }); if (slB.shortlistedCount === 0) { await db.from("chart_ingest_runs").update({ status: "failed", error_message: "Pipeline stopped at shortlist", updated_at: new Date().toISOString() }).eq("id", runId); return json(req, { ok: false, runId, status: "failed", pipelineStages: pss, durationMs: Date.now() - start }); } const td = Date.now() - start; await db.from("chart_ingest_runs").update({ status: "dry_run_complete", dry_run_completed_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("id", runId); await db.from("chart_ingest_audit_events").insert({ run_id: runId, actor: user.id, actor_email: user.email || null, action: "dry_run_complete", new_status: "dry_run_complete", payload_json: { pipelineStages: pss, totalDurationMs: td } }); return json(req, { ok: true, runId, status: "dry_run_complete", pipelineStages: pss, totalDurationMs: td }); }
 
 // COMMIT (v26 — normalizeSlug safety-net ensures every entry gets hyphenated slugs)
 async function handleCommitRun(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { const { runId, publishImmediately, notes } = params as { runId: string; publishImmediately?: boolean; notes?: string }; if (!runId) return json(req, { error: "runId_required" }, 400);
@@ -1190,4 +1193,170 @@ async function handleResetAfterOriginResolution(req: Request, db: ReturnType<typ
   if (error) return json(req, { error: error.message }, 500);
 
   return json(req, { ok: true, result: data });
+}
+
+
+async function handleGetFamilyIngestPresets(req: Request, db: ReturnType<typeof createClient>) {
+  const { data, error } = await db.rpc("chart_get_family_ingest_presets");
+
+  if (error) return json(req, { error: error.message }, 500);
+
+  return json(req, { presets: data || [] });
+}
+
+async function handleSaveFamilyIngestPreset(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) {
+  const { familyId, config } = params as {
+    familyId: string;
+    config: Record<string, unknown>;
+  };
+
+  if (!familyId) return json(req, { error: "familyId_required" }, 400);
+
+  const { data, error } = await db.rpc("chart_upsert_family_ingest_preset", {
+    p_family_id: familyId,
+    p_config_json: config || {},
+    p_actor_user_id: user.id,
+  });
+
+  if (error) return json(req, { error: error.message }, 500);
+
+  return json(req, { ok: true, preset: data });
+}
+
+async function handleGetWeeklyBackfillPlan(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>) {
+  const { familyId, startDate, endDate } = params as {
+    familyId: string;
+    startDate: string;
+    endDate: string;
+  };
+
+  if (!familyId) return json(req, { error: "familyId_required" }, 400);
+  if (!startDate) return json(req, { error: "startDate_required" }, 400);
+  if (!endDate) return json(req, { error: "endDate_required" }, 400);
+
+  const { data, error } = await db.rpc("chart_get_weekly_backfill_plan", {
+    p_family_id: familyId,
+    p_start_date: startDate,
+    p_end_date: endDate,
+  });
+
+  if (error) return json(req, { error: error.message }, 500);
+
+  return json(req, { plan: data || [] });
+}
+
+async function handleRunEligibilityWithReleaseWindow(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) {
+  const { runId } = params as { runId: string };
+
+  const baseResponse = await handleRunEligibility(req, db, params, user);
+
+  if (!runId || baseResponse.status >= 400) {
+    return baseResponse;
+  }
+
+  let basePayload: Record<string, unknown> = {};
+  try {
+    basePayload = await baseResponse.clone().json();
+  } catch {
+    basePayload = {};
+  }
+
+  const { data: run } = await db
+    .from("chart_ingest_runs")
+    .select("rule_snapshot_json")
+    .eq("id", runId)
+    .maybeSingle();
+
+  const snapshot = (run?.rule_snapshot_json || {}) as Record<string, unknown>;
+  const releaseWindowStart = String(
+    snapshot.releaseWindowStart ||
+    (snapshot.backfill as Record<string, unknown> | undefined)?.releaseWindowStart ||
+    ""
+  );
+  const releaseWindowEnd = String(
+    snapshot.releaseWindowEnd ||
+    (snapshot.backfill as Record<string, unknown> | undefined)?.releaseWindowEnd ||
+    ""
+  );
+
+  if (!releaseWindowStart || !releaseWindowEnd) {
+    return json(req, basePayload);
+  }
+
+  const { data: candidates, error: candidateErr } = await db
+    .from("chart_ingest_candidates")
+    .select("id,title,artist_display,release_date,status")
+    .eq("run_id", runId)
+    .eq("status", "eligible");
+
+  if (candidateErr) {
+    return json(req, {
+      ...basePayload,
+      releaseWindowError: candidateErr.message,
+    });
+  }
+
+  const outside = (candidates || []).filter((candidate) => {
+    const releaseDate = String(candidate.release_date || "");
+    if (!releaseDate) return true;
+    return releaseDate < releaseWindowStart || releaseDate > releaseWindowEnd;
+  });
+
+  if (outside.length === 0) {
+    return json(req, {
+      ...basePayload,
+      releaseWindowStart,
+      releaseWindowEnd,
+      releaseWindowExcludedCount: 0,
+    });
+  }
+
+  const now = new Date().toISOString();
+  const outsideIds = outside.map((candidate) => candidate.id as string);
+
+  const CH = 200;
+  for (let i = 0; i < outsideIds.length; i += CH) {
+    await db
+      .from("chart_ingest_candidates")
+      .update({ status: "excluded", updated_at: now })
+      .in("id", outsideIds.slice(i, i + CH))
+      .eq("run_id", runId);
+  }
+
+  const exclusions = outside.map((candidate) => ({
+    id: crypto.randomUUID(),
+    run_id: runId,
+    candidate_id: candidate.id as string,
+    reason_code: "release_window_mismatch",
+    reason_label: `Release date is outside ${releaseWindowStart} to ${releaseWindowEnd}.`,
+    severity: "hard",
+    source_stage: "eligibility",
+    details_json: {
+      title: candidate.title,
+      artistDisplay: candidate.artist_display,
+      releaseDate: candidate.release_date,
+      releaseWindowStart,
+      releaseWindowEnd,
+    },
+    created_at: now,
+  }));
+
+  for (let i = 0; i < exclusions.length; i += CH) {
+    await db.from("chart_ingest_exclusions").insert(exclusions.slice(i, i + CH));
+  }
+
+  await db
+    .from("chart_ingest_stage_events")
+    .update({
+      message: `Eligibility complete. ${outside.length} excluded by release window ${releaseWindowStart} to ${releaseWindowEnd}.`,
+    })
+    .eq("run_id", runId)
+    .eq("stage", "eligibility_execution");
+
+  return json(req, {
+    ...basePayload,
+    releaseWindowStart,
+    releaseWindowEnd,
+    releaseWindowExcludedCount: outside.length,
+  });
 }

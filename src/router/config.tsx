@@ -72,6 +72,7 @@ import { AdminChartsLayout } from "../pages/admin/charts/AdminChartsLayout";
 import AdminChartsDashboard from "../pages/admin/charts/dashboard/page";
 import AdminChartsFamilies from "../pages/admin/charts/families/page";
 import AdminChartsIngest from "../pages/admin/charts/ingest/page";
+import AdminChartsBackfillPlanner from "../pages/admin/charts/backfill/page";
 import AdminChartsIngestDetail from "../pages/admin/charts/ingest/detail/page";
 import AdminChartsEditions from "../pages/admin/charts/editions/page";
 import AdminChartsSnapshots from "../pages/admin/charts/snapshots/page";
@@ -329,6 +330,7 @@ const routes: RouteObject[] = [
         { path: "dashboard", element: <AdminChartsDashboard /> },
         { path: "families", element: <AdminChartsFamilies /> },
         { path: "ingest", element: <AdminChartsIngest /> },
+        { path: "backfill", element: <AdminChartsBackfillPlanner /> },
         { path: "ingest/:jobId", element: <AdminChartsIngestDetail /> },
         { path: "editions", element: <AdminChartsEditions /> },
         { path: "snapshots", element: <AdminChartsSnapshots /> },

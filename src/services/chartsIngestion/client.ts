@@ -193,6 +193,10 @@ export const setArtistOriginForRun = ingestStudioAdapter.setArtistOriginForRun;
 export const createOriginArtistShell = ingestStudioAdapter.createOriginArtistShell;
 export const getOriginCountryOptions = ingestStudioAdapter.getOriginCountryOptions;
 export const resetAfterOriginResolution = ingestStudioAdapter.resetAfterOriginResolution;
+export const getChartBackfillPresets = ingestStudioAdapter.getChartBackfillPresets;
+export const saveChartBackfillPreset = ingestStudioAdapter.saveChartBackfillPreset;
+export const getWeeklyBackfillPlan = ingestStudioAdapter.getWeeklyBackfillPlan;
+export type { ChartBackfillPreset, ChartBackfillPresetConfig, WeeklyBackfillPlanRow } from "./productionAdapter";
 export type { OriginReviewQueueRow, OriginCountryOption } from "./productionAdapter";
 
 // ═══════════════════════════════════════════════════════════════════════════════

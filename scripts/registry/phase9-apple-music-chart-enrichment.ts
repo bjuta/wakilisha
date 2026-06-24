@@ -677,6 +677,29 @@ function scoreArtistMatch(entryArtistRaw: string, songArtistRaw: string): number
   return 0;
 }
 
+function strippedVersionTitle(title: string): string {
+  const normalized = title.trim();
+  const stripped = normalized
+    .replace(/\s[-–—:]\s*(home\s+session|live\s+session|acoustic\s+session|session|home\s+version|live|acoustic)$/i, '')
+    .replace(/\s+\((home\s+session|live\s+session|acoustic\s+session|session|home\s+version|live|acoustic)\)$/i, '')
+    .replace(/\s+\[(home\s+session|live\s+session|acoustic\s+session|session|home\s+version|live|acoustic)\]$/i, '')
+    .trim();
+
+  return stripped && stripped !== normalized ? stripped : normalized;
+}
+
+function searchTermsForEntry(entry: ChartEntryRow): string[] {
+  const terms = new Set<string>();
+  const full = `${entry.track_title} ${entry.artist_name}`.trim();
+  const strippedTitle = strippedVersionTitle(entry.track_title);
+  const stripped = `${strippedTitle} ${entry.artist_name}`.trim();
+
+  if (full) terms.add(full);
+  if (stripped && stripped !== full) terms.add(stripped);
+
+  return [...terms];
+}
+
 function scoreSearchMatch(entry: ChartEntryRow, song: AppleSong): number {
   const entryTitle = normalizeText(entry.track_title);
   const songTitle = normalizeText(song.attributes?.name ?? '');
@@ -750,26 +773,35 @@ async function searchAppleSong(
   args: Args,
   token: string,
 ): Promise<MatchResult | null> {
-  const term = `${entry.track_title} ${entry.artist_name}`.trim();
-  if (!term) return null;
+  const terms = searchTermsForEntry(entry);
+  if (terms.length === 0) return null;
 
-  const params = new URLSearchParams();
-  params.set('term', term);
-  params.set('types', 'songs');
-  params.set('limit', '5');
+  const rankedAcrossTerms: Array<{ song: AppleSong; confidence: number; term: string }> = [];
 
-  const payload = await appleRequest<{
-    results?: { songs?: { data?: AppleSong[] } };
-  }>(`/v1/catalog/${args.storefront}/search?${params.toString()}`, token);
+  for (const term of terms) {
+    const params = new URLSearchParams();
+    params.set('term', term);
+    params.set('types', 'songs');
+    params.set('limit', '10');
 
-  const songs = payload.results?.songs?.data ?? [];
-  if (!songs.length) return null;
+    const payload = await appleRequest<{
+      results?: { songs?: { data?: AppleSong[] } };
+    }>(`/v1/catalog/${args.storefront}/search?${params.toString()}`, token);
 
-  const ranked = songs
-    .map((song) => ({
-      song,
-      confidence: scoreSearchMatch(entry, song),
-    }))
+    const songs = payload.results?.songs?.data ?? [];
+
+    for (const song of songs) {
+      rankedAcrossTerms.push({
+        song,
+        confidence: scoreSearchMatch(entry, song),
+        term,
+      });
+    }
+  }
+
+  if (!rankedAcrossTerms.length) return null;
+
+  const ranked = rankedAcrossTerms
     .sort((a, b) => b.confidence - a.confidence);
 
   const best = ranked[0];
@@ -783,7 +815,7 @@ async function searchAppleSong(
     matchMethod: method,
     confidence,
     status: confidence >= args.minAutoAccept ? 'matched' : 'needs_review',
-    reason: `Apple search best match confidence ${confidence.toFixed(2)}`,
+    reason: `Apple search best match confidence ${confidence.toFixed(2)} via "${best.term}"`,
   };
 }
 
@@ -800,7 +832,12 @@ async function loadChartEntries(client: PoolClient, args: Args, schema: RuntimeS
             coalesce(r.series_slug, r.program_id) as public_slug,
             null::text as source_family_slug,
             r.market_slug,
-            row_number() over (order by c.created_at asc, c.id asc)::integer as rank,
+            row_number() over (
+              order by
+                coalesce(cs.final_score, 0) desc,
+                c.normalized_key asc,
+                c.id asc
+            )::integer as rank,
             regexp_replace(
               regexp_replace(
                 lower(coalesce(nullif(split_part(c.normalized_key, '::', 1), ''), c.title, 'untitled')),
@@ -828,9 +865,15 @@ async function loadChartEntries(client: PoolClient, args: Args, schema: RuntimeS
             c.artwork_url
           from public.chart_ingest_candidates c
           join public.chart_ingest_runs r on r.id = c.run_id
+          left join public.chart_ingest_candidate_scores cs
+            on cs.run_id::text = c.run_id::text
+           and cs.candidate_id::text = c.id::text
           where c.run_id::text = $1
             and c.status = 'eligible'
-          order by c.created_at asc, c.id asc
+          order by
+            coalesce(cs.final_score, 0) desc,
+            c.normalized_key asc,
+            c.id asc
           limit $2
         )
         select
