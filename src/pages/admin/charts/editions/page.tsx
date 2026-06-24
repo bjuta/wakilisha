@@ -80,7 +80,11 @@ function normalizeEditionStatus(value: unknown): AdminEditionStatus {
   return "unknown";
 }
 
-function toAdminEdition(row: DbRow, programById: Map<string, DbRow>): AdminEdition {
+function toAdminEdition(
+  row: DbRow,
+  programById: Map<string, DbRow>,
+  runByEditionId: Map<string, DbRow> = new Map()
+): AdminEdition {
   const programId = asString(row.program_id);
   const program = programById.get(programId) ?? {};
   const programSlug = slugify(
@@ -90,6 +94,7 @@ function toAdminEdition(row: DbRow, programById: Map<string, DbRow>): AdminEditi
   const programLabel = asString(program.public_label ?? program.short_label, programSlug.replaceAll("-", " "));
   const status = normalizeEditionStatus(row.status);
   const id = asString(row.id);
+  const linkedRun = runByEditionId.get(id);
   const slug = slugify(asString(row.edition_slug ?? row.slug, dateOnly(row.edition_date) || id), id);
   const date = dateOnly(row.edition_date ?? row.published_at ?? row.created_at);
   const isPublic = status === "published";
@@ -106,7 +111,7 @@ function toAdminEdition(row: DbRow, programById: Map<string, DbRow>): AdminEditi
     periodStart: dateOnly(row.period_start) || date,
     periodEnd: dateOnly(row.period_end) || date,
     status,
-    ingestRunId: asString(row.ingest_run_id) || null,
+    ingestRunId: asString(row.ingest_run_id) || asString(linkedRun?.id) || null,
     ingestJobId: asString(row.ingest_job_id) || null,
     publishedAt: asString(row.published_at) || null,
     publishedBy: asString(row.published_by) || null,
@@ -212,7 +217,27 @@ export default function AdminChartsEditions() {
           programRows.map((program) => [asString(program.id), program])
         );
 
-        setEditions(rows.map((row) => toAdminEdition(row, programById)));
+        const editionIds = rows.map((row) => asString(row.id)).filter(Boolean);
+        let runRows: DbRow[] = [];
+
+        if (editionIds.length > 0) {
+          const { data: runs, error: runError } = await supabase
+            .from("chart_ingest_runs")
+            .select("id, commit_edition_id, status, updated_at")
+            .in("commit_edition_id", editionIds);
+
+          if (runError) {
+            setToastMsg(`Loaded editions, but failed to load linked ingest runs: ${runError.message}`);
+          }
+
+          runRows = (runs ?? []) as DbRow[];
+        }
+
+        const runByEditionId = new Map(
+          runRows.map((run) => [asString(run.commit_edition_id), run])
+        );
+
+        setEditions(rows.map((row) => toAdminEdition(row, programById, runByEditionId)));
       }
 
       setLoading(false);
