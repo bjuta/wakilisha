@@ -13,11 +13,13 @@ import {
   runEligibility,
   runScoring,
   runShortlist,
+  getChartPlaybackReadiness,
 } from "@/services/chartsIngestion/client";
 import { validateRunReadinessAsync } from "@/services/chartsIngestion/productionAdapter";
 import { SkeletonBlock } from "@/components/skeletons/Skeletons";
 import type { CommitIngestRunResponse, CommitValidationResult } from "@/services/chartsIngestion/commitTypes";
 import type { IngestRun, IngestStageStatus, ResourceGuardStatus } from "@/services/chartsIngestion/ingestStudioTypes";
+import type { ChartPlaybackReadiness } from "@/services/chartsIngestion/playbackReadiness";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { WkIcon } from "@/components/design-system/Icon";
 
@@ -144,6 +146,111 @@ function RunStatusBadge({ status }: { status: string }) {
   );
 }
 
+function PlaybackReadinessPanel({
+  readiness,
+  loading,
+  error,
+  run,
+}: {
+  readiness: ChartPlaybackReadiness | null;
+  loading: boolean;
+  error: string | null;
+  run: IngestRun;
+}) {
+  const top10Ready = readiness?.top10Entries
+    ? readiness.top10Playable === readiness.top10Entries
+    : false;
+
+  return (
+    <WkSurface className="p-5">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <WkIcon name="Radio" size={16} className={top10Ready ? "text-wk-success" : "text-wk-warning"} />
+          <h2 className="text-[14px] font-bold text-wk-text">Playback Readiness</h2>
+        </div>
+        {loading && (
+          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-wk-info">
+            <WkIcon name="Loader" size={11} className="animate-spin" />
+            Checking
+          </span>
+        )}
+      </div>
+
+      {error ? (
+        <div className="rounded-lg border border-wk-danger/20 bg-wk-danger-soft p-3">
+          <p className="text-[12px] font-semibold text-wk-danger">Could not check playback readiness</p>
+          <p className="mt-1 text-[11px] text-wk-danger/90">{error}</p>
+        </div>
+      ) : readiness ? (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-lg bg-wk-surface-raised p-3">
+              <p className="mb-1 text-[11px] text-wk-text-muted">Top 10 playable</p>
+              <p className={`text-[20px] font-black ${top10Ready ? "text-wk-success" : "text-wk-warning"}`}>
+                {readiness.top10Playable}/{readiness.top10Entries}
+              </p>
+            </div>
+            <div className="rounded-lg bg-wk-surface-raised p-3">
+              <p className="mb-1 text-[11px] text-wk-text-muted">Edition playable</p>
+              <p className="text-[20px] font-black text-wk-brand">
+                {readiness.playableEntries}/{readiness.totalEntries}
+              </p>
+            </div>
+          </div>
+
+          <div className={`rounded-lg border p-3 ${
+            top10Ready
+              ? "border-wk-success/20 bg-wk-success-soft"
+              : "border-wk-warning/20 bg-wk-warning-soft"
+          }`}>
+            <p className={`text-[12px] font-bold ${top10Ready ? "text-wk-success" : "text-wk-warning"}`}>
+              {top10Ready
+                ? "Top 10 is Apple Music ready"
+                : "Commit blocked until the top 10 is playable"}
+            </p>
+            <p className="mt-1 text-[11px] text-wk-text-muted">
+              Missing registry tracks: {readiness.missingRegistryTracks}. Missing Apple Music links: {readiness.missingProviderLinks}.
+            </p>
+          </div>
+
+          {!top10Ready && (
+            <div className="rounded-lg border border-wk-border bg-wk-surface-raised p-3">
+              <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-wk-text-muted">Run before publishing</p>
+              <code className="mt-2 block whitespace-pre-wrap break-words rounded-md bg-wk-surface px-3 py-2 text-[11px] text-wk-text">
+{`npm run registry:phase9:apple-music-chart-enrichment -- \
+  --run-id=${run.id} \
+  --storefront=ke \
+  --limit=${run.chartSize || readiness.totalEntries || 100} \
+  --min-auto-accept=0.90 \
+  --write`}
+              </code>
+            </div>
+          )}
+
+          {readiness.missingRows.length > 0 && (
+            <div className="max-h-44 overflow-auto rounded-lg border border-wk-border">
+              {readiness.missingRows.slice(0, 8).map((row) => (
+                <div key={`${row.rank}-${row.title}`} className="flex items-start gap-2 border-b border-wk-border px-3 py-2 last:border-b-0">
+                  <span className="mt-0.5 w-6 shrink-0 text-[11px] font-black text-wk-text-muted">#{row.rank}</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[12px] font-semibold text-wk-text">{row.title}</p>
+                    <p className="truncate text-[11px] text-wk-text-muted">{row.artist}</p>
+                  </div>
+                  <span className="shrink-0 rounded bg-wk-surface px-1.5 py-0.5 text-[10px] font-semibold text-wk-text-muted">
+                    {row.reason.replace(/_/g, " ")}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
+        <p className="text-[12px] text-wk-text-muted">Playback readiness appears once the run reaches commit readiness.</p>
+      )}
+    </WkSurface>
+  );
+}
+
 export default function AdminChartsIngestRunDetail() {
   const { runId } = useParams<{ runId: string }>();
   const navigate = useNavigate();
@@ -156,6 +263,9 @@ export default function AdminChartsIngestRunDetail() {
   const [commitError, setCommitError] = useState<string | null>(null);
   const [stageLoading, setStageLoading] = useState<string | null>(null);
   const [commitValidation, setCommitValidation] = useState<CommitValidationResult | null>(null);
+  const [playbackReadiness, setPlaybackReadiness] = useState<ChartPlaybackReadiness | null>(null);
+  const [playbackReadinessLoading, setPlaybackReadinessLoading] = useState(false);
+  const [playbackReadinessError, setPlaybackReadinessError] = useState<string | null>(null);
 
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -243,6 +353,40 @@ export default function AdminChartsIngestRunDetail() {
     load();
     return () => { cancelled = true; };
   }, [run?.id, run?.status]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadPlaybackReadiness() {
+      if (!run || (run.status !== "dry_run_complete" && run.status !== "ready_to_commit")) {
+        setPlaybackReadiness(null);
+        setPlaybackReadinessError(null);
+        setPlaybackReadinessLoading(false);
+        return;
+      }
+
+      setPlaybackReadinessLoading(true);
+      setPlaybackReadinessError(null);
+
+      try {
+        const readiness = await getChartPlaybackReadiness(run.id, "apple_music");
+        if (!cancelled) setPlaybackReadiness(readiness);
+      } catch (err) {
+        if (!cancelled) {
+          setPlaybackReadiness(null);
+          setPlaybackReadinessError(err instanceof Error ? err.message : "Playback readiness failed");
+        }
+      } finally {
+        if (!cancelled) setPlaybackReadinessLoading(false);
+      }
+    }
+
+    loadPlaybackReadiness();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [run?.id, run?.status, run?.updatedAt]);
 
   async function handleCommit() {
     if (!runId || !run) return;
@@ -360,6 +504,7 @@ export default function AdminChartsIngestRunDetail() {
   const doneStages = run.stages.filter((s) => s.status === "done").length;
   const progressPct = Math.round((doneStages / run.stages.length) * 100);
   const canCommit = (run.status === "dry_run_complete" || run.status === "ready_to_commit") && !commitResult;
+  const playbackGatePassed = playbackReadiness?.canPublish === true;
   const canCancel = run.status === "running" || run.status === "dry_run_complete" || run.status === "ready_to_commit";
   const canRetry = run.status === "failed" || run.status === "cancelled";
   const canSendGaps = run.status === "dry_run_complete" && run.summary.gaps > 0;
@@ -367,6 +512,8 @@ export default function AdminChartsIngestRunDetail() {
   // Get commit readiness for button tooltip (fetched async via useEffect above)
   const commitButtonTitle = !commitValidation?.canCommit && commitValidation?.errors?.[0]
     ? commitValidation.errors[0].message
+    : !playbackGatePassed
+    ? "Top 10 Apple Music playback must be ready before publishing"
     : "Commit this edition to V2";
 
   return (
@@ -470,8 +617,10 @@ export default function AdminChartsIngestRunDetail() {
               />
               {actionLoading === "commit"
                 ? "Committing…"
-                : commitValidation?.canCommit
+                : commitValidation?.canCommit && playbackGatePassed
                 ? "Commit Edition to V2"
+                : !playbackGatePassed
+                ? "Playback Blocked"
                 : "Commit Blocked"}
             </button>
           )}
@@ -507,6 +656,15 @@ export default function AdminChartsIngestRunDetail() {
           )}
         </div>
       </div>
+
+      {canCommit && (
+        <PlaybackReadinessPanel
+          readiness={playbackReadiness}
+          loading={playbackReadinessLoading}
+          error={playbackReadinessError}
+          run={run}
+        />
+      )}
 
       {/* Pipeline */}
       <WkSurface className="p-5">

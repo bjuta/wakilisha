@@ -7,6 +7,7 @@ const { Pool } = pg;
 type JsonRecord = Record<string, unknown>;
 
 type Args = {
+  runId: string | null;
   program: string | null;
   edition: string | null;
   storefront: string;
@@ -330,6 +331,7 @@ async function detectRuntimeSchema(client: PoolClient): Promise<RuntimeSchemaInf
 
 function parseArgs(): Args {
   return {
+    runId: getArg('run-id'),
     program: getArg('program'),
     edition: getArg('edition'),
     storefront: (getArg('storefront') ?? 'ke').toLowerCase(),
@@ -552,8 +554,50 @@ async function searchAppleSong(
 }
 
 async function loadChartEntries(client: PoolClient, args: Args, schema: RuntimeSchemaInfo): Promise<ChartEntryRow[]> {
+  if (args.runId) {
+    const result = await client.query<ChartEntryRow>(
+      `
+        select
+          c.id as entry_id,
+          null::uuid as edition_id,
+          r.edition_date::text as edition_slug,
+          r.program_id,
+          coalesce(r.series_slug, r.program_id) as public_slug,
+          null::text as source_family_slug,
+          r.market_slug,
+          row_number() over (order by c.created_at asc, c.id asc)::integer as rank,
+          split_part(c.normalized_key, '::', 1) as track_slug,
+          c.title as track_title,
+          c.artist_display as artist_name,
+          c.artwork_url,
+          '{}'::jsonb as raw_payload,
+          rt.id as track_id,
+          rt.slug as registry_slug,
+          rt.title as registry_title,
+          coalesce(rt.metadata, '{}'::jsonb) as registry_metadata,
+          rt.duration_ms as registry_duration_ms,
+          rt.preview_url as registry_preview_url,
+          rt.artwork_url as registry_artwork_url
+        from public.chart_ingest_candidates c
+        join public.chart_ingest_runs r on r.id = c.run_id
+        left join public.registry_tracks rt on rt.slug = split_part(c.normalized_key, '::', 1)
+        where c.run_id = $1
+          and c.status = 'eligible'
+        order by c.created_at asc, c.id asc
+        limit $2
+      `,
+      [args.runId, args.limit],
+    );
+
+    return result.rows.map((row) => ({
+      ...row,
+      raw_payload: row.raw_payload ?? {},
+      registry_metadata: row.registry_metadata ?? {},
+    }));
+  }
+
   if (!args.edition) {
-    throw new Error('Provide --edition=<edition-slug>, for example --edition=2025-12-29.');
+    throw new Error('Provide --edition=<edition-slug> or --run-id=<chart_ingest_run_id>.');
   }
 
   const rawPayloadSelect = schema.chartEntryRawPayloadColumn
@@ -805,7 +849,7 @@ async function writeProviderMatch(
     [entry.track_id, JSON.stringify(providerPayload), song.id],
   );
 
-  if (schema.chartEntryRawPayloadColumn) {
+  if (schema.chartEntryRawPayloadColumn && entry.edition_id) {
     await client.query(
       `
         update public.wk_chart_entries_v2
@@ -848,8 +892,9 @@ async function run(): Promise<void> {
   console.log('\nWAKILISHA Phase 9 Apple Music Chart Playback Enrichment');
   console.log('='.repeat(80));
   console.log(`Mode: ${args.write ? 'WRITE' : 'DRY RUN'}`);
+  console.log(`Run ID: ${args.runId ?? 'none'}`);
   console.log(`Program: ${args.program ?? 'any'}`);
-  console.log(`Edition: ${args.edition ?? 'missing'}`);
+  console.log(`Edition: ${args.edition ?? 'none'}`);
   console.log(`Storefront: ${args.storefront}`);
   console.log(`Limit: ${args.limit}`);
   console.log(`Force existing matches: ${args.force}`);
