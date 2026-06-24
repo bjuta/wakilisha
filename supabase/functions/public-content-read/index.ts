@@ -1,5 +1,5 @@
-// ── Public Content Read Gateway v16 — public API, no JWT required ──
-// v16: Track detail release-context enrichment from registry_release_tracks
+// ── Public Content Read Gateway v17 — public API, no JWT required ──
+// v17: Track detail release-context enrichment without registry_releases.track_count assumption
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -647,7 +647,7 @@ Deno.serve(async (req) => {
           const { data: candidateReleases } = candidateReleaseIds.length > 0
             ? await supabase
                 .from("registry_releases")
-                .select("id, release_type, release_date, track_count, status")
+                .select("id, release_type, release_date, status")
                 .in("id", candidateReleaseIds)
                 .in("status", ["active", "draft"])
             : { data: [] };
@@ -664,13 +664,9 @@ Deno.serve(async (req) => {
             .sort((a: any, b: any) => {
               const aType = String(a.release.release_type || "").toLowerCase();
               const bType = String(b.release.release_type || "").toLowerCase();
-              const aLongForm = longFormTypes.has(aType) || Number(a.release.track_count || 0) > 1 ? 0 : 1;
-              const bLongForm = longFormTypes.has(bType) || Number(b.release.track_count || 0) > 1 ? 0 : 1;
+              const aLongForm = longFormTypes.has(aType) ? 0 : 1;
+              const bLongForm = longFormTypes.has(bType) ? 0 : 1;
               if (aLongForm !== bLongForm) return aLongForm - bLongForm;
-
-              const aCount = Number(a.release.track_count || 0);
-              const bCount = Number(b.release.track_count || 0);
-              if (aCount !== bCount) return bCount - aCount;
 
               const aDate = new Date(String(a.release.release_date || "1900-01-01")).getTime();
               const bDate = new Date(String(b.release.release_date || "1900-01-01")).getTime();
@@ -685,7 +681,7 @@ Deno.serve(async (req) => {
       const { data: release } = releaseIdFromMembership
         ? await supabase
             .from("registry_releases")
-            .select("id, slug, title, release_date, release_type, artwork_url, label_id, track_count, metadata")
+            .select("id, slug, title, release_date, release_type, artwork_url, label_id, metadata")
             .eq("id", releaseIdFromMembership)
             .maybeSingle()
         : { data: null };
@@ -744,7 +740,7 @@ Deno.serve(async (req) => {
       const firstChartedDate = (historyEntries ?? []).length > 0 ? (historyEntries as any[])[0].release_date || "" : "";
       const sourceProviders: string[] = Array.isArray(trackMeta.source_providers) ? (trackMeta.source_providers as string[]) : [];
       const artistsWithRoles = (trackArtists ?? []).map((ta: any) => ({ name: String(ta.artist_name_text || ta.artist_slug || ""), slug: String(ta.artist_slug || ""), isPrimary: Boolean(ta.is_primary), isFeatured: Boolean(ta.is_featured), creditOrder: Number(ta.credit_order || 0), role: String(ta.role || "primary") }));
-      data = { track: { id: String(track.id), slug: String(track.slug), title: String(track.title), durationMs: track.duration_ms || 0, artworkUrl: track.artwork_url || "", isrc: track.isrc || null, explicit: track.explicit || false, trackNumber: Number(releaseMembership?.track_number || track.track_number || 0), discNumber: Number(releaseMembership?.disc_number || track.disc_number || 0), metadata: track.metadata || {}, status: track.status || "active", previewUrl: track.preview_url || null, appleMusicId: readAppleMusicCatalogId(track), appleMusicCatalogId: readAppleMusicCatalogId(track) }, artists: artistsWithRoles, artist: artistsWithRoles.length > 0 ? { slug: artistsWithRoles[0].slug, name: artistsWithRoles[0].name, imageUrl: bestEntry?.artwork_url || "" } : { slug: "", name: "Unknown", imageUrl: "" }, release: release ? { id: String(release.id), slug: String(release.slug), title: String(release.title), releaseDate: release.release_date || "", releaseType: String(release.release_type || "single"), artworkUrl: release.artwork_url || "", trackCount: releaseTrackCountResult.count || Number(release.track_count || 0), labelName: label?.name || "", labelSlug: label?.slug || "", tracks: releaseTracks } : null, label: label ? { slug: String(label.slug), name: String(label.name), countryCode: label.country_code || null } : null, genres: genres2, chartHistory: chartHistoryUnique, chartAppearances: allChartAppearances, chartAppearanceCount: allChartAppearances.length, peakRank, weeksOnChart: historyEntries ? historyEntries.length : 0, currentRank: bestEntry ? Number(bestEntry.rank) : null, previousRank: prevRank, movement, movementAmount, previewUrl: track.preview_url || null, appleMusicId: readAppleMusicCatalogId(track), appleMusicCatalogId: readAppleMusicCatalogId(track), firstChartedDate, editionLabels: editionLabelsAll, sourceProviders };
+      data = { track: { id: String(track.id), slug: String(track.slug), title: String(track.title), durationMs: track.duration_ms || 0, artworkUrl: track.artwork_url || "", isrc: track.isrc || null, explicit: track.explicit || false, trackNumber: Number(releaseMembership?.track_number || track.track_number || 0), discNumber: Number(releaseMembership?.disc_number || track.disc_number || 0), metadata: track.metadata || {}, status: track.status || "active", previewUrl: track.preview_url || null, appleMusicId: readAppleMusicCatalogId(track), appleMusicCatalogId: readAppleMusicCatalogId(track) }, artists: artistsWithRoles, artist: artistsWithRoles.length > 0 ? { slug: artistsWithRoles[0].slug, name: artistsWithRoles[0].name, imageUrl: bestEntry?.artwork_url || "" } : { slug: "", name: "Unknown", imageUrl: "" }, release: release ? { id: String(release.id), slug: String(release.slug), title: String(release.title), releaseDate: release.release_date || "", releaseType: String(release.release_type || "single"), artworkUrl: release.artwork_url || "", trackCount: releaseTrackCountResult.count || releaseTracks.length || 0, labelName: label?.name || "", labelSlug: label?.slug || "", tracks: releaseTracks } : null, label: label ? { slug: String(label.slug), name: String(label.name), countryCode: label.country_code || null } : null, genres: genres2, chartHistory: chartHistoryUnique, chartAppearances: allChartAppearances, chartAppearanceCount: allChartAppearances.length, peakRank, weeksOnChart: historyEntries ? historyEntries.length : 0, currentRank: bestEntry ? Number(bestEntry.rank) : null, previousRank: prevRank, movement, movementAmount, previewUrl: track.preview_url || null, appleMusicId: readAppleMusicCatalogId(track), appleMusicCatalogId: readAppleMusicCatalogId(track), firstChartedDate, editionLabels: editionLabelsAll, sourceProviders };
     }
 
     else if (path === "/charts" || path === "/charts/") { const { data: programs } = await supabase.from("wk_chart_programs_v2").select("id, public_slug, public_label, source_family_slug, series_slug, market_slug, chart_size, default_period_type, default_methodology_version").order("public_label", { ascending: true }); const programsWithEditions = await Promise.all((programs ?? []).map(async (p: any) => { const { data: editions } = await supabase.from("wk_chart_editions_v2").select("edition_slug, edition_label, edition_date, period_start, period_end, entry_count, status").eq("program_id", p.id).eq("status", "published").order("edition_date", { ascending: false }); const latestEdition = editions && editions.length > 0 ? { id: String(editions[0].edition_slug), slug: String(editions[0].edition_slug), label: String(editions[0].edition_label), date: String(editions[0].edition_date), periodStart: editions[0].period_start || null, periodEnd: editions[0].period_end || null, entryCount: editions[0].entry_count || 0 } : null; return { id: String(p.id), publicSlug: String(p.public_slug), publicLabel: String(p.public_label), shortLabel: String(p.public_label), sourceFamilySlug: String(p.source_family_slug || p.public_slug), seriesSlug: String(p.series_slug || ""), seriesLabel: String(p.series_slug || ""), marketSlug: String(p.market_slug || ""), marketLabel: String(p.market_slug || ""), periodType: String(p.default_period_type || "weekly"), methodologyVersion: String(p.default_methodology_version || "legacy-import-v1"), eligibilityRulesVersion: "legacy-import-v1", latestEdition, archive: (editions ?? []).map((e: any) => ({ id: String(e.edition_slug), slug: String(e.edition_slug), label: String(e.edition_label), date: String(e.edition_date), periodStart: e.period_start || null, periodEnd: e.period_end || null, entryCount: e.entry_count || 0 })) }; })); data = { programs: programsWithEditions }; }
