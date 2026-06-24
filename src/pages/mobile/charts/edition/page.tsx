@@ -30,6 +30,7 @@ import { ChartRefreshButton } from "@/components/charts/ChartRefreshButton";
 import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 import { trackUrl } from "@/utils/trackUrl";
 import { enrichChartEntriesWithPlaybackData } from "@/services/chartsPublic/playbackEnrichment";
+import { PlaybackAccessNotice } from "@/components/playback/PlaybackAccessNotice";
 
 // ─── Constants ───
 const INITIAL_COUNT = 15;
@@ -420,12 +421,11 @@ export default function MobileChartEdition() {
             </Link>
           </div>
 
-          {hasApplePlaybackTracks && (
-            <div className="mt-3 rounded-2xl border border-[var(--wk-brand)]/25 bg-[var(--wk-brand)]/10 px-3 py-2.5 text-[11px] font-semibold leading-snug text-[var(--wk-text-soft)]">
-              <span className="font-black text-[var(--wk-brand)]">Full tracks available.</span>{" "}
-              Connect Apple Music from the player to listen through this chart on WAKILISHA.
-            </div>
-          )}
+          <PlaybackAccessNotice
+            hasApplePlayback={hasApplePlaybackTracks}
+            className="mt-3"
+            compact
+          />
 
           {/* #1 track card */}
           <div className="mt-5 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)]/80 backdrop-blur-sm p-3.5">

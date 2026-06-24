@@ -43,6 +43,7 @@ import {
   type ContextAnchorTarget,
 } from "@/components/feature/community/ContextAnchorCommentDrawer";
 import type { ContextAnchorSummaryItem } from "@/services/community";
+import { PlaybackAccessNotice } from "@/components/playback/PlaybackAccessNotice";
 
 const rankTone = (rank: number) =>
   rank === 1 ? "gold" : rank === 2 ? "silver" : rank === 3 ? "bronze" : "";
@@ -403,11 +404,10 @@ export default function ChartEdition() {
               Back to charts
             </Link>
           </div>
-          {hasApplePlaybackTracks && (
-            <p className="mt-3 max-w-xl text-[12px] font-semibold text-white/72">
-              Full tracks available. Connect Apple Music from the player to listen through this chart without leaving WAKILISHA.
-            </p>
-          )}
+          <PlaybackAccessNotice
+            hasApplePlayback={hasApplePlaybackTracks}
+            className="mt-3 max-w-xl"
+          />
         </div>
       </main>
     );

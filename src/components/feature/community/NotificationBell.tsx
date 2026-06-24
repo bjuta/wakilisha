@@ -9,6 +9,12 @@ import {
 import type { CommunityNotification, CommunityProfile } from '@/services/community';
 import { trackEvent } from '@/services/analytics';
 import { WkIcon } from '@/components/design-system/Icon';
+import { useUserSettings } from '@/hooks/useUserSettings';
+import {
+  dismissFullPlaybackNotice,
+  FULL_PLAYBACK_NOTICE_EVENT,
+  isAppleMusicPlaybackConnected,
+} from '@/services/playback/fullPlaybackNotice';
 
 interface NotificationWithActor extends CommunityNotification {
   actor: CommunityProfile | null;
@@ -58,9 +64,56 @@ export function NotificationBell({ userId, className = '', placement = 'auto' }:
   const [notifications, setNotifications] = useState<NotificationWithActor[]>([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [productNoticeVersion, setProductNoticeVersion] = useState(0);
+  const { playback } = useUserSettings();
   const containerRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval>>();
   const isMobileNav = className.includes('phn-nav-tab');
+
+  useEffect(() => {
+    const syncProductNotices = () => setProductNoticeVersion((v) => v + 1);
+
+    window.addEventListener(FULL_PLAYBACK_NOTICE_EVENT, syncProductNotices);
+    window.addEventListener("wk-playback-changed", syncProductNotices);
+    window.addEventListener("wk-apple-music-connected", syncProductNotices);
+
+    return () => {
+      window.removeEventListener(FULL_PLAYBACK_NOTICE_EVENT, syncProductNotices);
+      window.removeEventListener("wk-playback-changed", syncProductNotices);
+      window.removeEventListener("wk-apple-music-connected", syncProductNotices);
+    };
+  }, []);
+
+  const showFullPlaybackAlert = !isAppleMusicPlaybackConnected(playback);
+
+  const renderFullPlaybackAlert = () => {
+    if (!showFullPlaybackAlert) return null;
+
+    return (
+      <div className="border-b border-[var(--wk-border)]/50 bg-[var(--wk-brand-soft)]/25 px-5 py-3.5">
+        <div className="flex items-start gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--wk-brand)]/15 text-[var(--wk-brand)]">
+            <WkIcon name="Music" size={15} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-[13px] font-black text-[var(--wk-text)]">Full playback is available</div>
+            <p className="mt-0.5 text-[11px] font-semibold leading-snug text-[var(--wk-text-muted)]">
+              Connect Apple Music from the player whenever you want full tracks on WAKILISHA.
+            </p>
+            <button
+              type="button"
+              onClick={dismissFullPlaybackNotice}
+              className="mt-2 text-[11px] font-black text-[var(--wk-brand)] hover:text-[var(--wk-brand-hi)]"
+            >
+              Hide this notice on pages
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  void productNoticeVersion;
 
   // Fetch unread count
   const fetchUnread = useCallback(async () => {
@@ -215,7 +268,7 @@ export function NotificationBell({ userId, className = '', placement = 'auto' }:
                 <div className="flex items-center justify-center py-12">
                   <i className="ri-loader-4-line animate-spin text-[20px] text-[var(--wk-text-muted)]" />
                 </div>
-              ) : notifications.length === 0 ? (
+              ) : notifications.length === 0 && !showFullPlaybackAlert ? (
                 <div className="text-center py-12 px-5">
                   <div className="w-10 h-10 mx-auto mb-3 rounded-full bg-[var(--wk-surface)] flex items-center justify-center">
                     <i className="ri-notification-off-line text-[18px] text-[var(--wk-text-faint)]" />
@@ -224,7 +277,9 @@ export function NotificationBell({ userId, className = '', placement = 'auto' }:
                   <p className="text-[11px] text-[var(--wk-text-faint)] mt-1">When someone replies or comments on threads you follow, it will show up here.</p>
                 </div>
               ) : (
-                notifications.map((notif) => {
+                <>
+                  {renderFullPlaybackAlert()}
+                  {notifications.map((notif) => {
                   const link = getNotificationLink(notif);
                   const icon = NOTIFICATION_ICONS[notif.notificationType] || 'ri-notification-line';
                   const label = NOTIFICATION_LABELS[notif.notificationType] || notif.notificationType;
@@ -293,7 +348,8 @@ export function NotificationBell({ userId, className = '', placement = 'auto' }:
                       {content}
                     </div>
                   );
-                })
+                })}
+                </>
               )}
             </div>
           </div>
@@ -340,7 +396,7 @@ export function NotificationBell({ userId, className = '', placement = 'auto' }:
               <div className="flex items-center justify-center py-12">
                 <i className="ri-loader-4-line animate-spin text-[20px] text-[var(--wk-text-muted)]" />
               </div>
-            ) : notifications.length === 0 ? (
+            ) : notifications.length === 0 && !showFullPlaybackAlert ? (
               <div className="text-center py-12 px-5">
                 <div className="w-10 h-10 mx-auto mb-3 rounded-full bg-[var(--wk-surface)] flex items-center justify-center">
                   <i className="ri-notification-off-line text-[18px] text-[var(--wk-text-faint)]" />
@@ -349,7 +405,9 @@ export function NotificationBell({ userId, className = '', placement = 'auto' }:
                 <p className="text-[11px] text-[var(--wk-text-faint)] mt-1">When someone replies or comments on threads you follow, it will show up here.</p>
               </div>
             ) : (
-              notifications.map((notif) => {
+              <>
+                {renderFullPlaybackAlert()}
+                {notifications.map((notif) => {
                 const link = getNotificationLink(notif);
                 const icon = NOTIFICATION_ICONS[notif.notificationType] || 'ri-notification-line';
                 const label = NOTIFICATION_LABELS[notif.notificationType] || notif.notificationType;
@@ -418,7 +476,8 @@ export function NotificationBell({ userId, className = '', placement = 'auto' }:
                     {content}
                   </div>
                 );
-              })
+              })}
+              </>
             )}
           </div>
         </div>
