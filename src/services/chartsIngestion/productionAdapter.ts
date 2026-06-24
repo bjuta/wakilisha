@@ -55,6 +55,33 @@ interface DbRunSource {
   fetch_status: string;
 }
 
+interface DbCandidate {
+  id: string;
+  run_id: string;
+  normalized_key: string | null;
+  lead_artist_key: string | null;
+  title: string | null;
+  artist_display: string | null;
+  status: string | null;
+  source_count: number | null;
+  occurrence_count: number | null;
+  artwork_url: string | null;
+  external_url: string | null;
+  preview_url: string | null;
+  source_urls_seen: string[] | null;
+  created_at: string | null;
+}
+
+interface DbExclusion {
+  id: string;
+  run_id: string;
+  candidate_id: string | null;
+  reason_code?: string | null;
+  reason?: string | null;
+  reason_label?: string | null;
+  details_json?: Record<string, unknown> | null;
+}
+
 interface DbRun {
   id: string;
   program_id: string;
@@ -80,6 +107,8 @@ interface DbRun {
   notes: string | null;
   chart_ingest_run_sources?: DbRunSource[];
   chart_ingest_stage_events?: DbStageEvent[];
+  chart_ingest_candidates?: DbCandidate[];
+  chart_ingest_exclusions?: DbExclusion[];
   candidateCounts?: {
     total: number;
     eligible: number;
@@ -115,11 +144,68 @@ async function invokeApi<T>(
 }
 
 // ── DB → UI mapper ────────────────────────────────────────────────────────────
+function detectedProviderFromSources(sources: DbRunSource[]): "spotify" | "apple_music" {
+  const provider = sources.find((source) => source.provider === "spotify" || source.provider === "apple_music")?.provider;
+  return provider === "apple_music" ? "apple_music" : "spotify";
+}
+
 function mapDbRunToUi(dbRun: DbRun): IngestRun {
   const snapshot = dbRun.rule_snapshot_json ?? {};
   const sources = (dbRun.chart_ingest_run_sources ?? []).filter((s) => s.enabled);
   const dbStages = dbRun.chart_ingest_stage_events ?? [];
   const counts = dbRun.candidateCounts;
+  const exclusions = dbRun.chart_ingest_exclusions ?? [];
+  const exclusionByCandidateId = new Map(
+    exclusions
+      .filter((exclusion) => Boolean(exclusion.candidate_id))
+      .map((exclusion) => [exclusion.candidate_id as string, exclusion])
+  );
+
+  const candidateRows = (dbRun.chart_ingest_candidates ?? []).map((candidate, index) => {
+    const exclusion = exclusionByCandidateId.get(candidate.id);
+    const status = (candidate.status ?? "").toLowerCase();
+    const reason = exclusion?.reason_code ?? exclusion?.reason ?? "";
+    const isDuplicate = reason === "duplicate_track";
+    const isExcluded = status === "excluded";
+
+    return {
+      id: candidate.id,
+      rank: index + 1,
+      sourceProvider: detectedProviderFromSources(dbRun.chart_ingest_run_sources ?? []),
+      sourceUrl: candidate.source_urls_seen?.[0] ?? dbRun.chart_ingest_run_sources?.[0]?.source_url ?? "",
+      title: candidate.title ?? "Untitled",
+      artistNames: (candidate.artist_display ?? "Unknown Artist")
+        .split(/\s*,\s*|\s+&\s+|\s+x\s+/i)
+        .map((artist) => artist.trim())
+        .filter(Boolean),
+      artworkUrl: candidate.artwork_url ?? null,
+      previewUrl: candidate.preview_url ?? null,
+      externalUrl: candidate.external_url ?? null,
+      matchStatus: isDuplicate
+        ? "duplicate_candidate"
+        : status === "needs_review"
+        ? "needs_review"
+        : isExcluded
+        ? "no_match"
+        : "canonical",
+      confidence: isExcluded ? 0 : Math.min(100, Math.max(0, Number(candidate.source_count ?? 1) * 50)),
+      warnings: [
+        reason || null,
+        exclusion?.reason_label ?? null,
+      ].filter(Boolean) as string[],
+      excludedRowId: exclusion?.id ?? null,
+      raw: {
+        status,
+        reasonCode: reason,
+        reasonLabel: exclusion?.reason_label ?? null,
+        occurrenceCount: candidate.occurrence_count,
+        sourceCount: candidate.source_count,
+        details: exclusion?.details_json ?? null,
+      },
+      normalized_key: candidate.normalized_key ?? "",
+      lead_artist_key: candidate.lead_artist_key ?? "",
+    };
+  });
 
   // Build ordered stages
   const stageMap = new Map<string, DbStageEvent>(
@@ -202,8 +288,8 @@ function mapDbRunToUi(dbRun: DbRun): IngestRun {
       scoringMethodologyVersion:
         dbRun.methodology_version ?? "1.0.0",
     },
-    rows: [],          // Populated from chart_ingest_candidates via separate call
-    excludedRows: [],
+    rows: candidateRows,
+    excludedRows: candidateRows.filter((row) => row.matchStatus === "no_match" || row.matchStatus === "duplicate_candidate"),
     commercialReadiness: null,
     rowIntelligence: {},
     createdBy: dbRun.created_by_email ?? dbRun.created_by ?? "Unknown",
@@ -235,7 +321,19 @@ export async function getIngestRuns(): Promise<IngestRun[]> {
 export async function getIngestRun(runId: string): Promise<IngestRun | null> {
   try {
     const { run } = await invokeApi<{ run: DbRun }>("get_run", { runId });
-    return run ? mapDbRunToUi(run) : null;
+
+    if (!run) return null;
+
+    const [{ candidates }, { exclusions }] = await Promise.all([
+      invokeApi<{ candidates: DbCandidate[] }>("get_candidates", { runId, limit: 500 }),
+      invokeApi<{ exclusions: DbExclusion[] }>("get_exclusions", { runId, limit: 500 }).catch(() => ({ exclusions: [] })),
+    ]);
+
+    return mapDbRunToUi({
+      ...run,
+      chart_ingest_candidates: candidates ?? [],
+      chart_ingest_exclusions: exclusions ?? [],
+    });
   } catch (err) {
     if (err instanceof Error && err.message.includes("run_not_found")) {
       return null;
@@ -415,7 +513,8 @@ export async function getRecentIngestActivity(): Promise<
   }));
 }
 
-function mapActionToActivityType(action: string): RecentIngestActivity["type"] {
+function mapActionToActivityType(actionValue: unknown): RecentIngestActivity["type"] {
+  const action = typeof actionValue === "string" ? actionValue : "";
   if (action.includes("commit") || action === "run_committed" || action === "published") return "commit";
   if (action.includes("cancel")) return "cancel";
   if (action.includes("retry")) return "retry";
@@ -423,7 +522,8 @@ function mapActionToActivityType(action: string): RecentIngestActivity["type"] {
   return "dry_run";
 }
 
-function mapActionToStatus(action: string): IngestRunStatus {
+function mapActionToStatus(actionValue: unknown): IngestRunStatus {
+  const action = typeof actionValue === "string" ? actionValue : "";
   if (action.includes("commit") || action === "run_committed") return "committed";
   if (action === "published") return "published";
   if (action.includes("cancel")) return "cancelled";
@@ -433,6 +533,7 @@ function mapActionToStatus(action: string): IngestRunStatus {
   if (action.includes("running")) return "running";
   return "queued";
 }
+
 
 /** Resource guard status for a specific run. */
 export async function getResourceGuardStatus(
@@ -734,4 +835,111 @@ export async function reingestEdition(params: {
     editionId: params.editionId,
     dryRun: params.dryRun ?? true,
   });
+}
+export interface OriginReviewQueueRow {
+  reviewKey: string;
+  issueType: "unresolved_artist" | "missing_origin" | "country_mismatch" | string;
+  sourceSlug: string;
+  sourceName: string;
+  canonicalArtistId: string | null;
+  canonicalSlug: string | null;
+  canonicalName: string | null;
+  currentOriginIso2: string | null;
+  targetIso2: string;
+  impactedCandidateCount: number;
+  topScore: number;
+  examples: Array<{
+    candidateId: string;
+    title: string;
+    artistDisplay: string;
+    finalScore: number;
+    candidateStatus?: string;
+    reasonCode?: string | null;
+    reasonLabel?: string | null;
+    resolvedVia?: string;
+  }>;
+}
+
+interface DbOriginReviewQueueRow {
+  review_key: string;
+  issue_type: string;
+  source_slug: string;
+  source_name: string;
+  canonical_artist_id: string | null;
+  canonical_slug: string | null;
+  canonical_name: string | null;
+  current_origin_iso2: string | null;
+  target_iso2: string;
+  impacted_candidate_count: number;
+  top_score: number;
+  examples: OriginReviewQueueRow["examples"];
+}
+
+function mapOriginReviewRow(row: DbOriginReviewQueueRow): OriginReviewQueueRow {
+  return {
+    reviewKey: row.review_key,
+    issueType: row.issue_type,
+    sourceSlug: row.source_slug,
+    sourceName: row.source_name,
+    canonicalArtistId: row.canonical_artist_id,
+    canonicalSlug: row.canonical_slug,
+    canonicalName: row.canonical_name,
+    currentOriginIso2: row.current_origin_iso2,
+    targetIso2: row.target_iso2,
+    impactedCandidateCount: Number(row.impacted_candidate_count ?? 0),
+    topScore: Number(row.top_score ?? 0),
+    examples: Array.isArray(row.examples) ? row.examples : [],
+  };
+}
+
+export async function getOriginReviewQueue(runId: string): Promise<OriginReviewQueueRow[]> {
+  const { rows } = await invokeApi<{ rows: DbOriginReviewQueueRow[] }>("get_origin_review_queue", { runId });
+  return (rows ?? []).map(mapOriginReviewRow);
+}
+
+export async function setArtistOriginForRun(input: {
+  runId: string;
+  artistId: string;
+  originIso2: string;
+  candidateId?: string;
+  note?: string;
+}): Promise<void> {
+  await invokeApi("set_artist_origin_for_run", input);
+}
+
+export async function createOriginArtistShell(input: {
+  runId: string;
+  artistName: string;
+  originIso2: string;
+  candidateId?: string;
+}): Promise<void> {
+  await invokeApi("create_origin_artist_shell", input);
+}
+
+export interface OriginCountryOption {
+  originIso2: string;
+  label: string;
+  artistCount: number;
+}
+
+interface DbOriginCountryOption {
+  originIso2: string;
+  label: string;
+  artistCount: number;
+}
+
+export async function getOriginCountryOptions(includeIso2?: string): Promise<OriginCountryOption[]> {
+  const { options } = await invokeApi<{ options: DbOriginCountryOption[] }>("get_origin_country_options", {
+    includeIso2,
+  });
+
+  return (options ?? []).map((option) => ({
+    originIso2: option.originIso2,
+    label: option.label,
+    artistCount: Number(option.artistCount ?? 0),
+  }));
+}
+
+export async function resetAfterOriginResolution(runId: string): Promise<void> {
+  await invokeApi("reset_after_origin_resolution", { runId });
 }

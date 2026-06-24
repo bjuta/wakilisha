@@ -14,7 +14,13 @@ import {
   runScoring,
   runShortlist,
   getChartPlaybackReadiness,
+  getOriginReviewQueue,
+  setArtistOriginForRun,
+  createOriginArtistShell,
+  getOriginCountryOptions,
+  resetAfterOriginResolution,
 } from "@/services/chartsIngestion/client";
+import type { OriginReviewQueueRow, OriginCountryOption } from "@/services/chartsIngestion/client";
 import { validateRunReadinessAsync } from "@/services/chartsIngestion/productionAdapter";
 import { SkeletonBlock } from "@/components/skeletons/Skeletons";
 import type { CommitIngestRunResponse, CommitValidationResult } from "@/services/chartsIngestion/commitTypes";
@@ -251,6 +257,276 @@ function PlaybackReadinessPanel({
   );
 }
 
+
+function candidateIdFromOriginRow(row: OriginReviewQueueRow): string | undefined {
+  return row.examples?.[0]?.candidateId;
+}
+
+function countryDisplayName(iso2: string): string {
+  try {
+    const display = new Intl.DisplayNames(["en"], { type: "region" });
+    return display.of(iso2.toUpperCase()) || iso2.toUpperCase();
+  } catch {
+    return iso2.toUpperCase();
+  }
+}
+
+function OriginCountryPicker({
+  row,
+  options,
+  busy,
+  onApply,
+}: {
+  row: OriginReviewQueueRow;
+  options: OriginCountryOption[];
+  busy: boolean;
+  onApply: (row: OriginReviewQueueRow, originIso2: string) => void;
+}) {
+  const initial = (row.currentOriginIso2 || row.targetIso2 || "KE").toUpperCase();
+  const [query, setQuery] = useState("");
+  const [selectedIso2, setSelectedIso2] = useState(initial);
+
+  const mergedOptions = (() => {
+    const map = new Map<string, OriginCountryOption>();
+
+    for (const option of options) {
+      if (!option.originIso2) continue;
+      map.set(option.originIso2.toUpperCase(), {
+        ...option,
+        originIso2: option.originIso2.toUpperCase(),
+      });
+    }
+
+    for (const code of [row.targetIso2, row.currentOriginIso2, selectedIso2]) {
+      const normalized = String(code || "").toUpperCase();
+      if (/^[A-Z]{2}$/.test(normalized) && !map.has(normalized)) {
+        map.set(normalized, {
+          originIso2: normalized,
+          label: countryDisplayName(normalized),
+          artistCount: 0,
+        });
+      }
+    }
+
+    return [...map.values()].sort((a, b) => {
+      if (a.originIso2 === row.targetIso2) return -1;
+      if (b.originIso2 === row.targetIso2) return 1;
+      return countryDisplayName(a.originIso2).localeCompare(countryDisplayName(b.originIso2));
+    });
+  })();
+
+  const normalizedQuery = query.trim().toLowerCase();
+  const filtered = mergedOptions.filter((option) => {
+    const label = `${option.originIso2} ${option.label} ${countryDisplayName(option.originIso2)}`.toLowerCase();
+    return !normalizedQuery || label.includes(normalizedQuery);
+  });
+
+  return (
+    <div className="flex min-w-[230px] flex-col gap-1.5">
+      <input
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+        placeholder="Search country..."
+        className="h-8 rounded-md border border-wk-border bg-wk-surface px-2 text-[11px] text-wk-text outline-none focus:border-wk-brand"
+      />
+      <div className="flex items-center gap-1.5">
+        <select
+          value={selectedIso2}
+          onChange={(event) => setSelectedIso2(event.target.value)}
+          className="h-8 min-w-0 flex-1 rounded-md border border-wk-border bg-wk-surface px-2 text-[11px] font-semibold text-wk-text outline-none focus:border-wk-brand"
+        >
+          {filtered.map((option) => (
+            <option key={option.originIso2} value={option.originIso2}>
+              {option.originIso2} — {countryDisplayName(option.originIso2)}
+              {option.artistCount > 0 ? ` (${option.artistCount})` : ""}
+            </option>
+          ))}
+        </select>
+        <button
+          onClick={() => onApply(row, selectedIso2)}
+          disabled={busy || !selectedIso2}
+          className="h-8 shrink-0 rounded-md bg-wk-brand px-2.5 text-[11px] font-bold text-wk-brand-on disabled:opacity-50"
+        >
+          {busy ? "Saving…" : "Apply"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+
+function OriginResolutionQueuePanel({
+  rows,
+  loading,
+  actionKey,
+  originOptions,
+  onApplyOrigin,
+  onRefresh,
+  onResetStages,
+  resetLoading,
+  error,
+}: {
+  rows: OriginReviewQueueRow[];
+  loading: boolean;
+  actionKey: string | null;
+  originOptions: OriginCountryOption[];
+  onApplyOrigin: (row: OriginReviewQueueRow, originIso2: string) => void;
+  onRefresh: () => void;
+  onResetStages: () => void;
+  resetLoading: boolean;
+  error: string | null;
+}) {
+  const missingOrigin = rows.filter((row) => row.issueType === "missing_origin");
+  const unresolved = rows.filter((row) => row.issueType === "unresolved_artist");
+  const mismatched = rows.filter((row) => row.issueType === "country_mismatch");
+
+  if (!loading && rows.length === 0) {
+    return (
+      <WkSurface className="p-5">
+        <div className="flex items-center gap-2">
+          <WkIcon name="CheckCircle2" size={16} className="text-wk-success" />
+          <div>
+            <h2 className="text-[14px] font-bold text-wk-text">Origin Resolution Queue</h2>
+            <p className="mt-1 text-[12px] text-wk-text-muted">No blocked artist-origin rows for this run.</p>
+          </div>
+        </div>
+      </WkSurface>
+    );
+  }
+
+  return (
+    <WkSurface className="overflow-hidden">
+      <div className="flex items-center justify-between gap-3 border-b border-wk-border px-5 py-4">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <WkIcon name="MapPinned" size={16} className="text-wk-warning" />
+            <h2 className="text-[14px] font-bold text-wk-text">Origin Resolution Queue</h2>
+          </div>
+          <p className="mt-1 text-[12px] text-wk-text-muted">
+            Fix missing artist origin data before rerunning Eligibility, Scoring, and Shortlist.
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="rounded-full bg-wk-warning-soft px-2 py-1 text-[11px] font-bold text-wk-warning">
+            {rows.length} artists
+          </span>
+          <button
+            onClick={onResetStages}
+            disabled={resetLoading}
+            className="rounded-md border border-wk-warning/40 px-2 py-1 text-[11px] font-semibold text-wk-warning hover:bg-wk-warning-soft disabled:opacity-50"
+            title="Reset Eligibility, Scoring, Shortlist, and commit stages so they can be rerun"
+          >
+            {resetLoading ? "Resetting…" : "Reset rerun stages"}
+          </button>
+          <button
+            onClick={onRefresh}
+            className="rounded-md border border-wk-border px-2 py-1 text-[11px] font-semibold text-wk-text-muted hover:bg-wk-surface-raised"
+          >
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      {error && (
+        <div className="border-b border-wk-danger/30 bg-wk-danger-soft px-5 py-3 text-[12px] font-semibold text-wk-danger">
+          {error}
+        </div>
+      )}
+
+      <div className="grid grid-cols-3 gap-3 border-b border-wk-border px-5 py-3 text-[11px]">
+        <div className="rounded-lg bg-wk-surface-raised p-3">
+          <p className="font-bold text-wk-text">{missingOrigin.length}</p>
+          <p className="text-wk-text-muted">Missing origin</p>
+        </div>
+        <div className="rounded-lg bg-wk-surface-raised p-3">
+          <p className="font-bold text-wk-text">{unresolved.length}</p>
+          <p className="text-wk-text-muted">Unresolved artist</p>
+        </div>
+        <div className="rounded-lg bg-wk-surface-raised p-3">
+          <p className="font-bold text-wk-text">{mismatched.length}</p>
+          <p className="text-wk-text-muted">Country mismatch</p>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="p-5 text-[12px] text-wk-text-muted">Loading origin queue…</div>
+      ) : (
+        <div className="max-h-[520px] overflow-auto">
+          <table className="w-full text-left text-[12px]">
+            <thead className="sticky top-0 bg-wk-surface">
+              <tr className="border-b border-wk-border">
+                {["Issue", "Artist", "Current", "Impact", "Examples", "Action"].map((header) => (
+                  <th key={header} className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-wk-text-muted">
+                    {header}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => {
+                const displayName = row.canonicalName || row.sourceName || row.sourceSlug;
+                const issueLabel = row.issueType.replace(/_/g, " ");
+                const busy = actionKey === row.reviewKey;
+
+                return (
+                  <tr key={row.reviewKey} className="border-b border-wk-border/60">
+                    <td className="px-4 py-3">
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                        row.issueType === "missing_origin"
+                          ? "bg-wk-warning-soft text-wk-warning"
+                          : row.issueType === "unresolved_artist"
+                          ? "bg-wk-info-soft text-wk-info"
+                          : "bg-wk-danger-soft text-wk-danger"
+                      }`}>
+                        {issueLabel}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <p className="font-bold text-wk-text">{displayName}</p>
+                      <p className="mt-0.5 font-mono text-[10px] text-wk-text-faint">{row.canonicalSlug || row.sourceSlug}</p>
+                    </td>
+                    <td className="px-4 py-3 text-wk-text-muted">
+                      {row.currentOriginIso2 || "Unknown"}
+                      <span className="ml-1 text-wk-text-faint">→ {row.targetIso2}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <p className="font-bold text-wk-text">{row.impactedCandidateCount} rows</p>
+                      <p className="text-[10px] text-wk-text-muted">top score {row.topScore}</p>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="max-w-[260px] space-y-1">
+                        {row.examples.slice(0, 2).map((example) => (
+                          <p key={`${row.reviewKey}-${example.candidateId}`} className="truncate text-[11px] text-wk-text-muted">
+                            {example.title} — {example.artistDisplay}
+                          </p>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <OriginCountryPicker
+                        row={row}
+                        options={originOptions}
+                        busy={busy}
+                        onApply={onApplyOrigin}
+                      />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {rows.length > 0 && (
+        <div className="border-t border-wk-border bg-wk-surface-raised px-5 py-3 text-[11px] text-wk-text-muted">
+          Saving an origin now resets Eligibility, Scoring, Shortlist, and commit stages automatically. After resolving a batch, rerun Eligibility → Scoring → Shortlist. Artists assigned to a non-target country leave this queue and remain excluded from this chart.
+        </div>
+      )}
+    </WkSurface>
+  );
+}
+
 export default function AdminChartsIngestRunDetail() {
   const { runId } = useParams<{ runId: string }>();
   const navigate = useNavigate();
@@ -266,6 +542,12 @@ export default function AdminChartsIngestRunDetail() {
   const [playbackReadiness, setPlaybackReadiness] = useState<ChartPlaybackReadiness | null>(null);
   const [playbackReadinessLoading, setPlaybackReadinessLoading] = useState(false);
   const [playbackReadinessError, setPlaybackReadinessError] = useState<string | null>(null);
+  const [originQueue, setOriginQueue] = useState<OriginReviewQueueRow[]>([]);
+  const [originQueueLoading, setOriginQueueLoading] = useState(false);
+  const [originActionKey, setOriginActionKey] = useState<string | null>(null);
+  const [originCountryOptions, setOriginCountryOptions] = useState<OriginCountryOption[]>([]);
+  const [originError, setOriginError] = useState<string | null>(null);
+  const [originResetLoading, setOriginResetLoading] = useState(false);
 
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -387,6 +669,113 @@ export default function AdminChartsIngestRunDetail() {
       cancelled = true;
     };
   }, [run?.id, run?.status, run?.updatedAt]);
+
+  async function loadOriginCountryOptions() {
+    if (!run) return;
+
+    try {
+      const options = await getOriginCountryOptions(run.market || "KE");
+      setOriginCountryOptions(options);
+    } catch {
+      setOriginCountryOptions([]);
+    }
+  }
+
+  async function loadOriginQueue() {
+    if (!runId) return;
+    setOriginQueueLoading(true);
+    try {
+      const rows = await getOriginReviewQueue(runId);
+      setOriginQueue(rows);
+    } catch {
+      setOriginQueue([]);
+    } finally {
+      setOriginQueueLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!runId || !run) return;
+    loadOriginQueue();
+    loadOriginCountryOptions();
+  }, [runId, run?.updatedAt]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function handleApplyOrigin(row: OriginReviewQueueRow, originIso2: string) {
+    if (row.canonicalArtistId) {
+      await handleMarkOrigin(row, originIso2);
+    } else {
+      await handleCreateOriginShell(row, originIso2);
+    }
+  }
+
+  async function handleResetOriginStages() {
+    if (!runId) return;
+
+    setOriginResetLoading(true);
+    setOriginError(null);
+
+    try {
+      await resetAfterOriginResolution(runId);
+      const updated = await getIngestRun(runId);
+      setRun(updated);
+      await loadOriginQueue();
+    } catch (err) {
+      setOriginError(err instanceof Error ? err.message : "Could not reset origin-dependent stages");
+    } finally {
+      setOriginResetLoading(false);
+    }
+  }
+
+  async function handleMarkOrigin(row: OriginReviewQueueRow, originIso2: string) {
+    if (!runId || !row.canonicalArtistId) return;
+    setOriginActionKey(row.reviewKey);
+
+    setOriginError(null);
+
+    try {
+      await setArtistOriginForRun({
+        runId,
+        artistId: row.canonicalArtistId,
+        originIso2,
+        candidateId: candidateIdFromOriginRow(row),
+        note: `Resolved from chart origin queue for ${run.chartTitle}.`,
+      });
+
+      await resetAfterOriginResolution(runId);
+      const updated = await getIngestRun(runId);
+      setRun(updated);
+      await loadOriginQueue();
+    } catch (err) {
+      setOriginError(err instanceof Error ? err.message : "Could not set artist origin");
+    } finally {
+      setOriginActionKey(null);
+    }
+  }
+
+  async function handleCreateOriginShell(row: OriginReviewQueueRow, originIso2: string) {
+    if (!runId) return;
+    setOriginActionKey(row.reviewKey);
+
+    setOriginError(null);
+
+    try {
+      await createOriginArtistShell({
+        runId,
+        artistName: row.sourceName || row.sourceSlug,
+        originIso2,
+        candidateId: candidateIdFromOriginRow(row),
+      });
+
+      await resetAfterOriginResolution(runId);
+      const updated = await getIngestRun(runId);
+      setRun(updated);
+      await loadOriginQueue();
+    } catch (err) {
+      setOriginError(err instanceof Error ? err.message : "Could not create artist shell");
+    } finally {
+      setOriginActionKey(null);
+    }
+  }
 
   async function handleCommit() {
     if (!runId || !run) return;
@@ -665,6 +1054,18 @@ export default function AdminChartsIngestRunDetail() {
           run={run}
         />
       )}
+
+      <OriginResolutionQueuePanel
+        rows={originQueue}
+        loading={originQueueLoading}
+        actionKey={originActionKey}
+        originOptions={originCountryOptions}
+        onApplyOrigin={handleApplyOrigin}
+        onRefresh={loadOriginQueue}
+        onResetStages={handleResetOriginStages}
+        resetLoading={originResetLoading}
+        error={originError}
+      />
 
       {/* Pipeline */}
       <WkSurface className="p-5">

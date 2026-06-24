@@ -188,6 +188,12 @@ export const runScoring = ingestStudioAdapter.runScoring;
 export const runShortlist = ingestStudioAdapter.runShortlist;
 export const resetPipeline = ingestStudioAdapter.resetPipeline;
 export const runFullPipeline = ingestStudioAdapter.runFullPipeline;
+export const getOriginReviewQueue = ingestStudioAdapter.getOriginReviewQueue;
+export const setArtistOriginForRun = ingestStudioAdapter.setArtistOriginForRun;
+export const createOriginArtistShell = ingestStudioAdapter.createOriginArtistShell;
+export const getOriginCountryOptions = ingestStudioAdapter.getOriginCountryOptions;
+export const resetAfterOriginResolution = ingestStudioAdapter.resetAfterOriginResolution;
+export type { OriginReviewQueueRow, OriginCountryOption } from "./productionAdapter";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Legacy ingest studio (9-phase UI) — now backed by real DB tables

@@ -22,8 +22,8 @@ function json(req: Request, body: unknown, status = 200): Response { const cors 
 function safeError(req: Request, action: string, err: unknown): Response { const m = err instanceof Error ? err.message : String(err); console.error("[chart-ingest-api] "+action+" error:", m); const cors = corsRestricted(req); return new Response(JSON.stringify({ error: "internal_error", requestId: rid() }), { status: 500, headers: { ...cors, "Content-Type": "application/json" } }); }
 
 const ACTION_CAPABILITIES: Record<string, string> = {
-  list_runs:"view_charts_admin",get_run:"view_charts_admin",get_stages:"view_charts_admin",get_sources:"view_charts_admin",get_candidates:"view_charts_admin",get_normalized:"view_charts_admin",get_kpis:"view_charts_admin",get_activity:"view_charts_admin",get_resource_guard:"view_charts_admin",get_review_issues:"view_charts_admin",get_matches_for_run:"view_charts_admin",validate_commit:"view_charts_admin",preflight:"view_charts_admin",csv_list:"view_charts_admin",
-  create_dry_run:"manage_ingest",source_fetch:"manage_ingest",normalize_run:"manage_ingest",run_eligibility:"manage_ingest",run_carry_forward:"manage_ingest",run_scoring:"manage_ingest",run_shortlist:"manage_ingest",run_airplay_detection:"manage_ingest",run_full_pipeline:"manage_ingest",send_gaps_to_review:"manage_ingest",apply_row_decision:"manage_ingest",cancel_run:"manage_ingest",retry_run:"manage_ingest",reset_pipeline:"manage_ingest",csv_upload:"manage_ingest",csv_normalize:"manage_ingest",commit_run:"publish_charts",fix_chart_artist_slugs:"publish_charts",reingest_edition:"publish_charts"};
+  list_runs:"view_charts_admin",get_run:"view_charts_admin",get_stages:"view_charts_admin",get_sources:"view_charts_admin",get_candidates:"view_charts_admin",get_normalized:"view_charts_admin",get_kpis:"view_charts_admin",get_activity:"view_charts_admin",get_resource_guard:"view_charts_admin",get_review_issues:"view_charts_admin",get_matches_for_run:"view_charts_admin",validate_commit:"view_charts_admin",preflight:"view_charts_admin",csv_list:"view_charts_admin",get_origin_review_queue:"view_charts_admin",get_origin_country_options:"view_charts_admin",
+  create_dry_run:"manage_ingest",source_fetch:"manage_ingest",normalize_run:"manage_ingest",run_eligibility:"manage_ingest",run_carry_forward:"manage_ingest",run_scoring:"manage_ingest",run_shortlist:"manage_ingest",run_airplay_detection:"manage_ingest",run_full_pipeline:"manage_ingest",send_gaps_to_review:"manage_ingest",apply_row_decision:"manage_ingest",cancel_run:"manage_ingest",retry_run:"manage_ingest",reset_pipeline:"manage_ingest",csv_upload:"manage_ingest",csv_normalize:"manage_ingest",set_artist_origin_for_run:"manage_registry",create_origin_artist_shell:"manage_registry",reset_after_origin_resolution:"manage_ingest",commit_run:"publish_charts",fix_chart_artist_slugs:"publish_charts",reingest_edition:"publish_charts"};
 
 Deno.serve(async (req) => {
   const cors = corsRestricted(req);
@@ -42,6 +42,7 @@ Deno.serve(async (req) => {
     if (action === "get_stages") return handleGetStages(req, db, params);
     if (action === "get_sources") return handleGetSources(req, db, params);
     if (action === "get_candidates") return handleGetCandidates(req, db, params);
+    if (action === "get_exclusions") return handleGetExclusions(req, db, params);
     if (action === "get_normalized") return handleGetNormalized(req, db, params);
     if (action === "normalize_run") return handleNormalizeRun(req, db, params, auth);
     if (action === "source_fetch") return handleSourceFetch(req, db, params, auth);
@@ -62,6 +63,11 @@ Deno.serve(async (req) => {
     if (action === "apply_row_decision") return handleApplyRowDecision(req, db, params, auth);
     if (action === "get_review_issues") return handleGetReviewIssues(req, db, params);
     if (action === "get_matches_for_run") return handleGetMatchesForRun(req, db, params);
+    if (action === "get_origin_review_queue") return handleGetOriginReviewQueue(req, db, params);
+    if (action === "get_origin_country_options") return handleGetOriginCountryOptions(req, db, params);
+    if (action === "set_artist_origin_for_run") return handleSetArtistOriginForRun(req, db, params, auth);
+    if (action === "create_origin_artist_shell") return handleCreateOriginArtistShell(req, db, params, auth);
+    if (action === "reset_after_origin_resolution") return handleResetAfterOriginResolution(req, db, params);
     if (action === "validate_commit") return handleValidateCommit(req, db, params);
     if (action === "commit_run") return handleCommitRun(req, db, params, auth);
     if (action === "fix_chart_artist_slugs") return handleFixChartArtistSlugs(req, db, params, auth);
@@ -81,6 +87,95 @@ function normalizeCore(text: string): string { if (!text || !text.trim()) return
 function normalize_title(title: string): string { return normalizeCore(title); }
 function lead_artist_key(full_artist_line: string): string { if (!full_artist_line || !full_artist_line.trim()) return ""; let extracted = full_artist_line; const featSplit = extracted.split(/\s+(?:feat\.|ft\.|featuring)\s+/i); if (featSplit.length > 1) extracted = featSplit[0]; const collabSplit = extracted.split(/\s+(?:x|&)\s+/i); if (collabSplit.length > 1) extracted = collabSplit[0]; const commaSplit = extracted.split(/\s*,\s*/); extracted = commaSplit[0]; return normalizeCore(extracted); }
 function build_normalized_key(title: string, full_artist_line: string): string { const nt = normalize_title(title); const lk = lead_artist_key(full_artist_line); if (!nt || !lk) return ""; return nt+"::"+lk; }
+
+function compactIdentityPart(value: unknown): string {
+  const raw = typeof value === "string" || typeof value === "number" ? String(value) : "";
+  return raw.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+}
+
+function addProviderIdToBag(bag: Record<string, Set<string>>, providerRaw: unknown, idRaw: unknown): void {
+  const provider = compactIdentityPart(providerRaw);
+  const id = compactIdentityPart(idRaw);
+  if (!provider || !id) return;
+  if (!bag[provider]) bag[provider] = new Set<string>();
+  bag[provider].add(id);
+}
+
+function providerIdsJsonFromBag(bag: Record<string, Set<string>>): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  for (const [provider, ids] of Object.entries(bag)) out[provider] = [...ids].sort();
+  return out;
+}
+
+function providerIdentityMapFromRaw(row: Record<string, unknown>): Record<string, string[]> {
+  const bag: Record<string, Set<string>> = {};
+  addProviderIdToBag(bag, row.provider, row.provider_track_id);
+
+  const raw = row.raw_payload_json;
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+    const payload = raw as Record<string, unknown>;
+    addProviderIdToBag(bag, payload.provider || row.provider, payload.songId || payload.trackId || payload.provider_track_id);
+  }
+
+  return providerIdsJsonFromBag(bag);
+}
+
+function providerIdentityAliasesFromJson(value: unknown): string[] {
+  const aliases: string[] = [];
+
+  if (!value || typeof value !== "object" || Array.isArray(value)) return aliases;
+
+  for (const [providerRaw, idsRaw] of Object.entries(value as Record<string, unknown>)) {
+    const provider = compactIdentityPart(providerRaw);
+    if (!provider) continue;
+
+    const ids = Array.isArray(idsRaw) ? idsRaw : [idsRaw];
+    for (const idRaw of ids) {
+      const id = compactIdentityPart(idRaw);
+      if (id) aliases.push(`provider:${provider}:${id}`);
+    }
+  }
+
+  return [...new Set(aliases)].sort();
+}
+
+function rawSongIdentityAliases(row: Record<string, unknown>, normalizedKey: string): string[] {
+  const title = (row.title_raw as string) || "";
+  const artist = (row.artist_raw as string) || "";
+  const normalizedTitle = normalize_title(title);
+  const lead = lead_artist_key(artist);
+  const aliases = new Set<string>();
+
+  if (normalizedKey) aliases.add(`normalized:${normalizedKey}`);
+
+  const isrc = compactIdentityPart(row.isrc);
+  if (isrc) aliases.add(`isrc:${isrc}`);
+
+  const providerMap = providerIdentityMapFromRaw(row);
+  for (const alias of providerIdentityAliasesFromJson(providerMap)) aliases.add(alias);
+
+  if (normalizedTitle && lead) aliases.add(`title-lead:${normalizedTitle}::${lead}`);
+
+  return [...aliases].sort();
+}
+
+function candidateSongIdentityKey(candidate: Record<string, unknown>): string {
+  const isrc = compactIdentityPart(candidate.isrc);
+  if (isrc) return `isrc:${isrc}`;
+
+  const providerAliases = providerIdentityAliasesFromJson(candidate.provider_ids_json);
+  if (providerAliases.length > 0) return providerAliases[0];
+
+  const title = normalize_title((candidate.title as string) || "");
+  const lead = lead_artist_key((candidate.artist_display as string) || "");
+  if (title && lead) return `title-lead:${title}::${lead}`;
+
+  const normalizedKey = (candidate.normalized_key as string) || "";
+  if (normalizedKey) return `normalized:${normalizedKey}`;
+
+  return `candidate:${candidate.id || crypto.randomUUID()}`;
+}
+
 function generateTrackSlug(title: string): string { return title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+$/, "").replace(/^-+/, "").slice(0, 200) || "untitled"; }
 function generateArtistSlug(name: string): string { return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+$/, "").replace(/^-+/, "").slice(0, 200) || "unknown-artist"; }
 function normalizeSlug(raw: string): string { if (!raw || !raw.trim()) return ""; return raw.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+$/, "").replace(/^-+/, "").slice(0, 200); }
@@ -115,7 +210,149 @@ interface ProviderFetchResult { tracks: ProviderTrack[]; warnings: string[]; err
 
 async function readCredential(db: ReturnType<typeof createClient> | null, envVar: string, dbKey: string): Promise<string | null> { const ev = Deno.env.get(envVar); if (ev && ev.trim()) return ev.trim(); if (!db) return null; try { const { data: row } = await db.from("admin_settings_secrets").select("setting_value").eq("setting_key", dbKey).maybeSingle(); if (row && (row.setting_value as string)?.trim()) return (row.setting_value as string).trim(); } catch { } return null; }
 
-async function fetchSpotifySource(sourceUrl: string, market: string, maxRows: number, db: ReturnType<typeof createClient>): Promise<ProviderFetchResult> { const clientId = await readCredential(db, "SPOTIFY_CLIENT_ID", "spotify_client_id"); const clientSecret = await readCredential(db, "SPOTIFY_CLIENT_SECRET", "spotify_client_secret"); const spotifyMarket = (await readCredential(db, "SPOTIFY_MARKET", "spotify_market")) || market; if (!clientId || !clientSecret) return { tracks: [], warnings: [], error: "Spotify credentials not configured." }; const tokenRes = await fetch("https://accounts.spotify.com/api/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded", Authorization: "Basic "+btoa(clientId+":"+clientSecret) }, body: "grant_type=client_credentials" }); if (!tokenRes.ok) { const eb = await tokenRes.text(); return { tracks: [], warnings: [], error: "Spotify auth failed ("+tokenRes.status+"): "+eb.slice(0, 200) }; } const tokenData = await tokenRes.json() as { access_token: string }; const pm = sourceUrl.match(/spotify\.com\/playlist\/([a-zA-Z0-9]+)/); if (!pm) return { tracks: [], warnings: [], error: "Cannot extract Spotify playlist ID from: "+sourceUrl }; const pid = pm[1]; const apiUrl = new URL("https://api.spotify.com/v1/playlists/"+pid); apiUrl.searchParams.set("market", spotifyMarket); apiUrl.searchParams.set("fields", "tracks.items(track(id,name,artists(id,name),album(id,name,images,release_date),external_ids(isrc),external_urls(spotify),preview_url,duration_ms,popularity)),tracks.total"); const pres = await fetch(apiUrl.toString(), { headers: { Authorization: "Bearer "+tokenData.access_token } }); if (!pres.ok) { const eb = await pres.text(); return { tracks: [], warnings: [], error: "Spotify API "+pres.status+": "+eb.slice(0, 300) }; } const playlist = await pres.json() as { tracks: { items: Array<{ track: { id: string; name: string; artists: Array<{ id: string; name: string }>; album: { id: string; name: string; images: Array<{ url: string }>; release_date: string }; external_ids: { isrc?: string }; external_urls: { spotify: string }; preview_url: string | null; duration_ms: number; popularity: number } | null }>; total: number }; }; const items = playlist.tracks.items.slice(0, maxRows); const warnings: string[] = []; const tracks: ProviderTrack[] = []; for (let i = 0; i < items.length; i++) { const item = items[i]; if (!item || !item.track) { warnings.push("Spotify item "+(i+1)+": null track"); continue; } const t = item.track; tracks.push({ title: t.name, artist: t.artists.map(a => a.name).join(", "), release_date: sanitizeDate(t.album?.release_date), isrc: t.external_ids?.isrc || null, source_position: i + 1, provider_track_id: t.id, provider_release_id: t.album?.id || null, provider_artist_ids: t.artists.map(a => a.id), artwork_url: t.album?.images?.[0]?.url || null, external_url: t.external_urls?.spotify || sourceUrl, preview_url: t.preview_url || null, raw_payload: { provider: "spotify", trackId: t.id, albumId: t.album?.id, artistIds: t.artists.map(a => a.id), durationMs: t.duration_ms, popularity: t.popularity } }); } if (tracks.length === 0 && warnings.length === 0) warnings.push("Spotify playlist returned 0 tracks (total: "+playlist.tracks.total+")"); return { tracks, warnings, error: null }; }
+async function fetchSpotifySource(sourceUrl: string, market: string, maxRows: number, db: ReturnType<typeof createClient>): Promise<ProviderFetchResult> {
+  const clientId = await readCredential(db, "SPOTIFY_CLIENT_ID", "spotify_client_id");
+  const clientSecret = await readCredential(db, "SPOTIFY_CLIENT_SECRET", "spotify_client_secret");
+  const spotifyMarket = (await readCredential(db, "SPOTIFY_MARKET", "spotify_market")) || market;
+
+  if (!clientId || !clientSecret) {
+    return { tracks: [], warnings: [], error: "Spotify credentials not configured." };
+  }
+
+  const tokenRes = await fetch("https://accounts.spotify.com/api/token", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Authorization: "Basic " + btoa(clientId + ":" + clientSecret),
+    },
+    body: "grant_type=client_credentials",
+  });
+
+  if (!tokenRes.ok) {
+    const eb = await tokenRes.text();
+    return { tracks: [], warnings: [], error: "Spotify auth failed (" + tokenRes.status + "): " + eb.slice(0, 200) };
+  }
+
+  const tokenData = await tokenRes.json() as { access_token: string };
+  const pm = sourceUrl.match(/spotify\.com\/playlist\/([a-zA-Z0-9]+)/);
+
+  if (!pm) {
+    return { tracks: [], warnings: [], error: "Cannot extract Spotify playlist ID from: " + sourceUrl };
+  }
+
+  const pid = pm[1];
+  const warnings: string[] = [];
+  const playlistItems: Array<{
+    track: {
+      id: string;
+      name: string;
+      artists: Array<{ id: string; name: string }>;
+      album: { id: string; name: string; images: Array<{ url: string }>; release_date: string };
+      external_ids: { isrc?: string };
+      external_urls: { spotify: string };
+      preview_url: string | null;
+      duration_ms: number;
+      popularity: number;
+    } | null;
+  }> = [];
+
+  const pageLimit = 100;
+  let offset = 0;
+  let total = 0;
+
+  while (playlistItems.length < maxRows) {
+    const remaining = maxRows - playlistItems.length;
+    const limit = Math.min(pageLimit, remaining);
+
+    const apiUrl = new URL("https://api.spotify.com/v1/playlists/" + pid + "/tracks");
+    apiUrl.searchParams.set("market", spotifyMarket);
+    apiUrl.searchParams.set("limit", String(limit));
+    apiUrl.searchParams.set("offset", String(offset));
+    apiUrl.searchParams.set("fields", "items(track(id,name,artists(id,name),album(id,name,images,release_date),external_ids(isrc),external_urls(spotify),preview_url,duration_ms,popularity)),next,total");
+
+    const pres = await fetch(apiUrl.toString(), {
+      headers: { Authorization: "Bearer " + tokenData.access_token },
+    });
+
+    if (!pres.ok) {
+      const eb = await pres.text();
+      return { tracks: [], warnings, error: "Spotify API " + pres.status + ": " + eb.slice(0, 300) };
+    }
+
+    const page = await pres.json() as {
+      items: Array<{
+        track: {
+          id: string;
+          name: string;
+          artists: Array<{ id: string; name: string }>;
+          album: { id: string; name: string; images: Array<{ url: string }>; release_date: string };
+          external_ids: { isrc?: string };
+          external_urls: { spotify: string };
+          preview_url: string | null;
+          duration_ms: number;
+          popularity: number;
+        } | null;
+      }>;
+      next: string | null;
+      total: number;
+    };
+
+    total = page.total ?? total;
+    const pageItems = page.items ?? [];
+
+    if (pageItems.length === 0) break;
+
+    playlistItems.push(...pageItems);
+    offset += pageItems.length;
+
+    if (!page.next) break;
+  }
+
+  if (total > playlistItems.length) {
+    warnings.push("Spotify playlist has " + total + " tracks; fetched " + playlistItems.length + " using maxRows cap " + maxRows + ".");
+  }
+
+  const tracks: ProviderTrack[] = [];
+
+  for (let i = 0; i < playlistItems.length; i++) {
+    const item = playlistItems[i];
+
+    if (!item || !item.track) {
+      warnings.push("Spotify item " + (i + 1) + ": null track");
+      continue;
+    }
+
+    const t = item.track;
+
+    tracks.push({
+      title: t.name,
+      artist: t.artists.map((a) => a.name).join(", "),
+      release_date: sanitizeDate(t.album?.release_date),
+      isrc: t.external_ids?.isrc || null,
+      source_position: i + 1,
+      provider_track_id: t.id,
+      provider_release_id: t.album?.id || null,
+      provider_artist_ids: t.artists.map((a) => a.id),
+      artwork_url: t.album?.images?.[0]?.url || null,
+      external_url: t.external_urls?.spotify || sourceUrl,
+      preview_url: t.preview_url || null,
+      raw_payload: {
+        provider: "spotify",
+        trackId: t.id,
+        albumId: t.album?.id,
+        artistIds: t.artists.map((a) => a.id),
+        durationMs: t.duration_ms,
+        popularity: t.popularity,
+      },
+    });
+  }
+
+  if (tracks.length === 0 && warnings.length === 0) {
+    warnings.push("Spotify playlist returned 0 tracks (total: " + total + ")");
+  }
+
+  return { tracks, warnings, error: null };
+}
 
 async function createAppleMusicJWT(pk: string, tid: string, kid: string): Promise<string> { const pem = pk.replace("-----BEGIN PRIVATE KEY-----", "").replace("-----END PRIVATE KEY-----", "").replace(/\s/g, ""); const bin = Uint8Array.from(atob(pem), c => c.charCodeAt(0)); const key = await crypto.subtle.importKey("pkcs8", bin, { name: "ECDSA", namedCurve: "P-256" }, false, ["sign"]); const header = { alg: "ES256", kid }; const now = Math.floor(Date.now() / 1000); const payload = { iss: tid, iat: now, exp: now + 3600 }; const enc = new TextEncoder(); const b64u = (s: string) => s.replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_"); const hb = b64u(btoa(JSON.stringify(header))), pb = b64u(btoa(JSON.stringify(payload))), si = hb+"."+pb; const sig = await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, key, enc.encode(si)); const sb = b64u(btoa(String.fromCharCode(...new Uint8Array(sig)))); return si+"."+sb; }
 
@@ -151,6 +388,22 @@ async function handleListRuns(req: Request, db: ReturnType<typeof createClient>,
 async function handleGetRun(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>) { const { runId } = params as { runId: string }; if (!runId) return json(req, { error: "runId_required" }, 400); const { data: run, error } = await db.from("chart_ingest_runs").select("*").eq("id", runId).maybeSingle(); if (error) return json(req, { error: error.message }, 500); if (!run) return json(req, { error: "run_not_found" }, 404); const [sr, sg] = await Promise.all([db.from("chart_ingest_run_sources").select("*").eq("run_id", runId).order("priority"), db.from("chart_ingest_stage_events").select("*").eq("run_id", runId).order("created_at")]); const [t1, t2, t3, t4] = await Promise.all([db.from("chart_ingest_candidates").select("*", { count: "exact", head: true }).eq("run_id", runId), db.from("chart_ingest_candidates").select("*", { count: "exact", head: true }).eq("run_id", runId).eq("status", "eligible"), db.from("chart_ingest_candidates").select("*", { count: "exact", head: true }).eq("run_id", runId).eq("status", "needs_review"), db.from("chart_ingest_candidates").select("*", { count: "exact", head: true }).eq("run_id", runId).eq("status", "excluded")]); return json(req, { run: { ...run, chart_ingest_run_sources: sr.data || [], chart_ingest_stage_events: sg.data || [], candidateCounts: { total: t1.count || 0, eligible: t2.count || 0, needsReview: t3.count || 0, excluded: t4.count || 0 } } }); }
 
 async function handleGetStages(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>) { const { runId } = params as { runId: string }; const { data, error } = await db.from("chart_ingest_stage_events").select("*").eq("run_id", runId).order("created_at"); if (error) return json(req, { error: error.message }, 500); return json(req, { stages: data || [] }); }
+
+async function handleGetExclusions(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>) {
+  const { runId, limit } = params as { runId: string; limit?: number };
+  if (!runId) return json(req, { error: "runId_required" }, 400);
+
+  const { data, error } = await db
+    .from("chart_ingest_exclusions")
+    .select("*")
+    .eq("run_id", runId)
+    .order("created_at", { ascending: false })
+    .limit(Math.min(limit || 500, 1000));
+
+  if (error) return json(req, { error: error.message }, 500);
+
+  return json(req, { exclusions: data || [] });
+}
 async function handleGetSources(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>) { const { runId } = params as { runId: string }; const { data, error } = await db.from("chart_ingest_run_sources").select("*").eq("run_id", runId).order("priority"); if (error) return json(req, { error: error.message }, 500); return json(req, { sources: data || [] }); }
 async function handleGetCandidates(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>) { const { runId, status, limit = 200 } = params as { runId: string; status?: string; limit?: number }; let q = db.from("chart_ingest_candidates").select("*").eq("run_id", runId).limit(Math.min(limit, 500)); if (status) q = q.eq("status", status); const { data, error } = await q; if (error) return json(req, { error: error.message }, 500); const cs = data || []; if (cs.length > 0) { const cids = cs.map((c: { id: string }) => c.id); const [sc, mc] = await Promise.all([db.from("chart_ingest_candidate_scores").select("*").in("candidate_id", cids), db.from("chart_ingest_matches").select("*").in("candidate_id", cids)]); const sbc = new Map<string, unknown[]>(); for (const s of (sc.data || [])) { const cid = s.candidate_id as string; if (!sbc.has(cid)) sbc.set(cid, []); sbc.get(cid)!.push(s); } const mbc = new Map<string, unknown[]>(); for (const m of (mc.data || [])) { const cid = m.candidate_id as string; if (!mbc.has(cid)) mbc.set(cid, []); mbc.get(cid)!.push(m); } return json(req, { candidates: cs.map((c: { id: string }) => ({ ...c, chart_ingest_candidate_scores: sbc.get(c.id) || [], chart_ingest_matches: mbc.get(c.id) || [] })) }); } return json(req, { candidates: [] }); }
 async function handleGetNormalized(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>) { const { runId } = params as { runId: string }; if (!runId) return json(req, { error: "runId_required" }, 400); const { data, error } = await db.from("chart_ingest_normalized_rows").select("*").eq("run_id", runId).order("created_at"); if (error) return json(req, { error: error.message }, 500); return json(req, { normalized_rows: data || [] }); }
@@ -205,10 +458,80 @@ async function handleValidateCommit(req: Request, db: ReturnType<typeof createCl
 }
 
 // NORMALIZE
-async function handleNormalizeRun(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { const { runId } = params as { runId: string }; if (!runId) return json(req, { error: "runId_required" }, 400); const ss = Date.now(); const { data: run } = await db.from("chart_ingest_runs").select("id,status").eq("id", runId).maybeSingle(); if (!run) return json(req, { error: "run_not_found" }, 404); await db.from("chart_ingest_normalized_rows").delete().eq("run_id", runId); await db.from("chart_ingest_candidates").delete().eq("run_id", runId); await db.from("chart_ingest_stage_events").update({ status: "running", started_at: new Date().toISOString(), message: null, error_code: null, error_message: null }).eq("run_id", runId).eq("stage", "normalize"); const { data: rawRows } = await db.from("chart_ingest_raw_rows").select("*").eq("run_id", runId).order("created_at"); if (!rawRows || rawRows.length === 0) { const d = Date.now() - ss; await db.from("chart_ingest_stage_events").update({ status: "done", finished_at: new Date().toISOString(), duration_ms: d, message: "No raw rows to normalize." }).eq("run_id", runId).eq("stage", "normalize"); return json(req, { ok: true, runId, rawCount: 0, uniqueCount: 0, durationMs: d }); } const groups = new Map<string, { rows: typeof rawRows; sources: Set<string>; sourceUrls: Set<string>; artwork_url: string | null; bestTitle: string; bestArtist: string; bestIsrc: string | null; bestReleaseDate: string | null }>(); for (const row of rawRows) { const nk = build_normalized_key((row.title_raw as string)||"", (row.artist_raw as string)||""); if (!nk) continue; const existing = groups.get(nk); if (!existing) { groups.set(nk, { rows:[row], sources:new Set([(row.provider as string)||"unknown"]), sourceUrls:new Set([(row.external_url as string)||""].filter(Boolean)), artwork_url:(row.artwork_url as string)||null, bestTitle:(row.title_raw as string)||"", bestArtist:(row.artist_raw as string)||"", bestIsrc:(row.isrc as string)||null, bestReleaseDate:sanitizeDate(row.release_date_raw as string) }); } else { existing.rows.push(row); existing.sources.add((row.provider as string)||"unknown"); if (row.external_url) existing.sourceUrls.add(row.external_url as string); if (!existing.artwork_url && row.artwork_url) existing.artwork_url = row.artwork_url as string; if (!existing.bestIsrc && row.isrc) existing.bestIsrc = row.isrc as string; if (!existing.bestReleaseDate && row.release_date_raw) existing.bestReleaseDate = sanitizeDate(row.release_date_raw as string); } } if (groups.size === 0) { const d = Date.now() - ss; await db.from("chart_ingest_stage_events").update({ status: "done", finished_at: new Date().toISOString(), duration_ms: d, message: "No valid keys" }).eq("run_id", runId).eq("stage", "normalize"); return json(req, { ok: true, runId, rawCount: rawRows.length, uniqueCount: 0, durationMs: d }); } const now = new Date().toISOString(); const nrs: Array<Record<string, unknown>> = []; const cds: Array<Record<string, unknown>> = []; let wc = 0; for (const [nk, g] of groups) { const lk = nk.split("::")[1] || ""; const nt = nk.split("::")[0] || ""; const sc = g.sources.size; const oc = g.rows.length; const surls = [...g.sourceUrls]; const srd = sanitizeDate(g.bestReleaseDate); const nid = crypto.randomUUID(); const cid = crypto.randomUUID(); const reasons: string[] = []; if (!nt) reasons.push("empty_title"); if (!lk) reasons.push("empty_artist"); if (sc < 1) reasons.push("no_sources"); nrs.push({ id:nid, run_id:runId, normalized_key:nk, lead_artist_key:lk, title:g.bestTitle, artist_display:g.bestArtist, normalized_title:nt, source_count:sc, occurrence_count:oc, source_urls_seen:surls, isrc:g.bestIsrc, release_date:srd, artwork_url:g.artwork_url, external_url:(g.rows[0].external_url as string)||null, preview_url:(g.rows[0].preview_url as string)||null, provider_track_id:(g.rows[0].provider_track_id as string)||null, provider_release_id:(g.rows[0].provider_release_id as string)||null, provider_artist_ids:(g.rows[0].provider_artist_ids as string[])||[], raw_source_count:g.rows.length, created_at:now }); cds.push({ id:cid, run_id:runId, normalized_key:nk, lead_artist_key:lk, title:g.bestTitle, artist_display:g.bestArtist, source_count:sc, occurrence_count:oc, source_urls_seen:surls, release_date:srd, candidate_type:"streaming", status:reasons.length===0?"eligible":"excluded", version:1, carry_forward_only:false, continuity_locked:false, airplay_candidate_only:false, streaming_qualified:sc>0, isrc:g.bestIsrc||null, upc:null, artwork_url:g.artwork_url, external_url:(g.rows[0].external_url as string)||null, preview_url:(g.rows[0].preview_url as string)||null, release_title:null, created_at:now, updated_at:now }); if (reasons.length > 0) wc++; } const CH = 200; for (let j=0; j<nrs.length; j+=CH) { await db.from("chart_ingest_normalized_rows").insert(nrs.slice(j,j+CH)); } for (let j=0; j<cds.length; j+=CH) { const chunk = cds.slice(j,j+CH); const { error: cErr } = await db.from("chart_ingest_candidates").insert(chunk); if (cErr) { const d = Date.now()-ss; await db.from("chart_ingest_stage_events").update({ status:"failed", finished_at:new Date().toISOString(), duration_ms:d, message:"Insert failed: "+cErr.message }).eq("run_id",runId).eq("stage","normalize"); return json(req, { error:"insert_failed", detail:cErr.message }, 500); } } const exclCands = cds.filter(c => c.status==="excluded"); if (exclCands.length>0) { const er = exclCands.map(c=>({ id:crypto.randomUUID(), run_id:runId, candidate_id:c.id, reason:"invalid_normalized_key", created_at:now })); for (let j=0; j<er.length; j+=CH) { await db.from("chart_ingest_exclusions").insert(er.slice(j,j+CH)); } } const ec = cds.filter(c=>c.status==="eligible").length; const d = Date.now()-ss; await db.from("chart_ingest_stage_events").update({ status:"done", finished_at:new Date().toISOString(), duration_ms:d, message:groups.size+" unique from "+rawRows.length }).eq("run_id",runId).eq("stage","normalize"); await db.from("chart_ingest_stage_events").update({ status:"done", finished_at:new Date().toISOString(), duration_ms:0, message:(rawRows.length-groups.size)+" duplicates removed." }).eq("run_id",runId).eq("stage","dedupe"); await db.from("chart_ingest_stage_events").update({ status:"done", finished_at:new Date().toISOString(), duration_ms:0, message:cds.length+" candidates built." }).eq("run_id",runId).eq("stage","release_candidate_build"); return json(req, { ok:true, runId, rawCount:rawRows.length, uniqueCount:groups.size, candidateCount:cds.length, warningCount:exclCands.length, durationMs:d }); }
+async function handleNormalizeRun(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { const { runId } = params as { runId: string }; if (!runId) return json(req, { error: "runId_required" }, 400); const ss = Date.now(); const { data: run } = await db.from("chart_ingest_runs").select("id,status").eq("id", runId).maybeSingle(); if (!run) return json(req, { error: "run_not_found" }, 404); await db.from("chart_ingest_normalized_rows").delete().eq("run_id", runId); await db.from("chart_ingest_candidates").delete().eq("run_id", runId); await db.from("chart_ingest_stage_events").update({ status: "running", started_at: new Date().toISOString(), message: null, error_code: null, error_message: null }).eq("run_id", runId).eq("stage", "normalize"); const { data: rawRows } = await db.from("chart_ingest_raw_rows").select("*").eq("run_id", runId).order("created_at"); if (!rawRows || rawRows.length === 0) { const d = Date.now() - ss; await db.from("chart_ingest_stage_events").update({ status: "done", finished_at: new Date().toISOString(), duration_ms: d, message: "No raw rows to normalize." }).eq("run_id", runId).eq("stage", "normalize"); return json(req, { ok: true, runId, rawCount: 0, uniqueCount: 0, durationMs: d }); } const groups = new Map<string, { rows: Array<Record<string, unknown>>; sources: Set<string>; sourceUrls: Set<string>; artwork_url: string | null; bestTitle: string; bestArtist: string; bestIsrc: string | null; bestReleaseDate: string | null; providerIds: Record<string, Set<string>> }>();
+  const groupAliases = new Map<string, string>();
+
+  function mergeProviderBag(target: Record<string, Set<string>>, incoming: Record<string, string[]>): void {
+    for (const [provider, ids] of Object.entries(incoming)) {
+      for (const id of ids) addProviderIdToBag(target, provider, id);
+    }
+  }
+
+  function mergeGroups(target: { rows: Array<Record<string, unknown>>; sources: Set<string>; sourceUrls: Set<string>; artwork_url: string | null; bestTitle: string; bestArtist: string; bestIsrc: string | null; bestReleaseDate: string | null; providerIds: Record<string, Set<string>> }, source: { rows: Array<Record<string, unknown>>; sources: Set<string>; sourceUrls: Set<string>; artwork_url: string | null; bestTitle: string; bestArtist: string; bestIsrc: string | null; bestReleaseDate: string | null; providerIds: Record<string, Set<string>> }): void {
+    target.rows.push(...source.rows);
+    for (const provider of source.sources) target.sources.add(provider);
+    for (const url of source.sourceUrls) target.sourceUrls.add(url);
+    if (!target.artwork_url && source.artwork_url) target.artwork_url = source.artwork_url;
+    if (!target.bestIsrc && source.bestIsrc) target.bestIsrc = source.bestIsrc;
+    if (!target.bestReleaseDate && source.bestReleaseDate) target.bestReleaseDate = source.bestReleaseDate;
+    for (const [provider, ids] of Object.entries(source.providerIds)) {
+      for (const id of ids) addProviderIdToBag(target.providerIds, provider, id);
+    }
+  }
+
+  for (const row of (rawRows as Array<Record<string, unknown>>)) {
+    const title = (row.title_raw as string) || "";
+    const artist = (row.artist_raw as string) || "";
+    const nk = build_normalized_key(title, artist);
+    if (!nk) continue;
+
+    const aliases = rawSongIdentityAliases(row, nk);
+    const existingGroupIds = [...new Set(aliases.map((alias) => groupAliases.get(alias)).filter(Boolean) as string[])];
+    const groupId = existingGroupIds[0] || nk;
+
+    let existing = groups.get(groupId);
+    const rowProviderMap = providerIdentityMapFromRaw(row);
+
+    if (!existing) {
+      existing = {
+        rows: [row],
+        sources: new Set([(row.provider as string) || "unknown"]),
+        sourceUrls: new Set([(row.external_url as string) || ""].filter(Boolean)),
+        artwork_url: (row.artwork_url as string) || null,
+        bestTitle: title,
+        bestArtist: artist,
+        bestIsrc: (row.isrc as string) || null,
+        bestReleaseDate: sanitizeDate(row.release_date_raw as string),
+        providerIds: {},
+      };
+      mergeProviderBag(existing.providerIds, rowProviderMap);
+      groups.set(groupId, existing);
+    } else {
+      existing.rows.push(row);
+      existing.sources.add((row.provider as string) || "unknown");
+      if (row.external_url) existing.sourceUrls.add(row.external_url as string);
+      if (!existing.artwork_url && row.artwork_url) existing.artwork_url = row.artwork_url as string;
+      if (!existing.bestIsrc && row.isrc) existing.bestIsrc = row.isrc as string;
+      if (!existing.bestReleaseDate && row.release_date_raw) existing.bestReleaseDate = sanitizeDate(row.release_date_raw as string);
+      mergeProviderBag(existing.providerIds, rowProviderMap);
+    }
+
+    for (const extraGroupId of existingGroupIds.slice(1)) {
+      if (extraGroupId === groupId) continue;
+      const extraGroup = groups.get(extraGroupId);
+      if (!extraGroup) continue;
+      mergeGroups(existing, extraGroup);
+      groups.delete(extraGroupId);
+      for (const [alias, aliasGroupId] of groupAliases.entries()) {
+        if (aliasGroupId === extraGroupId) groupAliases.set(alias, groupId);
+      }
+    }
+
+    for (const alias of aliases) groupAliases.set(alias, groupId);
+  } if (groups.size === 0) { const d = Date.now() - ss; await db.from("chart_ingest_stage_events").update({ status: "done", finished_at: new Date().toISOString(), duration_ms: d, message: "No valid keys" }).eq("run_id", runId).eq("stage", "normalize"); return json(req, { ok: true, runId, rawCount: rawRows.length, uniqueCount: 0, durationMs: d }); } const now = new Date().toISOString(); const nrs: Array<Record<string, unknown>> = []; const cds: Array<Record<string, unknown>> = []; let wc = 0; for (const [nk, g] of groups) { const lk = nk.split("::")[1] || ""; const nt = nk.split("::")[0] || ""; const sc = g.sources.size; const oc = g.rows.length; const surls = [...g.sourceUrls]; const srd = sanitizeDate(g.bestReleaseDate); const providerIdsJson = providerIdsJsonFromBag(g.providerIds); const nid = crypto.randomUUID(); const cid = crypto.randomUUID(); const reasons: string[] = []; if (!nt) reasons.push("empty_title"); if (!lk) reasons.push("empty_artist"); if (sc < 1) reasons.push("no_sources"); nrs.push({ id:nid, run_id:runId, normalized_key:nk, lead_artist_key:lk, title:g.bestTitle, artist_display:g.bestArtist, normalized_title:nt, source_count:sc, occurrence_count:oc, source_urls_seen:surls, isrc:g.bestIsrc, release_date:srd, artwork_url:g.artwork_url, external_url:(g.rows[0].external_url as string)||null, preview_url:(g.rows[0].preview_url as string)||null, provider_track_id:(g.rows[0].provider_track_id as string)||null, provider_release_id:(g.rows[0].provider_release_id as string)||null, provider_artist_ids:(g.rows[0].provider_artist_ids as string[])||[], raw_source_count:g.rows.length, created_at:now }); cds.push({ id:cid, run_id:runId, normalized_key:nk, lead_artist_key:lk, title:g.bestTitle, artist_display:g.bestArtist, source_count:sc, occurrence_count:oc, source_urls_seen:surls, provider_ids_json:providerIdsJson, release_date:srd, candidate_type:"streaming", status:reasons.length===0?"eligible":"excluded", version:1, carry_forward_only:false, continuity_locked:false, airplay_candidate_only:false, streaming_qualified:sc>0, isrc:g.bestIsrc||null, upc:null, artwork_url:g.artwork_url, external_url:(g.rows[0].external_url as string)||null, preview_url:(g.rows[0].preview_url as string)||null, release_title:null, created_at:now, updated_at:now }); if (reasons.length > 0) wc++; } const CH = 200; for (let j=0; j<nrs.length; j+=CH) { await db.from("chart_ingest_normalized_rows").insert(nrs.slice(j,j+CH)); } for (let j=0; j<cds.length; j+=CH) { const chunk = cds.slice(j,j+CH); const { error: cErr } = await db.from("chart_ingest_candidates").insert(chunk); if (cErr) { const d = Date.now()-ss; await db.from("chart_ingest_stage_events").update({ status:"failed", finished_at:new Date().toISOString(), duration_ms:d, message:"Insert failed: "+cErr.message }).eq("run_id",runId).eq("stage","normalize"); return json(req, { error:"insert_failed", detail:cErr.message }, 500); } } const exclCands = cds.filter(c => c.status==="excluded"); if (exclCands.length>0) { const er = exclCands.map(c=>({ id:crypto.randomUUID(), run_id:runId, candidate_id:c.id, reason:"invalid_normalized_key", created_at:now })); for (let j=0; j<er.length; j+=CH) { await db.from("chart_ingest_exclusions").insert(er.slice(j,j+CH)); } } const ec = cds.filter(c=>c.status==="eligible").length; const d = Date.now()-ss; await db.from("chart_ingest_stage_events").update({ status:"done", finished_at:new Date().toISOString(), duration_ms:d, message:groups.size+" unique from "+rawRows.length }).eq("run_id",runId).eq("stage","normalize"); await db.from("chart_ingest_stage_events").update({ status:"done", finished_at:new Date().toISOString(), duration_ms:0, message:(rawRows.length-groups.size)+" duplicates removed." }).eq("run_id",runId).eq("stage","dedupe"); await db.from("chart_ingest_stage_events").update({ status:"done", finished_at:new Date().toISOString(), duration_ms:0, message:cds.length+" candidates built." }).eq("run_id",runId).eq("stage","release_candidate_build"); return json(req, { ok:true, runId, rawCount:rawRows.length, uniqueCount:groups.size, candidateCount:cds.length, warningCount:exclCands.length, durationMs:d }); }
 
 // SOURCE_FETCH — unchanged from v25
-async function handleSourceFetch(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { const { runId } = params as { runId: string }; if (!runId) return json(req, { error: "runId_required" }, 400); const { data: run } = await db.from("chart_ingest_runs").select("id,status,edition_date,chart_size").eq("id", runId).maybeSingle(); if (!run) return json(req, { error: "run_not_found" }, 404); await db.from("chart_ingest_raw_rows").delete().eq("run_id", runId); await db.from("chart_ingest_stage_events").update({ status: "running", started_at: new Date().toISOString() }).eq("run_id", runId).eq("stage", "source_fetch"); const { data: sources } = await db.from("chart_ingest_run_sources").select("*").eq("run_id", runId).eq("enabled", true).order("priority"); if (!sources || sources.length === 0) { const d = Date.now(); await db.from("chart_ingest_stage_events").update({ status: "done", finished_at: new Date().toISOString(), duration_ms: d, message: "No enabled sources." }).eq("run_id", runId).eq("stage", "source_fetch"); return json(req, { ok: true, runId, sourceCount: 0, rawRowCount: 0 }); } const ed = (run.edition_date as string) || new Date().toISOString().split("T")[0]; const cs = (run.chart_size as number) || 20; let trr = 0, tfs = 0; const aw: string[] = []; const srs: Array<{ sourceId: string; fetchedCount: number; droppedCount: number; provider: string; warnings: string[]; error: string | null }> = []; for (const source of sources) { const market = (source.storefront_or_market as string) || "KE"; const mr = cs + 30; if (source.provider === "csv") { srs.push({ sourceId: source.id, fetchedCount: source.fetched_count || 0, droppedCount: 0, provider: "csv", warnings: [], error: null }); trr += source.fetched_count || 0; continue; } const fr = await fetchProviderSource(source.provider as string, source.source_url as string, market, mr, db); if (fr.error) { srs.push({ sourceId: source.id, fetchedCount: 0, droppedCount: 0, provider: source.provider, warnings: fr.warnings, error: fr.error }); tfs++; aw.push(...fr.warnings); continue; } const tracks = fr.tracks; aw.push(...fr.warnings); if (tracks.length === 0) { srs.push({ sourceId: source.id, fetchedCount: 0, droppedCount: 0, provider: source.provider, warnings: fr.warnings, error: null }); continue; } const now = new Date().toISOString(); const rrs = tracks.map(t => ({ id: crypto.randomUUID(), run_id: runId, source_id: source.id, provider: source.provider, provider_row_id: t.provider_track_id ? source.provider+":"+t.provider_track_id+":"+t.source_position : source.provider+":pos:"+t.source_position, provider_track_id: t.provider_track_id, provider_release_id: t.provider_release_id, provider_artist_ids: t.provider_artist_ids, source_position: t.source_position, title_raw: t.title, artist_raw: t.artist, release_raw: null, isrc: t.isrc, upc: null, release_date_raw: t.release_date, artwork_url: t.artwork_url, external_url: t.external_url || source.source_url || null, preview_url: t.preview_url, raw_payload_json: t.raw_payload, raw_payload_hash: null })); const CH = 100; for (let j = 0; j < rrs.length; j += CH) { await db.from("chart_ingest_raw_rows").insert(rrs.slice(j, j + CH)); } trr += rrs.length; srs.push({ sourceId: source.id, fetchedCount: rrs.length, droppedCount: 0, provider: source.provider, warnings: fr.warnings, error: null }); } const d = Date.now(); const sm = trr > 0 ? trr+" raw rows from "+(sources.length - tfs)+"/"+sources.length+" source(s)" : "All sources failed."; await db.from("chart_ingest_stage_events").update({ status: trr > 0 ? "done" : "failed", finished_at: new Date().toISOString(), duration_ms: d, message: sm }).eq("run_id", runId).eq("stage", "source_fetch"); if (trr > 0) { await db.from("chart_ingest_stage_events").update({ status: "done", finished_at: new Date().toISOString(), duration_ms: 1, message: "Raw rows persisted." }).eq("run_id", runId).eq("stage", "raw_persist"); await db.from("chart_ingest_runs").update({ status: "running", updated_at: new Date().toISOString() }).eq("id", runId); } else { await db.from("chart_ingest_runs").update({ status: "source_fetch_failed", error_code: "all_sources_failed", error_message: "Configure credentials in Settings.", updated_at: new Date().toISOString() }).eq("id", runId); } return json(req, { ok: trr > 0, runId, sourceCount: sources.length, rawRowCount: trr, failedSourceCount: tfs, sourceResults: srs, durationMs: d }); }
+async function handleSourceFetch(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { const { runId } = params as { runId: string }; if (!runId) return json(req, { error: "runId_required" }, 400); const { data: run } = await db.from("chart_ingest_runs").select("id,status,edition_date,chart_size").eq("id", runId).maybeSingle(); if (!run) return json(req, { error: "run_not_found" }, 404); await db.from("chart_ingest_raw_rows").delete().eq("run_id", runId); await db.from("chart_ingest_stage_events").update({ status: "running", started_at: new Date().toISOString() }).eq("run_id", runId).eq("stage", "source_fetch"); const { data: sources } = await db.from("chart_ingest_run_sources").select("*").eq("run_id", runId).eq("enabled", true).order("priority"); if (!sources || sources.length === 0) { const d = Date.now(); await db.from("chart_ingest_stage_events").update({ status: "done", finished_at: new Date().toISOString(), duration_ms: d, message: "No enabled sources." }).eq("run_id", runId).eq("stage", "source_fetch"); return json(req, { ok: true, runId, sourceCount: 0, rawRowCount: 0 }); } const ed = (run.edition_date as string) || new Date().toISOString().split("T")[0]; const cs = (run.chart_size as number) || 20; let trr = 0, tfs = 0; const aw: string[] = []; const srs: Array<{ sourceId: string; fetchedCount: number; droppedCount: number; provider: string; warnings: string[]; error: string | null }> = []; for (const source of sources) { const market = (source.storefront_or_market as string) || "KE"; const mr = Math.min(500, Math.max(cs * 5, cs + 100)); if (source.provider === "csv") { srs.push({ sourceId: source.id, fetchedCount: source.fetched_count || 0, droppedCount: 0, provider: "csv", warnings: [], error: null }); trr += source.fetched_count || 0; continue; } const fr = await fetchProviderSource(source.provider as string, source.source_url as string, market, mr, db); if (fr.error) { srs.push({ sourceId: source.id, fetchedCount: 0, droppedCount: 0, provider: source.provider, warnings: fr.warnings, error: fr.error }); tfs++; aw.push(...fr.warnings); continue; } const tracks = fr.tracks; aw.push(...fr.warnings); if (tracks.length === 0) { srs.push({ sourceId: source.id, fetchedCount: 0, droppedCount: 0, provider: source.provider, warnings: fr.warnings, error: null }); continue; } const now = new Date().toISOString(); const rrs = tracks.map(t => ({ id: crypto.randomUUID(), run_id: runId, source_id: source.id, provider: source.provider, provider_row_id: t.provider_track_id ? source.provider+":"+t.provider_track_id+":"+t.source_position : source.provider+":pos:"+t.source_position, provider_track_id: t.provider_track_id, provider_release_id: t.provider_release_id, provider_artist_ids: t.provider_artist_ids, source_position: t.source_position, title_raw: t.title, artist_raw: t.artist, release_raw: null, isrc: t.isrc, upc: null, release_date_raw: t.release_date, artwork_url: t.artwork_url, external_url: t.external_url || source.source_url || null, preview_url: t.preview_url, raw_payload_json: t.raw_payload, raw_payload_hash: null })); const CH = 100; for (let j = 0; j < rrs.length; j += CH) { await db.from("chart_ingest_raw_rows").insert(rrs.slice(j, j + CH)); } trr += rrs.length; srs.push({ sourceId: source.id, fetchedCount: rrs.length, droppedCount: 0, provider: source.provider, warnings: fr.warnings, error: null }); } const d = Date.now(); const sm = trr > 0 ? trr+" raw rows from "+(sources.length - tfs)+"/"+sources.length+" source(s)" : "All sources failed."; await db.from("chart_ingest_stage_events").update({ status: trr > 0 ? "done" : "failed", finished_at: new Date().toISOString(), duration_ms: d, message: sm }).eq("run_id", runId).eq("stage", "source_fetch"); if (trr > 0) { await db.from("chart_ingest_stage_events").update({ status: "done", finished_at: new Date().toISOString(), duration_ms: 1, message: "Raw rows persisted." }).eq("run_id", runId).eq("stage", "raw_persist"); await db.from("chart_ingest_runs").update({ status: "running", updated_at: new Date().toISOString() }).eq("id", runId); } else { await db.from("chart_ingest_runs").update({ status: "source_fetch_failed", error_code: "all_sources_failed", error_message: "Configure credentials in Settings.", updated_at: new Date().toISOString() }).eq("id", runId); } return json(req, { ok: trr > 0, runId, sourceCount: sources.length, rawRowCount: trr, failedSourceCount: tfs, sourceResults: srs, durationMs: d }); }
 
 // CARRY_FORWARD
 async function handleRunCarryForward(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { const { runId } = params as { runId: string }; if (!runId) return json(req, { error: "runId_required" }, 400); const ss = Date.now(); const { data: run } = await db.from("chart_ingest_runs").select("id,status,edition_date,chart_size,program_id,series_slug").eq("id", runId).maybeSingle(); if (!run) return json(req, { error: "run_not_found" }, 404); await db.from("chart_ingest_stage_events").update({ status: "running", started_at: new Date().toISOString() }).eq("run_id", runId).eq("stage", "carry_forward"); const ed2 = (run.edition_date as string) || new Date().toISOString().split("T")[0]; const pid = (run.program_id as string) || "unknown"; const { data: ccs } = await db.from("chart_ingest_candidates").select("normalized_key").eq("run_id", runId); const fks = new Set<string>(); if (ccs) { for (const c of ccs) { if (c.normalized_key) fks.add(c.normalized_key); } } let cfc = 0, skc = 0, pec = 0; const ccds: Array<Record<string, unknown>> = []; try { const { data: pe } = await db.from("wk_chart_editions_v2").select("id").eq("program_id", pid).in("status",["committed","published"]).lt("edition_date",ed2).order("edition_date",{ascending:false}).limit(1).maybeSingle(); if (pe) { const { data: pes } = await db.from("wk_chart_entries_v2").select("normalized_key, rank, track_title, artist_name, release_date, track_slug, artist_slug, artwork_url").eq("edition_id", pe.id).order("rank",{ascending:true}); if (pes) { pec = pes.length; for (const p of pes) { const nk = (p.normalized_key as string)||""; if (!nk||nk==="::"||!nk.includes("::")) continue; if (fks.has(nk)){skc++;continue;} const cid = crypto.randomUUID(); ccds.push({ id:cid, run_id:runId, normalized_key:nk, lead_artist_key:nk.split("::")[1]??"", title:(p.track_title as string)||"", artist_display:(p.artist_name as string)||"", source_count:0, source_urls_seen:[], occurrence_count:0, release_date:sanitizeDate(p.release_date as string), candidate_type:"carry_forward", status:"eligible", version:1, carry_forward_only:true, continuity_locked:false, airplay_candidate_only:false, streaming_qualified:false, isrc:null, upc:null, artwork_url:(p.artwork_url as string)||null, external_url:null, preview_url:null, release_title:null, created_at:new Date().toISOString(), updated_at:new Date().toISOString() }); cfc++; } } } } catch (err) { console.error("[carry_forward]", err); } if (ccds.length>0) { const CH=200; for (let j=0; j<ccds.length; j+=CH) { const { error: ie } = await db.from("chart_ingest_candidates").insert(ccds.slice(j,j+CH)); if (ie) { const d=Date.now()-ss; await db.from("chart_ingest_stage_events").update({ status:"failed", finished_at:new Date().toISOString(), duration_ms:d, message:ie.message }).eq("run_id",runId).eq("stage","carry_forward"); return json(req,{error:"insert_failed",detail:ie.message},500); } } } const d=Date.now()-ss; await db.from("chart_ingest_stage_events").update({ status:"done", finished_at:new Date().toISOString(), duration_ms:d, message:cfc>0?cfc+" carry-forward from "+pec+" entries":"No carry-forward needed." }).eq("run_id",runId).eq("stage","carry_forward"); return json(req,{ok:true,runId,carryForwardCount:cfc,freshEvidenceCount:fks.size,previousEntryCount:pec,skippedExistingCount:skc,durationMs:d}); }
@@ -474,17 +797,35 @@ async function handleRunShortlist(req: Request, db: ReturnType<typeof createClie
     return ((a.normalized_key as string) || "").localeCompare((b.normalized_key as string) || "");
   });
 
+  const seenSongIdentities = new Map<string, Record<string, unknown>>();
+  const dedupedSorted: typeof sorted = [];
+  const duplicateCandidates: typeof sorted = [];
+
+  for (const candidate of sorted) {
+    const identityKey = candidateSongIdentityKey(candidate as Record<string, unknown>);
+    if (seenSongIdentities.has(identityKey)) {
+      duplicateCandidates.push(candidate);
+    } else {
+      seenSongIdentities.set(identityKey, candidate as Record<string, unknown>);
+      dedupedSorted.push(candidate);
+    }
+  }
+
   const now = new Date().toISOString();
   const sids: string[] = [];
   const eids = new Set<string>();
 
-  for (let i = 0; i < sorted.length; i++) {
-    if (i < csz) sids.push(sorted[i].id as string);
-    else eids.add(sorted[i].id as string);
+  for (let i = 0; i < dedupedSorted.length; i++) {
+    if (i < csz) sids.push(dedupedSorted[i].id as string);
+    else eids.add(dedupedSorted[i].id as string);
   }
 
   for (const invalid of invalidCandidates) {
     eids.add(invalid.id as string);
+  }
+
+  for (const duplicate of duplicateCandidates) {
+    eids.add(duplicate.id as string);
   }
 
   await db
@@ -492,9 +833,9 @@ async function handleRunShortlist(req: Request, db: ReturnType<typeof createClie
     .delete()
     .eq("run_id", runId)
     .eq("source_stage", "shortlist")
-    .in("reason_code", ["country_mismatch", "missing_artist_country"]);
+    .in("reason_code", ["country_mismatch", "missing_artist_country", "duplicate_track"]);
 
-  const exclusionRows = invalidCandidates.map((candidate) => {
+  const countryExclusionRows = invalidCandidates.map((candidate) => {
     const origin = originByCandidate.get(candidate.id as string) || {};
     const reasonCode = (origin.reason_code as string) || "missing_artist_country";
     return {
@@ -515,6 +856,26 @@ async function handleRunShortlist(req: Request, db: ReturnType<typeof createClie
       created_at: now,
     };
   });
+
+  const duplicateExclusionRows = duplicateCandidates.map((candidate) => ({
+    id: crypto.randomUUID(),
+    run_id: runId,
+    candidate_id: candidate.id as string,
+    reason_code: "duplicate_track",
+    reason_label: "Duplicate track identity already selected in this chart run.",
+    severity: "hard",
+    source_stage: "shortlist",
+    details_json: {
+      normalizedKey: candidate.normalized_key,
+      title: candidate.title,
+      artistDisplay: candidate.artist_display,
+      finalScore: sbc.get(candidate.id as string)?.final_score ?? 0,
+      duplicateIdentityKey: candidateSongIdentityKey(candidate as Record<string, unknown>),
+    },
+    created_at: now,
+  }));
+
+  const exclusionRows = [...countryExclusionRows, ...duplicateExclusionRows];
 
   if (exclusionRows.length > 0) {
     const CH = 200;
@@ -637,11 +998,12 @@ async function handleRunShortlist(req: Request, db: ReturnType<typeof createClie
       status: "done",
       finished_at: new Date().toISOString(),
       duration_ms: d,
-      message: `${sids.length} country-clean shortlisted, ${eids.size} excluded, ${invalidCandidates.length} country-filtered.`,
+      message: `${sids.length} country-clean shortlisted, ${eids.size} excluded, ${invalidCandidates.length} country-filtered, ${duplicateCandidates.length} duplicate-filtered.`,
       metrics_json: {
         shortlistedCount: sids.length,
         excludedCount: eids.size,
         countryFilteredCount: invalidCandidates.length,
+        duplicateFilteredCount: duplicateCandidates.length,
         eligibleCandidateCount: candidates.length,
         chartSize: csz,
       },
@@ -667,6 +1029,7 @@ async function handleRunShortlist(req: Request, db: ReturnType<typeof createClie
     totalScored: candidates.length,
     excludedCount: eids.size,
     countryFilteredCount: invalidCandidates.length,
+    duplicateFilteredCount: duplicateCandidates.length,
     chartSize: csz,
     durationMs: d,
   });
@@ -695,3 +1058,136 @@ async function handleRunAirplayDetection(req: Request, db: ReturnType<typeof cre
 async function handleResetPipeline(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { const { runId } = params as { runId: string }; if (!runId) return json(req, { error: "runId_required" }, 400); const now = new Date().toISOString(); await db.from("chart_ingest_stage_events").update({ status: "idle", started_at: null, finished_at: null, duration_ms: null, message: null }).eq("run_id", runId); await Promise.all([db.from("chart_ingest_raw_rows").delete().eq("run_id", runId), db.from("chart_ingest_normalized_rows").delete().eq("run_id", runId), db.from("chart_ingest_candidates").delete().eq("run_id", runId), db.from("chart_ingest_exclusions").delete().eq("run_id", runId), db.from("chart_ingest_candidate_scores").delete().eq("run_id", runId), db.from("chart_ingest_matches").delete().eq("run_id", runId), db.from("chart_ingest_review_issues").delete().eq("run_id", runId)]); await db.from("chart_ingest_runs").update({ status: "draft", dry_run_completed_at: null, updated_at: now }).eq("id", runId); return json(req, { ok: true, runId, status: "draft" }); }
 async function handleCsvList(req: Request, db: ReturnType<typeof createClient>) { return json(req, { csvs: [] }); }
 async function handleApplyRowDecision(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { return json(req, { ok: true }); }
+
+
+async function handleGetOriginReviewQueue(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>) {
+  const { runId } = params as { runId: string };
+  if (!runId) return json(req, { error: "runId_required" }, 400);
+
+  const { data, error } = await db.rpc("chart_get_run_origin_review_queue", {
+    p_run_id: runId,
+  });
+
+  if (error) return json(req, { error: error.message }, 500);
+
+  return json(req, { rows: data || [] });
+}
+
+async function handleGetOriginCountryOptions(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>) {
+  const { includeIso2 } = params as { includeIso2?: string };
+  const include = typeof includeIso2 === "string" ? includeIso2.trim().toUpperCase() : "";
+
+  const { data: artists, error: artistErr } = await db
+    .from("registry_artists")
+    .select("origin_iso2")
+    .not("origin_iso2", "is", null);
+
+  if (artistErr) return json(req, { error: artistErr.message }, 500);
+
+  const codeCounts = new Map<string, number>();
+
+  for (const artist of artists || []) {
+    const code = String((artist as { origin_iso2?: string }).origin_iso2 || "").trim().toUpperCase();
+    if (!/^[A-Z]{2}$/.test(code)) continue;
+    codeCounts.set(code, (codeCounts.get(code) || 0) + 1);
+  }
+
+  const marketLabels = new Map<string, string>();
+
+  const { data: markets } = await db
+    .from("chart_markets")
+    .select("country_code,label")
+    .not("country_code", "is", null);
+
+  for (const market of markets || []) {
+    const code = String((market as { country_code?: string }).country_code || "").trim().toUpperCase();
+    const label = String((market as { label?: string }).label || "").trim();
+    if (!/^[A-Z]{2}$/.test(code)) continue;
+    if (label) marketLabels.set(code, label);
+    if (!codeCounts.has(code)) codeCounts.set(code, 0);
+  }
+
+  if (/^[A-Z]{2}$/.test(include) && !codeCounts.has(include)) {
+    codeCounts.set(include, 0);
+  }
+
+  const options = [...codeCounts.entries()]
+    .map(([originIso2, artistCount]) => ({
+      originIso2,
+      label: marketLabels.get(originIso2) || originIso2,
+      artistCount,
+    }))
+    .sort((a, b) => {
+      if (a.originIso2 === include) return -1;
+      if (b.originIso2 === include) return 1;
+      return a.originIso2.localeCompare(b.originIso2);
+    });
+
+  return json(req, { options });
+}
+
+
+async function handleSetArtistOriginForRun(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) {
+  const { artistId, originIso2, runId, candidateId, note } = params as {
+    artistId: string;
+    originIso2: string;
+    runId?: string;
+    candidateId?: string;
+    note?: string;
+  };
+
+  if (!artistId) return json(req, { error: "artistId_required" }, 400);
+  if (!originIso2) return json(req, { error: "originIso2_required" }, 400);
+
+  const { data, error } = await db.rpc("chart_set_artist_origin_for_charts", {
+    p_artist_id: artistId,
+    p_origin_iso2: originIso2,
+    p_run_id: runId || null,
+    p_candidate_id: candidateId || null,
+    p_note: note || "Resolved from chart origin queue.",
+    p_actor_user_id: user.id,
+  });
+
+  if (error) return json(req, { error: error.message }, 500);
+
+  return json(req, { ok: true, result: data });
+}
+
+async function handleCreateOriginArtistShell(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) {
+  const { artistName, originIso2, runId, candidateId } = params as {
+    artistName: string;
+    originIso2: string;
+    runId?: string;
+    candidateId?: string;
+  };
+
+  if (!artistName) return json(req, { error: "artistName_required" }, 400);
+  if (!originIso2) return json(req, { error: "originIso2_required" }, 400);
+
+  const { data, error } = await db.rpc("chart_create_artist_origin_shell", {
+    p_artist_name: artistName,
+    p_origin_iso2: originIso2,
+    p_run_id: runId || null,
+    p_candidate_id: candidateId || null,
+    p_actor_user_id: user.id,
+  });
+
+  if (error) return json(req, { error: error.message }, 500);
+
+  return json(req, { ok: true, result: data });
+}
+
+
+async function handleResetAfterOriginResolution(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>) {
+  const { runId } = params as { runId: string };
+
+  if (!runId) return json(req, { error: "runId_required" }, 400);
+
+  const { data, error } = await db.rpc("chart_reset_run_after_origin_resolution", {
+    p_run_id: runId,
+  });
+
+  if (error) return json(req, { error: error.message }, 500);
+
+  return json(req, { ok: true, result: data });
+}
