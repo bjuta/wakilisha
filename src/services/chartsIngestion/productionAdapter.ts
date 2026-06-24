@@ -93,7 +93,7 @@ async function invokeApi<T>(
   action: string,
   params: Record<string, unknown> = {}
 ): Promise<T> {
-  const { data, error } = await supabase.functions.invoke("admin-router", {
+  const { data, error } = await supabase.functions.invoke("chart-ingest-api", {
     body: { action, ...params },
   });
 
