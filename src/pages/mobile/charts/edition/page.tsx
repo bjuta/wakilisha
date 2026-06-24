@@ -180,6 +180,7 @@ export default function MobileChartEdition() {
     : series ?? "";
 
   const chartProgramSlug = normalizeChartProgramSlug(rawChartProgramSlug);
+  const chartMarketSlug = (market ?? "").toLowerCase();
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState(true);
@@ -206,7 +207,7 @@ export default function MobileChartEdition() {
     setNotFound(null);
     setDisplayedCount(INITIAL_COUNT);
     try {
-      const { data: family } = await getChartFamily(chartProgramSlug);
+      const { data: family } = await getChartFamily(chartProgramSlug, chartMarketSlug);
       if (!family) { setNotFound("family"); setLoading(false); return; }
 
       setFamilyLabel(family.label);
@@ -219,11 +220,11 @@ export default function MobileChartEdition() {
       }
 
       const edResult = editionSlug
-        ? await getChartEdition(chartProgramSlug, editionSlug)
-        : await getLatestChartEdition(chartProgramSlug);
+        ? await getChartEdition(chartProgramSlug, editionSlug, chartMarketSlug)
+        : await getLatestChartEdition(chartProgramSlug, chartMarketSlug);
 
       if (!edResult.data) {
-        const { data: latest } = await getLatestChartEdition(chartProgramSlug);
+        const { data: latest } = await getLatestChartEdition(chartProgramSlug, chartMarketSlug);
         setLatestEditionSlug(latest.data?.slug);
         setNotFound("edition");
         setLoading(false);
@@ -231,12 +232,12 @@ export default function MobileChartEdition() {
       }
 
       setMeta(edResult.meta);
-      const { data: rawEntries } = await getChartEditionEntries(chartProgramSlug, edResult.data.slug);
+      const { data: rawEntries } = await getChartEditionEntries(chartProgramSlug, edResult.data.slug, chartMarketSlug);
       const enrichedEntries = await enrichChartEntriesWithPlaybackData(rawEntries);
       setEdition(toChartEditionViewModel(edResult.data, family, enrichedEntries));
       setEntries(enrichedEntries.map(toChartEntryRowViewModel));
 
-      const { data: allEditions } = await getChartEditionsForFamily(chartProgramSlug);
+      const { data: allEditions } = await getChartEditionsForFamily(chartProgramSlug, chartMarketSlug);
       const sorted = [...allEditions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       const archiveEditions = sorted.slice(0, 4);
       const entriesMap: Record<string, import("@/services/chartsPublic/types").ChartEditionEntry[]> = { [edResult.data.slug]: enrichedEntries };
@@ -245,7 +246,7 @@ export default function MobileChartEdition() {
           .filter((e) => e.slug !== edResult.data!.slug)
           .slice(0, 3)
           .map(async (ed) => {
-            try { const { data: edEntries } = await getChartEditionEntries(chartProgramSlug, ed.slug); entriesMap[ed.slug] = edEntries; }
+            try { const { data: edEntries } = await getChartEditionEntries(chartProgramSlug, ed.slug, chartMarketSlug); entriesMap[ed.slug] = edEntries; }
             catch { entriesMap[ed.slug] = []; }
           })
       );
@@ -255,7 +256,7 @@ export default function MobileChartEdition() {
     } finally {
       setLoading(false);
     }
-  }, [chartProgramSlug, series, editionSlug, navigate]);
+  }, [chartProgramSlug, chartMarketSlug, series, editionSlug, navigate]);
 
   useEffect(() => { load(); }, [load]);
 

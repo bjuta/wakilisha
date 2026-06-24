@@ -251,31 +251,31 @@ export default function ArtistAliasesPage() {
   /* ──── Confirm alias ──── */
   const confirmAlias = useCallback(async (aliasSlug: string, canonicalArtistId: string, displayName: string | null) => {
     try {
-      const { error } = await supabase.from("registry_artist_aliases").insert({
-        alias_slug: aliasSlug,
-        canonical_artist_id: canonicalArtistId,
-        alias_display_name: displayName,
-        confidence: 100,
-        source: "similarity_match",
-        notes: "Confirmed via admin review",
+      const { data, error } = await supabase.rpc("admin_resolve_chart_artist_alias", {
+        p_alias_slug: aliasSlug,
+        p_canonical_artist_id: canonicalArtistId,
+        p_alias_display_name: displayName,
+        p_apply_to_existing: true,
       });
 
-      if (error) {
-        if (error.message.includes("duplicate")) {
-          showToast("Alias already exists", "error");
-        } else {
-          throw error;
-        }
-        return;
-      }
+      if (error) throw error;
 
-      showToast(`Alias "${aliasSlug}" confirmed`, "success");
+      const result = (data ?? {}) as {
+        chartEntriesUpdated?: number;
+      };
+
+      showToast(
+        `Alias "${aliasSlug}" confirmed · ${result.chartEntriesUpdated ?? 0} chart rows repaired`,
+        "success"
+      );
+
       setUnknownSlugs((prev) => prev.filter((u) => u.unknown_slug !== aliasSlug));
       loadAliases();
+      loadUnknownSlugs();
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Failed to confirm alias", "error");
     }
-  }, [loadAliases, showToast]);
+  }, [loadAliases, loadUnknownSlugs, showToast]);
 
   /* ──── Dismiss slug (skip review) ──── */
   const dismissSlug = useCallback((slug: string) => {

@@ -80,6 +80,7 @@ export default function ChartEdition() {
     : series ?? "";
 
   const chartProgramSlug = normalizeChartProgramSlug(rawChartProgramSlug);
+  const chartMarketSlug = (market ?? "").toLowerCase();
   const navigate = useNavigate();
   const { playTrack } = usePlayer();
 
@@ -112,7 +113,7 @@ export default function ChartEdition() {
     }
     setState({ status: "loading" });
     try {
-      const { data: family } = await getChartFamily(chartProgramSlug);
+      const { data: family } = await getChartFamily(chartProgramSlug, chartMarketSlug);
       if (!family) {
         setState({ status: "family_not_found" });
         return;
@@ -143,15 +144,15 @@ export default function ChartEdition() {
       let rawEntries: ChartEditionEntry[] = [];
 
       if (editionSlug) {
-        const result = await getChartEdition(chartProgramSlug, editionSlug);
+        const result = await getChartEdition(chartProgramSlug, editionSlug, chartMarketSlug);
         editionResult = result;
         editionMeta = result.meta;
         if (result.data) {
-          const entriesResult = await getChartEditionEntries(chartProgramSlug, result.data.slug);
+          const entriesResult = await getChartEditionEntries(chartProgramSlug, result.data.slug, chartMarketSlug);
           rawEntries = entriesResult.data;
         }
       } else {
-        const result = await getLatestChartEditionWithEntries(chartProgramSlug);
+        const result = await getLatestChartEditionWithEntries(chartProgramSlug, chartMarketSlug);
         editionMeta = result.meta;
         if (result.data.edition) {
           editionResult = {
@@ -165,7 +166,7 @@ export default function ChartEdition() {
       }
 
       if (!editionResult.data) {
-        const { data: latestResult } = await getLatestChartEditionWithEntries(chartProgramSlug);
+        const { data: latestResult } = await getLatestChartEditionWithEntries(chartProgramSlug, chartMarketSlug);
         setState({
           status: "edition_not_found",
           familySlug: chartProgramSlug,
@@ -189,7 +190,7 @@ export default function ChartEdition() {
       const editionVM = toChartEditionViewModel(editionResult.data, family, rawEntries);
 
       // Load all editions for archive and navigation
-      const { data: allEditions } = await getChartEditionsForFamily(chartProgramSlug);
+      const { data: allEditions } = await getChartEditionsForFamily(chartProgramSlug, chartMarketSlug);
       const sortedEditions = [...allEditions].sort(
         (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
       );
@@ -205,7 +206,7 @@ export default function ChartEdition() {
       await Promise.all(
         otherArchiveEditions.slice(0, 3).map(async (ed) => {
           try {
-            const { data: edEntries } = await getChartEditionEntries(chartProgramSlug, ed.slug);
+            const { data: edEntries } = await getChartEditionEntries(chartProgramSlug, ed.slug, chartMarketSlug);
             entriesMap[ed.slug] = edEntries;
           } catch {
             entriesMap[ed.slug] = [];
@@ -238,7 +239,7 @@ export default function ChartEdition() {
         retryable: isRetryable,
       });
     }
-  }, [chartProgramSlug, series, editionSlug, navigate]);
+  }, [chartProgramSlug, chartMarketSlug, series, editionSlug, navigate]);
 
   useEffect(() => { load(); setDisplayedCount(20); }, [load]);
   const handleRetry = () => load();
