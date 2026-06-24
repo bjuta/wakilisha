@@ -62,6 +62,7 @@ export type TrackFacts = {
   releaseType?: ReleaseType;
   releaseYear?: string;
   releaseMonth?: string;
+  releaseDate?: string;
   trackNumber?: number;
   trackCount?: number;
   genres: string[];
@@ -95,6 +96,7 @@ export type ReleaseFacts = {
   artistNames: string[];
   releaseYear?: string;
   releaseMonth?: string;
+  releaseDate?: string;
   trackCount?: number;
   totalDuration?: string;
   labelName?: string;
