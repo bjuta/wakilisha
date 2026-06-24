@@ -20,13 +20,14 @@ type Args = {
 
 type ChartEntryRow = {
   entry_id: string;
-  edition_id: string;
+  edition_id: string | null;
   edition_slug: string;
   program_id: string;
   public_slug: string;
   source_family_slug: string | null;
   market_slug: string | null;
   rank: number;
+  artist_slug: string | null;
   track_slug: string | null;
   track_title: string;
   artist_name: string;
@@ -82,6 +83,7 @@ type EnrichmentResult = {
 type RuntimeSchemaInfo = {
   chartEntryRawPayloadColumn: string | null;
   hasTrackArtistCreditsTable: boolean;
+  hasRegistryTrackArtistsTable: boolean;
 };
 
 function getArg(name: string): string | null {
@@ -123,6 +125,146 @@ function slugify(value: string): string {
     .replace(/-{2,}/g, '-');
 
   return slug || `chart-track-${Date.now()}`;
+}
+
+function stableSlug(value: string | null | undefined, fallback: string): string {
+  const raw = value?.trim() || fallback;
+  return slugify(raw || fallback);
+}
+
+function firstArtistName(value: string | null | undefined): string {
+  return (value || '')
+    .split(/,|&|\bfeat\.?\b|\bft\.?\b|\bwith\b|\bx\b/gi)
+    .map((part) => part.trim())
+    .find(Boolean) || value?.trim() || 'Unknown Artist';
+}
+
+function entryArtistSlug(entry: ChartEntryRow): string {
+  return stableSlug(entry.artist_slug, firstArtistName(entry.artist_name));
+}
+
+function entryTrackSlug(entry: ChartEntryRow): string {
+  return stableSlug(entry.track_slug, entry.track_title || 'untitled');
+}
+
+type RegistryTrackShellRow = {
+  id: string;
+  slug: string;
+  title: string;
+  metadata: JsonRecord;
+  duration_ms: number | null;
+  preview_url: string | null;
+  artwork_url: string | null;
+};
+
+function assignRegistryTrack(entry: ChartEntryRow, track: RegistryTrackShellRow, artistSlug?: string): void {
+  entry.track_id = track.id;
+  entry.track_slug = track.slug;
+  if (artistSlug) entry.artist_slug = artistSlug;
+  entry.registry_slug = track.slug;
+  entry.registry_title = track.title;
+  entry.registry_metadata = track.metadata ?? {};
+  entry.registry_duration_ms = track.duration_ms;
+  entry.registry_preview_url = track.preview_url;
+  entry.registry_artwork_url = track.artwork_url;
+}
+
+async function findScopedRegistryTrack(
+  client: PoolClient,
+  input: {
+    trackSlug: string;
+    artistSlug: string;
+    chartEntryId: string;
+  },
+): Promise<RegistryTrackShellRow | null> {
+  const result = await client.query<RegistryTrackShellRow>(
+    `
+      select
+        rt.id,
+        rt.slug,
+        rt.title,
+        coalesce(rt.metadata, '{}'::jsonb) as metadata,
+        rt.duration_ms,
+        rt.preview_url,
+        rt.artwork_url
+      from public.registry_tracks rt
+      left join public.registry_track_artists rta
+        on rta.track_id = rt.id
+      where rt.metadata->>'chart_entry_id' = $3
+         or (
+          rt.slug = $1
+          and (
+            rta.artist_slug = $2
+            or rt.metadata->>'primary_artist_slug' = $2
+          )
+        )
+      order by
+        case
+          when rt.metadata->>'chart_entry_id' = $3 then 1
+          when rta.artist_slug = $2 then 2
+          when rt.metadata->>'primary_artist_slug' = $2 then 3
+          else 4
+        end,
+        rt.updated_at desc nulls last,
+        rt.created_at desc
+      limit 1
+    `,
+    [input.trackSlug, input.artistSlug, input.chartEntryId],
+  );
+
+  return result.rows[0] ?? null;
+}
+
+async function chooseRegistryTrackSlug(
+  client: PoolClient,
+  baseTrackSlug: string,
+  artistSlug: string,
+): Promise<string> {
+  const existing = await client.query<{ id: string }>(
+    `
+      select rt.id
+      from public.registry_tracks rt
+      where rt.slug = $1
+      limit 1
+    `,
+    [baseTrackSlug],
+  );
+
+  if (existing.rowCount === 0) return baseTrackSlug;
+
+  const scoped = await client.query<{ id: string }>(
+    `
+      select rt.id
+      from public.registry_tracks rt
+      left join public.registry_track_artists rta
+        on rta.track_id = rt.id
+      where rt.slug = $1
+        and (
+          rta.artist_slug = $2
+          or rt.metadata->>'primary_artist_slug' = $2
+        )
+      limit 1
+    `,
+    [baseTrackSlug, artistSlug],
+  );
+
+  if ((scoped.rowCount ?? 0) > 0) return baseTrackSlug;
+
+  const seeded = `${baseTrackSlug}-${artistSlug}`;
+  let candidate = seeded;
+  let suffix = 2;
+
+  while (true) {
+    const check = await client.query<{ id: string }>(
+      `select id from public.registry_tracks where slug = $1 limit 1`,
+      [candidate],
+    );
+
+    if (check.rowCount === 0) return candidate;
+
+    candidate = `${seeded}-${suffix}`;
+    suffix += 1;
+  }
 }
 
 function buildAppleMusicDeveloperToken(): string {
@@ -174,24 +316,90 @@ async function ensureRegistryTrackShells(
   const next = [...entries];
 
   for (const entry of next) {
-    if (entry.track_id) continue;
+    const artistSlug = entryArtistSlug(entry);
+    const baseTrackSlug = entryTrackSlug(entry);
+
+    if (entry.track_id) {
+      entry.artist_slug = artistSlug;
+      entry.track_slug = entry.track_slug ? stableSlug(entry.track_slug, baseTrackSlug) : baseTrackSlug;
+      continue;
+    }
 
     const title = entry.track_title?.trim();
     if (!title) continue;
 
-    const slug = slugify(entry.track_slug || `${entry.track_title}-${entry.artist_name || 'unknown'}`);
-    const normalizedTitle = normalizeText(title);
-    const artistName = entry.artist_name?.trim() || null;
+    if (schema.hasRegistryTrackArtistsTable) {
+      const scopedTrack = await findScopedRegistryTrack(client, {
+        trackSlug: baseTrackSlug,
+        artistSlug,
+        chartEntryId: entry.entry_id,
+      });
 
-    const result = await client.query<{
-      id: string;
-      slug: string;
-      title: string;
-      metadata: JsonRecord;
-      duration_ms: number | null;
-      preview_url: string | null;
-      artwork_url: string | null;
-    }>(
+      if (scopedTrack) {
+        assignRegistryTrack(entry, scopedTrack, artistSlug);
+
+        if (entry.edition_id) {
+          await client.query(
+            `
+              update public.wk_chart_entries_v2
+              set
+                artist_slug = $2,
+                track_slug = $3
+              where id = $1
+                and (
+                  artist_slug is distinct from $2
+                  or track_slug is distinct from $3
+                )
+            `,
+            [entry.entry_id, artistSlug, scopedTrack.slug],
+          );
+        }
+
+        continue;
+      }
+    }
+
+    const artistName = firstArtistName(entry.artist_name);
+    const normalizedTitle = normalizeText(title);
+    const safeTrackSlug = await chooseRegistryTrackSlug(client, baseTrackSlug, artistSlug);
+
+    let artistId: string | null = null;
+
+    if (schema.hasRegistryTrackArtistsTable) {
+      const artistResult = await client.query<{ id: string }>(
+        `
+          insert into public.registry_artists (
+            slug,
+            display_name,
+            normalized_name,
+            sort_name,
+            status,
+            metadata
+          )
+          values (
+            $1,
+            $2,
+            $3,
+            $2,
+            'needs_review',
+            jsonb_build_object('source', 'chart_apple_music_enrichment')
+          )
+          on conflict (slug)
+          do update set
+            display_name = excluded.display_name,
+            normalized_name = excluded.normalized_name,
+            sort_name = excluded.sort_name,
+            metadata = coalesce(public.registry_artists.metadata, '{}'::jsonb) || excluded.metadata,
+            updated_at = now()
+          returning id
+        `,
+        [artistSlug, artistName, normalizeText(artistName)],
+      );
+
+      artistId = artistResult.rows[0]?.id ?? null;
+    }
+
+    const result = await client.query<RegistryTrackShellRow>(
       `
         insert into public.registry_tracks (
           slug,
@@ -212,7 +420,9 @@ async function ensureRegistryTrackShells(
             'chart_entry_id', $5::text,
             'chart_edition_slug', $6::text,
             'chart_program_slug', $7::text,
-            'artist_name', $8::text
+            'artist_name', $8::text,
+            'primary_artist_slug', $9::text,
+            'base_track_slug', $10::text
           )
         )
         on conflict (slug)
@@ -223,59 +433,82 @@ async function ensureRegistryTrackShells(
         returning id, slug, title, metadata, duration_ms, preview_url, artwork_url
       `,
       [
-        slug,
+        safeTrackSlug,
         title,
         normalizedTitle,
         entry.artwork_url,
         entry.entry_id,
         entry.edition_slug,
         entry.public_slug,
-        artistName,
+        entry.artist_name?.trim() || artistName,
+        artistSlug,
+        baseTrackSlug,
       ],
     );
 
     const track = result.rows[0];
     if (!track) continue;
 
-    entry.track_id = track.id;
-    entry.registry_slug = track.slug;
-    entry.registry_title = track.title;
-    entry.registry_metadata = track.metadata ?? {};
-    entry.registry_duration_ms = track.duration_ms;
-    entry.registry_preview_url = track.preview_url;
-    entry.registry_artwork_url = track.artwork_url;
+    assignRegistryTrack(entry, track, artistSlug);
 
-    if (artistName && schema.hasTrackArtistCreditsTable) {
+    if (schema.hasRegistryTrackArtistsTable && artistId) {
       await client.query(
         `
-          insert into public.registry_track_artist_credits (
+          insert into public.registry_track_artists (
             track_id,
-            display_name,
+            artist_id,
+            artist_slug,
+            artist_name_text,
             role,
+            is_primary,
+            is_featured,
             credit_order,
+            display_credit,
+            source,
             confidence,
-            review_status,
-            source_text,
+            status,
             metadata
           )
           select
             $1,
             $2,
+            $3,
+            $4,
             'primary_artist',
+            true,
+            false,
             1,
-            0.7000,
+            $4,
+            'chart_apple_music_enrichment',
+            0.9500,
             'needs_review',
-            $2,
             jsonb_build_object('source', 'chart_apple_music_enrichment')
           where not exists (
             select 1
-            from public.registry_track_artist_credits
+            from public.registry_track_artists
             where track_id = $1
-              and lower(display_name) = lower($2)
+              and artist_slug = $3
               and role = 'primary_artist'
           )
         `,
-        [track.id, artistName],
+        [track.id, artistId, artistSlug, artistName],
+      );
+    }
+
+    if (entry.edition_id) {
+      await client.query(
+        `
+          update public.wk_chart_entries_v2
+          set
+            artist_slug = $2,
+            track_slug = $3
+          where id = $1
+            and (
+              artist_slug is distinct from $2
+              or track_slug is distinct from $3
+            )
+        `,
+        [entry.entry_id, artistSlug, track.slug],
       );
     }
   }
@@ -326,6 +559,7 @@ async function detectRuntimeSchema(client: PoolClient): Promise<RuntimeSchemaInf
   return {
     chartEntryRawPayloadColumn,
     hasTrackArtistCreditsTable: await tableExists(client, 'registry_track_artist_credits'),
+    hasRegistryTrackArtistsTable: await tableExists(client, 'registry_track_artists'),
   };
 }
 
@@ -557,19 +791,62 @@ async function loadChartEntries(client: PoolClient, args: Args, schema: RuntimeS
   if (args.runId) {
     const result = await client.query<ChartEntryRow>(
       `
+        with base as (
+          select
+            c.id as entry_id,
+            null::uuid as edition_id,
+            r.edition_date::text as edition_slug,
+            r.program_id,
+            coalesce(r.series_slug, r.program_id) as public_slug,
+            null::text as source_family_slug,
+            r.market_slug,
+            row_number() over (order by c.created_at asc, c.id asc)::integer as rank,
+            regexp_replace(
+              regexp_replace(
+                lower(coalesce(nullif(split_part(c.normalized_key, '::', 1), ''), c.title, 'untitled')),
+                '[^a-z0-9]+',
+                '-',
+                'g'
+              ),
+              '(^-|-$)',
+              '',
+              'g'
+            ) as scoped_track_slug,
+            regexp_replace(
+              regexp_replace(
+                lower(coalesce(nullif(split_part(c.normalized_key, '::', 2), ''), split_part(c.artist_display, ',', 1), 'unknown-artist')),
+                '[^a-z0-9]+',
+                '-',
+                'g'
+              ),
+              '(^-|-$)',
+              '',
+              'g'
+            ) as scoped_artist_slug,
+            c.title as track_title,
+            c.artist_display as artist_name,
+            c.artwork_url
+          from public.chart_ingest_candidates c
+          join public.chart_ingest_runs r on r.id = c.run_id
+          where c.run_id::text = $1
+            and c.status = 'eligible'
+          order by c.created_at asc, c.id asc
+          limit $2
+        )
         select
-          c.id as entry_id,
-          null::uuid as edition_id,
-          r.edition_date::text as edition_slug,
-          r.program_id,
-          coalesce(r.series_slug, r.program_id) as public_slug,
-          null::text as source_family_slug,
-          r.market_slug,
-          row_number() over (order by c.created_at asc, c.id asc)::integer as rank,
-          split_part(c.normalized_key, '::', 1) as track_slug,
-          c.title as track_title,
-          c.artist_display as artist_name,
-          c.artwork_url,
+          b.entry_id,
+          b.edition_id,
+          b.edition_slug,
+          b.program_id,
+          b.public_slug,
+          b.source_family_slug,
+          b.market_slug,
+          b.rank,
+          b.scoped_artist_slug as artist_slug,
+          b.scoped_track_slug as track_slug,
+          b.track_title,
+          b.artist_name,
+          b.artwork_url,
           '{}'::jsonb as raw_payload,
           rt.id as track_id,
           rt.slug as registry_slug,
@@ -578,13 +855,32 @@ async function loadChartEntries(client: PoolClient, args: Args, schema: RuntimeS
           rt.duration_ms as registry_duration_ms,
           rt.preview_url as registry_preview_url,
           rt.artwork_url as registry_artwork_url
-        from public.chart_ingest_candidates c
-        join public.chart_ingest_runs r on r.id = c.run_id
-        left join public.registry_tracks rt on rt.slug = split_part(c.normalized_key, '::', 1)
-        where c.run_id = $1
-          and c.status = 'eligible'
-        order by c.created_at asc, c.id asc
-        limit $2
+        from base b
+        left join lateral (
+          select rt.*
+          from public.registry_tracks rt
+          left join public.registry_track_artists rta
+            on rta.track_id = rt.id
+          where rt.metadata->>'chart_entry_id' = b.entry_id::text
+             or (
+              rt.slug = b.scoped_track_slug
+              and (
+                rta.artist_slug = b.scoped_artist_slug
+                or rt.metadata->>'primary_artist_slug' = b.scoped_artist_slug
+              )
+            )
+          order by
+            case
+              when rt.metadata->>'chart_entry_id' = b.entry_id::text then 1
+              when rta.artist_slug = b.scoped_artist_slug then 2
+              when rt.metadata->>'primary_artist_slug' = b.scoped_artist_slug then 3
+              else 4
+            end,
+            rt.updated_at desc nulls last,
+            rt.created_at desc
+          limit 1
+        ) rt on true
+        order by b.rank asc
       `,
       [args.runId, args.limit],
     );
@@ -606,20 +902,70 @@ async function loadChartEntries(client: PoolClient, args: Args, schema: RuntimeS
 
   const result = await client.query<ChartEntryRow>(
     `
+      with base as (
+        select
+          ce.id as entry_id,
+          ce.edition_id,
+          e.edition_slug,
+          p.id as program_id,
+          p.public_slug,
+          p.source_family_slug,
+          p.market_slug,
+          ce.rank,
+          regexp_replace(
+            regexp_replace(
+              lower(coalesce(nullif(ce.artist_slug, ''), split_part(ce.artist_name, ',', 1), 'unknown-artist')),
+              '[^a-z0-9]+',
+              '-',
+              'g'
+            ),
+            '(^-|-$)',
+            '',
+            'g'
+          ) as scoped_artist_slug,
+          regexp_replace(
+            regexp_replace(
+              lower(coalesce(nullif(ce.track_slug, ''), ce.track_title, 'untitled')),
+              '[^a-z0-9]+',
+              '-',
+              'g'
+            ),
+            '(^-|-$)',
+            '',
+            'g'
+          ) as scoped_track_slug,
+          ce.track_title,
+          ce.artist_name,
+          ce.artwork_url,
+          ${rawPayloadSelect}
+        from public.wk_chart_entries_v2 ce
+        join public.wk_chart_editions_v2 e on e.id = ce.edition_id
+        join public.wk_chart_programs_v2 p on p.id = e.program_id
+        where e.edition_slug = $1
+          and (
+            $2::text is null
+            or p.public_slug = $2
+            or p.source_family_slug = $2
+            or p.id = $2
+          )
+        order by ce.rank asc
+        limit $3
+      )
       select
-        ce.id as entry_id,
-        ce.edition_id,
-        e.edition_slug,
-        p.id as program_id,
-        p.public_slug,
-        p.source_family_slug,
-        p.market_slug,
-        ce.rank,
-        ce.track_slug,
-        ce.track_title,
-        ce.artist_name,
-        ce.artwork_url,
-        ${rawPayloadSelect},
+        b.entry_id,
+        b.edition_id,
+        b.edition_slug,
+        b.program_id,
+        b.public_slug,
+        b.source_family_slug,
+        b.market_slug,
+        b.rank,
+        b.scoped_artist_slug as artist_slug,
+        b.scoped_track_slug as track_slug,
+        b.track_title,
+        b.artist_name,
+        b.artwork_url,
+        b.raw_payload,
         rt.id as track_id,
         rt.slug as registry_slug,
         rt.title as registry_title,
@@ -627,19 +973,32 @@ async function loadChartEntries(client: PoolClient, args: Args, schema: RuntimeS
         rt.duration_ms as registry_duration_ms,
         rt.preview_url as registry_preview_url,
         rt.artwork_url as registry_artwork_url
-      from public.wk_chart_entries_v2 ce
-      join public.wk_chart_editions_v2 e on e.id = ce.edition_id
-      join public.wk_chart_programs_v2 p on p.id = e.program_id
-      left join public.registry_tracks rt on rt.slug = ce.track_slug
-      where e.edition_slug = $1
-        and (
-          $2::text is null
-          or p.public_slug = $2
-          or p.source_family_slug = $2
-          or p.id = $2
-        )
-      order by ce.rank asc
-      limit $3
+      from base b
+      left join lateral (
+        select rt.*
+        from public.registry_tracks rt
+        left join public.registry_track_artists rta
+          on rta.track_id = rt.id
+        where rt.metadata->>'chart_entry_id' = b.entry_id::text
+           or (
+            rt.slug = b.scoped_track_slug
+            and (
+              rta.artist_slug = b.scoped_artist_slug
+              or rt.metadata->>'primary_artist_slug' = b.scoped_artist_slug
+            )
+          )
+        order by
+          case
+            when rt.metadata->>'chart_entry_id' = b.entry_id::text then 1
+            when rta.artist_slug = b.scoped_artist_slug then 2
+            when rt.metadata->>'primary_artist_slug' = b.scoped_artist_slug then 3
+            else 4
+          end,
+          rt.updated_at desc nulls last,
+          rt.created_at desc
+        limit 1
+      ) rt on true
+      order by b.rank asc
     `,
     [args.edition, args.program, args.limit],
   );
@@ -918,8 +1277,8 @@ async function run(): Promise<void> {
       console.warn('wk_chart_entries_v2 has no JSON payload column. Provider links and registry metadata will still be written, but chart entry playback snapshots will be skipped.');
     }
 
-    if (!schema.hasTrackArtistCreditsTable) {
-      console.warn('registry_track_artist_credits does not exist. Registry track shells will be created without artist-credit rows.');
+    if (!schema.hasRegistryTrackArtistsTable) {
+      console.warn('registry_track_artists does not exist. Scoped registry track shelling will fall back to track-only identity.');
     }
 
     let entries = await loadChartEntries(client, args, schema);
