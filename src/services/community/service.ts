@@ -34,6 +34,20 @@ function isDuplicateThreadConflict(error: unknown): boolean {
   return err?.code === "23505" || text.includes("duplicate key") || text.includes("community_threads_entity_type_entity_id_key");
 }
 
+function asArrayPayload<T = any>(data: unknown): T[] {
+  if (Array.isArray(data)) return data as T[];
+
+  if (data && typeof data === "object") {
+    const record = data as Record<string, unknown>;
+
+    if (Array.isArray(record.notifications)) return record.notifications as T[];
+    if (Array.isArray(record.data)) return record.data as T[];
+    if (Array.isArray(record.items)) return record.items as T[];
+  }
+
+  return [];
+}
+
 export async function getOrCreateThread(entity: CommunityEntity): Promise<ThreadResult> {
   const existing = await getThreadByEntity(entity.type, entity.id || undefined, entity.slug || undefined);
   if (existing) {
@@ -310,14 +324,17 @@ export async function markAllNotificationsRead(): Promise<void> {
 }
 
 export async function getNotificationsWithActors(userId: string, limit: number = 30): Promise<(CommunityNotification & { actor: CommunityProfile | null })[]> {
-  const { data: notifs, error } = await supabase.rpc('community_get_user_notifications', {
+  const { data, error } = await supabase.rpc('community_get_user_notifications', {
     p_user_id: userId,
     p_limit: limit,
   });
-  if (error) throw error;
-  if (!notifs || notifs.length === 0) return [];
 
-  const actorIds = [...new Set((notifs as any[]).map((n: any) => n.actor_id).filter(Boolean))];
+  if (error) throw error;
+
+  const notifs = asArrayPayload<Record<string, unknown>>(data);
+  if (notifs.length === 0) return [];
+
+  const actorIds = [...new Set(notifs.map((n: any) => n.actor_id).filter(Boolean))];
   let profileMap: Record<string, CommunityProfile> = {};
 
   if (actorIds.length > 0) {
@@ -331,7 +348,7 @@ export async function getNotificationsWithActors(userId: string, limit: number =
     }
   }
 
-  return (notifs as any[]).map((row: any) => ({
+  return notifs.map((row: any) => ({
     ...mapNotification(row),
     actor: row.actor_id ? profileMap[row.actor_id] || null : null,
   }));
@@ -384,7 +401,7 @@ export async function getUserNotifications(userId: string, limit: number = 20): 
     p_limit: limit,
   });
   if (error) throw error;
-  return (data || []).map((row: any) => mapNotification(row));
+  return asArrayPayload<Record<string, unknown>>(data).map((row: any) => mapNotification(row));
 }
 
 export async function getUserComments(userId: string, limit: number = 20): Promise<CommunityComment[]> {
