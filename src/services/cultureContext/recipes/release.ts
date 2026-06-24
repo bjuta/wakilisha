@@ -17,13 +17,29 @@ function artistFromPhrase(facts: ReleaseFacts): string {
 }
 
 function releaseDatePhrase(facts: ReleaseFacts): string {
+  if (facts.releaseDate) {
+    const parsed = new Date(facts.releaseDate);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+    }
+    return facts.releaseDate;
+  }
+
   if (facts.releaseMonth && facts.releaseYear) return `${facts.releaseMonth} ${facts.releaseYear}`;
   return facts.releaseYear || "";
 }
 
+function releaseDatePreposition(facts: ReleaseFacts): "on" | "in" {
+  return facts.releaseDate ? "on" : "in";
+}
+
 function releasedBit(facts: ReleaseFacts): string {
   const date = releaseDatePhrase(facts);
-  return date ? `, released in ${date}` : "";
+  return date ? `, released ${releaseDatePreposition(facts)} ${date}` : "";
 }
 
 function trackPhrase(facts: ReleaseFacts): string {
@@ -67,42 +83,16 @@ function standoutSentence(facts: ReleaseFacts): string | undefined {
 function typeHeroIntro(facts: ReleaseFacts): string {
   const title = releaseName(facts);
   const artists = artistPhrase(facts);
+  const type = releaseTypeLabel(facts.releaseType);
+  const trackText = facts.trackCount ? `${facts.trackCount}-track ` : "";
   const released = releasedBit(facts);
+  const label = facts.labelName ? ` under ${facts.labelName}` : "";
 
-  if (facts.releaseType === "album") {
-    return `${title} is a ${trackPrefix(facts)}album${artists}${released}. Start here for the full world around this era.`;
+  if (facts.releaseType === "unknown") {
+    return `${title}${artists} is a release on WAKILISHA${released}${label}.`;
   }
 
-  if (facts.releaseType === "ep") {
-    return `${title} is a focused ${trackPrefix(facts)}EP${artists}${released}${facts.labelName ? ` via ${facts.labelName}` : ""}. Short enough to enter quickly, strong enough to leave a trail.`;
-  }
-
-  if (facts.releaseType === "single") {
-    const labelBit = facts.labelName ? ` via ${facts.labelName}` : "";
-    return `${title} is a single${artists}${released}${labelBit}. One song, one moment, and a trail you can follow.`;
-  }
-
-  if (facts.releaseType === "compilation" || facts.isCompilation || facts.hasMultipleArtists) {
-    return `${title} brings multiple voices into one release${released}. Use it to follow the artists, tracks, and scene links gathered here.`;
-  }
-
-  if (facts.releaseType === "mixtape") {
-    return `${title} is a mixtape${artists}${released}. Looser, sharper, and built for the side of the sound that does not always wait for permission.`;
-  }
-
-  if (facts.releaseType === "live") {
-    return `${title} is a live release${artists}${released}. Start here for the songs as they moved from studio version to room, stage, crowd, and moment.`;
-  }
-
-  if (facts.releaseType === "soundtrack") {
-    return `${title} is a soundtrack${artists}${released}. It gathers music around a screen story, scene, or visual moment.`;
-  }
-
-  if (facts.releaseType === "deluxe") {
-    return `${title} is a deluxe edition${artists}${released}. Same era, more room, extra tracks, and more ways into the project.`;
-  }
-
-  return `${title}${artists} is in WAKILISHA with the release details we have so far. More songs, credits, and context will be added as the archive grows.`;
+  return `${title} is a ${trackText}${type}${artists}${released}${label}.`;
 }
 
 function baseFactsUsed(facts: ReleaseFacts): string[] {
@@ -120,11 +110,7 @@ function baseFactsUsed(facts: ReleaseFacts): string[] {
 }
 
 function heroIntro(facts: ReleaseFacts): string {
-  return sentenceJoin([
-    typeHeroIntro(facts),
-    chartSentence(facts),
-    standoutSentence(facts),
-  ]);
+  return typeHeroIntro(facts);
 }
 
 function cardBlurb(facts: ReleaseFacts): string {

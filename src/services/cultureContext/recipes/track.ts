@@ -25,6 +25,43 @@ function baseFactsUsed(facts: TrackFacts): string[] {
   ].filter(Boolean) as string[];
 }
 
+function ordinal(value: number): string {
+  const suffixes = ["th", "st", "nd", "rd"];
+  const v = value % 100;
+  return `${value}${suffixes[(v - 20) % 10] || suffixes[v] || suffixes[0]}`;
+}
+
+function releaseDatePhrase(facts: TrackFacts): string {
+  if (facts.releaseDate) {
+    const parsed = new Date(facts.releaseDate);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+    }
+    return facts.releaseDate;
+  }
+
+  if (facts.releaseMonth && facts.releaseYear) return `${facts.releaseMonth} ${facts.releaseYear}`;
+  return facts.releaseYear || "";
+}
+
+function releaseDescriptionSentence(facts: TrackFacts): string {
+  if (!facts.releaseTitle) return "";
+
+  const type = facts.releaseType && facts.releaseType !== "unknown"
+    ? releaseTypeLabel(facts.releaseType)
+    : "release";
+  const count = facts.trackCount ? `${facts.trackCount}-track ` : "";
+  const date = releaseDatePhrase(facts);
+  const dateBit = date ? ` released ${facts.releaseDate ? "on" : "in"} ${date}` : "";
+  const labelBit = facts.labelName ? ` under ${facts.labelName}` : "";
+
+  return `The ${type} is a ${count}${type}${dateBit}${labelBit}.`;
+}
+
 function formatReleaseContext(facts: TrackFacts): string {
   if (!facts.releaseTitle) return "";
   const typeLabel = facts.releaseType && facts.releaseType !== "unknown"
@@ -38,6 +75,19 @@ function formatReleaseContext(facts: TrackFacts): string {
   return `from ${typeLabel}${facts.releaseTitle}${yearPart}${trackNum}${countPart}`;
 }
 
+function factualReleaseTrackIntro(facts: TrackFacts): string {
+  if (!facts.releaseTitle) return "";
+
+  const trackTitle = title(facts);
+  const artists = artistLine(facts);
+  const byText = artists ? ` by ${artists}` : "";
+  const trackPosition = facts.trackNumber
+    ? `the ${ordinal(facts.trackNumber)} track`
+    : "a track";
+
+  return `${trackTitle} is ${trackPosition}${byText} on ${facts.releaseTitle}. ${releaseDescriptionSentence(facts)}`;
+}
+
 function heroIntro(facts: TrackFacts): string {
   const trackTitle = title(facts);
   const artists = artistLine(facts);
@@ -49,17 +99,21 @@ function heroIntro(facts: TrackFacts): string {
   const hasCollaboration = facts.primaryArtists.length + facts.featuredArtists.length > 1;
   const hasLabel = !!facts.labelName;
 
-  // Rich: chart + release + genre
-  if (hasChart && hasRelease) {
+  // Release-linked tracks: structured release data is the context.
+  if (hasRelease) {
+    const factualIntro = factualReleaseTrackIntro(facts);
+    if (factualIntro) return factualIntro;
+  }
+
+  // Rich: chart + genre, no release relationship
+  if (hasChart && hasGenre) {
     const chartPart = facts.peakRank
       ? `peaked at #${facts.peakRank}`
       : `spent ${pluralize(facts.weeksOnChart!, "week")} charting`;
     const weeksPart = facts.peakRank && facts.weeksOnChart
       ? `, spending ${pluralize(facts.weeksOnChart, "week")} on the charts`
       : "";
-    const releaseCtx = formatReleaseContext(facts);
-    const genrePart = hasGenre ? ` A ${humanList(facts.genres, 2)} track${releaseCtx ? "" : "."}` : "";
-    return `${trackTitle}${byText} ${chartPart}${weeksPart}${releaseCtx ? `. It appears ${releaseCtx}` : ""}${genrePart}.`;
+    return `${trackTitle}${byText} ${chartPart}${weeksPart}. A ${humanList(facts.genres, 2)} track.`;
   }
 
   // Chart only
@@ -70,13 +124,7 @@ function heroIntro(facts: TrackFacts): string {
     return `${trackTitle}${byText} ${peak}${weeks}${genreBit}.`;
   }
 
-  // Rich release context (no chart)
-  if (hasRelease) {
-    const releaseCtx = formatReleaseContext(facts);
-    const genrePart = hasGenre ? `${facts.trackNumber ? "," : " —"} a ${humanList(facts.genres, 2)} release` : "";
-    const labelPart = hasLabel ? ` on ${facts.labelName}` : "";
-    return `${trackTitle}${byText} is ${releaseCtx}${genrePart}${labelPart}.`;
-  }
+  // Release context is handled first through factualReleaseTrackIntro.
 
   // Collaboration (no release, no chart)
   if (hasCollaboration) {
