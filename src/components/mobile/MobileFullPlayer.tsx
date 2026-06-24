@@ -224,9 +224,13 @@ export function MobileFullPlayer() {
   const showFullTrackUnlock = hasAppleCatalog && playbackBackend !== "apple" && !appleConnected;
   const pct = Math.max(0, Math.min(1, progress || 0));
 
-  const remainingCount = queue.length - queueIndex - 1;
-  const upcoming = queue.slice(queueIndex + 1);
-  const hasQueue = queue.length > 1;
+  const activeQueueIndex = queueIndex >= 0
+    ? queueIndex
+    : queue.findIndex((track) => track.id === currentTrack.id);
+  const queueStartIndex = activeQueueIndex >= 0 ? activeQueueIndex + 1 : 0;
+  const upcoming = queue.slice(queueStartIndex);
+  const remainingCount = upcoming.length;
+  const hasQueue = queue.length > 1 || remainingCount > 0;
 
   return (
     <div
@@ -291,18 +295,13 @@ export function MobileFullPlayer() {
               </div>
             )}
             <div className="fp-art-shine" />
-            <div className="fp-art-badges">
-              {activeSourceLabel && (
-                <span className={`fp-source-pill ${playbackBackend === "apple" ? "apple" : ""}`}>
-                  <WkIcon name={activeSourceIcon} size={12} /> {activeSourceLabel}
-                </span>
-              )}
-              {isPlaying && (
+            {isPlaying && (
+              <div className="fp-art-badges">
                 <span className="fp-live-pill">
                   <span /> Live
                 </span>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -373,7 +372,7 @@ export function MobileFullPlayer() {
             <WkIcon name="Clock3" size={12} /> {formatTime(duration || currentTrack.duration || 0)}
           </span>
           <span className="fp-meta-pill">
-            <WkIcon name="ListMusic" size={12} /> {queue.length} in queue
+            <WkIcon name="ListMusic" size={12} /> {remainingCount} remaining
           </span>
           <button
             type="button"
@@ -478,7 +477,7 @@ export function MobileFullPlayer() {
                 <button
                   key={track.id}
                   className="fp-queue-row"
-                  onClick={() => playFromQueue(queueIndex + 1 + idx)}
+                  onClick={() => playFromQueue(queueStartIndex + idx)}
                   aria-label={`Play ${track.title} by ${track.artist}`}
                 >
                   <div className="fp-queue-art">
