@@ -7,13 +7,23 @@ function releaseName(facts: ReleaseFacts): string {
 }
 
 function artistPhrase(facts: ReleaseFacts): string {
-  const names = humanList(facts.artistNames, 4);
-  return names ? ` by ${names}` : "";
+  const primary = humanList(facts.artistNames, 4);
+  const featured = humanList(facts.featuredArtistNames, 4);
+
+  if (primary && featured) return ` by ${primary}, featuring ${featured}`;
+  if (primary) return ` by ${primary}`;
+  if (featured) return ` featuring ${featured}`;
+  return "";
 }
 
 function artistFromPhrase(facts: ReleaseFacts): string {
-  const names = humanList(facts.artistNames, 2);
-  return names ? ` from ${names}` : "";
+  const primary = humanList(facts.artistNames, 2);
+  const featured = humanList(facts.featuredArtistNames, 3);
+
+  if (primary && featured) return ` from ${primary}, featuring ${featured}`;
+  if (primary) return ` from ${primary}`;
+  if (featured) return ` featuring ${featured}`;
+  return "";
 }
 
 function releaseDatePhrase(facts: ReleaseFacts): string {
@@ -98,7 +108,9 @@ function typeHeroIntro(facts: ReleaseFacts): string {
 function baseFactsUsed(facts: ReleaseFacts): string[] {
   return [
     facts.title ? "title" : "missing:title",
-    facts.artistNames.length > 0 ? "artists" : "missing:artists",
+    facts.artistNames.length > 0 ? "primaryArtists" : "missing:primaryArtists",
+    facts.featuredArtistNames.length > 0 ? "featuredArtists" : "",
+    facts.artistNames.length > 1 ? "multiPrimaryArtists" : "",
     facts.releaseType !== "unknown" ? "releaseType" : "missing:releaseType",
     facts.releaseYear ? "releaseYear" : "missing:releaseYear",
     facts.trackCount ? "trackCount" : "missing:trackCount",
@@ -309,7 +321,7 @@ export function buildReleaseContext(context: CultureRecipeContext<ReleaseFacts>)
 
   return {
     text: textBySurface[surface],
-    confidence: facts.title && facts.artistNames.length > 0 ? "high" : "low",
+    confidence: facts.title && (facts.artistNames.length > 0 || facts.featuredArtistNames.length > 0) ? "high" : "low",
     factsUsed: baseFactsUsed(facts),
     recipe: `release.${surface}.${selectReleaseStory(facts)}`,
   };

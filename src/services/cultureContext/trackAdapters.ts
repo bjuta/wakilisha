@@ -5,6 +5,9 @@ type TrackLike = Partial<{
   title: string;
   artist: string;
   artists: Array<{ name?: string; slug?: string; isPrimary?: boolean; isFeatured?: boolean; creditOrder?: number }>;
+  artistNames: string[];
+  primaryArtists: string[];
+  featuredArtists: Array<string | { name?: string; slug?: string }>;
   genre: string;
   genres: string[];
   label: string;
@@ -32,6 +35,30 @@ function clean(value: unknown): string {
 function numberValue(value: unknown): number | undefined {
   const number = Number(value);
   return Number.isFinite(number) && number > 0 ? number : undefined;
+}
+
+function namesFromUnknown(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => {
+        if (typeof item === "string") return clean(item);
+        if (item && typeof item === "object") {
+          const record = item as Record<string, unknown>;
+          return clean(record.name) || clean(record.title) || clean(record.displayName);
+        }
+        return "";
+      })
+      .filter(Boolean);
+  }
+
+  if (typeof value === "string") {
+    return value
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  return [];
 }
 
 function fallbackPrimaryFlag(hasPrimary: boolean, hasNonFeatured: boolean, isPrimary: unknown, isFeatured: unknown, index: number): boolean {
@@ -77,8 +104,26 @@ function artistRolesFromLike(track: TrackLike): Array<{ name: string; isPrimary:
       .filter((artist) => artist.name);
   }
 
-  const artist = clean(track.artist);
-  return artist ? [{ name: artist, isPrimary: true, isFeatured: false, creditOrder: 0 }] : [];
+  const primaryNames = namesFromUnknown(track.primaryArtists || track.artistNames || track.artist);
+  const featuredNames = namesFromUnknown(track.featuredArtists);
+  const primarySet = new Set(primaryNames.map((name) => name.toLowerCase()));
+
+  return [
+    ...primaryNames.map((name, index) => ({
+      name,
+      isPrimary: true,
+      isFeatured: false,
+      creditOrder: index,
+    })),
+    ...featuredNames
+      .filter((name) => !primarySet.has(name.toLowerCase()))
+      .map((name, index) => ({
+        name,
+        isPrimary: false,
+        isFeatured: true,
+        creditOrder: primaryNames.length + index,
+      })),
+  ];
 }
 
 export function trackContextData(track: PublicTrackDetail | TrackLike) {

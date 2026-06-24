@@ -94,6 +94,7 @@ export type ReleaseFacts = {
   title: string;
   releaseType: ReleaseType;
   artistNames: string[];
+  featuredArtistNames: string[];
   releaseYear?: string;
   releaseMonth?: string;
   releaseDate?: string;
