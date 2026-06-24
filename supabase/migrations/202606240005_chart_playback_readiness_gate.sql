@@ -2,7 +2,7 @@
 -- Lets admin publish flow check whether a dry-run's eligible rows already have matched Apple Music provider links.
 
 create or replace function public.chart_get_run_playback_readiness(
-  p_run_id uuid,
+  p_run_id text,
   p_provider_key text default 'apple_music'
 )
 returns jsonb
@@ -20,7 +20,7 @@ as $$
       c.normalized_key,
       split_part(c.normalized_key, '::', 1) as candidate_track_slug
     from public.chart_ingest_candidates c
-    where c.run_id = p_run_id
+    where c.run_id::text = p_run_id
       and c.status = 'eligible'
   ),
   resolved as (
@@ -107,5 +107,5 @@ as $$
   from summary, missing;
 $$;
 
-grant execute on function public.chart_get_run_playback_readiness(uuid, text)
+grant execute on function public.chart_get_run_playback_readiness(text, text)
   to authenticated;
