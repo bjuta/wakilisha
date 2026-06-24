@@ -84,6 +84,76 @@ function normalizeTrackArtistNames(rawArtists: Record<string, unknown>[]): { pri
   return { primaryArtists, featuredArtists };
 }
 
+function uniqueNames(names: string[]): string[] {
+  const seen = new Set<string>();
+  return names.filter((name) => {
+    const key = name.toLowerCase();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function normalizeReleaseArtistNames(
+  record: Record<string, unknown>,
+): { artistNames: string[]; featuredArtistNames: string[] } {
+  const rawArtists = Array.isArray(record.artists)
+    ? record.artists.map(asRecord).filter((artist) => Object.keys(artist).length > 0)
+    : [];
+
+  if (rawArtists.length > 0) {
+    const namedArtists = rawArtists
+      .map((artist, index) => ({
+        name: cleanText(artist.name) || cleanText(artist.title),
+        isPrimary: artist.isPrimary === true || artist.role === "primary" || artist.creditRole === "primary",
+        isFeatured: artist.isFeatured === true || artist.role === "featured" || artist.creditRole === "featured",
+        creditOrder: numberValue(artist.creditOrder) ?? numberValue(artist.position) ?? index,
+      }))
+      .filter((artist) => artist.name)
+      .sort((a, b) => a.creditOrder - b.creditOrder);
+
+    const explicitPrimaryArtists = namedArtists
+      .filter((artist) => artist.isPrimary)
+      .map((artist) => artist.name);
+
+    const fallbackPrimaryArtists = namedArtists
+      .filter((artist) => !artist.isFeatured)
+      .map((artist) => artist.name);
+
+    const primaryArtists = explicitPrimaryArtists.length > 0
+      ? explicitPrimaryArtists
+      : fallbackPrimaryArtists.length > 0
+        ? fallbackPrimaryArtists
+        : artistNamesFromUnknown(record.artistNames || record.primaryArtists || record.artist);
+
+    const primarySet = new Set(primaryArtists.map((name) => name.toLowerCase()));
+    const featuredArtists = namedArtists
+      .filter((artist) => artist.isFeatured && !primarySet.has(artist.name.toLowerCase()))
+      .map((artist) => artist.name);
+
+    return {
+      artistNames: uniqueNames(primaryArtists),
+      featuredArtistNames: uniqueNames([
+        ...featuredArtists,
+        ...artistNamesFromUnknown(record.featuredArtistNames || record.featuredArtists),
+      ]).filter((name) => !primarySet.has(name.toLowerCase())),
+    };
+  }
+
+  const artistNames = uniqueNames(
+    artistNamesFromUnknown(record.artistNames || record.primaryArtistNames || record.primaryArtists || record.artists || record.artist)
+  );
+  const primarySet = new Set(artistNames.map((name) => name.toLowerCase()));
+
+  return {
+    artistNames,
+    featuredArtistNames: uniqueNames(
+      artistNamesFromUnknown(record.featuredArtistNames || record.featuredArtists)
+    ).filter((name) => !primarySet.has(name.toLowerCase())),
+  };
+}
+
+
 export function normalizeTrackFacts(data: unknown): TrackFacts {
   const record = asRecord(data);
   const rawArtists = Array.isArray(record.artists) ? record.artists.map(asRecord) : [];
@@ -137,11 +207,12 @@ export function normalizeArtistFacts(data: unknown): ArtistFacts {
 export function normalizeReleaseFacts(data: unknown): ReleaseFacts {
   const record = asRecord(data);
   const releaseType = normalizeReleaseType(record.releaseType || record.type);
-  const artistNames = artistNamesFromUnknown(record.artistNames || record.artists);
+  const { artistNames, featuredArtistNames } = normalizeReleaseArtistNames(record);
   return {
     title: firstString(record, ["title", "name"]),
     releaseType,
     artistNames,
+    featuredArtistNames,
     releaseYear: firstString(record, ["releaseYear"]) || extractYear(record.releaseDate),
     releaseMonth: firstString(record, ["releaseMonth"]) || extractMonthName(record.releaseDate),
     releaseDate: firstString(record, ["releaseDate", "date"]),

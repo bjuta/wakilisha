@@ -7,9 +7,127 @@ function clean(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function uniqueNames(names: string[]): string[] {
+  const seen = new Set<string>();
+  return names.filter((name) => {
+    const key = name.toLowerCase();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function namesFromUnknown(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => {
+        if (typeof item === "string") return clean(item);
+        if (item && typeof item === "object") {
+          const record = item as Record<string, unknown>;
+          return clean(record.name) || clean(record.title) || clean(record.displayName);
+        }
+        return "";
+      })
+      .filter(Boolean);
+  }
+
+  if (typeof value === "string") {
+    return value
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  return [];
+}
+
+function releaseMetadata(release: ReleaseLike): Record<string, unknown> {
+  const metadata = (release as PublicReleaseDetail).metadata;
+  return metadata && typeof metadata === "object" ? metadata as Record<string, unknown> : {};
+}
+
+function splitArtistRoles(value: unknown): { primary: string[]; featured: string[] } {
+  if (!Array.isArray(value)) return { primary: [], featured: [] };
+
+  const artists = value
+    .map((item, index) => {
+      if (typeof item === "string") {
+        return {
+          name: clean(item),
+          isPrimary: false,
+          isFeatured: false,
+          creditOrder: index,
+        };
+      }
+
+      if (!item || typeof item !== "object") return null;
+
+      const record = item as Record<string, unknown>;
+      return {
+        name: clean(record.name) || clean(record.title) || clean(record.displayName),
+        isPrimary: record.isPrimary === true || record.role === "primary" || record.creditRole === "primary",
+        isFeatured: record.isFeatured === true || record.role === "featured" || record.creditRole === "featured",
+        creditOrder: typeof record.creditOrder === "number"
+          ? record.creditOrder
+          : typeof record.position === "number"
+            ? record.position
+            : index,
+      };
+    })
+    .filter((artist): artist is { name: string; isPrimary: boolean; isFeatured: boolean; creditOrder: number } => Boolean(artist?.name))
+    .sort((a, b) => a.creditOrder - b.creditOrder);
+
+  const explicitPrimary = artists.filter((artist) => artist.isPrimary).map((artist) => artist.name);
+  const fallbackPrimary = artists.filter((artist) => !artist.isFeatured).map((artist) => artist.name);
+  const primary = explicitPrimary.length > 0
+    ? explicitPrimary
+    : fallbackPrimary.length > 0
+      ? fallbackPrimary
+      : [];
+
+  const primarySet = new Set(primary.map((name) => name.toLowerCase()));
+  const featured = artists
+    .filter((artist) => artist.isFeatured && !primarySet.has(artist.name.toLowerCase()))
+    .map((artist) => artist.name);
+
+  return { primary: uniqueNames(primary), featured: uniqueNames(featured) };
+}
+
+function releaseArtistCredits(release: ReleaseLike): { artistNames: string[]; featuredArtistNames: string[] } {
+  const metadata = releaseMetadata(release);
+  const anyRelease = release as Record<string, unknown>;
+  const roleCredits = splitArtistRoles(anyRelease.artists || metadata.artists || metadata.artistCredits);
+
+  const artistNames = uniqueNames([
+    ...roleCredits.primary,
+    ...namesFromUnknown(anyRelease.artistNames),
+    ...namesFromUnknown(anyRelease.primaryArtistNames),
+    ...namesFromUnknown(anyRelease.primaryArtists),
+    ...namesFromUnknown(metadata.artistNames),
+    ...namesFromUnknown(metadata.primaryArtistNames),
+    ...namesFromUnknown(metadata.primaryArtists),
+    ...namesFromUnknown(release.artist),
+  ]);
+
+  const primarySet = new Set(artistNames.map((name) => name.toLowerCase()));
+  const featuredArtistNames = uniqueNames([
+    ...roleCredits.featured,
+    ...namesFromUnknown((release as PublicReleaseDetail).featuredArtists),
+    ...namesFromUnknown(anyRelease.featuredArtistNames),
+    ...namesFromUnknown(anyRelease.featuredArtists),
+    ...namesFromUnknown(metadata.featuredArtistNames),
+    ...namesFromUnknown(metadata.featuredArtists),
+  ]).filter((name) => !primarySet.has(name.toLowerCase()));
+
+  return { artistNames, featuredArtistNames };
+}
+
 function releaseArtistNames(release: ReleaseLike): string[] {
-  const artist = clean(release.artist);
-  return artist ? [artist] : [];
+  return releaseArtistCredits(release).artistNames;
+}
+
+function releaseFeaturedArtistNames(release: ReleaseLike): string[] {
+  return releaseArtistCredits(release).featuredArtistNames;
 }
 
 function releaseYear(release: ReleaseLike): string {
@@ -73,6 +191,7 @@ export function releaseContextData(release: ReleaseLike) {
     title: clean(release.title),
     releaseType: clean(release.releaseType),
     artistNames: releaseArtistNames(release),
+    featuredArtistNames: releaseFeaturedArtistNames(release),
     releaseYear: releaseYear(release),
     releaseMonth: releaseMonth(release),
     releaseDate: clean(release.releaseDate),
