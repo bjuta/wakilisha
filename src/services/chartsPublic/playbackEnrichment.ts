@@ -1,7 +1,12 @@
 import { supabase } from "@/lib/supabase";
 import type { ChartEditionEntry } from "@/services/chartsPublic/types";
+import {
+  getPublicTrackPlaybackProviders,
+  type PublicTrackPlaybackProvider,
+} from "@/services/registry/providerLinks";
 
 type RegistryTrackPlaybackRow = {
+  id?: string | null;
   slug: string;
   title?: string | null;
   preview_url?: string | null;
@@ -25,10 +30,15 @@ function readNested(record: Record<string, unknown>, path: string[]): unknown {
   }, record);
 }
 
-function readAppleMusicCatalogId(row: RegistryTrackPlaybackRow): string | null {
+function readAppleMusicCatalogId(
+  row: RegistryTrackPlaybackRow,
+  provider?: PublicTrackPlaybackProvider | null,
+): string | null {
   const meta = (row.metadata || {}) as Record<string, unknown>;
 
   return firstString(
+    provider?.providerTrackId,
+    provider?.providerReleaseId,
     meta.apple_music_track_id,
     meta.apple_music_id,
     meta.appleMusicId,
@@ -47,8 +57,12 @@ function readAppleMusicCatalogId(row: RegistryTrackPlaybackRow): string | null {
   );
 }
 
-function applyPlaybackRow(entry: ChartEditionEntry, row: RegistryTrackPlaybackRow) {
-  const appleMusicCatalogId = readAppleMusicCatalogId(row);
+function applyPlaybackRow(
+  entry: ChartEditionEntry,
+  row: RegistryTrackPlaybackRow,
+  provider?: PublicTrackPlaybackProvider | null,
+) {
+  const appleMusicCatalogId = readAppleMusicCatalogId(row, provider);
   const rich = entry as ChartEditionEntry & {
     previewUrl?: string;
     appleMusicId?: string | null;
@@ -57,9 +71,13 @@ function applyPlaybackRow(entry: ChartEditionEntry, row: RegistryTrackPlaybackRo
     duration?: number;
   };
 
-  if (row.preview_url) rich.previewUrl = row.preview_url;
-  if (row.artwork_url && !entry.artworkUrl) entry.artworkUrl = row.artwork_url;
-  if (row.duration_ms && !rich.duration) rich.duration = Math.round(row.duration_ms / 1000);
+  const previewUrl = firstString(provider?.previewUrl, row.preview_url);
+  const artworkUrl = firstString(provider?.artworkUrl, row.artwork_url);
+  const durationMs = provider?.durationMs || row.duration_ms || null;
+
+  if (previewUrl) rich.previewUrl = previewUrl;
+  if (artworkUrl && !entry.artworkUrl) entry.artworkUrl = artworkUrl;
+  if (durationMs && !rich.duration) rich.duration = Math.round(durationMs / 1000);
 
   if (appleMusicCatalogId) {
     rich.appleMusicId = appleMusicCatalogId;
@@ -82,12 +100,26 @@ export async function enrichChartEntriesWithPlaybackData(
     try {
       const { data } = await supabase
         .from("registry_tracks")
-        .select("slug, title, preview_url, artwork_url, duration_ms, metadata")
+        .select("id, slug, title, preview_url, artwork_url, duration_ms, metadata")
         .in("slug", slugs);
 
-      for (const row of (data || []) as RegistryTrackPlaybackRow[]) {
+      const rows = (data || []) as RegistryTrackPlaybackRow[];
+      const trackIds = rows.map((row) => row.id).filter(Boolean) as string[];
+      let providerByTrackId = new Map<string, PublicTrackPlaybackProvider>();
+
+      if (trackIds.length > 0) {
+        try {
+          const providers = await getPublicTrackPlaybackProviders(trackIds, "apple_music");
+          providerByTrackId = new Map(providers.map((provider) => [provider.trackId, provider]));
+        } catch (err) {
+          console.warn("Chart playback provider-link enrichment failed", err);
+        }
+      }
+
+      for (const row of rows) {
         const entry = bySlug.get(row.slug);
-        if (entry) applyPlaybackRow(entry, row);
+        const provider = row.id ? providerByTrackId.get(row.id) : null;
+        if (entry) applyPlaybackRow(entry, row, provider);
       }
     } catch (err) {
       console.warn("Chart playback slug enrichment failed", err);
@@ -115,11 +147,22 @@ export async function enrichChartEntriesWithPlaybackData(
 
         const { data } = await supabase
           .from("registry_tracks")
-          .select("slug, title, preview_url, artwork_url, duration_ms, metadata")
+          .select("id, slug, title, preview_url, artwork_url, duration_ms, metadata")
           .or(orFilter)
           .limit(25);
 
         const rows = (data || []) as RegistryTrackPlaybackRow[];
+        const trackIds = rows.map((row) => row.id).filter(Boolean) as string[];
+        let providerByTrackId = new Map<string, PublicTrackPlaybackProvider>();
+
+        if (trackIds.length > 0) {
+          try {
+            const providers = await getPublicTrackPlaybackProviders(trackIds, "apple_music");
+            providerByTrackId = new Map(providers.map((provider) => [provider.trackId, provider]));
+          } catch (err) {
+            console.warn("Chart playback provider-link title enrichment failed", err);
+          }
+        }
 
         for (const entry of stillMissing.filter((item) => batch.includes(item.trackTitle))) {
           const entryTitle = (entry.trackTitle || "").toLowerCase();
@@ -128,7 +171,8 @@ export async function enrichChartEntriesWithPlaybackData(
             return title.includes(entryTitle) || entryTitle.includes(title);
           });
 
-          if (match) applyPlaybackRow(entry, match);
+          const provider = match?.id ? providerByTrackId.get(match.id) : null;
+          if (match) applyPlaybackRow(entry, match, provider);
         }
       } catch (err) {
         console.warn("Chart playback title enrichment failed", err);
