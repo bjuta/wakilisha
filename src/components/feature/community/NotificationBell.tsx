@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, type MouseEvent } from 'react';
 import { Link } from 'react-router-dom';
 import {
   getUnreadNotificationCount,
@@ -9,6 +9,7 @@ import {
 import type { CommunityNotification, CommunityProfile } from '@/services/community';
 import { trackEvent } from '@/services/analytics';
 import { WkIcon } from '@/components/design-system/Icon';
+import { Portal } from '@/components/base/Portal';
 import { useUserSettings } from '@/hooks/useUserSettings';
 import {
   dismissFullPlaybackNotice,
@@ -69,6 +70,9 @@ export function NotificationBell({ userId, className = '', placement = 'auto' }:
   const containerRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval>>();
   const isMobileNav = className.includes('phn-nav-tab');
+  const stopDropdownEvent = useCallback((event: MouseEvent<HTMLDivElement>) => {
+    event.stopPropagation();
+  }, []);
 
   useEffect(() => {
     const syncProductNotices = () => setProductNoticeVersion((v) => v + 1);
@@ -243,12 +247,16 @@ export function NotificationBell({ userId, className = '', placement = 'auto' }:
 
         {/* Dropdown - opens upward on mobile nav, full-width within viewport */}
         {open && (
-          <div className="fixed left-3 right-3 z-[85] rounded-t-2xl bg-[var(--wk-surface)] border border-[var(--wk-border)] shadow-[0_-4px_24px_rgba(0,0,0,.12)] overflow-hidden animate-[slideUp_0.2s_cubic-bezier(.16,1,.3,1)]"
-            style={{
-              bottom: 'calc(52px + max(env(safe-area-inset-bottom), 8px) + 8px)',
-              maxHeight: 'min(60vh, 420px)',
-            }}
-          >
+          <Portal>
+            <div
+              className="fixed left-3 right-3 z-[95] rounded-t-2xl bg-[var(--wk-surface)] border border-[var(--wk-border)] shadow-[0_-4px_24px_rgba(0,0,0,.12)] overflow-hidden animate-[slideUp_0.2s_cubic-bezier(.16,1,.3,1)]"
+              onMouseDown={stopDropdownEvent}
+              onClick={stopDropdownEvent}
+              style={{
+                bottom: 'calc(52px + max(env(safe-area-inset-bottom), 8px) + 8px)',
+                maxHeight: 'min(60vh, 420px)',
+              }}
+            >
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--wk-border)]">
               <h3 className="text-[14px] font-bold text-[var(--wk-text)]">Notifications</h3>
@@ -352,7 +360,8 @@ export function NotificationBell({ userId, className = '', placement = 'auto' }:
                 </>
               )}
             </div>
-          </div>
+            </div>
+          </Portal>
         )}
       </div>
     );
