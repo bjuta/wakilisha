@@ -400,6 +400,112 @@ function InfoRow({ label, value }: { label: string; value: ReactNode }) {
   );
 }
 
+function releaseKindLabel(type: string): string {
+  const normalized = String(type || "").toLowerCase();
+  if (normalized === "ep" || normalized === "extended play") return "EP";
+  if (normalized === "album" || normalized === "studio album") return "album";
+  if (normalized === "compilation") return "compilation";
+  if (normalized === "mixtape") return "mixtape";
+  if (normalized === "soundtrack") return "soundtrack";
+  if (normalized === "deluxe") return "deluxe edition";
+  if (normalized === "single") return "single";
+  return normalized || "release";
+}
+
+function TrackAlbumContextSection({ vm }: { vm: TrackViewModel }) {
+  if (!vm.albumTitle) return null;
+
+  const releaseKind = releaseKindLabel(vm.releaseType);
+  const releasePath = releaseUrl({ slug: vm.albumSlug, artist: vm.artist });
+  const trackPosition = vm.albumTrackNumber > 0
+    ? `Track ${vm.albumTrackNumber}${vm.albumTotalTracks > 0 ? ` of ${vm.albumTotalTracks}` : ""}`
+    : "";
+  const releaseDate = vm.releaseDate ? formatDate(vm.releaseDate) : vm.releaseYear;
+  const trackCountText = vm.albumTotalTracks > 0
+    ? `${vm.albumTotalTracks} track${vm.albumTotalTracks === 1 ? "" : "s"}`
+    : "";
+  const descriptionBits = [
+    trackPosition,
+    releaseKind,
+    trackCountText,
+    releaseDate ? `released ${vm.releaseDate ? "on" : "in"} ${releaseDate}` : "",
+    vm.label ? `under ${vm.label}` : "",
+  ].filter(Boolean);
+
+  return (
+    <section>
+      <div className="overflow-hidden rounded-3xl border border-[var(--wk-border)] bg-[var(--wk-surface)]">
+        <div className="grid gap-0 md:grid-cols-[220px_1fr]">
+          <Link
+            to={releasePath}
+            className="relative block min-h-[220px] bg-[var(--wk-bg)]"
+            aria-label={`Open ${vm.albumTitle}`}
+          >
+            {vm.artworkUrl ? (
+              <img
+                src={vm.artworkUrl}
+                alt={`${vm.albumTitle} artwork`}
+                loading="lazy"
+                className="absolute inset-0 h-full w-full object-cover"
+              />
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <WkIcon name="Disc3" size={42} className="text-[var(--wk-brand)]" />
+              </div>
+            )}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-transparent to-transparent" />
+            {trackPosition && (
+              <div className="absolute bottom-4 left-4 rounded-full bg-black/55 px-3 py-1 text-[11px] font-black uppercase tracking-[0.12em] text-white backdrop-blur">
+                {trackPosition}
+              </div>
+            )}
+          </Link>
+
+          <div className="p-6 md:p-7">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[var(--wk-brand)]/20 bg-[var(--wk-brand-soft)]/40 px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.18em] text-[var(--wk-brand)]">
+              <WkIcon name="Disc3" size={12} />
+              Release context
+            </div>
+
+            <h2 className="mt-4 text-[28px] font-black leading-none tracking-[-0.04em] text-[var(--wk-text)] md:text-[36px]">
+              From {vm.albumTitle}
+            </h2>
+
+            <p className="mt-3 max-w-[680px] text-[14px] leading-7 text-[var(--wk-text-soft)]">
+              {vm.title} appears on {vm.albumTitle}
+              {descriptionBits.length > 0 ? `, ${descriptionBits.join(" · ")}.` : "."}
+            </p>
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {trackPosition && <StatCard value={trackPosition} label="Position" />}
+              {releaseKind && <StatCard value={releaseKind} label="Release type" />}
+              {trackCountText && <StatCard value={trackCountText} label="Project size" />}
+              {releaseDate && <StatCard value={releaseDate} label="Release date" />}
+            </div>
+
+            <div className="mt-6 flex flex-wrap gap-3">
+              <Link
+                to={releasePath}
+                className="inline-flex items-center gap-2.5 rounded-xl bg-[var(--wk-brand)] px-5 py-3 text-[13px] font-extrabold text-white transition-colors hover:bg-[var(--wk-brand)]/90"
+              >
+                View release
+                <WkIcon name="ArrowRight" size={15} />
+              </Link>
+              {vm.releaseTracks.length > 1 && (
+                <span className="inline-flex items-center gap-2.5 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-5 py-3 text-[13px] font-bold text-[var(--wk-text-muted)]">
+                  <WkIcon name="ListMusic" size={15} />
+                  {vm.releaseTracks.length} tracks loaded
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+
 function TrackListeningSignalPanel({ signal }: { signal: ListeningHistoryItem | null }) {
   if (!signal) return null;
 
@@ -962,6 +1068,8 @@ export default function TrackDetail() {
                 </div>
               </section>
             )}
+
+            <TrackAlbumContextSection vm={track} />
 
             {/* Tracklist from the release */}
             <TrackReleaseTracklist
