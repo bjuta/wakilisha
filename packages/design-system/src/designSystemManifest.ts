@@ -76,7 +76,7 @@ export const wakilishaDesignChapters: WkDesignChapter[] = [
       'No generic SaaS blue as primary, no neon gradients, no random purple as brand color.',
       'Use vertical accents lightly and never as primary CTAs.'
     ],
-    parityTargets: ['All CSS must consume --wk-* tokens, not hard-coded Readdy classes.']
+    parityTargets: ['All CSS must consume --wk-* tokens, not hard-coded legacy prototype classes.']
   },
   {
     id: 'typography',
@@ -459,7 +459,7 @@ export const wakilishaDesignChapters: WkDesignChapter[] = [
       'No hard-coded content that should come from the repaired graph.',
       'No page ships without matching a design-system archetype.'
     ],
-    parityTargets: ['Add an anti-slop review gate to every Readdy/dev handoff.']
+    parityTargets: ['Add an anti-slop review gate to every prototype/development handoff.']
   },
   {
     id: 'roadmap',

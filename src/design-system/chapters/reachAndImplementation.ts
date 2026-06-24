@@ -261,7 +261,7 @@ export const implementationChapters: WkDesignChapterSpec[] = [
     componentsRequired: ['WkAntiSlopAudit', 'WkTemplateContamination', 'WkDesignDriftDetector'],
     tables: [],
     parityTargets: [
-      'Add an anti-slop review gate to every Readdy/dev handoff.',
+      'Add an anti-slop review gate to every prototype/development handoff.',
       'All production pages pass anti-slop review.',
     ],
     qaChecks: [

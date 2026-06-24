@@ -86,7 +86,7 @@ export const foundationsChapters: WkDesignChapterSpec[] = [
     ],
     componentsRequired: ['TokenInspector', 'ThemeProvider', 'Surface', 'Tag', 'AdminKpi'],
     tables: [],
-    parityTargets: ['All CSS must consume --wk-* tokens, not hard-coded Readdy classes.', 'No stray colors in production. Every surface color is traceable to a token.'],
+    parityTargets: ['All CSS must consume --wk-* tokens, not hard-coded legacy prototype classes.', 'No stray colors in production. Every surface color is traceable to a token.'],
     qaChecks: [
       { id: '04-token-only', label: 'Token-only', description: 'No hard-coded colors in production styles.' },
       { id: '04-no-blue', label: 'No generic blue', description: 'Blue is not the primary brand color.' },

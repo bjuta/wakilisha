@@ -180,7 +180,7 @@ export default function GuidesPage() {
       {/* Hero */}
       <div ref={heroRef} className="relative min-h-[90vh] flex items-end overflow-hidden bg-[#0a0a0a] -mt-16">
         <img ref={heroImgRef}
-          src="https://readdy.ai/api/search-image?query=Abstract%20editorial%20composition%20with%20overlapping%20translucent%20maps%20and%20architectural%20diagrams%20floating%20in%20warm%20amber%20and%20deep%20charcoal%20space%2C%20soft%20atmospheric%20light%20rays%20cutting%20through%20dust%2C%20museum%20gallery%20aesthetic%2C%20contemporary%20art%20publication%20vibe%2C%20cinematic%20depth%2C%20rich%20textures%2C%20editorial%20photography%20style%20with%20film%20grain&width=1800&height=1200&seq=guides-hero-2026&orientation=landscape"
+          src="https://wakilisha.africa/api/search-image?query=Abstract%20editorial%20composition%20with%20overlapping%20translucent%20maps%20and%20architectural%20diagrams%20floating%20in%20warm%20amber%20and%20deep%20charcoal%20space%2C%20soft%20atmospheric%20light%20rays%20cutting%20through%20dust%2C%20museum%20gallery%20aesthetic%2C%20contemporary%20art%20publication%20vibe%2C%20cinematic%20depth%2C%20rich%20textures%2C%20editorial%20photography%20style%20with%20film%20grain&width=1800&height=1200&seq=guides-hero-2026&orientation=landscape"
           alt="" className="absolute inset-0 w-full h-full object-cover will-change-transform"
         />
         <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/35 to-black/90" />

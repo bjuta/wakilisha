@@ -149,7 +149,7 @@ export default function TagsIndex() {
       >
         <img
           ref={heroImgRef}
-          src="https://readdy.ai/api/search-image?query=Dark%20abstract%20typographic%20composition%20with%20scattered%20floating%20labels%20and%20taxonomic%20threads%2C%20deep%20charcoal%20background%20with%20warm%20amber%20and%20muted%20gold%20highlights%2C%20minimalist%20data%20visualization%20aesthetic%2C%20soft%20film%20grain%2C%20editorial%20atmosphere%2C%20no%20text%2C%20museum%20archive%20mood%2C%20dramatic%20lighting&width=1800&height=1100&seq=tags-hero-2026&orientation=landscape"
+          src="https://wakilisha.africa/api/search-image?query=Dark%20abstract%20typographic%20composition%20with%20scattered%20floating%20labels%20and%20taxonomic%20threads%2C%20deep%20charcoal%20background%20with%20warm%20amber%20and%20muted%20gold%20highlights%2C%20minimalist%20data%20visualization%20aesthetic%2C%20soft%20film%20grain%2C%20editorial%20atmosphere%2C%20no%20text%2C%20museum%20archive%20mood%2C%20dramatic%20lighting&width=1800&height=1100&seq=tags-hero-2026&orientation=landscape"
           alt=""
           className="absolute inset-0 w-full h-full object-cover opacity-85 will-change-transform"
         />

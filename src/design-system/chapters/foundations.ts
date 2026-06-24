@@ -100,7 +100,7 @@ export const foundationsChapters: WkDesignChapterSpec[] = [
     componentsRequired: ['TokenInspector', 'ThemeProvider', 'Surface', 'Tag', 'AdminKpi'],
     tables: [],
     parityTargets: [
-      'All CSS must consume --wk-* tokens, not hard-coded Readdy classes.',
+      'All CSS must consume --wk-* tokens, not hard-coded legacy prototype classes.',
       'No stray colors in production. Every surface color is traceable to a token.',
     ],
     qaChecks: [

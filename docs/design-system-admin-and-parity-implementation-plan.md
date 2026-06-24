@@ -8,7 +8,7 @@ The first implementation order is no longer “make pages pretty.” It is:
 
 1. Install the design system as app infrastructure.
 2. Make the design system browsable and interactive inside admin.
-3. Replace every current Readdy/mock surface with graph-backed pages that obey the system.
+3. Replace every current prototype/mock surface with graph-backed pages that obey the system.
 4. Add page-level parity gates before any page can be called complete.
 
 ## Repository additions

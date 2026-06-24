@@ -79,7 +79,7 @@ export default function MobileGuides() {
       {/* Hero */}
       <section className="relative overflow-hidden bg-[#0a0a0a] min-h-[70vh] flex flex-col justify-end -mt-16">
         <img
-          src="https://readdy.ai/api/search-image?query=Abstract%20editorial%20composition%20with%20overlapping%20translucent%20maps%20and%20architectural%20diagrams%20floating%20in%20warm%20amber%20and%20deep%20charcoal%20space%2C%20soft%20atmospheric%20light%20rays%20cutting%20through%20dust%2C%20museum%20gallery%20aesthetic%2C%20contemporary%20art%20publication%20vibe%2C%20cinematic%20depth%2C%20rich%20textures%2C%20editorial%20photography%20style%20with%20film%20grain&width=800&height=1000&seq=guides-mobile-hero&orientation=portrait"
+          src="https://wakilisha.africa/api/search-image?query=Abstract%20editorial%20composition%20with%20overlapping%20translucent%20maps%20and%20architectural%20diagrams%20floating%20in%20warm%20amber%20and%20deep%20charcoal%20space%2C%20soft%20atmospheric%20light%20rays%20cutting%20through%20dust%2C%20museum%20gallery%20aesthetic%2C%20contemporary%20art%20publication%20vibe%2C%20cinematic%20depth%2C%20rich%20textures%2C%20editorial%20photography%20style%20with%20film%20grain&width=800&height=1000&seq=guides-mobile-hero&orientation=portrait"
           alt=""
           className="absolute inset-0 w-full h-full object-cover opacity-80"
         />

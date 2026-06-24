@@ -43,7 +43,7 @@ Before using it, make sure the Drive file permission is set to:
 Anyone with the link can view
 ```
 
-The dev/Readdy should download and unzip the bundle locally into:
+The development team should download and unzip the bundle locally into:
 
 ```text
 data/supabase-imports/2026-05-30/

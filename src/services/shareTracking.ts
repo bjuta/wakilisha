@@ -17,7 +17,7 @@ function normalizeUrl(raw: string): string {
     u.hash = "";
     // Strip trailing slash for consistency
     let path = u.pathname.replace(/\/+$/, "") || "/";
-    // Strip Readdy preview version segments so shares aggregate across deploys.
+    // Strip preview version segments so shares aggregate across deploys.
     // Preview URLs look like: /preview/PROJECT_ID/VERSION_NUM/actual/path
     // Production URLs are already canonical and won't match this pattern.
     path = path.replace(/^\/preview\/[^/]+\/\d+/, "");

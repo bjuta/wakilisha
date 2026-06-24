@@ -12,12 +12,12 @@ interface Tile {
 
 const TILES: Tile[] = [
   {
-    img: "https://readdy.ai/api/search-image?query=Dramatic%20African%20live%20music%20concert%20venue%20interior%20colorful%20stage%20lighting%20beams%20cutting%20through%20atmospheric%20smoke%20haze%20vibrant%20purple%20magenta%20cyan%20lights%20silhouettes%20of%20performers%20on%20stage%20moody%20cinematic%20music%20photography%20editorial%20quality%20dark%20rich%20atmosphere%20cultural%20performance%20deep%20colors&width=600&height=800&seq=collage-music-wk26&orientation=portrait",
+    img: "https://wakilisha.africa/api/search-image?query=Dramatic%20African%20live%20music%20concert%20venue%20interior%20colorful%20stage%20lighting%20beams%20cutting%20through%20atmospheric%20smoke%20haze%20vibrant%20purple%20magenta%20cyan%20lights%20silhouettes%20of%20performers%20on%20stage%20moody%20cinematic%20music%20photography%20editorial%20quality%20dark%20rich%20atmosphere%20cultural%20performance%20deep%20colors&width=600&height=800&seq=collage-music-wk26&orientation=portrait",
     label: "Music", tag: "Live", line: "Charts, artists & releases",
     href: "/charts", col: "1", row: "1 / 3",
   },
   {
-    img: "https://readdy.ai/api/search-image?query=Thoughtful%20portrait%20of%20African%20cultural%20guide%20storyteller%20elder%20in%20warm%20natural%20outdoor%20setting%20dappled%20sunlight%20through%20trees%20confident%20wise%20expression%20traditional%20and%20contemporary%20elements%20blended%20editorial%20portrait%20photography%20shallow%20depth%20of%20field%20soft%20bokeh%20background%20authentic%20documentary%20quality%20rich%20character%20depth&width=600&height=800&seq=collage-guides-wk26&orientation=portrait",
+    img: "https://wakilisha.africa/api/search-image?query=Thoughtful%20portrait%20of%20African%20cultural%20guide%20storyteller%20elder%20in%20warm%20natural%20outdoor%20setting%20dappled%20sunlight%20through%20trees%20confident%20wise%20expression%20traditional%20and%20contemporary%20elements%20blended%20editorial%20portrait%20photography%20shallow%20depth%20of%20field%20soft%20bokeh%20background%20authentic%20documentary%20quality%20rich%20character%20depth&width=600&height=800&seq=collage-guides-wk26&orientation=portrait",
     label: "Guides", tag: "Live", line: "The discovery layer",
     href: "/guides", col: "2", row: "1 / 3",
   },

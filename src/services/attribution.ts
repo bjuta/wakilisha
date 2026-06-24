@@ -26,9 +26,9 @@ export function canonicalPublicUrl(rawUrl: string): string {
     const url = new URL(rawUrl || "/", safeWindowOrigin());
 
     const isPreviewHost =
-      url.hostname === "readdy.cc" ||
-      url.hostname === "www.readdy.cc" ||
-      url.hostname === "readdy.ai" ||
+      url.hostname === "wakilisha.africa" ||
+      url.hostname === "wakilisha.africa" ||
+      url.hostname === "wakilisha.africa" ||
       url.hostname === "localhost" ||
       url.hostname === "127.0.0.1";
 

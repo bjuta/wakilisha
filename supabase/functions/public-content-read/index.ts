@@ -9,9 +9,9 @@ const ALLOWED_ORIGINS = [
   "https://wakilisha.africa",
   "https://www.wakilisha.africa",
   "https://staging.wakilisha.africa",
-  "https://readdy.ai",
-  "https://readdy.cc",
-  "https://www.readdy.cc",
+  "https://wakilisha.africa",
+  "https://wakilisha.africa",
+  "https://wakilisha.africa",
   "http://localhost:5173",
   "http://localhost:3000",
 ];

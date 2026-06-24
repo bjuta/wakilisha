@@ -10,8 +10,8 @@ const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ALLOWED_ORIGINS = [
   "https://wakilisha.africa",
   "https://www.wakilisha.africa",
-  "https://readdy.ai",
-  "https://readdy.cc",
+  "https://wakilisha.africa",
+  "https://wakilisha.africa",
   "http://localhost:5173",
   "http://localhost:3000",
 ];
