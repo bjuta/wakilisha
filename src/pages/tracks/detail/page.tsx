@@ -98,12 +98,66 @@ function clean(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function firstString(...values: unknown[]): string {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) return value.trim();
+    if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  }
+  return "";
+}
+
+function firstNumber(...values: unknown[]): number {
+  for (const value of values) {
+    const number = Number(value);
+    if (Number.isFinite(number) && number > 0) return number;
+  }
+  return 0;
+}
+
+function recordValue(record: unknown, key: string): unknown {
+  if (!record || typeof record !== "object") return undefined;
+  return (record as Record<string, unknown>)[key];
+}
+
+function findReleaseTrack(raw: any, trackData: any, releaseData: any) {
+  const candidates = [
+    ...(Array.isArray(releaseData?.tracks) ? releaseData.tracks : []),
+    ...(Array.isArray(raw.releaseTracks) ? raw.releaseTracks : []),
+    ...(Array.isArray(raw.tracks) ? raw.tracks : []),
+  ];
+
+  const currentSlug = clean(trackData.slug || raw.slug);
+  const currentId = clean(trackData.id || raw.id);
+  const currentTitle = clean(trackData.title || raw.title).toLowerCase();
+
+  return candidates.find((candidate: any) => {
+    const candidateSlug = clean(candidate.slug);
+    const candidateId = clean(candidate.id);
+    const candidateTitle = clean(candidate.title).toLowerCase();
+
+    return (
+      (currentSlug && candidateSlug === currentSlug) ||
+      (currentId && candidateId === currentId) ||
+      (currentTitle && candidateTitle === currentTitle)
+    );
+  }) || null;
+}
+
+function releaseMetadata(raw: any, trackData: any, releaseData: any) {
+  const trackMetadata = trackData?.metadata && typeof trackData.metadata === "object" ? trackData.metadata : {};
+  const rawMetadata = raw?.metadata && typeof raw.metadata === "object" ? raw.metadata : {};
+  const releaseMetadata = releaseData?.metadata && typeof releaseData.metadata === "object" ? releaseData.metadata : {};
+  return { trackMetadata, rawMetadata, releaseMetadata };
+}
+
 function apiToViewModel(api: PublicTrackDetail): TrackViewModel {
   const raw = api as any;
   const trackData = raw.track ?? raw;
   const artistData = raw.artist ?? {};
-  const releaseData = raw.release ?? trackData.release ?? null;
+  const releaseData = raw.release ?? trackData.release ?? raw.album ?? trackData.album ?? null;
   const labelData = raw.label ?? null;
+  const { trackMetadata, rawMetadata, releaseMetadata: relMetadata } = releaseMetadata(raw, trackData, releaseData);
+  const matchedReleaseTrack = findReleaseTrack(raw, trackData, releaseData);
 
   const rawArtists = Array.isArray(raw.artists) ? raw.artists : [];
   const mappedArtists = rawArtists.map((artist: any, index: number) => ({
@@ -159,13 +213,82 @@ function apiToViewModel(api: PublicTrackDetail): TrackViewModel {
   const duration = trackData.durationMs ? Math.round(trackData.durationMs / 1000) : (trackData.duration || 0);
   const artworkUrl = trackData.artworkUrl || releaseData?.artworkUrl || artistData?.imageUrl || "";
   const previewUrl: string | null = api.previewUrl || trackData.previewUrl || null;
-  const albumTitle = releaseData?.title || "";
-  const rawAlbumSlug = releaseData?.slug || "";
+  const albumTitle = firstString(
+    releaseData?.title,
+    releaseData?.name,
+    trackData.releaseTitle,
+    trackData.albumTitle,
+    raw.releaseTitle,
+    raw.albumTitle,
+    trackMetadata.releaseTitle,
+    trackMetadata.albumTitle,
+    rawMetadata.releaseTitle,
+    rawMetadata.albumTitle,
+    relMetadata.title,
+    relMetadata.name
+  );
+  const rawAlbumSlug = firstString(
+    releaseData?.slug,
+    trackData.releaseSlug,
+    trackData.albumSlug,
+    raw.releaseSlug,
+    raw.albumSlug,
+    trackMetadata.releaseSlug,
+    trackMetadata.albumSlug,
+    rawMetadata.releaseSlug,
+    rawMetadata.albumSlug,
+    relMetadata.slug
+  );
   const albumSlug = rawAlbumSlug.includes("--") ? rawAlbumSlug.split("--").slice(1).join("--") || rawAlbumSlug : rawAlbumSlug;
-  const albumTrackNumber = Number(trackData.trackNumber || trackData.track_number || 0);
-  const albumTotalTracks = Number(releaseData?.trackCount || 0);
-  const releaseFullDate = releaseData?.releaseDate || "";
-  const releaseType = releaseData?.releaseType || "";
+  const albumTrackNumber = firstNumber(
+    trackData.trackNumber,
+    trackData.track_number,
+    raw.trackNumber,
+    raw.track_number,
+    matchedReleaseTrack?.trackNumber,
+    matchedReleaseTrack?.track_number,
+    trackMetadata.trackNumber,
+    trackMetadata.track_number,
+    rawMetadata.trackNumber,
+    rawMetadata.track_number
+  );
+  const albumTotalTracks = firstNumber(
+    releaseData?.trackCount,
+    releaseData?.track_count,
+    raw.releaseTrackCount,
+    raw.albumTrackCount,
+    trackData.releaseTrackCount,
+    trackData.albumTrackCount,
+    trackMetadata.trackCount,
+    trackMetadata.releaseTrackCount,
+    trackMetadata.albumTrackCount,
+    rawMetadata.trackCount,
+    rawMetadata.releaseTrackCount,
+    rawMetadata.albumTrackCount,
+    relMetadata.trackCount,
+    relMetadata.track_count
+  );
+  const releaseFullDate = firstString(
+    releaseData?.releaseDate,
+    releaseData?.date,
+    releaseData?.releasedAt,
+    trackData.releaseDate,
+    raw.releaseDate,
+    trackMetadata.releaseDate,
+    rawMetadata.releaseDate,
+    relMetadata.releaseDate,
+    relMetadata.date
+  );
+  const releaseType = firstString(
+    releaseData?.releaseType,
+    releaseData?.type,
+    trackData.releaseType,
+    raw.releaseType,
+    trackMetadata.releaseType,
+    rawMetadata.releaseType,
+    relMetadata.releaseType,
+    relMetadata.type
+  );
   const releaseTracks = (releaseData?.tracks || []).map((t: any) => ({
     id: String(t.id || ""),
     slug: String(t.slug || ""),
@@ -188,8 +311,26 @@ function apiToViewModel(api: PublicTrackDetail): TrackViewModel {
     genre: primaryGenre,
     genreSlug: primaryGenreSlug,
     genres: allGenres,
-    label: labelData?.name || releaseData?.labelName || "",
-    labelSlug: labelData?.slug || releaseData?.labelSlug || "",
+    label: firstString(
+      labelData?.name,
+      releaseData?.labelName,
+      releaseData?.label,
+      trackData.labelName,
+      raw.labelName,
+      trackMetadata.labelName,
+      rawMetadata.labelName,
+      relMetadata.labelName,
+      relMetadata.label
+    ),
+    labelSlug: firstString(
+      labelData?.slug,
+      releaseData?.labelSlug,
+      trackData.labelSlug,
+      raw.labelSlug,
+      trackMetadata.labelSlug,
+      rawMetadata.labelSlug,
+      relMetadata.labelSlug
+    ),
     rank: currentRank,
     peakPosition: Number(raw.peakRank ?? currentRank) || 0,
     weeksOnChart: Number(raw.weeksOnChart ?? history.length ?? 0) || 0,

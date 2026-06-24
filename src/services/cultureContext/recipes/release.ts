@@ -7,8 +7,10 @@ function releaseName(facts: ReleaseFacts): string {
 }
 
 function artistPhrase(facts: ReleaseFacts): string {
-  const primary = humanList(facts.artistNames, 4);
-  const featured = humanList(facts.featuredArtistNames, 4);
+  const primaryArtists = Array.isArray(facts.artistNames) ? facts.artistNames : [];
+  const featuredArtists = Array.isArray(facts.featuredArtistNames) ? facts.featuredArtistNames : [];
+  const primary = humanList(primaryArtists, 4);
+  const featured = humanList(featuredArtists, 4);
 
   if (primary && featured) return ` by ${primary}, featuring ${featured}`;
   if (primary) return ` by ${primary}`;
@@ -17,8 +19,10 @@ function artistPhrase(facts: ReleaseFacts): string {
 }
 
 function artistFromPhrase(facts: ReleaseFacts): string {
-  const primary = humanList(facts.artistNames, 2);
-  const featured = humanList(facts.featuredArtistNames, 3);
+  const primaryArtists = Array.isArray(facts.artistNames) ? facts.artistNames : [];
+  const featuredArtists = Array.isArray(facts.featuredArtistNames) ? facts.featuredArtistNames : [];
+  const primary = humanList(primaryArtists, 2);
+  const featured = humanList(featuredArtists, 3);
 
   if (primary && featured) return ` from ${primary}, featuring ${featured}`;
   if (primary) return ` from ${primary}`;
@@ -108,9 +112,9 @@ function typeHeroIntro(facts: ReleaseFacts): string {
 function baseFactsUsed(facts: ReleaseFacts): string[] {
   return [
     facts.title ? "title" : "missing:title",
-    facts.artistNames.length > 0 ? "primaryArtists" : "missing:primaryArtists",
-    facts.featuredArtistNames.length > 0 ? "featuredArtists" : "",
-    facts.artistNames.length > 1 ? "multiPrimaryArtists" : "",
+    (Array.isArray(facts.artistNames) && facts.artistNames.length > 0) ? "primaryArtists" : "missing:primaryArtists",
+    (Array.isArray(facts.featuredArtistNames) && facts.featuredArtistNames.length > 0) ? "featuredArtists" : "",
+    (Array.isArray(facts.artistNames) && facts.artistNames.length > 1) ? "multiPrimaryArtists" : "",
     facts.releaseType !== "unknown" ? "releaseType" : "missing:releaseType",
     facts.releaseYear ? "releaseYear" : "missing:releaseYear",
     facts.trackCount ? "trackCount" : "missing:trackCount",
@@ -321,7 +325,10 @@ export function buildReleaseContext(context: CultureRecipeContext<ReleaseFacts>)
 
   return {
     text: textBySurface[surface],
-    confidence: facts.title && (facts.artistNames.length > 0 || facts.featuredArtistNames.length > 0) ? "high" : "low",
+    confidence: facts.title && (
+      (Array.isArray(facts.artistNames) && facts.artistNames.length > 0) ||
+      (Array.isArray(facts.featuredArtistNames) && facts.featuredArtistNames.length > 0)
+    ) ? "high" : "low",
     factsUsed: baseFactsUsed(facts),
     recipe: `release.${surface}.${selectReleaseStory(facts)}`,
   };
