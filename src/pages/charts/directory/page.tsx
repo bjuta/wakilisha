@@ -32,7 +32,7 @@ const METALLIC = {
 } as const;
 
 const HERO_FALLBACK =
-  "https://readdy.ai/api/search-image?query=abstract%20african%20music%20visualization%20with%20vibrant%20green%20and%20gold%20energy%20waves%20radiating%20from%20a%20central%20point%20on%20deep%20charcoal%20black%20background%20rhythmic%20geometric%20patterns%20inspired%20by%20african%20textile%20art%20premium%20cinematic%20atmosphere%20with%20subtle%20luminous%20particles%20no%20text%20high%20contrast%20editorial%20photography%20style&width=1600&height=720&seq=charts-home-hero-v2&orientation=landscape";
+  "https://wakilisha.africa/api/search-image?query=abstract%20african%20music%20visualization%20with%20vibrant%20green%20and%20gold%20energy%20waves%20radiating%20from%20a%20central%20point%20on%20deep%20charcoal%20black%20background%20rhythmic%20geometric%20patterns%20inspired%20by%20african%20textile%20art%20premium%20cinematic%20atmosphere%20with%20subtle%20luminous%20particles%20no%20text%20high%20contrast%20editorial%20photography%20style&width=1600&height=720&seq=charts-home-hero-v2&orientation=landscape";
 
 // ─── Grouping ───
 

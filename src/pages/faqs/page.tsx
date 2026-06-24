@@ -228,7 +228,7 @@ export default function FaqsPage() {
       <div ref={heroRef} className="relative min-h-[50vh] flex items-end overflow-hidden bg-[#0a0a0a] -mt-16">
         <img
           ref={heroImgRef}
-          src="https://readdy.ai/api/search-image?query=Abstract%20editorial%20composition%20with%20warm%20olive%20green%20and%20deep%20charcoal%20layered%20textures%2C%20soft%20atmospheric%20light%20diffusing%20through%20geometric%20and%20organic%20forms%2C%20contemporary%20art%20gallery%20aesthetic%2C%20cinematic%20depth%20with%20subtle%20film%20grain%2C%20thoughtful%20knowledge%20and%20inquiry%20mood%2C%20editorial%20photography%20style%20with%20warm%20amber%20and%20olive%20tonal%20palette%2C%20clean%20structured%20overlaps&width=1800&height=900&seq=faqs-hero-2026-wk&orientation=landscape"
+          src="https://wakilisha.africa/api/search-image?query=Abstract%20editorial%20composition%20with%20warm%20olive%20green%20and%20deep%20charcoal%20layered%20textures%2C%20soft%20atmospheric%20light%20diffusing%20through%20geometric%20and%20organic%20forms%2C%20contemporary%20art%20gallery%20aesthetic%2C%20cinematic%20depth%20with%20subtle%20film%20grain%2C%20thoughtful%20knowledge%20and%20inquiry%20mood%2C%20editorial%20photography%20style%20with%20warm%20amber%20and%20olive%20tonal%20palette%2C%20clean%20structured%20overlaps&width=1800&height=900&seq=faqs-hero-2026-wk&orientation=landscape"
           alt=""
           className="absolute inset-0 w-full h-full object-cover will-change-transform"
         />

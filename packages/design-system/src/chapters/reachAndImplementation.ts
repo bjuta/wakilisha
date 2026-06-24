@@ -223,7 +223,7 @@ export const implementationChapters: WkDesignChapterSpec[] = [
     ],
     componentsRequired: ['WkAntiSlopAudit', 'WkTemplateContamination', 'WkDesignDriftDetector'],
     tables: [],
-    parityTargets: ['Add an anti-slop review gate to every Readdy/dev handoff.', 'All production pages pass anti-slop review.'],
+    parityTargets: ['Add an anti-slop review gate to every prototype/development handoff.', 'All production pages pass anti-slop review.'],
     qaChecks: [
       { id: '33-no-fake', label: 'No fake data', description: 'Public pages have no mock or placeholder data.' },
       { id: '33-no-gradients', label: 'No generic gradients', description: 'No SaaS gradient backgrounds or neon accents.' },

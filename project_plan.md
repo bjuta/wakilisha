@@ -959,7 +959,7 @@ DROP TABLE IF EXISTS provider_items CASCADE;
 
 **1. Forms & Newsletter Subscriptions (15 surfaces, ZERO context)**
 
-Every form on the site submits directly to Readdy's form endpoint with no hidden context fields. When a user subscribes, we have no idea where they came from.
+Every form on the site submits directly to the legacy external form endpoint with no hidden context fields. When a user subscribes, we have no idea where they came from.
 
 | # | Surface | File | Missing Context |
 |---|---------|------|-----------------|
@@ -1137,7 +1137,7 @@ trackEvent("newsletter_signup", {
 });
 ```
 
-**This also applies to forms that use `data-readdy-form` (Readdy form endpoint).** The hidden context fields travel with the form submission to Readdy, AND we also fire our own `analytics_events` row so we own the data.
+**This also applies to forms that use `data-wakilisha-form` (legacy external form endpoint).** The hidden context fields travel with the form submission to the external endpoint, AND we also fire our own `analytics_events` row so we own the data.
 
 **Forms to update:**
 

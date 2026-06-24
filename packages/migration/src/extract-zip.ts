@@ -8,7 +8,7 @@ import unzipper from 'unzipper';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const ZIP_URL = 'https://storage.readdy-site.link/project_files/d0ae344a-1996-4233-9b59-53c8c2189ac8/cc10a676-788f-417c-82ef-6c35fd6bffcb_wakilisha_supabase_import_2026-05-30.zip?v=4b1e21fc25f31493758e2b52cd0bd2cd';
+const ZIP_URL = 'https://wakilisha.africa/project_files/d0ae344a-1996-4233-9b59-53c8c2189ac8/cc10a676-788f-417c-82ef-6c35fd6bffcb_wakilisha_supabase_import_2026-05-30.zip?v=4b1e21fc25f31493758e2b52cd0bd2cd';
 const OUTPUT_DIR = new URL('../../../data/supabase-imports/2026-05-30/raw/', import.meta.url).pathname;
 
 async function downloadAndExtract() {

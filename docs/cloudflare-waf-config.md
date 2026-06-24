@@ -99,7 +99,7 @@ Content-Security-Policy-Report-Only:
   script-src 'self' 'unsafe-inline' 'unsafe-eval' https://pgzizndxdyhqmtyywjmt.supabase.co https://cdn.jsdelivr.net;
   style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net;
   font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net;
-  img-src 'self' data: https://readdy.ai https://*.supabase.co https://img.youtube.com https://*.scdn.co https://*.mzstatic.com;
+  img-src 'self' data: https://wakilisha.africa https://*.supabase.co https://img.youtube.com https://*.scdn.co https://*.mzstatic.com;
   connect-src 'self' https://pgzizndxdyhqmtyywjmt.supabase.co https://api.music.apple.com https://api.spotify.com;
   frame-src 'self' https://www.youtube.com https://open.spotify.com https://music.apple.com https://www.google.com;
   media-src 'self';

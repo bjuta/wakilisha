@@ -71,13 +71,13 @@ const BG = new Set(["archive_routes", "archive_chart_route", "memory_archive", "
 
 const AO = [
   "https://wakilisha.africa", "https://www.wakilisha.africa",
-  "https://staging.wakilisha.africa", "https://readdy.ai", "https://readdy.cc",
-  "https://www.readdy.cc", "http://localhost:5173", "http://localhost:3000"
+  "https://staging.wakilisha.africa", "https://wakilisha.africa", "https://wakilisha.africa",
+  "https://wakilisha.africa", "http://localhost:5173", "http://localhost:3000"
 ];
 
 function cR(r: Request, m = "GET, POST, OPTIONS"): Record<string, string> {
   const o = r.headers.get("Origin") ?? "";
-  const ir = o.endsWith(".readdy.cc") || o === "https://readdy.cc";
+  const ir = o.endsWith(".wakilisha.africa") || o === "https://wakilisha.africa";
   const ao = AO.includes(o) || ir ? o : AO[0];
   return {
     "Access-Control-Allow-Origin": ao,

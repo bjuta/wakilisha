@@ -4,20 +4,20 @@ const ALLOWED_ORIGINS = [
   "https://wakilisha.africa",
   "https://www.wakilisha.africa",
   "https://staging.wakilisha.africa",
-  "https://readdy.cc",
-  "https://www.readdy.cc",
-  "https://readdy.ai",
-  "https://readdy-site.link",
-  "https://readdy-site.com",
-  "https://readdy-staging.com",
+  "https://wakilisha.africa",
+  "https://wakilisha.africa",
+  "https://wakilisha.africa",
+  "https://wakilisha.africa",
+  "https://wakilisha.africa",
+  "https://wakilisha.africa",
   "https://localhost:5173",
   "http://localhost:5173",
 ];
 
 function corsHeaders(req: Request): Record<string, string> {
   const origin = req.headers.get("Origin") ?? "";
-  const isReaddyPreview = origin === "https://readdy.cc" || origin.endsWith(".readdy.cc");
-  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) || isReaddyPreview ? origin : ALLOWED_ORIGINS[0];
+  const isWakilishaPreview = origin === "https://wakilisha.africa" || origin.endsWith(".wakilisha.africa");
+  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) || isWakilishaPreview ? origin : ALLOWED_ORIGINS[0];
   return {
     "Access-Control-Allow-Origin": allowedOrigin,
     "Access-Control-Allow-Methods": "POST, OPTIONS",

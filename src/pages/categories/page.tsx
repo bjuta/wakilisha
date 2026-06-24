@@ -146,7 +146,7 @@ export default function CategoriesIndex() {
       >
         <img
           ref={heroImgRef}
-          src="https://readdy.ai/api/search-image?query=Dark%20abstract%20editorial%20composition%20with%20layered%20archival%20textures%2C%20warm%20amber%20and%20deep%20charcoal%20tones%2C%20minimalist%20geometric%20shapes%20scattered%20like%20catalog%20cards%2C%20soft%20film%20grain%2C%20museum%20archive%20aesthetic%2C%20dramatic%20shadows%2C%20no%20text%2C%20editorial%20photography%20style%2C%20warm%20golden%20accents%20on%20dark%20background&width=1800&height=1100&seq=categories-hero-2026&orientation=landscape"
+          src="https://wakilisha.africa/api/search-image?query=Dark%20abstract%20editorial%20composition%20with%20layered%20archival%20textures%2C%20warm%20amber%20and%20deep%20charcoal%20tones%2C%20minimalist%20geometric%20shapes%20scattered%20like%20catalog%20cards%2C%20soft%20film%20grain%2C%20museum%20archive%20aesthetic%2C%20dramatic%20shadows%2C%20no%20text%2C%20editorial%20photography%20style%2C%20warm%20golden%20accents%20on%20dark%20background&width=1800&height=1100&seq=categories-hero-2026&orientation=landscape"
           alt=""
           className="absolute inset-0 w-full h-full object-cover opacity-85 will-change-transform"
         />
