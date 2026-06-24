@@ -1149,8 +1149,9 @@ async function writeProviderMatch(
         now(),
         now()
       )
-      on conflict (track_id, provider_key, provider_track_id)
+      on conflict (provider_key, provider_track_id)
       do update set
+        track_id = excluded.track_id,
         provider_release_id = excluded.provider_release_id,
         provider_artist_ids = excluded.provider_artist_ids,
         isrc = excluded.isrc,
