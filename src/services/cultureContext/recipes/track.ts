@@ -3,7 +3,12 @@ import { selectTrackStory } from "../scoring";
 import type { CultureRecipeContext, CultureRecipeResult, TrackFacts } from "../types";
 
 function title(facts: TrackFacts): string {
-  return facts.title || "This track";
+  const rawTitle = facts.title || "This track";
+  if (facts.featuredArtists.length === 0) return rawTitle;
+
+  return rawTitle
+    .replace(/\s*[\(\[]\s*(feat\.?|ft\.?|featuring)\s+[^\)\]]+[\)\]]\s*$/i, "")
+    .trim() || rawTitle;
 }
 
 function artistLine(facts: TrackFacts): string {
@@ -54,12 +59,23 @@ function releaseDescriptionSentence(facts: TrackFacts): string {
   const type = facts.releaseType && facts.releaseType !== "unknown"
     ? releaseTypeLabel(facts.releaseType)
     : "release";
-  const count = facts.trackCount ? `${facts.trackCount}-track ` : "";
   const date = releaseDatePhrase(facts);
-  const dateBit = date ? ` released ${facts.releaseDate ? "on" : "in"} ${date}` : "";
+  const dateBit = date ? `, released ${facts.releaseDate ? "on" : "in"} ${date}` : "";
   const labelBit = facts.labelName ? ` under ${facts.labelName}` : "";
 
-  return `The ${type} is a ${count}${type}${dateBit}${labelBit}.`;
+  if (facts.trackNumber && facts.trackCount) {
+    return `It appears as track ${facts.trackNumber} of ${facts.trackCount} on the ${type}${dateBit}${labelBit}.`;
+  }
+
+  if (facts.trackNumber) {
+    return `It appears as track ${facts.trackNumber} on the ${type}${dateBit}${labelBit}.`;
+  }
+
+  if (facts.trackCount) {
+    return `It appears on the ${facts.trackCount}-track ${type}${dateBit}${labelBit}.`;
+  }
+
+  return `It appears on the ${type}${dateBit}${labelBit}.`;
 }
 
 function formatReleaseContext(facts: TrackFacts): string {
@@ -81,11 +97,7 @@ function factualReleaseTrackIntro(facts: TrackFacts): string {
   const trackTitle = title(facts);
   const artists = artistLine(facts);
   const byText = artists ? ` by ${artists}` : "";
-  const trackPosition = facts.trackNumber
-    ? `the ${ordinal(facts.trackNumber)} track`
-    : "a track";
-
-  return `${trackTitle} is ${trackPosition}${byText} on ${facts.releaseTitle}. ${releaseDescriptionSentence(facts)}`;
+  return `${trackTitle} is a track${byText} on ${facts.releaseTitle}. ${releaseDescriptionSentence(facts)}`;
 }
 
 function heroIntro(facts: TrackFacts): string {
