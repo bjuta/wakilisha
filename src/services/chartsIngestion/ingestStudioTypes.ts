@@ -212,6 +212,15 @@ export type CreateIngestDryRunRequest = {
   marketScopeId?: string | null;
   marketScopeSnapshot?: IngestMarketScopeSnapshot | null;
   enrichmentOptions?: IngestEnrichmentOptions | null;
+  releaseWindowStart?: string | null;
+  releaseWindowEnd?: string | null;
+  backfillPresetId?: string | null;
+  backfill?: {
+    presetId?: string | null;
+    releaseWindowStart?: string | null;
+    releaseWindowEnd?: string | null;
+    cadence?: "weekly_monday" | string;
+  } | null;
 };
 
 export type CreateIngestDryRunResponse = {

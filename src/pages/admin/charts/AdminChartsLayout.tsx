@@ -12,6 +12,7 @@ const PRIMARY_TABS: NavItem[] = [
   { path: "/admin/charts/dashboard", label: "Dashboard", icon: "LayoutDashboard", requiredCapability: "view_charts_admin" },
   { path: "/admin/charts/ingest", label: "Ingest Studio", icon: "Database", requiredCapability: "manage_ingest" },
   { path: "/admin/charts/ingest-runs", label: "Ingest Runs", icon: "ListChecks", requiredCapability: "view_charts_admin" },
+  { path: "/admin/charts/backfill", label: "Backfill", icon: "CalendarRange", requiredCapability: "manage_ingest" },
   { path: "/admin/charts/editions", label: "Editions", icon: "Layers", requiredCapability: "manage_charts" },
   { path: "/admin/charts/scoring-runs", label: "Scoring", icon: "Rocket", requiredCapability: "view_charts_admin" },
   { path: "/admin/charts/review-queue", label: "Review", icon: "GitPullRequest", requiredCapability: "view_review_queue" },
