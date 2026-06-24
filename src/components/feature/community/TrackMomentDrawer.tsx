@@ -55,6 +55,7 @@ export function TrackMomentDrawer({
   currentTime,
   duration,
   onSeek,
+  initialTimeMs,
 }: {
   open: boolean;
   onClose: () => void;
@@ -62,6 +63,7 @@ export function TrackMomentDrawer({
   currentTime: number;
   duration?: number;
   onSeek?: (time: number) => void;
+  initialTimeMs?: number | null;
 }) {
   const user = useAuthUser();
   const userId = user.id || undefined;
@@ -87,7 +89,14 @@ export function TrackMomentDrawer({
   const { vote, react } = useCommentActions(userId);
   const seededOpenRef = useRef(false);
   const loadSeqRef = useRef(0);
-  const [selectedTimeMs, setSelectedTimeMs] = useState(() => Math.max(0, Math.round(currentTime * 1000)));
+  const resolveSelectedTimeMs = useCallback(() => {
+    const seeded = typeof initialTimeMs === "number" && Number.isFinite(initialTimeMs)
+      ? initialTimeMs
+      : currentTime * 1000;
+
+    return Math.max(0, Math.round(seeded));
+  }, [currentTime, initialTimeMs]);
+  const [selectedTimeMs, setSelectedTimeMs] = useState(resolveSelectedTimeMs);
   const [comments, setComments] = useState<CommunityComment[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
@@ -105,8 +114,8 @@ export function TrackMomentDrawer({
     if (seededOpenRef.current) return;
 
     seededOpenRef.current = true;
-    setSelectedTimeMs(Math.max(0, Math.round(currentTime * 1000)));
-  }, [open, currentTime]);
+    setSelectedTimeMs(resolveSelectedTimeMs());
+  }, [open, resolveSelectedTimeMs]);
 
   const loadMomentComments = useCallback(async (options?: { quiet?: boolean }) => {
     if (!thread?.id) return;

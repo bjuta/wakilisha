@@ -171,6 +171,13 @@ export function PlaybackSettingsPane({ playback, isSignedIn, updatePlayback }: P
         </div>
         <WakilishaToggle value={playback.preferApplePreviews} onChange={(v) => updatePlayback({ preferApplePreviews: v })} />
       </div>
+      <div className="flex items-center justify-between gap-4 py-4 border-b border-[var(--wk-divider)] last:border-b-0">
+        <div className="flex-1 min-w-0">
+          <div className="text-[13px] font-bold text-[var(--wk-text)]">Community moments while listening</div>
+          <div className="text-[11px] leading-relaxed text-[var(--wk-text-muted)] mt-0.5">Show top timestamp comments as tracks play. Turn this off if you want a quieter player.</div>
+        </div>
+        <WakilishaToggle value={playback.showCommunityMoments !== false} onChange={(v) => updatePlayback({ showCommunityMoments: v })} />
+      </div>
 
       {/* Playback quality */}
       <div className="flex items-center justify-between gap-4 py-4">
