@@ -732,6 +732,13 @@ function PreviewPanel({
                   <div key={track.credit_id} className="text-[12px]">
                     <span className="font-bold text-[#171712]">{truncate(track.track_title, 36)}</span>
                     <span className="text-[#858c7e]"> · {track.role ?? "unknown"}</span>
+                    {track.status && (
+                      <span className={`ml-1 rounded-full px-1.5 py-0.5 text-[9px] font-black uppercase ${
+                        track.status === "archived" ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"
+                      }`}>
+                        {track.status}
+                      </span>
+                    )}
                   </div>
                 ))}
               </div>
@@ -746,6 +753,13 @@ function PreviewPanel({
                   <div key={release.credit_id} className="text-[12px]">
                     <span className="font-bold text-[#171712]">{truncate(release.release_title, 36)}</span>
                     <span className="text-[#858c7e]"> · {release.role ?? "unknown"}</span>
+                    {release.status && (
+                      <span className={`ml-1 rounded-full px-1.5 py-0.5 text-[9px] font-black uppercase ${
+                        release.status === "archived" ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"
+                      }`}>
+                        {release.status}
+                      </span>
+                    )}
                   </div>
                 ))}
               </div>
