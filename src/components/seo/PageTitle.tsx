@@ -78,6 +78,13 @@ const STATIC_ROUTES: Record<string, Omit<SeoModel, "canonicalPath" | "jsonLd">> 
     ogType: "website",
     kind: "collection",
   },
+  "/briefings": {
+    title: "Email briefings and newsletters",
+    description: "Subscribe to WAKILISHA briefings and newsletters covering charts, artists, field guides, labels, scenes, language, memory, and African creative life.",
+    robots: "index, follow",
+    ogType: "website",
+    kind: "collection",
+  },
   "/guides": {
     title: "Guides",
     description: "Read WAKILISHA guides for navigating African music scenes, artists, songs, releases, and culture.",

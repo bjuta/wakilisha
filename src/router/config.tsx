@@ -124,6 +124,7 @@ import PublicApiDocsPage from "../pages/api-docs/page";
 import PublicProfilePage from "../pages/profile/public/page";
 
 // Briefing public pages
+import PublicBriefingsPage from "../pages/briefings/page";
 import BriefingConfirmPage from "../pages/briefing/confirm/page";
 import BriefingUnsubscribePage from "../pages/briefing/unsubscribe/page";
 import BriefingPreferencesPage from "../pages/briefing/preferences/page";
@@ -231,6 +232,7 @@ const routes: RouteObject[] = [
       { path: "/faqs", element: <ResponsivePage mobile={<FaqsPage />} desktop={<FaqsPage />} /> },
       { path: "/privacy", element: <ResponsivePage mobile={<PrivacyPage />} desktop={<PrivacyPage />} /> },
       { path: "/terms", element: <ResponsivePage mobile={<TermsPage />} desktop={<TermsPage />} /> },
+      { path: "/briefings", element: <ResponsivePage mobile={<PublicBriefingsPage />} desktop={<PublicBriefingsPage />} /> },
       { path: "/briefing/confirm", element: <ResponsivePage mobile={<BriefingConfirmPage />} desktop={<BriefingConfirmPage />} /> },
       { path: "/briefing/unsubscribe", element: <ResponsivePage mobile={<BriefingUnsubscribePage />} desktop={<BriefingUnsubscribePage />} /> },
       { path: "/briefing/preferences", element: <ResponsivePage mobile={<BriefingPreferencesPage />} desktop={<BriefingPreferencesPage />} /> },
