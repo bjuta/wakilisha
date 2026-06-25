@@ -90,10 +90,32 @@ interface DecoupleDecision {
   updated_at: string;
 }
 
+interface TokenDraft {
+  token: string;
+  query: string;
+  loading: boolean;
+  creating: boolean;
+  results: RegistryArtistSearchResult[];
+  selectedArtist: RegistryArtistSearchResult | null;
+  role: string;
+  displayCredit: string;
+}
+
 type Toast = { message: string; type: "success" | "error" } | null;
 
 const INPUT_CLASS = "min-w-0 rounded-xl border border-[#dfe4d8] bg-white px-3 py-2 text-[13px] outline-none focus:border-[#85c441]";
 const LABEL_CLASS = "mb-2 block text-[11px] font-black uppercase tracking-wider text-[#71796b]";
+
+const ROLE_OPTIONS = [
+  { value: "primary_artist", label: "Primary artist" },
+  { value: "featured_artist", label: "Featured artist" },
+  { value: "collaborator", label: "Collaborator" },
+  { value: "producer", label: "Producer" },
+  { value: "composer", label: "Composer" },
+  { value: "remixer", label: "Remixer" },
+  { value: "group_member", label: "Group member" },
+  { value: "unknown", label: "Unknown" },
+];
 
 const SOURCE_OPTIONS: Array<{
   key: SourceType;
@@ -190,6 +212,24 @@ function sourceKeyFor(sourceType: SourceType, artist: RegistryArtistSearchResult
   return `${sourceType}:${artist.artist_id}`;
 }
 
+function slugify(value: string): string {
+  return value
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+}
+
+function tokenTextForArtist(artist: RegistryArtistSearchResult): string {
+  const displaySlug = slugify(artist.display_name);
+  if (artist.artist_slug && artist.artist_slug !== displaySlug) {
+    return artist.artist_slug.replace(/-/g, " x ");
+  }
+  return artist.display_name;
+}
+
 function parseCreditTokens(value: string | null | undefined): Array<Record<string, unknown>> {
   const clean = value?.trim() ?? "";
   if (!clean) return [];
@@ -198,6 +238,51 @@ function parseCreditTokens(value: string | null | undefined): Array<Record<strin
     .map((token) => token.trim())
     .filter(Boolean)
     .map((token, index) => ({ token, token_order: index + 1 }));
+}
+
+function artistFromSelectedPayload(value: Record<string, unknown> | undefined): RegistryArtistSearchResult | null {
+  if (!value?.artist_id) return null;
+  return {
+    artist_id: String(value.artist_id),
+    artist_slug: String(value.artist_slug ?? ""),
+    display_name: String(value.display_name ?? value.artist_name ?? value.artist_slug ?? "Unknown artist"),
+    status: String(value.status ?? "active"),
+    origin_iso2: (value.origin_iso2 as string | null | undefined) ?? null,
+    public_image_url: (value.public_image_url as string | null | undefined) ?? null,
+    track_credit_count: Number(value.track_credit_count ?? 0),
+    release_credit_count: Number(value.release_credit_count ?? 0),
+  };
+}
+
+function selectedArtistsPayload(tokenDrafts: TokenDraft[]): Array<Record<string, unknown>> {
+  const seen = new Set<string>();
+  const selected: Array<Record<string, unknown>> = [];
+
+  tokenDrafts.forEach((draft) => {
+    if (!draft.selectedArtist) return;
+    if (seen.has(draft.selectedArtist.artist_id)) return;
+
+    seen.add(draft.selectedArtist.artist_id);
+
+    selected.push({
+      source_token: draft.token,
+      artist_id: draft.selectedArtist.artist_id,
+      artist_slug: draft.selectedArtist.artist_slug,
+      display_name: draft.selectedArtist.display_name,
+      status: draft.selectedArtist.status,
+      role: draft.role,
+      is_primary: draft.role === "primary_artist",
+      is_featured: draft.role === "featured_artist",
+      credit_order: selected.length + 1,
+      display_credit: draft.displayCredit.trim() || draft.selectedArtist.display_name,
+      origin_iso2: draft.selectedArtist.origin_iso2,
+      public_image_url: draft.selectedArtist.public_image_url,
+      track_credit_count: draft.selectedArtist.track_credit_count,
+      release_credit_count: draft.selectedArtist.release_credit_count,
+    });
+  });
+
+  return selected;
 }
 
 function asPreview(data: unknown): DecouplePreview | null {
@@ -367,9 +452,17 @@ function PreviewPanel({
   setDecisionType,
   decisionNote,
   setDecisionNote,
+  tokenDrafts,
+  autoMatching,
   savingDecision,
   onLoadPreview,
   onSaveDecision,
+  onAutoMatchArtists,
+  onSearchTokenArtist,
+  onCreateArtistForToken,
+  onSelectTokenArtist,
+  onUpdateTokenDraft,
+  onClearTokenArtist,
 }: {
   preview: DecouplePreview | null;
   loading: boolean;
@@ -379,9 +472,17 @@ function PreviewPanel({
   setDecisionType: (value: DecoupleDecisionType) => void;
   decisionNote: string;
   setDecisionNote: (value: string) => void;
+  tokenDrafts: TokenDraft[];
+  autoMatching: boolean;
   savingDecision: boolean;
   onLoadPreview: () => void;
   onSaveDecision: () => void;
+  onAutoMatchArtists: () => void;
+  onSearchTokenArtist: (index: number) => void;
+  onCreateArtistForToken: (index: number) => void;
+  onSelectTokenArtist: (index: number, artist: RegistryArtistSearchResult) => void;
+  onUpdateTokenDraft: (index: number, patch: Partial<TokenDraft>) => void;
+  onClearTokenArtist: (index: number) => void;
 }) {
   if (!sourceArtist) {
     return (
@@ -444,9 +545,80 @@ function PreviewPanel({
       {preview && (
         <div className="mt-4 space-y-4">
           <div className="rounded-2xl border border-[#dfe4d8] bg-white p-4">
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div>
+                <p className="text-[13px] font-black text-[#171712]">Canonical match builder</p>
+                <p className="mt-1 text-[12px] leading-relaxed text-[#697062]">
+                  Match each parsed token to a canonical artist. This only saves the decision. Apply stays locked until Phase 4.
+                </p>
+              </div>
+              <button onClick={onAutoMatchArtists} disabled={autoMatching || tokenDrafts.length === 0} className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#dfe4d8] bg-white px-3 py-2 text-[12px] font-black text-[#171712] disabled:opacity-50 hover:border-[#85c441]">
+                <WkIcon name={autoMatching ? "Loader2" : "SearchCheck"} size={13} className={autoMatching ? "animate-spin" : ""} />
+                {autoMatching ? "Matching…" : "Auto-match existing"}
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              {tokenDrafts.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-[#dfe4d8] bg-[#fbfcf8] p-4 text-[13px] text-[#697062]">
+                  No parsed tokens yet. Preview a source candidate first.
+                </div>
+              ) : tokenDrafts.map((draft, index) => (
+                <div key={`${draft.token}-${index}`} className="rounded-2xl border border-[#e8ece2] bg-[#fbfcf8] p-4">
+                  <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                    <div>
+                      <p className="text-[11px] font-black uppercase tracking-wider text-[#858c7e]">Parsed token #{index + 1}</p>
+                      <p className="text-[16px] font-black text-[#171712]">{draft.token}</p>
+                    </div>
+                    {draft.selectedArtist && (
+                      <div className="rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-black text-emerald-700">
+                        {draft.selectedArtist.display_name}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid gap-2 md:grid-cols-[1fr_auto_auto]">
+                    <input value={draft.query} onChange={(event) => onUpdateTokenDraft(index, { query: event.target.value })} className={INPUT_CLASS} placeholder="Search registry artist..." />
+                    <button onClick={() => onSearchTokenArtist(index)} disabled={draft.loading || draft.creating} className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#dfe4d8] bg-white px-3 py-2 text-[12px] font-black text-[#171712] disabled:opacity-50">
+                      <WkIcon name={draft.loading ? "Loader2" : "Search"} size={13} className={draft.loading ? "animate-spin" : ""} />
+                      Search
+                    </button>
+                    <button onClick={() => onCreateArtistForToken(index)} disabled={draft.loading || draft.creating} className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#171712] px-3 py-2 text-[12px] font-black text-white disabled:opacity-50">
+                      <WkIcon name={draft.creating ? "Loader2" : "Plus"} size={13} className={draft.creating ? "animate-spin" : ""} />
+                      Exact create
+                    </button>
+                  </div>
+
+                  {draft.results.length > 0 && (
+                    <div className="mt-3 grid gap-2 md:grid-cols-2">
+                      {draft.results.slice(0, 8).map((artist) => (
+                        <button key={`${draft.token}-${artist.artist_id}`} onClick={() => onSelectTokenArtist(index, artist)} className={`rounded-xl border p-3 text-left ${draft.selectedArtist?.artist_id === artist.artist_id ? "border-[#85c441] bg-[#f0f7e8]" : "border-[#e8ece2] bg-white hover:border-[#85c441]"}`}>
+                          <p className="truncate text-[13px] font-black text-[#171712]">{artist.display_name}</p>
+                          <p className="truncate text-[11px] text-[#858c7e]">{artist.artist_slug} · {artist.status}</p>
+                          <p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-[#858c7e]">{artist.track_credit_count} tracks · {artist.release_credit_count} releases</p>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {draft.selectedArtist && (
+                    <div className="mt-3 grid gap-2 md:grid-cols-[0.8fr_1fr_auto]">
+                      <select value={draft.role} onChange={(event) => onUpdateTokenDraft(index, { role: event.target.value })} className={INPUT_CLASS}>
+                        {ROLE_OPTIONS.map((role) => <option key={role.value} value={role.value}>{role.label}</option>)}
+                      </select>
+                      <input value={draft.displayCredit} onChange={(event) => onUpdateTokenDraft(index, { displayCredit: event.target.value })} className={INPUT_CLASS} placeholder="Display credit override optional" />
+                      <button onClick={() => onClearTokenArtist(index)} className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[12px] font-black text-red-700">Clear</button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-[#dfe4d8] bg-white p-4">
             <p className="text-[13px] font-black text-[#171712]">Decision capture</p>
             <p className="mt-1 text-[12px] leading-relaxed text-[#697062]">
-              Phase 2 saves the decouple decision only. Replacement artists and apply are still locked for later phases.
+              Save as draft while incomplete. Save as ready once at least two canonical artists are selected.
             </p>
 
             <div className="mt-3 grid gap-3 md:grid-cols-[0.8fr_1fr]">
@@ -462,18 +634,13 @@ function PreviewPanel({
               </div>
               <div>
                 <label className={LABEL_CLASS}>Decision note</label>
-                <input
-                  value={decisionNote}
-                  onChange={(event) => setDecisionNote(event.target.value)}
-                  className={INPUT_CLASS}
-                  placeholder="Why is this source being staged?"
-                />
+                <input value={decisionNote} onChange={(event) => setDecisionNote(event.target.value)} className={INPUT_CLASS} placeholder="Why is this source being staged?" />
               </div>
             </div>
 
             <button onClick={onSaveDecision} disabled={savingDecision} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-[#5f8f2f] px-4 py-2 text-[12px] font-black text-white disabled:opacity-50">
               <WkIcon name={savingDecision ? "Loader2" : "Save"} size={13} className={savingDecision ? "animate-spin" : ""} />
-              {savingDecision ? "Saving decision…" : "Save source decision"}
+              {savingDecision ? "Saving decision…" : "Save decision"}
             </button>
           </div>
           <div className="grid gap-2 sm:grid-cols-4">
@@ -639,7 +806,9 @@ export default function AdminArtistDecouplePage() {
   const [decisionsLoading, setDecisionsLoading] = useState(false);
   const [decisionType, setDecisionType] = useState<DecoupleDecisionType>("split_combined_artist");
   const [decisionNote, setDecisionNote] = useState("");
+  const [tokenDrafts, setTokenDrafts] = useState<TokenDraft[]>([]);
   const [savingDecision, setSavingDecision] = useState(false);
+  const [autoMatching, setAutoMatching] = useState(false);
   const [toast, setToast] = useState<Toast>(null);
 
   const showToast = useCallback((message: string, type: "success" | "error" = "success") => {
@@ -659,6 +828,43 @@ export default function AdminArtistDecouplePage() {
     const key = sourceKeyFor(selectedSource, sourceArtist);
     return key ? decisionsBySourceKey.get(key) ?? null : null;
   }, [decisionsBySourceKey, selectedSource, sourceArtist]);
+
+  const buildTokenDrafts = useCallback((artist: RegistryArtistSearchResult, decision: DecoupleDecision | null = null): TokenDraft[] => {
+    const selected = decision?.selected_artists ?? [];
+    const decisionTokens = decision?.parsed_tokens ?? [];
+    const sourceTokens = parseCreditTokens(tokenTextForArtist(artist));
+
+    const tokenRows =
+      sourceTokens.length > decisionTokens.length || (decisionTokens.length < 2 && sourceTokens.length >= 2)
+        ? sourceTokens
+        : decisionTokens.length
+          ? decisionTokens
+          : sourceTokens;
+
+    const selectedByToken = new Map<string, Record<string, unknown>>();
+
+    selected.forEach((artistPayload) => {
+      const tokenKey = slugify(String(artistPayload.source_token ?? artistPayload.display_name ?? artistPayload.artist_slug ?? ""));
+      if (tokenKey) selectedByToken.set(tokenKey, artistPayload);
+    });
+
+    return tokenRows.map((row, index) => {
+      const token = String(row.token ?? row.source_token ?? "").trim() || artist.display_name;
+      const matchedSelected = selectedByToken.get(slugify(token)) ?? selected[index];
+      const selectedArtist = artistFromSelectedPayload(matchedSelected);
+
+      return {
+        token,
+        query: token,
+        loading: false,
+        creating: false,
+        results: [],
+        selectedArtist,
+        role: String(matchedSelected?.role ?? (index === 0 ? "primary_artist" : "featured_artist")),
+        displayCredit: String(matchedSelected?.display_credit ?? selectedArtist?.display_name ?? ""),
+      };
+    });
+  }, []);
 
   const loadHistory = useCallback(async () => {
     setHistoryLoading(true);
@@ -739,7 +945,8 @@ export default function AdminArtistDecouplePage() {
     const existing = key ? decisionsBySourceKey.get(key) : null;
     setDecisionType(existing?.decision_type ?? "split_combined_artist");
     setDecisionNote(existing?.note ?? "");
-  }, [decisionsBySourceKey, selectedSource]);
+    setTokenDrafts(buildTokenDrafts(artist, existing ?? null));
+  }, [buildTokenDrafts, decisionsBySourceKey, selectedSource]);
 
   const loadPreview = useCallback(async () => {
     if (!sourceArtist) {
@@ -757,6 +964,7 @@ export default function AdminArtistDecouplePage() {
       if (error) throw error;
 
       setPreview(asPreview(data));
+      if (tokenDrafts.length === 0) setTokenDrafts(buildTokenDrafts(sourceArtist, selectedDecision));
       showToast("Read-only source preview loaded", "success");
     } catch (err) {
       setPreview(null);
@@ -764,7 +972,150 @@ export default function AdminArtistDecouplePage() {
     } finally {
       setPreviewLoading(false);
     }
-  }, [showToast, sourceArtist]);
+  }, [buildTokenDrafts, selectedDecision, showToast, sourceArtist, tokenDrafts.length]);
+
+  const updateTokenDraft = useCallback((index: number, patch: Partial<TokenDraft>) => {
+    setTokenDrafts((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item));
+  }, []);
+
+  const searchTokenArtist = useCallback(async (index: number) => {
+    const draft = tokenDrafts[index];
+    if (!draft?.query.trim()) return;
+
+    updateTokenDraft(index, { loading: true });
+
+    try {
+      const { data, error } = await supabase.rpc("admin_search_registry_artists", {
+        p_query: draft.query.trim(),
+        p_limit: 10,
+      });
+
+      if (error) throw error;
+      updateTokenDraft(index, { loading: false, results: asArtistRows(data) });
+    } catch (err) {
+      updateTokenDraft(index, { loading: false, results: [] });
+      showToast(err instanceof Error ? err.message : "Artist search failed", "error");
+    }
+  }, [showToast, tokenDrafts, updateTokenDraft]);
+
+  const selectTokenArtist = useCallback((index: number, artist: RegistryArtistSearchResult) => {
+    updateTokenDraft(index, {
+      selectedArtist: artist,
+      displayCredit: artist.display_name,
+      results: [],
+    });
+  }, [updateTokenDraft]);
+
+  const clearTokenArtist = useCallback((index: number) => {
+    updateTokenDraft(index, {
+      selectedArtist: null,
+      displayCredit: "",
+    });
+  }, [updateTokenDraft]);
+
+  const autoMatchArtists = useCallback(async () => {
+    const unmatched = tokenDrafts.map((draft, index) => ({ draft, index })).filter(({ draft }) => !draft.selectedArtist && draft.token.trim());
+
+    if (unmatched.length === 0) {
+      showToast("All parsed tokens already have canonical matches.", "success");
+      return;
+    }
+
+    setAutoMatching(true);
+
+    let matched = 0;
+    let uncertain = 0;
+    const nextDrafts = [...tokenDrafts];
+
+    for (const { draft, index } of unmatched) {
+      try {
+        const cleanToken = draft.token.trim();
+        const tokenSlug = slugify(cleanToken);
+
+        const { data, error } = await supabase.rpc("admin_search_registry_artists", {
+          p_query: cleanToken,
+          p_limit: 8,
+        });
+
+        if (error) throw error;
+
+        const rows = asArtistRows(data);
+        const exactSlug = rows.find((artist) => artist.artist_slug === tokenSlug);
+        const exactName = rows.find((artist) => artist.display_name.toLowerCase() === cleanToken.toLowerCase());
+        const picked = exactSlug ?? exactName ?? (rows.length === 1 ? rows[0] : null);
+
+        nextDrafts[index] = {
+          ...nextDrafts[index],
+          results: rows,
+          selectedArtist: picked,
+          displayCredit: picked?.display_name ?? nextDrafts[index].displayCredit,
+        };
+
+        if (picked) matched += 1;
+        else uncertain += 1;
+      } catch {
+        uncertain += 1;
+      }
+    }
+
+    setTokenDrafts(nextDrafts);
+    setAutoMatching(false);
+
+    if (matched > 0 && uncertain === 0) showToast(`Auto-matched ${matched} token${matched === 1 ? "" : "s"}.`, "success");
+    else if (matched > 0) showToast(`Auto-matched ${matched}; ${uncertain} need manual review.`, "success");
+    else showToast("No confident canonical matches found.", "error");
+  }, [showToast, tokenDrafts]);
+
+  const createArtistForToken = useCallback(async (index: number) => {
+    const draft = tokenDrafts[index];
+    const suggestedName = draft?.token.trim() || draft?.query.trim();
+    if (!draft || !suggestedName) return;
+
+    const exactDisplayName = window.prompt("Exact artist display name. Preserve punctuation, dots, symbols, and casing.", suggestedName)?.trim();
+    if (!exactDisplayName) return;
+
+    const exactSlug = window.prompt("Artist slug. Keep display name exact; only normalize the URL slug.", slugify(exactDisplayName))?.trim();
+    if (!exactSlug) return;
+
+    updateTokenDraft(index, { creating: true });
+
+    try {
+      const { data: searchData, error: searchError } = await supabase.rpc("admin_search_registry_artists", {
+        p_query: exactDisplayName,
+        p_limit: 10,
+      });
+
+      if (searchError) throw searchError;
+
+      const existing = asArtistRows(searchData).find((artist) => artist.artist_slug === exactSlug || artist.display_name.toLowerCase() === exactDisplayName.toLowerCase());
+
+      if (existing) {
+        selectTokenArtist(index, existing);
+        updateTokenDraft(index, { creating: false });
+        showToast("Existing artist attached instead of creating a duplicate.", "success");
+        return;
+      }
+
+      const { data, error } = await supabase.rpc("admin_create_registry_artist_for_decouple", {
+        p_display_name: exactDisplayName,
+        p_slug: exactSlug,
+        p_status: "needs_review",
+        p_note: `Created from decouple canonical match token "${draft.token}"`,
+      });
+
+      if (error) throw error;
+
+      const result = data as { artist?: RegistryArtistSearchResult; created?: boolean } | null;
+      if (!result?.artist) throw new Error("Artist was not returned after create.");
+
+      selectTokenArtist(index, asArtistRows([result.artist])[0]);
+      updateTokenDraft(index, { creating: false });
+      showToast(result.created ? "Artist created and attached" : "Existing artist attached", "success");
+    } catch (err) {
+      updateTokenDraft(index, { creating: false });
+      showToast(err instanceof Error ? err.message : "Could not create artist", "error");
+    }
+  }, [selectTokenArtist, showToast, tokenDrafts, updateTokenDraft]);
 
   const saveSourceDecision = useCallback(async () => {
     if (!sourceArtist || !preview) {
@@ -772,8 +1123,15 @@ export default function AdminArtistDecouplePage() {
       return;
     }
 
+    const selectedArtists = selectedArtistsPayload(tokenDrafts);
+    const primaryArtist = selectedArtists.find((artist) => artist.role === "primary_artist") ?? selectedArtists[0] ?? null;
+
     const status: DecoupleDecisionStatus =
-      decisionType === "not_a_decouple" || decisionType === "block_alias" ? "blocked" : "draft";
+      decisionType === "not_a_decouple" || decisionType === "block_alias"
+        ? "blocked"
+        : selectedArtists.length >= 2 && (decisionType === "split_combined_artist" || decisionType === "split_raw_credit")
+          ? "ready"
+          : "draft";
 
     setSavingDecision(true);
 
@@ -782,6 +1140,8 @@ export default function AdminArtistDecouplePage() {
         sourceArtist,
         preview,
         sourceType: selectedSource,
+        tokenDrafts,
+        selectedArtists,
       };
 
       const { error } = await supabase.rpc("admin_upsert_artist_decouple_decision", {
@@ -792,9 +1152,14 @@ export default function AdminArtistDecouplePage() {
         p_source_artist_id: sourceArtist.artist_id,
         p_raw_credit_text: sourceArtist.display_name,
         p_source_snapshot: sourceSnapshot,
-        p_parsed_tokens: parseCreditTokens(sourceArtist.display_name),
-        p_selected_artists: [],
-        p_chart_primary_artist_id: null,
+        p_parsed_tokens: tokenDrafts.map((draft, index) => ({
+          token: draft.token,
+          token_order: index + 1,
+          selected_artist_id: draft.selectedArtist?.artist_id ?? null,
+          role: draft.role,
+        })),
+        p_selected_artists: selectedArtists,
+        p_chart_primary_artist_id: primaryArtist?.artist_id ?? null,
         p_decision_type: decisionType,
         p_decision_status: status,
         p_note: decisionNote || null,
@@ -809,7 +1174,7 @@ export default function AdminArtistDecouplePage() {
     } finally {
       setSavingDecision(false);
     }
-  }, [decisionNote, decisionType, loadDecisions, preview, selectedSource, showToast, sourceArtist]);
+  }, [decisionNote, decisionType, loadDecisions, preview, selectedSource, showToast, sourceArtist, tokenDrafts]);
 
   const switchSource = useCallback((source: SourceType) => {
     setSelectedSource(source);
@@ -819,6 +1184,7 @@ export default function AdminArtistDecouplePage() {
     setPreview(null);
     setDecisionType("split_combined_artist");
     setDecisionNote("");
+    setTokenDrafts([]);
   }, []);
 
   return (
@@ -949,9 +1315,17 @@ export default function AdminArtistDecouplePage() {
           setDecisionType={setDecisionType}
           decisionNote={decisionNote}
           setDecisionNote={setDecisionNote}
+          tokenDrafts={tokenDrafts}
+          autoMatching={autoMatching}
           savingDecision={savingDecision}
           onLoadPreview={loadPreview}
           onSaveDecision={saveSourceDecision}
+          onAutoMatchArtists={autoMatchArtists}
+          onSearchTokenArtist={searchTokenArtist}
+          onCreateArtistForToken={createArtistForToken}
+          onSelectTokenArtist={selectTokenArtist}
+          onUpdateTokenDraft={updateTokenDraft}
+          onClearTokenArtist={clearTokenArtist}
         />
       </div>
 
