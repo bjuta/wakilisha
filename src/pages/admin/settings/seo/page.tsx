@@ -74,6 +74,17 @@ type SeoMeasurement = {
   growthNotes: string[];
 };
 
+type GrowthQueueItem = {
+  id: string;
+  target: string;
+  query: string;
+  action: string;
+  reason: string;
+  score: number;
+  priority: "High" | "Medium" | "Watch";
+  metrics: string;
+};
+
 const SEO_PAGE_TYPES = new Set([
   "article",
   "artist_detail",
@@ -195,6 +206,172 @@ function searchConsolePageLabel(row: SearchConsoleRow) {
 
 function searchConsoleQueryLabel(row: SearchConsoleRow) {
   return row.query || "Unknown query";
+}
+
+function normalizeSeoPath(value?: string | null) {
+  if (!value) return "";
+  const clean = cleanPathLabel(value).toLowerCase();
+  if (clean === "/") return clean;
+  return clean.replace(/\/$/, "");
+}
+
+function hasMetadataGapForPath(path: string, measurement?: SeoMeasurement | null) {
+  const normalized = normalizeSeoPath(path);
+  return Boolean(
+    measurement?.gaps.some((gap) => normalizeSeoPath(gap.path) === normalized),
+  );
+}
+
+function hasMissingImageForPath(path: string, measurement?: SeoMeasurement | null) {
+  const normalized = normalizeSeoPath(path);
+  return Boolean(
+    measurement?.gaps.some((gap) => normalizeSeoPath(gap.path) === normalized && gap.issue === "Missing image"),
+  );
+}
+
+function hasInternalSearchDemand(query: string, measurement?: SeoMeasurement | null) {
+  const normalized = query.toLowerCase().trim();
+  if (!normalized) return false;
+
+  return Boolean(
+    measurement?.searchQueries.some((row) => {
+      const internal = row.query.toLowerCase().trim();
+      return internal === normalized || internal.includes(normalized) || normalized.includes(internal);
+    }),
+  );
+}
+
+function pageTypeHint(path: string) {
+  const clean = normalizeSeoPath(path);
+  if (clean.startsWith("/artists/")) return "artist";
+  if (clean.startsWith("/tracks/")) return "track";
+  if (clean.startsWith("/releases/")) return "release";
+  if (clean.startsWith("/charts/")) return "chart";
+  if (clean.startsWith("/articles/")) return "article";
+  if (clean.includes("songs") || clean.includes("top-")) return "guide";
+  return "page";
+}
+
+function actionForSearchRow(row: SearchConsoleRow, measurement?: SeoMeasurement | null) {
+  const impressions = Number(row.impressions || 0);
+  const clicks = Number(row.clicks || 0);
+  const ctr = Number(row.ctr || 0);
+  const position = Number(row.position || 0);
+  const path = searchConsolePageLabel(row);
+  const query = searchConsoleQueryLabel(row);
+  const type = pageTypeHint(path);
+  const missingImage = hasMissingImageForPath(path, measurement);
+  const metadataGap = hasMetadataGapForPath(path, measurement);
+  const internalDemand = hasInternalSearchDemand(query, measurement);
+
+  if (missingImage) {
+    return {
+      action: "Add image/artwork",
+      reason: `This ${type} is visible in Google but still has a metadata image gap.`,
+    };
+  }
+
+  if (impressions >= 500 && clicks === 0) {
+    return {
+      action: "Rewrite snippet/title",
+      reason: "Google is testing this result, but nobody is clicking yet.",
+    };
+  }
+
+  if (impressions >= 500 && ctr < 0.01) {
+    return {
+      action: "Rewrite title/meta",
+      reason: "Strong impressions with very weak CTR. The search result is not selling the click.",
+    };
+  }
+
+  if (position >= 8 && position <= 20) {
+    return {
+      action: "Add internal links",
+      reason: "This is close enough to move with stronger internal links, supporting copy, and richer page modules.",
+    };
+  }
+
+  if (metadataGap) {
+    return {
+      action: "Fix metadata gap",
+      reason: "This page has Search Console visibility and still needs metadata cleanup.",
+    };
+  }
+
+  if (internalDemand && impressions < 100) {
+    return {
+      action: "Create supporting content",
+      reason: "Users are already searching for this inside WAKILISHA before Google has fully picked it up.",
+    };
+  }
+
+  if (position <= 5 && clicks > 0) {
+    return {
+      action: "Protect winner",
+      reason: "This result is already performing. Keep it fresh and link to deeper related pages.",
+    };
+  }
+
+  return {
+    action: "Improve page depth",
+    reason: "This page has enough signal to justify stronger copy, links, and related modules.",
+  };
+}
+
+function scoreSearchRow(row: SearchConsoleRow, measurement?: SeoMeasurement | null) {
+  const impressions = Number(row.impressions || 0);
+  const clicks = Number(row.clicks || 0);
+  const ctr = Number(row.ctr || 0);
+  const position = Number(row.position || 0);
+  const path = searchConsolePageLabel(row);
+  const query = searchConsoleQueryLabel(row);
+
+  let score = Math.log10(impressions + 1) * 24;
+
+  if (impressions >= 1000) score += 25;
+  if (impressions >= 5000) score += 20;
+  if (clicks === 0 && impressions >= 100) score += 22;
+  if (ctr < 0.01 && impressions >= 300) score += 20;
+  if (ctr < 0.03 && impressions >= 300) score += 12;
+  if (position >= 8 && position <= 20) score += 20;
+  if (position > 20 && position <= 40) score += 8;
+  if (hasMetadataGapForPath(path, measurement)) score += 14;
+  if (hasInternalSearchDemand(query, measurement)) score += 10;
+
+  return Math.round(score);
+}
+
+function buildSeoGrowthQueue(rows: SearchConsoleRow[], measurement?: SeoMeasurement | null): GrowthQueueItem[] {
+  const seen = new Set<string>();
+
+  return rows
+    .filter((row) => Number(row.impressions || 0) >= 50)
+    .map((row) => {
+      const target = searchConsolePageLabel(row);
+      const query = searchConsoleQueryLabel(row);
+      const score = scoreSearchRow(row, measurement);
+      const action = actionForSearchRow(row, measurement);
+      const id = `${target}::${query}`.toLowerCase();
+
+      return {
+        id,
+        target,
+        query,
+        action: action.action,
+        reason: action.reason,
+        score,
+        priority: score >= 115 ? "High" : score >= 85 ? "Medium" : "Watch",
+        metrics: `${Number(row.impressions || 0).toLocaleString()} imp · ${Number(row.clicks || 0).toLocaleString()} clicks · ${formatCtr(Number(row.ctr || 0))} CTR · pos ${formatPosition(Number(row.position || 0))}`,
+      } satisfies GrowthQueueItem;
+    })
+    .sort((a, b) => b.score - a.score)
+    .filter((item) => {
+      if (seen.has(item.id)) return false;
+      seen.add(item.id);
+      return true;
+    })
+    .slice(0, 12);
 }
 
 function resultMessage(payload: unknown): string {
@@ -442,6 +619,7 @@ export default function AdminSettingsSeoPage() {
         loading={searchConsoleLoading}
         syncing={searchConsoleSyncing}
         payload={searchConsole}
+        measurement={measurement}
         onRefresh={loadSearchConsole}
         onSync={runSearchConsoleSync}
       />
@@ -513,17 +691,20 @@ function SearchConsolePanel({
   loading,
   syncing,
   payload,
+  measurement,
   onRefresh,
   onSync,
 }: {
   loading: boolean;
   syncing: boolean;
   payload: SearchConsolePayload | null;
+  measurement?: SeoMeasurement | null;
   onRefresh: () => void;
   onSync: () => void;
 }) {
   const run = payload?.run ?? null;
   const rows = payload?.rows ?? [];
+  const growthQueue = buildSeoGrowthQueue(rows, measurement);
   const ctrLeaks = searchConsoleCtrLeaks(rows);
   const liftTargets = searchConsoleLiftTargets(rows);
   const noClickRows = searchConsoleNoClickRows(rows);
@@ -577,6 +758,8 @@ function SearchConsolePanel({
             Latest sync: {run.site_url} · {run.start_date} to {run.end_date} · {formatDate(run.completed_at || run.started_at)}
           </p>
 
+          <GrowthQueuePanel items={growthQueue} />
+
           <div className="mt-5 grid gap-4 xl:grid-cols-3 xl:items-start">
             <SeoTable
               title="CTR leaks"
@@ -620,6 +803,67 @@ function SearchConsolePanel({
         </>
       )}
     </WkSurface>
+  );
+}
+
+function GrowthQueuePanel({ items }: { items: GrowthQueueItem[] }) {
+  return (
+    <div className="mt-5 rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] p-4">
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <div className="mb-2 flex items-center gap-2">
+            <WkIcon name="TrendingUp" size={15} className="text-[var(--wk-brand)]" />
+            <h3 className="text-[13px] font-black text-[var(--wk-text)]">Priority growth queue</h3>
+          </div>
+          <p className="text-[11px] leading-relaxed text-[var(--wk-text-muted)]">
+            Ranked worklist from Search Console demand, CTR leaks, ranking distance, metadata gaps, and internal search demand.
+          </p>
+        </div>
+        {items.length > 0 && (
+          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[var(--wk-text-faint)]">
+            {items.length} active opportunities
+          </p>
+        )}
+      </div>
+
+      <div className="mt-4 space-y-3">
+        {items.length === 0 && (
+          <p className="text-[12px] text-[var(--wk-text-faint)]">
+            No priority growth items yet. Sync Search Console again after Google collects more data.
+          </p>
+        )}
+
+        {items.map((item, index) => (
+          <div
+            key={item.id}
+            className="grid gap-3 rounded-md border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4 lg:grid-cols-[48px_1.3fr_1fr_1fr]"
+          >
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[var(--wk-text-faint)]">Rank</p>
+              <p className="mt-1 text-[18px] font-black text-[var(--wk-text)]">#{index + 1}</p>
+            </div>
+
+            <div className="min-w-0">
+              <p className="truncate text-[13px] font-black text-[var(--wk-text)]">{item.target}</p>
+              <p className="mt-1 truncate text-[11px] uppercase tracking-[0.12em] text-[var(--wk-text-faint)]">{item.query}</p>
+              <p className="mt-2 text-[11px] leading-relaxed text-[var(--wk-text-muted)]">{item.metrics}</p>
+            </div>
+
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[var(--wk-text-faint)]">Action</p>
+              <p className="mt-1 text-[13px] font-black text-[var(--wk-text)]">{item.action}</p>
+              <p className="mt-2 text-[11px] leading-relaxed text-[var(--wk-text-muted)]">{item.reason}</p>
+            </div>
+
+            <div className="lg:text-right">
+              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[var(--wk-text-faint)]">Priority</p>
+              <p className="mt-1 text-[13px] font-black text-[var(--wk-text)]">{item.priority}</p>
+              <p className="mt-2 font-mono text-[11px] text-[var(--wk-text-muted)]">score {item.score}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
