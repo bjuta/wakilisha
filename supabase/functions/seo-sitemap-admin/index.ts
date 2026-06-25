@@ -405,6 +405,11 @@ function pathFromLoc(loc: string) {
   }
 }
 
+function slugFromArtistPath(pagePath: string) {
+  const parts = normalizePath(pagePath).split("/").filter(Boolean);
+  return parts[0] === "artists" ? String(parts[1] || "").trim() : "";
+}
+
 function absoluteImageUrl(value: string | null | undefined) {
   const raw = String(value || "").trim();
   if (!raw) return null;
@@ -455,6 +460,10 @@ function imageValue(row: Record<string, unknown> | null | undefined) {
       "featured_image_url",
       "featured_image",
       "image_url",
+      "public_image_url",
+      "publicImageUrl",
+      "public_image",
+      "portrait_image",
       "profile_image_url",
       "avatar_url",
       "thumbnail_url",
@@ -472,6 +481,10 @@ function imageValue(row: Record<string, unknown> | null | undefined) {
       "featured_image_url",
       "featured_image",
       "image_url",
+      "public_image_url",
+      "publicImageUrl",
+      "public_image",
+      "portrait_image",
       "profile_image_url",
       "avatar_url",
       "thumbnail_url",
@@ -821,6 +834,19 @@ async function fetchRowsById(db: ReturnType<typeof createClient>, table: string,
   return new Map((data || []).map((row: any) => [String(row.id), row as Record<string, unknown>]));
 }
 
+async function fetchRowsBySlug(db: ReturnType<typeof createClient>, table: string, slugs: string[]) {
+  const uniqueSlugs = Array.from(new Set(slugs.filter(Boolean)));
+  if (!uniqueSlugs.length) return new Map<string, Record<string, unknown>>();
+
+  const { data, error } = await db.from(table).select("*").in("slug", uniqueSlugs).limit(5000);
+  if (error) {
+    console.warn(`SEO metadata slug lookup failed for ${table}: ${error.message}`);
+    return new Map<string, Record<string, unknown>>();
+  }
+
+  return new Map((data || []).map((row: any) => [String(row.slug), row as Record<string, unknown>]));
+}
+
 async function buildSeoMetadataManifest(db: ReturnType<typeof createClient>) {
   const items = await buildInternalItems(db);
   const sourceIdsByTable = new Map<string, string[]>();
@@ -837,6 +863,12 @@ async function buildSeoMetadataManifest(db: ReturnType<typeof createClient>) {
     rowMaps.set(table, await fetchRowsById(db, table, ids));
   }
 
+  const artistSlugs = items
+    .map((item) => pathFromLoc(item.loc))
+    .map(slugFromArtistPath)
+    .filter(Boolean);
+  const artistRowsBySlug = await fetchRowsBySlug(db, "registry_artists", artistSlugs);
+
   const relationshipMaps = await buildRelationshipArtistMaps(
     db,
     sourceIdsByTable.get("registry_releases") || [],
@@ -852,9 +884,14 @@ async function buildSeoMetadataManifest(db: ReturnType<typeof createClient>) {
 
   for (const item of items) {
     const pagePath = pathFromLoc(item.loc);
-    const row = item.source_table && item.source_id
+    const artistSlug = slugFromArtistPath(pagePath);
+    const rowFromId = item.source_table && item.source_id
       ? rowMaps.get(item.source_table)?.get(item.source_id) || null
       : null;
+    const rowFromSlug = item.source_table === "registry_artists" && artistSlug
+      ? artistRowsBySlug.get(artistSlug) || null
+      : null;
+    const row = rowFromId || rowFromSlug || null;
 
     const relationshipArtist = item.source_table === "registry_releases" && item.source_id
       ? relationshipMaps.releaseArtistByReleaseId.get(item.source_id) || null
@@ -865,8 +902,12 @@ async function buildSeoMetadataManifest(db: ReturnType<typeof createClient>) {
     const providerImage = item.source_id
       ? providerImageByEntityId.get(item.source_id) || null
       : null;
+    const artistSlugImage = rowFromSlug ? imageValue(rowFromSlug) : null;
+    const fallbackImage = item.source_table === "registry_artists"
+      ? artistSlugImage || providerImage
+      : providerImage;
 
-    manifest[pagePath] = buildSeoMetadataEntry(item, row, relationshipArtist, providerImage);
+    manifest[pagePath] = buildSeoMetadataEntry(item, row, relationshipArtist, fallbackImage);
   }
 
   return manifest;
