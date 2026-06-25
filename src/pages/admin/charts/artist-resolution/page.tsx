@@ -68,6 +68,7 @@ interface TokenDraft {
   token: string;
   query: string;
   loading: boolean;
+  creating: boolean;
   results: RegistryArtistSearchResult[];
   selectedArtist: RegistryArtistSearchResult | null;
 }
@@ -389,6 +390,7 @@ export default function AdminChartsArtistResolutionPage() {
   const [decisionNote, setDecisionNote] = useState("");
   const [tokenDrafts, setTokenDrafts] = useState<TokenDraft[]>([]);
   const [savingDecision, setSavingDecision] = useState(false);
+  const [applyingDecision, setApplyingDecision] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   const [loadingEditions, setLoadingEditions] = useState(true);
@@ -637,6 +639,7 @@ export default function AdminChartsArtistResolutionPage() {
         token,
         query: token,
         loading: false,
+        creating: false,
         results: [],
         selectedArtist: selected ? {
           artist_id: selected.artist_id,
@@ -688,6 +691,73 @@ export default function AdminChartsArtistResolutionPage() {
     )));
   }, []);
 
+  const createArtistForToken = useCallback(async (index: number) => {
+    const draft = tokenDrafts[index];
+    const tokenName = draft?.token.trim();
+    const queryName = draft?.query.trim();
+    const suggestedName = tokenName || queryName;
+
+    if (!draft || !suggestedName) return;
+
+    const exactDisplayName = window.prompt(
+      "Exact artist display name. Keep punctuation, dots, symbols, and casing exactly as the artist uses them.",
+      suggestedName
+    )?.trim();
+
+    if (!exactDisplayName) return;
+
+    const suggestedSlug = exactDisplayName
+      .toLowerCase()
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/&/g, " and ")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "");
+
+    const exactSlug = window.prompt(
+      "Artist slug. Use a clean URL slug, but do not change the display name.",
+      suggestedSlug
+    )?.trim();
+
+    if (!exactSlug) return;
+
+    const confirmed = window.confirm(`Create registry artist "${exactDisplayName}" with slug "${exactSlug}" and attach it to this token?`);
+    if (!confirmed) return;
+
+    setTokenDrafts((current) => current.map((item, itemIndex) => (
+      itemIndex === index ? { ...item, creating: true } : item
+    )));
+
+    try {
+      const { data, error: createError } = await supabase.rpc("admin_create_registry_artist_for_decouple", {
+        p_display_name: exactDisplayName,
+        p_slug: exactSlug,
+        p_status: "needs_review",
+        p_note: `Created from chart artist resolution token "${draft.token}"`,
+      });
+
+      if (createError) throw new Error(createError.message);
+
+      const result = data as { artist?: RegistryArtistSearchResult; created?: boolean } | null;
+      if (!result?.artist) throw new Error("Artist was not returned after create.");
+
+      const artist = asArtistRows([result.artist])[0];
+
+      setTokenDrafts((current) => current.map((item, itemIndex) => (
+        itemIndex === index
+          ? { ...item, creating: false, selectedArtist: artist, results: [] }
+          : item
+      )));
+
+      showToast(result.created ? "Registry artist created and attached" : "Existing registry artist attached", "success");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Could not create registry artist", "error");
+      setTokenDrafts((current) => current.map((item, itemIndex) => (
+        itemIndex === index ? { ...item, creating: false } : item
+      )));
+    }
+  }, [showToast, tokenDrafts]);
+
   const saveResolutionDecision = useCallback(async () => {
     if (!selectedRow) return;
 
@@ -731,6 +801,35 @@ export default function AdminChartsArtistResolutionPage() {
       setSavingDecision(false);
     }
   }, [decisionNote, decisionType, loadDecisions, selectedRow, showToast, tokenDrafts]);
+
+  const applyResolutionDecision = useCallback(async () => {
+    if (!selectedRow || !selectedDecision) return;
+
+    const confirmed = window.confirm("Apply this saved artist resolution decision to registry track credits?");
+    if (!confirmed) return;
+
+    setApplyingDecision(true);
+
+    try {
+      const { data, error: applyError } = await supabase.rpc("admin_apply_chart_artist_resolution_decision", {
+        p_decision_id: selectedDecision.id,
+      });
+
+      if (applyError) throw new Error(applyError.message);
+
+      const result = data as { trackCreditsInserted?: number; trackCreditsExisting?: number; message?: string } | null;
+      await loadEntries(selectedRow.editionId);
+      setSelectedRowId(selectedRow.id);
+      showToast(
+        `Applied. Inserted ${result?.trackCreditsInserted ?? 0} track credits; ${result?.trackCreditsExisting ?? 0} already existed.`,
+        "success"
+      );
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Could not apply resolution decision", "error");
+    } finally {
+      setApplyingDecision(false);
+    }
+  }, [loadEntries, selectedDecision, selectedRow, showToast]);
 
   if (loadingEditions) return <AdminChartsLoadingState message="Loading chart artist workbench…" />;
 
@@ -1001,11 +1100,18 @@ export default function AdminChartsArtistResolutionPage() {
 
                           <div className="flex gap-2">
                             <input value={draft.query} onChange={(event) => updateTokenDraft(index, { query: event.target.value })} className={`${INPUT_CLASS} min-w-0 flex-1`} placeholder="Search registry artist…" />
-                            <button onClick={() => searchArtistsForToken(index)} className="wk-button wk-button-ghost wk-button-sm" disabled={draft.loading}>
+                            <button onClick={() => searchArtistsForToken(index)} className="wk-button wk-button-ghost wk-button-sm" disabled={draft.loading || draft.creating}>
                               <WkIcon name={draft.loading ? "Loader" : "Search"} size={13} className={draft.loading ? "animate-spin" : ""} />
                               Search
                             </button>
                           </div>
+
+                          {!draft.selectedArtist && (
+                            <button onClick={() => createArtistForToken(index)} className="mt-2 wk-button wk-button-ghost wk-button-sm w-full justify-center" disabled={draft.creating || draft.loading}>
+                              <WkIcon name={draft.creating ? "Loader" : "Plus"} size={13} className={draft.creating ? "animate-spin" : ""} />
+                              {draft.creating ? "Creating…" : `Create exact artist for "${draft.token}"`}
+                            </button>
+                          )}
 
                           {draft.results.length > 0 && (
                             <div className="mt-2 max-h-40 space-y-1 overflow-auto">
@@ -1036,8 +1142,27 @@ export default function AdminChartsArtistResolutionPage() {
                     {savingDecision ? "Saving…" : `Save ${decisionLabel(decisionType)}`}
                   </button>
 
+                  {selectedDecision && selectedDecision.decisionStatus === "ready" && (
+                    <button onClick={applyResolutionDecision} disabled={applyingDecision} className="wk-button wk-button-ghost wk-button-sm w-full justify-center border-wk-warning/30 bg-wk-warning-soft text-wk-warning hover:bg-wk-warning-soft">
+                      <WkIcon name={applyingDecision ? "Loader" : "Rocket"} size={14} className={applyingDecision ? "animate-spin" : ""} />
+                      {applyingDecision ? "Applying…" : "Apply saved decision to track credits"}
+                    </button>
+                  )}
+
+                  {selectedDecision && selectedDecision.decisionStatus === "draft" && selectedDecision.decisionType !== "accepted_as_group" && (
+                    <div className="rounded-xl border border-wk-warning/20 bg-wk-warning-soft p-3 text-[11px] font-semibold text-wk-warning">
+                      Pick at least one registry artist and save again before applying this decision.
+                    </div>
+                  )}
+
+                  {selectedDecision?.decisionStatus === "resolved" && (
+                    <div className="rounded-xl border border-wk-success/20 bg-wk-success-soft p-3 text-[11px] font-semibold text-wk-success">
+                      This decision has been applied to registry track credits.
+                    </div>
+                  )}
+
                   <div className="rounded-xl border border-wk-brand/20 bg-wk-brand-soft p-3 text-[11px] leading-relaxed text-wk-text-muted">
-                    This saves decision metadata only. It does not split artists, create aliases, alter registry credits, or mutate public chart rows.
+                    Save captures the decision. Apply inserts missing registry track credits and marks the decision resolved. It does not delete old credits or archive artists.
                   </div>
                 </div>
               )}
