@@ -4,6 +4,7 @@ import { WkIcon } from "@/components/design-system/Icon";
 import { AdminTable } from "@/components/design-system/admin/AdminTable";
 const mockDuplicateCandidates: any[] = [];
 const mockResolutionRuns: any[] = [];
+const DUPLICATE_MERGE_BACKEND_READY = false;
 
 /* ────────────────────────── Types ────────────────────────── */
 
@@ -89,13 +90,31 @@ export default function AdminDuplicateMergePage() {
     };
   }, [candidates]);
 
+  function showLockedToast(action: string) {
+    setToast(`Duplicate Merge is read-only until the real duplicate backend is wired. ${action} was not applied.`);
+    setTimeout(() => setToast(null), 3500);
+  }
+
   function handleMerge(candidate: DuplicateCandidate) {
+    if (!DUPLICATE_MERGE_BACKEND_READY) {
+      showLockedToast(`Merge for "${candidate.duplicate.name}"`);
+      return;
+    }
+
     setSelectedCandidate(candidate);
     setShowConfirm(true);
   }
 
   function confirmMerge() {
     if (!selectedCandidate) return;
+
+    if (!DUPLICATE_MERGE_BACKEND_READY) {
+      showLockedToast(`Merge for "${selectedCandidate.duplicate.name}"`);
+      setShowConfirm(false);
+      setSelectedCandidate(null);
+      return;
+    }
+
     setCandidates((prev) =>
       prev.map((c) =>
         c.id === selectedCandidate.id ? { ...c, status: "resolved" } : c
@@ -108,6 +127,11 @@ export default function AdminDuplicateMergePage() {
   }
 
   function handleReject(candidate: DuplicateCandidate) {
+    if (!DUPLICATE_MERGE_BACKEND_READY) {
+      showLockedToast(`Reject for "${candidate.duplicate.name}"`);
+      return;
+    }
+
     setCandidates((prev) =>
       prev.map((c) =>
         c.id === candidate.id ? { ...c, status: "rejected" } : c
@@ -118,6 +142,11 @@ export default function AdminDuplicateMergePage() {
   }
 
   function handleUndo(candidate: DuplicateCandidate) {
+    if (!DUPLICATE_MERGE_BACKEND_READY) {
+      showLockedToast(`Undo for "${candidate.duplicate.name}"`);
+      return;
+    }
+
     setCandidates((prev) =>
       prev.map((c) =>
         c.id === candidate.id ? { ...c, status: "pending" } : c
@@ -153,6 +182,19 @@ export default function AdminDuplicateMergePage() {
             <WkIcon name="Network" size={14} />
             View Relationships
           </button>
+        </div>
+      </div>
+
+      {/* Safety lock */}
+      <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+        <div className="flex items-start gap-3">
+          <WkIcon name="AlertTriangle" size={16} className="mt-0.5 shrink-0 text-amber-700" />
+          <div>
+            <p className="text-[13px] font-black text-amber-900">Safe shell only</p>
+            <p className="mt-1 text-[12px] leading-relaxed text-amber-800">
+              This page no longer pretends to merge duplicate records from mock data. Merge, reject, and undo actions are locked until a real audited duplicate-candidate backend is wired.
+            </p>
+          </div>
         </div>
       </div>
 
