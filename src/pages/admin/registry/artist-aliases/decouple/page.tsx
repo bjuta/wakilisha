@@ -323,6 +323,24 @@ function sourceTypeLabel(sourceType: SourceType): string {
   return SOURCE_OPTIONS.find((item) => item.key === sourceType)?.label ?? sourceType;
 }
 
+function getResultNumber(result: Record<string, unknown> | null | undefined, key: string): number {
+  const value = result?.[key];
+  return typeof value === "number" ? value : Number(value ?? 0);
+}
+
+function decisionResultSummary(decision: DecoupleDecision | null): Array<{ label: string; value: number }> {
+  const result = decision?.apply_result_json;
+  if (!result) return [];
+
+  return [
+    { label: "track credits inserted", value: getResultNumber(result, "trackArtistRowsInserted") },
+    { label: "source track credits archived", value: getResultNumber(result, "trackArtistRowsArchived") },
+    { label: "release credits inserted", value: getResultNumber(result, "releaseArtistRowsInserted") },
+    { label: "source release credits archived", value: getResultNumber(result, "releaseArtistRowsArchived") },
+    { label: "chart rows repaired", value: getResultNumber(result, "chartEntriesV2Updated") },
+  ];
+}
+
 function SourceCard({
   active,
   option,
@@ -538,9 +556,9 @@ function PreviewPanel({
         <div className="flex items-start gap-2">
           <WkIcon name="AlertTriangle" size={16} className="mt-0.5 shrink-0 text-amber-700" />
           <div>
-            <p className="text-[12px] font-black text-amber-900">Phase 1 safety lock</p>
+            <p className="text-[12px] font-black text-amber-900">Safe workflow lock</p>
             <p className="mt-1 text-[12px] leading-relaxed text-amber-800">
-              This page is now inspection-only. Decouple decisions will be saved in Phase 2 and applied only from a ready decision in Phase 4.
+              Raw search cannot mutate registry credits. Decoupling only applies from saved ready decisions with canonical replacement artists.
             </p>
           </div>
         </div>
@@ -671,6 +689,17 @@ function PreviewPanel({
                 <p className="mt-1 text-[12px] leading-relaxed text-emerald-800">
                   This decision has already been applied through the safe decision path.
                 </p>
+
+                {decisionResultSummary(decision).length > 0 && (
+                  <div className="mt-3 grid gap-2 md:grid-cols-5">
+                    {decisionResultSummary(decision).map((item) => (
+                      <div key={item.label} className="rounded-lg bg-white/75 px-2 py-2">
+                        <p className="text-[15px] font-black text-emerald-900">{item.value}</p>
+                        <p className="text-[9px] font-black uppercase tracking-wide text-emerald-700">{item.label}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -736,6 +765,154 @@ function PreviewPanel({
               </div>
             </div>
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DecisionLedger({
+  decisions,
+  selectedDecision,
+  onSelectDecision,
+}: {
+  decisions: DecoupleDecision[];
+  selectedDecision: DecoupleDecision | null;
+  onSelectDecision: (decision: DecoupleDecision) => void;
+}) {
+  const [statusFilter, setStatusFilter] = useState<"all" | DecoupleDecisionStatus>("all");
+  const [sourceFilter, setSourceFilter] = useState<"all" | SourceType>("all");
+
+  const counts = useMemo(() => ({
+    draft: decisions.filter((decision) => decision.decision_status === "draft").length,
+    ready: decisions.filter((decision) => decision.decision_status === "ready").length,
+    applied: decisions.filter((decision) => decision.decision_status === "applied").length,
+    blocked: decisions.filter((decision) => decision.decision_status === "blocked").length,
+    failed: decisions.filter((decision) => decision.decision_status === "failed").length,
+  }), [decisions]);
+
+  const filteredDecisions = useMemo(() => (
+    decisions.filter((decision) => (
+      (statusFilter === "all" || decision.decision_status === statusFilter)
+      && (sourceFilter === "all" || decision.source_type === sourceFilter)
+    ))
+  ), [decisions, sourceFilter, statusFilter]);
+
+  return (
+    <div className="rounded-2xl border border-[#dfe4d8] bg-white p-5">
+      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <p className="text-[15px] font-black text-[#171712]">Decision ledger</p>
+          <p className="mt-1 text-[13px] leading-relaxed text-[#697062]">
+            Operational view of saved decouple work. Click any decision to reload its source, saved preview, canonical matches, and apply result.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as "all" | DecoupleDecisionStatus)} className={INPUT_CLASS}>
+            <option value="all">All statuses</option>
+            <option value="draft">Draft</option>
+            <option value="ready">Ready</option>
+            <option value="applied">Applied</option>
+            <option value="blocked">Blocked</option>
+            <option value="failed">Failed</option>
+            <option value="superseded">Superseded</option>
+          </select>
+          <select value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value as "all" | SourceType)} className={INPUT_CLASS}>
+            <option value="all">All sources</option>
+            {SOURCE_OPTIONS.map((source) => (
+              <option key={source.key} value={source.key}>{source.label}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div className="mb-4 grid gap-2 sm:grid-cols-5">
+        <div className="rounded-xl bg-[#fbfcf8] p-3">
+          <p className="text-[20px] font-black text-[#171712]">{counts.draft}</p>
+          <p className="text-[10px] font-black uppercase text-[#858c7e]">draft</p>
+        </div>
+        <div className="rounded-xl bg-sky-50 p-3">
+          <p className="text-[20px] font-black text-sky-900">{counts.ready}</p>
+          <p className="text-[10px] font-black uppercase text-sky-700">ready</p>
+        </div>
+        <div className="rounded-xl bg-emerald-50 p-3">
+          <p className="text-[20px] font-black text-emerald-900">{counts.applied}</p>
+          <p className="text-[10px] font-black uppercase text-emerald-700">applied</p>
+        </div>
+        <div className="rounded-xl bg-amber-50 p-3">
+          <p className="text-[20px] font-black text-amber-900">{counts.blocked}</p>
+          <p className="text-[10px] font-black uppercase text-amber-700">blocked</p>
+        </div>
+        <div className="rounded-xl bg-red-50 p-3">
+          <p className="text-[20px] font-black text-red-900">{counts.failed}</p>
+          <p className="text-[10px] font-black uppercase text-red-700">failed</p>
+        </div>
+      </div>
+
+      {filteredDecisions.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-[#dfe4d8] bg-[#fbfcf8] p-4 text-[13px] text-[#697062]">
+          No decouple decisions match the current filters.
+        </div>
+      ) : (
+        <div className="grid gap-2 xl:grid-cols-2">
+          {filteredDecisions.slice(0, 40).map((decision) => {
+            const isSelected = selectedDecision?.id === decision.id;
+            const resultSummary = decisionResultSummary(decision);
+            const selectedArtists = decision.selected_artists ?? [];
+
+            return (
+              <button
+                key={decision.id}
+                onClick={() => onSelectDecision(decision)}
+                className={`rounded-2xl border p-4 text-left transition-colors ${
+                  isSelected ? "border-[#85c441] bg-[#f0f7e8]" : "border-[#e8ece2] bg-[#fbfcf8] hover:border-[#85c441]"
+                }`}
+              >
+                <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                  <div className="min-w-0">
+                    <p className="truncate text-[13px] font-black text-[#171712]">{decision.source_label}</p>
+                    <p className="mt-1 text-[11px] font-bold uppercase tracking-wide text-[#858c7e]">
+                      {sourceTypeLabel(decision.source_type)} · {decisionTypeLabel(decision.decision_type)}
+                    </p>
+                  </div>
+                  <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${decisionStatusClass(decision.decision_status)}`}>
+                    {decision.decision_status}
+                  </span>
+                </div>
+
+                {decision.note && <p className="mt-2 line-clamp-2 text-[12px] text-[#697062]">{decision.note}</p>}
+
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {selectedArtists.slice(0, 6).map((artist, index) => (
+                    <span key={`${decision.id}-${String(artist.artist_id ?? index)}`} className="rounded-full bg-white px-2 py-1 text-[10px] font-bold text-[#5d6557]">
+                      {String(artist.display_name ?? artist.artist_slug ?? "Artist")} · {String(artist.role ?? "role")}
+                    </span>
+                  ))}
+                  {selectedArtists.length === 0 && (
+                    <span className="rounded-full bg-white px-2 py-1 text-[10px] font-bold text-[#858c7e]">
+                      no canonical matches yet
+                    </span>
+                  )}
+                </div>
+
+                {decision.decision_status === "applied" && resultSummary.length > 0 && (
+                  <div className="mt-3 grid grid-cols-3 gap-2">
+                    {resultSummary.slice(0, 3).map((item) => (
+                      <div key={item.label} className="rounded-lg bg-white px-2 py-1.5">
+                        <p className="text-[13px] font-black text-[#171712]">{item.value}</p>
+                        <p className="text-[8px] font-black uppercase tracking-wide text-[#858c7e]">{item.label}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <p className="mt-3 text-[10px] font-bold uppercase tracking-wide text-[#858c7e]">
+                  updated {new Date(decision.updated_at).toLocaleString()}
+                </p>
+              </button>
+            );
+          })}
         </div>
       )}
     </div>
@@ -1258,6 +1435,31 @@ export default function AdminArtistDecouplePage() {
     }
   }, [loadDecisions, loadHistory, selectedDecision, showToast, sourceArtist]);
 
+  const selectDecisionFromLedger = useCallback((decision: DecoupleDecision) => {
+    const snapshot = decision.source_snapshot as {
+      sourceArtist?: RegistryArtistSearchResult;
+      preview?: DecouplePreview;
+    };
+
+    const snapshotArtist = snapshot.sourceArtist ?? null;
+
+    setSelectedSource(decision.source_type);
+    setSourceQuery("");
+    setSourceResults([]);
+    setSourceArtist(snapshotArtist);
+    setPreview(asPreview(snapshot.preview));
+    setDecisionType(decision.decision_type);
+    setDecisionNote(decision.note ?? "");
+
+    if (snapshotArtist) {
+      setTokenDrafts(buildTokenDrafts(snapshotArtist, decision));
+    } else {
+      setTokenDrafts([]);
+    }
+
+    showToast("Decision loaded from ledger", "success");
+  }, [buildTokenDrafts, showToast]);
+
   const switchSource = useCallback((source: SourceType) => {
     setSelectedSource(source);
     setSourceQuery("");
@@ -1337,6 +1539,12 @@ export default function AdminArtistDecouplePage() {
           />
         ))}
       </div>
+
+      <DecisionLedger
+        decisions={decisions}
+        selectedDecision={selectedDecision}
+        onSelectDecision={selectDecisionFromLedger}
+      />
 
       <div className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
         <div className="space-y-4">
