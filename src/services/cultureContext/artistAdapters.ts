@@ -1,6 +1,8 @@
 import { buildCultureContext, type CultureContextSurface } from "./index";
 import type { PublicArtist, PublicArtistDetail } from "@/services/publicContent/client";
 
+type LooseRecord = Record<string, unknown>;
+
 type ArtistLike = Partial<PublicArtist> & Partial<PublicArtistDetail> & Partial<{
   chartEntryCount: number;
   peakChartPosition: number;
@@ -8,6 +10,8 @@ type ArtistLike = Partial<PublicArtist> & Partial<PublicArtistDetail> & Partial<
   labels: string[];
   labelAffiliations: string[];
   yearsActive: string;
+  topTracks: Array<string | LooseRecord>;
+  tracks: Array<string | LooseRecord>;
 }>;
 
 function clean(value: unknown): string {
@@ -17,6 +21,55 @@ function clean(value: unknown): string {
 function numberValue(value: unknown): number | undefined {
   const number = Number(value);
   return Number.isFinite(number) && number > 0 ? number : undefined;
+}
+
+function titleFromUnknown(value: unknown): string {
+  if (typeof value === "string") return clean(value);
+  if (!value || typeof value !== "object" || Array.isArray(value)) return "";
+
+  const record = value as LooseRecord;
+  for (const key of ["title", "name", "display_title", "trackTitle", "releaseTitle", "normalized_title"]) {
+    const candidate = clean(record[key]);
+    if (candidate) return candidate;
+  }
+
+  return "";
+}
+
+function uniqueTitles(values: unknown[], limit = 6): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+
+  for (const value of values) {
+    const title = titleFromUnknown(value);
+    const key = title.toLowerCase();
+    if (!title || seen.has(key)) continue;
+    seen.add(key);
+    out.push(title);
+    if (out.length >= limit) break;
+  }
+
+  return out;
+}
+
+function topTrackTitles(artist: ArtistLike): string[] {
+  const topTracks = (artist as { topTracks?: unknown[] }).topTracks;
+  if (Array.isArray(topTracks)) return uniqueTitles(topTracks, 8);
+
+  const topSongs = (artist as { topSongs?: unknown[] }).topSongs;
+  if (Array.isArray(topSongs)) return uniqueTitles(topSongs, 8);
+
+  const tracks = (artist as { tracks?: unknown[] }).tracks;
+  if (Array.isArray(tracks)) return uniqueTitles(tracks, 8);
+
+  return [];
+}
+
+function topReleaseTitles(artist: ArtistLike): string[] {
+  const releases = (artist as { releases?: unknown[] }).releases;
+  if (Array.isArray(releases)) return uniqueTitles(releases, 6);
+
+  return [];
 }
 
 function topCollaborations(artist: ArtistLike): Array<{ name: string; count?: number }> {
@@ -40,6 +93,8 @@ function labels(artist: ArtistLike): string[] {
 }
 
 export function artistContextData(artist: ArtistLike) {
+  const topTracks = topTrackTitles(artist);
+  const topReleases = topReleaseTitles(artist);
   const chartEntryCount = numberValue(artist.chartEntryCount) || (Array.isArray(artist.chartEntries) ? artist.chartEntries.length : undefined);
   const peakChartPosition = numberValue(artist.peakChartPosition) || numberValue(artist.topChartPosition);
 
@@ -47,13 +102,15 @@ export function artistContextData(artist: ArtistLike) {
     name: clean(artist.name),
     country: clean(artist.country),
     genres: Array.isArray(artist.genres) ? artist.genres.map(clean).filter(Boolean) : [],
-    releaseCount: numberValue(artist.releaseCount) || (Array.isArray(artist.releases) ? artist.releases.length : undefined),
-    trackCount: numberValue(artist.trackCount) || (Array.isArray(artist.topSongs) ? artist.topSongs.length : undefined),
+    releaseCount: numberValue(artist.releaseCount) || (Array.isArray(artist.releases) ? artist.releases.length : topReleases.length || undefined),
+    trackCount: numberValue(artist.trackCount) || topTracks.length || undefined,
     chartEntryCount,
     peakChartPosition,
     collaborations: topCollaborations(artist),
     labels: labels(artist),
     yearsActive: clean(artist.yearsActive),
+    topTracks,
+    topReleases,
   };
 }
 
