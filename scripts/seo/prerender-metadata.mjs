@@ -11,6 +11,9 @@ const DIST_DIR = path.resolve("dist");
 const INDEX_PATH = path.join(DIST_DIR, "index.html");
 const SITEMAP_PATH = path.join(DIST_DIR, "sitemap.xml");
 const ROUTE_MANIFEST_PATH = path.resolve("public/seo-prerender-routes.txt");
+const DB_METADATA_OUTPUT_PATH = path.join(DIST_DIR, "seo-metadata-manifest.json");
+
+let DB_METADATA_BY_PATH = new Map();
 
 const EXTRA_NOINDEX_PATHS = [
   "/search",
@@ -137,6 +140,84 @@ const STATIC_ROUTES = {
     kind: "utility",
   },
 };
+
+function readEnvFileValue(key) {
+  for (const fileName of [".env.local", ".env"]) {
+    const filePath = path.resolve(fileName);
+    if (!fs.existsSync(filePath)) continue;
+
+    const lines = fs.readFileSync(filePath, "utf8").split(/\r?\n/);
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#") || !trimmed.includes("=")) continue;
+
+      const [name, ...rest] = trimmed.split("=");
+      if (name.trim() !== key) continue;
+
+      return rest.join("=").trim().replace(/^["']|["']$/g, "");
+    }
+  }
+
+  return "";
+}
+
+function envValue(key) {
+  return process.env[key] || readEnvFileValue(key) || "";
+}
+
+async function fetchDbMetadataManifest() {
+  const explicitUrl = envValue("SEO_METADATA_MANIFEST_URL");
+  const supabaseUrl = envValue("VITE_PUBLIC_SUPABASE_URL").replace(/\/+$/, "");
+  const anonKey = envValue("VITE_PUBLIC_SUPABASE_ANON_KEY");
+  const metadataUrl = explicitUrl || (supabaseUrl ? `${supabaseUrl}/functions/v1/seo-sitemap-admin?action=metadata` : "");
+
+  if (!metadataUrl) {
+    console.warn("SEO metadata manifest skipped: no SEO_METADATA_MANIFEST_URL or VITE_PUBLIC_SUPABASE_URL.");
+    return new Map();
+  }
+
+  try {
+    const response = await fetch(metadataUrl, {
+      headers: {
+        Accept: "application/json",
+        ...(anonKey ? { apikey: anonKey, Authorization: `Bearer ${anonKey}` } : {}),
+      },
+    });
+
+    if (!response.ok) {
+      console.warn(`SEO metadata manifest skipped: ${response.status} ${response.statusText}`);
+      return new Map();
+    }
+
+    const payload = await response.json();
+    const metadata = payload?.data?.metadata || payload?.metadata || {};
+    const entries = Object.entries(metadata).map(([routePath, value]) => [cleanPath(routePath), value]);
+    fs.writeFileSync(DB_METADATA_OUTPUT_PATH, JSON.stringify(metadata, null, 2) + "\n");
+
+    console.log(`SEO metadata manifest loaded: ${entries.length.toLocaleString()} entries.`);
+    return new Map(entries);
+  } catch (error) {
+    console.warn(`SEO metadata manifest skipped: ${error instanceof Error ? error.message : String(error)}`);
+    return new Map();
+  }
+}
+
+function mergeDbMetadata(model, pagePath) {
+  const db = DB_METADATA_BY_PATH.get(cleanPath(pagePath));
+  if (!db || typeof db !== "object") return model;
+
+  // Only DB-backed entries should override local static SEO copy.
+  // Static sitemap rows from the Edge Function do not have a source table/id and
+  // are intentionally generic, so keep the richer local metadata for those.
+  if (!db.sourceTable || !db.sourceId) return model;
+
+  return {
+    ...model,
+    ...Object.fromEntries(
+      Object.entries(db).filter(([, value]) => value !== null && value !== undefined && value !== "")
+    ),
+  };
+}
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -383,10 +464,10 @@ function stripExistingSeo(html) {
 }
 
 function seoBlockForPath(pagePath) {
-  const model = modelFromPath(pagePath);
+  const model = mergeDbMetadata(modelFromPath(pagePath), pagePath);
   const url = canonicalUrl(model.canonicalPath);
   const title = formatPageTitle(model.title);
-  const image = DEFAULT_IMAGE;
+  const image = model.image || DEFAULT_IMAGE;
   const jsonLd = JSON.stringify(buildJsonLd(model)).replace(/</g, "\\u003c");
 
   return `    <title>${escapeHtml(title)}</title>
@@ -468,13 +549,15 @@ function readSitemapPaths() {
   return [...new Set(["/", ...paths, ...extraPaths, ...EXTRA_NOINDEX_PATHS.map(cleanPath)])];
 }
 
-function main() {
+async function main() {
   if (!fs.existsSync(INDEX_PATH)) {
     throw new Error("dist/index.html was not found. Run vite build first.");
   }
 
+  DB_METADATA_BY_PATH = await fetchDbMetadataManifest();
+
   const baseHtml = fs.readFileSync(INDEX_PATH, "utf8");
-  const paths = readSitemapPaths();
+  const paths = [...new Set([...readSitemapPaths(), ...DB_METADATA_BY_PATH.keys()])];
 
   let written = 0;
 
@@ -488,4 +571,7 @@ function main() {
   console.log(`SEO prerender complete: ${written.toLocaleString()} HTML files written.`);
 }
 
-main();
+main().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
