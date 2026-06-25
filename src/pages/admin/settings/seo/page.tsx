@@ -22,6 +22,22 @@ import {
   type SearchConsolePayload,
   type SearchConsoleRow,
 } from "@/services/searchConsoleSeo";
+import {
+  buildArtistTrendSignalsFromSearchConsole,
+  fetchArtistTrendSignals,
+  fetchSeoGrowthDrafts,
+  fetchSeoGrowthTasks,
+  saveArtistTrendSignals,
+  saveSeoGrowthTask,
+  saveSeoGrowthTaskAndDraft,
+  updateArtistTrendSignalStatus,
+  updateSeoGrowthTaskStatus,
+  type SeoArtistTrendSignal,
+  type SeoArtistTrendStatus,
+  type SeoGrowthDraft,
+  type SeoGrowthTask,
+  type SeoGrowthTaskStatus,
+} from "@/services/seoGrowthActions";
 
 type SitemapSnapshot = {
   id: string;
@@ -374,6 +390,25 @@ function buildSeoGrowthQueue(rows: SearchConsoleRow[], measurement?: SeoMeasurem
     .slice(0, 12);
 }
 
+function growthItemKeyParts(target: string, query: string | null | undefined, action: string) {
+  return `${normalizeSeoPath(target)}::${(query || "").toLowerCase().trim()}::${action.toLowerCase().trim()}`;
+}
+
+function growthItemKey(item: GrowthQueueItem) {
+  return growthItemKeyParts(item.target, item.query, item.action);
+}
+
+function taskKey(task: SeoGrowthTask) {
+  return growthItemKeyParts(task.target_url, task.query, task.action);
+}
+
+function upsertById<T extends { id?: string }>(rows: T[], next: T) {
+  if (!next.id) return rows;
+  const exists = rows.some((row) => row.id === next.id);
+  if (!exists) return [next, ...rows];
+  return rows.map((row) => (row.id === next.id ? next : row));
+}
+
 function resultMessage(payload: unknown): string {
   if (!payload || typeof payload !== "object") return "Action completed.";
   const data = (payload as { data?: unknown }).data;
@@ -398,6 +433,11 @@ export default function AdminSettingsSeoPage() {
   const [searchConsoleLoading, setSearchConsoleLoading] = useState(true);
   const [searchConsoleSyncing, setSearchConsoleSyncing] = useState(false);
   const [searchConsole, setSearchConsole] = useState<SearchConsolePayload | null>(null);
+  const [growthTasks, setGrowthTasks] = useState<SeoGrowthTask[]>([]);
+  const [growthDrafts, setGrowthDrafts] = useState<SeoGrowthDraft[]>([]);
+  const [artistTrendSignals, setArtistTrendSignals] = useState<SeoArtistTrendSignal[]>([]);
+  const [growthActionBusy, setGrowthActionBusy] = useState<string | null>(null);
+  const [artistSignalsBusy, setArtistSignalsBusy] = useState<string | null>(null);
 
   const latestSourceLabel = useMemo(() => {
     if (!snapshot) return "No snapshot yet";
@@ -505,6 +545,22 @@ export default function AdminSettingsSeoPage() {
     }
   }, []);
 
+  const loadGrowthActions = useCallback(async () => {
+    try {
+      const [tasks, drafts, signals] = await Promise.all([
+        fetchSeoGrowthTasks(),
+        fetchSeoGrowthDrafts(),
+        fetchArtistTrendSignals(),
+      ]);
+
+      setGrowthTasks(tasks);
+      setGrowthDrafts(drafts);
+      setArtistTrendSignals(signals);
+    } catch (error) {
+      console.error("Failed to load SEO growth actions:", error);
+    }
+  }, []);
+
   const runSearchConsoleSync = useCallback(async () => {
     setSearchConsoleSyncing(true);
     setResult(null);
@@ -534,7 +590,135 @@ export default function AdminSettingsSeoPage() {
     loadStatus();
     loadMeasurement();
     loadSearchConsole();
-  }, [loadStatus, loadMeasurement, loadSearchConsole]);
+    loadGrowthActions();
+  }, [loadStatus, loadMeasurement, loadSearchConsole, loadGrowthActions]);
+
+  async function saveGrowthTask(item: GrowthQueueItem) {
+    setGrowthActionBusy(`task:${item.id}`);
+    setResult(null);
+
+    try {
+      const task = await saveSeoGrowthTask(item);
+      setGrowthTasks((rows) => upsertById(rows, task));
+      setResult({
+        ok: true,
+        message: "SEO growth task saved.",
+        detail: `${item.action} for ${item.target}`,
+      });
+    } catch (error) {
+      setResult({
+        ok: false,
+        message: "Could not save SEO growth task.",
+        detail: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setGrowthActionBusy(null);
+    }
+  }
+
+  async function draftGrowthAction(item: GrowthQueueItem) {
+    setGrowthActionBusy(`draft:${item.id}`);
+    setResult(null);
+
+    try {
+      const { task, draft } = await saveSeoGrowthTaskAndDraft(item);
+      setGrowthTasks((rows) => upsertById(rows, task));
+      setGrowthDrafts((rows) => upsertById(rows, draft));
+      setResult({
+        ok: true,
+        message: "Admin draft generated.",
+        detail: `${draft.content_kind.replace(/_/g, " ")} draft saved for ${item.target}.`,
+      });
+    } catch (error) {
+      setResult({
+        ok: false,
+        message: "Could not generate admin draft.",
+        detail: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setGrowthActionBusy(null);
+    }
+  }
+
+  async function changeGrowthTaskStatus(taskId: string, status: SeoGrowthTaskStatus) {
+    setGrowthActionBusy(`status:${taskId}:${status}`);
+    setResult(null);
+
+    try {
+      const task = await updateSeoGrowthTaskStatus(taskId, status);
+      setGrowthTasks((rows) => upsertById(rows, task));
+      setResult({
+        ok: true,
+        message: "SEO task status updated.",
+        detail: `${task.target_url} is now ${status.replace(/_/g, " ")}.`,
+      });
+    } catch (error) {
+      setResult({
+        ok: false,
+        message: "Could not update SEO task.",
+        detail: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setGrowthActionBusy(null);
+    }
+  }
+
+  async function generateArtistTrendSignals() {
+    setArtistSignalsBusy("generate");
+    setResult(null);
+
+    try {
+      if (!searchConsole?.run) {
+        throw new Error("Run Search Console sync before generating artist trend signals.");
+      }
+
+      const signals = buildArtistTrendSignalsFromSearchConsole(searchConsole.rows, searchConsole.run);
+      const saved = await saveArtistTrendSignals(signals);
+
+      setArtistTrendSignals(saved);
+      setResult({
+        ok: true,
+        message: `Generated ${saved.length.toLocaleString()} artist trend signals.`,
+        detail: "Approve or publish signals before they feed public trending artist suggestions.",
+      });
+    } catch (error) {
+      setResult({
+        ok: false,
+        message: "Could not generate artist trend signals.",
+        detail: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setArtistSignalsBusy(null);
+    }
+  }
+
+  async function changeArtistTrendSignalStatus(id: string | undefined, status: SeoArtistTrendStatus) {
+    if (!id) return;
+
+    setArtistSignalsBusy(`${id}:${status}`);
+    setResult(null);
+
+    try {
+      const signal = await updateArtistTrendSignalStatus(id, status);
+      setArtistTrendSignals((rows) => upsertById(rows, signal));
+      setResult({
+        ok: true,
+        message: "Artist trend signal updated.",
+        detail:
+          status === "approved" || status === "published"
+            ? `${signal.artist_name} can now feed public trending artist suggestions.`
+            : `${signal.artist_name} marked ${status}.`,
+      });
+    } catch (error) {
+      setResult({
+        ok: false,
+        message: "Could not update artist trend signal.",
+        detail: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setArtistSignalsBusy(null);
+    }
+  }
 
   async function runAction(action: "generate" | "generate_and_pro_update" | "pro_update") {
     setRunning(action);
@@ -620,8 +804,18 @@ export default function AdminSettingsSeoPage() {
         syncing={searchConsoleSyncing}
         payload={searchConsole}
         measurement={measurement}
+        growthTasks={growthTasks}
+        growthDrafts={growthDrafts}
+        artistTrendSignals={artistTrendSignals}
+        growthActionBusy={growthActionBusy}
+        artistSignalsBusy={artistSignalsBusy}
         onRefresh={loadSearchConsole}
         onSync={runSearchConsoleSync}
+        onSaveTask={saveGrowthTask}
+        onDraftAction={draftGrowthAction}
+        onTaskStatusChange={changeGrowthTaskStatus}
+        onGenerateArtistSignals={generateArtistTrendSignals}
+        onArtistSignalStatusChange={changeArtistTrendSignalStatus}
       />
 
       <WkSurface className="p-5">
@@ -692,15 +886,35 @@ function SearchConsolePanel({
   syncing,
   payload,
   measurement,
+  growthTasks,
+  growthDrafts,
+  artistTrendSignals,
+  growthActionBusy,
+  artistSignalsBusy,
   onRefresh,
   onSync,
+  onSaveTask,
+  onDraftAction,
+  onTaskStatusChange,
+  onGenerateArtistSignals,
+  onArtistSignalStatusChange,
 }: {
   loading: boolean;
   syncing: boolean;
   payload: SearchConsolePayload | null;
   measurement?: SeoMeasurement | null;
+  growthTasks: SeoGrowthTask[];
+  growthDrafts: SeoGrowthDraft[];
+  artistTrendSignals: SeoArtistTrendSignal[];
+  growthActionBusy: string | null;
+  artistSignalsBusy: string | null;
   onRefresh: () => void;
   onSync: () => void;
+  onSaveTask: (item: GrowthQueueItem) => void;
+  onDraftAction: (item: GrowthQueueItem) => void;
+  onTaskStatusChange: (taskId: string, status: SeoGrowthTaskStatus) => void;
+  onGenerateArtistSignals: () => void;
+  onArtistSignalStatusChange: (id: string | undefined, status: SeoArtistTrendStatus) => void;
 }) {
   const run = payload?.run ?? null;
   const rows = payload?.rows ?? [];
@@ -758,7 +972,29 @@ function SearchConsolePanel({
             Latest sync: {run.site_url} · {run.start_date} to {run.end_date} · {formatDate(run.completed_at || run.started_at)}
           </p>
 
-          <GrowthQueuePanel items={growthQueue} />
+          <GrowthQueuePanel
+            items={growthQueue}
+            tasks={growthTasks}
+            drafts={growthDrafts}
+            busyKey={growthActionBusy}
+            onSaveTask={onSaveTask}
+            onDraftAction={onDraftAction}
+          />
+
+          <GrowthActionsPanel
+            tasks={growthTasks}
+            drafts={growthDrafts}
+            busyKey={growthActionBusy}
+            onTaskStatusChange={onTaskStatusChange}
+          />
+
+          <ArtistTrendSignalsPanel
+            run={run}
+            signals={artistTrendSignals}
+            busyKey={artistSignalsBusy}
+            onGenerate={onGenerateArtistSignals}
+            onStatusChange={onArtistSignalStatusChange}
+          />
 
           <div className="mt-5 grid gap-4 xl:grid-cols-3 xl:items-start">
             <SeoTable
@@ -806,7 +1042,29 @@ function SearchConsolePanel({
   );
 }
 
-function GrowthQueuePanel({ items }: { items: GrowthQueueItem[] }) {
+function GrowthQueuePanel({
+  items,
+  tasks,
+  drafts,
+  busyKey,
+  onSaveTask,
+  onDraftAction,
+}: {
+  items: GrowthQueueItem[];
+  tasks: SeoGrowthTask[];
+  drafts: SeoGrowthDraft[];
+  busyKey: string | null;
+  onSaveTask: (item: GrowthQueueItem) => void;
+  onDraftAction: (item: GrowthQueueItem) => void;
+}) {
+  const taskByKey = useMemo(() => {
+    return new Map(tasks.map((task) => [taskKey(task), task]));
+  }, [tasks]);
+
+  const draftByKey = useMemo(() => {
+    return new Map(drafts.map((draft) => [growthItemKeyParts(draft.target_url, draft.query, draft.action), draft]));
+  }, [drafts]);
+
   return (
     <div className="mt-5 rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] p-4">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
@@ -833,32 +1091,243 @@ function GrowthQueuePanel({ items }: { items: GrowthQueueItem[] }) {
           </p>
         )}
 
-        {items.map((item, index) => (
-          <div
-            key={item.id}
-            className="grid gap-3 rounded-md border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4 lg:grid-cols-[48px_1.3fr_1fr_1fr]"
-          >
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[var(--wk-text-faint)]">Rank</p>
-              <p className="mt-1 text-[18px] font-black text-[var(--wk-text)]">#{index + 1}</p>
-            </div>
+        {items.map((item, index) => {
+          const key = growthItemKey(item);
+          const task = taskByKey.get(key);
+          const draft = draftByKey.get(key);
+          const taskBusy = busyKey === `task:${item.id}`;
+          const draftBusy = busyKey === `draft:${item.id}`;
 
+          return (
+            <div
+              key={item.id}
+              className="grid gap-3 rounded-md border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4 xl:grid-cols-[48px_1.25fr_1fr_1fr_210px]"
+            >
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[var(--wk-text-faint)]">Rank</p>
+                <p className="mt-1 text-[18px] font-black text-[var(--wk-text)]">#{index + 1}</p>
+              </div>
+
+              <div className="min-w-0">
+                <p className="truncate text-[13px] font-black text-[var(--wk-text)]">{item.target}</p>
+                <p className="mt-1 truncate text-[11px] uppercase tracking-[0.12em] text-[var(--wk-text-faint)]">{item.query}</p>
+                <p className="mt-2 text-[11px] leading-relaxed text-[var(--wk-text-muted)]">{item.metrics}</p>
+              </div>
+
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[var(--wk-text-faint)]">Action</p>
+                <p className="mt-1 text-[13px] font-black text-[var(--wk-text)]">{item.action}</p>
+                <p className="mt-2 text-[11px] leading-relaxed text-[var(--wk-text-muted)]">{item.reason}</p>
+              </div>
+
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[var(--wk-text-faint)]">Priority</p>
+                <p className="mt-1 text-[13px] font-black text-[var(--wk-text)]">{item.priority}</p>
+                <p className="mt-2 font-mono text-[11px] text-[var(--wk-text-muted)]">score {item.score}</p>
+                {task && <p className="mt-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--wk-success)]">Task: {task.status.replace(/_/g, " ")}</p>}
+                {draft && <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--wk-brand)]">Draft ready</p>}
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={() => onDraftAction(item)}
+                  disabled={Boolean(busyKey)}
+                  className="wk-button wk-button-primary wk-button-sm inline-flex items-center justify-center gap-2"
+                >
+                  <WkIcon name={draftBusy ? "Loader" : "Sparkles"} size={14} />
+                  {draftBusy ? "Drafting..." : draft ? "Refresh draft" : "Draft action"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onSaveTask(item)}
+                  disabled={Boolean(busyKey)}
+                  className="wk-button wk-button-soft wk-button-sm inline-flex items-center justify-center gap-2"
+                >
+                  <WkIcon name={taskBusy ? "Loader" : "CheckSquare"} size={14} />
+                  {taskBusy ? "Saving..." : task ? "Task saved" : "Save task"}
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function GrowthActionsPanel({
+  tasks,
+  drafts,
+  busyKey,
+  onTaskStatusChange,
+}: {
+  tasks: SeoGrowthTask[];
+  drafts: SeoGrowthDraft[];
+  busyKey: string | null;
+  onTaskStatusChange: (taskId: string, status: SeoGrowthTaskStatus) => void;
+}) {
+  const openTasks = tasks.filter((task) => task.status === "open" || task.status === "in_progress");
+  const latestDrafts = drafts.slice(0, 6);
+
+  return (
+    <div className="mt-5 grid gap-4 xl:grid-cols-2 xl:items-start">
+      <div className="rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] p-4">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <div>
+            <h3 className="text-[13px] font-black text-[var(--wk-text)]">Saved SEO tasks</h3>
+            <p className="mt-1 text-[11px] leading-relaxed text-[var(--wk-text-muted)]">
+              Operational queue for growth actions that need publishing, media, review, or follow-up.
+            </p>
+          </div>
+          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[var(--wk-text-faint)]">{openTasks.length} open</p>
+        </div>
+
+        <div className="space-y-2">
+          {tasks.length === 0 && <p className="text-[12px] text-[var(--wk-text-faint)]">No saved SEO tasks yet.</p>}
+          {tasks.slice(0, 8).map((task) => (
+            <div key={task.id} className="rounded-md border border-[var(--wk-border)] bg-[var(--wk-surface)] p-3">
+              <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+                <div className="min-w-0">
+                  <p className="truncate text-[12px] font-black text-[var(--wk-text)]">{task.target_url}</p>
+                  <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-[var(--wk-text-faint)]">{task.action} · {task.priority}</p>
+                  <p className="mt-2 text-[11px] leading-relaxed text-[var(--wk-text-muted)]">{task.reason}</p>
+                </div>
+                <p className="shrink-0 rounded-full border border-[var(--wk-border)] px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-[var(--wk-text-muted)]">
+                  {task.status.replace(/_/g, " ")}
+                </p>
+              </div>
+
+              <div className="mt-3 flex flex-wrap gap-2">
+                {(["open", "in_progress", "done", "ignored"] as SeoGrowthTaskStatus[]).map((status) => (
+                  <button
+                    key={`${task.id}-${status}`}
+                    type="button"
+                    disabled={Boolean(busyKey) || task.status === status}
+                    onClick={() => onTaskStatusChange(task.id, status)}
+                    className="rounded-full border border-[var(--wk-border)] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--wk-text-muted)] transition hover:border-[var(--wk-brand)] hover:text-[var(--wk-brand)] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {busyKey === `status:${task.id}:${status}` ? "Saving..." : status.replace(/_/g, " ")}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] p-4">
+        <div className="mb-3">
+          <h3 className="text-[13px] font-black text-[var(--wk-text)]">Admin drafts</h3>
+          <p className="mt-1 text-[11px] leading-relaxed text-[var(--wk-text-muted)]">
+            Culture Context powered drafts and safe SEO copy suggestions. Review before publishing.
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          {latestDrafts.length === 0 && <p className="text-[12px] text-[var(--wk-text-faint)]">No admin drafts yet.</p>}
+          {latestDrafts.map((draft) => (
+            <details key={draft.id} className="rounded-md border border-[var(--wk-border)] bg-[var(--wk-surface)] p-3">
+              <summary className="cursor-pointer text-[12px] font-black text-[var(--wk-text)]">
+                {draft.title}
+              </summary>
+              <p className="mt-2 text-[10px] uppercase tracking-[0.12em] text-[var(--wk-text-faint)]">
+                {draft.content_kind.replace(/_/g, " ")} · {draft.status}
+              </p>
+              <pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap rounded-md border border-[var(--wk-border)] bg-[var(--wk-bg)] p-3 text-[11px] leading-relaxed text-[var(--wk-text-muted)]">
+                {draft.body}
+              </pre>
+            </details>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ArtistTrendSignalsPanel({
+  run,
+  signals,
+  busyKey,
+  onGenerate,
+  onStatusChange,
+}: {
+  run: SearchConsolePayload["run"];
+  signals: SeoArtistTrendSignal[];
+  busyKey: string | null;
+  onGenerate: () => void;
+  onStatusChange: (id: string | undefined, status: SeoArtistTrendStatus) => void;
+}) {
+  const publicSignals = signals.filter((signal) => signal.status === "approved" || signal.status === "published");
+
+  return (
+    <div className="mt-5 rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] p-4">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <div className="mb-2 flex items-center gap-2">
+            <WkIcon name="Radio" size={15} className="text-[var(--wk-brand)]" />
+            <h3 className="text-[13px] font-black text-[var(--wk-text)]">Search-driven artist trend signals</h3>
+          </div>
+          <p className="text-[11px] leading-relaxed text-[var(--wk-text-muted)]">
+            Converts the latest Search Console artist-page demand into trend candidates. Approve or publish to feed public trending artist suggestions.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onGenerate}
+          disabled={!run || Boolean(busyKey)}
+          className="wk-button wk-button-primary wk-button-sm inline-flex items-center justify-center gap-2"
+        >
+          <WkIcon name={busyKey === "generate" ? "Loader" : "Sparkles"} size={14} />
+          {busyKey === "generate" ? "Generating..." : "Generate artist signals"}
+        </button>
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <MetricCard label="Trend candidates" value={signals.length.toLocaleString()} />
+        <MetricCard label="Public feed ready" value={publicSignals.length.toLocaleString()} />
+        <MetricCard label="Source window" value={run ? `${run.start_date} → ${run.end_date}` : "No sync yet"} mono />
+      </div>
+
+      <div className="mt-4 space-y-2">
+        {signals.length === 0 && (
+          <p className="text-[12px] text-[var(--wk-text-faint)]">
+            No artist trend signals yet. Generate them after Search Console sync has artist-page rows.
+          </p>
+        )}
+
+        {signals.slice(0, 10).map((signal) => (
+          <div key={signal.id || signal.artist_slug} className="grid gap-3 rounded-md border border-[var(--wk-border)] bg-[var(--wk-surface)] p-3 lg:grid-cols-[1fr_1fr_170px]">
             <div className="min-w-0">
-              <p className="truncate text-[13px] font-black text-[var(--wk-text)]">{item.target}</p>
-              <p className="mt-1 truncate text-[11px] uppercase tracking-[0.12em] text-[var(--wk-text-faint)]">{item.query}</p>
-              <p className="mt-2 text-[11px] leading-relaxed text-[var(--wk-text-muted)]">{item.metrics}</p>
+              <p className="truncate text-[12px] font-black text-[var(--wk-text)]">{signal.artist_name}</p>
+              <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-[var(--wk-text-faint)]">{signal.artist_url}</p>
+              <p className="mt-2 text-[11px] text-[var(--wk-text-muted)]">
+                score {signal.trend_score} · {signal.impressions.toLocaleString()} imp · {signal.clicks.toLocaleString()} clicks · {formatCtr(Number(signal.ctr || 0))} CTR · pos {formatPosition(Number(signal.average_position || 0))}
+              </p>
             </div>
 
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[var(--wk-text-faint)]">Action</p>
-              <p className="mt-1 text-[13px] font-black text-[var(--wk-text)]">{item.action}</p>
-              <p className="mt-2 text-[11px] leading-relaxed text-[var(--wk-text-muted)]">{item.reason}</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[var(--wk-text-faint)]">Top queries</p>
+              <p className="mt-1 text-[11px] leading-relaxed text-[var(--wk-text-muted)]">
+                {signal.top_queries?.length ? signal.top_queries.join(", ") : "No query sample"}
+              </p>
             </div>
 
-            <div className="lg:text-right">
-              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[var(--wk-text-faint)]">Priority</p>
-              <p className="mt-1 text-[13px] font-black text-[var(--wk-text)]">{item.priority}</p>
-              <p className="mt-2 font-mono text-[11px] text-[var(--wk-text-muted)]">score {item.score}</p>
+            <div className="flex flex-col gap-2">
+              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[var(--wk-text-faint)]">Status: {signal.status || "candidate"}</p>
+              <div className="grid grid-cols-2 gap-2">
+                {(["approved", "published", "rejected", "candidate"] as SeoArtistTrendStatus[]).map((status) => (
+                  <button
+                    key={`${signal.id}-${status}`}
+                    type="button"
+                    disabled={Boolean(busyKey) || signal.status === status}
+                    onClick={() => onStatusChange(signal.id, status)}
+                    className="rounded-full border border-[var(--wk-border)] px-2 py-1 text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--wk-text-muted)] transition hover:border-[var(--wk-brand)] hover:text-[var(--wk-brand)] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {busyKey === `${signal.id}:${status}` ? "Saving" : status}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         ))}
