@@ -594,17 +594,28 @@ export default function AdminChartsArtistResolutionPage() {
   const issueSummary = useMemo(() => {
     let missingCanonical = 0;
     let combined = 0;
+    let openCombined = 0;
     let missingSlug = 0;
     let trackNotCanonical = 0;
     let clean = 0;
+    let openQueue = 0;
+    let undecidedOpen = 0;
 
     entries.forEach((entry) => {
       const issues = getArtistIssues(entry);
+      const decision = decisions.get(entry.id) ?? null;
+      const hasIssue = issues.some((issue) => issue.key !== "looks_clean");
+      const isResolved = decision?.decisionStatus === "resolved";
+      const isOpen = hasIssue && !isResolved;
+
       if (issues.some((issue) => issue.key === "missing_canonical_artist")) missingCanonical += 1;
       if (issues.some((issue) => issue.key === "combined_artist_suspect")) combined += 1;
+      if (issues.some((issue) => issue.key === "combined_artist_suspect") && isOpen) openCombined += 1;
       if (issues.some((issue) => issue.key === "missing_artist_slug")) missingSlug += 1;
       if (issues.some((issue) => issue.key === "track_not_canonical")) trackNotCanonical += 1;
       if (issues.length === 1 && issues[0]?.key === "looks_clean") clean += 1;
+      if (isOpen) openQueue += 1;
+      if (isOpen && !decision) undecidedOpen += 1;
     });
 
     const decisionRows = Array.from(decisions.values());
@@ -615,16 +626,13 @@ export default function AdminChartsArtistResolutionPage() {
     return {
       missingCanonical,
       combined,
+      openCombined,
       missingSlug,
       trackNotCanonical,
       clean,
-      unresolved: entries.filter((entry) => {
-        const issues = getArtistIssues(entry);
-        const decision = decisions.get(entry.id) ?? null;
-        return issues.some((issue) => issue.key !== "looks_clean") && decision?.decisionStatus !== "resolved";
-      }).length,
+      unresolved: openQueue,
       decisions: decisions.size,
-      undecided: entries.length - decisions.size,
+      undecided: undecidedOpen,
       draft,
       ready,
       resolved,
@@ -1026,8 +1034,8 @@ export default function AdminChartsArtistResolutionPage() {
       <div className="grid grid-cols-2 gap-3 md:grid-cols-6">
         <AdminChartsKpiCard value={entries.length} label="Edition Rows" icon="ListChecks" accent="brand" />
         <AdminChartsKpiCard value={issueSummary.unresolved} label="Open Queue" icon="AlertTriangle" accent={issueSummary.unresolved > 0 ? "warning" : "muted"} />
-        <AdminChartsKpiCard value={issueSummary.combined} label="Combined Suspects" icon="Users" accent={issueSummary.combined > 0 ? "warning" : "muted"} />
-        <AdminChartsKpiCard value={issueSummary.undecided} label="Undecided" icon="User" accent={issueSummary.undecided > 0 ? "danger" : "muted"} />
+        <AdminChartsKpiCard value={issueSummary.openCombined} label="Open Combined" icon="Users" accent={issueSummary.openCombined > 0 ? "warning" : "muted"} />
+        <AdminChartsKpiCard value={issueSummary.undecided} label="Open Undecided" icon="User" accent={issueSummary.undecided > 0 ? "danger" : "muted"} />
         <AdminChartsKpiCard value={issueSummary.ready} label="Ready to Apply" icon="Rocket" accent={issueSummary.ready > 0 ? "info" : "muted"} />
         <AdminChartsKpiCard value={issueSummary.resolved} label="Resolved" icon="CheckCircle2" accent="success" />
       </div>
@@ -1180,7 +1188,11 @@ export default function AdminChartsArtistResolutionPage() {
                       </tr>
                     ) : filteredEntries.length === 0 ? (
                       <tr>
-                        <td colSpan={4} className="px-4 py-14 text-center text-[13px] text-wk-text-muted">No chart rows match the current filters.</td>
+                        <td colSpan={4} className="px-4 py-14 text-center text-[13px] text-wk-text-muted">
+                          {issueSummary.unresolved === 0 && unresolvedOnly
+                            ? "Queue clear. All issue rows in this edition are resolved."
+                            : "No chart rows match the current filters."}
+                        </td>
                       </tr>
                     ) : (
                       filteredEntries.map((entry) => {
