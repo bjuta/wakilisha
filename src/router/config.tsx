@@ -87,6 +87,7 @@ import AdminChartsIngestRunDetail from "../pages/admin/charts/ingest-run-detail/
 import AdminChartsScoringRuns from "../pages/admin/charts/scoring-runs/page";
 import AdminChartsEditionDetail from "../pages/admin/charts/edition-detail/page";
 import AdminChartsIngestHealth from "../pages/admin/charts/ingest-health/page";
+import AdminChartsArtistResolution from "../pages/admin/charts/artist-resolution/page";
 
 // Admin Share Analytics (redirected to main analytics)
 import AdminAnalyticsPage from "../pages/admin/analytics/page";
@@ -335,6 +336,7 @@ const routes: RouteObject[] = [
         { path: "backfill", element: <AdminChartsBackfillPlanner /> },
         { path: "ingest/:jobId", element: <AdminChartsIngestDetail /> },
         { path: "editions", element: <AdminChartsEditions /> },
+        { path: "artist-resolution", element: <AdminChartsArtistResolution /> },
         { path: "snapshots", element: <AdminChartsSnapshots /> },
         { path: "integration-map", element: <AdminChartsIntegrationMap /> },
         { path: "public-api-qa", element: <AdminChartsPublicApiQa /> },
