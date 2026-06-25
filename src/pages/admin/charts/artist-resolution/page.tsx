@@ -393,6 +393,7 @@ export default function AdminChartsArtistResolutionPage() {
   const [savingDecision, setSavingDecision] = useState(false);
   const [applyingDecision, setApplyingDecision] = useState(false);
   const [bulkApplying, setBulkApplying] = useState(false);
+  const [autoMatching, setAutoMatching] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   const [loadingEditions, setLoadingEditions] = useState(true);
@@ -774,6 +775,65 @@ export default function AdminChartsArtistResolutionPage() {
       setTokenDrafts((current) => current.map((item, itemIndex) => (
         itemIndex === index ? { ...item, creating: false } : item
       )));
+    }
+  }, [showToast, tokenDrafts]);
+
+  const autoMatchExistingArtists = useCallback(async () => {
+    const unmatched = tokenDrafts
+      .map((draft, index) => ({ draft, index }))
+      .filter(({ draft }) => !draft.selectedArtist && draft.token.trim());
+
+    if (unmatched.length === 0) {
+      showToast("All visible tokens already have selected artists.", "success");
+      return;
+    }
+
+    setAutoMatching(true);
+
+    let matched = 0;
+    let uncertain = 0;
+
+    const nextDrafts = [...tokenDrafts];
+
+    for (const { draft, index } of unmatched) {
+      try {
+        const cleanToken = draft.token.trim();
+        const tokenSlug = slugify(cleanToken, "");
+
+        const { data, error: searchError } = await supabase.rpc("admin_search_registry_artists", {
+          p_query: cleanToken,
+          p_limit: 8,
+        });
+
+        if (searchError) throw new Error(searchError.message);
+
+        const rows = asArtistRows(data);
+        const exactSlug = rows.find((artist) => artist.artist_slug === tokenSlug);
+        const exactName = rows.find((artist) => artist.display_name.toLowerCase() === cleanToken.toLowerCase());
+        const picked = exactSlug ?? exactName ?? (rows.length === 1 ? rows[0] : null);
+
+        nextDrafts[index] = {
+          ...nextDrafts[index],
+          results: rows,
+          selectedArtist: picked,
+        };
+
+        if (picked) matched += 1;
+        else uncertain += 1;
+      } catch {
+        uncertain += 1;
+      }
+    }
+
+    setTokenDrafts(nextDrafts);
+    setAutoMatching(false);
+
+    if (matched > 0 && uncertain === 0) {
+      showToast(`Auto-matched ${matched} token${matched === 1 ? "" : "s"}.`, "success");
+    } else if (matched > 0) {
+      showToast(`Auto-matched ${matched}; ${uncertain} need manual review.`, "success");
+    } else {
+      showToast("No confident existing artist matches found.", "error");
     }
   }, [showToast, tokenDrafts]);
 
@@ -1255,7 +1315,12 @@ export default function AdminChartsArtistResolutionPage() {
                     <textarea value={decisionNote} onChange={(event) => setDecisionNote(event.target.value)} className={`${INPUT_CLASS} min-h-[90px] w-full resize-y`} placeholder="Why are we accepting, splitting, aliasing, or deferring this row?" />
                   </div>
 
-                  <button onClick={saveResolutionDecision} disabled={savingDecision} className="wk-button wk-button-primary wk-button-sm w-full justify-center">
+                  <button onClick={autoMatchExistingArtists} disabled={autoMatching || savingDecision} className="wk-button wk-button-ghost wk-button-sm w-full justify-center">
+                    <WkIcon name={autoMatching ? "Loader" : "SearchCheck"} size={14} className={autoMatching ? "animate-spin" : ""} />
+                    {autoMatching ? "Auto-matching…" : "Auto-match existing artists"}
+                  </button>
+
+                  <button onClick={saveResolutionDecision} disabled={savingDecision || autoMatching} className="wk-button wk-button-primary wk-button-sm w-full justify-center">
                     <WkIcon name={savingDecision ? "Loader" : "CheckCircle2"} size={14} className={savingDecision ? "animate-spin" : ""} />
                     {savingDecision ? "Saving…" : `Save ${decisionLabel(decisionType)}`}
                   </button>
