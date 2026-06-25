@@ -262,6 +262,15 @@ function formatPageTitle(title) {
   return `${clean} | ${SITE_NAME}`;
 }
 
+function schemaEntityName(model) {
+  const explicit = String(model.entityName || "").trim();
+  if (explicit) return explicit;
+
+  const clean = String(model.title || "").trim();
+  const brandedPattern = new RegExp(`\\s*[|–—-]\\s*${SITE_NAME}$`, "i");
+  return clean.replace(brandedPattern, "").trim() || SITE_NAME;
+}
+
 function canonicalUrl(pagePath) {
   const clean = cleanPath(pagePath);
   return `${SITE_URL}${clean === "/" ? "/" : clean}`;
@@ -295,6 +304,7 @@ function breadcrumbItems(pagePath) {
 }
 
 function pageSchema(model, url) {
+  const entityName = schemaEntityName(model);
   const base = {
     "@type": "WebPage",
     "@id": `${url}#webpage`,
@@ -304,12 +314,12 @@ function pageSchema(model, url) {
     isPartOf: { "@id": `${SITE_URL}/#website` },
   };
 
-  if (model.kind === "article") return { ...base, "@type": "Article", headline: model.title };
-  if (model.kind === "artist") return { ...base, "@type": "ProfilePage", about: { "@type": "MusicGroup", name: model.title } };
-  if (model.kind === "track") return { ...base, "@type": "MusicRecording", name: model.title };
-  if (model.kind === "release") return { ...base, "@type": "MusicAlbum", name: model.title };
+  if (model.kind === "article") return { ...base, "@type": "Article", headline: entityName };
+  if (model.kind === "artist") return { ...base, "@type": "ProfilePage", about: { "@type": "MusicGroup", name: entityName } };
+  if (model.kind === "track") return { ...base, about: { "@type": "MusicRecording", name: entityName } };
+  if (model.kind === "release") return { ...base, about: { "@type": "MusicAlbum", name: entityName } };
   if (model.kind === "chart" || model.kind === "collection") return { ...base, "@type": "CollectionPage" };
-  if (model.kind === "profile") return { ...base, "@type": "ProfilePage" };
+  if (model.kind === "profile") return { ...base, "@type": "ProfilePage", about: { "@type": "Person", name: entityName } };
 
   return base;
 }
