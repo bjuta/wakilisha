@@ -4,6 +4,7 @@ import {
   briefingService,
   type AudienceSegmentRow,
   type AudienceSegmentsResult,
+  type AudienceSegmentSendFilters,
   type BriefingCatalogItem,
 } from "@/services/briefingService";
 
@@ -88,6 +89,16 @@ function StatCard({ label, value, helper }: { label: string; value: string | num
   );
 }
 
+interface SegmentIssueOption {
+  id: string;
+  title: string;
+  slug: string;
+  status: string;
+  iso_week: string;
+  created_at?: string;
+  briefing_catalog?: { slug: string; title: string } | null;
+}
+
 export default function AdminSettingsAudience() {
   const [catalog, setCatalog] = useState<BriefingCatalogItem[]>([]);
   const [result, setResult] = useState<AudienceSegmentsResult | null>(null);
@@ -102,6 +113,13 @@ export default function AdminSettingsAudience() {
   const [entitySlug, setEntitySlug] = useState("");
   const [sourceForm, setSourceForm] = useState("");
   const [limit, setLimit] = useState(250);
+
+  const [issues, setIssues] = useState<SegmentIssueOption[]>([]);
+  const [issuesLoading, setIssuesLoading] = useState(false);
+  const [selectedIssueId, setSelectedIssueId] = useState("");
+  const [sending, setSending] = useState(false);
+  const [sendMessage, setSendMessage] = useState<string | null>(null);
+  const [sendError, setSendError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -151,6 +169,34 @@ export default function AdminSettingsAudience() {
     loadSegments();
   }, [loadSegments]);
 
+  const loadSegmentIssues = useCallback(async () => {
+    setSendError(null);
+
+    if (!briefingSlug) {
+      setIssues([]);
+      setSelectedIssueId("");
+      return;
+    }
+
+    setIssuesLoading(true);
+    try {
+      const data = await briefingService.admin.listIssues({ briefingSlug, limit: 50 });
+      const sendable = (data as SegmentIssueOption[]).filter((issue) => issue.status !== "sent");
+      setIssues(sendable);
+      setSelectedIssueId((current) => sendable.some((issue) => issue.id === current) ? current : (sendable[0]?.id ?? ""));
+    } catch (err) {
+      setIssues([]);
+      setSelectedIssueId("");
+      setSendError(err instanceof Error ? err.message : "Could not load sendable issues for this briefing.");
+    } finally {
+      setIssuesLoading(false);
+    }
+  }, [briefingSlug]);
+
+  useEffect(() => {
+    loadSegmentIssues();
+  }, [loadSegmentIssues]);
+
   const rows = result?.rows ?? [];
   const summary = result?.summary;
 
@@ -158,6 +204,26 @@ export default function AdminSettingsAudience() {
     const fromRows = new Set(rows.map((row) => row.source_form).filter(Boolean));
     return Array.from(fromRows).sort();
   }, [rows]);
+
+  const issueOptions = useMemo(() => issues.filter((issue) => issue.status !== "sent"), [issues]);
+  const selectedIssue = useMemo(() => issueOptions.find((issue) => issue.id === selectedIssueId), [issueOptions, selectedIssueId]);
+  const sendTargetCount = summary?.confirmed_subscribers ?? 0;
+
+  const sendDisabledReason = !briefingSlug
+    ? "Choose a briefing first. Segment sending is always scoped to one briefing issue."
+    : subscriberStatus !== "confirmed"
+      ? "Segment sends are limited to confirmed subscribers only."
+      : interestStatus !== "active"
+        ? "Segment sends are limited to active interests only."
+        : issuesLoading
+          ? "Loading sendable issues for this briefing."
+          : !selectedIssueId
+            ? "Choose an unsent issue to send."
+            : sendTargetCount < 1
+              ? "No confirmed subscribers match this segment."
+              : null;
+
+  const canSendSegment = !sendDisabledReason && !sending;
 
   const segmentLabel = useMemo(() => {
     const parts = [
@@ -170,6 +236,37 @@ export default function AdminSettingsAudience() {
     ].filter(Boolean);
     return parts.join(" · ");
   }, [subscriberStatus, interestStatus, briefingSlug, entityType, entitySlug, sourceForm]);
+
+  const handleSendSegment = async () => {
+    setSendMessage(null);
+    setSendError(null);
+
+    if (sendDisabledReason) {
+      setSendError(sendDisabledReason);
+      return;
+    }
+
+    const filters: AudienceSegmentSendFilters = {
+      subscriberStatus: "confirmed",
+      interestStatus: "active",
+      briefingSlug,
+      entityType,
+      entitySlug: entitySlug.trim(),
+      sourceForm: sourceForm.trim(),
+    };
+
+    setSending(true);
+    try {
+      const response = await briefingService.admin.sendIssue(selectedIssueId, filters);
+      setSendMessage(response.message);
+      await loadSegments();
+      await loadSegmentIssues();
+    } catch (err) {
+      setSendError(err instanceof Error ? err.message : "Could not send this briefing to the selected segment.");
+    } finally {
+      setSending(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -267,6 +364,59 @@ export default function AdminSettingsAudience() {
               Apply filters
             </button>
           </div>
+        </div>
+      </WkSurface>
+
+      <WkSurface className="border-[var(--wk-brand)]/20 bg-[var(--wk-brand-soft)]/40 p-4">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="space-y-1">
+            <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[var(--wk-brand)]">Segment send</p>
+            <h2 className="text-[18px] font-black tracking-tight text-[var(--wk-text)]">Send an unsent issue to this exact segment</h2>
+            <p className="max-w-3xl text-[12px] text-[var(--wk-text-muted)]">
+              Uses the current filters above. It only sends to confirmed subscribers with active interests who are also actively opted into the selected briefing. This does not hit every opt-in in the database.
+            </p>
+          </div>
+
+          <div className="flex w-full flex-col gap-2 lg:w-[420px]">
+            <label className="space-y-1">
+              <span className="text-[11px] font-bold text-[var(--wk-text-muted)]">Unsent issue</span>
+              <select
+                value={selectedIssueId}
+                onChange={(event) => setSelectedIssueId(event.target.value)}
+                disabled={!briefingSlug || issuesLoading || issueOptions.length === 0 || sending}
+                className="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)] disabled:opacity-60"
+              >
+                <option value="">
+                  {!briefingSlug ? "Choose a briefing first" : issuesLoading ? "Loading issues..." : "Select an unsent issue"}
+                </option>
+                {issueOptions.map((issue) => (
+                  <option key={issue.id} value={issue.id}>
+                    {issue.title} · {issue.iso_week}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <button
+              onClick={handleSendSegment}
+              disabled={!canSendSegment}
+              className="wk-button wk-button-primary wk-button-sm inline-flex justify-center gap-2 disabled:opacity-50"
+            >
+              <i className={`ri-send-plane-line ${sending ? "animate-pulse" : ""}`} />
+              {sending ? "Sending..." : `Send to ${sendTargetCount} subscriber${sendTargetCount === 1 ? "" : "s"}`}
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-3 space-y-2">
+          {selectedIssue && (
+            <p className="text-[11px] text-[var(--wk-text-muted)]">
+              Selected issue: <span className="font-bold text-[var(--wk-text)]">{selectedIssue.title}</span>. Sending will mark this issue as sent.
+            </p>
+          )}
+          {sendDisabledReason && <p className="text-[11px] font-semibold text-[var(--wk-text-muted)]">{sendDisabledReason}</p>}
+          {sendMessage && <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[12px] font-semibold text-emerald-700">{sendMessage}</p>}
+          {sendError && <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[12px] font-semibold text-red-700">{sendError}</p>}
         </div>
       </WkSurface>
 

@@ -173,6 +173,15 @@ export interface AudienceSegmentsResult {
   filters: Record<string, string | number | null>;
 }
 
+export interface AudienceSegmentSendFilters {
+  subscriberStatus?: string;
+  interestStatus?: string;
+  briefingSlug?: string;
+  entityType?: string;
+  entitySlug?: string;
+  sourceForm?: string;
+}
+
 
 interface ApiError {
   code: string;
@@ -331,9 +340,27 @@ export const briefingService = {
       return adminPost("delete_issue", { issue_id: issueId });
     },
 
-    sendIssue(issueId: string): Promise<{ sent: boolean; sent_count: number; failed_count: number; total_subscribers: number; message: string }> {
+    sendIssue(issueId: string, segmentFilters?: AudienceSegmentSendFilters): Promise<{
+      sent: boolean;
+      sent_count: number;
+      failed_count: number;
+      total_subscribers: number;
+      segment_send?: boolean;
+      segment_filters?: Record<string, string | null>;
+      message: string;
+    }> {
       return adminPost("send_issue", {
         issue_id: issueId,
+        ...(segmentFilters ? {
+          segment_filters: {
+            subscriber_status: segmentFilters.subscriberStatus ?? "",
+            interest_status: segmentFilters.interestStatus ?? "",
+            briefing_slug: segmentFilters.briefingSlug ?? "",
+            entity_type: segmentFilters.entityType ?? "",
+            entity_slug: segmentFilters.entitySlug ?? "",
+            source_form: segmentFilters.sourceForm ?? "",
+          },
+        } : {}),
         ...getBrandingPayload(),
       });
     },
