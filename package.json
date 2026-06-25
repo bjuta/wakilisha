@@ -42,7 +42,7 @@
   "name": "wakilisha-react-rebuild",
   "private": true,
   "scripts": {
-    "build": "vite build",
+    "build": "vite build && node scripts/seo/prerender-metadata.mjs",
     "charts:generate-public-csv-data": "tsx scripts/charts/generate-public-csv-data.ts",
     "charts:v2-api-fixture-check": "tsx scripts/charts/compare-v2-api-fixtures.ts",
     "charts:v2-api-fixtures": "tsx scripts/charts/generate-v2-api-fixtures.ts",
@@ -103,7 +103,9 @@
     "registry:phase7b:apple-music-adapter-test": "tsx scripts/registry/phase7b-apple-music-adapter-test.ts",
     "registry:phase7b:apple-music-probe": "tsx scripts/registry/phase7b-apple-music-probe.ts",
     "registry:phase8b:provider-enrichment": "tsx scripts/registry/phase8b-provider-enrichment-write-test.ts",
-    "registry:phase9:apple-music-chart-enrichment": "tsx scripts/registry/phase9-apple-music-chart-enrichment.ts"
+    "registry:phase9:apple-music-chart-enrichment": "tsx scripts/registry/phase9-apple-music-chart-enrichment.ts",
+    "build:app": "vite build",
+    "seo:prerender": "node scripts/seo/prerender-metadata.mjs"
   },
   "type": "module",
   "version": "0.1.0"

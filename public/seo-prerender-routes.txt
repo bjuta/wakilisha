@@ -1,0 +1,4 @@
+# Extra public routes that must receive prerendered metadata even if the current sitemap misses them.
+# One route per line. Keep these as root-relative paths.
+
+/releases/bien/alusa-why-are-you-topless
