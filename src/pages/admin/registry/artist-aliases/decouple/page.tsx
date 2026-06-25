@@ -455,8 +455,10 @@ function PreviewPanel({
   tokenDrafts,
   autoMatching,
   savingDecision,
+  applyingDecision,
   onLoadPreview,
   onSaveDecision,
+  onApplyDecision,
   onAutoMatchArtists,
   onSearchTokenArtist,
   onCreateArtistForToken,
@@ -475,8 +477,10 @@ function PreviewPanel({
   tokenDrafts: TokenDraft[];
   autoMatching: boolean;
   savingDecision: boolean;
+  applyingDecision: boolean;
   onLoadPreview: () => void;
   onSaveDecision: () => void;
+  onApplyDecision: () => void;
   onAutoMatchArtists: () => void;
   onSearchTokenArtist: (index: number) => void;
   onCreateArtistForToken: (index: number) => void;
@@ -638,10 +642,37 @@ function PreviewPanel({
               </div>
             </div>
 
-            <button onClick={onSaveDecision} disabled={savingDecision} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-[#5f8f2f] px-4 py-2 text-[12px] font-black text-white disabled:opacity-50">
-              <WkIcon name={savingDecision ? "Loader2" : "Save"} size={13} className={savingDecision ? "animate-spin" : ""} />
-              {savingDecision ? "Saving decision…" : "Save decision"}
-            </button>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button onClick={onSaveDecision} disabled={savingDecision || applyingDecision} className="inline-flex items-center gap-2 rounded-xl bg-[#5f8f2f] px-4 py-2 text-[12px] font-black text-white disabled:opacity-50">
+                <WkIcon name={savingDecision ? "Loader2" : "Save"} size={13} className={savingDecision ? "animate-spin" : ""} />
+                {savingDecision ? "Saving decision…" : "Save decision"}
+              </button>
+
+              {decision?.decision_status === "ready" && (
+                <button onClick={onApplyDecision} disabled={applyingDecision || savingDecision} className="inline-flex items-center gap-2 rounded-xl bg-[#171712] px-4 py-2 text-[12px] font-black text-white disabled:opacity-50">
+                  <WkIcon name={applyingDecision ? "Loader2" : "CheckCircle2"} size={13} className={applyingDecision ? "animate-spin" : ""} />
+                  {applyingDecision ? "Applying…" : "Apply ready decision"}
+                </button>
+              )}
+            </div>
+
+            {decision?.decision_status === "ready" && (
+              <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
+                <p className="text-[12px] font-black text-amber-900">Ready to apply</p>
+                <p className="mt-1 text-[12px] leading-relaxed text-amber-800">
+                  Apply inserts missing replacement credits, archives the coupled source credits, repairs safe chart rows, and writes registry history.
+                </p>
+              </div>
+            )}
+
+            {decision?.decision_status === "applied" && (
+              <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                <p className="text-[12px] font-black text-emerald-900">Applied</p>
+                <p className="mt-1 text-[12px] leading-relaxed text-emerald-800">
+                  This decision has already been applied through the safe decision path.
+                </p>
+              </div>
+            )}
           </div>
           <div className="grid gap-2 sm:grid-cols-4">
             <div className="rounded-xl bg-[#fbfcf8] p-3">
@@ -808,6 +839,7 @@ export default function AdminArtistDecouplePage() {
   const [decisionNote, setDecisionNote] = useState("");
   const [tokenDrafts, setTokenDrafts] = useState<TokenDraft[]>([]);
   const [savingDecision, setSavingDecision] = useState(false);
+  const [applyingDecision, setApplyingDecision] = useState(false);
   const [autoMatching, setAutoMatching] = useState(false);
   const [toast, setToast] = useState<Toast>(null);
 
@@ -1176,6 +1208,56 @@ export default function AdminArtistDecouplePage() {
     }
   }, [decisionNote, decisionType, loadDecisions, preview, selectedSource, showToast, sourceArtist, tokenDrafts]);
 
+  const applySelectedDecision = useCallback(async () => {
+    if (!selectedDecision || selectedDecision.decision_status !== "ready") {
+      showToast("Select a ready decouple decision first.", "error");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Apply this decouple decision? This will insert replacement credits, archive coupled source credits, repair safe chart rows, and write registry history."
+    );
+
+    if (!confirmed) return;
+
+    setApplyingDecision(true);
+
+    try {
+      const { data, error } = await supabase.rpc("admin_apply_artist_decouple_decision", {
+        p_decision_id: selectedDecision.id,
+      });
+
+      if (error) throw error;
+
+      await loadDecisions();
+      await loadHistory();
+
+      if (sourceArtist) {
+        const { data: previewData } = await supabase.rpc("admin_get_artist_decouple_preview", {
+          p_source_artist_id: sourceArtist.artist_id,
+        });
+        setPreview(asPreview(previewData));
+      }
+
+      const result = data as {
+        trackArtistRowsInserted?: number;
+        trackArtistRowsArchived?: number;
+        releaseArtistRowsInserted?: number;
+        releaseArtistRowsArchived?: number;
+        chartEntriesV2Updated?: number;
+      } | null;
+
+      showToast(
+        `Applied · ${result?.trackArtistRowsInserted ?? 0} track credits inserted, ${result?.trackArtistRowsArchived ?? 0} source track credits archived`,
+        "success"
+      );
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Could not apply decouple decision", "error");
+    } finally {
+      setApplyingDecision(false);
+    }
+  }, [loadDecisions, loadHistory, selectedDecision, showToast, sourceArtist]);
+
   const switchSource = useCallback((source: SourceType) => {
     setSelectedSource(source);
     setSourceQuery("");
@@ -1318,8 +1400,10 @@ export default function AdminArtistDecouplePage() {
           tokenDrafts={tokenDrafts}
           autoMatching={autoMatching}
           savingDecision={savingDecision}
+          applyingDecision={applyingDecision}
           onLoadPreview={loadPreview}
           onSaveDecision={saveSourceDecision}
+          onApplyDecision={applySelectedDecision}
           onAutoMatchArtists={autoMatchArtists}
           onSearchTokenArtist={searchTokenArtist}
           onCreateArtistForToken={createArtistForToken}
