@@ -184,8 +184,22 @@ function buildTitleOptions(label: string, item: SeoGrowthActionInput) {
   ];
 }
 
-function buildMetaDescription(label: string, item: SeoGrowthActionInput) {
+function humanJoin(values: string[], limit = 5) {
+  const cleanValues = values.map((value) => value.trim()).filter(Boolean).slice(0, limit);
+  if (cleanValues.length <= 1) return cleanValues[0] || "";
+  if (cleanValues.length === 2) return `${cleanValues[0]} and ${cleanValues[1]}`;
+  return `${cleanValues.slice(0, -1).join(", ")}, and ${cleanValues[cleanValues.length - 1]}`;
+}
+
+function buildMetaDescription(label: string, item: SeoGrowthActionInput, trackNames: string[] = []) {
   const intent = cleanIntent(item.query);
+  const tracks = humanJoin(trackNames, 5);
+
+  if (tracks) {
+    return clampMetaDescription(
+      `Explore ${label} on WAKILISHA, including ${tracks}, releases, credits, and related music context.`,
+    );
+  }
 
   if (item.action.toLowerCase().includes("protect")) {
     return clampMetaDescription(
@@ -202,15 +216,192 @@ function titleOptionsLines(options: string[]) {
   return options.map((option, index) => `${index + 1}. ${option}`);
 }
 
-function buildArtistDraftBody(item: SeoGrowthActionInput, artistSlug: string) {
-  const artistName = slugToTitle(artistSlug);
-  const artist = { name: artistName, genres: [], country: "" };
+type ArtistDraftContext = {
+  name: string;
+  country?: string;
+  genres: string[];
+  topSongs: Array<{ title: string }>;
+  releases: Array<{ title: string; releaseType?: string | null; releaseDate?: string | null; labelName?: string | null }>;
+  trackCount?: number;
+  releaseCount?: number;
+  labels: string[];
+};
+
+function rowMeta(row: Record<string, unknown> | null | undefined): Record<string, unknown> {
+  const value = row?.metadata;
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function firstText(row: Record<string, unknown> | null | undefined, rowKeys: string[], metaKeys: string[] = []) {
+  const meta = rowMeta(row);
+
+  for (const key of rowKeys) {
+    const value = row?.[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+
+  for (const key of metaKeys) {
+    const value = meta[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+
+  return "";
+}
+
+function stringArray(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map((item) => typeof item === "string" ? item.trim() : "").filter(Boolean);
+  }
+
+  if (typeof value === "string") {
+    return value.split(",").map((item) => item.trim()).filter(Boolean);
+  }
+
+  return [];
+}
+
+function uniqueStrings(values: string[], limit = 8) {
+  const seen = new Set<string>();
+  const out: string[] = [];
+
+  for (const value of values) {
+    const clean = value.trim();
+    const key = clean.toLowerCase();
+    if (!clean || seen.has(key)) continue;
+    seen.add(key);
+    out.push(clean);
+    if (out.length >= limit) break;
+  }
+
+  return out;
+}
+
+async function fetchArtistDraftContext(artistSlug: string): Promise<ArtistDraftContext | null> {
+  try {
+    const { data: artistRow } = await supabase
+      .from("registry_artists")
+      .select("*")
+      .eq("slug", artistSlug)
+      .maybeSingle();
+
+    const [trackLinksResponse, releaseLinksResponse] = await Promise.all([
+      supabase
+        .from("registry_track_artists")
+        .select("track_id, artist_name_text, is_primary, is_featured, credit_order, status")
+        .eq("artist_slug", artistSlug)
+        .in("status", ["active", "shadow"])
+        .limit(120),
+      supabase
+        .from("registry_release_artists")
+        .select("release_id, artist_name_text, is_primary, is_featured, credit_order, status")
+        .eq("artist_slug", artistSlug)
+        .in("status", ["active", "shadow"])
+        .limit(120),
+    ]);
+
+    const trackIds = uniqueStrings((trackLinksResponse.data || []).map((row: any) => String(row.track_id || "")), 80);
+    const releaseIds = uniqueStrings((releaseLinksResponse.data || []).map((row: any) => String(row.release_id || "")), 80);
+
+    const [tracksResponse, releasesResponse] = await Promise.all([
+      trackIds.length
+        ? supabase.from("registry_tracks").select("*").in("id", trackIds).limit(80)
+        : Promise.resolve({ data: [], error: null }),
+      releaseIds.length
+        ? supabase.from("registry_releases").select("*").in("id", releaseIds).limit(80)
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+
+    if (trackLinksResponse.error) console.warn("SEO artist track link lookup failed:", trackLinksResponse.error.message);
+    if (releaseLinksResponse.error) console.warn("SEO artist release link lookup failed:", releaseLinksResponse.error.message);
+    if (tracksResponse.error) console.warn("SEO artist track lookup failed:", tracksResponse.error.message);
+    if (releasesResponse.error) console.warn("SEO artist release lookup failed:", releasesResponse.error.message);
+
+    const trackRows = (tracksResponse.data || []) as Record<string, unknown>[];
+    const releaseRows = (releasesResponse.data || []) as Record<string, unknown>[];
+    const trackById = new Map(trackRows.map((row) => [String(row.id || ""), row]));
+    const releaseById = new Map(releaseRows.map((row) => [String(row.id || ""), row]));
+
+    const orderedTracks = trackIds
+      .map((id) => trackById.get(id))
+      .filter((row): row is Record<string, unknown> => Boolean(row))
+      .map((row) => ({
+        title: firstText(row, ["title", "name", "display_title", "normalized_title"], ["title", "name", "display_title", "normalized_title"]),
+      }))
+      .filter((row) => row.title);
+
+    const orderedReleases = releaseIds
+      .map((id) => releaseById.get(id))
+      .filter((row): row is Record<string, unknown> => Boolean(row))
+      .map((row) => ({
+        title: firstText(row, ["title", "name", "display_title", "normalized_title"], ["title", "name", "display_title", "normalized_title"]),
+        releaseType: firstText(row, ["release_type", "type"], ["release_type", "type"]) || null,
+        releaseDate: firstText(row, ["release_date", "date"], ["release_date", "date"]) || null,
+        labelName: firstText(row, ["label_name"], ["label_name"]) || null,
+      }))
+      .filter((row) => row.title);
+
+    const artist = (artistRow || {}) as Record<string, unknown>;
+    const meta = rowMeta(artist);
+    const genres = uniqueStrings([
+      ...stringArray(artist.genres),
+      ...stringArray(meta.genres),
+      ...stringArray(meta.genre),
+    ], 5);
+
+    const labels = uniqueStrings(orderedReleases.map((release) => release.labelName || ""), 5);
+    const linkArtistName =
+      firstText((trackLinksResponse.data || [])[0] as Record<string, unknown> | undefined, ["artist_name_text"]) ||
+      firstText((releaseLinksResponse.data || [])[0] as Record<string, unknown> | undefined, ["artist_name_text"]);
+
+    return {
+      name: firstText(artist, ["name", "title", "display_name", "artist_name", "normalized_name"], ["name", "display_name", "artist_name"]) || linkArtistName || slugToTitle(artistSlug),
+      country: firstText(artist, ["country", "country_name"], ["country", "country_name"]) || undefined,
+      genres,
+      topSongs: orderedTracks.slice(0, 8),
+      releases: orderedReleases.slice(0, 6),
+      trackCount: orderedTracks.length || undefined,
+      releaseCount: orderedReleases.length || undefined,
+      labels,
+    };
+  } catch (error) {
+    console.warn("SEO artist draft context lookup failed:", error);
+    return null;
+  }
+}
+
+function artistFactPayload(artistName: string, context: ArtistDraftContext | null) {
+  return {
+    name: context?.name || artistName,
+    country: context?.country || "",
+    genres: context?.genres || [],
+    topSongs: context?.topSongs || [],
+    releases: context?.releases || [],
+    trackCount: context?.trackCount,
+    releaseCount: context?.releaseCount,
+    labels: context?.labels || [],
+  };
+}
+
+function buildArtistDraftBody(item: SeoGrowthActionInput, artistSlug: string, context: ArtistDraftContext | null = null) {
+  const artistName = context?.name || slugToTitle(artistSlug);
+  const topSongNames = uniqueStrings((context?.topSongs || []).map((song) => song.title), 8);
+  const releaseNames = uniqueStrings((context?.releases || []).map((release) => release.title), 6);
+  const artist = artistFactPayload(artistName, context);
   const heroIntro = buildArtistHeroIntro(artist);
   const cardBlurb = buildArtistCardBlurb(artist);
   const seoDescription = buildArtistSeoDescription(artist);
   const titleOptions = buildTitleOptions(artistName, item);
-  const metaDescription = buildMetaDescription(artistName, item);
+  const metaDescription = buildMetaDescription(artistName, item, topSongNames);
   const intent = cleanIntent(item.query);
+  const discographySignal = topSongNames.length
+    ? `${artistName} now has discography signals: ${humanJoin(topSongNames, 6)}.`
+    : releaseNames.length
+      ? `${artistName} now has release signals: ${humanJoin(releaseNames, 4)}.`
+      : `${artistName} still needs stronger discography data before the copy can make specific catalogue promises.`;
+
+  const pageIntro = topSongNames.length
+    ? `${artistName}'s WAKILISHA page brings together the artist's catalogue, including ${humanJoin(topSongNames, 6)}. Start here for songs, releases, credits, and the music context around ${artistName}, then keep moving through related tracks and artists inside WAKILISHA.`
+    : `${artistName} is picking up search demand on WAKILISHA. For people searching ${quoteIntent(item.query)}, this page should work as the clean starting point: available songs, releases, related artists, and the music context around the name. Keep it direct, useful, and easy to keep moving from.`;
 
   return [
     `Target: ${cleanPath(item.target)}`,
@@ -219,6 +410,9 @@ function buildArtistDraftBody(item: SeoGrowthActionInput, artistSlug: string) {
     "",
     "Search result problem:",
     searchDiagnosis(item),
+    "",
+    "Discography signal:",
+    discographySignal,
     "",
     "Recommended SEO title:",
     ...titleOptionsLines(titleOptions),
@@ -230,10 +424,10 @@ function buildArtistDraftBody(item: SeoGrowthActionInput, artistSlug: string) {
     `The result should quickly tell searchers that WAKILISHA has a useful ${artistName} page, not just a thin name record. The promise should be songs, releases, related artists, and culture context.`,
     "",
     "Page intro draft:",
-    `${artistName} is picking up search demand on WAKILISHA. For people searching ${quoteIntent(item.query)}, this page should work as the clean starting point: available songs, releases, related artists, and the music context around the name. Keep it direct, useful, and easy to keep moving from.`,
+    pageIntro,
     "",
     "Internal link module draft:",
-    `Looking for ${artistName}? Start with the available songs and releases, then follow the related artists, charts, and culture notes that connect this page to the wider WAKILISHA map.`,
+    `Looking for ${artistName} music? Start with ${topSongNames.length ? humanJoin(topSongNames, 4) : "the available songs and releases"}, then follow related tracks, featured credits, artist links, and chart or culture signals connected to this page.`,
     "",
     "Culture Context support copy:",
     "Hero intro:",
@@ -404,10 +598,11 @@ function buildGenericDraftBody(item: SeoGrowthActionInput) {
   ].join("\n");
 }
 
-export function buildGrowthDraft(item: SeoGrowthActionInput) {
+export async function buildGrowthDraft(item: SeoGrowthActionInput) {
   const artistSlug = extractArtistSlug(item.target);
   const contentKind = inferContentKind(item.action);
-  const body = artistSlug ? buildArtistDraftBody(item, artistSlug) : buildGenericDraftBody(item);
+  const artistContext = artistSlug ? await fetchArtistDraftContext(artistSlug) : null;
+  const body = artistSlug ? buildArtistDraftBody(item, artistSlug, artistContext) : buildGenericDraftBody(item);
 
   return {
     target_url: cleanPath(item.target),
@@ -423,6 +618,7 @@ export function buildGrowthDraft(item: SeoGrowthActionInput) {
       metrics: item.metrics,
       source: "search_console_growth_queue",
       artistSlug,
+      artistContext,
     },
   };
 }
@@ -483,7 +679,7 @@ export async function saveSeoGrowthTask(item: SeoGrowthActionInput) {
 export async function saveSeoGrowthDraft(item: SeoGrowthActionInput, taskId?: string | null) {
   const { data: userData } = await supabase.auth.getUser();
   const userId = userData.user?.id ?? null;
-  const draft = buildGrowthDraft(item);
+  const draft = await buildGrowthDraft(item);
 
   const { data, error } = await supabase
     .from("seo_growth_drafts")

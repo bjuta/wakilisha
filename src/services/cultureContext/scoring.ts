@@ -27,9 +27,14 @@ export function selectTrackStory(facts: TrackFacts): TrackStory {
 
 export function selectArtistStory(facts: ArtistFacts): ArtistStory {
   if ((facts.peakChartPosition && facts.peakChartPosition > 0) || (facts.chartEntryCount && facts.chartEntryCount > 0)) return "chartActor";
-  if ((facts.releaseCount && facts.releaseCount > 2) || (facts.trackCount && facts.trackCount > 5)) return "catalogBuilder";
+  if (
+    (facts.releaseCount && facts.releaseCount > 2) ||
+    (facts.trackCount && facts.trackCount > 5) ||
+    facts.topTracks.length >= 3 ||
+    facts.topReleases.length >= 2
+  ) return "catalogBuilder";
   if (facts.collaborations.length > 0) return "collaborator";
-  if (facts.genres.length > 0 || facts.country) return "sceneVoice";
+  if (facts.genres.length > 0 || facts.country || facts.topTracks.length > 0 || facts.topReleases.length > 0) return "sceneVoice";
   return "thinArtist";
 }
 

@@ -88,6 +88,8 @@ export type ArtistFacts = {
   collaborations: Array<{ name: string; count?: number }>;
   labels: string[];
   yearsActive?: string;
+  topTracks: string[];
+  topReleases: string[];
 };
 
 export type ReleaseFacts = {
