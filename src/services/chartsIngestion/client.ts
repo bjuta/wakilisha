@@ -13,6 +13,7 @@ import {
   detectProvidersFromUrls,
   isValidProviderUrl,
 } from "./providerDetection";
+import { getEligibilityProfile } from "../chartsEligibility/eligibilityStore";
 
 export type IngestionMode = "production";
 
@@ -166,7 +167,17 @@ export function getIngestStudioEndpointGroups(): Record<string, EndpointDefiniti
 // Production pipeline (new 21-stage ingest run system)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export const runDryRun = ingestStudioAdapter.runDryRun;
+export const runDryRun: typeof ingestStudioAdapter.runDryRun = (request) => {
+  const profile = request.eligibilityProfileId ? getEligibilityProfile(request.eligibilityProfileId) : null;
+  const releaseEligibility = profile?.releaseEligibility;
+
+  return ingestStudioAdapter.runDryRun({
+    ...request,
+    eligibilityProfileSnapshot: profile ?? null,
+    releaseWindowStart: request.releaseWindowStart ?? releaseEligibility?.releaseWindowFrom ?? null,
+    releaseWindowEnd: request.releaseWindowEnd ?? releaseEligibility?.releaseWindowTo ?? null,
+  } as Parameters<typeof ingestStudioAdapter.runDryRun>[0] & Record<string, unknown>);
+};
 export const commitIngestRun = ingestStudioAdapter.commitIngestRun;
 export const cancelIngestRun = ingestStudioAdapter.cancelIngestRun;
 export const retryIngestRun = ingestStudioAdapter.retryIngestRun;
@@ -218,79 +229,3 @@ export const getSources = adapter.getSources;
 export const addSourceApi = adapter.addSourceApi;
 export const removeSourceApi = adapter.removeSourceApi;
 export const updateSourceWeight = adapter.updateSourceWeight;
-export const toggleSourceEnabled = adapter.toggleSourceEnabled;
-export const fetchSources = adapter.fetchSources;
-export const getRawItems = adapter.getRawItems;
-export const getCandidates = adapter.getCandidates;
-export const getCandidateById = adapter.getCandidateById;
-export const approveCandidate = adapter.approveCandidate;
-export const excludeCandidate = adapter.excludeCandidate;
-export const restoreCandidate = adapter.restoreCandidate;
-export const getMatches = adapter.getMatches;
-export const approveCandidateMatch = adapter.approveCandidateMatch;
-export const rejectCandidateMatch = adapter.rejectCandidateMatch;
-export const rematchCandidate = adapter.rematchCandidate;
-export const markAsNewEntity = adapter.markAsNewEntity;
-export const resolveReviewIssue = adapter.resolveReviewIssue;
-export const reopenIssue = adapter.reopenIssue;
-export const applyRankOverride = adapter.applyRankOverride;
-export const clearRankOverride = adapter.clearRankOverride;
-export const createDraftEdition = adapter.createDraftEdition;
-export const publishEdition = adapter.publishEdition;
-export const runPreflightCheck = adapter.runPreflightCheck;
-export const getJobLogs = adapter.getJobLogs;
-export const getDraftEntries = adapter.getDraftEntries;
-export const getEditionsApi = adapter.getEditionsApi;
-export const getEditionById = adapter.getEditionById;
-export const getSnapshots = adapter.getSnapshots;
-export const getDashboardKpisApi = adapter.getDashboardKpisApi;
-export const getJobSummaryApi = adapter.getJobSummaryApi;
-export const getDemoJobId = adapter.getDemoJobId;
-export const searchCanonicalTracks = adapter.searchCanonicalTracks;
-export const getDiscoveredCsvSources = adapter.getDiscoveredCsvSources;
-export const getCsvImportSessions = adapter.getCsvImportSessions;
-
-export type { UserRole } from "./roles";
-export {
-  ROLE_PERMISSIONS,
-  getCurrentRole,
-  setCurrentRole,
-  hasCapability,
-  getRoleLabel,
-  getRoleDescription,
-  getDisabledReason,
-  ALL_ROLES,
-} from "./roles";
-
-// ─── Auto-restored chart admin barrel exports ───
-export { validateCommitReadiness } from "./commitService";
-export { getIngestRun, runPreflightCheck as preflight, validateRunReadinessAsync } from "./productionAdapter";
-export { fixChartArtistSlugs, reingestEdition } from "./productionAdapter";
-export type { FixArtistSlugsResult, ReingestEditionResult } from "./productionAdapter";
-export { detectProvidersFromUrls, isValidProviderUrl } from "./providerDetection";
-export { clearAllSimulations, getActiveSimulations, getLastErrorMessage, isSimulated, retry, simulate } from "./simulation";
-export { getStepStatus } from "./workflow";
-
-// ─── CSV operations — now backed by real adapter via chart-ingest-api edge function ───
-export { attachCsvAsSource, normalizeCsvCandidates, csvUpload } from "./realLegacyAdapter";
-// CSV functions that still process data client-side (validation, draft generation, JSON export)
-export { validateCsvDraftIntegrity, createDraftFromCsvCandidates, exportDraftJson } from "./api";
-export { appendJobLog, getStore } from "./store";
-
-// ─── Re-export from contracts for runtime shape validation ───
-export {
-  assertIngestJobShape,
-  assertSourceShape,
-  assertCandidateShape,
-  assertIssueShape,
-  assertDraftEntryShape,
-  assertSnapshotShape,
-  assertChartEditionShape,
-  assertChartFamilyShape,
-  assertIngestJobArray,
-  assertSourceArray,
-  assertCandidateArray,
-  assertIssueArray,
-} from "./contracts";
-export { getChartPlaybackReadiness } from "./playbackReadiness";
-export type { ChartPlaybackReadiness, ChartPlaybackMissingRow } from "./playbackReadiness";
