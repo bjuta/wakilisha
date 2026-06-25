@@ -164,6 +164,11 @@ export default function PublicBriefingsPage() {
         normalizedEmail,
         briefingSlugs,
         window.location.origin,
+        {
+          source_form: "public_briefings_hub",
+          page_url: window.location.href,
+          page_type: "briefings",
+        },
       );
 
       setSubmitState("success");

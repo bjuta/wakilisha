@@ -80,10 +80,40 @@ export interface BriefingSubscriber {
   briefings: BriefingCatalogItem[];
 }
 
+export interface AudienceInterestInput {
+  entity_type: "artist" | "track" | "release" | "guide" | "chart" | "genre" | "label" | "article" | "briefing";
+  entity_slug: string;
+  entity_name?: string;
+  entity_id?: string;
+  interest_kind?: "follow" | "subscribe" | "download" | "save" | "click" | "read" | "manual";
+  source_form?: string;
+  source_page?: string;
+  source_context?: Record<string, unknown>;
+  interest_strength?: number;
+}
+
+export interface SubscribeOptions {
+  interests?: AudienceInterestInput[];
+  source_form?: string;
+  page_url?: string;
+  page_type?: string;
+  session_id?: string;
+  referrer?: string;
+}
+
+
 export interface SubscribeResult {
   subscriber_id: string;
   email: string;
   briefings: string[];
+  audience_interests?: Array<{
+    entity_type: string;
+    entity_slug: string;
+    entity_name?: string;
+    interest_kind: string;
+    source_form: string;
+    interest_strength: number;
+  }>;
   status: "pending_confirmation" | "already_confirmed";
   message: string;
 }
@@ -167,8 +197,14 @@ export const briefingService = {
     return post("list_catalog", {});
   },
 
-  subscribe(email: string, briefingSlugs: string[], origin?: string): Promise<SubscribeResult> {
-    return post("subscribe", { email, briefing_slugs: briefingSlugs, origin, ...getBrandingPayload() });
+  subscribe(email: string, briefingSlugs: string[], origin?: string, options: SubscribeOptions = {}): Promise<SubscribeResult> {
+    return post("subscribe", {
+      email,
+      briefing_slugs: briefingSlugs,
+      origin,
+      ...options,
+      ...getBrandingPayload(),
+    });
   },
 
   confirm(token: string): Promise<ConfirmResult> {
