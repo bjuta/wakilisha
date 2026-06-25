@@ -253,6 +253,12 @@ function firstSentence(value) {
 function formatPageTitle(title) {
   const clean = String(title || "").trim();
   if (!clean || clean.toUpperCase() === SITE_NAME) return SITE_NAME;
+
+  const brandedPattern = new RegExp(`\\s*[|–—-]\\s*${SITE_NAME}$`, "i");
+  if (brandedPattern.test(clean)) {
+    return clean.replace(brandedPattern, ` | ${SITE_NAME}`).trim();
+  }
+
   return `${clean} | ${SITE_NAME}`;
 }
 
