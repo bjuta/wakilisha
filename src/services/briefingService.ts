@@ -137,6 +137,43 @@ export interface PreferencesResult {
   briefings: Array<BriefingCatalogItem & { subscribed: boolean }>;
 }
 
+export interface AudienceSegmentRow {
+  id: string;
+  subscriber_id: string;
+  email: string;
+  subscriber_status: string;
+  confirmed_at: string | null;
+  entity_type: string;
+  entity_slug: string;
+  entity_name: string | null;
+  interest_kind: string;
+  source_form: string;
+  source_page: string | null;
+  interest_strength: number;
+  status: string;
+  first_seen_at: string;
+  last_seen_at: string;
+  created_at: string;
+  briefings: Array<{ slug: string; title: string }>;
+}
+
+export interface AudienceSegmentSummary {
+  total_interests: number;
+  distinct_subscribers: number;
+  confirmed_subscribers: number;
+  active_interests: number;
+  top_entities: Array<{ entity_type: string; entity_slug: string; entity_name: string | null; count: number }>;
+  source_forms: Array<{ source_form: string; count: number }>;
+  per_briefing: Array<{ slug: string; title: string; count: number }>;
+}
+
+export interface AudienceSegmentsResult {
+  rows: AudienceSegmentRow[];
+  summary: AudienceSegmentSummary;
+  filters: Record<string, string | number | null>;
+}
+
+
 interface ApiError {
   code: string;
   message: string;
@@ -233,6 +270,27 @@ export const briefingService = {
         limit: opts?.limit ?? 100,
       });
     },
+
+    listAudienceSegments(opts?: {
+      subscriberStatus?: string;
+      interestStatus?: string;
+      briefingSlug?: string;
+      entityType?: string;
+      entitySlug?: string;
+      sourceForm?: string;
+      limit?: number;
+    }): Promise<AudienceSegmentsResult> {
+      return adminPost("list_audience_segments", {
+        subscriber_status: opts?.subscriberStatus ?? "",
+        interest_status: opts?.interestStatus ?? "",
+        briefing_slug: opts?.briefingSlug ?? "",
+        entity_type: opts?.entityType ?? "",
+        entity_slug: opts?.entitySlug ?? "",
+        source_form: opts?.sourceForm ?? "",
+        limit: opts?.limit ?? 250,
+      });
+    },
+
 
     listIssues(opts?: { briefingSlug?: string; status?: string; limit?: number }): Promise<any[]> {
       return adminPost("list_issues", {

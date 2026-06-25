@@ -1190,6 +1190,198 @@ async function handleListSubscribers(body: any, c: Record<string, string>) {
   return jO(subs, c);
 }
 
+
+async function handleListAudienceSegments(body: any, c: Record<string, string>) {
+  const db = createClient(SU, SK);
+
+  const limit = Math.min(Math.max(Number(body.limit) || 250, 1), 1000);
+  const subscriberStatus = String(body.subscriber_status ?? "").trim();
+  const interestStatus = String(body.interest_status ?? "").trim();
+  const briefingSlug = String(body.briefing_slug ?? "").trim();
+  const entityType = String(body.entity_type ?? "").trim();
+  const entitySlug = String(body.entity_slug ?? "").trim();
+  const sourceForm = String(body.source_form ?? "").trim();
+
+  let allowedSubscriberIds: string[] | null = null;
+
+  if (briefingSlug) {
+    const { data: briefing, error: briefingError } = await db
+      .from("briefing_catalog")
+      .select("id, slug, title")
+      .eq("slug", briefingSlug)
+      .maybeSingle();
+
+    if (briefingError) return jE("query_failed", briefingError.message, c, 500);
+    if (!briefing) return jE("not_found", `Briefing "${briefingSlug}" not found.`, c, 404);
+
+    const { data: optIns, error: optInError } = await db
+      .from("briefing_opt_ins")
+      .select("subscriber_id")
+      .eq("briefing_id", briefing.id)
+      .eq("status", "active")
+      .limit(5000);
+
+    if (optInError) return jE("query_failed", optInError.message, c, 500);
+
+    allowedSubscriberIds = Array.from(new Set((optIns ?? []).map((row: any) => row.subscriber_id).filter(Boolean)));
+
+    if (allowedSubscriberIds.length === 0) {
+      return jO({
+        rows: [],
+        summary: {
+          total_interests: 0,
+          distinct_subscribers: 0,
+          confirmed_subscribers: 0,
+          active_interests: 0,
+          top_entities: [],
+          source_forms: [],
+          per_briefing: [],
+        },
+        filters: {
+          subscriber_status: subscriberStatus || null,
+          interest_status: interestStatus || null,
+          briefing_slug: briefingSlug || null,
+          entity_type: entityType || null,
+          entity_slug: entitySlug || null,
+          source_form: sourceForm || null,
+          limit,
+        },
+      }, c);
+    }
+  }
+
+  let query = db
+    .from("audience_interests")
+    .select(`
+      id,
+      subscriber_id,
+      entity_type,
+      entity_slug,
+      entity_name,
+      interest_kind,
+      source_form,
+      source_page,
+      source_context,
+      interest_strength,
+      status,
+      first_seen_at,
+      last_seen_at,
+      created_at,
+      briefing_subscribers!inner(id,email,status,confirmed_at,created_at)
+    `)
+    .order("last_seen_at", { ascending: false })
+    .limit(limit);
+
+  if (interestStatus) query = query.eq("status", interestStatus);
+  if (entityType) query = query.eq("entity_type", entityType);
+  if (entitySlug) query = query.eq("entity_slug", entitySlug);
+  if (sourceForm) query = query.eq("source_form", sourceForm);
+  if (subscriberStatus) query = query.eq("briefing_subscribers.status", subscriberStatus);
+  if (allowedSubscriberIds) query = query.in("subscriber_id", allowedSubscriberIds);
+
+  const { data, error } = await query;
+  if (error) return jE("query_failed", error.message, c, 500);
+
+  const rawRows = data ?? [];
+  const subscriberIds = Array.from(new Set(rawRows.map((row: any) => row.subscriber_id).filter(Boolean)));
+
+  const briefingMap = new Map<string, Array<{ slug: string; title: string }>>();
+  if (subscriberIds.length > 0) {
+    const { data: optIns } = await db
+      .from("briefing_opt_ins")
+      .select("subscriber_id, briefing_catalog(slug,title)")
+      .in("subscriber_id", subscriberIds)
+      .eq("status", "active");
+
+    for (const optIn of optIns ?? []) {
+      const catalog = optIn.briefing_catalog as any;
+      if (!catalog) continue;
+      if (!briefingMap.has(optIn.subscriber_id)) briefingMap.set(optIn.subscriber_id, []);
+      briefingMap.get(optIn.subscriber_id)!.push({
+        slug: catalog.slug,
+        title: catalog.title,
+      });
+    }
+  }
+
+  const rows = rawRows.map((row: any) => {
+    const subscriber = row.briefing_subscribers as any;
+    return {
+      id: row.id,
+      subscriber_id: row.subscriber_id,
+      email: subscriber?.email ?? "",
+      subscriber_status: subscriber?.status ?? "",
+      confirmed_at: subscriber?.confirmed_at ?? null,
+      entity_type: row.entity_type,
+      entity_slug: row.entity_slug,
+      entity_name: row.entity_name ?? null,
+      interest_kind: row.interest_kind,
+      source_form: row.source_form,
+      source_page: row.source_page ?? null,
+      interest_strength: row.interest_strength ?? 1,
+      status: row.status,
+      first_seen_at: row.first_seen_at,
+      last_seen_at: row.last_seen_at,
+      created_at: row.created_at,
+      briefings: briefingMap.get(row.subscriber_id) ?? [],
+    };
+  });
+
+  const subscriberSet = new Set(rows.map((row: any) => row.subscriber_id));
+  const confirmedSet = new Set(rows.filter((row: any) => row.subscriber_status === "confirmed").map((row: any) => row.subscriber_id));
+
+  const entityCounts = new Map<string, { entity_type: string; entity_slug: string; entity_name: string | null; count: number }>();
+  const sourceCounts = new Map<string, number>();
+  const briefingCounts = new Map<string, { slug: string; title: string; count: number }>();
+
+  for (const row of rows) {
+    const entityKey = `${row.entity_type}:${row.entity_slug}`;
+    const currentEntity = entityCounts.get(entityKey) ?? {
+      entity_type: row.entity_type,
+      entity_slug: row.entity_slug,
+      entity_name: row.entity_name,
+      count: 0,
+    };
+    currentEntity.count += 1;
+    entityCounts.set(entityKey, currentEntity);
+
+    sourceCounts.set(row.source_form || "unknown", (sourceCounts.get(row.source_form || "unknown") ?? 0) + 1);
+
+    for (const briefing of row.briefings ?? []) {
+      const currentBriefing = briefingCounts.get(briefing.slug) ?? {
+        slug: briefing.slug,
+        title: briefing.title,
+        count: 0,
+      };
+      currentBriefing.count += 1;
+      briefingCounts.set(briefing.slug, currentBriefing);
+    }
+  }
+
+  return jO({
+    rows,
+    summary: {
+      total_interests: rows.length,
+      distinct_subscribers: subscriberSet.size,
+      confirmed_subscribers: confirmedSet.size,
+      active_interests: rows.filter((row: any) => row.status === "active").length,
+      top_entities: Array.from(entityCounts.values()).sort((a, b) => b.count - a.count).slice(0, 12),
+      source_forms: Array.from(sourceCounts.entries()).map(([source_form, count]) => ({ source_form, count })).sort((a, b) => b.count - a.count).slice(0, 12),
+      per_briefing: Array.from(briefingCounts.values()).sort((a, b) => b.count - a.count),
+    },
+    filters: {
+      subscriber_status: subscriberStatus || null,
+      interest_status: interestStatus || null,
+      briefing_slug: briefingSlug || null,
+      entity_type: entityType || null,
+      entity_slug: entitySlug || null,
+      source_form: sourceForm || null,
+      limit,
+    },
+  }, c);
+}
+
+
 async function handleBriefingAnalytics(body: any, c: Record<string, string>) {
   const db = createClient(SU, SK); const days = Math.min(Number(body.days) || 30, 365); const since = new Date(Date.now() - days * 86400000).toISOString();
   const be = ["briefing_subscribe","briefing_confirm_success","briefing_unsubscribe","briefing_email_delivered","briefing_email_opened","briefing_email_clicked","briefing_email_bounced","briefing_email_complained","briefing_issue_generated","briefing_issue_sent","briefing_test_sent","briefing_issue_deleted"];
@@ -1308,9 +1500,9 @@ Deno.serve(async (req) => {
       return listCatalog(c, false);
     }
 
-    const adminActions = ["generate_issue","generate_issue_from_content","delete_issue","preview_issue","preview_content","send_issue","send_test","list_issues","list_subscribers","update_catalog","update_issue_content","briefing_analytics","get_issue"];
+    const adminActions = ["generate_issue","generate_issue_from_content","delete_issue","preview_issue","preview_content","send_issue","send_test","list_issues","list_subscribers","list_audience_segments","update_catalog","update_issue_content","briefing_analytics","get_issue"];
     if (adminActions.includes(action)) { const auth = await vJ(req); if (!auth) return jE("not_authenticated", "Valid JWT required for admin actions.", c, 401); const hasCap = await rC(auth.id, "manage_settings"); if (!hasCap) return jE("permission_denied", "Requires manage_settings capability.", c, 403);
-      switch (action) { case "update_catalog": return handleUpdateCatalog(body, c); case "generate_issue": return handleGenerateIssue(body, c, auth); case "generate_issue_from_content": return handleGenerateIssueFromContent(body, c, auth); case "delete_issue": return handleDeleteIssue(body, c, auth); case "preview_issue": return handlePreviewIssue(body, c, auth); case "preview_content": return handlePreviewContent(body, c, auth); case "send_issue": return handleSendIssue(body, c, auth); case "send_test": return handleSendTest(body, c, auth); case "list_issues": return handleListIssues(body, c); case "list_subscribers": return handleListSubscribers(body, c); case "briefing_analytics": return handleBriefingAnalytics(body, c); case "get_issue": return handleGetIssue(body, c); case "update_issue_content": return handleUpdateIssueContent(body, c, auth); } }
+      switch (action) { case "update_catalog": return handleUpdateCatalog(body, c); case "generate_issue": return handleGenerateIssue(body, c, auth); case "generate_issue_from_content": return handleGenerateIssueFromContent(body, c, auth); case "delete_issue": return handleDeleteIssue(body, c, auth); case "preview_issue": return handlePreviewIssue(body, c, auth); case "preview_content": return handlePreviewContent(body, c, auth); case "send_issue": return handleSendIssue(body, c, auth); case "send_test": return handleSendTest(body, c, auth); case "list_issues": return handleListIssues(body, c); case "list_subscribers": return handleListSubscribers(body, c); case "list_audience_segments": return handleListAudienceSegments(body, c); case "briefing_analytics": return handleBriefingAnalytics(body, c); case "get_issue": return handleGetIssue(body, c); case "update_issue_content": return handleUpdateIssueContent(body, c, auth); } }
     const publicActions = ["subscribe","confirm","unsubscribe","preferences"];
     if (publicActions.includes(action)) { const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("cf-connecting-ip") || "unknown"; const rl = await ckRL(db, `briefing:public:${ip}`); if (!rl.allowed) return new Response(JSON.stringify({ ok: false, error: { code: "rate_limited", message: "Too many requests. Try again shortly." }, meta: { requestId: ri(), servedAt: is() } }), { status: 429, headers: { ...c, "Content-Type": "application/json", "Retry-After": "60" } }); const ua = req.headers.get("user-agent") || ""; switch (action) { case "list_catalog": return listCatalog(c, false); case "subscribe": return handleSubscribe(body, c, ip, ua); case "confirm": return handleConfirm(body, c); case "unsubscribe": return handleUnsubscribe(body, c); case "preferences": return handlePreferences(body, c); } }
     return jE("unknown_action", `Unknown action: "${action}".`, c);
