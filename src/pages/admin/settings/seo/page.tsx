@@ -2,6 +2,18 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { supabase } from "@/lib/supabase";
+import {
+  fetchAttributionSummary,
+  fetchPageTypeDistribution,
+  fetchSearchQueries,
+  fetchTopEntities,
+  fetchTopPages,
+  type AttributionSummary,
+  type PageTypeDistribution,
+  type SearchQueryRow,
+  type TopEntity,
+  type TopPage,
+} from "@/services/adminAnalytics";
 
 type SitemapSnapshot = {
   id: string;
@@ -21,6 +33,69 @@ type ConsoleResult =
   | { ok: true; message: string; detail?: string }
   | { ok: false; message: string; detail?: string };
 
+type SeoMetadataEntry = {
+  title?: string;
+  description?: string;
+  kind?: string;
+  image?: string | null;
+  robots?: string;
+  sourceTable?: string | null;
+  sourceId?: string | null;
+  modifiedAt?: string | null;
+};
+
+type MetadataGap = {
+  path: string;
+  title: string;
+  kind: string;
+  issue: string;
+};
+
+type SeoMeasurement = {
+  metadataCount: number;
+  dbBackedCount: number;
+  indexableCount: number;
+  missingImageCount: number;
+  missingDescriptionCount: number;
+  topSeoPages: TopPage[];
+  topSeoEntities: TopEntity[];
+  pageTypes: PageTypeDistribution[];
+  searchQueries: SearchQueryRow[];
+  attribution: AttributionSummary | null;
+  gaps: MetadataGap[];
+  growthNotes: string[];
+};
+
+const SEO_PAGE_TYPES = new Set([
+  "article",
+  "artist_detail",
+  "release_detail",
+  "track_detail",
+  "charts_edition",
+  "charts_directory",
+  "guide_detail",
+  "genre_detail",
+  "label_detail",
+  "magazine_issue",
+  "category_detail",
+  "tag_detail",
+  "author_detail",
+]);
+
+const SEO_ENTITY_TYPES = new Set([
+  "artist",
+  "release",
+  "track",
+  "article",
+  "chart",
+  "guide",
+  "genre",
+  "label",
+  "issue",
+]);
+
+const SEO_IMAGE_KINDS = new Set(["artist", "release", "track", "article", "label"]);
+
 const SUPABASE_URL = import.meta.env.VITE_PUBLIC_SUPABASE_URL as string;
 const EDGE_XML_URL = `${SUPABASE_URL}/functions/v1/seo-sitemap-admin?action=xml`;
 const ROOT_SITEMAP_URL = "https://wakilisha.africa/sitemap.xml";
@@ -34,6 +109,55 @@ function formatDate(value?: string | null) {
 function shortHash(value?: string | null) {
   if (!value) return "Not stored";
   return `${value.slice(0, 12)}…${value.slice(-8)}`;
+}
+
+function isSeoPage(page: TopPage) {
+  if (SEO_PAGE_TYPES.has(page.page_type)) return true;
+  return /^\/(artists|releases|tracks|charts|articles|magazine|guides|genres|labels|categories|tags|authors)\//.test(page.page_url || "");
+}
+
+function isSeoEntity(entity: TopEntity) {
+  return SEO_ENTITY_TYPES.has(entity.entity_type);
+}
+
+function cleanPathLabel(path: string) {
+  if (!path || path === "/") return "/";
+  return path.replace(/^https?:\/\/wakilisha\.africa/i, "").split("?")[0] || path;
+}
+
+function buildGrowthNotes(args: {
+  topSeoPages: TopPage[];
+  searchQueries: SearchQueryRow[];
+  gaps: MetadataGap[];
+  attribution: AttributionSummary | null;
+}) {
+  const notes: string[] = [];
+
+  const zeroResult = args.searchQueries.find((row) => row.zero_results);
+  if (zeroResult) {
+    notes.push(`Create or improve content for “${zeroResult.query}”. It appears in internal search and has zero-result demand.`);
+  }
+
+  const missingImage = args.gaps.find((gap) => gap.issue === "Missing image");
+  if (missingImage) {
+    notes.push(`Add image coverage for ${missingImage.title}. It is indexable but still missing social/search imagery.`);
+  }
+
+  const topPage = args.topSeoPages[0];
+  if (topPage) {
+    notes.push(`Protect and deepen ${cleanPathLabel(topPage.page_url)}. It is the strongest SEO surface in this period.`);
+  }
+
+  const googleSource = args.attribution?.sources.find((row) => /google|search|organic/i.test(row.label));
+  if (googleSource) {
+    notes.push(`Search/organic is already visible in attribution via ${googleSource.label}. Track this weekly before guessing content priorities.`);
+  }
+
+  if (!notes.length) {
+    notes.push("No urgent SEO growth signal yet. Keep collecting data and review again after the next crawl/indexing cycle.");
+  }
+
+  return notes.slice(0, 4);
 }
 
 function resultMessage(payload: unknown): string {
@@ -55,6 +179,8 @@ export default function AdminSettingsSeoPage() {
   const [running, setRunning] = useState<string | null>(null);
   const [snapshot, setSnapshot] = useState<SitemapSnapshot | null>(null);
   const [result, setResult] = useState<ConsoleResult | null>(null);
+  const [measurementLoading, setMeasurementLoading] = useState(true);
+  const [measurement, setMeasurement] = useState<SeoMeasurement | null>(null);
 
   const latestSourceLabel = useMemo(() => {
     if (!snapshot) return "No snapshot yet";
@@ -81,9 +207,78 @@ export default function AdminSettingsSeoPage() {
     setLoading(false);
   }, []);
 
+  const loadMeasurement = useCallback(async () => {
+    setMeasurementLoading(true);
+
+    try {
+      const metadataResponse = await fetch(`${SUPABASE_URL}/functions/v1/seo-sitemap-admin?action=metadata`);
+      const metadataPayload = await metadataResponse.json();
+      const metadata = ((metadataPayload?.data?.metadata || {}) as Record<string, SeoMetadataEntry>);
+
+      const entries = Object.entries(metadata);
+      const indexableEntries = entries.filter(([, entry]) => !String(entry.robots || "").includes("noindex"));
+      const dbBackedEntries = indexableEntries.filter(([, entry]) => Boolean(entry.sourceTable && entry.sourceId));
+      const missingImageGaps: MetadataGap[] = dbBackedEntries
+        .filter(([, entry]) => SEO_IMAGE_KINDS.has(String(entry.kind || "")) && !entry.image)
+        .map(([path, entry]) => ({
+          path,
+          title: entry.title || path,
+          kind: entry.kind || "unknown",
+          issue: "Missing image",
+        }));
+
+      const missingDescriptionGaps: MetadataGap[] = indexableEntries
+        .filter(([, entry]) => !String(entry.description || "").trim())
+        .map(([path, entry]) => ({
+          path,
+          title: entry.title || path,
+          kind: entry.kind || "unknown",
+          issue: "Missing description",
+        }));
+
+      const [
+        topPages,
+        topEntities,
+        pageTypes,
+        searchQueries,
+        attribution,
+      ] = await Promise.all([
+        fetchTopPages(30, 50),
+        fetchTopEntities(30, 50),
+        fetchPageTypeDistribution(30),
+        fetchSearchQueries(30, 30),
+        fetchAttributionSummary(30),
+      ]);
+
+      const topSeoPages = topPages.filter(isSeoPage).slice(0, 12);
+      const topSeoEntities = topEntities.filter(isSeoEntity).slice(0, 12);
+      const gaps = [...missingImageGaps, ...missingDescriptionGaps].slice(0, 12);
+
+      setMeasurement({
+        metadataCount: entries.length,
+        dbBackedCount: dbBackedEntries.length,
+        indexableCount: indexableEntries.length,
+        missingImageCount: missingImageGaps.length,
+        missingDescriptionCount: missingDescriptionGaps.length,
+        topSeoPages,
+        topSeoEntities,
+        pageTypes,
+        searchQueries,
+        attribution,
+        gaps,
+        growthNotes: buildGrowthNotes({ topSeoPages, searchQueries, gaps, attribution }),
+      });
+    } catch {
+      setMeasurement(null);
+    } finally {
+      setMeasurementLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadStatus();
-  }, [loadStatus]);
+    loadMeasurement();
+  }, [loadStatus, loadMeasurement]);
 
   async function runAction(action: "generate" | "generate_and_pro_update" | "pro_update") {
     setRunning(action);
@@ -158,6 +353,12 @@ export default function AdminSettingsSeoPage() {
         </div>
       </WkSurface>
 
+      <SeoMeasurementPanel
+        loading={measurementLoading}
+        measurement={measurement}
+        onRefresh={loadMeasurement}
+      />
+
       <WkSurface className="p-5">
         <h2 className="mb-4 text-[14px] font-black text-[var(--wk-text)]">Actions</h2>
 
@@ -217,6 +418,155 @@ export default function AdminSettingsSeoPage() {
           {result.detail && <p className="mt-1 text-[12px] text-[var(--wk-text-muted)]">{result.detail}</p>}
         </WkSurface>
       )}
+    </div>
+  );
+}
+
+function SeoMeasurementPanel({
+  loading,
+  measurement,
+  onRefresh,
+}: {
+  loading: boolean;
+  measurement: SeoMeasurement | null;
+  onRefresh: () => void;
+}) {
+  return (
+    <WkSurface className="p-5">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <h2 className="text-[14px] font-black text-[var(--wk-text)]">SEO measurement</h2>
+          <p className="mt-1 text-[12px] text-[var(--wk-text-muted)]">
+            Growth cockpit for indexable metadata, first-party traffic, internal search demand, and content gaps.
+          </p>
+        </div>
+        <button
+          onClick={onRefresh}
+          disabled={loading}
+          className="wk-button wk-button-soft wk-button-sm inline-flex items-center justify-center gap-2"
+        >
+          <WkIcon name={loading ? "Loader" : "RotateCcw"} size={14} />
+          {loading ? "Refreshing..." : "Refresh measurement"}
+        </button>
+      </div>
+
+      {!measurement && !loading && (
+        <div className="mt-5 rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] p-4 text-[12px] text-[var(--wk-text-muted)]">
+          SEO measurement could not load. Check the metadata endpoint and analytics_events access.
+        </div>
+      )}
+
+      {measurement && (
+        <>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <MetricCard label="Metadata routes" value={measurement.metadataCount.toLocaleString()} />
+            <MetricCard label="Indexable" value={measurement.indexableCount.toLocaleString()} />
+            <MetricCard label="DB-backed" value={measurement.dbBackedCount.toLocaleString()} />
+            <MetricCard label="Missing images" value={measurement.missingImageCount.toLocaleString()} />
+            <MetricCard label="Attributed page views" value={measurement.attribution?.attributedPageViews.toLocaleString() ?? "0"} />
+          </div>
+
+          <div className="mt-5 grid gap-4 xl:grid-cols-2 xl:items-start">
+            <SeoTable
+              title="Top SEO pages"
+              description="First-party page views for crawlable public surfaces over the last 30 days."
+              empty="No SEO page traffic yet."
+              rows={measurement.topSeoPages.map((row) => ({
+                primary: cleanPathLabel(row.page_url),
+                secondary: row.page_type.replace(/_/g, " "),
+                value: row.views.toLocaleString(),
+              }))}
+            />
+
+            <SeoTable
+              title="Top SEO entities"
+              description="Artist, release, track, article, chart, guide, genre, and label demand from analytics_events."
+              empty="No entity-level SEO traffic yet."
+              rows={measurement.topSeoEntities.map((row) => ({
+                primary: row.entity_slug,
+                secondary: row.entity_type,
+                value: row.views.toLocaleString(),
+              }))}
+            />
+
+            <SeoTable
+              title="Internal search demand"
+              description="Queries users are already typing inside WAKILISHA. Zero-result rows are growth opportunities."
+              empty="No internal search demand yet."
+              rows={measurement.searchQueries.slice(0, 10).map((row) => ({
+                primary: row.query,
+                secondary: row.zero_results ? "zero results" : "has results",
+                value: row.count.toLocaleString(),
+              }))}
+            />
+
+            <SeoTable
+              title="Metadata gaps"
+              description="Indexable DB-backed pages that need imagery or stronger metadata before we scale them."
+              empty="No obvious metadata gaps in the sampled routes."
+              limit={8}
+              rows={measurement.gaps.map((gap) => ({
+                primary: cleanPathLabel(gap.path),
+                secondary: `${gap.kind} · ${gap.issue}`,
+                value: gap.title,
+              }))}
+            />
+          </div>
+
+          <div className="mt-5 rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] p-4">
+            <div className="mb-3 flex items-center gap-2">
+              <WkIcon name="TrendingUp" size={15} className="text-[var(--wk-brand)]" />
+              <h3 className="text-[13px] font-black text-[var(--wk-text)]">Growth notes</h3>
+            </div>
+            <div className="space-y-2">
+              {measurement.growthNotes.map((note) => (
+                <p key={note} className="text-[12px] leading-relaxed text-[var(--wk-text-muted)]">{note}</p>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+    </WkSurface>
+  );
+}
+
+function SeoTable({
+  title,
+  description,
+  empty,
+  rows,
+  limit = 10,
+}: {
+  title: string;
+  description: string;
+  empty: string;
+  rows: Array<{ primary: string; secondary: string; value: string }>;
+  limit?: number;
+}) {
+  const visibleRows = rows.slice(0, limit);
+  const hiddenCount = Math.max(0, rows.length - visibleRows.length);
+
+  return (
+    <div className="rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] p-4">
+      <h3 className="text-[13px] font-black text-[var(--wk-text)]">{title}</h3>
+      <p className="mt-1 text-[11px] leading-relaxed text-[var(--wk-text-muted)]">{description}</p>
+      <div className="mt-4 space-y-2">
+        {rows.length === 0 && <p className="text-[12px] text-[var(--wk-text-faint)]">{empty}</p>}
+        {visibleRows.map((row) => (
+          <div key={`${title}-${row.primary}-${row.secondary}-${row.value}`} className="grid gap-2 rounded-md border border-[var(--wk-border)] bg-[var(--wk-surface)] p-3 md:grid-cols-[1fr_120px]">
+            <div className="min-w-0">
+              <p className="truncate text-[12px] font-bold text-[var(--wk-text)]">{row.primary}</p>
+              <p className="mt-0.5 truncate text-[10px] uppercase tracking-[0.12em] text-[var(--wk-text-faint)]">{row.secondary}</p>
+            </div>
+            <p className="truncate text-left text-[12px] font-black text-[var(--wk-text)] md:text-right">{row.value}</p>
+          </div>
+        ))}
+        {hiddenCount > 0 && (
+          <p className="pt-2 text-[11px] text-[var(--wk-text-faint)]">
+            Showing first {visibleRows.length} of {rows.length}. Use the metadata endpoint for the full gap list.
+          </p>
+        )}
+      </div>
     </div>
   );
 }
