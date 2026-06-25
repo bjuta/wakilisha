@@ -59,7 +59,7 @@ const SPECIAL = new Set(["featured_routes", "lead_editorial", "chart_pulse", "ch
 const AO = [
   "https://wakilisha.africa", "https://www.wakilisha.africa",
   "https://staging.wakilisha.africa", "https://wakilisha.africa", "https://wakilisha.africa",
-  "https://wakilisha.africa", "http://localhost:5173", "http://localhost:3000"
+  "https://wakilisha.africa", "http://localhost:5173", "http://localhost:4173", "http://localhost:3000"
 ];
 
 function cR(r: Request, m = "GET, POST, OPTIONS"): Record<string, string> {
@@ -1073,10 +1073,27 @@ Deno.serve(async (req) => {
   const c = cR(req, "GET, POST, OPTIONS"); if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: c });
   try { const body = await req.json() as any; const action = String(body.action ?? "").trim(); const db = createClient(SU, SK);
     if (action === "cron_generate") return handleCronGenerate(body, c);
-    const adminActions = ["generate_issue","generate_issue_from_content","delete_issue","preview_issue","preview_content","send_issue","send_test","list_issues","list_subscribers","update_catalog","update_issue_content","briefing_analytics","list_catalog","get_issue"];
+
+    if (action === "list_catalog") {
+      const authHeader = req.headers.get("authorization") || "";
+      if (authHeader.toLowerCase().startsWith("bearer ")) {
+        const auth = await vJ(req);
+        if (!auth) return jE("not_authenticated", "Valid JWT required for admin actions.", c, 401);
+        const hasCap = await rC(auth.id, "manage_settings");
+        if (!hasCap) return jE("permission_denied", "Requires manage_settings capability.", c, 403);
+        return listCatalog(c, true);
+      }
+
+      const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("cf-connecting-ip") || "unknown";
+      const rl = await ckRL(db, `briefing:public:${ip}`);
+      if (!rl.allowed) return new Response(JSON.stringify({ ok: false, error: { code: "rate_limited", message: "Too many requests. Try again shortly." }, meta: { requestId: ri(), servedAt: is() } }), { status: 429, headers: { ...c, "Content-Type": "application/json", "Retry-After": "60" } });
+      return listCatalog(c, false);
+    }
+
+    const adminActions = ["generate_issue","generate_issue_from_content","delete_issue","preview_issue","preview_content","send_issue","send_test","list_issues","list_subscribers","update_catalog","update_issue_content","briefing_analytics","get_issue"];
     if (adminActions.includes(action)) { const auth = await vJ(req); if (!auth) return jE("not_authenticated", "Valid JWT required for admin actions.", c, 401); const hasCap = await rC(auth.id, "manage_settings"); if (!hasCap) return jE("permission_denied", "Requires manage_settings capability.", c, 403);
-      switch (action) { case "list_catalog": return listCatalog(c, true); case "update_catalog": return handleUpdateCatalog(body, c); case "generate_issue": return handleGenerateIssue(body, c, auth); case "generate_issue_from_content": return handleGenerateIssueFromContent(body, c, auth); case "delete_issue": return handleDeleteIssue(body, c, auth); case "preview_issue": return handlePreviewIssue(body, c, auth); case "preview_content": return handlePreviewContent(body, c, auth); case "send_issue": return handleSendIssue(body, c, auth); case "send_test": return handleSendTest(body, c, auth); case "list_issues": return handleListIssues(body, c); case "list_subscribers": return handleListSubscribers(body, c); case "briefing_analytics": return handleBriefingAnalytics(body, c); case "get_issue": return handleGetIssue(body, c); case "update_issue_content": return handleUpdateIssueContent(body, c, auth); } }
-    const publicActions = ["subscribe","confirm","unsubscribe","preferences","list_catalog"];
+      switch (action) { case "update_catalog": return handleUpdateCatalog(body, c); case "generate_issue": return handleGenerateIssue(body, c, auth); case "generate_issue_from_content": return handleGenerateIssueFromContent(body, c, auth); case "delete_issue": return handleDeleteIssue(body, c, auth); case "preview_issue": return handlePreviewIssue(body, c, auth); case "preview_content": return handlePreviewContent(body, c, auth); case "send_issue": return handleSendIssue(body, c, auth); case "send_test": return handleSendTest(body, c, auth); case "list_issues": return handleListIssues(body, c); case "list_subscribers": return handleListSubscribers(body, c); case "briefing_analytics": return handleBriefingAnalytics(body, c); case "get_issue": return handleGetIssue(body, c); case "update_issue_content": return handleUpdateIssueContent(body, c, auth); } }
+    const publicActions = ["subscribe","confirm","unsubscribe","preferences"];
     if (publicActions.includes(action)) { const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("cf-connecting-ip") || "unknown"; const rl = await ckRL(db, `briefing:public:${ip}`); if (!rl.allowed) return new Response(JSON.stringify({ ok: false, error: { code: "rate_limited", message: "Too many requests. Try again shortly." }, meta: { requestId: ri(), servedAt: is() } }), { status: 429, headers: { ...c, "Content-Type": "application/json", "Retry-After": "60" } }); const ua = req.headers.get("user-agent") || ""; switch (action) { case "list_catalog": return listCatalog(c, false); case "subscribe": return handleSubscribe(body, c, ip, ua); case "confirm": return handleConfirm(body, c); case "unsubscribe": return handleUnsubscribe(body, c); case "preferences": return handlePreferences(body, c); } }
     return jE("unknown_action", `Unknown action: "${action}".`, c);
   } catch (err) { const m = err instanceof Error ? err.message : String(err); return jE("internal_error", m, c, 500); }

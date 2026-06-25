@@ -2,3 +2,4 @@
 # One route per line. Keep these as root-relative paths.
 
 /releases/bien/alusa-why-are-you-topless
+/briefings
