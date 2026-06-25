@@ -23,8 +23,12 @@ import {
   type SearchConsoleRow,
 } from "@/services/searchConsoleSeo";
 import {
+  applySeoGrowthDraft,
+  archiveSeoContentOverride,
+  deriveSeoOverrideFromDraft,
   buildArtistTrendSignalsFromSearchConsole,
   fetchArtistTrendSignals,
+  fetchSeoContentOverrides,
   fetchSeoGrowthDrafts,
   fetchSeoGrowthTasks,
   saveArtistTrendSignals,
@@ -34,6 +38,8 @@ import {
   updateSeoGrowthTaskStatus,
   type SeoArtistTrendSignal,
   type SeoArtistTrendStatus,
+  type SeoContentOverride,
+  type SeoDraftOverrideInput,
   type SeoGrowthDraft,
   type SeoGrowthTask,
   type SeoGrowthTaskStatus,
@@ -435,6 +441,7 @@ export default function AdminSettingsSeoPage() {
   const [searchConsole, setSearchConsole] = useState<SearchConsolePayload | null>(null);
   const [growthTasks, setGrowthTasks] = useState<SeoGrowthTask[]>([]);
   const [growthDrafts, setGrowthDrafts] = useState<SeoGrowthDraft[]>([]);
+  const [seoOverrides, setSeoOverrides] = useState<SeoContentOverride[]>([]);
   const [artistTrendSignals, setArtistTrendSignals] = useState<SeoArtistTrendSignal[]>([]);
   const [growthActionBusy, setGrowthActionBusy] = useState<string | null>(null);
   const [artistSignalsBusy, setArtistSignalsBusy] = useState<string | null>(null);
@@ -547,15 +554,17 @@ export default function AdminSettingsSeoPage() {
 
   const loadGrowthActions = useCallback(async () => {
     try {
-      const [tasks, drafts, signals] = await Promise.all([
+      const [tasks, drafts, signals, overrides] = await Promise.all([
         fetchSeoGrowthTasks(),
         fetchSeoGrowthDrafts(),
         fetchArtistTrendSignals(),
+        fetchSeoContentOverrides(),
       ]);
 
       setGrowthTasks(tasks);
       setGrowthDrafts(drafts);
       setArtistTrendSignals(signals);
+      setSeoOverrides(overrides);
     } catch (error) {
       console.error("Failed to load SEO growth actions:", error);
     }
@@ -633,6 +642,58 @@ export default function AdminSettingsSeoPage() {
       setResult({
         ok: false,
         message: "Could not generate admin draft.",
+        detail: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setGrowthActionBusy(null);
+    }
+  }
+
+  async function applyDraftToSeo(draft: SeoGrowthDraft, editedOverride?: SeoDraftOverrideInput) {
+    setGrowthActionBusy(`apply:${draft.id}`);
+    setResult(null);
+
+    try {
+      const { override, draft: publishedDraft, task } = await applySeoGrowthDraft(draft, editedOverride);
+      setSeoOverrides((rows) => upsertById(rows, override));
+      setGrowthDrafts((rows) => upsertById(rows, publishedDraft));
+      if (task) setGrowthTasks((rows) => upsertById(rows, task));
+      await loadMeasurement();
+
+      setResult({
+        ok: true,
+        message: "SEO draft applied.",
+        detail: `${override.target_url} now has an active metadata override. Regenerate/prerender metadata before production deploy.`,
+      });
+    } catch (error) {
+      setResult({
+        ok: false,
+        message: "Could not apply SEO draft.",
+        detail: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setGrowthActionBusy(null);
+    }
+  }
+
+  async function archiveOverride(override: SeoContentOverride) {
+    setGrowthActionBusy(`archive:${override.id}`);
+    setResult(null);
+
+    try {
+      const archived = await archiveSeoContentOverride(override);
+      setSeoOverrides((rows) => upsertById(rows, archived));
+      await loadMeasurement();
+
+      setResult({
+        ok: true,
+        message: "SEO override archived.",
+        detail: `${override.target_url} will fall back to generated metadata.`,
+      });
+    } catch (error) {
+      setResult({
+        ok: false,
+        message: "Could not archive SEO override.",
         detail: error instanceof Error ? error.message : String(error),
       });
     } finally {
@@ -806,6 +867,7 @@ export default function AdminSettingsSeoPage() {
         measurement={measurement}
         growthTasks={growthTasks}
         growthDrafts={growthDrafts}
+        seoOverrides={seoOverrides}
         artistTrendSignals={artistTrendSignals}
         growthActionBusy={growthActionBusy}
         artistSignalsBusy={artistSignalsBusy}
@@ -814,6 +876,8 @@ export default function AdminSettingsSeoPage() {
         onSaveTask={saveGrowthTask}
         onDraftAction={draftGrowthAction}
         onTaskStatusChange={changeGrowthTaskStatus}
+        onApplyDraft={applyDraftToSeo}
+        onArchiveOverride={archiveOverride}
         onGenerateArtistSignals={generateArtistTrendSignals}
         onArtistSignalStatusChange={changeArtistTrendSignalStatus}
       />
@@ -888,6 +952,7 @@ function SearchConsolePanel({
   measurement,
   growthTasks,
   growthDrafts,
+  seoOverrides,
   artistTrendSignals,
   growthActionBusy,
   artistSignalsBusy,
@@ -896,6 +961,8 @@ function SearchConsolePanel({
   onSaveTask,
   onDraftAction,
   onTaskStatusChange,
+  onApplyDraft,
+  onArchiveOverride,
   onGenerateArtistSignals,
   onArtistSignalStatusChange,
 }: {
@@ -905,6 +972,7 @@ function SearchConsolePanel({
   measurement?: SeoMeasurement | null;
   growthTasks: SeoGrowthTask[];
   growthDrafts: SeoGrowthDraft[];
+  seoOverrides: SeoContentOverride[];
   artistTrendSignals: SeoArtistTrendSignal[];
   growthActionBusy: string | null;
   artistSignalsBusy: string | null;
@@ -913,6 +981,8 @@ function SearchConsolePanel({
   onSaveTask: (item: GrowthQueueItem) => void;
   onDraftAction: (item: GrowthQueueItem) => void;
   onTaskStatusChange: (taskId: string, status: SeoGrowthTaskStatus) => void;
+  onApplyDraft: (draft: SeoGrowthDraft, editedOverride?: SeoDraftOverrideInput) => void;
+  onArchiveOverride: (override: SeoContentOverride) => void;
   onGenerateArtistSignals: () => void;
   onArtistSignalStatusChange: (id: string | undefined, status: SeoArtistTrendStatus) => void;
 }) {
@@ -984,8 +1054,11 @@ function SearchConsolePanel({
           <GrowthActionsPanel
             tasks={growthTasks}
             drafts={growthDrafts}
+            overrides={seoOverrides}
             busyKey={growthActionBusy}
             onTaskStatusChange={onTaskStatusChange}
+            onApplyDraft={onApplyDraft}
+            onArchiveOverride={onArchiveOverride}
           />
 
           <ArtistTrendSignalsPanel
@@ -1159,19 +1232,30 @@ function GrowthQueuePanel({
 function GrowthActionsPanel({
   tasks,
   drafts,
+  overrides,
   busyKey,
   onTaskStatusChange,
+  onApplyDraft,
+  onArchiveOverride,
 }: {
   tasks: SeoGrowthTask[];
   drafts: SeoGrowthDraft[];
+  overrides: SeoContentOverride[];
   busyKey: string | null;
   onTaskStatusChange: (taskId: string, status: SeoGrowthTaskStatus) => void;
+  onApplyDraft: (draft: SeoGrowthDraft, editedOverride?: SeoDraftOverrideInput) => void;
+  onArchiveOverride: (override: SeoContentOverride) => void;
 }) {
   const openTasks = tasks.filter((task) => task.status === "open" || task.status === "in_progress");
   const latestDrafts = drafts.slice(0, 6);
+  const [draftEdits, setDraftEdits] = useState<Record<string, SeoDraftOverrideInput>>({});
+  const activeOverrides = overrides.filter((override) => override.status === "active").slice(0, 8);
+  const overrideByPath = useMemo(() => {
+    return new Map(overrides.filter((override) => override.status === "active").map((override) => [normalizeSeoPath(override.target_url), override]));
+  }, [overrides]);
 
   return (
-    <div className="mt-5 grid gap-4 xl:grid-cols-2 xl:items-start">
+    <div className="mt-5 grid gap-4 xl:grid-cols-2 2xl:grid-cols-3 xl:items-start">
       <div className="rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] p-4">
         <div className="mb-3 flex items-center justify-between gap-2">
           <div>
@@ -1226,19 +1310,129 @@ function GrowthActionsPanel({
 
         <div className="space-y-2">
           {latestDrafts.length === 0 && <p className="text-[12px] text-[var(--wk-text-faint)]">No admin drafts yet.</p>}
-          {latestDrafts.map((draft) => (
-            <details key={draft.id} className="rounded-md border border-[var(--wk-border)] bg-[var(--wk-surface)] p-3">
-              <summary className="cursor-pointer text-[12px] font-black text-[var(--wk-text)]">
-                {draft.title}
-              </summary>
-              <p className="mt-2 text-[10px] uppercase tracking-[0.12em] text-[var(--wk-text-faint)]">
-                {draft.content_kind.replace(/_/g, " ")} · {draft.status}
-              </p>
-              <pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap rounded-md border border-[var(--wk-border)] bg-[var(--wk-bg)] p-3 text-[11px] leading-relaxed text-[var(--wk-text-muted)]">
-                {draft.body}
-              </pre>
-            </details>
-          ))}
+          {latestDrafts.map((draft) => {
+            const appliedOverride = overrideByPath.get(normalizeSeoPath(draft.target_url));
+            const applyBusy = busyKey === `apply:${draft.id}`;
+            const derivedOverride = deriveSeoOverrideFromDraft(draft);
+            const edited = draftEdits[draft.id] || {};
+            const editedTitle = edited.title ?? derivedOverride.title;
+            const editedDescription = edited.description ?? derivedOverride.description;
+
+            return (
+              <details key={draft.id} className="rounded-md border border-[var(--wk-border)] bg-[var(--wk-surface)] p-3">
+                <summary className="cursor-pointer text-[12px] font-black text-[var(--wk-text)]">
+                  {draft.title}
+                </summary>
+                <p className="mt-2 text-[10px] uppercase tracking-[0.12em] text-[var(--wk-text-faint)]">
+                  {draft.content_kind.replace(/_/g, " ")} · {draft.status}
+                </p>
+                {appliedOverride && (
+                  <p className="mt-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--wk-success)]">
+                    Active override applied
+                  </p>
+                )}
+                <div className="mt-3 grid gap-3">
+                  <label className="block">
+                    <span className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-[var(--wk-text-faint)]">
+                      SEO title to apply
+                    </span>
+                    <input
+                      value={editedTitle}
+                      onChange={(event) =>
+                        setDraftEdits((current) => ({
+                          ...current,
+                          [draft.id]: {
+                            ...current[draft.id],
+                            title: event.target.value,
+                            socialTitle: event.target.value,
+                          },
+                        }))
+                      }
+                      className="w-full rounded-md border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[12px] font-bold text-[var(--wk-text)] outline-none focus:border-[var(--wk-brand)]"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-[var(--wk-text-faint)]">
+                      Meta description to apply
+                    </span>
+                    <textarea
+                      value={editedDescription}
+                      rows={4}
+                      onChange={(event) =>
+                        setDraftEdits((current) => ({
+                          ...current,
+                          [draft.id]: {
+                            ...current[draft.id],
+                            description: event.target.value,
+                            socialDescription: event.target.value,
+                          },
+                        }))
+                      }
+                      className="w-full rounded-md border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[12px] leading-relaxed text-[var(--wk-text)] outline-none focus:border-[var(--wk-brand)]"
+                    />
+                    <span className="mt-1 block text-[10px] text-[var(--wk-text-faint)]">
+                      {editedDescription.length}/158 recommended characters
+                    </span>
+                  </label>
+                </div>
+
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    disabled={Boolean(busyKey) || draft.status === "published"}
+                    onClick={() =>
+                      onApplyDraft(draft, {
+                        title: editedTitle,
+                        description: editedDescription,
+                        socialTitle: editedTitle,
+                        socialDescription: editedDescription,
+                      })
+                    }
+                    className="wk-button wk-button-primary wk-button-sm inline-flex items-center justify-center gap-2"
+                  >
+                    <WkIcon name={applyBusy ? "Loader" : "UploadCloud"} size={14} />
+                    {applyBusy ? "Applying..." : draft.status === "published" ? "Applied" : "Apply draft"}
+                  </button>
+                </div>
+                <pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap rounded-md border border-[var(--wk-border)] bg-[var(--wk-bg)] p-3 text-[11px] leading-relaxed text-[var(--wk-text-muted)]">
+                  {draft.body}
+                </pre>
+              </details>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] p-4">
+        <div className="mb-3">
+          <h3 className="text-[13px] font-black text-[var(--wk-text)]">Applied SEO overrides</h3>
+          <p className="mt-1 text-[11px] leading-relaxed text-[var(--wk-text-muted)]">
+            Active metadata overrides generated from reviewed admin drafts. The metadata endpoint and prerender build read these.
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          {activeOverrides.length === 0 && <p className="text-[12px] text-[var(--wk-text-faint)]">No active SEO overrides yet.</p>}
+          {activeOverrides.map((override) => {
+            const archiveBusy = busyKey === `archive:${override.id}`;
+
+            return (
+              <div key={override.id} className="rounded-md border border-[var(--wk-border)] bg-[var(--wk-surface)] p-3">
+                <p className="truncate text-[12px] font-black text-[var(--wk-text)]">{override.target_url}</p>
+                <p className="mt-1 text-[11px] font-bold text-[var(--wk-text-muted)]">{override.title || "Untitled override"}</p>
+                <p className="mt-2 text-[11px] leading-relaxed text-[var(--wk-text-muted)]">{override.description}</p>
+                <button
+                  type="button"
+                  disabled={Boolean(busyKey)}
+                  onClick={() => onArchiveOverride(override)}
+                  className="mt-3 rounded-full border border-[var(--wk-border)] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--wk-text-muted)] transition hover:border-[var(--wk-danger)] hover:text-[var(--wk-danger)] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {archiveBusy ? "Archiving..." : "Archive override"}
+                </button>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>

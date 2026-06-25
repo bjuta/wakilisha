@@ -346,6 +346,22 @@ type SeoMetadataEntry = {
   modifiedAt?: string | null;
   sourceTable?: string | null;
   sourceId?: string | null;
+  socialTitle?: string | null;
+  socialDescription?: string | null;
+  seoOverrideId?: string | null;
+  overrideAppliedAt?: string | null;
+};
+
+type SeoContentOverrideRow = {
+  id: string;
+  target_url: string;
+  title?: string | null;
+  description?: string | null;
+  social_title?: string | null;
+  social_description?: string | null;
+  applied_at?: string | null;
+  updated_at?: string | null;
+  status: "active" | "archived";
 };
 
 function stripHtml(value: string) {
@@ -404,6 +420,32 @@ function pathFromLoc(loc: string) {
   } catch {
     return "/";
   }
+}
+
+function normalizeOverridePath(value: string) {
+  const raw = String(value || "").trim();
+  if (!raw) return "/";
+
+  try {
+    return normalizePath(new URL(raw).pathname).replace(/\/+$/, "") || "/";
+  } catch {
+    return normalizePath(raw.split("?")[0]).replace(/\/+$/, "") || "/";
+  }
+}
+
+function applySeoContentOverride(entry: SeoMetadataEntry, override?: SeoContentOverrideRow | null): SeoMetadataEntry {
+  if (!override) return entry;
+
+  return {
+    ...entry,
+    title: String(override.title || entry.title).trim(),
+    description: compactText(override.description || entry.description),
+    socialTitle: override.social_title || override.title || entry.socialTitle || entry.title,
+    socialDescription: compactText(override.social_description || override.description || entry.socialDescription || entry.description),
+    modifiedAt: override.applied_at || override.updated_at || entry.modifiedAt,
+    seoOverrideId: override.id,
+    overrideAppliedAt: override.applied_at || override.updated_at || null,
+  };
 }
 
 function slugFromArtistPath(pagePath: string) {
@@ -848,6 +890,26 @@ async function fetchRowsBySlug(db: ReturnType<typeof createClient>, table: strin
   return new Map((data || []).map((row: any) => [String(row.slug), row as Record<string, unknown>]));
 }
 
+async function fetchSeoContentOverrideMap(db: ReturnType<typeof createClient>) {
+  const { data, error } = await db
+    .from("seo_content_overrides")
+    .select("id, target_url, title, description, social_title, social_description, applied_at, updated_at, status")
+    .eq("status", "active")
+    .limit(10000);
+
+  if (error) {
+    console.warn(`SEO content override lookup failed: ${error.message}`);
+    return new Map<string, SeoContentOverrideRow>();
+  }
+
+  return new Map(
+    (data || []).map((row: SeoContentOverrideRow) => [
+      normalizeOverridePath(row.target_url),
+      row,
+    ]),
+  );
+}
+
 async function buildSeoMetadataManifest(db: ReturnType<typeof createClient>) {
   const items = await buildInternalItems(db);
   const sourceIdsByTable = new Map<string, string[]>();
@@ -880,6 +942,7 @@ async function buildSeoMetadataManifest(db: ReturnType<typeof createClient>) {
     new Set(Array.from(sourceIdsByTable.values()).flat().filter(Boolean))
   );
   const providerImageByEntityId = await buildProviderImageMap(db, allSourceIds);
+  const overrideByPath = await fetchSeoContentOverrideMap(db);
 
   const manifest: Record<string, SeoMetadataEntry> = {};
 
@@ -908,7 +971,8 @@ async function buildSeoMetadataManifest(db: ReturnType<typeof createClient>) {
       ? artistSlugImage || providerImage
       : providerImage;
 
-    manifest[pagePath] = buildSeoMetadataEntry(item, row, relationshipArtist, fallbackImage);
+    const baseEntry = buildSeoMetadataEntry(item, row, relationshipArtist, fallbackImage);
+    manifest[pagePath] = applySeoContentOverride(baseEntry, overrideByPath.get(pagePath));
   }
 
   return manifest;
