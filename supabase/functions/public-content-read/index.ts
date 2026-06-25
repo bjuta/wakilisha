@@ -213,24 +213,75 @@ function buildEntryItem(e: any) {
 }
 
 async function resolvePublicChartEntryArtists(supabase: any, entries: any[]): Promise<any[]> {
-  const sourceSlugs = Array.from(new Set(
-    entries.flatMap((entry: any) => {
-      const artistName = String(entry.artist_name || "");
-      const rawArtistSlug = String(entry.artist_slug || "").trim();
-      const fallback = artistName.split(",").map((part: string) => slugify(part)).filter(Boolean);
-      return rawArtistSlug
-        ? rawArtistSlug.split(",").map((part: string) => slugify(part)).filter(Boolean)
-        : fallback;
-    }).filter(Boolean)
-  ));
+  const sourceEntries = entries ?? [];
+  if (sourceEntries.length === 0) return sourceEntries;
 
-  if (sourceSlugs.length === 0) return entries;
+  const chartArtistSlugs = sourceEntries.flatMap((entry: any) => {
+    const artistName = String(entry.artist_name || "");
+    const rawArtistSlug = String(entry.artist_slug || "").trim();
+    const fallback = artistName.split(",").map((part: string) => slugify(part)).filter(Boolean);
+    return rawArtistSlug
+      ? rawArtistSlug.split(",").map((part: string) => slugify(part)).filter(Boolean)
+      : fallback;
+  });
 
-  const { data: activeArtists } = await supabase
-    .from("registry_artists")
-    .select("id, slug, display_name, status")
-    .in("slug", sourceSlugs)
-    .eq("status", "active");
+  const directTrackIds = sourceEntries
+    .map((entry: any) => String(entry.canonical_track_id || "").trim())
+    .filter(Boolean);
+
+  const trackSlugsNeedingLookup = sourceEntries
+    .filter((entry: any) => !String(entry.canonical_track_id || "").trim())
+    .map((entry: any) => String(entry.track_slug || "").trim())
+    .filter(Boolean);
+
+  let trackIdBySlug = new Map<string, string>();
+
+  if (trackSlugsNeedingLookup.length > 0) {
+    const { data: trackRows } = await supabase
+      .from("registry_tracks")
+      .select("id, slug")
+      .in("slug", [...new Set(trackSlugsNeedingLookup)])
+      .in("status", ["active", "draft", "needs_review"]);
+
+    trackIdBySlug = new Map(
+      (trackRows ?? []).map((track: any) => [String(track.slug), String(track.id)])
+    );
+  }
+
+  const allTrackIds = Array.from(new Set([
+    ...directTrackIds,
+    ...Array.from(trackIdBySlug.values()),
+  ].filter(Boolean)));
+
+  const { data: trackArtistRows } = allTrackIds.length > 0
+    ? await supabase
+        .from("registry_track_artists")
+        .select("track_id, artist_slug, artist_name_text, is_primary, is_featured, credit_order, role, status")
+        .in("track_id", allTrackIds)
+        .in("status", ["active", "needs_review", "draft"])
+        .order("credit_order", { ascending: true })
+    : { data: [] };
+
+  const artistsByTrackId = new Map<string, any[]>();
+
+  for (const row of (trackArtistRows ?? [])) {
+    const trackId = String(row.track_id);
+    if (!artistsByTrackId.has(trackId)) artistsByTrackId.set(trackId, []);
+    artistsByTrackId.get(trackId)!.push(row);
+  }
+
+  const relationshipSlugs = Array.from(new Set([
+    ...chartArtistSlugs,
+    ...(trackArtistRows ?? []).map((row: any) => String(row.artist_slug || "").trim()).filter(Boolean),
+  ].map((value) => slugify(value)).filter(Boolean)));
+
+  const { data: activeArtists } = relationshipSlugs.length > 0
+    ? await supabase
+        .from("registry_artists")
+        .select("id, slug, display_name, status")
+        .in("slug", relationshipSlugs)
+        .eq("status", "active")
+    : { data: [] };
 
   const activeBySlug = new Map(
     (activeArtists ?? []).map((artist: any) => [
@@ -242,11 +293,13 @@ async function resolvePublicChartEntryArtists(supabase: any, entries: any[]): Pr
     ])
   );
 
-  const { data: aliasRows } = await supabase
-    .from("registry_artist_aliases")
-    .select("alias_slug, alias_display_name, canonical_artist_id, status")
-    .in("alias_slug", sourceSlugs)
-    .eq("status", "active");
+  const { data: aliasRows } = relationshipSlugs.length > 0
+    ? await supabase
+        .from("registry_artist_aliases")
+        .select("alias_slug, alias_display_name, canonical_artist_id, status")
+        .in("alias_slug", relationshipSlugs)
+        .eq("status", "active")
+    : { data: [] };
 
   const canonicalIds = Array.from(new Set(
     (aliasRows ?? [])
@@ -286,7 +339,47 @@ async function resolvePublicChartEntryArtists(supabase: any, entries: any[]): Pr
     })
   );
 
-  return entries.map((entry: any) => {
+  function resolveArtist(sourceSlug: string, displayName: string): { slug: string; name: string } {
+    const cleanSlug = slugify(sourceSlug || displayName);
+    const resolved = activeBySlug.get(cleanSlug) ?? aliasBySlug.get(cleanSlug);
+    return {
+      slug: resolved?.slug || cleanSlug,
+      name: displayName || resolved?.name || cleanSlug.replace(/-/g, " "),
+    };
+  }
+
+  return sourceEntries.map((entry: any) => {
+    const entryTrackId =
+      String(entry.canonical_track_id || "").trim()
+      || trackIdBySlug.get(String(entry.track_slug || "").trim())
+      || "";
+
+    const trackArtists = entryTrackId ? artistsByTrackId.get(entryTrackId) ?? [] : [];
+
+    if (trackArtists.length > 0) {
+      const publicArtistSlugs: string[] = [];
+      const publicArtistNames: string[] = [];
+
+      for (const artistRow of trackArtists) {
+        const displayName = String(artistRow.artist_name_text || "").trim();
+        const sourceSlug = String(artistRow.artist_slug || "").trim() || slugify(displayName);
+        const resolved = resolveArtist(sourceSlug, displayName);
+
+        if (!resolved.slug || publicArtistSlugs.includes(resolved.slug)) continue;
+
+        publicArtistSlugs.push(resolved.slug);
+        publicArtistNames.push(displayName || resolved.name);
+      }
+
+      if (publicArtistSlugs.length > 0) {
+        return {
+          ...entry,
+          __publicArtistSlugs: publicArtistSlugs,
+          __publicArtistNames: publicArtistNames,
+        };
+      }
+    }
+
     const artistName = String(entry.artist_name || "");
     const displayNames = artistName.split(",").map((part: string) => part.trim()).filter(Boolean);
     const rawArtistSlug = String(entry.artist_slug || "").trim();
@@ -299,14 +392,12 @@ async function resolvePublicChartEntryArtists(supabase: any, entries: any[]): Pr
     const publicArtistNames: string[] = [];
 
     entrySourceSlugs.forEach((sourceSlug: string, index: number) => {
-      const resolved = activeBySlug.get(sourceSlug) ?? aliasBySlug.get(sourceSlug);
+      const resolved = resolveArtist(sourceSlug, displayNames[index] || "");
 
-      if (!resolved?.slug) return;
+      if (!resolved.slug || publicArtistSlugs.includes(resolved.slug)) return;
 
-      if (!publicArtistSlugs.includes(resolved.slug)) {
-        publicArtistSlugs.push(resolved.slug);
-        publicArtistNames.push(displayNames[index] || resolved.name);
-      }
+      publicArtistSlugs.push(resolved.slug);
+      publicArtistNames.push(displayNames[index] || resolved.name);
     });
 
     return {
@@ -941,7 +1032,7 @@ Deno.serve(async (req) => {
       const segments = chartPath.split("/").filter(Boolean);
       const programColumns = "id, public_slug, public_label, source_family_slug, series_slug, market_slug, chart_size, default_period_type, default_methodology_version";
       const editionColumns = "id, edition_slug, edition_label, edition_date, period_start, period_end, entry_count, status";
-      const entryColumns = "id, rank, previous_rank, movement, artist_slug, track_slug, track_title, artist_name, artwork_url, total_score";
+      const entryColumns = "id, rank, previous_rank, movement, artist_slug, track_slug, track_title, artist_name, artwork_url, total_score, canonical_track_id";
 
       async function loadProgram(cslug: string, marketSlug?: string | null) {
         const slug = String(cslug || "").trim().toLowerCase();
