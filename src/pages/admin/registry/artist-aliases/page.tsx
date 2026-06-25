@@ -32,6 +32,39 @@ interface AliasRecord {
   notes: string | null;
 }
 
+interface MergePreviewCredit {
+  credit_id: string;
+  track_id?: string | null;
+  track_slug?: string | null;
+  track_title?: string | null;
+  release_id?: string | null;
+  release_slug?: string | null;
+  release_title?: string | null;
+  role: string | null;
+  credit_order: number | null;
+  display_credit: string | null;
+  status: string | null;
+  will_archive_duplicate?: boolean | null;
+}
+
+interface MergePreviewChartEntry {
+  entry_id: string;
+  track_title: string | null;
+  artist_name: string | null;
+  artist_slug: string | null;
+  canonical_artist_id: string | null;
+  rank: number | null;
+}
+
+interface MergePreview {
+  sourceArtist: RegistryArtistSearchResult;
+  canonicalArtist: RegistryArtistSearchResult;
+  trackCredits: MergePreviewCredit[];
+  releaseCredits: MergePreviewCredit[];
+  chartEntries: MergePreviewChartEntry[];
+  aliases: AliasRecord[];
+}
+
 interface ReviewItem {
   slug: string;
   source_table: string;
@@ -113,9 +146,12 @@ export default function ArtistAliasesPage() {
   const [sourceArtist, setSourceArtist] = useState<RegistryArtistSearchResult | null>(null);
   const [canonicalArtist, setCanonicalArtist] = useState<RegistryArtistSearchResult | null>(null);
   const [mergeNote, setMergeNote] = useState("");
+  const [mergeReason, setMergeReason] = useState("same_person");
+  const [mergePreview, setMergePreview] = useState<MergePreview | null>(null);
   const [archiveSource, setArchiveSource] = useState(true);
   const [searchingSource, setSearchingSource] = useState(false);
   const [searchingCanonical, setSearchingCanonical] = useState(false);
+  const [previewingMerge, setPreviewingMerge] = useState(false);
   const [mergeLoading, setMergeLoading] = useState(false);
 
   // Toast
@@ -355,6 +391,38 @@ export default function ArtistAliasesPage() {
     }
   }, [showToast]);
 
+  const loadMergePreview = useCallback(async () => {
+    if (!sourceArtist || !canonicalArtist) {
+      showToast("Select both the source artist and the canonical artist.", "error");
+      return;
+    }
+
+    if (sourceArtist.artist_id === canonicalArtist.artist_id) {
+      showToast("You cannot merge an artist into itself.", "error");
+      return;
+    }
+
+    setPreviewingMerge(true);
+
+    try {
+      const { data, error } = await supabase.rpc("admin_get_registry_artist_merge_preview", {
+        p_source_artist_id: sourceArtist.artist_id,
+        p_canonical_artist_id: canonicalArtist.artist_id,
+      });
+
+      if (error) throw error;
+
+      const preview = data as MergePreview | null;
+      setMergePreview(preview);
+      showToast("Safe merge preview loaded", "success");
+    } catch (err) {
+      setMergePreview(null);
+      showToast(err instanceof Error ? err.message : "Merge preview failed", "error");
+    } finally {
+      setPreviewingMerge(false);
+    }
+  }, [canonicalArtist, showToast, sourceArtist]);
+
   /* ──── Manual artist merge ──── */
   const mergeArtists = useCallback(async () => {
     if (!sourceArtist || !canonicalArtist) {
@@ -367,8 +435,13 @@ export default function ArtistAliasesPage() {
       return;
     }
 
+    if (!mergePreview) {
+      showToast("Preview the safe merge first.", "error");
+      return;
+    }
+
     const confirmed = window.confirm(
-      `Merge "${sourceArtist.display_name}" (${sourceArtist.artist_slug}) into "${canonicalArtist.display_name}" (${canonicalArtist.artist_slug})?`
+      `Safely merge "${sourceArtist.display_name}" (${sourceArtist.artist_slug}) into "${canonicalArtist.display_name}" (${canonicalArtist.artist_slug})? Duplicate credit links will be archived, not deleted.`
     );
 
     if (!confirmed) return;
@@ -376,11 +449,12 @@ export default function ArtistAliasesPage() {
     setMergeLoading(true);
 
     try {
-      const { data, error } = await supabase.rpc("admin_merge_registry_artists", {
+      const { data, error } = await supabase.rpc("admin_safe_merge_registry_artists", {
         p_source_artist_id: sourceArtist.artist_id,
         p_canonical_artist_id: canonicalArtist.artist_id,
         p_note: mergeNote || null,
         p_archive_source: archiveSource,
+        p_merge_reason: mergeReason,
       });
 
       if (error) throw error;
@@ -393,7 +467,7 @@ export default function ArtistAliasesPage() {
       };
 
       showToast(
-        `Merged artists · ${result.trackArtistRowsUpdated ?? 0} track credits, ${result.releaseArtistRowsUpdated ?? 0} release credits, ${result.chartEntriesUpdated ?? 0} chart rows repaired`,
+        `Safe merge complete · ${result.trackArtistRowsMoved ?? 0} track credits moved, ${result.trackArtistRowsArchived ?? 0} duplicate track credits archived, ${result.chartEntriesUpdated ?? 0} chart rows repaired`,
         "success"
       );
 
@@ -404,6 +478,7 @@ export default function ArtistAliasesPage() {
       setSourceArtist(null);
       setCanonicalArtist(null);
       setMergeNote("");
+      setMergePreview(null);
       loadAliases();
       loadUnknownSlugs();
     } catch (err) {
@@ -411,7 +486,7 @@ export default function ArtistAliasesPage() {
     } finally {
       setMergeLoading(false);
     }
-  }, [sourceArtist, canonicalArtist, mergeNote, archiveSource, loadAliases, loadUnknownSlugs, showToast]);
+  }, [sourceArtist, canonicalArtist, mergePreview, mergeNote, mergeReason, archiveSource, loadAliases, loadUnknownSlugs, showToast]);
 
   /* ──── Stats ──── */
   const stats = useMemo(() => ({
@@ -535,7 +610,7 @@ export default function ArtistAliasesPage() {
                   {sourceResults.map((artist) => (
                     <button
                       key={artist.artist_id}
-                      onClick={() => setSourceArtist(artist)}
+                      onClick={() => { setSourceArtist(artist); setMergePreview(null); }}
                       className={`w-full rounded-xl border p-3 text-left transition-colors ${
                         sourceArtist?.artist_id === artist.artist_id
                           ? "border-amber-400 bg-amber-50"
@@ -588,7 +663,7 @@ export default function ArtistAliasesPage() {
                   {canonicalResults.map((artist) => (
                     <button
                       key={artist.artist_id}
-                      onClick={() => setCanonicalArtist(artist)}
+                      onClick={() => { setCanonicalArtist(artist); setMergePreview(null); }}
                       className={`w-full rounded-xl border p-3 text-left transition-colors ${
                         canonicalArtist?.artist_id === artist.artist_id
                           ? "border-emerald-400 bg-emerald-50"
@@ -629,13 +704,67 @@ export default function ArtistAliasesPage() {
                 Archive the source duplicate after merge
               </label>
 
-              <button
-                onClick={mergeArtists}
-                disabled={mergeLoading || !sourceArtist || !canonicalArtist || sourceArtist?.artist_id === canonicalArtist?.artist_id}
-                className="mt-4 rounded-xl bg-[#5f8f2f] px-5 py-2.5 text-[13px] font-black text-white disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {mergeLoading ? "Merging…" : "Merge artists"}
-              </button>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  onClick={loadMergePreview}
+                  disabled={previewingMerge || !sourceArtist || !canonicalArtist || sourceArtist?.artist_id === canonicalArtist?.artist_id}
+                  className="rounded-xl border border-[#dfe4d8] bg-white px-5 py-2.5 text-[13px] font-black text-[#171712] disabled:cursor-not-allowed disabled:opacity-50 hover:border-[#85c441]"
+                >
+                  {previewingMerge ? "Previewing…" : "Preview safe merge"}
+                </button>
+
+                <button
+                  onClick={mergeArtists}
+                  disabled={mergeLoading || !mergePreview || !sourceArtist || !canonicalArtist || sourceArtist?.artist_id === canonicalArtist?.artist_id}
+                  className="rounded-xl bg-[#5f8f2f] px-5 py-2.5 text-[13px] font-black text-white disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {mergeLoading ? "Merging…" : "Apply safe merge"}
+                </button>
+              </div>
+
+              {mergePreview && (
+                <div className="mt-4 rounded-2xl border border-[#dfe4d8] bg-[#fbfcf8] p-4">
+                  <p className="text-[13px] font-black text-[#171712]">Safe merge preview</p>
+                  <p className="mt-1 text-[12px] leading-relaxed text-[#697062]">
+                    Duplicate credit links will be archived with metadata. Remaining source credits will move to the canonical artist.
+                  </p>
+
+                  <div className="mt-3 grid gap-2 sm:grid-cols-4">
+                    <div className="rounded-xl bg-white p-3">
+                      <p className="text-[18px] font-black text-[#171712]">{mergePreview.trackCredits?.length ?? 0}</p>
+                      <p className="text-[10px] font-black uppercase text-[#858c7e]">track credits</p>
+                    </div>
+                    <div className="rounded-xl bg-white p-3">
+                      <p className="text-[18px] font-black text-[#171712]">{mergePreview.releaseCredits?.length ?? 0}</p>
+                      <p className="text-[10px] font-black uppercase text-[#858c7e]">release credits</p>
+                    </div>
+                    <div className="rounded-xl bg-white p-3">
+                      <p className="text-[18px] font-black text-[#171712]">{mergePreview.chartEntries?.length ?? 0}</p>
+                      <p className="text-[10px] font-black uppercase text-[#858c7e]">chart rows</p>
+                    </div>
+                    <div className="rounded-xl bg-white p-3">
+                      <p className="text-[18px] font-black text-amber-700">
+                        {[...(mergePreview.trackCredits ?? []), ...(mergePreview.releaseCredits ?? [])].filter((credit) => credit.will_archive_duplicate).length}
+                      </p>
+                      <p className="text-[10px] font-black uppercase text-[#858c7e]">duplicates archived</p>
+                    </div>
+                  </div>
+
+                  {(mergePreview.trackCredits?.length ?? 0) > 0 && (
+                    <div className="mt-3 max-h-[180px] overflow-auto rounded-xl border border-[#e8ece2] bg-white p-3">
+                      <p className="mb-2 text-[10px] font-black uppercase tracking-wider text-[#858c7e]">Affected tracks</p>
+                      {(mergePreview.trackCredits ?? []).slice(0, 20).map((credit) => (
+                        <div key={credit.credit_id} className="flex items-center justify-between gap-3 border-b border-[#eef1ea] py-1.5 last:border-b-0">
+                          <span className="truncate text-[12px] font-bold text-[#171712]">{credit.track_title ?? "Unknown track"}</span>
+                          <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${credit.will_archive_duplicate ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"}`}>
+                            {credit.will_archive_duplicate ? "archive duplicate" : "move"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
