@@ -1118,13 +1118,98 @@ async function handleSendIssue(body: any, c: Record<string, string>, auth: { id:
   const { data: issue } = await db.from("briefing_issues").select("*, briefing_catalog!inner(slug, title, visual_config)").eq("id", issueId).maybeSingle();
   if (!issue) return jE("not_found", "Issue not found.", c);
   if (issue.status === "sent") return jE("already_sent", "This issue has already been sent.", c, 409);
-  const { data: optIns } = await db.from("briefing_opt_ins").select("subscriber_id, briefing_subscribers!inner(id, email)").eq("briefing_id", issue.briefing_id).eq("status", "active");
-  const subscribers = (optIns ?? []).map((o: any) => ({ subscriber_id: o.subscriber_id, email: (o.briefing_subscribers as any)?.email ?? "" })).filter((s: any) => s.email);
-  if (subscribers.length === 0) return jO({ sent: false, sent_count: 0, message: "No active subscribers for this briefing." }, c);
+
   const briefingTitle = (issue.briefing_catalog as any)?.title ?? issue.title;
   const briefingSlug = (issue.briefing_catalog as any)?.slug ?? "";
   const origin = body.origin || "https://wakilisha.africa";
   const branding: Branding = { brandName: body.brand_name || "WAKILISHA", brandLogoUrl: body.brand_logo_url || "", brandFaviconUrl: body.brand_favicon_url || "" };
+
+  const rawSegmentFilters = body.segment_filters && typeof body.segment_filters === "object" ? body.segment_filters : null;
+  const hasSegmentFilters = Boolean(rawSegmentFilters && [
+    rawSegmentFilters.briefing_slug,
+    rawSegmentFilters.entity_type,
+    rawSegmentFilters.entity_slug,
+    rawSegmentFilters.source_form,
+  ].some((value) => String(value ?? "").trim().length > 0));
+
+  const segmentFilters = hasSegmentFilters ? {
+    subscriber_status: "confirmed",
+    interest_status: "active",
+    briefing_slug: String(rawSegmentFilters.briefing_slug ?? briefingSlug).trim() || briefingSlug,
+    entity_type: String(rawSegmentFilters.entity_type ?? "").trim(),
+    entity_slug: String(rawSegmentFilters.entity_slug ?? "").trim(),
+    source_form: String(rawSegmentFilters.source_form ?? "").trim(),
+  } : null;
+
+  if (segmentFilters?.briefing_slug && segmentFilters.briefing_slug !== briefingSlug) {
+    return jE("briefing_mismatch", `Selected segment briefing "${segmentFilters.briefing_slug}" does not match issue briefing "${briefingSlug}".`, c, 409);
+  }
+
+  let segmentSubscriberIds: string[] | null = null;
+
+  if (segmentFilters) {
+    let segmentQuery = db
+      .from("audience_interests")
+      .select("subscriber_id, briefing_subscribers!inner(id,email,status)")
+      .eq("status", "active")
+      .eq("briefing_subscribers.status", "confirmed")
+      .limit(5000);
+
+    if (segmentFilters.entity_type) segmentQuery = segmentQuery.eq("entity_type", segmentFilters.entity_type);
+    if (segmentFilters.entity_slug) segmentQuery = segmentQuery.eq("entity_slug", segmentFilters.entity_slug);
+    if (segmentFilters.source_form) segmentQuery = segmentQuery.eq("source_form", segmentFilters.source_form);
+
+    const { data: segmentRows, error: segmentError } = await segmentQuery;
+    if (segmentError) return jE("query_failed", segmentError.message, c, 500);
+
+    segmentSubscriberIds = Array.from(new Set((segmentRows ?? []).map((row: any) => row.subscriber_id).filter(Boolean)));
+
+    if (segmentSubscriberIds.length === 0) {
+      return jO({
+        sent: false,
+        sent_count: 0,
+        failed_count: 0,
+        total_subscribers: 0,
+        segment_send: true,
+        segment_filters: segmentFilters,
+        message: "No confirmed subscribers match this segment.",
+      }, c);
+    }
+  }
+
+  let optInQuery = db
+    .from("briefing_opt_ins")
+    .select("subscriber_id, briefing_subscribers!inner(id, email, status)")
+    .eq("briefing_id", issue.briefing_id)
+    .eq("status", "active")
+    .eq("briefing_subscribers.status", "confirmed");
+
+  if (segmentSubscriberIds) optInQuery = optInQuery.in("subscriber_id", segmentSubscriberIds);
+
+  const { data: optIns, error: optInError } = await optInQuery;
+  if (optInError) return jE("query_failed", optInError.message, c, 500);
+
+  const subscriberMap = new Map<string, { subscriber_id: string; email: string }>();
+  for (const optIn of optIns ?? []) {
+    const email = (optIn.briefing_subscribers as any)?.email ?? "";
+    if (!email) continue;
+    subscriberMap.set(optIn.subscriber_id, { subscriber_id: optIn.subscriber_id, email });
+  }
+
+  const subscribers = Array.from(subscriberMap.values());
+
+  if (subscribers.length === 0) {
+    return jO({
+      sent: false,
+      sent_count: 0,
+      failed_count: 0,
+      total_subscribers: 0,
+      segment_send: hasSegmentFilters,
+      segment_filters: segmentFilters,
+      message: hasSegmentFilters ? "No confirmed active opt-ins match this segment for this briefing." : "No confirmed active subscribers for this briefing.",
+    }, c);
+  }
+
   let sentCount = 0; let failedCount = 0; const recipients: any[] = [];
   for (const sub of subscribers) {
     const rId = crypto.randomUUID();
@@ -1137,15 +1222,29 @@ async function handleSendIssue(body: any, c: Record<string, string>, auth: { id:
         const html = wrapBriefingHtml(htmlBody, briefingTitle, sub.email, unsubToken, origin, branding);
         const text = (issue.plain_text ?? `${briefingTitle}\n\nUnsubscribe: ${unsubUrl}`).replace(/\{\{unsubscribe_url\}\}/g, `Unsubscribe: ${unsubUrl}`).replace(/\{\{preferences_url\}\}/g, `Manage preferences: ${prefsUrl}`);
         const resendHeaders: Record<string, string> = { "List-Unsubscribe": `<mailto:${RFE}?subject=Unsubscribe%20${briefingSlug}>, <${unsubUrl}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" };
-        const resendResult = await sendEmail(sub.email, briefingTitle, html, text, [{ name: "wakilisha_event", value: "briefing_send" }, { name: "briefing_slug", value: briefingSlug }], resendHeaders);
+        const resendResult = await sendEmail(sub.email, briefingTitle, html, text, [
+          { name: "wakilisha_event", value: "briefing_send" },
+          { name: "briefing_slug", value: briefingSlug },
+          { name: "send_scope", value: hasSegmentFilters ? "segment" : "briefing" },
+        ], resendHeaders);
         recipients.push({ id: rId, issue_id: issueId, subscriber_id: sub.subscriber_id, delivery_status: "sent", delivered_at: now, resend_message_id: resendResult?.id ?? null });
       } else { recipients.push({ id: rId, issue_id: issueId, subscriber_id: sub.subscriber_id, delivery_status: "queued" }); }
       sentCount++;
     } catch (e) { recipients.push({ id: rId, issue_id: issueId, subscriber_id: sub.subscriber_id, delivery_status: "queued" }); failedCount++; }
   }
+
   if (recipients.length > 0) { for (let j = 0; j < recipients.length; j += 100) { await db.from("briefing_issue_recipients").insert(recipients.slice(j, j + 100)); } }
   await db.from("briefing_issues").update({ status: "sent", sent_at: now, sent_count: sentCount, sent_by: auth.id, updated_at: now }).eq("id", issueId);
-  return jO({ sent: true, sent_count: sentCount, failed_count: failedCount, total_subscribers: subscribers.length, message: `Sent to ${sentCount}/${subscribers.length} subscribers.` }, c);
+
+  return jO({
+    sent: true,
+    sent_count: sentCount,
+    failed_count: failedCount,
+    total_subscribers: subscribers.length,
+    segment_send: hasSegmentFilters,
+    segment_filters: segmentFilters,
+    message: `${hasSegmentFilters ? "Segment sent" : "Sent"} to ${sentCount}/${subscribers.length} confirmed subscriber${subscribers.length === 1 ? "" : "s"}.`,
+  }, c);
 }
 
 async function handleSendTest(body: any, c: Record<string, string>, auth: { id: string; email: string }) {
