@@ -65,6 +65,31 @@ interface ArtistResolutionEvent {
   created_at: string;
 }
 
+type DecoupleDecisionType = "split_combined_artist" | "split_raw_credit" | "block_alias" | "needs_follow_up" | "not_a_decouple";
+type DecoupleDecisionStatus = "draft" | "ready" | "applied" | "blocked" | "failed" | "superseded";
+
+interface DecoupleDecision {
+  id: string;
+  source_key: string;
+  source_type: SourceType;
+  source_table: string | null;
+  source_id: string | null;
+  source_label: string;
+  source_snapshot: Record<string, unknown>;
+  source_artist_id: string | null;
+  raw_credit_text: string | null;
+  parsed_tokens: Array<Record<string, unknown>>;
+  selected_artists: Array<Record<string, unknown>>;
+  chart_primary_artist_id: string | null;
+  decision_type: DecoupleDecisionType;
+  decision_status: DecoupleDecisionStatus;
+  note: string | null;
+  applied_at: string | null;
+  apply_result_json: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+}
+
 type Toast = { message: string; type: "success" | "error" } | null;
 
 const INPUT_CLASS = "min-w-0 rounded-xl border border-[#dfe4d8] bg-white px-3 py-2 text-[13px] outline-none focus:border-[#85c441]";
@@ -130,6 +155,49 @@ function asHistoryRows(data: unknown): ArtistResolutionEvent[] {
     release_links: row.release_links ?? [],
     chart_entries: row.chart_entries ?? [],
   }));
+}
+
+function asDecisionRows(data: unknown): DecoupleDecision[] {
+  return ((data as DecoupleDecision[]) ?? []).map((row) => ({
+    ...row,
+    parsed_tokens: row.parsed_tokens ?? [],
+    selected_artists: row.selected_artists ?? [],
+  }));
+}
+
+function decisionTypeLabel(value: DecoupleDecisionType): string {
+  switch (value) {
+    case "split_combined_artist": return "Split combined artist";
+    case "split_raw_credit": return "Split raw credit";
+    case "block_alias": return "Block alias";
+    case "needs_follow_up": return "Needs follow-up";
+    case "not_a_decouple": return "Not a decouple";
+    default: return value;
+  }
+}
+
+function decisionStatusClass(status: DecoupleDecisionStatus): string {
+  if (status === "applied") return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  if (status === "ready") return "border-sky-200 bg-sky-50 text-sky-800";
+  if (status === "blocked") return "border-amber-200 bg-amber-50 text-amber-800";
+  if (status === "failed") return "border-red-200 bg-red-50 text-red-800";
+  if (status === "superseded") return "border-gray-200 bg-gray-50 text-gray-700";
+  return "border-[#dfe4d8] bg-white text-[#5d6557]";
+}
+
+function sourceKeyFor(sourceType: SourceType, artist: RegistryArtistSearchResult | null): string | null {
+  if (!artist) return null;
+  return `${sourceType}:${artist.artist_id}`;
+}
+
+function parseCreditTokens(value: string | null | undefined): Array<Record<string, unknown>> {
+  const clean = value?.trim() ?? "";
+  if (!clean) return [];
+  return clean
+    .split(/\s+(?:x|X|and|with|feat\.?|ft\.?|featuring)\s+|[,/&+]+/g)
+    .map((token) => token.trim())
+    .filter(Boolean)
+    .map((token, index) => ({ token, token_order: index + 1 }));
 }
 
 function asPreview(data: unknown): DecouplePreview | null {
@@ -205,10 +273,12 @@ function SourceCard({
 function ArtistCandidateCard({
   artist,
   selected,
+  decision,
   onSelect,
 }: {
   artist: RegistryArtistSearchResult;
   selected: boolean;
+  decision: DecoupleDecision | null;
   onSelect: () => void;
 }) {
   return (
@@ -227,9 +297,16 @@ function ArtistCandidateCard({
           {artist.status}
         </span>
       </div>
-      <p className="mt-2 text-[10px] font-bold uppercase tracking-wide text-[#858c7e]">
-        {artist.track_credit_count} track credits · {artist.release_credit_count} release credits
-      </p>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <p className="text-[10px] font-bold uppercase tracking-wide text-[#858c7e]">
+          {artist.track_credit_count} track credits · {artist.release_credit_count} release credits
+        </p>
+        {decision && (
+          <span className={`rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-wide ${decisionStatusClass(decision.decision_status)}`}>
+            {decision.decision_status}
+          </span>
+        )}
+      </div>
     </button>
   );
 }
@@ -285,12 +362,26 @@ function PreviewPanel({
   preview,
   loading,
   sourceArtist,
+  decision,
+  decisionType,
+  setDecisionType,
+  decisionNote,
+  setDecisionNote,
+  savingDecision,
   onLoadPreview,
+  onSaveDecision,
 }: {
   preview: DecouplePreview | null;
   loading: boolean;
   sourceArtist: RegistryArtistSearchResult | null;
+  decision: DecoupleDecision | null;
+  decisionType: DecoupleDecisionType;
+  setDecisionType: (value: DecoupleDecisionType) => void;
+  decisionNote: string;
+  setDecisionNote: (value: string) => void;
+  savingDecision: boolean;
   onLoadPreview: () => void;
+  onSaveDecision: () => void;
 }) {
   if (!sourceArtist) {
     return (
@@ -323,6 +414,21 @@ function PreviewPanel({
         </button>
       </div>
 
+      {decision && (
+        <div className="mt-4 rounded-2xl border border-[#dfe4d8] bg-[#fbfcf8] p-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={`rounded-full border px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${decisionStatusClass(decision.decision_status)}`}>
+              {decision.decision_status}
+            </span>
+            <span className="text-[12px] font-bold text-[#171712]">{decisionTypeLabel(decision.decision_type)}</span>
+          </div>
+          {decision.note && <p className="mt-2 text-[12px] leading-relaxed text-[#697062]">{decision.note}</p>}
+          <p className="mt-2 text-[10px] font-bold uppercase tracking-wide text-[#858c7e]">
+            Saved {new Date(decision.updated_at).toLocaleString()}
+          </p>
+        </div>
+      )}
+
       <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
         <div className="flex items-start gap-2">
           <WkIcon name="AlertTriangle" size={16} className="mt-0.5 shrink-0 text-amber-700" />
@@ -337,6 +443,39 @@ function PreviewPanel({
 
       {preview && (
         <div className="mt-4 space-y-4">
+          <div className="rounded-2xl border border-[#dfe4d8] bg-white p-4">
+            <p className="text-[13px] font-black text-[#171712]">Decision capture</p>
+            <p className="mt-1 text-[12px] leading-relaxed text-[#697062]">
+              Phase 2 saves the decouple decision only. Replacement artists and apply are still locked for later phases.
+            </p>
+
+            <div className="mt-3 grid gap-3 md:grid-cols-[0.8fr_1fr]">
+              <div>
+                <label className={LABEL_CLASS}>Decision type</label>
+                <select value={decisionType} onChange={(event) => setDecisionType(event.target.value as DecoupleDecisionType)} className={INPUT_CLASS}>
+                  <option value="split_combined_artist">Split combined artist</option>
+                  <option value="split_raw_credit">Split raw credit</option>
+                  <option value="block_alias">Block alias</option>
+                  <option value="needs_follow_up">Needs follow-up</option>
+                  <option value="not_a_decouple">Not a decouple</option>
+                </select>
+              </div>
+              <div>
+                <label className={LABEL_CLASS}>Decision note</label>
+                <input
+                  value={decisionNote}
+                  onChange={(event) => setDecisionNote(event.target.value)}
+                  className={INPUT_CLASS}
+                  placeholder="Why is this source being staged?"
+                />
+              </div>
+            </div>
+
+            <button onClick={onSaveDecision} disabled={savingDecision} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-[#5f8f2f] px-4 py-2 text-[12px] font-black text-white disabled:opacity-50">
+              <WkIcon name={savingDecision ? "Loader2" : "Save"} size={13} className={savingDecision ? "animate-spin" : ""} />
+              {savingDecision ? "Saving decision…" : "Save source decision"}
+            </button>
+          </div>
           <div className="grid gap-2 sm:grid-cols-4">
             <div className="rounded-xl bg-[#fbfcf8] p-3">
               <p className="text-[20px] font-black text-[#171712]">{totalCredits}</p>
@@ -495,7 +634,12 @@ export default function AdminArtistDecouplePage() {
   const [searchingSource, setSearchingSource] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [history, setHistory] = useState<ArtistResolutionEvent[]>([]);
+  const [decisions, setDecisions] = useState<DecoupleDecision[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [decisionsLoading, setDecisionsLoading] = useState(false);
+  const [decisionType, setDecisionType] = useState<DecoupleDecisionType>("split_combined_artist");
+  const [decisionNote, setDecisionNote] = useState("");
+  const [savingDecision, setSavingDecision] = useState(false);
   const [toast, setToast] = useState<Toast>(null);
 
   const showToast = useCallback((message: string, type: "success" | "error" = "success") => {
@@ -504,6 +648,17 @@ export default function AdminArtistDecouplePage() {
   }, []);
 
   const canSearchSource = selectedSource === "registry" || selectedSource === "manual";
+
+  const decisionsBySourceKey = useMemo(() => {
+    const map = new Map<string, DecoupleDecision>();
+    decisions.forEach((decision) => map.set(decision.source_key, decision));
+    return map;
+  }, [decisions]);
+
+  const selectedDecision = useMemo(() => {
+    const key = sourceKeyFor(selectedSource, sourceArtist);
+    return key ? decisionsBySourceKey.get(key) ?? null : null;
+  }, [decisionsBySourceKey, selectedSource, sourceArtist]);
 
   const loadHistory = useCallback(async () => {
     setHistoryLoading(true);
@@ -518,16 +673,34 @@ export default function AdminArtistDecouplePage() {
     }
   }, []);
 
+  const loadDecisions = useCallback(async () => {
+    setDecisionsLoading(true);
+    try {
+      const { data, error } = await supabase.rpc("admin_get_artist_decouple_decisions", {
+        p_source_type: null,
+      });
+      if (error) throw error;
+      setDecisions(asDecisionRows(data));
+    } catch {
+      setDecisions([]);
+    } finally {
+      setDecisionsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadHistory();
-  }, [loadHistory]);
+    loadDecisions();
+  }, [loadHistory, loadDecisions]);
 
   const sourceCounts = useMemo(() => ({
     trackCredits: preview?.trackCredits.length ?? 0,
     releaseCredits: preview?.releaseCredits.length ?? 0,
     chartRows: preview?.chartEntries.length ?? 0,
     candidates: sourceResults.length,
-  }), [preview, sourceResults.length]);
+    decisions: decisions.length,
+    draftDecisions: decisions.filter((decision) => decision.decision_status === "draft").length,
+  }), [decisions, preview, sourceResults.length]);
 
   const searchSourceArtists = useCallback(async () => {
     const clean = sourceQuery.trim();
@@ -562,7 +735,11 @@ export default function AdminArtistDecouplePage() {
   const selectSourceArtist = useCallback((artist: RegistryArtistSearchResult) => {
     setSourceArtist(artist);
     setPreview(null);
-  }, []);
+    const key = sourceKeyFor(selectedSource, artist);
+    const existing = key ? decisionsBySourceKey.get(key) : null;
+    setDecisionType(existing?.decision_type ?? "split_combined_artist");
+    setDecisionNote(existing?.note ?? "");
+  }, [decisionsBySourceKey, selectedSource]);
 
   const loadPreview = useCallback(async () => {
     if (!sourceArtist) {
@@ -589,12 +766,59 @@ export default function AdminArtistDecouplePage() {
     }
   }, [showToast, sourceArtist]);
 
+  const saveSourceDecision = useCallback(async () => {
+    if (!sourceArtist || !preview) {
+      showToast("Preview a source candidate before saving a decision.", "error");
+      return;
+    }
+
+    const status: DecoupleDecisionStatus =
+      decisionType === "not_a_decouple" || decisionType === "block_alias" ? "blocked" : "draft";
+
+    setSavingDecision(true);
+
+    try {
+      const sourceSnapshot = {
+        sourceArtist,
+        preview,
+        sourceType: selectedSource,
+      };
+
+      const { error } = await supabase.rpc("admin_upsert_artist_decouple_decision", {
+        p_source_type: selectedSource,
+        p_source_table: "registry_artists",
+        p_source_id: sourceArtist.artist_id,
+        p_source_label: `${sourceArtist.display_name} (${sourceArtist.artist_slug})`,
+        p_source_artist_id: sourceArtist.artist_id,
+        p_raw_credit_text: sourceArtist.display_name,
+        p_source_snapshot: sourceSnapshot,
+        p_parsed_tokens: parseCreditTokens(sourceArtist.display_name),
+        p_selected_artists: [],
+        p_chart_primary_artist_id: null,
+        p_decision_type: decisionType,
+        p_decision_status: status,
+        p_note: decisionNote || null,
+      });
+
+      if (error) throw error;
+
+      await loadDecisions();
+      showToast("Decouple source decision saved", "success");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Could not save decouple decision", "error");
+    } finally {
+      setSavingDecision(false);
+    }
+  }, [decisionNote, decisionType, loadDecisions, preview, selectedSource, showToast, sourceArtist]);
+
   const switchSource = useCallback((source: SourceType) => {
     setSelectedSource(source);
     setSourceQuery("");
     setSourceResults([]);
     setSourceArtist(null);
     setPreview(null);
+    setDecisionType("split_combined_artist");
+    setDecisionNote("");
   }, []);
 
   return (
@@ -641,6 +865,17 @@ export default function AdminArtistDecouplePage() {
         <div className="rounded-2xl border border-[#dfe4d8] bg-white p-4">
           <p className="text-[11px] font-black uppercase tracking-wide text-[#71796b]">Chart rows</p>
           <p className="mt-1 text-[28px] font-black text-[#171712]">{sourceCounts.chartRows}</p>
+        </div>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2">
+        <div className="rounded-2xl border border-[#dfe4d8] bg-white p-4">
+          <p className="text-[11px] font-black uppercase tracking-wide text-[#71796b]">Saved decisions</p>
+          <p className="mt-1 text-[28px] font-black text-[#171712]">{decisionsLoading ? "…" : sourceCounts.decisions}</p>
+        </div>
+        <div className="rounded-2xl border border-[#dfe4d8] bg-white p-4">
+          <p className="text-[11px] font-black uppercase tracking-wide text-[#71796b]">Draft source decisions</p>
+          <p className="mt-1 text-[28px] font-black text-[#171712]">{decisionsLoading ? "…" : sourceCounts.draftDecisions}</p>
         </div>
       </div>
 
@@ -694,6 +929,7 @@ export default function AdminArtistDecouplePage() {
                     key={artist.artist_id}
                     artist={artist}
                     selected={sourceArtist?.artist_id === artist.artist_id}
+                    decision={decisionsBySourceKey.get(`${selectedSource}:${artist.artist_id}`) ?? null}
                     onSelect={() => selectSourceArtist(artist)}
                   />
                 ))}
@@ -708,7 +944,14 @@ export default function AdminArtistDecouplePage() {
           preview={preview}
           loading={previewLoading}
           sourceArtist={sourceArtist}
+          decision={selectedDecision}
+          decisionType={decisionType}
+          setDecisionType={setDecisionType}
+          decisionNote={decisionNote}
+          setDecisionNote={setDecisionNote}
+          savingDecision={savingDecision}
           onLoadPreview={loadPreview}
+          onSaveDecision={saveSourceDecision}
         />
       </div>
 
