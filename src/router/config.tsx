@@ -23,6 +23,7 @@ import AdminArtistsPage from "../pages/admin/registry/artists/page";
 import AdminTracksPage from "../pages/admin/registry/tracks/page";
 import AdminReleasesPage from "../pages/admin/registry/releases/page";
 import AdminArtistAliasesPage from "../pages/admin/registry/artist-aliases/page";
+import AdminArtistDecouplePage from "../pages/admin/registry/artist-aliases/decouple/page";
 import AdminLabelsPage from "../pages/admin/registry/labels/page";
 import AdminGenresPage from "../pages/admin/registry/genres/page";
 import AdminMediaLibraryPage from "../pages/admin/media/library/page";
@@ -281,6 +282,7 @@ const routes: RouteObject[] = [
           { path: "tracks/:slug", element: <AdminTrackDetailPage /> },
           { path: "releases", element: <AdminReleasesPage /> },
           { path: "artist-aliases", element: <AdminArtistAliasesPage /> },
+          { path: "artist-aliases/decouple", element: <AdminArtistDecouplePage /> },
           { path: "releases/:slug", element: <AdminReleaseDetailPage /> },
           { path: "labels", element: <AdminLabelsPage /> },
           { path: "labels/:slug", element: <AdminLabelDetailPage /> },
