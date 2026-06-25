@@ -13,6 +13,7 @@ import {
   detectProvidersFromUrls,
   isValidProviderUrl,
 } from "./providerDetection";
+import { getEligibilityProfile } from "../chartsEligibility/eligibilityStore";
 
 export type IngestionMode = "production";
 
@@ -166,7 +167,19 @@ export function getIngestStudioEndpointGroups(): Record<string, EndpointDefiniti
 // Production pipeline (new 21-stage ingest run system)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export const runDryRun = ingestStudioAdapter.runDryRun;
+export const runDryRun: typeof ingestStudioAdapter.runDryRun = (request) => {
+  const payload = request as Parameters<typeof ingestStudioAdapter.runDryRun>[0] & Record<string, unknown>;
+  const profileId = typeof payload.eligibilityProfileId === "string" ? payload.eligibilityProfileId : "";
+  const profile = profileId ? getEligibilityProfile(profileId) : null;
+  const releaseEligibility = profile?.releaseEligibility;
+
+  return ingestStudioAdapter.runDryRun({
+    ...payload,
+    eligibilityProfileSnapshot: payload.eligibilityProfileSnapshot ?? profile ?? null,
+    releaseWindowStart: payload.releaseWindowStart ?? releaseEligibility?.releaseWindowFrom ?? null,
+    releaseWindowEnd: payload.releaseWindowEnd ?? releaseEligibility?.releaseWindowTo ?? null,
+  } as Parameters<typeof ingestStudioAdapter.runDryRun>[0]);
+};
 export const commitIngestRun = ingestStudioAdapter.commitIngestRun;
 export const cancelIngestRun = ingestStudioAdapter.cancelIngestRun;
 export const retryIngestRun = ingestStudioAdapter.retryIngestRun;
