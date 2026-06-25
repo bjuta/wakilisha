@@ -614,6 +614,184 @@ async function trackAnalyticsEvent(db: any, eventName: string, opts: { pageUrl?:
   try { await db.from("analytics_events").insert({ event_name: eventName, page_url: opts.pageUrl ?? "https://wakilisha.africa", page_type: opts.pageType ?? null, entity_slug: opts.entitySlug ?? null, entity_type: opts.entityType ?? null, context: opts.context ?? null, session_id: opts.sessionId ?? "wk_server_webhook", user_id: opts.userId ?? null, referrer: opts.referrer ?? null, created_at: is() }); } catch (e) { console.error("[analytics] track failed:", e instanceof Error ? e.message : String(e)); }
 }
 
+
+type AudienceInterestInput = {
+  entity_type?: unknown;
+  entity_slug?: unknown;
+  entity_name?: unknown;
+  entity_id?: unknown;
+  interest_kind?: unknown;
+  source_form?: unknown;
+  source_page?: unknown;
+  source_context?: unknown;
+  interest_strength?: unknown;
+};
+
+const AUDIENCE_ENTITY_TYPES = new Set(["artist", "track", "release", "guide", "chart", "genre", "label", "article", "briefing"]);
+const AUDIENCE_INTEREST_KINDS = new Set(["follow", "subscribe", "download", "save", "click", "read", "manual"]);
+
+function cleanAudienceText(value: unknown, max = 180): string {
+  return typeof value === "string" ? value.trim().replace(/\s+/g, " ").slice(0, max) : "";
+}
+
+function cleanAudienceSlug(value: unknown): string {
+  return cleanAudienceText(value, 220)
+    .toLowerCase()
+    .replace(/[^a-z0-9/_-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function cleanAudienceUuid(value: unknown): string | null {
+  const text = cleanAudienceText(value, 80);
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(text) ? text : null;
+}
+
+function cleanAudienceObject(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function cleanInterestStrength(value: unknown): number {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return 1;
+  return Math.max(1, Math.min(100, Math.round(number)));
+}
+
+function normalizeAudienceInterestInputs(body: any): Array<Required<Pick<AudienceInterestInput, "entity_type" | "entity_slug">> & AudienceInterestInput> {
+  const rawItems: unknown[] = [
+    ...(Array.isArray(body.interests) ? body.interests : []),
+    ...(Array.isArray(body.audience_interests) ? body.audience_interests : []),
+  ];
+
+  if (body.entity_type && body.entity_slug) {
+    rawItems.push({
+      entity_type: body.entity_type,
+      entity_slug: body.entity_slug,
+      entity_name: body.entity_name,
+      entity_id: body.entity_id,
+      interest_kind: body.interest_kind,
+      source_form: body.source_form,
+      source_page: body.source_page ?? body.page_url,
+      source_context: body.source_context,
+      interest_strength: body.interest_strength,
+    });
+  }
+
+  const seen = new Set<string>();
+  const out: Array<Required<Pick<AudienceInterestInput, "entity_type" | "entity_slug">> & AudienceInterestInput> = [];
+
+  for (const raw of rawItems.slice(0, 25)) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) continue;
+    const item = raw as AudienceInterestInput;
+
+    const entityType = cleanAudienceText(item.entity_type, 40).toLowerCase();
+    const entitySlug = cleanAudienceSlug(item.entity_slug);
+    if (!AUDIENCE_ENTITY_TYPES.has(entityType) || !entitySlug) continue;
+
+    const key = `${entityType}:${entitySlug}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    const kind = cleanAudienceText(item.interest_kind, 40).toLowerCase();
+    out.push({
+      ...item,
+      entity_type: entityType,
+      entity_slug: entitySlug,
+      interest_kind: AUDIENCE_INTEREST_KINDS.has(kind) ? kind : "follow",
+    });
+  }
+
+  return out;
+}
+
+async function recordAudienceInterests(
+  db: any,
+  subscriberId: string,
+  inputs: ReturnType<typeof normalizeAudienceInterestInputs>,
+  defaults: {
+    sourceForm: string;
+    sourcePage: string;
+    pageType: string;
+    briefingSlugs: string[];
+  },
+) {
+  const now = is();
+  const recorded: any[] = [];
+
+  for (const input of inputs) {
+    const sourceContext = {
+      ...cleanAudienceObject(input.source_context),
+      page_type: defaults.pageType,
+      briefing_slugs: defaults.briefingSlugs,
+    };
+
+    const sourceForm = cleanAudienceText(input.source_form, 80) || defaults.sourceForm || "unknown";
+    const sourcePage = cleanAudienceText(input.source_page, 500) || defaults.sourcePage || "";
+    const entityName = cleanAudienceText(input.entity_name, 180) || null;
+    const entityId = cleanAudienceUuid(input.entity_id);
+    const interestKind = cleanAudienceText(input.interest_kind, 40).toLowerCase() || "follow";
+    const interestStrength = cleanInterestStrength(input.interest_strength);
+
+    const { data: existing } = await db
+      .from("audience_interests")
+      .select("id, interest_strength")
+      .eq("subscriber_id", subscriberId)
+      .eq("entity_type", input.entity_type)
+      .eq("entity_slug", input.entity_slug)
+      .maybeSingle();
+
+    if (existing?.id) {
+      const nextStrength = Math.max(Number(existing.interest_strength) || 1, interestStrength);
+      const { data: updated, error } = await db
+        .from("audience_interests")
+        .update({
+          entity_name: entityName,
+          entity_id: entityId,
+          interest_kind: interestKind,
+          source_form: sourceForm,
+          source_page: sourcePage,
+          source_context: sourceContext,
+          interest_strength: nextStrength,
+          status: "active",
+          last_seen_at: now,
+          updated_at: now,
+        })
+        .eq("id", existing.id)
+        .select("entity_type, entity_slug, entity_name, interest_kind, source_form, interest_strength")
+        .maybeSingle();
+
+      if (!error && updated) recorded.push(updated);
+      continue;
+    }
+
+    const { data: inserted, error } = await db
+      .from("audience_interests")
+      .insert({
+        subscriber_id: subscriberId,
+        entity_type: input.entity_type,
+        entity_slug: input.entity_slug,
+        entity_name: entityName,
+        entity_id: entityId,
+        interest_kind: interestKind,
+        source_form: sourceForm,
+        source_page: sourcePage,
+        source_context: sourceContext,
+        interest_strength: interestStrength,
+        status: "active",
+        first_seen_at: now,
+        last_seen_at: now,
+        created_at: now,
+        updated_at: now,
+      })
+      .select("entity_type, entity_slug, entity_name, interest_kind, source_form, interest_strength")
+      .maybeSingle();
+
+    if (!error && inserted) recorded.push(inserted);
+  }
+
+  return recorded;
+}
+
+
 // ═══ HANDLERS ═══
 async function listCatalog(c: Record<string, string>, includeAll = false) {
   const db = createClient(SU, SK); let query = db.from("briefing_catalog").select("*").order("sort_order");
@@ -640,6 +818,11 @@ async function handleUpdateCatalog(body: any, c: Record<string, string>) {
 async function handleSubscribe(body: any, c: Record<string, string>, ip: string, ua: string) {
   const email = String(body.email ?? "").trim().toLowerCase(); const briefingSlugs: string[] = Array.isArray(body.briefing_slugs) ? body.briefing_slugs : [];
   const origin = body.origin || "https://wakilisha.africa";
+  const sourceForm = cleanAudienceText(body.source_form, 80) || "briefing_subscribe";
+  const pageUrl = cleanAudienceText(body.page_url ?? body.source_page, 500) || origin;
+  const pageType = cleanAudienceText(body.page_type, 80) || "briefing";
+  const audienceInterestInputs = normalizeAudienceInterestInputs(body);
+
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return jE("invalid_email", "A valid email address is required.", c);
   if (briefingSlugs.length === 0) return jE("no_briefings", "Select at least one briefing to subscribe to.", c);
   const db = createClient(SU, SK); const now = is();
@@ -649,20 +832,55 @@ async function handleSubscribe(body: any, c: Record<string, string>, ip: string,
   let subscriberId: string;
   if (existing) { subscriberId = existing.id; if (existing.status === "unsubscribed") { await db.from("briefing_subscribers").update({ status: "pending", unsubscribed_at: null, updated_at: now }).eq("id", subscriberId); } }
   else { const { data: ns } = await db.from("briefing_subscribers").insert({ email, status: "pending", ip_address: ip, user_agent: ua, created_at: now, updated_at: now }).select("id").single(); if (!ns) return jE("insert_failed", "Could not create subscriber.", c, 500); subscriberId = ns.id; }
+
   const optedIn: string[] = [];
   for (const b of briefings) { const { error: oiErr } = await db.from("briefing_opt_ins").upsert({ subscriber_id: subscriberId, briefing_id: b.id, status: "active", subscribed_at: now, unsubscribed_at: null }, { onConflict: "subscriber_id,briefing_id" }); if (!oiErr) optedIn.push(b.title); }
+
+  const recordedInterests = await recordAudienceInterests(db, subscriberId, audienceInterestInputs, {
+    sourceForm,
+    sourcePage: pageUrl,
+    pageType,
+    briefingSlugs,
+  });
+
   const token = crypto.randomUUID(); const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
   await db.from("briefing_tokens").insert({ subscriber_id: subscriberId, token, purpose: "confirm", expires_at: expiresAt });
   await db.from("briefing_tokens").delete().eq("subscriber_id", subscriberId).eq("purpose", "confirm").is("used_at", null).neq("token", token);
-  trackAnalyticsEvent(db, "briefing_subscribe", { pageUrl: body.page_url ?? origin, pageType: body.page_type ?? "briefing", entitySlug: briefingSlugs[0] ?? null, entityType: "briefing", sessionId: body.session_id ?? null, referrer: body.referrer ?? null, context: { email, briefing_count: optedIn.length, briefings: optedIn } });
+
+  trackAnalyticsEvent(db, "briefing_subscribe", {
+    pageUrl: body.page_url ?? origin,
+    pageType,
+    entitySlug: recordedInterests[0]?.entity_slug ?? briefingSlugs[0] ?? null,
+    entityType: recordedInterests[0]?.entity_type ?? "briefing",
+    sessionId: body.session_id ?? null,
+    referrer: body.referrer ?? null,
+    context: {
+      email,
+      briefing_count: optedIn.length,
+      briefings: optedIn,
+      audience_interest_count: recordedInterests.length,
+      audience_interests: recordedInterests,
+      source_form: sourceForm,
+    }
+  });
+
   try {
     const confirmUrl = `${origin}/briefing/confirm?token=${token}`; const briefingList = optedIn.map((t: string) => `&bull; ${t}`).join("<br>");
     const branding: Branding = { brandName: body.brand_name || "WAKILISHA", brandLogoUrl: body.brand_logo_url || "", brandFaviconUrl: body.brand_favicon_url || "" };
     const html = briefingEmailHtml("Confirm your WAKILISHA briefings", `You signed up for these briefings:<br><br>${briefingList}<br><br>Click below to confirm your subscription.`, "Confirm subscription", confirmUrl, "This confirmation link expires in 7 days. If you didn't request this, you can safely ignore it.", branding);
     await sendEmail(email, "Confirm your WAKILISHA briefing subscription", html, `Confirm: ${confirmUrl}`, [{ name: "wakilisha_event", value: "briefing_confirm" }]);
   } catch (e) { console.error("[briefing] confirm email failed:", e instanceof Error ? e.message : String(e)); }
-  return jO({ subscriber_id: subscriberId, email, briefings: optedIn, status: existing?.status === "confirmed" ? "already_confirmed" : "pending_confirmation", message: existing?.status === "confirmed" ? "Briefings updated. You're already confirmed." : "Check your email to confirm your subscription." }, c);
+
+  return jO({
+    subscriber_id: subscriberId,
+    email,
+    briefings: optedIn,
+    audience_interests: recordedInterests,
+    status: existing?.status === "confirmed" ? "already_confirmed" : "pending_confirmation",
+    message: existing?.status === "confirmed" ? "Briefings updated. You're already confirmed." : "Check your email to confirm your subscription."
+  }, c);
 }
+
 
 async function handleConfirm(body: any, c: Record<string, string>) {
   const token = String(body.token ?? "").trim(); if (!token) return jE("missing_token", "Confirmation token is required.", c);
