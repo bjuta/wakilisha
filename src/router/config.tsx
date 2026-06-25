@@ -106,6 +106,7 @@ import AdminSettingsAirplay from "../pages/admin/settings/airplay/page";
 import AdminSettingsAudience from "../pages/admin/settings/audience/page";
 import AdminSettingsEmailBriefings from "../pages/admin/settings/email-briefings/page";
 import AdminSettingsMaintenance from "../pages/admin/settings/maintenance/page";
+import AdminSettingsSeo from "../pages/admin/settings/seo/page";
 import AdminSettingsNavigation from "../pages/admin/settings/navigation/page";
 import AdminSettingsAudit from "../pages/admin/settings/audit/page";
 import AdminSettingsSiteIdentity from "../pages/admin/settings/site-identity/page";
@@ -366,6 +367,7 @@ const routes: RouteObject[] = [
         { path: "audience", element: <AdminSettingsAudience /> },
         { path: "email-briefings", element: <AdminSettingsEmailBriefings /> },
         { path: "maintenance", element: <AdminSettingsMaintenance /> },
+        { path: "seo", element: <AdminSettingsSeo /> },
         { path: "navigation", element: <AdminSettingsNavigation /> },
         { path: "audit", element: <AdminSettingsAudit /> },
         { path: "site-identity", element: <AdminSettingsSiteIdentity /> },

@@ -12,6 +12,7 @@ export type AdminSettingsDomain =
   | "audience"
   | "emailBriefings"
   | "maintenance"
+  | "seo"
   | "navigation"
   | "audit"
   | "designSystem";
@@ -135,6 +136,15 @@ export const SETTINGS_DOMAINS: SettingsDomainMeta[] = [
     route: "/admin/settings/maintenance",
     health: "healthy",
     primaryAction: "Run checks",
+  },
+  {
+    key: "seo",
+    label: "SEO",
+    description: "Sitemap generation, Pro-Sitemaps refresh, robots and launch search readiness",
+    icon: "Globe",
+    route: "/admin/settings/seo",
+    health: "warning",
+    primaryAction: "Generate sitemap",
   },
   {
     key: "navigation",
