@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { trackEvent, getAnalyticsSessionId, getCanonicalPageUrl } from "@/services/analytics";
 import { submitForm } from "@/services/formService";
+import { BRIEFING_SLUGS, guideInterest, subscribeToBriefings } from "@/services/audienceSubscriptionService";
 import { dakarData } from "@/pages/guides/detail/dakarData";
 import { MobileShareButton } from "@/components/design-system/share/ShareSheet";
 
@@ -20,7 +21,7 @@ export default function MobileDakarGuide() {
   const handleFollowSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    trackEvent("newsletter_signup", {
+    trackEvent("guide_subscribe_submit", {
       pageType: "guide_detail",
       entitySlug: guideSlug,
       entityType: "guide",
@@ -39,10 +40,30 @@ export default function MobileDakarGuide() {
       submission[key] = String(value);
     });
 
-    const result = await submitForm(submission);
-    if (result.success) {
+    try {
+      const result = await submitForm(submission);
+      if (!result.success) throw new Error(result.error ?? "Could not save subscription.");
+
+      await subscribeToBriefings(String(submission.email || ""), BRIEFING_SLUGS.fieldGuides, {
+        sourceForm: "mobile_dakar_follow",
+        pageType: "guide_detail",
+        pageUrl,
+        sessionId,
+        interests: [
+          guideInterest({
+            slug: guideSlug,
+            title: guideTitle,
+            sourceForm: "mobile_dakar_follow",
+            kind: "follow",
+            strength: 70,
+            sourceContext: { source_section: "follow_form_mobile", mobile: true },
+          }),
+        ],
+      });
+
       setFollowStatus("success");
-    } else {
+    } catch (error) {
+      console.warn("[mobile guide] subscription failed:", error);
       setFollowStatus("error");
     }
   };

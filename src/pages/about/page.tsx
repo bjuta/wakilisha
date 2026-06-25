@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { WkButton } from "@/components/design-system/primitives/Button";
 import { trackEvent, getAnalyticsSessionId, getCanonicalPageUrl } from "@/services/analytics";
-import { submitForm } from "@/services/formService";
+import { BRIEFING_SLUGS, isValidEmail, normalizeEmail, subscribeToBriefings } from "@/services/audienceSubscriptionService";
 
 function useScrollReveal() {
   useEffect(() => {
@@ -26,25 +26,36 @@ function useScrollReveal() {
 function AboutNewsletter() {
   const [email, setEmail] = useState("");
   const [done, setDone] = useState(false);
+  const [error, setError] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim()) return;
 
-    const form = e.currentTarget as HTMLFormElement;
-    const formData = new FormData(form);
-    const submission: Record<string, string> = { form_type: "newsletter" };
-    formData.forEach((value, key) => {
-      submission[key] = String(value);
-    });
+    const emailValue = normalizeEmail(email);
+    if (!isValidEmail(emailValue)) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+
+    setError("");
 
     trackEvent("newsletter_signup", {
       pageType: "about",
-      context: { sourceSection: "newsletter_footer", formId: "about-newsletter" },
+      context: { sourceSection: "newsletter_footer", formId: "about-newsletter", briefing_slugs: BRIEFING_SLUGS.cultureDispatch },
     });
 
-    const result = await submitForm(submission);
-    if (result.success) setDone(true);
+    try {
+      await subscribeToBriefings(emailValue, BRIEFING_SLUGS.cultureDispatch, {
+        sourceForm: "about_newsletter",
+        pageType: "about",
+        pageUrl: getCanonicalPageUrl(),
+        sessionId: getAnalyticsSessionId(),
+        sourceContext: { source_section: "newsletter_footer", form_id: "about-newsletter" },
+      });
+      setDone(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+    }
   };
 
   return (
@@ -79,6 +90,7 @@ function AboutNewsletter() {
             </div>
             <button type="submit" className="h-12 px-7 rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] text-[14px] font-extrabold hover:-translate-y-0.5 transition-transform whitespace-nowrap shrink-0 cursor-pointer">Subscribe</button>
           </form>
+          {error && <p className="mt-3 text-[12px] font-semibold text-[var(--wk-danger)]">{error}</p>}
           <p className="mt-4 text-[11px] font-semibold text-[var(--wk-text-faint)]">No spam. Unsubscribe anytime.</p>
         </div>
       )}

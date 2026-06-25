@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { trackEvent, getAnalyticsSessionId, getCanonicalPageUrl } from "@/services/analytics";
-import { submitForm } from "@/services/formService";
+import { BRIEFING_SLUGS, briefingInterest, subscribeToBriefings } from "@/services/audienceSubscriptionService";
 
 const guideEntries = [
   {
@@ -57,20 +57,30 @@ export default function MobileGuides() {
 
     setSubscribing(true);
 
-    const form = e.currentTarget as HTMLFormElement;
-    const formData = new FormData(form);
-    const submission: Record<string, string> = { form_type: "newsletter" };
-    formData.forEach((value, key) => {
-      submission[key] = String(value);
-    });
-
     trackEvent("newsletter_signup", {
       pageType: "guides_listing",
-      context: { sourceSection: "newsletter_footer", formId: "guides-newsletter-mobile" },
+      context: { sourceSection: "newsletter_footer", formId: "guides-newsletter-mobile", briefing_slugs: BRIEFING_SLUGS.fieldGuides },
     });
 
-    const result = await submitForm(submission);
-    if (result.success) setSubscribed(true);
+    try {
+      await subscribeToBriefings(email, BRIEFING_SLUGS.fieldGuides, {
+        sourceForm: "guides_mobile_newsletter",
+        pageType: "guides_listing",
+        pageUrl: getCanonicalPageUrl(),
+        sessionId: getAnalyticsSessionId(),
+        interests: [
+          briefingInterest({
+            slug: "field-guides",
+            title: "Field Guides",
+            sourceForm: "guides_mobile_newsletter",
+            sourceContext: { source_section: "newsletter_footer", mobile: true },
+          }),
+        ],
+      });
+      setSubscribed(true);
+    } catch {
+      setSubscribed(false);
+    }
     setSubscribing(false);
   };
 

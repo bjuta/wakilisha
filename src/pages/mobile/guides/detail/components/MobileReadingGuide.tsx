@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { trackEvent, getAnalyticsSessionId, getCanonicalPageUrl } from "@/services/analytics";
 import { submitForm } from "@/services/formService";
+import { BRIEFING_SLUGS, guideInterest, subscribeToBriefings } from "@/services/audienceSubscriptionService";
 import { readingGuide, prologueChapter } from "@/pages/guides/detail/readingData";
 import { MobileShareButton } from "@/components/design-system/share/ShareSheet";
 
@@ -21,7 +22,7 @@ export default function MobileReadingGuide() {
   const handleNotifySubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    trackEvent("newsletter_signup", {
+    trackEvent("guide_subscribe_submit", {
       pageType: "guide_detail",
       entitySlug: guideSlug,
       entityType: "guide",
@@ -40,10 +41,30 @@ export default function MobileReadingGuide() {
       submission[key] = String(value);
     });
 
-    const result = await submitForm(submission);
-    if (result.success) {
+    try {
+      const result = await submitForm(submission);
+      if (!result.success) throw new Error(result.error ?? "Could not save subscription.");
+
+      await subscribeToBriefings(String(submission.email || ""), BRIEFING_SLUGS.fieldGuides, {
+        sourceForm: "mobile_reading_notify",
+        pageType: "guide_detail",
+        pageUrl,
+        sessionId,
+        interests: [
+          guideInterest({
+            slug: guideSlug,
+            title: guideTitle,
+            sourceForm: "mobile_reading_notify",
+            kind: "follow",
+            strength: 70,
+            sourceContext: { source_section: "notify_form_mobile", mobile: true },
+          }),
+        ],
+      });
+
       setNotifyStatus("success");
-    } else {
+    } catch (error) {
+      console.warn("[mobile guide] subscription failed:", error);
       setNotifyStatus("error");
     }
   };
