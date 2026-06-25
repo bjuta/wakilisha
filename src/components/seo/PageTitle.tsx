@@ -175,6 +175,11 @@ function formatPageTitle(title?: string | null): string {
     return SITE_NAME;
   }
 
+  const brandedPattern = new RegExp(`\\s*[|–—-]\\s*${SITE_NAME}$`, "i");
+  if (brandedPattern.test(clean)) {
+    return clean.replace(brandedPattern, ` | ${SITE_NAME}`).trim();
+  }
+
   return `${clean} | ${SITE_NAME}`;
 }
 
