@@ -90,6 +90,13 @@ export function ChartRow({
 
   // Resolve artist names array from the artist string if not provided explicitly
   const resolvedArtistNames = artistNames ?? artist.split(", ");
+  const resolvedArtistSlugs = artistSlugs ?? [];
+  const resolvedArtistLinks = resolvedArtistNames
+    .map((name, index) => ({
+      name: name.trim(),
+      slug: resolvedArtistSlugs[index]?.trim() || "",
+    }))
+    .filter((item) => item.name);
 
   // ─── Compact variant — no expansion ───
   if (compact) {
@@ -206,7 +213,28 @@ export function ChartRow({
               </span>
             )}
           </div>
-          <div className="truncate text-[12px] text-[var(--wk-text-muted)]">{artist}</div>
+          <div className="flex min-w-0 flex-wrap items-center gap-x-1 text-[12px] text-[var(--wk-text-muted)]">
+            {resolvedArtistLinks.length > 0 ? (
+              resolvedArtistLinks.map((item, index) => (
+                <span key={`${item.slug || item.name}-${index}`} className="inline-flex min-w-0 items-center">
+                  {index > 0 && <span className="mr-1 text-[var(--wk-text-faint)]">,</span>}
+                  {item.slug ? (
+                    <Link
+                      to={`/artists/${item.slug}`}
+                      onClick={(event) => event.stopPropagation()}
+                      className="truncate hover:text-[var(--wk-brand)] hover:underline"
+                    >
+                      {item.name}
+                    </Link>
+                  ) : (
+                    <span className="truncate">{item.name}</span>
+                  )}
+                </span>
+              ))
+            ) : (
+              <span className="truncate">{artist}</span>
+            )}
+          </div>
           {(genre || label || previousWeek !== undefined) && (
             <div className="mt-1 hidden items-center gap-2 text-[11px] md:flex" style={{ color: "var(--wk-text-faint)" }}>
               {genre && <span>{genre}</span>}
