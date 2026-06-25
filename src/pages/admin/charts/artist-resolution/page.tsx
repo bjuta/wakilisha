@@ -382,6 +382,7 @@ export default function AdminChartsArtistResolutionPage() {
   const [programFilter, setProgramFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [issueFilter, setIssueFilter] = useState("all");
+  const [decisionStatusFilter, setDecisionStatusFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [entrySearch, setEntrySearch] = useState("");
   const [unresolvedOnly, setUnresolvedOnly] = useState(true);
@@ -391,6 +392,7 @@ export default function AdminChartsArtistResolutionPage() {
   const [tokenDrafts, setTokenDrafts] = useState<TokenDraft[]>([]);
   const [savingDecision, setSavingDecision] = useState(false);
   const [applyingDecision, setApplyingDecision] = useState(false);
+  const [bulkApplying, setBulkApplying] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   const [loadingEditions, setLoadingEditions] = useState(true);
@@ -568,9 +570,14 @@ export default function AdminChartsArtistResolutionPage() {
 
     return entries.filter((entry) => {
       const issues = getArtistIssues(entry);
-      const unresolved = issues.some((issue) => issue.key !== "looks_clean");
+      const decision = decisions.get(entry.id) ?? null;
+      const unresolved = issues.some((issue) => issue.key !== "looks_clean") && decision?.decisionStatus !== "resolved";
       const matchesUnresolved = !unresolvedOnly || unresolved;
       const matchesIssue = issueFilter === "all" || issues.some((issue) => issue.key === issueFilter);
+      const matchesDecisionStatus =
+        decisionStatusFilter === "all"
+        || (decisionStatusFilter === "undecided" && !decision)
+        || decision?.decisionStatus === decisionStatusFilter;
       const matchesSearch =
         !q ||
         entry.trackTitle.toLowerCase().includes(q) ||
@@ -579,9 +586,9 @@ export default function AdminChartsArtistResolutionPage() {
         (entry.normalizedKey ?? "").toLowerCase().includes(q) ||
         (entry.leadArtistKey ?? "").toLowerCase().includes(q);
 
-      return matchesUnresolved && matchesIssue && matchesSearch;
+      return matchesUnresolved && matchesIssue && matchesDecisionStatus && matchesSearch;
     });
-  }, [entries, entrySearch, issueFilter, unresolvedOnly]);
+  }, [decisions, decisionStatusFilter, entries, entrySearch, issueFilter, unresolvedOnly]);
 
   const issueSummary = useMemo(() => {
     let missingCanonical = 0;
@@ -599,15 +606,27 @@ export default function AdminChartsArtistResolutionPage() {
       if (issues.length === 1 && issues[0]?.key === "looks_clean") clean += 1;
     });
 
+    const decisionRows = Array.from(decisions.values());
+    const resolved = decisionRows.filter((decision) => decision.decisionStatus === "resolved").length;
+    const ready = decisionRows.filter((decision) => decision.decisionStatus === "ready").length;
+    const draft = decisionRows.filter((decision) => decision.decisionStatus === "draft").length;
+
     return {
       missingCanonical,
       combined,
       missingSlug,
       trackNotCanonical,
       clean,
-      unresolved: entries.length - clean,
+      unresolved: entries.filter((entry) => {
+        const issues = getArtistIssues(entry);
+        const decision = decisions.get(entry.id) ?? null;
+        return issues.some((issue) => issue.key !== "looks_clean") && decision?.decisionStatus !== "resolved";
+      }).length,
       decisions: decisions.size,
-      resolved: Array.from(decisions.values()).filter((decision) => decision.decisionStatus === "resolved").length,
+      undecided: entries.length - decisions.size,
+      draft,
+      ready,
+      resolved,
     };
   }, [entries, decisions]);
 
@@ -831,6 +850,86 @@ export default function AdminChartsArtistResolutionPage() {
     }
   }, [loadEntries, selectedDecision, selectedRow, showToast]);
 
+  const acceptSelectedAsGroup = useCallback(async () => {
+    if (!selectedRow) return;
+
+    const confirmed = window.confirm(`Accept "${selectedRow.artistName}" as an intentional group/collab credit?`);
+    if (!confirmed) return;
+
+    setSavingDecision(true);
+
+    try {
+      const { error: saveError } = await supabase.rpc("admin_upsert_chart_artist_resolution_decision", {
+        p_chart_entry_id: selectedRow.id,
+        p_decision_type: "accepted_as_group",
+        p_decision_status: "resolved",
+        p_parsed_tokens: splitArtistTokens(selectedRow.artistName),
+        p_selected_artists: [],
+        p_note: decisionNote.trim() || "Accepted as intentional group/collab credit.",
+      });
+
+      if (saveError) throw new Error(saveError.message);
+
+      await loadDecisions(selectedRow.editionId);
+      showToast("Accepted as group/collab", "success");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Could not accept as group/collab", "error");
+    } finally {
+      setSavingDecision(false);
+    }
+  }, [decisionNote, loadDecisions, selectedRow, showToast]);
+
+  const selectNextUnresolved = useCallback(() => {
+    const queue = entries.filter((entry) => {
+      const issues = getArtistIssues(entry);
+      const decision = decisions.get(entry.id) ?? null;
+      return issues.some((issue) => issue.key !== "looks_clean") && decision?.decisionStatus !== "resolved";
+    });
+
+    if (queue.length === 0) {
+      showToast("No unresolved artist rows left in this edition.", "success");
+      return;
+    }
+
+    const currentIndex = selectedRow ? queue.findIndex((entry) => entry.id === selectedRow.id) : -1;
+    const next = queue[currentIndex + 1] ?? queue[0];
+    setSelectedRowId(next.id);
+  }, [decisions, entries, selectedRow, showToast]);
+
+  const applyAllReadyDecisions = useCallback(async () => {
+    const readyDecisions = Array.from(decisions.values()).filter((decision) => decision.decisionStatus === "ready");
+
+    if (readyDecisions.length === 0) {
+      showToast("No ready decisions to apply.", "error");
+      return;
+    }
+
+    const confirmed = window.confirm(`Apply ${readyDecisions.length} ready decision${readyDecisions.length === 1 ? "" : "s"} to registry track credits?`);
+    if (!confirmed) return;
+
+    setBulkApplying(true);
+
+    let applied = 0;
+    let failed = 0;
+
+    for (const decision of readyDecisions) {
+      try {
+        const { error: applyError } = await supabase.rpc("admin_apply_chart_artist_resolution_decision", {
+          p_decision_id: decision.id,
+        });
+
+        if (applyError) throw new Error(applyError.message);
+        applied += 1;
+      } catch {
+        failed += 1;
+      }
+    }
+
+    if (selectedEditionId) await loadEntries(selectedEditionId);
+    showToast(`Applied ${applied} ready decision${applied === 1 ? "" : "s"}${failed ? `; ${failed} failed` : ""}.`, failed ? "error" : "success");
+    setBulkApplying(false);
+  }, [decisions, loadEntries, selectedEditionId, showToast]);
+
   if (loadingEditions) return <AdminChartsLoadingState message="Loading chart artist workbench…" />;
 
   return (
@@ -866,11 +965,11 @@ export default function AdminChartsArtistResolutionPage() {
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-6">
         <AdminChartsKpiCard value={entries.length} label="Edition Rows" icon="ListChecks" accent="brand" />
-        <AdminChartsKpiCard value={issueSummary.unresolved} label="Needs Review" icon="AlertTriangle" accent={issueSummary.unresolved > 0 ? "warning" : "muted"} />
+        <AdminChartsKpiCard value={issueSummary.unresolved} label="Open Queue" icon="AlertTriangle" accent={issueSummary.unresolved > 0 ? "warning" : "muted"} />
         <AdminChartsKpiCard value={issueSummary.combined} label="Combined Suspects" icon="Users" accent={issueSummary.combined > 0 ? "warning" : "muted"} />
-        <AdminChartsKpiCard value={issueSummary.missingCanonical} label="Missing Canonical" icon="User" accent={issueSummary.missingCanonical > 0 ? "danger" : "muted"} />
-        <AdminChartsKpiCard value={issueSummary.decisions} label="Saved Decisions" icon="CheckCircle2" accent="info" />
-        <AdminChartsKpiCard value={issueSummary.resolved} label="Accepted / Resolved" icon="CheckCircle2" accent="success" />
+        <AdminChartsKpiCard value={issueSummary.undecided} label="Undecided" icon="User" accent={issueSummary.undecided > 0 ? "danger" : "muted"} />
+        <AdminChartsKpiCard value={issueSummary.ready} label="Ready to Apply" icon="Rocket" accent={issueSummary.ready > 0 ? "info" : "muted"} />
+        <AdminChartsKpiCard value={issueSummary.resolved} label="Resolved" icon="CheckCircle2" accent="success" />
       </div>
 
       <WkSurface className="p-4">
@@ -895,6 +994,7 @@ export default function AdminChartsArtistResolutionPage() {
               setProgramFilter("all");
               setStatusFilter("all");
               setIssueFilter("all");
+              setDecisionStatusFilter("all");
               setSearch("");
               setEntrySearch("");
               setUnresolvedOnly(true);
@@ -953,16 +1053,26 @@ export default function AdminChartsArtistResolutionPage() {
               </div>
 
               {selectedEdition && (
-                <button onClick={() => navigate(`/admin/charts/editions/${selectedEdition.id}`)} className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap">
-                  <WkIcon name="SearchCheck" size={13} />
-                  Open scoring audit
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  <button onClick={selectNextUnresolved} className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap">
+                    <WkIcon name="ArrowRight" size={13} />
+                    Next unresolved
+                  </button>
+                  <button onClick={applyAllReadyDecisions} disabled={bulkApplying || issueSummary.ready === 0} className="wk-button wk-button-primary wk-button-sm whitespace-nowrap">
+                    <WkIcon name={bulkApplying ? "Loader" : "Rocket"} size={13} className={bulkApplying ? "animate-spin" : ""} />
+                    {bulkApplying ? "Applying…" : `Apply all ready (${issueSummary.ready})`}
+                  </button>
+                  <button onClick={() => navigate(`/admin/charts/editions/${selectedEdition.id}`)} className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap">
+                    <WkIcon name="SearchCheck" size={13} />
+                    Open scoring audit
+                  </button>
+                </div>
               )}
             </div>
           </WkSurface>
 
           <WkSurface className="p-4">
-            <div className="grid gap-3 lg:grid-cols-[1fr_auto_auto]">
+            <div className="grid gap-3 lg:grid-cols-[1fr_auto_auto_auto]">
               <div className="relative">
                 <WkIcon name="Search" size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-wk-text-faint" />
                 <input value={entrySearch} onChange={(event) => setEntrySearch(event.target.value)} className={`${INPUT_CLASS} w-full pl-9`} placeholder="Search rows by track, artist, slug, normalized key…" />
@@ -971,6 +1081,14 @@ export default function AdminChartsArtistResolutionPage() {
               <select value={issueFilter} onChange={(event) => setIssueFilter(event.target.value)} className={INPUT_CLASS}>
                 <option value="all">All issue types</option>
                 {issueOptions.map((issue) => <option key={issue} value={issue}>{issue.replace(/_/g, " ")}</option>)}
+              </select>
+
+              <select value={decisionStatusFilter} onChange={(event) => setDecisionStatusFilter(event.target.value)} className={INPUT_CLASS}>
+                <option value="all">All decision states</option>
+                <option value="undecided">Undecided only</option>
+                <option value="draft">Draft only</option>
+                <option value="ready">Ready only</option>
+                <option value="resolved">Resolved only</option>
               </select>
 
               <button onClick={() => setUnresolvedOnly((value) => !value)} className={`wk-button wk-button-sm justify-center ${unresolvedOnly ? "wk-button-primary" : "wk-button-ghost"}`}>
@@ -1141,6 +1259,13 @@ export default function AdminChartsArtistResolutionPage() {
                     <WkIcon name={savingDecision ? "Loader" : "CheckCircle2"} size={14} className={savingDecision ? "animate-spin" : ""} />
                     {savingDecision ? "Saving…" : `Save ${decisionLabel(decisionType)}`}
                   </button>
+
+                  {(!selectedDecision || selectedDecision.decisionStatus !== "resolved") && (
+                    <button onClick={acceptSelectedAsGroup} disabled={savingDecision} className="wk-button wk-button-ghost wk-button-sm w-full justify-center">
+                      <WkIcon name="CheckCircle2" size={14} />
+                      Accept as group/collab
+                    </button>
+                  )}
 
                   {selectedDecision && selectedDecision.decisionStatus === "ready" && (
                     <button onClick={applyResolutionDecision} disabled={applyingDecision} className="wk-button wk-button-ghost wk-button-sm w-full justify-center border-wk-warning/30 bg-wk-warning-soft text-wk-warning hover:bg-wk-warning-soft">
