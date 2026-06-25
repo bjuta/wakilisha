@@ -14,6 +14,14 @@ import {
   type TopEntity,
   type TopPage,
 } from "@/services/adminAnalytics";
+import {
+  fetchSearchConsoleSeo,
+  formatCtr,
+  formatPosition,
+  syncSearchConsoleSeo,
+  type SearchConsolePayload,
+  type SearchConsoleRow,
+} from "@/services/searchConsoleSeo";
 
 type SitemapSnapshot = {
   id: string;
@@ -160,6 +168,35 @@ function buildGrowthNotes(args: {
   return notes.slice(0, 4);
 }
 
+function searchConsoleCtrLeaks(rows: SearchConsoleRow[]) {
+  return rows
+    .filter((row) => Number(row.impressions || 0) >= 50 && Number(row.clicks || 0) > 0 && Number(row.ctr || 0) < 0.03)
+    .sort((a, b) => Number(b.impressions || 0) - Number(a.impressions || 0))
+    .slice(0, 10);
+}
+
+function searchConsoleLiftTargets(rows: SearchConsoleRow[]) {
+  return rows
+    .filter((row) => Number(row.impressions || 0) >= 20 && Number(row.position || 0) >= 8 && Number(row.position || 0) <= 20)
+    .sort((a, b) => Number(b.impressions || 0) - Number(a.impressions || 0))
+    .slice(0, 10);
+}
+
+function searchConsoleNoClickRows(rows: SearchConsoleRow[]) {
+  return rows
+    .filter((row) => Number(row.impressions || 0) >= 20 && Number(row.clicks || 0) === 0)
+    .sort((a, b) => Number(b.impressions || 0) - Number(a.impressions || 0))
+    .slice(0, 10);
+}
+
+function searchConsolePageLabel(row: SearchConsoleRow) {
+  return cleanPathLabel(row.page_url || "");
+}
+
+function searchConsoleQueryLabel(row: SearchConsoleRow) {
+  return row.query || "Unknown query";
+}
+
 function resultMessage(payload: unknown): string {
   if (!payload || typeof payload !== "object") return "Action completed.";
   const data = (payload as { data?: unknown }).data;
@@ -181,6 +218,9 @@ export default function AdminSettingsSeoPage() {
   const [result, setResult] = useState<ConsoleResult | null>(null);
   const [measurementLoading, setMeasurementLoading] = useState(true);
   const [measurement, setMeasurement] = useState<SeoMeasurement | null>(null);
+  const [searchConsoleLoading, setSearchConsoleLoading] = useState(true);
+  const [searchConsoleSyncing, setSearchConsoleSyncing] = useState(false);
+  const [searchConsole, setSearchConsole] = useState<SearchConsolePayload | null>(null);
 
   const latestSourceLabel = useMemo(() => {
     if (!snapshot) return "No snapshot yet";
@@ -275,10 +315,49 @@ export default function AdminSettingsSeoPage() {
     }
   }, []);
 
+  const loadSearchConsole = useCallback(async () => {
+    setSearchConsoleLoading(true);
+
+    try {
+      const payload = await fetchSearchConsoleSeo();
+      setSearchConsole(payload);
+    } catch {
+      setSearchConsole(null);
+    } finally {
+      setSearchConsoleLoading(false);
+    }
+  }, []);
+
+  const runSearchConsoleSync = useCallback(async () => {
+    setSearchConsoleSyncing(true);
+    setResult(null);
+
+    try {
+      const payload = await syncSearchConsoleSeo();
+      setSearchConsole(payload);
+      setResult({
+        ok: true,
+        message: `Search Console sync imported ${payload.run?.row_count?.toLocaleString() ?? 0} rows.`,
+        detail: payload.run
+          ? `${payload.run.start_date} to ${payload.run.end_date}.`
+          : "Sync completed.",
+      });
+    } catch (error) {
+      setResult({
+        ok: false,
+        message: "Search Console sync failed.",
+        detail: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setSearchConsoleSyncing(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadStatus();
     loadMeasurement();
-  }, [loadStatus, loadMeasurement]);
+    loadSearchConsole();
+  }, [loadStatus, loadMeasurement, loadSearchConsole]);
 
   async function runAction(action: "generate" | "generate_and_pro_update" | "pro_update") {
     setRunning(action);
@@ -359,6 +438,14 @@ export default function AdminSettingsSeoPage() {
         onRefresh={loadMeasurement}
       />
 
+      <SearchConsolePanel
+        loading={searchConsoleLoading}
+        syncing={searchConsoleSyncing}
+        payload={searchConsole}
+        onRefresh={loadSearchConsole}
+        onSync={runSearchConsoleSync}
+      />
+
       <WkSurface className="p-5">
         <h2 className="mb-4 text-[14px] font-black text-[var(--wk-text)]">Actions</h2>
 
@@ -419,6 +506,120 @@ export default function AdminSettingsSeoPage() {
         </WkSurface>
       )}
     </div>
+  );
+}
+
+function SearchConsolePanel({
+  loading,
+  syncing,
+  payload,
+  onRefresh,
+  onSync,
+}: {
+  loading: boolean;
+  syncing: boolean;
+  payload: SearchConsolePayload | null;
+  onRefresh: () => void;
+  onSync: () => void;
+}) {
+  const run = payload?.run ?? null;
+  const rows = payload?.rows ?? [];
+  const ctrLeaks = searchConsoleCtrLeaks(rows);
+  const liftTargets = searchConsoleLiftTargets(rows);
+  const noClickRows = searchConsoleNoClickRows(rows);
+
+  return (
+    <WkSurface className="p-5">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <h2 className="text-[14px] font-black text-[var(--wk-text)]">Search Console API</h2>
+          <p className="mt-1 text-[12px] text-[var(--wk-text-muted)]">
+            Google-side SEO truth: clicks, impressions, CTR, average position, and page/query opportunities.
+          </p>
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <button
+            onClick={onRefresh}
+            disabled={loading || syncing}
+            className="wk-button wk-button-soft wk-button-sm inline-flex items-center justify-center gap-2"
+          >
+            <WkIcon name={loading ? "Loader" : "RotateCcw"} size={14} />
+            {loading ? "Refreshing..." : "Refresh"}
+          </button>
+          <button
+            onClick={onSync}
+            disabled={loading || syncing}
+            className="wk-button wk-button-primary wk-button-sm inline-flex items-center justify-center gap-2"
+          >
+            <WkIcon name={syncing ? "Loader" : "Cloud"} size={14} />
+            {syncing ? "Syncing..." : "Sync Search Console"}
+          </button>
+        </div>
+      </div>
+
+      {!run && !loading && (
+        <div className="mt-5 rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] p-4 text-[12px] leading-relaxed text-[var(--wk-text-muted)]">
+          No Search Console sync has been imported yet. Configure Google service account secrets, add the service account to Search Console, then run the sync.
+        </div>
+      )}
+
+      {run && (
+        <>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <MetricCard label="Clicks" value={Number(run.total_clicks || 0).toLocaleString()} />
+            <MetricCard label="Impressions" value={Number(run.total_impressions || 0).toLocaleString()} />
+            <MetricCard label="CTR" value={formatCtr(Number(run.average_ctr || 0))} />
+            <MetricCard label="Avg position" value={formatPosition(Number(run.average_position || 0))} />
+            <MetricCard label="Rows" value={Number(run.row_count || 0).toLocaleString()} />
+          </div>
+
+          <p className="mt-3 text-[11px] text-[var(--wk-text-faint)]">
+            Latest sync: {run.site_url} · {run.start_date} to {run.end_date} · {formatDate(run.completed_at || run.started_at)}
+          </p>
+
+          <div className="mt-5 grid gap-4 xl:grid-cols-3 xl:items-start">
+            <SeoTable
+              title="CTR leaks"
+              description="Google is showing these pages, but the click-through rate is weak."
+              empty="No clear CTR leaks yet."
+              limit={8}
+              overflowNote="Showing the strongest CTR leaks from the latest Search Console sync."
+              rows={ctrLeaks.map((row) => ({
+                primary: searchConsolePageLabel(row),
+                secondary: searchConsoleQueryLabel(row),
+                value: `${Number(row.impressions || 0).toLocaleString()} imp · ${formatCtr(Number(row.ctr || 0))}`,
+              }))}
+            />
+
+            <SeoTable
+              title="Ranking lift targets"
+              description="Queries/pages sitting near page-one or page-two breakthrough range."
+              empty="No position 8–20 lift targets yet."
+              limit={8}
+              overflowNote="Showing the strongest ranking lift targets from the latest Search Console sync."
+              rows={liftTargets.map((row) => ({
+                primary: searchConsoleQueryLabel(row),
+                secondary: searchConsolePageLabel(row),
+                value: `pos ${formatPosition(Number(row.position || 0))} · ${Number(row.impressions || 0).toLocaleString()} imp`,
+              }))}
+            />
+
+            <SeoTable
+              title="Impressions, no clicks"
+              description="Google is testing these results, but users are not choosing them yet."
+              empty="No high-impression zero-click pages yet."
+              limit={8}
+              overflowNote="Showing the strongest zero-click opportunities from the latest Search Console sync."
+              rows={noClickRows.map((row) => ({
+                primary: searchConsolePageLabel(row),
+                secondary: searchConsoleQueryLabel(row),
+                value: `${Number(row.impressions || 0).toLocaleString()} imp`,
+              }))}
+            />
+          </div>
+        </>
+      )}
+    </WkSurface>
   );
 }
 
@@ -505,6 +706,7 @@ function SeoMeasurementPanel({
               description="Indexable DB-backed pages that need imagery or stronger metadata before we scale them."
               empty="No obvious metadata gaps in the sampled routes."
               limit={8}
+              overflowNote="Showing first metadata gaps only. Use the metadata endpoint for the full gap list."
               rows={measurement.gaps.map((gap) => ({
                 primary: cleanPathLabel(gap.path),
                 secondary: `${gap.kind} · ${gap.issue}`,
@@ -536,12 +738,14 @@ function SeoTable({
   empty,
   rows,
   limit = 10,
+  overflowNote,
 }: {
   title: string;
   description: string;
   empty: string;
   rows: Array<{ primary: string; secondary: string; value: string }>;
   limit?: number;
+  overflowNote?: string;
 }) {
   const visibleRows = rows.slice(0, limit);
   const hiddenCount = Math.max(0, rows.length - visibleRows.length);
@@ -563,7 +767,7 @@ function SeoTable({
         ))}
         {hiddenCount > 0 && (
           <p className="pt-2 text-[11px] text-[var(--wk-text-faint)]">
-            Showing first {visibleRows.length} of {rows.length}. Use the metadata endpoint for the full gap list.
+            {overflowNote || `Showing first ${visibleRows.length} of ${rows.length}.`}
           </p>
         )}
       </div>
