@@ -21,6 +21,7 @@ const PRIMARY_TABS: NavItem[] = [
 const MORE_ITEMS: NavItem[] = [
   { path: "/admin/charts/families", label: "Chart Families", icon: "FolderTree", requiredCapability: "manage_charts" },
   { path: "/admin/charts/snapshots", label: "Snapshots", icon: "Camera", requiredCapability: "view_charts_admin" },
+  { path: "/admin/charts/artist-resolution", label: "Artist Resolution", icon: "Users", requiredCapability: "view_charts_admin" },
   { path: "/admin/charts/no-match", label: "No-match", icon: "XCircle", requiredCapability: "view_charts_admin" },
   { path: "/admin/charts/canon-gaps", label: "Canon Gaps", icon: "AlertCircle", requiredCapability: "view_charts_admin" },
   { path: "/admin/charts/integration-map", label: "Integration Map", icon: "Map", requiredCapability: "view_charts_admin" },
