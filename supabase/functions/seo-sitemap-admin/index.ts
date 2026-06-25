@@ -342,6 +342,7 @@ type SeoMetadataEntry = {
   ogType: "website" | "article" | "profile" | "music.song" | "music.album";
   kind: "home" | "collection" | "article" | "artist" | "track" | "release" | "chart" | "guide" | "profile" | "utility" | "legal" | "notFound";
   image?: string | null;
+  entityName?: string | null;
   publishedAt?: string | null;
   modifiedAt?: string | null;
   sourceTable?: string | null;
@@ -617,6 +618,7 @@ function buildSeoMetadataEntry(
     const title = firstText(row, ["title", "post_title", "wp_title", "headline", "seo_title"], ["title", "headline", "seo_title"], last);
     return {
       title,
+      entityName: title,
       description: descriptionValue(row, `Read ${title} on WAKILISHA, with context from African music, charts, artists, and culture.`),
       robots: "index, follow",
       ogType: "article",
@@ -633,6 +635,7 @@ function buildSeoMetadataEntry(
     const title = firstText(row, ["name", "title", "display_name", "artist_name", "normalized_name"], ["name", "display_name", "artist_name"], last);
     return {
       title,
+      entityName: title,
       description: descriptionValue(row, `Explore ${title} on WAKILISHA, including music, releases, chart context, and cultural signals.`),
       robots: "index, follow",
       ogType: "profile",
@@ -650,6 +653,7 @@ function buildSeoMetadataEntry(
     const title = artistName ? `${releaseTitle} by ${artistName}` : releaseTitle;
     return {
       title,
+      entityName: releaseTitle,
       description: descriptionValue(row, `Explore ${title} on WAKILISHA, including release context, tracks, credits, and music metadata.`),
       robots: "index, follow",
       ogType: "music.album",
@@ -668,6 +672,7 @@ function buildSeoMetadataEntry(
     const title = artistName ? `${trackTitle} by ${artistName}` : trackTitle;
     return {
       title,
+      entityName: trackTitle,
       description: descriptionValue(row, `Explore ${title} on WAKILISHA, including chart context, credits, and music metadata.`),
       robots: "index, follow",
       ogType: "music.song",
@@ -684,6 +689,7 @@ function buildSeoMetadataEntry(
     const title = firstText(row, ["name", "title", "display_name"], ["name", "display_name"], last);
     return {
       title,
+      entityName: title,
       description: descriptionValue(row, `Explore ${title} on WAKILISHA, with related artists, releases, tracks, and cultural context.`),
       robots: "index, follow",
       ogType: "website",
@@ -699,6 +705,7 @@ function buildSeoMetadataEntry(
     const title = firstText(row, ["name", "title", "display_name", "label_name"], ["name", "display_name", "label_name"], last);
     return {
       title,
+      entityName: title,
       description: descriptionValue(row, `Explore ${title} on WAKILISHA, with related artists, releases, tracks, and cultural context.`),
       robots: "index, follow",
       ogType: "website",
@@ -714,6 +721,7 @@ function buildSeoMetadataEntry(
     const title = firstText(row, ["title", "name", "display_title"], ["title", "display_title"], last);
     return {
       title,
+      entityName: title,
       description: descriptionValue(row, `Read the ${title} guide on WAKILISHA.`),
       robots: "index, follow",
       ogType: "article",
@@ -730,6 +738,7 @@ function buildSeoMetadataEntry(
     const title = firstText(row, ["name", "title", "display_name"], ["name", "display_name"], last);
     return {
       title,
+      entityName: title,
       description: descriptionValue(row, `Read work by ${title} on WAKILISHA.`),
       robots: "index, follow",
       ogType: "profile",
