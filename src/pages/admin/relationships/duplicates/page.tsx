@@ -78,15 +78,16 @@ export default function AdminDuplicateMergePage() {
   }, [candidates]);
 
   const runStats = useMemo(() => {
-    const run = mockResolutionRuns[0];
+    const run = mockResolutionRuns[0] ?? {};
+
     return {
-      total: run.totalRows,
-      resolved: run.resolvedCount,
-      review: run.reviewCount,
-      shells: run.shellCount,
-      duplicates: run.duplicateCandidateCount,
+      total: Number(run.totalRows ?? candidates.length ?? 0),
+      resolved: Number(run.resolvedCount ?? candidates.filter((c) => c.status === "resolved").length ?? 0),
+      review: Number(run.reviewCount ?? candidates.filter((c) => c.status === "pending").length ?? 0),
+      shells: Number(run.shellCount ?? 0),
+      duplicates: Number(run.duplicateCandidateCount ?? candidates.length ?? 0),
     };
-  }, []);
+  }, [candidates]);
 
   function handleMerge(candidate: DuplicateCandidate) {
     setSelectedCandidate(candidate);
