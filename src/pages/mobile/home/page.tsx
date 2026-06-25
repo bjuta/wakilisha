@@ -8,7 +8,7 @@ import { HomeMission } from "@/pages/home/components/HomeMission";
 import { listMagazineStories, type PublicStory } from "@/services/publicContent/client";
 import { getChartFamilies, getLatestChartEdition, getChartEditionEntries, type ChartEditionEntry } from "@/services/chartsPublic/client";
 import { trackEvent, getAnalyticsSessionId, getCanonicalPageUrl } from "@/services/analytics";
-import { submitForm } from "@/services/formService";
+import { BRIEFING_SLUGS, subscribeToBriefings } from "@/services/audienceSubscriptionService";
 
 export default function MobileHome() {
   const [loading, setLoading] = useState(true);
@@ -25,21 +25,22 @@ export default function MobileHome() {
 
     trackEvent("newsletter_signup", {
       pageType: "home",
-      context: { sourceSection: "newsletter_footer", formId: "homepage-newsletter-mobile" },
+      context: { sourceSection: "newsletter_footer", formId: "homepage-newsletter-mobile", briefing_slugs: BRIEFING_SLUGS.cultureDispatch },
     });
 
     setNewsletterStatus("submitting");
-    const formData = new FormData(form);
-    const submission: Record<string, string> = { form_type: "newsletter" };
-    formData.forEach((value, key) => {
-      submission[key] = String(value);
-    });
 
-    const result = await submitForm(submission);
-    if (result.success) {
+    try {
+      await subscribeToBriefings(emailInput.value, BRIEFING_SLUGS.cultureDispatch, {
+        sourceForm: "home_mobile_newsletter",
+        pageType: "home",
+        pageUrl: getCanonicalPageUrl(),
+        sessionId: getAnalyticsSessionId(),
+        sourceContext: { source_section: "newsletter_footer", form_id: "homepage-newsletter-mobile" },
+      });
       setNewsletterStatus("success");
       form.reset();
-    } else {
+    } catch {
       setNewsletterStatus("error");
     }
   };

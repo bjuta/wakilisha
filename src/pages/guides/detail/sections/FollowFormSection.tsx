@@ -1,9 +1,15 @@
 import { useState, useCallback } from "react";
+import { useParams } from "react-router-dom";
+import { trackEvent, getAnalyticsSessionId, getCanonicalPageUrl } from "@/services/analytics";
 import { submitForm } from "@/services/formService";
+import { BRIEFING_SLUGS, guideInterest, subscribeToBriefings } from "@/services/audienceSubscriptionService";
 import type { FollowFormData } from "../sectionTypes";
 
 export default function FollowFormSection({ data }: { data: FollowFormData }) {
+  const { slug } = useParams<{ slug: string }>();
   const titleItalic = data.titleItalic || data.title_italic || "";
+  const guideSlug = slug || "guide";
+  const guideTitle = `${data.title}${titleItalic ? ` ${titleItalic}` : ""}`.trim();
   const [email, setEmail] = useState("");
   const [persona, setPersona] = useState("");
   const [consent, setConsent] = useState(false);
@@ -26,21 +32,56 @@ export default function FollowFormSection({ data }: { data: FollowFormData }) {
 
     setSubmitting(true);
 
-    const form = e.currentTarget as HTMLFormElement;
-    const formData = new FormData(form);
-    const submission: Record<string, string> = { form_type: "dakar_follow" };
-    formData.forEach((value, key) => {
-      submission[key] = String(value);
+    trackEvent("guide_follow_submit", {
+      pageType: "guide_detail",
+      entitySlug: guideSlug,
+      entityType: "guide",
+      context: {
+        source_section: "follow_form",
+        guide_title: guideTitle,
+        guide_slug: guideSlug,
+        briefing_slugs: BRIEFING_SLUGS.fieldGuides,
+      },
     });
 
-    const result = await submitForm(submission);
-    if (result.success) {
+    try {
+      const form = e.currentTarget as HTMLFormElement;
+      const formData = new FormData(form);
+      const submission: Record<string, string> = { form_type: "dakar_follow" };
+      formData.forEach((value, key) => {
+        submission[key] = String(value);
+      });
+
+      const result = await submitForm(submission);
+      if (!result.success) throw new Error(result.error ?? "Something went wrong. Please try again.");
+
+      await subscribeToBriefings(email, BRIEFING_SLUGS.fieldGuides, {
+        sourceForm: "guide_follow",
+        pageType: "guide_detail",
+        pageUrl: getCanonicalPageUrl(),
+        sessionId: getAnalyticsSessionId(),
+        interests: [
+          guideInterest({
+            slug: guideSlug,
+            title: guideTitle,
+            sourceForm: "guide_follow",
+            kind: "follow",
+            strength: 70,
+            sourceContext: {
+              source_section: "follow_form",
+              persona,
+            },
+          }),
+        ],
+      });
+
       setSubmitted(true);
-    } else {
-      setError(result.error ?? "Something went wrong. Please try again.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
     }
+
     setSubmitting(false);
-  }, [email, consent]);
+  }, [email, consent, persona, guideSlug, guideTitle]);
 
   return (
     <section id="updates" className="w-full py-16 md:py-24 border-t border-[var(--wk-divider)]" style={{ background: "var(--wk-bg-alt, var(--wk-bg))" }}>
@@ -66,7 +107,7 @@ export default function FollowFormSection({ data }: { data: FollowFormData }) {
                   <i className="ri-check-line text-xl text-[var(--wk-success)]" />
                 </div>
                 <h3 className="text-lg font-bold text-[var(--wk-text)] mb-2">You are on the list</h3>
-                <p className="text-sm text-[var(--wk-text-soft)]">We will send updates to your inbox.</p>
+                <p className="text-sm text-[var(--wk-text-soft)]">Check your inbox to confirm Field Guides updates.</p>
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-5">

@@ -1,13 +1,22 @@
 import { useState, useRef } from "react";
-import { trackEvent } from "@/services/analytics";
-import { submitForm } from "@/services/formService";
+import { trackEvent, getAnalyticsSessionId, getCanonicalPageUrl } from "@/services/analytics";
+import {
+  BRIEFING_SLUGS,
+  isValidEmail,
+  normalizeEmail,
+  subscribeToBriefings,
+} from "@/services/audienceSubscriptionService";
+import type { AudienceInterestInput } from "@/services/briefingService";
 
 interface NewsletterSubscribeProps {
   formId: string;
   headline: string;
   description: string;
   contextFields?: Record<string, string>;
-  /** Analytics context — passed through to trackEvent for all newsletter events */
+  briefingSlugs?: readonly string[];
+  sourceForm?: string;
+  interests?: AudienceInterestInput[];
+  successMessage?: string;
   analytics?: {
     pageType?: string;
     entitySlug?: string;
@@ -21,6 +30,10 @@ export function NewsletterSubscribe({
   headline,
   description,
   contextFields,
+  briefingSlugs = BRIEFING_SLUGS.cultureDispatch,
+  sourceForm = "newsletter_subscribe",
+  interests = [],
+  successMessage = "You're in. Check your inbox to confirm your subscription.",
   analytics,
 }: NewsletterSubscribeProps) {
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
@@ -29,11 +42,12 @@ export function NewsletterSubscribe({
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+
     const form = e.currentTarget;
     const emailInput = form.elements.namedItem("email") as HTMLInputElement;
-    const emailValue = emailInput.value.trim();
+    const emailValue = normalizeEmail(emailInput.value);
 
-    if (!emailValue || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailValue)) {
+    if (!isValidEmail(emailValue)) {
       setStatus("error");
       setMessage("Please enter a valid email address.");
 
@@ -43,6 +57,8 @@ export function NewsletterSubscribe({
         entityType: analytics?.entityType,
         context: {
           form_id: formId,
+          source_form: sourceForm,
+          briefing_slugs: briefingSlugs,
           ...analytics?.context,
           validation_reason: "invalid_email",
         },
@@ -60,21 +76,24 @@ export function NewsletterSubscribe({
       entityType: analytics?.entityType,
       context: {
         form_id: formId,
+        source_form: sourceForm,
+        briefing_slugs: briefingSlugs,
+        audience_interest_count: interests.length,
         ...analytics?.context,
       },
     });
 
-    const formData = new FormData(form);
-    const submission: Record<string, string> = { form_type: "newsletter" };
-    formData.forEach((value, key) => {
-      submission[key] = String(value);
-    });
+    try {
+      const result = await subscribeToBriefings(emailValue, briefingSlugs, {
+        sourceForm,
+        pageType: analytics?.pageType ?? contextFields?.wk_page_type ?? "newsletter",
+        pageUrl: getCanonicalPageUrl(),
+        sessionId: getAnalyticsSessionId(),
+        interests,
+      });
 
-    const result = await submitForm(submission);
-
-    if (result.success) {
       setStatus("success");
-      setMessage("You're in. Watch your inbox for updates.");
+      setMessage(result.status === "already_confirmed" ? "You're already confirmed. Your preferences have been updated." : successMessage);
       form.reset();
 
       trackEvent("newsletter_success", {
@@ -83,12 +102,16 @@ export function NewsletterSubscribe({
         entityType: analytics?.entityType,
         context: {
           form_id: formId,
+          source_form: sourceForm,
+          briefing_slugs: briefingSlugs,
+          audience_interest_count: result.audience_interests?.length ?? 0,
+          subscribe_status: result.status,
           ...analytics?.context,
         },
       });
-    } else {
+    } catch (error) {
       setStatus("error");
-      setMessage(result.error ?? "Something went wrong. Please try again.");
+      setMessage(error instanceof Error ? error.message : "Something went wrong. Please try again.");
 
       trackEvent("newsletter_error", {
         pageType: analytics?.pageType,
@@ -96,8 +119,10 @@ export function NewsletterSubscribe({
         entityType: analytics?.entityType,
         context: {
           form_id: formId,
+          source_form: sourceForm,
+          briefing_slugs: briefingSlugs,
           ...analytics?.context,
-          error_type: "server_error",
+          error_type: error instanceof Error ? error.message : "server_error",
         },
       });
     }
@@ -144,7 +169,7 @@ export function NewsletterSubscribe({
           </div>
 
           {message && (
-            <p className={`mt-4 text-[14px] font-medium ${status === "success" ? "text-primary-600" : "text-red-500"}`}>
+            <p className={`mt-4 text-[14px] font-medium ${status === "success" ? "text-primary-600" : "text-red-500"}`} aria-live="polite">
               {message}
             </p>
           )}

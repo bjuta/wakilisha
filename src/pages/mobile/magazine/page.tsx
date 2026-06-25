@@ -5,8 +5,8 @@ import { getAuthorMeta } from "@/services/authorProfiles";
 import { MagazineCard } from "@/pages/magazine/components/MagazineCard";
 import { SkeletonMagazinePage } from "@/components/skeletons/Skeletons";
 import { Chapter19FallbackImage } from "@/components/media/Chapter19FallbackImage";
-import { trackEvent } from "@/services/analytics";
-import { submitForm } from "@/services/formService";
+import { trackEvent, getAnalyticsSessionId, getCanonicalPageUrl } from "@/services/analytics";
+import { BRIEFING_SLUGS, briefingInterest, subscribeToBriefings } from "@/services/audienceSubscriptionService";
 
 function useScrollReveal(deps: unknown[] = []) {
   useEffect(() => {
@@ -634,20 +634,30 @@ function MobileNewsletterCTA() {
 
     setSubscribing(true);
 
-    const form = e.currentTarget as HTMLFormElement;
-    const formData = new FormData(form);
-    const submission: Record<string, string> = { form_type: "newsletter" };
-    formData.forEach((value, key) => {
-      submission[key] = String(value);
-    });
-
     trackEvent("newsletter_signup", {
       pageType: "magazine",
-      context: { sourceSection: "mobile_footer", formId: "magazine-newsletter-mobile" },
+      context: { sourceSection: "mobile_footer", formId: "magazine-newsletter-mobile", briefing_slugs: BRIEFING_SLUGS.weeklyEditorial },
     });
 
-    const result = await submitForm(submission);
-    if (result.success) setDone(true);
+    try {
+      await subscribeToBriefings(email, BRIEFING_SLUGS.weeklyEditorial, {
+        sourceForm: "magazine_mobile_newsletter",
+        pageType: "magazine",
+        pageUrl: getCanonicalPageUrl(),
+        sessionId: getAnalyticsSessionId(),
+        interests: [
+          briefingInterest({
+            slug: "weekly-editorial",
+            title: "Weekly Editorial",
+            sourceForm: "magazine_mobile_newsletter",
+            sourceContext: { source_section: "mobile_footer", mobile: true },
+          }),
+        ],
+      });
+      setDone(true);
+    } catch {
+      setDone(false);
+    }
     setSubscribing(false);
   };
 

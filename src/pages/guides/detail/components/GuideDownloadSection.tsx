@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { trackEvent, getAnalyticsSessionId, getCanonicalPageUrl } from "@/services/analytics";
 import { submitForm } from "@/services/formService";
+import { BRIEFING_SLUGS, guideInterest, subscribeToBriefings } from "@/services/audienceSubscriptionService";
 import { inMinorKeysData } from "../data";
 
 export default function GuideDownloadSection() {
@@ -17,7 +18,7 @@ export default function GuideDownloadSection() {
     e.preventDefault();
     setStatus("submitting");
 
-    trackEvent("newsletter_signup", {
+    trackEvent("guide_download_submit", {
       pageType: "guide_detail",
       entitySlug: guideSlug,
       entityType: "guide",
@@ -35,11 +36,35 @@ export default function GuideDownloadSection() {
       submission[key] = String(value);
     });
 
-    const result = await submitForm(submission);
-    if (result.success) {
+    try {
+      const result = await submitForm(submission);
+      if (!result.success) throw new Error(result.error ?? "Could not send the guide.");
+
+      await subscribeToBriefings(String(submission.email || ""), BRIEFING_SLUGS.fieldGuides, {
+        sourceForm: "guide_download",
+        pageType: "guide_detail",
+        pageUrl,
+        sessionId,
+        interests: [
+          guideInterest({
+            slug: guideSlug,
+            title: guideTitle,
+            sourceForm: "guide_download",
+            kind: "download",
+            strength: 75,
+            sourceContext: {
+              source_section: "download_form",
+              role: submission.wk_role || "",
+              use_case: submission.wk_use_case || "",
+            },
+          }),
+        ],
+      });
+
       setStatus("success");
       form.reset();
-    } else {
+    } catch (error) {
+      console.warn("[guide] subscription or delivery failed:", error);
       setStatus("error");
     }
   };

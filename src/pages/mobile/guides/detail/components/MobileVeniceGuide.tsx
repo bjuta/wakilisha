@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { trackEvent, getAnalyticsSessionId, getCanonicalPageUrl } from "@/services/analytics";
 import { submitForm } from "@/services/formService";
+import { BRIEFING_SLUGS, guideInterest, subscribeToBriefings } from "@/services/audienceSubscriptionService";
 import { inMinorKeysData } from "@/pages/guides/detail/data";
 import { MobileShareButton } from "@/components/design-system/share/ShareSheet";
 
@@ -19,7 +20,7 @@ export default function MobileVeniceGuide() {
   const handleDownloadSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    trackEvent("newsletter_signup", {
+    trackEvent("guide_subscribe_submit", {
       pageType: "guide_detail",
       entitySlug: guideSlug,
       entityType: "guide",
@@ -38,10 +39,30 @@ export default function MobileVeniceGuide() {
       submission[key] = String(value);
     });
 
-    const result = await submitForm(submission);
-    if (result.success) {
+    try {
+      const result = await submitForm(submission);
+      if (!result.success) throw new Error(result.error ?? "Could not save subscription.");
+
+      await subscribeToBriefings(String(submission.email || ""), BRIEFING_SLUGS.fieldGuides, {
+        sourceForm: "mobile_venice_download",
+        pageType: "guide_detail",
+        pageUrl,
+        sessionId,
+        interests: [
+          guideInterest({
+            slug: guideSlug,
+            title: guideTitle,
+            sourceForm: "mobile_venice_download",
+            kind: "download",
+            strength: 70,
+            sourceContext: { source_section: "download_form_mobile", mobile: true },
+          }),
+        ],
+      });
+
       setDownloadStatus("success");
-    } else {
+    } catch (error) {
+      console.warn("[mobile guide] subscription failed:", error);
       setDownloadStatus("error");
     }
   };
