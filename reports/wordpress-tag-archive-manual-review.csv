@@ -1,0 +1,3 @@
+source,target,status,tagSlug,decodedTagSlug,tagLabel,isPaginated,page,hasSuspiciousEncoding,confidence,reason,title
+/tag/abas-k%eb%ab%bf/,/search?tag=abas%20k%EB%AB%BF,302,abas-k%eb%ab%bf,abas-k뫿,abas k뫿,false,,true,low,Encoded tag slug needs manual review before redirecting.,Abas K뫿 | WAKILISHA
+/tag/abbas-k%eb%ab%bf/,/search?tag=abbas%20k%EB%AB%BF,302,abbas-k%eb%ab%bf,abbas-k뫿,abbas k뫿,false,,true,low,Encoded tag slug needs manual review before redirecting.,Abbas K뫿 | WAKILISHA
