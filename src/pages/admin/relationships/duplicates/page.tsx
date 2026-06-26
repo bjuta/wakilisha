@@ -193,6 +193,9 @@ export default function AdminDuplicateMergePage() {
   const [previewByCandidate, setPreviewByCandidate] = useState<Record<string, RepairPreview>>({});
   const [loadingPreviewId, setLoadingPreviewId] = useState<string | null>(null);
   const [applyingId, setApplyingId] = useState<string | null>(null);
+  const [bulkPreviewing, setBulkPreviewing] = useState(false);
+  const [bulkApplying, setBulkApplying] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
 
   const showToast = useCallback((message: string, type: "success" | "error" = "success") => {
     setToast({ message, type });
@@ -257,11 +260,28 @@ export default function AdminDuplicateMergePage() {
     });
   }, [audit.candidates, auditType, searchQuery]);
 
-  const previewRepair = useCallback(async (candidate: TrackDuplicateCandidate) => {
+  const highConfidenceVisibleCandidates = useMemo(() => {
+    return filteredCandidates.filter((candidate) => candidate.riskBucket === "high" && candidate.tracks.length > 1);
+  }, [filteredCandidates]);
+
+  const readyBulkPreviews = useMemo(() => {
+    return highConfidenceVisibleCandidates
+      .map((candidate) => ({
+        candidate,
+        preview: previewByCandidate[candidate.candidateId],
+      }))
+      .filter(({ preview }) => {
+        return preview
+          && preview.confidenceBucket === "high"
+          && !preview.blockers?.length
+          && preview.duplicateTracks?.length > 0;
+      });
+  }, [highConfidenceVisibleCandidates, previewByCandidate]);
+
+  const previewCandidateRepair = useCallback(async (candidate: TrackDuplicateCandidate): Promise<RepairPreview> => {
     const canonical = recommendedCanonicalTrack(candidate);
     if (!canonical) {
-      showToast("No canonical track could be selected for preview.", "error");
-      return;
+      throw new Error("No canonical track could be selected for preview.");
     }
 
     const duplicateIds = candidate.tracks
@@ -269,24 +289,29 @@ export default function AdminDuplicateMergePage() {
       .map((track) => track.id);
 
     if (duplicateIds.length === 0) {
-      showToast("No duplicate tracks to repair.", "error");
-      return;
+      throw new Error("No duplicate tracks to repair.");
     }
 
+    const { data, error: rpcError } = await supabase.rpc("admin_preview_registry_track_duplicate_repair", {
+      p_canonical_track_id: canonical.id,
+      p_duplicate_track_ids: duplicateIds,
+    });
+
+    if (rpcError) throw new Error(rpcError.message);
+    if (!data) throw new Error("Preview returned no data.");
+
+    return data as RepairPreview;
+  }, []);
+
+  const previewRepair = useCallback(async (candidate: TrackDuplicateCandidate) => {
     setLoadingPreviewId(candidate.candidateId);
 
     try {
-      const { data, error: rpcError } = await supabase.rpc("admin_preview_registry_track_duplicate_repair", {
-        p_canonical_track_id: canonical.id,
-        p_duplicate_track_ids: duplicateIds,
-      });
-
-      if (rpcError) throw new Error(rpcError.message);
-      if (!data) throw new Error("Preview returned no data.");
+      const preview = await previewCandidateRepair(candidate);
 
       setPreviewByCandidate((prev) => ({
         ...prev,
-        [candidate.candidateId]: data as RepairPreview,
+        [candidate.candidateId]: preview,
       }));
 
       showToast("Repair preview loaded", "success");
@@ -295,7 +320,7 @@ export default function AdminDuplicateMergePage() {
     } finally {
       setLoadingPreviewId(null);
     }
-  }, [showToast]);
+  }, [previewCandidateRepair, showToast]);
 
   const applyRepair = useCallback(async (candidate: TrackDuplicateCandidate) => {
     const preview = previewByCandidate[candidate.candidateId];
@@ -351,6 +376,102 @@ export default function AdminDuplicateMergePage() {
       setApplyingId(null);
     }
   }, [loadAudit, previewByCandidate, showToast]);
+
+  const bulkPreviewReady = useCallback(async () => {
+    const candidatesToPreview = highConfidenceVisibleCandidates.filter((candidate) => !previewByCandidate[candidate.candidateId]);
+
+    if (candidatesToPreview.length === 0) {
+      showToast("All visible high-confidence candidates already have previews.", "success");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Preview ${candidatesToPreview.length} high-confidence track duplicate repairs?\n\nThis does not change the database.`
+    );
+
+    if (!confirmed) return;
+
+    setBulkPreviewing(true);
+    setBulkProgress({ done: 0, total: candidatesToPreview.length });
+
+    let successCount = 0;
+    let failureCount = 0;
+    const nextPreviews: Record<string, RepairPreview> = {};
+
+    for (const candidate of candidatesToPreview) {
+      try {
+        const preview = await previewCandidateRepair(candidate);
+        nextPreviews[candidate.candidateId] = preview;
+        successCount += 1;
+      } catch {
+        failureCount += 1;
+      } finally {
+        setBulkProgress((prev) => prev ? { ...prev, done: prev.done + 1 } : null);
+      }
+    }
+
+    if (Object.keys(nextPreviews).length > 0) {
+      setPreviewByCandidate((prev) => ({
+        ...prev,
+        ...nextPreviews,
+      }));
+    }
+
+    setBulkPreviewing(false);
+    setBulkProgress(null);
+
+    showToast(`Bulk preview complete · ${successCount} ready, ${failureCount} failed`, failureCount > 0 ? "error" : "success");
+  }, [highConfidenceVisibleCandidates, previewByCandidate, previewCandidateRepair, showToast]);
+
+  const bulkApplyReady = useCallback(async () => {
+    if (readyBulkPreviews.length === 0) {
+      showToast("No ready high-confidence previews to apply.", "error");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Apply ${readyBulkPreviews.length} ready high-confidence track duplicate repairs?\n\nThis will move chart rows/provider links/credits and archive duplicate track rows candidate by candidate.`
+    );
+
+    if (!confirmed) return;
+
+    setBulkApplying(true);
+    setBulkProgress({ done: 0, total: readyBulkPreviews.length });
+
+    let successCount = 0;
+    let failureCount = 0;
+
+    for (const { candidate, preview } of readyBulkPreviews) {
+      try {
+        const { error: rpcError } = await supabase.rpc("admin_apply_registry_track_duplicate_repair", {
+          p_canonical_track_id: preview.canonicalTrack.id,
+          p_duplicate_track_ids: preview.duplicateTracks.map((track) => track.id),
+          p_note: `Bulk applied from Duplicate Merge admin candidate ${candidate.candidateId}`,
+          p_allow_medium_confidence: false,
+        });
+
+        if (rpcError) throw new Error(rpcError.message);
+
+        successCount += 1;
+        setPreviewByCandidate((prev) => {
+          const next = { ...prev };
+          delete next[candidate.candidateId];
+          return next;
+        });
+      } catch {
+        failureCount += 1;
+      } finally {
+        setBulkProgress((prev) => prev ? { ...prev, done: prev.done + 1 } : null);
+      }
+    }
+
+    setBulkApplying(false);
+    setBulkProgress(null);
+
+    await loadAudit();
+
+    showToast(`Bulk apply complete · ${successCount} applied, ${failureCount} failed`, failureCount > 0 ? "error" : "success");
+  }, [loadAudit, readyBulkPreviews, showToast]);
 
   return (
     <div className="space-y-6">
@@ -452,6 +573,42 @@ export default function AdminDuplicateMergePage() {
             />
             Include lower-confidence title checks
           </label>
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-wk-border bg-wk-surface p-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="text-[13px] font-black text-wk-text">Bulk ready repairs</p>
+            <p className="mt-1 text-[12px] text-wk-text-muted">
+              {highConfidenceVisibleCandidates.length} visible high-confidence candidates · {readyBulkPreviews.length} previewed and ready to apply.
+            </p>
+            {bulkProgress && (
+              <p className="mt-1 text-[12px] font-bold text-wk-brand">
+                Progress: {bulkProgress.done} / {bulkProgress.total}
+              </p>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <button
+              onClick={bulkPreviewReady}
+              disabled={bulkPreviewing || bulkApplying || highConfidenceVisibleCandidates.length === 0}
+              className="wk-button wk-button-secondary wk-button-sm justify-center whitespace-nowrap disabled:opacity-50"
+            >
+              <WkIcon name={bulkPreviewing ? "Loader2" : "Eye"} size={14} className={bulkPreviewing ? "animate-spin" : ""} />
+              Preview visible ready
+            </button>
+
+            <button
+              onClick={bulkApplyReady}
+              disabled={bulkPreviewing || bulkApplying || readyBulkPreviews.length === 0}
+              className="wk-button wk-button-primary wk-button-sm justify-center whitespace-nowrap disabled:opacity-50"
+            >
+              <WkIcon name={bulkApplying ? "Loader2" : "Wrench"} size={14} className={bulkApplying ? "animate-spin" : ""} />
+              Apply {readyBulkPreviews.length} ready
+            </button>
+          </div>
         </div>
       </div>
 
