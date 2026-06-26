@@ -281,22 +281,22 @@ export default function CategoryDetail() {
         )}
 
         {/* ── Editor's Picks (dynamic asymmetry: 1 hero + 3 compact stacked) ── */}
-        {picks.length > 0 && (
+        {stories.length > 0 && heroStory && (
           <section className="mag-reveal">
             <SectionLabel count={stories.length}>Stories in {term.name}</SectionLabel>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 lg:items-stretch">
-              {picks[0] && (
-                <div className="lg:h-full">
-                  <MagazineCard variant="hero" story={picks[0]} rank={1} />
+              <div className="lg:h-full">
+                <MagazineCard variant="hero" story={heroStory} rank={1} />
+              </div>
+              {picks.length > 0 && (
+                <div className="grid grid-cols-1 gap-5 lg:grid-rows-3">
+                  {picks.slice(0, 3).map((story, i) => (
+                    <div key={story.slug} className="flex">
+                      <CompactCardFill story={story} rank={i + 2} />
+                    </div>
+                  ))}
                 </div>
               )}
-              <div className="grid grid-cols-1 gap-5 lg:grid-rows-3">
-                {picks.slice(1, 4).map((story, i) => (
-                  <div key={story.slug} className="flex">
-                    <CompactCardFill story={story} rank={i + 2} />
-                  </div>
-                ))}
-              </div>
             </div>
           </section>
         )}
