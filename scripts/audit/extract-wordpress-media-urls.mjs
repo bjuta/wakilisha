@@ -52,6 +52,10 @@ function isRealUploadFile(uploadPath) {
   if (uploadPath.includes("{")) return false;
   if (uploadPath.includes("}")) return false;
   if (uploadPath.includes("${")) return false;
+  if (uploadPath.includes("/YYYY/")) return false;
+  if (uploadPath.includes("/MM/")) return false;
+  if (/\/example\.[a-z0-9]+$/i.test(uploadPath)) return false;
+  if (/\/filename\.[a-z0-9]+$/i.test(uploadPath)) return false;
   return FILE_EXTENSION_PATTERN.test(uploadPath);
 }
 
