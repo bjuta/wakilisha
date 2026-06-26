@@ -132,6 +132,74 @@ export interface RealtimeAnalyticsSnapshot {
   minuteSeries: Array<{ minute: string; pageViews: number }>;
 }
 
+export interface SignalBoardRowBase {
+  id: string;
+  score: number;
+  evidence: string[];
+  recommendedAction: string;
+  adminUrl?: string;
+  targetUrl?: string;
+}
+
+export interface SignalEntityRow extends SignalBoardRowBase {
+  entityType: string;
+  entitySlug: string;
+  label: string;
+  metric: number;
+  metricLabel: string;
+}
+
+export interface SearchGapSignalRow extends SignalBoardRowBase {
+  query: string;
+  count: number;
+  zeroResults: boolean;
+}
+
+export interface ShareVelocitySignalRow extends SignalBoardRowBase {
+  label: string;
+  platform: string;
+  shares: number;
+}
+
+export interface JourneySignalRow extends SignalBoardRowBase {
+  path: string;
+  sessions: number;
+}
+
+export interface PageFixSignalRow extends SignalBoardRowBase {
+  pageUrl: string;
+  pageType: string;
+  views: number;
+}
+
+export interface RecommendedSignalAction {
+  id: string;
+  priority: number;
+  title: string;
+  reason: string;
+  evidence: string[];
+  actionLabel: string;
+  actionUrl: string;
+}
+
+export interface SignalBoard {
+  generatedAt: string;
+  range: DateRange | number;
+  summary: {
+    signalCount: number;
+    opportunityCount: number;
+    risingEntityCount: number;
+    searchGapCount: number;
+    pageFixCount: number;
+  };
+  risingEntities: SignalEntityRow[];
+  searchGaps: SearchGapSignalRow[];
+  shareVelocity: ShareVelocitySignalRow[];
+  highIntentJourneys: JourneySignalRow[];
+  pagesToFix: PageFixSignalRow[];
+  recommendedActions: RecommendedSignalAction[];
+}
+
 interface AnalyticsSnapshot {
   today: { pageViews: number; newsletterSignups: number; uniqueSessions: number };
   kpis: AnalyticsKpis;
@@ -186,6 +254,10 @@ export function clearAdminAnalyticsCache(): void {
 
 export async function fetchRealtimeAnalytics(): Promise<RealtimeAnalyticsSnapshot> {
   return callAdminAnalytics<RealtimeAnalyticsSnapshot>("analytics_realtime");
+}
+
+export async function fetchSignalBoard(range: DateRange | number = 30): Promise<SignalBoard> {
+  return callAdminAnalytics<SignalBoard>("analytics_signal_board", { range });
 }
 
 export async function fetchDashboardKpis(range: DateRange | number = 30): Promise<AnalyticsKpis> {

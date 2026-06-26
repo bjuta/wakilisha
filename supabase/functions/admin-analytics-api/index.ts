@@ -394,6 +394,473 @@ function buildSnapshot(events: any[], range: RangeInput) {
   };
 }
 
+
+function pathFromUrl(raw: unknown): string {
+  const value = readString(raw);
+  if (!value) return "";
+  try {
+    const url = new URL(value);
+    return url.pathname || "/";
+  } catch {
+    return value.startsWith("/") ? value.split("?")[0] : value;
+  }
+}
+
+function labelFromPath(raw: unknown): string {
+  const path = pathFromUrl(raw);
+  if (!path || path === "/") return "Home";
+  const parts = path.split("/").filter(Boolean);
+  const last = parts[parts.length - 1] || path;
+  return last.replace(/[-_]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function isSignalNoisePath(raw: unknown): boolean {
+  const path = pathFromUrl(raw);
+  if (!path) return true;
+
+  const parts = path.split("/").filter(Boolean);
+  const first = parts[0] || "";
+
+  if (path === "/") return false;
+
+  return (
+    first === "admin" ||
+    first === "auth" ||
+    first === "preview" ||
+    first === "settings" ||
+    first === "profile" ||
+    first === "api" ||
+    first === "player" ||
+    first === "briefing" ||
+    first === "u" ||
+    first === "privacy" ||
+    first === "terms" ||
+    first === "contact" ||
+    first === "faqs" ||
+    first === "about" ||
+    path.includes("/settings") ||
+    path.includes("/preview/")
+  );
+}
+
+function isCommercialEntityType(raw: unknown): boolean {
+  const value = readString(raw);
+  return [
+    "artist",
+    "track",
+    "release",
+    "article",
+    "guide",
+    "chart",
+    "genre",
+    "label",
+    "category",
+    "tag",
+    "author",
+    "magazine_issue",
+  ].includes(value);
+}
+
+function isCommercialContentPath(raw: unknown): boolean {
+  const path = pathFromUrl(raw);
+  if (!path || isSignalNoisePath(path)) return false;
+
+  const parts = path.split("/").filter(Boolean);
+  const first = parts[0] || "";
+
+  return (
+    first === "artists" ||
+    first === "tracks" ||
+    first === "releases" ||
+    first === "charts" ||
+    first === "magazine" ||
+    first === "guides" ||
+    first === "genres" ||
+    first === "labels" ||
+    first === "categories" ||
+    first === "tags" ||
+    first === "authors" ||
+    parts.length === 1
+  );
+}
+
+function inferEntity(row: any): { entityType: string; entitySlug: string; pagePath: string } | null {
+  const explicitType = readString(row.entity_type);
+  const explicitSlug = readString(row.entity_slug);
+  const pagePath = pathFromUrl(row.page_url);
+
+  if (explicitType && explicitSlug && isCommercialEntityType(explicitType)) {
+    return { entityType: explicitType, entitySlug: explicitSlug, pagePath };
+  }
+
+  if (!isCommercialContentPath(pagePath)) return null;
+
+  const parts = pagePath.split("/").filter(Boolean);
+  if (parts[0] === "artists" && parts[1]) return { entityType: "artist", entitySlug: parts[1], pagePath };
+  if (parts[0] === "tracks" && parts[2]) return { entityType: "track", entitySlug: parts[2], pagePath };
+  if (parts[0] === "releases" && parts[2]) return { entityType: "release", entitySlug: parts[2], pagePath };
+  if ((parts[0] === "magazine" || parts.length === 1) && parts[parts.length - 1]) return { entityType: "article", entitySlug: parts[parts.length - 1], pagePath };
+  if (parts[0] === "guides" && parts[1]) return { entityType: "guide", entitySlug: parts[1], pagePath };
+  if (parts[0] === "charts") return { entityType: "chart", entitySlug: parts.join("/"), pagePath };
+
+  return null;
+}
+
+function adminUrlForEntity(entityType: string, slug: string): string {
+  if (!entityType || !slug) return "/admin/analytics";
+  if (entityType === "artist") return `/admin/registry/artists/${slug}`;
+  if (entityType === "track") return `/admin/registry/tracks/${slug}`;
+  if (entityType === "release") return `/admin/registry/releases/${slug}`;
+  if (entityType === "label") return `/admin/registry/labels/${slug}`;
+  if (entityType === "genre") return `/admin/registry/genres/${slug}`;
+  if (entityType === "article") return `/admin/content/articles/${slug}`;
+  if (entityType === "guide") return `/admin/content/guides/${slug}/edit`;
+  if (entityType === "chart") return "/admin/charts/dashboard";
+  return "/admin/analytics";
+}
+
+function scoreCap(value: number): number {
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function actionForEntity(entityType: string): string {
+  if (entityType === "artist") return "Open artist page, check related tracks, and consider featuring in Artist Signals.";
+  if (entityType === "track") return "Check playback, shares, chart presence, lyrics, and article context.";
+  if (entityType === "release") return "Check tracklist drop-off and promote the strongest track.";
+  if (entityType === "article") return "Refresh headline, internal links, entity embeds, and newsletter CTA.";
+  if (entityType === "chart") return "Use chart movement as evidence for a culture signal.";
+  return "Open the entity and decide the next editorial or registry move.";
+}
+
+function buildSignalBoard(events: any[], range: RangeInput) {
+  const pageViews = events.filter((e) => e.event_name === "page_view");
+  const searchEvents = events.filter((e) => e.event_name === "search_query");
+  const shareEvents = events.filter((e) => e.event_name === "share_click" || e.event_name === "share_copy");
+  const signups = events.filter((e) => e.event_name === "newsletter_signup" || e.event_name === "briefing_subscribe");
+  const plays = events.filter((e) => e.event_name === "video_play" || e.event_name === "player_play");
+  const scrollEvents = events.filter((e) => e.event_name === "scroll_depth");
+
+  const entityMap = new Map<string, any>();
+
+  function entityBucket(row: any) {
+    const inferred = inferEntity(row);
+    if (!inferred) return null;
+
+    const key = `${inferred.entityType}::${inferred.entitySlug}`;
+    const existing = entityMap.get(key) || {
+      id: key,
+      entityType: inferred.entityType,
+      entitySlug: inferred.entitySlug,
+      label: labelFromPath(inferred.pagePath || row.page_url || inferred.entitySlug),
+      pageViews: 0,
+      shares: 0,
+      signups: 0,
+      plays: 0,
+      scrolls: 0,
+      sessions: new Set<string>(),
+      referrers: new Set<string>(),
+      pagePath: inferred.pagePath,
+    };
+
+    if (row.session_id) existing.sessions.add(row.session_id);
+    const ref = domainFromReferrer(row.referrer);
+    if (ref) existing.referrers.add(ref);
+    if (!existing.pagePath && inferred.pagePath) existing.pagePath = inferred.pagePath;
+
+    entityMap.set(key, existing);
+    return existing;
+  }
+
+  for (const row of events) {
+    const bucket = entityBucket(row);
+    if (!bucket) continue;
+
+    if (row.event_name === "page_view") bucket.pageViews += 1;
+    if (row.event_name === "share_click" || row.event_name === "share_copy") bucket.shares += 1;
+    if (row.event_name === "newsletter_signup" || row.event_name === "briefing_subscribe") bucket.signups += 1;
+    if (row.event_name === "video_play" || row.event_name === "player_play") bucket.plays += 1;
+    if (row.event_name === "scroll_depth") bucket.scrolls += 1;
+  }
+
+  const risingEntities = Array.from(entityMap.values())
+    .filter((row) => isCommercialEntityType(row.entityType) || isCommercialContentPath(row.pagePath))
+    .map((row) => {
+      const score = scoreCap(
+        row.pageViews * 4 +
+        row.sessions.size * 7 +
+        row.shares * 14 +
+        row.signups * 18 +
+        row.plays * 10 +
+        row.referrers.size * 6
+      );
+
+      const evidence = [
+        `${row.pageViews} page views`,
+        `${row.sessions.size} sessions`,
+        row.shares > 0 ? `${row.shares} shares` : "",
+        row.signups > 0 ? `${row.signups} signups` : "",
+        row.plays > 0 ? `${row.plays} plays` : "",
+        row.referrers.size > 1 ? `${row.referrers.size} referrers` : "",
+      ].filter(Boolean);
+
+      return {
+        id: row.id,
+        entityType: row.entityType,
+        entitySlug: row.entitySlug,
+        label: row.label,
+        score,
+        metric: row.pageViews,
+        metricLabel: "views",
+        evidence,
+        recommendedAction: actionForEntity(row.entityType),
+        targetUrl: row.pagePath || "",
+        adminUrl: adminUrlForEntity(row.entityType, row.entitySlug),
+      };
+    })
+    .filter((row) => row.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 12);
+
+  const searchMap = new Map<string, any>();
+  for (const row of searchEvents) {
+    const ctx = row.context || {};
+    const query = readString(ctx.search_query).toLowerCase();
+    if (!query) continue;
+    const existing = searchMap.get(query) || { query, count: 0, zeroResults: false, sessions: new Set<string>() };
+    existing.count += 1;
+    existing.zeroResults = existing.zeroResults || ctx.results_count === 0 || ctx.zero_results === true;
+    if (row.session_id) existing.sessions.add(row.session_id);
+    searchMap.set(query, existing);
+  }
+
+  const searchGaps = Array.from(searchMap.values())
+    .map((row) => ({
+      id: `search::${row.query}`,
+      query: row.query,
+      count: row.count,
+      zeroResults: Boolean(row.zeroResults),
+      score: scoreCap(row.count * 14 + (row.zeroResults ? 35 : 8)),
+      evidence: [
+        `${row.count} searches`,
+        `${row.sessions.size} sessions`,
+        row.zeroResults ? "zero-result demand" : "existing demand",
+      ],
+      recommendedAction: row.zeroResults
+        ? "Fix this demand gap: ingest entity, add alias, create article, or improve search mapping."
+        : "Turn this demand into content: refresh the best page and add stronger entity links.",
+      adminUrl: row.zeroResults ? "/admin/registry/artist-aliases" : "/admin/content/articles/new",
+      targetUrl: `/search?q=${encodeURIComponent(row.query)}`,
+    }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 12);
+
+  const shareMap = new Map<string, any>();
+  for (const row of shareEvents) {
+    const ctx = row.context || {};
+    const platform = readString(ctx.platform) || readString(ctx.share_platform) || "unknown";
+    const pagePath = pathFromUrl(row.page_url);
+    const key = `${platform}::${pagePath || row.entity_slug || "unknown"}`;
+    const existing = shareMap.get(key) || {
+      id: key,
+      label: labelFromPath(pagePath || row.entity_slug || "Unknown"),
+      platform,
+      pagePath,
+      shares: 0,
+      sessions: new Set<string>(),
+    };
+    existing.shares += 1;
+    if (row.session_id) existing.sessions.add(row.session_id);
+    shareMap.set(key, existing);
+  }
+
+  const shareVelocity = Array.from(shareMap.values())
+    .map((row) => ({
+      id: row.id,
+      label: row.label,
+      platform: row.platform,
+      shares: row.shares,
+      score: scoreCap(row.shares * 20 + row.sessions.size * 8),
+      evidence: [`${row.shares} shares`, `${row.sessions.size} sessions`, `${row.platform} is moving it`],
+      recommendedAction: "Create a tracked campaign link for the strongest channel and push this entity again.",
+      targetUrl: row.pagePath,
+      adminUrl: "/admin/analytics",
+    }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 10);
+
+  const pageMap = new Map<string, any>();
+  for (const row of pageViews) {
+    const pagePath = pathFromUrl(row.page_url);
+    if (!pagePath || !isCommercialContentPath(pagePath)) continue;
+    const existing = pageMap.get(pagePath) || {
+      id: pagePath,
+      pageUrl: pagePath,
+      pageType: row.page_type || "unknown",
+      views: 0,
+      sessions: new Set<string>(),
+      shares: 0,
+      signups: 0,
+      plays: 0,
+      scrolls: 0,
+    };
+    existing.views += 1;
+    if (row.session_id) existing.sessions.add(row.session_id);
+    pageMap.set(pagePath, existing);
+  }
+
+  for (const row of [...shareEvents, ...signups, ...plays, ...scrollEvents]) {
+    const pagePath = pathFromUrl(row.page_url);
+    if (!isCommercialContentPath(pagePath)) continue;
+    const existing = pagePath ? pageMap.get(pagePath) : null;
+    if (!existing) continue;
+    if (row.event_name === "share_click" || row.event_name === "share_copy") existing.shares += 1;
+    if (row.event_name === "newsletter_signup" || row.event_name === "briefing_subscribe") existing.signups += 1;
+    if (row.event_name === "video_play" || row.event_name === "player_play") existing.plays += 1;
+    if (row.event_name === "scroll_depth") existing.scrolls += 1;
+  }
+
+  const pagesToFix = Array.from(pageMap.values())
+    .map((row) => {
+      const weakEngagement = row.views >= 3 && row.shares + row.signups + row.plays === 0;
+      const lowScroll = row.views >= 3 && row.scrolls === 0;
+      const score = scoreCap(row.views * 5 + (weakEngagement ? 30 : 0) + (lowScroll ? 12 : 0));
+
+      return {
+        id: row.id,
+        pageUrl: row.pageUrl,
+        pageType: row.pageType,
+        views: row.views,
+        score,
+        evidence: [
+          `${row.views} views`,
+          `${row.sessions.size} sessions`,
+          weakEngagement ? "weak downstream action" : "",
+          lowScroll ? "no scroll signal captured" : "",
+        ].filter(Boolean),
+        recommendedAction: weakEngagement
+          ? "Improve the CTA, add internal entity links, and make the next action obvious."
+          : "Review this page because it is getting attention.",
+        targetUrl: row.pageUrl,
+        adminUrl: row.pageType === "article" ? "/admin/content/articles" : "/admin/analytics",
+      };
+    })
+    .filter((row) => row.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 10);
+
+  const sessions = new Map<string, any[]>();
+  for (const row of pageViews) {
+    if (!row.session_id) continue;
+    if (!sessions.has(row.session_id)) sessions.set(row.session_id, []);
+    sessions.get(row.session_id)!.push(row);
+  }
+
+  const journeyMap = new Map<string, Set<string>>();
+  for (const [sessionId, rows] of sessions.entries()) {
+    const sorted = rows
+      .filter((row) => {
+        const inferred = inferEntity(row);
+        return inferred || isCommercialContentPath(row.page_url);
+      })
+      .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
+
+    for (let i = 0; i < sorted.length - 1; i += 1) {
+      const fromEntity = inferEntity(sorted[i]);
+      const toEntity = inferEntity(sorted[i + 1]);
+      const from = fromEntity ? `${fromEntity.entityType}:${fromEntity.entitySlug}` : labelFromPath(sorted[i].page_url);
+      const to = toEntity ? `${toEntity.entityType}:${toEntity.entitySlug}` : labelFromPath(sorted[i + 1].page_url);
+      if (!from || !to || from === to) continue;
+      const key = `${from} → ${to}`;
+      if (!journeyMap.has(key)) journeyMap.set(key, new Set<string>());
+      journeyMap.get(key)!.add(sessionId);
+    }
+  }
+
+  const highIntentJourneys = Array.from(journeyMap.entries())
+    .map(([path, sessionSet]) => ({
+      id: `journey::${path}`,
+      path,
+      sessions: sessionSet.size,
+      score: scoreCap(sessionSet.size * 18),
+      evidence: [`${sessionSet.size} sessions followed this path`],
+      recommendedAction: "Strengthen this journey with internal links, embeds, and a clearer next step.",
+      adminUrl: "/admin/analytics",
+    }))
+    .filter((row) => row.sessions > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 10);
+
+  const recommendedActions: any[] = [];
+  const actionKeys = new Set<string>();
+
+  function pushRecommendedAction(action: any) {
+    const key = String(action.title || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+
+    if (!key || actionKeys.has(key)) return;
+    actionKeys.add(key);
+    recommendedActions.push(action);
+  }
+
+  for (const row of risingEntities.slice(0, 8)) {
+    pushRecommendedAction({
+      id: `action::rising::${row.id}`,
+      priority: row.score,
+      title: `Lean into ${row.label}`,
+      reason: `${row.entityType} signal is moving now.`,
+      evidence: row.evidence,
+      actionLabel: "Open entity",
+      actionUrl: row.adminUrl,
+    });
+  }
+
+  for (const row of searchGaps.filter((r) => r.zeroResults).slice(0, 6)) {
+    pushRecommendedAction({
+      id: `action::search::${row.query}`,
+      priority: row.score,
+      title: `Fix search demand for “${row.query}”`,
+      reason: "People are asking for this and the site is not answering cleanly enough.",
+      evidence: row.evidence,
+      actionLabel: "Open aliases",
+      actionUrl: row.adminUrl,
+    });
+  }
+
+  for (const row of pagesToFix.slice(0, 6)) {
+    pushRecommendedAction({
+      id: `action::page::${row.pageUrl}`,
+      priority: row.score,
+      title: `Improve ${labelFromPath(row.pageUrl)}`,
+      reason: "This page has attention but needs a stronger next move.",
+      evidence: row.evidence,
+      actionLabel: "Open page",
+      actionUrl: row.targetUrl,
+    });
+  }
+
+  return {
+    generatedAt: new Date().toISOString(),
+    range,
+    summary: {
+      signalCount: risingEntities.length + shareVelocity.length + highIntentJourneys.length,
+      opportunityCount: recommendedActions.length,
+      risingEntityCount: risingEntities.length,
+      searchGapCount: searchGaps.filter((row) => row.zeroResults).length,
+      pageFixCount: pagesToFix.length,
+    },
+    risingEntities,
+    searchGaps,
+    shareVelocity,
+    highIntentJourneys,
+    pagesToFix,
+    recommendedActions: recommendedActions
+      .sort((a, b) => b.priority - a.priority)
+      .slice(0, 12),
+  };
+}
+
 async function buildRealtime(db: ReturnType<typeof createClient>) {
   const now = Date.now();
   const since5 = new Date(now - 5 * 60 * 1000).toISOString();
@@ -615,6 +1082,12 @@ Deno.serve(async (req) => {
       const range = body.range ?? 30;
       const events = await getAnalyticsEvents(db, range);
       return ok(buildSnapshot(events, range), headers);
+    }
+
+    if (action === "analytics_signal_board") {
+      const range = body.range ?? 30;
+      const events = await getAnalyticsEvents(db, range);
+      return ok(buildSignalBoard(events, range), headers);
     }
 
     if (action === "analytics_realtime") {

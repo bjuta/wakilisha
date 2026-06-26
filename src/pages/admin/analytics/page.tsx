@@ -28,6 +28,7 @@ import {
   fetchConversionFunnel,
   fetchExportEvents,
   fetchRealtimeAnalytics,
+  fetchSignalBoard,
 } from "@/services/adminAnalytics";
 import type {
   AnalyticsKpis,
@@ -43,6 +44,7 @@ import type {
   FunnelStep,
   AttributionSummary,
   RealtimeAnalyticsSnapshot,
+  SignalBoard,
   DateRange,
 } from "@/services/adminAnalytics";
 import {
@@ -190,7 +192,7 @@ function getPreviousPeriod(primary: DateRangeValue): DateRangeValue {
 export default function AdminAnalyticsPage() {
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState<DateRangeValue>({ mode: "preset", days: 30 });
-  const [tab, setTab] = useState<"realtime" | "overview" | "search" | "engagement" | "attribution" | "shares" | "funnel">("realtime");
+  const [tab, setTab] = useState<"signals" | "realtime" | "overview" | "search" | "engagement" | "attribution" | "shares" | "funnel">("signals");
 
   // ── Compare periods ─────────────────────────────────────────
   const [compareEnabled, setCompareEnabled] = useState(false);
@@ -214,6 +216,9 @@ export default function AdminAnalyticsPage() {
   const [referrerBreakdown, setReferrerBreakdown] = useState<Array<{ referrer: string; count: number }>>([]);
   const [attribution, setAttribution] = useState<AttributionSummary | null>(null);
   const [funnel, setFunnel] = useState<FunnelStep[]>([]);
+  const [signalBoard, setSignalBoard] = useState<SignalBoard | null>(null);
+  const [signalLoading, setSignalLoading] = useState(false);
+  const [signalError, setSignalError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
 
   // Realtime analytics data
@@ -286,6 +291,21 @@ export default function AdminAnalyticsPage() {
   }, []);
 
   useEffect(() => { loadData(dateRange); }, [dateRange, loadData]);
+
+  const loadSignalBoard = useCallback(async () => {
+    setSignalLoading(true);
+    setSignalError(null);
+
+    try {
+      setSignalBoard(await fetchSignalBoard(toRange(dateRange)));
+    } catch (error) {
+      setSignalError(error instanceof Error ? error.message : "Signal Board failed.");
+    } finally {
+      setSignalLoading(false);
+    }
+  }, [dateRange]);
+
+  useEffect(() => { loadSignalBoard(); }, [loadSignalBoard]);
 
   const loadRealtime = useCallback(async () => {
     setRealtimeLoading(true);
@@ -430,6 +450,7 @@ export default function AdminAnalyticsPage() {
   if (loading) return <AdminChartsLoadingState message="Loading analytics..." />;
 
   const tabButtons = [
+    { key: "signals" as const, label: "Signals", icon: "Sparkles" },
     { key: "realtime" as const, label: "Realtime", icon: "Activity" },
     { key: "overview" as const, label: "Overview", icon: "LayoutDashboard" },
     { key: "search" as const, label: "Search", icon: "Search" },
@@ -566,6 +587,15 @@ export default function AdminAnalyticsPage() {
       </div>
 
       {/* Tab content */}
+      {tab === "signals" && (
+        <SignalsTab
+          board={signalBoard}
+          loading={signalLoading}
+          error={signalError}
+          onRefresh={loadSignalBoard}
+        />
+      )}
+
       {tab === "realtime" && (
         <RealtimeTab
           data={realtime}
@@ -636,6 +666,257 @@ export default function AdminAnalyticsPage() {
   );
 }
 
+
+// ═══════════════════════════════════════════════════════════════════
+// Signals Tab
+// ═══════════════════════════════════════════════════════════════════
+
+function signalTone(score: number): string {
+  if (score >= 80) return "bg-[var(--wk-danger)]/10 text-[var(--wk-danger)] border-[var(--wk-danger)]/20";
+  if (score >= 60) return "bg-[var(--wk-warning)]/10 text-[var(--wk-warning)] border-[var(--wk-warning)]/20";
+  if (score >= 40) return "bg-[var(--wk-brand)]/10 text-[var(--wk-brand)] border-[var(--wk-brand)]/20";
+  return "bg-[var(--wk-surface-raised)] text-[var(--wk-text-muted)] border-[var(--wk-border)]";
+}
+
+function signalHref(value?: string): string | undefined {
+  if (!value) return undefined;
+  return value.startsWith("/") ? value : undefined;
+}
+
+function SignalsTab({
+  board,
+  loading,
+  error,
+  onRefresh,
+}: {
+  board: SignalBoard | null;
+  loading: boolean;
+  error: string | null;
+  onRefresh: () => void;
+}) {
+  const generatedAt = board?.generatedAt
+    ? new Date(board.generatedAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+    : "—";
+
+  const risingRows = (board?.risingEntities ?? []).map((row) => ({
+    id: row.id,
+    label: row.label,
+    meta: `${labelize(row.entityType)} · ${row.metric.toLocaleString()} ${row.metricLabel}`,
+    score: row.score,
+    evidence: row.evidence,
+    recommendedAction: row.recommendedAction,
+    href: signalHref(row.adminUrl || row.targetUrl),
+  }));
+
+  const searchRows = (board?.searchGaps ?? []).map((row) => ({
+    id: row.id,
+    label: `“${row.query}”`,
+    meta: `${row.count.toLocaleString()} searches · ${row.zeroResults ? "zero results" : "has results"}`,
+    score: row.score,
+    evidence: row.evidence,
+    recommendedAction: row.recommendedAction,
+    href: signalHref(row.adminUrl || row.targetUrl),
+  }));
+
+  const shareRows = (board?.shareVelocity ?? []).map((row) => ({
+    id: row.id,
+    label: row.label,
+    meta: `${labelize(row.platform)} · ${row.shares.toLocaleString()} shares`,
+    score: row.score,
+    evidence: row.evidence,
+    recommendedAction: row.recommendedAction,
+    href: signalHref(row.targetUrl || row.adminUrl),
+  }));
+
+  const journeyRows = (board?.highIntentJourneys ?? []).map((row) => ({
+    id: row.id,
+    label: row.path,
+    meta: `${row.sessions.toLocaleString()} sessions`,
+    score: row.score,
+    evidence: row.evidence,
+    recommendedAction: row.recommendedAction,
+    href: signalHref(row.adminUrl),
+  }));
+
+  const pageRows = (board?.pagesToFix ?? []).map((row) => ({
+    id: row.id,
+    label: row.pageUrl,
+    meta: `${formatPageType(row.pageType)} · ${row.views.toLocaleString()} views`,
+    score: row.score,
+    evidence: row.evidence,
+    recommendedAction: row.recommendedAction,
+    href: signalHref(row.adminUrl || row.targetUrl),
+  }));
+
+  return (
+    <div className="space-y-5">
+      <WkSurface className="p-5">
+        <div className="flex flex-wrap items-start gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--wk-brand)]/10 text-[var(--wk-brand)]">
+            <WkIcon name={"Sparkles" as never} size={19} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-[15px] font-black text-[var(--wk-text)]">Signal Board</h2>
+            <p className="mt-1 max-w-3xl text-[12px] leading-relaxed text-[var(--wk-text-muted)]">
+              What is moving, why it matters, and what to do next. Built from first-party WAKILISHA events, search behavior, shares, journeys, and page outcomes.
+            </p>
+            <p className="mt-1 text-[11px] text-[var(--wk-text-faint)]">Last generated: {generatedAt}</p>
+          </div>
+          <button
+            onClick={onRefresh}
+            disabled={loading}
+            className="inline-flex items-center gap-1.5 rounded-full border border-[var(--wk-border)] px-3 py-1.5 text-[11px] font-bold text-[var(--wk-text-muted)] hover:text-[var(--wk-text)] disabled:opacity-50"
+          >
+            <WkIcon name={loading ? "Loader2" : "RefreshCw"} size={13} className={loading ? "animate-spin" : ""} />
+            Refresh
+          </button>
+        </div>
+
+        {error && (
+          <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[12px] font-semibold text-red-700">
+            {error}
+          </div>
+        )}
+      </WkSurface>
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <AdminChartsKpiCard value={(board?.summary.signalCount ?? 0).toLocaleString()} label="Active Signals" icon="Activity" accent="brand" />
+        <AdminChartsKpiCard value={(board?.summary.opportunityCount ?? 0).toLocaleString()} label="Recommended Actions" icon="ListChecks" accent="warning" />
+        <AdminChartsKpiCard value={(board?.summary.risingEntityCount ?? 0).toLocaleString()} label="Rising Entities" icon="TrendingUp" accent="success" />
+        <AdminChartsKpiCard value={(board?.summary.searchGapCount ?? 0).toLocaleString()} label="Search Gaps" icon="Search" accent="danger" />
+        <AdminChartsKpiCard value={(board?.summary.pageFixCount ?? 0).toLocaleString()} label="Pages To Fix" icon="Wrench" accent="muted" />
+      </div>
+
+      <WkSurface className="p-5">
+        <div className="mb-4 flex items-center gap-2">
+          <WkIcon name={"Target" as never} size={16} className="text-[var(--wk-brand)]" />
+          <h2 className="text-[14px] font-bold text-[var(--wk-text)]">Recommended Actions</h2>
+          <span className="text-[11px] text-[var(--wk-text-faint)]">highest-value next moves</span>
+        </div>
+
+        {!board || board.recommendedActions.length === 0 ? (
+          <EmptyChart message="No recommended actions yet. More traffic will make this sharper." compact />
+        ) : (
+          <div className="grid gap-3 lg:grid-cols-2">
+            {board.recommendedActions.slice(0, 8).map((action) => (
+              <a
+                key={action.id}
+                href={signalHref(action.actionUrl) || "/admin/analytics"}
+                className="group rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4 transition-all hover:border-[var(--wk-brand)]/40 hover:bg-[var(--wk-surface-raised)]"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-[13px] font-black text-[var(--wk-text)]">{action.title}</div>
+                    <p className="mt-1 text-[12px] leading-relaxed text-[var(--wk-text-muted)]">{action.reason}</p>
+                  </div>
+                  <span className={`shrink-0 rounded-full border px-2 py-1 text-[10px] font-black ${signalTone(action.priority)}`}>
+                    {action.priority}
+                  </span>
+                </div>
+                {action.evidence.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {action.evidence.slice(0, 3).map((item) => (
+                      <span key={item} className="rounded-full bg-[var(--wk-bg-subtle)] px-2 py-0.5 text-[10px] font-semibold text-[var(--wk-text-muted)]">
+                        {item}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <div className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-black text-[var(--wk-brand)]">
+                  {action.actionLabel}
+                  <WkIcon name={"ArrowRight" as never} size={12} className="transition-transform group-hover:translate-x-0.5" />
+                </div>
+              </a>
+            ))}
+          </div>
+        )}
+      </WkSurface>
+
+      <div className="grid gap-5 lg:grid-cols-2">
+        <SignalList title="Rising Entities" icon="TrendingUp" rows={risingRows} emptyMessage="No rising entities yet." />
+        <SignalList title="Search Demand Gaps" icon="Search" rows={searchRows} emptyMessage="No search gaps yet." />
+        <SignalList title="Share Velocity" icon="Share2" rows={shareRows} emptyMessage="No share velocity yet." />
+        <SignalList title="High-Intent Journeys" icon="GitBranch" rows={journeyRows} emptyMessage="No journey signals yet." />
+      </div>
+
+      <SignalList title="Pages To Fix" icon="Wrench" rows={pageRows} emptyMessage="No page fixes detected yet." wide />
+    </div>
+  );
+}
+
+function SignalList({
+  title,
+  icon,
+  rows,
+  emptyMessage,
+  wide = false,
+}: {
+  title: string;
+  icon: string;
+  rows: Array<{
+    id: string;
+    label: string;
+    meta: string;
+    score: number;
+    evidence: string[];
+    recommendedAction: string;
+    href?: string;
+  }>;
+  emptyMessage: string;
+  wide?: boolean;
+}) {
+  return (
+    <WkSurface className={`p-5 ${wide ? "lg:col-span-2" : ""}`}>
+      <div className="mb-4 flex items-center gap-2">
+        <WkIcon name={icon as never} size={16} className="text-[var(--wk-brand)]" />
+        <h2 className="text-[14px] font-bold text-[var(--wk-text)]">{title}</h2>
+      </div>
+
+      {rows.length === 0 ? (
+        <EmptyChart message={emptyMessage} compact />
+      ) : (
+        <div className="divide-y divide-[var(--wk-border)]">
+          {rows.slice(0, 8).map((row) => {
+            const content = (
+              <div className="flex gap-3 py-3">
+                <span className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border text-[11px] font-black ${signalTone(row.score)}`}>
+                  {row.score}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[13px] font-black text-[var(--wk-text)]">{row.label}</div>
+                  <div className="mt-0.5 text-[11px] font-semibold text-[var(--wk-text-faint)]">{row.meta}</div>
+
+                  {row.evidence.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {row.evidence.slice(0, 3).map((item) => (
+                        <span key={item} className="rounded-full bg-[var(--wk-bg-subtle)] px-2 py-0.5 text-[10px] font-semibold text-[var(--wk-text-muted)]">
+                          {item}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  <p className="mt-2 text-[11px] leading-relaxed text-[var(--wk-text-muted)]">{row.recommendedAction}</p>
+                </div>
+                {row.href && (
+                  <WkIcon name={"ExternalLink" as never} size={13} className="mt-1 shrink-0 text-[var(--wk-text-faint)]" />
+                )}
+              </div>
+            );
+
+            return row.href ? (
+              <a key={row.id} href={row.href} className="block hover:bg-[var(--wk-surface-raised)]/70">
+                {content}
+              </a>
+            ) : (
+              <div key={row.id}>{content}</div>
+            );
+          })}
+        </div>
+      )}
+    </WkSurface>
+  );
+}
 
 // ═══════════════════════════════════════════════════════════════════
 // Realtime Tab
