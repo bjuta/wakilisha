@@ -201,6 +201,8 @@ export function normalizeArtistFacts(data: unknown): ArtistFacts {
       : [],
     labels: cleanStringArray(record.labels || record.labelAffiliations),
     yearsActive: firstString(record, ["yearsActive"]),
+    topTracks: cleanStringArray(record.topTracks || record.topSongs || record.tracks),
+    topReleases: cleanStringArray(record.topReleases || record.releases),
   };
 }
 
