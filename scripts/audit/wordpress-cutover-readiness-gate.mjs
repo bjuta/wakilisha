@@ -9,6 +9,7 @@ const INPUTS = {
   decisionRegister: 'reports/wordpress-cutover-decision-register.json',
   decisionResolution: 'reports/wordpress-cutover-decision-resolution-plan.json',
   browserQaChecklist: 'reports/wordpress-cutover-browser-qa-checklist.json',
+  browserQaResultsLedger: 'reports/wordpress-cutover-browser-qa-results-ledger.json',
 };
 
 const OUTPUTS = {
@@ -42,7 +43,6 @@ function csvEscape(value) {
 
 function toCsv(rows) {
   const columns = ['id', 'severity', 'category', 'blocker', 'requiredAction', 'evidence'];
-
   const lines = [columns.join(',')];
 
   for (const row of rows) {
@@ -88,6 +88,8 @@ function markdownReport({ summary, inputStatus, blockers, rollup }) {
   lines.push('');
   lines.push('This is the final planning gate before any DNS/IP/Cloudflare cutover move.');
   lines.push('');
+  lines.push('It consumes the browser QA results ledger, not the raw browser QA checklist, so real human QA results can control cutover readiness.');
+  lines.push('');
   lines.push('It does not approve or apply redirects, DNS changes, Cloudflare changes, Supabase changes, or frontend deploys.');
   lines.push('');
   lines.push('## Gate result');
@@ -105,6 +107,9 @@ function markdownReport({ summary, inputStatus, blockers, rollup }) {
   lines.push(`- Approval-gated redirect rows: ${rollup.approvalGatedRedirectRows}`);
   lines.push(`- Browser QA rows: ${rollup.browserQaRows}`);
   lines.push(`- Critical browser QA rows: ${rollup.criticalBrowserQaRows}`);
+  lines.push(`- QA results using filled CSV: ${rollup.qaResultsUsingFilledCsv ? 'yes' : 'no'}`);
+  lines.push(`- QA results complete: ${rollup.qaResultsComplete ? 'yes' : 'no'}`);
+  lines.push(`- QA validation issues: ${rollup.qaResultsIssues}`);
   lines.push(`- Hold/do-not-redirect rows: ${rollup.holdRows}`);
   lines.push(`- Preview smoke all passed: ${rollup.previewSmokeAllPassed ? 'yes' : 'no'}`);
   lines.push(`- Rehearsal may cut over now: ${rollup.rehearsalMayCutOverNow ? 'yes' : 'no'}`);
@@ -143,7 +148,7 @@ function markdownReport({ summary, inputStatus, blockers, rollup }) {
   lines.push('');
   lines.push('Cutover is blocked until every critical blocker is resolved. The presence of a validated redirect bundle does not itself approve DNS/IP or Cloudflare changes.');
   lines.push('');
-  lines.push('The correct sequence remains: finish browser QA, resolve product/content holds, run this gate again, then decide whether to stage redirects and DNS/IP cutover.');
+  lines.push('The correct sequence remains: fill the QA results CSV, regenerate the QA results ledger, resolve product/content holds, run this gate again, then decide whether to stage redirects and DNS/IP cutover.');
   lines.push('');
   lines.push('## Deployment checklist');
   lines.push('');
@@ -166,6 +171,7 @@ const [
   decisionRegister,
   decisionResolution,
   browserQaChecklist,
+  browserQaResultsLedger,
 ] = await Promise.all([
   readJson(INPUTS.rehearsalChecklist),
   readJson(INPUTS.previewSmoke),
@@ -173,11 +179,12 @@ const [
   readJson(INPUTS.decisionRegister),
   readJson(INPUTS.decisionResolution),
   readJson(INPUTS.browserQaChecklist),
+  readJson(INPUTS.browserQaResultsLedger),
 ]);
 
 const inputStatus = {};
 
-for (const [name, path] of Object.entries(INPUTS)) {
+for (const path of Object.values(INPUTS)) {
   inputStatus[path] = await exists(path);
 }
 
@@ -188,8 +195,9 @@ const previewSmokeAllPassed = previewSmoke?.summary?.allPassed === true;
 
 const decisionResolutionSummary = decisionResolution?.summary || {};
 const redirectBundleSummary = redirectBundle?.summaries || {};
+const qaResultsSummary = browserQaResultsLedger?.summary || {};
 
-const browserRows = browserQaChecklist?.rows || [];
+const browserRows = browserQaResultsLedger?.rows || browserQaChecklist?.rows || [];
 const criticalBrowserRows = browserRows.filter((row) => row.priority === 'critical');
 const pendingCriticalBrowserRows = criticalBrowserRows.filter((row) => row.qaStatus !== 'passed');
 const holdRows = browserRows.filter((row) => row.category === 'do_not_redirect_without_decision');
@@ -202,6 +210,36 @@ if (!previewSmokeAllPassed) {
     blocker: 'React preview smoke has not fully passed.',
     requiredAction: 'Run and pass the React preview smoke verifier before cutover.',
     evidence: INPUTS.previewSmoke,
+  });
+}
+
+if (!browserQaResultsLedger?.usingResultsCsv) {
+  addBlocker(blockers, {
+    severity: 'critical',
+    category: 'qa_results_ledger',
+    blocker: 'No filled browser QA results CSV is present.',
+    requiredAction: 'Copy the QA template to reports/wordpress-cutover-browser-qa-results.csv, fill real browser results, then regenerate the QA results ledger.',
+    evidence: INPUTS.browserQaResultsLedger,
+  });
+}
+
+if ((qaResultsSummary.issues || 0) > 0) {
+  addBlocker(blockers, {
+    severity: 'critical',
+    category: 'qa_results_validation',
+    blocker: `${qaResultsSummary.issues} QA results validation issues remain.`,
+    requiredAction: 'Fix invalid/missing QA result fields before gate review.',
+    evidence: INPUTS.browserQaResultsLedger,
+  });
+}
+
+if ((qaResultsSummary.failed || 0) > 0) {
+  addBlocker(blockers, {
+    severity: 'critical',
+    category: 'qa_failures',
+    blocker: `${qaResultsSummary.failed} browser QA rows failed.`,
+    requiredAction: 'Fix failed routes or explicitly defer cutover.',
+    evidence: INPUTS.browserQaResultsLedger,
   });
 }
 
@@ -221,7 +259,7 @@ if (pendingCriticalBrowserRows.length > 0) {
     category: 'browser_qa',
     blocker: `${pendingCriticalBrowserRows.length} critical browser QA rows are not passed.`,
     requiredAction: 'Open the critical routes in a browser and mark them passed only after visible UI and client-side data render correctly.',
-    evidence: INPUTS.browserQaChecklist,
+    evidence: INPUTS.browserQaResultsLedger,
   });
 }
 
@@ -231,7 +269,7 @@ if (holdRows.length > 0) {
     category: 'hold_routes',
     blocker: `${holdRows.length} hold/do-not-redirect routes remain unresolved.`,
     requiredAction: 'Confirm each hold route is intentionally retired, rebuilt, preserved, or left out of redirect rules.',
-    evidence: INPUTS.browserQaChecklist,
+    evidence: INPUTS.browserQaResultsLedger,
   });
 }
 
@@ -269,8 +307,11 @@ const rollup = {
   primaryRedirectRows: redirectBundleSummary.totalRedirects || 0,
   readyExtraRedirectRows: decisionResolutionSummary.readyExtraRedirectRows || 0,
   approvalGatedRedirectRows,
-  browserQaRows: browserQaChecklist?.summary?.total || browserRows.length,
+  browserQaRows: qaResultsSummary.total || browserRows.length,
   criticalBrowserQaRows: criticalBrowserRows.length,
+  qaResultsUsingFilledCsv: browserQaResultsLedger?.usingResultsCsv === true,
+  qaResultsComplete: qaResultsSummary.qaComplete === true,
+  qaResultsIssues: qaResultsSummary.issues || 0,
   holdRows: holdRows.length,
   previewSmokeAllPassed,
   rehearsalMayCutOverNow,
