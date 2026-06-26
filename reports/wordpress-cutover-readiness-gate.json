@@ -1,17 +1,18 @@
 {
-  "generatedAt": "2026-06-26T12:02:48.344Z",
+  "generatedAt": "2026-06-26T12:10:38.893Z",
   "inputStatus": {
     "reports/wordpress-cutover-rehearsal-checklist.json": true,
     "reports/wordpress-react-preview-smoke-report.json": true,
     "reports/wordpress-temporary-redirect-bundle.json": true,
     "reports/wordpress-cutover-decision-register.json": true,
     "reports/wordpress-cutover-decision-resolution-plan.json": true,
-    "reports/wordpress-cutover-browser-qa-checklist.json": true
+    "reports/wordpress-cutover-browser-qa-checklist.json": true,
+    "reports/wordpress-cutover-browser-qa-results-ledger.json": true
   },
   "summary": {
     "mayCutOverNow": false,
-    "blockers": 6,
-    "criticalBlockers": 3,
+    "blockers": 7,
+    "criticalBlockers": 4,
     "highBlockers": 2,
     "mediumBlockers": 1
   },
@@ -21,12 +22,15 @@
     "approvalGatedRedirectRows": 15,
     "browserQaRows": 56,
     "criticalBrowserQaRows": 18,
+    "qaResultsUsingFilledCsv": false,
+    "qaResultsComplete": false,
+    "qaResultsIssues": 0,
     "holdRows": 17,
     "previewSmokeAllPassed": true,
     "rehearsalMayCutOverNow": false
   },
   "blockerCounts": {
-    "critical": 3,
+    "critical": 4,
     "high": 2,
     "medium": 1
   },
@@ -34,29 +38,37 @@
     {
       "id": "BLOCKER-001",
       "severity": "critical",
+      "category": "qa_results_ledger",
+      "blocker": "No filled browser QA results CSV is present.",
+      "requiredAction": "Copy the QA template to reports/wordpress-cutover-browser-qa-results.csv, fill real browser results, then regenerate the QA results ledger.",
+      "evidence": "reports/wordpress-cutover-browser-qa-results-ledger.json"
+    },
+    {
+      "id": "BLOCKER-002",
+      "severity": "critical",
       "category": "rehearsal_gate",
       "blocker": "Rehearsal checklist still says mayCutOverNow is false.",
       "requiredAction": "Resolve remaining decisions and browser QA, then regenerate the rehearsal/readiness artifacts.",
       "evidence": "reports/wordpress-cutover-rehearsal-checklist.json"
     },
     {
-      "id": "BLOCKER-002",
+      "id": "BLOCKER-003",
       "severity": "critical",
       "category": "browser_qa",
       "blocker": "18 critical browser QA rows are not passed.",
       "requiredAction": "Open the critical routes in a browser and mark them passed only after visible UI and client-side data render correctly.",
-      "evidence": "reports/wordpress-cutover-browser-qa-checklist.json"
+      "evidence": "reports/wordpress-cutover-browser-qa-results-ledger.json"
     },
     {
-      "id": "BLOCKER-003",
+      "id": "BLOCKER-004",
       "severity": "critical",
       "category": "hold_routes",
       "blocker": "17 hold/do-not-redirect routes remain unresolved.",
       "requiredAction": "Confirm each hold route is intentionally retired, rebuilt, preserved, or left out of redirect rules.",
-      "evidence": "reports/wordpress-cutover-browser-qa-checklist.json"
+      "evidence": "reports/wordpress-cutover-browser-qa-results-ledger.json"
     },
     {
-      "id": "BLOCKER-004",
+      "id": "BLOCKER-005",
       "severity": "high",
       "category": "approval_gated_redirects",
       "blocker": "15 approval-gated redirect-shaped rows remain in the decision resolution plan.",
@@ -64,7 +76,7 @@
       "evidence": "reports/wordpress-cutover-decision-resolution-plan.json"
     },
     {
-      "id": "BLOCKER-005",
+      "id": "BLOCKER-006",
       "severity": "high",
       "category": "manual_decisions",
       "blocker": "17 manual decision rows remain.",
@@ -72,7 +84,7 @@
       "evidence": "reports/wordpress-cutover-decision-resolution-plan.json"
     },
     {
-      "id": "BLOCKER-006",
+      "id": "BLOCKER-007",
       "severity": "medium",
       "category": "risk_register",
       "blocker": "8 high-risk decision-register rows exist.",
