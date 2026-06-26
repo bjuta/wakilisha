@@ -61,6 +61,32 @@ function dedupeSlug(base: string, seen: Set<string>): string {
   return s;
 }
 
+type PagedQueryResult<T> = {
+  data: T[] | null;
+  error: { message: string } | null;
+};
+
+async function fetchAllRows<T>(
+  buildQuery: (from: number, to: number) => PromiseLike<PagedQueryResult<T>>,
+  pageSize = 1000,
+): Promise<PagedQueryResult<T>> {
+  const rows: T[] = [];
+
+  for (let from = 0; ; from += pageSize) {
+    const to = from + pageSize - 1;
+    const { data, error } = await buildQuery(from, to);
+
+    if (error) return { data: null, error };
+
+    const page = data ?? [];
+    rows.push(...page);
+
+    if (page.length < pageSize) break;
+  }
+
+  return { data: rows, error: null };
+}
+
 function artworkUrl(urlTemplate: string, width: number): string {
   return urlTemplate.replace("{w}", String(width)).replace("{h}", String(width));
 }
@@ -280,9 +306,15 @@ Deno.serve(async (req: Request) => {
     stage = "load_existing";
     logStage(stage, { mode, artistSlug });
     const [existingReleasesRes, existingTracksRes, artistReleaseIdsRes] = await Promise.all([
-      db.from("registry_releases").select("id, slug, title, metadata").eq("status", "active"),
-      db.from("registry_tracks").select("id, slug, isrc"),
-      db.from("registry_release_artists").select("release_id").eq("artist_id", artistId).eq("status", "active"),
+      fetchAllRows<{ id: string; slug: string; title: string; metadata: Record<string, unknown> | null }>((from, to) =>
+        db.from("registry_releases").select("id, slug, title, metadata").eq("status", "active").range(from, to)
+      ),
+      fetchAllRows<{ id: string; slug: string; isrc: string | null }>((from, to) =>
+        db.from("registry_tracks").select("id, slug, isrc").range(from, to)
+      ),
+      fetchAllRows<{ release_id: string }>((from, to) =>
+        db.from("registry_release_artists").select("release_id").eq("artist_id", artistId).eq("status", "active").range(from, to)
+      ),
     ]);
     const loadError = existingReleasesRes.error?.message ?? existingTracksRes.error?.message ?? artistReleaseIdsRes.error?.message;
     if (loadError) return fail(stage, "registry_preload_failed", loadError, { mode, artistSlug, storefront, duration_ms: Date.now() - start });
@@ -302,8 +334,14 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    const { data: existingTrackArtists } = await db.from("registry_track_artists")
-      .select("track_id, artist_slug").eq("status", "active");
+    const { data: existingTrackArtists, error: existingTrackArtistsError } =
+      await fetchAllRows<{ track_id: string; artist_slug: string }>((from, to) =>
+        db.from("registry_track_artists")
+          .select("track_id, artist_slug")
+          .eq("status", "active")
+          .range(from, to)
+      );
+    if (existingTrackArtistsError) return fail(stage, "track_artist_preload_failed", existingTrackArtistsError.message, { mode, artistSlug, storefront, duration_ms: Date.now() - start });
     const existingTrackArtistSet = new Set<string>(
       (existingTrackArtists ?? []).map((r: { track_id: string; artist_slug: string }) =>
         `${r.track_id}:${r.artist_slug}`
@@ -433,9 +471,14 @@ Deno.serve(async (req: Request) => {
       catch (err) { return fail(stage, "album_fetch_failed", err instanceof Error ? err.message : String(err), { mode, artistSlug, storefront, selected: selectedIds.length, duration_ms: Date.now() - start }); }
 
       stage = "load_artists_for_featured";
-      const { data: allRegistryArtists } = await db.from("registry_artists")
-        .select("id, slug, display_name")
-        .eq("status", "active");
+      const { data: allRegistryArtists, error: allRegistryArtistsError } =
+        await fetchAllRows<{ id: string; slug: string; display_name: string }>((from, to) =>
+          db.from("registry_artists")
+            .select("id, slug, display_name")
+            .eq("status", "active")
+            .range(from, to)
+        );
+      if (allRegistryArtistsError) return fail(stage, "artist_preload_failed", allRegistryArtistsError.message, { mode, artistSlug, storefront, duration_ms: Date.now() - start });
       const artistByName = new Map<string, { id: string; slug: string; display_name: string }>();
       const artistBySlug = new Map<string, { id: string; slug: string; display_name: string }>();
       for (const a of (allRegistryArtists ?? [])) {
