@@ -1,5 +1,18 @@
 import { supabase } from "@/lib/supabase";
 
+const LEGACY_WORDPRESS_IMPORTS_ENABLED = import.meta.env.VITE_ENABLE_LEGACY_WORDPRESS_IMPORTS === "true";
+const LEGACY_WORDPRESS_IMPORTS_LOCK_MESSAGE = "Legacy WordPress import tools are locked. Set VITE_ENABLE_LEGACY_WORDPRESS_IMPORTS=true locally only during an approved migration window.";
+
+export function areLegacyWordPressImportsEnabled(): boolean {
+  return LEGACY_WORDPRESS_IMPORTS_ENABLED;
+}
+
+export function assertLegacyWordPressImportsEnabled(): void {
+  if (!LEGACY_WORDPRESS_IMPORTS_ENABLED) {
+    throw new Error(LEGACY_WORDPRESS_IMPORTS_LOCK_MESSAGE);
+  }
+}
+
 // ---- Types ----
 
 export type WizardStep = "connect" | "map" | "stage" | "finalize";
@@ -112,6 +125,7 @@ const WP_TAXONOMY_TO_TARGET: Record<string, { table: string; label: string; conf
 // ---- API calls through the edge function ----
 
 async function callProxy(action: string, payload: Record<string, unknown>): Promise<unknown> {
+  assertLegacyWordPressImportsEnabled();
   const { data, error } = await supabase.functions.invoke("wp-connect-proxy", {
     body: { action, ...payload },
   });

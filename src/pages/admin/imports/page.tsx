@@ -20,11 +20,15 @@ import {
   type WpDbStageResult,
   getExistingEntityCounts,
   createDatabaseRun,
+  areLegacyWordPressImportsEnabled,
 } from "@/services/wordpressConnectService";
 import { uploadZipAndCreateIngestionRun } from "@/services/migrationImportJobs";
 import { supabase } from "@/lib/supabase";
 
 type ImportMethod = "wordpress" | "database" | "zip";
+
+const LEGACY_WORDPRESS_IMPORTS_ENABLED = areLegacyWordPressImportsEnabled();
+const LEGACY_WORDPRESS_LOCK_MESSAGE = "Legacy WordPress live import tools are locked. Set VITE_ENABLE_LEGACY_WORDPRESS_IMPORTS=true locally only during an approved migration window.";
 
 type WizardStep = "welcome" | "connect" | "map" | "stage" | "finalize" | "complete" | "db-connect" | "db-stage" | "zip-upload" | "zip-done";
 
@@ -297,6 +301,10 @@ export default function AdminImportsPage() {
 
   // ---- WordPress Connect Actions ----
   const handlePing = useCallback(async () => {
+    if (!LEGACY_WORDPRESS_IMPORTS_ENABLED) {
+      setPingResult({ accessible: false, message: LEGACY_WORDPRESS_LOCK_MESSAGE });
+      return;
+    }
     const trimmed = siteUrl.trim().replace(/\/+$/, "");
     if (!trimmed) return;
     setPinging(true);
@@ -367,6 +375,10 @@ export default function AdminImportsPage() {
 
   // ---- Database Connect Actions ----
   const handleDbTest = useCallback(async () => {
+    if (!LEGACY_WORDPRESS_IMPORTS_ENABLED) {
+      setDbTestResult({ success: false, accessible: false, message: LEGACY_WORDPRESS_LOCK_MESSAGE, error: LEGACY_WORDPRESS_LOCK_MESSAGE });
+      return;
+    }
     setDbTesting(true);
     setDbTestResult(null);
     setDiscoveryError("");
@@ -381,6 +393,10 @@ export default function AdminImportsPage() {
   }, [dbCredentials]);
 
   const handleDbStage = useCallback(async () => {
+    if (!LEGACY_WORDPRESS_IMPORTS_ENABLED) {
+      setDiscoveryError(LEGACY_WORDPRESS_LOCK_MESSAGE);
+      return;
+    }
     setDbStaging(true);
     try {
       const result = await stageWordPressDatabase(dbCredentials);
@@ -422,6 +438,10 @@ export default function AdminImportsPage() {
 
   // ---- Method selection ----
   const handleChooseMethod = useCallback((m: ImportMethod) => {
+    if ((m === "wordpress" || m === "database") && !LEGACY_WORDPRESS_IMPORTS_ENABLED) {
+      window.alert(LEGACY_WORDPRESS_LOCK_MESSAGE);
+      return;
+    }
     setMethod(m);
     if (m === "wordpress") {
       setStep("connect");
@@ -464,6 +484,20 @@ export default function AdminImportsPage() {
       </div>
 
       {/* Step Indicator (only for WordPress flow) */}
+      {!LEGACY_WORDPRESS_IMPORTS_ENABLED && (
+        <WkSurface className="p-4 border-wk-warning/25 bg-wk-warning-soft/30">
+          <div className="flex items-start gap-2">
+            <WkIcon name="Lock" size={15} className="mt-0.5 text-wk-warning" />
+            <div>
+              <p className="text-[12px] font-black text-wk-text">Legacy WordPress live imports are locked</p>
+              <p className="mt-1 text-[11px] leading-5 text-wk-text-muted">
+                REST, direct database, and discography enrichment flows require <code className="font-mono bg-wk-bg-subtle px-1 rounded">VITE_ENABLE_LEGACY_WORDPRESS_IMPORTS=true</code>. ZIP upload remains available for approved offline archives.
+              </p>
+            </div>
+          </div>
+        </WkSurface>
+      )}
+
       {(method === "wordpress" || method === "database") && step !== "welcome" && (
         <WkSurface className="p-4">
           <div className="flex items-center gap-2 flex-wrap">
@@ -631,8 +665,22 @@ export default function AdminImportsPage() {
         <ZipDoneStep zipRun={zipRun} zipFile={zipFile} />
       )}
 
-      {/* Discography enrichment — always visible */}
-      <DiscographyEnrichmentPanel />
+      {/* Discography enrichment — legacy WordPress only */}
+      {LEGACY_WORDPRESS_IMPORTS_ENABLED ? (
+        <DiscographyEnrichmentPanel />
+      ) : (
+        <WkSurface className="p-5 mt-8 border border-wk-warning/25 bg-wk-warning-soft/30">
+          <div className="flex items-start gap-3">
+            <WkIcon name="Lock" size={18} className="mt-0.5 text-wk-warning" />
+            <div>
+              <h2 className="text-[14px] font-black text-wk-text">Legacy WordPress discography enrichment locked</h2>
+              <p className="mt-1 text-[12px] leading-5 text-wk-text-muted">
+                This tool connects to the old WordPress MySQL database. Enable it only during an approved migration window.
+              </p>
+            </div>
+          </div>
+        </WkSurface>
+      )}
     </div>
   );
 }
