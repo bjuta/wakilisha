@@ -129,6 +129,135 @@ function getFinalUrl(baseUrl: string, timestamp?: string) {
   return `${baseUrl}${baseUrl.includes("?") ? "&" : "?"}t=${encodeURIComponent(timestamp)}`;
 }
 
+type ShareTargetContext = {
+  targetUrl: string;
+  targetPath: string;
+  entityType: string;
+  entitySlug: string;
+  artistSlug: string;
+};
+
+function normalizeShareEntityType(type: ShareObject["type"] | undefined): string {
+  if (type === "album") return "release";
+  return type ?? "page";
+}
+
+function parseShareTarget(rawUrl: string, fallbackType: ShareObject["type"] | undefined): ShareTargetContext {
+  const fallbackEntityType = normalizeShareEntityType(fallbackType);
+
+  try {
+    const parsed = new URL(rawUrl, typeof window !== "undefined" ? window.location.origin : "https://wakilisha.africa");
+    const parts = parsed.pathname.split("/").filter(Boolean);
+    const first = parts[0] || "";
+    const last = parts[parts.length - 1] || "";
+
+    if (first === "tracks" && parts.length >= 3) {
+      return { targetUrl: parsed.toString(), targetPath: parsed.pathname, entityType: "track", entitySlug: parts[2], artistSlug: parts[1] };
+    }
+
+    if (first === "releases" && parts.length >= 3) {
+      return { targetUrl: parsed.toString(), targetPath: parsed.pathname, entityType: "release", entitySlug: parts[2], artistSlug: parts[1] };
+    }
+
+    if (first === "artists" && parts[1]) {
+      return { targetUrl: parsed.toString(), targetPath: parsed.pathname, entityType: "artist", entitySlug: parts[1], artistSlug: parts[1] };
+    }
+
+    if (first === "magazine" && parts[1]) {
+      return { targetUrl: parsed.toString(), targetPath: parsed.pathname, entityType: "article", entitySlug: parts[1], artistSlug: "" };
+    }
+
+    if (first === "guides" && parts[1]) {
+      return { targetUrl: parsed.toString(), targetPath: parsed.pathname, entityType: "guide", entitySlug: parts[1], artistSlug: "" };
+    }
+
+    if (first === "charts") {
+      return { targetUrl: parsed.toString(), targetPath: parsed.pathname, entityType: "chart", entitySlug: parts.slice(1).join("/") || "charts", artistSlug: "" };
+    }
+
+    if (first === "genres" && parts[1]) {
+      return { targetUrl: parsed.toString(), targetPath: parsed.pathname, entityType: "genre", entitySlug: parts[1], artistSlug: "" };
+    }
+
+    if (first === "labels" && parts[1]) {
+      return { targetUrl: parsed.toString(), targetPath: parsed.pathname, entityType: "label", entitySlug: parts[1], artistSlug: "" };
+    }
+
+    if (first === "authors" && parts[1]) {
+      return { targetUrl: parsed.toString(), targetPath: parsed.pathname, entityType: "author", entitySlug: parts[1], artistSlug: "" };
+    }
+
+    if (parts.length === 1 && first) {
+      return { targetUrl: parsed.toString(), targetPath: parsed.pathname, entityType: fallbackEntityType === "page" ? "article" : fallbackEntityType, entitySlug: first, artistSlug: "" };
+    }
+
+    return { targetUrl: parsed.toString(), targetPath: parsed.pathname, entityType: fallbackEntityType, entitySlug: last, artistSlug: "" };
+  } catch {
+    const parts = rawUrl.split("?")[0].split("#")[0].split("/").filter(Boolean);
+    const last = parts[parts.length - 1] || "";
+
+    return {
+      targetUrl: rawUrl,
+      targetPath: rawUrl,
+      entityType: fallbackEntityType,
+      entitySlug: last,
+      artistSlug: "",
+    };
+  }
+}
+
+function buildShareAnalyticsPayload({
+  item,
+  target,
+  platformKey,
+  trackedUrl,
+  action,
+}: {
+  item: ShareObject;
+  target: ShareTargetContext;
+  platformKey: string;
+  trackedUrl?: string;
+  action: "open" | "copy" | "click";
+}) {
+  const entityType = target.entityType || normalizeShareEntityType(item.type);
+  const entitySlug = target.entitySlug || "";
+
+  return {
+    pageType: entityType || item.type || "page",
+    entitySlug: entitySlug || undefined,
+    entityType: entityType || undefined,
+    context: {
+      action,
+      platform: platformKey,
+      share_platform: platformKey,
+      sharePlatform: platformKey,
+
+      target_url: target.targetUrl,
+      target_path: target.targetPath,
+      target_title: item.title,
+      target_subtitle: item.subtitle ?? null,
+      target_description: item.description ?? null,
+      target_image_url: item.imageUrl ?? null,
+
+      entity_type: entityType,
+      entityType,
+      entity_slug: entitySlug || null,
+      entitySlug: entitySlug || null,
+      artist_slug: target.artistSlug || null,
+      artistSlug: target.artistSlug || null,
+
+      title: item.title,
+      entity_title: item.title,
+      entityTitle: item.title,
+      share_title: item.title,
+      share_type: item.type ?? "page",
+
+      outbound_url: trackedUrl ?? null,
+      outbound_utm: trackedUrl ? getUtmContextForUrl(trackedUrl) : null,
+    },
+  };
+}
+
 function openPopup(url: string) {
   window.open(url, "_blank", "noopener,noreferrer,width=720,height=640");
 }
@@ -274,6 +403,7 @@ export function SharePopover({
 
   const baseUrl = item.url || (typeof window !== "undefined" ? window.location.href : "");
   const finalUrl = useMemo(() => getFinalUrl(baseUrl, timestamp), [baseUrl, timestamp]);
+  const shareTarget = useMemo(() => parseShareTarget(finalUrl, item.type), [finalUrl, item.type]);
   const shareText = item.description || item.subtitle || item.title;
   const shareContent = item.type ?? "page";
   const getTrackedShareUrl = useCallback((platformKey: string) => buildUtmUrl(finalUrl, {
@@ -287,16 +417,13 @@ export function SharePopover({
   useEffect(() => {
     if (!open || !baseUrl) return;
     getShareCounts(baseUrl).then(setShareCounts).catch(() => {});
-    trackEvent("share_open", {
-      pageType: item.type ?? "page",
-      entitySlug: item.url ? (() => { try { return new URL(item.url).pathname.split("/").filter(Boolean).slice(-1)[0]; } catch { return undefined; } })() : undefined,
-      entityType: item.type ?? undefined,
-      context: {
-        share_title: item.title,
-        share_type: item.type ?? "page",
-      },
-    });
-  }, [open, baseUrl, item]);
+    trackEvent("share_open", buildShareAnalyticsPayload({
+      item,
+      target: shareTarget,
+      platformKey: "open",
+      action: "open",
+    }));
+  }, [open, baseUrl, item, shareTarget]);
 
   // Position
   useEffect(() => {
@@ -342,40 +469,33 @@ export function SharePopover({
     try { await navigator.clipboard.writeText(trackedUrl); } catch { /* no-op */ }
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-    trackEvent("share_copy", {
-      pageType: item.type ?? "page",
-      entitySlug: item.url ? (() => { try { return new URL(item.url).pathname.split("/").filter(Boolean).slice(-1)[0]; } catch { return undefined; } })() : undefined,
-      entityType: item.type ?? undefined,
-      context: {
-        share_title: item.title,
-        share_type: item.type ?? "page",
-      },
-    });
-    incrementShareCount(baseUrl, "copy", item.url ? (() => { try { return new URL(item.url).pathname.split("/").filter(Boolean).slice(-1)[0]; } catch { return undefined; } })() : undefined, item.title).then((count) => {
+    trackEvent("share_copy", buildShareAnalyticsPayload({
+      item,
+      target: shareTarget,
+      platformKey: "copy",
+      trackedUrl,
+      action: "copy",
+    }));
+    incrementShareCount(baseUrl, "copy", shareTarget.entitySlug || undefined, item.title).then((count) => {
       setShareCounts((prev) => ({ ...prev, copy: count }));
     }).catch(() => {});
-  }, [getTrackedShareUrl, baseUrl, item]);
+  }, [getTrackedShareUrl, baseUrl, item, shareTarget]);
 
   const handleShare = useCallback(async (platform: SharePlatform) => {
     const trackedUrl = getTrackedShareUrl(platform.key);
     const encodedUrl = encodeURIComponent(trackedUrl);
     const encodedText = encodeURIComponent(shareText);
 
-    trackEvent("share_click", {
-      pageType: item.type ?? "page",
-      entitySlug: item.url ? (() => { try { return new URL(item.url).pathname.split("/").filter(Boolean).slice(-1)[0]; } catch { return undefined; } })() : undefined,
-      entityType: item.type ?? undefined,
-      context: {
-        share_platform: platform.key,
-        share_title: item.title,
-        share_type: item.type ?? "page",
-        outbound_url: trackedUrl,
-        outbound_utm: getUtmContextForUrl(trackedUrl),
-      },
-    });
+    trackEvent("share_click", buildShareAnalyticsPayload({
+      item,
+      target: shareTarget,
+      platformKey: platform.key,
+      trackedUrl,
+      action: "click",
+    }));
 
     setPendingPlatforms((prev) => new Set(prev).add(platform.key));
-    incrementShareCount(baseUrl, platform.key, item.url ? (() => { try { return new URL(item.url).pathname.split("/").filter(Boolean).slice(-1)[0]; } catch { return undefined; } })() : undefined, item.title).then((count) => {
+    incrementShareCount(baseUrl, platform.key, shareTarget.entitySlug || undefined, item.title).then((count) => {
       setShareCounts((prev) => ({ ...prev, [platform.key]: count }));
       setPendingPlatforms((prev) => { const next = new Set(prev); next.delete(platform.key); return next; });
     }).catch(() => {
@@ -385,7 +505,7 @@ export function SharePopover({
     const shareUrl = platform.buildUrl(encodedUrl, encodedText);
     if (platform.key === "email") window.location.href = shareUrl;
     else openPopup(shareUrl);
-  }, [getTrackedShareUrl, shareText, baseUrl, item]);
+  }, [getTrackedShareUrl, shareText, baseUrl, item, shareTarget]);
 
   const totalShares = getTotalShareCount(shareCounts);
 
@@ -493,6 +613,7 @@ export function ShareSheet({ item, open, onClose, timestamp, onComment }: ShareS
 
   const baseUrl = item.url || (typeof window !== "undefined" ? window.location.href : "");
   const finalUrl = useMemo(() => getFinalUrl(baseUrl, timestamp), [baseUrl, timestamp]);
+  const shareTarget = useMemo(() => parseShareTarget(finalUrl, item.type), [finalUrl, item.type]);
   const shareText = item.description || item.subtitle || item.title;
   const shareContent = item.type ?? "page";
   const getTrackedShareUrl = useCallback((platformKey: string) => buildUtmUrl(finalUrl, {
@@ -507,16 +628,13 @@ export function ShareSheet({ item, open, onClose, timestamp, onComment }: ShareS
   useEffect(() => {
     if (!open || !baseUrl) return;
     getShareCounts(baseUrl).then(setShareCounts).catch(() => {});
-    trackEvent("share_open", {
-      pageType: item.type ?? "page",
-      entitySlug: item.url ? (() => { try { return new URL(item.url).pathname.split("/").filter(Boolean).slice(-1)[0]; } catch { return undefined; } })() : undefined,
-      entityType: item.type ?? undefined,
-      context: {
-        share_title: item.title,
-        share_type: item.type ?? "page",
-      },
-    });
-  }, [open, baseUrl, item]);
+    trackEvent("share_open", buildShareAnalyticsPayload({
+      item,
+      target: shareTarget,
+      platformKey: "open",
+      action: "open",
+    }));
+  }, [open, baseUrl, item, shareTarget]);
 
   useEffect(() => {
     if (!open) return;
@@ -560,13 +678,14 @@ export function ShareSheet({ item, open, onClose, timestamp, onComment }: ShareS
   const handleCopy = async () => {
     const trackedUrl = getTrackedShareUrl("copy");
     try { await navigator.clipboard.writeText(trackedUrl); } catch { /* no-op */ }
-    trackEvent("share_copy", {
-      pageType: item.type ?? "page",
-      entitySlug: item.url ? (() => { try { return new URL(item.url).pathname.split("/").filter(Boolean).slice(-1)[0]; } catch { return undefined; } })() : undefined,
-      entityType: item.type ?? undefined,
-      context: { share_title: item.title, share_type: item.type ?? "page" },
-    });
-    incrementShareCount(baseUrl, "copy", item.url ? (() => { try { return new URL(item.url).pathname.split("/").filter(Boolean).slice(-1)[0]; } catch { return undefined; } })() : undefined, item.title).then((count) => {
+    trackEvent("share_copy", buildShareAnalyticsPayload({
+      item,
+      target: shareTarget,
+      platformKey: "copy",
+      trackedUrl,
+      action: "copy",
+    }));
+    incrementShareCount(baseUrl, "copy", shareTarget.entitySlug || undefined, item.title).then((count) => {
       setShareCounts((prev) => ({ ...prev, copy: count }));
     }).catch(() => {});
   };
@@ -576,21 +695,16 @@ export function ShareSheet({ item, open, onClose, timestamp, onComment }: ShareS
     const encodedUrl = encodeURIComponent(trackedUrl);
     const encodedText = encodeURIComponent(shareText);
 
-    trackEvent("share_click", {
-      pageType: item.type ?? "page",
-      entitySlug: item.url ? (() => { try { return new URL(item.url).pathname.split("/").filter(Boolean).slice(-1)[0]; } catch { return undefined; } })() : undefined,
-      entityType: item.type ?? undefined,
-      context: {
-        share_platform: platform.key,
-        share_title: item.title,
-        share_type: item.type ?? "page",
-        outbound_url: trackedUrl,
-        outbound_utm: getUtmContextForUrl(trackedUrl),
-      },
-    });
+    trackEvent("share_click", buildShareAnalyticsPayload({
+      item,
+      target: shareTarget,
+      platformKey: platform.key,
+      trackedUrl,
+      action: "click",
+    }));
 
     setPendingPlatforms((prev) => new Set(prev).add(platform.key));
-    incrementShareCount(baseUrl, platform.key, item.url ? (() => { try { return new URL(item.url).pathname.split("/").filter(Boolean).slice(-1)[0]; } catch { return undefined; } })() : undefined, item.title).then((count) => {
+    incrementShareCount(baseUrl, platform.key, shareTarget.entitySlug || undefined, item.title).then((count) => {
       setShareCounts((prev) => ({ ...prev, [platform.key]: count }));
       setPendingPlatforms((prev) => { const next = new Set(prev); next.delete(platform.key); return next; });
     }).catch(() => {
