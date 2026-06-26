@@ -343,7 +343,7 @@ export const DEFAULT_AUDIENCE_SETTINGS: AudienceSettings = { subscriberDefaults:
 
 /* ──────── Email & Briefings ──────── */
 export interface EmailBriefingsSettings { fromName: string; fromAddress: string; enableArtistOptInEmails: boolean; enableFollowNotifications: boolean; enableBriefingIssues: boolean; briefingSendCadence: "weekly" | "biweekly" | "monthly"; testRecipientEmail: string; }
-export const DEFAULT_EMAIL_BRIEFINGS_SETTINGS: EmailBriefingsSettings = { fromName: "WAKILISHA", fromAddress: "briefings@wakilisha.com", enableArtistOptInEmails: false, enableFollowNotifications: false, enableBriefingIssues: false, briefingSendCadence: "weekly", testRecipientEmail: "" };
+export const DEFAULT_EMAIL_BRIEFINGS_SETTINGS: EmailBriefingsSettings = { fromName: "WAKILISHA", fromAddress: "briefings@wakilisha.africa", enableArtistOptInEmails: false, enableFollowNotifications: false, enableBriefingIssues: false, briefingSendCadence: "weekly", testRecipientEmail: "" };
 
 /* ──────── Maintenance Settings ──────── */
 export interface MaintenanceSettings { debugMode: boolean; lastIntegrityCheck: string | null; lastDuplicateScan: string | null; lastOrphanedScan: string | null; lastSnapshotIntegrityCheck: string | null; }

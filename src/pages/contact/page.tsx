@@ -80,7 +80,7 @@ export default function ContactPage() {
   };
 
   const CONTACT_INFO = [
-    { icon: "ri-mail-line", label: "Email", value: "hello@wakilisha.com", href: "mailto:hello@wakilisha.com" },
+    { icon: "ri-mail-line", label: "Email", value: "hello@wakilisha.africa", href: "mailto:hello@wakilisha.africa" },
     { icon: "ri-twitter-x-line", label: "X / Twitter", value: "@wakilisha", href: "https://x.com/wakilisha" },
     { icon: "ri-instagram-line", label: "Instagram", value: "@wakilisha.africa", href: "https://instagram.com/wakilisha.africa" },
     { icon: "ri-map-pin-line", label: "Location", value: "Nairobi, Kenya", href: null },
@@ -283,7 +283,7 @@ export default function ContactPage() {
           <div className="mt-4 flex items-center justify-center gap-1 text-[12px] text-[var(--wk-text-faint)]">
             <span>Nairobi, Kenya</span>
             <span className="text-[var(--wk-border-strong)]">·</span>
-            <a href="mailto:hello@wakilisha.com" className="underline underline-offset-2 hover:text-[var(--wk-text-muted)] transition-colors">hello@wakilisha.com</a>
+            <a href="mailto:hello@wakilisha.africa" className="underline underline-offset-2 hover:text-[var(--wk-text-muted)] transition-colors">hello@wakilisha.africa</a>
           </div>
         </footer>
       </div>

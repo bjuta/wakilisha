@@ -106,6 +106,27 @@ function sourceLabel(source: string): string {
   return source.replace(/_/g, " ");
 }
 
+function displayArtistName(name: string): string {
+  return name.trim().replace(/\s+/g, " ");
+}
+
+function normalizeArtistName(name: string): string {
+  return displayArtistName(name)
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function slugifyArtistName(name: string): string {
+  return normalizeArtistName(name)
+    .replace(/\s+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 160);
+}
+
 /* ── Track Row ────────────────────────────────────────────────────────────── */
 
 function TrackRow({ track, index }: { track: PreviewTrack; index: number }) {
@@ -151,16 +172,20 @@ function ArtistSearchDropdown({
   selectedArtists,
   onAdd,
   onRemove,
+  onCreate,
 }: {
   currentArtistSlug: string;
   selectedArtists: AdditionalPrimaryArtist[];
   onAdd: (artist: AdditionalPrimaryArtist) => void;
   onRemove: (artistSlug: string) => void;
+  onCreate: (artistName: string) => Promise<AdditionalPrimaryArtist | null>;
 }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<RegistryArtistOption[]>([]);
   const [searching, setSearching] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [creatingArtist, setCreatingArtist] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -194,6 +219,34 @@ function ArtistSearchDropdown({
     }, 250);
     return () => clearTimeout(timer);
   }, [query, currentArtistSlug, selectedArtists]);
+
+  const handleCreateArtist = useCallback(async () => {
+    const cleanName = displayArtistName(query);
+    if (cleanName.length < 2) {
+      setCreateError("Enter at least 2 characters.");
+      return;
+    }
+
+    setCreatingArtist(true);
+    setCreateError(null);
+
+    try {
+      const artist = await onCreate(cleanName);
+      if (!artist) {
+        setCreateError("Artist was not created.");
+        return;
+      }
+
+      onAdd(artist);
+      setQuery("");
+      setResults([]);
+      setShowDropdown(false);
+    } catch (err) {
+      setCreateError(err instanceof Error ? err.message : "Failed to create artist.");
+    } finally {
+      setCreatingArtist(false);
+    }
+  }, [query, onAdd, onCreate]);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -246,7 +299,10 @@ function ArtistSearchDropdown({
             ref={inputRef}
             type="text"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setCreateError(null);
+            }}
             onFocus={() => results.length > 0 && setShowDropdown(true)}
             placeholder="Search registry for co-primary artist…"
             className="flex-1 bg-transparent text-[11px] text-[#171712] placeholder:text-[#b8bfb2] outline-none"
@@ -293,6 +349,25 @@ function ArtistSearchDropdown({
         {showDropdown && !searching && results.length === 0 && query.length >= 2 && (
           <div className="absolute left-0 top-full z-50 mt-1 w-full rounded-xl border border-[#dfe4d8] bg-white shadow-lg px-3 py-2.5">
             <p className="text-[11px] text-[#97a290] italic">No artists found for &ldquo;{query}&rdquo;</p>
+            <button
+              type="button"
+              disabled={creatingArtist}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                handleCreateArtist();
+              }}
+              className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-[#85c441] bg-[#f0f7e8] px-3 py-2 text-[11px] font-bold text-[#5f8f2f] hover:bg-[#5f8f2f] hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {creatingArtist ? (
+                <WkIcon name="Loader2" size={12} className="animate-spin" />
+              ) : (
+                <WkIcon name="PlusCircle" size={12} />
+              )}
+              Create artist &ldquo;{displayArtistName(query)}&rdquo;
+            </button>
+            {createError && (
+              <p className="mt-2 text-[10px] font-semibold text-red-600">{createError}</p>
+            )}
           </div>
         )}
       </div>
@@ -310,10 +385,11 @@ interface AlbumCardProps {
   additionalPrimaryArtists: AdditionalPrimaryArtist[];
   onAddPrimaryArtist: (albumId: string, artist: AdditionalPrimaryArtist) => void;
   onRemovePrimaryArtist: (albumId: string, artistSlug: string) => void;
+  onCreatePrimaryArtist: (artistName: string) => Promise<AdditionalPrimaryArtist | null>;
   currentArtistSlug: string;
 }
 
-function AlbumCard({ album, action, onAction, applying, additionalPrimaryArtists, onAddPrimaryArtist, onRemovePrimaryArtist, currentArtistSlug }: AlbumCardProps) {
+function AlbumCard({ album, action, onAction, applying, additionalPrimaryArtists, onAddPrimaryArtist, onRemovePrimaryArtist, onCreatePrimaryArtist, currentArtistSlug }: AlbumCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [showPrimaryArtistPanel, setShowPrimaryArtistPanel] = useState(false);
   const isExisting = album.match_status === "existing";
@@ -452,6 +528,7 @@ function AlbumCard({ album, action, onAction, applying, additionalPrimaryArtists
             selectedArtists={additionalPrimaryArtists}
             onAdd={(artist) => onAddPrimaryArtist(album.apple_music_id, artist)}
             onRemove={(slug) => onRemovePrimaryArtist(album.apple_music_id, slug)}
+            onCreate={onCreatePrimaryArtist}
           />
           {additionalPrimaryArtists.length > 0 && (
             <p className="mt-2 text-[10px] text-[#697062]">
@@ -654,6 +731,59 @@ export function ArtistDiscographyIntakeDrawer({
       return { ...prev, [albumId]: existing.filter((a) => a.artist_slug !== artistSlug) };
     });
   }, []);
+
+  const handleCreatePrimaryArtist = useCallback(async (artistName: string): Promise<AdditionalPrimaryArtist | null> => {
+    const cleanName = displayArtistName(artistName);
+
+    if (cleanName.length < 2) {
+      throw new Error("Enter a valid artist name.");
+    }
+
+    const { data, error: invokeError } = await supabase.functions.invoke(
+      "ingest-artist-discography",
+      {
+        body: {
+          artistSlug,
+          mode: "create_artist_shell",
+          artistName: cleanName,
+        },
+        timeout: 15000,
+      }
+    );
+
+    if (invokeError) {
+      const ctx = (invokeError as Record<string, unknown>).context;
+      let detail = invokeError.message;
+
+      if (ctx) {
+        const bodyText = (ctx as Record<string, unknown>).body;
+        if (bodyText && typeof bodyText === "string") {
+          try {
+            const parsed = JSON.parse(bodyText);
+            if (parsed?.detail) detail = parsed.detail;
+            else if (parsed?.error) detail = `[${parsed.stage ?? "?"}] ${parsed.error}`;
+          } catch {
+            // Keep default detail.
+          }
+        }
+      }
+
+      throw new Error(detail);
+    }
+
+    const response = data as {
+      ok?: boolean;
+      error?: string;
+      detail?: string;
+      artist?: AdditionalPrimaryArtist;
+    };
+
+    if (!response.ok || !response.artist) {
+      throw new Error(response.detail ?? response.error ?? "Artist was not created.");
+    }
+
+    return response.artist;
+  }, [artistSlug]);
 
   const handleApply = async () => {
     const selectedAlbums = Object.entries(actions).map(([apple_music_id, action]) => ({
@@ -980,6 +1110,7 @@ export function ArtistDiscographyIntakeDrawer({
                   additionalPrimaryArtists={additionalPrimaryArtists[album.apple_music_id] || []}
                   onAddPrimaryArtist={handleAddPrimaryArtist}
                   onRemovePrimaryArtist={handleRemovePrimaryArtist}
+                  onCreatePrimaryArtist={handleCreatePrimaryArtist}
                   currentArtistSlug={artistSlug}
                 />
               ))}

@@ -33,6 +33,14 @@ function slugify(s: string): string {
   return s.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 160);
 }
 
+function cleanDisplayName(s: string): string {
+  return s.trim().replace(/\s+/g, " ");
+}
+
+function normalizeName(s: string): string {
+  return slugify(s).replace(/-/g, " ").trim();
+}
+
 function parseReleaseTypeFromApple(attrs: Record<string, unknown>): string {
   const isSingle = attrs.isSingle === true;
   const isComplete = attrs.isComplete === true;
@@ -297,6 +305,106 @@ Deno.serve(async (req: Request) => {
     const artistId = artistRow.id as string;
     const artistName = artistRow.display_name as string;
     const artistMeta = (artistRow.metadata ?? {}) as Record<string, unknown>;
+
+    if (mode === "create_artist_shell") {
+      stage = "create_artist_shell";
+
+      const requestedName = cleanDisplayName(String(body.artistName ?? body.newArtistName ?? ""));
+      const requestedNormalized = normalizeName(requestedName);
+      const baseSlug = slugify(requestedName);
+
+      if (requestedName.length < 2 || !baseSlug || !requestedNormalized) {
+        return fail(stage, "invalid_artist_name", "Enter a valid artist name.", { mode, artistSlug, storefront, duration_ms: Date.now() - start });
+      }
+
+      if (baseSlug === artistSlug || requestedNormalized === normalizeName(artistName)) {
+        return fail(stage, "same_artist", "That is the current artist.", { mode, artistSlug, storefront, duration_ms: Date.now() - start });
+      }
+
+      const { data: existingByName, error: existingByNameError } = await db
+        .from("registry_artists")
+        .select("id, slug, display_name")
+        .eq("normalized_name", requestedNormalized)
+        .eq("status", "active")
+        .limit(1);
+
+      if (existingByNameError) {
+        return fail(stage, "artist_lookup_failed", existingByNameError.message, { mode, artistSlug, storefront, duration_ms: Date.now() - start });
+      }
+
+      const existingArtist = existingByName?.[0];
+      if (existingArtist) {
+        return json({
+          ok: true,
+          mode,
+          created: false,
+          artist: {
+            artist_id: existingArtist.id,
+            artist_slug: existingArtist.slug,
+            artist_name: existingArtist.display_name,
+          },
+          duration_ms: Date.now() - start,
+        });
+      }
+
+      let availableSlug = "";
+      for (let i = 0; i < 50; i++) {
+        const candidateSlug = i === 0 ? baseSlug : `${baseSlug}-${i + 1}`;
+
+        const { data: slugMatches, error: slugError } = await db
+          .from("registry_artists")
+          .select("id")
+          .eq("slug", candidateSlug)
+          .limit(1);
+
+        if (slugError) {
+          return fail(stage, "slug_lookup_failed", slugError.message, { mode, artistSlug, storefront, duration_ms: Date.now() - start });
+        }
+
+        if (!slugMatches || slugMatches.length === 0) {
+          availableSlug = candidateSlug;
+          break;
+        }
+      }
+
+      if (!availableSlug) {
+        return fail(stage, "slug_exhausted", "Could not create a unique artist slug.", { mode, artistSlug, storefront, duration_ms: Date.now() - start });
+      }
+
+      const { data: createdArtist, error: createError } = await db
+        .from("registry_artists")
+        .insert({
+          slug: availableSlug,
+          display_name: requestedName,
+          normalized_name: requestedNormalized,
+          sort_name: requestedName,
+          status: "active",
+          metadata: {
+            source: "discography_intake",
+            created_from: "artist_discography_intake_drawer",
+            created_for_artist_slug: artistSlug,
+            created_at: new Date().toISOString(),
+          },
+        })
+        .select("id, slug, display_name")
+        .single();
+
+      if (createError) {
+        return fail(stage, "artist_create_failed", createError.message, { mode, artistSlug, storefront, duration_ms: Date.now() - start });
+      }
+
+      return json({
+        ok: true,
+        mode,
+        created: true,
+        artist: {
+          artist_id: createdArtist.id,
+          artist_slug: createdArtist.slug,
+          artist_name: createdArtist.display_name,
+        },
+        duration_ms: Date.now() - start,
+      });
+    }
 
     stage = "jwt";
     let token: string;

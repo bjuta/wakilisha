@@ -80,7 +80,7 @@ const FAQ_GROUPS: { title: string; icon: string; items: FaqItem[] }[] = [
       },
       {
         q: "How do I update my artist information?",
-        a: "We pull artist data from multiple sources — streaming platforms, labels, public databases, and editorial research. If something is incorrect or outdated, email us at hello@wakilisha.com with the correction and we'll update it.",
+        a: "We pull artist data from multiple sources — streaming platforms, labels, public databases, and editorial research. If something is incorrect or outdated, email us at hello@wakilisha.africa with the correction and we'll update it.",
       },
       {
         q: "Can I remove my profile from WAKILISHA?",
@@ -98,7 +98,7 @@ const FAQ_GROUPS: { title: string; icon: string; items: FaqItem[] }[] = [
     items: [
       {
         q: "How can I write for WAKILISHA Magazine?",
-        a: "We're always looking for sharp, original voices. Send a pitch to hello@wakilisha.com with the subject line 'Editorial pitch' — include a brief outline of your story, why it matters, and links to your previous work.",
+        a: "We're always looking for sharp, original voices. Send a pitch to hello@wakilisha.africa with the subject line 'Editorial pitch' — include a brief outline of your story, why it matters, and links to your previous work.",
       },
       {
         q: "What topics does the Magazine cover?",
@@ -138,7 +138,7 @@ const FAQ_GROUPS: { title: string; icon: string; items: FaqItem[] }[] = [
       },
       {
         q: "I found a bug or broken link. What should I do?",
-        a: "We appreciate bug reports! Send the details to hello@wakilisha.com with 'Technical issue' as the subject, including the page URL and what went wrong.",
+        a: "We appreciate bug reports! Send the details to hello@wakilisha.africa with 'Technical issue' as the subject, including the page URL and what went wrong.",
       },
       {
         q: "Is WAKILISHA accessible on mobile?",
