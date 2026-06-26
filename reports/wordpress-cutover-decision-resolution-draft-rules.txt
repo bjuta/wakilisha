@@ -49,3 +49,6 @@
 /science-and-technology/ -> /magazine 302
 /short-stories/ -> /magazine 302
 /sports/ -> /magazine 302
+/charts/top-100/ke/2026-01-26/ -> /charts 302
+/charts/top-gengetone/ke/2026-01-26/ -> /charts 302
+/charts/top-rnb/ke/2026-01-26/ -> /charts 302

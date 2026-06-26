@@ -17,6 +17,24 @@ const OUTPUTS = {
 
 const REDIRECT_STATUS = 302;
 
+const DECOMMISSIONED_LEGACY_ROUTES = new Set([
+  '/account/',
+  '/my-account/',
+  '/my-library/',
+  '/my-top-10/',
+  '/settings/',
+  '/order-tracking/',
+  '/cart/',
+  '/checkout/',
+  '/music/',
+  '/claim-your-name/',
+  '/events/',
+  '/faq/',
+  '/methodology/',
+  '/venues/',
+  '/corrections/',
+]);
+
 async function readJson(filePath) {
   return JSON.parse(await fs.readFile(filePath, 'utf8'));
 }
@@ -86,7 +104,24 @@ function isPaginatedAuthor(source) {
   return /^\/author\/[^/]+\/page\/\d+\/$/.test(source || '');
 }
 
+function isDecommissionedLegacyRoute(source) {
+  return DECOMMISSIONED_LEGACY_ROUTES.has(source || '');
+}
+
 function resolveRow(row) {
+  if (isDecommissionedLegacyRoute(row.source)) {
+    return {
+      ...row,
+      resolution: 'decommissioned_no_preserve',
+      finalTarget: '',
+      status: '',
+      cutoverAction: 'Do not preserve this old WordPress route. Required surfaces have been rebuilt or intentionally retired in React.',
+      risk: 'low',
+      ownerBucket: 'product_decision_locked',
+      reason: 'Product decision locked: old WordPress page is no longer needed and should not block cutover.',
+    };
+  }
+
   switch (row.sourceGroup) {
     case 'malformed_tag_route':
       return {
@@ -158,26 +193,14 @@ function resolveRow(row) {
       };
 
     case 'legacy_section_archive':
-      if (row.source === '/music/') {
-        return {
-          ...row,
-          resolution: 'manual_product_decision_required',
-          finalTarget: '',
-          status: '',
-          cutoverAction: 'Decide whether /music/ should be rebuilt as a public music archive before cutover.',
-          risk: 'medium',
-          reason: '/music/ may be product-significant and should not be blindly redirected.',
-        };
-      }
-
       return {
         ...row,
-        resolution: 'redirect_to_magazine_after_product_approval',
+        resolution: 'redirect_to_magazine',
         finalTarget: '/magazine',
         status: REDIRECT_STATUS,
-        cutoverAction: 'Redirect old section archive to /magazine only after product/content approval.',
+        cutoverAction: 'Redirect old WordPress section archive to the React magazine landing page.',
         risk: 'medium',
-        reason: 'Magazine is the closest broad React destination, but section-specific UX may be preferable later.',
+        reason: 'Legacy section archives do not need content migration. React/Supabase is the source of truth; /magazine is the safe public landing page.',
       };
 
     case 'woocommerce_route':
@@ -194,12 +217,12 @@ function resolveRow(row) {
     case 'chart_runtime_route':
       return {
         ...row,
-        resolution: 'browser_qa_required',
-        finalTarget: row.proposedTarget,
-        status: '',
-        cutoverAction: 'Run browser QA for chart data rendering on preview/cutover origin.',
+        resolution: 'redirect_to_charts',
+        finalTarget: '/charts',
+        status: REDIRECT_STATUS,
+        cutoverAction: 'Redirect old dated WordPress chart URL to the React charts landing page.',
         risk: 'low',
-        reason: 'HTML shell smoke passed, but client-side chart data rendering still needs browser verification.',
+        reason: 'Old dated WordPress chart pages do not need preservation. React charts are the source of truth.',
       };
 
     default:
@@ -277,7 +300,7 @@ function markdownReport({ rows, summary, inputStatus }) {
   lines.push('');
   lines.push('## Proposed extra redirects');
   lines.push('');
-  lines.push('These are not part of the validated 1,171-row redirect bundle. Some rows are ready proposals, while section-archive rows remain approval-gated. Apply only after explicit product/content approval.');
+  lines.push('These are not part of the validated 1,171-row redirect bundle. They reflect final product scope decisions for old WordPress routes.');
   lines.push('');
   lines.push('| Source | Target | Status | Reason |');
   lines.push('|---|---|---:|---|');
@@ -318,8 +341,9 @@ function markdownReport({ rows, summary, inputStatus }) {
   lines.push('- The validated 1,171-row temporary redirect bundle remains the primary approved redirect artifact.');
   lines.push('- This plan proposes extra handling for the 64 unresolved rows.');
   lines.push('- Author archive URLs should not fake author profile matches. The safe fallback is `/magazine` if we choose to preserve them.');
-  lines.push('- WooCommerce and account routes should not be redirected until product/auth behavior is confirmed.');
-  lines.push('- Chart routes have passed HTML-shell smoke and need browser QA for client-side data.');
+  lines.push('- Old account, store, static utility, music, and claim-your-name WordPress routes are intentionally decommissioned.');
+  lines.push('- Old dated WordPress chart routes redirect to `/charts`; historic WordPress chart pages are not preserved.');
+  lines.push('- Article content is not being migrated from WordPress here. React/Supabase is the source of truth; old article URLs are only preserved as redirects where React routes exist.');
   lines.push('');
   lines.push('## Deployment checklist');
   lines.push('');
@@ -354,10 +378,10 @@ const summary = {
   readyExtraRedirectRows: proposedExtraRedirectRows - approvalGatedRedirectRows,
   approvalGatedRedirectRows,
   intentionalRetireRows: rows.filter((row) =>
-    ['intentional_404', 'intentional_404_or_future_rebuild', 'intentional_404_until_auth_route_confirmed', 'intentional_404_or_legacy_store_hold'].includes(row.resolution)
+    ['intentional_404', 'intentional_404_or_future_rebuild', 'intentional_404_until_auth_route_confirmed', 'intentional_404_or_legacy_store_hold', 'decommissioned_no_preserve'].includes(row.resolution)
   ).length,
   manualDecisionRows: rows.filter((row) =>
-    ['manual_content_decision_required', 'manual_product_decision_required', 'redirect_to_magazine_after_product_approval'].includes(row.resolution)
+    ['manual_content_decision_required', 'manual_product_decision_required'].includes(row.resolution)
   ).length,
   browserQaRows: rows.filter((row) => row.resolution === 'browser_qa_required').length,
   highRisk: rows.filter((row) => row.risk === 'high').length,
