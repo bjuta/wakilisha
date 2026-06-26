@@ -1,3 +1,1 @@
 id,severity,category,blocker,requiredAction,evidence
-BLOCKER-001,critical,qa_results_ledger,No filled browser QA results CSV is present.,"Copy the QA template to reports/wordpress-cutover-browser-qa-results.csv, fill real browser results, then regenerate the QA results ledger.",reports/wordpress-cutover-browser-qa-results-ledger.json
-BLOCKER-002,critical,browser_qa,7 critical browser QA rows are not passed.,Open the critical routes in a browser and mark them passed only after visible UI and client-side data render correctly.,reports/wordpress-cutover-browser-qa-results-ledger.json

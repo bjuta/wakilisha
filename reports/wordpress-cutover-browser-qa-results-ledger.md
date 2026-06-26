@@ -6,19 +6,20 @@ It does not approve DNS, Cloudflare, Supabase, frontend deploy, or production re
 
 ## Summary
 
-- Using filled results CSV: no
+- Using filled results CSV: yes
 - Total rows: 18
-- Passed rows: 0
+- Passed rows: 7
 - Failed rows: 0
 - Blocked rows: 0
-- Pending rows: 18
-- Critical rows not passed: 7
+- Pending rows: 11
+- Critical rows not passed: 0
 - Issues: 0
 - QA complete: no
 
 ## Status counts
 
-- pending: 18
+- passed: 7
+- pending: 11
 
 ## Priority counts
 
@@ -41,13 +42,6 @@ No validation issues.
 
 | ID | Category | Route | Status | Notes |
 |---|---|---|---|---|
-| CORE-001 | core_route | `/` | pending |  |
-| CORE-002 | core_route | `/magazine` | pending |  |
-| CORE-003 | core_route | `/charts` | pending |  |
-| CORE-004 | core_route | `/artists` | pending |  |
-| CORE-005 | core_route | `/releases` | pending |  |
-| CORE-006 | core_route | `/tracks` | pending |  |
-| CORE-007 | core_route | `/search` | pending |  |
 
 ## How to fill
 
