@@ -216,94 +216,13 @@ async function findScopedRegistryTrack(
 }
 
 async function chooseRegistryTrackSlug(
-  client: PoolClient,
+  _client: PoolClient,
   baseTrackSlug: string,
-  artistSlug: string,
+  _artistSlug: string,
 ): Promise<string> {
-  const existing = await client.query<{ id: string }>(
-    `
-      select rt.id
-      from public.registry_tracks rt
-      where rt.slug = $1
-      limit 1
-    `,
-    [baseTrackSlug],
-  );
-
-  if (existing.rowCount === 0) return baseTrackSlug;
-
-  const scoped = await client.query<{ id: string }>(
-    `
-      select rt.id
-      from public.registry_tracks rt
-      left join public.registry_track_artists rta
-        on rta.track_id = rt.id
-      where rt.slug = $1
-        and (
-          rta.artist_slug = $2
-          or rt.metadata->>'primary_artist_slug' = $2
-        )
-      order by
-        case rt.status
-          when 'active' then 1
-          when 'needs_review' then 2
-          when 'draft' then 3
-          else 4
-        end,
-        rt.updated_at desc nulls last,
-        rt.created_at desc
-      limit 1
-    `,
-    [baseTrackSlug, artistSlug],
-  );
-
-  if ((scoped.rowCount ?? 0) > 0) return baseTrackSlug;
-
-  const seeded = `${baseTrackSlug}-${artistSlug}`;
-
-  // Important: if the artist-scoped slug already exists for this artist,
-  // reuse it instead of creating keki-willy-paul-2, colors-njerae-2, etc.
-  const scopedSeeded = await client.query<{ id: string }>(
-    `
-      select rt.id
-      from public.registry_tracks rt
-      left join public.registry_track_artists rta
-        on rta.track_id = rt.id
-      where rt.slug = $1
-        and (
-          rta.artist_slug = $2
-          or rt.metadata->>'primary_artist_slug' = $2
-        )
-      order by
-        case rt.status
-          when 'active' then 1
-          when 'needs_review' then 2
-          when 'draft' then 3
-          else 4
-        end,
-        rt.updated_at desc nulls last,
-        rt.created_at desc
-      limit 1
-    `,
-    [seeded, artistSlug],
-  );
-
-  if ((scopedSeeded.rowCount ?? 0) > 0) return seeded;
-
-  let candidate = seeded;
-  let suffix = 2;
-
-  while (true) {
-    const check = await client.query<{ id: string }>(
-      `select id from public.registry_tracks where slug = $1 limit 1`,
-      [candidate],
-    );
-
-    if (check.rowCount === 0) return candidate;
-
-    candidate = `${seeded}-${suffix}`;
-    suffix += 1;
-  }
+  // Public track URLs are artist-scoped: /tracks/:artistSlug/:trackSlug.
+  // Keep the track slug title-clean. Do not append artist slug just because another artist owns the same title slug.
+  return baseTrackSlug;
 }
 
 function buildAppleMusicDeveloperToken(): string {
@@ -464,11 +383,6 @@ async function ensureRegistryTrackShells(
             'base_track_slug', $10::text
           )
         )
-        on conflict (slug)
-        do update set
-          artwork_url = coalesce(public.registry_tracks.artwork_url, excluded.artwork_url),
-          metadata = coalesce(public.registry_tracks.metadata, '{}'::jsonb) || excluded.metadata,
-          updated_at = now()
         returning id, slug, title, metadata, duration_ms, preview_url, artwork_url
       `,
       [

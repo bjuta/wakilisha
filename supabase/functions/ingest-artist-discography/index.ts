@@ -456,18 +456,27 @@ Deno.serve(async (req: Request) => {
       )
     );
 
+    const existingTrackByArtistAndSlug = new Map<string, string>();
+    for (const row of existingTrackArtists ?? []) {
+      const trackSlug = existingTrackIdToSlug.get(String(row.track_id));
+      const artistSlugForTrack = String(row.artist_slug || "");
+      if (trackSlug && artistSlugForTrack) {
+        existingTrackByArtistAndSlug.set(`${artistSlugForTrack}:${trackSlug}`, String(row.track_id));
+      }
+    }
+
     const artistReleaseIdList = (artistReleaseIdsRes.data ?? []).map((r: { release_id: string }) => r.release_id);
     let existingArtistReleases: Array<{ id: string; slug: string; title: string; metadata: Record<string, unknown> | null }> = [];
     if (artistReleaseIdList.length > 0) existingArtistReleases = allActiveReleases.filter((r) => artistReleaseIdList.includes(r.id));
     const existingArtistReleaseBySlug = new Map(existingArtistReleases.map((r) => [r.slug, r]));
 
-    const existingReleaseByTitle = new Map<string, typeof allActiveReleases[0]>();
-    for (const r of allActiveReleases) {
+    const existingArtistReleaseByTitle = new Map<string, typeof existingArtistReleases[0]>();
+    for (const r of existingArtistReleases) {
       const key = (r.title as string).toLowerCase().trim();
-      if (!existingReleaseByTitle.has(key)) existingReleaseByTitle.set(key, r);
+      if (!existingArtistReleaseByTitle.has(key)) existingArtistReleaseByTitle.set(key, r);
     }
 
-    const existingReleaseSlugs = new Set(allActiveReleases.map((r: { slug: string }) => r.slug));
+    const existingReleaseSlugs = new Set(existingArtistReleases.map((r: { slug: string }) => r.slug));
 
     if (mode === "preview") {
       stage = "search";
@@ -505,7 +514,7 @@ Deno.serve(async (req: Request) => {
         if (attrs.artwork?.url) awUrl = artworkUrl(attrs.artwork.url, 800);
 
         let existingMatch = existingArtistReleaseBySlug.get(rawSlug);
-        if (!existingMatch) existingMatch = existingReleaseByTitle.get(rawTitle.toLowerCase().trim());
+        if (!existingMatch) existingMatch = existingArtistReleaseByTitle.get(rawTitle.toLowerCase().trim());
 
         const tracksData = album.relationships?.tracks?.data ?? [];
         const previewTracks: PreviewTrack[] = tracksData.map((track) => {
@@ -605,7 +614,7 @@ Deno.serve(async (req: Request) => {
       }
 
       const seenReleaseSlugs = new Set(existingReleaseSlugs);
-      const seenTrackSlugs = new Set(existingTrackBySlug.keys());
+      const seenTrackSlugs = new Set<string>();
 
       const releaseRows: Record<string, unknown>[] = [];
       const releaseArtistRows: Record<string, unknown>[] = [];
@@ -641,7 +650,7 @@ Deno.serve(async (req: Request) => {
         let releaseAlreadyExists = false;
 
         const existingBySlug = existingArtistReleaseBySlug.get(rawSlug);
-        const existingByTitle = existingReleaseByTitle.get(rawTitle.toLowerCase().trim());
+        const existingByTitle = existingArtistReleaseByTitle.get(rawTitle.toLowerCase().trim());
         const existingMatch = existingBySlug || existingByTitle;
 
         if (action === "merge" || (action === "canonicalize" && existingMatch)) {
@@ -765,7 +774,7 @@ Deno.serve(async (req: Request) => {
           if (trackIsrc) trackId = existingTrackByIsrc.get(trackIsrc);
 
           if (!trackId) {
-            const slugMatchId = existingTrackBySlug.get(rawTrackSlug);
+            const slugMatchId = existingTrackByArtistAndSlug.get(`${artistSlug}:${rawTrackSlug}`);
             if (slugMatchId && existingTrackArtistSet.has(`${slugMatchId}:${artistSlug}`)) {
               trackId = slugMatchId;
             }
@@ -776,6 +785,7 @@ Deno.serve(async (req: Request) => {
             trackSlug = dedupeSlug(rawTrackSlug, seenTrackSlugs);
             existingTrackBySlug.set(trackSlug, trackId);
             existingTrackIdToSlug.set(trackId, trackSlug);
+            existingTrackByArtistAndSlug.set(`${artistSlug}:${trackSlug}`, trackId);
             if (trackIsrc) existingTrackByIsrc.set(trackIsrc, trackId);
             seenTrackSlugs.add(trackSlug);
           } else {
@@ -883,7 +893,7 @@ Deno.serve(async (req: Request) => {
 
       if (releaseRows.length > 0) {
         for (const batch of chunk(releaseRows, BATCH)) {
-          const { error } = await db.from("registry_releases").upsert(batch, { onConflict: "slug", ignoreDuplicates: false });
+          const { error } = await db.from("registry_releases").upsert(batch, { onConflict: "id", ignoreDuplicates: false });
           if (error) summary.errors.push(`releases: ${error.message}`);
         }
       }
