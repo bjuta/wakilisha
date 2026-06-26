@@ -29,6 +29,7 @@ import {
   fetchExportEvents,
   fetchRealtimeAnalytics,
   fetchSignalBoard,
+  refreshSignalOsRollups,
 } from "@/services/adminAnalytics";
 import type {
   AnalyticsKpis,
@@ -218,6 +219,7 @@ export default function AdminAnalyticsPage() {
   const [funnel, setFunnel] = useState<FunnelStep[]>([]);
   const [signalBoard, setSignalBoard] = useState<SignalBoard | null>(null);
   const [signalLoading, setSignalLoading] = useState(false);
+  const [signalRefreshing, setSignalRefreshing] = useState(false);
   const [signalError, setSignalError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
 
@@ -292,16 +294,24 @@ export default function AdminAnalyticsPage() {
 
   useEffect(() => { loadData(dateRange); }, [dateRange, loadData]);
 
-  const loadSignalBoard = useCallback(async () => {
+  const loadSignalBoard = useCallback(async (options?: { refresh?: boolean }) => {
     setSignalLoading(true);
     setSignalError(null);
+    if (options?.refresh) setSignalRefreshing(true);
 
     try {
-      setSignalBoard(await fetchSignalBoard(toRange(dateRange)));
+      const range = toRange(dateRange);
+      if (options?.refresh) {
+        const refreshed = await refreshSignalOsRollups(range);
+        setSignalBoard(refreshed.board);
+      } else {
+        setSignalBoard(await fetchSignalBoard(range));
+      }
     } catch (error) {
       setSignalError(error instanceof Error ? error.message : "Signal Board failed.");
     } finally {
       setSignalLoading(false);
+      setSignalRefreshing(false);
     }
   }, [dateRange]);
 
@@ -592,7 +602,8 @@ export default function AdminAnalyticsPage() {
           board={signalBoard}
           loading={signalLoading}
           error={signalError}
-          onRefresh={loadSignalBoard}
+          refreshing={signalRefreshing}
+          onRefresh={() => loadSignalBoard({ refresh: true })}
         />
       )}
 
@@ -686,11 +697,13 @@ function signalHref(value?: string): string | undefined {
 function SignalsTab({
   board,
   loading,
+  refreshing,
   error,
   onRefresh,
 }: {
   board: SignalBoard | null;
   loading: boolean;
+  refreshing: boolean;
   error: string | null;
   onRefresh: () => void;
 }) {
@@ -767,8 +780,8 @@ function SignalsTab({
             disabled={loading}
             className="inline-flex items-center gap-1.5 rounded-full border border-[var(--wk-border)] px-3 py-1.5 text-[11px] font-bold text-[var(--wk-text-muted)] hover:text-[var(--wk-text)] disabled:opacity-50"
           >
-            <WkIcon name={loading ? "Loader2" : "RefreshCw"} size={13} className={loading ? "animate-spin" : ""} />
-            Refresh
+            <WkIcon name={refreshing || loading ? "Loader2" : "RefreshCw"} size={13} className={refreshing || loading ? "animate-spin" : ""} />
+            {refreshing ? "Rebuilding signals..." : "Refresh Signals"}
           </button>
         </div>
 
@@ -955,8 +968,8 @@ function RealtimeTab({
             disabled={loading}
             className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-[var(--wk-border)] px-3 py-1.5 text-[11px] font-bold text-[var(--wk-text-muted)] hover:text-[var(--wk-text)] disabled:opacity-50"
           >
-            <WkIcon name={loading ? "Loader2" : "RefreshCw"} size={13} className={loading ? "animate-spin" : ""} />
-            Refresh
+            <WkIcon name={refreshing || loading ? "Loader2" : "RefreshCw"} size={13} className={refreshing || loading ? "animate-spin" : ""} />
+            {refreshing ? "Rebuilding signals..." : "Refresh Signals"}
           </button>
         </div>
 

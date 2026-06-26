@@ -1627,6 +1627,29 @@ Deno.serve(async (req) => {
       return ok({ ...buildSignalBoard(events, range), source: "live_events_fallback" }, headers);
     }
 
+    if (action === "analytics_refresh_signal_os_rollups") {
+      const range = body.range ?? 30;
+      const { startDate, endDate } = dateRangeForRollups(range);
+
+      const { data: refreshResult, error: refreshError } = await db.rpc("admin_refresh_signal_os_rollups", {
+        p_start_date: startDate,
+        p_end_date: endDate,
+      });
+
+      if (refreshError) throw refreshError;
+
+      const rollupBoard = await buildSignalBoardFromRollups(db, range);
+      if (rollupBoard) {
+        return ok({ refresh: refreshResult, board: rollupBoard }, headers);
+      }
+
+      const events = await getAnalyticsEvents(db, range);
+      return ok({
+        refresh: refreshResult,
+        board: { ...buildSignalBoard(events, range), source: "live_events_fallback" },
+      }, headers);
+    }
+
     if (action === "analytics_realtime") {
       return ok(await buildRealtime(db), headers);
     }

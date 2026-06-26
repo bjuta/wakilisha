@@ -200,6 +200,11 @@ export interface SignalBoard {
   recommendedActions: RecommendedSignalAction[];
 }
 
+export interface SignalOsRefreshResponse {
+  refresh: Record<string, unknown>;
+  board: SignalBoard;
+}
+
 interface AnalyticsSnapshot {
   today: { pageViews: number; newsletterSignups: number; uniqueSessions: number };
   kpis: AnalyticsKpis;
@@ -258,6 +263,10 @@ export async function fetchRealtimeAnalytics(): Promise<RealtimeAnalyticsSnapsho
 
 export async function fetchSignalBoard(range: DateRange | number = 30): Promise<SignalBoard> {
   return callAdminAnalytics<SignalBoard>("analytics_signal_board", { range });
+}
+
+export async function refreshSignalOsRollups(range: DateRange | number = 30): Promise<SignalOsRefreshResponse> {
+  return callAdminAnalytics<SignalOsRefreshResponse>("analytics_refresh_signal_os_rollups", { range });
 }
 
 export async function fetchDashboardKpis(range: DateRange | number = 30): Promise<AnalyticsKpis> {
