@@ -492,9 +492,8 @@ export default function PublicApiQaPage() {
             <div className="text-[13px] font-bold text-wk-text mb-2">How to test live endpoints</div>
             <div className="space-y-2 text-[12px] text-wk-text-muted">
               <p>
-                <strong className="text-wk-text">V1 WordPress mode:</strong> Set{" "}
-                <code className="font-mono text-[11px] bg-wk-surface-raised px-1 rounded">VITE_CHARTS_PUBLIC_MODE=wordpress</code> and{" "}
-                <code className="font-mono text-[11px] bg-wk-surface-raised px-1 rounded">VITE_WAKILISHA_WP_API_BASE</code>.
+                <strong className="text-wk-text">Legacy WordPress mode:</strong>{" "}
+                Public runtime WordPress mode is disabled. Use the production Supabase-backed chart pipeline for live testing.
               </p>
               <p>
                 <strong className="text-wk-text">V2 local server:</strong> Run{" "}
