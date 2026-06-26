@@ -173,3 +173,67 @@ If you need changes to the Cloudflare config and can't access the dashboard:
 1. Cloudflare Support: https://dash.cloudflare.com/support
 2. For DDoS emergencies: Cloudflare dashboard → Under Attack Mode
 3. For Supabase-specific issues: Supabase dashboard → Support
+
+---
+
+## 12. WordPress Deprecation Route Plan
+
+This section replaces the older broad `wp-*` shutdown thinking with a safer staged plan.
+
+### 12.1 Do not block media yet
+
+Do not block or redirect `/wp-content/uploads/*` until the media migration is complete.
+
+Reason: imported and legacy article or track artwork may still depend on old WordPress upload URLs until the Lightsail-backed media origin is live and verified.
+
+Media phase target:
+
+`/wp-content/uploads/*` to Lightsail-backed media origin.
+
+Do not route long-term media storage through Supabase Storage. Supabase storage is constrained and should not be the permanent media bucket for imported and future WAKILISHA assets.
+
+### 12.2 Block WordPress attack surfaces
+
+Apply these as WAF custom rules or equivalent Cloudflare security rules.
+
+| Priority | Expression | Action | Reason |
+|---:|---|---|---|
+| 1 | `(http.request.uri.path eq "/wp-login.php")` | Block or 410 | No public WordPress login should exist after deprecation |
+| 2 | `(starts_with(http.request.uri.path, "/wp-admin"))` | Block or 410 | No public WordPress admin should exist after deprecation |
+| 3 | `(http.request.uri.path eq "/xmlrpc.php")` | Block or 410 | XML-RPC is not needed and attracts brute-force traffic |
+| 4 | `(starts_with(http.request.uri.path, "/wp-includes"))` | Block or 410 | WordPress internals should not be reachable |
+| 5 | `(starts_with(http.request.uri.path, "/wp-json"))` | Block or 410 after imports freeze | Only block after legacy WordPress imports are no longer needed |
+| 6 | `(http.request.uri.path contains "/.env")` | Block | Secret scraping probe |
+| 7 | `(http.request.uri.path contains "/.git")` | Block | Git metadata probe |
+
+### 12.3 Redirect old taxonomy URLs
+
+Use Cloudflare Redirect Rules or Bulk Redirects.
+
+| Source | Target | Type |
+|---|---|---:|
+| `/category/*` | `/categories/$1` | 301 |
+| `/tag/*` | `/tags/$1` | 301 |
+| `/author/*` | `/authors/$1` | 301, only after author slugs are verified |
+
+### 12.4 Article slug redirects
+
+Do not create a blanket top-level redirect from `/*` to `/magazine/*`. That would break real top-level React routes.
+
+Top-level legacy article redirects must come from a verified slug map, not a wildcard. Current React compatibility can catch old article slugs client-side, but SEO-grade shutdown should eventually export a Cloudflare Bulk Redirect map from `wk_slug_redirects` and `wk_articles`.
+
+### 12.5 Verification
+
+After Cloudflare rules are applied, run:
+
+`node scripts/audit/verify-wordpress-edge-routes.mjs`
+
+Optional staging or custom domain check:
+
+`WAKILISHA_VERIFY_BASE_URL=https://staging.wakilisha.africa node scripts/audit/verify-wordpress-edge-routes.mjs`
+
+Expected result:
+
+`All WordPress edge route checks passed.`
+
+Do not consider WordPress fully deprecated until this verification passes and the media migration has its own verification report.
