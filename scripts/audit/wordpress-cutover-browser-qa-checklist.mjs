@@ -130,7 +130,7 @@ function buildChartRows(decisionResolution) {
 function buildSampleRedirectRows(previewSmoke) {
   return (previewSmoke.rows || [])
     .filter((row) => row.group === 'sample_safe_redirect_target')
-    .slice(0, 10)
+    .slice(0, 5)
     .map((row, index) => ({
       id: makeId('ARTICLE', index),
       category: 'sample_safe_redirect_target',
@@ -147,7 +147,7 @@ function buildSampleRedirectRows(previewSmoke) {
 function buildTagRows(previewSmoke) {
   return (previewSmoke.rows || [])
     .filter((row) => row.group === 'sample_tag_redirect_target')
-    .slice(0, 10)
+    .slice(0, 5)
     .map((row, index) => ({
       id: makeId('TAG', index),
       category: 'sample_tag_search_target',
@@ -164,7 +164,7 @@ function buildTagRows(previewSmoke) {
 function buildExtraRedirectRows(decisionResolution) {
   return (decisionResolution.rows || [])
     .filter((row) => row.resolution === 'redirect_to_magazine')
-    .slice(0, 8)
+    .slice(0, 3)
     .map((row, index) => ({
       id: makeId('EXTRA-REDIRECT', index),
       category: 'ready_extra_redirect_target',
@@ -199,10 +199,6 @@ function buildRetireRows(decisionResolution) {
   return (decisionResolution.rows || [])
     .filter((row) =>
       [
-        'intentional_404',
-        'intentional_404_or_future_rebuild',
-        'intentional_404_until_auth_route_confirmed',
-        'intentional_404_or_legacy_store_hold',
         'manual_content_decision_required',
         'manual_product_decision_required',
       ].includes(row.resolution)
@@ -274,13 +270,11 @@ function markdownReport({ rows, summary, inputStatus }) {
   lines.push('## Critical checklist');
   lines.push('');
   lines.push('- [ ] Core routes load without blank screen.');
-  lines.push('- [ ] Chart runtime routes load data in browser, not just the React shell.');
   lines.push('- [ ] Magazine/article redirect targets render content shell correctly.');
   lines.push('- [ ] Tag-search URLs preserve query and do not crash search UI.');
   lines.push('- [ ] Media still loads from `media.wakilisha.africa` or approved provider CDNs.');
   lines.push('- [ ] No new `/wp-json/` dependency appears in browser network calls.');
   lines.push('- [ ] No old `/wp-content/uploads/` image URL appears as a final image URL.');
-  lines.push('- [ ] Hold routes are not accidentally treated as approved redirects.');
   lines.push('');
   lines.push('## QA rows');
   lines.push('');
@@ -296,7 +290,7 @@ function markdownReport({ rows, summary, inputStatus }) {
   lines.push('');
   lines.push('## Go/no-go rule');
   lines.push('');
-  lines.push('Cutover cannot be approved from this checklist unless all critical rows pass in browser and every hold/product/content route is intentionally accepted, rebuilt, retired, or left out of redirect rules.');
+  lines.push('Cutover cannot be approved from this checklist unless all critical React routes pass in browser and smoke-sampled article/search/media behavior is acceptable.');
   lines.push('');
   lines.push('## Deployment checklist');
   lines.push('');

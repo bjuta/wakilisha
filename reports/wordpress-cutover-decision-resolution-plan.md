@@ -7,15 +7,15 @@ It does not approve DNS, Cloudflare, Supabase, frontend deploy, or production re
 ## Summary
 
 - Decision rows reviewed: 64
-- Proposed extra redirect-shaped rows: 44
-- Ready extra redirect rows: 29
-- Approval-gated redirect rows: 15
-- Intentional retire/404 rows: 15
-- Manual decision rows remaining: 17
-- Browser QA rows: 3
-- High-risk rows: 8
-- Medium-risk rows: 50
-- Low-risk rows: 6
+- Proposed extra redirect-shaped rows: 47
+- Ready extra redirect rows: 47
+- Approval-gated redirect rows: 0
+- Intentional retire/404 rows: 17
+- Manual decision rows remaining: 0
+- Browser QA rows: 0
+- High-risk rows: 0
+- Medium-risk rows: 43
+- Low-risk rows: 21
 
 ## Input reports
 
@@ -27,19 +27,14 @@ It does not approve DNS, Cloudflare, Supabase, frontend deploy, or production re
 
 ## Resolution counts
 
-- browser_qa_required: 3
+- decommissioned_no_preserve: 15
 - intentional_404: 2
-- intentional_404_or_future_rebuild: 5
-- intentional_404_or_legacy_store_hold: 2
-- intentional_404_until_auth_route_confirmed: 6
-- manual_content_decision_required: 1
-- manual_product_decision_required: 1
-- redirect_to_magazine: 29
-- redirect_to_magazine_after_product_approval: 15
+- redirect_to_charts: 3
+- redirect_to_magazine: 44
 
 ## Proposed extra redirects
 
-These are not part of the validated 1,171-row redirect bundle. Some rows are ready proposals, while section-archive rows remain approval-gated. Apply only after explicit product/content approval.
+These are not part of the validated 1,171-row redirect bundle. They reflect final product scope decisions for old WordPress routes.
 
 | Source | Target | Status | Reason |
 |---|---|---:|---|
@@ -72,21 +67,24 @@ These are not part of the validated 1,171-row redirect bundle. Some rows are rea
 | `/author/wakilishaji/page/8/` | `/magazine` | 302 | WordPress username slugs are not confirmed React author slugs. /magazine is safer than fake /authors/<slug> routes. |
 | `/author/wangari/` | `/magazine` | 302 | WordPress username slugs are not confirmed React author slugs. /magazine is safer than fake /authors/<slug> routes. |
 | `/news-resources/` | `/magazine` | 302 | Magazine is the closest current React destination. |
-| `/album-reviews/` | `/magazine` | 302 | Magazine is the closest broad React destination, but section-specific UX may be preferable later. |
-| `/art-design/` | `/magazine` | 302 | Magazine is the closest broad React destination, but section-specific UX may be preferable later. |
-| `/art/` | `/magazine` | 302 | Magazine is the closest broad React destination, but section-specific UX may be preferable later. |
-| `/blog-newspaper/` | `/magazine` | 302 | Magazine is the closest broad React destination, but section-specific UX may be preferable later. |
-| `/film/` | `/magazine` | 302 | Magazine is the closest broad React destination, but section-specific UX may be preferable later. |
-| `/journal/` | `/magazine` | 302 | Magazine is the closest broad React destination, but section-specific UX may be preferable later. |
-| `/lifestyle/` | `/magazine` | 302 | Magazine is the closest broad React destination, but section-specific UX may be preferable later. |
-| `/literature/` | `/magazine` | 302 | Magazine is the closest broad React destination, but section-specific UX may be preferable later. |
-| `/literature/short-stories/` | `/magazine` | 302 | Magazine is the closest broad React destination, but section-specific UX may be preferable later. |
-| `/opinion/` | `/magazine` | 302 | Magazine is the closest broad React destination, but section-specific UX may be preferable later. |
-| `/plan/` | `/magazine` | 302 | Magazine is the closest broad React destination, but section-specific UX may be preferable later. |
-| `/plan/archive/` | `/magazine` | 302 | Magazine is the closest broad React destination, but section-specific UX may be preferable later. |
-| `/science-and-technology/` | `/magazine` | 302 | Magazine is the closest broad React destination, but section-specific UX may be preferable later. |
-| `/short-stories/` | `/magazine` | 302 | Magazine is the closest broad React destination, but section-specific UX may be preferable later. |
-| `/sports/` | `/magazine` | 302 | Magazine is the closest broad React destination, but section-specific UX may be preferable later. |
+| `/album-reviews/` | `/magazine` | 302 | Legacy section archives do not need content migration. React/Supabase is the source of truth; /magazine is the safe public landing page. |
+| `/art-design/` | `/magazine` | 302 | Legacy section archives do not need content migration. React/Supabase is the source of truth; /magazine is the safe public landing page. |
+| `/art/` | `/magazine` | 302 | Legacy section archives do not need content migration. React/Supabase is the source of truth; /magazine is the safe public landing page. |
+| `/blog-newspaper/` | `/magazine` | 302 | Legacy section archives do not need content migration. React/Supabase is the source of truth; /magazine is the safe public landing page. |
+| `/film/` | `/magazine` | 302 | Legacy section archives do not need content migration. React/Supabase is the source of truth; /magazine is the safe public landing page. |
+| `/journal/` | `/magazine` | 302 | Legacy section archives do not need content migration. React/Supabase is the source of truth; /magazine is the safe public landing page. |
+| `/lifestyle/` | `/magazine` | 302 | Legacy section archives do not need content migration. React/Supabase is the source of truth; /magazine is the safe public landing page. |
+| `/literature/` | `/magazine` | 302 | Legacy section archives do not need content migration. React/Supabase is the source of truth; /magazine is the safe public landing page. |
+| `/literature/short-stories/` | `/magazine` | 302 | Legacy section archives do not need content migration. React/Supabase is the source of truth; /magazine is the safe public landing page. |
+| `/opinion/` | `/magazine` | 302 | Legacy section archives do not need content migration. React/Supabase is the source of truth; /magazine is the safe public landing page. |
+| `/plan/` | `/magazine` | 302 | Legacy section archives do not need content migration. React/Supabase is the source of truth; /magazine is the safe public landing page. |
+| `/plan/archive/` | `/magazine` | 302 | Legacy section archives do not need content migration. React/Supabase is the source of truth; /magazine is the safe public landing page. |
+| `/science-and-technology/` | `/magazine` | 302 | Legacy section archives do not need content migration. React/Supabase is the source of truth; /magazine is the safe public landing page. |
+| `/short-stories/` | `/magazine` | 302 | Legacy section archives do not need content migration. React/Supabase is the source of truth; /magazine is the safe public landing page. |
+| `/sports/` | `/magazine` | 302 | Legacy section archives do not need content migration. React/Supabase is the source of truth; /magazine is the safe public landing page. |
+| `/charts/top-100/ke/2026-01-26/` | `/charts` | 302 | Old dated WordPress chart pages do not need preservation. React charts are the source of truth. |
+| `/charts/top-gengetone/ke/2026-01-26/` | `/charts` | 302 | Old dated WordPress chart pages do not need preservation. React charts are the source of truth. |
+| `/charts/top-rnb/ke/2026-01-26/` | `/charts` | 302 | Old dated WordPress chart pages do not need preservation. React charts are the source of truth. |
 
 ## Rows to retire or leave unredirected
 
@@ -94,37 +92,35 @@ These are not part of the validated 1,171-row redirect bundle. Some rows are rea
 |---|---|---|---|
 | `/tag/abas-k%eb%ab%bf/` | intentional_404 | low | Malformed encoded tag slugs are not worth preserving and should not be bulk-mapped blindly. |
 | `/tag/abbas-k%eb%ab%bf/` | intentional_404 | low | Malformed encoded tag slugs are not worth preserving and should not be bulk-mapped blindly. |
-| `/corrections/` | intentional_404_or_future_rebuild | medium | Target route does not exist in current React prerender output. |
-| `/events/` | intentional_404_or_future_rebuild | medium | Target route does not exist in current React prerender output. |
-| `/faq/` | intentional_404_or_future_rebuild | medium | Target route does not exist in current React prerender output. |
-| `/methodology/` | intentional_404_or_future_rebuild | medium | Target route does not exist in current React prerender output. |
-| `/venues/` | intentional_404_or_future_rebuild | medium | Target route does not exist in current React prerender output. |
-| `/account/` | intentional_404_until_auth_route_confirmed | high | Account, library, top-10, order, and settings routes can affect user expectations and auth behavior. |
-| `/my-account/` | intentional_404_until_auth_route_confirmed | high | Account, library, top-10, order, and settings routes can affect user expectations and auth behavior. |
-| `/my-library/` | intentional_404_until_auth_route_confirmed | high | Account, library, top-10, order, and settings routes can affect user expectations and auth behavior. |
-| `/my-top-10/` | intentional_404_until_auth_route_confirmed | high | Account, library, top-10, order, and settings routes can affect user expectations and auth behavior. |
-| `/order-tracking/` | intentional_404_until_auth_route_confirmed | high | Account, library, top-10, order, and settings routes can affect user expectations and auth behavior. |
-| `/settings/` | intentional_404_until_auth_route_confirmed | high | Account, library, top-10, order, and settings routes can affect user expectations and auth behavior. |
-| `/claim-your-name/` | manual_content_decision_required | medium | This is a specific legacy page/article and should not be silently redirected without content decision. |
-| `/music/` | manual_product_decision_required | medium | /music/ may be product-significant and should not be blindly redirected. |
-| `/cart/` | intentional_404_or_legacy_store_hold | high | Cart/checkout behavior can create false commercial expectations. |
-| `/checkout/` | intentional_404_or_legacy_store_hold | high | Cart/checkout behavior can create false commercial expectations. |
+| `/corrections/` | decommissioned_no_preserve | low | Product decision locked: old WordPress page is no longer needed and should not block cutover. |
+| `/events/` | decommissioned_no_preserve | low | Product decision locked: old WordPress page is no longer needed and should not block cutover. |
+| `/faq/` | decommissioned_no_preserve | low | Product decision locked: old WordPress page is no longer needed and should not block cutover. |
+| `/methodology/` | decommissioned_no_preserve | low | Product decision locked: old WordPress page is no longer needed and should not block cutover. |
+| `/venues/` | decommissioned_no_preserve | low | Product decision locked: old WordPress page is no longer needed and should not block cutover. |
+| `/account/` | decommissioned_no_preserve | low | Product decision locked: old WordPress page is no longer needed and should not block cutover. |
+| `/my-account/` | decommissioned_no_preserve | low | Product decision locked: old WordPress page is no longer needed and should not block cutover. |
+| `/my-library/` | decommissioned_no_preserve | low | Product decision locked: old WordPress page is no longer needed and should not block cutover. |
+| `/my-top-10/` | decommissioned_no_preserve | low | Product decision locked: old WordPress page is no longer needed and should not block cutover. |
+| `/order-tracking/` | decommissioned_no_preserve | low | Product decision locked: old WordPress page is no longer needed and should not block cutover. |
+| `/settings/` | decommissioned_no_preserve | low | Product decision locked: old WordPress page is no longer needed and should not block cutover. |
+| `/claim-your-name/` | decommissioned_no_preserve | low | Product decision locked: old WordPress page is no longer needed and should not block cutover. |
+| `/music/` | decommissioned_no_preserve | low | Product decision locked: old WordPress page is no longer needed and should not block cutover. |
+| `/cart/` | decommissioned_no_preserve | low | Product decision locked: old WordPress page is no longer needed and should not block cutover. |
+| `/checkout/` | decommissioned_no_preserve | low | Product decision locked: old WordPress page is no longer needed and should not block cutover. |
 
 ## Browser QA rows
 
 | Source | Target | Reason |
 |---|---|---|
-| `/charts/top-100/ke/2026-01-26/` | `/charts/top-100/ke/2026-01-26` | HTML shell smoke passed, but client-side chart data rendering still needs browser verification. |
-| `/charts/top-gengetone/ke/2026-01-26/` | `/charts/top-gengetone/ke/2026-01-26` | HTML shell smoke passed, but client-side chart data rendering still needs browser verification. |
-| `/charts/top-rnb/ke/2026-01-26/` | `/charts/top-rnb/ke/2026-01-26` | HTML shell smoke passed, but client-side chart data rendering still needs browser verification. |
 
 ## Cutover interpretation
 
 - The validated 1,171-row temporary redirect bundle remains the primary approved redirect artifact.
 - This plan proposes extra handling for the 64 unresolved rows.
 - Author archive URLs should not fake author profile matches. The safe fallback is `/magazine` if we choose to preserve them.
-- WooCommerce and account routes should not be redirected until product/auth behavior is confirmed.
-- Chart routes have passed HTML-shell smoke and need browser QA for client-side data.
+- Old account, store, static utility, music, and claim-your-name WordPress routes are intentionally decommissioned.
+- Old dated WordPress chart routes redirect to `/charts`; historic WordPress chart pages are not preserved.
+- Article content is not being migrated from WordPress here. React/Supabase is the source of truth; old article URLs are only preserved as redirects where React routes exist.
 
 ## Deployment checklist
 

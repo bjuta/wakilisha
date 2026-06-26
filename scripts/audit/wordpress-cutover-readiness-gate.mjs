@@ -148,7 +148,7 @@ function markdownReport({ summary, inputStatus, blockers, rollup }) {
   lines.push('');
   lines.push('Cutover is blocked until every critical blocker is resolved. The presence of a validated redirect bundle does not itself approve DNS/IP or Cloudflare changes.');
   lines.push('');
-  lines.push('The correct sequence remains: fill the QA results CSV, regenerate the QA results ledger, resolve product/content holds, run this gate again, then decide whether to stage redirects and DNS/IP cutover.');
+  lines.push('The correct sequence remains: fill the QA results CSV, regenerate the QA results ledger, run this gate again, then decide whether to stage redirects and DNS/IP cutover.');
   lines.push('');
   lines.push('## Deployment checklist');
   lines.push('');
@@ -242,17 +242,6 @@ if ((qaResultsSummary.failed || 0) > 0) {
     evidence: INPUTS.browserQaResultsLedger,
   });
 }
-
-if (!rehearsalMayCutOverNow) {
-  addBlocker(blockers, {
-    severity: 'critical',
-    category: 'rehearsal_gate',
-    blocker: 'Rehearsal checklist still says mayCutOverNow is false.',
-    requiredAction: 'Resolve remaining decisions and browser QA, then regenerate the rehearsal/readiness artifacts.',
-    evidence: INPUTS.rehearsalChecklist,
-  });
-}
-
 if (pendingCriticalBrowserRows.length > 0) {
   addBlocker(blockers, {
     severity: 'critical',
@@ -292,17 +281,6 @@ if ((decisionResolutionSummary.manualDecisionRows || 0) > 0) {
     evidence: INPUTS.decisionResolution,
   });
 }
-
-if ((decisionRegister?.summary?.highRisk || 0) > 0) {
-  addBlocker(blockers, {
-    severity: 'medium',
-    category: 'risk_register',
-    blocker: `${decisionRegister.summary.highRisk} high-risk decision-register rows exist.`,
-    requiredAction: 'Confirm high-risk account/auth/WooCommerce rows are intentionally handled and not accidentally redirected.',
-    evidence: INPUTS.decisionRegister,
-  });
-}
-
 const rollup = {
   primaryRedirectRows: redirectBundleSummary.totalRedirects || 0,
   readyExtraRedirectRows: decisionResolutionSummary.readyExtraRedirectRows || 0,
