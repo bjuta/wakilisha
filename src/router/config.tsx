@@ -1,5 +1,5 @@
 import type { RouteObject } from "react-router-dom";
-import { Navigate } from "react-router-dom";
+import { Navigate, useParams } from "react-router-dom";
 import { ResponsiveAppLayout } from "@/components/mobile/ResponsiveAppLayout";
 import { ResponsivePage } from "@/components/mobile/ResponsivePage";
 import { MobileFullPlayer } from "@/components/mobile/MobileFullPlayer";
@@ -189,6 +189,11 @@ import FaqsPage from "../pages/faqs/page";
 import PrivacyPage from "../pages/privacy/page";
 import TermsPage from "../pages/terms/page";
 
+function LegacyTaxonomyRedirect({ base }: { base: "/categories" | "/tags" }) {
+  const { slug } = useParams<{ slug?: string }>();
+  return <Navigate to={slug ? `${base}/${slug}` : base} replace />;
+}
+
 const routes: RouteObject[] = [
   { path: "/admin/login", element: <AdminLoginPage /> },
   { path: "/auth/reset-password", element: <ResetPasswordPage /> },
@@ -213,6 +218,10 @@ const routes: RouteObject[] = [
       { path: "/labels/:slug", element: <ResponsivePage mobile={<LabelDetail />} desktop={<LabelDetail />} /> },
       { path: "/labels", element: <ResponsivePage mobile={<MobileLabels />} desktop={<Labels />} /> },
       { path: "/preview/:nonce", element: <PreviewPage /> },
+      { path: "/category", element: <LegacyTaxonomyRedirect base="/categories" /> },
+      { path: "/category/:slug", element: <LegacyTaxonomyRedirect base="/categories" /> },
+      { path: "/tag", element: <LegacyTaxonomyRedirect base="/tags" /> },
+      { path: "/tag/:slug", element: <LegacyTaxonomyRedirect base="/tags" /> },
       { path: "/categories", element: <ResponsivePage mobile={<CategoriesIndex />} desktop={<CategoriesIndex />} /> },
       { path: "/categories/:slug", element: <ResponsivePage mobile={<CategoryDetail />} desktop={<CategoryDetail />} /> },
       { path: "/tags", element: <ResponsivePage mobile={<TagsIndex />} desktop={<TagsIndex />} /> },
