@@ -218,9 +218,9 @@ async function main(): Promise<void> {
   log("5/5", `Starting Vite dev server on port ${VITE_PORT}...`);
   const viteEnv = {
     ...process.env,
-    VITE_CHARTS_PUBLIC_MODE: "wordpress",
+    VITE_CHARTS_PUBLIC_MODE: "production",
     VITE_CHARTS_PUBLIC_API_VERSION: "v2",
-    VITE_WAKILISHA_WP_V2_API_BASE: PROXY_PATH,
+    VITE_WAKILISHA_LEGACY_WP_V2_API_BASE: PROXY_PATH,
     NODE_ENV: "development",
   };
 

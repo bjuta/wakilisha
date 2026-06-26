@@ -72,9 +72,9 @@ export function ProviderHealthPanel() {
 
   const ingestModeStatus = {
     provider: "Ingest Mode",
-    status: mode === "wordpress" ? "live" : "mocked" as const,
-    message: mode === "mock" ? "Mock (dev) — switch to wordpress mode for production" : "WordPress mode — real backend active",
-    envVars: mode === "wordpress" ? [] : ["VITE_CHARTS_INGESTION_MODE=wordpress"],
+    status: "live" as const,
+    message: mode === "production" ? "Production mode — provider-backed Supabase pipeline active" : "Production mode — legacy WordPress runtime disabled",
+    envVars: [],
   };
 
   return (
