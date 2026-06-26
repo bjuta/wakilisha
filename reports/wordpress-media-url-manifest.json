@@ -1,0 +1,1441 @@
+{
+  "generatedAt": "2026-06-26T07:45:06.191Z",
+  "total": 29,
+  "items": [
+    {
+      "path": "/wp-content/uploads/*",
+      "sources": [
+        {
+          "file": "docs/cloudflare-waf-config.md",
+          "line": 185,
+          "raw": "/wp-content/uploads/*"
+        },
+        {
+          "file": "docs/cloudflare-waf-config.md",
+          "line": 191,
+          "raw": "/wp-content/uploads/*"
+        },
+        {
+          "file": "docs/lightsail-media-mirror-plan.md",
+          "line": 9,
+          "raw": "/wp-content/uploads/*"
+        },
+        {
+          "file": "docs/lightsail-media-mirror-plan.md",
+          "line": 67,
+          "raw": "/wp-content/uploads/*"
+        },
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 17,
+          "raw": "/wp-content/uploads/*"
+        },
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 19,
+          "raw": "/wp-content/uploads/*"
+        },
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 29,
+          "raw": "/wp-content/uploads/*"
+        },
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 35,
+          "raw": "/wp-content/uploads/*"
+        },
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 36,
+          "raw": "/wp-content/uploads/*"
+        },
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 98,
+          "raw": "/wp-content/uploads/*"
+        },
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 99,
+          "raw": "/wp-content/uploads/*"
+        },
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 100,
+          "raw": "/wp-content/uploads/*"
+        },
+        {
+          "file": "scripts/audit/wordpress-media-dependency-audit.mjs",
+          "line": 149,
+          "raw": "/wp-content/uploads/*"
+        },
+        {
+          "file": "scripts/audit/wordpress-media-dependency-audit.mjs",
+          "line": 151,
+          "raw": "/wp-content/uploads/*"
+        },
+        {
+          "file": "scripts/audit/wordpress-media-dependency-audit.mjs",
+          "line": 161,
+          "raw": "/wp-content/uploads/*"
+        }
+      ]
+    },
+    {
+      "path": "/wp-content/uploads/%",
+      "sources": [
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 132,
+          "raw": "/wp-content/uploads/%"
+        },
+        {
+          "file": "supabase/functions/backfill-article-hero-storage/index.ts",
+          "line": 186,
+          "raw": "/wp-content/uploads/%"
+        }
+      ]
+    },
+    {
+      "path": "/wp-content/uploads/2020/11/bg2.jpg",
+      "sources": [
+        {
+          "file": "packages/db/migrations/003_seed_repaired_data.sql",
+          "line": 24489,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg2.jpg?id=20161"
+        },
+        {
+          "file": "packages/db/migrations/003_seed_repaired_data.sql",
+          "line": 24489,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg2.jpg?id=20161"
+        },
+        {
+          "file": "packages/db/migrations/003_seed_repaired_data.sql",
+          "line": 24489,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg2.jpg?id=20161"
+        },
+        {
+          "file": "packages/db/migrations/003_seed_repaired_data.sql",
+          "line": 24489,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg2.jpg?id=20161"
+        },
+        {
+          "file": "packages/db/migrations/003_seed_repaired_data.sql",
+          "line": 24489,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg2.jpg?id=20161"
+        },
+        {
+          "file": "packages/db/migrations/seed_chunks/054_content_route_classification.sql",
+          "line": 40,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg2.jpg?id=20161"
+        },
+        {
+          "file": "packages/db/migrations/seed_chunks/054_content_route_classification.sql",
+          "line": 40,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg2.jpg?id=20161"
+        },
+        {
+          "file": "packages/db/migrations/seed_chunks/054_content_route_classification.sql",
+          "line": 40,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg2.jpg?id=20161"
+        },
+        {
+          "file": "packages/db/migrations/seed_chunks/054_content_route_classification.sql",
+          "line": 40,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg2.jpg?id=20161"
+        },
+        {
+          "file": "packages/db/migrations/seed_chunks/054_content_route_classification.sql",
+          "line": 40,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg2.jpg?id=20161"
+        },
+        {
+          "file": "packages/migration/reports/content-classification.json",
+          "line": 786,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg2.jpg?id=20161"
+        },
+        {
+          "file": "packages/migration/reports/content-classification.json",
+          "line": 789,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg2.jpg?id=20161"
+        },
+        {
+          "file": "packages/migration/reports/content-classification.json",
+          "line": 789,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg2.jpg?id=20161"
+        },
+        {
+          "file": "packages/migration/reports/content-classification.json",
+          "line": 789,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg2.jpg?id=20161"
+        },
+        {
+          "file": "packages/migration/reports/content-classification.json",
+          "line": 789,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg2.jpg?id=20161"
+        }
+      ]
+    },
+    {
+      "path": "/wp-content/uploads/2020/11/bg4.jpg",
+      "sources": [
+        {
+          "file": "packages/db/migrations/003_seed_repaired_data.sql",
+          "line": 24489,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg4.jpg?id=20162"
+        },
+        {
+          "file": "packages/db/migrations/003_seed_repaired_data.sql",
+          "line": 24489,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg4.jpg?id=20162"
+        },
+        {
+          "file": "packages/db/migrations/003_seed_repaired_data.sql",
+          "line": 24489,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg4.jpg?id=20162"
+        },
+        {
+          "file": "packages/db/migrations/003_seed_repaired_data.sql",
+          "line": 24489,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg4.jpg?id=20162"
+        },
+        {
+          "file": "packages/db/migrations/003_seed_repaired_data.sql",
+          "line": 24489,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg4.jpg?id=20162"
+        },
+        {
+          "file": "packages/db/migrations/seed_chunks/054_content_route_classification.sql",
+          "line": 40,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg4.jpg?id=20162"
+        },
+        {
+          "file": "packages/db/migrations/seed_chunks/054_content_route_classification.sql",
+          "line": 40,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg4.jpg?id=20162"
+        },
+        {
+          "file": "packages/db/migrations/seed_chunks/054_content_route_classification.sql",
+          "line": 40,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg4.jpg?id=20162"
+        },
+        {
+          "file": "packages/db/migrations/seed_chunks/054_content_route_classification.sql",
+          "line": 40,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg4.jpg?id=20162"
+        },
+        {
+          "file": "packages/db/migrations/seed_chunks/054_content_route_classification.sql",
+          "line": 40,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg4.jpg?id=20162"
+        },
+        {
+          "file": "packages/migration/reports/content-classification.json",
+          "line": 786,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg4.jpg?id=20162"
+        },
+        {
+          "file": "packages/migration/reports/content-classification.json",
+          "line": 789,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg4.jpg?id=20162"
+        },
+        {
+          "file": "packages/migration/reports/content-classification.json",
+          "line": 789,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg4.jpg?id=20162"
+        },
+        {
+          "file": "packages/migration/reports/content-classification.json",
+          "line": 789,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg4.jpg?id=20162"
+        },
+        {
+          "file": "packages/migration/reports/content-classification.json",
+          "line": 789,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg4.jpg?id=20162"
+        }
+      ]
+    },
+    {
+      "path": "/wp-content/uploads/2020/11/bg5.jpg",
+      "sources": [
+        {
+          "file": "packages/db/migrations/003_seed_repaired_data.sql",
+          "line": 24489,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg5.jpg?id=20165"
+        },
+        {
+          "file": "packages/db/migrations/003_seed_repaired_data.sql",
+          "line": 24489,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg5.jpg?id=20165"
+        },
+        {
+          "file": "packages/db/migrations/003_seed_repaired_data.sql",
+          "line": 24489,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg5.jpg?id=20165"
+        },
+        {
+          "file": "packages/db/migrations/003_seed_repaired_data.sql",
+          "line": 24489,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg5.jpg?id=20165"
+        },
+        {
+          "file": "packages/db/migrations/003_seed_repaired_data.sql",
+          "line": 24489,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg5.jpg?id=20165"
+        },
+        {
+          "file": "packages/db/migrations/seed_chunks/054_content_route_classification.sql",
+          "line": 40,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg5.jpg?id=20165"
+        },
+        {
+          "file": "packages/db/migrations/seed_chunks/054_content_route_classification.sql",
+          "line": 40,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg5.jpg?id=20165"
+        },
+        {
+          "file": "packages/db/migrations/seed_chunks/054_content_route_classification.sql",
+          "line": 40,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg5.jpg?id=20165"
+        },
+        {
+          "file": "packages/db/migrations/seed_chunks/054_content_route_classification.sql",
+          "line": 40,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg5.jpg?id=20165"
+        },
+        {
+          "file": "packages/db/migrations/seed_chunks/054_content_route_classification.sql",
+          "line": 40,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg5.jpg?id=20165"
+        },
+        {
+          "file": "packages/migration/reports/content-classification.json",
+          "line": 786,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg5.jpg?id=20165"
+        },
+        {
+          "file": "packages/migration/reports/content-classification.json",
+          "line": 789,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg5.jpg?id=20165"
+        },
+        {
+          "file": "packages/migration/reports/content-classification.json",
+          "line": 789,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg5.jpg?id=20165"
+        },
+        {
+          "file": "packages/migration/reports/content-classification.json",
+          "line": 789,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg5.jpg?id=20165"
+        },
+        {
+          "file": "packages/migration/reports/content-classification.json",
+          "line": 789,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg5.jpg?id=20165"
+        }
+      ]
+    },
+    {
+      "path": "/wp-content/uploads/2020/11/bg9.jpg",
+      "sources": [
+        {
+          "file": "packages/db/migrations/003_seed_repaired_data.sql",
+          "line": 24489,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg9.jpg?id=20187"
+        },
+        {
+          "file": "packages/db/migrations/003_seed_repaired_data.sql",
+          "line": 24489,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg9.jpg?id=20187"
+        },
+        {
+          "file": "packages/db/migrations/003_seed_repaired_data.sql",
+          "line": 24489,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg9.jpg?id=20187"
+        },
+        {
+          "file": "packages/db/migrations/003_seed_repaired_data.sql",
+          "line": 24489,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg9.jpg?id=20187"
+        },
+        {
+          "file": "packages/db/migrations/003_seed_repaired_data.sql",
+          "line": 24489,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg9.jpg?id=20187"
+        },
+        {
+          "file": "packages/db/migrations/seed_chunks/054_content_route_classification.sql",
+          "line": 40,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg9.jpg?id=20187"
+        },
+        {
+          "file": "packages/db/migrations/seed_chunks/054_content_route_classification.sql",
+          "line": 40,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg9.jpg?id=20187"
+        },
+        {
+          "file": "packages/db/migrations/seed_chunks/054_content_route_classification.sql",
+          "line": 40,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg9.jpg?id=20187"
+        },
+        {
+          "file": "packages/db/migrations/seed_chunks/054_content_route_classification.sql",
+          "line": 40,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg9.jpg?id=20187"
+        },
+        {
+          "file": "packages/db/migrations/seed_chunks/054_content_route_classification.sql",
+          "line": 40,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg9.jpg?id=20187"
+        },
+        {
+          "file": "packages/migration/reports/content-classification.json",
+          "line": 786,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg9.jpg?id=20187"
+        },
+        {
+          "file": "packages/migration/reports/content-classification.json",
+          "line": 789,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg9.jpg?id=20187"
+        },
+        {
+          "file": "packages/migration/reports/content-classification.json",
+          "line": 789,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg9.jpg?id=20187"
+        },
+        {
+          "file": "packages/migration/reports/content-classification.json",
+          "line": 789,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg9.jpg?id=20187"
+        },
+        {
+          "file": "packages/migration/reports/content-classification.json",
+          "line": 789,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/bg9.jpg?id=20187"
+        }
+      ]
+    },
+    {
+      "path": "/wp-content/uploads/2020/11/digital-curation-1160x653.jpg/",
+      "sources": [
+        {
+          "file": "packages/db/migrations/003_seed_repaired_data.sql",
+          "line": 24457,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/digital-curation-1160x653.jpg\\"
+        },
+        {
+          "file": "packages/db/migrations/seed_chunks/054_content_route_classification.sql",
+          "line": 8,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/digital-curation-1160x653.jpg\\"
+        },
+        {
+          "file": "packages/migration/reports/content-classification.json",
+          "line": 18,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/digital-curation-1160x653.jpg\\"
+        }
+      ]
+    },
+    {
+      "path": "/wp-content/uploads/2020/11/digital-curation.jpg",
+      "sources": [
+        {
+          "file": "packages/db/migrations/003_seed_repaired_data.sql",
+          "line": 24489,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/digital-curation.jpg?id=20158"
+        },
+        {
+          "file": "packages/db/migrations/003_seed_repaired_data.sql",
+          "line": 24489,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/digital-curation.jpg?id=20158"
+        },
+        {
+          "file": "packages/db/migrations/003_seed_repaired_data.sql",
+          "line": 24489,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/digital-curation.jpg?id=20158"
+        },
+        {
+          "file": "packages/db/migrations/003_seed_repaired_data.sql",
+          "line": 24489,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/digital-curation.jpg?id=20158"
+        },
+        {
+          "file": "packages/db/migrations/003_seed_repaired_data.sql",
+          "line": 24489,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/digital-curation.jpg?id=20158"
+        },
+        {
+          "file": "packages/db/migrations/seed_chunks/054_content_route_classification.sql",
+          "line": 40,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/digital-curation.jpg?id=20158"
+        },
+        {
+          "file": "packages/db/migrations/seed_chunks/054_content_route_classification.sql",
+          "line": 40,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/digital-curation.jpg?id=20158"
+        },
+        {
+          "file": "packages/db/migrations/seed_chunks/054_content_route_classification.sql",
+          "line": 40,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/digital-curation.jpg?id=20158"
+        },
+        {
+          "file": "packages/db/migrations/seed_chunks/054_content_route_classification.sql",
+          "line": 40,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/digital-curation.jpg?id=20158"
+        },
+        {
+          "file": "packages/db/migrations/seed_chunks/054_content_route_classification.sql",
+          "line": 40,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/digital-curation.jpg?id=20158"
+        },
+        {
+          "file": "packages/migration/reports/content-classification.json",
+          "line": 786,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/digital-curation.jpg?id=20158"
+        },
+        {
+          "file": "packages/migration/reports/content-classification.json",
+          "line": 789,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/digital-curation.jpg?id=20158"
+        },
+        {
+          "file": "packages/migration/reports/content-classification.json",
+          "line": 789,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/digital-curation.jpg?id=20158"
+        },
+        {
+          "file": "packages/migration/reports/content-classification.json",
+          "line": 789,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/digital-curation.jpg?id=20158"
+        },
+        {
+          "file": "packages/migration/reports/content-classification.json",
+          "line": 789,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/digital-curation.jpg?id=20158"
+        }
+      ]
+    },
+    {
+      "path": "/wp-content/uploads/2020/11/digital-curation.jpg/",
+      "sources": [
+        {
+          "file": "packages/db/migrations/003_seed_repaired_data.sql",
+          "line": 24457,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/digital-curation.jpg\\"
+        },
+        {
+          "file": "packages/db/migrations/seed_chunks/054_content_route_classification.sql",
+          "line": 8,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/digital-curation.jpg\\"
+        },
+        {
+          "file": "packages/migration/reports/content-classification.json",
+          "line": 18,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/digital-curation.jpg\\"
+        }
+      ]
+    },
+    {
+      "path": "/wp-content/uploads/2020/11/wakilisha-creative-enterprise-our-business-is-people-1160x653.jpg/",
+      "sources": [
+        {
+          "file": "packages/db/migrations/003_seed_repaired_data.sql",
+          "line": 24457,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/wakilisha-creative-enterprise-our-business-is-people-1160x653.jpg\\"
+        },
+        {
+          "file": "packages/db/migrations/seed_chunks/054_content_route_classification.sql",
+          "line": 8,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/wakilisha-creative-enterprise-our-business-is-people-1160x653.jpg\\"
+        },
+        {
+          "file": "packages/migration/reports/content-classification.json",
+          "line": 18,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/wakilisha-creative-enterprise-our-business-is-people-1160x653.jpg\\"
+        }
+      ]
+    },
+    {
+      "path": "/wp-content/uploads/2020/11/wakilisha-creative-enterprise-our-business-is-people.jpg",
+      "sources": [
+        {
+          "file": "packages/db/migrations/003_seed_repaired_data.sql",
+          "line": 24489,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/wakilisha-creative-enterprise-our-business-is-people.jpg?id=20193"
+        },
+        {
+          "file": "packages/db/migrations/003_seed_repaired_data.sql",
+          "line": 24489,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/wakilisha-creative-enterprise-our-business-is-people.jpg?id=20193"
+        },
+        {
+          "file": "packages/db/migrations/003_seed_repaired_data.sql",
+          "line": 24489,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/wakilisha-creative-enterprise-our-business-is-people.jpg?id=20193"
+        },
+        {
+          "file": "packages/db/migrations/003_seed_repaired_data.sql",
+          "line": 24489,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/wakilisha-creative-enterprise-our-business-is-people.jpg?id=20193"
+        },
+        {
+          "file": "packages/db/migrations/003_seed_repaired_data.sql",
+          "line": 24489,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/wakilisha-creative-enterprise-our-business-is-people.jpg?id=20193"
+        },
+        {
+          "file": "packages/db/migrations/seed_chunks/054_content_route_classification.sql",
+          "line": 40,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/wakilisha-creative-enterprise-our-business-is-people.jpg?id=20193"
+        },
+        {
+          "file": "packages/db/migrations/seed_chunks/054_content_route_classification.sql",
+          "line": 40,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/wakilisha-creative-enterprise-our-business-is-people.jpg?id=20193"
+        },
+        {
+          "file": "packages/db/migrations/seed_chunks/054_content_route_classification.sql",
+          "line": 40,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/wakilisha-creative-enterprise-our-business-is-people.jpg?id=20193"
+        },
+        {
+          "file": "packages/db/migrations/seed_chunks/054_content_route_classification.sql",
+          "line": 40,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/wakilisha-creative-enterprise-our-business-is-people.jpg?id=20193"
+        },
+        {
+          "file": "packages/db/migrations/seed_chunks/054_content_route_classification.sql",
+          "line": 40,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/wakilisha-creative-enterprise-our-business-is-people.jpg?id=20193"
+        },
+        {
+          "file": "packages/migration/reports/content-classification.json",
+          "line": 786,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/wakilisha-creative-enterprise-our-business-is-people.jpg?id=20193"
+        },
+        {
+          "file": "packages/migration/reports/content-classification.json",
+          "line": 789,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/wakilisha-creative-enterprise-our-business-is-people.jpg?id=20193"
+        },
+        {
+          "file": "packages/migration/reports/content-classification.json",
+          "line": 789,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/wakilisha-creative-enterprise-our-business-is-people.jpg?id=20193"
+        },
+        {
+          "file": "packages/migration/reports/content-classification.json",
+          "line": 789,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/wakilisha-creative-enterprise-our-business-is-people.jpg?id=20193"
+        },
+        {
+          "file": "packages/migration/reports/content-classification.json",
+          "line": 789,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/wakilisha-creative-enterprise-our-business-is-people.jpg?id=20193"
+        }
+      ]
+    },
+    {
+      "path": "/wp-content/uploads/2020/11/wakilisha-creative-enterprise-our-business-is-people.jpg/",
+      "sources": [
+        {
+          "file": "packages/db/migrations/003_seed_repaired_data.sql",
+          "line": 24457,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/wakilisha-creative-enterprise-our-business-is-people.jpg\\"
+        },
+        {
+          "file": "packages/db/migrations/seed_chunks/054_content_route_classification.sql",
+          "line": 8,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/wakilisha-creative-enterprise-our-business-is-people.jpg\\"
+        },
+        {
+          "file": "packages/migration/reports/content-classification.json",
+          "line": 18,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/wakilisha-creative-enterprise-our-business-is-people.jpg\\"
+        }
+      ]
+    },
+    {
+      "path": "/wp-content/uploads/2020/11/wakilisha-creative-enterprise-stylish-young-african-woman-design-inspiration-1160x653.jpg/",
+      "sources": [
+        {
+          "file": "packages/db/migrations/003_seed_repaired_data.sql",
+          "line": 24457,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/wakilisha-creative-enterprise-stylish-young-african-woman-design-inspiration-1160x653.jpg\\"
+        },
+        {
+          "file": "packages/db/migrations/seed_chunks/054_content_route_classification.sql",
+          "line": 8,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/wakilisha-creative-enterprise-stylish-young-african-woman-design-inspiration-1160x653.jpg\\"
+        },
+        {
+          "file": "packages/migration/reports/content-classification.json",
+          "line": 18,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/wakilisha-creative-enterprise-stylish-young-african-woman-design-inspiration-1160x653.jpg\\"
+        }
+      ]
+    },
+    {
+      "path": "/wp-content/uploads/2020/11/wakilisha-creative-enterprise-stylish-young-african-woman-design-inspiration.jpg/",
+      "sources": [
+        {
+          "file": "packages/db/migrations/003_seed_repaired_data.sql",
+          "line": 24457,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/wakilisha-creative-enterprise-stylish-young-african-woman-design-inspiration.jpg\\"
+        },
+        {
+          "file": "packages/db/migrations/seed_chunks/054_content_route_classification.sql",
+          "line": 8,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/wakilisha-creative-enterprise-stylish-young-african-woman-design-inspiration.jpg\\"
+        },
+        {
+          "file": "packages/migration/reports/content-classification.json",
+          "line": 18,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/11/wakilisha-creative-enterprise-stylish-young-african-woman-design-inspiration.jpg\\"
+        }
+      ]
+    },
+    {
+      "path": "/wp-content/uploads/2020/12/wakilisha-creative-enterprise-collaboration-1160x653.jpg/",
+      "sources": [
+        {
+          "file": "packages/db/migrations/003_seed_repaired_data.sql",
+          "line": 24457,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/12/wakilisha-creative-enterprise-collaboration-1160x653.jpg\\"
+        },
+        {
+          "file": "packages/db/migrations/seed_chunks/054_content_route_classification.sql",
+          "line": 8,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/12/wakilisha-creative-enterprise-collaboration-1160x653.jpg\\"
+        },
+        {
+          "file": "packages/migration/reports/content-classification.json",
+          "line": 18,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/12/wakilisha-creative-enterprise-collaboration-1160x653.jpg\\"
+        }
+      ]
+    },
+    {
+      "path": "/wp-content/uploads/2020/12/wakilisha-creative-enterprise-collaboration.jpg/",
+      "sources": [
+        {
+          "file": "packages/db/migrations/003_seed_repaired_data.sql",
+          "line": 24457,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/12/wakilisha-creative-enterprise-collaboration.jpg\\"
+        },
+        {
+          "file": "packages/db/migrations/seed_chunks/054_content_route_classification.sql",
+          "line": 8,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/12/wakilisha-creative-enterprise-collaboration.jpg\\"
+        },
+        {
+          "file": "packages/migration/reports/content-classification.json",
+          "line": 18,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/12/wakilisha-creative-enterprise-collaboration.jpg\\"
+        }
+      ]
+    },
+    {
+      "path": "/wp-content/uploads/2020/12/wakilisha-creative-enterprise-culture-1160x653.jpg/",
+      "sources": [
+        {
+          "file": "packages/db/migrations/003_seed_repaired_data.sql",
+          "line": 24457,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/12/wakilisha-creative-enterprise-culture-1160x653.jpg\\"
+        },
+        {
+          "file": "packages/db/migrations/seed_chunks/054_content_route_classification.sql",
+          "line": 8,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/12/wakilisha-creative-enterprise-culture-1160x653.jpg\\"
+        },
+        {
+          "file": "packages/migration/reports/content-classification.json",
+          "line": 18,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/12/wakilisha-creative-enterprise-culture-1160x653.jpg\\"
+        }
+      ]
+    },
+    {
+      "path": "/wp-content/uploads/2020/12/wakilisha-creative-enterprise-culture.jpg/",
+      "sources": [
+        {
+          "file": "packages/db/migrations/003_seed_repaired_data.sql",
+          "line": 24457,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/12/wakilisha-creative-enterprise-culture.jpg\\"
+        },
+        {
+          "file": "packages/db/migrations/seed_chunks/054_content_route_classification.sql",
+          "line": 8,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/12/wakilisha-creative-enterprise-culture.jpg\\"
+        },
+        {
+          "file": "packages/migration/reports/content-classification.json",
+          "line": 18,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/12/wakilisha-creative-enterprise-culture.jpg\\"
+        }
+      ]
+    },
+    {
+      "path": "/wp-content/uploads/2020/12/wakilisha-creative-enterprise-visual-trends-for-2021-unfiltered-access-1160x653.jpg/",
+      "sources": [
+        {
+          "file": "packages/db/migrations/003_seed_repaired_data.sql",
+          "line": 24457,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/12/wakilisha-creative-enterprise-visual-trends-for-2021-unfiltered-access-1160x653.jpg\\"
+        },
+        {
+          "file": "packages/db/migrations/seed_chunks/054_content_route_classification.sql",
+          "line": 8,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/12/wakilisha-creative-enterprise-visual-trends-for-2021-unfiltered-access-1160x653.jpg\\"
+        },
+        {
+          "file": "packages/migration/reports/content-classification.json",
+          "line": 18,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/12/wakilisha-creative-enterprise-visual-trends-for-2021-unfiltered-access-1160x653.jpg\\"
+        }
+      ]
+    },
+    {
+      "path": "/wp-content/uploads/2020/12/wakilisha-creative-enterprise-visual-trends-for-2021-unfiltered-access.jpg/",
+      "sources": [
+        {
+          "file": "packages/db/migrations/003_seed_repaired_data.sql",
+          "line": 24457,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/12/wakilisha-creative-enterprise-visual-trends-for-2021-unfiltered-access.jpg\\"
+        },
+        {
+          "file": "packages/db/migrations/seed_chunks/054_content_route_classification.sql",
+          "line": 8,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/12/wakilisha-creative-enterprise-visual-trends-for-2021-unfiltered-access.jpg\\"
+        },
+        {
+          "file": "packages/migration/reports/content-classification.json",
+          "line": 18,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2020/12/wakilisha-creative-enterprise-visual-trends-for-2021-unfiltered-access.jpg\\"
+        }
+      ]
+    },
+    {
+      "path": "/wp-content/uploads/2021/01/Black-and-white-portrait-of-young-African-woman-with-hat-made-of-roses-on-wakilisha.africa-1160x653.jpg/",
+      "sources": [
+        {
+          "file": "packages/db/migrations/003_seed_repaired_data.sql",
+          "line": 24457,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2021/01/Black-and-white-portrait-of-young-African-woman-with-hat-made-of-roses-on-wakilisha.africa-1160x653.jpg\\"
+        },
+        {
+          "file": "packages/db/migrations/seed_chunks/054_content_route_classification.sql",
+          "line": 8,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2021/01/Black-and-white-portrait-of-young-African-woman-with-hat-made-of-roses-on-wakilisha.africa-1160x653.jpg\\"
+        },
+        {
+          "file": "packages/migration/reports/content-classification.json",
+          "line": 18,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2021/01/Black-and-white-portrait-of-young-African-woman-with-hat-made-of-roses-on-wakilisha.africa-1160x653.jpg\\"
+        }
+      ]
+    },
+    {
+      "path": "/wp-content/uploads/2021/01/Black-and-white-portrait-of-young-African-woman-with-hat-made-of-roses-on-wakilisha.africa.jpg/",
+      "sources": [
+        {
+          "file": "packages/db/migrations/003_seed_repaired_data.sql",
+          "line": 24457,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2021/01/Black-and-white-portrait-of-young-African-woman-with-hat-made-of-roses-on-wakilisha.africa.jpg\\"
+        },
+        {
+          "file": "packages/db/migrations/seed_chunks/054_content_route_classification.sql",
+          "line": 8,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2021/01/Black-and-white-portrait-of-young-African-woman-with-hat-made-of-roses-on-wakilisha.africa.jpg\\"
+        },
+        {
+          "file": "packages/migration/reports/content-classification.json",
+          "line": 18,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2021/01/Black-and-white-portrait-of-young-African-woman-with-hat-made-of-roses-on-wakilisha.africa.jpg\\"
+        }
+      ]
+    },
+    {
+      "path": "/wp-content/uploads/2024/05/example.jpg",
+      "sources": [
+        {
+          "file": "docs/lightsail-media-mirror-plan.md",
+          "line": 18,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2024/05/example.jpg"
+        },
+        {
+          "file": "docs/lightsail-media-mirror-plan.md",
+          "line": 24,
+          "raw": "https://media.wakilisha.africa/wp-content/uploads/2024/05/example.jpg"
+        }
+      ]
+    },
+    {
+      "path": "/wp-content/uploads/2026/01/Inauma-947503db39.jpg",
+      "sources": [
+        {
+          "file": "packages/db/migrations/003_seed_repaired_data.sql",
+          "line": 15195,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Inauma-947503db39.jpg"
+        },
+        {
+          "file": "packages/db/migrations/003_seed_repaired_data.sql",
+          "line": 15195,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Inauma-947503db39.jpg"
+        },
+        {
+          "file": "packages/db/migrations/seed_chunks/044_track_playback_sources.sql",
+          "line": 754,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Inauma-947503db39.jpg"
+        },
+        {
+          "file": "packages/db/migrations/seed_chunks/044_track_playback_sources.sql",
+          "line": 754,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Inauma-947503db39.jpg"
+        },
+        {
+          "file": "packages/db/migrations/seed_chunks/052_track_playback_sources.sql",
+          "line": 371,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Inauma-947503db39.jpg"
+        },
+        {
+          "file": "packages/migration/reports/track-playback-sources.full.json",
+          "line": 32198,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Inauma-947503db39.jpg"
+        },
+        {
+          "file": "packages/migration/reports/track-playback-sources.full.json",
+          "line": 32216,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Inauma-947503db39.jpg"
+        },
+        {
+          "file": "packages/migration/reports/track-playback-sources.full.json",
+          "line": 304484,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Inauma-947503db39.jpg"
+        },
+        {
+          "file": "reports/wordpress-deprecation-audit.md",
+          "line": 141,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Inauma-947503db39.jpg"
+        },
+        {
+          "file": "reports/wordpress-deprecation-audit.md",
+          "line": 147,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Inauma-947503db39.jpg"
+        },
+        {
+          "file": "reports/wordpress-deprecation-audit.md",
+          "line": 151,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Inauma-947503db39.jpg"
+        },
+        {
+          "file": "reports/wordpress-deprecation-audit.md",
+          "line": 160,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Inauma-947503db39.jpg"
+        },
+        {
+          "file": "reports/wordpress-deprecation-audit.md",
+          "line": 161,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Inauma-947503db39.jpg"
+        },
+        {
+          "file": "reports/wordpress-deprecation-audit.md",
+          "line": 168,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Inauma-947503db39.jpg"
+        },
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 37,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Inauma-947503db39.jpg"
+        },
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 43,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Inauma-947503db39.jpg"
+        },
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 47,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Inauma-947503db39.jpg"
+        },
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 56,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Inauma-947503db39.jpg"
+        },
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 57,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Inauma-947503db39.jpg"
+        },
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 64,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Inauma-947503db39.jpg"
+        },
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 69,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Inauma-947503db39.jpg"
+        },
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 73,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Inauma-947503db39.jpg"
+        },
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 77,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Inauma-947503db39.jpg"
+        },
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 81,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Inauma-947503db39.jpg"
+        },
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 82,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Inauma-947503db39.jpg"
+        },
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 89,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Inauma-947503db39.jpg"
+        }
+      ]
+    },
+    {
+      "path": "/wp-content/uploads/2026/01/Katam-fd83835635.jpeg",
+      "sources": [
+        {
+          "file": "packages/db/migrations/003_seed_repaired_data.sql",
+          "line": 15196,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Katam-fd83835635.jpeg"
+        },
+        {
+          "file": "packages/db/migrations/003_seed_repaired_data.sql",
+          "line": 15196,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Katam-fd83835635.jpeg"
+        },
+        {
+          "file": "packages/db/migrations/seed_chunks/044_track_playback_sources.sql",
+          "line": 755,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Katam-fd83835635.jpeg"
+        },
+        {
+          "file": "packages/db/migrations/seed_chunks/044_track_playback_sources.sql",
+          "line": 755,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Katam-fd83835635.jpeg"
+        },
+        {
+          "file": "packages/db/migrations/seed_chunks/052_track_playback_sources.sql",
+          "line": 372,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Katam-fd83835635.jpeg"
+        },
+        {
+          "file": "packages/migration/reports/track-playback-sources.full.json",
+          "line": 32241,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Katam-fd83835635.jpeg"
+        },
+        {
+          "file": "packages/migration/reports/track-playback-sources.full.json",
+          "line": 32259,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Katam-fd83835635.jpeg"
+        },
+        {
+          "file": "packages/migration/reports/track-playback-sources.full.json",
+          "line": 304493,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Katam-fd83835635.jpeg"
+        },
+        {
+          "file": "reports/wordpress-deprecation-audit.md",
+          "line": 142,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Katam-fd83835635.jpeg"
+        },
+        {
+          "file": "reports/wordpress-deprecation-audit.md",
+          "line": 148,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Katam-fd83835635.jpeg"
+        },
+        {
+          "file": "reports/wordpress-deprecation-audit.md",
+          "line": 152,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Katam-fd83835635.jpeg"
+        },
+        {
+          "file": "reports/wordpress-deprecation-audit.md",
+          "line": 162,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Katam-fd83835635.jpeg"
+        },
+        {
+          "file": "reports/wordpress-deprecation-audit.md",
+          "line": 163,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Katam-fd83835635.jpeg"
+        },
+        {
+          "file": "reports/wordpress-deprecation-audit.md",
+          "line": 169,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Katam-fd83835635.jpeg"
+        },
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 38,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Katam-fd83835635.jpeg"
+        },
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 44,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Katam-fd83835635.jpeg"
+        },
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 48,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Katam-fd83835635.jpeg"
+        },
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 58,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Katam-fd83835635.jpeg"
+        },
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 59,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Katam-fd83835635.jpeg"
+        },
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 65,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Katam-fd83835635.jpeg"
+        },
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 70,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Katam-fd83835635.jpeg"
+        },
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 74,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Katam-fd83835635.jpeg"
+        },
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 78,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Katam-fd83835635.jpeg"
+        },
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 83,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Katam-fd83835635.jpeg"
+        },
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 84,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Katam-fd83835635.jpeg"
+        },
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 90,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Katam-fd83835635.jpeg"
+        }
+      ]
+    },
+    {
+      "path": "/wp-content/uploads/2026/01/Lifestyle-2308c84aea.jpg",
+      "sources": [
+        {
+          "file": "packages/db/migrations/003_seed_repaired_data.sql",
+          "line": 15197,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Lifestyle-2308c84aea.jpg"
+        },
+        {
+          "file": "packages/db/migrations/003_seed_repaired_data.sql",
+          "line": 15197,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Lifestyle-2308c84aea.jpg"
+        },
+        {
+          "file": "packages/db/migrations/seed_chunks/044_track_playback_sources.sql",
+          "line": 756,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Lifestyle-2308c84aea.jpg"
+        },
+        {
+          "file": "packages/db/migrations/seed_chunks/044_track_playback_sources.sql",
+          "line": 756,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Lifestyle-2308c84aea.jpg"
+        },
+        {
+          "file": "packages/db/migrations/seed_chunks/052_track_playback_sources.sql",
+          "line": 374,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Lifestyle-2308c84aea.jpg"
+        },
+        {
+          "file": "packages/migration/reports/track-playback-sources.full.json",
+          "line": 32285,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Lifestyle-2308c84aea.jpg"
+        },
+        {
+          "file": "packages/migration/reports/track-playback-sources.full.json",
+          "line": 32303,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Lifestyle-2308c84aea.jpg"
+        },
+        {
+          "file": "packages/migration/reports/track-playback-sources.full.json",
+          "line": 304511,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Lifestyle-2308c84aea.jpg"
+        },
+        {
+          "file": "reports/wordpress-deprecation-audit.md",
+          "line": 143,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Lifestyle-2308c84aea.jpg"
+        },
+        {
+          "file": "reports/wordpress-deprecation-audit.md",
+          "line": 149,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Lifestyle-2308c84aea.jpg"
+        },
+        {
+          "file": "reports/wordpress-deprecation-audit.md",
+          "line": 153,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Lifestyle-2308c84aea.jpg"
+        },
+        {
+          "file": "reports/wordpress-deprecation-audit.md",
+          "line": 164,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Lifestyle-2308c84aea.jpg"
+        },
+        {
+          "file": "reports/wordpress-deprecation-audit.md",
+          "line": 165,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Lifestyle-2308c84aea.jpg"
+        },
+        {
+          "file": "reports/wordpress-deprecation-audit.md",
+          "line": 170,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Lifestyle-2308c84aea.jpg"
+        },
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 39,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Lifestyle-2308c84aea.jpg"
+        },
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 45,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Lifestyle-2308c84aea.jpg"
+        },
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 49,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Lifestyle-2308c84aea.jpg"
+        },
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 60,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Lifestyle-2308c84aea.jpg"
+        },
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 61,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Lifestyle-2308c84aea.jpg"
+        },
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 66,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Lifestyle-2308c84aea.jpg"
+        },
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 71,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Lifestyle-2308c84aea.jpg"
+        },
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 75,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Lifestyle-2308c84aea.jpg"
+        },
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 79,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Lifestyle-2308c84aea.jpg"
+        },
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 85,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Lifestyle-2308c84aea.jpg"
+        },
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 86,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Lifestyle-2308c84aea.jpg"
+        },
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 91,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Lifestyle-2308c84aea.jpg"
+        }
+      ]
+    },
+    {
+      "path": "/wp-content/uploads/2026/01/Mbwe-Mbwe-34b4b21972.jpg",
+      "sources": [
+        {
+          "file": "packages/db/migrations/003_seed_repaired_data.sql",
+          "line": 15198,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Mbwe-Mbwe-34b4b21972.jpg"
+        },
+        {
+          "file": "packages/db/migrations/003_seed_repaired_data.sql",
+          "line": 15198,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Mbwe-Mbwe-34b4b21972.jpg"
+        },
+        {
+          "file": "packages/db/migrations/seed_chunks/044_track_playback_sources.sql",
+          "line": 757,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Mbwe-Mbwe-34b4b21972.jpg"
+        },
+        {
+          "file": "packages/db/migrations/seed_chunks/044_track_playback_sources.sql",
+          "line": 757,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Mbwe-Mbwe-34b4b21972.jpg"
+        },
+        {
+          "file": "packages/db/migrations/seed_chunks/052_track_playback_sources.sql",
+          "line": 375,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Mbwe-Mbwe-34b4b21972.jpg"
+        },
+        {
+          "file": "packages/migration/reports/track-playback-sources.full.json",
+          "line": 32329,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Mbwe-Mbwe-34b4b21972.jpg"
+        },
+        {
+          "file": "packages/migration/reports/track-playback-sources.full.json",
+          "line": 32347,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Mbwe-Mbwe-34b4b21972.jpg"
+        },
+        {
+          "file": "packages/migration/reports/track-playback-sources.full.json",
+          "line": 304520,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Mbwe-Mbwe-34b4b21972.jpg"
+        },
+        {
+          "file": "reports/wordpress-deprecation-audit.md",
+          "line": 144,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Mbwe-Mbwe-34b4b21972.jpg"
+        },
+        {
+          "file": "reports/wordpress-deprecation-audit.md",
+          "line": 150,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Mbwe-Mbwe-34b4b21972.jpg"
+        },
+        {
+          "file": "reports/wordpress-deprecation-audit.md",
+          "line": 154,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Mbwe-Mbwe-34b4b21972.jpg"
+        },
+        {
+          "file": "reports/wordpress-deprecation-audit.md",
+          "line": 166,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Mbwe-Mbwe-34b4b21972.jpg"
+        },
+        {
+          "file": "reports/wordpress-deprecation-audit.md",
+          "line": 167,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Mbwe-Mbwe-34b4b21972.jpg"
+        },
+        {
+          "file": "reports/wordpress-deprecation-audit.md",
+          "line": 171,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Mbwe-Mbwe-34b4b21972.jpg"
+        },
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 40,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Mbwe-Mbwe-34b4b21972.jpg"
+        },
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 46,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Mbwe-Mbwe-34b4b21972.jpg"
+        },
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 50,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Mbwe-Mbwe-34b4b21972.jpg"
+        },
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 62,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Mbwe-Mbwe-34b4b21972.jpg"
+        },
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 63,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Mbwe-Mbwe-34b4b21972.jpg"
+        },
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 67,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Mbwe-Mbwe-34b4b21972.jpg"
+        },
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 72,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Mbwe-Mbwe-34b4b21972.jpg"
+        },
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 76,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Mbwe-Mbwe-34b4b21972.jpg"
+        },
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 80,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Mbwe-Mbwe-34b4b21972.jpg"
+        },
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 87,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Mbwe-Mbwe-34b4b21972.jpg"
+        },
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 88,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Mbwe-Mbwe-34b4b21972.jpg"
+        },
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 92,
+          "raw": "https://wakilisha.africa/wp-content/uploads/2026/01/Mbwe-Mbwe-34b4b21972.jpg"
+        }
+      ]
+    },
+    {
+      "path": "/wp-content/uploads/YYYY/MM/file.ext",
+      "sources": [
+        {
+          "file": "docs/lightsail-media-mirror-plan.md",
+          "line": 30,
+          "raw": "/wp-content/uploads/YYYY/MM/file.ext"
+        }
+      ]
+    },
+    {
+      "path": "/wp-content/uploads/YYYY/MM/filename.jpg",
+      "sources": [
+        {
+          "file": "reports/wordpress-media-dependency-audit.md",
+          "line": 182,
+          "raw": "https://wakilisha.africa/wp-content/uploads/YYYY/MM/filename.jpg"
+        },
+        {
+          "file": "src/services/wpImageRewrite.ts",
+          "line": 11,
+          "raw": "https://wakilisha.africa/wp-content/uploads/YYYY/MM/filename.jpg"
+        }
+      ]
+    }
+  ]
+}
