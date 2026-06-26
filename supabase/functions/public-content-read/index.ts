@@ -806,9 +806,10 @@ Deno.serve(async (req) => {
           .select(RELEASE_ENTITY_SELECT)
           .eq("slug", releaseSlug)
           .in("status", ["active", "draft"])
-          .maybeSingle();
+          .order("release_date", { ascending: false })
+          .limit(1);
 
-        release = byReleaseSlug;
+        release = byReleaseSlug && byReleaseSlug.length > 0 ? byReleaseSlug[0] : null;
       }
 
       if (!release) return jsonResponse({ data: null }, origin, 404);
@@ -899,9 +900,10 @@ Deno.serve(async (req) => {
             .from("registry_tracks")
             .select(MUSIC_ENTITY_SELECT)
             .eq("slug", trackSlug)
-            .maybeSingle();
+            .order("updated_at", { ascending: false })
+            .limit(1);
 
-          track = bySlug;
+          track = bySlug && bySlug.length > 0 ? bySlug[0] : null;
         }
       }
 
