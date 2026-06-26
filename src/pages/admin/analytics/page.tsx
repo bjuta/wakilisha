@@ -27,6 +27,7 @@ import {
   fetchAttributionSummary,
   fetchConversionFunnel,
   fetchExportEvents,
+  fetchRealtimeAnalytics,
 } from "@/services/adminAnalytics";
 import type {
   AnalyticsKpis,
@@ -41,6 +42,7 @@ import type {
   VideoStat,
   FunnelStep,
   AttributionSummary,
+  RealtimeAnalyticsSnapshot,
   DateRange,
 } from "@/services/adminAnalytics";
 import {
@@ -188,7 +190,7 @@ function getPreviousPeriod(primary: DateRangeValue): DateRangeValue {
 export default function AdminAnalyticsPage() {
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState<DateRangeValue>({ mode: "preset", days: 30 });
-  const [tab, setTab] = useState<"overview" | "search" | "engagement" | "attribution" | "shares" | "funnel">("overview");
+  const [tab, setTab] = useState<"realtime" | "overview" | "search" | "engagement" | "attribution" | "shares" | "funnel">("realtime");
 
   // ── Compare periods ─────────────────────────────────────────
   const [compareEnabled, setCompareEnabled] = useState(false);
@@ -213,6 +215,11 @@ export default function AdminAnalyticsPage() {
   const [attribution, setAttribution] = useState<AttributionSummary | null>(null);
   const [funnel, setFunnel] = useState<FunnelStep[]>([]);
   const [exporting, setExporting] = useState(false);
+
+  // Realtime analytics data
+  const [realtime, setRealtime] = useState<RealtimeAnalyticsSnapshot | null>(null);
+  const [realtimeLoading, setRealtimeLoading] = useState(false);
+  const [realtimeError, setRealtimeError] = useState<string | null>(null);
 
   // Share analytics data
   const [shareDailyData, setShareDailyData] = useState<Array<{ date: string; total: number; [platform: string]: number | string }>>([]);
@@ -279,6 +286,24 @@ export default function AdminAnalyticsPage() {
   }, []);
 
   useEffect(() => { loadData(dateRange); }, [dateRange, loadData]);
+
+  const loadRealtime = useCallback(async () => {
+    setRealtimeLoading(true);
+    setRealtimeError(null);
+    try {
+      setRealtime(await fetchRealtimeAnalytics());
+    } catch (error) {
+      setRealtimeError(error instanceof Error ? error.message : "Realtime analytics failed.");
+    } finally {
+      setRealtimeLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadRealtime();
+    const timer = window.setInterval(loadRealtime, 15000);
+    return () => window.clearInterval(timer);
+  }, [loadRealtime]);
 
   // Load comparison data when compare is toggled on or secondary range changes
   useEffect(() => {
@@ -405,6 +430,7 @@ export default function AdminAnalyticsPage() {
   if (loading) return <AdminChartsLoadingState message="Loading analytics..." />;
 
   const tabButtons = [
+    { key: "realtime" as const, label: "Realtime", icon: "Activity" },
     { key: "overview" as const, label: "Overview", icon: "LayoutDashboard" },
     { key: "search" as const, label: "Search", icon: "Search" },
     { key: "engagement" as const, label: "Engagement", icon: "Heart" },
@@ -540,6 +566,15 @@ export default function AdminAnalyticsPage() {
       </div>
 
       {/* Tab content */}
+      {tab === "realtime" && (
+        <RealtimeTab
+          data={realtime}
+          loading={realtimeLoading}
+          error={realtimeError}
+          onRefresh={loadRealtime}
+        />
+      )}
+
       {tab === "overview" && (
         <OverviewTab
           timeline={timeline}
@@ -600,6 +635,165 @@ export default function AdminAnalyticsPage() {
     </div>
   );
 }
+
+
+// ═══════════════════════════════════════════════════════════════════
+// Realtime Tab
+// ═══════════════════════════════════════════════════════════════════
+
+function RealtimeTab({
+  data,
+  loading,
+  error,
+  onRefresh,
+}: {
+  data: RealtimeAnalyticsSnapshot | null;
+  loading: boolean;
+  error: string | null;
+  onRefresh: () => void;
+}) {
+  const lastUpdated = data?.generatedAt
+    ? new Date(data.generatedAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+    : "—";
+
+  return (
+    <div className="space-y-5">
+      <WkSurface className="p-5">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[var(--wk-brand)]/10 text-[var(--wk-brand)]">
+            <WkIcon name="Activity" size={18} />
+          </div>
+          <div>
+            <h2 className="text-[15px] font-black text-[var(--wk-text)]">Realtime Traffic</h2>
+            <p className="text-[12px] text-[var(--wk-text-muted)]">
+              Auto-refreshes every 15 seconds. Last updated: {lastUpdated}
+            </p>
+          </div>
+          <button
+            onClick={onRefresh}
+            disabled={loading}
+            className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-[var(--wk-border)] px-3 py-1.5 text-[11px] font-bold text-[var(--wk-text-muted)] hover:text-[var(--wk-text)] disabled:opacity-50"
+          >
+            <WkIcon name={loading ? "Loader2" : "RefreshCw"} size={13} className={loading ? "animate-spin" : ""} />
+            Refresh
+          </button>
+        </div>
+
+        {error && (
+          <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[12px] font-semibold text-red-700">
+            {error}
+          </div>
+        )}
+      </WkSurface>
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <AdminChartsKpiCard value={(data?.activeSessions ?? 0).toLocaleString()} label="Active Sessions — 5m" icon="Users" accent="brand" />
+        <AdminChartsKpiCard value={(data?.pageViews5m ?? 0).toLocaleString()} label="Page Views — 5m" icon="Eye" accent="success" />
+        <AdminChartsKpiCard value={(data?.pageViews30m ?? 0).toLocaleString()} label="Page Views — 30m" icon="BarChart3" accent="warning" />
+        <AdminChartsKpiCard value={(data?.events30m ?? 0).toLocaleString()} label="Events — 30m" icon="Activity" accent="muted" />
+      </div>
+
+      <WkSurface className="p-5">
+        <div className="mb-4 flex items-center gap-2">
+          <WkIcon name="TrendingUp" size={16} className="text-[var(--wk-brand)]" />
+          <h2 className="text-[14px] font-bold text-[var(--wk-text)]">Page Views Per Minute</h2>
+        </div>
+        {!data || data.minuteSeries.length === 0 ? (
+          <EmptyChart message="No realtime page views yet." />
+        ) : (
+          <div className="h-[260px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={data.minuteSeries}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--wk-border)" strokeOpacity={0.4} />
+                <XAxis
+                  dataKey="minute"
+                  tick={{ fontSize: 10, fill: "var(--wk-text-muted)" }}
+                  tickFormatter={(value) => new Date(value).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
+                />
+                <YAxis tick={{ fontSize: 10, fill: "var(--wk-text-muted)" }} allowDecimals={false} />
+                <Tooltip
+                  contentStyle={{
+                    borderRadius: 10,
+                    border: "1px solid var(--wk-border)",
+                    background: "var(--wk-surface)",
+                    fontSize: 11,
+                  }}
+                  labelFormatter={(value) => new Date(String(value)).toLocaleTimeString()}
+                />
+                <Line type="monotone" dataKey="pageViews" stroke="var(--wk-brand)" strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </WkSurface>
+
+      <div className="grid gap-5 lg:grid-cols-2">
+        <WkSurface className="p-5">
+          <div className="mb-4 flex items-center gap-2">
+            <WkIcon name="FileText" size={16} className="text-[var(--wk-text-muted)]" />
+            <h2 className="text-[14px] font-bold text-[var(--wk-text)]">Live Top Pages</h2>
+          </div>
+          {!data || data.topLivePages.length === 0 ? (
+            <EmptyChart message="No live page views in the last 30 minutes." compact />
+          ) : (
+            <DataList
+              items={data.topLivePages}
+              getLabel={(p) => p.page_url}
+              getValue={(p) => p.views}
+              getMeta={(p) => formatPageType(p.page_type)}
+              maxValue={data.topLivePages[0]?.views ?? 1}
+            />
+          )}
+        </WkSurface>
+
+        <WkSurface className="p-5">
+          <div className="mb-4 flex items-center gap-2">
+            <WkIcon name="Globe" size={16} className="text-[var(--wk-text-muted)]" />
+            <h2 className="text-[14px] font-bold text-[var(--wk-text)]">Live Referrers</h2>
+          </div>
+          {!data || data.topReferrers.length === 0 ? (
+            <EmptyChart message="No live referrer data yet." compact />
+          ) : (
+            <DataList
+              items={data.topReferrers}
+              getLabel={(r) => r.referrer}
+              getValue={(r) => r.count}
+              getMeta={() => "referrer"}
+              maxValue={data.topReferrers[0]?.count ?? 1}
+            />
+          )}
+        </WkSurface>
+      </div>
+
+      <WkSurface className="p-5">
+        <div className="mb-4 flex items-center gap-2">
+          <WkIcon name="List" size={16} className="text-[var(--wk-brand)]" />
+          <h2 className="text-[14px] font-bold text-[var(--wk-text)]">Live Event Stream</h2>
+        </div>
+        {!data || data.eventStream.length === 0 ? (
+          <EmptyChart message="No events in the last 30 minutes." compact />
+        ) : (
+          <div className="divide-y divide-[var(--wk-border)]">
+            {data.eventStream.slice(0, 20).map((event) => (
+              <div key={event.id} className="flex items-center gap-3 py-2 text-[12px]">
+                <span className="w-24 shrink-0 font-mono text-[10px] text-[var(--wk-text-faint)]">
+                  {new Date(event.created_at).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                </span>
+                <span className="rounded-full bg-[var(--wk-brand)]/10 px-2 py-0.5 text-[10px] font-bold text-[var(--wk-brand)]">
+                  {event.event_name.replace(/_/g, " ")}
+                </span>
+                <span className="min-w-0 truncate text-[var(--wk-text-muted)]">
+                  {event.page_url || event.entity_slug || "Unknown page"}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </WkSurface>
+    </div>
+  );
+}
+
 
 // ═══════════════════════════════════════════════════════════════════
 // Overview Tab
