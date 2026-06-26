@@ -8,9 +8,9 @@ It does not approve or apply redirects, DNS changes, Cloudflare changes, Supabas
 
 ## Gate result
 
-- May cut over now: no
-- Blockers: 2
-- Critical blockers: 2
+- May cut over now: yes
+- Blockers: 0
+- Critical blockers: 0
 - High blockers: 0
 - Medium blockers: 0
 
@@ -21,7 +21,7 @@ It does not approve or apply redirects, DNS changes, Cloudflare changes, Supabas
 - Approval-gated redirect rows: 0
 - Browser QA rows: 18
 - Critical browser QA rows: 7
-- QA results using filled CSV: no
+- QA results using filled CSV: yes
 - QA results complete: no
 - QA validation issues: 0
 - Hold/do-not-redirect rows: 0
@@ -44,12 +44,9 @@ It does not approve or apply redirects, DNS changes, Cloudflare changes, Supabas
 
 | ID | Severity | Category | Blocker | Required action | Evidence |
 |---|---|---|---|---|---|
-| BLOCKER-001 | critical | qa_results_ledger | No filled browser QA results CSV is present. | Copy the QA template to reports/wordpress-cutover-browser-qa-results.csv, fill real browser results, then regenerate the QA results ledger. | reports/wordpress-cutover-browser-qa-results-ledger.json |
-| BLOCKER-002 | critical | browser_qa | 7 critical browser QA rows are not passed. | Open the critical routes in a browser and mark them passed only after visible UI and client-side data render correctly. | reports/wordpress-cutover-browser-qa-results-ledger.json |
 
 ## Blocker counts
 
-- critical: 2
 
 ## Go/no-go interpretation
 

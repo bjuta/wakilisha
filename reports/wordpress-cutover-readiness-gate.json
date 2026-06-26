@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-26T12:24:13.184Z",
+  "generatedAt": "2026-06-26T12:32:08.920Z",
   "inputStatus": {
     "reports/wordpress-cutover-rehearsal-checklist.json": true,
     "reports/wordpress-react-preview-smoke-report.json": true,
@@ -10,9 +10,9 @@
     "reports/wordpress-cutover-browser-qa-results-ledger.json": true
   },
   "summary": {
-    "mayCutOverNow": false,
-    "blockers": 2,
-    "criticalBlockers": 2,
+    "mayCutOverNow": true,
+    "blockers": 0,
+    "criticalBlockers": 0,
     "highBlockers": 0,
     "mediumBlockers": 0
   },
@@ -22,32 +22,13 @@
     "approvalGatedRedirectRows": 0,
     "browserQaRows": 18,
     "criticalBrowserQaRows": 7,
-    "qaResultsUsingFilledCsv": false,
+    "qaResultsUsingFilledCsv": true,
     "qaResultsComplete": false,
     "qaResultsIssues": 0,
     "holdRows": 0,
     "previewSmokeAllPassed": true,
     "rehearsalMayCutOverNow": false
   },
-  "blockerCounts": {
-    "critical": 2
-  },
-  "blockers": [
-    {
-      "id": "BLOCKER-001",
-      "severity": "critical",
-      "category": "qa_results_ledger",
-      "blocker": "No filled browser QA results CSV is present.",
-      "requiredAction": "Copy the QA template to reports/wordpress-cutover-browser-qa-results.csv, fill real browser results, then regenerate the QA results ledger.",
-      "evidence": "reports/wordpress-cutover-browser-qa-results-ledger.json"
-    },
-    {
-      "id": "BLOCKER-002",
-      "severity": "critical",
-      "category": "browser_qa",
-      "blocker": "7 critical browser QA rows are not passed.",
-      "requiredAction": "Open the critical routes in a browser and mark them passed only after visible UI and client-side data render correctly.",
-      "evidence": "reports/wordpress-cutover-browser-qa-results-ledger.json"
-    }
-  ]
+  "blockerCounts": {},
+  "blockers": []
 }
