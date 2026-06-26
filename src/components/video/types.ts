@@ -29,9 +29,9 @@ export function detectPlatform(url: string): string {
   return "Video";
 }
 
-export function getThumbnail(url: string): string | null {
-  const ytId = getYouTubeId(url);
-  if (ytId) return `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
+export function getThumbnail(_url: string): string | null {
+  // Avoid noisy 404s from old/private/deleted YouTube thumbnails.
+  // VideoCard already renders a branded platform fallback when no thumbnail is present.
   return null;
 }
 
