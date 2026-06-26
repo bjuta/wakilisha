@@ -1,54 +1,27 @@
 /**
  * WP Image URL Rewriter
  *
- * Maps old WordPress image URLs (from wakilisha.africa/wp-content/uploads)
- * to their corresponding Supabase Storage URLs in the article-media bucket.
- *
- * The edge function `backfill-article-hero-storage` stores files at:
- *   article-media/wp-import/YYYY/MM/filename.jpg
- *
- * Old URLs look like:
+ * Maps old WordPress image URLs from:
  *   https://wakilisha.africa/wp-content/uploads/YYYY/MM/filename.jpg
+ *
+ * to the clean Lightsail media origin:
+ *   https://media.wakilisha.africa/uploads/YYYY/MM/filename.jpg
+ *
+ * The old /wp-content/uploads/ path remains available as a compatibility layer,
+ * but new runtime rewrites should prefer the clean /uploads/ media path.
  */
-
-const SUPABASE_URL = import.meta.env.VITE_PUBLIC_SUPABASE_URL;
 
 const WP_UPLOADS_BASE = 'https://wakilisha.africa/wp-content/uploads/';
-const STORAGE_BASE = `${SUPABASE_URL}/storage/v1/object/public/article-media/wp-import`;
+const CLEAN_MEDIA_UPLOADS_BASE = 'https://media.wakilisha.africa/uploads/';
 
 /**
- * Sanitize a filename to ASCII-only for Supabase Storage compatibility.
- * Must match the edge function's sanitizeFilename exactly.
- */
-function sanitizeFilename(name: string): string {
-  return name
-    .replace(/\u2013/g, '-')   // en-dash → hyphen
-    .replace(/\u2014/g, '-')   // em-dash → hyphen
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, ''); // strip combining diacritics (ï → i, é → e, etc.)
-}
-
-/**
- * Rewrite a single WordPress uploads URL to its Supabase Storage equivalent.
- * Sanitizes the filename portion to match the storage path.
+ * Rewrite a single WordPress uploads URL to the clean Lightsail media origin.
  */
 export function rewriteWpImageUrl(url: string): string {
   if (!url || typeof url !== 'string') return url;
-  if (!url.includes('wakilisha.africa/wp-content/uploads/')) return url;
+  if (!url.includes(WP_UPLOADS_BASE)) return url;
 
-  const path = url.replace(WP_UPLOADS_BASE, '');
-  const rawPath = path.split('?')[0].split('#')[0];
-  const decoded = decodeURIComponent(rawPath);
-
-  // Split into directory parts and filename, sanitize only the filename
-  const parts = decoded.split('/');
-  if (parts.length >= 2) {
-    const filename = parts.pop() || '';
-    const sanitized = sanitizeFilename(filename);
-    return `${STORAGE_BASE}/${parts.join('/')}/${sanitized}`;
-  }
-
-  return `${STORAGE_BASE}/${sanitizeFilename(decoded)}`;
+  return url.replace(WP_UPLOADS_BASE, CLEAN_MEDIA_UPLOADS_BASE);
 }
 
 /**
@@ -58,20 +31,8 @@ export function rewriteWpImageUrls(html: string): string {
   if (!html || typeof html !== 'string') return html;
 
   return html.replace(
-    /https:\/\/wakilisha\.africa\/wp-content\/uploads\/([^"'\s\)]+)/g,
-    (match, path) => {
-      const rawPath = String(path).split('?')[0].split('#')[0];
-      const decoded = decodeURIComponent(rawPath);
-
-      const parts = decoded.split('/');
-      if (parts.length >= 2) {
-        const filename = parts.pop() || '';
-        const sanitized = sanitizeFilename(filename);
-        return `${STORAGE_BASE}/${parts.join('/')}/${sanitized}`;
-      }
-
-      return `${STORAGE_BASE}/${sanitizeFilename(decoded)}`;
-    }
+    /https:\/\/wakilisha\.africa\/wp-content\/uploads\//g,
+    CLEAN_MEDIA_UPLOADS_BASE
   );
 }
 
@@ -80,5 +41,5 @@ export function rewriteWpImageUrls(html: string): string {
  */
 export function isWpImageUrl(url: string): boolean {
   if (!url || typeof url !== 'string') return false;
-  return url.includes('wakilisha.africa/wp-content/uploads/');
+  return url.includes(WP_UPLOADS_BASE);
 }
