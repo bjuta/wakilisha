@@ -243,6 +243,15 @@ async function chooseRegistryTrackSlug(
           rta.artist_slug = $2
           or rt.metadata->>'primary_artist_slug' = $2
         )
+      order by
+        case rt.status
+          when 'active' then 1
+          when 'needs_review' then 2
+          when 'draft' then 3
+          else 4
+        end,
+        rt.updated_at desc nulls last,
+        rt.created_at desc
       limit 1
     `,
     [baseTrackSlug, artistSlug],
@@ -251,6 +260,36 @@ async function chooseRegistryTrackSlug(
   if ((scoped.rowCount ?? 0) > 0) return baseTrackSlug;
 
   const seeded = `${baseTrackSlug}-${artistSlug}`;
+
+  // Important: if the artist-scoped slug already exists for this artist,
+  // reuse it instead of creating keki-willy-paul-2, colors-njerae-2, etc.
+  const scopedSeeded = await client.query<{ id: string }>(
+    `
+      select rt.id
+      from public.registry_tracks rt
+      left join public.registry_track_artists rta
+        on rta.track_id = rt.id
+      where rt.slug = $1
+        and (
+          rta.artist_slug = $2
+          or rt.metadata->>'primary_artist_slug' = $2
+        )
+      order by
+        case rt.status
+          when 'active' then 1
+          when 'needs_review' then 2
+          when 'draft' then 3
+          else 4
+        end,
+        rt.updated_at desc nulls last,
+        rt.created_at desc
+      limit 1
+    `,
+    [seeded, artistSlug],
+  );
+
+  if ((scopedSeeded.rowCount ?? 0) > 0) return seeded;
+
   let candidate = seeded;
   let suffix = 2;
 
@@ -1194,7 +1233,7 @@ async function writeProviderMatch(
       )
       on conflict (provider_key, provider_track_id)
       do update set
-        track_id = excluded.track_id,
+        track_id = public.registry_track_provider_links.track_id,
         provider_release_id = excluded.provider_release_id,
         provider_artist_ids = excluded.provider_artist_ids,
         isrc = excluded.isrc,
