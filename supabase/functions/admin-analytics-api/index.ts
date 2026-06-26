@@ -506,6 +506,125 @@ function inferEntity(row: any): { entityType: string; entitySlug: string; pagePa
   return null;
 }
 
+function readContextString(row: any, keys: string[]): string {
+  const ctx = row?.context || {};
+  for (const key of keys) {
+    const value = readString(ctx[key]);
+    if (value) return value;
+  }
+  return "";
+}
+
+function publicUrlForEntity(entityType: string, slug: string, row?: any): string {
+  const ctx = row?.context || {};
+  const artistSlug = readString(ctx.artist_slug) || readString(ctx.artistSlug) || readString(ctx.primary_artist_slug);
+
+  if (!entityType || !slug) return "";
+
+  if (entityType === "artist") return `/artists/${slug}`;
+  if (entityType === "track") return artistSlug ? `/tracks/${artistSlug}/${slug}` : `/tracks/${slug}`;
+  if (entityType === "release") return artistSlug ? `/releases/${artistSlug}/${slug}` : `/releases/${slug}`;
+  if (entityType === "article") return `/magazine/${slug}`;
+  if (entityType === "guide") return `/guides/${slug}`;
+  if (entityType === "genre") return `/genres/${slug}`;
+  if (entityType === "label") return `/labels/${slug}`;
+  if (entityType === "category") return `/categories/${slug}`;
+  if (entityType === "tag") return `/tags/${slug}`;
+  if (entityType === "author") return `/authors/${slug}`;
+  if (entityType === "chart") return `/charts/${slug}`;
+
+  return "";
+}
+
+function bestSignalPath(row: any): string {
+  const ctx = row?.context || {};
+
+  const direct = [
+    row?.page_url,
+    ctx.page_url,
+    ctx.url,
+    ctx.href,
+    ctx.raw_page_url,
+    ctx.landing_url,
+    ctx.target_url,
+    ctx.share_url,
+    ctx.canonical_url,
+    ctx.article_url,
+    ctx.entity_url,
+    ctx.path,
+  ].map(pathFromUrl).find((path) => path && isCommercialContentPath(path));
+
+  if (direct) return direct;
+
+  const explicitType = readString(row?.entity_type) || readString(ctx.entity_type) || readString(ctx.entityType);
+  const explicitSlug = readString(row?.entity_slug) || readString(ctx.entity_slug) || readString(ctx.entitySlug);
+
+  if (explicitType && explicitSlug) {
+    const entityUrl = publicUrlForEntity(explicitType, explicitSlug, row);
+    if (entityUrl) return entityUrl;
+  }
+
+  const articleSlug = readString(ctx.article_slug) || readString(ctx.articleSlug) || readString(ctx.slug);
+  if (articleSlug) return `/magazine/${articleSlug}`;
+
+  const trackSlug = readString(ctx.track_slug) || readString(ctx.trackSlug);
+  if (trackSlug) return publicUrlForEntity("track", trackSlug, row);
+
+  const releaseSlug = readString(ctx.release_slug) || readString(ctx.releaseSlug);
+  if (releaseSlug) return publicUrlForEntity("release", releaseSlug, row);
+
+  const artistSlug = readString(ctx.artist_slug) || readString(ctx.artistSlug);
+  if (artistSlug) return `/artists/${artistSlug}`;
+
+  return "";
+}
+
+function bestSignalLabel(row: any): string {
+  const label = readContextString(row, [
+    "title",
+    "article_title",
+    "articleTitle",
+    "track_title",
+    "trackTitle",
+    "release_title",
+    "releaseTitle",
+    "artist_name",
+    "artistName",
+    "entity_title",
+    "entityTitle",
+    "label",
+    "name",
+  ]);
+
+  if (label) return label;
+
+  const path = bestSignalPath(row) || row?.page_url || row?.entity_slug;
+  return labelFromPath(path);
+}
+
+function sharePlatform(row: any): string {
+  const ctx = row?.context || {};
+  return (
+    readString(ctx.platform) ||
+    readString(ctx.share_platform) ||
+    readString(ctx.sharePlatform) ||
+    readString(ctx.channel) ||
+    readString(ctx.target) ||
+    "unknown"
+  );
+}
+
+function prettySignalLabel(value: unknown): string {
+  const raw = readString(value);
+  if (!raw) return "Unknown";
+
+  return raw
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
 function adminUrlForEntity(entityType: string, slug: string): string {
   if (!entityType || !slug) return "/admin/analytics";
   if (entityType === "artist") return `/admin/registry/artists/${slug}`;
@@ -656,18 +775,24 @@ function buildSignalBoard(events: any[], range: RangeInput) {
 
   const shareMap = new Map<string, any>();
   for (const row of shareEvents) {
-    const ctx = row.context || {};
-    const platform = readString(ctx.platform) || readString(ctx.share_platform) || "unknown";
-    const pagePath = pathFromUrl(row.page_url);
-    const key = `${platform}::${pagePath || row.entity_slug || "unknown"}`;
+    const platform = sharePlatform(row);
+    const pagePath = bestSignalPath(row);
+    const inferred = inferEntity(row);
+    const label = bestSignalLabel(row);
+
+    if (!pagePath && !inferred && label === "Unknown") continue;
+
+    const targetKey = pagePath || (inferred ? `${inferred.entityType}:${inferred.entitySlug}` : label);
+    const key = `${platform}::${targetKey}`;
     const existing = shareMap.get(key) || {
       id: key,
-      label: labelFromPath(pagePath || row.entity_slug || "Unknown"),
+      label,
       platform,
       pagePath,
       shares: 0,
       sessions: new Set<string>(),
     };
+
     existing.shares += 1;
     if (row.session_id) existing.sessions.add(row.session_id);
     shareMap.set(key, existing);
@@ -680,7 +805,7 @@ function buildSignalBoard(events: any[], range: RangeInput) {
       platform: row.platform,
       shares: row.shares,
       score: scoreCap(row.shares * 20 + row.sessions.size * 8),
-      evidence: [`${row.shares} shares`, `${row.sessions.size} sessions`, `${row.platform} is moving it`],
+      evidence: [`${row.shares} shares`, `${row.sessions.size} sessions`, `${prettySignalLabel(row.platform)} is moving it`],
       recommendedAction: "Create a tracked campaign link for the strongest channel and push this entity again.",
       targetUrl: row.pagePath,
       adminUrl: "/admin/analytics",
