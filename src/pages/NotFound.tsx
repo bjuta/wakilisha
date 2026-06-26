@@ -132,7 +132,7 @@ export default function NotFound() {
           style={{ color: "var(--wk-text-faint)" }}
         >
           If you believe this is a mistake,{" "}
-          <a href="mailto:hello@wakilisha.com" className="underline underline-offset-2 hover:text-[var(--wk-text-muted)] transition-colors">
+          <a href="mailto:hello@wakilisha.africa" className="underline underline-offset-2 hover:text-[var(--wk-text-muted)] transition-colors">
             let us know
           </a>
           .

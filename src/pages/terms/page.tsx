@@ -178,7 +178,7 @@ export default function TermsPage() {
           <section className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-6 lg:p-8">
             <h2 className="text-[16px] font-black tracking-[-0.02em] text-[var(--wk-text)] mb-2">Questions about these terms?</h2>
             <p className="text-[14px] leading-relaxed text-[var(--wk-text-muted)] mb-4">
-              Contact us at <a href="mailto:hello@wakilisha.com" className="underline underline-offset-2 text-[var(--wk-text-soft)] hover:text-[var(--wk-text)] transition-colors">hello@wakilisha.com</a> or visit our <a href="/contact" className="underline underline-offset-2 text-[var(--wk-text-soft)] hover:text-[var(--wk-text)] transition-colors">Contact page</a>.
+              Contact us at <a href="mailto:hello@wakilisha.africa" className="underline underline-offset-2 text-[var(--wk-text-soft)] hover:text-[var(--wk-text)] transition-colors">hello@wakilisha.africa</a> or visit our <a href="/contact" className="underline underline-offset-2 text-[var(--wk-text-soft)] hover:text-[var(--wk-text)] transition-colors">Contact page</a>.
             </p>
           </section>
         </div>

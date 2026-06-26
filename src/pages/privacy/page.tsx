@@ -77,7 +77,7 @@ export default function PrivacyPage() {
               WAKILISHA is built on the principle that discovery infrastructure should respect the people who use it. We collect as little data as possible, we're transparent about what we do collect, and we never sell personal information.
             </p>
             <p className="text-[14px] leading-relaxed text-[var(--wk-text-muted)]">
-              This policy explains what information we gather, how we use it, and the choices you have. If you have questions after reading this, contact us at hello@wakilisha.com.
+              This policy explains what information we gather, how we use it, and the choices you have. If you have questions after reading this, contact us at hello@wakilisha.africa.
             </p>
           </section>
 
@@ -137,7 +137,7 @@ export default function PrivacyPage() {
               Our artist registry contains only publicly available information — names, aliases, genre associations, discographies, and chart histories sourced from streaming platforms, public databases, and editorial research. We do not collect or store private artist data such as contact details, financial information, or unreleased material.
             </p>
             <p className="text-[14px] leading-relaxed text-[var(--wk-text-muted)]">
-              Artists can request corrections or removal of their information by contacting us at hello@wakilisha.com.
+              Artists can request corrections or removal of their information by contacting us at hello@wakilisha.africa.
             </p>
           </section>
 
@@ -169,7 +169,7 @@ export default function PrivacyPage() {
           <section className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-6 lg:p-8">
             <h2 className="text-[16px] font-black tracking-[-0.02em] text-[var(--wk-text)] mb-2">Questions about your privacy?</h2>
             <p className="text-[14px] leading-relaxed text-[var(--wk-text-muted)] mb-4">
-              Contact us at <a href="mailto:hello@wakilisha.com" className="underline underline-offset-2 text-[var(--wk-text-soft)] hover:text-[var(--wk-text)] transition-colors">hello@wakilisha.com</a> — we take privacy seriously and respond to every inquiry.
+              Contact us at <a href="mailto:hello@wakilisha.africa" className="underline underline-offset-2 text-[var(--wk-text-soft)] hover:text-[var(--wk-text)] transition-colors">hello@wakilisha.africa</a> — we take privacy seriously and respond to every inquiry.
             </p>
           </section>
         </div>

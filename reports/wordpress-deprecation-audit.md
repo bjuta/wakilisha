@@ -59,7 +59,7 @@ Media storage direction: do not expand long-term media storage on Supabase Stora
 - `docs/charts-api-env.md:39` — VITE_WAKILISHA_WP_API_BASE=/wp-json/wakilisha/v1
 - `docs/charts-api-env.md:41` — # Standalone dev server pointing to local WordPress
 - `docs/charts-api-env.md:42` — VITE_WAKILISHA_WP_API_BASE=http://localhost:8080/wp-json/wakilisha/v1
-- `docs/charts-api-env.md:45` — VITE_WAKILISHA_WP_API_BASE=https://wakilisha.com/wp-json/wakilisha/v1
+- `docs/charts-api-env.md:45` — VITE_WAKILISHA_WP_API_BASE=https://wakilisha.africa/wp-json/wakilisha/v1
 - `docs/charts-api-env.md:50` — ## WordPress Nonce
 - `docs/charts-api-env.md:52` — The WordPress adapter automatically reads the REST nonce from the global window object:
 - `docs/charts-api-env.md:58` — This must be injected by the WordPress plugin that embeds the React app. Example in PHP:
@@ -69,7 +69,7 @@ Media storage direction: do not expand long-term media storage on Supabase Stora
 - `docs/charts-api-env.md:81` — VITE_WAKILISHA_WP_API_BASE=http://localhost:8080/wp-json/wakilisha/v1
 - `docs/charts-api-env.md:86` — VITE_CHARTS_INGESTION_MODE=wordpress
 - `docs/charts-api-env.md:87` — VITE_CHARTS_PUBLIC_MODE=wordpress
-- `docs/charts-api-env.md:88` — VITE_WAKILISHA_WP_API_BASE=https://staging.wakilisha.com/wp-json/wakilisha/v1
+- `docs/charts-api-env.md:88` — VITE_WAKILISHA_WP_API_BASE=https://staging.wakilisha.africa/wp-json/wakilisha/v1
 - `docs/charts-api-env.md:93` — VITE_CHARTS_INGESTION_MODE=wordpress
 - `docs/charts-api-env.md:94` — VITE_CHARTS_PUBLIC_MODE=wordpress
 - `docs/charts-api-env.md:95` — VITE_WAKILISHA_WP_API_BASE=/wp-json/wakilisha/v1

@@ -42,7 +42,7 @@ VITE_WAKILISHA_WP_API_BASE=/wp-json/wakilisha/v1
 VITE_WAKILISHA_WP_API_BASE=http://localhost:8080/wp-json/wakilisha/v1
 
 # Production
-VITE_WAKILISHA_WP_API_BASE=https://wakilisha.com/wp-json/wakilisha/v1
+VITE_WAKILISHA_WP_API_BASE=https://wakilisha.africa/wp-json/wakilisha/v1
 ```
 
 ---
@@ -85,7 +85,7 @@ VITE_WAKILISHA_WP_API_BASE=http://localhost:8080/wp-json/wakilisha/v1
 ```env
 VITE_CHARTS_INGESTION_MODE=wordpress
 VITE_CHARTS_PUBLIC_MODE=wordpress
-VITE_WAKILISHA_WP_API_BASE=https://staging.wakilisha.com/wp-json/wakilisha/v1
+VITE_WAKILISHA_WP_API_BASE=https://staging.wakilisha.africa/wp-json/wakilisha/v1
 ```
 
 ### Production

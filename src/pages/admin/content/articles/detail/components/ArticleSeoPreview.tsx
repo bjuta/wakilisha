@@ -28,7 +28,7 @@ export function ArticleSeoPreview({ title, excerpt, slug, seo, author, published
 
   const pageTitle = seo.title || title || "Untitled";
   const pageDesc = seo.description || excerpt || "No description set.";
-  const pageUrl = `https://wakilisha.com/magazine/${slug}`;
+  const pageUrl = `https://wakilisha.africa/magazine/${slug}`;
   const displayDate = publishedAt ? new Date(publishedAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" }) : "";
 
   const tabs = [
