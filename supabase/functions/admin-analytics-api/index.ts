@@ -986,6 +986,415 @@ function buildSignalBoard(events: any[], range: RangeInput) {
   };
 }
 
+function dateRangeForRollups(range: RangeInput = 30): { startDate: string; endDate: string } {
+  if (typeof range !== "number") {
+    return { startDate: range.start, endDate: range.end };
+  }
+
+  const end = new Date();
+  const start = new Date(Date.now() - Math.max(1, range) * 86400000);
+
+  return {
+    startDate: start.toISOString().slice(0, 10),
+    endDate: end.toISOString().slice(0, 10),
+  };
+}
+
+function evidenceFromRollup(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((item: any) => {
+      const label = readString(item?.label);
+      const rawValue = item?.value;
+      const numberValue = typeof rawValue === "number" ? rawValue : Number(rawValue || 0);
+      if (!label || !Number.isFinite(numberValue) || numberValue <= 0) return "";
+      return `${numberValue} ${label.toLowerCase()}`;
+    })
+    .filter(Boolean);
+}
+
+function rollupLabel(row: any): string {
+  return (
+    readString(row.entity_title) ||
+    labelFromPath(row.page_path || row.entity_slug || row.query || "Unknown")
+  );
+}
+
+function platformFromRollupContext(row: any): string {
+  const ctx = row?.sample_context || {};
+  return (
+    readString(ctx.platform) ||
+    readString(ctx.share_platform) ||
+    readString(ctx.sharePlatform) ||
+    readString(ctx.channel) ||
+    readString(ctx.target) ||
+    "share"
+  );
+}
+
+function rollupNumber(row: any, key: string): number {
+  const value = Number(row?.[key] || 0);
+  return Number.isFinite(value) ? value : 0;
+}
+
+function mergeRollupEvidence(a: unknown, b: unknown): unknown[] {
+  const left = Array.isArray(a) ? a : [];
+  const right = Array.isArray(b) ? b : [];
+  return [...left, ...right].slice(0, 12);
+}
+
+function rollupNodeLabel(entityType: unknown, entitySlug: unknown, entityTitle: unknown, pagePath: unknown): string {
+  const title = readString(entityTitle);
+  if (title) return title;
+
+  const type = prettySignalLabel(entityType);
+  const label = labelFromPath(pagePath || entitySlug || "Unknown");
+
+  if (!type || type === "Unknown" || type === "Page") return label;
+  return `${type}: ${label}`;
+}
+
+function dedupeScoreRows(rows: any[]): any[] {
+  const map = new Map<string, any>();
+
+  for (const row of rows) {
+    const key = `${row.entity_type || "entity"}::${row.entity_slug || row.page_path || ""}`;
+    if (!key || key.endsWith("::")) continue;
+
+    const existing = map.get(key) || { ...row };
+    if (!map.has(key)) {
+      map.set(key, existing);
+      continue;
+    }
+
+    existing.entity_title = existing.entity_title || row.entity_title;
+    existing.page_path = existing.page_path || row.page_path;
+    existing.page_views += rollupNumber(row, "page_views");
+    existing.unique_sessions += rollupNumber(row, "unique_sessions");
+    existing.share_events += rollupNumber(row, "share_events");
+    existing.search_mentions += rollupNumber(row, "search_mentions");
+    existing.newsletter_events += rollupNumber(row, "newsletter_events");
+    existing.playback_events += rollupNumber(row, "playback_events");
+    existing.referrer_domains += rollupNumber(row, "referrer_domains");
+    existing.signal_score = Math.max(rollupNumber(existing, "signal_score"), rollupNumber(row, "signal_score"));
+    existing.evidence = mergeRollupEvidence(existing.evidence, row.evidence);
+    existing.explanation = existing.explanation || row.explanation;
+    existing.recommended_action = existing.recommended_action || row.recommended_action;
+  }
+
+  return Array.from(map.values()).sort((a, b) => rollupNumber(b, "signal_score") - rollupNumber(a, "signal_score"));
+}
+
+function dedupeOpportunityRows(rows: any[]): any[] {
+  const map = new Map<string, any>();
+
+  for (const row of rows) {
+    const key = [
+      row.opportunity_type || "opportunity",
+      row.entity_type || "",
+      row.entity_slug || "",
+      row.query || "",
+      row.page_path || "",
+    ].join("::");
+
+    const existing = map.get(key);
+    if (!existing || rollupNumber(row, "opportunity_score") > rollupNumber(existing, "opportunity_score")) {
+      map.set(key, row);
+    }
+  }
+
+  return Array.from(map.values()).sort((a, b) => rollupNumber(b, "opportunity_score") - rollupNumber(a, "opportunity_score"));
+}
+
+function dedupeSearchRows(rows: any[]): any[] {
+  const map = new Map<string, any>();
+
+  for (const row of rows) {
+    const key = readString(row.query).toLowerCase();
+    if (!key) continue;
+
+    const existing = map.get(key) || { ...row, searches: 0, unique_sessions: 0, zero_result_events: 0, opportunity_score: 0 };
+    existing.searches += rollupNumber(row, "searches");
+    existing.unique_sessions += rollupNumber(row, "unique_sessions");
+    existing.zero_result_events += rollupNumber(row, "zero_result_events");
+    existing.opportunity_score = Math.max(rollupNumber(existing, "opportunity_score"), rollupNumber(row, "opportunity_score"));
+    existing.recommended_action = existing.recommended_action || row.recommended_action;
+    map.set(key, existing);
+  }
+
+  return Array.from(map.values()).sort((a, b) => rollupNumber(b, "opportunity_score") - rollupNumber(a, "opportunity_score"));
+}
+
+function dedupeJourneyRows(rows: any[]): any[] {
+  const map = new Map<string, any>();
+
+  for (const row of rows) {
+    const key = `${row.from_type}::${row.from_slug}::${row.to_type}::${row.to_slug}`;
+    const existing = map.get(key) || { ...row, sessions: 0, transitions: 0 };
+
+    existing.from_title = existing.from_title || row.from_title;
+    existing.to_title = existing.to_title || row.to_title;
+    existing.from_path = existing.from_path || row.from_path;
+    existing.to_path = existing.to_path || row.to_path;
+    existing.sessions += rollupNumber(row, "sessions");
+    existing.transitions += rollupNumber(row, "transitions");
+    map.set(key, existing);
+  }
+
+  return Array.from(map.values()).sort((a, b) => {
+    const sessionDiff = rollupNumber(b, "sessions") - rollupNumber(a, "sessions");
+    if (sessionDiff !== 0) return sessionDiff;
+    return rollupNumber(b, "transitions") - rollupNumber(a, "transitions");
+  });
+}
+
+function dedupeShareRows(rows: any[]): any[] {
+  const map = new Map<string, any>();
+
+  for (const row of rows) {
+    const key = `${row.entity_type || "entity"}::${row.entity_slug || row.page_path || ""}`;
+    if (!key || key.endsWith("::")) continue;
+
+    const existing = map.get(key) || { ...row, share_events: 0, unique_sessions: 0 };
+    existing.entity_title = existing.entity_title || row.entity_title;
+    existing.page_path = existing.page_path || row.page_path;
+    existing.share_events += rollupNumber(row, "share_events");
+    existing.unique_sessions += rollupNumber(row, "unique_sessions");
+
+    const currentPlatform = platformFromRollupContext(existing);
+    const nextPlatform = platformFromRollupContext(row);
+    if (currentPlatform === "share" && nextPlatform !== "share") existing.sample_context = row.sample_context;
+
+    map.set(key, existing);
+  }
+
+  return Array.from(map.values()).sort((a, b) => rollupNumber(b, "share_events") - rollupNumber(a, "share_events"));
+}
+
+async function buildSignalBoardFromRollups(db: ReturnType<typeof createClient>, range: RangeInput) {
+  const { startDate, endDate } = dateRangeForRollups(range);
+
+  const [scoresResult, opportunitiesResult, searchResult, journeyResult, shareResult] = await Promise.all([
+    db
+      .from("signal_os_entity_signal_scores")
+      .select("score_date,entity_type,entity_slug,entity_title,page_path,signal_score,signal_label,page_views,unique_sessions,share_events,search_mentions,newsletter_events,playback_events,referrer_domains,explanation,recommended_action,evidence")
+      .gte("score_date", startDate)
+      .lte("score_date", endDate)
+      .order("signal_score", { ascending: false })
+      .limit(200),
+
+    db
+      .from("signal_os_content_opportunities")
+      .select("id,opportunity_date,opportunity_type,entity_type,entity_slug,entity_title,query,page_path,opportunity_score,title,reason,recommended_action,evidence,status")
+      .gte("opportunity_date", startDate)
+      .lte("opportunity_date", endDate)
+      .eq("status", "open")
+      .order("opportunity_score", { ascending: false })
+      .limit(200),
+
+    db
+      .from("signal_os_search_demand_gaps")
+      .select("metric_date,query,searches,unique_sessions,zero_result_events,matched_entity_type,matched_entity_slug,opportunity_score,recommended_action,sample_context")
+      .gte("metric_date", startDate)
+      .lte("metric_date", endDate)
+      .order("opportunity_score", { ascending: false })
+      .limit(200),
+
+    db
+      .from("signal_os_journey_edges_daily")
+      .select("metric_date,from_type,from_slug,from_title,from_path,to_type,to_slug,to_title,to_path,sessions,transitions")
+      .gte("metric_date", startDate)
+      .lte("metric_date", endDate)
+      .order("sessions", { ascending: false })
+      .order("transitions", { ascending: false })
+      .limit(200),
+
+    db
+      .from("signal_os_entity_daily_metrics")
+      .select("metric_date,entity_type,entity_slug,entity_title,page_path,share_events,unique_sessions,sample_context")
+      .gte("metric_date", startDate)
+      .lte("metric_date", endDate)
+      .gt("share_events", 0)
+      .order("share_events", { ascending: false })
+      .limit(200),
+  ]);
+
+  const firstError =
+    scoresResult.error ||
+    opportunitiesResult.error ||
+    searchResult.error ||
+    journeyResult.error ||
+    shareResult.error;
+
+  if (firstError) {
+    console.warn("[analytics_signal_board] rollup fallback:", firstError.message);
+    return null;
+  }
+
+  const scoreRows = dedupeScoreRows(scoresResult.data ?? []).slice(0, 12);
+  const opportunityRows = dedupeOpportunityRows(opportunitiesResult.data ?? []).slice(0, 12);
+  const searchRows = dedupeSearchRows(searchResult.data ?? []).slice(0, 12);
+  const journeyRows = dedupeJourneyRows(journeyResult.data ?? []).slice(0, 12);
+  const shareRows = dedupeShareRows(shareResult.data ?? []).slice(0, 10);
+
+  if (
+    scoreRows.length === 0 &&
+    opportunityRows.length === 0 &&
+    searchRows.length === 0 &&
+    journeyRows.length === 0 &&
+    shareRows.length === 0
+  ) {
+    return null;
+  }
+
+  const risingEntities = scoreRows.map((row: any) => {
+    const evidence = evidenceFromRollup(row.evidence);
+    if (evidence.length === 0 && row.explanation) evidence.push(row.explanation);
+
+    return {
+      id: `${row.entity_type}::${row.entity_slug}`,
+      entityType: row.entity_type,
+      entitySlug: row.entity_slug,
+      label: rollupLabel(row),
+      score: Number(row.signal_score || 0),
+      metric: Number(row.page_views || 0),
+      metricLabel: "views",
+      evidence,
+      recommendedAction: row.recommended_action || actionForEntity(row.entity_type),
+      targetUrl: row.page_path || "",
+      adminUrl: adminUrlForEntity(row.entity_type, row.entity_slug),
+    };
+  });
+
+  const searchGaps = searchRows.map((row: any) => {
+    const zeroResults = Number(row.zero_result_events || 0) > 0;
+
+    return {
+      id: `search::${row.query}`,
+      query: row.query,
+      count: Number(row.searches || 0),
+      zeroResults,
+      score: Number(row.opportunity_score || 0),
+      evidence: [
+        `${Number(row.searches || 0)} searches`,
+        `${Number(row.unique_sessions || 0)} sessions`,
+        zeroResults ? `${Number(row.zero_result_events || 0)} zero-result events` : "existing demand",
+      ],
+      recommendedAction:
+        row.recommended_action ||
+        (zeroResults
+          ? "Fix this demand gap: ingest entity, add alias, create article, or improve search mapping."
+          : "Turn this demand into content: refresh the best page and add stronger entity links."),
+      adminUrl: zeroResults ? "/admin/registry/artist-aliases" : "/admin/content/articles/new",
+      targetUrl: `/search?q=${encodeURIComponent(row.query || "")}`,
+    };
+  });
+
+  const shareVelocity = shareRows.map((row: any) => {
+    const platform = platformFromRollupContext(row);
+    const score = scoreCap(Number(row.share_events || 0) * 20 + Number(row.unique_sessions || 0) * 8);
+
+    return {
+      id: `share::${platform}::${row.entity_type}::${row.entity_slug}`,
+      label: rollupLabel(row),
+      platform,
+      shares: Number(row.share_events || 0),
+      score,
+      evidence: [
+        `${Number(row.share_events || 0)} shares`,
+        `${Number(row.unique_sessions || 0)} sessions`,
+        platform === "share" ? "Share activity is moving it" : `${prettySignalLabel(platform)} is moving it`,
+      ],
+      recommendedAction: "Create a tracked campaign link for the strongest channel and push this entity again.",
+      targetUrl: row.page_path || "",
+      adminUrl: "/admin/analytics",
+    };
+  });
+
+  const highIntentJourneys = journeyRows.map((row: any) => {
+    const fromLabel = rollupNodeLabel(row.from_type, row.from_slug, row.from_title, row.from_path);
+    const toLabel = rollupNodeLabel(row.to_type, row.to_slug, row.to_title, row.to_path);
+    const path = `${fromLabel} → ${toLabel}`;
+
+    return {
+      id: `journey::${row.metric_date}::${row.from_type}::${row.from_slug}::${row.to_type}::${row.to_slug}`,
+      path,
+      sessions: Number(row.sessions || 0),
+      score: scoreCap(Number(row.sessions || 0) * 18 + Number(row.transitions || 0) * 6),
+      evidence: [
+        `${Number(row.sessions || 0)} sessions followed this path`,
+        `${Number(row.transitions || 0)} transitions`,
+      ],
+      recommendedAction: "Strengthen this journey with internal links, embeds, and a clearer next step.",
+      adminUrl: "/admin/analytics",
+    };
+  });
+
+  const pagesToFix = opportunityRows
+    .filter((row: any) => row.opportunity_type === "page_fix")
+    .map((row: any) => ({
+      id: row.id,
+      pageUrl: row.page_path || "",
+      pageType: row.entity_type || "page",
+      views: 0,
+      score: Number(row.opportunity_score || 0),
+      evidence: evidenceFromRollup(row.evidence),
+      recommendedAction: row.recommended_action || "Review this page because it is getting attention.",
+      targetUrl: row.page_path || "",
+      adminUrl: row.entity_type === "article" ? "/admin/content/articles" : "/admin/analytics",
+    }));
+
+  const recommendedActionKeys = new Set<string>();
+  const recommendedActions = opportunityRows
+    .map((row: any) => ({
+      id: `action::${row.id}`,
+      priority: Number(row.opportunity_score || 0),
+      title: row.title || `Review ${rollupLabel(row)}`,
+      reason: row.reason || row.recommended_action || "Signal OS found a culture opportunity.",
+      evidence: evidenceFromRollup(row.evidence),
+      actionLabel:
+        row.opportunity_type === "search_gap"
+          ? "Open demand"
+          : row.entity_type
+            ? "Open entity"
+            : "Open signal",
+      actionUrl:
+        row.opportunity_type === "search_gap"
+          ? `/search?q=${encodeURIComponent(row.query || "")}`
+          : row.page_path || adminUrlForEntity(row.entity_type, row.entity_slug),
+    }))
+    .filter((action: any) => {
+      const key = String(action.title || "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+
+      if (!key || recommendedActionKeys.has(key)) return false;
+      recommendedActionKeys.add(key);
+      return true;
+    });
+
+  return {
+    generatedAt: new Date().toISOString(),
+    range,
+    source: "signal_os_rollups",
+    summary: {
+      signalCount: risingEntities.length + shareVelocity.length + highIntentJourneys.length,
+      opportunityCount: recommendedActions.length,
+      risingEntityCount: risingEntities.length,
+      searchGapCount: searchGaps.filter((row) => row.zeroResults).length,
+      pageFixCount: pagesToFix.length,
+    },
+    risingEntities,
+    searchGaps,
+    shareVelocity,
+    highIntentJourneys,
+    pagesToFix,
+    recommendedActions,
+  };
+}
+
 async function buildRealtime(db: ReturnType<typeof createClient>) {
   const now = Date.now();
   const since5 = new Date(now - 5 * 60 * 1000).toISOString();
@@ -1211,8 +1620,11 @@ Deno.serve(async (req) => {
 
     if (action === "analytics_signal_board") {
       const range = body.range ?? 30;
+      const rollupBoard = await buildSignalBoardFromRollups(db, range);
+      if (rollupBoard) return ok(rollupBoard, headers);
+
       const events = await getAnalyticsEvents(db, range);
-      return ok(buildSignalBoard(events, range), headers);
+      return ok({ ...buildSignalBoard(events, range), source: "live_events_fallback" }, headers);
     }
 
     if (action === "analytics_realtime") {
