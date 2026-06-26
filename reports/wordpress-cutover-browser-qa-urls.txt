@@ -1,0 +1,172 @@
+# WordPress cutover browser QA URLs
+# Replace <REACT_PREVIEW_OR_CUTOVER_ORIGIN> with the preview/cutover origin.
+# Example: https://preview.example.com
+
+# CORE-001 | core_route | critical
+<REACT_PREVIEW_OR_CUTOVER_ORIGIN>/
+
+# CORE-002 | core_route | critical
+<REACT_PREVIEW_OR_CUTOVER_ORIGIN>/magazine
+
+# CORE-003 | core_route | critical
+<REACT_PREVIEW_OR_CUTOVER_ORIGIN>/charts
+
+# CORE-004 | core_route | critical
+<REACT_PREVIEW_OR_CUTOVER_ORIGIN>/artists
+
+# CORE-005 | core_route | critical
+<REACT_PREVIEW_OR_CUTOVER_ORIGIN>/releases
+
+# CORE-006 | core_route | critical
+<REACT_PREVIEW_OR_CUTOVER_ORIGIN>/tracks
+
+# CORE-007 | core_route | critical
+<REACT_PREVIEW_OR_CUTOVER_ORIGIN>/search
+
+# CHART-001 | chart_runtime_route | critical
+<REACT_PREVIEW_OR_CUTOVER_ORIGIN>/charts/top-100/ke/2026-01-26
+
+# CHART-002 | chart_runtime_route | critical
+<REACT_PREVIEW_OR_CUTOVER_ORIGIN>/charts/top-gengetone/ke/2026-01-26
+
+# CHART-003 | chart_runtime_route | critical
+<REACT_PREVIEW_OR_CUTOVER_ORIGIN>/charts/top-rnb/ke/2026-01-26
+
+# ARTICLE-001 | sample_safe_redirect_target | high
+<REACT_PREVIEW_OR_CUTOVER_ORIGIN>/magazine/10-contemporary-kenyan-artists-you-should-know
+
+# ARTICLE-002 | sample_safe_redirect_target | high
+<REACT_PREVIEW_OR_CUTOVER_ORIGIN>/magazine/10-kenyan-authors-you-should-read
+
+# ARTICLE-003 | sample_safe_redirect_target | high
+<REACT_PREVIEW_OR_CUTOVER_ORIGIN>/magazine/10-places-in-nairobi-to-explore-art-music-and-design
+
+# ARTICLE-004 | sample_safe_redirect_target | high
+<REACT_PREVIEW_OR_CUTOVER_ORIGIN>/magazine/15-fatoumata-diawara-songs
+
+# ARTICLE-005 | sample_safe_redirect_target | high
+<REACT_PREVIEW_OR_CUTOVER_ORIGIN>/magazine/15-things-to-do-home-5-months
+
+# ARTICLE-006 | sample_safe_redirect_target | high
+<REACT_PREVIEW_OR_CUTOVER_ORIGIN>/magazine/2021-visual-trends
+
+# ARTICLE-007 | sample_safe_redirect_target | high
+<REACT_PREVIEW_OR_CUTOVER_ORIGIN>/magazine/2022-nyege-nyege-festival-officially-announced
+
+# ARTICLE-008 | sample_safe_redirect_target | high
+<REACT_PREVIEW_OR_CUTOVER_ORIGIN>/magazine/2023-trends-to-take-note-of
+
+# ARTICLE-009 | sample_safe_redirect_target | high
+<REACT_PREVIEW_OR_CUTOVER_ORIGIN>/magazine/4-tips-for-diversifying-your-diet-on-a-budget
+
+# ARTICLE-010 | sample_safe_redirect_target | high
+<REACT_PREVIEW_OR_CUTOVER_ORIGIN>/magazine/5-cultural-destinations-worth-visiting-in-nairobi
+
+# TAG-001 | sample_tag_search_target | high
+<REACT_PREVIEW_OR_CUTOVER_ORIGIN>/search?tag=2026
+
+# TAG-002 | sample_tag_search_target | high
+<REACT_PREVIEW_OR_CUTOVER_ORIGIN>/search?tag=4mr%20frank%20white
+
+# TAG-003 | sample_tag_search_target | high
+<REACT_PREVIEW_OR_CUTOVER_ORIGIN>/search?tag=60%20nozzles
+
+# TAG-004 | sample_tag_search_target | high
+<REACT_PREVIEW_OR_CUTOVER_ORIGIN>/search?tag=8%204%204
+
+# TAG-005 | sample_tag_search_target | high
+<REACT_PREVIEW_OR_CUTOVER_ORIGIN>/search?tag=8th%20street%20gang
+
+# TAG-006 | sample_tag_search_target | high
+<REACT_PREVIEW_OR_CUTOVER_ORIGIN>/search?tag=a%20grain%20of%20wheat
+
+# TAG-007 | sample_tag_search_target | high
+<REACT_PREVIEW_OR_CUTOVER_ORIGIN>/search?tag=a%20nurse%20toto
+
+# TAG-008 | sample_tag_search_target | high
+<REACT_PREVIEW_OR_CUTOVER_ORIGIN>/search?tag=aahil
+
+# TAG-009 | sample_tag_search_target | high
+<REACT_PREVIEW_OR_CUTOVER_ORIGIN>/search?tag=aaron%20rimbui
+
+# TAG-010 | sample_tag_search_target | high
+<REACT_PREVIEW_OR_CUTOVER_ORIGIN>/search?tag=ababu%20namwamba
+
+# EXTRA-REDIRECT-001 | ready_extra_redirect_target | medium
+<REACT_PREVIEW_OR_CUTOVER_ORIGIN>/magazine
+
+# APPROVAL-GATED-001 | approval_gated_redirect | medium
+<REACT_PREVIEW_OR_CUTOVER_ORIGIN>/album-reviews/
+
+# APPROVAL-GATED-002 | approval_gated_redirect | medium
+<REACT_PREVIEW_OR_CUTOVER_ORIGIN>/art-design/
+
+# APPROVAL-GATED-003 | approval_gated_redirect | medium
+<REACT_PREVIEW_OR_CUTOVER_ORIGIN>/art/
+
+# APPROVAL-GATED-004 | approval_gated_redirect | medium
+<REACT_PREVIEW_OR_CUTOVER_ORIGIN>/blog-newspaper/
+
+# APPROVAL-GATED-005 | approval_gated_redirect | medium
+<REACT_PREVIEW_OR_CUTOVER_ORIGIN>/film/
+
+# APPROVAL-GATED-006 | approval_gated_redirect | medium
+<REACT_PREVIEW_OR_CUTOVER_ORIGIN>/journal/
+
+# APPROVAL-GATED-007 | approval_gated_redirect | medium
+<REACT_PREVIEW_OR_CUTOVER_ORIGIN>/lifestyle/
+
+# APPROVAL-GATED-008 | approval_gated_redirect | medium
+<REACT_PREVIEW_OR_CUTOVER_ORIGIN>/literature/
+
+# HOLD-001 | do_not_redirect_without_decision | high
+<REACT_PREVIEW_OR_CUTOVER_ORIGIN>/tag/abas-k%eb%ab%bf/
+
+# HOLD-002 | do_not_redirect_without_decision | high
+<REACT_PREVIEW_OR_CUTOVER_ORIGIN>/tag/abbas-k%eb%ab%bf/
+
+# HOLD-003 | do_not_redirect_without_decision | high
+<REACT_PREVIEW_OR_CUTOVER_ORIGIN>/corrections/
+
+# HOLD-004 | do_not_redirect_without_decision | high
+<REACT_PREVIEW_OR_CUTOVER_ORIGIN>/events/
+
+# HOLD-005 | do_not_redirect_without_decision | high
+<REACT_PREVIEW_OR_CUTOVER_ORIGIN>/faq/
+
+# HOLD-006 | do_not_redirect_without_decision | high
+<REACT_PREVIEW_OR_CUTOVER_ORIGIN>/methodology/
+
+# HOLD-007 | do_not_redirect_without_decision | high
+<REACT_PREVIEW_OR_CUTOVER_ORIGIN>/venues/
+
+# HOLD-008 | do_not_redirect_without_decision | critical
+<REACT_PREVIEW_OR_CUTOVER_ORIGIN>/account/
+
+# HOLD-009 | do_not_redirect_without_decision | critical
+<REACT_PREVIEW_OR_CUTOVER_ORIGIN>/my-account/
+
+# HOLD-010 | do_not_redirect_without_decision | critical
+<REACT_PREVIEW_OR_CUTOVER_ORIGIN>/my-library/
+
+# HOLD-011 | do_not_redirect_without_decision | critical
+<REACT_PREVIEW_OR_CUTOVER_ORIGIN>/my-top-10/
+
+# HOLD-012 | do_not_redirect_without_decision | critical
+<REACT_PREVIEW_OR_CUTOVER_ORIGIN>/order-tracking/
+
+# HOLD-013 | do_not_redirect_without_decision | critical
+<REACT_PREVIEW_OR_CUTOVER_ORIGIN>/settings/
+
+# HOLD-014 | do_not_redirect_without_decision | high
+<REACT_PREVIEW_OR_CUTOVER_ORIGIN>/claim-your-name/
+
+# HOLD-015 | do_not_redirect_without_decision | high
+<REACT_PREVIEW_OR_CUTOVER_ORIGIN>/music/
+
+# HOLD-016 | do_not_redirect_without_decision | critical
+<REACT_PREVIEW_OR_CUTOVER_ORIGIN>/cart/
+
+# HOLD-017 | do_not_redirect_without_decision | critical
+<REACT_PREVIEW_OR_CUTOVER_ORIGIN>/checkout/
+
