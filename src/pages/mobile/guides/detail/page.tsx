@@ -12,7 +12,7 @@ export default function MobileGuideDetail() {
   useScrollDepthTracking({
     pageType: "guide_detail",
     entitySlug: slug,
-    recordType: "guide",
+    entityType: "guide",
   });
 
   if (!slug || !SUPPORTED_SLUGS.includes(slug)) {

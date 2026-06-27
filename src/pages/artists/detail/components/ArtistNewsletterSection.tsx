@@ -32,7 +32,7 @@ export function ArtistNewsletterSection({ artistName, artistSlug }: ArtistNewsle
         analytics={{
           pageType: "artist_detail",
           entitySlug: artistSlug,
-          recordType: "artist",
+          entityType: "artist",
           context: {
             briefing_slugs: BRIEFING_SLUGS.artistSignals,
             source_form: "artist_follow",

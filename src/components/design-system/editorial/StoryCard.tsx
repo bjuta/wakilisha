@@ -37,7 +37,7 @@ export function StoryCard({
   const handleClick = () => {
     if (sourceSection) {
       trackEvent("card_click", {
-        recordType: "article",
+        entityType: "article",
         entitySlug: slug,
         context: {
           source_section: sourceSection,

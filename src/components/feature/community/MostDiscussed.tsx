@@ -45,15 +45,15 @@ function getEntityUrl(thread: MostDiscussedThread): string {
   if (thread.entityUrl) return thread.entityUrl;
   if (thread.entitySlug) {
     switch (thread.entityType) {
-      case 'article': return `/magazine/${thread.recordSlug}`;
-      case 'artist': return `/artists/${thread.recordSlug}`;
-      case 'track': return `/tracks/${thread.recordSlug}`;
-      case 'release': return `/releases/${thread.recordSlug}`;
-      case 'label': return `/labels/${thread.recordSlug}`;
-      case 'genre': return `/genres/${thread.recordSlug}`;
-      case 'chart': return `/charts/${thread.recordSlug}`;
-      case 'chart_edition': return `/charts/${thread.recordSlug}`;
-      case 'field_guide': return `/guides/${thread.recordSlug}`;
+      case 'article': return `/magazine/${thread.entitySlug}`;
+      case 'artist': return `/artists/${thread.entitySlug}`;
+      case 'track': return `/tracks/${thread.entitySlug}`;
+      case 'release': return `/releases/${thread.entitySlug}`;
+      case 'label': return `/labels/${thread.entitySlug}`;
+      case 'genre': return `/genres/${thread.entitySlug}`;
+      case 'chart': return `/charts/${thread.entitySlug}`;
+      case 'chart_edition': return `/charts/${thread.entitySlug}`;
+      case 'field_guide': return `/guides/${thread.entitySlug}`;
       default: return '#';
     }
   }
@@ -143,7 +143,7 @@ export function MostDiscussed({ limit = 6, className = '' }: MostDiscussedProps)
       <div className="space-y-2">
         {threads.map((thread, idx) => {
           const url = getEntityUrl(thread);
-          const icon = ENTITY_ICONS[thread.recordType] || 'ri-chat-1-line';
+          const icon = ENTITY_ICONS[thread.entityType] || 'ri-chat-1-line';
           const label = ENTITY_LABELS[thread.entityType] || thread.entityType;
 
           return (

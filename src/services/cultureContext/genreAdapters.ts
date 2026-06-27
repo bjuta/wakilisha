@@ -53,7 +53,7 @@ export function genreContextData(input: GenreLike | PublicGenreDetail) {
 
 export function buildGenreCultureText(input: GenreLike | PublicGenreDetail, surface: CultureContextSurface): string {
   return buildCultureContext({
-    recordType: "genre",
+    entityType: "genre",
     surface,
     data: genreContextData(input),
   }).text;

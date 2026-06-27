@@ -61,10 +61,10 @@ function MobileMiniPlayer() {
 
   const activeSourceLabel = playbackSourceLabel || currentTrack.source || null;
   const hasAppleCatalog = Boolean(currentTrack.appleMusicCatalogId || currentTrack.appleMusicId);
-  const showUseFullTrack = hasAppleCatalog && playbackBackend !== "apple" && !appleConnected;
+  const showUnlockFullTrack = hasAppleCatalog && playbackBackend !== "apple" && !appleConnected;
   const isPlayable = currentTrack.isPlayable !== false;
 
-  const handleUseFullTrack = async (event: React.MouseEvent<HTMLButtonElement>) => {
+  const handleUnlockFullTrack = async (event: React.MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
     if (appleConnecting) return;
 
@@ -77,7 +77,7 @@ function MobileMiniPlayer() {
       const nextQueue = queue.length ? queue : [currentTrack];
       playTrack(currentTrack, nextQueue, {
         pageType: "player",
-        recordType: "track",
+        entityType: "track",
         entitySlug: currentTrack.trackSlug || currentTrack.id,
         sourceSection: "mini_player_full_track_cta",
       });
@@ -113,7 +113,7 @@ function MobileMiniPlayer() {
           onPointerDown={(e) => e.stopPropagation()}
           onTouchStart={(e) => e.stopPropagation()}
           onClick={handleUnlockFullTrack}
-          className="phn-mp-use"
+          className="phn-mp-unlock"
           aria-label="Connect Apple Music to play the full track"
         >
           <WkIcon name={appleConnecting ? "Loader2" : "Music2"} size={13} />

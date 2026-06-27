@@ -39,7 +39,7 @@ function getHeroGap(cols: number): number {
 }
 
 /* ── Portrait aspect ratios for organic rhythm — width-driven, never height-driven ── */
-/* Each value is "w/h". all > 1 tall so faces are always visible regardless of viewport height */
+/* Each value is "w/h" — all > 1 tall so faces are always visible regardless of viewport height */
 const CELL_ASPECTS = ["2/3", "3/4", "1/2", "7/10", "3/5", "2/3", "3/4", "9/16", "7/10", "3/5"] as const;
 
 
@@ -679,7 +679,7 @@ function SplitHero({ artists }: SplitHeroProps) {
       </div>
 
       {/* Overlays — localized scrim only behind text, collage edges stay visible */}
-      {/* Top dark fade. theme-neutral, won’t bleach in light mode */}
+      {/* Top dark fade — theme-neutral, won't bleach in light mode */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-[1] h-20 bg-gradient-to-b from-black/30 to-transparent" />
       {/* Radial spotlight scrim — dark only in the text zone, transparent at edges */}
       <div
@@ -693,7 +693,7 @@ function SplitHero({ artists }: SplitHeroProps) {
 
       {/* Content — frosted pill so text pops cleanly in both light + dark mode */}
       <div className="relative z-10 mx-auto flex w-full max-w-[1200px] flex-col items-center px-4 py-24 text-center md:px-6 md:py-32">
-        {/* Eyebrow + headline + body copy. all inside a lightweight frosted pill */}
+        {/* Eyebrow + headline + body copy — all inside a lightweight frosted pill */}
         <div className="hero-text-reveal mb-8 flex flex-col items-center gap-5 rounded-3xl px-6 py-8 backdrop-blur-[6px] md:px-12"
           style={{ background: "radial-gradient(ellipse at center, rgba(0,0,0,0.22) 0%, transparent 80%)" }}
         >

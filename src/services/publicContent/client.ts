@@ -395,215 +395,6 @@ function releaseTypeFromTrackCount(trackCount: number): string {
   return "Album";
 }
 
-type ResolvedReleaseArtist = { name: string; slug: string };
-
-const UNKNOWN_ARTIST_NAME = "Unknown artist";
-
-function chunkArray<T>(items: T[], size = 250): T[][] {
-  const uniqueItems = Array.from(new Set(items.filter(Boolean)));
-  const chunks: T[][] = [];
-  for (let i = 0; i < uniqueItems.length; i += size) {
-    chunks.push(uniqueItems.slice(i, i + size));
-  }
-  return chunks;
-}
-
-function hasKnownArtistName(value: string | null | undefined): boolean {
-  const text = String(value || "").trim();
-  return Boolean(text) && !/^unknown(?: artist)?$/i.test(text);
-}
-
-function artistNameFromReleaseMetadata(meta: Record<string, unknown> | null | undefined): string {
-  if (!meta) return "";
-  const keys = [
-    "artist",
-    "artists",
-    "artist_name",
-    "artistName",
-    "primary_artist",
-    "primaryArtist",
-    "primary_artist_name",
-    "primaryArtistName",
-  ];
-
-  for (const key of keys) {
-    const value = meta[key];
-    if (typeof value === "string" && hasKnownArtistName(value)) return value.trim();
-
-    if (Array.isArray(value)) {
-      for (const item of value) {
-        if (typeof item === "string" && hasKnownArtistName(item)) return item.trim();
-        if (item && typeof item === "object") {
-          const name = (item as Record<string, unknown>).name || (item as Record<string, unknown>).artist_name;
-          if (typeof name === "string" && hasKnownArtistName(name)) return name.trim();
-        }
-      }
-    }
-  }
-
-  return "";
-}
-
-function trackArtistCreditOrder(row: { creditOrder?: number | null }): number {
-  const n = Number(row.creditOrder);
-  return Number.isFinite(n) ? n : 999;
-}
-
-function releaseTrackPosition(row: GenericRow): number {
-  const n = Number(row.track_number);
-  return Number.isFinite(n) ? n : 999;
-}
-
-function firstPrimaryArtistFromTrackRows(
-  releaseTrackRows: GenericRow[] | null | undefined,
-  artistsByTrack: Map<string, Array<{ name: string; slug: string; isPrimary: boolean; isFeatured?: boolean; creditOrder?: number | null }>>,
-): ResolvedReleaseArtist | null {
-  const orderedTracks = [...(releaseTrackRows || [])].sort(
-    (a, b) => releaseTrackPosition(a) - releaseTrackPosition(b),
-  );
-
-  for (const trackRow of orderedTracks) {
-    const trackId = textValue(trackRow, ["track_id", "id"]);
-    const artists = [...(artistsByTrack.get(trackId) || [])].sort((a, b) => {
-      if (a.isPrimary !== b.isPrimary) return a.isPrimary ? -1 : 1;
-      if (a.isFeatured !== b.isFeatured) return a.isFeatured ? 1 : -1;
-      return trackArtistCreditOrder(a) - trackArtistCreditOrder(b);
-    });
-
-    const primary = artists.find((artist) => artist.isPrimary && hasKnownArtistName(artist.name))
-      || artists.find((artist) => hasKnownArtistName(artist.name));
-
-    if (primary) return { name: primary.name, slug: primary.slug };
-  }
-
-  return null;
-}
-
-async function resolvePrimaryArtistsForReleases(
-  releaseIds: string[],
-  releaseMetadataById = new Map<string, Record<string, unknown>>(),
-): Promise<Map<string, ResolvedReleaseArtist>> {
-  const uniqueReleaseIds = Array.from(new Set(releaseIds.filter(Boolean)));
-  const artistsByRelease = new Map<string, ResolvedReleaseArtist>();
-
-  if (!uniqueReleaseIds.length) return artistsByRelease;
-
-  for (const ids of chunkArray(uniqueReleaseIds)) {
-    const { data: releaseArtistRows, error } = await supabase
-      .from("registry_release_artists")
-      .select("release_id, artist_name_text, artist_slug, is_primary, credit_order")
-      .in("release_id", ids)
-      .eq("status", "active")
-      .order("credit_order", { ascending: true });
-
-    if (error) {
-      console.warn(`Release artist lookup failed: ${error.message}`);
-      continue;
-    }
-
-    for (const row of (releaseArtistRows || []) as Array<{
-      release_id: string;
-      artist_name_text: string | null;
-      artist_slug: string | null;
-      is_primary: boolean | null;
-      credit_order: number | null;
-    }>) {
-      if (!hasKnownArtistName(row.artist_name_text)) continue;
-
-      const current = artistsByRelease.get(row.release_id);
-      if (!current || row.is_primary) {
-        artistsByRelease.set(row.release_id, {
-          name: String(row.artist_name_text).trim(),
-          slug: row.artist_slug || "",
-        });
-      }
-    }
-  }
-
-  for (const releaseId of uniqueReleaseIds) {
-    if (artistsByRelease.has(releaseId)) continue;
-    const metadataArtist = artistNameFromReleaseMetadata(releaseMetadataById.get(releaseId));
-    if (metadataArtist) {
-      artistsByRelease.set(releaseId, {
-        name: metadataArtist,
-        slug: slugify(metadataArtist),
-      });
-    }
-  }
-
-  const missingReleaseIds = uniqueReleaseIds.filter((releaseId) => !artistsByRelease.has(releaseId));
-  if (!missingReleaseIds.length) return artistsByRelease;
-
-  const releaseTrackRows: GenericRow[] = [];
-  for (const ids of chunkArray(missingReleaseIds)) {
-    const { data, error } = await supabase
-      .from("registry_release_tracks")
-      .select("release_id, track_id, track_number")
-      .in("release_id", ids)
-      .eq("status", "active");
-
-    if (error) {
-      console.warn(`Release track artist fallback lookup failed: ${error.message}`);
-      continue;
-    }
-
-    releaseTrackRows.push(...deepDecode((data || []) as GenericRow[]));
-  }
-
-  const trackIds = Array.from(new Set(releaseTrackRows.map((row) => textValue(row, ["track_id"])).filter(Boolean)));
-  const artistsByTrack = new Map<string, Array<{ name: string; slug: string; isPrimary: boolean; isFeatured: boolean; creditOrder: number | null }>>();
-
-  for (const ids of chunkArray(trackIds)) {
-    const { data, error } = await supabase
-      .from("registry_track_artists")
-      .select("track_id, artist_name_text, artist_slug, is_primary, is_featured, credit_order")
-      .in("track_id", ids)
-      .eq("status", "active")
-      .order("credit_order", { ascending: true });
-
-    if (error) {
-      console.warn(`Track artist fallback lookup failed: ${error.message}`);
-      continue;
-    }
-
-    for (const row of (data || []) as Array<{
-      track_id: string;
-      artist_name_text: string | null;
-      artist_slug: string | null;
-      is_primary: boolean | null;
-      is_featured: boolean | null;
-      credit_order: number | null;
-    }>) {
-      if (!hasKnownArtistName(row.artist_name_text)) continue;
-      const list = artistsByTrack.get(row.track_id) || [];
-      list.push({
-        name: String(row.artist_name_text).trim(),
-        slug: row.artist_slug || "",
-        isPrimary: Boolean(row.is_primary),
-        isFeatured: Boolean(row.is_featured),
-        creditOrder: row.credit_order,
-      });
-      artistsByTrack.set(row.track_id, list);
-    }
-  }
-
-  const tracksByRelease = new Map<string, GenericRow[]>();
-  for (const row of releaseTrackRows) {
-    const releaseId = textValue(row, ["release_id"]);
-    if (!releaseId) continue;
-    const list = tracksByRelease.get(releaseId) || [];
-    list.push(row);
-    tracksByRelease.set(releaseId, list);
-  }
-
-  for (const releaseId of missingReleaseIds) {
-    const resolved = firstPrimaryArtistFromTrackRows(tracksByRelease.get(releaseId), artistsByTrack);
-    if (resolved) artistsByRelease.set(releaseId, resolved);
-  }
-
-  return artistsByRelease;
-}
-
 function mediaCandidates(slug: string, title: string): string[] {
   const normalizedSlug = slugify(slug || title);
   const normalizedTitle = slugify(title || slug);
@@ -700,7 +491,7 @@ async function getRegistryTracklist(releaseId: string, fallbackArtist: string): 
     .eq("status", "active")
     .order("credit_order", { ascending: true });
 
-  const artistsByTrack = new Map<string, Array<{ name: string; slug: string; isPrimary: boolean; isFeatured: boolean; creditOrder: number | null }>>();
+  const artistsByTrack = new Map<string, Array<{ name: string; slug: string; isPrimary: boolean; isFeatured: boolean }>>();
   for (const ta of (trackArtistRows || [])) {
     if (!artistsByTrack.has(ta.track_id)) artistsByTrack.set(ta.track_id, []);
     artistsByTrack.get(ta.track_id)!.push({
@@ -708,22 +499,7 @@ async function getRegistryTracklist(releaseId: string, fallbackArtist: string): 
       slug: ta.artist_slug || "",
       isPrimary: ta.is_primary,
       isFeatured: ta.is_featured,
-      creditOrder: ta.credit_order ?? null,
     });
-  }
-
-  if (!hasKnownArtistName(fallbackArtist)) {
-    const resolvedFromTracks = firstPrimaryArtistFromTrackRows(
-      relationships.map((relationship) => relationship.row),
-      artistsByTrack,
-    );
-    if (resolvedFromTracks) {
-      fallbackArtist = resolvedFromTracks.name;
-    }
-  }
-
-  if (!hasKnownArtistName(fallbackArtist)) {
-    fallbackArtist = UNKNOWN_ARTIST_NAME;
   }
 
   const mediaSlugs: string[] = [];
@@ -900,34 +676,34 @@ async function listReleasesFromRegistry(): Promise<PublicRelease[]> {
 
   if (releaseIds.length === 0) return [];
 
-  // 2. Resolve primary artists for all releases.
-  // Prefer release-level credits, then release metadata, then first-track credits.
-  const releaseMetadataById = new Map<string, Record<string, unknown>>();
-  for (const row of releases) {
-    const id = textValue(row, ["id"]);
-    if (id) releaseMetadataById.set(id, (row.metadata || {}) as Record<string, unknown>);
-  }
-  const artistsByRelease = await resolvePrimaryArtistsForReleases(releaseIds, releaseMetadataById);
+  // 2. Fetch primary artists for all releases
+  const { data: artistRows } = await supabase
+    .from("registry_release_artists")
+    .select("release_id, artist_name_text, artist_slug")
+    .in("release_id", releaseIds)
+    .eq("status", "active")
+    .eq("is_primary", true);
 
-  // 3. Fetch track counts for all releases, chunked to avoid oversized Supabase REST URLs.
-  const trackRows: Array<{ release_id: string }> = [];
-  for (const ids of chunkArray(releaseIds)) {
-    const { data, error } = await supabase
-      .from("registry_release_tracks")
-      .select("release_id")
-      .in("release_id", ids)
-      .eq("status", "active");
-
-    if (error) {
-      console.warn(`WAKILISHA release track batch lookup failed: ${error.message}`);
-      continue;
+  const artistsByRelease = new Map<string, { name: string; slug: string }>();
+  for (const row of (artistRows || [])) {
+    const rid = row.release_id;
+    if (!artistsByRelease.has(rid)) {
+      artistsByRelease.set(rid, {
+        name: row.artist_name_text || row.artist_slug || "Unknown artist",
+        slug: row.artist_slug || "",
+      });
     }
-
-    trackRows.push(...((data || []) as Array<{ release_id: string }>));
   }
+
+  // 3. Fetch track counts for all releases
+  const { data: trackRows } = await supabase
+    .from("registry_release_tracks")
+    .select("release_id")
+    .in("release_id", releaseIds)
+    .eq("status", "active");
 
   const trackCountByRelease = new Map<string, number>();
-  for (const row of trackRows) {
+  for (const row of (trackRows || [])) {
     const rid = row.release_id;
     trackCountByRelease.set(rid, (trackCountByRelease.get(rid) || 0) + 1);
   }
@@ -1193,10 +969,8 @@ async function getReleaseFromRegistry(artistSlug: string, releaseSlug: string): 
     .eq("status", "active");
 
   const primaryReleaseArtist = (releaseArtistRows || []).find((ra) => ra.is_primary);
-  const releaseMetaForArtist = (releaseRow.metadata || {}) as Record<string, unknown>;
-  const metadataArtist = artistNameFromReleaseMetadata(releaseMetaForArtist);
-  let fallbackArtist = primaryReleaseArtist?.artist_name_text || metadataArtist || "";
-  let fallbackArtistSlug = primaryReleaseArtist?.artist_slug || (metadataArtist ? slugify(metadataArtist) : artistSlug);
+  const fallbackArtist = primaryReleaseArtist?.artist_name_text || "";
+  const fallbackArtistSlug = primaryReleaseArtist?.artist_slug || artistSlug;
 
   const { data: releaseTrackRows } = await supabase
     .from("registry_release_tracks")
@@ -1408,65 +1182,25 @@ export interface LabelCatalogStats {
   countries: string[];
 }
 
-type ArtistOriginRow = {
-  slug: string;
-  origin_iso2?: string | null;
-  metadata?: Record<string, unknown> | null;
-};
-
-function artistOriginCountry(row: ArtistOriginRow): string {
-  const meta = row.metadata || {};
-  const country =
-    row.origin_iso2 ||
-    (typeof meta.country_code === "string" ? meta.country_code : "") ||
-    (typeof meta.country === "string" ? meta.country : "") ||
-    (typeof meta.origin_country === "string" ? meta.origin_country : "") ||
-    (typeof meta.originCountry === "string" ? meta.originCountry : "");
-
-  return String(country || "").trim();
-}
-
-async function resolveArtistOriginsBySlug(artistSlugs: string[]): Promise<Map<string, string>> {
-  const origins = new Map<string, string>();
-
-  for (const slugs of chunkArray(artistSlugs)) {
-    const { data, error } = await supabase
-      .from("registry_artists")
-      .select("slug, origin_iso2, metadata")
-      .eq("status", "active")
-      .in("slug", slugs);
-
-    if (error) {
-      console.warn(`WAKILISHA artist origin lookup failed: ${error.message}`);
-      continue;
-    }
-
-    for (const artist of (data || []) as ArtistOriginRow[]) {
-      const country = artistOriginCountry(artist);
-      if (artist.slug && country) origins.set(artist.slug, country);
-    }
-  }
-
-  return origins;
-}
-
 export async function listLabelsPaginated(
   params: LabelPaginatedParams,
 ): Promise<PaginatedLabelsResult> {
   const { page, pageSize, countryFilter, search } = params;
 
+  // 1. Get all active releases with label info (metadata->record_label)
   const { data: releaseRows, error: relErr } = await supabase
     .from("registry_releases")
     .select("id, metadata, label_id")
-    .eq("status", "active");
+    .eq("status", "active")
+    .not("metadata", "is", null);
 
   if (relErr) {
     console.warn(`Label paginated release lookup failed: ${relErr.message}`);
     return { labels: [], totalCount: 0 };
   }
 
+  // Build label-name -> release-ids map
   const releaseIdsByLabelName = new Map<string, string[]>();
-  const releaseIdsByLabelId = new Map<string, string[]>();
   const activeLabelIds = new Set<string>();
 
   for (const r of (releaseRows || []) as Array<{
@@ -1474,13 +1208,7 @@ export async function listLabelsPaginated(
     metadata: Record<string, unknown> | null;
     label_id: string | null;
   }>) {
-    if (r.label_id) {
-      activeLabelIds.add(r.label_id);
-      const ids = releaseIdsByLabelId.get(r.label_id) || [];
-      ids.push(r.id);
-      releaseIdsByLabelId.set(r.label_id, ids);
-    }
-
+    if (r.label_id) activeLabelIds.add(r.label_id);
     const meta = r.metadata || {};
     const labelName = (meta.record_label || meta.wp_label || "") as string;
     if (labelName?.trim()) {
@@ -1495,6 +1223,7 @@ export async function listLabelsPaginated(
     return { labels: [], totalCount: 0 };
   }
 
+  // 2. Get all active labels
   const { data: allLabels, error: labelErr } = await supabase
     .from("registry_labels")
     .select("id, slug, name, country_code, description, normalized_name, status")
@@ -1505,121 +1234,126 @@ export async function listLabelsPaginated(
     return { labels: [], totalCount: 0 };
   }
 
+  // 3. Filter to labels with active releases (by name or label_id)
   const activeLabelNames = Array.from(releaseIdsByLabelName.keys());
-  let activeLabels = (allLabels || []).filter((label) => {
-    if (activeLabelIds.has(label.id)) return true;
-
-    const key = (label.name || "").trim().toLowerCase();
-    const normKey = (label.normalized_name || "").trim().toLowerCase();
-
-    return activeLabelNames.some((name) => name === key || name === normKey);
+  let activeLabels = (allLabels || []).filter((l) => {
+    if (activeLabelIds.has(l.id)) return true;
+    const key = (l.name || "").trim().toLowerCase();
+    const normKey = (l.normalized_name || "").trim().toLowerCase();
+    return activeLabelNames.some(
+      (n) => n === key || n === normKey,
+    );
   });
 
+  // 4. Apply search filter
   if (search) {
     const term = search.toLowerCase().trim();
     activeLabels = activeLabels.filter(
-      (label) =>
-        (label.name || "").toLowerCase().includes(term) ||
-        (label.country_code || "").toLowerCase().includes(term),
+      (l) =>
+        (l.name || "").toLowerCase().includes(term) ||
+        (l.country_code || "").toLowerCase().includes(term),
     );
   }
 
-  const allReleaseIds = Array.from(new Set([
-    ...Array.from(releaseIdsByLabelName.values()).flat(),
-    ...Array.from(releaseIdsByLabelId.values()).flat(),
-  ]));
+  // 5. Apply country filter
+  if (countryFilter && countryFilter !== "All") {
+    activeLabels = activeLabels.filter((l) => l.country_code === countryFilter);
+  }
 
-  const releaseArtistMap = await resolvePrimaryArtistsForReleases(allReleaseIds);
-  const allArtistSlugs = Array.from(new Set(
-    Array.from(releaseArtistMap.values())
-      .map((artist) => artist.slug)
-      .filter(Boolean),
-  ));
-  const artistOriginBySlug = await resolveArtistOriginsBySlug(allArtistSlugs);
+  // 6. Collect all release IDs for batch artist lookup
+  const allReleaseIds = Array.from(releaseIdsByLabelName.values()).flat();
 
-  const labelArtistSlugs = new Map<string, string[]>();
-  let labelsWithCounts: PublicLabel[] = activeLabels.map((label) => {
-    const key = (label.name || "").trim().toLowerCase();
-    const normKey = (label.normalized_name || "").trim().toLowerCase();
-    const releaseIds = Array.from(new Set([
-      ...(releaseIdsByLabelId.get(label.id) || []),
-      ...(releaseIdsByLabelName.get(key) || []),
-      ...(normKey && normKey !== key ? (releaseIdsByLabelName.get(normKey) || []) : []),
-    ]));
+  let releaseArtistsMap = new Map<string, Array<{ name: string; slug: string }>>();
+  if (allReleaseIds.length > 0) {
+    const { data: releaseArtists } = await supabase
+      .from("registry_release_artists")
+      .select("release_id, artist_name_text, artist_slug")
+      .in("release_id", [...new Set(allReleaseIds)])
+      .eq("status", "active")
+      .eq("is_primary", true);
+
+    for (const ra of (releaseArtists || []) as Array<{
+      release_id: string;
+      artist_name_text: string | null;
+      artist_slug: string | null;
+    }>) {
+      const list = releaseArtistsMap.get(ra.release_id) || [];
+      list.push({
+        name: ra.artist_name_text || ra.artist_slug || "",
+        slug: ra.artist_slug || "",
+      });
+      releaseArtistsMap.set(ra.release_id, list);
+    }
+  }
+
+  // 7. Build enriched label objects
+  const labelArtistSlugs: Map<string, string[]> = new Map();
+  const labelsWithCounts: PublicLabel[] = activeLabels.map((l) => {
+    const key = (l.name || "").trim().toLowerCase();
+    const releaseIds = releaseIdsByLabelName.get(key) || [];
+    const releaseCount = releaseIds.length;
 
     const seenArtists = new Set<string>();
     const featuredArtists: string[] = [];
     const slugs: string[] = [];
-    const originCountries = new Set<string>();
-
     for (const rid of releaseIds) {
-      const artist = releaseArtistMap.get(rid);
-      if (!artist || !hasKnownArtistName(artist.name)) continue;
-
-      const artistKey = artist.slug || artist.name.toLowerCase();
-      if (seenArtists.has(artistKey)) continue;
-
-      seenArtists.add(artistKey);
-      featuredArtists.push(artist.name);
-
-      if (artist.slug) {
-        slugs.push(artist.slug);
-        const originCountry = artistOriginBySlug.get(artist.slug);
-        if (originCountry) originCountries.add(originCountry);
-      }
-    }
-
-    labelArtistSlugs.set(label.slug, slugs);
-
-    return {
-      id: label.id,
-      slug: label.slug,
-      name: label.name,
-      country: Array.from(originCountries)[0] || label.country_code,
-      logoUrl: null,
-      artistCount: seenArtists.size,
-      releaseCount: releaseIds.length,
-      featuredArtists: featuredArtists.slice(0, 5),
-      isFeatured: false,
-      description: label.description,
-    };
-  });
-
-  if (countryFilter && countryFilter !== "All") {
-    labelsWithCounts = labelsWithCounts.filter((label) => {
-      const slugs = labelArtistSlugs.get(label.slug) || [];
-      return slugs.some((slug) => artistOriginBySlug.get(slug) === countryFilter);
-    });
-  }
-
-  const artistImageBySlug = new Map<string, string>();
-  if (allArtistSlugs.length > 0) {
-    for (const slugs of chunkArray(allArtistSlugs)) {
-      const { data: artistRows } = await supabase
-        .from("registry_artists")
-        .select("slug, public_image_url")
-        .eq("status", "active")
-        .in("slug", slugs);
-
-      for (const artist of (artistRows || []) as Array<{ slug: string; public_image_url: string | null }>) {
-        if (artist.public_image_url && !artistImageBySlug.has(artist.slug)) {
-          artistImageBySlug.set(artist.slug, artist.public_image_url);
+      const artists = releaseArtistsMap.get(rid) || [];
+      for (const a of artists) {
+        if (a.name && !seenArtists.has(a.name)) {
+          seenArtists.add(a.name);
+          featuredArtists.push(a.name);
+          if (a.slug) slugs.push(a.slug);
         }
       }
     }
+    labelArtistSlugs.set(l.slug, slugs);
+
+    return {
+      id: l.id,
+      slug: l.slug,
+      name: l.name,
+      country: l.country_code,
+      logoUrl: null,
+      artistCount: seenArtists.size,
+      releaseCount,
+      featuredArtists: featuredArtists.slice(0, 5),
+      isFeatured: false,
+      description: l.description,
+    };
+  });
+
+  // 7b. Batch-fetch artist images from registry_artists.public_image_url
+  const allArtistSlugs = [...new Set(
+    Array.from(labelArtistSlugs.values()).flat()
+  )];
+  const artistImageBySlug = new Map<string, string>();
+  if (allArtistSlugs.length > 0) {
+    const { data: artistRows } = await supabase
+      .from("registry_artists")
+      .select("slug, public_image_url")
+      .eq("status", "active")
+      .in("slug", allArtistSlugs);
+
+    for (const a of (artistRows || []) as Array<{ slug: string; public_image_url: string | null }>) {
+      if (a.public_image_url && !artistImageBySlug.has(a.slug)) {
+        artistImageBySlug.set(a.slug, a.public_image_url);
+      }
+    }
   }
 
+  // Attach the first available artist image to each label
   for (const label of labelsWithCounts) {
     const slugs = labelArtistSlugs.get(label.slug) || [];
-    for (const slug of slugs) {
-      const imageUrl = artistImageBySlug.get(slug);
-      if (imageUrl) {
-        label.artistImageUrl = imageUrl;
+    for (const s of slugs) {
+      const img = artistImageBySlug.get(s);
+      if (img) {
+        label.artistImageUrl = img;
         break;
       }
     }
   }
 
+  // 8. Sort by prominence
   labelsWithCounts.sort(
     (a, b) => b.artistCount + b.releaseCount - (a.artistCount + a.releaseCount),
   );
@@ -1627,104 +1361,86 @@ export async function listLabelsPaginated(
   const totalCount = labelsWithCounts.length;
   const from = (page - 1) * pageSize;
   const to = from + pageSize;
+  const paginated = labelsWithCounts.slice(from, to);
 
-  return {
-    labels: labelsWithCounts.slice(from, to),
-    totalCount,
-  };
+  return { labels: paginated, totalCount };
 }
 
 export async function getLabelCatalogStats(): Promise<LabelCatalogStats> {
-  const { data: releaseRows, error: releaseErr } = await supabase
+  const { data: releaseRows } = await supabase
     .from("registry_releases")
-    .select("id, metadata, label_id")
-    .eq("status", "active");
-
-  if (releaseErr) {
-    console.warn(`Label catalog stats release lookup failed: ${releaseErr.message}`);
-    return {
-      total: 0,
-      totalArtists: 0,
-      totalReleases: 0,
-      featuredCount: 0,
-      countries: [],
-    };
-  }
+    .select("metadata, label_id")
+    .eq("status", "active")
+    .not("metadata", "is", null);
 
   const releaseIdsByLabelName = new Map<string, string[]>();
-  const releaseIdsByLabelId = new Map<string, string[]>();
   const activeLabelIds = new Set<string>();
 
   for (const r of (releaseRows || []) as Array<{
-    id: string;
     metadata: Record<string, unknown> | null;
     label_id: string | null;
   }>) {
-    if (r.label_id) {
-      activeLabelIds.add(r.label_id);
-      const ids = releaseIdsByLabelId.get(r.label_id) || [];
-      ids.push(r.id);
-      releaseIdsByLabelId.set(r.label_id, ids);
-    }
-
+    if (r.label_id) activeLabelIds.add(r.label_id);
     const meta = r.metadata || {};
     const labelName = (meta.record_label || meta.wp_label || "") as string;
     if (labelName?.trim()) {
       const key = labelName.trim().toLowerCase();
       const ids = releaseIdsByLabelName.get(key) || [];
-      ids.push(r.id);
+      ids.push("");
       releaseIdsByLabelName.set(key, ids);
     }
   }
 
-  const { data: allLabels, error: labelErr } = await supabase
+  const { data: allLabels } = await supabase
     .from("registry_labels")
-    .select("id, name, normalized_name, country_code")
+    .select("name, country_code, normalized_name, id")
     .eq("status", "active");
 
-  if (labelErr) {
-    console.warn(`Label catalog stats label lookup failed: ${labelErr.message}`);
-  }
-
-  const activeLabelNames = Array.from(releaseIdsByLabelName.keys());
-  const activeLabels = (allLabels || []).filter((label) => {
-    if (activeLabelIds.has(label.id)) return true;
-
-    const key = (label.name || "").trim().toLowerCase();
-    const normKey = (label.normalized_name || "").trim().toLowerCase();
-
-    return activeLabelNames.some((name) => name === key || name === normKey);
+  const activeNames = Array.from(releaseIdsByLabelName.keys());
+  const activeLabels = (allLabels || []).filter((l) => {
+    if (activeLabelIds.has(l.id)) return true;
+    const key = (l.name || "").trim().toLowerCase();
+    const normKey = (l.normalized_name || "").trim().toLowerCase();
+    return activeNames.some((n) => n === key || n === normKey);
   });
 
-  const allReleaseIds = Array.from(new Set([
-    ...Array.from(releaseIdsByLabelName.values()).flat(),
-    ...Array.from(releaseIdsByLabelId.values()).flat(),
-  ]));
+  const total = activeLabels.length;
+  const countries = [
+    ...new Set(activeLabels.map((l) => l.country_code).filter(Boolean)),
+  ].sort((a, b) => String(a).localeCompare(String(b)));
 
-  const releaseArtistMap = await resolvePrimaryArtistsForReleases(allReleaseIds);
+  let totalReleases = 0;
+  let totalArtists = 0;
+  const allReleaseIds = Array.from(releaseIdsByLabelName.values()).flat();
 
-  const artistSet = new Set<string>();
-  const artistSlugs = new Set<string>();
+  if (allReleaseIds.length > 0) {
+    const { data: releaseArtists } = await supabase
+      .from("registry_release_artists")
+      .select("release_id, artist_name_text")
+      .in(
+        "release_id",
+        [...new Set(allReleaseIds)],
+      )
+      .eq("status", "active")
+      .eq("is_primary", true);
 
-  for (const artist of releaseArtistMap.values()) {
-    if (!hasKnownArtistName(artist.name)) continue;
-
-    const key = artist.slug || artist.name.toLowerCase();
-    artistSet.add(key);
-
-    if (artist.slug) artistSlugs.add(artist.slug);
+    const artistSet = new Set<string>();
+    for (const ra of (releaseArtists || []) as Array<{
+      release_id: string;
+      artist_name_text: string | null;
+    }>) {
+      if (ra.artist_name_text) artistSet.add(ra.artist_name_text);
+    }
+    totalArtists = artistSet.size;
+    totalReleases = allReleaseIds.length;
   }
 
-  const artistOriginBySlug = await resolveArtistOriginsBySlug(Array.from(artistSlugs));
-  const originCountries = Array.from(new Set(artistOriginBySlug.values()))
-    .sort((a, b) => a.localeCompare(b));
-
   return {
-    total: activeLabels.length,
-    totalArtists: artistSet.size,
-    totalReleases: allReleaseIds.length,
+    total,
+    totalArtists,
+    totalReleases,
     featuredCount: 0,
-    countries: originCountries,
+    countries,
   };
 }
 

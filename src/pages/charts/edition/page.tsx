@@ -323,7 +323,7 @@ export default function ChartEdition() {
     playTrack(track, chartTracks, {
       pageType: "charts_edition",
       entitySlug: editionSlug,
-      recordType: "chart_edition",
+      entityType: "chart_edition",
       sourceSection,
     });
   }, [chartTracks, playTrack, editionSlug]);
@@ -334,7 +334,7 @@ export default function ChartEdition() {
     playTrack(firstPlayable, chartTracks, {
       pageType: "charts_edition",
       entitySlug: editionSlug,
-      recordType: "chart_edition",
+      entityType: "chart_edition",
       sourceSection,
     });
   }, [chartTracks, playTrack, editionSlug]);
@@ -354,9 +354,9 @@ export default function ChartEdition() {
 
     setSelectedChartAnchor({
       anchorType: "chart_entry",
-      contextRecordType: "chart_entry",
-      contextRecordId: `${editionSlug || "latest"}:${entry.rank}:${entry.slug}`,
-      contextRecordSlug: `${editionSlug || "latest"}-${entry.slug}`,
+      contextEntityType: "chart_entry",
+      contextEntityId: `${editionSlug || "latest"}:${entry.rank}:${entry.slug}`,
+      contextEntitySlug: `${editionSlug || "latest"}-${entry.slug}`,
       contextLabel: `#${entry.rank} · ${entry.title}`,
       anchorLabel: `#${entry.rank}`,
       title: `${entry.title} at #${entry.rank}`,
@@ -516,7 +516,7 @@ export default function ChartEdition() {
   const openChartSummaryDiscussion = (item: ContextAnchorSummaryItem) => {
     setSelectedChartAnchor({
       anchorType: "chart_entry",
-      contextRecordType: item.contextRecordType || "chart_entry",
+      contextEntityType: item.contextEntityType || "chart_entry",
       contextEntityId: item.contextEntityId,
       contextEntitySlug: item.contextEntitySlug,
       contextLabel: item.contextLabel || item.anchorLabel,
@@ -1102,14 +1102,14 @@ export default function ChartEdition() {
               wk_page_type: "charts_edition",
               wk_source_section: "edition_newsletter",
               wk_entity_slug: edition.slug,
-              wk_record_type: "chart_edition",
+              wk_entity_type: "chart_edition",
               chart_family_slug: familySlug,
               chart_program: familyLabel,
             }}
             analytics={{
               pageType: "charts_edition",
               entitySlug: edition.slug,
-              recordType: "chart_edition",
+              entityType: "chart_edition",
               context: {
                 chart_family_slug: familySlug,
                 chart_program: familyLabel,

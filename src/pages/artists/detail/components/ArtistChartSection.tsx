@@ -70,7 +70,7 @@ function Movement({ movement, amount }: { movement: ChartEntry["movement"]; amou
     );
   }
   return (
-    <span className="text-[12px] font-bold text-[var(--wk-text-faint)]">,</span>
+    <span className="text-[12px] font-bold text-[var(--wk-text-faint)]">—</span>
   );
 }
 
@@ -252,7 +252,7 @@ function TrackChartRow({
       {
         pageType: "artist_detail",
         entitySlug: artistSlug,
-        recordType: "artist",
+        entityType: "artist",
         sourceSection: "chart_journey",
       },
     );

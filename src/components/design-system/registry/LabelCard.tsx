@@ -32,7 +32,7 @@ export function LabelCard({
   const handleClick = () => {
     if (sourceSection) {
       trackEvent("card_click", {
-        recordType: "label",
+        entityType: "label",
         entitySlug: slug,
         context: {
           source_section: sourceSection,

@@ -127,7 +127,7 @@ export default function LyricContribution() {
         {
           pageType: "track_detail",
           entitySlug: trackSlug ?? track.slug,
-          recordType: "track",
+          entityType: "track",
           sourceSection: "contribute_page",
         },
       );
@@ -166,8 +166,8 @@ export default function LyricContribution() {
     if (track) {
       trackEvent("lyrics_contribution", {
         pageType: "track_detail",
-        recordSlug: trackSlug ?? "",
-        recordType: "track",
+        entitySlug: trackSlug ?? "",
+        entityType: "track",
         context: {
           source_section: "contribute_page",
           artist_slug: artistSlug ?? track.artistSlug,

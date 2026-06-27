@@ -4,13 +4,13 @@ type Ch19GradientImageProps = Ch19Identity & {
   className?: string;
 };
 
-export function Ch19GradientImage({ className = "", ...idrecord }: Ch19GradientImageProps) {
+export function Ch19GradientImage({ className = "", ...identity }: Ch19GradientImageProps) {
   return (
     <div
       className={`h-full w-full ${className}`}
       style={{ background: ch19Background(identity) }}
       role="img"
-      aria-label={`${idrecord.name ?? idrecord.slug ?? "item"} placeholder`}
+      aria-label={`${identity.name ?? identity.slug ?? "item"} placeholder`}
     />
   );
 }

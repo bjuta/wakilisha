@@ -57,7 +57,7 @@ export interface ArticleSchema {
 
 export interface FAQPageSchema {
   "@type": "FAQPage";
-  mainRecord: Array<{ "@type": "Question"; name: string; acceptedAnswer: { "@type": "Answer"; text: string } }>;
+  mainEntity: Array<{ "@type": "Question"; name: string; acceptedAnswer: { "@type": "Answer"; text: string } }>;
 }
 
 export interface WebPageSchema {

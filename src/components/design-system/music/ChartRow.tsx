@@ -175,7 +175,7 @@ export function ChartRow({
             <span className="mt-0.5 rounded-full px-1 py-px text-[9px] font-black uppercase tracking-wider" style={{ backgroundColor: "var(--wk-brand-soft)", color: "var(--wk-brand)" }}>RE</span>
           )}
           {movement === "same" && (
-            <span className="mt-0.5 text-[11px] font-bold" style={{ color: "var(--wk-text-faint)" }}>,</span>
+            <span className="mt-0.5 text-[11px] font-bold" style={{ color: "var(--wk-text-faint)" }}>—</span>
           )}
         </div>
 

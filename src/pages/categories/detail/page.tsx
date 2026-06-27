@@ -205,7 +205,7 @@ export default function CategoryDetail() {
     );
   }
 
-  const seoTitle = term.seo_title || `${term.name}. WAKILISHA Magazine`;
+  const seoTitle = term.seo_title || `${term.name} — WAKILISHA Magazine`;
   const seoDescription = term.seo_description || term.description?.replace(/<[^>]*>/g, "").slice(0, 160) || `Browse all ${term.name} articles on WAKILISHA.`;
 
   return (
@@ -280,7 +280,7 @@ export default function CategoryDetail() {
           </section>
         )}
 
-        {/* ── Editor’s Picks (dynamic asymmetry: 1 hero + 3 compact stacked) ── */}
+        {/* ── Editor's Picks (dynamic asymmetry: 1 hero + 3 compact stacked) ── */}
         {stories.length > 0 && heroStory && (
           <section className="mag-reveal">
             <SectionLabel count={stories.length}>Stories in {term.name}</SectionLabel>

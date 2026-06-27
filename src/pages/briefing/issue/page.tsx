@@ -28,7 +28,7 @@ export default function BriefingIssuePage() {
           setIssueHtml(html);
           setIssueTitle(result.issue.title ?? "Briefing Issue");
         } else {
-          setError("This issue doesn’t have a web view yet.");
+          setError("This issue doesn't have a web view yet.");
         }
       })
       .catch((e: any) => {
@@ -70,7 +70,7 @@ export default function BriefingIssuePage() {
   return (
     <>
       <MetaTags
-        title={`${issueTitle}. WAKILISHA`}
+        title={`${issueTitle} — WAKILISHA`}
         description={`Read ${issueTitle} on the web`}
       />
       <div style={{ background: "#f6f4ef", minHeight: "100vh", padding: "32px 0" }}>

@@ -122,7 +122,7 @@ export function ContributionSheet({
         context: {
           contribution_type: selectedType,
           source_comment_id: sourceCommentId || null,
-          record_title: record.title,
+          entity_title: entity.title,
         },
       });
       setStep("success");
@@ -156,7 +156,7 @@ export function ContributionSheet({
                 </div>
                 {step === "form" && (
                   <div className="share-sub">
-                    {record.type === "artist" ? "Artist" : record.type === "track" ? "Track" : record.type === "release" ? "Release" : record.type} · {record.title}
+                    {entity.type === "artist" ? "Artist" : entity.type === "track" ? "Track" : entity.type === "release" ? "Release" : entity.type} · {entity.title}
                   </div>
                 )}
               </div>

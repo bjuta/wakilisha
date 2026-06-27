@@ -96,7 +96,7 @@ export default function DesktopPlayerPage() {
 
     try {
       const result = await saveEntityAction({
-        recordType: "track",
+        entityType: "track",
         entityId: currentTrack.id,
         entitySlug: trackSlug,
         entityUrl,

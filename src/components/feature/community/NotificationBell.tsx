@@ -197,13 +197,13 @@ export function NotificationBell({ userId, className = '', placement = 'auto' }:
 
   const getNotificationLink = (notif: NotificationWithActor): string | null => {
     if (notif.commentId && notif.entitySlug) {
-      if (notif.recordType === 'article') {
-        return `/magazine/${notif.recordSlug}#community-section`;
+      if (notif.entityType === 'article') {
+        return `/magazine/${notif.entitySlug}#community-section`;
       }
       return `#comment-${notif.commentId}`;
     }
-    if (notif.recordType === 'profile' && notif.recordSlug) {
-      return `/u/${notif.recordSlug}`;
+    if (notif.entityType === 'profile' && notif.entitySlug) {
+      return `/u/${notif.entitySlug}`;
     }
     return null;
   };

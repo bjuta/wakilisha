@@ -32,7 +32,7 @@ export default function ReleaseDetail() {
   useScrollDepthTracking({
     pageType: "release_detail",
     entitySlug: releaseSlug,
-    recordType: "release",
+    entityType: "release",
   });
 
   const [release, setRelease] = useState<PublicReleaseDetail | null>(null);
@@ -124,8 +124,8 @@ export default function ReleaseDetail() {
   const openReleaseTrackDiscussion = (track: PublicReleaseDetail["tracks"][number], index: number) => {
     setSelectedAnchor({
       anchorType: "release_track",
-      contextRecordType: "release_track",
-      contextRecordId: track.id || track.slug || `${release.slug}-${index + 1}`,
+      contextEntityType: "release_track",
+      contextEntityId: track.id || track.slug || `${release.slug}-${index + 1}`,
       contextEntitySlug: track.slug || undefined,
       contextLabel: `Track ${index + 1}: ${track.title}`,
       anchorLabel: `Track ${index + 1}`,
@@ -139,7 +139,7 @@ export default function ReleaseDetail() {
   const openReleaseSummaryDiscussion = (item: ContextAnchorSummaryItem) => {
     setSelectedAnchor({
       anchorType: "release_track",
-      contextRecordType: item.contextRecordType || "release_track",
+      contextEntityType: item.contextEntityType || "release_track",
       contextEntityId: item.contextEntityId,
       contextEntitySlug: item.contextEntitySlug,
       contextLabel: item.contextLabel || item.anchorLabel,
@@ -187,7 +187,7 @@ export default function ReleaseDetail() {
 
       {/* Contribution Badges */}
       <div className="wk-container-wide px-6 pb-2">
-        <ContributionBadges recordType="release" recordSlug={releaseSlug} />
+        <ContributionBadges entityType="release" entitySlug={releaseSlug} />
       </div>
 
       {/* Content */}
@@ -307,7 +307,7 @@ export default function ReleaseDetail() {
         </div>
       </div>
 
-      <CommunitySection record={communityRecord} user={user} />
+      <CommunitySection entity={communityEntity} user={user} />
 
       <ContextAnchorCommentDrawer
         open={Boolean(selectedAnchor)}

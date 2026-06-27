@@ -239,7 +239,7 @@ export function ChartHighlights({ entries, onJumpTo }: ChartHighlightsProps) {
               <h2 className="wk-h-section leading-none">Long-running tracks</h2>
               <p className="mt-2 max-w-[480px] text-[13px] leading-relaxed text-[var(--wk-text-muted)]">
                 These tracks refuse to leave. Every week on the chart is a
-                statement. and they're making theirs loud.
+                statement — and they're making theirs loud.
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-2">

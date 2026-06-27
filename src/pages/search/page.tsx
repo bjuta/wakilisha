@@ -147,7 +147,7 @@ export default function Search() {
     );
   };
 
-  const handleResultClick = (recordType: string, recordSlug: string, position: number) => {
+  const handleResultClick = (entityType: string, entitySlug: string, position: number) => {
     trackEvent("search_result_click", {
       pageType: "search",
       entityType,

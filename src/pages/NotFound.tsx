@@ -18,7 +18,7 @@ function routeGuess(pathname: string): string {
   if (pathname.startsWith("/artist/")) return "legacy_artist";
   if (pathname.startsWith("/release/")) return "legacy_release";
   if (pathname.startsWith("/track/")) return "legacy_track";
-  if (pathname.startsWith("/wp-content/")) return "legacy_wordpress_image";
+  if (pathname.startsWith("/wp-content/")) return "legacy_wordpress_asset";
   if (pathname.startsWith("/wp-admin/")) return "wordpress_admin_probe";
   return "unknown";
 }
@@ -44,8 +44,8 @@ export default function NotFound() {
 
     trackEvent("page_not_found", {
       pageType: "404",
-      recordType: "broken_page",
-      recordSlug: location.pathname.replace(/^\/+|\/+$/g, "").replace(/[^a-zA-Z0-9/_-]+/g, "-") || "home",
+      entityType: "broken_page",
+      entitySlug: location.pathname.replace(/^\/+|\/+$/g, "").replace(/[^a-zA-Z0-9/_-]+/g, "-") || "home",
       context: {
         status_code: 404,
         not_found_path: location.pathname,

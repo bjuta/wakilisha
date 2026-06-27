@@ -25,7 +25,7 @@ export default function MobileReadingGuide() {
     trackEvent("guide_subscribe_submit", {
       pageType: "guide_detail",
       entitySlug: guideSlug,
-      recordType: "guide",
+      entityType: "guide",
       context: {
         source_section: "notify_form_mobile",
         guide_title: guideTitle,

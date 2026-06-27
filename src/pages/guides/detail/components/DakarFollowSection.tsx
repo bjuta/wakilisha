@@ -32,7 +32,7 @@ export default function DakarFollowSection() {
     trackEvent("newsletter_signup", {
       pageType: "guide_detail",
       entitySlug: guideSlug,
-      recordType: "guide",
+      entityType: "guide",
       context: {
         source_section: "follow_form",
         guide_title: guideTitle,
@@ -50,7 +50,7 @@ export default function DakarFollowSection() {
     <section id="updates" className="w-full py-16 md:py-24 border-t border-[var(--wk-divider)]" style={{ background: "var(--wk-bg-alt, var(--wk-bg))" }}>
       <div className="wk-container-wide px-6 md:px-10 lg:px-16">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16">
-          {/* Left column. copy */}
+          {/* Left column — copy */}
           <div className="space-y-6">
             <div className="text-xs font-semibold uppercase tracking-wider text-[var(--wk-text-muted)] mb-2">
               {follow.label}
