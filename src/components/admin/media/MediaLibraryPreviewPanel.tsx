@@ -2,7 +2,7 @@
  * MediaLibraryPreviewPanel — right-hand preview + metadata + actions.
  *
  * Used inside the picker modal and optionally inside the library page.
- * Handles both registered assets (registry_media_assets rows) and raw storage files.
+ * Handles registered media assets and unmanaged URLs.
  */
 
 import { useState } from "react";
@@ -29,10 +29,6 @@ interface Props {
   onAssetUpdated?: (asset: MediaAsset) => void;
   /** Library mode: callback after deleting an asset */
   onAssetDeleted?: (id: string) => void;
-  /** Register a raw storage URL as a proper registry asset */
-  onRegisterFromStorage?: (url: string) => Promise<MediaAsset>;
-  /** Delete a raw storage file directly from the bucket */
-  onDeleteStorage?: (url: string) => Promise<void>;
   /** Which mode we're in — affects buttons shown */
   mode: "library" | "picker";
 }
@@ -47,18 +43,13 @@ export function MediaLibraryPreviewPanel({
   onDelete,
   onAssetUpdated,
   onAssetDeleted,
-  onRegisterFromStorage,
-  onDeleteStorage,
   mode,
 }: Props) {
   const [editingAsset, setEditingAsset] = useState<MediaAsset | null>(null);
   const [editFocus, setEditFocus] = useState<"view" | "edit">("view");
   const [previewError, setPreviewError] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [registering, setRegistering] = useState(false);
-  const [deletingStorage, setDeletingStorage] = useState(false);
-
-  const isStorage = !selectedAsset && !!selectedUrl;
+  const isUnmanagedUrl = !selectedAsset && !!selectedUrl;
 
   const metadata = selectedAsset?.metadata ?? {};
   const altText = typeof metadata.alt_text === "string" ? metadata.alt_text : undefined;
@@ -78,29 +69,6 @@ export function MediaLibraryPreviewPanel({
     }
   };
 
-  const handleDeleteStorageFile = async () => {
-    if (!onDeleteStorage || !selectedUrl) return;
-    setDeletingStorage(true);
-    try {
-      await onDeleteStorage(selectedUrl);
-    } catch {
-      // error handled by parent
-    } finally {
-      setDeletingStorage(false);
-    }
-  };
-
-  const handleRegister = async () => {
-    if (!onRegisterFromStorage || !selectedUrl) return;
-    setRegistering(true);
-    try {
-      await onRegisterFromStorage(selectedUrl);
-    } catch {
-      // error handled by parent
-    } finally {
-      setRegistering(false);
-    }
-  };
 
   const handleOpenEdit = (asset: MediaAsset) => {
     setEditingAsset(asset);
@@ -250,54 +218,19 @@ export function MediaLibraryPreviewPanel({
                   </div>
                 )}
               </div>
-            ) : isStorage ? (
-              /* Storage file — Register to Library */
+            ) : isUnmanagedUrl ? (
               <div className="space-y-3">
                 <div className="rounded-lg border border-wk-border bg-wk-surface p-2.5">
                   <p className="text-[10px] font-black uppercase tracking-wider text-wk-text-faint mb-1">URL</p>
                   <p className="text-[10px] font-mono text-wk-text break-all leading-relaxed">{selectedUrl}</p>
                 </div>
-                <div className="rounded-lg border border-wk-warning/20 bg-wk-warning/5 p-3 space-y-2.5">
+                <div className="rounded-lg border border-wk-warning/20 bg-wk-warning/5 p-3">
                   <div className="flex items-start gap-2">
                     <i className="ri-alert-line text-[13px] text-wk-warning shrink-0 mt-0.5" />
                     <p className="text-[11px] text-wk-text-muted leading-relaxed">
-                      Raw storage file — not yet in the registry. Register it to unlock metadata, editing, and asset management.
+                      This URL is not attached to a managed media asset. Re-upload it through Upload to bring it under the media registry.
                     </p>
                   </div>
-                  <button
-                    onClick={handleRegister}
-                    disabled={registering || !onRegisterFromStorage}
-                    className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-wk-brand px-3 py-2 text-[12px] font-bold text-wk-brand-on hover:opacity-90 disabled:opacity-40 transition-all cursor-pointer whitespace-nowrap"
-                  >
-                    {registering ? (
-                      <>
-                        <i className="ri-loader-2-line animate-spin text-[12px]" />
-                        Registering…
-                      </>
-                    ) : (
-                      <>
-                        <i className="ri-database-2-line text-[12px]" />
-                        Register to Library
-                      </>
-                    )}
-                  </button>
-                  <button
-                    onClick={handleDeleteStorageFile}
-                    disabled={deletingStorage || !onDeleteStorage}
-                    className="w-full flex items-center justify-center gap-1.5 rounded-lg border border-wk-danger/20 px-3 py-2 text-[12px] font-bold text-wk-danger hover:bg-wk-danger-soft disabled:opacity-40 transition-all cursor-pointer whitespace-nowrap"
-                  >
-                    {deletingStorage ? (
-                      <>
-                        <i className="ri-loader-2-line animate-spin text-[12px]" />
-                        Deleting…
-                      </>
-                    ) : (
-                      <>
-                        <i className="ri-delete-bin-line text-[12px]" />
-                        Delete from Storage
-                      </>
-                    )}
-                  </button>
                 </div>
               </div>
             ) : null}

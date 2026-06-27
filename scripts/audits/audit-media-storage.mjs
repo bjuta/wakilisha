@@ -52,7 +52,6 @@ const CHECKS = [
  * in focused PRs later.
  */
 const BASELINE_COUNTS = new Map([
-  ["src/components/admin/media/MediaLibraryCore.tsx::Direct Supabase Storage object operation", 2],
   ["src/services/mediaService.ts::Direct Supabase Storage object operation", 1],
   ["src/services/mediaService.ts::Direct Supabase public storage URL", 1],
   ["src/services/migrationImportJobs.ts::Direct Supabase Storage object operation", 2],

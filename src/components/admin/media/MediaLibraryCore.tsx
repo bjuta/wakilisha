@@ -14,19 +14,10 @@ import { WkIcon } from "@/components/design-system/Icon";
 import { mediaService, type MediaAsset } from "@/services/mediaService";
 import { MediaEditModal } from "@/components/admin/media/MediaEditModal";
 import { MediaLibraryPreviewPanel } from "@/components/admin/media/MediaLibraryPreviewPanel";
-import { supabase } from "@/lib/supabase";
 
 // ─── Types ───────────────────────────────────────────────────
 
-interface BucketItem {
-  name: string;
-  id: string | null;
-  path: string;
-  isFolder: boolean;
-  publicUrl?: string;
-}
-
-type Tab = "assets" | "storage" | "upload";
+type Tab = "assets" | "upload" | "audit";
 
 export interface MediaLibraryCoreProps {
   /** "library" = standalone page, "picker" = inside a modal for selection */
@@ -48,7 +39,6 @@ export interface MediaLibraryCoreProps {
 }
 
 const PAGE_SIZE = 60;
-const BUCKET = "article-media";
 
 // ─── Component ───────────────────────────────────────────────
 
@@ -92,11 +82,6 @@ export function MediaLibraryCore({
   // ── Edit modal
   const [editingAsset, setEditingAsset] = useState<MediaAsset | null>(null);
 
-  // ── Storage browser
-  const [storageRoot, setStorageRoot] = useState<"uploads" | "wp-import">("uploads");
-  const [bucketPath, setBucketPath] = useState("uploads");
-  const [bucketItems, setBucketItems] = useState<BucketItem[]>([]);
-  const [bucketLoading, setBucketLoading] = useState(false);
 
   // ── Upload
   const [uploadFiles, setUploadFiles] = useState<File[]>([]);
@@ -166,29 +151,6 @@ export function MediaLibraryCore({
     }
   }, [currentUrl, assets]);
 
-  // ── Fetch storage bucket
-  const fetchBucket = useCallback(async () => {
-    setBucketLoading(true);
-    const { data, error } = await supabase.storage.from(BUCKET).list(bucketPath);
-    if (error) {
-      setBucketItems([]);
-    } else {
-      const items: BucketItem[] = (data ?? []).map((item) => {
-        const isFolder = !item.id;
-        const path = `${bucketPath}/${item.name}`;
-        let publicUrl: string | undefined;
-        if (!isFolder) {
-          const { data: u } = supabase.storage.from(BUCKET).getPublicUrl(path);
-          publicUrl = u.publicUrl;
-        }
-        return { name: item.name, id: item.id ?? null, path, isFolder, publicUrl };
-      });
-      setBucketItems(items.filter((i) => i.isFolder || /\.(jpe?g|png|gif|webp|svg)$/i.test(i.name)));
-    }
-    setBucketLoading(false);
-  }, [bucketPath]);
-
-  useEffect(() => { if (tab === "storage") fetchBucket(); }, [tab, bucketPath, fetchBucket]);
 
   // ── Upload
   const uploadFile = useCallback(async (file: File) => {
@@ -290,40 +252,14 @@ export function MediaLibraryCore({
     }
   };
 
-  const handleDeleteStorage = async (url: string) => {
-    try {
-      const item = bucketItems.find((i) => i.publicUrl === url);
-      if (!item) throw new Error("Storage item not found");
-      const { error } = await supabase.storage.from(BUCKET).remove([item.path]);
-      if (error) throw error;
-      setBucketItems((prev) => prev.filter((i) => i.publicUrl !== url));
-      if (selectedUrl === url) selectItem(null, "");
-      showToast("success", "Deleted from storage.");
-    } catch (err) {
-      showToast("error", err instanceof Error ? err.message : "Failed to delete.");
-    }
-  };
-
-  const handleRegisterFromStorage = async (url: string) => {
-    try {
-      const asset = await mediaService.registerFromUrl(url);
-      setAssets((prev) => [asset, ...prev]);
-      selectItem(asset.id, asset.url!, asset);
-      showToast("success", `Registered: ${asset.title || asset.slug}`);
-      return asset;
-    } catch (err) {
-      showToast("error", err instanceof Error ? err.message : "Failed to register.");
-      throw err;
-    }
-  };
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
   // ── Tabs
   const TABS: { key: Tab; label: string; icon: string }[] = [
     { key: "assets", label: "Media Assets", icon: "ri-database-2-line" },
-    { key: "storage", label: "Storage", icon: "ri-folder-image-line" },
     { key: "upload", label: "Upload", icon: "ri-upload-cloud-line" },
+    { key: "audit", label: "Audit", icon: "ri-shield-check-line" },
   ];
 
   const selectedAsset = selectedAssetId ? assets.find((a) => a.id === selectedAssetId) ?? null : null;
@@ -339,7 +275,7 @@ export function MediaLibraryCore({
             <div className="mb-1 text-[11px] font-black uppercase tracking-wider text-wk-brand">Media</div>
             <h1 className="text-[22px] font-black tracking-tight text-wk-text">Media Library</h1>
             <p className="mt-1 text-[13px] text-wk-text-muted">
-              {total.toLocaleString()} assets · single source of truth for all images
+              {total.toLocaleString()} managed assets · Lightsail-backed media registry
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
@@ -680,86 +616,24 @@ export function MediaLibraryCore({
           </>
         )}
 
-        {/* ═══ Storage tab ═══ */}
-        {tab === "storage" && (
-          <div className="space-y-3">
-            {/* Root switcher */}
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-wk-text-muted shrink-0">Folder</span>
-              <div className="flex items-center rounded-lg border border-wk-border bg-wk-bg p-0.5 gap-0.5">
-                {(["uploads", "wp-import"] as const).map((root) => (
-                  <button key={root} onClick={() => { setStorageRoot(root); setBucketPath(root); }}
-                    className={`flex items-center gap-1.5 rounded-md px-3 py-1 text-[11px] font-semibold transition-all whitespace-nowrap cursor-pointer ${
-                      storageRoot === root ? "bg-wk-surface text-wk-text shadow-sm" : "text-wk-text-muted hover:text-wk-text"
-                    }`}>
-                    <i className={root === "uploads" ? "ri-upload-cloud-line text-[11px]" : "ri-wordpress-line text-[11px]"} />
-                    {root === "uploads" ? "Uploads" : "WP Import"}
-                  </button>
-                ))}
-              </div>
+        {/* ═══ Audit tab ═══ */}
+        {tab === "audit" && (
+          <div className="grid gap-3 md:grid-cols-3">
+            <div className="rounded-xl border border-wk-border bg-wk-surface p-4">
+              <p className="text-[10px] font-black uppercase tracking-wider text-wk-text-faint">File origin</p>
+              <p className="mt-1 text-[14px] font-black text-wk-text">Lightsail</p>
+              <p className="mt-1 text-[11px] text-wk-text-muted">All managed files should resolve from media.wakilisha.africa.</p>
             </div>
-
-            {/* Breadcrumb */}
-            <div className="flex items-center gap-1 text-[12px] text-wk-text-muted">
-              <i className="ri-folder-line text-[12px]" />
-              <button onClick={() => setBucketPath(storageRoot)} className="rounded px-1.5 py-0.5 hover:bg-wk-surface-raised text-wk-brand font-semibold cursor-pointer">{storageRoot}</button>
-              {bucketPath !== storageRoot && (
-                <>
-                  <WkIcon name="ChevronRight" size={11} />
-                  <span className="font-mono text-[11px]">{bucketPath.replace(`${storageRoot}/`, "")}</span>
-                </>
-              )}
+            <div className="rounded-xl border border-wk-border bg-wk-surface p-4">
+              <p className="text-[10px] font-black uppercase tracking-wider text-wk-text-faint">Registry</p>
+              <p className="mt-1 text-[14px] font-black text-wk-text">registry_media_assets</p>
+              <p className="mt-1 text-[11px] text-wk-text-muted">This table is the auditable media library.</p>
             </div>
-
-            {bucketLoading ? (
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
-                {Array.from({ length: 12 }).map((_, i) => <div key={i} className="aspect-square animate-pulse rounded-xl bg-wk-surface-raised" />)}
-              </div>
-            ) : bucketItems.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-14 text-wk-text-muted">
-                <WkIcon name="Folder" size={32} className="mb-2 text-wk-text-faint" />
-                <p className="text-[13px]">No images in this folder.</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
-                {bucketItems.map((item) => (
-                  <div key={item.path}
-                    onClick={() => { if (item.isFolder) { setBucketPath(item.path); } else { selectItem(null, item.publicUrl ?? ""); } }}
-                    className={`group relative aspect-square overflow-hidden rounded-xl border cursor-pointer transition-all ${
-                      !item.isFolder && selectedUrl === item.publicUrl
-                        ? "ring-2 ring-wk-brand border-wk-brand"
-                        : "border-wk-border hover:border-wk-brand/40"
-                    }`}>
-                    {item.isFolder ? (
-                      <div className="flex h-full flex-col items-center justify-center gap-2 text-wk-text-muted bg-wk-surface-raised">
-                        <WkIcon name="Folder" size={26} />
-                        <span className="text-[10px] font-semibold truncate max-w-[90%] px-2">{item.name}</span>
-                      </div>
-                    ) : (
-                      <>
-                        <img src={item.publicUrl} alt={item.name} className="h-full w-full object-cover object-top" loading="lazy"
-                          onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2">
-                          <p className="text-[10px] font-semibold text-white truncate">{item.name}</p>
-                        </div>
-                        {selectedUrl === item.publicUrl && (
-                          <div className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-wk-brand">
-                            <WkIcon name="Check" size={11} className="text-white" />
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Storage item tip */}
-            {selectedUrl && !selectedAsset && tab === "storage" && (
-              <div className="rounded-lg border border-wk-warning/20 bg-wk-warning-soft p-3 text-[11px] text-wk-text-muted">
-                <strong className="text-wk-warning">Raw storage file</strong> — this URL has no registry metadata. For full management, use Upload to add it to the registry.
-              </div>
-            )}
+            <div className="rounded-xl border border-wk-border bg-wk-surface p-4">
+              <p className="text-[10px] font-black uppercase tracking-wider text-wk-text-faint">Legacy storage</p>
+              <p className="mt-1 text-[14px] font-black text-wk-success">Retired</p>
+              <p className="mt-1 text-[11px] text-wk-text-muted">Supabase Storage is no longer a browsing or upload surface.</p>
+            </div>
           </div>
         )}
 
@@ -780,7 +654,7 @@ export function MediaLibraryCore({
               </div>
               <div className="text-center">
                 <p className="text-[15px] font-bold text-wk-text">{isDragging ? "Drop images here" : "Drag & drop or click to upload"}</p>
-                <p className="mt-1 text-[12px] text-wk-text-muted">PNG, JPG, GIF, WebP, SVG · Uploads to registry + storage</p>
+                <p className="mt-1 text-[12px] text-wk-text-muted">PNG, JPG, GIF, WebP, SVG · Uploads to Lightsail + media registry</p>
               </div>
               <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden"
                 onChange={(e) => e.target.files && handleFilesAdded(e.target.files)} />
@@ -862,8 +736,6 @@ export function MediaLibraryCore({
           onDelete={handleDeleteAsset}
           onAssetUpdated={handleEditSave}
           onAssetDeleted={handleEditDelete}
-          onRegisterFromStorage={handleRegisterFromStorage}
-          onDeleteStorage={handleDeleteStorage}
           mode="library"
         />
       )}
