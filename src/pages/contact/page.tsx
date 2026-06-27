@@ -106,10 +106,10 @@ export default function ContactPage() {
               <span className="text-[10px] font-black uppercase tracking-[0.24em] text-white/60">Get in touch</span>
             </div>
             <h1 className="text-[clamp(44px,6vw,80px)] font-black tracking-[-0.05em] leading-[0.90] mb-5">
-              We'd love to hear from you
+              We’d love to hear from you
             </h1>
             <p className="text-[clamp(15px,1.8vw,18px)] leading-relaxed text-white/55 max-w-[480px]">
-              Whether you're an artist wanting to be in the registry, a writer pitching a story, or just someone who cares about African creative life — say hello.
+              Whether you’re an artist, a writer pitching a story, or someone who cares about African creative life, say hello.
             </p>
           </div>
         </div>
@@ -132,7 +132,7 @@ export default function ContactPage() {
                 </div>
                 <h3 className="text-[24px] font-black tracking-[-0.03em] text-[var(--wk-text)] mb-2">Message sent</h3>
                 <p className="text-[14px] text-[var(--wk-text-muted)] max-w-[380px] mx-auto leading-relaxed">
-                  Thanks for reaching out. We read every message and we'll get back to you as soon as we can.
+                  Thanks for reaching out. We read every message and we’ll get back to you as soon as we can.
                 </p>
               </div>
             ) : (
@@ -202,7 +202,7 @@ export default function ContactPage() {
                     required
                     maxLength={500}
                     rows={5}
-                    placeholder="Tell us what's on your mind..."
+                    placeholder="Tell us what’s on your mind..."
                     className="w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] p-4 text-[14px] text-[var(--wk-text)] placeholder:text-[var(--wk-text-faint)] outline-none focus:border-[var(--wk-brand)] transition-colors resize-none"
                   />
                 </div>
