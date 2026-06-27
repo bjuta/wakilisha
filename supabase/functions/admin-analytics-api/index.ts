@@ -84,6 +84,54 @@ function readString(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function hostnameFromUrl(raw: unknown): string {
+  const value = readString(raw);
+  if (!value) return "";
+
+  try {
+    return new URL(value).hostname.replace(/^www\./, "").toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
+function isInternalHostname(hostname: string): boolean {
+  const host = hostname.replace(/^www\./, "").toLowerCase();
+  return (
+    host === "localhost" ||
+    host === "127.0.0.1" ||
+    host === "::1" ||
+    host.endsWith(".local") ||
+    /^10\./.test(host) ||
+    /^192\.168\./.test(host) ||
+    /^172\.(1[6-9]|2\d|3[0-1])\./.test(host)
+  );
+}
+
+function isInternalAnalyticsEvent(row: any): boolean {
+  const ctx = (row?.context || {}) as Record<string, any>;
+
+  if (ctx.analytics_is_internal === true) return true;
+  if (readString(ctx.analytics_traffic_type).toLowerCase() === "internal") return true;
+  if (isInternalHostname(readString(ctx.analytics_hostname))) return true;
+
+  const pageHost = hostnameFromUrl(row?.page_url);
+  if (pageHost && isInternalHostname(pageHost)) return true;
+
+  const rawHost = hostnameFromUrl(ctx.raw_page_url);
+  if (rawHost && isInternalHostname(rawHost)) return true;
+
+  const canonicalHost = hostnameFromUrl(ctx.canonical_page_url);
+  if (canonicalHost && isInternalHostname(canonicalHost)) return true;
+
+  return false;
+}
+
+function filterInternalEvents<T extends any[]>(events: T, clean = true): T {
+  if (!clean) return events;
+  return events.filter((row) => !isInternalAnalyticsEvent(row)) as T;
+}
+
 function domainFromReferrer(raw: unknown): string {
   const ref = readString(raw);
   if (!ref) return "";
@@ -149,7 +197,7 @@ async function requireAdminRead(userId: string, db: ReturnType<typeof createClie
   return caps.has("view_analytics") || caps.has("view_community") || caps.has("manage_registry");
 }
 
-async function getAnalyticsEvents(db: ReturnType<typeof createClient>, range: RangeInput, limit = 10000) {
+async function getAnalyticsEvents(db: ReturnType<typeof createClient>, range: RangeInput, limit = 10000, clean = true) {
   const since = sinceFromRange(range);
   const until = untilFromRange(range);
 
@@ -162,7 +210,7 @@ async function getAnalyticsEvents(db: ReturnType<typeof createClient>, range: Ra
     .limit(limit);
 
   if (error) throw error;
-  return data ?? [];
+  return filterInternalEvents(data ?? [], clean);
 }
 
 function buildTimeline(events: any[], range: RangeInput) {
@@ -1533,7 +1581,7 @@ async function taxonomyEmptyEvents(db: ReturnType<typeof createClient>, pageRows
   return events;
 }
 
-async function scanBrokenPages(db: ReturnType<typeof createClient>, range: RangeInput, limit = 80) {
+async function scanBrokenPages(db: ReturnType<typeof createClient>, range: RangeInput, limit = 80, clean = true) {
   const { data: pageRows, error: pageError } = await db
     .from("analytics_events")
     .select("page_url,created_at,event_name,session_id,referrer,page_type,entity_slug,entity_type,context")
@@ -1545,11 +1593,13 @@ async function scanBrokenPages(db: ReturnType<typeof createClient>, range: Range
 
   if (pageError) throw pageError;
 
+  const cleanPageRows = filterInternalEvents(pageRows ?? [], clean);
+
   const seen = new Set<string>();
   const candidates: string[] = [];
   const routeEvents: any[] = [];
 
-  for (const row of pageRows ?? []) {
+  for (const row of cleanPageRows) {
     const url = canonicalScanUrl(row.page_url);
     if (!url || seen.has(url) || !isScannablePublicUrl(url)) continue;
 
@@ -1562,7 +1612,7 @@ async function scanBrokenPages(db: ReturnType<typeof createClient>, range: Range
     if (candidates.length >= Math.max(1, Math.min(limit, 150))) break;
   }
 
-  const taxonomyEvents = await taxonomyEmptyEvents(db, pageRows ?? []);
+  const taxonomyEvents = await taxonomyEmptyEvents(db, cleanPageRows);
 
   const brokenEvents: any[] = [...routeEvents, ...taxonomyEvents];
   let scanned = 0;
@@ -1902,7 +1952,7 @@ async function buildSignalBoardFromRollups(db: ReturnType<typeof createClient>, 
   };
 }
 
-async function buildRealtime(db: ReturnType<typeof createClient>) {
+async function buildRealtime(db: ReturnType<typeof createClient>, clean = true) {
   const now = Date.now();
   const since5 = new Date(now - 5 * 60 * 1000).toISOString();
   const since30 = new Date(now - 30 * 60 * 1000).toISOString();
@@ -1916,7 +1966,7 @@ async function buildRealtime(db: ReturnType<typeof createClient>) {
 
   if (error) throw error;
 
-  const events = data ?? [];
+  const events = filterInternalEvents(data ?? [], clean);
   const last5 = events.filter((e) => e.created_at >= since5);
   const pageViews = events.filter((e) => e.event_name === "page_view");
   const last5PageViews = last5.filter((e) => e.event_name === "page_view");
@@ -2121,21 +2171,24 @@ Deno.serve(async (req) => {
   try {
     if (action === "analytics_snapshot") {
       const range = body.range ?? 30;
-      const events = await getAnalyticsEvents(db, range);
+      const clean = body.clean !== false;
+      const events = await getAnalyticsEvents(db, range, 10000, clean);
       return ok(buildSnapshot(events, range), headers);
     }
 
     if (action === "analytics_signal_board") {
       const range = body.range ?? 30;
+      const clean = body.clean !== false;
       const rollupBoard = await buildSignalBoardFromRollups(db, range);
       if (rollupBoard) return ok(rollupBoard, headers);
 
-      const events = await getAnalyticsEvents(db, range);
+      const events = await getAnalyticsEvents(db, range, 10000, clean);
       return ok({ ...buildSignalBoard(events, range), source: "live_events_fallback" }, headers);
     }
 
     if (action === "analytics_broken_pages") {
       const range = body.range ?? 30;
+      const clean = body.clean !== false;
 
       const { data: brokenEvents, error: brokenError } = await db
         .from("analytics_events")
@@ -2148,17 +2201,19 @@ Deno.serve(async (req) => {
 
       if (brokenError) throw brokenError;
 
-      return ok(buildBrokenPages(brokenEvents ?? [], range), headers);
+      return ok(buildBrokenPages(filterInternalEvents(brokenEvents ?? [], clean), range), headers);
     }
 
     if (action === "analytics_scan_broken_pages") {
       const range = body.range ?? 30;
       const limit = Number(body.limit || 80);
-      return ok(await scanBrokenPages(db, range, limit), headers);
+      const clean = body.clean !== false;
+      return ok(await scanBrokenPages(db, range, limit, clean), headers);
     }
 
     if (action === "analytics_refresh_signal_os_rollups") {
       const range = body.range ?? 30;
+      const clean = body.clean !== false;
       const { startDate, endDate } = dateRangeForRollups(range);
 
       const { data: refreshResult, error: refreshError } = await db.rpc("admin_refresh_signal_os_rollups", {
@@ -2173,7 +2228,7 @@ Deno.serve(async (req) => {
         return ok({ refresh: refreshResult, board: rollupBoard }, headers);
       }
 
-      const events = await getAnalyticsEvents(db, range);
+      const events = await getAnalyticsEvents(db, range, 10000, clean);
       return ok({
         refresh: refreshResult,
         board: { ...buildSignalBoard(events, range), source: "live_events_fallback" },
@@ -2181,7 +2236,8 @@ Deno.serve(async (req) => {
     }
 
     if (action === "analytics_realtime") {
-      return ok(await buildRealtime(db), headers);
+      const clean = body.clean !== false;
+      return ok(await buildRealtime(db, clean), headers);
     }
 
     if (action === "moderation_stats") {

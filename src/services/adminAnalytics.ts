@@ -2,6 +2,15 @@ import { supabase } from "@/lib/supabase";
 
 export type DateRange = { start: string; end: string };
 
+export interface AnalyticsFilterOptions {
+  /**
+   * true/default = hide internal, localhost, private-network, and tagged internal events.
+   * false = raw analytics for debugging.
+   */
+  clean?: boolean;
+}
+
+
 export interface AnalyticsKpis {
   totalPageViews: number;
   uniqueSessions: number;
@@ -264,6 +273,14 @@ function rangeKey(range: DateRange | number): string {
   return typeof range === "number" ? `preset:${range}` : `custom:${range.start}:${range.end}`;
 }
 
+function analyticsOptionsKey(options: AnalyticsFilterOptions = {}): string {
+  return options.clean === false ? "raw" : "clean";
+}
+
+function analyticsPayload(range: DateRange | number, options: AnalyticsFilterOptions = {}): Record<string, unknown> {
+  return { range, clean: options.clean !== false };
+}
+
 async function callAdminAnalytics<T>(action: string, payload: Record<string, unknown> = {}): Promise<T> {
   const { data, error } = await supabase.functions.invoke("admin-analytics-api", {
     body: { action, ...payload },
@@ -282,10 +299,13 @@ async function callAdminAnalytics<T>(action: string, payload: Record<string, unk
 
 const snapshotCache = new Map<string, Promise<AnalyticsSnapshot>>();
 
-async function getSnapshot(range: DateRange | number = 30): Promise<AnalyticsSnapshot> {
-  const key = rangeKey(range);
+async function getSnapshot(
+  range: DateRange | number = 30,
+  options: AnalyticsFilterOptions = {},
+): Promise<AnalyticsSnapshot> {
+  const key = `${rangeKey(range)}:${analyticsOptionsKey(options)}`;
   if (!snapshotCache.has(key)) {
-    snapshotCache.set(key, callAdminAnalytics<AnalyticsSnapshot>("analytics_snapshot", { range }));
+    snapshotCache.set(key, callAdminAnalytics<AnalyticsSnapshot>("analytics_snapshot", analyticsPayload(range, options)));
   }
   return snapshotCache.get(key)!;
 }
@@ -294,32 +314,32 @@ export function clearAdminAnalyticsCache(): void {
   snapshotCache.clear();
 }
 
-export async function fetchRealtimeAnalytics(): Promise<RealtimeAnalyticsSnapshot> {
-  return callAdminAnalytics<RealtimeAnalyticsSnapshot>("analytics_realtime");
+export async function fetchRealtimeAnalytics(options: AnalyticsFilterOptions = {}): Promise<RealtimeAnalyticsSnapshot> {
+  return callAdminAnalytics<RealtimeAnalyticsSnapshot>("analytics_realtime", { clean: options.clean !== false });
 }
 
-export async function fetchSignalBoard(range: DateRange | number = 30): Promise<SignalBoard> {
-  return callAdminAnalytics<SignalBoard>("analytics_signal_board", { range });
+export async function fetchSignalBoard(range: DateRange | number = 30, options: AnalyticsFilterOptions = {}): Promise<SignalBoard> {
+  return callAdminAnalytics<SignalBoard>("analytics_signal_board", analyticsPayload(range, options));
 }
 
-export async function fetchBrokenPages(range: DateRange | number = 30): Promise<BrokenPagesResponse> {
-  return callAdminAnalytics<BrokenPagesResponse>("analytics_broken_pages", { range });
+export async function fetchBrokenPages(range: DateRange | number = 30, options: AnalyticsFilterOptions = {}): Promise<BrokenPagesResponse> {
+  return callAdminAnalytics<BrokenPagesResponse>("analytics_broken_pages", analyticsPayload(range, options));
 }
 
-export async function scanBrokenPages(range: DateRange | number = 30, limit = 80): Promise<BrokenPageScanResponse> {
-  return callAdminAnalytics<BrokenPageScanResponse>("analytics_scan_broken_pages", { range, limit });
+export async function scanBrokenPages(range: DateRange | number = 30, limit = 80, options: AnalyticsFilterOptions = {}): Promise<BrokenPageScanResponse> {
+  return callAdminAnalytics<BrokenPageScanResponse>("analytics_scan_broken_pages", { ...analyticsPayload(range, options), limit });
 }
 
-export async function refreshSignalOsRollups(range: DateRange | number = 30): Promise<SignalOsRefreshResponse> {
-  return callAdminAnalytics<SignalOsRefreshResponse>("analytics_refresh_signal_os_rollups", { range });
+export async function refreshSignalOsRollups(range: DateRange | number = 30, options: AnalyticsFilterOptions = {}): Promise<SignalOsRefreshResponse> {
+  return callAdminAnalytics<SignalOsRefreshResponse>("analytics_refresh_signal_os_rollups", analyticsPayload(range, options));
 }
 
-export async function fetchDashboardKpis(range: DateRange | number = 30): Promise<AnalyticsKpis> {
-  return (await getSnapshot(range)).kpis;
+export async function fetchDashboardKpis(range: DateRange | number = 30, options: AnalyticsFilterOptions = {}): Promise<AnalyticsKpis> {
+  return (await getSnapshot(range, options)).kpis;
 }
 
-export async function fetchTodayKpis(): Promise<{ pageViews: number; newsletterSignups: number; uniqueSessions: number }> {
-  return (await getSnapshot(1)).today;
+export async function fetchTodayKpis(options: AnalyticsFilterOptions = {}): Promise<{ pageViews: number; newsletterSignups: number; uniqueSessions: number }> {
+  return (await getSnapshot(1, options)).today;
 }
 
 export async function fetchPageViewsTimeline(range: DateRange | number = 30): Promise<TimelinePoint[]> {
