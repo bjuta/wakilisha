@@ -32,19 +32,19 @@ const FAQ_GROUPS: { title: string; icon: string; items: FaqItem[] }[] = [
     items: [
       {
         q: "What is WAKILISHA?",
-        a: "WAKILISHA is a discovery platform for African creative life. We build music charts, artist registries, editorial coverage, and practical cultural guides — all designed to help people discover and understand African creativity on its own terms.",
+        a: "WAKILISHA helps people follow African creative life. We publish charts, artist pages, stories, and guides that make the culture easier to find and understand.",
       },
       {
         q: "Who runs WAKILISHA?",
-        a: "WAKILISHA is an independent team based in Nairobi, Kenya. We're a small group of editors, engineers, and researchers who care deeply about African creative infrastructure.",
+        a: "WAKILISHA is an independent team based in Nairobi, Kenya. We’re a small group of editors, engineers, and researchers who care deeply about African creative life.",
       },
       {
         q: "Is WAKILISHA free?",
-        a: "Yes. Everything on WAKILISHA is free to access — charts, artist profiles, magazine articles, and guides. We believe discovery infrastructure should be open.",
+        a: "Yes. Charts, artist profiles, magazine articles, and guides are free to access. We believe culture should be easy to reach.",
       },
       {
         q: "How is WAKILISHA funded?",
-        a: "We're currently self-funded and exploring sustainable models that don't compromise our editorial independence or put artist data behind paywalls. If you're interested in supporting us, reach out via the contact page.",
+        a: "We’re currently self-funded and exploring sustainable models that protect our editorial independence. To support the work, reach out through the contact page.",
       },
     ],
   },
@@ -54,7 +54,7 @@ const FAQ_GROUPS: { title: string; icon: string; items: FaqItem[] }[] = [
     items: [
       {
         q: "How are WAKILISHA charts compiled?",
-        a: "Our charts use a transparent scoring engine that weights multiple signals: streaming data, radio airplay, digital sales where available, and editorial context. We publish our methodology openly. Each chart edition includes a methodology panel explaining the weighting system used for that specific market and time period.",
+        a: "Our charts are built from real music activity, including streaming, radio airplay, and sales data where available. Each edition includes a methodology note for that market and period.",
       },
       {
         q: "How often are charts updated?",
@@ -62,11 +62,11 @@ const FAQ_GROUPS: { title: string; icon: string; items: FaqItem[] }[] = [
       },
       {
         q: "Can I suggest a chart or market to cover?",
-        a: "Absolutely. We're always looking to expand our chart coverage across African markets. Send us a message through the contact page with your suggestion — include the market, genre, and any data sources you think would be relevant.",
+        a: "Yes. Send us a message through the contact page. Include the market, genre, and any data sources you think would help.",
       },
       {
         q: "How do you handle artist name variations across platforms?",
-        a: "We maintain a central artist registry that resolves different name spellings and aliases across streaming platforms, radio databases, and editorial sources. This is part of our ongoing entity resolution work — it's complex but essential for accurate charting.",
+        a: "We keep artist names, aliases, and credits connected across platforms, radio data, and editorial sources. It is careful work, and it helps keep charts accurate.",
       },
     ],
   },
@@ -76,19 +76,19 @@ const FAQ_GROUPS: { title: string; icon: string; items: FaqItem[] }[] = [
     items: [
       {
         q: "How do I get my artist profile on WAKILISHA?",
-        a: "If your music is available on major streaming platforms or has charted on any African music chart, you may already be in our registry. Search for your name on the Artists page. If you're not there, contact us and we'll work to get you added.",
+        a: "If your music is on major streaming platforms or has charted on an African music chart, you may already have a profile. Search for your name on the Artists page. If you are not there, contact us.",
       },
       {
         q: "How do I update my artist information?",
-        a: "We pull artist data from multiple sources — streaming platforms, labels, public databases, and editorial research. If something is incorrect or outdated, email us at hello@wakilisha.africa with the correction and we'll update it.",
+        a: "We pull artist data from streaming platforms, labels, public databases, and editorial research. If something is incorrect or outdated, email hello@wakilisha.africa with the correction.",
       },
       {
         q: "Can I remove my profile from WAKILISHA?",
-        a: "We respect artists' wishes. If you'd like your profile removed or specific information redacted, contact us and we'll handle it promptly.",
+        a: "We respect artists’ wishes. If you’d like your profile removed or specific information redacted, contact us and we’ll handle it promptly.",
       },
       {
         q: "What data do you store about artists?",
-        a: "We store publicly available information: artist names, aliases, genre associations, discographies, chart history, and biographical data from public sources. We don't collect or store private artist data. See our Privacy page for full details.",
+        a: "We store publicly available information: artist names, aliases, genre associations, discographies, chart history, and biographical data. We don’t collect private artist data. See our Privacy page for full details.",
       },
     ],
   },
@@ -98,15 +98,15 @@ const FAQ_GROUPS: { title: string; icon: string; items: FaqItem[] }[] = [
     items: [
       {
         q: "How can I write for WAKILISHA Magazine?",
-        a: "We're always looking for sharp, original voices. Send a pitch to hello@wakilisha.africa with the subject line 'Editorial pitch' — include a brief outline of your story, why it matters, and links to your previous work.",
+        a: "We’re always looking for sharp, original voices. Send a pitch to hello@wakilisha.africa with the subject line “Editorial pitch.” Include a brief outline, why it matters, and links to your previous work.",
       },
       {
         q: "What topics does the Magazine cover?",
-        a: "African creative life in the broadest sense: music, visual art, film, fashion, food, literature, architecture, and the cultural infrastructure that connects them. We're particularly interested in stories that mainstream outlets miss.",
+        a: "African creative life in the broadest sense: music, visual art, film, fashion, food, literature, architecture, and the systems that connect them. We’re especially interested in stories mainstream outlets miss.",
       },
       {
         q: "Can I republish a WAKILISHA article?",
-        a: "Contact us for republication permissions. We're generally open to syndication and cross-publication — just ask first.",
+        a: "Contact us for republication permissions. We’re generally open to syndication and cross-publication. Just ask first.",
       },
     ],
   },
@@ -116,15 +116,15 @@ const FAQ_GROUPS: { title: string; icon: string; items: FaqItem[] }[] = [
     items: [
       {
         q: "What are WAKILISHA Guides?",
-        a: "Guides are our practical discovery products. They come in three formats: Field Guides (on-the-ground routes through exhibitions and events), Advance Dossiers (pre-event intelligence and preparation), and Literary Projects (long-form cultural investigation). Each guide is built to be genuinely useful, not just beautiful.",
+        a: "Guides help readers move through cultural moments with context. They come as Field Guides, Advance Dossiers, and Literary Projects. Each one is built to be useful, not just beautiful.",
       },
       {
         q: "How do you choose what to build a guide about?",
-        a: "We focus on cultural moments and spaces where a structured guide adds real value — major biennales, emerging art scenes, literary movements, and cultural infrastructure stories that benefit from deep, methodical coverage.",
+        a: "We focus on cultural moments where a structured guide helps: major biennales, emerging art scenes, literary movements, and cultural stories that need careful coverage.",
       },
       {
         q: "Can I suggest a guide topic?",
-        a: "Yes! Use the contact form and select 'Guide suggestion' as your subject. Tell us what cultural moment or space you think deserves a guide, and why.",
+        a: "Yes. Use the contact form and select “Guide suggestion” as your subject. Tell us what cultural moment or space deserves a guide, and why.",
       },
     ],
   },
@@ -134,11 +134,11 @@ const FAQ_GROUPS: { title: string; icon: string; items: FaqItem[] }[] = [
     items: [
       {
         q: "Do I need an account to use WAKILISHA?",
-        a: "No. You can browse charts, artists, magazine articles, and guides without an account. Accounts are only needed if you want to save favorites, contribute lyrics, or access features we're building for registered users.",
+        a: "No. You can browse charts, artists, magazine articles, and guides without an account. Accounts are only needed for saves, lyric contributions, and registered-user features.",
       },
       {
         q: "I found a bug or broken link. What should I do?",
-        a: "We appreciate bug reports! Send the details to hello@wakilisha.africa with 'Technical issue' as the subject, including the page URL and what went wrong.",
+        a: "We appreciate bug reports. Send the details to hello@wakilisha.africa with “Technical issue” as the subject. Include the page URL and what went wrong.",
       },
       {
         q: "Is WAKILISHA accessible on mobile?",
@@ -146,7 +146,7 @@ const FAQ_GROUPS: { title: string; icon: string; items: FaqItem[] }[] = [
       },
       {
         q: "How can I stay updated on new features?",
-        a: "Subscribe to our newsletter from the homepage or any footer. We send occasional updates about new charts, guides, magazine issues, and platform features.",
+        a: "Subscribe from the homepage or footer. We send occasional updates about new charts, guides, magazine issues, and platform features.",
       },
     ],
   },

@@ -148,7 +148,7 @@ export default function AuthPage() {
 
     try {
       await resendVerificationEmail(email.trim(), resolveReturnTo());
-      setSuccess("Verification email sent. Open it from your inbox to unlock Save, Follow, Comments, and the rest of the community layer.");
+      setSuccess("Verification email sent. Open it from your inbox to use Save, Follow, Comments, and the rest of the community layer.");
     } catch (err: any) {
       setError(err?.message ?? "Could not send verification email.");
     } finally {
@@ -277,7 +277,7 @@ export default function AuthPage() {
   }
 
   const heading = isRecovery ? "Reset your password" : mode === "verify" ? "Verify your email" : mode === "forgot" ? "Forgot password?" : mode === "magic" ? "Get a magic link" : mode === "signin" ? "Welcome back" : "Create your account";
-  const subcopy = isRecovery ? "Enter a new password for your WAKILISHA account." : mode === "verify" ? "Confirm your email to unlock saves, follows, comments, replies, and community actions." : mode === "forgot" ? "Enter your email and we will send a secure reset link." : mode === "magic" ? "Enter your email and we will send a one-time sign-in link." : mode === "signin" ? "Sign in to continue to your WAKILISHA account." : "Join WAKILISHA and connect with African culture.";
+  const subcopy = isRecovery ? "Enter a new password for your WAKILISHA account." : mode === "verify" ? "Confirm your email to use saves, follows, comments, replies, and community actions." : mode === "forgot" ? "Enter your email and we will send a secure reset link." : mode === "magic" ? "Enter your email and we will send a one-time sign-in link." : mode === "signin" ? "Sign in to continue to your WAKILISHA account." : "Join WAKILISHA and connect with African culture.";
 
   return (
     <main className="flex min-h-screen" style={{ background: "var(--wk-bg)" }}>

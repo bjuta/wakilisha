@@ -132,7 +132,7 @@ function heroIntro(facts: TrackFacts): string {
   if (hasChart) {
     const peak = facts.peakRank ? `peaked at #${facts.peakRank}` : "";
     const weeks = facts.weeksOnChart ? `, staying on the charts for ${pluralize(facts.weeksOnChart, "week")}` : "";
-    const genreBit = hasGenre ? `${facts.peakRank || facts.weeksOnChart ? " —" : ""} a ${humanList(facts.genres, 2)} track` : "";
+    const genreBit = hasGenre ? `${facts.peakRank || facts.weeksOnChart ? ", " : ""}a ${humanList(facts.genres, 2)} track` : "";
     return `${trackTitle}${byText} ${peak}${weeks}${genreBit}.`;
   }
 
@@ -192,7 +192,7 @@ function seoDescription(facts: TrackFacts): string {
       ? ` from ${facts.releaseTitle} (${facts.releaseYear})`
       : ` from ${facts.releaseTitle}`
     : "";
-  return `Explore ${title(facts)}${byText}${genreBit}${chartBit}${releaseBit} on WAKILISHA. Artist links, chart history, and related music.`;
+  return `Explore ${title(facts)}${byText}${genreBit}${chartBit}${releaseBit} on WAKILISHA. Related artists, chart history, and music context.`;
 }
 
 function whyItMatters(facts: TrackFacts): string {
@@ -227,7 +227,7 @@ function whyItMatters(facts: TrackFacts): string {
   }
 
   if (parts.length === 0) {
-    return `${trackTitle}${byText} is in the WAKILISHA archive — we're connecting chart data, release links, and artist context as the platform grows.`;
+    return `${trackTitle}${byText} is in the WAKILISHA archive. We’re connecting chart data, release links, and artist context as the platform grows.`;
   }
 
   return `${trackTitle}${byText} ${parts.join(", ")}.`;

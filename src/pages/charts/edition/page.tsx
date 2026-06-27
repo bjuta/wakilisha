@@ -780,9 +780,9 @@ export default function ChartEdition() {
             <div className="chart-section-eyebrow">Movement radar</div>
             <h2 className="chart-section-title">Biggest movers this week</h2>
             {hasMovementData ? (
-              <p className="chart-section-sub">The tracks that made the most dramatic shifts — one soaring, one sliding. Here's what the data says.</p>
+              <p className="chart-section-sub">The tracks with the biggest rank changes this week. One moved up, one moved down.</p>
             ) : (
-              <p className="chart-section-sub">This is the earliest edition available — there's no prior chart date to compare against. Movement data will appear once a second edition is published.</p>
+              <p className="chart-section-sub">This is the earliest edition available. Movement data will appear once a second edition is published.</p>
             )}
           </div>
 
@@ -822,10 +822,10 @@ export default function ChartEdition() {
 
                       <p className="chart-mover-card-story">
                         {biggestUpMover.rank <= 10
-                          ? `A massive ${biggestUpMover.movementAmount ?? 0}-position leap propels this track straight into the top 10. The biggest upward surge of any track this week — momentum doesn't get more decisive than this.`
+                          ? `This track climbed ${biggestUpMover.movementAmount ?? 0} positions into the top 10. No other entry moved up further this week.`
                           : biggestUpMover.rank <= 20
-                          ? `Climbing ${biggestUpMover.movementAmount ?? 0} spots in a single week, this track is charging toward the top tier with unstoppable velocity. No other track gained more ground this edition.`
-                          : `The most aggressive climb of the week — ${biggestUpMover.movementAmount ?? 0} positions gained. From the outskirts of the ranking into serious contention, this is the kind of move that signals a breakout.`}
+                          ? `This track climbed ${biggestUpMover.movementAmount ?? 0} positions in one week. No other entry gained more ground this edition.`
+                          : `Biggest climb this week: ${biggestUpMover.movementAmount ?? 0} positions gained. This track made the strongest upward move in the edition.`}
                       </p>
 
                       <div className="chart-mover-card-context">
@@ -881,10 +881,10 @@ export default function ChartEdition() {
 
                       <p className="chart-mover-card-story">
                         {biggestDownMover.previousRank !== null && biggestDownMover.previousRank <= 10
-                          ? `A ${biggestDownMover.movementAmount ?? 0}-position tumble from the top 10. Once commanding a premium spot, this track now faces the steepest decline of any entry this week — a sharp correction that reshuffles the upper tier.`
+                          ? `This track dropped ${biggestDownMover.movementAmount ?? 0} positions from the top 10. No other entry fell further this week.`
                           : biggestDownMover.previousRank !== null && biggestDownMover.previousRank <= 20
-                          ? `Slipping ${biggestDownMover.movementAmount ?? 0} positions, this track experienced the single largest downward shift this week. Momentum can be fleeting, and this drop marks the most dramatic reversal on the chart.`
-                          : `The heaviest fall of the edition — down ${biggestDownMover.movementAmount ?? 0} spots. Whether it's a temporary dip or the start of a longer slide, no other track lost more ground this week.`}
+                          ? `This track slipped ${biggestDownMover.movementAmount ?? 0} positions. That is the largest downward move in this edition.`
+                          : `Biggest drop this week: down ${biggestDownMover.movementAmount ?? 0} positions. No other entry lost more ground in this edition.`}
                       </p>
 
                       <div className="chart-mover-card-context">
