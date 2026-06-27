@@ -5,8 +5,8 @@
  * MediaLibrary page, article editor, settings pages) delegates to this service.
  *
  * ── Capabilities ──
- * upload()       → creates registry_media_assets row + uploads to Supabase Storage
- * editImage()    → re-uploads edited Blob to same path, updates registry_media_assets row
+ * upload()       → creates registry_media_assets row + uploads to Lightsail media origin
+ * editImage()    → re-uploads edited Blob to same Lightsail path, updates registry_media_assets row
  * deleteAsset()  → checks all 11 FK references, returns affected entities, then deletes
  * getById()      → fetches full asset with metadata and dimensions
  * getByUrl()     → fetches asset by public URL
@@ -116,7 +116,8 @@ const FK_REFERENCE_MAP: Array<{ table: string; column: string; id_column: string
   { table: "wk_chart_entries_v2", column: "artwork_image_id", id_column: "id", label_column: "title" },
 ];
 
-const STORAGE_BUCKET = "article-media";
+const LEGACY_STORAGE_BUCKET = "article-media";
+const LIGHTSAIL_STORAGE_BUCKET = "lightsail-media";
 
 // ─── Helpers ──────────────────────────────────────────────────
 
@@ -138,13 +139,64 @@ function buildStoragePath(folder: string, fileName: string): string {
 function parseStoragePathFromUrl(url: string): string | null {
   try {
     const parsed = new URL(url);
-    const prefix = `/storage/v1/object/public/${STORAGE_BUCKET}/`;
-    const idx = parsed.pathname.indexOf(prefix);
-    if (idx === -1) return null;
-    return parsed.pathname.slice(idx + prefix.length);
+
+    const legacyPrefix = `/storage/v1/object/public/${LEGACY_STORAGE_BUCKET}/`;
+    const legacyIdx = parsed.pathname.indexOf(legacyPrefix);
+    if (legacyIdx !== -1) return parsed.pathname.slice(legacyIdx + legacyPrefix.length);
+
+    if (parsed.hostname === "media.wakilisha.africa") {
+      const cleanPath = parsed.pathname.replace(/^\/+/, "");
+      if (cleanPath.startsWith("uploads/")) return cleanPath;
+    }
+
+    return null;
   } catch {
     return null;
   }
+}
+
+async function uploadToLightsailMedia(
+  file: File | Blob,
+  options: { folder?: string; storagePath?: string; fileName?: string } = {},
+): Promise<{ url: string; storagePath: string; storageBucket: string; mimeType: string; size: number }> {
+  const form = new FormData();
+
+  const fileName = options.fileName || (file instanceof File ? file.name : "edited-image.png");
+  const uploadFile = file instanceof File ? file : new File([file], fileName, { type: file.type || "image/png" });
+
+  form.append("file", uploadFile);
+  form.append("folder", options.folder || "uploads");
+  if (options.storagePath) form.append("storage_path", options.storagePath);
+
+  const { data, error } = await supabase.functions.invoke("media-upload-api", {
+    body: form,
+  });
+
+  if (error) {
+    throw new Error(`Lightsail upload failed: ${error.message}`);
+  }
+
+  const payload = data as {
+    ok?: boolean;
+    url?: string;
+    storage_path?: string;
+    storage_bucket?: string;
+    mime_type?: string;
+    size?: number;
+    error?: string;
+  } | null;
+
+  if (!payload?.ok || !payload.url || !payload.storage_path) {
+    throw new Error(payload?.error || "Lightsail upload failed.");
+  }
+
+  return {
+    url: payload.url,
+    storagePath: payload.storage_path,
+    storageBucket: payload.storage_bucket || LIGHTSAIL_STORAGE_BUCKET,
+    mimeType: payload.mime_type || uploadFile.type || "application/octet-stream",
+    size: payload.size || uploadFile.size,
+  };
 }
 
 // ─── Service ──────────────────────────────────────────────────
@@ -162,24 +214,9 @@ export const mediaService = {
     const folder = options.folder ?? "uploads";
     const storagePath = buildStoragePath(folder, file.name);
 
-    // 1. Upload to storage
-    const { error: uploadError } = await supabase.storage
-      .from(STORAGE_BUCKET)
-      .upload(storagePath, file, {
-        contentType: file.type,
-        upsert: false,
-      });
-
-    if (uploadError) {
-      throw new Error(`Upload failed: ${uploadError.message}`);
-    }
-
-    // 2. Get public URL
-    const { data: urlData } = supabase.storage
-      .from(STORAGE_BUCKET)
-      .getPublicUrl(storagePath);
-
-    const publicUrl = urlData.publicUrl;
+    // 1. Upload to Lightsail media origin
+    const uploaded = await uploadToLightsailMedia(file, { folder });
+    const publicUrl = uploaded.url;
 
     // 3. Get image dimensions
     let width = 0;
@@ -216,8 +253,8 @@ export const mediaService = {
         source_kind: options.sourceKind ?? "editor_upload",
         source_entity: options.sourceEntity ?? null,
         source_record_id: options.sourceRecordId ?? null,
-        storage_bucket: STORAGE_BUCKET,
-        storage_path: storagePath,
+        storage_bucket: uploaded.storageBucket,
+        storage_path: uploaded.storagePath,
         metadata,
       })
       .select("id, slug, title, url, mime_type, media_kind, status, source_kind, source_entity, source_record_id, source_staging_record_id, storage_bucket, storage_path, metadata, created_at, updated_at")
@@ -226,7 +263,7 @@ export const mediaService = {
     if (insertError || !inserted) {
       // Best-effort cleanup: remove the uploaded file if DB insert fails
       try {
-        await supabase.storage.from(STORAGE_BUCKET).remove([storagePath]);
+        // Lightsail cleanup is handled separately. Do not delete through Supabase Storage here.
       } catch { /* best effort */ }
       throw new Error(`Failed to create media asset: ${insertError?.message ?? "Unknown error"}`);
     }
@@ -261,7 +298,7 @@ export const mediaService = {
     }
 
     let storagePath = existing.storage_path;
-    const bucket = existing.storage_bucket ?? STORAGE_BUCKET;
+    const bucket = existing.storage_bucket ?? LIGHTSAIL_STORAGE_BUCKET;
 
     // If storage_path is missing (legacy data), try to derive from URL
     if (!storagePath && existing.url) {
@@ -272,17 +309,13 @@ export const mediaService = {
       throw new Error("Cannot determine storage path for this asset. Re-upload as a new asset instead.");
     }
 
-    // 2. Re-upload to the same path (upsert: true replaces the file)
-    const { error: uploadError } = await supabase.storage
-      .from(bucket)
-      .upload(storagePath, blob, {
-        contentType: "image/png",
-        upsert: true,
-      });
-
-    if (uploadError) {
-      throw new Error(`Image replace failed: ${uploadError.message}`);
-    }
+    // 2. Re-upload to the same Lightsail path.
+    // The public URL stays stable and all entity references keep working.
+    await uploadToLightsailMedia(blob, {
+      folder: storagePath.split("/").slice(0, -1).join("/") || "uploads",
+      storagePath,
+      fileName: storagePath.split("/").pop() || "edited-image.png",
+    });
 
     // 3. Update metadata in registry_media_assets
     const existingMeta = (existing.metadata ?? {}) as MediaAssetMetadata;
@@ -345,13 +378,13 @@ export const mediaService = {
     // 4. Best-effort storage cleanup
     if (asset) {
       let storagePath = asset.storage_path;
-      const bucket = asset.storage_bucket ?? STORAGE_BUCKET;
+      const bucket = asset.storage_bucket ?? LIGHTSAIL_STORAGE_BUCKET;
 
       if (!storagePath && asset.url) {
         storagePath = parseStoragePathFromUrl(asset.url);
       }
 
-      if (storagePath) {
+      if (storagePath && bucket !== LIGHTSAIL_STORAGE_BUCKET) {
         try {
           await supabase.storage.from(bucket).remove([storagePath]);
         } catch {

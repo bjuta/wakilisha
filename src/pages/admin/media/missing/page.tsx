@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { MediaPickerModal } from "@/components/admin/MediaPickerModal";
 import { supabase } from "@/lib/supabase";
+import { mediaService } from "@/services/mediaService";
 
 interface MissingImageSlot {
   uid: string;
@@ -389,72 +390,20 @@ export default function AdminMissingImagesPage() {
       if (!files || files.length === 0) return;
 
       const file = files[0];
-      const folder = `${item.entityType}/${item.entitySlug}`;
-      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-      const storagePath = `${folder}/${Date.now()}-${safeName}`;
+      const folder = `uploads/${item.entityType}/${item.entitySlug}`;
 
       try {
-        const { error: uploadError } = await supabase.storage
-          .from("article-media")
-          .upload(storagePath, file, { contentType: file.type, upsert: false });
+        const inserted = await mediaService.upload(file, {
+          folder,
+          slug: `${item.entityType}-${item.entitySlug}-${item.missingRole}`,
+          title: file.name,
+          sourceKind: "manual_upload",
+          sourceEntity: item.entityType,
+          sourceRecordId: item.entitySlug,
+          altText: item.entityTitle ?? file.name,
+        });
 
-        if (uploadError) {
-          showToast("Upload failed: " + uploadError.message);
-          return;
-        }
-
-        const { data: urlData } = supabase.storage.from("article-media").getPublicUrl(storagePath);
-        const publicUrl = urlData.publicUrl;
-
-        // Get dimensions
-        let width = 0;
-        let height = 0;
-        try {
-          const dims = await new Promise<{ width: number; height: number }>((resolve, reject) => {
-            const img = new Image();
-            img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
-            img.onerror = () => reject(new Error("Failed"));
-            img.src = URL.createObjectURL(file);
-          });
-          width = dims.width;
-          height = dims.height;
-        } catch {
-          // Best effort
-        }
-
-        // Create registry_media_assets row
-        const { data: inserted, error: insertError } = await supabase
-          .from("registry_media_assets")
-          .insert({
-            slug: `${item.entityType}-${item.entitySlug}-${item.missingRole}`,
-            title: file.name,
-            url: publicUrl,
-            mime_type: file.type,
-            media_kind: "image",
-            status: "active",
-            source_kind: "manual_upload",
-            source_entity: item.entityType,
-            source_record_id: item.entitySlug,
-            storage_bucket: "article-media",
-            storage_path: storagePath,
-            metadata: {
-              alt_text: item.entityTitle ?? file.name,
-              file_name: file.name,
-              file_size: file.size,
-              width,
-              height,
-              role: item.missingRole,
-            },
-          })
-          .select("id")
-          .single();
-
-        if (insertError || !inserted) {
-          showToast("Failed to create media asset: " + (insertError?.message ?? "Unknown"));
-          return;
-        }
-
-        // Update entity FK
+        // Update entity FK. Keep URL columns canonical elsewhere via the entity/media registry.
         const updatePayload: Record<string, unknown> = {};
         updatePayload[item.fkColumn] = inserted.id;
 
@@ -464,12 +413,12 @@ export default function AdminMissingImagesPage() {
           .eq(item.slugColumn, item.entitySlug);
 
         if (updateError) {
-          showToast("Linked but failed to update entity: " + updateError.message);
+          showToast("Uploaded but failed to update entity: " + updateError.message);
           return;
         }
 
         saveAudit(item.uid, "resolved");
-        showToast("Uploaded and linked!");
+        showToast("Uploaded to media.wakilisha.africa and linked!");
 
         // Remove from list
         setAllItems((prev) => prev.filter((i) => i.uid !== item.uid));
@@ -477,7 +426,7 @@ export default function AdminMissingImagesPage() {
         showToast("Error: " + (err instanceof Error ? err.message : "Unknown error"));
       }
     },
-    []
+    [saveAudit]
   );
 
   // ─── Bulk actions ───
