@@ -255,10 +255,10 @@ export default function MobileMagazine() {
       {/* ═══════════════════════ CONTENT BODY ═══════════════════════ */}
       <div className="px-4 py-8 flex flex-col gap-12">
 
-        {/* ── Editor's Picks ── */}
+        {/* ── Editor’s Picks ── */}
         {filteredPicks.length > 0 && (
           <section className="mag-reveal">
-            <MobileSectionLabel>Editor's Picks</MobileSectionLabel>
+            <MobileSectionLabel>Editor’s Picks</MobileSectionLabel>
             <div className="flex flex-col gap-3">
               <MagazineCard variant="hero" story={filteredPicks[0]} rank={1} />
               {filteredPicks.slice(1, 3).map((story, i) => (
@@ -668,9 +668,9 @@ function MobileNewsletterCTA() {
           <div className="w-12 h-12 rounded-full bg-[var(--wk-brand)] flex items-center justify-center mx-auto mb-4">
             <i className="ri-check-line text-[24px] text-[var(--wk-brand-on)]" />
           </div>
-          <h3 className="text-[20px] font-black tracking-[-0.03em] text-[var(--wk-text)] mb-2">You're on the list</h3>
+          <h3 className="text-[20px] font-black tracking-[-0.03em] text-[var(--wk-text)] mb-2">You’re on the list</h3>
           <p className="text-[13px] text-[var(--wk-text-muted)] max-w-[320px] mx-auto leading-relaxed">
-            Expect WAKILISHA stories, charts, and cultural dispatches — no noise.
+            Expect WAKILISHA stories, charts, and cultural dispatches. No noise.
           </p>
         </div>
       ) : (

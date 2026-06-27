@@ -74,7 +74,7 @@ export default function TermsPage() {
           <section>
             <h2 className="text-[20px] font-black tracking-[-0.03em] text-[var(--wk-text)] mb-4">Acceptance of terms</h2>
             <p className="text-[14px] leading-relaxed text-[var(--wk-text-muted)]">
-              By accessing or using WAKILISHA ("the platform"), you agree to be bound by these Terms of Service. If you do not agree with any part of these terms, please do not use the platform. We may update these terms from time to time — continued use after changes constitutes acceptance.
+              By accessing or using WAKILISHA ("the platform"), you agree to be bound by these Terms of Service. If you do not agree with any part of these terms, please do not use the platform. We may update these terms from time to time. continued use after changes constitutes acceptance.
             </p>
           </section>
 
@@ -124,7 +124,7 @@ export default function TermsPage() {
               <div>
                 <h3 className="text-[14px] font-bold text-[var(--wk-text)] mb-1.5">Our content</h3>
                 <p className="text-[14px] leading-relaxed text-[var(--wk-text-muted)]">
-                  All original content on WAKILISHA — including articles, guides, chart methodology, editorial writing, design, and code — is owned by WAKILISHA or its respective authors and is protected by applicable copyright laws. You may share and link to our content freely; reproduction, republication, or commercial use requires our written permission.
+                  All original content on WAKILISHA. including articles, guides, chart methodology, editorial writing, design, and code. is owned by WAKILISHA or its respective authors and is protected by applicable copyright laws. You may share and link to our content freely; reproduction, republication, or commercial use requires our written permission.
                 </p>
               </div>
               <div>
@@ -136,7 +136,7 @@ export default function TermsPage() {
               <div>
                 <h3 className="text-[14px] font-bold text-[var(--wk-text)] mb-1.5">Your contributions</h3>
                 <p className="text-[14px] leading-relaxed text-[var(--wk-text-muted)]">
-                  By submitting content to WAKILISHA — such as lyric contributions, corrections, or editorial pitches — you grant us the right to use, display, and distribute that content on the platform. You retain ownership of your original work.
+                  By submitting content to WAKILISHA. such as lyric contributions, corrections, or editorial pitches. you grant us the right to use, display, and distribute that content on the platform. You retain ownership of your original work.
                 </p>
               </div>
             </div>
@@ -146,7 +146,7 @@ export default function TermsPage() {
           <section>
             <h2 className="text-[20px] font-black tracking-[-0.03em] text-[var(--wk-text)] mb-4">Disclaimer</h2>
             <p className="text-[14px] leading-relaxed text-[var(--wk-text-muted)]">
-              WAKILISHA is provided "as is" without warranties of any kind. We work hard to ensure accuracy — especially in our charts and artist registry — but we cannot guarantee that all information is complete, current, or error-free. Chart data is compiled from multiple sources and methodologies; use it for discovery, not as a sole basis for business or legal decisions.
+              WAKILISHA is provided "as is" without warranties of any kind. We work hard to ensure accuracy. especially in our charts and artist registry. but we cannot guarantee that all information is complete, current, or error-free. Chart data is compiled from multiple sources and methodologies; use it for discovery, not as a sole basis for business or legal decisions.
             </p>
           </section>
 

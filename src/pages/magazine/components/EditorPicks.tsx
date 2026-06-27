@@ -12,7 +12,7 @@ export function EditorPicks({ stories }: EditorPicksProps) {
   return (
     <section className="mag-picks-v2">
       <div className="mag-picks-v2-header">
-        <div className="mag-picks-v2-eyebrow">Editor's picks</div>
+        <div className="mag-picks-v2-eyebrow">Editor’s picks</div>
         <h2 className="mag-picks-v2-heading">Selected from the graph</h2>
       </div>
 

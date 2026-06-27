@@ -92,7 +92,7 @@ export default function BriefingUnsubscribePage() {
             </div>
             <h2 className="text-[22px] font-black tracking-[-0.03em] text-[var(--wk-text)] mb-2">Unsubscribe from briefings</h2>
             <p className="text-[14px] leading-relaxed text-[var(--wk-text-muted)] max-w-[360px] mx-auto mb-6">
-              It looks like you arrived here without an unsubscribe link. Enter the email address you receive briefings at, and we'll unsubscribe you.
+              It looks like you arrived here without an unsubscribe link. Enter the email address that receives briefings, and we’ll unsubscribe it.
             </p>
             <div className="flex flex-col gap-3 max-w-[320px] mx-auto">
               <div className="flex flex-col gap-1">
@@ -133,7 +133,7 @@ export default function BriefingUnsubscribePage() {
             </div>
             <h2 className="text-[22px] font-black tracking-[-0.03em] text-[var(--wk-text)] mb-2">Unsubscribe?</h2>
             <p className="text-[14px] leading-relaxed text-[var(--wk-text-muted)] max-w-[360px] mx-auto mb-8">
-              You'll stop receiving WAKILISHA briefings. You can always subscribe again from the homepage.
+              You’ll stop receiving WAKILISHA briefings. You can subscribe again from the homepage anytime.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
               <button
@@ -179,7 +179,7 @@ export default function BriefingUnsubscribePage() {
             <div className="w-14 h-14 rounded-full bg-[var(--wk-bg-subtle)] flex items-center justify-center mx-auto mb-5">
               <i className="ri-check-line text-[26px] text-[var(--wk-text-faint)]" />
             </div>
-            <h2 className="text-[22px] font-black tracking-[-0.03em] text-[var(--wk-text)] mb-2">You've been unsubscribed</h2>
+            <h2 className="text-[22px] font-black tracking-[-0.03em] text-[var(--wk-text)] mb-2">You’ve been unsubscribed</h2>
             <p className="text-[14px] leading-relaxed text-[var(--wk-text-muted)] max-w-[360px] mx-auto mb-6">
               {state.message}
             </p>
@@ -207,7 +207,7 @@ export default function BriefingUnsubscribePage() {
             <div className="w-14 h-14 rounded-full bg-[var(--wk-bg-subtle)] flex items-center justify-center mx-auto mb-5">
               <i className="ri-check-line text-[26px] text-[var(--wk-text-faint)]" />
             </div>
-            <h2 className="text-[22px] font-black tracking-[-0.03em] text-[var(--wk-text)] mb-2">You've been unsubscribed</h2>
+            <h2 className="text-[22px] font-black tracking-[-0.03em] text-[var(--wk-text)] mb-2">You’ve been unsubscribed</h2>
             <p className="text-[14px] leading-relaxed text-[var(--wk-text-muted)] max-w-[360px] mx-auto mb-6">
               {state.message}
             </p>

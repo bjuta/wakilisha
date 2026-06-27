@@ -27,7 +27,7 @@ export function ArtistNewsletterSection({ artistName, artistSlug }: ArtistNewsle
             strength: 80,
           }),
         ]}
-        successMessage="You're in. Check your inbox to confirm Artist Signals."
+        successMessage="You’re in. Check your inbox to confirm Artist Signals."
         contextFields={{ artistSlug, artistName, wk_page_type: "artist_detail" }}
         analytics={{
           pageType: "artist_detail",

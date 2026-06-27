@@ -671,7 +671,7 @@ export default function AuthorProfilePage() {
                 <WkIcon name="SearchX" size={32} />
                 <div className="author-profile-empty-title">No articles in {activeCategory}</div>
                 <div className="author-profile-empty-sub">
-                  {firstName} hasn't written any {activeCategory} articles yet.
+                  {firstName} hasn’t written any {activeCategory} articles yet.
                 </div>
                 <button
                   className="mt-5 inline-flex items-center gap-2 rounded-lg bg-[var(--wk-surface-raised)] px-4 py-2 text-sm font-bold text-[var(--wk-text)] hover:bg-[var(--wk-surface)] transition-colors cursor-pointer"
@@ -790,7 +790,7 @@ export default function AuthorProfilePage() {
         {articles.length > 0 && (
           <section className="author-profile-explore">
             <p className="author-profile-explore-text">
-              {firstName} is part of WAKILISHA's cultural memory system — documenting and interpreting East African creative life.
+              {firstName} is part of WAKILISHA’s cultural memory work, documenting and interpreting East African creative life.
             </p>
             <div className="author-profile-explore-links">
               <Link to="/magazine" className="author-profile-explore-link">

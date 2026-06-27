@@ -74,7 +74,7 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-[20px] font-black tracking-[-0.03em] text-[var(--wk-text)] mb-4">Our approach to privacy</h2>
             <p className="text-[14px] leading-relaxed text-[var(--wk-text-muted)] mb-4">
-              WAKILISHA is built on the principle that discovery infrastructure should respect the people who use it. We collect as little data as possible, we're transparent about what we do collect, and we never sell personal information.
+              WAKILISHA is built on the principle that discovery infrastructure should respect the people who use it. We collect as little data as possible, we’re transparent about what we do collect, and we never sell personal information.
             </p>
             <p className="text-[14px] leading-relaxed text-[var(--wk-text-muted)]">
               This policy explains what information we gather, how we use it, and the choices you have. If you have questions after reading this, contact us at hello@wakilisha.africa.
@@ -88,7 +88,7 @@ export default function PrivacyPage() {
               <div>
                 <h3 className="text-[14px] font-bold text-[var(--wk-text)] mb-1.5">Anonymous usage data</h3>
                 <p className="text-[14px] leading-relaxed text-[var(--wk-text-muted)]">
-                  We use standard analytics to understand how people use WAKILISHA — which pages are visited, how long people spend reading articles, which charts are most popular. This data is aggregated and does not identify individual users.
+                  We use standard analytics to understand how people use WAKILISHA. which pages are visited, how long people spend reading articles, which charts are most popular. This data is aggregated and does not identify individual users.
                 </p>
               </div>
               <div>
@@ -114,7 +114,7 @@ export default function PrivacyPage() {
 
           {/* Section 3 */}
           <section>
-            <h2 className="text-[20px] font-black tracking-[-0.03em] text-[var(--wk-text)] mb-4">What we don't do</h2>
+            <h2 className="text-[20px] font-black tracking-[-0.03em] text-[var(--wk-text)] mb-4">What we don’t do</h2>
             <ul className="space-y-3 list-none">
               {[
                 "We never sell your personal information to third parties.",
@@ -134,7 +134,7 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-[20px] font-black tracking-[-0.03em] text-[var(--wk-text)] mb-4">Artist data</h2>
             <p className="text-[14px] leading-relaxed text-[var(--wk-text-muted)] mb-4">
-              Our artist registry contains only publicly available information — names, aliases, genre associations, discographies, and chart histories sourced from streaming platforms, public databases, and editorial research. We do not collect or store private artist data such as contact details, financial information, or unreleased material.
+              Our artist registry contains only publicly available information. names, aliases, genre associations, discographies, and chart histories sourced from streaming platforms, public databases, and editorial research. We do not collect or store private artist data such as contact details, financial information, or unreleased material.
             </p>
             <p className="text-[14px] leading-relaxed text-[var(--wk-text-muted)]">
               Artists can request corrections or removal of their information by contacting us at hello@wakilisha.africa.
@@ -145,7 +145,7 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-[20px] font-black tracking-[-0.03em] text-[var(--wk-text)] mb-4">Cookies</h2>
             <p className="text-[14px] leading-relaxed text-[var(--wk-text-muted)]">
-              We use minimal cookies for essential functionality — session management for logged-in users and analytics. We do not use third-party advertising or tracking cookies. You can disable cookies in your browser settings, though some features (like account login) may not work.
+              We use minimal cookies for essential functionality. session management for logged-in users and analytics. We do not use third-party advertising or tracking cookies. You can disable cookies in your browser settings, though some features (like account login) may not work.
             </p>
           </section>
 
@@ -161,7 +161,7 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-[20px] font-black tracking-[-0.03em] text-[var(--wk-text)] mb-4">Changes to this policy</h2>
             <p className="text-[14px] leading-relaxed text-[var(--wk-text-muted)]">
-              We'll update this page if our practices change. The last-modified date at the top of the page shows when the latest version was published. If we make significant changes, we'll note them in our newsletter.
+              We’ll update this page if our practices change. The last-modified date at the top of the page shows when the latest version was published. If we make significant changes, we’ll note them in our newsletter.
             </p>
           </section>
 
@@ -169,7 +169,7 @@ export default function PrivacyPage() {
           <section className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-6 lg:p-8">
             <h2 className="text-[16px] font-black tracking-[-0.02em] text-[var(--wk-text)] mb-2">Questions about your privacy?</h2>
             <p className="text-[14px] leading-relaxed text-[var(--wk-text-muted)] mb-4">
-              Contact us at <a href="mailto:hello@wakilisha.africa" className="underline underline-offset-2 text-[var(--wk-text-soft)] hover:text-[var(--wk-text)] transition-colors">hello@wakilisha.africa</a> — we take privacy seriously and respond to every inquiry.
+              Contact us at <a href="mailto:hello@wakilisha.africa" className="underline underline-offset-2 text-[var(--wk-text-soft)] hover:text-[var(--wk-text)] transition-colors">hello@wakilisha.africa</a>. we take privacy seriously and respond to every inquiry.
             </p>
           </section>
         </div>
