@@ -49,6 +49,57 @@ export interface TrackEventOptions {
   entityType?: string;
   context?: Record<string, unknown>;
   userId?: string;
+  /**
+   * Use only for deliberate admin diagnostics. Normal internal/dev traffic is suppressed.
+   */
+  allowInternal?: boolean;
+}
+
+export const INTERNAL_TRAFFIC_STORAGE_KEY = "wakilisha_internal_traffic";
+
+function currentHostname(): string {
+  if (typeof window === "undefined") return "";
+  return window.location.hostname.replace(/^www\./, "").toLowerCase();
+}
+
+function isLocalDevelopmentHost(hostname = currentHostname()): boolean {
+  return (
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname === "::1" ||
+    hostname.endsWith(".local") ||
+    /^10\./.test(hostname) ||
+    /^192\.168\./.test(hostname) ||
+    /^172\.(1[6-9]|2\d|3[0-1])\./.test(hostname)
+  );
+}
+
+export function isInternalTrafficEnabled(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(INTERNAL_TRAFFIC_STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function setInternalTrafficEnabled(enabled: boolean): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (enabled) {
+      window.localStorage.setItem(INTERNAL_TRAFFIC_STORAGE_KEY, "1");
+    } else {
+      window.localStorage.removeItem(INTERNAL_TRAFFIC_STORAGE_KEY);
+    }
+    window.dispatchEvent(new CustomEvent("wakilisha_internal_traffic_changed", { detail: { enabled } }));
+  } catch {
+    // localStorage unavailable; ignore.
+  }
+}
+
+export function shouldSuppressAnalytics(options: Pick<TrackEventOptions, "allowInternal"> = {}): boolean {
+  if (options.allowInternal) return false;
+  return isInternalTrafficEnabled() || isLocalDevelopmentHost();
 }
 
 // ── Public API ─────────────────────────────────────────────────────
@@ -66,10 +117,13 @@ export function trackEvent(
   eventName: string,
   options: TrackEventOptions = {},
 ): void {
+  if (shouldSuppressAnalytics(options)) return;
+
   const rawPageUrl =
     typeof window !== "undefined" ? window.location.href : "";
   const pageUrl = normalizeUrl(rawPageUrl);
   const sessionId = getSessionId();
+  const hostname = currentHostname();
   const referrer =
     typeof document !== "undefined" ? document.referrer || undefined : undefined;
 
@@ -78,6 +132,9 @@ export function trackEvent(
     attribution: getAttributionContext(rawPageUrl, referrer),
     raw_page_url: rawPageUrl || null,
     canonical_page_url: pageUrl || null,
+    analytics_traffic_type: "external",
+    analytics_is_internal: false,
+    analytics_hostname: hostname || null,
   };
 
   const payload = {

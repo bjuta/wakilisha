@@ -30,6 +30,7 @@ import {
   fetchRealtimeAnalytics,
   fetchSignalBoard,
   refreshSignalOsRollups,
+  clearAdminAnalyticsCache,
 } from "@/services/adminAnalytics";
 import type {
   AnalyticsKpis,
@@ -53,6 +54,10 @@ import {
   getTopSharedArticles,
   getShareEventsTimeline,
 } from "@/services/shareTracking";
+import {
+  isInternalTrafficEnabled,
+  setInternalTrafficEnabled,
+} from "@/services/analytics";
 
 // ── Chart colors — warm, non-blue palette ─────────────────────────
 
@@ -194,6 +199,8 @@ export default function AdminAnalyticsPage() {
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState<DateRangeValue>({ mode: "preset", days: 30 });
   const [tab, setTab] = useState<"signals" | "realtime" | "overview" | "search" | "engagement" | "attribution" | "shares" | "funnel">("signals");
+  const [cleanAnalytics, setCleanAnalytics] = useState(true);
+  const [internalTraffic, setInternalTraffic] = useState(() => isInternalTrafficEnabled());
 
   // ── Compare periods ─────────────────────────────────────────
   const [compareEnabled, setCompareEnabled] = useState(false);
@@ -254,22 +261,23 @@ export default function AdminAnalyticsPage() {
   const loadData = useCallback(async (dr: DateRangeValue) => {
     setLoading(true);
     const range = toRange(dr);
+    const analyticsOptions = { clean: cleanAnalytics };
     try {
         const [today, period, tl, tp, te, ed, ptd, sq, ns, sd, ve, rb, attr, f] = await Promise.all([
-        fetchTodayKpis(),
-        fetchDashboardKpis(range),
-        fetchPageViewsTimeline(range),
-        fetchTopPages(range, 20),
-        fetchTopEntities(range, 20),
-        fetchEventDistribution(range),
-        fetchPageTypeDistribution(range),
-        fetchSearchQueries(range, 20),
-        fetchNewsletterSources(range),
-        fetchScrollDepth(range),
-        fetchVideoEngagement(range),
-        fetchReferrerBreakdown(range),
-        fetchAttributionSummary(range),
-        fetchConversionFunnel(range),
+        fetchTodayKpis(analyticsOptions),
+        fetchDashboardKpis(range, analyticsOptions),
+        fetchPageViewsTimeline(range, analyticsOptions),
+        fetchTopPages(range, 20, analyticsOptions),
+        fetchTopEntities(range, 20, analyticsOptions),
+        fetchEventDistribution(range, analyticsOptions),
+        fetchPageTypeDistribution(range, analyticsOptions),
+        fetchSearchQueries(range, 20, analyticsOptions),
+        fetchNewsletterSources(range, analyticsOptions),
+        fetchScrollDepth(range, analyticsOptions),
+        fetchVideoEngagement(range, analyticsOptions),
+        fetchReferrerBreakdown(range, analyticsOptions),
+        fetchAttributionSummary(range, analyticsOptions),
+        fetchConversionFunnel(range, analyticsOptions),
       ]);
       setTodayKpis(today);
       setKpis(period);
@@ -290,7 +298,7 @@ export default function AdminAnalyticsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [cleanAnalytics]);
 
   useEffect(() => { loadData(dateRange); }, [dateRange, loadData]);
 
@@ -301,11 +309,12 @@ export default function AdminAnalyticsPage() {
 
     try {
       const range = toRange(dateRange);
+      const analyticsOptions = { clean: cleanAnalytics };
       if (options?.refresh) {
-        const refreshed = await refreshSignalOsRollups(range);
+        const refreshed = await refreshSignalOsRollups(range, analyticsOptions);
         setSignalBoard(refreshed.board);
       } else {
-        setSignalBoard(await fetchSignalBoard(range));
+        setSignalBoard(await fetchSignalBoard(range, analyticsOptions));
       }
     } catch (error) {
       setSignalError(error instanceof Error ? error.message : "Signal Board failed.");
@@ -313,7 +322,7 @@ export default function AdminAnalyticsPage() {
       setSignalLoading(false);
       setSignalRefreshing(false);
     }
-  }, [dateRange]);
+  }, [dateRange, cleanAnalytics]);
 
   useEffect(() => { loadSignalBoard(); }, [loadSignalBoard]);
 
@@ -321,13 +330,13 @@ export default function AdminAnalyticsPage() {
     setRealtimeLoading(true);
     setRealtimeError(null);
     try {
-      setRealtime(await fetchRealtimeAnalytics());
+      setRealtime(await fetchRealtimeAnalytics({ clean: cleanAnalytics }));
     } catch (error) {
       setRealtimeError(error instanceof Error ? error.message : "Realtime analytics failed.");
     } finally {
       setRealtimeLoading(false);
     }
-  }, []);
+  }, [cleanAnalytics]);
 
   useEffect(() => {
     loadRealtime();
@@ -345,9 +354,10 @@ export default function AdminAnalyticsPage() {
     let cancelled = false;
     setCompareLoading(true);
     const range = toRange(secondaryDateRange);
+    const analyticsOptions = { clean: cleanAnalytics };
     Promise.all([
-      fetchDashboardKpis(range),
-      fetchPageViewsTimeline(range),
+      fetchDashboardKpis(range, analyticsOptions),
+      fetchPageViewsTimeline(range, analyticsOptions),
     ]).then(([k, tl]) => {
       if (cancelled) return;
       setCompareKpis(k);
@@ -356,7 +366,7 @@ export default function AdminAnalyticsPage() {
       if (!cancelled) setCompareLoading(false);
     });
     return () => { cancelled = true; };
-  }, [compareEnabled, secondaryDateRange]);
+  }, [compareEnabled, secondaryDateRange, cleanAnalytics]);
 
   // Load share data separately (different table)
   useEffect(() => {
@@ -395,7 +405,7 @@ export default function AdminAnalyticsPage() {
     setExporting(true);
     try {
       const range = toRange(dateRange);
-      const rows = await fetchExportEvents(range);
+      const rows = await fetchExportEvents(range, { clean: cleanAnalytics });
       const csv = ["event_name,page_url,page_type,entity_slug,entity_type,session_id,referrer,created_at,utm_source,utm_medium,utm_campaign,utm_content,utm_term,first_utm_source,first_utm_medium,first_utm_campaign,referrer_domain,raw_page_url,context_json"];
       rows.forEach((r: any) => {
         const ctx = (r.context || {}) as Record<string, any>;
@@ -451,6 +461,17 @@ export default function AdminAnalyticsPage() {
     }
   };
 
+  const handleCleanAnalyticsToggle = () => {
+    clearAdminAnalyticsCache();
+    setCleanAnalytics((current) => !current);
+  };
+
+  const handleInternalTrafficToggle = () => {
+    const next = !internalTraffic;
+    setInternalTrafficEnabled(next);
+    setInternalTraffic(next);
+  };
+
   const calcDelta = (primary: number, secondary: number): { text: string; up: boolean } | null => {
     if (secondary === 0) return primary > 0 ? { text: "+∞", up: true } : null;
     const pct = Math.round(((primary - secondary) / secondary) * 100);
@@ -478,6 +499,32 @@ export default function AdminAnalyticsPage() {
         description="First-party analytics across all WAKILISHA surfaces. Page views, search behavior, engagement, and conversion funnels."
       >
         <div className="flex items-center gap-2">
+          <button
+            onClick={handleCleanAnalyticsToggle}
+            className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold transition-all whitespace-nowrap cursor-pointer border ${
+              cleanAnalytics
+                ? "bg-[var(--wk-brand)] text-white border-[var(--wk-brand)]"
+                : "border-[var(--wk-warning)] text-[var(--wk-warning)] hover:bg-[var(--wk-warning)]/10"
+            }`}
+            title={cleanAnalytics ? "Internal and local traffic is hidden" : "Raw analytics includes internal/local traffic"}
+          >
+            <WkIcon name={cleanAnalytics ? "ShieldCheck" : "ShieldAlert"} size={13} />
+            {cleanAnalytics ? "Clean Analytics On" : "Raw Analytics"}
+          </button>
+
+          <button
+            onClick={handleInternalTrafficToggle}
+            className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold transition-all whitespace-nowrap cursor-pointer border ${
+              internalTraffic
+                ? "bg-[var(--wk-text)] text-[var(--wk-bg)] border-[var(--wk-text)]"
+                : "border-[var(--wk-border)] text-[var(--wk-text-muted)] hover:text-[var(--wk-text)] hover:border-[var(--wk-text-faint)]"
+            }`}
+            title={internalTraffic ? "This browser is excluded from analytics" : "Mark this browser as internal"}
+          >
+            <WkIcon name={internalTraffic ? "UserCheck" : "UserMinus"} size={13} />
+            {internalTraffic ? "My Traffic Is Internal" : "Mark Me Internal"}
+          </button>
+
           {/* Export */}
           <button
             onClick={handleExport}
