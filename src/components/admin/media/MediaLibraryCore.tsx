@@ -39,6 +39,34 @@ export interface MediaLibraryCoreProps {
 }
 
 const PAGE_SIZE = 60;
+const ACCEPTED_UPLOAD_TYPES = "image/*,application/pdf,.pdf";
+
+function inferUploadFileKind(file: File): "image" | "document" | "other" {
+  if (file.type.startsWith("image/")) return "image";
+  if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) return "document";
+  return "other";
+}
+
+function isSupportedUploadFile(file: File): boolean {
+  return inferUploadFileKind(file) !== "other";
+}
+
+function assetFileKind(asset: MediaAsset): string {
+  return asset.file_kind || (asset.mime_type === "application/pdf" ? "document" : asset.media_kind || "other");
+}
+
+function isImageAsset(asset: MediaAsset): boolean {
+  return asset.mime_type?.startsWith("image/") === true || assetFileKind(asset) === "image";
+}
+
+function fileBadge(asset: MediaAsset): string {
+  const ext = asset.file_extension || asset.original_filename?.split(".").pop() || asset.mime_type?.split("/").pop() || "file";
+  return ext.toUpperCase();
+}
+
+function fileIconClass(asset: MediaAsset): string {
+  return assetFileKind(asset) === "document" ? "ri-file-pdf-2-line" : "ri-file-line";
+}
 
 // ─── Component ───────────────────────────────────────────────
 
@@ -156,11 +184,15 @@ export function MediaLibraryCore({
   const uploadFile = useCallback(async (file: File) => {
     setUploadProgress((p) => ({ ...p, [file.name]: "uploading" }));
     try {
+      const fileKind = inferUploadFileKind(file);
+      const label = file.name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " ");
       const asset = await mediaService.upload(file, {
-        folder: "uploads",
+        folder: fileKind === "document" ? "uploads/downloads" : "uploads",
         sourceKind: "editor_upload",
         sourceEntity: "admin_upload",
-        altText: file.name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " "),
+        altText: fileKind === "image" ? label : undefined,
+        fileKind,
+        assetPurpose: fileKind === "document" ? "downloadable" : "general",
       });
       setUploadProgress((p) => ({ ...p, [file.name]: "done" }));
       setUploadedItems((prev) => [...prev, { name: file.name, url: asset.url!, assetId: asset.id }]);
@@ -174,7 +206,16 @@ export function MediaLibraryCore({
   }, [fetchAssets, selectItem]);
 
   const handleFilesAdded = useCallback((files: FileList | File[]) => {
-    const arr = Array.from(files).filter((f) => f.type.startsWith("image/"));
+    const incoming = Array.from(files);
+    const arr = incoming.filter(isSupportedUploadFile);
+    const rejected = incoming.length - arr.length;
+
+    if (rejected > 0) {
+      showToast("error", `${rejected} unsupported file${rejected === 1 ? "" : "s"} skipped. Use images or PDFs.`);
+    }
+
+    if (arr.length === 0) return;
+
     setUploadFiles((prev) => [...prev, ...arr]);
     arr.forEach(uploadFile);
   }, [uploadFile]);
@@ -293,7 +334,7 @@ export function MediaLibraryCore({
               className="flex items-center gap-1.5 rounded-lg bg-wk-brand px-3 py-2 text-[12px] font-bold text-wk-brand-on hover:opacity-90 transition-all whitespace-nowrap cursor-pointer"
             >
               <i className="ri-upload-cloud-line text-[13px]" />
-              Upload Images
+              Upload Files
             </button>
             <button onClick={() => fetchAssets()} className="flex items-center gap-1.5 rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[12px] font-semibold text-wk-text-soft hover:bg-wk-surface-raised transition-all whitespace-nowrap cursor-pointer">
               <WkIcon name="RefreshCw" size={13} />
@@ -357,6 +398,7 @@ export function MediaLibraryCore({
               className="rounded-lg border border-wk-border bg-wk-surface px-2.5 py-2 text-[12px] text-wk-text outline-none cursor-pointer">
               <option value="all">All types</option>
               <option value="image">Image</option>
+              <option value="document">Document/PDF</option>
               <option value="external_artist_image_postmeta">Artist photo</option>
               <option value="external_chart_entry_artwork">Chart artwork</option>
             </select>
@@ -440,7 +482,7 @@ export function MediaLibraryCore({
                   <div className="col-span-full flex flex-col items-center justify-center py-16 text-wk-text-muted">
                     <WkIcon name="Image" size={36} className="mb-3 text-wk-text-faint" />
                     <p className="text-[13px] font-semibold">No media assets found</p>
-                    <p className="text-[12px] mt-1">Try different filters or upload new images.</p>
+                    <p className="text-[12px] mt-1">Try different filters or upload new files.</p>
                   </div>
                 ) : assets.map((asset) => {
                   const isSelected = selectedAssetId === asset.id;
@@ -468,14 +510,15 @@ export function MediaLibraryCore({
                         </div>
                       )}
 
-                      {/* Image */}
-                      {asset.url ? (
+                      {/* File preview */}
+                      {asset.url && isImageAsset(asset) ? (
                         <img src={asset.url} alt={String(asset.metadata?.alt_text ?? asset.title ?? "")}
                           className="h-full w-full object-cover object-top" loading="lazy"
                           onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
                       ) : (
-                        <div className="flex h-full w-full items-center justify-center bg-wk-surface-raised text-wk-text-faint">
-                          <WkIcon name="Image" size={22} />
+                        <div className="flex h-full w-full flex-col items-center justify-center gap-1 bg-wk-surface-raised text-wk-text-faint">
+                          <i className={`${fileIconClass(asset)} text-[24px]`} />
+                          <span className="text-[9px] font-black uppercase tracking-wider">{fileBadge(asset)}</span>
                         </div>
                       )}
 
@@ -530,7 +573,7 @@ export function MediaLibraryCore({
                             onChange={(e) => e.target.checked ? setBulkSelected(new Set(assets.map((a) => a.id))) : setBulkSelected(new Set())}
                             className="rounded w-3 h-3" />
                         </th>
-                        <th className="px-3 py-3 w-12">Img</th>
+                        <th className="px-3 py-3 w-12">File</th>
                         <th className="px-3 py-3">Title / Slug</th>
                         <th className="px-3 py-3">Type</th>
                         <th className="px-3 py-3">Source</th>
@@ -548,10 +591,10 @@ export function MediaLibraryCore({
                           </td>
                           <td className="px-3 py-2.5">
                             <div className="h-9 w-9 overflow-hidden rounded-lg bg-wk-surface-raised cursor-pointer" onClick={() => selectItem(asset.id, asset.url ?? "")}>
-                              {asset.url ? (
+                              {asset.url && isImageAsset(asset) ? (
                                 <img src={asset.url} alt="" className="h-full w-full object-cover object-top" loading="lazy" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
                               ) : (
-                                <div className="flex h-full w-full items-center justify-center text-wk-text-faint"><WkIcon name="Image" size={12} /></div>
+                                <div className="flex h-full w-full items-center justify-center text-wk-text-faint"><i className={`${fileIconClass(asset)} text-[16px]`} /></div>
                               )}
                             </div>
                           </td>
@@ -562,7 +605,7 @@ export function MediaLibraryCore({
                             </button>
                           </td>
                           <td className="px-3 py-2.5">
-                            <span className="rounded-full bg-wk-surface-raised px-2 py-0.5 text-[10px] font-bold text-wk-text-muted">{asset.media_kind ?? "—"}</span>
+                            <span className="rounded-full bg-wk-surface-raised px-2 py-0.5 text-[10px] font-bold text-wk-text-muted">{asset.file_kind ?? asset.media_kind ?? "—"}</span>
                           </td>
                           <td className="px-3 py-2.5 text-wk-text-muted">{asset.source_kind ?? "—"}</td>
                           <td className="px-3 py-2.5">
@@ -653,10 +696,10 @@ export function MediaLibraryCore({
                 <i className="ri-upload-cloud-2-line text-[32px] text-wk-brand" />
               </div>
               <div className="text-center">
-                <p className="text-[15px] font-bold text-wk-text">{isDragging ? "Drop images here" : "Drag & drop or click to upload"}</p>
-                <p className="mt-1 text-[12px] text-wk-text-muted">PNG, JPG, GIF, WebP, SVG · Uploads to Lightsail + media registry</p>
+                <p className="text-[15px] font-bold text-wk-text">{isDragging ? "Drop files here" : "Drag & drop or click to upload"}</p>
+                <p className="mt-1 text-[12px] text-wk-text-muted">PNG, JPG, GIF, WebP, SVG, PDF · Uploads to Lightsail + media registry</p>
               </div>
-              <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden"
+              <input ref={fileInputRef} type="file" accept={ACCEPTED_UPLOAD_TYPES} multiple className="hidden"
                 onChange={(e) => e.target.files && handleFilesAdded(e.target.files)} />
             </div>
 
@@ -681,7 +724,13 @@ export function MediaLibraryCore({
                         {status === "pending" && <div className="h-5 w-5 rounded-full border-2 border-wk-border-2" />}
                       </div>
                       {status === "done" && uploaded && (
-                        <img src={uploaded.url} alt="" className="h-8 w-8 shrink-0 rounded-lg object-cover" />
+                        file.type.startsWith("image/") ? (
+                          <img src={uploaded.url} alt="" className="h-8 w-8 shrink-0 rounded-lg object-cover" />
+                        ) : (
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-wk-surface-raised text-wk-text-faint">
+                            <i className="ri-file-pdf-2-line text-[17px]" />
+                          </div>
+                        )
                       )}
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-[12px] font-semibold text-wk-text">{file.name}</p>

@@ -16,7 +16,11 @@ const corsHeaders = {
 };
 
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
-const ALLOWED_EXTENSIONS = new Set(["jpg", "jpeg", "png", "gif", "webp", "svg", "avif", "ico"]);
+const ALLOWED_IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "gif", "webp", "svg", "avif", "ico"]);
+const ALLOWED_DOCUMENT_EXTENSIONS = new Set(["pdf"]);
+const ALLOWED_EXTENSIONS = new Set([...ALLOWED_IMAGE_EXTENSIONS, ...ALLOWED_DOCUMENT_EXTENSIONS]);
+
+type UploadKind = "image" | "document";
 
 function json(status: number, body: unknown) {
   return new Response(JSON.stringify(body), {
@@ -78,6 +82,29 @@ function extensionFromName(fileName: string) {
   return match?.[1] || "";
 }
 
+function classifyUploadKind(file: File, ext: string): UploadKind {
+  const mimeType = String(file.type || "").toLowerCase();
+
+  if (ALLOWED_IMAGE_EXTENSIONS.has(ext) && (mimeType.startsWith("image/") || mimeType === "")) {
+    return "image";
+  }
+
+  if (ALLOWED_DOCUMENT_EXTENSIONS.has(ext) && (mimeType === "application/pdf" || mimeType === "")) {
+    return "document";
+  }
+
+  throw Object.assign(
+    new Error(`Unsupported file type: ${mimeType || ext || "unknown"}`),
+    { status: 415 },
+  );
+}
+
+function contentTypeForUpload(file: File, kind: UploadKind) {
+  if (file.type) return file.type;
+  if (kind === "document") return "application/pdf";
+  return "application/octet-stream";
+}
+
 function buildStoragePath(folder: string, fileName: string) {
   const ext = extensionFromName(fileName);
   if (!ext || !ALLOWED_EXTENSIONS.has(ext)) {
@@ -132,12 +159,11 @@ serve(async (req) => {
       return json(400, { error: "file is required." });
     }
 
-    if (!fileValue.type.startsWith("image/")) {
-      return json(415, { error: `Only image uploads are supported. Got: ${fileValue.type || "unknown"}` });
-    }
-
     if (fileValue.size <= 0) return json(400, { error: "File is empty." });
     if (fileValue.size > MAX_UPLOAD_BYTES) return json(413, { error: "File is too large." });
+
+    const fileExtension = extensionFromName(fileValue.name || "");
+    const uploadKind = classifyUploadKind(fileValue, fileExtension);
 
     const folder = String(form.get("folder") ?? "uploads");
     const existingPath = String(form.get("storage_path") ?? "").trim();
@@ -146,8 +172,14 @@ serve(async (req) => {
       ? validateExistingPath(existingPath)
       : buildStoragePath(folder, fileValue.name || "upload.png");
 
-    if (!isAdmin && !isOwnProfileMediaPath(storagePath, actor.id)) {
-      return json(403, { error: "You can only upload your own profile media." });
+    if (!isAdmin) {
+      if (!isOwnProfileMediaPath(storagePath, actor.id)) {
+        return json(403, { error: "You can only upload your own profile media." });
+      }
+
+      if (uploadKind !== "image") {
+        return json(415, { error: "Profile media uploads must be images." });
+      }
     }
 
     const receiverUrl = env("MEDIA_UPLOAD_RECEIVER_URL");
@@ -160,7 +192,7 @@ serve(async (req) => {
       method: "PUT",
       headers: {
         Authorization: `Bearer ${receiverSecret}`,
-        "Content-Type": fileValue.type,
+        "Content-Type": contentTypeForUpload(fileValue, uploadKind),
       },
       body: await fileValue.arrayBuffer(),
     });
@@ -179,8 +211,9 @@ serve(async (req) => {
       url: payload.url || `https://media.wakilisha.africa/${storagePath}`,
       storage_path: payload.storage_path || storagePath,
       storage_bucket: "lightsail-media",
-      mime_type: fileValue.type,
+      mime_type: contentTypeForUpload(fileValue, uploadKind),
       size: fileValue.size,
+      file_kind: uploadKind,
       uploaded_by: actor.id,
     });
   } catch (error) {

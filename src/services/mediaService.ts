@@ -1,5 +1,5 @@
 /**
- * Unified Media Service — single source of truth for all image operations.
+ * Unified Media Service — single source of truth for all media operations.
  *
  * Every component that touches media (MediaPickerModal, MediaEditModal,
  * MediaLibrary page, article editor, settings pages) delegates to this service.
@@ -20,6 +20,8 @@ import { supabase } from "@/lib/supabase";
 
 // ─── Types ────────────────────────────────────────────────────
 
+export type MediaFileKind = "image" | "document" | "audio" | "video" | "archive" | "other";
+
 export interface MediaAsset {
   id: string;
   slug: string | null;
@@ -34,6 +36,20 @@ export interface MediaAsset {
   source_staging_record_id: string | null;
   storage_bucket: string | null;
   storage_path: string | null;
+  folder_id?: string | null;
+  file_kind?: MediaFileKind | string | null;
+  asset_purpose?: string | null;
+  display_filename?: string | null;
+  original_filename?: string | null;
+  file_extension?: string | null;
+  file_size_bytes?: number | null;
+  content_date?: string | null;
+  rights_status?: string | null;
+  credit_text?: string | null;
+  country_code?: string | null;
+  language_code?: string | null;
+  tags?: string[] | null;
+  internal_notes?: string | null;
   metadata: MediaAssetMetadata | null;
   created_at: string | null;
   updated_at: string | null;
@@ -64,8 +80,14 @@ export interface UploadOptions {
   slug?: string;
   /** Human-readable title. Defaults to file name. */
   title?: string;
-  /** Subfolder path within the bucket. Defaults to "uploads/". */
+  /** Subfolder path within the media origin. Defaults by file kind. */
   folder?: string;
+  /** Logical file kind for filtering. Auto-detected if omitted. */
+  fileKind?: MediaFileKind;
+  /** Admin/editorial purpose. Defaults to general or downloadable. */
+  assetPurpose?: string;
+  /** Logical folder ID from media_folders. */
+  folderId?: string | null;
   /** Source tracking — what ingested this? */
   sourceKind?: string;
   sourceEntity?: string;
@@ -79,6 +101,8 @@ export interface UploadOptions {
 export interface ListOptions {
   search?: string;
   mediaKind?: string;
+  fileKind?: string;
+  assetPurpose?: string;
   sourceKind?: string;
   status?: string;
   missingAltOnly?: boolean;
@@ -118,6 +142,7 @@ const FK_REFERENCE_MAP: Array<{ table: string; column: string; id_column: string
 
 const LEGACY_STORAGE_BUCKET = "article-media";
 const LIGHTSAIL_STORAGE_BUCKET = "lightsail-media";
+const MEDIA_ASSET_SELECT = "id, slug, title, url, mime_type, media_kind, status, source_kind, source_entity, source_record_id, source_staging_record_id, storage_bucket, storage_path, folder_id, file_kind, asset_purpose, display_filename, original_filename, file_extension, file_size_bytes, content_date, rights_status, credit_text, country_code, language_code, tags, internal_notes, metadata, created_at, updated_at";
 
 // ─── Helpers ──────────────────────────────────────────────────
 
@@ -134,6 +159,29 @@ function buildStoragePath(folder: string, fileName: string): string {
   const ext = safe.split(".").pop() ?? "bin";
   const base = safe.replace(/\.[^.]+$/, "").slice(0, 40);
   return clean ? `${clean}/${ts}-${base}.${ext}` : `${ts}-${base}.${ext}`;
+}
+
+function getFileExtension(fileName: string): string | null {
+  const match = String(fileName || "").toLowerCase().match(/\.([a-z0-9]+)$/);
+  return match?.[1] ?? null;
+}
+
+function inferFileKind(file: File): MediaFileKind {
+  const ext = getFileExtension(file.name);
+  if (file.type.startsWith("image/")) return "image";
+  if (file.type === "application/pdf" || ext === "pdf") return "document";
+  if (file.type.startsWith("audio/")) return "audio";
+  if (file.type.startsWith("video/")) return "video";
+  if (ext === "zip") return "archive";
+  return "other";
+}
+
+function defaultAssetPurpose(fileKind: MediaFileKind): string {
+  return fileKind === "document" ? "downloadable" : "general";
+}
+
+function isImageFileKind(fileKind: MediaFileKind): boolean {
+  return fileKind === "image";
 }
 
 function parseStoragePathFromUrl(url: string): string | null {
@@ -207,38 +255,44 @@ export const mediaService = {
   // ════════════════════════════════════════════════════════════
 
   /**
-   * Upload a file to Supabase Storage and create a registry_media_assets row.
+   * Upload a file to Lightsail media origin and create a registry_media_assets row.
    * Returns the complete MediaAsset with its generated ID.
    */
   async upload(file: File, options: UploadOptions = {}): Promise<MediaAsset> {
-    const folder = options.folder ?? "uploads";
-    const storagePath = buildStoragePath(folder, file.name);
+    const fileKind = options.fileKind ?? inferFileKind(file);
+    const assetPurpose = options.assetPurpose ?? defaultAssetPurpose(fileKind);
+    const folder = options.folder ?? (fileKind === "document" ? "uploads/downloads" : "uploads");
 
     // 1. Upload to Lightsail media origin
     const uploaded = await uploadToLightsailMedia(file, { folder });
     const publicUrl = uploaded.url;
 
-    // 3. Get image dimensions
+    // 2. Get image dimensions when the file is an image
     let width = 0;
     let height = 0;
-    try {
-      const dims = await getImageDimensions(file);
-      width = dims.width;
-      height = dims.height;
-    } catch {
-      // Non-blocking — dimensions are best-effort
+    if (isImageFileKind(fileKind)) {
+      try {
+        const dims = await getImageDimensions(file);
+        width = dims.width;
+        height = dims.height;
+      } catch {
+        // Non-blocking — dimensions are best-effort
+      }
     }
 
-    // 4. Insert into registry_media_assets
+    // 3. Insert into registry_media_assets
     const slug = options.slug ?? generateSlug();
+    const fileExtension = getFileExtension(file.name);
     const metadata: MediaAssetMetadata = {
-      alt_text: options.altText ?? file.name,
+      ...(fileKind === "image" ? { alt_text: options.altText ?? file.name } : {}),
       caption: options.caption ?? null,
       description: options.description ?? null,
       file_name: file.name,
-      file_size: file.size,
+      file_size: uploaded.size || file.size,
       width,
       height,
+      file_kind: fileKind,
+      asset_purpose: assetPurpose,
     };
 
     const { data: inserted, error: insertError } = await supabase
@@ -247,17 +301,24 @@ export const mediaService = {
         slug,
         title: options.title ?? file.name,
         url: publicUrl,
-        mime_type: file.type,
-        media_kind: "image",
+        mime_type: uploaded.mimeType || file.type,
+        media_kind: fileKind,
         status: "active",
         source_kind: options.sourceKind ?? "editor_upload",
         source_entity: options.sourceEntity ?? null,
         source_record_id: options.sourceRecordId ?? null,
         storage_bucket: uploaded.storageBucket,
         storage_path: uploaded.storagePath,
+        folder_id: options.folderId ?? null,
+        file_kind: fileKind,
+        asset_purpose: assetPurpose,
+        display_filename: options.title ?? file.name,
+        original_filename: file.name,
+        file_extension: fileExtension,
+        file_size_bytes: uploaded.size || file.size,
         metadata,
       })
-      .select("id, slug, title, url, mime_type, media_kind, status, source_kind, source_entity, source_record_id, source_staging_record_id, storage_bucket, storage_path, metadata, created_at, updated_at")
+      .select(MEDIA_ASSET_SELECT)
       .single();
 
     if (insertError || !inserted) {
@@ -332,7 +393,7 @@ export const mediaService = {
         updated_at: new Date().toISOString(),
       })
       .eq("id", assetId)
-      .select("id, slug, title, url, mime_type, media_kind, status, source_kind, source_entity, source_record_id, source_staging_record_id, storage_bucket, storage_path, metadata, created_at, updated_at")
+      .select(MEDIA_ASSET_SELECT)
       .single();
 
     if (updateError || !updated) {
@@ -403,7 +464,7 @@ export const mediaService = {
   async getById(assetId: string): Promise<MediaAsset | null> {
     const { data, error } = await supabase
       .from("registry_media_assets")
-      .select("id, slug, title, url, mime_type, media_kind, status, source_kind, source_entity, source_record_id, source_staging_record_id, storage_bucket, storage_path, metadata, created_at, updated_at")
+      .select(MEDIA_ASSET_SELECT)
       .eq("id", assetId)
       .single();
 
@@ -414,7 +475,7 @@ export const mediaService = {
   async getByUrl(url: string): Promise<MediaAsset | null> {
     const { data, error } = await supabase
       .from("registry_media_assets")
-      .select("id, slug, title, url, mime_type, media_kind, status, source_kind, source_entity, source_record_id, source_staging_record_id, storage_bucket, storage_path, metadata, created_at, updated_at")
+      .select(MEDIA_ASSET_SELECT)
       .eq("url", url)
       .maybeSingle();
 
@@ -430,6 +491,8 @@ export const mediaService = {
     const {
       search = "",
       mediaKind = "all",
+      fileKind = "all",
+      assetPurpose = "all",
       sourceKind = "all",
       status = "all",
       missingAltOnly = false,
@@ -441,12 +504,14 @@ export const mediaService = {
 
     let query = supabase
       .from("registry_media_assets")
-      .select("id, slug, title, url, mime_type, media_kind, status, source_kind, source_entity, source_record_id, source_staging_record_id, storage_bucket, storage_path, metadata, created_at, updated_at", { count: "exact" });
+      .select(MEDIA_ASSET_SELECT, { count: "exact" });
 
     if (search) {
-      query = query.or(`title.ilike.%${search}%,slug.ilike.%${search}%,url.ilike.%${search}%,source_record_id.ilike.%${search}%`);
+      query = query.or(`title.ilike.%${search}%,slug.ilike.%${search}%,url.ilike.%${search}%,source_record_id.ilike.%${search}%,display_filename.ilike.%${search}%,original_filename.ilike.%${search}%,file_extension.ilike.%${search}%`);
     }
     if (mediaKind !== "all") query = query.eq("media_kind", mediaKind);
+    if (fileKind !== "all") query = query.eq("file_kind", fileKind);
+    if (assetPurpose !== "all") query = query.eq("asset_purpose", assetPurpose);
     if (sourceKind !== "all") query = query.eq("source_kind", sourceKind);
     if (status !== "all") query = query.eq("status", status);
     if (missingAltOnly) query = query.or("metadata.is.null,metadata->>alt_text.is.null");
@@ -545,7 +610,7 @@ export const mediaService = {
       .from("registry_media_assets")
       .update(payload)
       .eq("id", assetId)
-      .select("id, slug, title, url, mime_type, media_kind, status, source_kind, source_entity, source_record_id, source_staging_record_id, storage_bucket, storage_path, metadata, created_at, updated_at")
+      .select(MEDIA_ASSET_SELECT)
       .single();
 
     if (error || !data) {
