@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
+import { fetchBrokenPages, type BrokenPagesResponse, type BrokenPageRow } from "@/services/adminAnalytics";
 import {
   getMaintenanceSettings,
   saveDomainSettings,
@@ -17,12 +18,32 @@ export default function AdminSettingsMaintenance() {
   const [saved, setSaved] = useState(false);
   const [running, setRunning] = useState<string | null>(null);
   const [lastResult, setLastResult] = useState<MaintenanceActionResult | null>(null);
+  const [brokenPages, setBrokenPages] = useState<BrokenPagesResponse | null>(null);
+  const [brokenPagesLoading, setBrokenPagesLoading] = useState(false);
+  const [brokenPagesError, setBrokenPagesError] = useState<string | null>(null);
 
   const update = <K extends keyof MaintenanceSettings>(key: K, value: MaintenanceSettings[K]) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
     setSaved(false);
     saveDomainSettings("maintenance", { ...settings, [key]: value });
   };
+
+  const loadBrokenPages = async () => {
+    setBrokenPagesLoading(true);
+    setBrokenPagesError(null);
+
+    try {
+      setBrokenPages(await fetchBrokenPages(30));
+    } catch (error) {
+      setBrokenPagesError(error instanceof Error ? error.message : "Could not load broken pages.");
+    } finally {
+      setBrokenPagesLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadBrokenPages();
+  }, []);
 
   const runAction = (action: string, fn: () => MaintenanceActionResult) => {
     setRunning(action);
@@ -66,6 +87,68 @@ export default function AdminSettingsMaintenance() {
             <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-[var(--wk-surface)] transition-transform ${settings.debugMode ? "translate-x-[22px]" : "translate-x-0.5"}`} />
           </button>
         </div>
+      </WkSurface>
+
+      <WkSurface className="p-5">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <WkIcon name="AlertTriangle" size={16} className="text-[var(--wk-danger)]" />
+              <h2 className="text-[14px] font-bold text-[var(--wk-text)]">Broken Pages</h2>
+            </div>
+            <p className="mt-1 text-[12px] text-[var(--wk-text-muted)]">
+              Real hard 404s from analytics. This catches users landing on dead routes before we find them by accident.
+            </p>
+          </div>
+          <button
+            onClick={loadBrokenPages}
+            disabled={brokenPagesLoading}
+            className="wk-button wk-button-soft wk-button-sm inline-flex items-center gap-1.5"
+          >
+            <WkIcon name={brokenPagesLoading ? "Loader" : "RefreshCw"} size={14} />
+            {brokenPagesLoading ? "Checking..." : "Refresh"}
+          </button>
+        </div>
+
+        {brokenPagesError && (
+          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[12px] font-semibold text-red-700">
+            {brokenPagesError}
+          </div>
+        )}
+
+        <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <MaintenanceKpi label="404 Hits" value={brokenPages?.summary.totalHits ?? 0} />
+          <MaintenanceKpi label="Broken URLs" value={brokenPages?.summary.uniquePages ?? 0} />
+          <MaintenanceKpi label="High Severity" value={brokenPages?.summary.highSeverityCount ?? 0} />
+          <MaintenanceKpi label="Auto-fix Candidates" value={brokenPages?.summary.legacyFixCount ?? 0} />
+        </div>
+
+        {!brokenPages || brokenPages.rows.length === 0 ? (
+          <div className="rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] p-4 text-[12px] font-semibold text-[var(--wk-text-muted)]">
+            No tracked 404s yet. New 404 visits will appear here after this deploy.
+          </div>
+        ) : (
+          <div className="overflow-hidden rounded-xl border border-[var(--wk-border)]">
+            <div className="max-h-[460px] overflow-auto">
+              <table className="min-w-full divide-y divide-[var(--wk-border)] text-left text-[12px]">
+                <thead className="sticky top-0 bg-[var(--wk-surface)] text-[10px] uppercase tracking-[0.16em] text-[var(--wk-text-faint)]">
+                  <tr>
+                    <th className="px-3 py-2">Broken URL</th>
+                    <th className="px-3 py-2">Hits</th>
+                    <th className="px-3 py-2">Cause</th>
+                    <th className="px-3 py-2">Suggested Fix</th>
+                    <th className="px-3 py-2">Last Seen</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--wk-border)] bg-[var(--wk-bg)]">
+                  {brokenPages.rows.slice(0, 50).map((row) => (
+                    <BrokenPageRowView key={row.id} row={row} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </WkSurface>
 
       <WkSurface className="p-5">
@@ -203,5 +286,55 @@ function MaintenanceActionButton({
         {running ? "Running..." : "Run"}
       </button>
     </div>
+  );
+}
+function MaintenanceKpi({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] p-3">
+      <div className="text-[20px] font-black text-[var(--wk-text)]">{value.toLocaleString()}</div>
+      <div className="mt-1 text-[10px] font-black uppercase tracking-[0.14em] text-[var(--wk-text-faint)]">{label}</div>
+    </div>
+  );
+}
+
+function severityClass(severity: BrokenPageRow["severity"]) {
+  if (severity === "high") return "border-red-200 bg-red-50 text-red-700";
+  if (severity === "medium") return "border-amber-200 bg-amber-50 text-amber-700";
+  return "border-[var(--wk-border)] bg-[var(--wk-surface)] text-[var(--wk-text-muted)]";
+}
+
+function BrokenPageRowView({ row }: { row: BrokenPageRow }) {
+  return (
+    <tr>
+      <td className="px-3 py-3 align-top">
+        <div className="max-w-[360px] truncate font-black text-[var(--wk-text)]">{row.path}</div>
+        {row.referrers.length > 0 && (
+          <div className="mt-1 text-[10px] text-[var(--wk-text-faint)]">
+            Referrers: {row.referrers.join(", ")}
+          </div>
+        )}
+      </td>
+      <td className="px-3 py-3 align-top">
+        <div className="font-black text-[var(--wk-text)]">{row.hits}</div>
+        <div className="text-[10px] text-[var(--wk-text-faint)]">{row.sessions} sessions</div>
+      </td>
+      <td className="px-3 py-3 align-top">
+        <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-black ${severityClass(row.severity)}`}>
+          {row.routeGuess.replace(/_/g, " ")}
+        </span>
+      </td>
+      <td className="px-3 py-3 align-top">
+        {row.suggestedFix ? (
+          <a href={row.suggestedFix} className="font-bold text-[var(--wk-brand)] hover:underline">
+            {row.suggestedFix}
+          </a>
+        ) : (
+          <span className="text-[var(--wk-text-faint)]">Needs review</span>
+        )}
+      </td>
+      <td className="px-3 py-3 align-top text-[var(--wk-text-muted)]">
+        {row.lastSeenAt ? new Date(row.lastSeenAt).toLocaleString() : "—"}
+      </td>
+    </tr>
   );
 }

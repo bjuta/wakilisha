@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
+import { trackEvent } from "@/services/analytics";
 
 /**
  * LegacyArticleRedirect
@@ -16,6 +17,7 @@ import { supabase } from "@/lib/supabase";
 export default function LegacyArticleRedirect() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const [checked, setChecked] = useState(false);
 
   useEffect(() => {
@@ -51,6 +53,26 @@ export default function LegacyArticleRedirect() {
 
       if (article) {
         navigate(`/magazine/${targetSlug}`, { replace: true });
+      } else {
+        const path = `${location.pathname}${location.search || ""}${location.hash || ""}`;
+
+        trackEvent("page_not_found", {
+          pageType: "404",
+          entityType: "broken_page",
+          entitySlug: slug,
+          context: {
+            status_code: 404,
+            not_found_path: location.pathname,
+            not_found_search: location.search || "",
+            not_found_hash: location.hash || "",
+            route_guess: "legacy_article_slug",
+            suggested_fix: "",
+            soft_404_surface: "legacy_article_redirect",
+            attempted_slug: slug,
+            attempted_target_slug: targetSlug,
+            path,
+          },
+        });
       }
 
       setChecked(true);
@@ -61,7 +83,7 @@ export default function LegacyArticleRedirect() {
     return () => {
       alive = false;
     };
-  }, [slug, navigate]);
+  }, [slug, navigate, location.pathname, location.search, location.hash]);
 
   if (!checked) {
     return (
