@@ -342,54 +342,54 @@ export async function fetchTodayKpis(options: AnalyticsFilterOptions = {}): Prom
   return (await getSnapshot(1, options)).today;
 }
 
-export async function fetchPageViewsTimeline(range: DateRange | number = 30): Promise<TimelinePoint[]> {
-  return (await getSnapshot(range)).timeline;
+export async function fetchPageViewsTimeline(range: DateRange | number = 30, options: AnalyticsFilterOptions = {}): Promise<TimelinePoint[]> {
+  return (await getSnapshot(range, options)).timeline;
 }
 
-export async function fetchTopPages(range: DateRange | number = 30, limit = 20): Promise<TopPage[]> {
-  return (await getSnapshot(range)).topPages.slice(0, limit);
+export async function fetchTopPages(range: DateRange | number = 30, limit = 20, options: AnalyticsFilterOptions = {}): Promise<TopPage[]> {
+  return (await getSnapshot(range, options)).topPages.slice(0, limit);
 }
 
-export async function fetchTopEntities(range: DateRange | number = 30, limit = 20): Promise<TopEntity[]> {
-  return (await getSnapshot(range)).topEntities.slice(0, limit);
+export async function fetchTopEntities(range: DateRange | number = 30, limit = 20, options: AnalyticsFilterOptions = {}): Promise<TopEntity[]> {
+  return (await getSnapshot(range, options)).topEntities.slice(0, limit);
 }
 
-export async function fetchEventDistribution(range: DateRange | number = 30): Promise<EventDistribution[]> {
-  return (await getSnapshot(range)).eventDistribution;
+export async function fetchEventDistribution(range: DateRange | number = 30, options: AnalyticsFilterOptions = {}): Promise<EventDistribution[]> {
+  return (await getSnapshot(range, options)).eventDistribution;
 }
 
-export async function fetchPageTypeDistribution(range: DateRange | number = 30): Promise<PageTypeDistribution[]> {
-  return (await getSnapshot(range)).pageTypeDistribution;
+export async function fetchPageTypeDistribution(range: DateRange | number = 30, options: AnalyticsFilterOptions = {}): Promise<PageTypeDistribution[]> {
+  return (await getSnapshot(range, options)).pageTypeDistribution;
 }
 
-export async function fetchSearchQueries(range: DateRange | number = 30, limit = 20): Promise<SearchQueryRow[]> {
-  return (await getSnapshot(range)).searchQueries.slice(0, limit);
+export async function fetchSearchQueries(range: DateRange | number = 30, limit = 20, options: AnalyticsFilterOptions = {}): Promise<SearchQueryRow[]> {
+  return (await getSnapshot(range, options)).searchQueries.slice(0, limit);
 }
 
-export async function fetchNewsletterSources(range: DateRange | number = 30): Promise<NewsletterSource[]> {
-  return (await getSnapshot(range)).newsletterSources;
+export async function fetchNewsletterSources(range: DateRange | number = 30, options: AnalyticsFilterOptions = {}): Promise<NewsletterSource[]> {
+  return (await getSnapshot(range, options)).newsletterSources;
 }
 
-export async function fetchScrollDepth(range: DateRange | number = 30): Promise<ScrollDepthBucket[]> {
-  return (await getSnapshot(range)).scrollDepth;
+export async function fetchScrollDepth(range: DateRange | number = 30, options: AnalyticsFilterOptions = {}): Promise<ScrollDepthBucket[]> {
+  return (await getSnapshot(range, options)).scrollDepth;
 }
 
-export async function fetchVideoEngagement(range: DateRange | number = 30): Promise<VideoStat[]> {
-  return (await getSnapshot(range)).videoEngagement;
+export async function fetchVideoEngagement(range: DateRange | number = 30, options: AnalyticsFilterOptions = {}): Promise<VideoStat[]> {
+  return (await getSnapshot(range, options)).videoEngagement;
 }
 
-export async function fetchReferrerBreakdown(range: DateRange | number = 30): Promise<Array<{ referrer: string; count: number }>> {
-  return (await getSnapshot(range)).referrerBreakdown;
+export async function fetchReferrerBreakdown(range: DateRange | number = 30, options: AnalyticsFilterOptions = {}): Promise<Array<{ referrer: string; count: number }>> {
+  return (await getSnapshot(range, options)).referrerBreakdown;
 }
 
-export async function fetchAttributionSummary(range: DateRange | number = 30): Promise<AttributionSummary> {
-  return (await getSnapshot(range)).attribution;
+export async function fetchAttributionSummary(range: DateRange | number = 30, options: AnalyticsFilterOptions = {}): Promise<AttributionSummary> {
+  return (await getSnapshot(range, options)).attribution;
 }
 
-export async function fetchConversionFunnel(range: DateRange | number = 30): Promise<FunnelStep[]> {
-  return (await getSnapshot(range)).funnel;
+export async function fetchConversionFunnel(range: DateRange | number = 30, options: AnalyticsFilterOptions = {}): Promise<FunnelStep[]> {
+  return (await getSnapshot(range, options)).funnel;
 }
 
-export async function fetchExportEvents(range: DateRange | number = 30): Promise<unknown[]> {
-  return (await getSnapshot(range)).exportRows;
+export async function fetchExportEvents(range: DateRange | number = 30, options: AnalyticsFilterOptions = {}): Promise<unknown[]> {
+  return (await getSnapshot(range, options)).exportRows;
 }

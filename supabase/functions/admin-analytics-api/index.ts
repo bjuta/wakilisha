@@ -129,7 +129,20 @@ function isInternalAnalyticsEvent(row: any): boolean {
 
 function filterInternalEvents<T extends any[]>(events: T, clean = true): T {
   if (!clean) return events;
-  return events.filter((row) => !isInternalAnalyticsEvent(row)) as T;
+
+  const filtered = events.filter((row) => !isInternalAnalyticsEvent(row)) as T;
+
+  // Safety guard: clean mode should remove internal noise, not erase the dashboard.
+  // If raw analytics has rows but the clean filter removes everything, return raw rows
+  // and log loudly so we can tighten the classifier without breaking reporting.
+  if (events.length > 0 && filtered.length === 0) {
+    console.warn("[admin-analytics-api] clean filter removed all events; returning raw events as safety fallback", {
+      rawCount: events.length,
+    });
+    return events;
+  }
+
+  return filtered;
 }
 
 function domainFromReferrer(raw: unknown): string {
@@ -2172,8 +2185,41 @@ Deno.serve(async (req) => {
     if (action === "analytics_snapshot") {
       const range = body.range ?? 30;
       const clean = body.clean !== false;
-      const events = await getAnalyticsEvents(db, range, 10000, clean);
-      return ok(buildSnapshot(events, range), headers);
+
+      if (!clean) {
+        const rawEvents = await getAnalyticsEvents(db, range, 10000, false);
+        return ok(buildSnapshot(rawEvents, range), headers);
+      }
+
+      const rawEvents = await getAnalyticsEvents(db, range, 10000, false);
+      const cleanEvents = filterInternalEvents(rawEvents, true);
+
+      const rawSnapshot = buildSnapshot(rawEvents, range);
+      const cleanSnapshot = buildSnapshot(cleanEvents, range);
+
+      const cleanLooksEmpty =
+        cleanSnapshot.today.pageViews === 0 &&
+        cleanSnapshot.today.uniqueSessions === 0 &&
+        cleanSnapshot.kpis.totalPageViews === 0;
+
+      const rawHasTraffic =
+        rawSnapshot.today.pageViews > 0 ||
+        rawSnapshot.today.uniqueSessions > 0 ||
+        rawSnapshot.kpis.totalPageViews > 0;
+
+      if (cleanLooksEmpty && rawHasTraffic) {
+        console.warn("[admin-analytics-api] clean snapshot returned empty while raw has traffic; returning raw snapshot", {
+          rawEvents: rawEvents.length,
+          cleanEvents: cleanEvents.length,
+          rawTodayPageViews: rawSnapshot.today.pageViews,
+          rawTodaySessions: rawSnapshot.today.uniqueSessions,
+          rawTotalPageViews: rawSnapshot.kpis.totalPageViews,
+        });
+
+        return ok(rawSnapshot, headers);
+      }
+
+      return ok(cleanSnapshot, headers);
     }
 
     if (action === "analytics_signal_board") {
