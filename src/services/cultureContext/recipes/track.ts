@@ -154,7 +154,7 @@ function heroIntro(facts: TrackFacts): string {
 
   // Thin — honest but useful
   const labelBit = hasLabel ? `, released on ${facts.labelName}` : "";
-  return `${trackTitle}${byText} is in the WAKILISHA archive${labelBit}. We're still building out the full picture for this one.`;
+  return `${trackTitle}${byText} is in the WAKILISHA archive${labelBit}. We’re still building out the full picture for this one.`;
 }
 
 function cardBlurb(facts: TrackFacts): string {

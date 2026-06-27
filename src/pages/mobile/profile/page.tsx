@@ -109,9 +109,9 @@ function commentContextTitle(comment: CommunityComment): string {
 }
 
 
-type ProfileEntityRecord = Record<string, unknown>;
+type ProfileRecordRecord = Record<string, unknown>;
 
-function recordText(row: ProfileEntityRecord, keys: string[], fallback = ""): string {
+function recordText(row: ProfileRecordRecord, keys: string[], fallback = ""): string {
   for (const key of keys) {
     const value = row[key];
     if (value === null || value === undefined) continue;
@@ -129,8 +129,8 @@ function titleFromSlug(slug: string): string {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-function entityTitle(row: ProfileEntityRecord, slugKey = "entity_slug"): string {
-  return recordText(row, ["title", "entity_title", "target_title", "name"], "") ||
+function recordTitle(row: ProfileRecordRecord, slugKey = "record_slug"): string {
+  return recordText(row, ["title", "record_title", "target_title", "name"], "") ||
     titleFromSlug(recordText(row, [slugKey, "target_slug", "slug"], "Saved item"));
 }
 
@@ -169,7 +169,7 @@ function followUrl(row: ProfileEntityRecord): string {
   return urlMap[type] || "#";
 }
 
-async function enrichFollowEntities(rows: ProfileEntityRecord[]): Promise<ProfileEntityRecord[]> {
+async function enrichFollowRecords(rows: ProfileRecordRecord[]): Promise<ProfileRecordRecord[]> {
   const artistSlugs = Array.from(new Set(
     rows
       .filter((row) => recordText(row, ["target_type"]) === "artist")
@@ -200,7 +200,7 @@ async function enrichFollowEntities(rows: ProfileEntityRecord[]): Promise<Profil
     return {
       ...row,
       target_title: recordText(row, ["target_title"]) || artist.display_name || titleFromSlug(slug),
-      target_image_url: entityImage(row) || artist.public_image_url || "",
+      target_image_url: recordImage(row) || artist.public_image_url || "",
     };
   });
 }
@@ -275,7 +275,7 @@ export default function MobileProfilePage() {
     Promise.all([
       getUserSaves(userId).catch(() => []),
       getUserFollows(userId)
-        .then((rows) => enrichFollowEntities(rows as ProfileEntityRecord[]))
+        .then((rows) => enrichFollowRecords(rows as ProfileRecordRecord[]))
         .catch(() => []),
     ]).then(([saveRows, followRows]) => {
       if (!alive) return;
@@ -1213,8 +1213,8 @@ function MobileSavesTab({
       <div className="grid grid-cols-2 gap-3">
         {saves.map((raw) => {
           const save = raw as ProfileEntityRecord;
-          const entityUrl = recordText(save, ["entity_url"], "#");
-          const entityType = recordText(save, ["entity_type"]);
+          const recordUrl = recordText(save, ["record_url"], "#");
+          const recordType = recordText(save, ["record_type"]);
           const title = entityTitle(save);
           const imageUrl = entityImage(save);
           const createdAt = entityCreatedAt(save);
@@ -1222,16 +1222,16 @@ function MobileSavesTab({
           return (
             <Link
               key={String(save.id)}
-              to={entityUrl || "#"}
+              to={recordUrl || "#"}
               className="group block min-w-0 cursor-pointer"
             >
-              <MobileEntityArtwork imageUrl={imageUrl} title={title} type={entityType} />
+              <MobileRecordArtwork imageUrl={imageUrl} title={title} type={recordType} />
               <div className="pt-2 px-1">
                 <div className="text-[13px] font-black leading-tight line-clamp-2" style={{ color: "var(--wk-text)" }}>
                   {title}
                 </div>
                 <div className="mt-1 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.08em]" style={{ color: "var(--wk-text-faint)" }}>
-                  <span>{entityLabel(entityType)}</span>
+                  <span>{recordLabel(recordType)}</span>
                   {createdAt && (
                     <>
                       <span>·</span>
@@ -1275,11 +1275,11 @@ function MobileFollowingTab({
 
   const [lead, ...rest] = follows as ProfileEntityRecord[];
 
-  const renderFollowCard = (follow: ProfileEntityRecord, featured = false) => {
+  const renderFollowCard = (follow: ProfileRecordRecord, featured = false) => {
     const targetType = recordText(follow, ["target_type"]);
     const targetSlug = recordText(follow, ["target_slug"]);
     const createdAt = entityCreatedAt(follow);
-    const title = entityTitle(follow, "target_slug") || titleFromSlug(targetSlug);
+    const title = recordTitle(follow, "target_slug") || titleFromSlug(targetSlug);
     const imageUrl = entityImage(follow);
     const url = followUrl(follow);
 
@@ -1290,7 +1290,7 @@ function MobileFollowingTab({
         className={`group block min-w-0 cursor-pointer ${featured ? "col-span-2" : ""}`}
       >
         <div className="relative">
-          <MobileEntityArtwork imageUrl={imageUrl} title={title} type={targetType} tall={featured} />
+          <MobileRecordArtwork imageUrl={imageUrl} title={title} type={targetType} tall={featured} />
           {featured && (
             <div className="absolute bottom-4 left-4 right-4">
               <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/65">
@@ -1300,7 +1300,7 @@ function MobileFollowingTab({
                 {title}
               </h3>
               <p className="mt-2 text-[11px] font-bold uppercase tracking-[0.12em] text-white/65">
-                {entityLabel(targetType)}{createdAt ? ` · ${timeAgo(createdAt)}` : ""}
+                {recordLabel(targetType)}{createdAt ? ` · ${timeAgo(createdAt)}` : ""}
               </p>
             </div>
           )}
@@ -1312,7 +1312,7 @@ function MobileFollowingTab({
               {title}
             </div>
             <div className="mt-1 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.08em]" style={{ color: "var(--wk-text-faint)" }}>
-              <span>{entityLabel(targetType)}</span>
+              <span>{recordLabel(targetType)}</span>
               {createdAt && (
                 <>
                   <span>·</span>

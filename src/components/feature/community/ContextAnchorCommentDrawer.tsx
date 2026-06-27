@@ -359,7 +359,7 @@ export function ContextAnchorSummary({
       <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {items.map((item) => (
           <button
-            key={`${item.anchorType}-${item.contextEntitySlug || item.contextEntityId}-${item.contextLabel}`}
+            key={`${item.anchorType}-${item.contextRecordSlug || item.contextRecordId}-${item.contextLabel}`}
             type="button"
             onClick={() => onSelect(item)}
             className="group rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-bg)] p-4 text-left transition-all hover:-translate-y-0.5 hover:border-[var(--wk-brand)]/35 hover:bg-[var(--wk-surface-raised)]"

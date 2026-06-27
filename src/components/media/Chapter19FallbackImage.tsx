@@ -4,7 +4,7 @@ type Chapter19FallbackImageProps = Ch19Identity & {
   className?: string;
 };
 
-export function Chapter19FallbackImage({ className = "", ...identity }: Chapter19FallbackImageProps) {
+export function Chapter19FallbackImage({ className = "", ...idrecord }: Chapter19FallbackImageProps) {
   return (
     <div
       className={`h-full w-full ${className}`}

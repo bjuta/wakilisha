@@ -69,7 +69,7 @@ export function TrackMomentDrawer({
   const userId = user.id || undefined;
   const isLoggedIn = Boolean(userId);
   const entity = useMemo(
-    () => buildTrackEntity(track),
+    () => buildTrackRecord(track),
     [
       track.id,
       track.trackSlug,

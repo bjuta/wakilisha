@@ -125,7 +125,7 @@ export default function MobileLyricContribution() {
         {
           pageType: "track_detail",
           entitySlug: trackSlug ?? track.slug,
-          entityType: "track",
+          recordType: "track",
           sourceSection: "contribute_page_mobile",
         },
       );
@@ -164,8 +164,8 @@ export default function MobileLyricContribution() {
     if (track) {
       trackEvent("lyrics_contribution", {
         pageType: "track_detail",
-        entitySlug: trackSlug ?? "",
-        entityType: "track",
+        recordSlug: trackSlug ?? "",
+        recordType: "track",
         context: {
           source_section: "contribute_page_mobile",
           artist_slug: artistSlug ?? track.artistSlug,
@@ -302,7 +302,7 @@ export default function MobileLyricContribution() {
           <h3 className="mb-2 text-[11px] font-black uppercase tracking-wider text-[var(--wk-text-muted)]">Guidelines</h3>
           <ul className="space-y-1.5 text-[11px] text-[var(--wk-text-soft)]">
             <li>• Play the track and tap <strong>Set</strong> at the exact moment each line begins</li>
-            <li>• Include section markers like <strong>— Chorus —</strong></li>
+            <li>• Include section markers like <strong>, Chorus ,</strong></li>
             <li>• Mark instrumental sections with <strong>♪ ♪</strong></li>
             <li>• Add a source description for verifiability</li>
           </ul>

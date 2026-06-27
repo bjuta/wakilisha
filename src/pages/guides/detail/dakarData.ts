@@ -1,7 +1,7 @@
 export const dakarData = {
   slug: "dakar-biennale-2026",
   hero: {
-    mastheadImage: "https://wakilisha.africa/wp-content/plugins/wakilisha-v2.0.201-cpt-cleanup/assets/guides/dakar-biennale-2026/WAKILISHA_Dakar_Biennale_2026.jpg",
+    mastheadImage: "https://wakilisha.africa/wp-content/plugins/wakilisha-v2.0.201-cpt-cleanup/images/guides/dakar-biennale-2026/WAKILISHA_Dakar_Biennale_2026.jpg",
     badge: "Issue 002 · Advance dossier",
     kicker: "Dak’Art | The 16th Dakar Biennale",
     title: "(Anti)",

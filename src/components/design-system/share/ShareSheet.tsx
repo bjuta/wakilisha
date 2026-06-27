@@ -137,7 +137,7 @@ type ShareTargetContext = {
   artistSlug: string;
 };
 
-function normalizeShareEntityType(type: ShareObject["type"] | undefined): string {
+function normalizeShareRecordType(type: ShareObject["type"] | undefined): string {
   if (type === "album") return "release";
   return type ?? "page";
 }
@@ -152,46 +152,46 @@ function parseShareTarget(rawUrl: string, fallbackType: ShareObject["type"] | un
     const last = parts[parts.length - 1] || "";
 
     if (first === "tracks" && parts.length >= 3) {
-      return { targetUrl: parsed.toString(), targetPath: parsed.pathname, entityType: "track", entitySlug: parts[2], artistSlug: parts[1] };
+      return { targetUrl: parsed.toString(), targetPath: parsed.pathname, recordType: "track", recordSlug: parts[2], artistSlug: parts[1] };
     }
 
     if (first === "releases" && parts.length >= 3) {
-      return { targetUrl: parsed.toString(), targetPath: parsed.pathname, entityType: "release", entitySlug: parts[2], artistSlug: parts[1] };
+      return { targetUrl: parsed.toString(), targetPath: parsed.pathname, recordType: "release", recordSlug: parts[2], artistSlug: parts[1] };
     }
 
     if (first === "artists" && parts[1]) {
-      return { targetUrl: parsed.toString(), targetPath: parsed.pathname, entityType: "artist", entitySlug: parts[1], artistSlug: parts[1] };
+      return { targetUrl: parsed.toString(), targetPath: parsed.pathname, recordType: "artist", recordSlug: parts[1], artistSlug: parts[1] };
     }
 
     if (first === "magazine" && parts[1]) {
-      return { targetUrl: parsed.toString(), targetPath: parsed.pathname, entityType: "article", entitySlug: parts[1], artistSlug: "" };
+      return { targetUrl: parsed.toString(), targetPath: parsed.pathname, recordType: "article", recordSlug: parts[1], artistSlug: "" };
     }
 
     if (first === "guides" && parts[1]) {
-      return { targetUrl: parsed.toString(), targetPath: parsed.pathname, entityType: "guide", entitySlug: parts[1], artistSlug: "" };
+      return { targetUrl: parsed.toString(), targetPath: parsed.pathname, recordType: "guide", recordSlug: parts[1], artistSlug: "" };
     }
 
     if (first === "charts") {
-      return { targetUrl: parsed.toString(), targetPath: parsed.pathname, entityType: "chart", entitySlug: parts.slice(1).join("/") || "charts", artistSlug: "" };
+      return { targetUrl: parsed.toString(), targetPath: parsed.pathname, recordType: "chart", recordSlug: parts.slice(1).join("/") || "charts", artistSlug: "" };
     }
 
     if (first === "genres" && parts[1]) {
-      return { targetUrl: parsed.toString(), targetPath: parsed.pathname, entityType: "genre", entitySlug: parts[1], artistSlug: "" };
+      return { targetUrl: parsed.toString(), targetPath: parsed.pathname, recordType: "genre", recordSlug: parts[1], artistSlug: "" };
     }
 
     if (first === "labels" && parts[1]) {
-      return { targetUrl: parsed.toString(), targetPath: parsed.pathname, entityType: "label", entitySlug: parts[1], artistSlug: "" };
+      return { targetUrl: parsed.toString(), targetPath: parsed.pathname, recordType: "label", recordSlug: parts[1], artistSlug: "" };
     }
 
     if (first === "authors" && parts[1]) {
-      return { targetUrl: parsed.toString(), targetPath: parsed.pathname, entityType: "author", entitySlug: parts[1], artistSlug: "" };
+      return { targetUrl: parsed.toString(), targetPath: parsed.pathname, recordType: "author", recordSlug: parts[1], artistSlug: "" };
     }
 
     if (parts.length === 1 && first) {
-      return { targetUrl: parsed.toString(), targetPath: parsed.pathname, entityType: fallbackEntityType === "page" ? "article" : fallbackEntityType, entitySlug: first, artistSlug: "" };
+      return { targetUrl: parsed.toString(), targetPath: parsed.pathname, recordType: fallbackRecordType === "page" ? "article" : fallbackRecordType, recordSlug: first, artistSlug: "" };
     }
 
-    return { targetUrl: parsed.toString(), targetPath: parsed.pathname, entityType: fallbackEntityType, entitySlug: last, artistSlug: "" };
+    return { targetUrl: parsed.toString(), targetPath: parsed.pathname, recordType: fallbackRecordType, recordSlug: last, artistSlug: "" };
   } catch {
     const parts = rawUrl.split("?")[0].split("#")[0].split("/").filter(Boolean);
     const last = parts[parts.length - 1] || "";
@@ -220,10 +220,10 @@ function buildShareAnalyticsPayload({
   action: "open" | "copy" | "click";
 }) {
   const entityType = target.entityType || normalizeShareEntityType(item.type);
-  const entitySlug = target.entitySlug || "";
+  const recordSlug = target.recordSlug || "";
 
   return {
-    pageType: entityType || item.type || "page",
+    pageType: recordType || item.type || "page",
     entitySlug: entitySlug || undefined,
     entityType: entityType || undefined,
     context: {
@@ -247,7 +247,7 @@ function buildShareAnalyticsPayload({
       artistSlug: target.artistSlug || null,
 
       title: item.title,
-      entity_title: item.title,
+      record_title: item.title,
       entityTitle: item.title,
       share_title: item.title,
       share_type: item.type ?? "page",
@@ -476,7 +476,7 @@ export function SharePopover({
       trackedUrl,
       action: "copy",
     }));
-    incrementShareCount(baseUrl, "copy", shareTarget.entitySlug || undefined, item.title).then((count) => {
+    incrementShareCount(baseUrl, "copy", shareTarget.recordSlug || undefined, item.title).then((count) => {
       setShareCounts((prev) => ({ ...prev, copy: count }));
     }).catch(() => {});
   }, [getTrackedShareUrl, baseUrl, item, shareTarget]);
@@ -495,7 +495,7 @@ export function SharePopover({
     }));
 
     setPendingPlatforms((prev) => new Set(prev).add(platform.key));
-    incrementShareCount(baseUrl, platform.key, shareTarget.entitySlug || undefined, item.title).then((count) => {
+    incrementShareCount(baseUrl, platform.key, shareTarget.recordSlug || undefined, item.title).then((count) => {
       setShareCounts((prev) => ({ ...prev, [platform.key]: count }));
       setPendingPlatforms((prev) => { const next = new Set(prev); next.delete(platform.key); return next; });
     }).catch(() => {
@@ -685,7 +685,7 @@ export function ShareSheet({ item, open, onClose, timestamp, onComment }: ShareS
       trackedUrl,
       action: "copy",
     }));
-    incrementShareCount(baseUrl, "copy", shareTarget.entitySlug || undefined, item.title).then((count) => {
+    incrementShareCount(baseUrl, "copy", shareTarget.recordSlug || undefined, item.title).then((count) => {
       setShareCounts((prev) => ({ ...prev, copy: count }));
     }).catch(() => {});
   };
@@ -704,7 +704,7 @@ export function ShareSheet({ item, open, onClose, timestamp, onComment }: ShareS
     }));
 
     setPendingPlatforms((prev) => new Set(prev).add(platform.key));
-    incrementShareCount(baseUrl, platform.key, shareTarget.entitySlug || undefined, item.title).then((count) => {
+    incrementShareCount(baseUrl, platform.key, shareTarget.recordSlug || undefined, item.title).then((count) => {
       setShareCounts((prev) => ({ ...prev, [platform.key]: count }));
       setPendingPlatforms((prev) => { const next = new Set(prev); next.delete(platform.key); return next; });
     }).catch(() => {

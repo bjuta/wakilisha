@@ -31,7 +31,7 @@ export function ArtistSpotlightSpread({ artists, mood, sectionColor }: { artists
             <span>Voices in the archive</span>
           </div>
           <p style={{ color: "var(--mag-text-muted)", fontSize: 13, maxWidth: 360 }}>
-            The artists linked to this issue's cultural moment — pulled from the WAKILISHA archive.
+            The artists linked to this issue's cultural moment. pulled from the WAKILISHA archive.
           </p>
           <Link
             to="/artists"
@@ -74,7 +74,7 @@ export function ReleaseSpotlightSpread({ releases, mood, sectionColor }: { relea
             <span>Records that shaped the window</span>
           </div>
           <p style={{ color: "var(--mag-text-muted)", fontSize: 13, maxWidth: 360 }}>
-            Releases connected to this issue's timeframe — pulled from the WAKILISHA archive.
+            Releases connected to this issue's timeframe. pulled from the WAKILISHA archive.
           </p>
           <Link
             to="/releases"

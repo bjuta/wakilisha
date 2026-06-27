@@ -58,7 +58,7 @@ export default function ReleaseDetailHero({
     playTrack(queue[0], queue, {
       pageType: "release_detail",
       entitySlug: release.slug,
-      entityType: "release",
+      recordType: "release",
       sourceSection: "release_hero",
     });
   };
@@ -76,7 +76,7 @@ export default function ReleaseDetailHero({
     playTrack(queue[randomIndex], queue, {
       pageType: "release_detail",
       entitySlug: release.slug,
-      entityType: "release",
+      recordType: "release",
       sourceSection: "release_hero",
     });
   };

@@ -268,7 +268,7 @@ export function ArtistBioSection({
                   <h3 className="bio-section-heading">
                     {section.title}
                   </h3>
-                  {/* Section body — drop cap on first section's first paragraph */}
+                  {/* Section body. drop cap on first section's first paragraph */}
                   <div
                     className={`bio-html-content ${index === 0 ? "bio-html-content-first" : ""}`}
                     dangerouslySetInnerHTML={{ __html: section.html }}

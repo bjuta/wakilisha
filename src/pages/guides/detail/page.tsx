@@ -12,7 +12,7 @@ export default function GuideDetailPage() {
   useScrollDepthTracking({
     pageType: "guide_detail",
     entitySlug: slug,
-    entityType: "guide",
+    recordType: "guide",
   });
 
   const [guide, setGuide] = useState<GuidePageRecord | null>(null);

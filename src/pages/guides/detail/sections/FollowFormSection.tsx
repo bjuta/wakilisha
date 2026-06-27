@@ -35,7 +35,7 @@ export default function FollowFormSection({ data }: { data: FollowFormData }) {
     trackEvent("guide_follow_submit", {
       pageType: "guide_detail",
       entitySlug: guideSlug,
-      entityType: "guide",
+      recordType: "guide",
       context: {
         source_section: "follow_form",
         guide_title: guideTitle,

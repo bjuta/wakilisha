@@ -32,7 +32,7 @@ export function ArtistVideos({ videos, artistSlug }: ArtistVideosProps) {
     trackEvent("video_play", {
       pageType: "artist_detail",
       entitySlug: artistSlug,
-      entityType: "artist",
+      recordType: "artist",
       context: {
         action: ev.action,
         video_url: ev.videoUrl,
