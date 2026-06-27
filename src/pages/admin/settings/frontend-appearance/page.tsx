@@ -144,6 +144,7 @@ export default function AdminSettingsFrontendAppearance() {
             { key: "defaultGenreHeroFallback",  label: "Default Genre Hero Fallback" },
             { key: "defaultLabelHeroFallback",  label: "Default Label Hero Fallback" },
             { key: "defaultLoginBackground",    label: "Default Login Background" },
+            { key: "aboutHeroBackgroundImage", label: "About Page Hero Background Image" },
           ] as { key: keyof FrontendAppearanceSettings; label: string }[]).map(({ key, label }) => (
             <div key={key}>
               <label className="block text-[12px] font-semibold text-[var(--wk-text-muted)] mb-1.5">{label}</label>

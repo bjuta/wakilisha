@@ -248,6 +248,7 @@ export interface FrontendAppearanceSettings {
   defaultGenreHeroFallback: string;
   defaultLabelHeroFallback: string;
   defaultLoginBackground: string;
+  aboutHeroBackgroundImage: string;
   archiveFilterBehavior: "show_all" | "collapse_by_year";
   artistHeroImageCount: number;
 }
@@ -261,6 +262,7 @@ export const DEFAULT_FRONTEND_APPEARANCE_SETTINGS: FrontendAppearanceSettings = 
   defaultGenreHeroFallback: "",
   defaultLabelHeroFallback: "",
   defaultLoginBackground: "",
+  aboutHeroBackgroundImage: "",
   archiveFilterBehavior: "collapse_by_year",
   artistHeroImageCount: 40,
 };
