@@ -50,7 +50,7 @@ export function ArtistCard({
   const handleClick = () => {
     if (sourceSection) {
       trackEvent("card_click", {
-        entityType: "artist",
+        recordType: "artist",
         entitySlug: slug,
         context: {
           source_section: sourceSection,

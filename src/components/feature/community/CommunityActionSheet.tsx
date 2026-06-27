@@ -169,7 +169,7 @@ export function CommunityActionSheet({
       pageType: "community",
       entitySlug: entity.slug,
       entityType: entity.type,
-      context: { action, entity_title: entity.title },
+      context: { action, record_title: record.title },
     });
     onClose();
     window.location.assign(buildCommunityAuthUrl());
@@ -184,7 +184,7 @@ export function CommunityActionSheet({
       pageType: "community",
       entitySlug: entity.slug,
       entityType: entity.type,
-      context: { action, entity_title: entity.title },
+      context: { action, record_title: record.title },
     });
 
     onClose();
@@ -217,8 +217,8 @@ export function CommunityActionSheet({
         entityId: entity.id,
         entitySlug: entity.slug,
         entityUrl: entity.url,
-        title: entity.title,
-        subtitle: entity.subtitle,
+        title: record.title,
+        subtitle: record.subtitle,
         imageUrl: entity.imageUrl,
       });
       const nowSaved = result?.saved ?? !saved;
@@ -227,7 +227,7 @@ export function CommunityActionSheet({
         pageType: "article",
         entitySlug: entity.slug,
         entityType: entity.type,
-        context: { action: nowSaved ? "save" : "unsave", entity_title: entity.title },
+        context: { action: nowSaved ? "save" : "unsave", record_title: record.title },
       });
     } catch { /* no-op */ }
     finally { setSavePending(false); }
@@ -253,7 +253,7 @@ export function CommunityActionSheet({
         pageType: "article",
         entitySlug: entity.slug,
         entityType: entity.type,
-        context: { action: nowFollowing ? "follow" : "unfollow", entity_title: entity.title },
+        context: { action: nowFollowing ? "follow" : "unfollow", record_title: record.title },
       });
     } catch { /* no-op */ }
     finally { setFollowPending(false); }
@@ -266,7 +266,7 @@ export function CommunityActionSheet({
       pageType: "article",
       entitySlug: entity.slug,
       entityType: entity.type,
-      context: { entity_title: entity.title },
+      context: { record_title: record.title },
     });
     setTimeout(() => setCopied(false), 2000);
   }, [entity]);
@@ -301,14 +301,14 @@ export function CommunityActionSheet({
       await reportComment({
         commentId: "",
         reason,
-        details: `Reported entity: ${entity.type}/${entity.slug || entity.id} — "${entity.title}"`,
+        details: `Reported record: ${record.type}/${record.slug || record.id}. "${record.title}"`,
       });
       setReportDone(true);
       trackEvent("community_report", {
         pageType: "article",
         entitySlug: entity.slug,
         entityType: entity.type,
-        context: { report_reason: reason, entity_title: entity.title },
+        context: { report_reason: reason, record_title: record.title },
       });
       setTimeout(() => {
         setReportOpen(false);
@@ -341,11 +341,11 @@ export function CommunityActionSheet({
               <div className="share-header">
                 <div>
                   <div className="share-title">
-                    {reportOpen ? "Report this content" : entity.title}
+                    {reportOpen ? "Report this content" : record.title}
                   </div>
                   {!reportOpen && (
                     <div className="share-sub">
-                      {entity.type === "article" ? "Article" : entity.type} · Choose an action
+                      {record.type === "article" ? "Article" : record.type} · Choose an action
                     </div>
                   )}
                 </div>
@@ -456,12 +456,12 @@ export function CommunityActionSheet({
       {/* Nested ShareSheet */}
       <ShareSheet
         item={{
-          title: entity.title,
-          subtitle: entity.subtitle,
-          description: entity.description,
+          title: record.title,
+          subtitle: record.subtitle,
+          description: record.description,
           imageUrl: entity.imageUrl,
           url: entity.url,
-          type: entity.type === "article" ? "article" : "page",
+          type: record.type === "article" ? "article" : "page",
         }}
         open={shareOpen}
         onClose={() => setShareOpen(false)}

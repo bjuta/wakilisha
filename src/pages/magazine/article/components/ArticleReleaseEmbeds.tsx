@@ -573,7 +573,7 @@ export function ReleaseEmbedCard({ release, articleSlug }: { release: ReleaseEmb
     playTrack(playerTrack, queueTracks, articleSlug ? {
         pageType: "article",
         entitySlug: articleSlug,
-        entityType: "article",
+        recordType: "article",
         sourceSection: "article_body",
       } : undefined);
   };
@@ -591,7 +591,7 @@ export function ReleaseEmbedCard({ release, articleSlug }: { release: ReleaseEmb
     playTrack(firstTrack, queueTracks, articleSlug ? {
         pageType: "article",
         entitySlug: articleSlug,
-        entityType: "article",
+        recordType: "article",
         sourceSection: "article_body",
       } : undefined);
   };

@@ -41,16 +41,16 @@ function timeAgo(dateStr: string): string {
 }
 
 function getEntityUrl(entityType: string | null, entitySlug: string | null): string {
-  if (!entityType || !entitySlug) return '#';
+  if (!recordType || !recordSlug) return '#';
   switch (entityType) {
-    case 'article': return `/magazine/${entitySlug}`;
-    case 'artist': return `/artists/${entitySlug}`;
-    case 'track': return `/tracks/${entitySlug}`;
-    case 'release': return `/releases/${entitySlug}`;
-    case 'label': return `/labels/${entitySlug}`;
-    case 'genre': return `/genres/${entitySlug}`;
-    case 'chart': return `/charts/${entitySlug}`;
-    case 'field_guide': return `/guides/${entitySlug}`;
+    case 'article': return `/magazine/${recordSlug}`;
+    case 'artist': return `/artists/${recordSlug}`;
+    case 'track': return `/tracks/${recordSlug}`;
+    case 'release': return `/releases/${recordSlug}`;
+    case 'label': return `/labels/${recordSlug}`;
+    case 'genre': return `/genres/${recordSlug}`;
+    case 'chart': return `/charts/${recordSlug}`;
+    case 'field_guide': return `/guides/${recordSlug}`;
     default: return '#';
   }
 }
@@ -125,7 +125,7 @@ export function CommunityDigest({ limit = 8, className = '' }: CommunityDigestPr
           const icon = ACTIVITY_ICONS[act.activityType] || 'ri-arrow-right-line';
           const phrase = ACTIVITY_PHRASES[act.activityType] || act.activityType;
           const url = getEntityUrl(act.entityType, act.entitySlug);
-          const title = act.entityTitle || (act.metadata as any)?.title || '';
+          const title = act.recordTitle || (act.metadata as any)?.title || '';
           const displayName = act.actorName || act.actorUsername || 'Someone';
 
           return (

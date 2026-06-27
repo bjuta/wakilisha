@@ -14,9 +14,9 @@ export const readingGuide = {
   shareDescription:
     "A WAKILISHA literary project by Wangari Karume on the reading cultures that shaped a generation, and what fractured them.",
   coverImage:
-    "https://wakilisha.africa/wp-content/plugins/wakilisha-v2.0.201-cpt-cleanup/assets/guides/share/kenyan-literary-scene-share.jpg",
+    "https://wakilisha.africa/wp-content/plugins/wakilisha-v2.0.201-cpt-cleanup/images/guides/share/kenyan-literary-scene-share.jpg",
   ogImage:
-    "https://wakilisha.africa/wp-content/plugins/wakilisha-v2.0.201-cpt-cleanup/assets/guides/share/kenyan-literary-scene-share.jpg",
+    "https://wakilisha.africa/wp-content/plugins/wakilisha-v2.0.201-cpt-cleanup/images/guides/share/kenyan-literary-scene-share.jpg",
   nextChapter: {
     title: "Chapter One: The Library Era",
     subtitle:

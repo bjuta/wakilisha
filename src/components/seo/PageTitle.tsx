@@ -3,7 +3,7 @@ import { useLocation } from "react-router-dom";
 
 const SITE_NAME = "WAKILISHA";
 const SITE_URL = "https://wakilisha.africa";
-const DEFAULT_IMAGE = `${SITE_URL}/assets/logos/wakilisha-logo-dark.svg`;
+const DEFAULT_IMAGE = `${SITE_URL}/images/logos/wakilisha-logo-dark.svg`;
 const DEFAULT_DESCRIPTION =
   "WAKILISHA maps African music culture through charts, artists, releases, guides, and stories from the continent and diaspora.";
 
@@ -183,7 +183,7 @@ function formatPageTitle(title?: string | null): string {
     return SITE_NAME;
   }
 
-  const brandedPattern = new RegExp(`\\s*[|–—-]\\s*${SITE_NAME}$`, "i");
+  const brandedPattern = new RegExp(`\\s*[|–,-]\\s*${SITE_NAME}$`, "i");
   if (brandedPattern.test(clean)) {
     return clean.replace(brandedPattern, ` | ${SITE_NAME}`).trim();
   }
@@ -192,11 +192,11 @@ function formatPageTitle(title?: string | null): string {
 }
 
 function schemaEntityName(model: SeoModel): string {
-  const explicit = String(model.entityName || "").trim();
+  const explicit = String(model.recordName || "").trim();
   if (explicit) return explicit;
 
   const clean = String(model.title || "").trim();
-  const brandedPattern = new RegExp(`\\s*[|–—-]\\s*${SITE_NAME}$`, "i");
+  const brandedPattern = new RegExp(`\\s*[|–,-]\\s*${SITE_NAME}$`, "i");
   return clean.replace(brandedPattern, "").trim() || SITE_NAME;
 }
 
@@ -243,12 +243,12 @@ function pageSchema(model: SeoModel, url: string): Record<string, unknown> {
     isPartOf: { "@id": `${SITE_URL}/#website` },
   };
 
-  if (model.kind === "article") return { ...base, "@type": "Article", headline: entityName };
-  if (model.kind === "artist") return { ...base, "@type": "ProfilePage", about: { "@type": "MusicGroup", name: entityName } };
-  if (model.kind === "track") return { ...base, about: { "@type": "MusicRecording", name: entityName } };
-  if (model.kind === "release") return { ...base, about: { "@type": "MusicAlbum", name: entityName } };
+  if (model.kind === "article") return { ...base, "@type": "Article", headline: recordName };
+  if (model.kind === "artist") return { ...base, "@type": "ProfilePage", about: { "@type": "MusicGroup", name: recordName } };
+  if (model.kind === "track") return { ...base, about: { "@type": "MusicRecording", name: recordName } };
+  if (model.kind === "release") return { ...base, about: { "@type": "MusicAlbum", name: recordName } };
   if (model.kind === "chart" || model.kind === "collection") return { ...base, "@type": "CollectionPage" };
-  if (model.kind === "profile") return { ...base, "@type": "ProfilePage", about: { "@type": "Person", name: entityName } };
+  if (model.kind === "profile") return { ...base, "@type": "ProfilePage", about: { "@type": "Person", name: recordName } };
 
   return base;
 }

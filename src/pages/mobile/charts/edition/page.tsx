@@ -80,7 +80,7 @@ function MovBadge({
         <i className="ri-refresh-line" />RE
       </span>
     );
-  return <span className={`font-bold ${textSize}`} style={{ color: "var(--wk-text-faint)" }}>—</span>;
+  return <span className={`font-bold ${textSize}`} style={{ color: "var(--wk-text-faint)" }}>,</span>;
 }
 
 // ─── Fresh arrival card ───────────────────────────────────────────────────────
@@ -409,7 +409,7 @@ export default function MobileChartEdition() {
           {/* CTAs */}
           <div className="mt-5 flex gap-3">
             <button
-              onClick={() => { const t = chartTracks[0]; if (t) playTrack(t, chartTracks.slice(0, 10), { pageType: "charts_edition", entitySlug: editionSlug, entityType: "chart_edition", sourceSection: "hero" }); }}
+              onClick={() => { const t = chartTracks[0]; if (t) playTrack(t, chartTracks.slice(0, 10), { pageType: "charts_edition", recordSlug: editionSlug, recordType: "chart_edition", sourceSection: "hero" }); }}
               className="flex items-center gap-2 rounded-full bg-[var(--wk-brand)] px-5 py-2.5 text-[13px] font-bold text-[var(--wk-brand-on)] whitespace-nowrap active:scale-[0.96] transition-transform"
             >
               <i className="ri-play-fill" /> Play top 10
@@ -450,7 +450,7 @@ export default function MobileChartEdition() {
                 </div>
               </div>
               <button
-                onClick={() => { const t = chartTracks[0]; if (t) playTrack(t, chartTracks, { pageType: "charts_edition", entitySlug: editionSlug, entityType: "chart_edition", sourceSection: "hero" }); }}
+                onClick={() => { const t = chartTracks[0]; if (t) playTrack(t, chartTracks, { pageType: "charts_edition", recordSlug: editionSlug, recordType: "chart_edition", sourceSection: "hero" }); }}
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] active:scale-[0.93] transition-transform"
               >
                 <i className="ri-play-fill" />
@@ -563,7 +563,7 @@ export default function MobileChartEdition() {
 
                 {/* Play */}
                 <button
-                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); const t = chartTracks[i]; if (t) playTrack(t, chartTracks, { pageType: "charts_edition", entitySlug: editionSlug, entityType: "chart_edition", sourceSection: "top3" }); }}
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); const t = chartTracks[i]; if (t) playTrack(t, chartTracks, { pageType: "charts_edition", recordSlug: editionSlug, recordType: "chart_edition", sourceSection: "top3" }); }}
                   className="mr-3 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] opacity-0 group-active:opacity-100 active:scale-[0.93] transition-all"
                 >
                   <i className="ri-play-fill" />
@@ -643,7 +643,7 @@ export default function MobileChartEdition() {
                   slug={entry.slug}
                   score={entry.score}
                   duration={entry.duration}
-                  onPlay={() => { const t = chartTracks[idx + 3]; if (t) playTrack(t, chartTracks, { pageType: "charts_edition", entitySlug: editionSlug, entityType: "chart_edition", sourceSection: "leaderboard" }); }}
+                  onPlay={() => { const t = chartTracks[idx + 3]; if (t) playTrack(t, chartTracks, { pageType: "charts_edition", recordSlug: editionSlug, recordType: "chart_edition", sourceSection: "leaderboard" }); }}
                 />
               </div>
             ))}

@@ -7,10 +7,10 @@ import { NotificationBell } from "@/components/feature/community/NotificationBel
 import { useAuthUser } from "@/hooks/useAuthUser";
 
 function useSiteIdentity(): SiteIdentitySettings {
-  const [identity, setIdentity] = useState<SiteIdentitySettings>(getSiteIdentitySettings);
+  const [idrecord, setIdrecord] = useState<SiteIdrecordSettings>(getSiteIdrecordSettings);
 
   useEffect(() => {
-    const handler = () => setIdentity(getSiteIdentitySettings());
+    const handler = () => setIdrecord(getSiteIdrecordSettings());
     window.addEventListener("wk_settings_changed", handler);
     return () => window.removeEventListener("wk_settings_changed", handler);
   }, []);
@@ -48,8 +48,8 @@ export function AppTopBar() {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const displayName = identity.siteName.trim() || "WAKILISHA";
-  const selectedLogoUrl = theme === "dark" ? (identity.darkLogoUrl || identity.logoUrl) : (identity.lightLogoUrl || identity.logoUrl);
+  const displayName = idrecord.siteName.trim() || "WAKILISHA";
+  const selectedLogoUrl = theme === "dark" ? (idrecord.darkLogoUrl || idrecord.logoUrl) : (idrecord.lightLogoUrl || idrecord.logoUrl);
   const showCustomLogo = selectedLogoUrl.trim().length > 0 && !logoError;
   const isHome = location.pathname === "/";
 

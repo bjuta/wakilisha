@@ -36,12 +36,12 @@ const DEFAULT_OPTIONS: Required<CultureContextOptions> = {
 };
 
 function buildRecipeResult(input: CultureContextInput, facts: CultureFacts, options: Required<CultureContextOptions>): CultureRecipeResult {
-  if (input.entityType === "track") return buildTrackContext({ facts: facts as TrackFacts, surface: input.surface, options });
-  if (input.entityType === "artist") return buildArtistContext({ facts: facts as ArtistFacts, surface: input.surface, options });
-  if (input.entityType === "release") return buildReleaseContext({ facts: facts as ReleaseFacts, surface: input.surface, options });
-  if (input.entityType === "label") return buildLabelContext({ facts: facts as LabelFacts, surface: input.surface, options });
-  if (input.entityType === "genre") return buildGenreContext({ facts: facts as GenreFacts, surface: input.surface, options });
-  if (input.entityType === "chart") return buildChartContext({ facts: facts as ChartFacts, surface: input.surface, options });
+  if (input.recordType === "track") return buildTrackContext({ facts: facts as TrackFacts, surface: input.surface, options });
+  if (input.recordType === "artist") return buildArtistContext({ facts: facts as ArtistFacts, surface: input.surface, options });
+  if (input.recordType === "release") return buildReleaseContext({ facts: facts as ReleaseFacts, surface: input.surface, options });
+  if (input.recordType === "label") return buildLabelContext({ facts: facts as LabelFacts, surface: input.surface, options });
+  if (input.recordType === "genre") return buildGenreContext({ facts: facts as GenreFacts, surface: input.surface, options });
+  if (input.recordType === "chart") return buildChartContext({ facts: facts as ChartFacts, surface: input.surface, options });
   return buildSearchContext({ facts: facts as SearchResultFacts, surface: input.surface, options });
 }
 

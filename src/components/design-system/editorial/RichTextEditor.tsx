@@ -306,7 +306,7 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 500 }
   /* ─── Image insertion ─── */
 
   const handleInsertImage = useCallback(
-    (assetId: string | null, url: string) => {
+    (imageId: string | null, url: string) => {
       if (!editor || !url) return;
       // Open the image edit dialog after insertion so the user can set alt/caption
       setImagePickerMeta({
@@ -322,7 +322,7 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 500 }
   );
 
   const handleSaveImageMeta = useCallback(
-    (meta: { src: string; alt: string; caption: string; title: string; assetId?: string }) => {
+    (meta: { src: string; alt: string; caption: string; title: string; imageId?: string }) => {
       if (!editor || !meta.src) return;
       editor
         .chain()
@@ -332,7 +332,7 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 500 }
           alt: meta.alt,
           caption: meta.caption,
           title: meta.title,
-          "data-asset-id": meta.assetId || null,
+          "data-image-id": meta.imageId || null,
         })
         .run();
       setImagePickerMeta(null);

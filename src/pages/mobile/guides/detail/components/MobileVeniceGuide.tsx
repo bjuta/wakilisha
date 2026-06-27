@@ -23,7 +23,7 @@ export default function MobileVeniceGuide() {
     trackEvent("guide_subscribe_submit", {
       pageType: "guide_detail",
       entitySlug: guideSlug,
-      entityType: "guide",
+      recordType: "guide",
       context: {
         source_section: "download_form_mobile",
         guide_title: guideTitle,
