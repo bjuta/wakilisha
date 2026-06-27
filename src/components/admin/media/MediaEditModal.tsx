@@ -8,6 +8,18 @@ import {
   type ReferencedEntity,
 } from "@/services/mediaService";
 
+function assetFileKind(asset: MediaAsset): string {
+  return asset.file_kind || (asset.mime_type === "application/pdf" ? "document" : asset.media_kind || "other");
+}
+
+function isImageAsset(asset: MediaAsset): boolean {
+  return asset.mime_type?.startsWith("image/") === true || assetFileKind(asset) === "image";
+}
+
+function fileIconClass(asset: MediaAsset): string {
+  return assetFileKind(asset) === "document" ? "ri-file-pdf-2-line" : "ri-file-line";
+}
+
 interface MediaEditModalProps {
   asset: MediaAsset;
   onClose: () => void;
@@ -239,6 +251,11 @@ export function MediaEditModal({
   };
 
   const imageUrl = editedPreview || asset.url || "";
+  const canEditImage = isImageAsset(asset);
+  const fileName = String(asset.original_filename ?? asset.display_filename ?? asset.metadata?.file_name ?? asset.slug ?? "—");
+  const fileSize = typeof asset.file_size_bytes === "number"
+    ? asset.file_size_bytes
+    : asset.metadata?.file_size as number | undefined;
 
   return (
     <div
@@ -253,7 +270,7 @@ export function MediaEditModal({
         <div className="flex items-center justify-between gap-4 px-5 py-3 shrink-0 border-b border-wk-border">
           <div className="flex items-center gap-3 min-w-0">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-wk-surface-raised text-wk-text-muted shrink-0">
-              <i className="ri-image-line text-[14px]" />
+              <i className={`${canEditImage ? "ri-image-line" : fileIconClass(asset)} text-[14px]`} />
             </div>
             <div className="min-w-0">
               <p className="text-[14px] font-bold text-wk-text truncate max-w-[400px]">
@@ -299,16 +316,16 @@ export function MediaEditModal({
 
         {/* Body */}
         <div className="flex-1 flex min-h-0">
-          {/* Left: Image */}
+          {/* Left: Preview */}
           <div className="flex-[2] min-w-0 flex flex-col bg-wk-surface-raised">
-            {editMode === "edit" ? (
+            {canEditImage && editMode === "edit" ? (
               <ImageEditor
                 url={asset.url || ""}
                 onApply={handleImageEdited}
                 onSaveAsNew={handleSaveAsNewImage}
                 onCancel={() => setEditMode("view")}
               />
-            ) : (
+            ) : canEditImage ? (
               <div
                 className="flex-1 flex items-center justify-center p-4 overflow-hidden"
                 style={{
@@ -351,6 +368,29 @@ export function MediaEditModal({
                   </div>
                 )}
               </div>
+            ) : (
+              <div className="flex-1 flex items-center justify-center p-8">
+                <div className="flex max-w-sm flex-col items-center gap-4 rounded-2xl border border-wk-border bg-wk-bg px-8 py-10 text-center">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-wk-surface-raised text-wk-text-faint">
+                    <i className={`${fileIconClass(asset)} text-[36px]`} />
+                  </div>
+                  <div>
+                    <p className="text-[15px] font-black text-wk-text">{asset.title || fileName}</p>
+                    <p className="mt-1 text-[12px] text-wk-text-muted">{asset.mime_type || "Managed file"}</p>
+                  </div>
+                  {asset.url && (
+                    <a
+                      href={asset.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-wk-brand px-3 py-2 text-[12px] font-bold text-wk-brand-on hover:opacity-90"
+                    >
+                      <i className="ri-download-line text-[13px]" />
+                      Open file
+                    </a>
+                  )}
+                </div>
+              </div>
             )}
           </div>
 
@@ -366,22 +406,22 @@ export function MediaEditModal({
                   <div className="space-y-2">
                     <FieldRow
                       label="File name"
-                      value={String(asset.metadata?.file_name ?? asset.slug ?? "—")}
+                      value={fileName}
                     />
                     <FieldRow label="MIME Type" value={asset.mime_type || "—"} />
                     <FieldRow
                       label="File size"
-                      value={formatFileSize(asset.metadata?.file_size as number | undefined)}
+                      value={formatFileSize(fileSize)}
                     />
                     <FieldRow label="Uploaded" value={formatDate(asset.created_at)} />
                     <FieldRow label="URL" value={asset.url || "—"} long copyable />
                   </div>
                 </section>
 
-                {/* Image Details */}
+                {/* Asset Details */}
                 <section>
                   <h4 className="text-[10px] font-black uppercase tracking-wider text-wk-text-faint mb-3">
-                    Image Details
+                    {canEditImage ? "Image Details" : "File Details"}
                   </h4>
                   <div className="space-y-3">
                     <div>
@@ -396,18 +436,20 @@ export function MediaEditModal({
                         className="w-full rounded-lg border border-wk-border bg-wk-surface px-3 py-1.5 text-[12px] text-wk-text placeholder:text-wk-text-faint outline-none focus:border-wk-brand/50 focus:ring-1 focus:ring-wk-brand/20 transition-all"
                       />
                     </div>
-                    <div>
-                      <label className="block text-[11px] font-semibold text-wk-text-soft mb-1.5">
-                        Alt Text
-                      </label>
-                      <input
-                        type="text"
-                        value={altText}
-                        onChange={(e) => setAltText(e.target.value)}
-                        placeholder="Describe the image for accessibility..."
-                        className="w-full rounded-lg border border-wk-border bg-wk-surface px-3 py-1.5 text-[12px] text-wk-text placeholder:text-wk-text-faint outline-none focus:border-wk-brand/50 focus:ring-1 focus:ring-wk-brand/20 transition-all"
-                      />
-                    </div>
+                    {canEditImage && (
+                      <div>
+                        <label className="block text-[11px] font-semibold text-wk-text-soft mb-1.5">
+                          Alt Text
+                        </label>
+                        <input
+                          type="text"
+                          value={altText}
+                          onChange={(e) => setAltText(e.target.value)}
+                          placeholder="Describe the image for accessibility..."
+                          className="w-full rounded-lg border border-wk-border bg-wk-surface px-3 py-1.5 text-[12px] text-wk-text placeholder:text-wk-text-faint outline-none focus:border-wk-brand/50 focus:ring-1 focus:ring-wk-brand/20 transition-all"
+                        />
+                      </div>
+                    )}
                     <div>
                       <label className="block text-[11px] font-semibold text-wk-text-soft mb-1.5">
                         Caption
@@ -434,6 +476,7 @@ export function MediaEditModal({
                     </div>
 
                     {/* Dimensions */}
+                    {canEditImage && (
                     <div className="flex gap-2">
                       <div className="flex-1">
                         <label className="block text-[11px] font-semibold text-wk-text-soft mb-1.5">
@@ -466,8 +509,10 @@ export function MediaEditModal({
                         />
                       </div>
                     </div>
+                    )}
 
                     {/* HEX Color */}
+                    {canEditImage && (
                     <div>
                       <label className="block text-[11px] font-semibold text-wk-text-soft mb-1.5">
                         HEX Color
@@ -486,8 +531,10 @@ export function MediaEditModal({
                         />
                       </div>
                     </div>
+                    )}
 
                     {/* Animated */}
+                    {canEditImage && (
                     <label className="flex items-center gap-2 text-[12px] text-wk-text cursor-pointer">
                       <input
                         type="checkbox"
@@ -497,6 +544,7 @@ export function MediaEditModal({
                       />
                       Animated
                     </label>
+                    )}
 
                     {/* Save */}
                     <button

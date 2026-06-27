@@ -10,6 +10,18 @@ import { WkIcon } from "@/components/design-system/Icon";
 import { type MediaAsset } from "@/services/mediaService";
 import { MediaEditModal } from "@/components/admin/media/MediaEditModal";
 
+function assetFileKind(asset: MediaAsset): string {
+  return asset.file_kind || (asset.mime_type === "application/pdf" ? "document" : asset.media_kind || "other");
+}
+
+function isImageAsset(asset: MediaAsset): boolean {
+  return asset.mime_type?.startsWith("image/") === true || assetFileKind(asset) === "image";
+}
+
+function fileIconClass(asset: MediaAsset | null): string {
+  return asset && assetFileKind(asset) === "document" ? "ri-file-pdf-2-line" : "ri-file-line";
+}
+
 interface Props {
   /** Currently selected asset (if it's a registered asset) */
   selectedAsset: MediaAsset | null;
@@ -59,6 +71,9 @@ export function MediaLibraryPreviewPanel({
   const height = typeof metadata.height === "number" ? metadata.height : undefined;
   const fileSize = typeof metadata.file_size === "number" ? metadata.file_size : undefined;
   const fileName = typeof metadata.file_name === "string" ? metadata.file_name : undefined;
+  const isImagePreview = selectedAsset ? isImageAsset(selectedAsset) : /\.(jpe?g|png|gif|webp|svg|avif|ico)(\?|$)/i.test(selectedUrl);
+  const displayFileSize = selectedAsset?.file_size_bytes ?? fileSize;
+  const displayFileName = selectedAsset?.original_filename ?? selectedAsset?.display_filename ?? fileName;
 
   const handleCopy = () => {
     if (selectedUrl) {
@@ -110,17 +125,31 @@ export function MediaLibraryPreviewPanel({
 
         {selectedUrl ? (
           <>
-            {/* Preview image */}
-            <div className="overflow-hidden rounded-xl border border-wk-border bg-wk-surface-raised">
-              <img
-                src={selectedUrl}
-                alt={altText || "Preview"}
-                className="w-full"
-                onError={() => setPreviewError(true)}
-              />
-            </div>
-            {previewError && (
-              <p className="text-[11px] text-wk-danger">Failed to load preview.</p>
+            {/* Preview */}
+            {isImagePreview ? (
+              <>
+                <div className="overflow-hidden rounded-xl border border-wk-border bg-wk-surface-raised">
+                  <img
+                    src={selectedUrl}
+                    alt={altText || "Preview"}
+                    className="w-full"
+                    onError={() => setPreviewError(true)}
+                  />
+                </div>
+                {previewError && (
+                  <p className="text-[11px] text-wk-danger">Failed to load preview.</p>
+                )}
+              </>
+            ) : (
+              <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-wk-border bg-wk-surface-raised px-4 py-10 text-center">
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-wk-bg text-wk-text-faint">
+                  <i className={`${fileIconClass(selectedAsset)} text-[32px]`} />
+                </div>
+                <div>
+                  <p className="text-[13px] font-bold text-wk-text">{selectedAsset?.title || displayFileName || "Document"}</p>
+                  <p className="mt-1 text-[11px] text-wk-text-muted">{selectedAsset?.mime_type || "Managed file"}</p>
+                </div>
+              </div>
             )}
 
             {/* ── Registered asset metadata ── */}
@@ -171,16 +200,16 @@ export function MediaLibraryPreviewPanel({
                     <span className="text-wk-text-faint">Type</span>
                     <span className="font-mono text-wk-text">{selectedAsset.mime_type || "—"}</span>
                   </div>
-                  {fileSize && (
+                  {displayFileSize && (
                     <div className="flex items-center justify-between text-[11px]">
                       <span className="text-wk-text-faint">Size</span>
-                      <span className="font-mono text-wk-text">{formatFileSize(fileSize)}</span>
+                      <span className="font-mono text-wk-text">{formatFileSize(displayFileSize)}</span>
                     </div>
                   )}
-                  {fileName && (
+                  {displayFileName && (
                     <div className="flex items-center justify-between text-[11px]">
                       <span className="text-wk-text-faint">Name</span>
-                      <span className="font-mono text-wk-text truncate max-w-[140px]" title={fileName}>{fileName}</span>
+                      <span className="font-mono text-wk-text truncate max-w-[140px]" title={displayFileName}>{displayFileName}</span>
                     </div>
                   )}
                 </div>
@@ -238,7 +267,7 @@ export function MediaLibraryPreviewPanel({
         ) : (
           <div className="flex flex-col items-center justify-center py-14 text-wk-text-muted">
             <WkIcon name="Image" size={36} className="mb-2 text-wk-text-faint" />
-            <p className="text-[12px] text-center">Select an image<br />to preview it here</p>
+            <p className="text-[12px] text-center">Select a file<br />to preview it here</p>
           </div>
         )}
       </div>
