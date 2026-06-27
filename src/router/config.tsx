@@ -194,6 +194,27 @@ function LegacyTaxonomyRedirect({ base }: { base: "/categories" | "/tags" }) {
   return <Navigate to={slug ? `${base}/${slug}` : base} replace />;
 }
 
+function LegacyEntityRedirect({ base }: { base: "/artists" | "/releases" | "/tracks" }) {
+  const params = useParams<Record<string, string | undefined>>();
+
+  if (base === "/artists") {
+    return <Navigate to={params.slug ? `/artists/${params.slug}` : "/artists"} replace />;
+  }
+
+  if (base === "/releases") {
+    if (params.artistSlug && params.releaseSlug) {
+      return <Navigate to={`/releases/${params.artistSlug}/${params.releaseSlug}`} replace />;
+    }
+    return <Navigate to="/releases" replace />;
+  }
+
+  if (params.artistSlug && params.trackSlug) {
+    return <Navigate to={`/tracks/${params.artistSlug}/${params.trackSlug}`} replace />;
+  }
+
+  return <Navigate to="/tracks" replace />;
+}
+
 const routes: RouteObject[] = [
   { path: "/admin/login", element: <AdminLoginPage /> },
   { path: "/auth/reset-password", element: <ResetPasswordPage /> },
@@ -207,6 +228,12 @@ const routes: RouteObject[] = [
       { path: "/charts/:series/:market/:edition", element: <ResponsivePage mobile={<MobileChartEdition />} desktop={<ChartEdition />} /> },
       { path: "/charts/:series/:edition", element: <ResponsivePage mobile={<MobileChartEdition />} desktop={<ChartEdition />} /> },
       { path: "/charts/:series", element: <ResponsivePage mobile={<MobileChartEdition />} desktop={<ChartEdition />} /> },
+      { path: "/artist", element: <LegacyEntityRedirect base="/artists" /> },
+      { path: "/artist/:slug", element: <LegacyEntityRedirect base="/artists" /> },
+      { path: "/release", element: <LegacyEntityRedirect base="/releases" /> },
+      { path: "/release/:artistSlug/:releaseSlug", element: <LegacyEntityRedirect base="/releases" /> },
+      { path: "/track", element: <LegacyEntityRedirect base="/tracks" /> },
+      { path: "/track/:artistSlug/:trackSlug", element: <LegacyEntityRedirect base="/tracks" /> },
       { path: "/artists", element: <ResponsivePage mobile={<Artists />} desktop={<Artists />} /> },
       { path: "/artists/:slug", element: <ResponsivePage mobile={<ArtistDetail />} desktop={<ArtistDetail />} /> },
       { path: "/tracks/:artistSlug/:trackSlug", element: <ResponsivePage mobile={<TrackDetail />} desktop={<TrackDetail />} /> },

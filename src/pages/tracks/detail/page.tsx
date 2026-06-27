@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
 import { usePlayer } from "@/context/PlayerContext";
 import { getTrack, type PublicTrackDetail } from "@/services/publicApi/client";
 import { buildTrackHeroIntro, buildTrackSeoDescription } from "@/services/cultureContext/trackAdapters";
@@ -25,6 +25,13 @@ import {
   type ListeningHistoryItem,
 } from "@/services/listeningHistory";
 import { useScrollDepthTracking } from "@/hooks/useScrollDepthTracking";
+import { trackEvent } from "@/services/analytics";
+
+function cleanDirtyTrackSlug(artistSlug?: string, trackSlug?: string): string {
+  if (!artistSlug || !trackSlug) return "";
+  if (!trackSlug.endsWith(`-${artistSlug}`)) return "";
+  return trackSlug.slice(0, -artistSlug.length - 1);
+}
 
 type TrackChartAppearance = {
   editionSlug?: string;
@@ -710,6 +717,8 @@ function ConnectedArtists({ artists, artworkUrl }: { artists: TrackViewModel["ar
 
 export default function TrackDetail() {
   const { artistSlug, trackSlug } = useParams<{ artistSlug: string; trackSlug: string }>();
+  const navigate = useNavigate();
+  const location = useLocation();
   const { playTrack, currentTrack, isPlaying, togglePlay, playbackBackend } = usePlayer();
   const user = useAuthUser();
   const { save: saveEntityAction, loading: entityActionLoading } = useEntityActions(user.id || undefined);
@@ -728,6 +737,15 @@ export default function TrackDetail() {
     entitySlug: trackSlug,
     entityType: "track",
   });
+
+  useEffect(() => {
+    const cleanedTrackSlug = cleanDirtyTrackSlug(artistSlug, trackSlug);
+    if (!artistSlug || !trackSlug || !cleanedTrackSlug || cleanedTrackSlug === trackSlug) return;
+
+    navigate(`/tracks/${artistSlug}/${cleanedTrackSlug}${location.search || ""}${location.hash || ""}`, {
+      replace: true,
+    });
+  }, [artistSlug, trackSlug, navigate, location.search, location.hash]);
 
   useEffect(() => {
     const syncApplePlaybackState = () => {
@@ -778,6 +796,25 @@ export default function TrackDetail() {
       .then((apiData) => {
         if (!alive) return;
         if (!apiData) {
+          trackEvent("page_not_found", {
+            pageType: "404",
+            entityType: "broken_page",
+            entitySlug: `${artistSlug || "unknown"}/${trackSlug || "unknown"}`,
+            context: {
+              status_code: 404,
+              not_found_path: location.pathname,
+              not_found_search: location.search || "",
+              not_found_hash: location.hash || "",
+              route_guess: "missing_track",
+              suggested_fix: cleanDirtyTrackSlug(artistSlug, trackSlug)
+                ? `/tracks/${artistSlug}/${cleanDirtyTrackSlug(artistSlug, trackSlug)}`
+                : "",
+              soft_404_surface: "track_detail",
+              artist_slug: artistSlug,
+              track_slug: trackSlug,
+            },
+          });
+
           setError("Track not found.");
           setLoading(false);
           return;
@@ -792,7 +829,7 @@ export default function TrackDetail() {
       });
 
     return () => { alive = false; };
-  }, [artistSlug, trackSlug]);
+  }, [artistSlug, trackSlug, location.pathname, location.search, location.hash]);
 
   if (loading) {
     return (
