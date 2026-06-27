@@ -180,7 +180,7 @@ function genStoryCardRows(items: SectionItem[], origin: string, accent: string):
   const s = eH; const rows: string[] = [];
   for (const it of items) {
     const img = resolveImg(it); const title = resolveTitle(it); const cat = it.section || "";
-    const link = it.url || it.link || getEntityUrl(origin, "articles", it);
+    const link = it.url || it.link || getRecordUrl(origin, "articles", it);
     const imgHtml = img
       ? `<div style="width:100%;aspect-ratio:16/9;border-radius:12px 12px 0 0;overflow:hidden;background:#EEF1E8;"><img src="${s(img)}" alt="${s(title)}" width="100%" style="display:block;border:0;outline:none;width:100%;height:100%;object-fit:cover;"></div>`
       : `<div style="width:100%;aspect-ratio:16/9;border-radius:12px 12px 0 0;background:#EEF1E8;display:flex;align-items:center;justify-content:center;"><span style="font-size:36px;font-weight:900;color:#C4C8BC;">${s(title.charAt(0).toUpperCase())}</span></div>`;
@@ -202,7 +202,7 @@ function genStoryFeaturedRows(items: SectionItem[], origin: string, accent: stri
   for (const it of items) {
     const img = resolveImg(it); const title = resolveTitle(it); const cat = it.section || "";
     const deck = (it.excerpt || it.description || "").replace(/<[^>]+>/g, "").slice(0, 120);
-    const link = it.url || it.link || getEntityUrl(origin, "articles", it);
+    const link = it.url || it.link || getRecordUrl(origin, "articles", it);
     const imgHtml = img
       ? `<img src="${s(img)}" alt="${s(title)}" style="display:block;border:0;outline:none;width:100%;height:100%;object-fit:cover;">`
       : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#EEF1E8;"><span style="font-size:36px;font-weight:900;color:#C4C8BC;">${s(title.charAt(0).toUpperCase())}</span></div>`;
@@ -230,7 +230,7 @@ function genChartTrackTileRows(items: SectionItem[], origin: string, accent: str
     const a = items[i]; const b = items[i + 1]; const cells: string[] = [];
     [a, b].filter(Boolean).forEach((it: any) => {
       const img = resolveImg(it); const title = resolveTitle(it); const artist = resolveSubtitle(it);
-      const link = it.url || it.link || getEntityUrl(origin, "charts", it);
+      const link = it.url || it.link || getRecordUrl(origin, "charts", it);
       const rColor = chartRankColor(it.rank, accent);
       const rankNum = it.rank !== undefined ? `<div style="position:absolute;top:10px;left:10px;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:${FNT};font-size:16px;font-weight:900;letter-spacing:-.03em;color:#FFFFFF;background:${rColor};">${it.rank}</div>` : "";
       const imgHtml = img
@@ -261,7 +261,7 @@ function genArtistImageCardRows(items: SectionItem[], origin: string, accent: st
       const img = resolveImg(it); const name = resolveTitle(it);
       const bio = (it.bio_excerpt || it.contextText || "").replace(/<[^>]+>/g, "").slice(0, 140);
       const country = it.country || "";
-      const link = it.url || it.link || getEntityUrl(origin, "artists", it);
+      const link = it.url || it.link || getRecordUrl(origin, "artists", it);
       const padRight = idx < batch.length - 1 ? "padding-right:8px;" : "";
       cells.push(`<td class="wk-stack-pad" width="25%" style="vertical-align:top;${padRight}">
 <table role="presentation" width="100%" class="wk-card" style="border:1px solid rgba(12,13,10,.14);border-radius:14px;overflow:hidden;background:#FFFFFF;position:relative;">
@@ -292,7 +292,7 @@ function genRouteTileRows(items: SectionItem[], origin: string, accent: string):
     batch.forEach((it, idx) => {
       const img = resolveImg(it); const title = resolveTitle(it); const sub = resolveSubtitle(it);
       const type = it.type || it.release_type || "";
-      const link = it.url || it.link || getEntityUrl(origin, it.type || "articles", it);
+      const link = it.url || it.link || getRecordUrl(origin, it.type || "articles", it);
       const padRight = idx < batch.length - 1 ? "padding-right:10px;" : "";
       cells.push(`<td class="wk-route-cell" width="33%" style="vertical-align:top;${padRight}">
 <table role="presentation" width="100%" class="wk-card" style="border:1px solid rgba(12,13,10,.14);border-radius:14px;overflow:hidden;background:#FFFFFF;">
@@ -344,7 +344,7 @@ function renderModule(
     const featured = section.items[0]; const rest = section.items.slice(1);
     const fsImg = resolveImg(featured); const fsTitle = resolveTitle(featured);
     const fsCat = featured.section || featured.type || "Story";
-    const fsUrl = featured.url || featured.link || getEntityUrl(origin, "articles", featured);
+    const fsUrl = featured.url || featured.link || getRecordUrl(origin, "articles", featured);
     const fsDeck = featured.excerpt || featured.description || "";
     const imgBlock = fsImg
       ? `<tr><td style="padding:0;"><div style="width:100%;aspect-ratio:16/9;border-radius:14px 14px 0 0;overflow:hidden;background:#EEF1E8;"><img src="${s(fsImg)}" alt="${s(fsTitle)}" style="display:block;border:0;outline:none;width:100%;height:100%;object-fit:cover;"></div></td></tr>`
@@ -402,7 +402,7 @@ ${sectionHeader()}
     if (idx >= 0) consumed.add(idx);
     const hero = section.items[0]; if (!hero) return "";
     const hImg = resolveImg(hero); const hTitle = resolveTitle(hero); const hSub = resolveSubtitle(hero);
-    const hUrl = hero.url || hero.link || getEntityUrl(origin, "guides", hero);
+    const hUrl = hero.url || hero.link || getRecordUrl(origin, "guides", hero);
     return `<tr><td class="wk-pad" style="padding:32px 48px;border-bottom:1px solid rgba(12,13,10,.08);background:#EEF1E8;">
 ${sectionHeader()}
 <table role="presentation" width="100%" class="wk-card" style="margin-top:18px;border:1px solid rgba(12,13,10,.14);border-radius:14px;overflow:hidden;background:#FFFFFF;">
@@ -610,8 +610,8 @@ async function rC(uid: string, cap: string): Promise<boolean> {
   return all.has(cap);
 }
 
-async function trackAnalyticsEvent(db: any, eventName: string, opts: { pageUrl?: string; pageType?: string; entitySlug?: string; entityType?: string; sessionId?: string; userId?: string; referrer?: string; context?: Record<string, unknown>; }) {
-  try { await db.from("analytics_events").insert({ event_name: eventName, page_url: opts.pageUrl ?? "https://wakilisha.africa", page_type: opts.pageType ?? null, entity_slug: opts.entitySlug ?? null, entity_type: opts.entityType ?? null, context: opts.context ?? null, session_id: opts.sessionId ?? "wk_server_webhook", user_id: opts.userId ?? null, referrer: opts.referrer ?? null, created_at: is() }); } catch (e) { console.error("[analytics] track failed:", e instanceof Error ? e.message : String(e)); }
+async function trackAnalyticsEvent(db: any, eventName: string, opts: { pageUrl?: string; pageType?: string; recordSlug?: string; recordType?: string; sessionId?: string; userId?: string; referrer?: string; context?: Record<string, unknown>; }) {
+  try { await db.from("analytics_events").insert({ event_name: eventName, page_url: opts.pageUrl ?? "https://wakilisha.africa", page_type: opts.pageType ?? null, record_slug: opts.recordSlug ?? null, record_type: opts.recordType ?? null, context: opts.context ?? null, session_id: opts.sessionId ?? "wk_server_webhook", user_id: opts.userId ?? null, referrer: opts.referrer ?? null, created_at: is() }); } catch (e) { console.error("[analytics] track failed:", e instanceof Error ? e.message : String(e)); }
 }
 
 
@@ -656,7 +656,7 @@ function cleanInterestStrength(value: unknown): number {
   return Math.max(1, Math.min(100, Math.round(number)));
 }
 
-function normalizeAudienceInterestInputs(body: any): Array<Required<Pick<AudienceInterestInput, "entity_type" | "entity_slug">> & AudienceInterestInput> {
+function normalizeAudienceInterestInputs(body: any): Array<Required<Pick<AudienceInterestInput, "record_type" | "record_slug">> & AudienceInterestInput> {
   const rawItems: unknown[] = [
     ...(Array.isArray(body.interests) ? body.interests : []),
     ...(Array.isArray(body.audience_interests) ? body.audience_interests : []),
@@ -677,7 +677,7 @@ function normalizeAudienceInterestInputs(body: any): Array<Required<Pick<Audienc
   }
 
   const seen = new Set<string>();
-  const out: Array<Required<Pick<AudienceInterestInput, "entity_type" | "entity_slug">> & AudienceInterestInput> = [];
+  const out: Array<Required<Pick<AudienceInterestInput, "record_type" | "record_slug">> & AudienceInterestInput> = [];
 
   for (const raw of rawItems.slice(0, 25)) {
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) continue;
@@ -687,7 +687,7 @@ function normalizeAudienceInterestInputs(body: any): Array<Required<Pick<Audienc
     const entitySlug = cleanAudienceSlug(item.entity_slug);
     if (!AUDIENCE_ENTITY_TYPES.has(entityType) || !entitySlug) continue;
 
-    const key = `${entityType}:${entitySlug}`;
+    const key = `${recordType}:${recordSlug}`;
     if (seen.has(key)) continue;
     seen.add(key);
 
@@ -735,8 +735,8 @@ async function recordAudienceInterests(
       .from("audience_interests")
       .select("id, interest_strength")
       .eq("subscriber_id", subscriberId)
-      .eq("entity_type", input.entity_type)
-      .eq("entity_slug", input.entity_slug)
+      .eq("record_type", input.record_type)
+      .eq("record_slug", input.record_slug)
       .maybeSingle();
 
     if (existing?.id) {
@@ -756,7 +756,7 @@ async function recordAudienceInterests(
           updated_at: now,
         })
         .eq("id", existing.id)
-        .select("entity_type, entity_slug, entity_name, interest_kind, source_form, interest_strength")
+        .select("record_type, record_slug, record_name, interest_kind, source_form, interest_strength")
         .maybeSingle();
 
       if (!error && updated) recorded.push(updated);
@@ -782,7 +782,7 @@ async function recordAudienceInterests(
         created_at: now,
         updated_at: now,
       })
-      .select("entity_type, entity_slug, entity_name, interest_kind, source_form, interest_strength")
+      .select("record_type, record_slug, record_name, interest_kind, source_form, interest_strength")
       .maybeSingle();
 
     if (!error && inserted) recorded.push(inserted);
@@ -851,7 +851,7 @@ async function handleSubscribe(body: any, c: Record<string, string>, ip: string,
     pageUrl: body.page_url ?? origin,
     pageType,
     entitySlug: recordedInterests[0]?.entity_slug ?? briefingSlugs[0] ?? null,
-    entityType: recordedInterests[0]?.entity_type ?? "briefing",
+    recordType: recordedInterests[0]?.record_type ?? "briefing",
     sessionId: body.session_id ?? null,
     referrer: body.referrer ?? null,
     context: {
@@ -1136,8 +1136,8 @@ async function handleSendIssue(body: any, c: Record<string, string>, auth: { id:
     subscriber_status: "confirmed",
     interest_status: "active",
     briefing_slug: String(rawSegmentFilters.briefing_slug ?? briefingSlug).trim() || briefingSlug,
-    entity_type: String(rawSegmentFilters.entity_type ?? "").trim(),
-    entity_slug: String(rawSegmentFilters.entity_slug ?? "").trim(),
+    record_type: String(rawSegmentFilters.record_type ?? "").trim(),
+    record_slug: String(rawSegmentFilters.record_slug ?? "").trim(),
     source_form: String(rawSegmentFilters.source_form ?? "").trim(),
   } : null;
 
@@ -1155,8 +1155,8 @@ async function handleSendIssue(body: any, c: Record<string, string>, auth: { id:
       .eq("briefing_subscribers.status", "confirmed")
       .limit(5000);
 
-    if (segmentFilters.entity_type) segmentQuery = segmentQuery.eq("entity_type", segmentFilters.entity_type);
-    if (segmentFilters.entity_slug) segmentQuery = segmentQuery.eq("entity_slug", segmentFilters.entity_slug);
+    if (segmentFilters.record_type) segmentQuery = segmentQuery.eq("record_type", segmentFilters.record_type);
+    if (segmentFilters.record_slug) segmentQuery = segmentQuery.eq("record_slug", segmentFilters.record_slug);
     if (segmentFilters.source_form) segmentQuery = segmentQuery.eq("source_form", segmentFilters.source_form);
 
     const { data: segmentRows, error: segmentError } = await segmentQuery;
@@ -1297,8 +1297,8 @@ async function handleListAudienceSegments(body: any, c: Record<string, string>) 
   const subscriberStatus = String(body.subscriber_status ?? "").trim();
   const interestStatus = String(body.interest_status ?? "").trim();
   const briefingSlug = String(body.briefing_slug ?? "").trim();
-  const entityType = String(body.entity_type ?? "").trim();
-  const entitySlug = String(body.entity_slug ?? "").trim();
+  const recordType = String(body.record_type ?? "").trim();
+  const recordSlug = String(body.record_slug ?? "").trim();
   const sourceForm = String(body.source_form ?? "").trim();
 
   let allowedSubscriberIds: string[] | null = null;
@@ -1372,8 +1372,8 @@ async function handleListAudienceSegments(body: any, c: Record<string, string>) 
     .limit(limit);
 
   if (interestStatus) query = query.eq("status", interestStatus);
-  if (entityType) query = query.eq("entity_type", entityType);
-  if (entitySlug) query = query.eq("entity_slug", entitySlug);
+  if (recordType) query = query.eq("record_type", recordType);
+  if (recordSlug) query = query.eq("record_slug", recordSlug);
   if (sourceForm) query = query.eq("source_form", sourceForm);
   if (subscriberStatus) query = query.eq("briefing_subscribers.status", subscriberStatus);
   if (allowedSubscriberIds) query = query.in("subscriber_id", allowedSubscriberIds);
@@ -1429,12 +1429,12 @@ async function handleListAudienceSegments(body: any, c: Record<string, string>) 
   const subscriberSet = new Set(rows.map((row: any) => row.subscriber_id));
   const confirmedSet = new Set(rows.filter((row: any) => row.subscriber_status === "confirmed").map((row: any) => row.subscriber_id));
 
-  const entityCounts = new Map<string, { entity_type: string; entity_slug: string; entity_name: string | null; count: number }>();
+  const recordCounts = new Map<string, { record_type: string; record_slug: string; record_name: string | null; count: number }>();
   const sourceCounts = new Map<string, number>();
   const briefingCounts = new Map<string, { slug: string; title: string; count: number }>();
 
   for (const row of rows) {
-    const entityKey = `${row.entity_type}:${row.entity_slug}`;
+    const recordKey = `${row.record_type}:${row.record_slug}`;
     const currentEntity = entityCounts.get(entityKey) ?? {
       entity_type: row.entity_type,
       entity_slug: row.entity_slug,
@@ -1464,7 +1464,7 @@ async function handleListAudienceSegments(body: any, c: Record<string, string>) 
       distinct_subscribers: subscriberSet.size,
       confirmed_subscribers: confirmedSet.size,
       active_interests: rows.filter((row: any) => row.status === "active").length,
-      top_entities: Array.from(entityCounts.values()).sort((a, b) => b.count - a.count).slice(0, 12),
+      top_records: Array.from(recordCounts.values()).sort((a, b) => b.count - a.count).slice(0, 12),
       source_forms: Array.from(sourceCounts.entries()).map(([source_form, count]) => ({ source_form, count })).sort((a, b) => b.count - a.count).slice(0, 12),
       per_briefing: Array.from(briefingCounts.values()).sort((a, b) => b.count - a.count),
     },
@@ -1484,7 +1484,7 @@ async function handleListAudienceSegments(body: any, c: Record<string, string>) 
 async function handleBriefingAnalytics(body: any, c: Record<string, string>) {
   const db = createClient(SU, SK); const days = Math.min(Number(body.days) || 30, 365); const since = new Date(Date.now() - days * 86400000).toISOString();
   const be = ["briefing_subscribe","briefing_confirm_success","briefing_unsubscribe","briefing_email_delivered","briefing_email_opened","briefing_email_clicked","briefing_email_bounced","briefing_email_complained","briefing_issue_generated","briefing_issue_sent","briefing_test_sent","briefing_issue_deleted"];
-  const [{ data: events }, { data: eventCounts }, { data: timeline }, { data: sources }] = await Promise.all([db.from("analytics_events").select("event_name, context, created_at, page_type, entity_slug").in("event_name", be).gte("created_at", since).order("created_at", { ascending: false }).limit(5000), db.from("analytics_events").select("event_name").in("event_name", be).gte("created_at", since), db.from("analytics_events").select("event_name, created_at").in("event_name", ["briefing_subscribe","briefing_confirm_success","briefing_email_opened","briefing_email_clicked"]).gte("created_at", since).order("created_at", { ascending: true }), db.from("analytics_events").select("page_type, context").eq("event_name", "briefing_subscribe").gte("created_at", since)]);
+  const [{ data: events }, { data: eventCounts }, { data: timeline }, { data: sources }] = await Promise.all([db.from("analytics_events").select("event_name, context, created_at, page_type, record_slug").in("event_name", be).gte("created_at", since).order("created_at", { ascending: false }).limit(5000), db.from("analytics_events").select("event_name").in("event_name", be).gte("created_at", since), db.from("analytics_events").select("event_name, created_at").in("event_name", ["briefing_subscribe","briefing_confirm_success","briefing_email_opened","briefing_email_clicked"]).gte("created_at", since).order("created_at", { ascending: true }), db.from("analytics_events").select("page_type, context").eq("event_name", "briefing_subscribe").gte("created_at", since)]);
   const counts: Record<string, number> = {}; for (const e of (eventCounts ?? [])) { counts[e.event_name] = (counts[e.event_name] || 0) + 1; }
   const dm = new Map<string, Record<string, number>>(); for (const e of (timeline ?? [])) { const ds = e.created_at.split("T")[0]; if (!dm.has(ds)) dm.set(ds, {}); const entry = dm.get(ds)!; entry[e.event_name] = (entry[e.event_name] || 0) + 1; }
   const dt = Array.from(dm.entries()).map(([date, data]) => ({ date, ...data })).sort((a, b) => a.date.localeCompare(b.date));
@@ -1524,7 +1524,7 @@ async function processWebhookEvent(body: any, c: Record<string, string>): Promis
   if (!recipients || recipients.length === 0) return jO({ processed: false, reason: "recipient_not_found", message_id: messageId }, c);
   const eventMap: Record<string, string> = { "email.delivered": "briefing_email_delivered", "email.opened": "briefing_email_opened", "email.clicked": "briefing_email_clicked", "email.bounced": "briefing_email_bounced", "email.complained": "briefing_email_complained" };
   const aen = eventMap[eventType] || `briefing_email_${eventType.replace("email.", "")}`;
-  for (const recipient of recipients) { const events = recipient.webhook_events ?? []; events.push(webhookEvent); const update: Record<string, any> = { webhook_events: events }; switch (eventType) { case "email.delivered": update.delivery_status = "delivered"; if (!recipient.delivered_at) update.delivered_at = now; break; case "email.opened": update.delivery_status = "opened"; update.opened_at = now; break; case "email.clicked": update.delivery_status = "clicked"; update.clicked_at = now; break; case "email.bounced": update.delivery_status = "bounced"; update.bounced_at = now; break; case "email.complained": update.delivery_status = "complained"; break; } await db.from("briefing_issue_recipients").update(update).eq("id", recipient.id); trackAnalyticsEvent(db, aen, { pageUrl: "https://wakilisha.africa", pageType: "briefing_email", entitySlug: `recipient_${recipient.id}`, entityType: "briefing_recipient", sessionId: `wk_webhook_${messageId}`, context: { message_id: messageId, recipient_id: recipient.id, subscriber_id: recipient.subscriber_id, issue_id: recipient.issue_id, event_type: eventType, email: payload?.email ?? payload?.to ?? null } }); }
+  for (const recipient of recipients) { const events = recipient.webhook_events ?? []; events.push(webhookEvent); const update: Record<string, any> = { webhook_events: events }; switch (eventType) { case "email.delivered": update.delivery_status = "delivered"; if (!recipient.delivered_at) update.delivered_at = now; break; case "email.opened": update.delivery_status = "opened"; update.opened_at = now; break; case "email.clicked": update.delivery_status = "clicked"; update.clicked_at = now; break; case "email.bounced": update.delivery_status = "bounced"; update.bounced_at = now; break; case "email.complained": update.delivery_status = "complained"; break; } await db.from("briefing_issue_recipients").update(update).eq("id", recipient.id); trackAnalyticsEvent(db, aen, { pageUrl: "https://wakilisha.africa", pageType: "briefing_email", recordSlug: `recipient_${recipient.id}`, recordType: "briefing_recipient", sessionId: `wk_webhook_${messageId}`, context: { message_id: messageId, recipient_id: recipient.id, subscriber_id: recipient.subscriber_id, issue_id: recipient.issue_id, event_type: eventType, email: payload?.email ?? payload?.to ?? null } }); }
   return jO({ processed: true, event_type: eventType, message_id: messageId, matched_recipients: recipients.length, analytics_event: aen }, c);
 }
 

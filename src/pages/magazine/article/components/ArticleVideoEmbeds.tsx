@@ -36,7 +36,7 @@ export function ArticleContentRenderer({
     trackEvent("video_play", {
       pageType: "article",
       entitySlug: articleSlug,
-      entityType: "article",
+      recordType: "article",
       context: {
         action: ev.action,
         video_url: ev.videoUrl,

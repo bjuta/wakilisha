@@ -246,7 +246,7 @@ export function TrackEmbedCard({ track, articleSlug }: { track: TrackEmbedData; 
     playTrack(playerTrack, [playerTrack], articleSlug ? {
       pageType: "article",
       entitySlug: articleSlug,
-      entityType: "article",
+      recordType: "article",
       sourceSection: "article_body",
     } : undefined);
   };

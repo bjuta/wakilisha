@@ -84,7 +84,7 @@ export default function MobileArticle() {
   useScrollDepthTracking({
     pageType: "article",
     entitySlug: slug,
-    entityType: "article",
+    recordType: "article",
   });
 
   const { article, loading, error } = useMagazineArticle(slug, previewNonce);
@@ -178,7 +178,7 @@ export default function MobileArticle() {
   const totalShares = getTotalShareCount(shareCounts);
 
   // Memoize community entities so useCommunityThread doesn't re-fetch on every scroll
-  const communityEntity = useMemo(() => {
+  const communityRecord = useMemo(() => {
     if (!article) return null;
     return {
       type: "article" as const,
@@ -189,7 +189,7 @@ export default function MobileArticle() {
     };
   }, [article?.slug, article?.id, article?.title]);
 
-  const actionEntity = useMemo(() => {
+  const actionRecord = useMemo(() => {
     if (!article) return null;
     return {
       type: "article" as const,

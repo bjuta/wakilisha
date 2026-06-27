@@ -52,7 +52,7 @@ export type SearchChartEntryLike = Partial<{
 
 export function buildGenreSearchSnippet(genre: SearchGenreLike): string {
   return buildCultureContext({
-    entityType: "genre",
+    recordType: "genre",
     surface: "searchSnippet",
     data: {
       name: clean(genre.name),
@@ -72,7 +72,7 @@ export function buildGenreSearchSnippet(genre: SearchGenreLike): string {
 
 export function buildLabelSearchSnippet(label: SearchLabelLike): string {
   return buildCultureContext({
-    entityType: "label",
+    recordType: "label",
     surface: "searchSnippet",
     data: {
       name: clean(label.name),
@@ -114,11 +114,11 @@ export function buildChartEntrySearchSnippet(entry: SearchChartEntryLike): strin
   }
 
   return buildCultureContext({
-    entityType: "searchResult",
+    recordType: "searchResult",
     surface: "searchSnippet",
     data: {
       title,
-      entityType: "track",
+      recordType: "track",
       artists: artist ? [artist] : [],
       hasChartContext: true,
     },
@@ -127,7 +127,7 @@ export function buildChartEntrySearchSnippet(entry: SearchChartEntryLike): strin
 
 export function buildGenericSearchSnippet(input: {
   title: string;
-  entityType: "track" | "artist" | "release" | "label" | "genre" | "chart" | "searchResult";
+  recordType: "track" | "artist" | "release" | "label" | "genre" | "chart" | "searchResult";
   artists?: string[];
   subtitle?: string;
   country?: string;
@@ -136,7 +136,7 @@ export function buildGenericSearchSnippet(input: {
   hasChartContext?: boolean;
 }): string {
   const text = buildCultureContext({
-    entityType: "searchResult",
+    recordType: "searchResult",
     surface: "searchSnippet",
     data: {
       title: clean(input.title),

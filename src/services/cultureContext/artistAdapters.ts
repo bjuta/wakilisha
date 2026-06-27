@@ -116,7 +116,7 @@ export function artistContextData(artist: ArtistLike) {
 
 export function buildArtistCultureText(artist: ArtistLike, surface: CultureContextSurface): string {
   return buildCultureContext({
-    entityType: "artist",
+    recordType: "artist",
     surface,
     data: artistContextData(artist),
   }).text;

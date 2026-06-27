@@ -18,7 +18,7 @@ const moreNetworks = [
 ];
 
 function shareLink(network: string, url: string, title: string, desc: string) {
-  const text = encodeURIComponent(`${title} — ${desc}`);
+  const text = encodeURIComponent(`${title}. ${desc}`);
   const encodedUrl = encodeURIComponent(url);
   switch (network) {
     case "whatsapp":

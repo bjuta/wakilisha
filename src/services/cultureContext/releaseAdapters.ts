@@ -210,7 +210,7 @@ export function buildReleaseCultureText(
   surface: CultureContextSurface,
 ): string {
   return buildCultureContext({
-    entityType: "release",
+    recordType: "release",
     surface,
     data: releaseContextData(release),
   }).text;

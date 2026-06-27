@@ -549,7 +549,7 @@ export default function MobileSettingsPage() {
                 <div>
                   <div className="text-sm font-black text-[var(--wk-text)]">Apple Music</div>
                   <div className="text-[11px] text-[var(--wk-text-muted)]">
-                    {playback.appleMusicConnected ? "Connected — full playback enabled" : "Connect for full track playback"}
+                    {playback.appleMusicConnected ? "Connected. full playback enabled" : "Connect for full track playback"}
                   </div>
                 </div>
               </div>
@@ -640,7 +640,7 @@ export default function MobileSettingsPage() {
           <div className="flex items-center justify-between gap-3 py-3.5 border-b border-[var(--wk-divider)] last:border-b-0">
             <div className="flex-1 min-w-0">
               <div className="text-[13px] font-bold text-[var(--wk-text)]">Private listening history</div>
-              <div className="text-[11px] leading-relaxed text-[var(--wk-text-muted)] mt-0.5">Don't share what you're listening to.</div>
+              <div className="text-[11px] leading-relaxed text-[var(--wk-text-muted)] mt-0.5">Don’t share what you’re listening to.</div>
             </div>
             <WakilishaToggle value={privacy.privateListening} onChange={(v) => updatePrivacy({ privateListening: v })} />
           </div>

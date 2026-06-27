@@ -21,7 +21,7 @@ export default function GuideDownloadSection() {
     trackEvent("guide_download_submit", {
       pageType: "guide_detail",
       entitySlug: guideSlug,
-      entityType: "guide",
+      recordType: "guide",
       context: {
         source_section: "download_form",
         guide_title: guideTitle,

@@ -73,7 +73,7 @@ function formatDateLabel(dateStr: string): string {
 
 /**
  * Calculate movement between two appearances.
- * Returns { delta, direction } — delta is absolute rank change, direction is "up"/"down"/"new"/"same".
+ * Returns { delta, direction }. delta is absolute rank change, direction is "up"/"down"/"new"/"same".
  */
 function calcMovement(current: number, previous: number | null | undefined): { delta: number; direction: "up" | "down" | "new" | "same" } {
   if (previous == null || previous <= 0) return { delta: 0, direction: "new" };
@@ -326,7 +326,7 @@ export function TrackChartHistorySection({
                     </span>
                   )}
                   {direction === "same" && (
-                    <span className="flex-shrink-0 text-[11px] text-[var(--wk-text-faint)]">—</span>
+                    <span className="flex-shrink-0 text-[11px] text-[var(--wk-text-faint)]">,</span>
                   )}
 
                   {/* Chevron */}

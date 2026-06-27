@@ -205,7 +205,7 @@ export default function FaqsPage() {
   const faqStructuredData = {
     "@context": "https://schema.org",
     "@type": "FAQPage",
-    "mainEntity": FAQ_GROUPS.flatMap((group) =>
+    "mainRecord": FAQ_GROUPS.flatMap((group) =>
       group.items.map((item) => ({
         "@type": "Question",
         "name": item.q,
@@ -245,7 +245,7 @@ export default function FaqsPage() {
               Everything you want to know
             </h1>
             <p className="text-[clamp(15px,1.8vw,18px)] leading-relaxed text-white/55 max-w-[480px]">
-              About the platform, the charts, the registry, and how we're building the discovery layer for African creative life.
+              About the platform, the charts, the registry, and how we’re building the discovery layer for African creative life.
             </p>
           </div>
         </div>
@@ -278,7 +278,7 @@ export default function FaqsPage() {
           </div>
           <h3 className="text-[22px] font-black tracking-[-0.03em] text-[var(--wk-text)] mb-2">Still have questions?</h3>
           <p className="text-[14px] text-[var(--wk-text-muted)] max-w-[420px] mx-auto leading-relaxed mb-6">
-            Can't find what you're looking for? Send us a message and we'll get back to you.
+            Can’t find what you’re looking for? Send us a message and we’ll get back to you.
           </p>
           <Link
             to="/contact"

@@ -106,7 +106,7 @@ export default function ArticlePage() {
   useScrollDepthTracking({
     pageType: "article",
     entitySlug: slug,
-    entityType: "article",
+    recordType: "article",
   });
   const { articles: allArticles } = useMagazineArticles();
   const [related, setRelated] = useState<MagazineArticle[]>([]);
@@ -270,7 +270,7 @@ export default function ArticlePage() {
   const heroShareCount = useArticleShareCount(pageUrl);
 
   // Memoize community entities so useCommunityThread doesn't re-fetch on every scroll
-  const communityEntity = useMemo(() => {
+  const communityRecord = useMemo(() => {
     if (!article) return null;
     return {
       type: "article" as const,
@@ -281,7 +281,7 @@ export default function ArticlePage() {
     };
   }, [article?.slug, article?.id, article?.title]);
 
-  const actionEntity = useMemo(() => {
+  const actionRecord = useMemo(() => {
     if (!article) return null;
     return {
       type: "article" as const,
