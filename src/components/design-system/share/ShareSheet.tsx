@@ -821,13 +821,15 @@ export function MobileShareButton({
   className = "",
   variant = "dark",
   size = "md",
+  label,
   onComment,
 }: {
   item: ShareObject;
   timestamp?: string;
   className?: string;
-  variant?: "dark" | "light";
-  size?: "sm" | "md" | "lg";
+  variant?: "dark" | "light" | "brand";
+  size?: "sm" | "md" | "lg" | "label";
+  label?: string;
   onComment?: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -847,19 +849,25 @@ export function MobileShareButton({
     return () => { cancelled = true; };
   }, [baseUrl]);
 
-  const sizeClasses = { sm: "h-8 w-8", md: "h-10 w-10", lg: "h-12 w-12" };
-  const iconSizes = { sm: "text-base", md: "text-lg", lg: "text-xl" };
+  const sizeClasses = { sm: "h-8 w-8", md: "h-10 w-10", lg: "h-12 w-12", label: "h-11 px-6" };
+  const iconSizes = { sm: "text-base", md: "text-lg", lg: "text-xl", label: "text-[16px]" };
+  const variantClasses = {
+    dark: "bg-black/40 text-white",
+    light: "bg-white/40 text-[var(--wk-text)]",
+    brand: "bg-[var(--wk-brand)] text-white hover:opacity-90",
+  };
 
   return (
     <>
       <button
         onClick={() => setOpen(true)}
-        className={`relative flex ${sizeClasses[size]} items-center justify-center rounded-full backdrop-blur-md transition-all active:scale-95 cursor-pointer ${variant === "dark" ? "bg-black/40 text-white" : "bg-white/40 text-[var(--wk-text)]"} ${className}`}
-        aria-label="Share"
+        className={`relative inline-flex ${sizeClasses[size]} items-center justify-center gap-2 rounded-full backdrop-blur-md text-[14px] font-bold transition-all active:scale-95 cursor-pointer whitespace-nowrap ${variantClasses[variant]} ${className}`}
+        aria-label={label || "Share"}
       >
         <i className={`ri-share-line ${iconSizes[size]}`} />
+        {label && <span>{label}</span>}
         {count !== null && count > 0 && (
-          <span className="absolute -top-1 -right-1 min-w-[16px] h-[16px] px-[3px] rounded-full bg-[var(--wk-brand)] text-white text-[9px] font-black flex items-center justify-center border border-white/20">
+          <span className={label ? "inline-flex min-w-[22px] h-[22px] px-[6px] items-center justify-center rounded-full bg-white/20 text-white text-[11px] font-bold" : "absolute -top-1 -right-1 min-w-[16px] h-[16px] px-[3px] rounded-full bg-[var(--wk-brand)] text-white text-[9px] font-black flex items-center justify-center border border-white/20"}>
             {count >= 1000 ? `${(count / 1000).toFixed(1)}k` : count}
           </span>
         )}
