@@ -14,6 +14,7 @@ const ROUTE_MANIFEST_PATH = path.resolve("public/seo-prerender-routes.txt");
 const DB_METADATA_OUTPUT_PATH = path.join(DIST_DIR, "seo-metadata-manifest.json");
 
 let DB_METADATA_BY_PATH = new Map();
+let ARTICLE_IMAGE_BY_PATH = new Map();
 
 const EXTRA_NOINDEX_PATHS = [
   "/search",
@@ -209,6 +210,95 @@ async function fetchDbMetadataManifest() {
   }
 }
 
+
+function publicContentHeaders(anonKey) {
+  return {
+    Accept: "application/json",
+    ...(anonKey ? { apikey: anonKey, Authorization: `Bearer ${anonKey}` } : {}),
+  };
+}
+
+function articlePathFromSlug(slug) {
+  const clean = String(slug || "").trim().replace(/^\/+|\/+$/g, "");
+  return clean ? `/magazine/${clean}` : "";
+}
+
+function publicArticleImage(article) {
+  if (!article || typeof article !== "object") return "";
+
+  const seo = article.seo && typeof article.seo === "object" ? article.seo : {};
+  const meta = article.metadata && typeof article.metadata === "object" ? article.metadata : {};
+
+  return firstNonEmpty(
+    article.image,
+    article.imageUrl,
+    article.heroUrl,
+    article.heroImageUrl,
+    article.hero_image_url,
+    article.featuredImageUrl,
+    article.featured_image_url,
+    article.coverImageUrl,
+    article.cover_image_url,
+    article.thumbnailUrl,
+    article.thumbnail_url,
+    seo.image,
+    seo.imageUrl,
+    seo.ogImage,
+    seo.og_image,
+    meta.image,
+    meta.imageUrl,
+    meta.heroUrl,
+    meta.hero_image_url,
+    meta.featured_image_url,
+  );
+}
+
+async function fetchArticleImageManifest() {
+  const supabaseUrl = envValue("VITE_PUBLIC_SUPABASE_URL").replace(/\/+$/, "");
+  const anonKey = envValue("VITE_PUBLIC_SUPABASE_ANON_KEY");
+  const explicitBase = envValue("VITE_PUBLIC_API_BASE").replace(/\/+$/, "");
+  const apiBase = explicitBase || (supabaseUrl ? `${supabaseUrl}/functions/v1/public-content-read` : "");
+
+  if (!apiBase) {
+    explicitBase = envValue("VITE_PUBLIC_API_BASE").replace(/\/+$/, "");
+  console.warn("Article image manifest skipped: no VITE_PUBLIC_API_BASE or VITE_PUBLIC_SUPABASE_URL.");
+    return new Map();
+  }
+
+  try {
+    const response = await fetch(`${apiBase}/magazine?limit=1000`, {
+      headers: publicContentHeaders(anonKey),
+    });
+
+    if (!response.ok) {
+      console.warn(`Article image manifest skipped: ${response.status} ${response.statusText}`);
+      return new Map();
+    }
+
+    const payload = await response.json();
+    const stories =
+      payload?.data?.stories ||
+      payload?.stories ||
+      payload?.data ||
+      [];
+
+    const imageByPath = new Map();
+
+    for (const story of Array.isArray(stories) ? stories : []) {
+      const slug = firstNonEmpty(story.slug, story.path, story.url);
+      const pagePath = articlePathFromSlug(slug);
+      const image = publicArticleImage(story);
+      if (pagePath && image) imageByPath.set(cleanPath(pagePath), image);
+    }
+
+    console.log(`Article image manifest loaded: ${imageByPath.size.toLocaleString()} article images.`);
+    return imageByPath;
+  } catch (error) {
+    console.warn(`Article image manifest skipped: ${error instanceof Error ? error.message : String(error)}`);
+    return new Map();
+  }
+}
+
 function mergeDbMetadata(model, pagePath) {
   const db = DB_METADATA_BY_PATH.get(cleanPath(pagePath));
   if (!db || typeof db !== "object") return model;
@@ -281,6 +371,47 @@ function schemaEntityName(model) {
 function canonicalUrl(pagePath) {
   const clean = cleanPath(pagePath);
   return `${SITE_URL}${clean === "/" ? "/" : clean}`;
+}
+
+function firstNonEmpty(...values) {
+  for (const value of values) {
+    const clean = String(value ?? "").trim();
+    if (clean) return clean;
+  }
+  return "";
+}
+
+function absoluteImageUrl(raw) {
+  const value = String(raw || "").trim();
+  if (!value) return "";
+  if (/^https?:\/\//i.test(value)) return value;
+  if (value.startsWith("//")) return `https:${value}`;
+  if (value.startsWith("/")) return `${SITE_URL}${value}`;
+  return `${SITE_URL}/${value.replace(/^\/+/, "")}`;
+}
+
+function socialImageForModel(model) {
+  const articleImage = ARTICLE_IMAGE_BY_PATH.get(cleanPath(model.canonicalPath));
+
+  return absoluteImageUrl(firstNonEmpty(
+    articleImage,
+    model.image,
+    model.imageUrl,
+    model.heroUrl,
+    model.heroImageUrl,
+    model.hero_image_url,
+    model.featuredImageUrl,
+    model.featured_image_url,
+    model.coverImageUrl,
+    model.cover_image_url,
+    model.thumbnailUrl,
+    model.thumbnail_url,
+    model.artworkUrl,
+    model.artwork_url,
+    model.posterUrl,
+    model.poster_url,
+    DEFAULT_IMAGE,
+  ));
 }
 
 function breadcrumbItems(pagePath) {
@@ -480,8 +611,8 @@ function modelFromPath(pagePath) {
 function stripExistingSeo(html) {
   return html
     .replace(/\n?\s*<title>[\s\S]*?<\/title>/i, "")
-    .replace(/\n?\s*<meta\s+name="(?:description|robots|twitter:card|twitter:title|twitter:description|twitter:image)"[^>]*>/gi, "")
-    .replace(/\n?\s*<meta\s+property="(?:og:site_name|og:title|og:description|og:type|og:url|og:image)"[^>]*>/gi, "")
+    .replace(/\n?\s*<meta\s+name="(?:description|robots|twitter:card|twitter:title|twitter:description|twitter:image|twitter:image:alt|twitter:site)"[^>]*>/gi, "")
+    .replace(/\n?\s*<meta\s+property="(?:og:site_name|og:title|og:description|og:type|og:url|og:image|og:image:secure_url|og:image:width|og:image:height|og:image:alt)"[^>]*>/gi, "")
     .replace(/\n?\s*<link\s+rel="canonical"[^>]*>/gi, "")
     .replace(/\n?\s*<script\s+id="wk-jsonld-primary"[^>]*>[\s\S]*?<\/script>/gi, "");
 }
@@ -490,7 +621,7 @@ function seoBlockForPath(pagePath) {
   const model = mergeDbMetadata(modelFromPath(pagePath), pagePath);
   const url = canonicalUrl(model.canonicalPath);
   const title = formatPageTitle(model.title);
-  const image = model.image || DEFAULT_IMAGE;
+  const image = socialImageForModel(model);
   const jsonLd = JSON.stringify(buildJsonLd(model)).replace(/</g, "\\u003c");
 
   return `    <title>${escapeHtml(title)}</title>
@@ -503,10 +634,16 @@ function seoBlockForPath(pagePath) {
     <meta property="og:type" content="${escapeAttr(model.ogType)}" />
     <meta property="og:url" content="${escapeAttr(url)}" />
     <meta property="og:image" content="${escapeAttr(image)}" />
+    <meta property="og:image:secure_url" content="${escapeAttr(image)}" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="${escapeAttr(schemaEntityName(model))}" />
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@wakilisha" />
     <meta name="twitter:title" content="${escapeAttr(title)}" />
     <meta name="twitter:description" content="${escapeAttr(model.description)}" />
     <meta name="twitter:image" content="${escapeAttr(image)}" />
+    <meta name="twitter:image:alt" content="${escapeAttr(schemaEntityName(model))}" />
     <script id="wk-jsonld-primary" type="application/ld+json">${jsonLd}</script>`;
 }
 
@@ -578,6 +715,7 @@ async function main() {
   }
 
   DB_METADATA_BY_PATH = await fetchDbMetadataManifest();
+  ARTICLE_IMAGE_BY_PATH = await fetchArticleImageManifest();
 
   const baseHtml = fs.readFileSync(INDEX_PATH, "utf8");
   const paths = [...new Set([...readSitemapPaths(), ...DB_METADATA_BY_PATH.keys()])];

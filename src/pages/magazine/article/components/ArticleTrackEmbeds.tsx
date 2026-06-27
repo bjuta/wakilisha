@@ -215,7 +215,11 @@ export function TrackEmbedCard({ track, articleSlug }: { track: TrackEmbedData; 
   const { playTrack, currentTrack, isPlaying, togglePlay } = usePlayer();
   const [imgLoaded, setImgLoaded] = useState(false);
 
-  const trackUrl = track.slug ? `/tracks/${track.slug}` : undefined;
+  const trackUrl = track.slug
+    ? track.artistSlug
+      ? `/tracks/${track.artistSlug}/${track.slug}`
+      : `/tracks/${track.slug}`
+    : undefined;
   const artistUrl = track.artistSlug ? `/artists/${track.artistSlug}` : undefined;
   const hasAppleCatalog = Boolean(track.appleMusicCatalogId || track.appleMusicId);
   const hasPlayableSource = Boolean(track.previewUrl || hasAppleCatalog);
