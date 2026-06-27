@@ -1172,6 +1172,130 @@ function dedupeShareRows(rows: any[]): any[] {
   return Array.from(map.values()).sort((a, b) => rollupNumber(b, "share_events") - rollupNumber(a, "share_events"));
 }
 
+function brokenPagePathFromUrl(raw: unknown): string {
+  const value = readString(raw);
+  if (!value) return "";
+  try {
+    const url = new URL(value);
+    return url.pathname.replace(/\/+$/, "") || "/";
+  } catch {
+    return value.split("?")[0].split("#")[0].replace(/\/+$/, "") || "/";
+  }
+}
+
+function brokenRouteGuess(path: string): string {
+  if (path.startsWith("/tag/")) return "legacy_tag";
+  if (path.startsWith("/category/")) return "legacy_category";
+  if (path.startsWith("/artist/")) return "legacy_artist";
+  if (path.startsWith("/release/")) return "legacy_release";
+  if (path.startsWith("/track/")) return "legacy_track";
+  if (path.startsWith("/wp-content/")) return "legacy_wordpress_asset";
+  if (path.startsWith("/wp-admin/")) return "wordpress_admin_probe";
+  if (path.startsWith("/xmlrpc.php")) return "wordpress_probe";
+  return "unknown";
+}
+
+function brokenSuggestedFix(path: string): string {
+  if (path.startsWith("/tag/")) return path.replace(/^\/tag\//, "/tags/");
+  if (path.startsWith("/category/")) return path.replace(/^\/category\//, "/categories/");
+  if (path.startsWith("/artist/")) return path.replace(/^\/artist\//, "/artists/");
+  if (path.startsWith("/release/")) return path.replace(/^\/release\//, "/releases/");
+  if (path.startsWith("/track/")) return path.replace(/^\/track\//, "/tracks/");
+  return "";
+}
+
+function brokenSeverity(hits: number, sessions: number, suggestedFix: string): "low" | "medium" | "high" {
+  if (hits >= 10 || sessions >= 5) return "high";
+  if (hits >= 3 || sessions >= 2 || suggestedFix) return "medium";
+  return "low";
+}
+
+function buildBrokenPages(events: any[], range: RangeInput) {
+  const notFoundEvents = events.filter((row) => row.event_name === "page_not_found");
+  const map = new Map<string, any>();
+
+  for (const row of notFoundEvents) {
+    const ctx = row.context || {};
+    const path =
+      readString(ctx.not_found_path) ||
+      brokenPagePathFromUrl(ctx.raw_page_url) ||
+      brokenPagePathFromUrl(row.page_url);
+
+    if (!path) continue;
+
+    const existing = map.get(path) || {
+      id: `broken::${path}`,
+      path,
+      url: row.page_url || path,
+      hits: 0,
+      sessionSet: new Set<string>(),
+      referrerSet: new Set<string>(),
+      firstSeenAt: row.created_at,
+      lastSeenAt: row.created_at,
+      routeGuess: readString(ctx.route_guess) || brokenRouteGuess(path),
+      suggestedFix: readString(ctx.suggested_fix) || brokenSuggestedFix(path),
+      sampleUserAgent: readString(ctx.user_agent) || null,
+    };
+
+    existing.hits += 1;
+    if (row.session_id) existing.sessionSet.add(row.session_id);
+    if (row.referrer) existing.referrerSet.add(domainFromReferrer(row.referrer) || row.referrer);
+
+    if (!existing.firstSeenAt || new Date(row.created_at) < new Date(existing.firstSeenAt)) {
+      existing.firstSeenAt = row.created_at;
+    }
+    if (!existing.lastSeenAt || new Date(row.created_at) > new Date(existing.lastSeenAt)) {
+      existing.lastSeenAt = row.created_at;
+    }
+
+    existing.routeGuess = existing.routeGuess || readString(ctx.route_guess) || brokenRouteGuess(path);
+    existing.suggestedFix = existing.suggestedFix || readString(ctx.suggested_fix) || brokenSuggestedFix(path);
+    map.set(path, existing);
+  }
+
+  const rows = Array.from(map.values())
+    .map((row) => {
+      const sessions = row.sessionSet.size;
+      const referrers = Array.from(row.referrerSet).filter(Boolean).slice(0, 5);
+      const severity = brokenSeverity(row.hits, sessions, row.suggestedFix);
+
+      return {
+        id: row.id,
+        path: row.path,
+        url: row.url,
+        hits: row.hits,
+        sessions,
+        referrers,
+        firstSeenAt: row.firstSeenAt,
+        lastSeenAt: row.lastSeenAt,
+        routeGuess: row.routeGuess || "unknown",
+        suggestedFix: row.suggestedFix || "",
+        severity,
+        status: "hard_404",
+        sampleUserAgent: row.sampleUserAgent,
+      };
+    })
+    .sort((a, b) => {
+      const severityWeight: Record<string, number> = { high: 3, medium: 2, low: 1 };
+      const severityDiff = severityWeight[b.severity] - severityWeight[a.severity];
+      if (severityDiff !== 0) return severityDiff;
+      return b.hits - a.hits;
+    });
+
+  return {
+    generatedAt: new Date().toISOString(),
+    range,
+    summary: {
+      totalHits: rows.reduce((sum, row) => sum + row.hits, 0),
+      uniquePages: rows.length,
+      highSeverityCount: rows.filter((row) => row.severity === "high").length,
+      legacyFixCount: rows.filter((row) => Boolean(row.suggestedFix)).length,
+      lastSeenAt: rows[0]?.lastSeenAt || null,
+    },
+    rows,
+  };
+}
+
 async function buildSignalBoardFromRollups(db: ReturnType<typeof createClient>, range: RangeInput) {
   const { startDate, endDate } = dateRangeForRollups(range);
 
@@ -1625,6 +1749,23 @@ Deno.serve(async (req) => {
 
       const events = await getAnalyticsEvents(db, range);
       return ok({ ...buildSignalBoard(events, range), source: "live_events_fallback" }, headers);
+    }
+
+    if (action === "analytics_broken_pages") {
+      const range = body.range ?? 30;
+
+      const { data: brokenEvents, error: brokenError } = await db
+        .from("analytics_events")
+        .select("id,event_name,page_url,page_type,entity_slug,entity_type,context,session_id,referrer,created_at")
+        .eq("event_name", "page_not_found")
+        .gte("created_at", sinceFromRange(range))
+        .lte("created_at", untilFromRange(range))
+        .order("created_at", { ascending: false })
+        .limit(5000);
+
+      if (brokenError) throw brokenError;
+
+      return ok(buildBrokenPages(brokenEvents ?? [], range), headers);
     }
 
     if (action === "analytics_refresh_signal_os_rollups") {

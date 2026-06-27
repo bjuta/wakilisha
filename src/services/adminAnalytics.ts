@@ -110,6 +110,37 @@ export interface AttributionSummary {
   shareOutbounds: ShareAttributionRow[];
 }
 
+export interface BrokenPageRow {
+  id: string;
+  path: string;
+  url: string;
+  hits: number;
+  sessions: number;
+  referrers: string[];
+  firstSeenAt: string | null;
+  lastSeenAt: string | null;
+  routeGuess: string;
+  suggestedFix: string;
+  severity: "low" | "medium" | "high";
+  status: "hard_404" | "suspected_soft_404";
+  sampleUserAgent?: string | null;
+}
+
+export interface BrokenPagesSummary {
+  totalHits: number;
+  uniquePages: number;
+  highSeverityCount: number;
+  legacyFixCount: number;
+  lastSeenAt: string | null;
+}
+
+export interface BrokenPagesResponse {
+  generatedAt: string;
+  range: DateRange | number;
+  summary: BrokenPagesSummary;
+  rows: BrokenPageRow[];
+}
+
 export interface RealtimeAnalyticsSnapshot {
   generatedAt: string;
   activeSessions: number;
@@ -263,6 +294,10 @@ export async function fetchRealtimeAnalytics(): Promise<RealtimeAnalyticsSnapsho
 
 export async function fetchSignalBoard(range: DateRange | number = 30): Promise<SignalBoard> {
   return callAdminAnalytics<SignalBoard>("analytics_signal_board", { range });
+}
+
+export async function fetchBrokenPages(range: DateRange | number = 30): Promise<BrokenPagesResponse> {
+  return callAdminAnalytics<BrokenPagesResponse>("analytics_broken_pages", { range });
 }
 
 export async function refreshSignalOsRollups(range: DateRange | number = 30): Promise<SignalOsRefreshResponse> {

@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { WkButton } from "@/components/design-system/primitives/Button";
+import { trackEvent } from "@/services/analytics";
 
 const SUGGESTED_LINKS = [
   { label: "Charts", to: "/charts", icon: "ri-bar-chart-line" },
@@ -11,8 +12,50 @@ const SUGGESTED_LINKS = [
   { label: "Labels", to: "/labels", icon: "ri-disc-line" },
 ];
 
+function routeGuess(pathname: string): string {
+  if (pathname.startsWith("/tag/")) return "legacy_tag";
+  if (pathname.startsWith("/category/")) return "legacy_category";
+  if (pathname.startsWith("/artist/")) return "legacy_artist";
+  if (pathname.startsWith("/release/")) return "legacy_release";
+  if (pathname.startsWith("/track/")) return "legacy_track";
+  if (pathname.startsWith("/wp-content/")) return "legacy_wordpress_asset";
+  if (pathname.startsWith("/wp-admin/")) return "wordpress_admin_probe";
+  return "unknown";
+}
+
+function suggestedFix(pathname: string): string {
+  if (pathname.startsWith("/tag/")) return pathname.replace(/^\/tag\//, "/tags/");
+  if (pathname.startsWith("/category/")) return pathname.replace(/^\/category\//, "/categories/");
+  if (pathname.startsWith("/artist/")) return pathname.replace(/^\/artist\//, "/artists/");
+  if (pathname.startsWith("/release/")) return pathname.replace(/^\/release\//, "/releases/");
+  if (pathname.startsWith("/track/")) return pathname.replace(/^\/track\//, "/tracks/");
+  return "";
+}
+
 export default function NotFound() {
   const [visible, setVisible] = useState(false);
+  const location = useLocation();
+  const trackedRef = useRef("");
+
+  useEffect(() => {
+    const path = `${location.pathname}${location.search || ""}${location.hash || ""}`;
+    if (trackedRef.current === path) return;
+    trackedRef.current = path;
+
+    trackEvent("page_not_found", {
+      pageType: "404",
+      entityType: "broken_page",
+      entitySlug: location.pathname.replace(/^\/+|\/+$/g, "").replace(/[^a-zA-Z0-9/_-]+/g, "-") || "home",
+      context: {
+        status_code: 404,
+        not_found_path: location.pathname,
+        not_found_search: location.search || "",
+        not_found_hash: location.hash || "",
+        route_guess: routeGuess(location.pathname),
+        suggested_fix: suggestedFix(location.pathname),
+      },
+    });
+  }, [location.pathname, location.search, location.hash]);
 
   useEffect(() => {
     const t = setTimeout(() => setVisible(true), 60);
