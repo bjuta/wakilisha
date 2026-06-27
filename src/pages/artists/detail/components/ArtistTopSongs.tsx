@@ -58,7 +58,7 @@ function SongExpandedPanel({
       {
         pageType: "artist_detail",
         entitySlug: artistSlug,
-        recordType: "artist",
+        entityType: "artist",
         sourceSection: "top_songs_expanded",
       },
     );
@@ -151,7 +151,7 @@ function ArtistSongRow({ song, index, artistSlug }: { song: Song; index: number;
     }, undefined, {
       pageType: "artist_detail",
       entitySlug: artistSlug,
-      recordType: "artist",
+      entityType: "artist",
       sourceSection: "top_songs",
     });
   };

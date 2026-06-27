@@ -315,7 +315,7 @@ export default function LabelDetail() {
               analytics={{
                 pageType: "label_detail",
                 entitySlug: slug,
-                recordType: "label",
+                entityType: "label",
                 context: { label_name: label.name },
               }}
             />

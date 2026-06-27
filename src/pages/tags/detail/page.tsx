@@ -198,7 +198,7 @@ export default function TagDetail() {
     );
   }
 
-  const seoTitle = term.seo_title || `${term.name}. WAKILISHA Magazine`;
+  const seoTitle = term.seo_title || `${term.name} — WAKILISHA Magazine`;
   const seoDescription = term.seo_description || `Browse all articles tagged "${term.name}" on WAKILISHA.`;
 
   return (

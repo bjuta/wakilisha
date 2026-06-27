@@ -166,7 +166,7 @@ export function trackContextData(track: PublicTrackDetail | TrackLike) {
 
 export function buildTrackCultureText(track: PublicTrackDetail | TrackLike, surface: CultureContextSurface): string {
   return buildCultureContext({
-    recordType: "track",
+    entityType: "track",
     surface,
     data: trackContextData(track),
   }).text;

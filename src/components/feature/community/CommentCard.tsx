@@ -51,7 +51,7 @@ function formatAnchorTime(ms?: number | null): string | null {
 }
 
 function getCommentAnchorBadge(comment: CommunityComment): { label: string; icon: string } | null {
-  if (!comment.anchorType || comment.anchorType === "whole_record") return null;
+  if (!comment.anchorType || comment.anchorType === "whole_entity") return null;
 
   if (comment.anchorType === "timestamp" || comment.anchorType === "time_range") {
     const start = formatAnchorTime(comment.anchorTimeMs);

@@ -97,7 +97,7 @@ export default function DateRangePicker({
     const e = new Date(value.end + "T00:00:00");
     const fmt = (d: Date) =>
       d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-    return `${fmt(s)}. ${fmt(e)}`;
+    return `${fmt(s)} — ${fmt(e)}`;
   };
 
   const todayStr = new Date().toISOString().split("T")[0];

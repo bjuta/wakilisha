@@ -15,7 +15,7 @@ const tabs: { key: SettingsTab; icon: string; desc: string }[] = [
   {
     key: "Account",
     icon: "ri-user-3-line",
-    desc: "Public idrecord and profile information shown across WAKILISHA.",
+    desc: "Public identity and profile information shown across WAKILISHA.",
   },
   {
     key: "Appearance",

@@ -390,8 +390,8 @@ export default function AuthPage() {
             </div>
           )}
 
-          {!isRecovery && !["forgot", "magic", "verify"].includes(mode) && <button onClick={toggleMode} className="w-full text-center mb-4 text-[13px] font-semibold cursor-pointer hover:opacity-80 transition-opacity" style={{ fontFamily: "var(--wk-font-ui)", color: "var(--wk-brand)" }}>{mode === "signin" ? "Don’t have an account? Sign up" : "Already have an account? Sign in"}</button>}
-          <p className="text-center leading-relaxed" style={{ fontFamily: "var(--wk-font-ui)", fontSize: "11px", color: "var(--wk-text-faint)" }}>By continuing, you agree to WAKILISHA’s <a href="#" className="font-semibold hover:underline" style={{ color: "var(--wk-brand)" }}>Terms</a> and <a href="#" className="font-semibold hover:underline" style={{ color: "var(--wk-brand)" }}>Privacy Policy</a>.</p>
+          {!isRecovery && !["forgot", "magic", "verify"].includes(mode) && <button onClick={toggleMode} className="w-full text-center mb-4 text-[13px] font-semibold cursor-pointer hover:opacity-80 transition-opacity" style={{ fontFamily: "var(--wk-font-ui)", color: "var(--wk-brand)" }}>{mode === "signin" ? "Don't have an account? Sign up" : "Already have an account? Sign in"}</button>}
+          <p className="text-center leading-relaxed" style={{ fontFamily: "var(--wk-font-ui)", fontSize: "11px", color: "var(--wk-text-faint)" }}>By continuing, you agree to WAKILISHA's <a href="#" className="font-semibold hover:underline" style={{ color: "var(--wk-brand)" }}>Terms</a> and <a href="#" className="font-semibold hover:underline" style={{ color: "var(--wk-brand)" }}>Privacy Policy</a>.</p>
         </div>
       </section>
     </main>

@@ -110,7 +110,7 @@ export default function MobileReleaseDetail() {
   useScrollDepthTracking({
     pageType: "release_detail",
     entitySlug: releaseSlug,
-    recordType: "release",
+    entityType: "release",
   });
 
   const [release, setRelease] = useState<PublicReleaseDetail | null>(null);
@@ -196,8 +196,8 @@ export default function MobileReleaseDetail() {
 
     playTrack(queue[0], queue, {
       pageType: "release_detail",
-      recordSlug: releaseSlug || "",
-      recordType: "release",
+      entitySlug: releaseSlug || "",
+      entityType: "release",
       sourceSection: "release_hero",
     });
   };
@@ -215,8 +215,8 @@ export default function MobileReleaseDetail() {
 
     playTrack(queue[0], queue, {
       pageType: "release_detail",
-      recordSlug: releaseSlug || "",
-      recordType: "release",
+      entitySlug: releaseSlug || "",
+      entityType: "release",
       sourceSection: "release_hero_shuffle",
     });
   };
@@ -228,8 +228,8 @@ export default function MobileReleaseDetail() {
     const queue = buildReleaseQueue(trackIndex);
     playTrack(queue[0], queue, {
       pageType: "release_detail",
-      recordSlug: releaseSlug || "",
-      recordType: "release",
+      entitySlug: releaseSlug || "",
+      entityType: "release",
       sourceSection: "tracklist",
     });
   };
@@ -316,7 +316,7 @@ export default function MobileReleaseDetail() {
           item={{
             title: release?.title || "Release",
             subtitle: release?.artist,
-            description: release ? `${release.title} by ${release.artist}. ${release.releaseType} released in ${release.year}` : undefined,
+            description: release ? `${release.title} by ${release.artist} — ${release.releaseType} released in ${release.year}` : undefined,
             imageUrl: release?.artworkUrl,
             type: "album",
           }}
@@ -597,7 +597,7 @@ export default function MobileReleaseDetail() {
 
       {/* Community Section */}
       <div className="px-5 pb-6">
-        <CommunitySection record={communityRecord} user={user} />
+        <CommunitySection entity={communityEntity} user={user} />
       </div>
 
     </div>

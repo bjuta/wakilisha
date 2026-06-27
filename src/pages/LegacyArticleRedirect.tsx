@@ -9,7 +9,7 @@ import { trackEvent } from "@/services/analytics";
  * Catches old WordPress-style article URLs like /some-article-slug/
  * and redirects them to /magazine/some-article-slug/.
  *
- * Also respects wk_slug_redirects. if an article's slug was changed
+ * Also respects wk_slug_redirects — if an article's slug was changed
  * during migration (e.g. /old-slug → /magazine/new-slug), the redirect
  * table handles that second hop inside the article page.
  */
@@ -34,7 +34,7 @@ export default function LegacyArticleRedirect() {
         .from("wk_slug_redirects")
         .select("new_slug")
         .eq("old_slug", slug)
-        .eq("record_type", "article")
+        .eq("entity_type", "article")
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -58,7 +58,7 @@ export default function LegacyArticleRedirect() {
 
         trackEvent("page_not_found", {
           pageType: "404",
-          recordType: "broken_page",
+          entityType: "broken_page",
           entitySlug: slug,
           context: {
             status_code: 404,

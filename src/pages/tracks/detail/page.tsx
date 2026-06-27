@@ -735,7 +735,7 @@ export default function TrackDetail() {
   useScrollDepthTracking({
     pageType: "track_detail",
     entitySlug: trackSlug,
-    recordType: "track",
+    entityType: "track",
   });
 
   useEffect(() => {
@@ -798,8 +798,8 @@ export default function TrackDetail() {
         if (!apiData) {
           trackEvent("page_not_found", {
             pageType: "404",
-            recordType: "broken_page",
-            recordSlug: `${artistSlug || "unknown"}/${trackSlug || "unknown"}`,
+            entityType: "broken_page",
+            entitySlug: `${artistSlug || "unknown"}/${trackSlug || "unknown"}`,
             context: {
               status_code: 404,
               not_found_path: location.pathname,
@@ -907,7 +907,7 @@ export default function TrackDetail() {
     playTrack(playerTrack, [playerTrack], {
       pageType: "track_detail",
       entitySlug: trackSlug,
-      recordType: "track",
+      entityType: "track",
       sourceSection: "track_hero",
     });
   };
@@ -923,7 +923,7 @@ export default function TrackDetail() {
 
     try {
       const result = await saveEntityAction({
-        recordType: "track",
+        entityType: "track",
         entityId: track.slug,
         entitySlug: track.slug,
         entityUrl: canonicalPath,
@@ -1049,7 +1049,7 @@ export default function TrackDetail() {
                   }`}
                 >
                   <WkIcon name="Heart" size={16} fill={trackSaved ? "currentColor" : "none"} />
-                  {recordActionLoading ? "Saving..." : trackSaved ? "Saved" : "Save track"}
+                  {entityActionLoading ? "Saving..." : trackSaved ? "Saved" : "Save track"}
                 </button>
                 <ShareButton item={{ title: track.title, subtitle: track.artist, description: trackIntro || seoDescription, imageUrl: track.artworkUrl, type: "track" }} />
               </div>
@@ -1064,7 +1064,7 @@ export default function TrackDetail() {
       </section>
 
       <div className="wk-container-wide px-6 pb-2">
-        <ContributionBadges recordType="track" recordSlug={trackSlug} />
+        <ContributionBadges entityType="track" entitySlug={trackSlug} />
       </div>
 
       <div className="wk-container-wide px-6 py-10 md:py-14">
@@ -1117,7 +1117,7 @@ export default function TrackDetail() {
             />
 
             <TrackListeningSignalPanel signal={listeningSignal} />
-            <TrackMomentSummary record={communityRecord} />
+            <TrackMomentSummary entity={communityEntity} />
 
             {(track.chartHistory.length > 0 || track.weeksOnChart > 0) && (
               <section>
@@ -1192,7 +1192,7 @@ export default function TrackDetail() {
         </div>
       </div>
 
-      <CommunitySection record={communityRecord} user={user} />
+      <CommunitySection entity={communityEntity} user={user} />
     </main>
   );
 }

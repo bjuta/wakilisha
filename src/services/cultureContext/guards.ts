@@ -45,7 +45,7 @@ export function validatePublicTone(text: string): string[] {
 
 export function normalizePublicPunctuation(text: string): string {
   return text
-    .replace(/[,–]/g, ",")
+    .replace(/[—–]/g, ",")
     .replace(/\s+/g, " ")
     .trim();
 }

@@ -105,7 +105,7 @@ export default function GenreDetail() {
       <SchemaOrg
         data={{
           "@type": "WebPage",
-          name: `${genre.name}. WAKILISHA Genre`,
+          name: `${genre.name} — WAKILISHA Genre`,
           description: seoDescription,
           url: typeof window !== "undefined" ? window.location.href : undefined,
         }}
@@ -317,7 +317,7 @@ export default function GenreDetail() {
               analytics={{
                 pageType: "genre_detail",
                 entitySlug: slug,
-                recordType: "genre",
+                entityType: "genre",
                 context: { genre_name: genre.name },
               }}
             />

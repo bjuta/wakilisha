@@ -75,7 +75,7 @@ export default function TrackReleaseTracklist({
     playTrack(queueTracks[0], fullQueue, {
       pageType: "track_detail",
       entitySlug: currentTrackSlug,
-      recordType: "track",
+      entityType: "track",
       sourceSection: "album_tracklist",
     });
   };

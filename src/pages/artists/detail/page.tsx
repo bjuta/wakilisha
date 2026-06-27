@@ -42,7 +42,7 @@ export default function ArtistDetail() {
   useScrollDepthTracking({
     pageType: "artist_detail",
     entitySlug: slug,
-    recordType: "artist",
+    entityType: "artist",
   });
 
   const [artist, setArtist] = useState<PublicArtistDetail | null>(null);
@@ -135,7 +135,7 @@ export default function ArtistDetail() {
   const hasVideos = artist.videos && artist.videos.length > 0;
   const heroBio = cleanBioExcerpt(artist.fullBio || artist.bio || "");
   const bioForSeo = cleanBioExcerpt(artist.fullBio || artist.bio || "");
-  const seoDescription = bioForSeo || `Explore ${artist.name} on WAKILISHA. songs, releases, chart moments, and more.`;
+  const seoDescription = bioForSeo || `Explore ${artist.name} on WAKILISHA — songs, releases, chart moments, and more.`;
 
   const communityEntity = {
     type: "artist" as const,
@@ -186,7 +186,7 @@ export default function ArtistDetail() {
       />
 
       <div className="wk-container px-6 pb-4">
-        <ContributionBadges recordType="artist" recordSlug={artist.slug} />
+        <ContributionBadges entityType="artist" entitySlug={artist.slug} />
       </div>
 
       <div className="wk-container px-6 py-10 md:py-14">
@@ -250,7 +250,7 @@ export default function ArtistDetail() {
         )}
       </div>
 
-      <CommunitySection record={communityRecord} user={user} />
+      <CommunitySection entity={communityEntity} user={user} />
     </div>
   );
 }

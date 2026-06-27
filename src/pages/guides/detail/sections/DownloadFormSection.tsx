@@ -22,7 +22,7 @@ export default function DownloadFormSection({ data }: { data: DownloadFormData }
     trackEvent("guide_download_submit", {
       pageType: "guide_detail",
       entitySlug: slug,
-      recordType: "guide",
+      entityType: "guide",
       context: {
         source_section: "download_form",
         guide_title: guideTitle,

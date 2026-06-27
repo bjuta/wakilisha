@@ -22,7 +22,7 @@ const SORT_OPTIONS: { value: SortMode; label: string }[] = [
 ];
 
 function isWholeEntityComment(comment: CommunityComment): boolean {
-  return !comment.anchorType || comment.anchorType === "whole_record";
+  return !comment.anchorType || comment.anchorType === "whole_entity";
 }
 
 export function CommunitySection({ entity, user }: CommunitySectionProps) {
@@ -44,7 +44,7 @@ export function CommunitySection({ entity, user }: CommunitySectionProps) {
 
   const { vote, react, votingCommentId, reactingCommentId } = useCommentActions(userId);
   const visibleComments = useMemo(
-    () => comments.filter(isWholeRecordComment),
+    () => comments.filter(isWholeEntityComment),
     [comments]
   );
   const visibleCommentCount = visibleComments.length;

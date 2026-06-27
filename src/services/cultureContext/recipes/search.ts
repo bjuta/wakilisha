@@ -4,7 +4,7 @@ import type { CultureRecipeContext, CultureRecipeResult, SearchResultFacts } fro
 function baseFactsUsed(facts: SearchResultFacts): string[] {
   return [
     facts.title ? "title" : "missing:title",
-    facts.recordType ? "recordType" : "missing:recordType",
+    facts.entityType ? "entityType" : "missing:entityType",
     facts.artists && facts.artists.length > 0 ? "artists" : "missing:artists",
     facts.genres.length > 0 ? "genres" : "missing:genres",
   ];
@@ -18,11 +18,11 @@ export function buildSearchContext(context: CultureRecipeContext<SearchResultFac
   const typeLabel = facts.releaseType ? releaseTypeLabel(facts.releaseType) : facts.entityType;
 
   const snippet = (() => {
-    if (facts.recordType === "track" && artists) return `Track by ${artists}${facts.hasChartContext ? ", with chart context" : ""}.`;
-    if (facts.recordType === "release") return `${typeLabel} ${artists ? `by ${artists}` : "on WAKILISHA"}.`;
-    if (facts.recordType === "artist") return scene ? `Artist connected to ${scene}.` : "Artist profile on WAKILISHA.";
-    if (facts.recordType === "label") return scene ? `Label connected to ${scene}.` : "Label profile on WAKILISHA.";
-    if (facts.recordType === "genre") return `${title} is a sound path in WAKILISHA.`;
+    if (facts.entityType === "track" && artists) return `Track by ${artists}${facts.hasChartContext ? ", with chart context" : ""}.`;
+    if (facts.entityType === "release") return `${typeLabel} ${artists ? `by ${artists}` : "on WAKILISHA"}.`;
+    if (facts.entityType === "artist") return scene ? `Artist connected to ${scene}.` : "Artist profile on WAKILISHA.";
+    if (facts.entityType === "label") return scene ? `Label connected to ${scene}.` : "Label profile on WAKILISHA.";
+    if (facts.entityType === "genre") return `${title} is a sound path in WAKILISHA.`;
     return facts.subtitle || `${title} on WAKILISHA.`;
   })();
 
@@ -41,6 +41,6 @@ export function buildSearchContext(context: CultureRecipeContext<SearchResultFac
     text: textBySurface[surface],
     confidence: facts.title ? "medium" : "low",
     factsUsed: baseFactsUsed(facts),
-    recipe: `search.${surface}.${facts.recordType}`,
+    recipe: `search.${surface}.${facts.entityType}`,
   };
 }

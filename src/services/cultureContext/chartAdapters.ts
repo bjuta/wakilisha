@@ -81,7 +81,7 @@ export function chartContextData(input: ChartLike | { edition: ChartEditionViewM
 
 export function buildChartCultureText(input: ChartLike | { edition: ChartEditionViewModel; entries: ChartEntryRowViewModel[] }, surface: CultureContextSurface): string {
   return buildCultureContext({
-    recordType: "chart",
+    entityType: "chart",
     surface,
     data: chartContextData(input),
   }).text;

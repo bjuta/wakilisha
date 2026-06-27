@@ -28,7 +28,7 @@ export function GenreCard({
   const handleClick = () => {
     if (sourceSection) {
       trackEvent("card_click", {
-        recordType: "genre",
+        entityType: "genre",
         entitySlug: slug,
         context: {
           source_section: sourceSection,

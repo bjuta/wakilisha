@@ -15,7 +15,7 @@ const guideEntries = [
     accentBg: "rgba(196,163,90,0.12)",
     accentBorder: "rgba(196,163,90,0.30)",
     image:
-      "https://wakilisha.africa/wp-content/plugins/wakilisha-v2.0.201-cpt-cleanup/images/guides/share/kenyan-literary-scene-share.jpg",
+      "https://wakilisha.africa/wp-content/plugins/wakilisha-v2.0.201-cpt-cleanup/assets/guides/share/kenyan-literary-scene-share.jpg",
   },
   {
     slug: "dakar-biennale-2026",
@@ -28,7 +28,7 @@ const guideEntries = [
     accentBg: "rgba(214,118,106,0.12)",
     accentBorder: "rgba(214,118,106,0.30)",
     image:
-      "https://wakilisha.africa/wp-content/plugins/wakilisha-v2.0.201-cpt-cleanup/images/guides/dakar-biennale-2026/WAKILISHA_Dakar_Biennale_2026.jpg",
+      "https://wakilisha.africa/wp-content/plugins/wakilisha-v2.0.201-cpt-cleanup/assets/guides/dakar-biennale-2026/WAKILISHA_Dakar_Biennale_2026.jpg",
   },
   {
     slug: "in-minor-keys",
@@ -41,7 +41,7 @@ const guideEntries = [
     accentBg: "rgba(156,143,245,0.12)",
     accentBorder: "rgba(156,143,245,0.30)",
     image:
-      "https://wakilisha.africa/wp-content/plugins/wakilisha-v2.0.201-cpt-cleanup/images/guides/in-minor-keys/p21-img1.webp",
+      "https://wakilisha.africa/wp-content/plugins/wakilisha-v2.0.201-cpt-cleanup/assets/guides/in-minor-keys/p21-img1.webp",
   },
 ];
 

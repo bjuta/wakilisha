@@ -24,7 +24,7 @@ export default function MobileDakarGuide() {
     trackEvent("guide_subscribe_submit", {
       pageType: "guide_detail",
       entitySlug: guideSlug,
-      recordType: "guide",
+      entityType: "guide",
       context: {
         source_section: "follow_form_mobile",
         guide_title: guideTitle,

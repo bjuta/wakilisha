@@ -162,7 +162,7 @@ export function MobileFullPlayer() {
       const nextQueue = queue.length ? queue : [currentTrack];
       playTrack(currentTrack, nextQueue, {
         pageType: "player",
-        recordType: "track",
+        entityType: "track",
         entitySlug: currentTrack.trackSlug || currentTrack.id,
         sourceSection: "apple_music_full_track_cta",
       });
@@ -186,7 +186,7 @@ export function MobileFullPlayer() {
 
     try {
       const result = await saveEntityAction({
-        recordType: "track",
+        entityType: "track",
         entityId: currentTrack.id,
         entitySlug: trackSlug,
         entityUrl,
@@ -225,7 +225,7 @@ export function MobileFullPlayer() {
   const activeSourceIcon = playbackBackend === "apple" ? "Music2" : "Radio";
   const playbackEyebrow = playbackBackend === "apple" ? "Now playing" : "Preview";
   const hasAppleCatalog = Boolean(currentTrack.appleMusicCatalogId || currentTrack.appleMusicId);
-  const showFullTrackUse = hasAppleCatalog && playbackBackend !== "apple" && !appleConnected;
+  const showFullTrackUnlock = hasAppleCatalog && playbackBackend !== "apple" && !appleConnected;
   const pct = Math.max(0, Math.min(1, progress || 0));
 
   const activeQueueIndex = queueIndex >= 0
@@ -317,7 +317,7 @@ export function MobileFullPlayer() {
             <span className="fp-fullplayback-dot" />
             <div>
               <strong>Full track playing</strong>
-              <p>Useed through Apple Music.</p>
+              <p>Unlocked through Apple Music.</p>
             </div>
           </div>
         )}

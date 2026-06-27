@@ -52,7 +52,7 @@ export function ReleaseCard({
   const handleClick = () => {
     if (sourceSection) {
       trackEvent("card_click", {
-        recordType: "release",
+        entityType: "release",
         entitySlug: slug,
         context: {
           source_section: sourceSection,

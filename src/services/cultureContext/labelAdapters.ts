@@ -55,7 +55,7 @@ export function labelContextData(input: LabelLike | PublicLabelDetail) {
 
 export function buildLabelCultureText(input: LabelLike | PublicLabelDetail, surface: CultureContextSurface): string {
   return buildCultureContext({
-    recordType: "label",
+    entityType: "label",
     surface,
     data: labelContextData(input),
   }).text;

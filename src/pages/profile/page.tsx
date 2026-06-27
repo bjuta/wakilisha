@@ -565,17 +565,17 @@ function SavesTab({
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       {saves.map((s) => {
         const save = s as Record<string, unknown>;
-        const recordUrl = String(save.record_url || "");
+        const entityUrl = String(save.entity_url || "");
         const title = String(save.title || "Untitled");
         const subtitle = save.subtitle ? String(save.subtitle) : null;
         const imageUrl = save.image_url ? String(save.image_url) : null;
-        const recordType = String(save.record_type || "");
+        const entityType = String(save.entity_type || "");
         const createdAt = String(save.created_at || "");
 
         return (
           <Link
             key={String(save.id)}
-            to={recordUrl || "#"}
+            to={entityUrl || "#"}
             className="block border border-[var(--wk-border)] rounded-xl overflow-hidden bg-[var(--wk-surface)] hover:border-[var(--wk-border-2)] hover:translate-y-[-2px] transition-all"
           >
             <div className="aspect-[16/10] overflow-hidden bg-[var(--wk-surface-raised)]">
@@ -692,7 +692,7 @@ function FollowingTab({
                 {targetSlug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
               </div>
               <div className="flex items-center gap-2 text-[11px] text-[var(--wk-text-muted)]">
-                <span>{recordLabel(targetType)}</span>
+                <span>{entityLabel(targetType)}</span>
                 <span>·</span>
                 <span>{timeAgo(createdAt)}</span>
               </div>

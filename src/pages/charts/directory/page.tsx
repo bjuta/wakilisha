@@ -182,7 +182,7 @@ function LeaderboardRow({
               </span>
             )}
             {(entry.movement === "same" || !entry.movement) && (
-              <span className="md:hidden ml-auto shrink-0 text-[11px] font-bold text-[var(--wk-text-faint)]">,</span>
+              <span className="md:hidden ml-auto shrink-0 text-[11px] font-bold text-[var(--wk-text-faint)]">—</span>
             )}
           </div>
 
@@ -221,7 +221,7 @@ function LeaderboardRow({
             </span>
           )}
           {(entry.movement === "same" || !entry.movement) && (
-            <span className="text-[12px] font-bold" style={{ color: "var(--wk-text-faint)" }}>,</span>
+            <span className="text-[12px] font-bold" style={{ color: "var(--wk-text-faint)" }}>—</span>
           )}
         </div>
 

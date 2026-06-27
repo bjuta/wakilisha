@@ -287,7 +287,7 @@ export function normalizeSearchResultFacts(data: unknown): SearchResultFacts {
   const record = asRecord(data);
   return {
     title: firstString(record, ["title", "name"]),
-    recordType: (firstString(record, ["recordType", "type"]) as CultureRecordType) || "searchResult",
+    entityType: (firstString(record, ["entityType", "type"]) as CultureEntityType) || "searchResult",
     artists: artistNamesFromUnknown(record.artists || record.artistNames),
     subtitle: firstString(record, ["subtitle", "description"]),
     country: normalizeCountry(record.country || record.countryCode),
@@ -298,11 +298,11 @@ export function normalizeSearchResultFacts(data: unknown): SearchResultFacts {
 }
 
 export function normalizeCultureFacts(entityType: CultureEntityType, data: unknown): CultureFacts {
-  if (recordType === "track") return normalizeTrackFacts(data);
-  if (recordType === "artist") return normalizeArtistFacts(data);
-  if (recordType === "release") return normalizeReleaseFacts(data);
-  if (recordType === "label") return normalizeLabelFacts(data);
-  if (recordType === "genre") return normalizeGenreFacts(data);
-  if (recordType === "chart") return normalizeChartFacts(data);
+  if (entityType === "track") return normalizeTrackFacts(data);
+  if (entityType === "artist") return normalizeArtistFacts(data);
+  if (entityType === "release") return normalizeReleaseFacts(data);
+  if (entityType === "label") return normalizeLabelFacts(data);
+  if (entityType === "genre") return normalizeGenreFacts(data);
+  if (entityType === "chart") return normalizeChartFacts(data);
   return normalizeSearchResultFacts(data);
 }
