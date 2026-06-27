@@ -132,8 +132,8 @@ function getFinalUrl(baseUrl: string, timestamp?: string) {
 type ShareTargetContext = {
   targetUrl: string;
   targetPath: string;
-  entityType: string;
-  entitySlug: string;
+  recordType: string;
+  recordSlug: string;
   artistSlug: string;
 };
 
@@ -143,7 +143,7 @@ function normalizeShareRecordType(type: ShareObject["type"] | undefined): string
 }
 
 function parseShareTarget(rawUrl: string, fallbackType: ShareObject["type"] | undefined): ShareTargetContext {
-  const fallbackEntityType = normalizeShareEntityType(fallbackType);
+  const fallbackRecordType = normalizeShareRecordType(fallbackType);
 
   try {
     const parsed = new URL(rawUrl, typeof window !== "undefined" ? window.location.origin : "https://wakilisha.africa");
@@ -199,8 +199,8 @@ function parseShareTarget(rawUrl: string, fallbackType: ShareObject["type"] | un
     return {
       targetUrl: rawUrl,
       targetPath: rawUrl,
-      entityType: fallbackEntityType,
-      entitySlug: last,
+      recordType: fallbackRecordType,
+      recordSlug: last,
       artistSlug: "",
     };
   }
@@ -219,13 +219,13 @@ function buildShareAnalyticsPayload({
   trackedUrl?: string;
   action: "open" | "copy" | "click";
 }) {
-  const entityType = target.entityType || normalizeShareEntityType(item.type);
+  const recordType = target.recordType || normalizeShareRecordType(item.type);
   const recordSlug = target.recordSlug || "";
 
   return {
     pageType: recordType || item.type || "page",
-    entitySlug: entitySlug || undefined,
-    entityType: entityType || undefined,
+    entitySlug: recordSlug || undefined,
+    entityType: recordType || undefined,
     context: {
       action,
       platform: platformKey,
@@ -239,10 +239,10 @@ function buildShareAnalyticsPayload({
       target_description: item.description ?? null,
       target_image_url: item.imageUrl ?? null,
 
-      entity_type: entityType,
-      entityType,
-      entity_slug: entitySlug || null,
-      entitySlug: entitySlug || null,
+      entity_type: recordType,
+      entityType: recordType,
+      entity_slug: recordSlug || null,
+      entitySlug: recordSlug || null,
       artist_slug: target.artistSlug || null,
       artistSlug: target.artistSlug || null,
 
