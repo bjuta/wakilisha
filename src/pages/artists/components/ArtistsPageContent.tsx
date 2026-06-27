@@ -77,8 +77,6 @@ function enrichArtist(artist: PublicArtist) {
   return {
     ...artist,
     spotlightBio: bioSnippets[Math.floor(rng(0, bioSnippets.length))],
-    monthlyStreams: Number(rng(0.5, 12).toFixed(1)),
-    debutYear: 2010 + Math.floor(rng(0, 14)),
     country: normalizeCountry(artist.country),
   };
 }
@@ -153,7 +151,7 @@ export default function ArtistsPageContent() {
         list.sort((a, b) => a.name.localeCompare(b.name));
         break;
       case "newest":
-        list.sort((a, b) => (b.debutYear || 0) - (a.debutYear || 0));
+        list.sort((a, b) => b.releaseCount - a.releaseCount || b.trackCount - a.trackCount || a.name.localeCompare(b.name));
         break;
       case "prolific":
         list.sort((a, b) => b.trackCount - a.trackCount || a.name.localeCompare(b.name));

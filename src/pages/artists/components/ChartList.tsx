@@ -8,7 +8,6 @@ interface ChartArtist {
   genres: string[];
   trackCount: number;
   releaseCount: number;
-  monthlyStreams: number;
   topChartPosition: number;
 }
 
@@ -92,9 +91,6 @@ export function ChartList({ artists }: ChartListProps) {
                       <i className="ri-bar-chart-line text-[10px]" />
                       Peak #{artist.topChartPosition}
                     </span>
-                    <span className="text-[12px] font-semibold text-[var(--wk-text-faint)]">
-                      {artist.monthlyStreams}M
-                    </span>
                   </div>
                 </div>
               </Link>
@@ -136,8 +132,6 @@ export function ChartList({ artists }: ChartListProps) {
                     <span>{artist.trackCount} tracks</span>
                     <span className="opacity-40">·</span>
                     <span>{artist.releaseCount} releases</span>
-                    <span className="hidden sm:inline opacity-40">·</span>
-                    <span className="hidden sm:inline">{artist.monthlyStreams}M streams</span>
                   </div>
                 </div>
 

@@ -117,7 +117,7 @@ export function AppTopBar() {
       <div className="wk-container-max flex items-center justify-between gap-6 px-6 py-4">
         <Link to="/" className="group relative shrink-0 flex items-center gap-2.5 no-underline" aria-label={displayName}>
           {showCustomLogo ? (
-            <img src={selectedLogoUrl} alt={displayName} onError={() => setLogoError(true)} className={`h-8 max-w-[160px] object-contain transition-opacity duration-300 ${isHome && !scrolled ? "brightness-0 invert" : ""}`} />
+            <img src={selectedLogoUrl} alt={displayName} onError={() => setLogoError(true)} className="h-8 max-w-[160px] object-contain transition-opacity duration-300" />
           ) : (
             <span className={`hidden sm:block text-base font-black tracking-tight transition-colors duration-300 ${logoColor}`}>{displayName}</span>
           )}

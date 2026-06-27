@@ -6,7 +6,7 @@ interface ArtistBioSectionProps {
   fullBio: string;
   name: string;
   country: string;
-  debutYear: number;
+  oldestReleaseLabel?: string;
   trackCount: number;
   releaseCount: number;
   artistType?: string | null;
@@ -187,7 +187,7 @@ export function ArtistBioSection({
   fullBio,
   name,
   country,
-  debutYear,
+  oldestReleaseLabel,
   trackCount,
   releaseCount,
   artistType,
@@ -208,7 +208,7 @@ export function ArtistBioSection({
   const metaItems = [
     ...(artistType ? [{ icon: "ri-user-line", label: artistType }] : []),
     { icon: "ri-map-pin-line", label: country },
-    { icon: "ri-calendar-line", label: `Active since ${debutYear}` },
+    ...(oldestReleaseLabel ? [{ icon: "ri-calendar-line", label: `Oldest WAKILISHA release: ${oldestReleaseLabel}` }] : []),
     { icon: "ri-music-2-line", label: `${trackCount} tracks, ${releaseCount} releases` },
   ];
 

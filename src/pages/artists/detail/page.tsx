@@ -113,10 +113,18 @@ export default function ArtistDetail() {
     );
   }
 
-  const releaseYears = artist.releases
-    .map((r) => (r.releaseDate ? parseInt(r.releaseDate.split("-")[0], 10) : 0))
-    .filter((y) => y > 0);
-  const debutYear = releaseYears.length > 0 ? Math.min(...releaseYears) : new Date().getFullYear();
+  const datedReleases = artist.releases
+    .map((release) => release.releaseDate || release.year || "")
+    .filter((value) => /\d{4}/.test(value))
+    .sort((a, b) => a.localeCompare(b));
+
+  const oldestReleaseLabel = datedReleases[0]
+    ? new Date(datedReleases[0]).toLocaleDateString(undefined, {
+        year: "numeric",
+        month: "short",
+        day: datedReleases[0].length > 4 ? "numeric" : undefined,
+      })
+    : "";
 
   const hasChartEntries = artist.chartEntries.length > 0;
   const hasAppearsOn = appearsOn.length > 0;
@@ -189,7 +197,7 @@ export default function ArtistDetail() {
               fullBio={artist.fullBio}
               name={artist.name}
               country={artist.country}
-              debutYear={debutYear}
+              oldestReleaseLabel={oldestReleaseLabel}
               trackCount={artist.trackCount}
               releaseCount={artist.releaseCount}
               artistType={artist.artistType}

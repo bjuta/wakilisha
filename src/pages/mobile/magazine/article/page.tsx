@@ -408,9 +408,9 @@ export default function MobileArticle() {
                 imageUrl: article.heroUrl,
                 type: "article",
               }}
-              variant="light"
-              size="lg"
-              className="bg-[var(--wk-brand)] text-white hover:opacity-90 rounded-full px-5"
+              variant="brand"
+              size="label"
+              label="Share this article"
             />
           </div>
         </div>

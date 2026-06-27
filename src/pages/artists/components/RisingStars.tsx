@@ -10,8 +10,6 @@ interface RisingArtist {
   trackCount: number;
   releaseCount: number;
   country: string;
-  debutYear: number;
-  monthlyStreams: number;
   spotlightBio: string;
 }
 
@@ -105,9 +103,9 @@ export function RisingStars({ artists }: RisingStarsProps) {
                 <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-white/40">
                   <span>{artist.country}</span>
                   <span>·</span>
-                  <span>{artist.monthlyStreams}M</span>
+                  <span>{artist.trackCount} tracks</span>
                   <span>·</span>
-                  <span>Since {artist.debutYear}</span>
+                  <span>{artist.releaseCount} releases</span>
                 </div>
                 <div className="mt-2.5 flex flex-wrap gap-1.5">
                   {artist.genres.slice(0, 2).map((g) => (

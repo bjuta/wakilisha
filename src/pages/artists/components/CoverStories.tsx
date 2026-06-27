@@ -6,7 +6,6 @@ interface CoverArtist {
   name: string;
   imageUrl?: string;
   genres: string[];
-  monthlyStreams: number;
   topChartPosition: number;
   spotlightBio: string;
   trackCount: number;
@@ -78,8 +77,6 @@ export function CoverStories({ artists }: CoverStoriesProps) {
                   <i className="ri-bar-chart-line text-[12px]" />
                   Peak #{hero.topChartPosition}
                 </span>
-                <span>·</span>
-                <span>{hero.monthlyStreams}M streams</span>
                 <span>·</span>
                 <span>{hero.country}</span>
                 <span>·</span>
