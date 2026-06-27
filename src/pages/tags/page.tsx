@@ -163,7 +163,7 @@ export default function TagsIndex() {
             Tags
           </h1>
           <p className="mt-5 text-[16px] lg:text-[18px] leading-relaxed text-white/60 max-w-[56ch]">
-            Every topic, theme, artist, and cultural thread across {tags.length.toLocaleString()} tags. Click any tag to explore related stories.
+            Every topic, theme, artist, and cultural thread in {tags.length.toLocaleString()} tags. Click any tag to explore related stories.
           </p>
           <div className="mt-6 flex flex-wrap items-center gap-3">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-white/85 font-semibold px-3.5 py-2 text-[12px]">
@@ -245,7 +245,7 @@ export default function TagsIndex() {
           <section className="mag-reveal">
             <div className="flex items-center gap-3 mb-8">
               <span className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--wk-brand)]">
-                Trending Topics
+                Active topics
               </span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -285,10 +285,10 @@ export default function TagsIndex() {
         {/* ── Magazine Footer ── */}
         <footer className="border-t border-[var(--wk-border)] pt-14 pb-8 text-center">
           <span className="text-[9px] font-black uppercase tracking-[0.24em] text-[var(--wk-brand)] mb-3 block">
-            WAKILISHA Topic Map
+            WAKILISHA Topics
           </span>
           <p className="text-[24px] lg:text-[28px] font-black tracking-[-0.035em] text-[var(--wk-text)] leading-snug max-w-[420px] mx-auto">
-            {tags.length.toLocaleString()} tags mapping the cultural conversation.
+            {tags.length.toLocaleString()} tags helping map the cultural conversation.
           </p>
         </footer>
       </div>

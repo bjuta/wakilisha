@@ -170,7 +170,7 @@ function RegistryPortalCard() {
           </div>
           <div>
             <div className="text-[12px] font-bold text-white/90">Releases</div>
-            <div className="text-[10px] text-white/40">Albums, EPs, singles — catalogued</div>
+            <div className="text-[10px] text-white/40">Albums, EPs, singles, catalogued</div>
           </div>
         </div>
       </div>

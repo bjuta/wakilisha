@@ -8,7 +8,7 @@ const PILLARS = [
   {
     k: "02",
     t: "Document",
-    d: "Keep the culture visible before it disappears into someone's camera roll. Names, scenes, lyrics, and lineage all recorded.",
+    d: "Keep the culture visible before it disappears into someone’s camera roll. Names, scenes, lyrics, and lineage all recorded.",
     color: "var(--wk-v-intel)",
   },
   {
