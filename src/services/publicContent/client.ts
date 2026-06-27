@@ -447,7 +447,7 @@ function trackArtistCreditOrder(row: { creditOrder?: number | null }): number {
 }
 
 function releaseTrackPosition(row: GenericRow): number {
-  const n = Number(row.track_number ?? row.position ?? row.sort_order ?? row.display_order);
+  const n = Number(row.track_number);
   return Number.isFinite(n) ? n : 999;
 }
 
@@ -535,9 +535,8 @@ async function resolvePrimaryArtistsForReleases(
   for (const ids of chunkArray(missingReleaseIds)) {
     const { data, error } = await supabase
       .from("registry_release_tracks")
-      .select("release_id, track_id, track_number, position, sort_order, display_order")
-      .in("release_id", ids)
-      .eq("status", "active");
+      .select("release_id, track_id, track_number")
+      .in("release_id", ids);
 
     if (error) {
       console.warn(`Release track artist fallback lookup failed: ${error.message}`);
@@ -908,8 +907,7 @@ async function listReleasesFromRegistry(): Promise<PublicRelease[]> {
   const { data: trackRows } = await supabase
     .from("registry_release_tracks")
     .select("release_id")
-    .in("release_id", releaseIds)
-    .eq("status", "active");
+    .in("release_id", releaseIds);
 
   const trackCountByRelease = new Map<string, number>();
   for (const row of (trackRows || [])) {

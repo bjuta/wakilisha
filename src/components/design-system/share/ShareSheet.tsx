@@ -142,6 +142,10 @@ function normalizeShareRecordType(type: ShareObject["type"] | undefined): string
   return type ?? "page";
 }
 
+function normalizeShareEntityType(type: ShareObject["type"] | undefined): string {
+  return normalizeShareRecordType(type);
+}
+
 function parseShareTarget(rawUrl: string, fallbackType: ShareObject["type"] | undefined): ShareTargetContext {
   const fallbackEntityType = normalizeShareEntityType(fallbackType);
 
@@ -224,7 +228,7 @@ function buildShareAnalyticsPayload({
 
   return {
     pageType: recordType || item.type || "page",
-    entitySlug: entitySlug || undefined,
+    entitySlug: recordSlug || undefined,
     entityType: entityType || undefined,
     context: {
       action,
@@ -241,8 +245,8 @@ function buildShareAnalyticsPayload({
 
       entity_type: entityType,
       entityType,
-      entity_slug: entitySlug || null,
-      entitySlug: entitySlug || null,
+      entity_slug: recordSlug || null,
+      entitySlug: recordSlug || null,
       artist_slug: target.artistSlug || null,
       artistSlug: target.artistSlug || null,
 
