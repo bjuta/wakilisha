@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { trackEvent, getAnalyticsSessionId, getCanonicalPageUrl } from "@/services/analytics";
 import { BRIEFING_SLUGS, isValidEmail, normalizeEmail, subscribeToBriefings } from "@/services/audienceSubscriptionService";
 import { fetchAllAuthors, type AuthorRow } from "@/services/authorProfiles";
+import { Chapter19FallbackImage } from "@/components/media/Chapter19FallbackImage";
 
 type PersonLink = {
   label: string;
@@ -21,20 +22,6 @@ type PersonProfile = {
   profilePath?: string;
   links: PersonLink[];
   source: "founder" | "registry_authors";
-};
-
-const FOUNDER: PersonProfile = {
-  slug: "beautah-muiruri",
-  name: "Beautah Muiruri",
-  role: "Founder & Editor-in-Chief",
-  team: "Founder",
-  location: "Nairobi, Kenya",
-  avatarUrl: "",
-  profilePath: "",
-  links: [],
-  source: "founder",
-  bio:
-    "Beautah leads WAKILISHA's editorial direction, product vision, and company-building work. His focus is turning African creative life into durable infrastructure: stories, charts, artist pages, guides, and tools that make culture easier to discover, understand, and build around.",
 };
 
 const TRUST_POINTS = [
@@ -92,6 +79,15 @@ const DILIGENCE_LINKS = [
   { label: "Terms", value: "Platform terms of use", href: "/terms", icon: "ri-file-list-3-line" },
 ];
 
+const SECTION_NAV_ITEMS = [
+  { label: "Overview", href: "#overview" },
+  { label: "Gang", href: "#meet-the-gang" },
+  { label: "Work", href: "#work" },
+  { label: "Trust", href: "#trust" },
+  { label: "Diligence", href: "#diligence" },
+];
+
+
 function useScrollReveal() {
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -119,6 +115,36 @@ function initials(name: string) {
     .map((part) => part[0]?.toUpperCase() || "")
     .join("")
     .slice(0, 2);
+}
+
+function excerpt(value: string, max = 175) {
+  const clean = value.replace(/\s+/g, " ").trim();
+  if (clean.length <= max) return clean;
+  return `${clean.slice(0, max).replace(/[\s,.;:!?-]+$/, "")}…`;
+}
+
+function isUsablePortraitUrl(url?: string | null) {
+  const value = String(url || "").trim();
+  if (!value) return false;
+
+  const lower = value.toLowerCase();
+  const blocked = [
+    "placeholder",
+    "default-avatar",
+    "avatar-default",
+    "avatar-placeholder",
+    "profile-placeholder",
+    "blank-profile",
+    "missing-avatar",
+    "missing-profile",
+    "silhouette",
+    "anonymous",
+    "no-avatar",
+    "no_profile",
+    "user-icon",
+  ];
+
+  return !blocked.some((token) => lower.includes(token));
 }
 
 function generatedPortrait(name: string, slug: string) {
@@ -151,9 +177,21 @@ function generatedPortrait(name: string, slug: string) {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
+function isFounderProfile(name: string, role: string, slug: string) {
+  const haystack = `${name} ${role} ${slug}`.toLowerCase();
+  return (
+    haystack.includes("founder") ||
+    haystack.includes("editor-in-chief") ||
+    haystack.includes("editor in chief") ||
+    haystack.includes("muiruri beautah") ||
+    haystack.includes("beautah muiruri")
+  );
+}
+
 function authorToPerson(author: AuthorRow): PersonProfile {
   const name = (author.name || author.slug).trim();
   const role = author.role || "Contributor";
+  const founder = isFounderProfile(name, role, author.slug);
   const links: PersonLink[] = [];
 
   if (author.url) {
@@ -173,9 +211,9 @@ function authorToPerson(author: AuthorRow): PersonProfile {
     slug: author.slug,
     name,
     role,
-    team: role.toLowerCase().includes("editor") ? "Editorial" : "Contributor",
+    team: founder ? "Founder" : role.toLowerCase().includes("editor") ? "Editorial" : "Contributor",
     location: author.location || "",
-    avatarUrl: author.avatar_url || "",
+    avatarUrl: isUsablePortraitUrl(author.avatar_url) ? author.avatar_url || "" : "",
     profilePath: `/authors/${author.slug}`,
     links,
     source: "registry_authors",
@@ -280,20 +318,33 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 }
 
 function PersonCard({ person, featured = false }: { person: PersonProfile; featured?: boolean }) {
-  const portrait = person.avatarUrl || generatedPortrait(person.name, person.slug);
+  const portrait = isUsablePortraitUrl(person.avatarUrl) ? person.avatarUrl : "";
+  const bioExcerpt = excerpt(person.bio, featured ? 260 : 155);
   const card = (
-    <article className={`group relative overflow-hidden rounded-[28px] border border-[var(--wk-border)] bg-[var(--wk-surface)] transition-all duration-300 hover:-translate-y-1 hover:border-[var(--wk-border-2)] ${featured ? "lg:grid lg:grid-cols-[0.9fr_1.1fr]" : ""}`}>
-      <div className={`relative overflow-hidden bg-[#0c0d0a] ${featured ? "min-h-[360px]" : "aspect-[4/5]"}`}>
-        <img src={portrait} alt={person.name} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
-        <div className="absolute left-4 top-4 rounded-full bg-black/55 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-white backdrop-blur">
+    <article className={`about-person-card group relative flex h-full flex-col overflow-hidden rounded-[22px] border border-[var(--wk-border)] bg-[var(--wk-surface)] transition-all duration-300 hover:-translate-y-0.5 hover:border-[var(--wk-border-2)] ${featured ? "lg:grid lg:grid-cols-[0.9fr_1.1fr]" : ""}`}>
+      <div className={`about-portrait-frame relative overflow-hidden bg-[#0c0d0a] ${featured ? "min-h-[300px]" : "aspect-[16/11]"}`}>
+        {portrait ? (
+          <img src={portrait} alt={person.name} className="about-portrait-img h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
+        ) : (
+          <Chapter19FallbackImage
+            id={person.slug}
+            slug={person.slug}
+            name={person.name}
+            className="about-portrait-img transition-transform duration-700 group-hover:scale-105"
+          />
+        )}
+        <div className="about-portrait-grid absolute inset-0" />
+        <div className="about-portrait-sheen absolute inset-0" />
+        <div className="absolute left-4 top-4 rounded-full bg-black/60 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-white backdrop-blur">
           {person.team}
         </div>
+
       </div>
 
-      <div className={`${featured ? "p-6 lg:p-9" : "p-5"} flex flex-col`}>
+      <div className={`${featured ? "p-5 lg:p-7" : "p-4"} relative flex flex-1 flex-col`}>
         <div className="mb-4">
           <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[var(--wk-brand)]">{person.role}</p>
-          <h3 className={`${featured ? "text-[clamp(30px,4vw,56px)]" : "text-[22px]"} mt-2 font-black leading-[0.95] tracking-[-0.045em] text-[var(--wk-text)]`}>
+          <h3 className={`${featured ? "text-[clamp(28px,3.5vw,46px)]" : "text-[18px]"} mt-1.5 font-black leading-[0.98] tracking-[-0.04em] text-[var(--wk-text)]`}>
             {person.name}
           </h3>
           {person.location && (
@@ -303,11 +354,11 @@ function PersonCard({ person, featured = false }: { person: PersonProfile; featu
           )}
         </div>
 
-        <p className={`${featured ? "text-[15px]" : "text-[13px]"} leading-relaxed text-[var(--wk-text-muted)]`}>
-          {person.bio}
+        <p className={`${featured ? "text-[15px]" : "text-[13px]"} ${featured ? "" : "min-h-[76px]"} leading-relaxed text-[var(--wk-text-muted)]`}>
+          {bioExcerpt}
         </p>
 
-        <div className="mt-5 flex flex-wrap items-center gap-2">
+        <div className="mt-auto flex flex-wrap items-center gap-2 pt-5">
           {person.profilePath && (
             <Link to={person.profilePath} className="inline-flex h-9 items-center gap-2 rounded-full bg-[var(--wk-brand)] px-4 text-[12px] font-black text-[var(--wk-brand-on)] transition-transform hover:-translate-y-0.5">
               View profile <i className="ri-arrow-right-line" />
@@ -327,11 +378,7 @@ function PersonCard({ person, featured = false }: { person: PersonProfile; featu
           ))}
         </div>
 
-        {person.source === "registry_authors" && (
-          <p className="mt-4 text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--wk-text-faint)]">
-            Sourced from contributor profile data
-          </p>
-        )}
+
       </div>
     </article>
   );
@@ -366,7 +413,7 @@ export default function AboutPage() {
   }, []);
 
   const contributorPeople = useMemo(() => {
-    const seen = new Set([FOUNDER.slug]);
+    const seen = new Set<string>();
     return authors
       .map(authorToPerson)
       .filter((person) => {
@@ -375,92 +422,94 @@ export default function AboutPage() {
         return true;
       })
       .sort((a, b) => {
-        const aEditorial = a.team === "Editorial" ? 0 : 1;
-        const bEditorial = b.team === "Editorial" ? 0 : 1;
-        return aEditorial - bEditorial || a.name.localeCompare(b.name);
+        const aRank = a.team === "Founder" ? 0 : a.team === "Editorial" ? 1 : 2;
+        const bRank = b.team === "Founder" ? 0 : b.team === "Editorial" ? 1 : 2;
+        return aRank - bRank || a.name.localeCompare(b.name);
       });
   }, [authors]);
 
   const hasContributors = contributorPeople.length > 0;
+  const founderPerson = contributorPeople.find((person) => person.team === "Founder") || null;
 
   return (
     <main className="min-h-screen bg-[var(--wk-bg)]">
-      <section ref={heroRef} className="relative -mt-16 overflow-hidden bg-[#070807] text-white">
+      <section ref={heroRef} className="about-hero relative -mt-16 overflow-hidden bg-[#070807] text-white">
         <div className="absolute inset-0">
-          <div className="absolute left-[-15%] top-[-20%] h-[520px] w-[520px] rounded-full bg-[var(--wk-brand)] opacity-20 blur-[120px]" />
-          <div className="absolute right-[-10%] top-[18%] h-[480px] w-[480px] rounded-full bg-[#f7f9f1] opacity-[0.08] blur-[120px]" />
-          <div className="absolute inset-0 opacity-[0.12]" style={{ backgroundImage: "linear-gradient(to right, #fff 1px, transparent 1px), linear-gradient(to bottom, #fff 1px, transparent 1px)", backgroundSize: "72px 72px" }} />
+          <div className="absolute left-[-12%] top-[-35%] h-[460px] w-[460px] rounded-full bg-[var(--wk-brand)] opacity-18 blur-[120px]" />
+          <div className="absolute right-[-20%] bottom-[-35%] h-[420px] w-[420px] rounded-full bg-white opacity-[0.06] blur-[120px]" />
+          <div className="absolute inset-0 opacity-[0.055]" style={{ backgroundImage: "linear-gradient(to right, #fff 1px, transparent 1px), linear-gradient(to bottom, #fff 1px, transparent 1px)", backgroundSize: "84px 84px" }} />
         </div>
 
-        <div className="relative mx-auto grid min-h-[92vh] max-w-[1440px] grid-cols-1 gap-10 px-5 pb-14 pt-32 sm:px-6 lg:grid-cols-[1.05fr_0.95fr] lg:px-8 lg:pb-20">
-          <div className="flex flex-col justify-end">
-            <div className="mb-6 flex items-center gap-3">
-              <span className="h-px w-8 bg-white/40" />
-              <span className="text-[10px] font-black uppercase tracking-[0.24em] text-white/60">About WAKILISHA</span>
+        <div className="relative mx-auto max-w-[1180px] px-5 pb-12 pt-32 sm:px-6 lg:px-8 lg:pb-16 lg:pt-36">
+          <div className="max-w-[760px]">
+            <div className="mb-5 flex items-center gap-3">
+              <span className="h-px w-8 bg-white/35" />
+              <span className="text-[10px] font-black uppercase tracking-[0.24em] text-white/55">About WAKILISHA</span>
             </div>
-            <h1 className="max-w-[780px] text-[clamp(48px,8vw,112px)] font-black leading-[0.84] tracking-[-0.07em]">
-              The people building the culture layer.
+
+            <h1 className="text-[clamp(42px,7vw,86px)] font-black leading-[0.88] tracking-[-0.065em]">
+              The people behind the platform.
             </h1>
-            <p className="mt-7 max-w-[600px] text-[16px] leading-relaxed text-white/60 md:text-[19px]">
-              WAKILISHA is an editorial and data company for African creative life. We publish stories, map artists, build charts, and create discovery infrastructure that can be inspected, trusted, and built upon.
+
+            <p className="mt-6 max-w-[620px] text-[15px] leading-relaxed text-white/62 md:text-[18px]">
+              WAKILISHA is an editorial and data company for African creative life. We publish stories, map artists, build charts, and make discovery infrastructure easier to inspect.
             </p>
 
-            <div className="mt-9 flex flex-wrap gap-3">
-              <a href="#meet-the-gang" className="inline-flex h-12 items-center rounded-full bg-[var(--wk-brand)] px-6 text-[13px] font-black text-[var(--wk-brand-on)] transition-transform hover:-translate-y-0.5">
+            {founderPerson && (
+              <Link to={founderPerson.profilePath || "#meet-the-gang"} className="mt-7 inline-flex items-center gap-3 rounded-full border border-white/12 bg-white/[0.05] py-2 pl-2 pr-5 backdrop-blur transition-colors hover:border-[var(--wk-brand)]">
+                {isUsablePortraitUrl(founderPerson.avatarUrl) ? (
+                  <img src={founderPerson.avatarUrl} alt={founderPerson.name} className="h-10 w-10 rounded-full object-cover" />
+                ) : (
+                  <Chapter19FallbackImage
+                    id={founderPerson.slug}
+                    slug={founderPerson.slug}
+                    name={founderPerson.name}
+                    className="h-10 w-10 rounded-full"
+                  />
+                )}
+                <span className="text-left">
+                  <span className="block text-[12px] font-black text-white">{founderPerson.name}</span>
+                  <span className="block text-[10px] font-bold uppercase tracking-[0.12em] text-white/42">{founderPerson.role}</span>
+                </span>
+              </Link>
+            )}
+
+            <div className="mt-8 flex flex-wrap gap-3">
+              <a href="#meet-the-gang" className="inline-flex h-11 items-center rounded-full bg-[var(--wk-brand)] px-5 text-[12px] font-black text-[var(--wk-brand-on)] transition-transform hover:-translate-y-0.5">
                 Meet the Gang
               </a>
-              <a href="#diligence" className="inline-flex h-12 items-center rounded-full border border-white/20 px-6 text-[13px] font-black text-white transition-colors hover:bg-white hover:text-black">
+              <a href="#diligence" className="inline-flex h-11 items-center rounded-full border border-white/18 px-5 text-[12px] font-black text-white transition-colors hover:bg-white hover:text-black">
                 Due diligence
               </a>
             </div>
-
-            <div className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {[
-                ["Founder-led", "Leadership"],
-                ["Named people", "Profiles"],
-                ["Editorial standards", "Trust"],
-                ["Nairobi", "Base"],
-              ].map(([value, label]) => (
-                <div key={value} className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 backdrop-blur">
-                  <p className="text-[16px] font-black tracking-[-0.02em]">{value}</p>
-                  <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-white/35">{label}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3 self-end sm:grid-cols-3 lg:pb-2">
-            {[FOUNDER, ...contributorPeople.slice(0, 8)].map((person, index) => {
-              const portrait = person.avatarUrl || generatedPortrait(person.name, person.slug);
-              return (
-                <Link
-                  key={`${person.slug}-${index}`}
-                  to={person.profilePath || "#meet-the-gang"}
-                  className={`group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] ${index === 0 ? "col-span-2 aspect-[16/10] sm:col-span-2" : "aspect-[4/5]"}`}
-                >
-                  <img src={portrait} alt={person.name} className="h-full w-full object-cover opacity-85 transition duration-700 group-hover:scale-105 group-hover:opacity-100" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
-                  <div className="absolute bottom-3 left-3 right-3">
-                    <p className="truncate text-[13px] font-black leading-tight text-white">{person.name}</p>
-                    <p className="mt-0.5 truncate text-[9px] font-bold uppercase tracking-[0.13em] text-white/45">{person.role}</p>
-                  </div>
-                </Link>
-              );
-            })}
           </div>
         </div>
       </section>
 
-      <div className="mx-auto flex max-w-[1440px] flex-col gap-18 px-5 py-16 sm:px-6 lg:gap-24 lg:px-8 lg:py-24">
-        <section className="about-reveal grid gap-8 border-y border-[var(--wk-border)] py-12 lg:grid-cols-[0.85fr_1.15fr] lg:py-20">
+      <nav className="sticky top-16 z-30 border-y border-[var(--wk-border)] bg-[var(--wk-bg)]/86 px-5 py-3 backdrop-blur-xl sm:px-6 lg:px-8">
+        <div className="mx-auto flex max-w-[1440px] gap-2 overflow-x-auto">
+          {SECTION_NAV_ITEMS.map((item) => (
+            <a
+              key={item.href}
+              href={item.href}
+              className="shrink-0 rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] px-4 py-2 text-[11px] font-black uppercase tracking-[0.13em] text-[var(--wk-text-muted)] transition-colors hover:border-[var(--wk-brand)] hover:text-[var(--wk-brand)]"
+            >
+              {item.label}
+            </a>
+          ))}
+        </div>
+      </nav>
+
+      <div className="mx-auto flex max-w-[1180px] flex-col gap-12 px-5 py-12 sm:px-6 lg:gap-16 lg:px-8 lg:py-16">
+        <section id="overview" className="about-reveal scroll-mt-28 grid gap-7 border-y border-[var(--wk-border)] py-10 lg:grid-cols-[0.85fr_1.15fr] lg:py-14">
           <div>
             <SectionLabel>Why we exist</SectionLabel>
-            <h2 className="mt-5 max-w-[520px] text-[clamp(34px,5vw,68px)] font-black leading-[0.88] tracking-[-0.06em] text-[var(--wk-text)]">
+            <h2 className="mt-4 max-w-[460px] text-[clamp(30px,4vw,48px)] font-black leading-[0.92] tracking-[-0.055em] text-[var(--wk-text)]">
               Trust is part of the product.
             </h2>
           </div>
           <div className="max-w-[760px]">
-            <p className="text-[clamp(20px,3vw,34px)] font-black leading-[1] tracking-[-0.045em] text-[var(--wk-text)]">
+            <p className="text-[clamp(18px,2.4vw,28px)] font-black leading-[1.04] tracking-[-0.04em] text-[var(--wk-text)]">
               Your people are here. Your music is here. Your stories deserve infrastructure that understands them.
             </p>
             <p className="mt-6 text-[15px] leading-relaxed text-[var(--wk-text-muted)]">
@@ -469,11 +518,11 @@ export default function AboutPage() {
           </div>
         </section>
 
-        <section id="meet-the-gang" className="about-reveal scroll-mt-24">
+        <section id="meet-the-gang" className="about-reveal scroll-mt-28">
           <div className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <SectionLabel>Meet the Gang</SectionLabel>
-              <h2 className="mt-5 text-[clamp(36px,6vw,82px)] font-black leading-[0.86] tracking-[-0.065em] text-[var(--wk-text)]">
+              <h2 className="mt-4 text-[clamp(32px,5vw,58px)] font-black leading-[0.9] tracking-[-0.055em] text-[var(--wk-text)]">
                 Real people. Real work.
               </h2>
             </div>
@@ -481,8 +530,6 @@ export default function AboutPage() {
               This section is powered by WAKILISHA contributor profile data where available. No fake team members. No anonymous mascots. Missing links stay missing until they are verified.
             </p>
           </div>
-
-          <PersonCard person={FOUNDER} featured />
 
           <div className="mt-5">
             {authorsStatus === "loading" && (
@@ -504,7 +551,7 @@ export default function AboutPage() {
             )}
 
             {hasContributors && (
-              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 {contributorPeople.map((person) => (
                   <PersonCard key={person.slug} person={person} />
                 ))}
@@ -513,10 +560,10 @@ export default function AboutPage() {
           </div>
         </section>
 
-        <section className="about-reveal">
+        <section id="work" className="about-reveal scroll-mt-28">
           <div className="mb-8">
             <SectionLabel>How WAKILISHA works</SectionLabel>
-            <h2 className="mt-5 text-[clamp(32px,4.5vw,60px)] font-black leading-[0.9] tracking-[-0.055em] text-[var(--wk-text)]">
+            <h2 className="mt-4 text-[clamp(28px,4vw,46px)] font-black leading-[0.94] tracking-[-0.05em] text-[var(--wk-text)]">
               Editorial company, data spine, cultural memory.
             </h2>
           </div>
@@ -536,10 +583,10 @@ export default function AboutPage() {
           </div>
         </section>
 
-        <section className="about-reveal">
+        <section id="trust" className="about-reveal scroll-mt-28">
           <div className="mb-8">
             <SectionLabel>Trust layer</SectionLabel>
-            <h2 className="mt-5 text-[clamp(32px,4.5vw,60px)] font-black leading-[0.9] tracking-[-0.055em] text-[var(--wk-text)]">
+            <h2 className="mt-4 text-[clamp(28px,4vw,46px)] font-black leading-[0.94] tracking-[-0.05em] text-[var(--wk-text)]">
               Built to be checked.
             </h2>
           </div>
@@ -557,11 +604,11 @@ export default function AboutPage() {
           </div>
         </section>
 
-        <section id="diligence" className="about-reveal scroll-mt-24 rounded-[32px] border border-[var(--wk-border)] bg-[var(--wk-surface)] p-6 lg:p-9">
+        <section id="diligence" className="about-reveal scroll-mt-28 rounded-[26px] border border-[var(--wk-border)] bg-[var(--wk-surface)] p-5 lg:p-7">
           <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
             <div>
               <SectionLabel>Due diligence</SectionLabel>
-              <h2 className="mt-5 text-[clamp(32px,4vw,58px)] font-black leading-[0.9] tracking-[-0.055em] text-[var(--wk-text)]">
+              <h2 className="mt-4 text-[clamp(28px,3.6vw,44px)] font-black leading-[0.94] tracking-[-0.05em] text-[var(--wk-text)]">
                 Know who to call and what to inspect.
               </h2>
               <p className="mt-5 text-[14px] leading-relaxed text-[var(--wk-text-muted)]">
@@ -607,6 +654,55 @@ export default function AboutPage() {
       </div>
 
       <style>{`
+        .about-hero {
+          isolation: isolate;
+        }
+
+        .about-hero::after {
+          content: "";
+          position: absolute;
+          inset: auto 0 0;
+          height: 32%;
+          pointer-events: none;
+          background: linear-gradient(to bottom, transparent, var(--wk-bg));
+          opacity: 0.28;
+        }
+
+        .about-person-card {
+          box-shadow: 0 18px 60px rgba(0, 0, 0, 0.06);
+        }
+
+        .dark .about-person-card {
+          box-shadow: 0 22px 80px rgba(0, 0, 0, 0.28);
+        }
+
+        .about-portrait-frame {
+          isolation: isolate;
+        }
+
+        .about-portrait-img {
+          filter: saturate(1.18) contrast(1.08);
+        }
+
+        .about-portrait-grid {
+          pointer-events: none;
+          opacity: 0.12;
+          background-image:
+            linear-gradient(to right, rgba(255,255,255,.45) 1px, transparent 1px),
+            linear-gradient(to bottom, rgba(255,255,255,.45) 1px, transparent 1px);
+          background-size: 26px 26px;
+          mix-blend-mode: overlay;
+        }
+
+        .about-portrait-sheen {
+          pointer-events: none;
+          background:
+            radial-gradient(circle at 18% 12%, rgba(255,255,255,.38), transparent 28%),
+            linear-gradient(135deg, rgba(132,194,65,.22), transparent 42%, rgba(255,255,255,.10));
+          opacity: 0.65;
+          mix-blend-mode: screen;
+        }
+
         .about-reveal {
           opacity: 0;
           transform: translateY(24px);
@@ -617,6 +713,7 @@ export default function AboutPage() {
           opacity: 1;
           transform: translateY(0);
         }
+
       `}</style>
     </main>
   );
