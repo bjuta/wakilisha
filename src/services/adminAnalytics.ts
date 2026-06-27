@@ -141,6 +141,12 @@ export interface BrokenPagesResponse {
   rows: BrokenPageRow[];
 }
 
+export interface BrokenPageScanResponse extends BrokenPagesResponse {
+  scanned: number;
+  skipped: number;
+  failed: number;
+}
+
 export interface RealtimeAnalyticsSnapshot {
   generatedAt: string;
   activeSessions: number;
@@ -298,6 +304,10 @@ export async function fetchSignalBoard(range: DateRange | number = 30): Promise<
 
 export async function fetchBrokenPages(range: DateRange | number = 30): Promise<BrokenPagesResponse> {
   return callAdminAnalytics<BrokenPagesResponse>("analytics_broken_pages", { range });
+}
+
+export async function scanBrokenPages(range: DateRange | number = 30, limit = 80): Promise<BrokenPageScanResponse> {
+  return callAdminAnalytics<BrokenPageScanResponse>("analytics_scan_broken_pages", { range, limit });
 }
 
 export async function refreshSignalOsRollups(range: DateRange | number = 30): Promise<SignalOsRefreshResponse> {
