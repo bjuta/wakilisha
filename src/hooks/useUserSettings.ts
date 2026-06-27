@@ -128,8 +128,6 @@ const LS_PLAYBACK = "wk-playback-v2";
 const LS_PRIVACY = "wk-privacy-v2";
 const LS_SAVED_AT = "wk-settings-saved-v2";
 
-const AVATAR_BUCKET = "avatars";
-const COVER_BUCKET = "profile-covers";
 const COVER_MAX_BYTES = 8 * 1024 * 1024;
 const COVER_MIN_WIDTH = 1600;
 const COVER_MIN_HEIGHT = 600;
@@ -191,6 +189,73 @@ function getAvatarExtension(file: File): AvatarExtension | null {
   if (rawExt === "jpeg") return "jpg";
   if (rawExt === "jpg" || rawExt === "png" || rawExt === "webp") return rawExt;
   return null;
+}
+
+function buildProfileMediaStoragePath(userId: string, kind: "avatar" | "cover", ext: AvatarExtension): string {
+  const safeUserId = userId.replace(/[^a-zA-Z0-9_-]/g, "-");
+  return `uploads/profiles/${safeUserId}/${kind}-${Date.now()}.${ext}`;
+}
+
+async function uploadProfileMediaToLightsail(
+  userId: string,
+  file: File,
+  kind: "avatar" | "cover",
+  ext: AvatarExtension,
+): Promise<string> {
+  const form = new FormData();
+  const storagePath = buildProfileMediaStoragePath(userId, kind, ext);
+  const fileName = `${kind}.${ext}`;
+  const uploadFile = new File([file], fileName, {
+    type: getAvatarContentType(file, ext),
+  });
+
+  form.append("file", uploadFile);
+  form.append("folder", `uploads/profiles/${userId}`);
+  form.append("storage_path", storagePath);
+
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+
+  if (
+    sessionError ||
+    userError ||
+    !sessionData.session?.access_token ||
+    !userData.user
+  ) {
+    throw new Error("Sign in again before uploading profile media.");
+  }
+
+  const supabaseUrl = import.meta.env.VITE_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error("Supabase client environment is missing.");
+  }
+
+  const response = await fetch(`${supabaseUrl}/functions/v1/media-upload-api`, {
+    method: "POST",
+    body: form,
+    headers: {
+      Authorization: `Bearer ${sessionData.session.access_token}`,
+      apikey: supabaseAnonKey,
+    },
+  });
+
+  const payload = await response.json().catch(() => null) as {
+    ok?: boolean;
+    url?: string;
+    error?: string;
+  } | null;
+
+  if (!response.ok) {
+    throw new Error(payload?.error || `Profile image upload failed with ${response.status}.`);
+  }
+
+  if (!payload?.ok || !payload.url) {
+    throw new Error(payload?.error || "Profile image upload failed.");
+  }
+
+  return payload.url;
 }
 
 function getAvatarContentType(file: File, ext: AvatarExtension): string {
@@ -598,17 +663,7 @@ export function useUserSettings() {
     const ext = getAvatarExtension(file);
     if (!ext) throw new Error("Use a JPG, PNG, or WEBP image.");
 
-    const path = `${userId}/avatar.${ext}`;
-    const contentType = getAvatarContentType(file, ext);
-
-    const { error: uploadErr } = await supabase.storage
-      .from(AVATAR_BUCKET)
-      .upload(path, file, { upsert: true, contentType });
-
-    if (uploadErr) throw new Error(uploadErr.message);
-
-    const { data: urlData } = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(path);
-    return `${urlData.publicUrl}?v=${Date.now()}`;
+    return uploadProfileMediaToLightsail(userId, file, "avatar", ext);
   }, [userId]);
 
   // ─── Cover photo upload helper ───
@@ -620,17 +675,7 @@ export function useUserSettings() {
     const ext = getAvatarExtension(file);
     if (!ext) throw new Error("Use a JPG, PNG, or WEBP cover image.");
 
-    const path = `${userId}/cover.${ext}`;
-    const contentType = getAvatarContentType(file, ext);
-
-    const { error: uploadErr } = await supabase.storage
-      .from(COVER_BUCKET)
-      .upload(path, file, { upsert: true, contentType });
-
-    if (uploadErr) throw new Error(uploadErr.message);
-
-    const { data: urlData } = supabase.storage.from(COVER_BUCKET).getPublicUrl(path);
-    return `${urlData.publicUrl}?v=${Date.now()}`;
+    return uploadProfileMediaToLightsail(userId, file, "cover", ext);
   }, [userId]);
 
   return {

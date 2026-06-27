@@ -38,19 +38,24 @@ function userClient(authHeader: string) {
   });
 }
 
-async function requireAdministrator(authHeader: string) {
+async function requireAuthenticatedUser(authHeader: string) {
   const client = userClient(authHeader);
   const { data: userData, error: userError } = await client.auth.getUser();
   if (userError || !userData.user) {
     throw Object.assign(new Error("Not authenticated."), { status: 401 });
   }
 
-  const { data: ok, error } = await client.rpc("current_user_is_administrator");
-  if (error || ok !== true) {
-    throw Object.assign(new Error("Only administrators can upload media."), { status: 403 });
-  }
+  const { data: isAdmin } = await client.rpc("current_user_is_administrator");
 
-  return userData.user;
+  return {
+    user: userData.user,
+    isAdmin: isAdmin === true,
+  };
+}
+
+function isOwnProfileMediaPath(storagePath: string, userId: string) {
+  const safeUserId = userId.replace(/[^a-zA-Z0-9_-]/g, "-");
+  return storagePath.startsWith(`uploads/profiles/${safeUserId}/`);
 }
 
 function slugPart(value: string, fallback = "upload") {
@@ -118,7 +123,7 @@ serve(async (req) => {
     const authHeader = req.headers.get("Authorization") ?? "";
     if (!authHeader.startsWith("Bearer ")) return json(401, { error: "Missing bearer token." });
 
-    const actor = await requireAdministrator(authHeader);
+    const { user: actor, isAdmin } = await requireAuthenticatedUser(authHeader);
 
     const form = await req.formData();
     const fileValue = form.get("file");
@@ -140,6 +145,10 @@ serve(async (req) => {
     const storagePath = existingPath
       ? validateExistingPath(existingPath)
       : buildStoragePath(folder, fileValue.name || "upload.png");
+
+    if (!isAdmin && !isOwnProfileMediaPath(storagePath, actor.id)) {
+      return json(403, { error: "You can only upload your own profile media." });
+    }
 
     const receiverUrl = env("MEDIA_UPLOAD_RECEIVER_URL");
     const receiverSecret = env("MEDIA_UPLOAD_RECEIVER_SECRET");
