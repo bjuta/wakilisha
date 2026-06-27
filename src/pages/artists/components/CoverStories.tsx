@@ -32,8 +32,8 @@ export function CoverStories({ artists }: CoverStoriesProps) {
       <div className="wk-container-wide relative z-10">
         {/* Section header */}
         <div className="mb-10">
-          <div className="wk-eyebrow mb-3">Spotlight</div>
-          <h3 className="wk-h-page max-w-[16ch]">The artists defining the moment</h3>
+          <div className="wk-eyebrow mb-3">Chart focus</div>
+          <h3 className="wk-h-page max-w-[16ch]">Artists near the top of the charts</h3>
         </div>
 
         {/* Asymmetric layout: 1 big hero + side stack */}
@@ -63,7 +63,7 @@ export function CoverStories({ artists }: CoverStoriesProps) {
             <div className="relative z-10 p-6 md:p-8 lg:p-10">
               {/* Badge */}
               <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-[var(--wk-brand)] px-3 py-1.5">
-                <span className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-[var(--wk-brand-on)]">Featured</span>
+                <span className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-[var(--wk-brand-on)]">Featured artist</span>
               </div>
 
               <h4 className="mb-3 font-black text-[clamp(28px,4vw,52px)] leading-[0.95] tracking-[-0.035em] text-white">
