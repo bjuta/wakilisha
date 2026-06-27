@@ -18,7 +18,7 @@ const TILES: Tile[] = [
   },
   {
     img: "https://wakilisha.africa/api/search-image?query=Thoughtful%20portrait%20of%20African%20cultural%20guide%20storyteller%20elder%20in%20warm%20natural%20outdoor%20setting%20dappled%20sunlight%20through%20trees%20confident%20wise%20expression%20traditional%20and%20contemporary%20elements%20blended%20editorial%20portrait%20photography%20shallow%20depth%20of%20field%20soft%20bokeh%20background%20authentic%20documentary%20quality%20rich%20character%20depth&width=600&height=800&seq=collage-guides-wk26&orientation=portrait",
-    label: "Guides", tag: "Live", line: "The discovery layer",
+    label: "Guides", tag: "Live", line: "How to move through it",
     href: "/guides", col: "2", row: "1 / 3",
   },
 ];
@@ -38,7 +38,7 @@ export function HomeCollage() {
           className="font-bold tracking-[-0.025em] text-[var(--wk-text)] max-w-[24ch]"
           style={{ fontSize: "clamp(1.7rem,3.2vw,2.4rem)", lineHeight: 1.05 }}
         >
-          Music and guides — the heart of African creative life.
+          Music and guides, the heart of African creative life.
         </h2>
       </div>
 

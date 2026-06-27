@@ -44,7 +44,7 @@ export function HomeRightNow({ chartEntries, stories, loading }: Props) {
                   className="font-black tracking-[-0.03em] text-[var(--wk-text)]"
                   style={{ fontSize: "clamp(1.6rem,3vw,2.2rem)", lineHeight: 1.05 }}
                 >
-                  What's charting right now
+                  Charting right now
                 </h2>
               </div>
               <Link

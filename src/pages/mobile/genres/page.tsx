@@ -95,7 +95,7 @@ export default function MobileGenres() {
         <div className="genre43-hero-content">
           <div className="genre43-hero-badge"><WkIcon name="Compass" size={12} /> Cultural territories</div>
           <h1 className="genre43-hero-title">Genres</h1>
-          <p className="genre43-hero-sub">Browse WAKILISHA by genre as living cultural territory: artists, tracks, activity, representative voices, and routes into discovery.</p>
+          <p className="genre43-hero-sub">Browse WAKILISHA by genre: artists, tracks, activity, representative voices, and routes into the music.</p>
           <div className="genre43-hero-row">
             <div className="genre43-hero-search-wrap">
               <i className="ri-search-line genre43-hero-search-icon" />
@@ -132,7 +132,7 @@ export default function MobileGenres() {
                   <div className="genre43-spot-kicker">Most active genre</div>
                   <h2 className="genre43-spot-title">{spotlight.name}</h2>
                   <div className="genre43-spot-meta-row"><span>{spotlight.artistCount} artists</span><span className="genre43-spot-dot" /><span>{spotlight.trackCount} tracks</span></div>
-                  <p className="genre43-spot-desc">Representative voices: {spotlight.representativeArtists?.slice(0, 4).join(", ") || "registry pending"}.</p>
+                  <p className="genre43-spot-desc">Artists represented: {spotlight.representativeArtists?.slice(0, 4).join(", ") || "more context soon"}.</p>
                 </div>
               </Link>
               <div className="genre43-compact-stack">
@@ -155,7 +155,7 @@ export default function MobileGenres() {
         )}
 
         <div className="genre43-reveal genre43-pullquote">
-          <div className="genre43-pullquote-inner"><div className="genre43-pullquote-line" /><p className="genre43-pullquote-text">Genres are portals, not people. Every territory is mapped through texture, colour, rhythm, and cultural geography — because sound deserves an ecosystem, not a headshot.</p><div className="genre43-pullquote-line" /></div>
+          <div className="genre43-pullquote-inner"><div className="genre43-pullquote-line" /><p className="genre43-pullquote-text">Genres are routes into sound, not people. Each one is mapped through texture, colour, rhythm, and cultural geography.</p><div className="genre43-pullquote-line" /></div>
         </div>
 
         <section className="genre43-reveal">
@@ -165,8 +165,8 @@ export default function MobileGenres() {
         </section>
 
         <footer className="genre43-reveal genre43-footer">
-          <span className="genre43-footer-brand">WAKILISHA Cultural Map</span>
-          <p className="genre43-footer-tagline">{genres.length} genres across the continent. Every territory mapped as a living ecosystem.</p>
+          <span className="genre43-footer-brand">WAKILISHA Genres</span>
+          <p className="genre43-footer-tagline">{genres.length} genres across the continent. Each one mapped through artists, tracks, and context.</p>
           <p className="genre43-footer-meta">{totalArtists.toLocaleString()} artists &middot; {totalTracks.toLocaleString()} tracks</p>
         </footer>
       </div>
