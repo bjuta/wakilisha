@@ -33,6 +33,16 @@ function ActionMenu({
 
   if (!open) return null;
 
+  const origin = typeof window !== "undefined" ? window.location.origin : "https://wakilisha.africa";
+  const trackSlug = track.trackSlug || track.id || "";
+  const shareUrl = track.artistSlug && trackSlug
+    ? `${origin}/tracks/${track.artistSlug}/${trackSlug}`
+    : trackSlug
+      ? `${origin}/tracks/${trackSlug}`
+      : typeof window !== "undefined"
+        ? window.location.href
+        : origin;
+
   const actions = [
     { label: "Share", icon: "Share2" as const, onClick: () => setShareOpen(true) },
     { label: "View artist", icon: "User" as const, onClick: () => onClose() },
@@ -59,6 +69,7 @@ function ActionMenu({
           subtitle: track.artist,
           description: `${track.title} by ${track.artist}`,
           imageUrl: track.artworkUrl || null,
+          url: shareUrl,
           type: "track",
         }}
         open={shareOpen}
@@ -568,9 +579,12 @@ export function MobileFullPlayer() {
         open={actionMenuOpen}
         onClose={() => setActionMenuOpen(false)}
         track={{
+          id: currentTrack.id,
           title: currentTrack.title,
           artist: currentTrack.artist,
           artworkUrl: currentTrack.artworkUrl,
+          artistSlug: currentTrack.artistSlug,
+          trackSlug: currentTrack.trackSlug,
         }}
         saved={liked}
         savePending={savePending}
