@@ -33,7 +33,7 @@ export function NewsletterSubscribe({
   briefingSlugs = BRIEFING_SLUGS.cultureDispatch,
   sourceForm = "newsletter_subscribe",
   interests = [],
-  successMessage = "You're in. Check your inbox to confirm your subscription.",
+  successMessage = "You’re in. Check your inbox to confirm your subscription.",
   analytics,
 }: NewsletterSubscribeProps) {
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
@@ -93,7 +93,7 @@ export function NewsletterSubscribe({
       });
 
       setStatus("success");
-      setMessage(result.status === "already_confirmed" ? "You're already confirmed. Your preferences have been updated." : successMessage);
+      setMessage(result.status === "already_confirmed" ? "You’re already confirmed. Your preferences have been updated." : successMessage);
       form.reset();
 
       trackEvent("newsletter_success", {

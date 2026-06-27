@@ -284,13 +284,13 @@ export default function Magazine() {
   const orderedSections = useMemo((): SectionDef[] => {
     const defs: SectionDef[] = [];
 
-    // Editor's Picks
+    // Editor’s Picks
     if (picks.length > 0) {
       defs.push({
         id: "picks",
         render: () => (
           <section className="mag-reveal">
-            <SectionLabel>Editor's Picks</SectionLabel>
+            <SectionLabel>Editor’s Picks</SectionLabel>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 lg:items-stretch">
               <div className="lg:h-full">
                 <MagazineCard variant="hero" story={picks[0]} rank={1} />
@@ -410,7 +410,7 @@ export default function Magazine() {
   /* ── Human-readable label for each section ID ── */
   const sectionNavItems = useMemo(() => {
     const LABELS: Record<string, string> = {
-      picks: "Editor's Picks",
+      picks: "Editor’s Picks",
       latest: "Latest",
       artists: "Featured Artists",
       guides: "Featured Guide",

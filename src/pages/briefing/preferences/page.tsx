@@ -225,7 +225,7 @@ export default function BriefingPreferencesPage() {
             </div>
             <h2 className="text-[22px] font-black tracking-[-0.03em] text-[var(--wk-text)] mb-2">Preferences saved</h2>
             <p className="text-[14px] leading-relaxed text-[var(--wk-text-muted)] max-w-[360px] mx-auto mb-6">
-              You're now subscribed to {toggled.size} briefing{toggled.size > 1 ? "s" : ""}. You can update these anytime from the link in any briefing email.
+              You’re now subscribed to {toggled.size} briefing{toggled.size > 1 ? "s" : ""}. You can update these anytime from the link in any briefing email.
             </p>
             <Link
               to="/"

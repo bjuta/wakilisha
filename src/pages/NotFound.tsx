@@ -119,8 +119,8 @@ export default function NotFound() {
           className="wk-copy mb-10 max-w-md text-center"
           style={{ color: "var(--wk-text-muted)" }}
         >
-          The page you're looking for doesn't exist or has been moved.
-          Let's get you back on track.
+          The page you’re looking for doesn’t exist or has been moved.
+          Let’s get you back on track.
         </p>
 
         {/* Primary action */}

@@ -22,7 +22,7 @@ export function WkEditorialPicks({ picks }: WkEditorialPicksProps) {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
-        <div className="wk-eyebrow">Editor's picks</div>
+        <div className="wk-eyebrow">Editor’s picks</div>
       </div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {picks.map((pick) => (

@@ -877,7 +877,7 @@ async function handleSubscribe(body: any, c: Record<string, string>, ip: string,
     briefings: optedIn,
     audience_interests: recordedInterests,
     status: existing?.status === "confirmed" ? "already_confirmed" : "pending_confirmation",
-    message: existing?.status === "confirmed" ? "Briefings updated. You're already confirmed." : "Check your email to confirm your subscription."
+    message: existing?.status === "confirmed" ? "Briefings updated. You’re already confirmed." : "Check your email to confirm your subscription."
   }, c);
 }
 

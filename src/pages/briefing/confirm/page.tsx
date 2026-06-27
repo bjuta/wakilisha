@@ -87,7 +87,7 @@ export default function BriefingConfirmPage() {
             </div>
             <h2 className="text-[22px] font-black tracking-[-0.03em] text-[var(--wk-text)] mb-2">Confirmation link expired</h2>
             <p className="text-[14px] leading-relaxed text-[var(--wk-text-muted)] max-w-[360px] mx-auto mb-6">
-              This confirmation link has expired. Subscribe again to receive a fresh confirmation email — links are valid for 7 days.
+              This confirmation link has expired. Subscribe again to receive a fresh confirmation email. Links are valid for 7 days.
             </p>
             <Link
               to="/"
@@ -105,14 +105,14 @@ export default function BriefingConfirmPage() {
               <i className="ri-check-line text-[36px] font-bold text-[var(--wk-brand-on)]" />
               <style>{`.confetti{position:absolute;width:8px;height:8px;border-radius:2px;animation:confetti-fall 1.8s var(--wk-ease-out) forwards;opacity:0}@keyframes confetti-fall{0%{transform:translateY(0) rotate(0deg);opacity:1}100%{transform:translateY(60px) rotate(360deg);opacity:0}}`}</style>
             </div>
-            <h2 className="text-[22px] lg:text-[26px] font-black tracking-[-0.035em] text-[var(--wk-text)] mb-2">You're in</h2>
+            <h2 className="text-[22px] lg:text-[26px] font-black tracking-[-0.035em] text-[var(--wk-text)] mb-2">You’re in</h2>
             {state.email && (
               <p className="text-[14px] leading-relaxed text-[var(--wk-text-soft)] mb-1">
                 <strong>{state.email}</strong> is now confirmed.
               </p>
             )}
             <p className="text-[14px] leading-relaxed text-[var(--wk-text-muted)] max-w-[360px] mx-auto mb-8">
-              You'll start receiving WAKILISHA briefings on their scheduled days. Look out for our first one in your inbox.
+              You’ll start receiving WAKILISHA briefings on their scheduled days. Look out for the first one in your inbox.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
               <Link
@@ -144,7 +144,7 @@ export default function BriefingConfirmPage() {
               </p>
             )}
             <p className="text-[14px] leading-relaxed text-[var(--wk-text-muted)] max-w-[360px] mx-auto mb-6">
-              Your briefings have been updated with your latest selections. You're all set.
+              Your briefings have been updated with your latest selections. You’re all set.
             </p>
             <Link
               to="/"

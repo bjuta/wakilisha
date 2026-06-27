@@ -158,7 +158,7 @@ function authorToPerson(author: AuthorRow): PersonProfile {
     profilePath: `/authors/${author.slug}`,
     links,
     source: "registry_authors",
-    bio: author.bio || `${name} contributes to WAKILISHA's coverage of African music and creative life.`,
+    bio: author.bio || `${name} contributes to WAKILISHA’s coverage of African music and creative life.`,
   };
 }
 
@@ -204,7 +204,7 @@ function AboutNewsletter() {
           <div className="w-14 h-14 rounded-full bg-[var(--wk-brand)] flex items-center justify-center mx-auto mb-5">
             <i className="ri-check-line text-[28px] text-[var(--wk-brand-on)]" />
           </div>
-          <h3 className="text-[24px] font-black tracking-[-0.03em] text-[var(--wk-text)] mb-2">You're in</h3>
+          <h3 className="text-[24px] font-black tracking-[-0.03em] text-[var(--wk-text)] mb-2">You’re in</h3>
           <p className="text-[14px] text-[var(--wk-text-muted)] max-w-[380px] mx-auto leading-relaxed">
             Culture Dispatch is now on its way to you.
           </p>
