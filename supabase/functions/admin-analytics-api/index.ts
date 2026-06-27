@@ -1210,6 +1210,389 @@ function brokenSeverity(hits: number, sessions: number, suggestedFix: string): "
   return "low";
 }
 
+function isScannablePublicUrl(raw: unknown): boolean {
+  const value = readString(raw);
+  if (!value) return false;
+
+  try {
+    const url = new URL(value);
+    const host = url.hostname.replace(/^www\./, "");
+    if (host !== "wakilisha.africa") return false;
+
+    const path = url.pathname || "/";
+    if (path.startsWith("/admin")) return false;
+    if (path.startsWith("/api")) return false;
+    if (path.startsWith("/auth")) return false;
+    if (path.startsWith("/settings")) return false;
+    if (path.startsWith("/wp-admin")) return false;
+    if (path.match(/\.(png|jpg|jpeg|gif|webp|svg|ico|css|js|map|xml|txt|json|woff2?)$/i)) return false;
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function canonicalScanUrl(raw: unknown): string {
+  try {
+    const url = new URL(readString(raw));
+    url.hash = "";
+    return `https://wakilisha.africa${url.pathname.replace(/\/+$/, "") || "/"}${url.search || ""}`;
+  } catch {
+    return "";
+  }
+}
+
+function isSoft404Html(html: string): boolean {
+  const sample = html.slice(0, 120000).toLowerCase();
+
+  return (
+    sample.includes("page not found") ||
+    sample.includes(">404<") ||
+    sample.includes("the page you're looking for doesn't exist") ||
+    sample.includes("doesn't exist or has been moved") ||
+    sample.includes("not found.")
+  );
+}
+
+function titleFromHtml(html: string): string {
+  const match = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+  return match?.[1]?.trim() || "";
+}
+
+async function scanPublicUrl(url: string) {
+  const startedAt = Date.now();
+
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      redirect: "follow",
+      headers: {
+        "User-Agent": "WAKILISHA Maintenance URL Health Scanner/1.0",
+        "Accept": "text/html,application/xhtml+xml",
+      },
+    });
+
+    const finalUrl = response.url || url;
+    const contentType = response.headers.get("content-type") || "";
+    const html = contentType.includes("text/html") ? await response.text() : "";
+    const soft404 = response.ok && html ? isSoft404Html(html) : false;
+
+    return {
+      url,
+      finalUrl,
+      statusCode: response.status,
+      ok: response.ok && !soft404,
+      soft404,
+      title: html ? titleFromHtml(html) : "",
+      durationMs: Date.now() - startedAt,
+      error: "",
+    };
+  } catch (error) {
+    return {
+      url,
+      finalUrl: url,
+      statusCode: 0,
+      ok: false,
+      soft404: false,
+      title: "",
+      durationMs: Date.now() - startedAt,
+      error: error instanceof Error ? error.message : "Fetch failed",
+    };
+  }
+}
+
+function scanResultToBrokenEvent(result: any) {
+  const path = brokenPagePathFromUrl(result.finalUrl || result.url);
+  const status = result.statusCode || 0;
+  const legacyFix = brokenSuggestedFix(path);
+  const dirtyTrackFix = cleanDirtyTrackPath(path);
+  const suggestedFix = legacyFix || dirtyTrackFix;
+
+  let routeGuess = brokenRouteGuess(path);
+  if (dirtyTrackFix) routeGuess = "dirty_track_slug";
+  if (routeGuess === "unknown" && path.startsWith("/magazine/")) routeGuess = "missing_article";
+  if (routeGuess === "unknown" && path.startsWith("/tracks/")) routeGuess = "missing_track";
+  if (routeGuess === "unknown" && path.startsWith("/artists/")) routeGuess = "missing_artist";
+  if (routeGuess === "unknown" && path.startsWith("/releases/")) routeGuess = "missing_release";
+  if (routeGuess === "unknown" && path.startsWith("/guides/")) routeGuess = "missing_guide";
+
+  if (routeGuess === "unknown" && isKnownContentRoute(path) && status < 400 && !result.soft404) {
+    return null;
+  }
+
+  return {
+    id: `scan::${result.url}`,
+    event_name: "page_not_found",
+    page_url: result.finalUrl || result.url,
+    page_type: result.soft404 ? "soft_404" : "404",
+    entity_slug: path.replace(/^\/+|\/+$/g, "").replace(/[^a-zA-Z0-9/_-]+/g, "-") || "home",
+    entity_type: "broken_page",
+    session_id: `maintenance_scan::${new Date().toISOString().slice(0, 10)}`,
+    referrer: null,
+    created_at: new Date().toISOString(),
+    context: {
+      status_code: status,
+      not_found_path: path,
+      route_guess: result.soft404 && routeGuess === "unknown" ? "suspected_soft_404" : routeGuess,
+      suggested_fix: suggestedFix,
+      soft_404_surface: result.soft404 ? "proactive_url_scan" : null,
+      proactive_scan: true,
+      scanned_url: result.url,
+      final_url: result.finalUrl,
+      page_title: result.title,
+      fetch_error: result.error,
+      duration_ms: result.durationMs,
+    },
+  };
+}
+
+function isKnownPublicIndexPath(path: string): boolean {
+  return [
+    "/about",
+    "/account",
+    "/artists",
+    "/authors",
+    "/categories",
+    "/charts",
+    "/contact",
+    "/faqs",
+    "/featured-artists",
+    "/featured-guides",
+    "/genres",
+    "/guides",
+    "/labels",
+    "/lyrics",
+    "/magazine",
+    "/privacy",
+    "/profile",
+    "/releases",
+    "/search",
+    "/tags",
+    "/terms",
+    "/tracks",
+  ].includes(path);
+}
+
+function isKnownContentRoute(path: string): boolean {
+  return (
+    path.startsWith("/magazine/") ||
+    path.startsWith("/tracks/") ||
+    path.startsWith("/artists/") ||
+    path.startsWith("/releases/") ||
+    path.startsWith("/guides/")
+  );
+}
+
+function cleanDirtyTrackPath(path: string): string {
+  const parts = path.split("/").filter(Boolean);
+  if (parts[0] !== "tracks" || parts.length < 3) return "";
+
+  const artistSlug = parts[1];
+  const trackSlug = parts.slice(2).join("/");
+
+  if (trackSlug.endsWith(`-${artistSlug}`)) {
+    return `/tracks/${artistSlug}/${trackSlug.slice(0, -artistSlug.length - 1)}`;
+  }
+
+  return "";
+}
+
+function routeAwareBrokenEvent(url: string): any | null {
+  const path = brokenPagePathFromUrl(url);
+  if (!path || path === "/" || isKnownPublicIndexPath(path)) return null;
+
+  const legacyFix = brokenSuggestedFix(path);
+  const routeGuess = brokenRouteGuess(path);
+
+  if (legacyFix) {
+    return {
+      id: `route_scan::${path}`,
+      event_name: "page_not_found",
+      page_url: url,
+      page_type: "suspected_soft_404",
+      entity_slug: path.replace(/^\/+|\/+$/g, "").replace(/[^a-zA-Z0-9/_-]+/g, "-") || "home",
+      entity_type: "broken_page",
+      session_id: `maintenance_route_scan::${new Date().toISOString().slice(0, 10)}`,
+      referrer: null,
+      created_at: new Date().toISOString(),
+      context: {
+        status_code: 200,
+        not_found_path: path,
+        route_guess: routeGuess,
+        suggested_fix: legacyFix,
+        soft_404_surface: "route_aware_proactive_scan",
+        proactive_scan: true,
+        scanned_url: url,
+        final_url: legacyFix,
+      },
+    };
+  }
+
+  const parts = path.split("/").filter(Boolean);
+
+  if (parts.length === 1) {
+    return {
+      id: `single_slug_scan::${path}`,
+      event_name: "page_not_found",
+      page_url: url,
+      page_type: "suspected_soft_404",
+      entity_slug: parts[0],
+      entity_type: "broken_page",
+      session_id: `maintenance_route_scan::${new Date().toISOString().slice(0, 10)}`,
+      referrer: null,
+      created_at: new Date().toISOString(),
+      context: {
+        status_code: 200,
+        not_found_path: path,
+        route_guess: "possible_legacy_article_slug",
+        suggested_fix: "",
+        soft_404_surface: "single_slug_proactive_scan",
+        proactive_scan: true,
+        scanned_url: url,
+      },
+    };
+  }
+
+  return null;
+}
+
+async function taxonomyEmptyEvents(db: ReturnType<typeof createClient>, pageRows: any[]) {
+  const events: any[] = [];
+  const seen = new Set<string>();
+
+  for (const row of pageRows) {
+    const path = brokenPagePathFromUrl(row.page_url);
+    const match = path.match(/^\/(tags|categories)\/([^/?#]+)/);
+    if (!match) continue;
+
+    const taxonomy = match[1] === "tags" ? "post_tag" : "category";
+    const kind = match[1] === "tags" ? "tag" : "category";
+    const slug = decodeURIComponent(match[2]);
+    const key = `${kind}:${slug}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    const { data: termRows, error: termError } = await db.rpc("public_get_taxonomy_term", {
+      p_taxonomy: taxonomy,
+      p_slug: slug,
+    });
+
+    const term = Array.isArray(termRows) ? termRows[0] : null;
+
+    if (termError || !term) {
+      events.push({
+        id: `missing_taxonomy::${kind}::${slug}`,
+        event_name: "page_not_found",
+        page_url: row.page_url,
+        page_type: "suspected_soft_404",
+        entity_slug: slug,
+        entity_type: "broken_page",
+        session_id: `maintenance_taxonomy_scan::${new Date().toISOString().slice(0, 10)}`,
+        referrer: row.referrer ?? null,
+        created_at: new Date().toISOString(),
+        context: {
+          status_code: 200,
+          not_found_path: path,
+          route_guess: `missing_${kind}`,
+          suggested_fix: "",
+          soft_404_surface: "taxonomy_proactive_scan",
+          proactive_scan: true,
+          scanned_url: row.page_url,
+        },
+      });
+      continue;
+    }
+
+    const count = Number(term.article_count || 0);
+    if (count === 0) {
+      events.push({
+        id: `empty_taxonomy::${kind}::${slug}`,
+        event_name: "page_not_found",
+        page_url: row.page_url,
+        page_type: "suspected_soft_404",
+        entity_slug: slug,
+        entity_type: "broken_page",
+        session_id: `maintenance_taxonomy_scan::${new Date().toISOString().slice(0, 10)}`,
+        referrer: row.referrer ?? null,
+        created_at: new Date().toISOString(),
+        context: {
+          status_code: 200,
+          not_found_path: path,
+          route_guess: `empty_${kind}`,
+          suggested_fix: kind === "tag" ? "/admin/tags" : "/admin/categories",
+          soft_404_surface: "taxonomy_proactive_scan",
+          proactive_scan: true,
+          scanned_url: row.page_url,
+          taxonomy_name: term.name,
+        },
+      });
+    }
+  }
+
+  return events;
+}
+
+async function scanBrokenPages(db: ReturnType<typeof createClient>, range: RangeInput, limit = 80) {
+  const { data: pageRows, error: pageError } = await db
+    .from("analytics_events")
+    .select("page_url,created_at,event_name,session_id,referrer,page_type,entity_slug,entity_type,context")
+    .gte("created_at", sinceFromRange(range))
+    .lte("created_at", untilFromRange(range))
+    .not("page_url", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(5000);
+
+  if (pageError) throw pageError;
+
+  const seen = new Set<string>();
+  const candidates: string[] = [];
+  const routeEvents: any[] = [];
+
+  for (const row of pageRows ?? []) {
+    const url = canonicalScanUrl(row.page_url);
+    if (!url || seen.has(url) || !isScannablePublicUrl(url)) continue;
+
+    seen.add(url);
+
+    const routeEvent = routeAwareBrokenEvent(url);
+    if (routeEvent) routeEvents.push(routeEvent);
+
+    candidates.push(url);
+    if (candidates.length >= Math.max(1, Math.min(limit, 150))) break;
+  }
+
+  const taxonomyEvents = await taxonomyEmptyEvents(db, pageRows ?? []);
+
+  const brokenEvents: any[] = [...routeEvents, ...taxonomyEvents];
+  let scanned = 0;
+  let skipped = 0;
+  let failed = 0;
+
+  for (const url of candidates) {
+    const result = await scanPublicUrl(url);
+    scanned += 1;
+
+    if (result.error) failed += 1;
+
+    if (!result.ok) {
+      const brokenEvent = scanResultToBrokenEvent(result);
+      if (brokenEvent) brokenEvents.push(brokenEvent);
+    } else {
+      skipped += 1;
+    }
+  }
+
+  const board = buildBrokenPages(brokenEvents, range);
+
+  return {
+    ...board,
+    scanned,
+    skipped,
+    failed,
+  };
+}
+
 function buildBrokenPages(events: any[], range: RangeInput) {
   const notFoundEvents = events.filter((row) => row.event_name === "page_not_found");
   const map = new Map<string, any>();
@@ -1766,6 +2149,12 @@ Deno.serve(async (req) => {
       if (brokenError) throw brokenError;
 
       return ok(buildBrokenPages(brokenEvents ?? [], range), headers);
+    }
+
+    if (action === "analytics_scan_broken_pages") {
+      const range = body.range ?? 30;
+      const limit = Number(body.limit || 80);
+      return ok(await scanBrokenPages(db, range, limit), headers);
     }
 
     if (action === "analytics_refresh_signal_os_rollups") {

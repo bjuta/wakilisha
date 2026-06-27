@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
-import { fetchBrokenPages, type BrokenPagesResponse, type BrokenPageRow } from "@/services/adminAnalytics";
+import { fetchBrokenPages, scanBrokenPages, type BrokenPagesResponse, type BrokenPageRow, type BrokenPageScanResponse } from "@/services/adminAnalytics";
 import {
   getMaintenanceSettings,
   saveDomainSettings,
@@ -20,7 +20,9 @@ export default function AdminSettingsMaintenance() {
   const [lastResult, setLastResult] = useState<MaintenanceActionResult | null>(null);
   const [brokenPages, setBrokenPages] = useState<BrokenPagesResponse | null>(null);
   const [brokenPagesLoading, setBrokenPagesLoading] = useState(false);
+  const [brokenPagesScanning, setBrokenPagesScanning] = useState(false);
   const [brokenPagesError, setBrokenPagesError] = useState<string | null>(null);
+  const [lastScan, setLastScan] = useState<BrokenPageScanResponse | null>(null);
 
   const update = <K extends keyof MaintenanceSettings>(key: K, value: MaintenanceSettings[K]) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
@@ -38,6 +40,27 @@ export default function AdminSettingsMaintenance() {
       setBrokenPagesError(error instanceof Error ? error.message : "Could not load broken pages.");
     } finally {
       setBrokenPagesLoading(false);
+    }
+  };
+
+  const runBrokenPageScan = async () => {
+    setBrokenPagesScanning(true);
+    setBrokenPagesError(null);
+
+    try {
+      const result = await scanBrokenPages(30, 80);
+      setLastScan(result);
+      setBrokenPages(result);
+      pushAuditEvent({
+        domain: "maintenance",
+        action: "broken_page_scan",
+        details: `Scanned ${result.scanned} URLs. Found ${result.summary.uniquePages} broken candidates.`,
+        severity: result.summary.uniquePages > 0 ? "warning" : "info",
+      });
+    } catch (error) {
+      setBrokenPagesError(error instanceof Error ? error.message : "Could not run proactive scan.");
+    } finally {
+      setBrokenPagesScanning(false);
     }
   };
 
@@ -100,14 +123,24 @@ export default function AdminSettingsMaintenance() {
               Real hard 404s from analytics. This catches users landing on dead routes before we find them by accident.
             </p>
           </div>
-          <button
-            onClick={loadBrokenPages}
-            disabled={brokenPagesLoading}
-            className="wk-button wk-button-soft wk-button-sm inline-flex items-center gap-1.5"
-          >
-            <WkIcon name={brokenPagesLoading ? "Loader" : "RefreshCw"} size={14} />
-            {brokenPagesLoading ? "Checking..." : "Refresh"}
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={runBrokenPageScan}
+              disabled={brokenPagesScanning}
+              className="wk-button wk-button-primary wk-button-sm inline-flex items-center gap-1.5"
+            >
+              <WkIcon name={brokenPagesScanning ? "Loader" : "Radar"} size={14} />
+              {brokenPagesScanning ? "Scanning..." : "Run Proactive Scan"}
+            </button>
+            <button
+              onClick={loadBrokenPages}
+              disabled={brokenPagesLoading || brokenPagesScanning}
+              className="wk-button wk-button-soft wk-button-sm inline-flex items-center gap-1.5"
+            >
+              <WkIcon name={brokenPagesLoading ? "Loader" : "RefreshCw"} size={14} />
+              {brokenPagesLoading ? "Checking..." : "Refresh"}
+            </button>
+          </div>
         </div>
 
         {brokenPagesError && (
@@ -122,6 +155,12 @@ export default function AdminSettingsMaintenance() {
           <MaintenanceKpi label="High Severity" value={brokenPages?.summary.highSeverityCount ?? 0} />
           <MaintenanceKpi label="Auto-fix Candidates" value={brokenPages?.summary.legacyFixCount ?? 0} />
         </div>
+
+        {lastScan && (
+          <div className="mb-4 rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[12px] font-semibold text-[var(--wk-text-muted)]">
+            Last proactive scan checked {lastScan.scanned.toLocaleString()} recent public URLs, passed {lastScan.skipped.toLocaleString()}, failed {lastScan.failed.toLocaleString()}, and found {lastScan.summary.uniquePages.toLocaleString()} broken candidates.
+          </div>
+        )}
 
         {!brokenPages || brokenPages.rows.length === 0 ? (
           <div className="rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] p-4 text-[12px] font-semibold text-[var(--wk-text-muted)]">
