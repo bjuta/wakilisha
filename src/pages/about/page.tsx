@@ -4,6 +4,7 @@ import { trackEvent, getAnalyticsSessionId, getCanonicalPageUrl } from "@/servic
 import { BRIEFING_SLUGS, isValidEmail, normalizeEmail, subscribeToBriefings } from "@/services/audienceSubscriptionService";
 import { fetchAllAuthors, type AuthorRow } from "@/services/authorProfiles";
 import { Chapter19FallbackImage } from "@/components/media/Chapter19FallbackImage";
+import { getFrontendAppearanceSettings } from "@/services/adminSettings/settingsStore";
 
 type PersonLink = {
   label: string;
@@ -24,26 +25,6 @@ type PersonProfile = {
   source: "founder" | "registry_authors";
 };
 
-const TRUST_POINTS = [
-  {
-    eyebrow: "Editorial",
-    title: "Real bylines, real context",
-    desc: "WAKILISHA is built around named contributors, visible authorship, and stories that carry context beyond the algorithm.",
-    icon: "ri-quill-pen-line",
-  },
-  {
-    eyebrow: "Data",
-    title: "Explainable music surfaces",
-    desc: "Charts, artist pages, tracks, releases, and signals should be inspectable. We are building toward clearer methodology, source trails, and correction paths.",
-    icon: "ri-bar-chart-box-line",
-  },
-  {
-    eyebrow: "Company",
-    title: "Built for diligence",
-    desc: "Partners, funders, contributors, and readers should be able to understand who runs WAKILISHA, how it works, and how to reach the right person.",
-    icon: "ri-shield-check-line",
-  },
-];
 
 const OPERATING_AREAS = [
   {
@@ -83,8 +64,7 @@ const SECTION_NAV_ITEMS = [
   { label: "Overview", href: "#overview" },
   { label: "Gang", href: "#meet-the-gang" },
   { label: "Work", href: "#work" },
-  { label: "Trust", href: "#trust" },
-  { label: "Diligence", href: "#diligence" },
+  { label: "Contact", href: "#diligence" },
 ];
 
 
@@ -106,15 +86,6 @@ function useScrollReveal() {
     els.forEach((el) => observer.observe(el));
     return () => observer.disconnect();
   }, []);
-}
-
-function initials(name: string) {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((part) => part[0]?.toUpperCase() || "")
-    .join("")
-    .slice(0, 2);
 }
 
 function excerpt(value: string, max = 175) {
@@ -145,36 +116,6 @@ function isUsablePortraitUrl(url?: string | null) {
   ];
 
   return !blocked.some((token) => lower.includes(token));
-}
-
-function generatedPortrait(name: string, slug: string) {
-  const seed = Array.from(slug).reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  const hueA = 72 + (seed % 32);
-  const hueB = 220 + (seed % 80);
-  const mark = initials(name) || "WK";
-
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="720" height="900" viewBox="0 0 720 900">
-    <defs>
-      <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0" stop-color="hsl(${hueA} 58% 54%)"/>
-        <stop offset="0.58" stop-color="#11160d"/>
-        <stop offset="1" stop-color="hsl(${hueB} 58% 42%)"/>
-      </linearGradient>
-      <radialGradient id="orb" cx="50%" cy="32%" r="58%">
-        <stop offset="0" stop-color="#ffffff" stop-opacity="0.34"/>
-        <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
-      </radialGradient>
-    </defs>
-    <rect width="720" height="900" fill="url(#bg)"/>
-    <circle cx="560" cy="160" r="260" fill="url(#orb)"/>
-    <circle cx="140" cy="760" r="300" fill="#84C241" opacity="0.16"/>
-    <path d="M0 610 C160 545 250 675 380 585 C505 498 565 542 720 470 L720 900 L0 900 Z" fill="#f7f9f1" opacity="0.14"/>
-    <rect x="72" y="74" width="576" height="752" rx="36" fill="#0c0d0a" opacity="0.22" stroke="#ffffff" stroke-opacity="0.22"/>
-    <text x="360" y="488" text-anchor="middle" fill="#f7f9f1" font-family="Inter,Arial,sans-serif" font-size="154" font-weight="900" letter-spacing="-10">${mark}</text>
-    <text x="360" y="550" text-anchor="middle" fill="#84C241" font-family="Inter,Arial,sans-serif" font-size="28" font-weight="900" letter-spacing="8">WAKILISHA</text>
-  </svg>`;
-
-  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
 function isFounderProfile(name: string, role: string, slug: string) {
@@ -277,7 +218,7 @@ function AboutNewsletter() {
             Follow what we are building
           </h2>
           <p className="text-[14px] text-[var(--wk-text-muted)] leading-relaxed mb-8">
-            Editorial updates, charts, guides, contributor notes, and the company signals worth paying attention to.
+            New stories, chart updates, guides, contributor notes, and the cultural signals worth paying attention to.
           </p>
           <form onSubmit={handleSubmit} className="flex flex-col gap-3 max-w-[500px] mx-auto sm:flex-row">
             <input type="hidden" name="wk_session_id" value={getAnalyticsSessionId()} />
@@ -321,7 +262,7 @@ function PersonCard({ person, featured = false }: { person: PersonProfile; featu
   const portrait = isUsablePortraitUrl(person.avatarUrl) ? person.avatarUrl : "";
   const bioExcerpt = excerpt(person.bio, featured ? 260 : 155);
   const card = (
-    <article className={`about-person-card group relative flex h-full flex-col overflow-hidden rounded-[22px] border border-[var(--wk-border)] bg-[var(--wk-surface)] transition-all duration-300 hover:-translate-y-0.5 hover:border-[var(--wk-border-2)] ${featured ? "lg:grid lg:grid-cols-[0.9fr_1.1fr]" : ""}`}>
+    <article className={`about-person-card group relative flex h-full flex-col overflow-hidden rounded-[22px] border border-[var(--wk-border)] bg-[var(--wk-surface)] transition-all duration-300 hover:-translate-y-1 hover:border-[var(--wk-brand)] ${featured ? "lg:grid lg:grid-cols-[0.9fr_1.1fr]" : ""}`}>
       <div className={`about-portrait-frame relative overflow-hidden bg-[#0c0d0a] ${featured ? "min-h-[300px]" : "aspect-[16/11]"}`}>
         {portrait ? (
           <img src={portrait} alt={person.name} className="about-portrait-img h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
@@ -389,9 +330,16 @@ function PersonCard({ person, featured = false }: { person: PersonProfile; featu
 export default function AboutPage() {
   const [authors, setAuthors] = useState<AuthorRow[]>([]);
   const [authorsStatus, setAuthorsStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [appearance, setAppearance] = useState(() => getFrontendAppearanceSettings());
   const heroRef = useRef<HTMLDivElement>(null);
 
   useScrollReveal();
+
+  useEffect(() => {
+    const syncAppearance = () => setAppearance(getFrontendAppearanceSettings());
+    window.addEventListener("wk_settings_changed", syncAppearance);
+    return () => window.removeEventListener("wk_settings_changed", syncAppearance);
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -429,12 +377,18 @@ export default function AboutPage() {
   }, [authors]);
 
   const hasContributors = contributorPeople.length > 0;
-  const founderPerson = contributorPeople.find((person) => person.team === "Founder") || null;
+
+  const aboutHeroBackgroundImage = appearance.aboutHeroBackgroundImage?.trim();
 
   return (
     <main className="min-h-screen bg-[var(--wk-bg)]">
-      <section ref={heroRef} className="about-hero relative -mt-16 overflow-hidden bg-[#070807] text-white">
+      <section
+        ref={heroRef}
+        className="about-hero relative -mt-16 overflow-hidden bg-[#070807] text-white"
+        style={aboutHeroBackgroundImage ? { backgroundImage: `url(${aboutHeroBackgroundImage})`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}
+      >
         <div className="absolute inset-0">
+          {aboutHeroBackgroundImage && <div className="absolute inset-0 bg-black/68" />}
           <div className="absolute left-[-12%] top-[-35%] h-[460px] w-[460px] rounded-full bg-[var(--wk-brand)] opacity-18 blur-[120px]" />
           <div className="absolute right-[-20%] bottom-[-35%] h-[420px] w-[420px] rounded-full bg-white opacity-[0.06] blur-[120px]" />
           <div className="absolute inset-0 opacity-[0.055]" style={{ backgroundImage: "linear-gradient(to right, #fff 1px, transparent 1px), linear-gradient(to bottom, #fff 1px, transparent 1px)", backgroundSize: "84px 84px" }} />
@@ -452,34 +406,12 @@ export default function AboutPage() {
             </h1>
 
             <p className="mt-6 max-w-[620px] text-[15px] leading-relaxed text-white/62 md:text-[18px]">
-              WAKILISHA is an editorial and data company for African creative life. We publish stories, map artists, build charts, and make discovery infrastructure easier to inspect.
+              WAKILISHA is an editorial and data company for African creative life. We publish stories, map artists, build charts, and make the culture easier to discover, credit, and understand.
             </p>
-
-            {founderPerson && (
-              <Link to={founderPerson.profilePath || "#meet-the-gang"} className="mt-7 inline-flex items-center gap-3 rounded-full border border-white/12 bg-white/[0.05] py-2 pl-2 pr-5 backdrop-blur transition-colors hover:border-[var(--wk-brand)]">
-                {isUsablePortraitUrl(founderPerson.avatarUrl) ? (
-                  <img src={founderPerson.avatarUrl} alt={founderPerson.name} className="h-10 w-10 rounded-full object-cover" />
-                ) : (
-                  <Chapter19FallbackImage
-                    id={founderPerson.slug}
-                    slug={founderPerson.slug}
-                    name={founderPerson.name}
-                    className="h-10 w-10 rounded-full"
-                  />
-                )}
-                <span className="text-left">
-                  <span className="block text-[12px] font-black text-white">{founderPerson.name}</span>
-                  <span className="block text-[10px] font-bold uppercase tracking-[0.12em] text-white/42">{founderPerson.role}</span>
-                </span>
-              </Link>
-            )}
 
             <div className="mt-8 flex flex-wrap gap-3">
               <a href="#meet-the-gang" className="inline-flex h-11 items-center rounded-full bg-[var(--wk-brand)] px-5 text-[12px] font-black text-[var(--wk-brand-on)] transition-transform hover:-translate-y-0.5">
                 Meet the Gang
-              </a>
-              <a href="#diligence" className="inline-flex h-11 items-center rounded-full border border-white/18 px-5 text-[12px] font-black text-white transition-colors hover:bg-white hover:text-black">
-                Due diligence
               </a>
             </div>
           </div>
@@ -492,7 +424,7 @@ export default function AboutPage() {
             <a
               key={item.href}
               href={item.href}
-              className="shrink-0 rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] px-4 py-2 text-[11px] font-black uppercase tracking-[0.13em] text-[var(--wk-text-muted)] transition-colors hover:border-[var(--wk-brand)] hover:text-[var(--wk-brand)]"
+              className="shrink-0 rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] px-4 py-2 text-[11px] font-black uppercase tracking-[0.13em] text-[var(--wk-text-muted)] transition-all hover:-translate-y-0.5 hover:border-[var(--wk-brand)] hover:text-[var(--wk-brand)]"
             >
               {item.label}
             </a>
@@ -527,26 +459,26 @@ export default function AboutPage() {
               </h2>
             </div>
             <p className="max-w-[440px] text-[14px] leading-relaxed text-[var(--wk-text-muted)]">
-              This section is powered by WAKILISHA contributor profile data where available. No fake team members. No anonymous mascots. Missing links stay missing until they are verified.
+              Meet the writers, editors, researchers, and cultural workers helping shape WAKILISHA’s voice.
             </p>
           </div>
 
           <div className="mt-5">
             {authorsStatus === "loading" && (
               <div className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-6 text-[13px] font-semibold text-[var(--wk-text-muted)]">
-                Loading contributor profiles…
+                Loading the gang…
               </div>
             )}
 
             {authorsStatus === "error" && (
               <div className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-6 text-[13px] font-semibold text-[var(--wk-text-muted)]">
-                Contributor profiles could not load from the author database. Founder information remains visible while we fix the data layer.
+                We could not load contributor profiles right now. Please refresh the page or check back shortly.
               </div>
             )}
 
             {authorsStatus === "ready" && !hasContributors && (
               <div className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-6 text-[13px] font-semibold text-[var(--wk-text-muted)]">
-                Contributor profiles will appear here as registry_authors records are verified.
+                Contributor profiles are being prepared and will appear here soon.
               </div>
             )}
 
@@ -564,7 +496,7 @@ export default function AboutPage() {
           <div className="mb-8">
             <SectionLabel>How WAKILISHA works</SectionLabel>
             <h2 className="mt-4 text-[clamp(28px,4vw,46px)] font-black leading-[0.94] tracking-[-0.05em] text-[var(--wk-text)]">
-              Editorial company, data spine, cultural memory.
+              Stories, charts, artists, and guides in one place.
             </h2>
           </div>
           <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
@@ -583,36 +515,15 @@ export default function AboutPage() {
           </div>
         </section>
 
-        <section id="trust" className="about-reveal scroll-mt-28">
-          <div className="mb-8">
-            <SectionLabel>Trust layer</SectionLabel>
-            <h2 className="mt-4 text-[clamp(28px,4vw,46px)] font-black leading-[0.94] tracking-[-0.05em] text-[var(--wk-text)]">
-              Built to be checked.
-            </h2>
-          </div>
-          <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-            {TRUST_POINTS.map((point) => (
-              <article key={point.title} className="rounded-[24px] border border-[var(--wk-border)] bg-[var(--wk-surface)] p-6 lg:p-7">
-                <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--wk-bg-subtle)] text-[var(--wk-brand)]">
-                  <i className={`${point.icon} text-[22px]`} />
-                </div>
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--wk-brand)]">{point.eyebrow}</p>
-                <h3 className="mt-2 text-[21px] font-black tracking-[-0.03em] text-[var(--wk-text)]">{point.title}</h3>
-                <p className="mt-3 text-[13px] leading-relaxed text-[var(--wk-text-muted)]">{point.desc}</p>
-              </article>
-            ))}
-          </div>
-        </section>
-
         <section id="diligence" className="about-reveal scroll-mt-28 rounded-[26px] border border-[var(--wk-border)] bg-[var(--wk-surface)] p-5 lg:p-7">
           <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
             <div>
-              <SectionLabel>Due diligence</SectionLabel>
+              <SectionLabel>Contact & policies</SectionLabel>
               <h2 className="mt-4 text-[clamp(28px,3.6vw,44px)] font-black leading-[0.94] tracking-[-0.05em] text-[var(--wk-text)]">
-                Know who to call and what to inspect.
+                Everything important, easy to find.
               </h2>
               <p className="mt-5 text-[14px] leading-relaxed text-[var(--wk-text-muted)]">
-                This page is becoming WAKILISHA's public trust surface: leadership, contributors, contact paths, editorial posture, and policy links in one place.
+                Find the right contact path, read the basics, and understand how WAKILISHA presents itself to readers, contributors, partners, and funders.
               </p>
             </div>
 
