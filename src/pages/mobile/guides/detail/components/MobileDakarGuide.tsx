@@ -337,7 +337,7 @@ export default function MobileDakarGuide() {
                 <span>{follow.form.consentLabel}</span>
               </label>
               <button type="submit" disabled={followStatus === "submitting" || followStatus === "success"} className="w-full rounded-lg bg-[var(--wk-brand)] px-4 py-3 text-[13px] font-bold text-[var(--wk-brand-on)] active:scale-[0.98] transition-transform whitespace-nowrap cursor-pointer disabled:opacity-60">
-                {followStatus === "submitting" ? "Submitting..." : followStatus === "success" ? "You're on the list!" : follow.form.submitLabel}
+                {followStatus === "submitting" ? "Submitting..." : followStatus === "success" ? "You’re on the list!" : follow.form.submitLabel}
               </button>
             </form>
           </div>

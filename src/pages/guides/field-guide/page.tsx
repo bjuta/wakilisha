@@ -13,7 +13,7 @@ const lodestarArtists = [
     origin: "Born 1945, Dakar, Senegal. D. 2017",
     image: "https://wakilisha.africa/api/search-image?query=Abstract%20artistic%20portrait%20of%20Senegalese%20artist%20and%20poet%2C%20warm%20earthy%20tones%2C%20textured%20painterly%20style%2C%20contemplative%20expression%2C%20soft%20dramatic%20lighting%2C%20African%20contemporary%20art%20aesthetic%2C%20museum%20quality%2C%20golden%20amber%20and%20deep%20brown%20palette%2C%20artist%20studio%20atmosphere%2C%20intellectual%20presence&width=400&height=400&seq=issa-samb-portrait&orientation=squarish",
     description:
-      "Artist, poet, playwright and co-founder of Laboratoire Agit'Art in Dakar. An enduring presence and mentor for Kouoh, his practice resists simple categorisation.",
+      "Artist, poet, playwright and co-founder of Laboratoire Agit’Art in Dakar. An enduring presence and mentor for Kouoh, his practice resists easy categorisation.",
   },
   {
     tag: "SHRINE",
@@ -52,7 +52,7 @@ const fieldArtistsContinued = [
   { tag: "TEXTILE", name: "Georgina Maxim", origin: "Zimbabwe", image: "https://wakilisha.africa/api/search-image?query=Contemporary%20Zimbabwean%20textile%20art%20with%20reclaimed%20fabric%20and%20stitching%2C%20patchwork%20composition%2C%20everyday%20materials%20transformed%2C%20warm%20earthy%20colors%2C%20tactile%20surface%2C%20craft%20and%20fine%20art%20boundary%2C%20gallery%20wall%20display&width=400&height=400&seq=georgina-maxim&orientation=squarish", description: "Daily life, enchantment and the material." },
   { tag: "ECOLOGY", name: "Otobong Nkanga", origin: "Nigeria | Berlin", image: "https://wakilisha.africa/api/search-image?query=Contemporary%20art%20installation%20with%20living%20plants%20and%20botanical%20elements%2C%20tapestry%20and%20natural%20materials%2C%20ecological%20themes%2C%20Nigerian%20artist%2C%20gallery%20setting%20with%20natural%20light%2C%20green%20and%20earth%20tones%2C%20environmental%20art&width=400&height=400&seq=otobong-nkanga&orientation=squarish", description: "Botanical interventions and material ecology." },
   { tag: "RITUAL", name: "Ebony G. Patterson", origin: "Jamaica | Chicago", image: "https://wakilisha.africa/api/search-image?query=Jamaican%20contemporary%20art%20installation%20with%20vibrant%20floral%20patterns%20and%20glitter%2C%20carnival%20aesthetic%2C%20garden%20themes%20with%20dark%20undertones%2C%20rich%20color%20palette%2C%20tropical%20ornamentation%2C%20gallery%20installation%2C%20collective%20presence&width=400&height=400&seq=ebony-patterson&orientation=squarish", description: "Carnival, ritual and collective presence." },
-  { tag: "SCHOOL", name: "Raw Material Company", origin: "Senegal | School", image: "https://wakilisha.africa/api/search-image?query=Contemporary%20art%20center%20in%20Dakar%20Senegal%2C%20modern%20gallery%20space%20with%20exhibition%2C%20cultural%20institution%20architecture%2C%20warm%20atmosphere%2C%20African%20contemporary%20art%20hub%2C%20natural%20light%2C%20community%20gathering%20space&width=400&height=400&seq=raw-material-dakar&orientation=squarish", description: "Kouoh's Dakar institution and living archive." },
+  { tag: "SCHOOL", name: "Raw Material Company", origin: "Senegal | School", image: "https://wakilisha.africa/api/search-image?query=Contemporary%20art%20center%20in%20Dakar%20Senegal%2C%20modern%20gallery%20space%20with%20exhibition%2C%20cultural%20institution%20architecture%2C%20warm%20atmosphere%2C%20African%20contemporary%20art%20hub%2C%20natural%20light%2C%20community%20gathering%20space&width=400&height=400&seq=raw-material-dakar&orientation=squarish", description: "Kouoh’s Dakar institution and living archive." },
 ];
 
 const schools = [
@@ -83,7 +83,7 @@ export default function VeniceFieldGuidePage() {
   const { slug } = useParams<{ slug: string }>();
 
   useEffect(() => {
-    document.title = "Through an African Lens — Venice Biennale 2026 Field Guide | WAKILISHA";
+    document.title = "Through an African Lens: Venice Biennale 2026 Field Guide | WAKILISHA";
   }, []);
 
   const handlePrint = () => {
@@ -96,7 +96,7 @@ export default function VeniceFieldGuidePage() {
       <div className="fg-print-header">
         <div className="fg-print-header-inner">
           <span className="fg-print-logo">WAKILISHA</span>
-          <span className="fg-print-meta">Through an African Lens — Venice Biennale Arte 2026</span>
+          <span className="fg-print-meta">Through an African Lens: Venice Biennale Arte 2026</span>
           <button onClick={handlePrint} className="fg-print-btn">
             <i className="ri-printer-line" /> Print / Save as PDF
           </button>
@@ -104,7 +104,7 @@ export default function VeniceFieldGuidePage() {
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════
-          SECTION 01 — COVER
+          SECTION 01 · COVER
       ═══════════════════════════════════════════════════════════════ */}
       <section className="fg-section fg-cover">
         <div className="fg-cover-inner">
@@ -136,11 +136,11 @@ export default function VeniceFieldGuidePage() {
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════
-          SECTION 02 — EDITOR'S NOTE
+          SECTION 02 · EDITOR’S NOTE
       ═══════════════════════════════════════════════════════════════ */}
       <section className="fg-section">
         <div className="fg-container">
-          <div className="fg-eyebrow">Editor's Note</div>
+          <div className="fg-eyebrow">Editor’s Note</div>
           <h2 className="fg-h-section">
             Africa at the
             <br />
@@ -148,13 +148,13 @@ export default function VeniceFieldGuidePage() {
           </h2>
           <div className="fg-prose">
             <p className="fg-prose-lead">
-              The 61st Venice Biennale Arte does not simply include Africa. It is shaped, haunted and held by African intelligence.
+              The 61st Venice Biennale Arte does not just include Africa. It is shaped, haunted and held by African intelligence.
             </p>
             <p>
               At the centre of this edition is Koyo Kouoh, the Cameroonian curator whose vision became <em>In Minor Keys</em>. She shaped the artists, the themes, the catalogue, the Schools, the performances and the emotional architecture of the exhibition before her passing in 2025. That she did not live to see it open does not weaken her authorship. It makes the exhibition feel more like a final transmission.
             </p>
             <p>
-              <em>In Minor Keys</em> asks us to listen differently. Not everything important arrives loudly. Some things move through hums, silences, laments, shrines, gardens, schools, processions, oases, rest and enchantment. Kouoh's exhibition is not interested in spectacle for its own sake. It is interested in the lower frequencies of life: the things that remain, the things that gather, the things that survive without always asking permission to be seen.
+              <em>In Minor Keys</em> asks us to listen differently. Not everything important arrives loudly. Some things move through hums, silences, laments, shrines, gardens, schools, processions, oases, rest and enchantment. Kouoh’s exhibition is not interested in spectacle for its own sake. It is interested in the lower frequencies of life: the things that remain, the things that gather, the things that survive without always asking permission to be seen.
             </p>
             <p>
               For WAKILISHA, this guide is both practical and emotional. Practical because Venice can overwhelm you. There are pavilions, routes, venues, queues, tickets, schedules and more art than one person can hold in a single visit. Emotional because this edition asks us to stop treating African art as a side room inside the larger house of world art. Africa is not a footnote here.
@@ -171,7 +171,7 @@ export default function VeniceFieldGuidePage() {
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════
-          SECTION 03 — TONI MORRISON QUOTE
+          SECTION 03 · TONI MORRISON QUOTE
       ═══════════════════════════════════════════════════════════════ */}
       <section className="fg-section fg-quote-section">
         <div className="fg-container">
@@ -179,16 +179,16 @@ export default function VeniceFieldGuidePage() {
             <blockquote>
               "In our myths, in our songs, that's where the seeds are. It is not possible to constantly hone on the crisis. You have to have the love and you have to have the magic, that is also life."
             </blockquote>
-            <cite>— Toni Morrison, 1977, cited by Koyo Kouoh in her curatorial text</cite>
+            <cite>Toni Morrison, 1977, cited by Koyo Kouoh in her curatorial text</cite>
           </div>
           <p className="fg-quote-context">
-            Koyo Kouoh chose this quote as one of two literary anchors for the exhibition. The other was Gabriel García Márquez's <em>One Hundred Years of Solitude</em>. Both texts connect thresholds between lifeworlds and temporalities through magical realism that deepens rather than distracts from an emotional register. This is the intellectual climate of <em>In Minor Keys</em>.
+            Koyo Kouoh chose this quote as one of two literary anchors for the exhibition. The other was Gabriel García Márquez’s <em>One Hundred Years of Solitude</em>. Both texts connect thresholds between lifeworlds and temporalities through magical realism that deepens rather than distracts from an emotional register. This is the intellectual climate of <em>In Minor Keys</em>.
           </p>
         </div>
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════
-          SECTION 04 — KOYO KOUOH
+          SECTION 04 · KOYO KOUOH
       ═══════════════════════════════════════════════════════════════ */}
       <section className="fg-section">
         <div className="fg-container">
@@ -238,7 +238,7 @@ export default function VeniceFieldGuidePage() {
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════
-          SECTION 05 — QUOTE SPREAD
+          SECTION 05 · QUOTE SPREAD
       ═══════════════════════════════════════════════════════════════ */}
       <section className="fg-section fg-quote-spread">
         <div className="fg-quote-spread-inner">
@@ -257,7 +257,7 @@ export default function VeniceFieldGuidePage() {
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════
-          SECTION 06 — THE SHRINES
+          SECTION 06 · THE SHRINES
       ═══════════════════════════════════════════════════════════════ */}
       <section className="fg-section">
         <div className="fg-container">
@@ -289,7 +289,7 @@ export default function VeniceFieldGuidePage() {
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════
-          SECTION 07 — ARTIST FIELD GUIDE
+          SECTION 07 · ARTIST FIELD GUIDE
       ═══════════════════════════════════════════════════════════════ */}
       <section className="fg-section">
         <div className="fg-container">
@@ -321,7 +321,7 @@ export default function VeniceFieldGuidePage() {
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════
-          SECTION 08 — ARTIST FIELD CONTINUED
+          SECTION 08 · ARTIST FIELD CONTINUED
       ═══════════════════════════════════════════════════════════════ */}
       <section className="fg-section">
         <div className="fg-container">
@@ -353,7 +353,7 @@ export default function VeniceFieldGuidePage() {
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════
-          SECTION 09 — AFRICAN PAVILIONS (all 13, unified)
+          SECTION 09 · AFRICAN PAVILIONS (all 13, unified)
       ═══════════════════════════════════════════════════════════════ */}
       <section className="fg-section">
         <div className="fg-container fg-container--wide">
@@ -434,7 +434,7 @@ export default function VeniceFieldGuidePage() {
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════
-          SECTION 13 — KENYA AT VENICE
+          SECTION 13 · KENYA AT VENICE
       ═══════════════════════════════════════════════════════════════ */}
       <section className="fg-section">
         <div className="fg-container">
@@ -454,7 +454,7 @@ export default function VeniceFieldGuidePage() {
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════
-          SECTION 14 — THREE KENYAN PRESENCES
+          SECTION 14 · THREE KENYAN PRESENCES
       ═══════════════════════════════════════════════════════════════ */}
       <section className="fg-section">
         <div className="fg-container">
@@ -475,7 +475,7 @@ export default function VeniceFieldGuidePage() {
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════
-          SECTION 15 — THE AFRICAN SCHOOLS
+          SECTION 15 · THE AFRICAN SCHOOLS
       ═══════════════════════════════════════════════════════════════ */}
       <section className="fg-section">
         <div className="fg-container">
@@ -507,7 +507,7 @@ export default function VeniceFieldGuidePage() {
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════
-          SECTION 16 — PRACTICAL INFO
+          SECTION 16 · PRACTICAL INFO
       ═══════════════════════════════════════════════════════════════ */}
       <section className="fg-section">
         <div className="fg-container">
@@ -566,7 +566,7 @@ export default function VeniceFieldGuidePage() {
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════
-          SECTION 17 — TICKETS
+          SECTION 17 · TICKETS
       ═══════════════════════════════════════════════════════════════ */}
       <section className="fg-section">
         <div className="fg-container">
@@ -601,7 +601,7 @@ export default function VeniceFieldGuidePage() {
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════
-          SECTION 18 — CLOSING
+          SECTION 18 · CLOSING
       ═══════════════════════════════════════════════════════════════ */}
       <section className="fg-section fg-closing">
         <div className="fg-container">
@@ -630,7 +630,7 @@ export default function VeniceFieldGuidePage() {
       {/* ── Print Footer ── */}
       <div className="fg-print-footer">
         <div className="fg-print-footer-inner">
-          <span>Through an African Lens — Venice Biennale Arte 2026 Field Guide</span>
+          <span>Through an African Lens: Venice Biennale Arte 2026 Field Guide</span>
           <span>wakilisha.africa</span>
         </div>
       </div>

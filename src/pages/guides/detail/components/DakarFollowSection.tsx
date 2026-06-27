@@ -75,7 +75,7 @@ export default function DakarFollowSection() {
                 </div>
                 <h3 className="text-lg font-bold text-[var(--wk-text)] mb-2">You are on the list</h3>
                 <p className="text-sm text-[var(--wk-text-soft)]">
-                  We will send Dak'Art updates to your inbox as the field opens.
+                  We will send Dak’Art updates to your inbox as the field opens.
                 </p>
               </div>
             ) : (

@@ -58,7 +58,7 @@ function GuidesNewsletter() {
       <NewsletterSubscribe
         formId="guides-newsletter-form"
         headline="Guides delivered first"
-        description="Get WAKILISHA guides — field reports, dossiers, literary projects — as soon as they launch. No noise, just signal."
+        description="Get WAKILISHA guides as soon as they launch: field reports, dossiers, and literary projects. No noise, just useful context."
         contextFields={{ wk_page_type: "guides_listing", wk_source_section: "newsletter_footer" }}
         analytics={{
           pageType: "guides_listing",
@@ -81,7 +81,7 @@ function FormatExplainer() {
         {[
           { icon: "ri-map-2-line", label: "Field Guide", desc: "On-the-ground routes through exhibitions, cities, and cultural events. Practical, mapped, opinionated." },
           { icon: "ri-folder-open-line", label: "Advance Dossier", desc: "Pre-event intelligence: themes, artists, architecture, and reporting angles before the programme drops." },
-          { icon: "ri-book-open-line", label: "Literary Project", desc: "Long-form cultural investigation. Books, reading, memory, infrastructure — the slow work of ideas." },
+          { icon: "ri-book-open-line", label: "Literary Project", desc: "Long-form cultural investigation. Books, reading, memory, infrastructure, and the slow work of ideas." },
         ].map((format) => (
           <div key={format.label} className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-6 lg:p-7">
             <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--wk-bg-subtle)] mb-4">
@@ -201,7 +201,7 @@ export default function GuidesPage() {
               Your discovery layer for African creative life
             </h1>
             <p className="text-[clamp(16px,2vw,20px)] leading-relaxed text-white/55 max-w-[540px]">
-              Where to go, what to experience, who to know — practical guides built for the culture, not the algorithm.
+              Where to go, what to experience, who to know. Practical guides built for the culture, not the algorithm.
             </p>
             <div className="flex items-center gap-8 mt-10 flex-wrap">
               {[
@@ -277,10 +277,10 @@ export default function GuidesPage() {
           <div className="max-w-[760px] mx-auto text-center">
             <div className="w-10 h-1 rounded-full bg-[var(--wk-brand)] mx-auto mb-6" />
             <p className="text-[clamp(24px,3.5vw,44px)] font-black tracking-[-0.045em] leading-[0.96] text-[var(--wk-text)]">
-              Culture doesn't need more noise. It needs signal.
+              Culture needs less noise and better routes.
             </p>
             <p className="mt-5 text-[15px] text-[var(--wk-text-muted)] max-w-[480px] mx-auto leading-relaxed">
-              Each guide is a focused, edited, resourced route into one corner of African creative life — built to be useful, not just beautiful.
+              Each guide is a focused, edited, resourced route into one corner of African creative life. Built to be useful, not just beautiful.
             </p>
             <div className="w-10 h-1 rounded-full bg-[var(--wk-brand)] mx-auto mt-6" />
           </div>

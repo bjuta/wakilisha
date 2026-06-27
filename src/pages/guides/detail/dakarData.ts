@@ -3,7 +3,7 @@ export const dakarData = {
   hero: {
     mastheadImage: "https://wakilisha.africa/wp-content/plugins/wakilisha-v2.0.201-cpt-cleanup/assets/guides/dakar-biennale-2026/WAKILISHA_Dakar_Biennale_2026.jpg",
     badge: "Issue 002 · Advance dossier",
-    kicker: "Dak'Art | The 16th Dakar Biennale",
+    kicker: "Dak’Art | The 16th Dakar Biennale",
     title: "(Anti)",
     titleItalic: "fragility",
     subtitle: "19 November to 19 December 2026 · Dakar, Senegal",
@@ -20,15 +20,15 @@ export const dakarData = {
   },
   share: {
     url: "https://wakilisha.africa/guides/dakar-biennale-2026/",
-    title: "Dak'Art 2026 | WAKILISHA Advance Dossier",
-    description: "The WAKILISHA advance dossier for Dak'Art 2026, the 16th Dakar Biennale of Contemporary African Art.",
+    title: "Dak’Art 2026 | WAKILISHA Advance Dossier",
+    description: "The WAKILISHA advance dossier for Dak’Art 2026, the 16th Dakar Biennale of Contemporary African Art.",
   },
   argument: {
     label: "01 · The argument",
     title: "Fragility is not the opposite of",
     titleItalic: "force",
     prose: [
-      "Dak'Art 2026 is not framing fragility as weakness. Its concept turns the crack, the wound, the accident, the lack, the shelter and the repaired object into artistic material. The useful word is not resilience alone. It is transformation.",
+      "Dak’Art 2026 is not framing fragility as weakness. Its concept turns the crack, the wound, the accident, the lack, the shelter and the repaired object into artistic material. The useful word is not resilience alone. It is transformation.",
       "The artistic direction names Morad Montazami as the conceptual lead. The early dossier gives WAKILISHA a live reporting frame before the Q4 opening, with attention on repair, care, language, scarcity, infrastructure and cultural value.",
     ],
     chaptersLabel: "Theme chapters",
@@ -43,11 +43,11 @@ export const dakarData = {
     title: "The Biennale is already",
     titleItalic: "more than one exhibition",
     items: [
-      { number: "01", name: "Official International Exhibition", description: "African artists and diaspora artists selected through the official process. The spine of the edition, curated under Montazami's direction.", route: "Primary route" },
-      { number: "02", name: "National Pavilions", description: "Country-led presences that turn Dak'Art into a map of institutions, diplomacy and cultural strategy.", route: "Institutional route" },
+      { number: "01", name: "Official International Exhibition", description: "African artists and diaspora artists selected through the official process. The spine of the edition, curated under Montazami’s direction.", route: "Primary route" },
+      { number: "02", name: "National Pavilions", description: "Country-led presences that turn Dak’Art into a map of institutions, diplomacy and cultural strategy.", route: "Institutional route" },
       { number: "03", name: "Thematic and Tribute Exhibitions", description: "Curated arguments, memory work and homage formats that widen the field beyond the main selection.", route: "Context route" },
       { number: "04", name: "Special Projects", description: "Large-scale projects by artists, galleries, museums and institutions. The programmes with the most institutional independence.", route: "Independent route" },
-      { number: "05", name: "Scientific and Professional Meetings", description: "The thinking layer: talks, research, publishing and art-sector infrastructure. Dak'Art positions itself as a knowledge event, not only an art fair.", route: "Knowledge route" },
+      { number: "05", name: "Scientific and Professional Meetings", description: "The thinking layer: talks, research, publishing and art-sector infrastructure. Dak’Art positions itself as a knowledge event, not only an art fair.", route: "Knowledge route" },
       { number: "06", name: "Off Exhibitions and Collateral Events", description: "The city-facing layer. Private initiatives, labelled collateral events and environmental projects across Dakar.", route: "City route" },
     ],
   },
@@ -79,7 +79,7 @@ export const dakarData = {
       { number: "01", signal: "Care as infrastructure", question: "Who is building the systems that hold artists up?", body: "The theme gives us permission to look beyond objects into workshops, schools, collectives, archives, clinics of repair, mutual aid and the slow labour behind cultural survival." },
       { number: "02", signal: "Languages restored", question: "Which invisible signs return to public life?", body: "The concept explicitly opens a route into signs and languages made invisible. That makes language, translation, notation and oral knowledge central reporting ground." },
       { number: "03", signal: "Shock strategy", question: "How do artists work after crisis?", body: "Recycling, short supply chains and local knowledge are not side notes. They are ways to read artistic intelligence in a continent shaped by instability, scarcity and invention." },
-      { number: "04", signal: "Market and memory", question: "Where does value move?", body: "Dak'Art's mandate includes international visibility and the contemporary African art market. The question is not only who is shown, but who gains infrastructure from being shown." },
+      { number: "04", signal: "Market and memory", question: "Where does value move?", body: "Dak’Art's mandate includes international visibility and the contemporary African art market. The question is not only who is shown, but who gains infrastructure from being shown." },
     ],
   },
   timeline: {
@@ -104,7 +104,7 @@ export const dakarData = {
       "When the full artist list, pavilion programmes, and WAKILISHA on-the-ground coverage are ready, subscribers receive them first.",
     ],
     form: {
-      heading: "Get Dak'Art updates",
+      heading: "Get Dak’Art updates",
       description: "Dates, selected artists, pavilions, off routes, interviews and the full WAKILISHA guide when it is ready.",
       emailLabel: "Email address",
       emailPlaceholder: "you@example.com",

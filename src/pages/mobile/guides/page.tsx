@@ -21,7 +21,7 @@ const guideEntries = [
     slug: "dakar-biennale-2026",
     title: "Dakar Biennale 2026",
     excerpt:
-      "A WAKILISHA advance dossier on Dak'Art 2026, built from the official call, internal regulations, theme, event architecture and early editorial signals.",
+      "A WAKILISHA advance dossier on Dak’Art 2026, built from the official call, internal regulations, theme, event architecture and early editorial signals.",
     badge: "Issue 002",
     tagline: "Advance Dossier",
     accentColor: "#D6766A",
@@ -109,7 +109,7 @@ export default function MobileGuides() {
             Your discovery layer for African creative life
           </h1>
           <p className="text-[14px] leading-relaxed text-white/50 max-w-[320px]">
-            Where to go, what to experience, who to know — practical guides built for the culture.
+            Where to go, what to experience, who to know. Practical guides built for the culture.
           </p>
 
           {/* City pills */}
@@ -202,7 +202,7 @@ export default function MobileGuides() {
             {
               icon: "ri-book-open-line",
               label: "Literary Project",
-              desc: "Long-form cultural investigation — the slow work of ideas.",
+              desc: "Long-form cultural investigation and the slow work of ideas.",
             },
           ].map((format) => (
             <div
@@ -230,7 +230,7 @@ export default function MobileGuides() {
         <div className="border-y border-[var(--wk-border)] py-10 text-center">
           <div className="w-8 h-0.5 rounded-full bg-[var(--wk-brand)] mx-auto mb-4" />
           <p className="text-[22px] font-black tracking-[-0.035em] leading-[0.96] text-[var(--wk-text)]">
-            Culture doesn't need more noise. It needs signal.
+            Culture needs less noise and better routes.
           </p>
           <p className="mt-3 text-[13px] text-[var(--wk-text-muted)] max-w-[280px] mx-auto leading-relaxed">
             Each guide is built to be useful, not just beautiful.
@@ -248,7 +248,7 @@ export default function MobileGuides() {
                 <i className="ri-check-line text-[24px] text-[var(--wk-brand-on)]" />
               </div>
               <h3 className="text-[20px] font-black tracking-[-0.03em] text-[var(--wk-text)] mb-1">
-                You're on the list
+                You’re on the list
               </h3>
               <p className="text-[13px] text-[var(--wk-text-muted)]">
                 Guides delivered straight to your inbox.

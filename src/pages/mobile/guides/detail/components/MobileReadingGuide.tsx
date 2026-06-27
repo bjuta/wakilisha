@@ -253,7 +253,7 @@ export default function MobileReadingGuide() {
               className="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-4 py-3 text-[13px] text-[var(--wk-text)] placeholder:text-[var(--wk-text-faint)] outline-none focus:border-[var(--wk-brand)]/40"
             />
             <button type="submit" disabled={notifyStatus === "submitting" || notifyStatus === "success"} className="w-full rounded-lg px-4 py-3 text-[13px] font-bold text-white active:scale-[0.98] transition-transform whitespace-nowrap cursor-pointer disabled:opacity-60" style={{ background: "#C4A35A" }}>
-              {notifyStatus === "submitting" ? "Submitting..." : notifyStatus === "success" ? "You're on the list!" : "Notify me when Chapter One drops"}
+              {notifyStatus === "submitting" ? "Submitting..." : notifyStatus === "success" ? "You’re on the list!" : "Notify me when Chapter One drops"}
             </button>
           </form>
         </div>
