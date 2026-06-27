@@ -67,12 +67,12 @@ function seededRandom(seed: string) {
 function enrichArtist(artist: PublicArtist) {
   const rng = seededRandom(artist.slug);
   const bioSnippets = [
-    "Redefining the sound of a generation with fearless originality.",
-    "A voice that carries the rhythm of the continent.",
-    "From underground circles to chart-topping anthems.",
-    "Bridging tradition and modernity in every bar.",
-    "The architect of a new African sonic era.",
-    "Unapologetic, bold, and unmistakably original.",
+    "Tracks, releases, and chart history gathered in one place.",
+    "Follow the songs, genres, and routes around this artist.",
+    "From early releases to wider audience attention.",
+    "Sound, scene, and release context in one artist record.",
+    "Part of the wider WAKILISHA artist archive.",
+    "Browse the work, links, and listening routes around this artist.",
   ];
   return {
     ...artist,
@@ -301,7 +301,7 @@ export default function ArtistsPageContent() {
           <div className="max-w-[700px] mx-auto text-center">
             <div className="w-10 h-0.5 rounded-full bg-[var(--wk-brand)] mx-auto mb-5" />
             <p className="text-[clamp(26px,3.5vw,44px)] font-black tracking-[-0.04em] leading-[1.02] text-[var(--wk-text)]">
-              Every voice mapped. Every nation heard. Every beat counted.
+              Artists, countries, songs, and routes in one place.
             </p>
             <div className="w-10 h-0.5 rounded-full bg-[var(--wk-brand)] mx-auto mt-5" />
           </div>
@@ -313,8 +313,8 @@ export default function ArtistsPageContent() {
         <div className="wk-container-wide">
           <div className="mb-10 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
             <div>
-              <div className="wk-eyebrow mb-3">Complete archive</div>
-              <h2 className="wk-h-page">Browse the artist archive</h2>
+              <div className="wk-eyebrow mb-3">Artist archive</div>
+              <h2 className="wk-h-page">Browse artists</h2>
             </div>
             <p className="wk-copy max-w-[44ch] text-[13px]">
               Search by name, country, genre, chart moments, or release history. Start with who you know. Leave with someone new.

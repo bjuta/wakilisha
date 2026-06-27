@@ -31,12 +31,12 @@ export function RisingStars({ artists }: RisingStarsProps) {
       <div className="wk-container-wide">
         <div className="mb-10 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
-            <div className="wk-eyebrow mb-3">Rising voices</div>
-            <h3 className="wk-h-page">The next wave</h3>
+            <div className="wk-eyebrow mb-3">Artists to watch</div>
+            <h3 className="wk-h-page">More artists to keep close</h3>
           </div>
           <div className="flex items-center gap-3">
             <p className="wk-copy hidden max-w-[40ch] text-[13px] md:block">
-              Emerging artists making their mark with trajectories pointing straight up.
+              Artists with growing activity across tracks, releases, or charts.
             </p>
             <div className="flex items-center gap-2">
               <button
@@ -86,9 +86,9 @@ export function RisingStars({ artists }: RisingStarsProps) {
 
               {/* Rising badge */}
               <div className="absolute left-4 top-4">
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--wk-brand)] px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.12em] text-[var(--wk-brand-on)]">
+                <span title="Artists with growing activity across tracks, releases, or charts." className="inline-flex items-center gap-1.5 rounded-full bg-[var(--wk-brand)] px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.12em] text-[var(--wk-brand-on)]">
                   <i className="ri-fire-line text-[10px]" />
-                  Rising
+                  To watch
                 </span>
               </div>
 
