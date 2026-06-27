@@ -2,3 +2,6 @@
 
 [functions.seo-sitemap-admin]
 verify_jwt = false
+
+[functions.media-upload-api]
+verify_jwt = false
