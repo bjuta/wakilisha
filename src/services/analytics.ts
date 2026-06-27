@@ -1,6 +1,43 @@
 import { supabase } from "@/lib/supabase";
 import { getAttributionContext } from "@/services/attribution";
 
+export const INTERNAL_TRAFFIC_STORAGE_KEY = "wakilisha_internal_traffic";
+
+function safeHostname(): string {
+  if (typeof window === "undefined") return "";
+  return window.location.hostname || "";
+}
+
+function isLocalhostHost(hostname: string): boolean {
+  return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+}
+
+export function isInternalTrafficEnabled(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return localStorage.getItem(INTERNAL_TRAFFIC_STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function setInternalTrafficEnabled(enabled: boolean): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (enabled) localStorage.setItem(INTERNAL_TRAFFIC_STORAGE_KEY, "1");
+    else localStorage.removeItem(INTERNAL_TRAFFIC_STORAGE_KEY);
+  } catch {
+    // localStorage unavailable. Ignore.
+  }
+}
+
+export function shouldSuppressAnalytics(): boolean {
+  const hostname = safeHostname();
+  if (isLocalhostHost(hostname)) return true;
+  if (isInternalTrafficEnabled()) return true;
+  return false;
+}
+
 // ── Session ID ────────────────────────────────────────────────────
 // Generated once per browser tab session, stored in sessionStorage.
 // Persists across page navigations within the same tab but resets
@@ -49,6 +86,7 @@ export interface TrackEventOptions {
   entityType?: string;
   context?: Record<string, unknown>;
   userId?: string;
+  allowInternal?: boolean;
 }
 
 // ── Public API ─────────────────────────────────────────────────────
@@ -66,6 +104,8 @@ export function trackEvent(
   eventName: string,
   options: TrackEventOptions = {},
 ): void {
+  if (!options.allowInternal && shouldSuppressAnalytics()) return;
+
   const rawPageUrl =
     typeof window !== "undefined" ? window.location.href : "";
   const pageUrl = normalizeUrl(rawPageUrl);
@@ -73,11 +113,17 @@ export function trackEvent(
   const referrer =
     typeof document !== "undefined" ? document.referrer || undefined : undefined;
 
+  const hostname = safeHostname();
+  const internalTraffic = isLocalhostHost(hostname) || isInternalTrafficEnabled();
+
   const enrichedContext = {
     ...(options.context ?? {}),
     attribution: getAttributionContext(rawPageUrl, referrer),
     raw_page_url: rawPageUrl || null,
     canonical_page_url: pageUrl || null,
+    analytics_traffic_type: internalTraffic ? "internal" : "external",
+    analytics_is_internal: internalTraffic,
+    analytics_hostname: hostname || null,
   };
 
   const payload = {

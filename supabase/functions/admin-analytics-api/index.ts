@@ -94,6 +94,37 @@ function domainFromReferrer(raw: unknown): string {
   }
 }
 
+function isLocalhostUrl(raw: unknown): boolean {
+  const value = readString(raw);
+  if (!value) return false;
+
+  try {
+    const url = new URL(value);
+    return url.hostname === "localhost" || url.hostname === "127.0.0.1" || url.hostname === "::1";
+  } catch {
+    return value.includes("localhost") || value.includes("127.0.0.1");
+  }
+}
+
+function isInternalAnalyticsEvent(row: any): boolean {
+  const ctx = (row?.context || {}) as Record<string, any>;
+
+  if (ctx.analytics_is_internal === true) return true;
+  if (readString(ctx.analytics_traffic_type) === "internal") return true;
+
+  if (isLocalhostUrl(row?.page_url)) return true;
+  if (isLocalhostUrl(row?.referrer)) return true;
+  if (isLocalhostUrl(ctx.raw_page_url)) return true;
+  if (isLocalhostUrl(ctx.canonical_page_url)) return true;
+
+  return false;
+}
+
+function filterInternalEvents(events: any[], clean = true): any[] {
+  if (!clean) return events;
+  return events.filter((event) => !isInternalAnalyticsEvent(event));
+}
+
 function getAttribution(row: any) {
   const ctx = (row.context || {}) as Record<string, any>;
   const attr = (ctx.attribution || {}) as Record<string, any>;
@@ -149,7 +180,7 @@ async function requireAdminRead(userId: string, db: ReturnType<typeof createClie
   return caps.has("view_analytics") || caps.has("view_community") || caps.has("manage_registry");
 }
 
-async function getAnalyticsEvents(db: ReturnType<typeof createClient>, range: RangeInput, limit = 10000) {
+async function getAnalyticsEvents(db: ReturnType<typeof createClient>, range: RangeInput, limit = 10000, clean = true) {
   const since = sinceFromRange(range);
   const until = untilFromRange(range);
 
@@ -162,7 +193,7 @@ async function getAnalyticsEvents(db: ReturnType<typeof createClient>, range: Ra
     .limit(limit);
 
   if (error) throw error;
-  return data ?? [];
+  return filterInternalEvents(data ?? [], clean);
 }
 
 function buildTimeline(events: any[], range: RangeInput) {
@@ -2121,7 +2152,7 @@ Deno.serve(async (req) => {
   try {
     if (action === "analytics_snapshot") {
       const range = body.range ?? 30;
-      const events = await getAnalyticsEvents(db, range);
+      const events = await getAnalyticsEvents(db, range, 10000, clean);
       return ok(buildSnapshot(events, range), headers);
     }
 
@@ -2130,7 +2161,7 @@ Deno.serve(async (req) => {
       const rollupBoard = await buildSignalBoardFromRollups(db, range);
       if (rollupBoard) return ok(rollupBoard, headers);
 
-      const events = await getAnalyticsEvents(db, range);
+      const events = await getAnalyticsEvents(db, range, 10000, clean);
       return ok({ ...buildSignalBoard(events, range), source: "live_events_fallback" }, headers);
     }
 
@@ -2173,7 +2204,7 @@ Deno.serve(async (req) => {
         return ok({ refresh: refreshResult, board: rollupBoard }, headers);
       }
 
-      const events = await getAnalyticsEvents(db, range);
+      const events = await getAnalyticsEvents(db, range, 10000, clean);
       return ok({
         refresh: refreshResult,
         board: { ...buildSignalBoard(events, range), source: "live_events_fallback" },

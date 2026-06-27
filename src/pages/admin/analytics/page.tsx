@@ -12,6 +12,7 @@ import { AdminChartsLoadingState } from "@/pages/admin/charts/components/AdminCh
 import DateRangePicker from "@/components/base/DateRangePicker";
 import type { DateRangeValue } from "@/components/base/DateRangePicker";
 import {
+  clearAdminAnalyticsCache,
   fetchTodayKpis,
   fetchDashboardKpis,
   fetchPageViewsTimeline,
@@ -48,6 +49,10 @@ import type {
   SignalBoard,
   DateRange,
 } from "@/services/adminAnalytics";
+import {
+  isInternalTrafficEnabled,
+  setInternalTrafficEnabled,
+} from "@/services/analytics";
 import {
   getShareEventsDaily,
   getTopSharedArticles,
@@ -194,6 +199,8 @@ export default function AdminAnalyticsPage() {
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState<DateRangeValue>({ mode: "preset", days: 30 });
   const [tab, setTab] = useState<"signals" | "realtime" | "overview" | "search" | "engagement" | "attribution" | "shares" | "funnel">("signals");
+  const [cleanAnalytics, setCleanAnalytics] = useState(true);
+  const [internalTraffic, setInternalTraffic] = useState(() => isInternalTrafficEnabled());
 
   // ── Compare periods ─────────────────────────────────────────
   const [compareEnabled, setCompareEnabled] = useState(false);
@@ -290,7 +297,7 @@ export default function AdminAnalyticsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [cleanAnalytics]);
 
   useEffect(() => { loadData(dateRange); }, [dateRange, loadData]);
 
@@ -472,6 +479,46 @@ export default function AdminAnalyticsPage() {
 
   return (
     <div className="space-y-5">
+      <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="text-xs font-extrabold uppercase tracking-[0.16em] text-[var(--wk-text-faint)]">Analytics Hygiene</div>
+          <div className="mt-1 text-sm font-semibold text-[var(--wk-text-muted)]">
+            Clean analytics excludes localhost and browsers marked as internal.
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              clearAdminAnalyticsCache();
+              setCleanAnalytics((current) => !current);
+            }}
+            className={`rounded-full border px-4 py-2 text-xs font-extrabold uppercase tracking-[0.12em] ${
+              cleanAnalytics
+                ? "border-[var(--wk-brand)] bg-[var(--wk-brand)] text-white"
+                : "border-[var(--wk-border)] bg-[var(--wk-bg)] text-[var(--wk-text-muted)]"
+            }`}
+          >
+            {cleanAnalytics ? "Clean Analytics On" : "Raw Analytics"}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const next = !internalTraffic;
+              setInternalTrafficEnabled(next);
+              setInternalTraffic(next);
+            }}
+            className={`rounded-full border px-4 py-2 text-xs font-extrabold uppercase tracking-[0.12em] ${
+              internalTraffic
+                ? "border-[var(--wk-brand)] bg-[var(--wk-brand)] text-white"
+                : "border-[var(--wk-border)] bg-[var(--wk-bg)] text-[var(--wk-text-muted)]"
+            }`}
+          >
+            {internalTraffic ? "My Traffic Is Internal" : "Mark Me Internal"}
+          </button>
+        </div>
+      </div>
+
       <AdminChartsPageHeader
         eyebrow="Analytics"
         title="Audience Dashboard"
