@@ -11,7 +11,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
-import { mediaService, type MediaAsset } from "@/services/mediaService";
+import { mediaService, type MediaAsset, type MediaFolder } from "@/services/mediaService";
 import { MediaEditModal } from "@/components/admin/media/MediaEditModal";
 import { MediaLibraryPreviewPanel } from "@/components/admin/media/MediaLibraryPreviewPanel";
 
@@ -68,6 +68,14 @@ function fileIconClass(asset: MediaAsset): string {
   return assetFileKind(asset) === "document" ? "ri-file-pdf-2-line" : "ri-file-line";
 }
 
+function assetPurposeForFolder(folder: MediaFolder | null, fileKind: "image" | "document" | "other"): string {
+  if (folder?.purpose === "downloads") return "downloadable";
+  if (folder?.purpose === "press_kits") return "press_kit";
+  if (folder?.purpose === "brand_assets") return "brand_asset";
+  if (fileKind === "document") return "downloadable";
+  return "general";
+}
+
 // ─── Component ───────────────────────────────────────────────
 
 export function MediaLibraryCore({
@@ -94,9 +102,18 @@ export function MediaLibraryCore({
   // ── Filters
   const [search, setSearch] = useState("");
   const [mediaKindFilter, setMediaKindFilter] = useState("all");
+  const [fileKindFilter, setFileKindFilter] = useState("all");
+  const [assetPurposeFilter, setAssetPurposeFilter] = useState("all");
+  const [folderIdFilter, setFolderIdFilter] = useState("all");
+  const [rightsStatusFilter, setRightsStatusFilter] = useState("all");
   const [sourceKindFilter, setSourceKindFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [missingAltOnly, setMissingAltOnly] = useState(false);
+  const [uploadedFrom, setUploadedFrom] = useState("");
+  const [uploadedTo, setUploadedTo] = useState("");
+  const [contentFrom, setContentFrom] = useState("");
+  const [contentTo, setContentTo] = useState("");
+  const [folders, setFolders] = useState<MediaFolder[]>([]);
 
   // ── Selection (picker mode)
   const [selectedUrl, setSelectedUrl] = useState(currentUrl ?? "");
@@ -129,6 +146,20 @@ export function MediaLibraryCore({
     setTimeout(() => setToast(null), 3500);
   };
 
+  useEffect(() => {
+    let alive = true;
+    mediaService.listFolders()
+      .then((rows) => {
+        if (alive) setFolders(rows);
+      })
+      .catch(() => {
+        if (alive) setFolders([]);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   // ── Notify parent on selection change
   const selectItem = useCallback((assetId: string | null, url: string, assetOverride?: MediaAsset | null) => {
     setSelectedUrl(url);
@@ -147,9 +178,17 @@ export function MediaLibraryCore({
       const result = await mediaService.list({
         search,
         mediaKind: mediaKindFilter,
+        fileKind: fileKindFilter,
+        assetPurpose: assetPurposeFilter,
+        folderId: folderIdFilter,
+        rightsStatus: rightsStatusFilter,
         sourceKind: sourceKindFilter,
         status: statusFilter,
         missingAltOnly,
+        uploadedFrom,
+        uploadedTo,
+        contentFrom,
+        contentTo,
         page,
         pageSize: PAGE_SIZE,
         orderBy: "created_at",
@@ -162,7 +201,7 @@ export function MediaLibraryCore({
     } finally {
       setLoading(false);
     }
-  }, [search, mediaKindFilter, sourceKindFilter, statusFilter, missingAltOnly, page, refreshKey]);
+  }, [search, mediaKindFilter, fileKindFilter, assetPurposeFilter, folderIdFilter, rightsStatusFilter, sourceKindFilter, statusFilter, missingAltOnly, uploadedFrom, uploadedTo, contentFrom, contentTo, page, refreshKey]);
 
   useEffect(() => { fetchAssets(); }, [fetchAssets]);
 
@@ -186,13 +225,20 @@ export function MediaLibraryCore({
     try {
       const fileKind = inferUploadFileKind(file);
       const label = file.name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " ");
+      const activeFolder = folderIdFilter !== "all" && folderIdFilter !== "none"
+        ? folders.find((folder) => folder.id === folderIdFilter) ?? null
+        : null;
+      const folderPath = activeFolder?.path
+        ? `uploads/${activeFolder.path}`
+        : fileKind === "document" ? "uploads/downloads" : "uploads";
       const asset = await mediaService.upload(file, {
-        folder: fileKind === "document" ? "uploads/downloads" : "uploads",
+        folder: folderPath,
+        folderId: activeFolder?.id ?? null,
         sourceKind: "editor_upload",
         sourceEntity: "admin_upload",
         altText: fileKind === "image" ? label : undefined,
         fileKind,
-        assetPurpose: fileKind === "document" ? "downloadable" : "general",
+        assetPurpose: assetPurposeForFolder(activeFolder, fileKind),
       });
       setUploadProgress((p) => ({ ...p, [file.name]: "done" }));
       setUploadedItems((prev) => [...prev, { name: file.name, url: asset.url!, assetId: asset.id }]);
@@ -203,7 +249,7 @@ export function MediaLibraryCore({
     } catch {
       setUploadProgress((p) => ({ ...p, [file.name]: "error" }));
     }
-  }, [fetchAssets, selectItem]);
+  }, [fetchAssets, selectItem, folderIdFilter, folders]);
 
   const handleFilesAdded = useCallback((files: FileList | File[]) => {
     const incoming = Array.from(files);
@@ -304,6 +350,37 @@ export function MediaLibraryCore({
   ];
 
   const selectedAsset = selectedAssetId ? assets.find((a) => a.id === selectedAssetId) ?? null : null;
+  const hasActiveFilters =
+    search ||
+    mediaKindFilter !== "all" ||
+    fileKindFilter !== "all" ||
+    assetPurposeFilter !== "all" ||
+    folderIdFilter !== "all" ||
+    rightsStatusFilter !== "all" ||
+    sourceKindFilter !== "all" ||
+    statusFilter !== "all" ||
+    missingAltOnly ||
+    uploadedFrom ||
+    uploadedTo ||
+    contentFrom ||
+    contentTo;
+
+  const clearFilters = () => {
+    setSearch("");
+    setMediaKindFilter("all");
+    setFileKindFilter("all");
+    setAssetPurposeFilter("all");
+    setFolderIdFilter("all");
+    setRightsStatusFilter("all");
+    setSourceKindFilter("all");
+    setStatusFilter("all");
+    setMissingAltOnly(false);
+    setUploadedFrom("");
+    setUploadedTo("");
+    setContentFrom("");
+    setContentTo("");
+    setPage(0);
+  };
 
   return (
     <div className={`flex ${isPickerMode ? "flex-col h-full" : "flex-row h-full"}`}>
@@ -377,30 +454,87 @@ export function MediaLibraryCore({
 
       {/* ── Filters (assets tab only) ── */}
       {tab === "assets" && (
-        <div className={`flex flex-col gap-2 sm:flex-row sm:items-center flex-wrap ${isPickerMode ? "px-4 pb-2" : ""}`}>
-          <div className="flex items-center gap-2 rounded-lg border border-wk-border bg-wk-bg px-3 py-2 flex-1 min-w-[200px]">
-            <WkIcon name="Search" size={13} className="text-wk-text-faint shrink-0" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(0); }}
-              placeholder="Search title, slug, alt text, URL…"
-              className="w-full bg-transparent text-[12px] text-wk-text placeholder:text-wk-text-faint outline-none"
-            />
-            {search && (
-              <button onClick={() => { setSearch(""); setPage(0); }} className="shrink-0 text-wk-text-faint hover:text-wk-text cursor-pointer">
-                <WkIcon name="X" size={12} />
+        <div className={`space-y-2 ${isPickerMode ? "px-4 pb-2" : ""}`}>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center flex-wrap">
+            <div className="flex items-center gap-2 rounded-lg border border-wk-border bg-wk-bg px-3 py-2 flex-1 min-w-[220px]">
+              <WkIcon name="Search" size={13} className="text-wk-text-faint shrink-0" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => { setSearch(e.target.value); setPage(0); }}
+                placeholder="Search title, file name, slug, URL…"
+                className="w-full bg-transparent text-[12px] text-wk-text placeholder:text-wk-text-faint outline-none"
+              />
+              {search && (
+                <button onClick={() => { setSearch(""); setPage(0); }} className="shrink-0 text-wk-text-faint hover:text-wk-text cursor-pointer">
+                  <WkIcon name="X" size={12} />
+                </button>
+              )}
+            </div>
+            {hasActiveFilters && (
+              <button
+                onClick={clearFilters}
+                className="rounded-lg border border-wk-border bg-wk-surface px-2.5 py-2 text-[12px] font-semibold text-wk-text-soft hover:bg-wk-surface-raised cursor-pointer whitespace-nowrap"
+              >
+                Clear filters
               </button>
             )}
           </div>
+
           <div className="flex flex-wrap gap-1.5">
+            <select value={folderIdFilter} onChange={(e) => { setFolderIdFilter(e.target.value); setPage(0); }}
+              className="rounded-lg border border-wk-border bg-wk-surface px-2.5 py-2 text-[12px] text-wk-text outline-none cursor-pointer">
+              <option value="all">All folders</option>
+              <option value="none">No folder</option>
+              {folders.map((folder) => (
+                <option key={folder.id} value={folder.id}>{folder.name}</option>
+              ))}
+            </select>
+            <select value={fileKindFilter} onChange={(e) => { setFileKindFilter(e.target.value); setPage(0); }}
+              className="rounded-lg border border-wk-border bg-wk-surface px-2.5 py-2 text-[12px] text-wk-text outline-none cursor-pointer">
+              <option value="all">All file kinds</option>
+              <option value="image">Images</option>
+              <option value="document">Documents</option>
+              <option value="audio">Audio</option>
+              <option value="video">Video</option>
+              <option value="archive">Archives</option>
+              <option value="other">Other</option>
+            </select>
+            <select value={assetPurposeFilter} onChange={(e) => { setAssetPurposeFilter(e.target.value); setPage(0); }}
+              className="rounded-lg border border-wk-border bg-wk-surface px-2.5 py-2 text-[12px] text-wk-text outline-none cursor-pointer">
+              <option value="all">All purposes</option>
+              <option value="general">General</option>
+              <option value="article_hero">Article hero</option>
+              <option value="article_inline">Article inline</option>
+              <option value="chart_artwork">Chart artwork</option>
+              <option value="artist_photo">Artist photo</option>
+              <option value="release_artwork">Release artwork</option>
+              <option value="track_artwork">Track artwork</option>
+              <option value="downloadable">Downloadable</option>
+              <option value="press_kit">Press kit</option>
+              <option value="brand_asset">Brand asset</option>
+              <option value="profile_media">Profile media</option>
+              <option value="social_card">Social card</option>
+              <option value="system">System</option>
+            </select>
             <select value={mediaKindFilter} onChange={(e) => { setMediaKindFilter(e.target.value); setPage(0); }}
               className="rounded-lg border border-wk-border bg-wk-surface px-2.5 py-2 text-[12px] text-wk-text outline-none cursor-pointer">
-              <option value="all">All types</option>
-              <option value="image">Image</option>
-              <option value="document">Document/PDF</option>
-              <option value="external_artist_image_postmeta">Artist photo</option>
+              <option value="all">All legacy types</option>
+              <option value="image">Legacy image</option>
+              <option value="document">Legacy document</option>
+              <option value="external_artist_image_postmeta">Artist postmeta</option>
               <option value="external_chart_entry_artwork">Chart artwork</option>
+            </select>
+            <select value={rightsStatusFilter} onChange={(e) => { setRightsStatusFilter(e.target.value); setPage(0); }}
+              className="rounded-lg border border-wk-border bg-wk-surface px-2.5 py-2 text-[12px] text-wk-text outline-none cursor-pointer">
+              <option value="all">All rights</option>
+              <option value="unknown">Unknown rights</option>
+              <option value="owned">Owned</option>
+              <option value="licensed">Licensed</option>
+              <option value="public_domain">Public domain</option>
+              <option value="fair_use">Fair use</option>
+              <option value="needs_clearance">Needs clearance</option>
+              <option value="restricted">Restricted</option>
             </select>
             <select value={sourceKindFilter} onChange={(e) => { setSourceKindFilter(e.target.value); setPage(0); }}
               className="rounded-lg border border-wk-border bg-wk-surface px-2.5 py-2 text-[12px] text-wk-text outline-none cursor-pointer">
@@ -425,6 +559,31 @@ export function MediaLibraryCore({
               </label>
             )}
           </div>
+
+          {!isPickerMode && (
+            <div className="flex flex-wrap gap-1.5 rounded-xl border border-wk-border bg-wk-surface/60 p-2">
+              <label className="flex items-center gap-1.5 text-[11px] text-wk-text-muted">
+                Uploaded from
+                <input type="date" value={uploadedFrom} onChange={(e) => { setUploadedFrom(e.target.value); setPage(0); }}
+                  className="rounded-lg border border-wk-border bg-wk-bg px-2 py-1 text-[11px] text-wk-text outline-none" />
+              </label>
+              <label className="flex items-center gap-1.5 text-[11px] text-wk-text-muted">
+                to
+                <input type="date" value={uploadedTo} onChange={(e) => { setUploadedTo(e.target.value); setPage(0); }}
+                  className="rounded-lg border border-wk-border bg-wk-bg px-2 py-1 text-[11px] text-wk-text outline-none" />
+              </label>
+              <label className="flex items-center gap-1.5 text-[11px] text-wk-text-muted">
+                Content from
+                <input type="date" value={contentFrom} onChange={(e) => { setContentFrom(e.target.value); setPage(0); }}
+                  className="rounded-lg border border-wk-border bg-wk-bg px-2 py-1 text-[11px] text-wk-text outline-none" />
+              </label>
+              <label className="flex items-center gap-1.5 text-[11px] text-wk-text-muted">
+                to
+                <input type="date" value={contentTo} onChange={(e) => { setContentTo(e.target.value); setPage(0); }}
+                  className="rounded-lg border border-wk-border bg-wk-bg px-2 py-1 text-[11px] text-wk-text outline-none" />
+              </label>
+            </div>
+          )}
         </div>
       )}
 

@@ -21,6 +21,45 @@ import { supabase } from "@/lib/supabase";
 // ─── Types ────────────────────────────────────────────────────
 
 export type MediaFileKind = "image" | "document" | "audio" | "video" | "archive" | "other";
+export type MediaAssetPurpose =
+  | "general"
+  | "article_hero"
+  | "article_inline"
+  | "chart_artwork"
+  | "artist_photo"
+  | "release_artwork"
+  | "track_artwork"
+  | "downloadable"
+  | "press_kit"
+  | "brand_asset"
+  | "profile_media"
+  | "social_card"
+  | "system";
+export type MediaRightsStatus =
+  | "unknown"
+  | "owned"
+  | "licensed"
+  | "public_domain"
+  | "fair_use"
+  | "needs_clearance"
+  | "restricted";
+
+export interface MediaFolder {
+  id: string;
+  parent_id: string | null;
+  slug: string;
+  name: string;
+  path: string;
+  purpose: string;
+  description: string | null;
+  color: string | null;
+  icon: string | null;
+  sort_order: number;
+  is_system: boolean;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
 
 export interface MediaAsset {
   id: string;
@@ -103,12 +142,18 @@ export interface ListOptions {
   mediaKind?: string;
   fileKind?: string;
   assetPurpose?: string;
+  folderId?: string;
+  rightsStatus?: string;
   sourceKind?: string;
   status?: string;
   missingAltOnly?: boolean;
+  uploadedFrom?: string;
+  uploadedTo?: string;
+  contentFrom?: string;
+  contentTo?: string;
   page?: number;
   pageSize?: number;
-  orderBy?: "created_at" | "updated_at" | "title";
+  orderBy?: "created_at" | "updated_at" | "title" | "content_date";
   ascending?: boolean;
 }
 
@@ -483,6 +528,20 @@ export const mediaService = {
     return data as MediaAsset;
   },
 
+  async listFolders(): Promise<MediaFolder[]> {
+    const { data, error } = await supabase
+      .from("media_folders")
+      .select("id, parent_id, slug, name, path, purpose, description, color, icon, sort_order, is_system, created_at, updated_at")
+      .order("sort_order", { ascending: true })
+      .order("name", { ascending: true });
+
+    if (error) {
+      throw new Error(`Failed to list media folders: ${error.message}`);
+    }
+
+    return (data ?? []) as MediaFolder[];
+  },
+
   // ════════════════════════════════════════════════════════════
   // LIST
   // ════════════════════════════════════════════════════════════
@@ -493,9 +552,15 @@ export const mediaService = {
       mediaKind = "all",
       fileKind = "all",
       assetPurpose = "all",
+      folderId = "all",
+      rightsStatus = "all",
       sourceKind = "all",
       status = "all",
       missingAltOnly = false,
+      uploadedFrom = "",
+      uploadedTo = "",
+      contentFrom = "",
+      contentTo = "",
       page = 0,
       pageSize = 60,
       orderBy = "created_at",
@@ -512,8 +577,15 @@ export const mediaService = {
     if (mediaKind !== "all") query = query.eq("media_kind", mediaKind);
     if (fileKind !== "all") query = query.eq("file_kind", fileKind);
     if (assetPurpose !== "all") query = query.eq("asset_purpose", assetPurpose);
+    if (folderId === "none") query = query.is("folder_id", null);
+    else if (folderId !== "all") query = query.eq("folder_id", folderId);
+    if (rightsStatus !== "all") query = query.eq("rights_status", rightsStatus);
     if (sourceKind !== "all") query = query.eq("source_kind", sourceKind);
     if (status !== "all") query = query.eq("status", status);
+    if (uploadedFrom) query = query.gte("created_at", `${uploadedFrom}T00:00:00.000Z`);
+    if (uploadedTo) query = query.lte("created_at", `${uploadedTo}T23:59:59.999Z`);
+    if (contentFrom) query = query.gte("content_date", contentFrom);
+    if (contentTo) query = query.lte("content_date", contentTo);
     if (missingAltOnly) query = query.or("metadata.is.null,metadata->>alt_text.is.null");
 
     query = query
@@ -585,6 +657,18 @@ export const mediaService = {
       title?: string;
       metadata?: Partial<MediaAssetMetadata>;
       status?: string;
+      folderId?: string | null;
+      fileKind?: MediaFileKind | string | null;
+      assetPurpose?: MediaAssetPurpose | string | null;
+      displayFilename?: string | null;
+      originalFilename?: string | null;
+      contentDate?: string | null;
+      rightsStatus?: MediaRightsStatus | string;
+      creditText?: string | null;
+      countryCode?: string | null;
+      languageCode?: string | null;
+      tags?: string[];
+      internalNotes?: string | null;
     }
   ): Promise<MediaAsset> {
     const payload: Record<string, unknown> = {
@@ -593,6 +677,18 @@ export const mediaService = {
 
     if (updates.title !== undefined) payload.title = updates.title;
     if (updates.status !== undefined) payload.status = updates.status;
+    if (updates.folderId !== undefined) payload.folder_id = updates.folderId || null;
+    if (updates.fileKind !== undefined) payload.file_kind = updates.fileKind || null;
+    if (updates.assetPurpose !== undefined) payload.asset_purpose = updates.assetPurpose || null;
+    if (updates.displayFilename !== undefined) payload.display_filename = updates.displayFilename || null;
+    if (updates.originalFilename !== undefined) payload.original_filename = updates.originalFilename || null;
+    if (updates.contentDate !== undefined) payload.content_date = updates.contentDate || null;
+    if (updates.rightsStatus !== undefined) payload.rights_status = updates.rightsStatus || "unknown";
+    if (updates.creditText !== undefined) payload.credit_text = updates.creditText || null;
+    if (updates.countryCode !== undefined) payload.country_code = updates.countryCode || null;
+    if (updates.languageCode !== undefined) payload.language_code = updates.languageCode || null;
+    if (updates.tags !== undefined) payload.tags = updates.tags;
+    if (updates.internalNotes !== undefined) payload.internal_notes = updates.internalNotes || null;
 
     if (updates.metadata !== undefined) {
       // Merge with existing metadata

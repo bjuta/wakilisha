@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
 import { ImageEditor } from "./ImageEditor";
 import {
   mediaService,
   type MediaAsset,
   type MediaAssetMetadata,
+  type MediaFolder,
   type ReferencedEntity,
 } from "@/services/mediaService";
 
@@ -100,6 +101,17 @@ export function MediaEditModal({
   );
   const [animated, setAnimated] = useState(asset.metadata?.animated === true);
   const [status, setStatus] = useState(asset.status || "active");
+  const [folders, setFolders] = useState<MediaFolder[]>([]);
+  const [folderId, setFolderId] = useState(asset.folder_id || "none");
+  const [displayFilename, setDisplayFilename] = useState(asset.display_filename || asset.title || "");
+  const [assetPurpose, setAssetPurpose] = useState(asset.asset_purpose || "general");
+  const [contentDate, setContentDate] = useState(asset.content_date || "");
+  const [rightsStatus, setRightsStatus] = useState(asset.rights_status || "unknown");
+  const [creditText, setCreditText] = useState(asset.credit_text || "");
+  const [countryCode, setCountryCode] = useState(asset.country_code || "");
+  const [languageCode, setLanguageCode] = useState(asset.language_code || "");
+  const [tagsText, setTagsText] = useState((asset.tags ?? []).join(", "));
+  const [internalNotes, setInternalNotes] = useState(asset.internal_notes || "");
 
   const [saving, setSaving] = useState(false);
   const [savingStatus, setSavingStatus] = useState(false);
@@ -113,6 +125,20 @@ export function MediaEditModal({
     setToast({ type, msg });
     setTimeout(() => setToast(null), 3500);
   };
+
+  useEffect(() => {
+    let alive = true;
+    mediaService.listFolders()
+      .then((rows) => {
+        if (alive) setFolders(rows);
+      })
+      .catch(() => {
+        if (alive) setFolders([]);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const handleImageEdited = (blob: Blob, width: number, height: number) => {
     setEditedBlob(blob);
@@ -180,6 +206,16 @@ export function MediaEditModal({
         title: title || asset.title || undefined,
         metadata: metadataUpdates,
         status,
+        folderId: folderId === "none" ? null : folderId,
+        assetPurpose,
+        displayFilename: displayFilename || title || asset.title || null,
+        contentDate: contentDate || null,
+        rightsStatus,
+        creditText: creditText || null,
+        countryCode: countryCode.trim().toUpperCase() || null,
+        languageCode: languageCode.trim().toLowerCase() || null,
+        tags: tagsText.split(",").map((tag) => tag.trim()).filter(Boolean),
+        internalNotes: internalNotes || null,
       });
 
       onSave(updatedAsset);
@@ -546,6 +582,167 @@ export function MediaEditModal({
                     </label>
                     )}
 
+                    {/* Library metadata */}
+                    <div className="rounded-xl border border-wk-border bg-wk-surface/60 p-3 space-y-3">
+                      <p className="text-[10px] font-black uppercase tracking-wider text-wk-text-faint">
+                        Library metadata
+                      </p>
+
+                      <div>
+                        <label className="block text-[11px] font-semibold text-wk-text-soft mb-1.5">
+                          Folder
+                        </label>
+                        <select
+                          value={folderId}
+                          onChange={(e) => setFolderId(e.target.value)}
+                          className="w-full rounded-lg border border-wk-border bg-wk-surface px-3 py-1.5 text-[12px] text-wk-text outline-none focus:border-wk-brand/50 cursor-pointer"
+                        >
+                          <option value="none">No folder</option>
+                          {folders.map((folder) => (
+                            <option key={folder.id} value={folder.id}>{folder.name}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-semibold text-wk-text-soft mb-1.5">
+                          Display filename
+                        </label>
+                        <input
+                          type="text"
+                          value={displayFilename}
+                          onChange={(e) => setDisplayFilename(e.target.value)}
+                          placeholder="Readable file name..."
+                          className="w-full rounded-lg border border-wk-border bg-wk-surface px-3 py-1.5 text-[12px] text-wk-text placeholder:text-wk-text-faint outline-none focus:border-wk-brand/50 focus:ring-1 focus:ring-wk-brand/20 transition-all"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[11px] font-semibold text-wk-text-soft mb-1.5">
+                            Purpose
+                          </label>
+                          <select
+                            value={assetPurpose}
+                            onChange={(e) => setAssetPurpose(e.target.value)}
+                            className="w-full rounded-lg border border-wk-border bg-wk-surface px-2.5 py-1.5 text-[12px] text-wk-text outline-none focus:border-wk-brand/50 cursor-pointer"
+                          >
+                            <option value="general">General</option>
+                            <option value="article_hero">Article hero</option>
+                            <option value="article_inline">Article inline</option>
+                            <option value="chart_artwork">Chart artwork</option>
+                            <option value="artist_photo">Artist photo</option>
+                            <option value="release_artwork">Release artwork</option>
+                            <option value="track_artwork">Track artwork</option>
+                            <option value="downloadable">Downloadable</option>
+                            <option value="press_kit">Press kit</option>
+                            <option value="brand_asset">Brand asset</option>
+                            <option value="profile_media">Profile media</option>
+                            <option value="social_card">Social card</option>
+                            <option value="system">System</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-semibold text-wk-text-soft mb-1.5">
+                            Content date
+                          </label>
+                          <input
+                            type="date"
+                            value={contentDate}
+                            onChange={(e) => setContentDate(e.target.value)}
+                            className="w-full rounded-lg border border-wk-border bg-wk-surface px-2.5 py-1.5 text-[12px] text-wk-text outline-none focus:border-wk-brand/50"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-semibold text-wk-text-soft mb-1.5">
+                          Rights status
+                        </label>
+                        <select
+                          value={rightsStatus}
+                          onChange={(e) => setRightsStatus(e.target.value)}
+                          className="w-full rounded-lg border border-wk-border bg-wk-surface px-3 py-1.5 text-[12px] text-wk-text outline-none focus:border-wk-brand/50 cursor-pointer"
+                        >
+                          <option value="unknown">Unknown</option>
+                          <option value="owned">Owned</option>
+                          <option value="licensed">Licensed</option>
+                          <option value="public_domain">Public domain</option>
+                          <option value="fair_use">Fair use</option>
+                          <option value="needs_clearance">Needs clearance</option>
+                          <option value="restricted">Restricted</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-semibold text-wk-text-soft mb-1.5">
+                          Credit
+                        </label>
+                        <input
+                          type="text"
+                          value={creditText}
+                          onChange={(e) => setCreditText(e.target.value)}
+                          placeholder="Photographer, publication, partner..."
+                          className="w-full rounded-lg border border-wk-border bg-wk-surface px-3 py-1.5 text-[12px] text-wk-text placeholder:text-wk-text-faint outline-none focus:border-wk-brand/50 focus:ring-1 focus:ring-wk-brand/20 transition-all"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[11px] font-semibold text-wk-text-soft mb-1.5">
+                            Country
+                          </label>
+                          <input
+                            type="text"
+                            value={countryCode}
+                            onChange={(e) => setCountryCode(e.target.value)}
+                            placeholder="KE"
+                            maxLength={2}
+                            className="w-full rounded-lg border border-wk-border bg-wk-surface px-3 py-1.5 text-[12px] uppercase text-wk-text placeholder:text-wk-text-faint outline-none focus:border-wk-brand/50"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-semibold text-wk-text-soft mb-1.5">
+                            Language
+                          </label>
+                          <input
+                            type="text"
+                            value={languageCode}
+                            onChange={(e) => setLanguageCode(e.target.value)}
+                            placeholder="en"
+                            maxLength={8}
+                            className="w-full rounded-lg border border-wk-border bg-wk-surface px-3 py-1.5 text-[12px] lowercase text-wk-text placeholder:text-wk-text-faint outline-none focus:border-wk-brand/50"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-semibold text-wk-text-soft mb-1.5">
+                          Tags
+                        </label>
+                        <input
+                          type="text"
+                          value={tagsText}
+                          onChange={(e) => setTagsText(e.target.value)}
+                          placeholder="comma, separated, tags"
+                          className="w-full rounded-lg border border-wk-border bg-wk-surface px-3 py-1.5 text-[12px] text-wk-text placeholder:text-wk-text-faint outline-none focus:border-wk-brand/50 focus:ring-1 focus:ring-wk-brand/20 transition-all"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-semibold text-wk-text-soft mb-1.5">
+                          Internal notes
+                        </label>
+                        <textarea
+                          value={internalNotes}
+                          onChange={(e) => setInternalNotes(e.target.value)}
+                          placeholder="Rights notes, usage limits, source context..."
+                          rows={3}
+                          className="w-full rounded-lg border border-wk-border bg-wk-surface px-3 py-1.5 text-[12px] text-wk-text placeholder:text-wk-text-faint outline-none focus:border-wk-brand/50 focus:ring-1 focus:ring-wk-brand/20 resize-none transition-all"
+                        />
+                      </div>
+                    </div>
+
                     {/* Save */}
                     <button
                       onClick={handleSave}
@@ -600,6 +797,9 @@ export function MediaEditModal({
                     <FieldRow label="ID" value={asset.id} mono long />
                     <FieldRow label="Slug" value={asset.slug || "—"} mono />
                     <FieldRow label="Media Kind" value={asset.media_kind || "—"} />
+                    <FieldRow label="File Kind" value={asset.file_kind || "—"} />
+                    <FieldRow label="Purpose" value={asset.asset_purpose || "—"} />
+                    <FieldRow label="Rights" value={asset.rights_status || "—"} />
                   </div>
                 </section>
 
