@@ -162,6 +162,13 @@ const STATIC_ROUTES: Record<string, Omit<SeoModel, "canonicalPath" | "jsonLd">> 
     ogType: "website",
     kind: "utility",
   },
+  "/institute": {
+    title: "The WAKILISHA Institute",
+    description: "The WAKILISHA Institute is the intellectual home for African cultural inquiry, preserving questions, evidence, memory, and understanding.",
+    robots: "index, follow",
+    ogType: "website",
+    kind: "utility",
+  },
 };
 
 function cleanPath(pathname: string): string {
