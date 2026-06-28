@@ -1,13 +1,13 @@
 ---
 title: "The Inquiry Model"
 type: "constitution"
-status: "internal"
+status: "active"
 version: "1.0"
 created: "2026-06-28"
 last_updated: "2026-06-28"
 author: "WAKILISHA"
 origin: "Genesis Field Notes, June 2026"
-visibility: "internal"
+visibility: "public"
 review_cycle: "annual"
 ---
 
