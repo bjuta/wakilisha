@@ -42,30 +42,62 @@ function fail(code: string, message: string, headers: Record<string, string>, st
   return json({ ok: false, error: { code, message }, meta: { servedAt: new Date().toISOString() } }, headers, status);
 }
 
+const ANALYTICS_TIME_ZONE = "Africa/Nairobi";
+
+function nairobiDateString(date = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: ANALYTICS_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
+function utcFromNairobiDate(dateString: string): Date {
+  return new Date(`${dateString}T00:00:00+03:00`);
+}
+
+function shiftNairobiDate(dateString: string, days: number): string {
+  const date = utcFromNairobiDate(dateString);
+  date.setUTCDate(date.getUTCDate() + days);
+  return nairobiDateString(date);
+}
+
 function sinceFromRange(range: RangeInput = 30): string {
   if (typeof range === "number") {
     if (range <= 0) return new Date(0).toISOString();
-    return new Date(Date.now() - range * 86400000).toISOString();
+
+    const today = nairobiDateString();
+    const start = shiftNairobiDate(today, -(range - 1));
+    return utcFromNairobiDate(start).toISOString();
   }
-  return new Date(`${range.start}T00:00:00`).toISOString();
+
+  return utcFromNairobiDate(range.start).toISOString();
 }
 
 function untilFromRange(range: RangeInput = 30): string {
-  if (typeof range === "number") return new Date().toISOString();
-  return new Date(`${range.end}T23:59:59.999`).toISOString();
+  if (typeof range === "number") {
+    if (range <= 0) return new Date().toISOString();
+
+    const today = nairobiDateString();
+    const tomorrow = shiftNairobiDate(today, 1);
+    return new Date(utcFromNairobiDate(tomorrow).getTime() - 1).toISOString();
+  }
+
+  const nextDay = shiftNairobiDate(range.end, 1);
+  return new Date(utcFromNairobiDate(nextDay).getTime() - 1).toISOString();
 }
 
 function dayCount(range: RangeInput = 30): number {
   if (typeof range === "number") return range <= 0 ? 365 : range;
-  const start = new Date(`${range.start}T00:00:00`);
-  const end = new Date(`${range.end}T00:00:00`);
+
+  const start = utcFromNairobiDate(range.start);
+  const end = utcFromNairobiDate(range.end);
   return Math.max(1, Math.round((end.getTime() - start.getTime()) / 86400000) + 1);
 }
 
 function todayStart(): string {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d.toISOString();
+  return utcFromNairobiDate(nairobiDateString()).toISOString();
 }
 
 function countBy<T extends Record<string, unknown>>(rows: T[], keyFn: (row: T) => string, limit = 20) {
@@ -210,20 +242,30 @@ async function requireAdminRead(userId: string, db: ReturnType<typeof createClie
   return caps.has("view_analytics") || caps.has("view_community") || caps.has("manage_registry");
 }
 
-async function getAnalyticsEvents(db: ReturnType<typeof createClient>, range: RangeInput, limit = 10000, clean = true) {
+async function getAnalyticsEvents(db: ReturnType<typeof createClient>, range: RangeInput, limit = 50000, clean = true) {
   const since = sinceFromRange(range);
   const until = untilFromRange(range);
+  const pageSize = 1000;
+  const rows: any[] = [];
 
-  const { data, error } = await db
-    .from("analytics_events")
-    .select("id,event_name,page_url,page_type,entity_slug,entity_type,context,session_id,user_id,referrer,created_at")
-    .gte("created_at", since)
-    .lte("created_at", until)
-    .order("created_at", { ascending: true })
-    .limit(limit);
+  for (let offset = 0; offset < limit; offset += pageSize) {
+    const { data, error } = await db
+      .from("analytics_events")
+      .select("id,event_name,page_url,page_type,entity_slug,entity_type,context,session_id,user_id,referrer,created_at")
+      .gte("created_at", since)
+      .lte("created_at", until)
+      .order("created_at", { ascending: true })
+      .range(offset, Math.min(offset + pageSize - 1, limit - 1));
 
-  if (error) throw error;
-  return filterInternalEvents(data ?? [], clean);
+    if (error) throw error;
+
+    const batch = data ?? [];
+    rows.push(...batch);
+
+    if (batch.length < pageSize) break;
+  }
+
+  return filterInternalEvents(rows, clean);
 }
 
 function buildTimeline(events: any[], range: RangeInput) {
@@ -402,6 +444,8 @@ function buildSnapshot(events: any[], range: RangeInput) {
       pageViews: todayPageViews.length,
       newsletterSignups: signups.filter((e) => e.created_at >= today).length,
       uniqueSessions: todaySessions.size,
+      searchQueries: searchEvents.filter((e) => e.created_at >= today).length,
+      videoPlays: videos.filter((e) => e.created_at >= today).length,
     },
     kpis: {
       totalPageViews: pageViews.length,
@@ -2184,6 +2228,7 @@ Deno.serve(async (req) => {
   try {
     if (action === "analytics_snapshot") {
       const range = body.range ?? 30;
+
       const clean = body.clean !== false;
 
       if (!clean) {
@@ -2207,13 +2252,19 @@ Deno.serve(async (req) => {
         rawSnapshot.today.uniqueSessions > 0 ||
         rawSnapshot.kpis.totalPageViews > 0;
 
-      if (cleanLooksEmpty && rawHasTraffic) {
-        console.warn("[admin-analytics-api] clean snapshot returned empty while raw has traffic; returning raw snapshot", {
+      const cleanLooksOverFiltered =
+        rawSnapshot.kpis.totalPageViews >= 100 &&
+        cleanSnapshot.kpis.totalPageViews < Math.floor(rawSnapshot.kpis.totalPageViews * 0.6);
+
+      if ((cleanLooksEmpty && rawHasTraffic) || cleanLooksOverFiltered) {
+        console.warn("[admin-analytics-api] clean snapshot looked untrustworthy; returning raw snapshot", {
           rawEvents: rawEvents.length,
           cleanEvents: cleanEvents.length,
           rawTodayPageViews: rawSnapshot.today.pageViews,
-          rawTodaySessions: rawSnapshot.today.uniqueSessions,
+          cleanTodayPageViews: cleanSnapshot.today.pageViews,
           rawTotalPageViews: rawSnapshot.kpis.totalPageViews,
+          cleanTotalPageViews: cleanSnapshot.kpis.totalPageViews,
+          reason: cleanLooksEmpty ? "clean_empty" : "clean_over_filtered",
         });
 
         return ok(rawSnapshot, headers);
