@@ -155,6 +155,13 @@ const STATIC_ROUTES: Record<string, Omit<SeoModel, "canonicalPath" | "jsonLd">> 
     ogType: "website",
     kind: "utility",
   },
+  "/library": {
+    title: "The WAKILISHA Library",
+    description: "The WAKILISHA Library preserves the principles, Inquiries, Field Notes, and institutional memory that guide the work.",
+    robots: "noindex, follow",
+    ogType: "website",
+    kind: "utility",
+  },
 };
 
 function cleanPath(pathname: string): string {
@@ -309,6 +316,7 @@ function modelFromPath(pathname: string): SeoModel {
     "preview",
     "player",
     "briefing",
+    "library",
   ]);
 
   if (noIndexSections.has(section) || path.includes("/lyrics/contribute")) {
