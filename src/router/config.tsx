@@ -190,6 +190,7 @@ import PrivacyPage from "../pages/privacy/page";
 import TermsPage from "../pages/terms/page";
 import LibraryPage from "../pages/library/page";
 import LibraryEntryPage from "../pages/library/entry/page";
+import InstitutePage from "../pages/institute/page";
 
 function LegacyTaxonomyRedirect({ base }: { base: "/categories" | "/tags" }) {
   const { slug } = useParams<{ slug?: string }>();
@@ -272,6 +273,7 @@ const routes: RouteObject[] = [
       { path: "/terms", element: <ResponsivePage mobile={<TermsPage />} desktop={<TermsPage />} /> },
       { path: "/library", element: <ResponsivePage mobile={<LibraryPage />} desktop={<LibraryPage />} /> },
       { path: "/library/:category/:slug", element: <ResponsivePage mobile={<LibraryEntryPage />} desktop={<LibraryEntryPage />} /> },
+      { path: "/institute", element: <ResponsivePage mobile={<InstitutePage />} desktop={<InstitutePage />} /> },
       { path: "/briefings", element: <ResponsivePage mobile={<PublicBriefingsPage />} desktop={<PublicBriefingsPage />} /> },
       { path: "/briefing/confirm", element: <ResponsivePage mobile={<BriefingConfirmPage />} desktop={<BriefingConfirmPage />} /> },
       { path: "/briefing/unsubscribe", element: <ResponsivePage mobile={<BriefingUnsubscribePage />} desktop={<BriefingUnsubscribePage />} /> },
