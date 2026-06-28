@@ -210,7 +210,7 @@ export default function AdminAnalyticsPage() {
   const [compareLoading, setCompareLoading] = useState(false);
 
   // Data states
-  const [todayKpis, setTodayKpis] = useState<{ pageViews: number; newsletterSignups: number; uniqueSessions: number } | null>(null);
+  const [todayKpis, setTodayKpis] = useState<{ pageViews: number; newsletterSignups: number; uniqueSessions: number; searchQueries?: number; videoPlays?: number } | null>(null);
   const [kpis, setKpis] = useState<AnalyticsKpis | null>(null);
   const [timeline, setTimeline] = useState<TimelinePoint[]>([]);
   const [topPages, setTopPages] = useState<TopPage[]>([]);
@@ -506,7 +506,7 @@ export default function AdminAnalyticsPage() {
                 ? "bg-[var(--wk-brand)] text-white border-[var(--wk-brand)]"
                 : "border-[var(--wk-warning)] text-[var(--wk-warning)] hover:bg-[var(--wk-warning)]/10"
             }`}
-            title={cleanAnalytics ? "Internal and local traffic is hidden" : "Raw analytics includes internal/local traffic"}
+            title={cleanAnalytics ? "Internal and local traffic is hidden where analytics can identify it" : "Raw analytics includes all captured traffic"}
           >
             <WkIcon name={cleanAnalytics ? "ShieldCheck" : "ShieldAlert"} size={13} />
             {cleanAnalytics ? "Clean Analytics On" : "Raw Analytics"}
@@ -519,10 +519,10 @@ export default function AdminAnalyticsPage() {
                 ? "bg-[var(--wk-text)] text-[var(--wk-bg)] border-[var(--wk-text)]"
                 : "border-[var(--wk-border)] text-[var(--wk-text-muted)] hover:text-[var(--wk-text)] hover:border-[var(--wk-text-faint)]"
             }`}
-            title={internalTraffic ? "This browser is excluded from analytics" : "Mark this browser as internal"}
+            title={internalTraffic ? "Future events from this browser are excluded. This does not rewrite past analytics." : "Exclude future events from this browser. This does not rewrite past analytics."}
           >
             <WkIcon name={internalTraffic ? "UserCheck" : "UserMinus"} size={13} />
-            {internalTraffic ? "My Traffic Is Internal" : "Mark Me Internal"}
+            {internalTraffic ? "This Browser Is Excluded" : "Exclude This Browser"}
           </button>
 
           {/* Export */}
@@ -587,7 +587,7 @@ export default function AdminAnalyticsPage() {
           accent="success"
         />
         <AdminChartsKpiCard
-          value={kpis?.searchQueries?.toLocaleString() ?? "—"}
+          value={todayKpis?.searchQueries?.toLocaleString() ?? "—"}
           label="Searches Today"
           icon="Search"
           accent="warning"
@@ -618,7 +618,7 @@ export default function AdminAnalyticsPage() {
         />
         <AdminChartsKpiCard
           value={kpis?.totalVideoPlays?.toLocaleString() ?? "—"}
-          label="Video Plays"
+          label={`Video Plays — ${rangeDayLabel(dateRange)}`}
           icon="Play"
           accent="warning"
           compareDelta={compareEnabled && compareKpis ? calcDelta(kpis?.totalVideoPlays ?? 0, compareKpis.totalVideoPlays) : null}

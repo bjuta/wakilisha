@@ -252,7 +252,7 @@ export interface SignalOsRefreshResponse {
 }
 
 interface AnalyticsSnapshot {
-  today: { pageViews: number; newsletterSignups: number; uniqueSessions: number };
+  today: { pageViews: number; newsletterSignups: number; uniqueSessions: number; searchQueries?: number; videoPlays?: number };
   kpis: AnalyticsKpis;
   timeline: TimelinePoint[];
   topPages: TopPage[];
@@ -297,21 +297,15 @@ async function callAdminAnalytics<T>(action: string, payload: Record<string, unk
   return data.data as T;
 }
 
-const snapshotCache = new Map<string, Promise<AnalyticsSnapshot>>();
-
 async function getSnapshot(
   range: DateRange | number = 30,
   options: AnalyticsFilterOptions = {},
 ): Promise<AnalyticsSnapshot> {
-  const key = `${rangeKey(range)}:${analyticsOptionsKey(options)}`;
-  if (!snapshotCache.has(key)) {
-    snapshotCache.set(key, callAdminAnalytics<AnalyticsSnapshot>("analytics_snapshot", analyticsPayload(range, options)));
-  }
-  return snapshotCache.get(key)!;
+  return callAdminAnalytics<AnalyticsSnapshot>("analytics_snapshot", analyticsPayload(range, options));
 }
 
 export function clearAdminAnalyticsCache(): void {
-  snapshotCache.clear();
+  // No-op kept for callers. Analytics snapshots must be fresh.
 }
 
 export async function fetchRealtimeAnalytics(options: AnalyticsFilterOptions = {}): Promise<RealtimeAnalyticsSnapshot> {
@@ -338,7 +332,7 @@ export async function fetchDashboardKpis(range: DateRange | number = 30, options
   return (await getSnapshot(range, options)).kpis;
 }
 
-export async function fetchTodayKpis(options: AnalyticsFilterOptions = {}): Promise<{ pageViews: number; newsletterSignups: number; uniqueSessions: number }> {
+export async function fetchTodayKpis(options: AnalyticsFilterOptions = {}): Promise<{ pageViews: number; newsletterSignups: number; uniqueSessions: number; searchQueries?: number; videoPlays?: number }> {
   return (await getSnapshot(1, options)).today;
 }
 
