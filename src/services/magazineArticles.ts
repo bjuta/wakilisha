@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { listMagazineStories, getArticle, type PublicStory } from '@/services/publicContent/client';
+import { listMagazineStories, getArticle, getInlineMagazineFallbackStories, type PublicStory } from '@/services/publicContent/client';
 import { processArticleContent, generateExcerpt } from '@/services/articles/contentPipeline';
 import { fetchAllSiteContent, type SiteContentResponse, type MagazineSiteArtist, type MagazineSiteRelease } from '@/services/magazineSiteContent';
 import { supabase } from '@/lib/supabase';
@@ -227,22 +227,30 @@ export async function getArticlesByAuthor(authorSlug: string): Promise<MagazineA
   return [];
 }
 
+function initialMagazineArticles(): MagazineArticle[] {
+  return getInlineMagazineFallbackStories().map(storyToArticle);
+}
+
 export function useMagazineArticles() {
-  const [articles, setArticles] = useState<MagazineArticle[]>([]);
-  const [loading, setLoading] = useState(true);
+  const initialArticles = initialMagazineArticles();
+  const [articles, setArticles] = useState<MagazineArticle[]>(initialArticles);
+  const [loading, setLoading] = useState(initialArticles.length === 0);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(() => {
-    setLoading(true);
+    const fallbackArticles = initialMagazineArticles();
+
+    setLoading(fallbackArticles.length === 0);
     setError(null);
+
     listMagazineArticles()
       .then((items) => {
-        setArticles(items);
+        setArticles(items.length > 0 ? items : fallbackArticles);
         setLoading(false);
       })
       .catch((err) => {
-        setArticles([]);
-        setError(err instanceof Error ? err.message : 'Failed to load articles');
+        setArticles(fallbackArticles);
+        setError(fallbackArticles.length > 0 ? null : err instanceof Error ? err.message : 'Failed to load articles');
         setLoading(false);
       });
   }, []);

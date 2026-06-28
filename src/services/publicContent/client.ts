@@ -325,6 +325,28 @@ async function apiGet<T>(path: string): Promise<T> {
   return deepDecode(raw);
 }
 
+function getInlineMagazineFallbackPayload(): { stories: PublicStory[] } {
+  if (typeof document === "undefined") return { stories: [] };
+
+  const node = document.getElementById("wk-magazine-fallback");
+  const text = node?.textContent?.trim();
+
+  if (!text) return { stories: [] };
+
+  try {
+    const payload = JSON.parse(text) as { stories?: PublicStory[] };
+    return {
+      stories: Array.isArray(payload.stories) ? payload.stories : [],
+    };
+  } catch {
+    return { stories: [] };
+  }
+}
+
+export function getInlineMagazineFallbackStories(): PublicStory[] {
+  return getInlineMagazineFallbackPayload().stories;
+}
+
 async function safeApiGet<T>(path: string, fallback: T): Promise<T> {
   try {
     return await apiGet<T>(path);
@@ -1095,10 +1117,14 @@ export async function getReleaseFilterYears(): Promise<string[]> {
 
 export async function listMagazineStories(): Promise<PublicStory[]> {
   const result = await safeApiGet<{ stories: PublicStory[] }>("/magazine?limit=500", { stories: [] });
-  const mapped = result.stories.map((story) => ({
+  const apiStories = Array.isArray(result.stories) ? result.stories : [];
+  const sourceStories = apiStories.length > 0 ? apiStories : getInlineMagazineFallbackStories();
+
+  const mapped = sourceStories.map((story) => ({
     ...story,
     heroUrl: image(story.heroUrl, { id: story.id, slug: story.slug, name: story.title, type: "article" }),
   }));
+
   return await enrichArticlesMedia(mapped) as PublicStory[];
 }
 
