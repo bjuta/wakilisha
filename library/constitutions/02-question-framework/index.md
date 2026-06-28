@@ -6,7 +6,7 @@ version: "1.0"
 created: "2026-06-28"
 last_updated: "2026-06-28"
 author: "WAKILISHA"
-origin: "Genesis Field Notes, June 2026"
+origin: "WAKILISHA Library, June 2026"
 visibility: "public"
 review_cycle: "annual"
 ---
