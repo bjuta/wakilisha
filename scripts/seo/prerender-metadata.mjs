@@ -682,6 +682,17 @@ function readExtraRouteManifest() {
     .map(cleanPath);
 }
 
+function isCanonicalPublicPath(pagePath) {
+  const clean = cleanPath(pagePath);
+  const parts = clean.split("/").filter(Boolean);
+
+  if (parts[0] === "tracks") {
+    return parts.length >= 3;
+  }
+
+  return true;
+}
+
 function readSitemapPaths() {
   if (!fs.existsSync(SITEMAP_PATH)) {
     throw new Error("dist/sitemap.xml was not found. Build must copy public/sitemap.xml first.");
@@ -703,7 +714,8 @@ function readSitemapPaths() {
       }
     })
     .filter(Boolean)
-    .filter((page) => !page.includes("/admin") && !page.includes("/auth") && !page.includes("/preview"));
+    .filter((page) => !page.includes("/admin") && !page.includes("/auth") && !page.includes("/preview"))
+    .filter(isCanonicalPublicPath);
 
   const extraPaths = readExtraRouteManifest();
   return [...new Set(["/", ...paths, ...extraPaths, ...EXTRA_NOINDEX_PATHS.map(cleanPath)])];
@@ -718,7 +730,7 @@ async function main() {
   ARTICLE_IMAGE_BY_PATH = await fetchArticleImageManifest();
 
   const baseHtml = fs.readFileSync(INDEX_PATH, "utf8");
-  const paths = [...new Set([...readSitemapPaths(), ...DB_METADATA_BY_PATH.keys()])];
+  const paths = [...new Set([...readSitemapPaths(), ...DB_METADATA_BY_PATH.keys()].filter(isCanonicalPublicPath))];
 
   let written = 0;
 
