@@ -21,11 +21,19 @@ export interface LibraryEntry {
 
 type FrontMatter = Record<string, string>;
 
-const rawLibraryModules = import.meta.glob("../../library/**/*.md", {
-  query: "?raw",
-  import: "default",
-  eager: true,
-}) as Record<string, string>;
+import northStarRaw from "../../library/constitutions/01-north-star/index.md?raw";
+import questionFrameworkRaw from "../../library/constitutions/02-question-framework/index.md?raw";
+import inquiryModelRaw from "../../library/constitutions/03-inquiry-model/index.md?raw";
+import relationshipConstitutionRaw from "../../library/constitutions/04-relationship-constitution/index.md?raw";
+import sixtyYearTestRaw from "../../library/constitutions/13-sixty-year-test/index.md?raw";
+
+const rawLibraryModules: Record<string, string> = {
+  "../../library/constitutions/01-north-star/index.md": northStarRaw,
+  "../../library/constitutions/02-question-framework/index.md": questionFrameworkRaw,
+  "../../library/constitutions/03-inquiry-model/index.md": inquiryModelRaw,
+  "../../library/constitutions/04-relationship-constitution/index.md": relationshipConstitutionRaw,
+  "../../library/constitutions/13-sixty-year-test/index.md": sixtyYearTestRaw,
+};
 
 export const LIBRARY_CATEGORY_ORDER = [
   "constitutions",
