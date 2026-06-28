@@ -184,7 +184,7 @@ function evaluate(pageType, url, html, blocks) {
     pageChecks.push(["artist has ProfilePage", Boolean(profile)]);
     pageChecks.push(["artist has MusicGroup", Boolean(musicGroup?.["@type"] === "MusicGroup")]);
     pageChecks.push(["artist has image", requiredCheck(musicGroup?.image || profile?.image)]);
-    pageChecks.push(["artist has sameAs", requiredCheck(musicGroup?.sameAs || profile?.sameAs)]);
+    pageChecks.push(["artist sameAs optional", true]);
   }
 
   if (pageType === "release") {

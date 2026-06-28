@@ -16,6 +16,7 @@ const DB_METADATA_OUTPUT_PATH = path.join(DIST_DIR, "seo-metadata-manifest.json"
 let DB_METADATA_BY_PATH = new Map();
 let ARTICLE_IMAGE_BY_PATH = new Map();
 let ARTICLE_METADATA_BY_PATH = new Map();
+let ARTIST_METADATA_BY_PATH = new Map();
 
 const EXTRA_NOINDEX_PATHS = [
   "/search",
@@ -386,6 +387,93 @@ function escapeAttr(value) {
     .replaceAll("'", "&#39;");
 }
 
+
+function socialUrlListFromArtist(artist) {
+  const urls = [
+    artist.sameAs,
+    artist.website,
+    artist.websiteUrl,
+    artist.spotifyUrl,
+    artist.appleMusicUrl,
+    artist.youtubeChannel,
+    artist.youtubeUrl,
+    artist.instagram,
+    artist.instagramUrl,
+    artist.twitter,
+    artist.twitterUrl,
+    artist.xUrl,
+    artist.tiktok,
+    artist.tiktokUrl,
+    artist.facebook,
+    artist.facebookUrl,
+  ];
+
+  return urls
+    .flatMap((value) => Array.isArray(value) ? value : [value])
+    .map((value) => String(value || "").trim())
+    .filter((value) => /^https?:\/\//i.test(value));
+}
+
+async function fetchArtistMetadataManifest() {
+  const supabaseUrl = envValue("VITE_PUBLIC_SUPABASE_URL").replace(/\/+$/, "");
+  const anonKey = envValue("VITE_PUBLIC_SUPABASE_ANON_KEY");
+  const explicitBase = envValue("VITE_PUBLIC_API_BASE").replace(/\/+$/, "");
+  const apiBase = explicitBase || (supabaseUrl ? `${supabaseUrl}/functions/v1/public-content-read` : "");
+
+  if (!apiBase) {
+    console.warn("Artist metadata manifest skipped: no VITE_PUBLIC_API_BASE or VITE_PUBLIC_SUPABASE_URL.");
+    return new Map();
+  }
+
+  try {
+    const response = await fetch(`${apiBase}/artists?limit=3000`, {
+      headers: publicContentHeaders(anonKey),
+    });
+
+    if (!response.ok) {
+      console.warn(`Artist metadata manifest skipped: ${response.status} ${response.statusText}`);
+      return new Map();
+    }
+
+    const payload = await response.json();
+    const artists =
+      payload?.data?.artists ||
+      payload?.artists ||
+      payload?.data ||
+      [];
+
+    const metadataByPath = new Map();
+
+    for (const artist of Array.isArray(artists) ? artists : []) {
+      const slug = firstNonEmpty(artist.slug, artist.path, artist.url);
+      const cleanSlug = String(slug || "").trim().replace(/^\/+|\/+$/g, "");
+      if (!cleanSlug) continue;
+
+      metadataByPath.set(cleanPath(`/artists/${cleanSlug}`), {
+        id: firstNonEmpty(artist.id),
+        slug: cleanSlug,
+        name: firstNonEmpty(artist.name, artist.title),
+        description: firstNonEmpty(artist.bio, artist.fullBio, artist.description),
+        country: firstNonEmpty(artist.country, artist.countryCode, artist.country_code),
+        image: firstNonEmpty(artist.imageUrl, artist.profileImageUrl, artist.image, artist.photoUrl, artist.avatarUrl),
+        genres: Array.isArray(artist.genres) ? artist.genres.filter(Boolean) : [],
+        sameAs: socialUrlListFromArtist(artist),
+        trackCount: artist.trackCount,
+        releaseCount: artist.releaseCount,
+        isChartArtist: artist.isChartArtist,
+        isRising: artist.isRising,
+      });
+    }
+
+    console.log(`Artist metadata manifest loaded: ${metadataByPath.size.toLocaleString()} artist rows.`);
+    return metadataByPath;
+  } catch (error) {
+    console.warn(`Artist metadata manifest skipped: ${error instanceof Error ? error.message : String(error)}`);
+    return new Map();
+  }
+}
+
+
 function cleanPath(input) {
   const clean = String(input || "/").split("?")[0].split("#")[0].replace(/\/+$/, "");
   return clean || "/";
@@ -536,7 +624,59 @@ function pageSchema(model, url) {
 
     return Object.fromEntries(Object.entries(article).filter(([, value]) => value !== undefined && value !== ""));
   }
-  if (model.kind === "artist") return { ...base, "@type": "ProfilePage", about: { "@type": "MusicGroup", name: entityName } };
+  if (model.kind === "artist") {
+    const artistMeta = ARTIST_METADATA_BY_PATH.get(cleanPath(model.canonicalPath)) || {};
+    const image = firstNonEmpty(model.image, artistMeta.image, socialImageForModel(model));
+    const description = firstNonEmpty(model.description, artistMeta.description);
+    const genres = Array.isArray(artistMeta.genres) ? artistMeta.genres.filter(Boolean) : [];
+    const sameAs = Array.isArray(artistMeta.sameAs) ? artistMeta.sameAs.filter(Boolean) : [];
+    const country = firstNonEmpty(model.country, artistMeta.country);
+    const artistEntity = {
+      "@type": "MusicGroup",
+      "@id": `${url}#artist`,
+      name: firstNonEmpty(model.entityName, model.title, artistMeta.name, entityName),
+      url,
+      description,
+      image: image || undefined,
+      genre: genres.length ? genres : undefined,
+      sameAs: sameAs.length ? sameAs : undefined,
+      homeLocation: country ? { "@type": "Country", name: country } : undefined,
+      interactionStatistic: [
+        Number.isFinite(Number(artistMeta.trackCount))
+          ? {
+              "@type": "InteractionCounter",
+              interactionType: "https://schema.org/ListenAction",
+              userInteractionCount: Number(artistMeta.trackCount),
+              name: "Tracks on WAKILISHA",
+            }
+          : undefined,
+        Number.isFinite(Number(artistMeta.releaseCount))
+          ? {
+              "@type": "InteractionCounter",
+              interactionType: "https://schema.org/DiscoverAction",
+              userInteractionCount: Number(artistMeta.releaseCount),
+              name: "Releases on WAKILISHA",
+            }
+          : undefined,
+      ].filter(Boolean),
+    };
+
+    const cleanArtistEntity = Object.fromEntries(
+      Object.entries(artistEntity).filter(([, value]) => {
+        if (value === undefined || value === "") return false;
+        if (Array.isArray(value) && value.length === 0) return false;
+        return true;
+      })
+    );
+
+    return {
+      ...base,
+      "@type": "ProfilePage",
+      image: image || undefined,
+      about: cleanArtistEntity,
+      mainEntity: cleanArtistEntity,
+    };
+  }
   if (model.kind === "track") return { ...base, about: { "@type": "MusicRecording", name: entityName } };
   if (model.kind === "release") return { ...base, about: { "@type": "MusicAlbum", name: entityName } };
   if (model.kind === "chart" || model.kind === "collection") return { ...base, "@type": "CollectionPage" };
@@ -812,6 +952,7 @@ async function main() {
   DB_METADATA_BY_PATH = await fetchDbMetadataManifest();
   ARTICLE_IMAGE_BY_PATH = await fetchArticleImageManifest();
   ARTICLE_METADATA_BY_PATH = await fetchArticleMetadataManifest();
+  ARTIST_METADATA_BY_PATH = await fetchArtistMetadataManifest();
 
   const baseHtml = fs.readFileSync(INDEX_PATH, "utf8");
   const paths = [...new Set([...readSitemapPaths(), ...DB_METADATA_BY_PATH.keys()].filter(isCanonicalPublicPath))];
