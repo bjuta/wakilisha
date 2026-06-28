@@ -51,6 +51,12 @@ const OPERATING_AREAS = [
     to: "/guides",
     icon: "ri-compass-3-line",
   },
+  {
+    title: "Institute",
+    desc: "The intellectual home for WAKILISHA's questions, evidence, memory, and cultural inquiry.",
+    to: "/institute",
+    icon: "ri-bank-line",
+  },
 ];
 
 const DILIGENCE_LINKS = [
