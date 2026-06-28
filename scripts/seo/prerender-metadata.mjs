@@ -15,6 +15,7 @@ const DB_METADATA_OUTPUT_PATH = path.join(DIST_DIR, "seo-metadata-manifest.json"
 
 let DB_METADATA_BY_PATH = new Map();
 let ARTICLE_IMAGE_BY_PATH = new Map();
+let ARTICLE_METADATA_BY_PATH = new Map();
 
 const EXTRA_NOINDEX_PATHS = [
   "/search",
@@ -299,6 +300,62 @@ async function fetchArticleImageManifest() {
   }
 }
 
+async function fetchArticleMetadataManifest() {
+  const supabaseUrl = envValue("VITE_PUBLIC_SUPABASE_URL").replace(/\/+$/, "");
+  const anonKey = envValue("VITE_PUBLIC_SUPABASE_ANON_KEY");
+  const explicitBase = envValue("VITE_PUBLIC_API_BASE").replace(/\/+$/, "");
+  const apiBase = explicitBase || (supabaseUrl ? `${supabaseUrl}/functions/v1/public-content-read` : "");
+
+  if (!apiBase) {
+    console.warn("Article metadata manifest skipped: no VITE_PUBLIC_API_BASE or VITE_PUBLIC_SUPABASE_URL.");
+    return new Map();
+  }
+
+  try {
+    const response = await fetch(`${apiBase}/magazine?limit=1000`, {
+      headers: publicContentHeaders(anonKey),
+    });
+
+    if (!response.ok) {
+      console.warn(`Article metadata manifest skipped: ${response.status} ${response.statusText}`);
+      return new Map();
+    }
+
+    const payload = await response.json();
+    const stories =
+      payload?.data?.stories ||
+      payload?.stories ||
+      payload?.data ||
+      [];
+
+    const metadataByPath = new Map();
+
+    for (const story of Array.isArray(stories) ? stories : []) {
+      const slug = firstNonEmpty(story.slug, story.path, story.url);
+      const pagePath = articlePathFromSlug(slug);
+      if (!pagePath) continue;
+
+      metadataByPath.set(cleanPath(pagePath), {
+        id: firstNonEmpty(story.id),
+        slug: firstNonEmpty(story.slug),
+        title: firstNonEmpty(story.title),
+        description: firstNonEmpty(story.dek, story.description, story.excerpt),
+        author: firstNonEmpty(story.author, story.authorName, story.byline),
+        authorSlug: firstNonEmpty(story.authorSlug, story.author_slug),
+        date: firstNonEmpty(story.date, story.publishedAt, story.datePublished),
+        modifiedAt: firstNonEmpty(story.modifiedAt, story.updatedAt, story.dateModified),
+        image: publicArticleImage(story),
+      });
+    }
+
+    console.log(`Article metadata manifest loaded: ${metadataByPath.size.toLocaleString()} article rows.`);
+    return metadataByPath;
+  } catch (error) {
+    console.warn(`Article metadata manifest skipped: ${error instanceof Error ? error.message : String(error)}`);
+    return new Map();
+  }
+}
+
 function mergeDbMetadata(model, pagePath) {
   const db = DB_METADATA_BY_PATH.get(cleanPath(pagePath));
   if (!db || typeof db !== "object") return model;
@@ -452,7 +509,33 @@ function pageSchema(model, url) {
     isPartOf: { "@id": `${SITE_URL}/#website` },
   };
 
-  if (model.kind === "article") return { ...base, "@type": "Article", headline: entityName };
+  if (model.kind === "article") {
+    const articleMeta = ARTICLE_METADATA_BY_PATH.get(cleanPath(model.canonicalPath)) || {};
+    const image = socialImageForModel(model);
+    const authorName = firstNonEmpty(model.author, model.authorName, model.byline, articleMeta.author, "WAKILISHA Editorial");
+    const authorSlug = firstNonEmpty(model.authorSlug, model.author_slug, articleMeta.authorSlug);
+    const publishedAt = firstNonEmpty(model.publishedAt, model.datePublished, model.date, articleMeta.date);
+    const modifiedAt = firstNonEmpty(model.modifiedAt, model.updatedAt, model.dateModified, articleMeta.modifiedAt, publishedAt);
+    const article = {
+      ...base,
+      "@type": "Article",
+      "@id": `${url}#article`,
+      headline: entityName,
+      description: firstNonEmpty(model.description, articleMeta.description),
+      image: image ? [image] : undefined,
+      author: {
+        "@type": "Person",
+        name: authorName,
+        ...(authorSlug ? { url: canonicalUrl(`/authors/${authorSlug}`) } : {}),
+      },
+      datePublished: publishedAt || undefined,
+      dateModified: modifiedAt || undefined,
+      publisher: { "@id": `${SITE_URL}/#organization` },
+      mainEntityOfPage: url,
+    };
+
+    return Object.fromEntries(Object.entries(article).filter(([, value]) => value !== undefined && value !== ""));
+  }
   if (model.kind === "artist") return { ...base, "@type": "ProfilePage", about: { "@type": "MusicGroup", name: entityName } };
   if (model.kind === "track") return { ...base, about: { "@type": "MusicRecording", name: entityName } };
   if (model.kind === "release") return { ...base, about: { "@type": "MusicAlbum", name: entityName } };
@@ -728,6 +811,7 @@ async function main() {
 
   DB_METADATA_BY_PATH = await fetchDbMetadataManifest();
   ARTICLE_IMAGE_BY_PATH = await fetchArticleImageManifest();
+  ARTICLE_METADATA_BY_PATH = await fetchArticleMetadataManifest();
 
   const baseHtml = fs.readFileSync(INDEX_PATH, "utf8");
   const paths = [...new Set([...readSitemapPaths(), ...DB_METADATA_BY_PATH.keys()].filter(isCanonicalPublicPath))];
