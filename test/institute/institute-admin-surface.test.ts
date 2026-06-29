@@ -45,20 +45,22 @@ describe("Institute admin surface", () => {
     expect(review).not.toContain("supabase.from");
   });
 
-  it("keeps Institute review mutations controlled through the evidence RPC", () => {
+  it("keeps Institute review mutations controlled through RPCs", () => {
     const combined = `${overview}\n${review}`;
 
     expect(combined).not.toContain(".insert(");
     expect(combined).not.toContain(".update(");
     expect(combined).not.toContain(".delete(");
     expect(combined).toContain("reviewEvidenceItem");
+    expect(combined).toContain("reviewEntityRelationship");
     expect(combined).toContain("Needs more evidence");
+    expect(combined).toContain("Enable public-safe");
     expect(combined).not.toContain("createAiRun");
     expect(combined).not.toContain("createRetrievalRun");
     expect(combined).not.toContain("createEvidenceReviewEvent");
   });
 
-  it("keeps non-evidence review actions pointed at existing admin surfaces for now", () => {
+  it("keeps non-actionable review items pointed at existing admin surfaces for now", () => {
     expect(review).toContain('/admin/relationships/viewer');
     expect(review).toContain('/admin/community');
     expect(review).toContain('/admin/review/queue');
