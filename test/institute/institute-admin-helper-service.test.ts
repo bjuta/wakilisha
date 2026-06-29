@@ -128,4 +128,19 @@ describe("Institute admin helper service", () => {
       "List Institute admin overview counts failed: RLS denied",
     );
   });
+  it("includes Supabase object error details", async () => {
+    const { listHumanReviewQueueItems } = await import("@/services/institute");
+
+    mocks.builder.error = {
+      message: "relation does not exist",
+      details: "Missing helper view",
+      hint: "Apply PR4 migration",
+      code: "42P01",
+    };
+
+    await expect(listHumanReviewQueueItems()).rejects.toThrow(
+      "List human review queue items failed: relation does not exist Missing helper view Apply PR4 migration code: 42P01",
+    );
+  });
+
 });
