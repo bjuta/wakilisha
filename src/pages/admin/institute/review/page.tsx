@@ -2,10 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   listHumanReviewQueueItems,
+  reviewContributorSubmission,
   reviewEntityRelationship,
   reviewEvidenceItem,
   type HumanReviewQueueItem,
   type HumanReviewSubjectType,
+  type InstituteContributorSubmissionReviewAction,
   type InstituteEvidenceReviewAction,
   type InstituteRelationshipReviewAction,
 } from "@/services/institute";
@@ -59,6 +61,29 @@ function EvidenceActionButton({
 }
 
 
+function ContributorSubmissionActionButton({
+  label,
+  decision,
+  onReview,
+  disabled,
+}: {
+  label: string;
+  decision: InstituteContributorSubmissionReviewAction;
+  onReview: (decision: InstituteContributorSubmissionReviewAction) => void;
+  disabled: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={() => onReview(decision)}
+      className="rounded-full border border-wk-border px-3 py-2 text-[12px] font-bold text-wk-text transition hover:border-wk-brand/40 disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      {label}
+    </button>
+  );
+}
+
 function RelationshipActionButton({
   label,
   decision,
@@ -86,15 +111,18 @@ function ReviewQueueRow({
   item,
   onReviewEvidence,
   onReviewRelationship,
+  onReviewContributorSubmission,
   busy,
 }: {
   item: HumanReviewQueueItem;
   onReviewEvidence: (item: HumanReviewQueueItem, decision: InstituteEvidenceReviewAction) => void;
   onReviewRelationship: (item: HumanReviewQueueItem, decision: InstituteRelationshipReviewAction) => void;
+  onReviewContributorSubmission: (item: HumanReviewQueueItem, decision: InstituteContributorSubmissionReviewAction) => void;
   busy: boolean;
 }) {
   const isEvidence = item.subject_type === "evidence";
   const isRelationship = item.subject_type === "relationship";
+  const isContributorSubmission = item.subject_type === "contributor_submission";
   const isPublicSafe = item.metadata.public_safe === true;
   const canEnableRetrieval =
     isEvidence &&
@@ -124,6 +152,11 @@ function ReviewQueueRow({
             {isRelationship && (
               <span className="rounded-full border border-wk-border px-2.5 py-1 text-[11px] font-bold text-wk-text-muted">
                 {isPublicSafe ? "public safe" : "internal only"}
+              </span>
+            )}
+            {isContributorSubmission && typeof item.metadata.submission_type === "string" && (
+              <span className="rounded-full border border-wk-border px-2.5 py-1 text-[11px] font-bold text-wk-text-muted">
+                {item.metadata.submission_type.replaceAll("_", " ")}
               </span>
             )}
           </div>
@@ -159,6 +192,16 @@ function ReviewQueueRow({
               {isPublicSafe ? (
                 <RelationshipActionButton label="Disable public-safe" decision="public_safe_disabled" onReview={(decision) => onReviewRelationship(item, decision)} disabled={busy} />
               ) : null}
+            </>
+          ) : isContributorSubmission ? (
+            <>
+              <ContributorSubmissionActionButton label="Triage" decision="triaged" onReview={(decision) => onReviewContributorSubmission(item, decision)} disabled={busy} />
+              <ContributorSubmissionActionButton label="Needs source" decision="needs_source" onReview={(decision) => onReviewContributorSubmission(item, decision)} disabled={busy} />
+              <ContributorSubmissionActionButton label="Needs clarification" decision="needs_clarification" onReview={(decision) => onReviewContributorSubmission(item, decision)} disabled={busy} />
+              <ContributorSubmissionActionButton label="Accept as memory" decision="accepted_as_memory" onReview={(decision) => onReviewContributorSubmission(item, decision)} disabled={busy} />
+              <ContributorSubmissionActionButton label="Accept as evidence" decision="accepted_as_evidence" onReview={(decision) => onReviewContributorSubmission(item, decision)} disabled={busy} />
+              <ContributorSubmissionActionButton label="Reject" decision="rejected" onReview={(decision) => onReviewContributorSubmission(item, decision)} disabled={busy} />
+              <ContributorSubmissionActionButton label="Archive" decision="archived" onReview={(decision) => onReviewContributorSubmission(item, decision)} disabled={busy} />
             </>
           ) : (
             <Link to={subjectDestination(item)} className="rounded-full border border-wk-border px-3 py-2 text-[12px] font-bold text-wk-text hover:border-wk-brand/40">
@@ -276,6 +319,28 @@ export default function AdminInstituteReviewPage() {
     }
   }
 
+  async function handleReviewContributorSubmission(item: HumanReviewQueueItem, decision: InstituteContributorSubmissionReviewAction) {
+    const busyKey = `${item.subject_type}-${item.subject_id}-${decision}`;
+    setActionBusyKey(busyKey);
+    setNotice(null);
+    setError(null);
+
+    try {
+      await reviewContributorSubmission({
+        submissionId: item.subject_id,
+        decision,
+        decisionNote: `Admin review action from Institute review queue: ${decision.replaceAll("_", " ")}`,
+      });
+
+      setNotice(`${item.title} marked ${decision.replaceAll("_", " ")}.`);
+      await loadQueue({ quiet: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setActionBusyKey(null);
+    }
+  }
+
   return (
     <div className="space-y-6 p-6">
       <header className="rounded-3xl border border-wk-border bg-wk-surface p-6 shadow-sm">
@@ -337,6 +402,7 @@ export default function AdminInstituteReviewPage() {
               item={item}
               onReviewEvidence={handleReviewEvidence}
               onReviewRelationship={handleReviewRelationship}
+              onReviewContributorSubmission={handleReviewContributorSubmission}
               busy={actionBusyKey?.startsWith(`${item.subject_type}-${item.subject_id}`) ?? false}
             />
           ))}
