@@ -8,3 +8,5 @@ export * from "./adminHelperTypes";
 export * from "./adminHelperService";
 export * from "./reviewDecisionTypes";
 export * from "./reviewDecisionService";
+export * from "./relationshipReviewTypes";
+export * from "./relationshipReviewService";

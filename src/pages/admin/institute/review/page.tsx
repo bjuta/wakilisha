@@ -2,10 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   listHumanReviewQueueItems,
+  reviewEntityRelationship,
   reviewEvidenceItem,
   type HumanReviewQueueItem,
   type HumanReviewSubjectType,
   type InstituteEvidenceReviewAction,
+  type InstituteRelationshipReviewAction,
 } from "@/services/institute";
 
 type SubjectFilter = "all" | HumanReviewSubjectType;
@@ -43,6 +45,31 @@ function EvidenceActionButton({
   onReview: (decision: InstituteEvidenceReviewAction) => void;
   disabled: boolean;
 }) {
+
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={() => onReview(decision)}
+      className="rounded-full border border-wk-border px-3 py-2 text-[12px] font-bold text-wk-text transition hover:border-wk-brand/40 disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      {label}
+    </button>
+  );
+}
+
+
+function RelationshipActionButton({
+  label,
+  decision,
+  onReview,
+  disabled,
+}: {
+  label: string;
+  decision: InstituteRelationshipReviewAction;
+  onReview: (decision: InstituteRelationshipReviewAction) => void;
+  disabled: boolean;
+}) {
   return (
     <button
       type="button"
@@ -58,17 +85,22 @@ function EvidenceActionButton({
 function ReviewQueueRow({
   item,
   onReviewEvidence,
+  onReviewRelationship,
   busy,
 }: {
   item: HumanReviewQueueItem;
   onReviewEvidence: (item: HumanReviewQueueItem, decision: InstituteEvidenceReviewAction) => void;
+  onReviewRelationship: (item: HumanReviewQueueItem, decision: InstituteRelationshipReviewAction) => void;
   busy: boolean;
 }) {
   const isEvidence = item.subject_type === "evidence";
+  const isRelationship = item.subject_type === "relationship";
+  const isPublicSafe = item.metadata.public_safe === true;
   const canEnableRetrieval =
     isEvidence &&
     (item.review_status === "reviewed" || item.review_status === "approved") &&
     item.metadata.retrieval_status !== "default_retrieval";
+  const canEnablePublicSafe = isRelationship && item.review_status === "approved" && !isPublicSafe;
 
   return (
     <div className="rounded-2xl border border-wk-border bg-wk-surface p-4 shadow-sm">
@@ -87,6 +119,11 @@ function ReviewQueueRow({
             {isEvidence && typeof item.metadata.retrieval_status === "string" && (
               <span className="rounded-full border border-wk-border px-2.5 py-1 text-[11px] font-bold text-wk-text-muted">
                 {item.metadata.retrieval_status.replaceAll("_", " ")}
+              </span>
+            )}
+            {isRelationship && (
+              <span className="rounded-full border border-wk-border px-2.5 py-1 text-[11px] font-bold text-wk-text-muted">
+                {isPublicSafe ? "public safe" : "internal only"}
               </span>
             )}
           </div>
@@ -108,6 +145,19 @@ function ReviewQueueRow({
               ) : null}
               {item.metadata.retrieval_status === "default_retrieval" ? (
                 <EvidenceActionButton label="Disable retrieval" decision="retrieval_disabled" onReview={(decision) => onReviewEvidence(item, decision)} disabled={busy} />
+              ) : null}
+            </>
+          ) : isRelationship ? (
+            <>
+              <RelationshipActionButton label="Approve" decision="approved" onReview={(decision) => onReviewRelationship(item, decision)} disabled={busy} />
+              <RelationshipActionButton label="Dispute" decision="disputed" onReview={(decision) => onReviewRelationship(item, decision)} disabled={busy} />
+              <RelationshipActionButton label="Needs more evidence" decision="needs_more_evidence" onReview={(decision) => onReviewRelationship(item, decision)} disabled={busy} />
+              <RelationshipActionButton label="Reject" decision="rejected" onReview={(decision) => onReviewRelationship(item, decision)} disabled={busy} />
+              {canEnablePublicSafe ? (
+                <RelationshipActionButton label="Enable public-safe" decision="public_safe_enabled" onReview={(decision) => onReviewRelationship(item, decision)} disabled={busy} />
+              ) : null}
+              {isPublicSafe ? (
+                <RelationshipActionButton label="Disable public-safe" decision="public_safe_disabled" onReview={(decision) => onReviewRelationship(item, decision)} disabled={busy} />
               ) : null}
             </>
           ) : (
@@ -204,6 +254,28 @@ export default function AdminInstituteReviewPage() {
     }
   }
 
+  async function handleReviewRelationship(item: HumanReviewQueueItem, decision: InstituteRelationshipReviewAction) {
+    const busyKey = `${item.subject_type}-${item.subject_id}-${decision}`;
+    setActionBusyKey(busyKey);
+    setNotice(null);
+    setError(null);
+
+    try {
+      await reviewEntityRelationship({
+        relationshipId: item.subject_id,
+        decision,
+        decisionNote: `Admin review action from Institute review queue: ${decision.replaceAll("_", " ")}`,
+      });
+
+      setNotice(`${item.title} marked ${decision.replaceAll("_", " ")}.`);
+      await loadQueue({ quiet: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setActionBusyKey(null);
+    }
+  }
+
   return (
     <div className="space-y-6 p-6">
       <header className="rounded-3xl border border-wk-border bg-wk-surface p-6 shadow-sm">
@@ -264,6 +336,7 @@ export default function AdminInstituteReviewPage() {
               key={`${item.subject_type}-${item.subject_id}`}
               item={item}
               onReviewEvidence={handleReviewEvidence}
+              onReviewRelationship={handleReviewRelationship}
               busy={actionBusyKey?.startsWith(`${item.subject_type}-${item.subject_id}`) ?? false}
             />
           ))}
