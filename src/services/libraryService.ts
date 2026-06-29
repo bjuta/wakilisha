@@ -1,26 +1,3 @@
-export type LibraryVisibility = "public" | "internal" | "embargoed" | "draft" | "archived";
-
-export interface LibraryEntry {
-  title: string;
-  type: string;
-  status: string;
-  version: string;
-  created: string;
-  lastUpdated: string;
-  author: string;
-  origin: string;
-  visibility: LibraryVisibility;
-  reviewCycle: string;
-  category: string;
-  slug: string;
-  route: string;
-  sourcePath: string;
-  body: string;
-  excerpt: string;
-}
-
-type FrontMatter = Record<string, string>;
-
 import prefaceRaw from "../../library/constitutions/00-preface-why-this-library-exists/index.md?raw";
 import northStarRaw from "../../library/constitutions/01-north-star/index.md?raw";
 import questionFrameworkRaw from "../../library/constitutions/02-question-framework/index.md?raw";
@@ -34,6 +11,39 @@ import communityConstitutionRaw from "../../library/constitutions/09-community-c
 import aiConstitutionRaw from "../../library/constitutions/10-ai-constitution/index.md?raw";
 import institutionalMemoryRaw from "../../library/constitutions/11-institutional-memory/index.md?raw";
 import sixtyYearTestRaw from "../../library/constitutions/13-sixty-year-test/index.md?raw";
+
+export type LibraryVisibility = "public" | "internal" | "embargoed" | "draft" | "archived";
+
+export interface LibraryEntry {
+  title: string;
+  type: string;
+  status: string;
+  version: string;
+  created: string;
+  lastUpdated: string;
+  author: string;
+  origin: string;
+  visibility: LibraryVisibility;
+  reviewCycle: string;
+  book: string;
+  chapter: string;
+  category: string;
+  slug: string;
+  route: string;
+  sourcePath: string;
+  body: string;
+  excerpt: string;
+}
+
+export interface LibraryEntryNavigation {
+  entries: LibraryEntry[];
+  index: number;
+  total: number;
+  previous: LibraryEntry | null;
+  next: LibraryEntry | null;
+}
+
+type FrontMatter = Record<string, string>;
 
 const rawLibraryModules: Record<string, string> = {
   "../../library/constitutions/00-preface-why-this-library-exists/index.md": prefaceRaw,
@@ -67,14 +77,18 @@ const CATEGORY_LABELS: Record<string, string> = {
   "things-we-laughed-about": "Things We Laughed About",
 };
 
+const BOOK_ONE_TITLE = "Book One: The WAKILISHA Constitution";
+
 function stripQuotes(value: string): string {
   const clean = value.trim();
+
   if (
     (clean.startsWith('"') && clean.endsWith('"')) ||
     (clean.startsWith("'") && clean.endsWith("'"))
   ) {
     return clean.slice(1, -1);
   }
+
   return clean;
 }
 
@@ -110,8 +124,8 @@ function excerptFromMarkdown(markdown: string): string {
     .replace(/\s+/g, " ")
     .trim();
 
-  if (clean.length <= 180) return clean;
-  return `${clean.slice(0, 177).replace(/[\s,.;:!?-]+$/, "")}...`;
+  if (clean.length <= 220) return clean;
+  return `${clean.slice(0, 217).replace(/[\s,.;:!?-]+$/, "")}...`;
 }
 
 function normalizeVisibility(value?: string): LibraryVisibility {
@@ -126,6 +140,17 @@ function normalizeVisibility(value?: string): LibraryVisibility {
   }
 
   return "internal";
+}
+
+function chapterSortValue(entry: LibraryEntry): number {
+  const parsed = Number.parseInt(entry.chapter, 10);
+
+  if (Number.isFinite(parsed)) return parsed;
+
+  const slugMatch = entry.slug.match(/^(\d+)/);
+  if (!slugMatch) return 999;
+
+  return Number.parseInt(slugMatch[1] || "999", 10);
 }
 
 function entryFromModule(sourcePath: string, raw: string): LibraryEntry | null {
@@ -158,6 +183,8 @@ function entryFromModule(sourcePath: string, raw: string): LibraryEntry | null {
     origin: frontMatter.origin || "",
     visibility: normalizeVisibility(frontMatter.visibility),
     reviewCycle: frontMatter.review_cycle || frontMatter.reviewCycle || "",
+    book: frontMatter.book || "",
+    chapter: frontMatter.chapter || "",
     category,
     slug,
     route: `/library/${category}/${slug}`,
@@ -177,6 +204,14 @@ const allEntries = Object.entries(rawLibraryModules)
     const normalizedB = categoryB === -1 ? 999 : categoryB;
 
     if (normalizedA !== normalizedB) return normalizedA - normalizedB;
+
+    if (a.category === "constitutions" && b.category === "constitutions") {
+      const chapterA = chapterSortValue(a);
+      const chapterB = chapterSortValue(b);
+
+      if (chapterA !== chapterB) return chapterA - chapterB;
+    }
+
     return a.slug.localeCompare(b.slug);
   });
 
@@ -202,4 +237,30 @@ export function getPublicLibraryEntry(category: string, slug: string): LibraryEn
 
 export function getPublicLibraryEntriesByCategory(category: string): LibraryEntry[] {
   return getPublicLibraryEntries().filter((entry) => entry.category === category);
+}
+
+export function getBookOneLibraryEntries(): LibraryEntry[] {
+  return getPublicLibraryEntriesByCategory("constitutions").filter((entry) => {
+    return entry.book === BOOK_ONE_TITLE || entry.type === "constitution";
+  });
+}
+
+export function getPublicLibraryEntryNavigation(
+  category: string,
+  slug: string,
+): LibraryEntryNavigation {
+  const entries =
+    category === "constitutions"
+      ? getBookOneLibraryEntries()
+      : getPublicLibraryEntriesByCategory(category);
+
+  const index = entries.findIndex((entry) => entry.slug === slug);
+
+  return {
+    entries,
+    index,
+    total: entries.length,
+    previous: index > 0 ? entries[index - 1] || null : null,
+    next: index >= 0 && index < entries.length - 1 ? entries[index + 1] || null : null,
+  };
 }

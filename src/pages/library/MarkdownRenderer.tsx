@@ -1,8 +1,16 @@
 import type { ReactNode } from "react";
 
+function slugify(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[`*_#[\]()]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 function renderInline(value: string): ReactNode[] {
   const nodes: ReactNode[] = [];
-  const pattern = /(\*\*([^*]+)\*\*|`([^`]+)`)/g;
+  const pattern = /(\[([^\]]+)\]\(([^)]+)\)|\*\*([^*]+)\*\*|`([^`]+)`)/g;
   let lastIndex = 0;
   let match: RegExpExecArray | null;
 
@@ -11,19 +19,34 @@ function renderInline(value: string): ReactNode[] {
       nodes.push(value.slice(lastIndex, match.index));
     }
 
-    if (match[2]) {
+    if (match[2] && match[3]) {
+      const href = match[3];
+      const isExternal = /^https?:\/\//.test(href);
+
+      nodes.push(
+        <a
+          key={`${match.index}-link`}
+          href={href}
+          target={isExternal ? "_blank" : undefined}
+          rel={isExternal ? "noreferrer" : undefined}
+          className="font-bold text-[var(--wk-brand)] underline decoration-[var(--wk-brand)]/30 underline-offset-4 transition hover:decoration-[var(--wk-brand)]"
+        >
+          {match[2]}
+        </a>,
+      );
+    } else if (match[4]) {
       nodes.push(
         <strong key={`${match.index}-strong`} className="font-black text-[var(--wk-text)]">
-          {match[2]}
+          {match[4]}
         </strong>,
       );
-    } else if (match[3]) {
+    } else if (match[5]) {
       nodes.push(
         <code
           key={`${match.index}-code`}
-          className="rounded-md border border-[var(--wk-border)] bg-[var(--wk-surface)] px-1.5 py-0.5 text-[0.9em]"
+          className="rounded-md border border-[var(--wk-border)] bg-[var(--wk-surface)] px-1.5 py-0.5 text-[0.9em] text-[var(--wk-text)]"
         >
-          {match[3]}
+          {match[5]}
         </code>,
       );
     }
@@ -48,38 +71,59 @@ export function MarkdownRenderer({ body }: { body: string }) {
 
   const flushParagraph = () => {
     if (!paragraph.length) return;
+
     const text = paragraph.join(" ").trim();
+
     if (text) {
       nodes.push(
-        <p key={`p-${nodes.length}`} className="text-[15px] leading-8 text-[var(--wk-text-muted)]">
+        <p key={`p-${nodes.length}`} className="text-[16px] leading-8 text-[var(--wk-text-muted)]">
           {renderInline(text)}
         </p>,
       );
     }
+
     paragraph = [];
   };
 
   const flushUnorderedList = () => {
     if (!unorderedList.length) return;
+
     nodes.push(
-      <ul key={`ul-${nodes.length}`} className="space-y-2 pl-5 text-[15px] leading-7 text-[var(--wk-text-muted)] list-disc">
+      <ul
+        key={`ul-${nodes.length}`}
+        className="space-y-2 rounded-[24px] border border-[var(--wk-border)] bg-[var(--wk-surface)] px-6 py-5 text-[15px] leading-7 text-[var(--wk-text-muted)]"
+      >
         {unorderedList.map((item, index) => (
-          <li key={`${item}-${index}`}>{renderInline(item)}</li>
+          <li key={`${item}-${index}`} className="relative pl-5">
+            <span className="absolute left-0 top-[0.78em] h-1.5 w-1.5 rounded-full bg-[var(--wk-brand)]" />
+            {renderInline(item)}
+          </li>
         ))}
       </ul>,
     );
+
     unorderedList = [];
   };
 
   const flushOrderedList = () => {
     if (!orderedList.length) return;
+
     nodes.push(
-      <ol key={`ol-${nodes.length}`} className="space-y-2 pl-5 text-[15px] leading-7 text-[var(--wk-text-muted)] list-decimal">
+      <ol
+        key={`ol-${nodes.length}`}
+        className="space-y-3 rounded-[24px] border border-[var(--wk-border)] bg-[var(--wk-surface)] px-6 py-5 text-[15px] leading-7 text-[var(--wk-text-muted)]"
+      >
         {orderedList.map((item, index) => (
-          <li key={`${item}-${index}`}>{renderInline(item)}</li>
+          <li key={`${item}-${index}`} className="grid grid-cols-[28px_1fr] gap-3">
+            <span className="flex h-7 w-7 items-center justify-center rounded-full border border-[var(--wk-border)] bg-[var(--wk-bg)] text-[11px] font-black text-[var(--wk-brand)]">
+              {index + 1}
+            </span>
+            <span>{renderInline(item)}</span>
+          </li>
         ))}
       </ol>,
     );
+
     orderedList = [];
   };
 
@@ -120,11 +164,24 @@ export function MarkdownRenderer({ body }: { body: string }) {
       return;
     }
 
-    if (trimmed.startsWith("# ")) {
+    if (trimmed === "---" || trimmed === "***") {
       flushAll();
       nodes.push(
-        <h2 key={`h1-${index}`} className="pt-6 text-[clamp(28px,4vw,46px)] font-black tracking-[-0.05em] text-[var(--wk-text)]">
-          {renderInline(trimmed.replace(/^#\s+/, ""))}
+        <hr key={`hr-${index}`} className="my-10 border-0 border-t border-[var(--wk-border)]" />,
+      );
+      return;
+    }
+
+    if (trimmed.startsWith("# ")) {
+      flushAll();
+      const text = trimmed.replace(/^#\s+/, "");
+      nodes.push(
+        <h2
+          key={`h1-${index}`}
+          id={slugify(text)}
+          className="scroll-mt-24 pt-8 text-[clamp(30px,5vw,54px)] font-black leading-[1] tracking-[-0.06em] text-[var(--wk-text)]"
+        >
+          {renderInline(text)}
         </h2>,
       );
       return;
@@ -132,9 +189,14 @@ export function MarkdownRenderer({ body }: { body: string }) {
 
     if (trimmed.startsWith("## ")) {
       flushAll();
+      const text = trimmed.replace(/^##\s+/, "");
       nodes.push(
-        <h3 key={`h2-${index}`} className="pt-6 text-[24px] font-black tracking-[-0.035em] text-[var(--wk-text)]">
-          {renderInline(trimmed.replace(/^##\s+/, ""))}
+        <h3
+          key={`h2-${index}`}
+          id={slugify(text)}
+          className="scroll-mt-24 pt-8 text-[26px] font-black leading-tight tracking-[-0.04em] text-[var(--wk-text)]"
+        >
+          {renderInline(text)}
         </h3>,
       );
       return;
@@ -142,9 +204,14 @@ export function MarkdownRenderer({ body }: { body: string }) {
 
     if (trimmed.startsWith("### ")) {
       flushAll();
+      const text = trimmed.replace(/^###\s+/, "");
       nodes.push(
-        <h4 key={`h3-${index}`} className="pt-4 text-[18px] font-black tracking-[-0.02em] text-[var(--wk-text)]">
-          {renderInline(trimmed.replace(/^###\s+/, ""))}
+        <h4
+          key={`h3-${index}`}
+          id={slugify(text)}
+          className="scroll-mt-24 pt-5 text-[19px] font-black tracking-[-0.02em] text-[var(--wk-text)]"
+        >
+          {renderInline(text)}
         </h4>,
       );
       return;
@@ -153,7 +220,10 @@ export function MarkdownRenderer({ body }: { body: string }) {
     if (trimmed.startsWith(">")) {
       flushAll();
       nodes.push(
-        <blockquote key={`quote-${index}`} className="rounded-2xl border-l-4 border-[var(--wk-brand)] bg-[var(--wk-surface)] px-5 py-4 text-[17px] font-semibold leading-8 text-[var(--wk-text)]">
+        <blockquote
+          key={`quote-${index}`}
+          className="rounded-[28px] border-l-4 border-[var(--wk-brand)] bg-[var(--wk-surface)] px-6 py-5 text-[18px] font-semibold leading-8 text-[var(--wk-text)]"
+        >
           {renderInline(trimmed.replace(/^>\s?/, ""))}
         </blockquote>,
       );
@@ -181,5 +251,5 @@ export function MarkdownRenderer({ body }: { body: string }) {
 
   flushAll();
 
-  return <div className="space-y-5">{nodes}</div>;
+  return <div className="space-y-6">{nodes}</div>;
 }
