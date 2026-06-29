@@ -7,9 +7,34 @@ import type {
   InstituteAdminOverviewCount,
 } from "./adminHelperTypes";
 
+function describeSupabaseError(error: unknown): string {
+  if (error instanceof Error) return error.message;
+
+  if (typeof error === "object" && error !== null) {
+    const record = error as Record<string, unknown>;
+    const parts = [
+      record.message,
+      record.details,
+      record.hint,
+      record.code ? `code: ${String(record.code)}` : null,
+    ]
+      .filter(Boolean)
+      .map(String);
+
+    if (parts.length > 0) return parts.join(" ");
+
+    try {
+      return JSON.stringify(record);
+    } catch {
+      return "Unknown Supabase error object";
+    }
+  }
+
+  return String(error);
+}
+
 function raiseSupabaseError(error: unknown, action: string): never {
-  const message = error instanceof Error ? error.message : String(error);
-  throw new Error(`${action} failed: ${message}`);
+  throw new Error(`${action} failed: ${describeSupabaseError(error)}`);
 }
 
 export async function listHumanReviewQueueItems(query?: {
