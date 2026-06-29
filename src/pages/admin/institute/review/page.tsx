@@ -5,9 +5,11 @@ import {
   reviewContributorSubmission,
   reviewEntityRelationship,
   reviewEvidenceItem,
+  reviewSurfaceDraft,
   type HumanReviewQueueItem,
   type HumanReviewSubjectType,
   type InstituteContributorSubmissionReviewAction,
+  type InstituteDraftReviewAction,
   type InstituteEvidenceReviewAction,
   type InstituteRelationshipReviewAction,
 } from "@/services/institute";
@@ -61,6 +63,29 @@ function EvidenceActionButton({
 }
 
 
+function DraftActionButton({
+  label,
+  decision,
+  onReview,
+  disabled,
+}: {
+  label: string;
+  decision: InstituteDraftReviewAction;
+  onReview: (decision: InstituteDraftReviewAction) => void;
+  disabled: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={() => onReview(decision)}
+      className="rounded-full border border-wk-border px-3 py-2 text-[12px] font-bold text-wk-text transition hover:border-wk-brand/40 disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      {label}
+    </button>
+  );
+}
+
 function ContributorSubmissionActionButton({
   label,
   decision,
@@ -112,17 +137,20 @@ function ReviewQueueRow({
   onReviewEvidence,
   onReviewRelationship,
   onReviewContributorSubmission,
+  onReviewDraft,
   busy,
 }: {
   item: HumanReviewQueueItem;
   onReviewEvidence: (item: HumanReviewQueueItem, decision: InstituteEvidenceReviewAction) => void;
   onReviewRelationship: (item: HumanReviewQueueItem, decision: InstituteRelationshipReviewAction) => void;
   onReviewContributorSubmission: (item: HumanReviewQueueItem, decision: InstituteContributorSubmissionReviewAction) => void;
+  onReviewDraft: (item: HumanReviewQueueItem, decision: InstituteDraftReviewAction) => void;
   busy: boolean;
 }) {
   const isEvidence = item.subject_type === "evidence";
   const isRelationship = item.subject_type === "relationship";
   const isContributorSubmission = item.subject_type === "contributor_submission";
+  const isDraft = item.subject_type === "surface_draft";
   const isPublicSafe = item.metadata.public_safe === true;
   const canEnableRetrieval =
     isEvidence &&
@@ -157,6 +185,16 @@ function ReviewQueueRow({
             {isContributorSubmission && typeof item.metadata.submission_type === "string" && (
               <span className="rounded-full border border-wk-border px-2.5 py-1 text-[11px] font-bold text-wk-text-muted">
                 {item.metadata.submission_type.replaceAll("_", " ")}
+              </span>
+            )}
+            {isDraft && typeof item.metadata.surface_type === "string" && (
+              <span className="rounded-full border border-wk-border px-2.5 py-1 text-[11px] font-bold text-wk-text-muted">
+                {item.metadata.surface_type.replaceAll("_", " ")}
+              </span>
+            )}
+            {isDraft && (
+              <span className="rounded-full border border-wk-border px-2.5 py-1 text-[11px] font-bold text-wk-text-muted">
+                {isPublicSafe ? "public safe" : "internal only"}
               </span>
             )}
           </div>
@@ -202,6 +240,21 @@ function ReviewQueueRow({
               <ContributorSubmissionActionButton label="Accept as evidence" decision="accepted_as_evidence" onReview={(decision) => onReviewContributorSubmission(item, decision)} disabled={busy} />
               <ContributorSubmissionActionButton label="Reject" decision="rejected" onReview={(decision) => onReviewContributorSubmission(item, decision)} disabled={busy} />
               <ContributorSubmissionActionButton label="Archive" decision="archived" onReview={(decision) => onReviewContributorSubmission(item, decision)} disabled={busy} />
+            </>
+          ) : isDraft ? (
+            <>
+              <DraftActionButton label="Send to review" decision="pending_review" onReview={(decision) => onReviewDraft(item, decision)} disabled={busy} />
+              <DraftActionButton label="Approve" decision="approved" onReview={(decision) => onReviewDraft(item, decision)} disabled={busy} />
+              <DraftActionButton label="Needs rewrite" decision="needs_rewrite" onReview={(decision) => onReviewDraft(item, decision)} disabled={busy} />
+              <DraftActionButton label="Too vague" decision="too_vague" onReview={(decision) => onReviewDraft(item, decision)} disabled={busy} />
+              <DraftActionButton label="Overclaims" decision="overclaims" onReview={(decision) => onReviewDraft(item, decision)} disabled={busy} />
+              <DraftActionButton label="Reject" decision="rejected" onReview={(decision) => onReviewDraft(item, decision)} disabled={busy} />
+              {item.review_status === "approved" && !isPublicSafe ? (
+                <DraftActionButton label="Enable public-safe" decision="public_safe_enabled" onReview={(decision) => onReviewDraft(item, decision)} disabled={busy} />
+              ) : null}
+              {isPublicSafe ? (
+                <DraftActionButton label="Disable public-safe" decision="public_safe_disabled" onReview={(decision) => onReviewDraft(item, decision)} disabled={busy} />
+              ) : null}
             </>
           ) : (
             <Link to={subjectDestination(item)} className="rounded-full border border-wk-border px-3 py-2 text-[12px] font-bold text-wk-text hover:border-wk-brand/40">
@@ -341,6 +394,28 @@ export default function AdminInstituteReviewPage() {
     }
   }
 
+  async function handleReviewDraft(item: HumanReviewQueueItem, decision: InstituteDraftReviewAction) {
+    const busyKey = `${item.subject_type}-${item.subject_id}-${decision}`;
+    setActionBusyKey(busyKey);
+    setNotice(null);
+    setError(null);
+
+    try {
+      await reviewSurfaceDraft({
+        draftId: item.subject_id,
+        decision,
+        decisionNote: `Admin review action from Institute review queue: ${decision.replaceAll("_", " ")}`,
+      });
+
+      setNotice(`${item.title} marked ${decision.replaceAll("_", " ")}.`);
+      await loadQueue({ quiet: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setActionBusyKey(null);
+    }
+  }
+
   return (
     <div className="space-y-6 p-6">
       <header className="rounded-3xl border border-wk-border bg-wk-surface p-6 shadow-sm">
@@ -403,6 +478,7 @@ export default function AdminInstituteReviewPage() {
               onReviewEvidence={handleReviewEvidence}
               onReviewRelationship={handleReviewRelationship}
               onReviewContributorSubmission={handleReviewContributorSubmission}
+              onReviewDraft={handleReviewDraft}
               busy={actionBusyKey?.startsWith(`${item.subject_type}-${item.subject_id}`) ?? false}
             />
           ))}
