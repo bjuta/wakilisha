@@ -4,3 +4,5 @@ export * from "./modelPromptTypes";
 export * from "./modelPromptRegistryService";
 export * from "./retrievalTypes";
 export * from "./retrievalWorkflowService";
+export * from "./adminHelperTypes";
+export * from "./adminHelperService";
