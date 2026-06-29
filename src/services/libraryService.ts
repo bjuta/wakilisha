@@ -21,17 +21,33 @@ export interface LibraryEntry {
 
 type FrontMatter = Record<string, string>;
 
+import prefaceRaw from "../../library/constitutions/00-preface-why-this-library-exists/index.md?raw";
 import northStarRaw from "../../library/constitutions/01-north-star/index.md?raw";
 import questionFrameworkRaw from "../../library/constitutions/02-question-framework/index.md?raw";
 import inquiryModelRaw from "../../library/constitutions/03-inquiry-model/index.md?raw";
 import relationshipConstitutionRaw from "../../library/constitutions/04-relationship-constitution/index.md?raw";
+import editorialConstitutionRaw from "../../library/constitutions/05-editorial-constitution/index.md?raw";
+import evidenceAndTruthRaw from "../../library/constitutions/06-evidence-and-truth/index.md?raw";
+import productConstitutionRaw from "../../library/constitutions/07-product-constitution/index.md?raw";
+import experienceArchitectureRaw from "../../library/constitutions/08-experience-architecture/index.md?raw";
+import communityConstitutionRaw from "../../library/constitutions/09-community-constitution/index.md?raw";
+import aiConstitutionRaw from "../../library/constitutions/10-ai-constitution/index.md?raw";
+import institutionalMemoryRaw from "../../library/constitutions/11-institutional-memory/index.md?raw";
 import sixtyYearTestRaw from "../../library/constitutions/13-sixty-year-test/index.md?raw";
 
 const rawLibraryModules: Record<string, string> = {
+  "../../library/constitutions/00-preface-why-this-library-exists/index.md": prefaceRaw,
   "../../library/constitutions/01-north-star/index.md": northStarRaw,
   "../../library/constitutions/02-question-framework/index.md": questionFrameworkRaw,
   "../../library/constitutions/03-inquiry-model/index.md": inquiryModelRaw,
   "../../library/constitutions/04-relationship-constitution/index.md": relationshipConstitutionRaw,
+  "../../library/constitutions/05-editorial-constitution/index.md": editorialConstitutionRaw,
+  "../../library/constitutions/06-evidence-and-truth/index.md": evidenceAndTruthRaw,
+  "../../library/constitutions/07-product-constitution/index.md": productConstitutionRaw,
+  "../../library/constitutions/08-experience-architecture/index.md": experienceArchitectureRaw,
+  "../../library/constitutions/09-community-constitution/index.md": communityConstitutionRaw,
+  "../../library/constitutions/10-ai-constitution/index.md": aiConstitutionRaw,
+  "../../library/constitutions/11-institutional-memory/index.md": institutionalMemoryRaw,
   "../../library/constitutions/13-sixty-year-test/index.md": sixtyYearTestRaw,
 };
 
