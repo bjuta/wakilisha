@@ -66,6 +66,7 @@ import {
   AdminReviewLayout,
   AdminImportsLayout,
   AdminRelationshipsLayout,
+  AdminInstituteLayout,
 } from "@/components/admin/AdminSectionLayouts";
 
 // Admin Charts Ingestion Studio
@@ -117,6 +118,8 @@ import AdminApiDocsPage from "../pages/admin/api-docs/page";
 
 // Admin Community Moderation
 import AdminCommunityPage from "../pages/admin/community/page";
+import AdminInstituteReviewPage from "../pages/admin/institute/review/page";
+import AdminInstituteOverviewPage from "../pages/admin/institute/page";
 
 // Public API Docs
 import PublicApiDocsPage from "../pages/api-docs/page";
@@ -336,6 +339,14 @@ const routes: RouteObject[] = [
           { path: "genres/:slug", element: <AdminGenreDetailPage /> },
           { path: "authors", element: <AdminAuthorsPage /> },
           { path: "authors/:slug", element: <AdminAuthorDetailPage /> },
+        ],
+      },
+      {
+        path: "institute",
+        element: <AdminInstituteLayout />,
+        children: [
+          { index: true, element: <AdminInstituteOverviewPage /> },
+          { path: "review", element: <AdminInstituteReviewPage /> },
         ],
       },
       {

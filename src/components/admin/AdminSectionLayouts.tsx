@@ -25,3 +25,4 @@ export const AdminMediaLayout = makeLayout(["upload_media", "manage_media_librar
 export const AdminReviewLayout = makeLayout(["view_review_queue", "manage_review_queue"], "review");
 export const AdminImportsLayout = makeLayout(["view_imports", "manage_imports"], "imports");
 export const AdminRelationshipsLayout = makeLayout(["view_relationships", "manage_relationships"], "relationships");
+export const AdminInstituteLayout = makeLayout(["view_registry", "view_review_queue", "view_relationships"], "Institute");
