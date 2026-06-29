@@ -47,6 +47,7 @@ const NAV_GROUPS: NavGroup[] = [
   ] },
   { label: "Institute", visible: (can) => can("view_registry") || can("view_review_queue") || can("view_relationships"), items: [
     { path: "/admin/institute", label: "Inquiry OS", icon: "Network", requiredCapability: "view_registry" },
+    { path: "/admin/institute/inquiries", label: "Inquiries", icon: "Network", requiredCapability: "view_registry" },
     { path: "/admin/institute/review", label: "Institute Review", icon: "GitPullRequest", badgeKey: "reviewQueue", requiredCapability: "view_review_queue" },
   ] },
   { label: "Charts Engine", visible: (can) => can("view_charts_admin"), items: [

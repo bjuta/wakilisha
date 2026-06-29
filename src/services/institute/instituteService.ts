@@ -7,6 +7,7 @@ import type {
   CreateCulturalEntityInput,
   CreateEntityRelationshipInput,
   CreateEvidenceItemInput,
+  CreateInquiryEntityLinkInput,
   CreateInquiryInput,
   CreateInquiryNoteInput,
   CreateMemoryEmbeddingRecordInput,
@@ -16,12 +17,14 @@ import type {
   EntityRelationship,
   EvidenceItem,
   Inquiry,
+  InquiryEntityLink,
   InquiryNote,
   Contributor,
   ContributorSubmission,
   MemoryEmbeddingRecord,
   ReviewDecisionRecord,
   SurfaceDraft,
+  UpdateInquiryInput,
 } from "./instituteTypes";
 
 function raiseSupabaseError(error: unknown, action: string): never {
@@ -61,6 +64,22 @@ export async function createInquiry(input: CreateInquiryInput): Promise<Inquiry>
   return insertOne<Inquiry>("inquiries", input, "Create inquiry");
 }
 
+export async function updateInquiry(id: string, input: UpdateInquiryInput): Promise<Inquiry> {
+  if (!id) {
+    throw new Error("Update inquiry failed: id is required.");
+  }
+
+  const { data, error } = await supabase
+    .from("inquiries")
+    .update(input)
+    .eq("id", id)
+    .select("*")
+    .single();
+
+  if (error) raiseSupabaseError(error, "Update inquiry");
+  return data as Inquiry;
+}
+
 export async function listInquiryNotes(inquiryId: string): Promise<InquiryNote[]> {
   const { data, error } = await supabase
     .from("inquiry_notes")
@@ -74,6 +93,38 @@ export async function listInquiryNotes(inquiryId: string): Promise<InquiryNote[]
 
 export async function createInquiryNote(input: CreateInquiryNoteInput): Promise<InquiryNote> {
   return insertOne<InquiryNote>("inquiry_notes", input, "Create inquiry note");
+}
+
+export async function listInquiryEntityLinks(inquiryId: string): Promise<InquiryEntityLink[]> {
+  const { data, error } = await supabase
+    .from("inquiry_entities")
+    .select("*, entity:cultural_entities(*)")
+    .eq("inquiry_id", inquiryId)
+    .order("created_at", { ascending: false });
+
+  if (error) raiseSupabaseError(error, "List inquiry entity links");
+  return (data ?? []) as InquiryEntityLink[];
+}
+
+export async function linkEntityToInquiry(input: CreateInquiryEntityLinkInput): Promise<InquiryEntityLink> {
+  return insertOne<InquiryEntityLink>(
+    "inquiry_entities",
+    {
+      entity_role: "related_subject",
+      ...input,
+    },
+    "Link entity to inquiry",
+  );
+}
+
+export async function unlinkEntityFromInquiry(linkId: string): Promise<void> {
+  if (!linkId) {
+    throw new Error("Unlink entity from inquiry failed: linkId is required.");
+  }
+
+  const { error } = await supabase.from("inquiry_entities").delete().eq("id", linkId);
+
+  if (error) raiseSupabaseError(error, "Unlink entity from inquiry");
 }
 
 export async function createEvidenceItem(input: CreateEvidenceItemInput): Promise<EvidenceItem> {

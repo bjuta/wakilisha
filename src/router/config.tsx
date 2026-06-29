@@ -120,6 +120,8 @@ import AdminApiDocsPage from "../pages/admin/api-docs/page";
 import AdminCommunityPage from "../pages/admin/community/page";
 import AdminInstituteReviewPage from "../pages/admin/institute/review/page";
 import AdminInstituteOverviewPage from "../pages/admin/institute/page";
+import AdminInstituteInquiriesPage from "../pages/admin/institute/inquiries/page";
+import AdminInstituteInquiryDetailPage from "../pages/admin/institute/inquiries/detail/page";
 
 // Public API Docs
 import PublicApiDocsPage from "../pages/api-docs/page";
@@ -346,6 +348,8 @@ const routes: RouteObject[] = [
         element: <AdminInstituteLayout />,
         children: [
           { index: true, element: <AdminInstituteOverviewPage /> },
+          { path: "inquiries", element: <AdminInstituteInquiriesPage /> },
+          { path: "inquiries/:inquiryId", element: <AdminInstituteInquiryDetailPage /> },
           { path: "review", element: <AdminInstituteReviewPage /> },
         ],
       },
