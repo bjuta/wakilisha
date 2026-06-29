@@ -122,6 +122,9 @@ import AdminInstituteReviewPage from "../pages/admin/institute/review/page";
 import AdminInstituteOverviewPage from "../pages/admin/institute/page";
 import AdminInstituteInquiriesPage from "../pages/admin/institute/inquiries/page";
 import AdminInstituteInquiryDetailPage from "../pages/admin/institute/inquiries/detail/page";
+import AdminInstituteEvidencePage from "../pages/admin/institute/evidence/page";
+import AdminInstituteEvidenceDetailPage from "../pages/admin/institute/evidence/detail/page";
+import AdminInstituteContributorsPage from "../pages/admin/institute/contributors/page";
 
 // Public API Docs
 import PublicApiDocsPage from "../pages/api-docs/page";
@@ -350,6 +353,9 @@ const routes: RouteObject[] = [
           { index: true, element: <AdminInstituteOverviewPage /> },
           { path: "inquiries", element: <AdminInstituteInquiriesPage /> },
           { path: "inquiries/:inquiryId", element: <AdminInstituteInquiryDetailPage /> },
+          { path: "evidence", element: <AdminInstituteEvidencePage /> },
+          { path: "evidence/:evidenceId", element: <AdminInstituteEvidenceDetailPage /> },
+          { path: "contributors", element: <AdminInstituteContributorsPage /> },
           { path: "review", element: <AdminInstituteReviewPage /> },
         ],
       },

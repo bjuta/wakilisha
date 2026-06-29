@@ -387,6 +387,24 @@ export type CreateInquiryInput = Pick<
 export type CreateInquiryNoteInput = Pick<InquiryNote, "inquiry_id" | "note_type" | "body"> &
   Partial<Pick<InquiryNote, "title" | "confidence">>;
 
+export type UpdateEvidenceItemInput = Partial<
+  Pick<
+    EvidenceItem,
+    | "title"
+    | "evidence_type"
+    | "source_url"
+    | "source_file"
+    | "source_note"
+    | "summary"
+    | "main_claim"
+    | "why_it_matters"
+    | "reliability"
+    | "confidence"
+    | "review_status"
+    | "retrieval_status"
+  >
+>;
+
 export type CreateEvidenceItemInput = Pick<EvidenceItem, "title" | "evidence_type" | "summary"> &
   Partial<
     Pick<
