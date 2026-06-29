@@ -7,6 +7,7 @@ import type {
   CreateCulturalEntityInput,
   CreateEntityRelationshipInput,
   CreateEvidenceItemInput,
+  UpdateEvidenceItemInput,
   CreateInquiryEntityLinkInput,
   CreateInquiryInput,
   CreateInquiryNoteInput,
@@ -131,6 +132,63 @@ export async function createEvidenceItem(input: CreateEvidenceItemInput): Promis
   return insertOne<EvidenceItem>("evidence_items", input, "Create evidence item");
 }
 
+export async function listEvidenceItems(query?: {
+  reviewStatus?: string;
+  retrievalStatus?: string;
+  search?: string;
+  limit?: number;
+}): Promise<EvidenceItem[]> {
+  let request = supabase
+    .from("evidence_items")
+    .select("*")
+    .order("updated_at", { ascending: false })
+    .limit(query?.limit ?? 100);
+
+  if (query?.reviewStatus) {
+    request = request.eq("review_status", query.reviewStatus);
+  }
+
+  if (query?.retrievalStatus) {
+    request = request.eq("retrieval_status", query.retrievalStatus);
+  }
+
+  if (query?.search) {
+    request = request.ilike("title", `%${query.search}%`);
+  }
+
+  const { data, error } = await request;
+
+  if (error) raiseSupabaseError(error, "List evidence items");
+  return (data ?? []) as EvidenceItem[];
+}
+
+export async function getEvidenceItem(id: string): Promise<EvidenceItem | null> {
+  const { data, error } = await supabase
+    .from("evidence_items")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) raiseSupabaseError(error, "Get evidence item");
+  return (data ?? null) as EvidenceItem | null;
+}
+
+export async function updateEvidenceItem(id: string, input: UpdateEvidenceItemInput): Promise<EvidenceItem> {
+  if (!id) {
+    throw new Error("Update evidence item failed: id is required.");
+  }
+
+  const { data, error } = await supabase
+    .from("evidence_items")
+    .update(input)
+    .eq("id", id)
+    .select("*")
+    .single();
+
+  if (error) raiseSupabaseError(error, "Update evidence item");
+  return data as EvidenceItem;
+}
+
 export async function linkEvidenceToInquiry(input: {
   inquiry_id: string;
   evidence_id: string;
@@ -189,10 +247,111 @@ export async function createContributor(input: CreateContributorInput): Promise<
   return insertOne<Contributor>("contributors", input, "Create contributor");
 }
 
+export async function listContributors(query?: {
+  status?: string;
+  trustLevel?: string;
+  search?: string;
+  limit?: number;
+}): Promise<Contributor[]> {
+  let request = supabase
+    .from("contributors")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(query?.limit ?? 100);
+
+  if (query?.status) {
+    request = request.eq("contributor_status", query.status);
+  }
+
+  if (query?.trustLevel) {
+    request = request.eq("trust_level", query.trustLevel);
+  }
+
+  if (query?.search) {
+    request = request.ilike("display_name", `%${query.search}%`);
+  }
+
+  const { data, error } = await request;
+
+  if (error) raiseSupabaseError(error, "List contributors");
+  return (data ?? []) as Contributor[];
+}
+
 export async function createContributorSubmission(
   input: CreateContributorSubmissionInput,
 ): Promise<ContributorSubmission> {
   return insertOne<ContributorSubmission>("contributor_submissions", input, "Create contributor submission");
+}
+
+export async function listContributorSubmissions(query?: {
+  inquiryId?: string;
+  entityId?: string;
+  reviewStatus?: string;
+  submissionType?: string;
+  limit?: number;
+}): Promise<ContributorSubmission[]> {
+  let request = supabase
+    .from("contributor_submissions")
+    .select("*")
+    .order("updated_at", { ascending: false })
+    .limit(query?.limit ?? 100);
+
+  if (query?.inquiryId) {
+    request = request.eq("inquiry_id", query.inquiryId);
+  }
+
+  if (query?.entityId) {
+    request = request.eq("entity_id", query.entityId);
+  }
+
+  if (query?.reviewStatus) {
+    request = request.eq("review_status", query.reviewStatus);
+  }
+
+  if (query?.submissionType) {
+    request = request.eq("submission_type", query.submissionType);
+  }
+
+  const { data, error } = await request;
+
+  if (error) raiseSupabaseError(error, "List contributor submissions");
+  return (data ?? []) as ContributorSubmission[];
+}
+
+export async function acceptContributorSubmissionAsEvidence(input: {
+  submissionId: string;
+  evidenceTitle?: string | null;
+  reviewNote?: string | null;
+}): Promise<ContributorSubmission> {
+  if (!input.submissionId) {
+    throw new Error("Accept submission as evidence failed: submissionId is required.");
+  }
+
+  const { data, error } = await supabase.rpc("institute_accept_submission_as_evidence", {
+    p_submission_id: input.submissionId,
+    p_evidence_title: input.evidenceTitle ?? null,
+    p_review_note: input.reviewNote ?? null,
+  });
+
+  if (error) raiseSupabaseError(error, "Accept submission as evidence");
+  return data as ContributorSubmission;
+}
+
+export async function acceptContributorSubmissionAsMemory(input: {
+  submissionId: string;
+  reviewNote?: string | null;
+}): Promise<ContributorSubmission> {
+  if (!input.submissionId) {
+    throw new Error("Accept submission as memory failed: submissionId is required.");
+  }
+
+  const { data, error } = await supabase.rpc("institute_accept_submission_as_memory", {
+    p_submission_id: input.submissionId,
+    p_review_note: input.reviewNote ?? null,
+  });
+
+  if (error) raiseSupabaseError(error, "Accept submission as memory");
+  return data as ContributorSubmission;
 }
 
 export async function createReviewDecision(input: CreateReviewDecisionInput): Promise<ReviewDecisionRecord> {
