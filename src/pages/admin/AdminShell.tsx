@@ -50,6 +50,7 @@ const NAV_GROUPS: NavGroup[] = [
     { path: "/admin/institute/inquiries", label: "Inquiries", icon: "Network", requiredCapability: "view_registry" },
     { path: "/admin/institute/evidence", label: "Evidence Locker", icon: "Database", requiredCapability: "view_review_queue" },
     { path: "/admin/institute/contributors", label: "Contributor Desk", icon: "Users", requiredCapability: "view_review_queue" },
+    { path: "/admin/institute/relationships", label: "Relationship Curator", icon: "Network", requiredCapability: "view_relationships" },
     { path: "/admin/institute/review", label: "Institute Review", icon: "GitPullRequest", badgeKey: "reviewQueue", requiredCapability: "view_review_queue" },
   ] },
   { label: "Charts Engine", visible: (can) => can("view_charts_admin"), items: [

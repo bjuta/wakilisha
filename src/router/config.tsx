@@ -125,6 +125,8 @@ import AdminInstituteInquiryDetailPage from "../pages/admin/institute/inquiries/
 import AdminInstituteEvidencePage from "../pages/admin/institute/evidence/page";
 import AdminInstituteEvidenceDetailPage from "../pages/admin/institute/evidence/detail/page";
 import AdminInstituteContributorsPage from "../pages/admin/institute/contributors/page";
+import AdminInstituteRelationshipsPage from "../pages/admin/institute/relationships/page";
+import AdminInstituteRelationshipDetailPage from "../pages/admin/institute/relationships/detail/page";
 
 // Public API Docs
 import PublicApiDocsPage from "../pages/api-docs/page";
@@ -356,6 +358,8 @@ const routes: RouteObject[] = [
           { path: "evidence", element: <AdminInstituteEvidencePage /> },
           { path: "evidence/:evidenceId", element: <AdminInstituteEvidenceDetailPage /> },
           { path: "contributors", element: <AdminInstituteContributorsPage /> },
+          { path: "relationships", element: <AdminInstituteRelationshipsPage /> },
+          { path: "relationships/:relationshipId", element: <AdminInstituteRelationshipDetailPage /> },
           { path: "review", element: <AdminInstituteReviewPage /> },
         ],
       },

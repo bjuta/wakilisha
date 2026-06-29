@@ -274,6 +274,29 @@ export interface EntityRelationship {
   updated_at: string;
 }
 
+export interface RelationshipEvidenceLink {
+  relationship_id: string;
+  evidence_id: string;
+  support_type: RelationshipEvidenceSupportType;
+  note: string | null;
+  created_at: string;
+  evidence?: EvidenceItem | null;
+}
+
+export type UpdateEntityRelationshipInput = Partial<
+  Pick<
+    EntityRelationship,
+    | "source_entity_id"
+    | "target_entity_id"
+    | "relationship_type"
+    | "reason"
+    | "confidence"
+    | "review_status"
+    | "public_safe"
+    | "review_note"
+  >
+>;
+
 export interface Contributor {
   id: string;
   user_id: string | null;
