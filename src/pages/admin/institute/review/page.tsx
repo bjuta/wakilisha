@@ -2,8 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   listHumanReviewQueueItems,
+  reviewEvidenceItem,
   type HumanReviewQueueItem,
   type HumanReviewSubjectType,
+  type InstituteEvidenceReviewAction,
 } from "@/services/institute";
 
 type SubjectFilter = "all" | HumanReviewSubjectType;
@@ -20,7 +22,7 @@ const SUBJECT_FILTERS: Array<{ value: SubjectFilter; label: string }> = [
 function statusClass(status: string): string {
   if (["approved", "accepted_as_evidence", "accepted_as_memory"].includes(status)) return "bg-wk-success/10 text-wk-success border-wk-success/20";
   if (["rejected", "disputed"].includes(status)) return "bg-wk-danger/10 text-wk-danger border-wk-danger/20";
-  if (["unreviewed", "submitted", "pending_review", "needs_source", "needs_clarification", "unresolved"].includes(status)) return "bg-wk-warning/10 text-wk-warning border-wk-warning/20";
+  if (["unreviewed", "submitted", "pending_review", "needs_source", "needs_clarification", "needs_more_evidence", "unresolved"].includes(status)) return "bg-wk-warning/10 text-wk-warning border-wk-warning/20";
   return "bg-wk-surface-raised text-wk-text-muted border-wk-border";
 }
 
@@ -30,7 +32,44 @@ function subjectDestination(item: HumanReviewQueueItem): string {
   return "/admin/review/queue";
 }
 
-function ReviewQueueRow({ item }: { item: HumanReviewQueueItem }) {
+function EvidenceActionButton({
+  label,
+  decision,
+  onReview,
+  disabled,
+}: {
+  label: string;
+  decision: InstituteEvidenceReviewAction;
+  onReview: (decision: InstituteEvidenceReviewAction) => void;
+  disabled: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={() => onReview(decision)}
+      className="rounded-full border border-wk-border px-3 py-2 text-[12px] font-bold text-wk-text transition hover:border-wk-brand/40 disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      {label}
+    </button>
+  );
+}
+
+function ReviewQueueRow({
+  item,
+  onReviewEvidence,
+  busy,
+}: {
+  item: HumanReviewQueueItem;
+  onReviewEvidence: (item: HumanReviewQueueItem, decision: InstituteEvidenceReviewAction) => void;
+  busy: boolean;
+}) {
+  const isEvidence = item.subject_type === "evidence";
+  const canEnableRetrieval =
+    isEvidence &&
+    (item.review_status === "reviewed" || item.review_status === "approved") &&
+    item.metadata.retrieval_status !== "default_retrieval";
+
   return (
     <div className="rounded-2xl border border-wk-border bg-wk-surface p-4 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -45,15 +84,38 @@ function ReviewQueueRow({ item }: { item: HumanReviewQueueItem }) {
             <span className="rounded-full border border-wk-border px-2.5 py-1 text-[11px] font-bold text-wk-text-muted">
               Priority {item.priority_weight}
             </span>
+            {isEvidence && typeof item.metadata.retrieval_status === "string" && (
+              <span className="rounded-full border border-wk-border px-2.5 py-1 text-[11px] font-bold text-wk-text-muted">
+                {item.metadata.retrieval_status.replaceAll("_", " ")}
+              </span>
+            )}
           </div>
           <h2 className="mt-3 line-clamp-1 text-[16px] font-black text-wk-text">{item.title}</h2>
           <p className="mt-2 line-clamp-2 text-[13px] leading-5 text-wk-text-muted">{item.summary}</p>
           <p className="mt-2 text-[12px] font-semibold text-wk-text-soft">{item.review_reason}</p>
         </div>
 
-        <Link to={subjectDestination(item)} className="rounded-full border border-wk-border px-3 py-2 text-[12px] font-bold text-wk-text hover:border-wk-brand/40">
-          Open source
-        </Link>
+        <div className="flex flex-wrap justify-end gap-2">
+          {isEvidence ? (
+            <>
+              <EvidenceActionButton label="Reviewed" decision="reviewed" onReview={(decision) => onReviewEvidence(item, decision)} disabled={busy} />
+              <EvidenceActionButton label="Approve" decision="approved" onReview={(decision) => onReviewEvidence(item, decision)} disabled={busy} />
+              <EvidenceActionButton label="Dispute" decision="disputed" onReview={(decision) => onReviewEvidence(item, decision)} disabled={busy} />
+              <EvidenceActionButton label="Needs more evidence" decision="needs_more_evidence" onReview={(decision) => onReviewEvidence(item, decision)} disabled={busy} />
+              <EvidenceActionButton label="Reject" decision="rejected" onReview={(decision) => onReviewEvidence(item, decision)} disabled={busy} />
+              {canEnableRetrieval ? (
+                <EvidenceActionButton label="Enable retrieval" decision="retrieval_enabled" onReview={(decision) => onReviewEvidence(item, decision)} disabled={busy} />
+              ) : null}
+              {item.metadata.retrieval_status === "default_retrieval" ? (
+                <EvidenceActionButton label="Disable retrieval" decision="retrieval_disabled" onReview={(decision) => onReviewEvidence(item, decision)} disabled={busy} />
+              ) : null}
+            </>
+          ) : (
+            <Link to={subjectDestination(item)} className="rounded-full border border-wk-border px-3 py-2 text-[12px] font-bold text-wk-text hover:border-wk-brand/40">
+              Open source
+            </Link>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -63,6 +125,8 @@ export default function AdminInstituteReviewPage() {
   const [filter, setFilter] = useState<SubjectFilter>("all");
   const [items, setItems] = useState<HumanReviewQueueItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [actionBusyKey, setActionBusyKey] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const groupedCounts = useMemo(() => {
@@ -72,10 +136,28 @@ export default function AdminInstituteReviewPage() {
     }, {});
   }, [items]);
 
+  async function loadQueue(options?: { quiet?: boolean }) {
+    if (!options?.quiet) setLoading(true);
+    setError(null);
+
+    try {
+      const rows = await listHumanReviewQueueItems({
+        subjectType: filter === "all" ? undefined : filter,
+        limit: 100,
+      });
+
+      setItems(rows);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      if (!options?.quiet) setLoading(false);
+    }
+  }
+
   useEffect(() => {
     let cancelled = false;
 
-    async function loadQueue() {
+    async function loadInitialQueue() {
       setLoading(true);
       setError(null);
 
@@ -93,12 +175,34 @@ export default function AdminInstituteReviewPage() {
       }
     }
 
-    loadQueue();
+    loadInitialQueue();
 
     return () => {
       cancelled = true;
     };
   }, [filter]);
+
+  async function handleReviewEvidence(item: HumanReviewQueueItem, decision: InstituteEvidenceReviewAction) {
+    const busyKey = `${item.subject_type}-${item.subject_id}-${decision}`;
+    setActionBusyKey(busyKey);
+    setNotice(null);
+    setError(null);
+
+    try {
+      await reviewEvidenceItem({
+        evidenceId: item.subject_id,
+        decision,
+        decisionNote: `Admin review action from Institute review queue: ${decision.replaceAll("_", " ")}`,
+      });
+
+      setNotice(`${item.title} marked ${decision.replaceAll("_", " ")}.`);
+      await loadQueue({ quiet: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setActionBusyKey(null);
+    }
+  }
 
   return (
     <div className="space-y-6 p-6">
@@ -108,7 +212,7 @@ export default function AdminInstituteReviewPage() {
           <div>
             <h1 className="text-3xl font-black tracking-tight text-wk-text">Institute review queue</h1>
             <p className="mt-3 max-w-3xl text-[14px] leading-6 text-wk-text-muted">
-              One queue for evidence, relationships, contributor submissions, drafts, and corrections. This page is read-only for now.
+              One queue for evidence, relationships, contributor submissions, drafts, and corrections. Evidence can now be reviewed from here.
             </p>
           </div>
           <Link to="/admin/institute" className="rounded-full border border-wk-border px-4 py-2 text-[13px] font-bold text-wk-text hover:border-wk-brand/40">
@@ -137,6 +241,12 @@ export default function AdminInstituteReviewPage() {
         </div>
       </section>
 
+      {notice && (
+        <div className="rounded-2xl border border-wk-success/20 bg-wk-success/10 p-4 text-[13px] font-semibold text-wk-success">
+          {notice}
+        </div>
+      )}
+
       {error && (
         <div className="rounded-2xl border border-wk-danger/20 bg-wk-danger/10 p-4 text-[13px] font-semibold text-wk-danger">
           {error}
@@ -150,7 +260,12 @@ export default function AdminInstituteReviewPage() {
       ) : items.length ? (
         <section className="space-y-3">
           {items.map((item) => (
-            <ReviewQueueRow key={`${item.subject_type}-${item.subject_id}`} item={item} />
+            <ReviewQueueRow
+              key={`${item.subject_type}-${item.subject_id}`}
+              item={item}
+              onReviewEvidence={handleReviewEvidence}
+              busy={actionBusyKey?.startsWith(`${item.subject_type}-${item.subject_id}`) ?? false}
+            />
           ))}
         </section>
       ) : (
