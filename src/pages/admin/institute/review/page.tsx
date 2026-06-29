@@ -46,28 +46,6 @@ function EvidenceActionButton({
   disabled: boolean;
 }) {
 
-  async function handleReviewRelationship(item: HumanReviewQueueItem, decision: InstituteRelationshipReviewAction) {
-    const busyKey = `${item.subject_type}-${item.subject_id}-${decision}`;
-    setActionBusyKey(busyKey);
-    setNotice(null);
-    setError(null);
-
-    try {
-      await reviewEntityRelationship({
-        relationshipId: item.subject_id,
-        decision,
-        decisionNote: `Admin review action from Institute review queue: ${decision.replaceAll("_", " ")}`,
-      });
-
-      setNotice(`${item.title} marked ${decision.replaceAll("_", " ")}.`);
-      await loadQueue({ quiet: true });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setActionBusyKey(null);
-    }
-  }
-
   return (
     <button
       type="button"
@@ -263,6 +241,28 @@ export default function AdminInstituteReviewPage() {
     try {
       await reviewEvidenceItem({
         evidenceId: item.subject_id,
+        decision,
+        decisionNote: `Admin review action from Institute review queue: ${decision.replaceAll("_", " ")}`,
+      });
+
+      setNotice(`${item.title} marked ${decision.replaceAll("_", " ")}.`);
+      await loadQueue({ quiet: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setActionBusyKey(null);
+    }
+  }
+
+  async function handleReviewRelationship(item: HumanReviewQueueItem, decision: InstituteRelationshipReviewAction) {
+    const busyKey = `${item.subject_type}-${item.subject_id}-${decision}`;
+    setActionBusyKey(busyKey);
+    setNotice(null);
+    setError(null);
+
+    try {
+      await reviewEntityRelationship({
+        relationshipId: item.subject_id,
         decision,
         decisionNote: `Admin review action from Institute review queue: ${decision.replaceAll("_", " ")}`,
       });

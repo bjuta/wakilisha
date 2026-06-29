@@ -66,6 +66,22 @@ describe("Institute admin surface", () => {
     expect(review).toContain('/admin/review/queue');
   });
 
+  it("keeps relationship review handler inside the page component", () => {
+    const evidenceButtonStart = review.indexOf("function EvidenceActionButton");
+    const relationshipButtonStart = review.indexOf("function RelationshipActionButton");
+    const pageStart = review.indexOf("export default function AdminInstituteReviewPage");
+    const relationshipHandlerStart = review.indexOf("async function handleReviewRelationship");
+
+    expect(evidenceButtonStart).toBeGreaterThan(-1);
+    expect(relationshipButtonStart).toBeGreaterThan(evidenceButtonStart);
+    expect(pageStart).toBeGreaterThan(relationshipButtonStart);
+    expect(relationshipHandlerStart).toBeGreaterThan(pageStart);
+
+    const evidenceButtonBlock = review.slice(evidenceButtonStart, relationshipButtonStart);
+    expect(evidenceButtonBlock).not.toContain("reviewEntityRelationship");
+    expect(evidenceButtonBlock).not.toContain("setActionBusyKey");
+  });
+
   it("does not claim the Institute review page is read-only after PR6", () => {
     expect(review).not.toContain("read-only for now");
     expect(review).toContain("Evidence can now be reviewed from here.");
