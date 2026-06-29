@@ -26,6 +26,29 @@ function graphNodes(jsonld) {
   return [jsonld];
 }
 
+function findFirstDeep(value, type) {
+  if (!value) return null;
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = findFirstDeep(item, type);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  if (typeof value === "object") {
+    if (value["@type"] === type) return value;
+
+    for (const child of Object.values(value)) {
+      const found = findFirstDeep(child, type);
+      if (found) return found;
+    }
+  }
+
+  return null;
+}
+
 function findFirst(nodes, wantedType) {
   return nodes.find((node) => {
     const type = node?.["@type"];
@@ -207,7 +230,7 @@ function evaluate(pageType, url, html, blocks) {
 
   if (pageType === "chart") {
     const collection = findFirst(allNodes, "CollectionPage");
-    const itemList = findFirst(allNodes, "ItemList");
+    const itemList = findFirstDeep(allNodes, "ItemList");
     pageChecks.push(["chart has CollectionPage", Boolean(collection)]);
     pageChecks.push(["chart has ItemList", Boolean(itemList)]);
     pageChecks.push(["chart has itemListElement", requiredCheck(itemList?.itemListElement)]);

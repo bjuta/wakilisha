@@ -17,6 +17,9 @@ let DB_METADATA_BY_PATH = new Map();
 let ARTICLE_IMAGE_BY_PATH = new Map();
 let ARTICLE_METADATA_BY_PATH = new Map();
 let ARTIST_METADATA_BY_PATH = new Map();
+let RELEASE_METADATA_BY_PATH = new Map();
+let TRACK_METADATA_BY_PATH = new Map();
+let CHART_METADATA_BY_PATH = new Map();
 
 const EXTRA_NOINDEX_PATHS = [
   "/search",
@@ -586,6 +589,236 @@ function breadcrumbItems(pagePath) {
   return items;
 }
 
+
+function compactSchema(value) {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => compactSchema(item))
+      .filter((item) => item !== undefined && item !== "" && !(Array.isArray(item) && item.length === 0));
+  }
+
+  if (value && typeof value === "object") {
+    const entries = Object.entries(value)
+      .map(([key, item]) => [key, compactSchema(item)])
+      .filter(([, item]) => {
+        if (item === undefined || item === "") return false;
+        if (Array.isArray(item) && item.length === 0) return false;
+        if (item && typeof item === "object" && !Array.isArray(item) && Object.keys(item).length === 0) return false;
+        return true;
+      });
+
+    return Object.fromEntries(entries);
+  }
+
+  return value;
+}
+
+function slugifySchema(value) {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function schemaArtistEntity(name, slug) {
+  const cleanName = firstNonEmpty(name);
+  const cleanSlug = firstNonEmpty(slug, cleanName ? slugifySchema(cleanName) : "");
+
+  if (!cleanName) return undefined;
+
+  return compactSchema({
+    "@type": "MusicGroup",
+    name: cleanName,
+    url: cleanSlug ? canonicalUrl(`/artists/${cleanSlug}`) : undefined,
+  });
+}
+
+function schemaArtistEntitiesFromCredits(credits, fallbackName, fallbackSlug) {
+  const artists = Array.isArray(credits) ? credits : [];
+  const primary = artists.filter((artist) => artist?.isPrimary || artist?.role === "primary" || artist?.role === "primary_artist");
+  const selected = primary.length ? primary : artists;
+
+  const entities = selected
+    .map((artist) => schemaArtistEntity(artist?.name, artist?.slug))
+    .filter(Boolean);
+
+  if (entities.length) return entities.length === 1 ? entities[0] : entities;
+
+  return schemaArtistEntity(fallbackName, fallbackSlug);
+}
+
+function isoDurationFromSecondsOrMs(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number <= 0) return "";
+
+  const totalSeconds = number > 10000 ? Math.round(number / 1000) : Math.round(number);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  return `PT${hours ? `${hours}H` : ""}${minutes ? `${minutes}M` : ""}${seconds || (!hours && !minutes) ? `${seconds}S` : ""}`;
+}
+
+function publicContentApiBase() {
+  const supabaseUrl = envValue("VITE_PUBLIC_SUPABASE_URL").replace(/\/+$/, "");
+  const explicitBase = envValue("VITE_PUBLIC_API_BASE").replace(/\/+$/, "");
+  return explicitBase || (supabaseUrl ? `${supabaseUrl}/functions/v1/public-content-read` : "");
+}
+
+async function fetchPublicContentJson(apiBase, anonKey, pagePath) {
+  const response = await fetch(`${apiBase}${pagePath}`, {
+    headers: publicContentHeaders(anonKey),
+  });
+
+  if (!response.ok) return null;
+  return response.json();
+}
+
+function structuredDataTargetPaths(section) {
+  return [...new Set([...readSitemapPaths(), ...DB_METADATA_BY_PATH.keys()].filter(isCanonicalPublicPath))]
+    .map(cleanPath)
+    .filter((pagePath) => pagePath.startsWith(`/${section}/`));
+}
+
+async function promisePool(items, concurrency, worker) {
+  const queue = [...items];
+  const workers = Array.from({ length: Math.max(1, concurrency) }, async () => {
+    while (queue.length) {
+      const item = queue.shift();
+      await worker(item);
+    }
+  });
+
+  await Promise.all(workers);
+}
+
+async function fetchReleaseMetadataManifest() {
+  const apiBase = publicContentApiBase();
+  const anonKey = envValue("VITE_PUBLIC_SUPABASE_ANON_KEY");
+  const metadataByPath = new Map();
+
+  if (!apiBase) {
+    console.warn("Release metadata manifest skipped: no public content API base.");
+    return metadataByPath;
+  }
+
+  const paths = structuredDataTargetPaths("releases").filter((pagePath) => pagePath.split("/").filter(Boolean).length >= 3);
+
+  await promisePool(paths, 6, async (pagePath) => {
+    try {
+      const payload = await fetchPublicContentJson(apiBase, anonKey, pagePath);
+      const release = payload?.data?.release || payload?.release;
+      if (!release) return;
+
+      const parts = pagePath.split("/").filter(Boolean);
+      const artistSlugFromPath = parts[1];
+
+      metadataByPath.set(cleanPath(pagePath), {
+        title: firstNonEmpty(release.title),
+        artist: firstNonEmpty(release.artist),
+        artistSlug: slugifySchema(firstNonEmpty(release.artist)) || artistSlugFromPath,
+        releaseDate: firstNonEmpty(release.releaseDate, release.datePublished, release.year),
+        image: firstNonEmpty(release.artworkUrl, release.imageUrl, release.coverImageUrl),
+        releaseType: firstNonEmpty(release.releaseType),
+        labelName: firstNonEmpty(release.labelName),
+        trackCount: release.trackCount,
+        tracks: Array.isArray(release.tracks) ? release.tracks : [],
+      });
+    } catch {
+      return;
+    }
+  });
+
+  console.log(`Release metadata manifest loaded: ${metadataByPath.size.toLocaleString()} release rows.`);
+  return metadataByPath;
+}
+
+async function fetchTrackMetadataManifest() {
+  const apiBase = publicContentApiBase();
+  const anonKey = envValue("VITE_PUBLIC_SUPABASE_ANON_KEY");
+  const metadataByPath = new Map();
+
+  if (!apiBase) {
+    console.warn("Track metadata manifest skipped: no public content API base.");
+    return metadataByPath;
+  }
+
+  const paths = structuredDataTargetPaths("tracks").filter((pagePath) => pagePath.split("/").filter(Boolean).length >= 3);
+
+  await promisePool(paths, 6, async (pagePath) => {
+    try {
+      const payload = await fetchPublicContentJson(apiBase, anonKey, pagePath);
+      const data = payload?.data || payload;
+      const track = data?.track;
+      if (!track) return;
+
+      const parts = pagePath.split("/").filter(Boolean);
+      const artistSlugFromPath = parts[1];
+      const primaryArtist = data?.artist || {};
+      const release = data?.release || {};
+
+      metadataByPath.set(cleanPath(pagePath), {
+        title: firstNonEmpty(track.title),
+        image: firstNonEmpty(track.artworkUrl, release.artworkUrl),
+        duration: firstNonEmpty(track.durationMs, track.duration),
+        isrc: firstNonEmpty(track.isrc, track.isrcCode),
+        artists: Array.isArray(data?.artists) ? data.artists : [],
+        primaryArtistName: firstNonEmpty(primaryArtist.name),
+        primaryArtistSlug: firstNonEmpty(primaryArtist.slug, artistSlugFromPath),
+        releaseTitle: firstNonEmpty(release.title),
+        releaseSlug: firstNonEmpty(release.slug),
+        releaseDate: firstNonEmpty(release.releaseDate),
+        releaseType: firstNonEmpty(release.releaseType),
+      });
+    } catch {
+      return;
+    }
+  });
+
+  console.log(`Track metadata manifest loaded: ${metadataByPath.size.toLocaleString()} track rows.`);
+  return metadataByPath;
+}
+
+async function fetchChartMetadataManifest() {
+  const apiBase = publicContentApiBase();
+  const anonKey = envValue("VITE_PUBLIC_SUPABASE_ANON_KEY");
+  const metadataByPath = new Map();
+
+  if (!apiBase) {
+    console.warn("Chart metadata manifest skipped: no public content API base.");
+    return metadataByPath;
+  }
+
+  const paths = structuredDataTargetPaths("charts").filter((pagePath) => pagePath.split("/").filter(Boolean).length >= 4);
+
+  await promisePool(paths, 4, async (pagePath) => {
+    try {
+      const payload = await fetchPublicContentJson(apiBase, anonKey, pagePath);
+      const data = payload?.data || payload;
+      const program = data?.program || {};
+      const edition = data?.edition || {};
+      const entries = Array.isArray(data?.entries) ? data.entries : [];
+
+      if (!entries.length) return;
+
+      metadataByPath.set(cleanPath(pagePath), {
+        name: firstNonEmpty(program.publicLabel, program.shortLabel, edition.label),
+        date: firstNonEmpty(edition.date, edition.periodStart),
+        entries,
+      });
+    } catch {
+      return;
+    }
+  });
+
+  console.log(`Chart metadata manifest loaded: ${metadataByPath.size.toLocaleString()} chart rows.`);
+  return metadataByPath;
+}
+
+
 function pageSchema(model, url) {
   const entityName = schemaEntityName(model);
   const base = {
@@ -677,9 +910,108 @@ function pageSchema(model, url) {
       mainEntity: cleanArtistEntity,
     };
   }
-  if (model.kind === "track") return { ...base, about: { "@type": "MusicRecording", name: entityName } };
-  if (model.kind === "release") return { ...base, about: { "@type": "MusicAlbum", name: entityName } };
-  if (model.kind === "chart" || model.kind === "collection") return { ...base, "@type": "CollectionPage" };
+  if (model.kind === "track") {
+    const trackMeta = TRACK_METADATA_BY_PATH.get(cleanPath(model.canonicalPath)) || {};
+    const parts = cleanPath(model.canonicalPath).split("/").filter(Boolean);
+    const artistSlugFromPath = parts[1];
+    const image = firstNonEmpty(model.image, trackMeta.image, socialImageForModel(model));
+    const byArtist = schemaArtistEntitiesFromCredits(trackMeta.artists, trackMeta.primaryArtistName, trackMeta.primaryArtistSlug || artistSlugFromPath);
+    const releaseArtistSlug = firstNonEmpty(trackMeta.primaryArtistSlug, artistSlugFromPath);
+    const recording = compactSchema({
+      "@type": "MusicRecording",
+      "@id": `${url}#recording`,
+      name: firstNonEmpty(model.entityName, model.title, trackMeta.title, entityName),
+      url,
+      description: model.description,
+      image: image || undefined,
+      byArtist,
+      inAlbum: trackMeta.releaseTitle ? {
+        "@type": "MusicAlbum",
+        name: trackMeta.releaseTitle,
+        url: trackMeta.releaseSlug && releaseArtistSlug ? canonicalUrl(`/releases/${releaseArtistSlug}/${trackMeta.releaseSlug}`) : undefined,
+        datePublished: trackMeta.releaseDate || undefined,
+      } : undefined,
+      duration: isoDurationFromSecondsOrMs(trackMeta.duration),
+      isrcCode: trackMeta.isrc || undefined,
+    });
+
+    return compactSchema({
+      ...base,
+      image: image || undefined,
+      about: recording,
+      mainEntity: recording,
+    });
+  }
+  if (model.kind === "release") {
+    const releaseMeta = RELEASE_METADATA_BY_PATH.get(cleanPath(model.canonicalPath)) || {};
+    const image = firstNonEmpty(model.image, releaseMeta.image, socialImageForModel(model));
+    const byArtist = schemaArtistEntity(releaseMeta.artist, releaseMeta.artistSlug);
+    const tracks = Array.isArray(releaseMeta.tracks) ? releaseMeta.tracks : [];
+    const album = compactSchema({
+      "@type": "MusicAlbum",
+      "@id": `${url}#album`,
+      name: firstNonEmpty(model.entityName, model.title, releaseMeta.title, entityName),
+      url,
+      description: firstNonEmpty(model.description),
+      image: image || undefined,
+      byArtist,
+      datePublished: releaseMeta.releaseDate || undefined,
+      numTracks: Number.isFinite(Number(releaseMeta.trackCount)) ? Number(releaseMeta.trackCount) : undefined,
+      recordLabel: releaseMeta.labelName ? { "@type": "Organization", name: releaseMeta.labelName } : undefined,
+      track: tracks.map((track) => compactSchema({
+        "@type": "MusicRecording",
+        name: firstNonEmpty(track.title),
+        position: Number.isFinite(Number(track.trackNumber)) ? Number(track.trackNumber) : undefined,
+        byArtist: track.artist ? { "@type": "MusicGroup", name: track.artist } : byArtist,
+        image: firstNonEmpty(track.artworkUrl, image) || undefined,
+        duration: isoDurationFromSecondsOrMs(firstNonEmpty(track.duration, track.durationMs)),
+      })).filter((track) => track.name),
+    });
+
+    return compactSchema({
+      ...base,
+      "@type": "WebPage",
+      image: image || undefined,
+      about: album,
+      mainEntity: album,
+    });
+  }
+  if (model.kind === "chart" || model.kind === "collection") {
+    const chartMeta = CHART_METADATA_BY_PATH.get(cleanPath(model.canonicalPath)) || {};
+    const entries = Array.isArray(chartMeta.entries) ? chartMeta.entries : [];
+    const itemList = compactSchema({
+      "@type": "ItemList",
+      "@id": `${url}#itemlist`,
+      name: firstNonEmpty(chartMeta.name, entityName),
+      datePublished: chartMeta.date || undefined,
+      itemListOrder: "https://schema.org/ItemListOrderAscending",
+      numberOfItems: entries.length || undefined,
+      itemListElement: entries.map((entry) => {
+        const artistSlug = Array.isArray(entry.artistSlugs) ? entry.artistSlugs[0] : "";
+        const artistName = Array.isArray(entry.artistNames) ? entry.artistNames.join(", ") : "";
+        const trackUrl = artistSlug && entry.trackSlug ? canonicalUrl(`/tracks/${artistSlug}/${entry.trackSlug}`) : undefined;
+
+        return compactSchema({
+          "@type": "ListItem",
+          position: Number.isFinite(Number(entry.rank)) ? Number(entry.rank) : undefined,
+          url: trackUrl,
+          item: {
+            "@type": "MusicRecording",
+            name: firstNonEmpty(entry.trackTitle),
+            url: trackUrl,
+            image: firstNonEmpty(entry.artworkUrl) || undefined,
+            byArtist: artistName ? { "@type": "MusicGroup", name: artistName } : undefined,
+          },
+        });
+      }).filter((item) => item.position && item.item?.name),
+    });
+
+    return compactSchema({
+      ...base,
+      "@type": "CollectionPage",
+      mainEntity: itemList.itemListElement?.length ? itemList : undefined,
+    });
+  }
   if (model.kind === "profile") return { ...base, "@type": "ProfilePage", about: { "@type": "Person", name: entityName } };
 
   return base;
@@ -953,6 +1285,9 @@ async function main() {
   ARTICLE_IMAGE_BY_PATH = await fetchArticleImageManifest();
   ARTICLE_METADATA_BY_PATH = await fetchArticleMetadataManifest();
   ARTIST_METADATA_BY_PATH = await fetchArtistMetadataManifest();
+  RELEASE_METADATA_BY_PATH = await fetchReleaseMetadataManifest();
+  TRACK_METADATA_BY_PATH = await fetchTrackMetadataManifest();
+  CHART_METADATA_BY_PATH = await fetchChartMetadataManifest();
 
   const baseHtml = fs.readFileSync(INDEX_PATH, "utf8");
   const paths = [...new Set([...readSitemapPaths(), ...DB_METADATA_BY_PATH.keys()].filter(isCanonicalPublicPath))];
