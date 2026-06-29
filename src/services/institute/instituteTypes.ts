@@ -3,6 +3,15 @@ export type InstituteConfidence = "low" | "medium" | "high";
 export type InquiryStatus = "draft" | "open" | "active" | "paused" | "closed";
 export type InquiryVisibility = "internal" | "private" | "public";
 
+export type InquiryEntityRole =
+  | "primary_subject"
+  | "related_subject"
+  | "context"
+  | "place"
+  | "scene"
+  | "language"
+  | "source";
+
 export type InquiryNoteType =
   | "known_known"
   | "known_unknown"
@@ -192,6 +201,17 @@ export interface Inquiry {
   updated_at: string;
 }
 
+export interface InquiryEntityLink {
+  id: string;
+  inquiry_id: string;
+  entity_id: string;
+  entity_role: InquiryEntityRole;
+  link_note: string | null;
+  added_by: string | null;
+  created_at: string;
+  entity?: CulturalEntity | null;
+}
+
 export interface InquiryNote {
   id: string;
   inquiry_id: string;
@@ -336,6 +356,27 @@ export interface MemoryEmbeddingRecord {
   retrieval_status: RetrievalStatus;
   created_at: string;
 }
+
+export type UpdateInquiryInput = Partial<
+  Pick<
+    Inquiry,
+    | "title"
+    | "primary_question"
+    | "short_question"
+    | "why_it_matters"
+    | "status"
+    | "visibility"
+    | "summary"
+    | "current_understanding"
+    | "closed_at"
+  >
+>;
+
+export type CreateInquiryEntityLinkInput = Pick<
+  InquiryEntityLink,
+  "inquiry_id" | "entity_id"
+> &
+  Partial<Pick<InquiryEntityLink, "entity_role" | "link_note">>;
 
 export type CreateInquiryInput = Pick<
   Inquiry,

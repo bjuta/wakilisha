@@ -193,6 +193,9 @@ export default function AdminInstituteOverviewPage() {
           </p>
         </div>
         <div className="mt-5 flex flex-wrap gap-3">
+          <Link to="/admin/institute/inquiries" className="rounded-full border border-wk-border px-4 py-2 text-[13px] font-bold text-wk-text hover:border-wk-brand/40">
+            Open Inquiries
+          </Link>
           <Link to="/admin/institute/review" className="rounded-full bg-wk-brand px-4 py-2 text-[13px] font-bold text-wk-brand-on hover:opacity-90">
             Open review queue
           </Link>
