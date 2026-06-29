@@ -6,3 +6,5 @@ export * from "./retrievalTypes";
 export * from "./retrievalWorkflowService";
 export * from "./adminHelperTypes";
 export * from "./adminHelperService";
+export * from "./reviewDecisionTypes";
+export * from "./reviewDecisionService";

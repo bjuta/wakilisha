@@ -45,20 +45,27 @@ describe("Institute admin surface", () => {
     expect(review).not.toContain("supabase.from");
   });
 
-  it("keeps the first admin surface read-only", () => {
+  it("keeps Institute review mutations controlled through the evidence RPC", () => {
     const combined = `${overview}\n${review}`;
 
     expect(combined).not.toContain(".insert(");
     expect(combined).not.toContain(".update(");
     expect(combined).not.toContain(".delete(");
+    expect(combined).toContain("reviewEvidenceItem");
+    expect(combined).toContain("Needs more evidence");
     expect(combined).not.toContain("createAiRun");
     expect(combined).not.toContain("createRetrievalRun");
     expect(combined).not.toContain("createEvidenceReviewEvent");
   });
 
-  it("keeps review actions pointed at existing admin surfaces for now", () => {
+  it("keeps non-evidence review actions pointed at existing admin surfaces for now", () => {
     expect(review).toContain('/admin/relationships/viewer');
     expect(review).toContain('/admin/community');
     expect(review).toContain('/admin/review/queue');
+  });
+
+  it("does not claim the Institute review page is read-only after PR6", () => {
+    expect(review).not.toContain("read-only for now");
+    expect(review).toContain("Evidence can now be reviewed from here.");
   });
 });
