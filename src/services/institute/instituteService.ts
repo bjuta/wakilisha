@@ -23,8 +23,10 @@ import type {
   Contributor,
   ContributorSubmission,
   MemoryEmbeddingRecord,
+  RelationshipEvidenceLink,
   ReviewDecisionRecord,
   SurfaceDraft,
+  UpdateEntityRelationshipInput,
   UpdateInquiryInput,
 } from "./instituteTypes";
 
@@ -232,6 +234,75 @@ export async function createEntityRelationship(input: CreateEntityRelationshipIn
   return insertOne<EntityRelationship>("entity_relationships", input, "Create entity relationship");
 }
 
+export async function listEntityRelationships(query?: {
+  reviewStatus?: string;
+  entityId?: string;
+  limit?: number;
+}): Promise<EntityRelationship[]> {
+  let request = supabase
+    .from("entity_relationships")
+    .select("*")
+    .order("updated_at", { ascending: false })
+    .limit(query?.limit ?? 100);
+
+  if (query?.reviewStatus) {
+    request = request.eq("review_status", query.reviewStatus);
+  }
+
+  if (query?.entityId) {
+    request = request.or(`source_entity_id.eq.${query.entityId},target_entity_id.eq.${query.entityId}`);
+  }
+
+  const { data, error } = await request;
+
+  if (error) raiseSupabaseError(error, "List entity relationships");
+  return (data ?? []) as EntityRelationship[];
+}
+
+export async function getEntityRelationship(id: string): Promise<EntityRelationship | null> {
+  const { data, error } = await supabase
+    .from("entity_relationships")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) raiseSupabaseError(error, "Get entity relationship");
+  return (data ?? null) as EntityRelationship | null;
+}
+
+export async function updateEntityRelationship(
+  id: string,
+  input: UpdateEntityRelationshipInput,
+): Promise<EntityRelationship> {
+  if (!id) {
+    throw new Error("Update entity relationship failed: id is required.");
+  }
+
+  const { data, error } = await supabase
+    .from("entity_relationships")
+    .update(input)
+    .eq("id", id)
+    .select("*")
+    .single();
+
+  if (error) raiseSupabaseError(error, "Update entity relationship");
+  return data as EntityRelationship;
+}
+
+export async function listRelationshipEvidenceLinks(relationshipId: string): Promise<RelationshipEvidenceLink[]> {
+  if (!relationshipId) {
+    throw new Error("List relationship evidence links failed: relationshipId is required.");
+  }
+
+  const { data, error } = await supabase
+    .from("relationship_evidence")
+    .select("*, evidence:evidence_items(*)")
+    .eq("relationship_id", relationshipId);
+
+  if (error) raiseSupabaseError(error, "List relationship evidence links");
+  return (data ?? []) as RelationshipEvidenceLink[];
+}
+
 export async function linkRelationshipEvidence(input: {
   relationship_id: string;
   evidence_id: string;
@@ -241,6 +312,23 @@ export async function linkRelationshipEvidence(input: {
   const { error } = await supabase.from("relationship_evidence").insert(input);
 
   if (error) raiseSupabaseError(error, "Link relationship evidence");
+}
+
+export async function unlinkRelationshipEvidence(input: {
+  relationship_id: string;
+  evidence_id: string;
+}): Promise<void> {
+  if (!input.relationship_id || !input.evidence_id) {
+    throw new Error("Unlink relationship evidence failed: relationship_id and evidence_id are required.");
+  }
+
+  const { error } = await supabase
+    .from("relationship_evidence")
+    .delete()
+    .eq("relationship_id", input.relationship_id)
+    .eq("evidence_id", input.evidence_id);
+
+  if (error) raiseSupabaseError(error, "Unlink relationship evidence");
 }
 
 export async function createContributor(input: CreateContributorInput): Promise<Contributor> {
