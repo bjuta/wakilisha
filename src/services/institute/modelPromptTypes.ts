@@ -45,8 +45,8 @@ export type InstituteTaskType =
 export type InferenceTaskType = InstituteTaskType | "embedding";
 
 export type InferenceProfileStatus = "draft" | "active" | "paused" | "deprecated";
-export type PromptRecipeStatus = "draft" | "active" | "paused" | "deprecated";
-export type PromptVersionStatus = "draft" | "active" | "paused" | "deprecated";
+export type PromptRecipeStatus = "draft" | "active" | "paused" | "deprecated" | "blocked";
+export type PromptVersionStatus = "draft" | "active" | "paused" | "deprecated" | "blocked";
 
 export type AiRunStatus =
   | "queued"
