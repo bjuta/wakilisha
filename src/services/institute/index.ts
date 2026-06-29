@@ -10,3 +10,5 @@ export * from "./reviewDecisionTypes";
 export * from "./reviewDecisionService";
 export * from "./relationshipReviewTypes";
 export * from "./relationshipReviewService";
+export * from "./contributorSubmissionReviewTypes";
+export * from "./contributorSubmissionReviewService";

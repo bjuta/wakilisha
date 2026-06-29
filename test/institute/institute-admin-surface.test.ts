@@ -53,8 +53,11 @@ describe("Institute admin surface", () => {
     expect(combined).not.toContain(".delete(");
     expect(combined).toContain("reviewEvidenceItem");
     expect(combined).toContain("reviewEntityRelationship");
+    expect(combined).toContain("reviewContributorSubmission");
     expect(combined).toContain("Needs more evidence");
     expect(combined).toContain("Enable public-safe");
+    expect(combined).toContain("Accept as memory");
+    expect(combined).toContain("Accept as evidence");
     expect(combined).not.toContain("createAiRun");
     expect(combined).not.toContain("createRetrievalRun");
     expect(combined).not.toContain("createEvidenceReviewEvent");
@@ -80,6 +83,22 @@ describe("Institute admin surface", () => {
     const evidenceButtonBlock = review.slice(evidenceButtonStart, relationshipButtonStart);
     expect(evidenceButtonBlock).not.toContain("reviewEntityRelationship");
     expect(evidenceButtonBlock).not.toContain("setActionBusyKey");
+  });
+
+  it("keeps contributor submission review handler inside the page component", () => {
+    const contributorButtonStart = review.indexOf("function ContributorSubmissionActionButton");
+    const relationshipButtonStart = review.indexOf("function RelationshipActionButton");
+    const pageStart = review.indexOf("export default function AdminInstituteReviewPage");
+    const contributorHandlerStart = review.indexOf("async function handleReviewContributorSubmission");
+
+    expect(contributorButtonStart).toBeGreaterThan(-1);
+    expect(relationshipButtonStart).toBeGreaterThan(contributorButtonStart);
+    expect(pageStart).toBeGreaterThan(relationshipButtonStart);
+    expect(contributorHandlerStart).toBeGreaterThan(pageStart);
+
+    const contributorButtonBlock = review.slice(contributorButtonStart, relationshipButtonStart);
+    expect(contributorButtonBlock).not.toContain("reviewContributorSubmission");
+    expect(contributorButtonBlock).not.toContain("setActionBusyKey");
   });
 
   it("does not claim the Institute review page is read-only after PR6", () => {
