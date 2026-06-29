@@ -54,10 +54,13 @@ describe("Institute admin surface", () => {
     expect(combined).toContain("reviewEvidenceItem");
     expect(combined).toContain("reviewEntityRelationship");
     expect(combined).toContain("reviewContributorSubmission");
+    expect(combined).toContain("reviewSurfaceDraft");
     expect(combined).toContain("Needs more evidence");
     expect(combined).toContain("Enable public-safe");
     expect(combined).toContain("Accept as memory");
     expect(combined).toContain("Accept as evidence");
+    expect(combined).toContain("Needs rewrite");
+    expect(combined).toContain("Enable public-safe");
     expect(combined).not.toContain("createAiRun");
     expect(combined).not.toContain("createRetrievalRun");
     expect(combined).not.toContain("createEvidenceReviewEvent");
@@ -99,6 +102,22 @@ describe("Institute admin surface", () => {
     const contributorButtonBlock = review.slice(contributorButtonStart, relationshipButtonStart);
     expect(contributorButtonBlock).not.toContain("reviewContributorSubmission");
     expect(contributorButtonBlock).not.toContain("setActionBusyKey");
+  });
+
+  it("keeps draft review handler inside the page component", () => {
+    const draftButtonStart = review.indexOf("function DraftActionButton");
+    const contributorButtonStart = review.indexOf("function ContributorSubmissionActionButton");
+    const pageStart = review.indexOf("export default function AdminInstituteReviewPage");
+    const draftHandlerStart = review.indexOf("async function handleReviewDraft");
+
+    expect(draftButtonStart).toBeGreaterThan(-1);
+    expect(contributorButtonStart).toBeGreaterThan(draftButtonStart);
+    expect(pageStart).toBeGreaterThan(contributorButtonStart);
+    expect(draftHandlerStart).toBeGreaterThan(pageStart);
+
+    const draftButtonBlock = review.slice(draftButtonStart, contributorButtonStart);
+    expect(draftButtonBlock).not.toContain("reviewSurfaceDraft");
+    expect(draftButtonBlock).not.toContain("setActionBusyKey");
   });
 
   it("does not claim the Institute review page is read-only after PR6", () => {
