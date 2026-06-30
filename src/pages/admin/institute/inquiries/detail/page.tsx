@@ -19,7 +19,9 @@ import {
 import {
   createCulturalEntityReference,
   createInquiryNote,
+  createQuestionVersion,
   getInquiry,
+  listQuestionVersions,
   linkEntityToInquiry,
   listContributorSubmissions,
   listCulturalEntities,
@@ -34,6 +36,7 @@ import {
   type CulturalEntityType,
   type EntityRelationship,
   type Inquiry,
+  type QuestionVersion,
   type InquiryEntityLink,
   type InquiryEntityRole,
   type InquiryEvidenceLink,
@@ -104,6 +107,7 @@ export default function AdminInstituteInquiryDetailPage() {
   const { inquiryId } = useParams();
 
   const [inquiry, setInquiry] = useState<Inquiry | null>(null);
+  const [questionVersions, setQuestionVersions] = useState<QuestionVersion[]>([]);
   const [notes, setNotes] = useState<InquiryNote[]>([]);
   const [entityLinks, setEntityLinks] = useState<InquiryEntityLink[]>([]);
   const [entities, setEntities] = useState<CulturalEntity[]>([]);
@@ -120,6 +124,7 @@ export default function AdminInstituteInquiryDetailPage() {
 
   const [title, setTitle] = useState("");
   const [primaryQuestion, setPrimaryQuestion] = useState("");
+  const [questionChangeReason, setQuestionChangeReason] = useState("");
   const [shortQuestion, setShortQuestion] = useState("");
   const [whyItMatters, setWhyItMatters] = useState("");
   const [summary, setSummary] = useState("");
@@ -149,8 +154,9 @@ export default function AdminInstituteInquiryDetailPage() {
     setError(null);
 
     try {
-      const [nextInquiry, nextNotes, nextLinks, nextEntities, nextEvidenceLinks, nextSubmissions] = await Promise.all([
+      const [nextInquiry, nextQuestionVersions, nextNotes, nextLinks, nextEntities, nextEvidenceLinks, nextSubmissions] = await Promise.all([
         getInquiry(inquiryId),
+        listQuestionVersions(inquiryId),
         listInquiryNotes(inquiryId),
         listInquiryEntityLinks(inquiryId),
         listCulturalEntities({ search: entitySearch || undefined, limit: 100 }),
@@ -168,6 +174,7 @@ export default function AdminInstituteInquiryDetailPage() {
       );
 
       setInquiry(nextInquiry);
+      setQuestionVersions(nextQuestionVersions);
       setNotes(nextNotes);
       setEntityLinks(nextLinks);
       setEntities(nextEntities);
@@ -177,6 +184,7 @@ export default function AdminInstituteInquiryDetailPage() {
 
       setTitle(nextInquiry.title);
       setPrimaryQuestion(nextInquiry.primary_question);
+      setQuestionChangeReason("");
       setShortQuestion(nextInquiry.short_question ?? "");
       setWhyItMatters(nextInquiry.why_it_matters);
       setSummary(nextInquiry.summary ?? "");
@@ -204,16 +212,26 @@ export default function AdminInstituteInquiryDetailPage() {
 
   async function handleSaveBasics(event: FormEvent) {
     event.preventDefault();
-    if (!inquiryId) return;
+    if (!inquiryId || !inquiry) return;
 
     setSavingBasics(true);
     setNotice(null);
     setError(null);
 
     try {
+      const nextPrimaryQuestion = primaryQuestion.trim();
+      const questionChanged = nextPrimaryQuestion !== inquiry.primary_question;
+
+      if (!nextPrimaryQuestion) {
+        throw new Error("Primary question is required.");
+      }
+
+      if (questionChanged && !questionChangeReason.trim()) {
+        throw new Error("Add a reason for this refinement. WAKILISHA keeps the path of thought, not just the final wording.");
+      }
+
       const updated = await updateInquiry(inquiryId, {
         title: title.trim(),
-        primary_question: primaryQuestion.trim(),
         short_question: shortQuestion.trim() || null,
         why_it_matters: whyItMatters.trim(),
         summary: summary.trim() || null,
@@ -223,8 +241,20 @@ export default function AdminInstituteInquiryDetailPage() {
         closed_at: status === "closed" ? new Date().toISOString() : null,
       });
 
+      if (questionChanged) {
+        await createQuestionVersion({
+          inquiry_id: inquiryId,
+          question_text: nextPrimaryQuestion,
+          change_reason: questionChangeReason.trim(),
+          change_type: "manual_refinement",
+          metadata: { source: "inquiry_detail_shape_form" },
+        });
+
+        setQuestionChangeReason("");
+      }
+
       setInquiry(updated);
-      setNotice("Inquiry shaped.");
+      setNotice(questionChanged ? "Question refinement preserved." : "Inquiry shaped.");
       await loadWorkbench();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -530,6 +560,11 @@ export default function AdminInstituteInquiryDetailPage() {
     return <div className="p-6 text-[13px] text-wk-text-muted">This Inquiry could not be found.</div>;
   }
 
+  const orderedQuestionVersions = [...questionVersions].sort((a, b) => b.version_number - a.version_number);
+  const originalQuestionVersion = [...questionVersions].sort((a, b) => a.version_number - b.version_number)[0];
+  const currentQuestionVersion = questionVersions.find((version) => version.is_current) ?? orderedQuestionVersions[0] ?? null;
+  const questionHasChanged = primaryQuestion.trim() !== inquiry.primary_question;
+
   return (
     <div className="space-y-6 p-6">
       <InstitutePageHeader
@@ -553,6 +588,95 @@ export default function AdminInstituteInquiryDetailPage() {
           { label: `Visibility: ${humanize(inquiry.visibility)}`, description: "Who can safely see this work right now.", tone: visibilityTone(inquiry.visibility) },
         ]}
       />
+
+      <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+        <InstituteSectionCard
+          eyebrow="Question Lineage"
+          title="How did this question move?"
+          description="Every refinement should explain what became clearer. The original curiosity stays visible so the learning path is never erased."
+        >
+          <div className="space-y-4">
+            <div className="grid gap-3 rounded-2xl border border-wk-border bg-wk-bg p-4">
+              <div>
+                <div className="text-[11px] font-black uppercase tracking-[0.16em] text-wk-text-muted">Original Raw Question</div>
+                <p className="mt-1 text-[14px] font-bold leading-6 text-wk-text">
+                  {originalQuestionVersion?.question_text ?? inquiry.primary_question}
+                </p>
+              </div>
+              <div>
+                <div className="text-[11px] font-black uppercase tracking-[0.16em] text-wk-text-muted">Current Working Question</div>
+                <p className="mt-1 text-[14px] font-bold leading-6 text-wk-text">
+                  {currentQuestionVersion?.question_text ?? inquiry.primary_question}
+                </p>
+              </div>
+            </div>
+
+            {orderedQuestionVersions.length === 0 ? (
+              <p className="rounded-2xl border border-wk-border bg-wk-bg p-4 text-[13px] leading-5 text-wk-text-muted">
+                Lineage begins here. Save the Inquiry to preserve the first version of this question.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {orderedQuestionVersions.map((version) => (
+                  <article key={version.id} className="rounded-2xl border border-wk-border bg-wk-bg p-4">
+                    <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                      <div>
+                        <div className="text-[11px] font-black uppercase tracking-[0.16em] text-wk-brand">
+                          Version {version.version_number}{version.is_current ? " · Current" : ""}
+                        </div>
+                        <p className="mt-2 text-[14px] font-bold leading-6 text-wk-text">{version.question_text}</p>
+                      </div>
+                      <span className="rounded-full border border-wk-border px-3 py-1 text-[11px] font-bold text-wk-text-muted">
+                        {version.change_type.replaceAll("_", " ")}
+                      </span>
+                    </div>
+                    <p className="mt-3 text-[13px] leading-5 text-wk-text-muted">
+                      <span className="font-bold text-wk-text">Reason:</span> {version.change_reason}
+                    </p>
+                    <p className="mt-2 text-[11px] font-bold text-wk-text-muted">
+                      By {version.created_by ?? "Unknown worker"} · {new Date(version.created_at).toLocaleString()}
+                    </p>
+                  </article>
+                ))}
+              </div>
+            )}
+          </div>
+        </InstituteSectionCard>
+
+        <div className="space-y-6">
+          <InstituteSectionCard
+            eyebrow="Next Honest Move"
+            title="Preserve the path before the Clinic"
+            description="WAKILISHA keeps the path of thought, not just the final wording."
+          >
+            <p className="text-[13px] leading-5 text-wk-text-muted">
+              Preserve the question history before moving to the Clinic. If the question changes, add a reason for what became clearer.
+            </p>
+          </InstituteSectionCard>
+
+          <InstituteSectionCard
+            eyebrow="Locked future tools"
+            title="What unlocks after BOOK4.1?"
+            description="These tools are visible as method markers only. They are not active in this phase."
+          >
+            <div className="grid gap-3">
+              {[
+                ["Question Clinic", "This unlocks after the question lineage foundation is saved."],
+                ["Branch Inquiry", "Branches come after the Clinic can identify better nearby questions."],
+                ["Path Selector", "The refined question chooses the medium. Finish the Clinic first."],
+                ["Studios", "Studios open after the question is ready and a path is selected."],
+                ["AI Readiness", "AI comes later, after the human workflow is strong."],
+              ].map(([title, body]) => (
+                <div key={title} className="rounded-2xl border border-wk-border bg-wk-bg p-4 opacity-80">
+                  <div className="text-[11px] font-black uppercase tracking-[0.16em] text-wk-text-muted">Locked</div>
+                  <h3 className="mt-1 text-[14px] font-black text-wk-text">{title}</h3>
+                  <p className="mt-2 text-[13px] leading-5 text-wk-text-muted">{body}</p>
+                </div>
+              ))}
+            </div>
+          </InstituteSectionCard>
+        </div>
+      </div>
 
       <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
         <InstituteUnderstandingPanel
@@ -604,6 +728,40 @@ export default function AdminInstituteInquiryDetailPage() {
             Primary question
             <textarea value={primaryQuestion} onChange={(event) => setPrimaryQuestion(event.target.value)} required rows={3} className="rounded-2xl border border-wk-border bg-wk-bg px-3 py-2 text-[13px] text-wk-text" />
           </label>
+
+          {questionHasChanged ? (
+            <label className="grid gap-1 text-[12px] font-bold text-wk-text-muted">
+              Reason for change
+              <textarea
+                value={questionChangeReason}
+                onChange={(event) => setQuestionChangeReason(event.target.value)}
+                required
+                rows={3}
+                placeholder="What became clearer?"
+                className="rounded-2xl border border-wk-border bg-wk-bg px-3 py-2 text-[13px] text-wk-text"
+              />
+              <span className="text-[12px] font-medium leading-5 text-wk-text-muted">
+                Add a reason for this refinement. WAKILISHA keeps the path of thought, not just the final wording.
+              </span>
+            </label>
+          ) : null}
+
+          {questionHasChanged ? (
+            <label className="grid gap-1 text-[12px] font-bold text-wk-text-muted">
+              Reason for change
+              <textarea
+                value={questionChangeReason}
+                onChange={(event) => setQuestionChangeReason(event.target.value)}
+                required
+                rows={3}
+                placeholder="What became clearer?"
+                className="rounded-2xl border border-wk-border bg-wk-bg px-3 py-2 text-[13px] text-wk-text"
+              />
+              <span className="text-[12px] font-medium leading-5 text-wk-text-muted">
+                Add a reason for this refinement. WAKILISHA keeps the path of thought, not just the final wording.
+              </span>
+            </label>
+          ) : null}
 
           <div className="grid gap-4 lg:grid-cols-2">
             <label className="grid gap-1 text-[12px] font-bold text-wk-text-muted">
