@@ -19,6 +19,7 @@ import type {
   EvidenceItem,
   Inquiry,
   InquiryEntityLink,
+  InquiryEvidenceLink,
   InquiryNote,
   Contributor,
   ContributorSubmission,
@@ -199,6 +200,21 @@ export async function linkEvidenceToInquiry(input: {
   const { error } = await supabase.from("inquiry_evidence").insert(input);
 
   if (error) raiseSupabaseError(error, "Link evidence to inquiry");
+}
+
+export async function listInquiryEvidenceLinks(inquiryId: string): Promise<InquiryEvidenceLink[]> {
+  if (!inquiryId) {
+    throw new Error("List Inquiry evidence failed: inquiryId is required.");
+  }
+
+  const { data, error } = await supabase
+    .from("inquiry_evidence")
+    .select("*, evidence:evidence_items(*)")
+    .eq("inquiry_id", inquiryId)
+    .order("created_at", { ascending: false });
+
+  if (error) raiseSupabaseError(error, "List Inquiry evidence");
+  return (data ?? []) as InquiryEvidenceLink[];
 }
 
 export async function createCulturalEntityReference(input: CreateCulturalEntityInput): Promise<CulturalEntity> {

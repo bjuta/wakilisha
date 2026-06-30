@@ -223,6 +223,15 @@ export interface InquiryNote {
   created_at: string;
 }
 
+export interface InquiryEvidenceLink {
+  inquiry_id: string;
+  evidence_id: string;
+  use_note: string | null;
+  added_by: string | null;
+  created_at: string;
+  evidence?: EvidenceItem | null;
+}
+
 export interface EvidenceItem {
   id: string;
   title: string;
