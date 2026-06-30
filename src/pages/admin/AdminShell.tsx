@@ -48,7 +48,7 @@ const NAV_GROUPS: NavGroup[] = [
   { label: "Institute", visible: (can) => can("view_registry") || can("view_review_queue") || can("view_relationships"), items: [
     { path: "/admin/institute", label: "Inquiry OS", icon: "Network", requiredCapability: "view_registry" },
     { path: "/admin/institute/inquiries", label: "Inquiries", icon: "Network", requiredCapability: "view_registry" },
-    { path: "/admin/institute/evidence", label: "Evidence Locker", icon: "Database", requiredCapability: "view_review_queue" },
+    { path: "/admin/institute/evidence", label: "Evidence Room", icon: "Database", requiredCapability: "view_review_queue" },
     { path: "/admin/institute/contributors", label: "Contributor Desk", icon: "Users", requiredCapability: "view_review_queue" },
     { path: "/admin/institute/relationships", label: "Relationship Curator", icon: "Network", requiredCapability: "view_relationships" },
     { path: "/admin/institute/review", label: "Institute Review", icon: "GitPullRequest", badgeKey: "reviewQueue", requiredCapability: "view_review_queue" },
