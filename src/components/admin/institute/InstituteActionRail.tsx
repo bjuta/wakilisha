@@ -13,11 +13,11 @@ export function InstituteActionRail({
   }
 
   return (
-    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+    <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
       {actions.map((action) => {
         const tone = instituteToneClasses(action.tone ?? "neutral");
         const className = cx(
-          "block rounded-2xl border bg-wk-bg p-4 text-left transition hover:border-wk-brand/40 disabled:cursor-not-allowed disabled:opacity-50",
+          "block rounded-2xl border bg-wk-bg p-3 text-left transition hover:border-wk-brand/40 disabled:cursor-not-allowed disabled:opacity-50 sm:p-4",
           tone.button,
         );
 
