@@ -45,14 +45,6 @@ const NAV_GROUPS: NavGroup[] = [
     { path: "/admin/registry/artist-aliases", label: "Artist Aliases", icon: "Link", requiredCapability: "view_registry" },
     { path: "/admin/registry/authors", label: "Authors", icon: "PenLine", requiredCapability: "view_registry" },
   ] },
-  { label: "Institute", visible: (can) => can("view_registry") || can("view_review_queue") || can("view_relationships"), items: [
-    { path: "/admin/institute", label: "Inquiry OS", icon: "Network", requiredCapability: "view_registry" },
-    { path: "/admin/institute/inquiries", label: "Inquiries", icon: "Network", requiredCapability: "view_registry" },
-    { path: "/admin/institute/evidence", label: "Evidence Room", icon: "Database", requiredCapability: "view_review_queue" },
-    { path: "/admin/institute/contributors", label: "Contributor Desk", icon: "Users", requiredCapability: "view_review_queue" },
-    { path: "/admin/institute/relationships", label: "Relationship Curator", icon: "Network", requiredCapability: "view_relationships" },
-    { path: "/admin/institute/review", label: "Institute Review", icon: "GitPullRequest", badgeKey: "reviewQueue", requiredCapability: "view_review_queue" },
-  ] },
   { label: "Charts Engine", visible: (can) => can("view_charts_admin"), items: [
     { path: "/admin/charts/dashboard", label: "Dashboard", icon: "LayoutDashboard", requiredCapability: "view_charts_admin" },
     { path: "/admin/charts/ingest", label: "Ingest Studio", icon: "Database", requiredCapability: "manage_ingest" },
