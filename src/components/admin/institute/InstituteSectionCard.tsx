@@ -14,17 +14,17 @@ export function InstituteSectionCard({
   const toneClass = instituteToneClasses(tone);
 
   return (
-    <section className={cx("rounded-3xl border border-wk-border bg-wk-surface p-5 shadow-sm", className)}>
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+    <section className={cx("rounded-3xl border border-wk-border bg-wk-surface p-4 shadow-sm sm:p-5", className)}>
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div className="min-w-0">
           {eyebrow ? (
             <div className={cx("text-[11px] font-black uppercase tracking-[0.2em]", toneClass.text)}>{eyebrow}</div>
           ) : null}
-          <h2 className="mt-1 text-xl font-black tracking-tight text-wk-text">{title}</h2>
+          <h2 className="mt-1 text-lg font-black tracking-tight text-wk-text sm:text-xl">{title}</h2>
           {description ? <p className="mt-2 max-w-3xl text-[13px] leading-6 text-wk-text-muted">{description}</p> : null}
         </div>
         {actions.length > 0 ? (
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
             {actions.map((action) => {
               const actionTone = instituteToneClasses(action.tone ?? "neutral");
               const className = cx(

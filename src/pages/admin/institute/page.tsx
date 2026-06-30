@@ -82,15 +82,15 @@ function MethodStepCard({ step }: { step: MethodStep }) {
   return (
     <Link
       to={step.route}
-      className="group rounded-3xl border border-wk-border bg-wk-surface p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-wk-brand/40"
+      className="group rounded-3xl border border-wk-border bg-wk-surface p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-wk-brand/40 sm:p-5"
     >
-      <div className="flex items-start gap-4">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-wk-border bg-wk-bg text-[15px] font-black text-wk-brand">
+      <div className="grid gap-4 sm:grid-cols-[56px_1fr] sm:items-start">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-wk-border bg-wk-bg text-[15px] font-black text-wk-brand">
           {step.number}
         </div>
         <div className="min-w-0">
           <div className="text-[11px] font-black uppercase tracking-[0.16em] text-wk-brand">{step.surface}</div>
-          <h3 className="mt-2 text-[18px] font-black leading-6 text-wk-text">{step.question}</h3>
+          <h3 className="mt-2 text-[16px] font-black leading-5 text-wk-text lg:text-[17px] lg:leading-6">{step.question}</h3>
           <p className="mt-2 text-[13px] leading-5 text-wk-text-muted">{step.note}</p>
           <p className="mt-3 rounded-2xl border border-wk-border bg-wk-bg p-3 text-[12px] font-bold leading-5 text-wk-text-muted">
             {step.signal}
@@ -105,7 +105,7 @@ function SurfaceMapCard({ card }: { card: SurfaceCard }) {
   return (
     <Link
       to={card.route}
-      className="group rounded-3xl border border-wk-border bg-wk-surface p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-wk-brand/40"
+      className="group rounded-3xl border border-wk-border bg-wk-surface p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-wk-brand/40 sm:p-5"
     >
       <div className="flex items-start justify-between gap-4">
         <div>
@@ -294,8 +294,8 @@ export default function AdminInstituteOverviewPage() {
   }, []);
 
   return (
-    <div className="space-y-6 p-6">
-      <header className="rounded-3xl border border-wk-border bg-wk-surface p-6 shadow-sm">
+    <div className="space-y-5 p-4 sm:p-6">
+      <header className="rounded-3xl border border-wk-border bg-wk-surface p-4 shadow-sm sm:p-6">
         <div className="text-[12px] font-bold uppercase tracking-[0.2em] text-wk-brand">WAKILISHA Institute</div>
         <div className="mt-3 grid gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-end">
           <div className="max-w-3xl">
@@ -336,7 +336,7 @@ export default function AdminInstituteOverviewPage() {
         ))}
       </section>
 
-      <section className="rounded-3xl border border-wk-border bg-wk-surface-raised p-5 shadow-sm">
+      <section className="rounded-3xl border border-wk-border bg-wk-surface-raised p-4 shadow-sm sm:p-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <div className="text-[12px] font-black uppercase tracking-[0.18em] text-wk-brand">Five-screen rule</div>
@@ -350,7 +350,7 @@ export default function AdminInstituteOverviewPage() {
           </Link>
         </div>
 
-        <div className="mt-5 grid gap-4 xl:grid-cols-5">
+        <div className="mt-5 grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
           {methodSteps.map((step) => (
             <MethodStepCard key={step.number} step={step} />
           ))}
@@ -362,7 +362,7 @@ export default function AdminInstituteOverviewPage() {
           Opening the Method Console...
         </div>
       ) : (
-        <section className="grid gap-6 xl:grid-cols-[1.35fr_0.9fr]">
+        <section className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.9fr)]">
           <div className="space-y-4">
             <div className="flex items-end justify-between gap-4">
               <div>
@@ -389,7 +389,7 @@ export default function AdminInstituteOverviewPage() {
         </section>
       )}
 
-      <section className="rounded-3xl border border-wk-border bg-wk-surface-raised p-5 shadow-sm">
+      <section className="rounded-3xl border border-wk-border bg-wk-surface-raised p-4 shadow-sm sm:p-5">
         <div>
           <div className="text-[12px] font-black uppercase tracking-[0.18em] text-wk-brand">Institute surfaces</div>
           <h2 className="mt-2 text-2xl font-black tracking-tight text-wk-text">Where the method lives</h2>
@@ -398,7 +398,7 @@ export default function AdminInstituteOverviewPage() {
           </p>
         </div>
 
-        <div className="mt-5 grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+        <div className="mt-5 grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
           {surfaceCards.map((card) => (
             <SurfaceMapCard key={card.title} card={card} />
           ))}
