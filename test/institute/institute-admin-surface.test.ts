@@ -37,8 +37,10 @@ describe("Institute admin surface", () => {
   it("uses PR4 admin helper services instead of direct Supabase reads", () => {
     expect(overview).toContain("getInstituteAdminOverviewCountMap");
     expect(overview).toContain("listHumanReviewQueueItems");
-    expect(overview).toContain("listRetrievalPolicies");
-    expect(overview).toContain("listRetrievalRuns");
+    expect(overview).toContain("Method Console");
+    expect(overview).toContain("Five-screen rule");
+    expect(overview).not.toContain("listRetrievalPolicies");
+    expect(overview).not.toContain("listRetrievalRuns");
     expect(review).toContain("listHumanReviewQueueItems");
 
     expect(overview).not.toContain("supabase.from");
