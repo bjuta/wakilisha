@@ -18,6 +18,8 @@ import type {
   EntityRelationship,
   EvidenceItem,
   Inquiry,
+  QuestionVersion,
+  CreateQuestionVersionInput,
   InquiryEntityLink,
   InquiryEvidenceLink,
   InquiryNote,
@@ -65,7 +67,17 @@ export async function getInquiry(id: string): Promise<Inquiry | null> {
 }
 
 export async function createInquiry(input: CreateInquiryInput): Promise<Inquiry> {
-  return insertOne<Inquiry>("inquiries", input, "Create inquiry");
+  const inquiry = await insertOne<Inquiry>("inquiries", input, "Create inquiry");
+
+  await createQuestionVersion({
+    inquiry_id: inquiry.id,
+    question_text: inquiry.primary_question,
+    change_reason: "Initial curiosity.",
+    change_type: "initial_question",
+    metadata: { source: "create_inquiry" },
+  });
+
+  return inquiry;
 }
 
 export async function updateInquiry(id: string, input: UpdateInquiryInput): Promise<Inquiry> {
@@ -82,6 +94,150 @@ export async function updateInquiry(id: string, input: UpdateInquiryInput): Prom
 
   if (error) raiseSupabaseError(error, "Update inquiry");
   return data as Inquiry;
+}
+
+function requireTrimmedValue(value: string | undefined | null, label: string): string {
+  const trimmed = (value ?? "").trim();
+
+  if (!trimmed) {
+    throw new Error(`${label} is required.`);
+  }
+
+  return trimmed;
+}
+
+export async function listQuestionVersions(inquiryId: string): Promise<QuestionVersion[]> {
+  if (!inquiryId) {
+    throw new Error("List question versions failed: inquiryId is required.");
+  }
+
+  const { data, error } = await supabase
+    .from("question_versions")
+    .select("*")
+    .eq("inquiry_id", inquiryId)
+    .order("version_number", { ascending: false });
+
+  if (error) raiseSupabaseError(error, "List question versions");
+  return (data ?? []) as QuestionVersion[];
+}
+
+export async function getCurrentQuestionVersion(inquiryId: string): Promise<QuestionVersion | null> {
+  if (!inquiryId) {
+    throw new Error("Get current question version failed: inquiryId is required.");
+  }
+
+  const { data, error } = await supabase
+    .from("question_versions")
+    .select("*")
+    .eq("inquiry_id", inquiryId)
+    .eq("is_current", true)
+    .maybeSingle();
+
+  if (error) raiseSupabaseError(error, "Get current question version");
+  return (data ?? null) as QuestionVersion | null;
+}
+
+export async function createQuestionVersion(input: CreateQuestionVersionInput): Promise<QuestionVersion> {
+  const inquiryId = requireTrimmedValue(input.inquiry_id, "Inquiry id");
+  const questionText = requireTrimmedValue(input.question_text, "Question text");
+  const changeReason = requireTrimmedValue(input.change_reason, "Reason for change");
+
+  const existingVersions = await listQuestionVersions(inquiryId);
+  const nextVersionNumber = existingVersions.length > 0
+    ? Math.max(...existingVersions.map((version) => version.version_number)) + 1
+    : 1;
+
+  const { error: unsetError } = await supabase
+    .from("question_versions")
+    .update({ is_current: false })
+    .eq("inquiry_id", inquiryId)
+    .eq("is_current", true);
+
+  if (unsetError) raiseSupabaseError(unsetError, "Unset current question version");
+
+  const { data, error } = await supabase
+    .from("question_versions")
+    .insert({
+      inquiry_id: inquiryId,
+      version_number: nextVersionNumber,
+      question_text: questionText,
+      change_reason: changeReason,
+      change_type: input.change_type ?? "manual_refinement",
+      is_current: true,
+      metadata: input.metadata ?? {},
+    })
+    .select("*")
+    .single();
+
+  if (error) raiseSupabaseError(error, "Create question version");
+
+  const { error: inquiryError } = await supabase
+    .from("inquiries")
+    .update({
+      primary_question: questionText,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", inquiryId);
+
+  if (inquiryError) raiseSupabaseError(inquiryError, "Sync inquiry current question");
+
+  return data as QuestionVersion;
+}
+
+export async function setCurrentQuestionVersion(versionId: string, reason: string): Promise<QuestionVersion> {
+  const safeVersionId = requireTrimmedValue(versionId, "Question version id");
+  const changeReason = requireTrimmedValue(reason, "Reason for selecting current question");
+
+  const { data: version, error: versionError } = await supabase
+    .from("question_versions")
+    .select("*")
+    .eq("id", safeVersionId)
+    .maybeSingle();
+
+  if (versionError) raiseSupabaseError(versionError, "Get question version for current selection");
+  if (!version) {
+    throw new Error("Set current question version failed: version was not found.");
+  }
+
+  const questionVersion = version as QuestionVersion;
+
+  const { error: unsetError } = await supabase
+    .from("question_versions")
+    .update({ is_current: false })
+    .eq("inquiry_id", questionVersion.inquiry_id)
+    .eq("is_current", true);
+
+  if (unsetError) raiseSupabaseError(unsetError, "Unset previous current question version");
+
+  const nextMetadata = {
+    ...(questionVersion.metadata ?? {}),
+    current_selection_reason: changeReason,
+    current_selected_at: new Date().toISOString(),
+  };
+
+  const { data, error } = await supabase
+    .from("question_versions")
+    .update({
+      is_current: true,
+      metadata: nextMetadata,
+    })
+    .eq("id", safeVersionId)
+    .select("*")
+    .single();
+
+  if (error) raiseSupabaseError(error, "Set current question version");
+
+  const { error: inquiryError } = await supabase
+    .from("inquiries")
+    .update({
+      primary_question: questionVersion.question_text,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", questionVersion.inquiry_id);
+
+  if (inquiryError) raiseSupabaseError(inquiryError, "Sync inquiry current question");
+
+  return data as QuestionVersion;
 }
 
 export async function listInquiryNotes(inquiryId: string): Promise<InquiryNote[]> {

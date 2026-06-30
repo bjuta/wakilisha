@@ -201,6 +201,19 @@ export interface Inquiry {
   updated_at: string;
 }
 
+export interface QuestionVersion {
+  id: string;
+  inquiry_id: string;
+  version_number: number;
+  question_text: string;
+  change_reason: string;
+  change_type: string;
+  is_current: boolean;
+  created_by: string | null;
+  created_at: string;
+  metadata: { [key: string]: JsonValue };
+}
+
 export interface InquiryEntityLink {
   id: string;
   inquiry_id: string;
@@ -389,6 +402,9 @@ export interface MemoryEmbeddingRecord {
   retrieval_status: RetrievalStatus;
   created_at: string;
 }
+
+export type CreateQuestionVersionInput = Pick<QuestionVersion, "inquiry_id" | "question_text" | "change_reason"> &
+  Partial<Pick<QuestionVersion, "change_type" | "metadata">>;
 
 export type UpdateInquiryInput = Partial<
   Pick<
