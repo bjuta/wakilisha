@@ -66,7 +66,6 @@ import {
   AdminReviewLayout,
   AdminImportsLayout,
   AdminRelationshipsLayout,
-  AdminInstituteLayout,
 } from "@/components/admin/AdminSectionLayouts";
 
 // Admin Charts Ingestion Studio
@@ -118,15 +117,6 @@ import AdminApiDocsPage from "../pages/admin/api-docs/page";
 
 // Admin Community Moderation
 import AdminCommunityPage from "../pages/admin/community/page";
-import AdminInstituteReviewPage from "../pages/admin/institute/review/page";
-import AdminInstituteOverviewPage from "../pages/admin/institute/page";
-import AdminInstituteInquiriesPage from "../pages/admin/institute/inquiries/page";
-import AdminInstituteInquiryDetailPage from "../pages/admin/institute/inquiries/detail/page";
-import AdminInstituteEvidencePage from "../pages/admin/institute/evidence/page";
-import AdminInstituteEvidenceDetailPage from "../pages/admin/institute/evidence/detail/page";
-import AdminInstituteContributorsPage from "../pages/admin/institute/contributors/page";
-import AdminInstituteRelationshipsPage from "../pages/admin/institute/relationships/page";
-import AdminInstituteRelationshipDetailPage from "../pages/admin/institute/relationships/detail/page";
 
 // Public API Docs
 import PublicApiDocsPage from "../pages/api-docs/page";
@@ -198,9 +188,6 @@ import ContactPage from "../pages/contact/page";
 import FaqsPage from "../pages/faqs/page";
 import PrivacyPage from "../pages/privacy/page";
 import TermsPage from "../pages/terms/page";
-import LibraryPage from "../pages/library/page";
-import LibraryEntryPage from "../pages/library/entry/page";
-import InstitutePage from "../pages/institute/page";
 
 function LegacyTaxonomyRedirect({ base }: { base: "/categories" | "/tags" }) {
   const { slug } = useParams<{ slug?: string }>();
@@ -281,9 +268,6 @@ const routes: RouteObject[] = [
       { path: "/faqs", element: <ResponsivePage mobile={<FaqsPage />} desktop={<FaqsPage />} /> },
       { path: "/privacy", element: <ResponsivePage mobile={<PrivacyPage />} desktop={<PrivacyPage />} /> },
       { path: "/terms", element: <ResponsivePage mobile={<TermsPage />} desktop={<TermsPage />} /> },
-      { path: "/library", element: <ResponsivePage mobile={<LibraryPage />} desktop={<LibraryPage />} /> },
-      { path: "/library/:category/:slug", element: <ResponsivePage mobile={<LibraryEntryPage />} desktop={<LibraryEntryPage />} /> },
-      { path: "/institute", element: <ResponsivePage mobile={<InstitutePage />} desktop={<InstitutePage />} /> },
       { path: "/briefings", element: <ResponsivePage mobile={<PublicBriefingsPage />} desktop={<PublicBriefingsPage />} /> },
       { path: "/briefing/confirm", element: <ResponsivePage mobile={<BriefingConfirmPage />} desktop={<BriefingConfirmPage />} /> },
       { path: "/briefing/unsubscribe", element: <ResponsivePage mobile={<BriefingUnsubscribePage />} desktop={<BriefingUnsubscribePage />} /> },
@@ -346,21 +330,6 @@ const routes: RouteObject[] = [
           { path: "genres/:slug", element: <AdminGenreDetailPage /> },
           { path: "authors", element: <AdminAuthorsPage /> },
           { path: "authors/:slug", element: <AdminAuthorDetailPage /> },
-        ],
-      },
-      {
-        path: "institute",
-        element: <AdminInstituteLayout />,
-        children: [
-          { index: true, element: <AdminInstituteOverviewPage /> },
-          { path: "inquiries", element: <AdminInstituteInquiriesPage /> },
-          { path: "inquiries/:inquiryId", element: <AdminInstituteInquiryDetailPage /> },
-          { path: "evidence", element: <AdminInstituteEvidencePage /> },
-          { path: "evidence/:evidenceId", element: <AdminInstituteEvidenceDetailPage /> },
-          { path: "contributors", element: <AdminInstituteContributorsPage /> },
-          { path: "relationships", element: <AdminInstituteRelationshipsPage /> },
-          { path: "relationships/:relationshipId", element: <AdminInstituteRelationshipDetailPage /> },
-          { path: "review", element: <AdminInstituteReviewPage /> },
         ],
       },
       {
