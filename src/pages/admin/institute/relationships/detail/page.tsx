@@ -1,5 +1,18 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import {
+  InstituteDecisionLog,
+  InstituteEvidenceStatePanel,
+  InstituteNextMovePanel,
+  InstitutePageHeader,
+  InstituteRelationshipStatePanel,
+  InstituteSectionCard,
+  InstituteUnderstandingPanel,
+  InstituteUncertaintyPanel,
+  type InstituteActionItem,
+  type InstituteBadgeItem,
+  type InstituteDecisionItem,
+  type InstituteInsightItem,
+} from "@/components/admin/institute";
 import {
   getEntityRelationship,
   linkRelationshipEvidence,
@@ -19,6 +32,7 @@ import {
   type RelationshipReviewStatus,
   type RelationshipType,
 } from "@/services/institute";
+import { useParams } from "react-router-dom";
 
 const RELATIONSHIP_TYPES: RelationshipType[] = [
   "collaborated_with",
@@ -43,12 +57,27 @@ const REVIEW_STATUSES: RelationshipReviewStatus[] = ["suggested", "pending_revie
 const CONFIDENCE_OPTIONS: InstituteConfidence[] = ["low", "medium", "high"];
 const SUPPORT_TYPES: RelationshipEvidenceSupportType[] = ["supports", "challenges", "contextualizes"];
 
-function label(value: string) {
+function humanize(value: string) {
   return value.replaceAll("_", " ");
 }
 
 function entityName(entities: CulturalEntity[], id: string) {
   return entities.find((entity) => entity.id === id)?.name ?? id;
+}
+
+function reviewTone(status: RelationshipReviewStatus): InstituteBadgeItem["tone"] {
+  if (status === "approved") return "good";
+  if (status === "rejected" || status === "disputed") return "danger";
+  if (status === "pending_review" || status === "suggested") return "warning";
+  return "info";
+}
+
+function publicSafetyLabel(isSafe: boolean) {
+  return isSafe ? "public-safe" : "internal only";
+}
+
+function publicSafetyTone(isSafe: boolean): InstituteBadgeItem["tone"] {
+  return isSafe ? "good" : "warning";
 }
 
 export default function AdminInstituteRelationshipDetailPage() {
@@ -79,7 +108,10 @@ export default function AdminInstituteRelationshipDetailPage() {
   const [evidenceNote, setEvidenceNote] = useState("");
 
   const hasEvidence = evidenceLinks.length > 0;
-  const canApprove = reason.trim().length > 0 && confidence && hasEvidence;
+  const hasReason = reason.trim().length > 0;
+  const canApprove = hasReason && confidence && hasEvidence;
+  const canMarkPublicSafe = relationship?.review_status === "approved";
+
   const title = useMemo(() => {
     if (!relationship) return "Relationship";
     return `${entityName(entities, relationship.source_entity_id)} → ${entityName(entities, relationship.target_entity_id)}`;
@@ -148,7 +180,8 @@ export default function AdminInstituteRelationshipDetailPage() {
       });
 
       setRelationship(updated);
-      setNotice("Relationship updated.");
+      setNotice("Relationship meaning updated.");
+      await loadRelationship();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -167,10 +200,10 @@ export default function AdminInstituteRelationshipDetailPage() {
       await reviewEntityRelationship({
         relationshipId,
         decision,
-        decisionNote: reviewNote.trim() || `Relationship Curator action: ${label(decision)}`,
+        decisionNote: reviewNote.trim() || `Relationship Curator action: ${humanize(decision)}`,
       });
 
-      setNotice(`Relationship action applied: ${label(decision)}.`);
+      setNotice(`Relationship action applied: ${humanize(decision)}.`);
       await loadRelationship();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -197,7 +230,7 @@ export default function AdminInstituteRelationshipDetailPage() {
 
       setEvidenceId("");
       setEvidenceNote("");
-      setNotice("Evidence linked.");
+      setNotice("Evidence attached to the relationship.");
       setEvidenceLinks(await listRelationshipEvidenceLinks(relationshipId));
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -218,129 +251,311 @@ export default function AdminInstituteRelationshipDetailPage() {
         evidence_id: link.evidence_id,
       });
 
-      setNotice("Evidence unlinked.");
+      setNotice("Evidence removed from this relationship.");
       setEvidenceLinks(await listRelationshipEvidenceLinks(relationshipId));
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
   }
 
+  const relationshipStateItems: InstituteInsightItem[] = useMemo(() => {
+    if (!relationship) return [];
+
+    return [
+      {
+        label: "Where this stands",
+        value: humanize(relationship.review_status),
+        description: relationship.review_status === "approved" ? "This relationship has reviewed meaning." : "This relationship still needs human judgment.",
+        tone: reviewTone(relationship.review_status),
+      },
+      {
+        label: "Public safety",
+        value: publicSafetyLabel(relationship.public_safe),
+        description: relationship.public_safe ? "This relationship can travel beyond internal review." : "This relationship stays internal until approved for travel.",
+        tone: publicSafetyTone(relationship.public_safe),
+      },
+      {
+        label: "Evidence links",
+        value: evidenceLinks.length,
+        description: "Evidence currently attached to this relationship.",
+        tone: evidenceLinks.length > 0 ? "good" : "warning",
+      },
+    ];
+  }, [relationship, evidenceLinks.length]);
+
+  const evidenceStateItems: InstituteInsightItem[] = useMemo(() => [
+    {
+      label: "Supports",
+      value: evidenceLinks.filter((link) => link.support_type === "supports").length,
+      description: "Evidence that supports the relationship.",
+      tone: "good",
+    },
+    {
+      label: "Challenges",
+      value: evidenceLinks.filter((link) => link.support_type === "challenges").length,
+      description: "Evidence that limits or challenges the relationship.",
+      tone: "warning",
+    },
+    {
+      label: "Context",
+      value: evidenceLinks.filter((link) => link.support_type === "contextualizes").length,
+      description: "Evidence that gives background without proving the relationship alone.",
+      tone: "info",
+    },
+  ], [evidenceLinks]);
+
+  const uncertaintyItems: InstituteInsightItem[] = useMemo(() => {
+    if (!relationship) return [];
+
+    return [
+      {
+        label: "Approval blocked",
+        value: canApprove ? "No" : "Yes",
+        description: canApprove ? "Reason, confidence, and evidence are present." : "Approval is blocked until reason, confidence, and evidence are present.",
+        tone: canApprove ? "good" : "warning",
+      },
+      {
+        label: "Confidence",
+        value: relationship.confidence,
+        description: relationship.confidence === "high" ? "The relationship is strongly held." : "The relationship may need stronger evidence or a sharper reason.",
+        tone: relationship.confidence === "high" ? "good" : "info",
+      },
+      {
+        label: "Travel risk",
+        value: relationship.public_safe ? "Lower" : "High",
+        description: relationship.public_safe ? "Still use with context." : "Do not surface this as public meaning yet.",
+        tone: relationship.public_safe ? "info" : "danger",
+      },
+    ];
+  }, [relationship, canApprove]);
+
+  const decisionItems: InstituteDecisionItem[] = relationship
+    ? [
+        {
+          label: `Human review: ${humanize(relationship.review_status)}`,
+          reason: relationship.review_note ?? "No reviewer note has been added yet.",
+          meta: relationship.reviewed_at ? new Date(relationship.reviewed_at).toLocaleString() : "waiting",
+          tone: reviewTone(relationship.review_status),
+        },
+        {
+          label: `Public safety: ${publicSafetyLabel(relationship.public_safe)}`,
+          reason: relationship.public_safe ? "This relationship has been marked safe for public travel." : "This relationship remains internal.",
+          tone: publicSafetyTone(relationship.public_safe),
+        },
+      ]
+    : [];
+
+  const nextMoves: InstituteActionItem[] = relationship
+    ? [
+        ...(!hasEvidence
+          ? [{
+              label: "Attach evidence",
+              description: "Relationship approval needs at least one evidence link.",
+              href: "#relationship-evidence",
+              tone: "warning" as const,
+            }]
+          : []),
+        ...(!hasReason
+          ? [{
+              label: "Write the reason",
+              description: "The reason should explain what the relationship helps someone understand.",
+              href: "#shape-relationship",
+              tone: "warning" as const,
+            }]
+          : []),
+        ...(relationship.review_status !== "approved"
+          ? [{
+              label: "Review the relationship",
+              description: "Approve, dispute, reject, or request stronger evidence.",
+              href: "#review-relationship",
+              tone: "warning" as const,
+            }]
+          : []),
+        ...(relationship.review_status === "approved" && !relationship.public_safe
+          ? [{
+              label: "Consider public safety",
+              description: "Only approved relationships should be marked safe to travel.",
+              href: "#review-relationship",
+              tone: "info" as const,
+            }]
+          : []),
+      ]
+    : [];
+
   if (loading) {
-    return <div className="p-6 text-[13px] text-wk-text-muted">Loading relationship…</div>;
+    return <div className="p-6 text-[13px] text-wk-text-muted">Opening relationship...</div>;
   }
 
   if (!relationship) {
-    return <div className="p-6 text-[13px] text-wk-text-muted">Relationship not found.</div>;
+    return <div className="p-6 text-[13px] text-wk-text-muted">Relationship could not be found.</div>;
   }
+
+  const safeToSay = hasReason ? [relationship.reason] : [];
+  const cannotSayYet = [
+    ...(!hasEvidence ? ["This relationship does not have enough evidence yet."] : []),
+    ...(relationship.review_status !== "approved" ? ["This relationship should not carry strong claims yet."] : []),
+    ...(!relationship.public_safe ? ["This relationship should remain internal until public-safe review is complete."] : []),
+  ];
 
   return (
     <div className="space-y-6 p-6">
-      <header className="rounded-3xl border border-wk-border bg-wk-surface p-6 shadow-sm">
-        <div className="text-[12px] font-bold uppercase tracking-[0.2em] text-wk-brand">Relationship Curator</div>
-        <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <h1 className="text-3xl font-black tracking-tight text-wk-text">{title}</h1>
-            <p className="mt-2 max-w-3xl text-[14px] leading-6 text-wk-text-muted">{relationship.reason}</p>
-          </div>
-          <Link to="/admin/institute/relationships" className="rounded-full border border-wk-border px-4 py-2 text-[13px] font-bold text-wk-text hover:border-wk-brand/40">
-            Back to Relationships
-          </Link>
-        </div>
-      </header>
+      <InstitutePageHeader
+        eyebrow="Relationship Curator"
+        title={title}
+        description="A meaningful relationship must explain something, carry evidence, show uncertainty, and stay internal until it is safe to travel."
+        badges={[
+          {
+            label: `Where this stands: ${humanize(relationship.review_status)}`,
+            description: relationship.review_status === "approved" ? "Reviewed relationship meaning." : "Still waiting for judgment.",
+            tone: reviewTone(relationship.review_status),
+          },
+          {
+            label: `Public safety: ${publicSafetyLabel(relationship.public_safe)}`,
+            description: relationship.public_safe ? "Safe to travel beyond internal review." : "Internal until reviewed further.",
+            tone: publicSafetyTone(relationship.public_safe),
+          },
+          {
+            label: `${evidenceLinks.length} evidence links`,
+            description: "Evidence attached to this relationship.",
+            tone: evidenceLinks.length > 0 ? "good" : "warning",
+          },
+        ]}
+        actions={[{ label: "Back to Relationships", href: "/admin/institute/relationships" }]}
+      />
 
       {error ? <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-[13px] font-semibold text-red-700">{error}</div> : null}
       {notice ? <div className="rounded-2xl border border-wk-brand/20 bg-wk-brand/10 p-4 text-[13px] font-semibold text-wk-text">{notice}</div> : null}
 
-      <section className="rounded-3xl border border-wk-border bg-wk-surface p-5 shadow-sm">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <h2 className="text-lg font-black text-wk-text">Review actions</h2>
-            <p className="mt-1 text-[13px] text-wk-text-muted">
-              Approval requires a reason, confidence, and at least one evidence link.
-            </p>
-            {!canApprove ? (
-              <p className="mt-2 text-[12px] font-bold text-red-700">Approval is blocked until reason, confidence, and evidence are present.</p>
-            ) : null}
+      <InstituteSectionCard
+        eyebrow="Meaning first"
+        title="What does this relationship help someone understand?"
+        description="Separate a useful cultural relationship from shallow adjacency."
+      >
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div className="rounded-2xl border border-wk-border bg-wk-bg p-4">
+            <div className="text-[11px] font-black uppercase tracking-[0.16em] text-wk-brand">What this helps explain</div>
+            <p className="mt-2 text-[14px] leading-6 text-wk-text-soft">{relationship.reason}</p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <button type="button" disabled={reviewing || !canApprove} onClick={() => handleReview("approved")} className="rounded-full bg-wk-brand px-3 py-2 text-[12px] font-bold text-wk-brand-on hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50">Approve</button>
-            <button type="button" disabled={reviewing} onClick={() => handleReview("needs_more_evidence")} className="rounded-full border border-wk-border px-3 py-2 text-[12px] font-bold text-wk-text hover:border-wk-brand/40 disabled:opacity-60">Needs evidence</button>
-            <button type="button" disabled={reviewing} onClick={() => handleReview("disputed")} className="rounded-full border border-wk-border px-3 py-2 text-[12px] font-bold text-wk-text hover:border-wk-brand/40 disabled:opacity-60">Dispute</button>
-            <button type="button" disabled={reviewing} onClick={() => handleReview("rejected")} className="rounded-full border border-red-200 px-3 py-2 text-[12px] font-bold text-red-700 hover:border-red-400 disabled:opacity-60">Reject</button>
-            <button type="button" disabled={reviewing || relationship.review_status !== "approved"} onClick={() => handleReview("public_safe_enabled")} className="rounded-full border border-wk-border px-3 py-2 text-[12px] font-bold text-wk-text hover:border-wk-brand/40 disabled:cursor-not-allowed disabled:opacity-50">Public safe</button>
-            <button type="button" disabled={reviewing} onClick={() => handleReview("public_safe_disabled")} className="rounded-full border border-wk-border px-3 py-2 text-[12px] font-bold text-wk-text hover:border-wk-brand/40 disabled:opacity-60">Internal only</button>
+          <div className="rounded-2xl border border-wk-border bg-wk-bg p-4">
+            <div className="text-[11px] font-black uppercase tracking-[0.16em] text-wk-warning">What this does not prove</div>
+            <p className="mt-2 text-[14px] leading-6 text-wk-text-soft">
+              This relationship does not prove influence, importance, or public meaning beyond its evidence and review.
+            </p>
           </div>
         </div>
-      </section>
+      </InstituteSectionCard>
 
-      <section className="rounded-3xl border border-wk-border bg-wk-surface p-5 shadow-sm">
-        <h2 className="text-lg font-black text-wk-text">Relationship detail</h2>
-        <form onSubmit={handleSave} className="mt-4 grid gap-4">
+      <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+        <InstituteUnderstandingPanel
+          currentUnderstanding={relationship.reason}
+          safeToSay={safeToSay}
+          cannotSayYet={cannotSayYet}
+          confidenceLabel={`${relationship.confidence} confidence`}
+        />
+        <InstituteUncertaintyPanel items={uncertaintyItems} />
+      </div>
+
+      <InstituteRelationshipStatePanel items={relationshipStateItems} />
+      <InstituteEvidenceStatePanel items={evidenceStateItems} />
+      <InstituteDecisionLog decisions={decisionItems} />
+      <InstituteNextMovePanel moves={nextMoves} />
+
+      <InstituteSectionCard
+        eyebrow="Review"
+        title="Decide how far this relationship can travel"
+        description="Approval requires a reason, confidence, and evidence. Public safety is a separate decision."
+      >
+        <div id="review-relationship" className="grid gap-4">
+          {!canApprove ? (
+            <p className="rounded-2xl border border-wk-warning/30 bg-wk-warning-soft p-3 text-[13px] font-bold leading-5 text-wk-warning">
+              Approval is blocked until reason, confidence, and evidence are present.
+            </p>
+          ) : null}
+          <div className="flex flex-wrap gap-2">
+            <button type="button" disabled={reviewing || !canApprove} onClick={() => handleReview("approved")} className="rounded-full bg-wk-brand px-3 py-2 text-[12px] font-bold text-wk-brand-on hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50">Approve</button>
+            <button type="button" disabled={reviewing} onClick={() => handleReview("needs_more_evidence")} className="rounded-full border border-wk-border px-3 py-2 text-[12px] font-bold text-wk-text hover:border-wk-brand/40 disabled:opacity-60">Needs stronger evidence</button>
+            <button type="button" disabled={reviewing} onClick={() => handleReview("disputed")} className="rounded-full border border-wk-border px-3 py-2 text-[12px] font-bold text-wk-text hover:border-wk-brand/40 disabled:opacity-60">Dispute</button>
+            <button type="button" disabled={reviewing} onClick={() => handleReview("rejected")} className="rounded-full border border-red-200 px-3 py-2 text-[12px] font-bold text-red-700 hover:border-red-400 disabled:opacity-60">Reject</button>
+            <button type="button" disabled={reviewing || !canMarkPublicSafe} onClick={() => handleReview("public_safe_enabled")} className="rounded-full border border-wk-border px-3 py-2 text-[12px] font-bold text-wk-text hover:border-wk-brand/40 disabled:cursor-not-allowed disabled:opacity-50">Mark public-safe</button>
+            <button type="button" disabled={reviewing} onClick={() => handleReview("public_safe_disabled")} className="rounded-full border border-wk-border px-3 py-2 text-[12px] font-bold text-wk-text hover:border-wk-brand/40 disabled:opacity-60">Keep internal</button>
+          </div>
+        </div>
+      </InstituteSectionCard>
+
+      <InstituteSectionCard
+        eyebrow="Shape relationship"
+        title="Edit the meaning, safety, and review notes"
+        description="Use this when the reason, confidence, human review state, or safety boundary changes."
+      >
+        <form id="shape-relationship" onSubmit={handleSave} className="grid gap-4">
           <div className="grid gap-4 lg:grid-cols-[1fr_1fr_240px]">
             <label className="grid gap-1 text-[12px] font-bold text-wk-text-muted">
-              Source entity
+              First cultural reference
               <select value={sourceEntityId} onChange={(event) => setSourceEntityId(event.target.value)} required className="rounded-2xl border border-wk-border bg-wk-bg px-3 py-2 text-[13px] text-wk-text">
                 {entities.map((entity) => <option key={entity.id} value={entity.id}>{entity.name} · {entity.entity_type}</option>)}
               </select>
             </label>
             <label className="grid gap-1 text-[12px] font-bold text-wk-text-muted">
-              Target entity
+              Second cultural reference
               <select value={targetEntityId} onChange={(event) => setTargetEntityId(event.target.value)} required className="rounded-2xl border border-wk-border bg-wk-bg px-3 py-2 text-[13px] text-wk-text">
                 {entities.map((entity) => <option key={entity.id} value={entity.id}>{entity.name} · {entity.entity_type}</option>)}
               </select>
             </label>
             <label className="grid gap-1 text-[12px] font-bold text-wk-text-muted">
-              Relationship
+              Kind of connection
               <select value={relationshipType} onChange={(event) => setRelationshipType(event.target.value as RelationshipType)} className="rounded-2xl border border-wk-border bg-wk-bg px-3 py-2 text-[13px] text-wk-text">
-                {RELATIONSHIP_TYPES.map((type) => <option key={type} value={type}>{label(type)}</option>)}
+                {RELATIONSHIP_TYPES.map((type) => <option key={type} value={type}>{humanize(type)}</option>)}
               </select>
             </label>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-[1fr_180px_180px_180px]">
+          <div className="grid gap-4 lg:grid-cols-[1fr_180px_180px]">
             <label className="grid gap-1 text-[12px] font-bold text-wk-text-muted">
-              Review status
+              Where this stands
               <select value={reviewStatus} onChange={(event) => setReviewStatus(event.target.value as RelationshipReviewStatus)} className="rounded-2xl border border-wk-border bg-wk-bg px-3 py-2 text-[13px] text-wk-text">
-                {REVIEW_STATUSES.map((status) => <option key={status} value={status}>{label(status)}</option>)}
+                {REVIEW_STATUSES.map((status) => <option key={status} value={status}>{humanize(status)}</option>)}
               </select>
             </label>
             <label className="grid gap-1 text-[12px] font-bold text-wk-text-muted">
-              Confidence
+              Claim confidence
               <select value={confidence} onChange={(event) => setConfidence(event.target.value as InstituteConfidence)} className="rounded-2xl border border-wk-border bg-wk-bg px-3 py-2 text-[13px] text-wk-text">
                 {CONFIDENCE_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
               </select>
             </label>
             <label className="grid gap-1 text-[12px] font-bold text-wk-text-muted">
-              Public safe
+              Public safety
               <select value={String(publicSafe)} onChange={(event) => setPublicSafe(event.target.value === "true")} className="rounded-2xl border border-wk-border bg-wk-bg px-3 py-2 text-[13px] text-wk-text">
-                <option value="false">internal</option>
-                <option value="true">public safe</option>
+                <option value="false">internal only</option>
+                <option value="true">public-safe</option>
               </select>
             </label>
           </div>
 
           <label className="grid gap-1 text-[12px] font-bold text-wk-text-muted">
-            Reason
+            Why this connection matters
             <textarea value={reason} onChange={(event) => setReason(event.target.value)} required rows={4} className="rounded-2xl border border-wk-border bg-wk-bg px-3 py-2 text-[13px] text-wk-text" />
           </label>
 
           <label className="grid gap-1 text-[12px] font-bold text-wk-text-muted">
-            Review note
+            Reviewer note
             <textarea value={reviewNote} onChange={(event) => setReviewNote(event.target.value)} rows={3} className="rounded-2xl border border-wk-border bg-wk-bg px-3 py-2 text-[13px] text-wk-text" />
           </label>
 
           <div>
             <button type="submit" disabled={saving} className="rounded-full bg-wk-brand px-4 py-2 text-[13px] font-bold text-wk-brand-on hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60">
-              {saving ? "Saving…" : "Save relationship"}
+              {saving ? "Saving..." : "Save relationship"}
             </button>
           </div>
         </form>
-      </section>
+      </InstituteSectionCard>
 
-      <section className="grid gap-6 xl:grid-cols-2">
-        <div className="rounded-3xl border border-wk-border bg-wk-surface p-5 shadow-sm">
-          <h2 className="text-lg font-black text-wk-text">Link evidence</h2>
-          <form onSubmit={handleLinkEvidence} className="mt-4 grid gap-4">
+      <section id="relationship-evidence" className="grid gap-6 xl:grid-cols-2">
+        <InstituteSectionCard
+          eyebrow="Evidence strength"
+          title="Attach evidence to the relationship"
+          description="Evidence can support, challenge, or contextualize the connection."
+        >
+          <form onSubmit={handleLinkEvidence} className="grid gap-4">
             <label className="grid gap-1 text-[12px] font-bold text-wk-text-muted">
               Evidence
               <select value={evidenceId} onChange={(event) => setEvidenceId(event.target.value)} required className="rounded-2xl border border-wk-border bg-wk-bg px-3 py-2 text-[13px] text-wk-text">
@@ -349,9 +564,9 @@ export default function AdminInstituteRelationshipDetailPage() {
               </select>
             </label>
             <label className="grid gap-1 text-[12px] font-bold text-wk-text-muted">
-              Support type
+              Evidence role
               <select value={supportType} onChange={(event) => setSupportType(event.target.value as RelationshipEvidenceSupportType)} className="rounded-2xl border border-wk-border bg-wk-bg px-3 py-2 text-[13px] text-wk-text">
-                {SUPPORT_TYPES.map((type) => <option key={type} value={type}>{label(type)}</option>)}
+                {SUPPORT_TYPES.map((type) => <option key={type} value={type}>{humanize(type)}</option>)}
               </select>
             </label>
             <label className="grid gap-1 text-[12px] font-bold text-wk-text-muted">
@@ -360,35 +575,40 @@ export default function AdminInstituteRelationshipDetailPage() {
             </label>
             <div>
               <button type="submit" disabled={linkingEvidence} className="rounded-full bg-wk-brand px-4 py-2 text-[13px] font-bold text-wk-brand-on hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60">
-                {linkingEvidence ? "Linking…" : "Link evidence"}
+                {linkingEvidence ? "Attaching..." : "Attach evidence"}
               </button>
             </div>
           </form>
-        </div>
+        </InstituteSectionCard>
 
-        <div className="rounded-3xl border border-wk-border bg-wk-surface p-5 shadow-sm">
-          <h2 className="text-lg font-black text-wk-text">Evidence links</h2>
+        <InstituteSectionCard
+          eyebrow="Evidence map"
+          title="Evidence attached to this relationship"
+          description="Review what supports, challenges, or contextualizes the connection before approval."
+        >
           {evidenceLinks.length === 0 ? (
-            <p className="mt-4 text-[13px] text-wk-text-muted">No evidence linked yet.</p>
+            <p className="rounded-2xl border border-wk-border bg-wk-bg p-4 text-[13px] leading-5 text-wk-text-muted">
+              No evidence is attached to this relationship yet.
+            </p>
           ) : (
-            <div className="mt-4 space-y-3">
+            <div className="grid gap-3">
               {evidenceLinks.map((link) => (
                 <article key={`${link.relationship_id}-${link.evidence_id}`} className="rounded-2xl border border-wk-border bg-wk-bg p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <div className="text-[12px] font-bold uppercase tracking-[0.16em] text-wk-brand">{label(link.support_type)}</div>
+                      <div className="text-[11px] font-black uppercase tracking-[0.16em] text-wk-brand">{humanize(link.support_type)}</div>
                       <h3 className="mt-1 text-[14px] font-black text-wk-text">{link.evidence?.title ?? link.evidence_id}</h3>
                       {link.note ? <p className="mt-2 text-[13px] leading-5 text-wk-text-muted">{link.note}</p> : null}
                     </div>
                     <button type="button" onClick={() => handleUnlinkEvidence(link)} className="rounded-full border border-wk-border px-3 py-1.5 text-[11px] font-bold text-wk-text hover:border-wk-brand/40">
-                      Unlink
+                      Remove
                     </button>
                   </div>
                 </article>
               ))}
             </div>
           )}
-        </div>
+        </InstituteSectionCard>
       </section>
     </div>
   );
