@@ -43,6 +43,23 @@ export interface LibraryEntryNavigation {
   next: LibraryEntry | null;
 }
 
+export type LibraryBookStatus = "public" | "internal" | "draft";
+
+export interface LibraryBook {
+  key: "book-one" | "book-two" | "book-three";
+  label: string;
+  title: string;
+  status: LibraryBookStatus;
+  stage: string;
+  route: string | null;
+  startLabel: string;
+  description: string;
+  governs: string[];
+  shapedBy: string[];
+  restraint: string;
+  entries: LibraryEntry[];
+}
+
 type FrontMatter = Record<string, string>;
 
 const rawLibraryModules: Record<string, string> = {
@@ -243,6 +260,97 @@ export function getBookOneLibraryEntries(): LibraryEntry[] {
   return getPublicLibraryEntriesByCategory("constitutions").filter((entry) => {
     return entry.book === BOOK_ONE_TITLE || entry.type === "constitution";
   });
+}
+
+export function getLibraryBooks(): LibraryBook[] {
+  const bookOneEntries = getBookOneLibraryEntries();
+  const firstBookOneEntry = bookOneEntries[0] || null;
+
+  return [
+    {
+      key: "book-one",
+      label: "Book One",
+      title: "The WAKILISHA Constitution",
+      status: "public",
+      stage: "Public reading path",
+      route: firstBookOneEntry?.route ?? null,
+      startLabel: "Start Book One",
+      description:
+        "The constitutional spine. It explains what WAKILISHA is, why it exists, how it thinks, and what future builders must protect.",
+      governs: [
+        "The north star",
+        "The question framework",
+        "The Inquiry model",
+        "Evidence and truth",
+        "Product and experience architecture",
+        "Community and memory",
+      ],
+      shapedBy: [
+        "Institute public language",
+        "Inquiry Workbench method",
+        "Evidence Room restraint",
+        "Relationship Curator judgment",
+      ],
+      restraint:
+        "Public because it defines the institution. It should remain readable, stable, and careful.",
+      entries: bookOneEntries,
+    },
+    {
+      key: "book-two",
+      label: "Book Two",
+      title: "WAKILISHA Becomes the Institute",
+      status: "internal",
+      stage: "Internal operating shift",
+      route: null,
+      startLabel: "Not public yet",
+      description:
+        "The transformation layer. It explains why every WAKILISHA surface is an Institute surface and how public work should carry method.",
+      governs: [
+        "Institute identity",
+        "Surface purpose",
+        "Copy as guidance",
+        "Admin screens as method",
+        "Public trust",
+      ],
+      shapedBy: [
+        "Institute homepage direction",
+        "Admin redesign correction pass",
+        "Library restraint",
+        "Future public Inquiry surfaces",
+      ],
+      restraint:
+        "Internal until the product surfaces can prove the method without turning the book into marketing copy.",
+      entries: [],
+    },
+    {
+      key: "book-three",
+      label: "Book Three",
+      title: "Inquiry Operating System",
+      status: "internal",
+      stage: "Build guide",
+      route: null,
+      startLabel: "Not public yet",
+      description:
+        "The operating layer. It explains how Inquiries, evidence, relationships, contributors, review, and future AI should work together.",
+      governs: [
+        "Inquiry Workbench",
+        "Evidence Room",
+        "Contributor Desk",
+        "Relationship Curator",
+        "Review decisions",
+        "Future AI memory",
+      ],
+      shapedBy: [
+        "PR3R.2 Inquiry Workbench redesign",
+        "PR4R.1 Evidence Room redesign",
+        "PR4R.2 Contributor Desk redesign",
+        "PR5R.1 Relationship Curator redesign",
+      ],
+      restraint:
+        "Internal until the tools are usable enough to teach the method by doing, not by promising.",
+      entries: [],
+    },
+  ];
 }
 
 export function getPublicLibraryEntryNavigation(
