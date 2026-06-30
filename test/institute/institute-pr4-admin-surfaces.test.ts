@@ -9,7 +9,7 @@ const evidenceDetail = readFileSync(resolve(process.cwd(), "src/pages/admin/inst
 const contributors = readFileSync(resolve(process.cwd(), "src/pages/admin/institute/contributors/page.tsx"), "utf8");
 
 describe("Institute PR4 admin surfaces", () => {
-  it("registers Evidence Locker and Contributor Desk admin routes", () => {
+  it("registers Evidence Room and Contributor Desk admin routes", () => {
     expect(router).toContain("AdminInstituteEvidencePage");
     expect(router).toContain("AdminInstituteEvidenceDetailPage");
     expect(router).toContain("AdminInstituteContributorsPage");
@@ -18,14 +18,14 @@ describe("Institute PR4 admin surfaces", () => {
     expect(router).toContain('{ path: "contributors", element: <AdminInstituteContributorsPage /> }');
   });
 
-  it("adds Evidence Locker and Contributor Desk to the admin sidebar", () => {
+  it("adds Evidence Room and Contributor Desk to the admin sidebar", () => {
     expect(shell).toContain('/admin/institute/evidence');
-    expect(shell).toContain('label: "Evidence Locker"');
+    expect(shell).toContain('label: "Evidence Room"');
     expect(shell).toContain('/admin/institute/contributors');
     expect(shell).toContain('label: "Contributor Desk"');
   });
 
-  it("Evidence Locker supports list, create, detail, review, and retrieval actions", () => {
+  it("Evidence Room supports list, create, detail, review, and retrieval actions", () => {
     expect(evidenceList).toContain("listEvidenceItems");
     expect(evidenceList).toContain("createEvidenceItem");
     expect(evidenceList).toContain("linkEvidenceToInquiry");

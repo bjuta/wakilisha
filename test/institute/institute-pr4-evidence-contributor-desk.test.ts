@@ -10,7 +10,7 @@ const migration = readFileSync(
 const service = readFileSync(resolve(process.cwd(), "src/services/institute/instituteService.ts"), "utf8");
 const types = readFileSync(resolve(process.cwd(), "src/services/institute/instituteTypes.ts"), "utf8");
 
-describe("Institute PR4 Evidence Locker and Contributor Desk foundation", () => {
+describe("Institute PR4 Evidence Room and Contributor Desk foundation", () => {
   it("adds conversion RPCs for contributor submissions", () => {
     expect(migration).toContain("create or replace function public.institute_accept_submission_as_evidence");
     expect(migration).toContain("create or replace function public.institute_accept_submission_as_memory");
@@ -32,7 +32,7 @@ describe("Institute PR4 Evidence Locker and Contributor Desk foundation", () => 
     expect(migration).toContain("'memory'");
   });
 
-  it("adds Evidence Locker and Contributor Desk service helpers", () => {
+  it("adds Evidence Room and Contributor Desk service helpers", () => {
     expect(types).toContain("UpdateEvidenceItemInput");
     expect(service).toContain("listEvidenceItems");
     expect(service).toContain("getEvidenceItem");

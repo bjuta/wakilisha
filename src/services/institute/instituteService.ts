@@ -217,6 +217,21 @@ export async function listInquiryEvidenceLinks(inquiryId: string): Promise<Inqui
   return (data ?? []) as InquiryEvidenceLink[];
 }
 
+export async function listEvidenceInquiryLinks(evidenceId: string): Promise<InquiryEvidenceLink[]> {
+  if (!evidenceId) {
+    throw new Error("List evidence Inquiry links failed: evidenceId is required.");
+  }
+
+  const { data, error } = await supabase
+    .from("inquiry_evidence")
+    .select("*, inquiry:inquiries(*)")
+    .eq("evidence_id", evidenceId)
+    .order("created_at", { ascending: false });
+
+  if (error) raiseSupabaseError(error, "List evidence Inquiry links");
+  return (data ?? []) as InquiryEvidenceLink[];
+}
+
 export async function createCulturalEntityReference(input: CreateCulturalEntityInput): Promise<CulturalEntity> {
   return insertOne<CulturalEntity>("cultural_entities", input, "Create cultural entity reference");
 }

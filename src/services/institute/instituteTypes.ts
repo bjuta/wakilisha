@@ -230,6 +230,7 @@ export interface InquiryEvidenceLink {
   added_by: string | null;
   created_at: string;
   evidence?: EvidenceItem | null;
+  inquiry?: Inquiry | null;
 }
 
 export interface EvidenceItem {
