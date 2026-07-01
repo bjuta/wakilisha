@@ -118,6 +118,9 @@ import AdminApiDocsPage from "../pages/admin/api-docs/page";
 // Admin Community Moderation
 import AdminCommunityPage from "../pages/admin/community/page";
 
+// Admin Institute Lab
+import AdminInquiryInterfacePage from "../pages/admin/lab/inquiry-interface/page";
+
 // Public API Docs
 import PublicApiDocsPage from "../pages/api-docs/page";
 
@@ -283,6 +286,7 @@ const routes: RouteObject[] = [
       { index: true, element: <AdminDashboardPage /> },
       { path: "analytics", element: <AdminAnalyticsPage /> },
       { path: "community", element: <AdminCommunityPage /> },
+      { path: "lab/inquiry-interface", element: <AdminInquiryInterfacePage /> },
       {
         path: "content",
         element: <AdminContentLayout />,

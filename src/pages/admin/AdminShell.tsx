@@ -17,6 +17,9 @@ const NAV_GROUPS: NavGroup[] = [
     { path: "/admin", label: "Overview", icon: "LayoutDashboard", requiredCapability: "view_dashboard" },
     { path: "/admin/analytics", label: "Analytics", icon: "BarChart3", requiredCapability: "view_dashboard" },
   ] },
+  { label: "Institute", visible: (can) => can("view_dashboard") || can("view_admin_readonly"), items: [
+    { path: "/admin/lab/inquiry-interface", label: "Inquiry Lab", icon: "BookOpen" },
+  ] },
   { label: "Community", visible: (can) => can("moderate_community"), items: [
     { path: "/admin/community", label: "Moderation", icon: "MessageSquare", requiredCapability: "moderate_community", badgeKey: "pendingReports" },
   ] },
