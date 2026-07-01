@@ -16,7 +16,7 @@ export const navigatePromise = new Promise<NavigateFunction>((resolve) => {
 });
 
 export function AppRoutes() {
-  const element = useRoutes(routes);
+  const element = useRoutes([...routes]);
   const navigate = useNavigate();
   useEffect(() => {
     window.REACT_APP_NAVIGATE = navigate;
