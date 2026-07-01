@@ -1,6 +1,7 @@
 import { useNavigate, type NavigateFunction } from "react-router-dom";
 import { useRoutes } from "react-router-dom";
 import { createElement, useEffect } from "react";
+import { AdminShell } from "../pages/admin/AdminShell";
 import AdminInquiryInterfacePage from "../pages/admin/lab/inquiry-interface/page";
 import routes from "./config";
 
@@ -22,6 +23,7 @@ export const navigatePromise = new Promise<NavigateFunction>((resolve) => {
 });
 
 export function AppRoutes() {
+  void AdminShell;
   const element = useRoutes([labRoute, ...routes]);
   const navigate = useNavigate();
   useEffect(() => {
