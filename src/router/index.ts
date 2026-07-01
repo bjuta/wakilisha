@@ -1,6 +1,7 @@
 import { useNavigate, type NavigateFunction } from "react-router-dom";
 import { useRoutes } from "react-router-dom";
 import { createElement, useEffect } from "react";
+import AdminInquiryInterfacePage from "../pages/admin/lab/inquiry-interface/page";
 import routes from "./config";
 
 let navigateResolver: (navigate: ReturnType<typeof useNavigate>) => void;
