@@ -6,8 +6,11 @@ import AdminInquiryInterfacePage from "../pages/admin/lab/inquiry-interface/page
 import routes from "./config";
 
 const labRoute = {
-  path: "/admin/lab/inquiry-interface",
-  element: createElement(AdminInquiryInterfacePage),
+  path: "/admin",
+  element: createElement(AdminShell),
+  children: [
+    { path: "lab/inquiry-interface", element: createElement(AdminInquiryInterfacePage) },
+  ],
 };
 
 let navigateResolver: (navigate: ReturnType<typeof useNavigate>) => void;
@@ -23,7 +26,6 @@ export const navigatePromise = new Promise<NavigateFunction>((resolve) => {
 });
 
 export function AppRoutes() {
-  void AdminShell;
   const element = useRoutes([labRoute, ...routes]);
   const navigate = useNavigate();
   useEffect(() => {
