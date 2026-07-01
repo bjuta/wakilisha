@@ -1,8 +1,15 @@
 import { createElement, useState } from "react";
+import { useAdminUser } from "@/hooks/useAdminUser";
+import { roleCanAccessAdmin } from "@/services/userRoles";
 import { seedInquiry } from "./seed";
 
 export default function AdminInquiryInterfacePage() {
+  const user = useAdminUser();
   const [question, setQuestion] = useState(seedInquiry.question);
+
+  if (user.loading || !user.id || !roleCanAccessAdmin(user.role)) {
+    return createElement("div", { className: "p-6 text-wk-text" }, "Admin access needed");
+  }
 
   return createElement(
     "div",
