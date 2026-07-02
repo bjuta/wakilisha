@@ -94,6 +94,15 @@ const setupOptions = {
   draftTimers: ["10 sec", "30 sec", "60 sec", "Off"],
 };
 
+
+function stripLegacyInstituteHash() {
+  if (typeof window === "undefined") return;
+  if (window.location.pathname !== "/admin/institute/inquiry-interface") return;
+  if (!window.location.hash.startsWith("#/")) return;
+
+  window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
+}
+
 function makeId() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
   return `local-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -1312,6 +1321,10 @@ function LockedScreen({ screen }: { screen: InquiryScreen }) {
 }
 
 export default function NativeInstituteInquiryInterface() {
+  useEffect(() => {
+    stripLegacyInstituteHash();
+  }, []);
+
   const { anchors, loading: anchorsLoading, error: anchorsError } = useRegistryAnchors();
   const { drafts, addDraft, updateDraft } = useLocalDrafts();
   const [state, setRawState] = useState<InstituteState>({
