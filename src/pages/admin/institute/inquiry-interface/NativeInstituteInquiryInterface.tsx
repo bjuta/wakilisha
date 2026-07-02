@@ -9,6 +9,7 @@ import {
   useInstituteAnchorSearch,
 } from "./useInstituteAnchorSearch";
 import type {
+  AnchorContextItem,
   EvidenceItem,
   EvidenceKind,
   InquiryDraft,
@@ -260,6 +261,7 @@ function Rail({
 }) {
   const inquiryNav: Array<{ screen: InquiryScreen; label: string; badge?: string; disabled?: boolean }> = [
     { screen: "workbench", label: "Workbench" },
+    { screen: "anchorBrief", label: "Anchor brief", badge: active?.anchorContextSnapshot ? "ready" : "none" },
     { screen: "evidence", label: "Evidence", badge: "soon", disabled: true },
     { screen: "claims", label: "Claims", disabled: true },
     { screen: "relationships", label: "Relationships", disabled: true },
@@ -1087,6 +1089,160 @@ function WorkbenchScreen({
   );
 }
 
+function BriefItemList({
+  title,
+  items,
+  empty,
+}: {
+  title: string;
+  items: AnchorContextItem[];
+  empty: string;
+}) {
+  return (
+    <div className="rounded-xl border border-wk-border bg-wk-surface p-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h3 className="text-[14px] font-black text-wk-text">{title}</h3>
+        <Chip>{items.length}</Chip>
+      </div>
+
+      {items.length ? (
+        <div className="space-y-3">
+          {items.map((item, index) => (
+            <article key={`${item.title}-${index}`} className="rounded-lg border border-wk-border bg-wk-bg-subtle p-3">
+              <div className="text-[12px] font-black text-wk-text">{item.title}</div>
+              <p className="mt-1 text-[12px] leading-5 text-wk-text-muted">{item.body}</p>
+              {item.source ? (
+                <div className="mt-2 text-[10px] font-black uppercase tracking-[0.14em] text-wk-text-faint">
+                  Source: {item.source}
+                </div>
+              ) : null}
+            </article>
+          ))}
+        </div>
+      ) : (
+        <EmptyState title="Nothing here yet" body={empty} />
+      )}
+    </div>
+  );
+}
+
+function AnchorBriefScreen({ draft }: { draft: InquiryDraft | null }) {
+  if (!draft) {
+    return (
+      <div className="mx-auto max-w-[1000px]">
+        <Panel eyebrow="Anchor Brief" title="No Active Inquiry">
+          <EmptyState title="Nothing to brief yet" body="Create or select an Inquiry first." />
+        </Panel>
+      </div>
+    );
+  }
+
+  if (!draft.anchor) {
+    return (
+      <div className="mx-auto max-w-[1000px]">
+        <Panel eyebrow={`${draft.code} · Anchor Brief`} title="No anchor attached">
+          <EmptyState
+            title="This Inquiry started without a registry anchor"
+            body="Use the Workbench and Evidence surfaces to frame it manually. Anchor suggestions come later."
+          />
+        </Panel>
+      </div>
+    );
+  }
+
+  const snapshot = draft.anchorContextSnapshot;
+
+  return (
+    <div className="mx-auto max-w-[1180px] space-y-5">
+      <section className="rounded-[22px] border border-wk-border bg-wk-surface p-6 shadow-sm lg:p-7">
+        <div className="text-[10px] font-black uppercase tracking-[0.24em] text-wk-brand">
+          {draft.code} · Anchor Brief
+        </div>
+
+        <div className="mt-4 grid gap-4 lg:grid-cols-[220px_1fr]">
+          <div className="overflow-hidden rounded-xl border border-wk-border bg-wk-bg-subtle">
+            {draft.anchor.imageUrl ? (
+              <img src={draft.anchor.imageUrl} alt="" className="h-44 w-full object-cover" />
+            ) : (
+              <div className="flex h-44 items-center justify-center text-[11px] font-black uppercase tracking-[0.16em] text-wk-text-faint">
+                No image
+              </div>
+            )}
+          </div>
+
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Chip tone="brand">{draft.anchor.type}</Chip>
+              {snapshot ? <Chip tone="success">Snapshot ready</Chip> : <Chip tone="warning">No snapshot</Chip>}
+            </div>
+
+            <h1 className="mt-3 text-[34px] font-black leading-[1.02] tracking-[-0.065em] text-wk-text lg:text-[40px]">
+              {draft.anchor.label}
+            </h1>
+
+            <p className="mt-2 max-w-3xl text-[14px] leading-6 text-wk-text-muted">
+              {draft.anchor.contextText || draft.anchor.subtitle}
+            </p>
+
+            {snapshot ? (
+              <p className="mt-3 text-[12px] leading-5 text-wk-text-muted">
+                Captured {new Date(snapshot.createdAt).toLocaleString()} as snapshot v{snapshot.snapshotVersion}.
+              </p>
+            ) : (
+              <p className="mt-3 text-[12px] leading-5 text-wk-text-muted">
+                This Inquiry has an anchor but no captured context snapshot yet. Create a new anchored Inquiry after PR4 deployment, or add a backfill later.
+              </p>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {snapshot ? (
+        <>
+          <div className="grid gap-3 md:grid-cols-4">
+            <div className="rounded-xl border border-wk-border bg-wk-surface p-4">
+              <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Knowns</div>
+              <div className="mt-2 text-[26px] font-black tracking-[-0.05em] text-wk-text">{snapshot.knowns.length}</div>
+            </div>
+            <div className="rounded-xl border border-wk-border bg-wk-surface p-4">
+              <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Unknowns</div>
+              <div className="mt-2 text-[26px] font-black tracking-[-0.05em] text-wk-text">{snapshot.unknowns.length}</div>
+            </div>
+            <div className="rounded-xl border border-wk-border bg-wk-surface p-4">
+              <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Evidence gaps</div>
+              <div className="mt-2 text-[26px] font-black tracking-[-0.05em] text-wk-text">{snapshot.evidenceGaps.length}</div>
+            </div>
+            <div className="rounded-xl border border-wk-border bg-wk-surface p-4">
+              <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Relationship leads</div>
+              <div className="mt-2 text-[26px] font-black tracking-[-0.05em] text-wk-text">{snapshot.relationshipLeads.length}</div>
+            </div>
+          </div>
+
+          <div className="grid gap-5 lg:grid-cols-2">
+            <BriefItemList title="What this anchor already gives us" items={snapshot.knowns} empty="No knowns were captured." />
+            <BriefItemList title="What is still unknown" items={snapshot.unknowns} empty="No unknowns were captured." />
+            <BriefItemList title="Evidence gaps to fill" items={snapshot.evidenceGaps} empty="No evidence gaps were captured." />
+            <BriefItemList title="Relationship leads" items={snapshot.relationshipLeads} empty="No relationship leads were captured." />
+          </div>
+
+          {snapshot.thinDataNotes.length ? (
+            <Panel eyebrow="Data Quality" title="Thin data notes">
+              <BriefItemList title="Things to improve" items={snapshot.thinDataNotes} empty="No thin data notes were captured." />
+            </Panel>
+          ) : null}
+        </>
+      ) : (
+        <Panel title="No captured snapshot yet">
+          <EmptyState
+            title="Anchor exists, but the brief has no saved snapshot"
+            body="This usually means the Inquiry was created before snapshot capture existed. A backfill can handle older Inquiries later."
+          />
+        </Panel>
+      )}
+    </div>
+  );
+}
+
 function EvidenceScreen({
   draft,
   updateDraft,
@@ -1357,6 +1513,7 @@ function LockedScreen({ screen }: { screen: InquiryScreen }) {
   const labels: Record<InquiryScreen, string> = {
     home: "Home",
     workbench: "Workbench",
+    anchorBrief: "Anchor Brief",
     evidence: "Evidence",
     claims: "Claims",
     relationships: "Relationships",
@@ -1447,6 +1604,8 @@ export default function NativeInstituteInquiryInterface() {
             />
           ) : state.screen === "workbench" ? (
             <WorkbenchScreen draft={active} updateDraft={updateActiveDraft} />
+          ) : state.screen === "anchorBrief" ? (
+            <AnchorBriefScreen draft={active} />
           ) : state.screen === "evidence" ? (
             <EvidenceScreen draft={active} updateDraft={updateActiveDraft} />
           ) : (

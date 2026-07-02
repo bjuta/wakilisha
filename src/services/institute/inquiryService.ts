@@ -1,5 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import type {
+  AnchorContextItem,
+  AnchorContextSnapshot,
   InquiryDraft,
   InquirySetup,
   RegistryAnchor,
@@ -45,6 +47,24 @@ type WorkbenchSetupRow = {
 type QuestionVersionRow = {
   inquiry_id: string;
   version_number: number;
+};
+
+type AnchorContextSnapshotRow = {
+  id: string;
+  inquiry_id: string;
+  snapshot_version: number;
+  anchor_entity_type: string;
+  anchor_slug: string | null;
+  anchor_label: string;
+  source_context: Record<string, unknown> | null;
+  knowns: AnchorContextItem[] | null;
+  unknowns: AnchorContextItem[] | null;
+  relationship_leads: AnchorContextItem[] | null;
+  evidence_gaps: AnchorContextItem[] | null;
+  related_entities: AnchorContextItem[] | null;
+  thin_data_notes: AnchorContextItem[] | null;
+  source_references: Array<Record<string, unknown>> | null;
+  created_at: string;
 };
 
 function nowIso() {
@@ -279,11 +299,33 @@ async function createAnchorContextSnapshot(
   if (error) throw error;
 }
 
+function mapSnapshot(row: AnchorContextSnapshotRow | undefined): AnchorContextSnapshot | null {
+  if (!row) return null;
+
+  return {
+    id: row.id,
+    snapshotVersion: row.snapshot_version,
+    anchorEntityType: normalizeAnchorType(row.anchor_entity_type),
+    anchorSlug: row.anchor_slug,
+    anchorLabel: row.anchor_label,
+    sourceContext: row.source_context ?? {},
+    knowns: Array.isArray(row.knowns) ? row.knowns : [],
+    unknowns: Array.isArray(row.unknowns) ? row.unknowns : [],
+    relationshipLeads: Array.isArray(row.relationship_leads) ? row.relationship_leads : [],
+    evidenceGaps: Array.isArray(row.evidence_gaps) ? row.evidence_gaps : [],
+    relatedEntities: Array.isArray(row.related_entities) ? row.related_entities : [],
+    thinDataNotes: Array.isArray(row.thin_data_notes) ? row.thin_data_notes : [],
+    sourceReferences: Array.isArray(row.source_references) ? row.source_references : [],
+    createdAt: row.created_at,
+  };
+}
+
 function normalizeInquiry(
   row: InquiryRow,
   anchorByInquiryId: Map<string, AnchorRow>,
   setupByInquiryId: Map<string, WorkbenchSetupRow>,
   versionCountByInquiryId: Map<string, number>,
+  snapshotByInquiryId: Map<string, AnchorContextSnapshotRow>,
   defaultSetup: InquirySetup,
 ): InquiryDraft {
   const anchor = mapAnchor(anchorByInquiryId.get(row.id));
@@ -294,6 +336,7 @@ function normalizeInquiry(
     rawQuestion: row.raw_question,
     workingQuestion: row.current_question,
     anchor,
+    anchorContextSnapshot: mapSnapshot(snapshotByInquiryId.get(row.id)),
     featuredImageUrl: row.featured_image_url ?? "",
     featuredImageAlt: row.featured_image_alt ?? "",
     featuredImageCredit: row.featured_image_credit ?? "",
@@ -322,7 +365,7 @@ export async function listInstituteInquiries(defaultSetup: InquirySetup): Promis
 
   if (!inquiryIds.length) return [];
 
-  const [{ data: anchorRows }, { data: setupRows }, { data: versionRows }] = await Promise.all([
+  const [{ data: anchorRows }, { data: setupRows }, { data: versionRows }, { data: snapshotRows }] = await Promise.all([
     supabase
       .from("institute_inquiry_anchors")
       .select("inquiry_id, anchor_entity_type, anchor_slug, anchor_label, anchor_image_url, anchor_metadata, is_primary, status")
@@ -337,6 +380,11 @@ export async function listInstituteInquiries(defaultSetup: InquirySetup): Promis
       .from("institute_question_versions")
       .select("inquiry_id, version_number")
       .in("inquiry_id", inquiryIds),
+    supabase
+      .from("institute_anchor_context_snapshots")
+      .select("id, inquiry_id, snapshot_version, anchor_entity_type, anchor_slug, anchor_label, source_context, knowns, unknowns, relationship_leads, evidence_gaps, related_entities, thin_data_notes, source_references, created_at")
+      .in("inquiry_id", inquiryIds)
+      .order("created_at", { ascending: false }),
   ]);
 
   const anchorByInquiryId = new Map<string, AnchorRow>();
@@ -354,8 +402,13 @@ export async function listInstituteInquiries(defaultSetup: InquirySetup): Promis
     versionCountByInquiryId.set(version.inquiry_id, Math.max(versionCountByInquiryId.get(version.inquiry_id) ?? 0, version.version_number));
   });
 
+  const snapshotByInquiryId = new Map<string, AnchorContextSnapshotRow>();
+  ((snapshotRows ?? []) as AnchorContextSnapshotRow[]).forEach((snapshot) => {
+    if (!snapshotByInquiryId.has(snapshot.inquiry_id)) snapshotByInquiryId.set(snapshot.inquiry_id, snapshot);
+  });
+
   return inquiries.map((row) =>
-    normalizeInquiry(row, anchorByInquiryId, setupByInquiryId, versionCountByInquiryId, defaultSetup),
+    normalizeInquiry(row, anchorByInquiryId, setupByInquiryId, versionCountByInquiryId, snapshotByInquiryId, defaultSetup),
   );
 }
 
@@ -460,8 +513,9 @@ export async function createInstituteInquiry(
 
   const setupByInquiryId = new Map<string, WorkbenchSetupRow>();
   const versionCountByInquiryId = new Map<string, number>([[inquiryRow.id, 1]]);
+  const snapshotByInquiryId = new Map<string, AnchorContextSnapshotRow>();
 
-  return normalizeInquiry(inquiryRow, anchorByInquiryId, setupByInquiryId, versionCountByInquiryId, defaultSetup);
+  return normalizeInquiry(inquiryRow, anchorByInquiryId, setupByInquiryId, versionCountByInquiryId, snapshotByInquiryId, defaultSetup);
 }
 
 export async function updateInstituteInquiry(
