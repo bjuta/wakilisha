@@ -373,6 +373,92 @@ export function ArticleEditorWorkspace({
     }));
   }
 
+
+  function normalizeTextForCompare(value: unknown): string {
+    return value == null ? "" : String(value).trim();
+  }
+
+  function normalizeListForCompare(value: unknown): string[] {
+    if (!Array.isArray(value)) return [];
+    return value
+      .map((item) => {
+        if (typeof item === "string") return item;
+        if (item && typeof item === "object" && "name" in item) {
+          return String((item as { name?: unknown }).name ?? "");
+        }
+        return String(item ?? "");
+      })
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .sort();
+  }
+
+  function articleSavedFingerprint(source: AdminArticleDetail) {
+    return JSON.stringify({
+      title: normalizeTextForCompare(source.title),
+      excerpt: normalizeTextForCompare(source.excerpt),
+      contentHtml: normalizeTextForCompare(source.contentHtml),
+      author: normalizeTextForCompare(source.author),
+      categories: normalizeListForCompare(source.categories),
+      tags: normalizeListForCompare(source.tags),
+      publishedAt: normalizeTextForCompare(source.publishedAt),
+      wpStatus: normalizeTextForCompare(source.wpStatus),
+      heroImageUrl: normalizeTextForCompare(source.heroImageUrl),
+    });
+  }
+
+  function draftSaveFingerprint(currentDraft: Draft, expectedStatus: string | null | undefined, expectedPublishedAt: string | null | undefined) {
+    return JSON.stringify({
+      title: normalizeTextForCompare(currentDraft.title),
+      excerpt: normalizeTextForCompare(currentDraft.excerpt),
+      contentHtml: normalizeTextForCompare(currentDraft.content),
+      author: normalizeTextForCompare(currentDraft.author),
+      categories: normalizeListForCompare(currentDraft.categories),
+      tags: normalizeListForCompare(currentDraft.tags),
+      publishedAt: normalizeTextForCompare(expectedPublishedAt ?? currentDraft.publishedAt),
+      wpStatus: normalizeTextForCompare(expectedStatus),
+    });
+  }
+
+  function articleMatchesDraftSave(
+    freshArticle: AdminArticleDetail,
+    currentDraft: Draft,
+    expectedStatus: string | null | undefined,
+    expectedPublishedAt: string | null | undefined,
+  ) {
+    const articleComparable = JSON.stringify({
+      title: normalizeTextForCompare(freshArticle.title),
+      excerpt: normalizeTextForCompare(freshArticle.excerpt),
+      contentHtml: normalizeTextForCompare(freshArticle.contentHtml),
+      author: normalizeTextForCompare(freshArticle.author),
+      categories: normalizeListForCompare(freshArticle.categories),
+      tags: normalizeListForCompare(freshArticle.tags),
+      publishedAt: normalizeTextForCompare(expectedPublishedAt ?? freshArticle.publishedAt),
+      wpStatus: normalizeTextForCompare(expectedStatus ?? freshArticle.wpStatus),
+    });
+
+    return articleComparable === draftSaveFingerprint(currentDraft, expectedStatus, expectedPublishedAt);
+  }
+
+  function applyServerArticleState(freshArticle: AdminArticleDetail, resetDraft = true) {
+    articleUpdatedAtRef.current = freshArticle.updatedAt ?? null;
+    setArticle(freshArticle);
+    setPreviewNonce(freshArticle.previewNonce ?? null);
+
+    if (resetDraft) {
+      setDraft({
+        title: freshArticle.title,
+        excerpt: freshArticle.excerpt,
+        content: freshArticle.contentHtml,
+        author: freshArticle.author,
+        categories: freshArticle.categories,
+        tags: freshArticle.tags,
+        publishedAt: freshArticle.publishedAt,
+        seo: freshArticle.seo,
+      });
+    }
+  }
+
   /* ─── Save helpers ─── */
 
   function buildSavePayload(extraFields: Partial<ArticleSavePayload> = {}): ArticleSavePayload {
@@ -392,58 +478,115 @@ export function ArticleEditorWorkspace({
   async function saveToSupabase(extraFields: Partial<ArticleSavePayload> = {}, forceOverwrite = false): Promise<boolean> {
     if (!article) return false;
 
+    const currentArticle = article;
+    const currentDraft: Draft = {
+      title: draft.title,
+      excerpt: draft.excerpt,
+      content: draft.content,
+      author: draft.author,
+      categories: [...draft.categories],
+      tags: [...draft.tags],
+      publishedAt: draft.publishedAt,
+      seo: { ...draft.seo },
+    };
+
     const payload = buildSavePayload(extraFields);
-    const lockTimestamp = forceOverwrite ? null : articleUpdatedAtRef.current;
-    const result = await saveArticle(article.id, payload, lockTimestamp);
+    const expectedStatus = (extraFields.wp_status as string | undefined) ?? currentArticle.wpStatus;
+    const expectedPublishedAt = (extraFields.published_at as string | undefined) ?? currentDraft.publishedAt;
+    let lockTimestamp = forceOverwrite ? null : articleUpdatedAtRef.current;
+
+    let result = await saveArticle(currentArticle.id, payload, lockTimestamp);
+
+    if (!result.ok && result.errorCode === "stale_update" && !forceOverwrite) {
+      const freshArticle = await fetchArticleForAdmin(currentArticle.slug);
+
+      if (freshArticle) {
+        if (articleMatchesDraftSave(freshArticle, currentDraft, expectedStatus, expectedPublishedAt)) {
+          applyServerArticleState(freshArticle, true);
+          setIsDirty(false);
+          lastAutosavedContentRef.current = currentDraft.content + currentDraft.title + currentDraft.excerpt;
+          return true;
+        }
+
+        const serverStillMatchesOurLastSavedArticle =
+          articleSavedFingerprint(freshArticle) === articleSavedFingerprint(currentArticle);
+
+        if (serverStillMatchesOurLastSavedArticle) {
+          applyServerArticleState(freshArticle, false);
+          lockTimestamp = freshArticle.updatedAt ?? null;
+          result = await saveArticle(currentArticle.id, payload, lockTimestamp);
+
+          if (!result.ok && result.errorCode === "stale_update") {
+            const afterRetry = await fetchArticleForAdmin(currentArticle.slug);
+            if (afterRetry && articleMatchesDraftSave(afterRetry, currentDraft, expectedStatus, expectedPublishedAt)) {
+              applyServerArticleState(afterRetry, true);
+              setIsDirty(false);
+              lastAutosavedContentRef.current = currentDraft.content + currentDraft.title + currentDraft.excerpt;
+              return true;
+            }
+          }
+        } else {
+          setConflictError(result.error ?? "This article was modified by someone else while you were editing.");
+          setPendingConflictPayload(extraFields);
+          setShowConflict(true);
+          return false;
+        }
+      }
+    }
 
     if (!result.ok) {
       if (result.errorCode === "stale_update" && !forceOverwrite) {
-        // Show conflict dialog
         setConflictError(result.error ?? "This article was modified by someone else while you were editing.");
         setPendingConflictPayload(extraFields);
         setShowConflict(true);
         return false;
       }
+
       addToast("error", result.error ?? "Save failed.");
       return false;
     }
 
-    // Create revision snapshot
-    const newStatus = (extraFields.wp_status as string | undefined) ?? article.wpStatus;
+    const newStatus = (extraFields.wp_status as string | undefined) ?? currentArticle.wpStatus;
+
     await createRevision({
-      articleId: article.id,
+      articleId: currentArticle.id,
       revisionNumber: 0,
-      title: draft.title || null,
-      excerpt: draft.excerpt || null,
-      contentHtml: draft.content || null,
-      author: draft.author || null,
-      categories: draft.categories,
-      tags: draft.tags,
-      seo: draft.seo,
-      publishedAt: draft.publishedAt || null,
+      title: currentDraft.title || null,
+      excerpt: currentDraft.excerpt || null,
+      contentHtml: currentDraft.content || null,
+      author: currentDraft.author || null,
+      categories: currentDraft.categories,
+      tags: currentDraft.tags,
+      seo: currentDraft.seo,
+      publishedAt: currentDraft.publishedAt || null,
       wpStatus: newStatus ?? null,
       createdBy: "manual_save",
     });
 
-    // Update optimistic lock
-    articleUpdatedAtRef.current = new Date().toISOString();
+    const refreshedArticle = await fetchArticleForAdmin(currentArticle.slug);
 
-    // Refresh local article state
-    setArticle((prev) =>
-      prev
-        ? {
-            ...prev,
-            title: draft.title,
-            excerpt: draft.excerpt,
-            contentHtml: draft.content,
-            author: draft.author,
-            categories: draft.categories,
-            tags: draft.tags,
-            publishedAt: payload.published_at ?? prev.publishedAt,
-            wpStatus: newStatus ?? prev.wpStatus,
-          }
-        : prev
-    );
+    if (refreshedArticle) {
+      applyServerArticleState(refreshedArticle, true);
+    } else {
+      articleUpdatedAtRef.current = null;
+      setArticle((prev) =>
+        prev
+          ? {
+              ...prev,
+              title: currentDraft.title,
+              excerpt: currentDraft.excerpt,
+              contentHtml: currentDraft.content,
+              author: currentDraft.author,
+              categories: currentDraft.categories,
+              tags: currentDraft.tags,
+              publishedAt: payload.published_at ?? prev.publishedAt,
+              wpStatus: newStatus ?? prev.wpStatus,
+            }
+          : prev,
+      );
+    }
+
+    lastAutosavedContentRef.current = currentDraft.content + currentDraft.title + currentDraft.excerpt;
     setIsDirty(false);
     return true;
   }
@@ -612,13 +755,18 @@ export function ArticleEditorWorkspace({
         return;
       }
 
-      articleUpdatedAtRef.current = new Date().toISOString();
+      const refreshedArticle = await fetchArticleForAdmin(article.slug);
+      if (refreshedArticle) {
+        applyServerArticleState(refreshedArticle, false);
+      } else {
+        articleUpdatedAtRef.current = null;
+        setArticle((prev) => (prev ? { ...prev, heroImageUrl: url || "" } : prev));
+      }
 
       if (url) {
         await saveHeroToMediaLibrary(article.slug, draft.title, url);
       }
 
-      setArticle((prev) => (prev ? { ...prev, heroImageUrl: url || "" } : prev));
       addToast("success", url ? "Hero image saved to media library." : "Hero image removed.");
     } finally {
       setIsSavingHero(false);
