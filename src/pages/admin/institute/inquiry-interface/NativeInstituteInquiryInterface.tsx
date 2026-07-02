@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import {
+  createInstituteInquiry,
+  listInstituteInquiries,
+  updateInstituteInquiry,
+} from "@/services/institute/inquiryService";
 import type {
   EvidenceItem,
   EvidenceKind,
@@ -11,7 +16,6 @@ import type {
   ReviewState,
 } from "./types";
 
-const STORAGE_KEY = "wk_institute_native_inquiry_drafts_v1";
 
 const defaultSetup: InquirySetup = {
   inquiryType: "Explain a cultural shift",
@@ -108,38 +112,11 @@ function makeId() {
   return `local-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-function makeCode(count: number) {
-  return `Inquiry ${String(count + 1).padStart(4, "0")}`;
-}
 
 function nowDate() {
   return new Date().toISOString();
 }
 
-function readDrafts(): InquiryDraft[] {
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-
-    return parsed.map((draft) => ({
-      ...draft,
-      featuredImageUrl: typeof draft.featuredImageUrl === "string" ? draft.featuredImageUrl : "",
-      featuredImageAlt: typeof draft.featuredImageAlt === "string" ? draft.featuredImageAlt : "",
-      featuredImageCredit: typeof draft.featuredImageCredit === "string" ? draft.featuredImageCredit : "",
-      featuredImageSource: typeof draft.featuredImageSource === "string" ? draft.featuredImageSource : "Not set",
-      setup: { ...defaultSetup, ...(draft.setup ?? {}) },
-      evidence: Array.isArray(draft.evidence) ? draft.evidence : [],
-    })) as InquiryDraft[];
-  } catch {
-    return [];
-  }
-}
-
-function writeDrafts(drafts: InquiryDraft[]) {
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(drafts));
-}
 
 function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
@@ -256,51 +233,69 @@ function useRegistryAnchors() {
   return { anchors, loading, error };
 }
 
-function useLocalDrafts() {
-  const [drafts, setDrafts] = useState<InquiryDraft[]>([]);
+
+function useSupabaseInquiries() {
+  const [inquiries, setInquiries] = useState<InquiryDraft[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const loadInquiries = async () => {
+    setLoading(true);
+    setError("");
+
+    try {
+      const rows = await listInstituteInquiries(defaultSetup);
+      setInquiries(rows);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to load Institute inquiries.";
+      setError(message);
+      setInquiries([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    setDrafts(readDrafts());
+    void loadInquiries();
   }, []);
 
-  const persist = (next: InquiryDraft[]) => {
-    setDrafts(next);
-    writeDrafts(next);
+  const addInquiry = async (question: string, anchor: RegistryAnchor | null) => {
+    const inquiry = await createInstituteInquiry(question, anchor, defaultSetup);
+    setInquiries((current) => [inquiry, ...current.filter((item) => item.id !== inquiry.id)]);
+    return inquiry;
   };
 
-  const addDraft = (question: string, anchor: RegistryAnchor | null) => {
-    const existing = readDrafts();
-    const createdAt = nowDate();
-    const draft: InquiryDraft = {
-      id: makeId(),
-      code: makeCode(existing.length),
-      rawQuestion: question,
-      workingQuestion: question,
-      anchor,
-      featuredImageUrl: anchor?.imageUrl ?? "",
-      featuredImageAlt: anchor?.imageUrl ? `${anchor.label} registry image` : "",
-      featuredImageCredit: anchor?.imageUrl ? "WAKILISHA registry" : "",
-      featuredImageSource: anchor?.imageUrl ? "Registry anchor" : "Not set",
-      status: "Framing",
-      createdAt,
-      updatedAt: createdAt,
-      versionCount: 1,
-      setup: defaultSetup,
-      evidence: [],
-    };
+  const updateInquiry = async (id: string, patch: Partial<InquiryDraft>) => {
+    const existing = inquiries.find((inquiry) => inquiry.id === id) ?? null;
+    const updatedAt = new Date().toISOString();
+    const questionChanged =
+      typeof patch.workingQuestion === "string" &&
+      patch.workingQuestion.trim().length >= 8 &&
+      patch.workingQuestion.trim() !== existing?.workingQuestion;
 
-    persist([draft, ...existing]);
-    return draft;
-  };
-
-  const updateDraft = (id: string, patch: Partial<InquiryDraft>) => {
-    const next = readDrafts().map((draft) =>
-      draft.id === id ? { ...draft, ...patch, updatedAt: nowDate() } : draft,
+    setInquiries((current) =>
+      current.map((inquiry) =>
+        inquiry.id === id
+          ? {
+              ...inquiry,
+              ...patch,
+              updatedAt,
+              versionCount: questionChanged ? inquiry.versionCount + 1 : inquiry.versionCount,
+            }
+          : inquiry,
+      ),
     );
-    persist(next);
+
+    try {
+      await updateInstituteInquiry(id, patch, existing);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to save Institute Inquiry.";
+      setError(message);
+      await loadInquiries();
+    }
   };
 
-  return { drafts, addDraft, updateDraft };
+  return { inquiries, loading, error, addInquiry, updateInquiry };
 }
 
 function Rail({
@@ -316,7 +311,7 @@ function Rail({
 }) {
   const inquiryNav: Array<{ screen: InquiryScreen; label: string; badge?: string; disabled?: boolean }> = [
     { screen: "workbench", label: "Workbench" },
-    { screen: "evidence", label: "Evidence", badge: active?.evidence?.length ? String(active.evidence.length) : "next" },
+    { screen: "evidence", label: "Evidence", badge: "soon", disabled: true },
     { screen: "claims", label: "Claims", disabled: true },
     { screen: "relationships", label: "Relationships", disabled: true },
     { screen: "review", label: "Review", disabled: true },
@@ -344,7 +339,7 @@ function Rail({
           <>
             <div className="flex items-center gap-2">
               <Chip tone="brand">{active.code}</Chip>
-              <Chip tone="warning">Local draft</Chip>
+              <Chip tone="warning">Production</Chip>
             </div>
             <p className="mt-3 line-clamp-3 text-[13px] font-bold leading-5 text-wk-text">{active.workingQuestion}</p>
             {active.anchor ? (
@@ -358,7 +353,7 @@ function Rail({
         ) : (
           <>
             <div className="text-[13px] font-black text-wk-text">No Active Inquiry</div>
-            <p className="mt-2 text-[11px] leading-4 text-wk-text-muted">Start with a question or continue a local draft.</p>
+            <p className="mt-2 text-[11px] leading-4 text-wk-text-muted">Start with a question or continue an Inquiry.</p>
           </>
         )}
       </div>
@@ -424,6 +419,8 @@ function HomeScreen({
   anchorsError,
   drafts,
   createDraft,
+  inquiriesLoading,
+  inquiriesError,
 }: {
   state: InstituteState;
   setState: (patch: Partial<InstituteState>) => void;
@@ -432,6 +429,8 @@ function HomeScreen({
   anchorsError: string;
   drafts: InquiryDraft[];
   createDraft: () => void;
+  inquiriesLoading: boolean;
+  inquiriesError: string;
 }) {
   const similarDrafts = useMemo(() => {
     const q = state.questionDraft.trim().toLowerCase();
@@ -485,7 +484,7 @@ function HomeScreen({
 
         {similarDrafts.length ? (
           <div className="mt-5 rounded-xl border border-wk-warning/30 bg-wk-warning-soft p-4">
-            <div className="text-[11px] font-black uppercase tracking-[0.16em] text-wk-warning">A similar local draft may already exist</div>
+            <div className="text-[11px] font-black uppercase tracking-[0.16em] text-wk-warning">A similar Inquiry may already exist</div>
             <div className="mt-3 space-y-2">
               {similarDrafts.slice(0, 2).map((draft) => (
                 <button
@@ -509,10 +508,10 @@ function HomeScreen({
             onClick={createDraft}
             className="rounded-lg bg-wk-brand px-6 py-3 text-[14px] font-black text-wk-brand-on transition disabled:cursor-not-allowed disabled:opacity-40"
           >
-            Start Inquiry Draft
+            Create Inquiry
           </button>
           <span className="text-[12px] leading-5 text-wk-text-faint">
-            Saves a local draft as Version 1 and opens the workbench.
+            Creates a production Inquiry and opens the workbench.
           </span>
         </div>
       </Panel>
@@ -522,7 +521,7 @@ function HomeScreen({
           <span className="h-px w-7 bg-wk-brand" />
           Continue an Inquiry
         </div>
-        <span className="text-[12px] font-semibold text-wk-text-faint">{drafts.length} local draft(s)</span>
+        <span className="text-[12px] font-semibold text-wk-text-faint">{drafts.length} production record(s)</span>
       </div>
 
       {drafts.length ? (
@@ -550,7 +549,7 @@ function HomeScreen({
                 <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/45 to-transparent p-3">
                   <div className="flex flex-wrap items-center gap-2">
                     <Chip tone="dark">{draft.code}</Chip>
-                    <Chip tone="warning">Local draft</Chip>
+                    <Chip tone="warning">Production</Chip>
                     {draft.anchor ? <Chip tone="brand">{draft.anchor.label}</Chip> : null}
                   </div>
                 </div>
@@ -565,8 +564,8 @@ function HomeScreen({
         </div>
       ) : (
         <EmptyState
-          title="No Inquiry drafts yet"
-          body="The Institute has no local drafts on this browser. Start with a question above."
+          title="No Inquiries yet"
+          body="The Institute has no production Inquiries yet. Start with a question above."
         />
       )}
     </div>
@@ -657,18 +656,20 @@ function WorkbenchScreen({
   updateDraft: (patch: Partial<InquiryDraft>) => void;
 }) {
   const [setup, setSetup] = useState<InquirySetup>(draft?.setup ?? defaultSetup);
+  const [workingQuestion, setWorkingQuestion] = useState(draft?.workingQuestion ?? "");
   const [savedLabel, setSavedLabel] = useState("Not saved this session");
 
   useEffect(() => {
     setSetup({ ...defaultSetup, ...(draft?.setup ?? {}) });
+    setWorkingQuestion(draft?.workingQuestion ?? "");
     setSavedLabel(draft ? `Saved ${new Date(draft.updatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "Not saved this session");
-  }, [draft?.id]);
+  }, [draft?.id, draft?.workingQuestion]);
 
   if (!draft) {
     return (
       <div className="mx-auto max-w-[1040px]">
         <Panel eyebrow="Workbench" title="No Active Inquiry">
-          <EmptyState title="Nothing to configure yet" body="Start or select an Inquiry draft first." />
+          <EmptyState title="Nothing to configure yet" body="Create or select an Inquiry first." />
         </Panel>
       </div>
     );
@@ -685,7 +686,7 @@ function WorkbenchScreen({
   };
 
   const saveSetup = () => {
-    updateDraft({ setup });
+    updateDraft({ setup, workingQuestion: workingQuestion.trim() || draft.workingQuestion });
     setSavedLabel(`Saved ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`);
   };
 
@@ -712,12 +713,12 @@ function WorkbenchScreen({
         <div className="mt-5 rounded-xl border border-wk-border bg-wk-bg-subtle p-4">
           <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Working question</div>
           <input
-            value={draft.workingQuestion}
-            onChange={(event) => updateDraft({ workingQuestion: event.target.value })}
+            value={workingQuestion}
+            onChange={(event) => setWorkingQuestion(event.target.value)}
             className="mt-2 w-full rounded-lg border border-wk-border bg-wk-surface px-4 py-3 text-[18px] font-black leading-6 text-wk-text outline-none focus:border-wk-brand"
           />
           <p className="mt-2 text-[12px] leading-5 text-wk-text-muted">
-            {draft.rawQuestion === draft.workingQuestion ? "Original question preserved as Version 1." : `Original question: ${draft.rawQuestion}`}
+            {draft.rawQuestion === workingQuestion ? "Original question preserved as Version 1." : `Original question: ${draft.rawQuestion}`}
           </p>
         </div>
       </section>
@@ -1046,7 +1047,7 @@ function EvidenceScreen({
     return (
       <div className="mx-auto max-w-[1000px]">
         <Panel eyebrow="Evidence" title="No Active Inquiry">
-          <EmptyState title="Nothing to add evidence to yet" body="Start or select an Inquiry draft first." />
+          <EmptyState title="Nothing to add evidence to yet" body="Create or select an Inquiry first." />
         </Panel>
       </div>
     );
@@ -1326,7 +1327,7 @@ export default function NativeInstituteInquiryInterface() {
   }, []);
 
   const { anchors, loading: anchorsLoading, error: anchorsError } = useRegistryAnchors();
-  const { drafts, addDraft, updateDraft } = useLocalDrafts();
+  const { inquiries: drafts, loading: inquiriesLoading, error: inquiriesError, addInquiry, updateInquiry } = useSupabaseInquiries();
   const [state, setRawState] = useState<InstituteState>({
     screen: "home",
     activeId: null,
@@ -1341,13 +1342,13 @@ export default function NativeInstituteInquiryInterface() {
     [drafts, state.activeId],
   );
 
-  const createDraft = () => {
+  const createDraft = async () => {
     const question = state.questionDraft.trim();
     if (question.length < 8) return;
 
-    const draft = addDraft(question, state.selectedAnchor);
+    const inquiry = await addInquiry(question, state.selectedAnchor);
     setState({
-      activeId: draft.id,
+      activeId: inquiry.id,
       screen: "workbench",
       questionDraft: "",
       selectedAnchor: null,
@@ -1356,7 +1357,7 @@ export default function NativeInstituteInquiryInterface() {
 
   const updateActiveDraft = (patch: Partial<InquiryDraft>) => {
     if (!active) return;
-    updateDraft(active.id, patch);
+    void updateInquiry(active.id, patch);
   };
 
   return (
@@ -1374,6 +1375,8 @@ export default function NativeInstituteInquiryInterface() {
               anchorsError={anchorsError}
               drafts={drafts}
               createDraft={createDraft}
+              inquiriesLoading={inquiriesLoading}
+              inquiriesError={inquiriesError}
             />
           ) : state.screen === "workbench" ? (
             <WorkbenchScreen draft={active} updateDraft={updateActiveDraft} />
