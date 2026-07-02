@@ -116,6 +116,10 @@ function readDrafts(): InquiryDraft[] {
 
     return parsed.map((draft) => ({
       ...draft,
+      featuredImageUrl: typeof draft.featuredImageUrl === "string" ? draft.featuredImageUrl : "",
+      featuredImageAlt: typeof draft.featuredImageAlt === "string" ? draft.featuredImageAlt : "",
+      featuredImageCredit: typeof draft.featuredImageCredit === "string" ? draft.featuredImageCredit : "",
+      featuredImageSource: typeof draft.featuredImageSource === "string" ? draft.featuredImageSource : "Not set",
       setup: { ...defaultSetup, ...(draft.setup ?? {}) },
       evidence: Array.isArray(draft.evidence) ? draft.evidence : [],
     })) as InquiryDraft[];
@@ -264,6 +268,10 @@ function useLocalDrafts() {
       rawQuestion: question,
       workingQuestion: question,
       anchor,
+      featuredImageUrl: anchor?.imageUrl ?? "",
+      featuredImageAlt: anchor?.imageUrl ? `${anchor.label} registry image` : "",
+      featuredImageCredit: anchor?.imageUrl ? "WAKILISHA registry" : "",
+      featuredImageSource: anchor?.imageUrl ? "Registry anchor" : "Not set",
       status: "Framing",
       createdAt,
       updatedAt: createdAt,
@@ -517,13 +525,32 @@ function HomeScreen({
               onClick={() => setState({ activeId: draft.id, screen: "workbench" })}
               className="rounded-2xl border border-wk-border bg-wk-surface p-5 text-left transition hover:border-wk-brand/40 hover:shadow-sm"
             >
-              <div className="flex flex-wrap items-center gap-2">
-                <Chip tone="dark">{draft.code}</Chip>
-                <Chip tone="warning">Local draft</Chip>
-                {draft.anchor ? <Chip tone="brand">{draft.anchor.label}</Chip> : null}
+              <div className="relative -m-5 mb-4 h-32 overflow-hidden rounded-t-2xl bg-wk-bg-subtle">
+                {draft.featuredImageUrl ? (
+                  <img
+                    src={draft.featuredImageUrl}
+                    alt={draft.featuredImageAlt || ""}
+                    className="h-full w-full object-cover"
+                    loading="lazy"
+                  />
+                ) : (
+                  <div className="flex h-full items-center justify-center text-[11px] font-black uppercase tracking-[0.18em] text-wk-text-faint">
+                    No featured image yet
+                  </div>
+                )}
+                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/45 to-transparent p-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Chip tone="dark">{draft.code}</Chip>
+                    <Chip tone="warning">Local draft</Chip>
+                    {draft.anchor ? <Chip tone="brand">{draft.anchor.label}</Chip> : null}
+                  </div>
+                </div>
               </div>
-              <h3 className="mt-4 text-[18px] font-black tracking-[-0.03em] text-wk-text">{draft.workingQuestion}</h3>
-              <p className="mt-3 text-[12px] leading-5 text-wk-text-muted">Updated {new Date(draft.updatedAt).toLocaleString()}</p>
+              <h3 className="text-[18px] font-black tracking-[-0.03em] text-wk-text">{draft.workingQuestion}</h3>
+              <p className="mt-3 text-[12px] leading-5 text-wk-text-muted">
+                Updated {new Date(draft.updatedAt).toLocaleString()}
+                {draft.featuredImageSource !== "Not set" ? ` · Image: ${draft.featuredImageSource}` : ""}
+              </p>
             </button>
           ))}
         </div>
@@ -685,6 +712,78 @@ function WorkbenchScreen({
           </p>
         </div>
       </section>
+
+      <Panel eyebrow="Featured Image" title="What image carries this Inquiry?">
+        <div className="grid gap-4 lg:grid-cols-[240px_1fr]">
+          <div className="self-start overflow-hidden rounded-xl border border-wk-border bg-wk-bg-subtle">
+            {draft.featuredImageUrl ? (
+              <img
+                src={draft.featuredImageUrl}
+                alt={draft.featuredImageAlt || ""}
+                className="h-40 w-full object-cover"
+              />
+            ) : (
+              <div className="flex h-40 items-center justify-center px-4 text-center text-[11px] font-black uppercase tracking-[0.16em] text-wk-text-faint">
+                No featured image yet
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-3">
+            {draft.anchor?.imageUrl ? (
+              <button
+                type="button"
+                onClick={() =>
+                  updateDraft({
+                    featuredImageUrl: draft.anchor?.imageUrl ?? "",
+                    featuredImageAlt: `${draft.anchor?.label ?? "Artist"} registry image`,
+                    featuredImageCredit: "WAKILISHA registry",
+                    featuredImageSource: "Registry anchor",
+                  })
+                }
+                className="rounded-lg border border-wk-brand/30 bg-wk-brand-soft px-4 py-3 text-left text-[12px] font-black text-wk-text"
+              >
+                Use {draft.anchor.label} registry image
+              </button>
+            ) : null}
+
+            <label className="block">
+              <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Image URL</span>
+              <input
+                value={draft.featuredImageUrl}
+                onChange={(event) =>
+                  updateDraft({
+                    featuredImageUrl: event.target.value,
+                    featuredImageSource: event.target.value.trim() ? "Manual URL" : "Not set",
+                  })
+                }
+                placeholder="https://..."
+                className="w-full rounded-lg border border-wk-border bg-wk-bg px-4 py-3 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
+              />
+            </label>
+
+            <label className="block">
+              <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Alt text</span>
+              <input
+                value={draft.featuredImageAlt}
+                onChange={(event) => updateDraft({ featuredImageAlt: event.target.value })}
+                placeholder="Describe the image for readers who cannot see it."
+                className="w-full rounded-lg border border-wk-border bg-wk-bg px-4 py-3 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
+              />
+            </label>
+
+            <label className="block">
+              <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Credit</span>
+              <input
+                value={draft.featuredImageCredit}
+                onChange={(event) => updateDraft({ featuredImageCredit: event.target.value })}
+                placeholder="Photographer, archive, registry, or source credit"
+                className="w-full rounded-lg border border-wk-border bg-wk-bg px-4 py-3 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
+              />
+            </label>
+          </div>
+        </div>
+      </Panel>
 
       <section className="rounded-2xl border border-wk-brand/20 bg-wk-brand-soft p-5">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
