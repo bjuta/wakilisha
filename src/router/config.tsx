@@ -118,8 +118,8 @@ import AdminApiDocsPage from "../pages/admin/api-docs/page";
 // Admin Community Moderation
 import AdminCommunityPage from "../pages/admin/community/page";
 
-// Admin Institute Lab
-import AdminInquiryInterfacePage from "../pages/admin/lab/inquiry-interface/page";
+// Admin Institute
+import AdminInquiryInterfacePage from "../pages/admin/institute/inquiry-interface/page";
 
 // Public API Docs
 import PublicApiDocsPage from "../pages/api-docs/page";
@@ -219,7 +219,7 @@ function LegacyEntityRedirect({ base }: { base: "/artists" | "/releases" | "/tra
 }
 
 const routes: RouteObject[] = [
-  { path: "/admin/login", element: <AdminLoginPage /> },
+    { path: "/admin/login", element: <AdminLoginPage /> },
   { path: "/auth/reset-password", element: <ResetPasswordPage /> },
   {
     element: <ResponsiveAppLayout />,
@@ -286,7 +286,7 @@ const routes: RouteObject[] = [
       { index: true, element: <AdminDashboardPage /> },
       { path: "analytics", element: <AdminAnalyticsPage /> },
       { path: "community", element: <AdminCommunityPage /> },
-      { path: "lab/inquiry-interface", element: <AdminInquiryInterfacePage /> },
+      { path: "institute/inquiry-interface", element: <AdminInquiryInterfacePage /> },
       {
         path: "content",
         element: <AdminContentLayout />,
