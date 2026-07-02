@@ -1,3 +1,9 @@
+import {
+  fetchInstituteReviewPackets,
+  updateInstituteReviewPacketDecision,
+  type InstituteReviewPacket,
+  type InstituteReviewPacketStatus,
+} from "@/services/institute/instituteReviewDeskService";
 import { ArticleEditorWorkspace } from "@/pages/admin/content/articles/detail/ArticleEditorWorkspace";
 import {
   createOrFetchInstituteArticleDraftLink,
@@ -314,7 +320,7 @@ function Rail({
     { screen: "evidence", label: "Evidence", badge: active?.evidence?.length ? String(active.evidence.length) : "0" },
     { screen: "claims", label: "Claims", disabled: true },
     { screen: "relationships", label: "Relationships", disabled: true },
-    { screen: "review", label: "Review", disabled: true },
+    { screen: "review", label: "Review", badge: "desk" },
     { screen: "summary", label: "Inquiry summary", disabled: true },
     { screen: "clinic", label: "Question & clinic", badge: active ? `v${active.versionCount}` : "", disabled: true },
     { screen: "lineage", label: "Lineage & forks", disabled: true },
@@ -2008,6 +2014,242 @@ function EvidenceScreen({
 }
 
 
+
+function ReviewDeskScreen() {
+  const [packets, setPackets] = useState<InstituteReviewPacket[]>([]);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [editorNotes, setEditorNotes] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [savingStatus, setSavingStatus] = useState<InstituteReviewPacketStatus | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadPackets = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const rows = await fetchInstituteReviewPackets();
+      setPackets(rows);
+      setActiveId((current) => current ?? rows[0]?.id ?? null);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "Failed to load review packets.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadPackets();
+  }, []);
+
+  const activePacket = packets.find((packet) => packet.id === activeId) ?? packets[0] ?? null;
+  const snapshot = activePacket?.snapshot;
+  const inquiry = snapshot?.inquiry;
+  const article = snapshot?.articleDraft;
+  const workProduct = snapshot?.workProduct;
+
+  useEffect(() => {
+    setEditorNotes(activePacket?.editorNotes ?? "");
+  }, [activePacket?.id]);
+
+  const updateStatus = async (status: InstituteReviewPacketStatus) => {
+    if (!activePacket || savingStatus) return;
+
+    setSavingStatus(status);
+    setError(null);
+
+    try {
+      const updated = await updateInstituteReviewPacketDecision(activePacket, status, editorNotes);
+      setPackets((current) => current.map((packet) => (packet.id === updated.id ? updated : packet)));
+    } catch (updateError) {
+      setError(updateError instanceof Error ? updateError.message : "Failed to update review packet.");
+    } finally {
+      setSavingStatus(null);
+    }
+  };
+
+  const counts = {
+    submitted: packets.filter((packet) => packet.status === "submitted").length,
+    underReview: packets.filter((packet) => packet.status === "under_review").length,
+    changesRequested: packets.filter((packet) => packet.status === "changes_requested").length,
+    approved: packets.filter((packet) => packet.status === "approved_for_promotion").length,
+  };
+
+  const actionClass =
+    "rounded-lg border border-wk-border bg-wk-surface px-4 py-2 text-[12px] font-black text-wk-text transition hover:border-wk-brand hover:text-wk-brand disabled:cursor-not-allowed disabled:opacity-50";
+
+  return (
+    <div className="mx-auto max-w-[1240px] space-y-5">
+      <section className="rounded-[26px] border border-wk-border bg-wk-surface p-6 shadow-sm lg:p-7">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <div className="text-[10px] font-black uppercase tracking-[0.24em] text-wk-brand">Institute Review Desk</div>
+            <h1 className="mt-3 text-[34px] font-black leading-[1.02] tracking-[-0.065em] text-wk-text lg:text-[42px]">
+              Review submitted Inquiry work.
+            </h1>
+            <p className="mt-3 max-w-3xl text-[14px] leading-6 text-wk-text-muted">
+              This is the editor gate. Review packets can be accepted, rejected, or sent back. Nothing publishes from here.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => void loadPackets()}
+            className="rounded-lg border border-wk-border bg-wk-bg px-4 py-2 text-[12px] font-black text-wk-text"
+          >
+            Refresh queue
+          </button>
+        </div>
+
+        <div className="mt-5 grid gap-3 md:grid-cols-4">
+          <EvidenceMetric label="Submitted" value={counts.submitted} note="Waiting for editor action." />
+          <EvidenceMetric label="Under review" value={counts.underReview} note="An editor has picked these up." />
+          <EvidenceMetric label="Changes requested" value={counts.changesRequested} note="Contributor needs to revise." />
+          <EvidenceMetric label="Approved" value={counts.approved} note="Ready for the next editorial step." />
+        </div>
+      </section>
+
+      {error ? (
+        <div className="rounded-xl border border-wk-danger/30 bg-wk-danger-soft px-4 py-3 text-[12px] font-bold text-wk-danger">
+          {error}
+        </div>
+      ) : null}
+
+      {loading ? (
+        <Panel eyebrow="Review queue" title="Loading packets">
+          <EmptyState title="Loading Review Desk" body="Fetching submitted review packets." />
+        </Panel>
+      ) : !packets.length ? (
+        <Panel eyebrow="Review queue" title="Nothing waiting">
+          <EmptyState title="No submitted packets yet" body="When contributors submit linked article drafts, they will appear here." />
+        </Panel>
+      ) : (
+        <div className="grid gap-5 xl:grid-cols-[380px_1fr]">
+          <Panel eyebrow="Queue" title={`${packets.length} packet(s)`}>
+            <div className="space-y-3">
+              {packets.map((packet) => {
+                const packetArticle = packet.snapshot?.articleDraft;
+                const packetInquiry = packet.snapshot?.inquiry;
+                const selected = activePacket?.id === packet.id;
+
+                return (
+                  <button
+                    key={packet.id}
+                    type="button"
+                    onClick={() => setActiveId(packet.id)}
+                    className={cx(
+                      "block w-full rounded-xl border p-4 text-left transition",
+                      selected ? "border-wk-brand bg-wk-brand-soft" : "border-wk-border bg-wk-bg",
+                    )}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-[11px] font-black uppercase tracking-[0.14em] text-wk-text-faint">
+                        {packetInquiry?.code ?? "Inquiry"} · v{packet.packetVersion}
+                      </div>
+                      <Chip tone={packet.status === "submitted" ? "warning" : packet.status === "approved_for_promotion" ? "success" : "neutral"}>
+                        {packet.status.replaceAll("_", " ")}
+                      </Chip>
+                    </div>
+                    <div className="mt-2 text-[15px] font-black text-wk-text">{packetArticle?.title || packetArticle?.slug || "Untitled article draft"}</div>
+                    <p className="mt-1 line-clamp-2 text-[12px] leading-5 text-wk-text-muted">
+                      {packetInquiry?.workingQuestion || packetInquiry?.rawQuestion || "No Inquiry question in snapshot."}
+                    </p>
+                    <div className="mt-3 text-[11px] text-wk-text-faint">
+                      Submitted {new Date(packet.submittedAt).toLocaleString()}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </Panel>
+
+          <div className="space-y-5">
+            <Panel eyebrow="Packet detail" title={article?.title || "Selected review packet"}>
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="rounded-xl border border-wk-border bg-wk-bg-subtle p-4">
+                  <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Inquiry</div>
+                  <div className="mt-2 text-[15px] font-black text-wk-text">{inquiry?.code ?? "Unknown Inquiry"}</div>
+                  <p className="mt-2 text-[13px] leading-6 text-wk-text-muted">
+                    {inquiry?.workingQuestion || inquiry?.rawQuestion || "No question captured."}
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {inquiry?.anchor?.label ? <Chip tone="brand">{inquiry.anchor.label}</Chip> : <Chip tone="warning">No anchor</Chip>}
+                    <Chip>{workProduct?.formatLabel ?? "Article"}</Chip>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-wk-border bg-wk-bg-subtle p-4">
+                  <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Linked article draft</div>
+                  <div className="mt-2 text-[15px] font-black text-wk-text">{article?.slug ?? workProduct?.productSlug ?? "No article slug"}</div>
+                  <p className="mt-2 text-[13px] leading-6 text-wk-text-muted">
+                    {article?.excerpt || "No excerpt captured in snapshot."}
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Chip tone="warning">{article?.wpStatus ?? "pending"}</Chip>
+                    <Chip>Private draft</Chip>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4 rounded-xl border border-wk-border bg-wk-bg p-4">
+                <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Contributor note</div>
+                <p className="mt-2 text-[13px] leading-6 text-wk-text-muted">
+                  {activePacket?.contributorNote || "No contributor note captured."}
+                </p>
+              </div>
+
+              <div className="mt-4 rounded-xl border border-wk-border bg-wk-bg p-4">
+                <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Article snapshot preview</div>
+                <div
+                  className="prose prose-sm mt-3 max-h-[360px] overflow-auto text-wk-text"
+                  dangerouslySetInnerHTML={{ __html: article?.contentHtml || "<p>No article body captured.</p>" }}
+                />
+              </div>
+            </Panel>
+
+            <Panel eyebrow="Editor decision" title="Gate this work">
+              <label className="block">
+                <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Editor notes</span>
+                <textarea
+                  value={editorNotes}
+                  onChange={(event) => setEditorNotes(event.target.value)}
+                  rows={6}
+                  placeholder="What should happen next? What needs revision? What is approved?"
+                  className="w-full resize-y rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[13px] leading-6 text-wk-text outline-none focus:border-wk-brand"
+                />
+              </label>
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button type="button" disabled={Boolean(savingStatus)} onClick={() => void updateStatus("under_review")} className={actionClass}>
+                  Start review
+                </button>
+                <button type="button" disabled={Boolean(savingStatus)} onClick={() => void updateStatus("changes_requested")} className={actionClass}>
+                  Request changes
+                </button>
+                <button type="button" disabled={Boolean(savingStatus)} onClick={() => void updateStatus("approved_for_promotion")} className={actionClass}>
+                  Approve for editorial review
+                </button>
+                <button type="button" disabled={Boolean(savingStatus)} onClick={() => void updateStatus("accepted_for_internal_memory")} className={actionClass}>
+                  Accept as internal memory
+                </button>
+                <button type="button" disabled={Boolean(savingStatus)} onClick={() => void updateStatus("rejected")} className={actionClass}>
+                  Reject
+                </button>
+              </div>
+
+              <div className="mt-4 rounded-xl border border-wk-warning/30 bg-wk-warning-soft px-4 py-3 text-[12px] leading-5 text-wk-text-muted">
+                No publishing happens here. Approval only moves the work to the next editor-controlled step.
+              </div>
+            </Panel>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+
 function LockedScreen({ screen }: { screen: InquiryScreen }) {
   const labels: Record<InquiryScreen, string> = {
     home: "Home",
@@ -2107,6 +2349,8 @@ export default function NativeInstituteInquiryInterface() {
             <AnchorBriefScreen draft={active} />
           ) : state.screen === "evidence" ? (
             <EvidenceScreen draft={active} addEvidence={addEvidence} updateDraft={updateActiveDraft} />
+          ) : state.screen === "review" ? (
+            <ReviewDeskScreen />
           ) : (
             <LockedScreen screen={state.screen} />
           )}
