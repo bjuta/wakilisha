@@ -14,12 +14,18 @@ export type InquiryScreen =
   | "learned"
   | "ai";
 
+export type RegistryAnchorType = "artist" | "track" | "release" | "label" | "genre";
+export type AnchorCategory = RegistryAnchorType | "none";
+
 export type RegistryAnchor = {
-  type: "artist";
+  type: RegistryAnchorType;
   slug: string;
   label: string;
   subtitle: string;
   imageUrl: string | null;
+  contextText?: string;
+  href?: string;
+  metadata?: Record<string, unknown>;
 };
 
 export type EvidenceKind =
@@ -96,4 +102,6 @@ export type InstituteState = {
   activeId: string | null;
   questionDraft: string;
   selectedAnchor: RegistryAnchor | null;
+  selectedAnchorCategory: AnchorCategory | null;
+  anchorSearch: string;
 };

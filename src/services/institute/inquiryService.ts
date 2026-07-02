@@ -3,6 +3,7 @@ import type {
   InquiryDraft,
   InquirySetup,
   RegistryAnchor,
+  RegistryAnchorType,
 } from "@/pages/admin/institute/inquiry-interface/types";
 
 type InquiryRow = {
@@ -54,15 +55,24 @@ function mapStatus(status: string): InquiryDraft["status"] {
   return status === "draft" ? "Draft" : "Framing";
 }
 
+const registryAnchorTypes: RegistryAnchorType[] = ["artist", "track", "release", "label", "genre"];
+
+function normalizeAnchorType(value: string): RegistryAnchorType {
+  return registryAnchorTypes.includes(value as RegistryAnchorType) ? value as RegistryAnchorType : "artist";
+}
+
 function mapAnchor(row: AnchorRow | undefined): RegistryAnchor | null {
   if (!row) return null;
 
   return {
-    type: "artist",
+    type: normalizeAnchorType(row.anchor_entity_type),
     slug: row.anchor_slug ?? "",
     label: row.anchor_label,
     subtitle: typeof row.anchor_metadata?.subtitle === "string" ? row.anchor_metadata.subtitle : "Anchor",
     imageUrl: row.anchor_image_url ?? null,
+    contextText: typeof row.anchor_metadata?.contextText === "string" ? row.anchor_metadata.contextText : undefined,
+    href: typeof row.anchor_metadata?.href === "string" ? row.anchor_metadata.href : undefined,
+    metadata: row.anchor_metadata ?? undefined,
   };
 }
 
@@ -210,7 +220,7 @@ export async function createInstituteInquiry(
       status: "framing",
       maturity: "framing",
       featured_image_url: anchor?.imageUrl ?? null,
-      featured_image_alt: anchor?.imageUrl ? `${anchor.label} registry image` : null,
+      featured_image_alt: anchor?.imageUrl ? `${anchor.label} registry ${anchor.type} image` : null,
       featured_image_credit: anchor?.imageUrl ? "WAKILISHA registry" : null,
       featured_image_source: anchor?.imageUrl ? "Registry anchor" : "Not set",
     })
@@ -249,7 +259,10 @@ export async function createInstituteInquiry(
       anchor_label: anchor.label,
       anchor_image_url: anchor.imageUrl,
       anchor_metadata: {
+        ...(anchor.metadata ?? {}),
         subtitle: anchor.subtitle,
+        contextText: anchor.contextText,
+        href: anchor.href,
       },
       is_primary: true,
       status: "active",
@@ -268,7 +281,12 @@ export async function createInstituteInquiry(
       anchor_slug: anchor.slug,
       anchor_label: anchor.label,
       anchor_image_url: anchor.imageUrl,
-      anchor_metadata: { subtitle: anchor.subtitle },
+      anchor_metadata: {
+        ...(anchor.metadata ?? {}),
+        subtitle: anchor.subtitle,
+        contextText: anchor.contextText,
+        href: anchor.href,
+      },
       is_primary: true,
       status: "active",
     });
