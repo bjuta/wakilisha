@@ -8,6 +8,7 @@ import { ArticleEditorWorkspace } from "@/pages/admin/content/articles/detail/Ar
 import {
   createOrFetchInstituteArticleDraftLink,
   fetchInstituteArticleDraftLink,
+  fetchInstituteArticleReviewHistory,
   fetchInstituteArticleReviewState,
   submitInstituteArticleDraftForReview,
   type InstituteArticleDraftLink,
@@ -1526,6 +1527,7 @@ function EvidenceScreen({
   const [articleLinkLoading, setArticleLinkLoading] = useState(false);
   const [articleLinkError, setArticleLinkError] = useState<string | null>(null);
   const [articleReviewState, setArticleReviewState] = useState<InstituteLinkedArticleReviewState | null>(null);
+  const [articleReviewHistory, setArticleReviewHistory] = useState<InstituteLinkedArticleReviewState[]>([]);
 
   const activeDefinition = activeFormat ? workspaceDefinitionFor(activeFormat) : null;
   const isArticleWorkspace = activeDefinition?.workspaceType === "article";
@@ -1595,6 +1597,11 @@ function EvidenceScreen({
 
     const submission = await submitInstituteArticleDraftForReview(draft, articleLink, articlePayload);
     setArticleReviewState(submission);
+    setArticleReviewHistory((current) =>
+      [...current.filter((item) => item.packetId !== submission.packetId), submission].sort(
+        (first, second) => first.packetVersion - second.packetVersion,
+      ),
+    );
     setArticleLink((current) => (current ? { ...current, status: "submitted_for_review", updatedAt: submission.submittedAt } : current));
   };
 
@@ -1604,17 +1611,25 @@ function EvidenceScreen({
 
     if (!draft || !articleLink) {
       setArticleReviewState(null);
+      setArticleReviewHistory([]);
       return () => {
         alive = false;
       };
     }
 
-    void fetchInstituteArticleReviewState(draft, articleLink)
-      .then((reviewState) => {
-        if (alive) setArticleReviewState(reviewState);
+    void Promise.all([
+      fetchInstituteArticleReviewState(draft, articleLink),
+      fetchInstituteArticleReviewHistory(draft, articleLink),
+    ])
+      .then(([reviewState, reviewHistory]) => {
+        if (!alive) return;
+        setArticleReviewState(reviewState);
+        setArticleReviewHistory(reviewHistory);
       })
       .catch(() => {
-        if (alive) setArticleReviewState(null);
+        if (!alive) return;
+        setArticleReviewState(null);
+        setArticleReviewHistory([]);
       });
 
     return () => {
@@ -1883,6 +1898,26 @@ function EvidenceScreen({
                     </div>
                   ) : null}
 
+                  {articleReviewHistory.length > 1 ? (
+                    <div className="rounded-xl border border-wk-border bg-wk-bg px-4 py-3">
+                      <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Review version history</div>
+                      <div className="mt-3 space-y-2">
+                        {articleReviewHistory.map((item) => (
+                          <div key={item.packetId} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[12px] text-wk-text-muted">
+                            <div>
+                              <strong className="text-wk-text">v{item.packetVersion}</strong>
+                              {" "}· {item.status.replaceAll("_", " ")}
+                              {" "}· {new Date(item.submittedAt).toLocaleString()}
+                            </div>
+                            {item.editorNotes ? (
+                              <span className="max-w-[420px] truncate text-wk-text-faint">Editor notes: {item.editorNotes}</span>
+                            ) : null}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+
                   <ArticleEditorWorkspace
                     slug={articleLink.articleSlug}
                     mode="institute"
@@ -2121,6 +2156,25 @@ function ReviewDeskScreen() {
   const isApprovedHandoff = activePacket?.status === "approved_for_promotion" && !isPublishedWork;
   const liveArticleUrl = article?.slug ? `/magazine/${article.slug}` : null;
 
+  const packetVersionHistory = useMemo(() => {
+    if (!activePacket) return [];
+
+    const activeLinkId = activePacket.snapshot?.workProduct?.linkId;
+    const activeSlug = activePacket.snapshot?.workProduct?.productSlug ?? activePacket.snapshot?.articleDraft?.slug;
+
+    return packets
+      .filter((packet) => {
+        const packetLinkId = packet.snapshot?.workProduct?.linkId;
+        const packetSlug = packet.snapshot?.workProduct?.productSlug ?? packet.snapshot?.articleDraft?.slug;
+
+        return Boolean(
+          (activeLinkId && packetLinkId === activeLinkId) ||
+            (activeSlug && packetSlug === activeSlug),
+        );
+      })
+      .sort((first, second) => first.packetVersion - second.packetVersion);
+  }, [activePacket, packets]);
+
   useEffect(() => {
     setEditorNotes(activePacket?.editorNotes ?? "");
     setArticleEditorOpen(false);
@@ -2318,6 +2372,38 @@ function ReviewDeskScreen() {
                 />
               </div>
             </Panel>
+
+            {packetVersionHistory.length > 1 ? (
+              <Panel eyebrow="Version history" title={`${packetVersionHistory.length} review submissions`}>
+                <div className="space-y-3">
+                  {packetVersionHistory.map((packet) => (
+                    <div
+                      key={packet.id}
+                      className={cx(
+                        "rounded-xl border p-4",
+                        packet.id === activePacket?.id ? "border-wk-brand bg-wk-brand-soft" : "border-wk-border bg-wk-bg",
+                      )}
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="text-[13px] font-black text-wk-text">v{packet.packetVersion}</div>
+                        <Chip tone={packet.liveWorkProductStatus === "published" ? "success" : packet.status === "changes_requested" ? "warning" : packet.status === "rejected" ? "danger" : "neutral"}>
+                          {(packet.liveWorkProductStatus === "published" ? "published" : packet.status).replaceAll("_", " ")}
+                        </Chip>
+                      </div>
+                      <div className="mt-2 text-[12px] leading-5 text-wk-text-muted">
+                        Submitted {new Date(packet.submittedAt).toLocaleString()}
+                        {packet.reviewedAt ? ` · Reviewed ${new Date(packet.reviewedAt).toLocaleString()}` : ""}
+                      </div>
+                      {packet.editorNotes ? (
+                        <div className="mt-3 rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[12px] leading-5 text-wk-text-muted">
+                          <span className="font-black text-wk-text">Editor notes:</span> {packet.editorNotes}
+                        </div>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              </Panel>
+            ) : null}
 
             {isPublishedWork ? (
               <Panel eyebrow="Published" title="This Institute work is live">

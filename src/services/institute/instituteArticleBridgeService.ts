@@ -212,6 +212,18 @@ export async function fetchInstituteArticleReviewState(
   return latestForLink ? mapReviewState(latestForLink) : null;
 }
 
+export async function fetchInstituteArticleReviewHistory(
+  inquiry: InquiryDraft,
+  link: InstituteArticleDraftLink,
+): Promise<InstituteLinkedArticleReviewState[]> {
+  const rows = await fetchLatestReviewRowsForInquiry(inquiry.id);
+
+  return rows
+    .filter((row) => reviewPacketMatchesLink(row, link))
+    .map(mapReviewState)
+    .sort((first, second) => first.packetVersion - second.packetVersion);
+}
+
 export async function submitInstituteArticleDraftForReview(
   inquiry: InquiryDraft,
   link: InstituteArticleDraftLink,
