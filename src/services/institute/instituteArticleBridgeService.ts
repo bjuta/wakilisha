@@ -122,35 +122,134 @@ export type InstituteArticleReviewPayload = {
   wpStatus: string | null;
 };
 
-export type InstituteArticleReviewSubmission = {
+export type InstituteLinkedArticleReviewStatus =
+  | "submitted"
+  | "under_review"
+  | "changes_requested"
+  | "approved_for_promotion"
+  | "accepted_for_internal_memory"
+  | "rejected"
+  | "withdrawn";
+
+export type InstituteLinkedArticleReviewState = {
   packetId: string;
   packetVersion: number;
+  status: InstituteLinkedArticleReviewStatus;
   submittedAt: string;
+  reviewedAt: string | null;
+  editorDecision: string | null;
+  editorNotes: string | null;
+  contributorNote: string | null;
 };
+
+export type InstituteArticleReviewSubmission = InstituteLinkedArticleReviewState & {
+  alreadySubmitted?: boolean;
+};
+
+type ReviewPacketForStateRow = {
+  id: string;
+  packet_version: number;
+  status: InstituteLinkedArticleReviewStatus;
+  submitted_at: string;
+  reviewed_at: string | null;
+  editor_decision: string | null;
+  editor_notes: string | null;
+  contributor_note: string | null;
+  snapshot_json: {
+    workProduct?: {
+      linkId?: string;
+      productSlug?: string;
+    };
+  } | null;
+};
+
+function mapReviewState(row: ReviewPacketForStateRow): InstituteLinkedArticleReviewState {
+  return {
+    packetId: row.id,
+    packetVersion: row.packet_version,
+    status: row.status,
+    submittedAt: row.submitted_at,
+    reviewedAt: row.reviewed_at,
+    editorDecision: row.editor_decision,
+    editorNotes: row.editor_notes,
+    contributorNote: row.contributor_note,
+  };
+}
+
+function reviewPacketMatchesLink(row: ReviewPacketForStateRow, link: InstituteArticleDraftLink) {
+  const workProduct = row.snapshot_json?.workProduct;
+  return workProduct?.linkId === link.id || workProduct?.productSlug === link.articleSlug;
+}
+
+async function fetchLatestReviewRowsForInquiry(inquiryId: string): Promise<ReviewPacketForStateRow[]> {
+  const { data, error } = await supabase
+    .from("institute_review_packets")
+    .select(`
+      id,
+      packet_version,
+      status,
+      submitted_at,
+      reviewed_at,
+      editor_decision,
+      editor_notes,
+      contributor_note,
+      snapshot_json
+    `)
+    .eq("inquiry_id", inquiryId)
+    .order("packet_version", { ascending: false })
+    .limit(25);
+
+  if (error) throw error;
+  return (data ?? []) as ReviewPacketForStateRow[];
+}
+
+export async function fetchInstituteArticleReviewState(
+  inquiry: InquiryDraft,
+  link: InstituteArticleDraftLink,
+): Promise<InstituteLinkedArticleReviewState | null> {
+  const rows = await fetchLatestReviewRowsForInquiry(inquiry.id);
+  const latestForLink = rows.find((row) => reviewPacketMatchesLink(row, link));
+  return latestForLink ? mapReviewState(latestForLink) : null;
+}
 
 export async function submitInstituteArticleDraftForReview(
   inquiry: InquiryDraft,
   link: InstituteArticleDraftLink,
   article: InstituteArticleReviewPayload,
 ): Promise<InstituteArticleReviewSubmission> {
-  const { data: latestRows, error: latestError } = await supabase
-    .from("institute_review_packets")
-    .select("packet_version")
-    .eq("inquiry_id", inquiry.id)
-    .order("packet_version", { ascending: false })
-    .limit(1);
+  if (link.status === "published") {
+    throw new Error("This linked article has already been published. Start a new Inquiry for major follow-up work.");
+  }
 
-  if (latestError) throw latestError;
+  const rows = await fetchLatestReviewRowsForInquiry(inquiry.id);
+  const latestVersion = rows.length ? Number(rows[0].packet_version) || 0 : 0;
+  const latestForLink = rows.find((row) => reviewPacketMatchesLink(row, link));
 
-  const latestVersion = Array.isArray(latestRows) && latestRows.length
-    ? Number(latestRows[0].packet_version) || 0
-    : 0;
+  if (latestForLink) {
+    if (latestForLink.status === "submitted" || latestForLink.status === "under_review") {
+      return {
+        ...mapReviewState(latestForLink),
+        alreadySubmitted: true,
+      };
+    }
+
+    if (latestForLink.status === "approved_for_promotion" || latestForLink.status === "accepted_for_internal_memory") {
+      throw new Error("This work has already been accepted by review. Editors control the next step.");
+    }
+
+    if (latestForLink.status === "rejected") {
+      throw new Error("This review packet was rejected. Start a new Inquiry if the work needs to be rebuilt.");
+    }
+  }
 
   const snapshot = {
     reviewPacketVersion: 1,
-    packetKind: "linked_article_draft_review",
+    packetKind: latestForLink?.status === "changes_requested" ? "linked_article_draft_resubmission" : "linked_article_draft_review",
     capturedAt: new Date().toISOString(),
-    editorialInstruction: "Contributor submitted a linked Institute article draft for editorial review. This is not a publishing action.",
+    editorialInstruction:
+      latestForLink?.status === "changes_requested"
+        ? "Contributor resubmitted a linked Institute article draft after editor-requested changes. This is not a publishing action."
+        : "Contributor submitted a linked Institute article draft for editorial review. This is not a publishing action.",
     inquiry: {
       id: inquiry.id,
       code: inquiry.code,
@@ -167,6 +266,8 @@ export async function submitInstituteArticleDraftForReview(
       productId: link.articleId,
       productSlug: link.articleSlug,
       status: "submitted_for_review",
+      previousReviewStatus: latestForLink?.status ?? null,
+      previousReviewPacketId: latestForLink?.id ?? null,
     },
     articleDraft: {
       id: article.articleId,
@@ -193,10 +294,13 @@ export async function submitInstituteArticleDraftForReview(
       inquiry_id: inquiry.id,
       packet_version: latestVersion + 1,
       status: "submitted",
-      contributor_note: `Linked article draft submitted for review: ${article.articleSlug}`,
+      contributor_note:
+        latestForLink?.status === "changes_requested"
+          ? `Linked article draft resubmitted after requested changes: ${article.articleSlug}`
+          : `Linked article draft submitted for review: ${article.articleSlug}`,
       snapshot_json: snapshot,
     })
-    .select("id, packet_version, submitted_at")
+    .select("id, packet_version, status, submitted_at, reviewed_at, editor_decision, editor_notes, contributor_note")
     .single();
 
   if (error) throw error;
@@ -206,11 +310,12 @@ export async function submitInstituteArticleDraftForReview(
     .update({
       status: "submitted_for_review",
       metadata: {
-        source: "institute_article_review_submission",
+        source: latestForLink?.status === "changes_requested" ? "institute_article_review_resubmission" : "institute_article_review_submission",
         inquiry_code: inquiry.code,
         article_slug: article.articleSlug,
         submitted_at: data.submitted_at,
         review_packet_id: data.id,
+        previous_review_packet_id: latestForLink?.id ?? null,
       },
     })
     .eq("id", link.id);
@@ -218,6 +323,11 @@ export async function submitInstituteArticleDraftForReview(
   return {
     packetId: data.id,
     packetVersion: data.packet_version,
+    status: data.status,
     submittedAt: data.submitted_at,
+    reviewedAt: data.reviewed_at,
+    editorDecision: data.editor_decision,
+    editorNotes: data.editor_notes,
+    contributorNote: data.contributor_note,
   };
 }
