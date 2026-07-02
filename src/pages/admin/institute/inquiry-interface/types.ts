@@ -79,6 +79,10 @@ export type InquiryDraft = {
   rawQuestion: string;
   workingQuestion: string;
   anchor: RegistryAnchor | null;
+  featuredImageUrl: string;
+  featuredImageAlt: string;
+  featuredImageCredit: string;
+  featuredImageSource: string;
   status: "Draft" | "Framing";
   createdAt: string;
   updatedAt: string;
