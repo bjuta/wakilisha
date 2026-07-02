@@ -1,6 +1,7 @@
 export type InquiryScreen =
   | "home"
   | "workbench"
+  | "anchorBrief"
   | "evidence"
   | "claims"
   | "relationships"
@@ -26,6 +27,29 @@ export type RegistryAnchor = {
   contextText?: string;
   href?: string;
   metadata?: Record<string, unknown>;
+};
+
+export type AnchorContextItem = {
+  title: string;
+  body: string;
+  source?: string;
+};
+
+export type AnchorContextSnapshot = {
+  id: string;
+  snapshotVersion: number;
+  anchorEntityType: RegistryAnchorType;
+  anchorSlug: string | null;
+  anchorLabel: string;
+  sourceContext: Record<string, unknown>;
+  knowns: AnchorContextItem[];
+  unknowns: AnchorContextItem[];
+  relationshipLeads: AnchorContextItem[];
+  evidenceGaps: AnchorContextItem[];
+  relatedEntities: AnchorContextItem[];
+  thinDataNotes: AnchorContextItem[];
+  sourceReferences: Array<Record<string, unknown>>;
+  createdAt: string;
 };
 
 export type EvidenceKind =
@@ -85,6 +109,7 @@ export type InquiryDraft = {
   rawQuestion: string;
   workingQuestion: string;
   anchor: RegistryAnchor | null;
+  anchorContextSnapshot: AnchorContextSnapshot | null;
   featuredImageUrl: string;
   featuredImageAlt: string;
   featuredImageCredit: string;
