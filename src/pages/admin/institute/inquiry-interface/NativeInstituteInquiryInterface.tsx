@@ -15,6 +15,7 @@ import {
   type InstituteLinkedArticleReviewState,
 } from "@/services/institute/instituteArticleBridgeService";
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   createInstituteEvidenceItem,
   createInstituteInquiry,
@@ -2555,14 +2556,22 @@ function LockedScreen({ screen }: { screen: InquiryScreen }) {
   );
 }
 
+const globalInstituteScreens = new Set<InquiryScreen>(["home", "workbench", "anchorBrief", "evidence", "review"]);
+
+function readInstituteScreen(value: string | null): InquiryScreen {
+  return value && globalInstituteScreens.has(value as InquiryScreen) ? (value as InquiryScreen) : "home";
+}
+
 export default function NativeInstituteInquiryInterface() {
+  const [searchParams, setSearchParams] = useSearchParams();
+
   useEffect(() => {
     stripLegacyInstituteHash();
   }, []);
 
   const { inquiries: drafts, loading: inquiriesLoading, error: inquiriesError, addInquiry, addEvidence, updateInquiry } = useSupabaseInquiries();
   const [state, setRawState] = useState<InstituteState>({
-    screen: "home",
+    screen: readInstituteScreen(searchParams.get("screen")),
     activeId: null,
     questionDraft: "",
     selectedAnchor: null,
@@ -2572,7 +2581,20 @@ export default function NativeInstituteInquiryInterface() {
 
   const { anchors, loading: anchorsLoading, error: anchorsError } = useInstituteAnchorSearch(state.selectedAnchorCategory, state.anchorSearch);
 
-  const setState = (patch: Partial<InstituteState>) => setRawState((current) => ({ ...current, ...patch }));
+  useEffect(() => {
+    const nextScreen = readInstituteScreen(searchParams.get("screen"));
+    setRawState((current) => (current.screen === nextScreen ? current : { ...current, screen: nextScreen }));
+  }, [searchParams]);
+
+  const setState = (patch: Partial<InstituteState>) => {
+    setRawState((current) => ({ ...current, ...patch }));
+
+    if (patch.screen) {
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.set("screen", patch.screen);
+      setSearchParams(nextParams, { replace: true });
+    }
+  };
 
   const active = useMemo(
     () => drafts.find((draft) => draft.id === state.activeId) ?? null,
@@ -2601,11 +2623,8 @@ export default function NativeInstituteInquiryInterface() {
 
   return (
     <div className="-mx-3 min-h-[calc(100vh-90px)] bg-wk-bg-subtle px-3 py-2 sm:-mx-5 sm:px-5 lg:-mx-8 lg:px-8">
-      <div className="grid gap-5 xl:grid-cols-[230px_minmax(0,1fr)] 2xl:grid-cols-[250px_minmax(0,1fr)]">
-        <Rail state={state} setState={setState} drafts={drafts} active={active} />
-
-        <main className="min-w-0">
-          {state.screen === "home" ? (
+      <main className="min-w-0">
+        {state.screen === "home" ? (
             <HomeScreen
               state={state}
               setState={setState}
@@ -2625,11 +2644,10 @@ export default function NativeInstituteInquiryInterface() {
             <EvidenceScreen draft={active} addEvidence={addEvidence} updateDraft={updateActiveDraft} />
           ) : state.screen === "review" ? (
             <ReviewDeskScreen />
-          ) : (
-            <LockedScreen screen={state.screen} />
-          )}
-        </main>
-      </div>
+        ) : (
+          <LockedScreen screen={state.screen} />
+        )}
+      </main>
     </div>
   );
 }
