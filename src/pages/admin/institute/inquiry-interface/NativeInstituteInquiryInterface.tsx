@@ -15,6 +15,8 @@ import {
   type InstituteLinkedArticleReviewState,
 } from "@/services/institute/instituteArticleBridgeService";
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
+import type { ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   createInstituteEvidenceItem,
@@ -37,7 +39,6 @@ import type {
   RegistryAnchor,
   ReviewState,
 } from "./types";
-
 
 const defaultSetup: InquirySetup = {
   inquiryType: "Explain a cultural shift",
@@ -120,8 +121,6 @@ const setupOptions = {
   draftTimers: ["10 sec", "30 sec", "60 sec", "Off"],
 };
 
-
-
 const evidenceKinds: EvidenceKind[] = [
   "WAKILISHA record",
   "Article",
@@ -159,11 +158,9 @@ function makeId() {
   return `local-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-
 function nowDate() {
   return new Date().toISOString();
 }
-
 
 function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
@@ -173,7 +170,7 @@ function Chip({
   children,
   tone = "neutral",
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
   tone?: "brand" | "success" | "warning" | "neutral" | "dark";
 }) {
   return (
@@ -200,7 +197,7 @@ function Panel({
 }: {
   eyebrow?: string;
   title: string;
-  children: React.ReactNode;
+  children: ReactNode;
   className?: string;
 }) {
   return (
@@ -226,6 +223,74 @@ function EmptyState({ title, body }: { title: string; body: string }) {
   );
 }
 
+function InstituteWorkspaceOverlay({
+  open,
+  title,
+  eyebrow,
+  description,
+  children,
+  onClose,
+}: {
+  open: boolean;
+  title: string;
+  eyebrow?: string;
+  description?: string;
+  children: ReactNode;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    if (!open) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+
+    const previousOverflow = document.body.style.overflow;
+    const previousOverscroll = document.body.style.overscrollBehavior;
+
+    document.body.style.overflow = "hidden";
+    document.body.style.overscrollBehavior = "contain";
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.body.style.overscrollBehavior = previousOverscroll;
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open, onClose]);
+
+  if (!open || typeof document === "undefined") return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[80] overflow-hidden bg-black/45 backdrop-blur-sm">
+      <div className="flex h-dvh min-h-0 items-stretch justify-center p-2 sm:p-4">
+        <section className="flex h-full max-h-full w-full max-w-[calc(100vw-1rem)] flex-col overflow-hidden rounded-[28px] border border-wk-border bg-wk-bg shadow-2xl sm:max-w-[calc(100vw-2rem)] 2xl:max-w-[1600px]">
+          <header className="flex shrink-0 flex-wrap items-start justify-between gap-4 border-b border-wk-border bg-wk-surface px-5 py-4">
+            <div className="min-w-0">
+              {eyebrow ? (
+                <div className="text-[10px] font-black uppercase tracking-[0.14em] text-wk-text-faint">{eyebrow}</div>
+              ) : null}
+              <h2 className="mt-1 text-[22px] font-black tracking-[-0.04em] text-wk-text">{title}</h2>
+              {description ? <p className="mt-1 max-w-3xl text-[13px] leading-5 text-wk-text-muted">{description}</p> : null}
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-full border border-wk-border bg-wk-bg px-4 py-2 text-[12px] font-black text-wk-text-muted transition hover:border-wk-brand hover:text-wk-brand"
+            >
+              Close workspace
+            </button>
+          </header>
+
+          <div className="min-h-0 flex-1 overflow-y-auto overflow-x-auto px-4 py-4 sm:px-5 sm:py-5">
+            {children}
+          </div>
+        </section>
+      </div>
+    </div>,
+    document.body,
+  );
+}
 
 function useSupabaseInquiries() {
   const [inquiries, setInquiries] = useState<InquiryDraft[]>([]);
@@ -701,7 +766,7 @@ function ToggleButton({
   onClick,
 }: {
   selected: boolean;
-  children: React.ReactNode;
+  children: ReactNode;
   onClick: () => void;
 }) {
   return (
@@ -724,7 +789,7 @@ function OptionPill({
   onClick,
 }: {
   selected: boolean;
-  children: React.ReactNode;
+  children: ReactNode;
   onClick: () => void;
 }) {
   return (
@@ -1302,8 +1367,6 @@ function AnchorBriefScreen({ draft }: { draft: InquiryDraft | null }) {
   );
 }
 
-
-
 type FormatWorkspaceDefinition = {
   label: string;
   evidenceKind: EvidenceKind;
@@ -1512,6 +1575,32 @@ function EvidenceScreen({
   addEvidence: (inquiryId: string, evidence: Omit<EvidenceItem, "id" | "createdAt" | "updatedAt">) => Promise<EvidenceItem>;
   updateDraft: (patch: Partial<InquiryDraft>) => void;
 }) {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeWorkspace = searchParams.get("workspace");
+  const articleWorkspaceOpen = activeWorkspace === "article";
+
+  const openWorkspace = (workspace: string) => {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set("screen", "evidence");
+    nextParams.set("workspace", workspace);
+    setSearchParams(nextParams, { replace: false });
+  };
+
+  const closeWorkspace = () => {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete("workspace");
+    setSearchParams(nextParams, { replace: false });
+  };
+
+  const openArticleWorkspace = () => {
+    if (articleLink) {
+      openWorkspace("article");
+      return;
+    }
+
+    void ensureArticleDraft().then(() => openWorkspace("article"));
+  };
+
   const formats = draft?.setup.formats ?? [];
   const [activeFormat, setActiveFormat] = useState("");
   const [saving, setSaving] = useState(false);
@@ -1605,7 +1694,6 @@ function EvidenceScreen({
     );
     setArticleLink((current) => (current ? { ...current, status: "submitted_for_review", updatedAt: submission.submittedAt } : current));
   };
-
 
   useEffect(() => {
     let alive = true;
@@ -1826,7 +1914,12 @@ function EvidenceScreen({
                     <div className="mt-4 flex flex-wrap gap-2">
                       <button
                         type="button"
-                        onClick={() => setActiveFormat(format)}
+                        onClick={() => {
+                          setActiveFormat(format);
+                          if (definition.workspaceType === "article") {
+                            openArticleWorkspace();
+                          }
+                        }}
                         className="rounded-lg bg-wk-text px-4 py-2 text-[11px] font-black text-wk-bg"
                       >
                         Open workspace
@@ -1858,11 +1951,11 @@ function EvidenceScreen({
 
                 <button
                   type="button"
-                  onClick={() => void ensureArticleDraft()}
+                  onClick={openArticleWorkspace}
                   disabled={articleLinkLoading}
                   className="rounded-lg bg-wk-brand px-5 py-3 text-[13px] font-black text-wk-brand-on transition disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {articleLinkLoading ? "Loading..." : articleLink ? "Linked draft ready" : "Create linked article draft"}
+                  {articleLinkLoading ? "Opening..." : articleLink ? "Open workspace" : "Create linked article draft"}
                 </button>
               </div>
 
@@ -1919,21 +2012,49 @@ function EvidenceScreen({
                     </div>
                   ) : null}
 
-                  <ArticleEditorWorkspace
-                    slug={articleLink.articleSlug}
-                    mode="institute"
-                    returnPath="/admin/institute/inquiry-interface"
-                    allowSubmitForReview={canSubmitArticleForReview}
-                    submitForReviewLabel={articleReviewState?.status === "changes_requested" ? "Resubmit for Review" : "Submit for Review"}
-                    instituteNotice={articleReviewNotice}
-                    onSubmittedForReview={submitLinkedArticleForReview}
-                  />
+                  <div className="rounded-xl border border-wk-border bg-wk-surface p-5 shadow-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <div className="text-[14px] font-black text-wk-text">Article workspace ready</div>
+                        <p className="mt-1 text-[13px] leading-5 text-wk-text-muted">
+                          Open the focused workspace to write, save, preview, and submit.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => openWorkspace("article")}
+                        className="rounded-lg bg-wk-brand px-4 py-2 text-[12px] font-black text-wk-brand-on"
+                      >
+                        Open workspace
+                      </button>
+                    </div>
+                  </div>
+
+                  <InstituteWorkspaceOverlay
+                    open={Boolean(articleLink && articleWorkspaceOpen)}
+                    eyebrow="Evidence · Article"
+                    title="Article workspace"
+                    description="Write in focus. Close returns you to Evidence without losing the inquiry context."
+                    onClose={closeWorkspace}
+                  >
+                    {articleLink ? (
+                      <ArticleEditorWorkspace
+                          slug={articleLink.articleSlug}
+                        mode="institute"
+                        returnPath="/admin/institute/inquiry-interface?screen=evidence"
+                        allowSubmitForReview={canSubmitArticleForReview}
+                        submitForReviewLabel={articleReviewState?.status === "changes_requested" ? "Resubmit for Review" : "Submit for Review"}
+                        instituteNotice={articleReviewNotice}
+                          onSubmittedForReview={submitLinkedArticleForReview}
+                        />
+                    ) : null}
+                  </InstituteWorkspaceOverlay>
                 </div>
               ) : (
                 <div className="rounded-xl border border-wk-border bg-wk-bg-subtle p-5">
                   <h3 className="text-[16px] font-black text-wk-text">No linked article draft yet</h3>
                   <p className="mt-2 text-[13px] leading-6 text-wk-text-muted">
-                    Create one draft once, then keep writing here. The article will save through the shared article editor, not through a separate Institute textarea.
+                    Create one draft, then open the focused workspace.
                   </p>
                 </div>
               )}
@@ -2105,8 +2226,6 @@ function EvidenceScreen({
     </div>
   );
 }
-
-
 
 function ReviewDeskScreen() {
   const [packets, setPackets] = useState<InstituteReviewPacket[]>([]);
@@ -2522,8 +2641,6 @@ function ReviewDeskScreen() {
     </div>
   );
 }
-
-
 
 function LockedScreen({ screen }: { screen: InquiryScreen }) {
   const labels: Record<InquiryScreen, string> = {
