@@ -2020,7 +2020,7 @@ function ReviewDeskScreen() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [editorNotes, setEditorNotes] = useState("");
   const [articleEditorOpen, setArticleEditorOpen] = useState(false);
-  const [queueFilter, setQueueFilter] = useState<"all" | InstituteReviewPacketStatus>("all");
+  const [queueFilter, setQueueFilter] = useState<"all" | "published" | InstituteReviewPacketStatus>("all");
   const [loading, setLoading] = useState(true);
   const [savingStatus, setSavingStatus] = useState<InstituteReviewPacketStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -2045,7 +2045,12 @@ function ReviewDeskScreen() {
   }, []);
 
   const filteredPackets = useMemo(
-    () => (queueFilter === "all" ? packets : packets.filter((packet) => packet.status === queueFilter)),
+    () =>
+      queueFilter === "all"
+        ? packets
+        : queueFilter === "published"
+          ? packets.filter((packet) => packet.liveWorkProductStatus === "published")
+          : packets.filter((packet) => packet.status === queueFilter && packet.liveWorkProductStatus !== "published"),
     [packets, queueFilter],
   );
 
@@ -2055,7 +2060,9 @@ function ReviewDeskScreen() {
   const article = snapshot?.articleDraft;
   const workProduct = snapshot?.workProduct;
   const articleAdminUrl = article?.slug ? `/admin/content/articles/${article.slug}` : null;
-  const isApprovedHandoff = activePacket?.status === "approved_for_promotion";
+  const isPublishedWork = activePacket?.liveWorkProductStatus === "published";
+  const isApprovedHandoff = activePacket?.status === "approved_for_promotion" && !isPublishedWork;
+  const liveArticleUrl = article?.slug ? `/magazine/${article.slug}` : null;
 
   useEffect(() => {
     setEditorNotes(activePacket?.editorNotes ?? "");
@@ -2082,19 +2089,21 @@ function ReviewDeskScreen() {
     submitted: packets.filter((packet) => packet.status === "submitted").length,
     underReview: packets.filter((packet) => packet.status === "under_review").length,
     changesRequested: packets.filter((packet) => packet.status === "changes_requested").length,
-    approved: packets.filter((packet) => packet.status === "approved_for_promotion").length,
+    approved: packets.filter((packet) => packet.status === "approved_for_promotion" && packet.liveWorkProductStatus !== "published").length,
+    published: packets.filter((packet) => packet.liveWorkProductStatus === "published").length,
     rejected: packets.filter((packet) => packet.status === "rejected").length,
   };
 
   const actionClass =
     "rounded-lg border border-wk-border bg-wk-surface px-4 py-2 text-[12px] font-black text-wk-text transition hover:border-wk-brand hover:text-wk-brand disabled:cursor-not-allowed disabled:opacity-50";
 
-  const queueTabs: Array<{ key: "all" | InstituteReviewPacketStatus; label: string; count: number }> = [
+  const queueTabs: Array<{ key: "all" | "published" | InstituteReviewPacketStatus; label: string; count: number }> = [
     { key: "all", label: "All", count: packets.length },
     { key: "submitted", label: "Submitted", count: counts.submitted },
     { key: "under_review", label: "Under review", count: counts.underReview },
     { key: "changes_requested", label: "Changes requested", count: counts.changesRequested },
     { key: "approved_for_promotion", label: "Approved handoff", count: counts.approved },
+    { key: "published", label: "Published", count: counts.published },
     { key: "rejected", label: "Rejected", count: counts.rejected },
   ];
 
@@ -2191,8 +2200,8 @@ function ReviewDeskScreen() {
                       <div className="text-[11px] font-black uppercase tracking-[0.14em] text-wk-text-faint">
                         {packetInquiry?.code ?? "Inquiry"} · v{packet.packetVersion}
                       </div>
-                      <Chip tone={packet.status === "submitted" ? "warning" : packet.status === "approved_for_promotion" ? "success" : "neutral"}>
-                        {packet.status.replaceAll("_", " ")}
+                      <Chip tone={packet.liveWorkProductStatus === "published" ? "success" : packet.status === "submitted" ? "warning" : packet.status === "approved_for_promotion" ? "success" : "neutral"}>
+                        {(packet.liveWorkProductStatus === "published" ? "published" : packet.status).replaceAll("_", " ")}
                       </Chip>
                     </div>
                     <div className="mt-2 text-[15px] font-black text-wk-text">{packetArticle?.title || packetArticle?.slug || "Untitled article draft"}</div>
@@ -2252,6 +2261,29 @@ function ReviewDeskScreen() {
                 />
               </div>
             </Panel>
+
+            {isPublishedWork ? (
+              <Panel eyebrow="Published" title="This Institute work is live">
+                <div className="rounded-xl border border-wk-success/30 bg-wk-success-soft px-4 py-3 text-[12px] leading-5 text-wk-text-muted">
+                  The linked article has been published from the editor-controlled Article Editor. Institute did not publish it directly.
+                </div>
+
+                {liveArticleUrl ? (
+                  <a
+                    href={liveArticleUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-4 inline-flex rounded-lg bg-wk-brand px-5 py-3 text-[13px] font-black text-wk-brand-on"
+                  >
+                    Open live article
+                  </a>
+                ) : null}
+
+                <div className="mt-4 rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[12px] leading-5 text-wk-text-muted">
+                  Published state is synced from the article system into the Institute work product link.
+                </div>
+              </Panel>
+            ) : null}
 
             {isApprovedHandoff ? (
               <Panel eyebrow="Editorial handoff" title="Ready for final editorial pass">

@@ -22,6 +22,7 @@ import {
   type ArticleSavePayload,
 } from "@/services/articles/articleAdminService";
 import { processArticleContent } from "@/services/articles/contentPipeline";
+import { syncInstituteArticlePublicationState } from "@/services/institute/institutePublicationSyncService";
 
 /* ─── Draft state (UI-layer only) ─── */
 
@@ -586,6 +587,15 @@ export function ArticleEditorWorkspace({
 
     if (refreshedArticle) {
       applyServerArticleState(refreshedArticle, true);
+
+      if (typeof extraFields.wp_status !== "undefined") {
+        await syncInstituteArticlePublicationState({
+          articleId: refreshedArticle.id,
+          articleSlug: refreshedArticle.slug,
+          wpStatus: refreshedArticle.wpStatus,
+          publishedAt: refreshedArticle.publishedAt,
+        });
+      }
     } else {
       articleUpdatedAtRef.current = null;
       setArticle((prev) =>
