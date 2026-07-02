@@ -713,8 +713,8 @@ function WorkbenchScreen({
         <div className="mt-5 rounded-xl border border-wk-border bg-wk-bg-subtle p-4">
           <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Working question</div>
           <input
-            value={draft.workingQuestion}
-            onChange={(event) => updateDraft({ workingQuestion: event.target.value })}
+            value={workingQuestion}
+            onChange={(event) => setWorkingQuestion(event.target.value)}
             className="mt-2 w-full rounded-lg border border-wk-border bg-wk-surface px-4 py-3 text-[18px] font-black leading-6 text-wk-text outline-none focus:border-wk-brand"
           />
           <p className="mt-2 text-[12px] leading-5 text-wk-text-muted">
