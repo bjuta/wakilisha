@@ -2,10 +2,13 @@ import { supabase } from "@/lib/supabase";
 import type {
   AnchorContextItem,
   AnchorContextSnapshot,
+  EvidenceItem,
+  EvidenceKind,
   InquiryDraft,
   InquirySetup,
   RegistryAnchor,
   RegistryAnchorType,
+  ReviewState,
 } from "@/pages/admin/institute/inquiry-interface/types";
 
 type InquiryRow = {
@@ -47,6 +50,22 @@ type WorkbenchSetupRow = {
 type QuestionVersionRow = {
   inquiry_id: string;
   version_number: number;
+};
+
+type EvidenceRow = {
+  id: string;
+  inquiry_id: string;
+  evidence_kind: EvidenceKind;
+  title: string;
+  source: string;
+  source_url: string | null;
+  summary: string;
+  why_it_matters: string;
+  media_minutes: number | string | null;
+  review_state: ReviewState;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
 };
 
 type AnchorContextSnapshotRow = {
@@ -299,6 +318,23 @@ async function createAnchorContextSnapshot(
   if (error) throw error;
 }
 
+function mapEvidence(row: EvidenceRow): EvidenceItem {
+  return {
+    id: row.id,
+    title: row.title,
+    kind: row.evidence_kind,
+    source: row.source,
+    sourceUrl: row.source_url ?? "",
+    summary: row.summary,
+    whyItMatters: row.why_it_matters,
+    mediaMinutes: Math.max(0, Number(row.media_minutes) || 0),
+    reviewState: row.review_state,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    metadata: row.metadata ?? {},
+  };
+}
+
 function mapSnapshot(row: AnchorContextSnapshotRow | undefined): AnchorContextSnapshot | null {
   if (!row) return null;
 
@@ -326,6 +362,7 @@ function normalizeInquiry(
   setupByInquiryId: Map<string, WorkbenchSetupRow>,
   versionCountByInquiryId: Map<string, number>,
   snapshotByInquiryId: Map<string, AnchorContextSnapshotRow>,
+  evidenceByInquiryId: Map<string, EvidenceItem[]>,
   defaultSetup: InquirySetup,
 ): InquiryDraft {
   const anchor = mapAnchor(anchorByInquiryId.get(row.id));
@@ -346,7 +383,7 @@ function normalizeInquiry(
     updatedAt: row.updated_at,
     versionCount: versionCountByInquiryId.get(row.id) ?? 1,
     setup: setupFromRow(setupByInquiryId.get(row.id), defaultSetup),
-    evidence: [],
+    evidence: evidenceByInquiryId.get(row.id) ?? [],
   };
 }
 
@@ -365,7 +402,7 @@ export async function listInstituteInquiries(defaultSetup: InquirySetup): Promis
 
   if (!inquiryIds.length) return [];
 
-  const [{ data: anchorRows }, { data: setupRows }, { data: versionRows }, { data: snapshotRows }] = await Promise.all([
+  const [{ data: anchorRows }, { data: setupRows }, { data: versionRows }, { data: snapshotRows }, { data: evidenceRows }] = await Promise.all([
     supabase
       .from("institute_inquiry_anchors")
       .select("inquiry_id, anchor_entity_type, anchor_slug, anchor_label, anchor_image_url, anchor_metadata, is_primary, status")
@@ -384,6 +421,12 @@ export async function listInstituteInquiries(defaultSetup: InquirySetup): Promis
       .from("institute_anchor_context_snapshots")
       .select("id, inquiry_id, snapshot_version, anchor_entity_type, anchor_slug, anchor_label, source_context, knowns, unknowns, relationship_leads, evidence_gaps, related_entities, thin_data_notes, source_references, created_at")
       .in("inquiry_id", inquiryIds)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("institute_evidence_items")
+      .select("id, inquiry_id, evidence_kind, title, source, source_url, summary, why_it_matters, media_minutes, review_state, metadata, created_at, updated_at")
+      .in("inquiry_id", inquiryIds)
+      .is("deleted_at", null)
       .order("created_at", { ascending: false }),
   ]);
 
@@ -407,8 +450,14 @@ export async function listInstituteInquiries(defaultSetup: InquirySetup): Promis
     if (!snapshotByInquiryId.has(snapshot.inquiry_id)) snapshotByInquiryId.set(snapshot.inquiry_id, snapshot);
   });
 
+  const evidenceByInquiryId = new Map<string, EvidenceItem[]>();
+  ((evidenceRows ?? []) as EvidenceRow[]).forEach((row) => {
+    const current = evidenceByInquiryId.get(row.inquiry_id) ?? [];
+    evidenceByInquiryId.set(row.inquiry_id, [...current, mapEvidence(row)]);
+  });
+
   return inquiries.map((row) =>
-    normalizeInquiry(row, anchorByInquiryId, setupByInquiryId, versionCountByInquiryId, snapshotByInquiryId, defaultSetup),
+    normalizeInquiry(row, anchorByInquiryId, setupByInquiryId, versionCountByInquiryId, snapshotByInquiryId, evidenceByInquiryId, defaultSetup),
   );
 }
 
@@ -514,8 +563,35 @@ export async function createInstituteInquiry(
   const setupByInquiryId = new Map<string, WorkbenchSetupRow>();
   const versionCountByInquiryId = new Map<string, number>([[inquiryRow.id, 1]]);
   const snapshotByInquiryId = new Map<string, AnchorContextSnapshotRow>();
+  const evidenceByInquiryId = new Map<string, EvidenceItem[]>();
 
-  return normalizeInquiry(inquiryRow, anchorByInquiryId, setupByInquiryId, versionCountByInquiryId, snapshotByInquiryId, defaultSetup);
+  return normalizeInquiry(inquiryRow, anchorByInquiryId, setupByInquiryId, versionCountByInquiryId, snapshotByInquiryId, evidenceByInquiryId, defaultSetup);
+}
+
+export async function createInstituteEvidenceItem(
+  inquiryId: string,
+  evidence: Omit<EvidenceItem, "id" | "createdAt" | "updatedAt">,
+): Promise<EvidenceItem> {
+  const { data, error } = await supabase
+    .from("institute_evidence_items")
+    .insert({
+      inquiry_id: inquiryId,
+      evidence_kind: evidence.kind,
+      title: evidence.title,
+      source: evidence.source,
+      source_url: evidence.sourceUrl || null,
+      summary: evidence.summary,
+      why_it_matters: evidence.whyItMatters,
+      media_minutes: evidence.mediaMinutes,
+      review_state: evidence.reviewState,
+      metadata: evidence.metadata ?? {},
+    })
+    .select("id, inquiry_id, evidence_kind, title, source, source_url, summary, why_it_matters, media_minutes, review_state, metadata, created_at, updated_at")
+    .single();
+
+  if (error) throw error;
+
+  return mapEvidence(data as EvidenceRow);
 }
 
 export async function updateInstituteInquiry(

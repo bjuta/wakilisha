@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  createInstituteEvidenceItem,
   createInstituteInquiry,
   listInstituteInquiries,
   updateInstituteInquiry,
@@ -102,6 +103,31 @@ const setupOptions = {
   draftTimers: ["10 sec", "30 sec", "60 sec", "Off"],
 };
 
+
+
+const evidenceKinds: EvidenceKind[] = [
+  "WAKILISHA record",
+  "Article",
+  "Link",
+  "Citation",
+  "Audio",
+  "Video",
+  "Photo",
+  "Interview",
+  "Chart data",
+  "Archive document",
+  "Personal note",
+];
+
+const reviewStates: ReviewState[] = [
+  "Draft",
+  "Needs review",
+  "Accepted for internal memory",
+  "Public-safe candidate",
+  "Needs more evidence",
+  "Kept as doubt",
+  "Rejected with reason",
+];
 
 function stripLegacyInstituteHash() {
   if (typeof window === "undefined") return;
@@ -215,6 +241,22 @@ function useSupabaseInquiries() {
     return inquiry;
   };
 
+  const addEvidence = async (id: string, evidence: Omit<EvidenceItem, "id" | "createdAt" | "updatedAt">) => {
+    const saved = await createInstituteEvidenceItem(id, evidence);
+    setInquiries((current) =>
+      current.map((inquiry) =>
+        inquiry.id === id
+          ? {
+              ...inquiry,
+              evidence: [saved, ...(inquiry.evidence ?? [])],
+              updatedAt: saved.updatedAt,
+            }
+          : inquiry,
+      ),
+    );
+    return saved;
+  };
+
   const updateInquiry = async (id: string, patch: Partial<InquiryDraft>) => {
     const existing = inquiries.find((inquiry) => inquiry.id === id) ?? null;
     const updatedAt = new Date().toISOString();
@@ -245,7 +287,7 @@ function useSupabaseInquiries() {
     }
   };
 
-  return { inquiries, loading, error, addInquiry, updateInquiry };
+  return { inquiries, loading, error, addInquiry, addEvidence, updateInquiry };
 }
 
 function Rail({
@@ -262,7 +304,7 @@ function Rail({
   const inquiryNav: Array<{ screen: InquiryScreen; label: string; badge?: string; disabled?: boolean }> = [
     { screen: "workbench", label: "Workbench" },
     { screen: "anchorBrief", label: "Anchor brief", badge: active?.anchorContextSnapshot ? "ready" : "none" },
-    { screen: "evidence", label: "Evidence", badge: "soon", disabled: true },
+    { screen: "evidence", label: "Evidence", badge: active?.evidence?.length ? String(active.evidence.length) : "0" },
     { screen: "claims", label: "Claims", disabled: true },
     { screen: "relationships", label: "Relationships", disabled: true },
     { screen: "review", label: "Review", disabled: true },
@@ -1243,207 +1285,565 @@ function AnchorBriefScreen({ draft }: { draft: InquiryDraft | null }) {
   );
 }
 
+
+type EvidenceSourceConfig = {
+  kind: EvidenceKind;
+  label: string;
+  role: string;
+  integrityPrompt: string;
+  editorUse: string;
+};
+
+const evidenceSourceConfigs: EvidenceSourceConfig[] = [
+  {
+    kind: "WAKILISHA record",
+    label: "WAKILISHA record",
+    role: "Use an existing artist, track, release, label, genre, chart, or internal record as structured source material.",
+    integrityPrompt: "Confirm the record is current, specific, and relevant to this Inquiry.",
+    editorUse: "Can support registry updates, article context, claims, relationships, or corrections.",
+  },
+  {
+    kind: "Article",
+    label: "Reference article",
+    role: "Use an existing article as source material. This is not the article we are publishing.",
+    integrityPrompt: "Capture author, publisher, access date, and what the article actually proves.",
+    editorUse: "Can support a future WAKILISHA article, guide, citation trail, or research note.",
+  },
+  {
+    kind: "Link",
+    label: "Web source",
+    role: "Capture a web page, post, database entry, archive page, or useful public URL.",
+    integrityPrompt: "Check source credibility, access date, link rot risk, and whether it needs archiving.",
+    editorUse: "Can support claims, provide context, or point editors to material that needs verification.",
+  },
+  {
+    kind: "Citation",
+    label: "Citation or quote",
+    role: "Capture a quote, excerpt, page reference, timestamp, or exact claim from a source.",
+    integrityPrompt: "Separate what is quoted from what we infer. Add page, timestamp, or locator where possible.",
+    editorUse: "Can become claim support, article citation, correction evidence, or research packet material.",
+  },
+  {
+    kind: "Interview",
+    label: "Interview or oral history",
+    role: "Capture an interview, transcript note, voice account, or contributor conversation.",
+    integrityPrompt: "Track consent, speaker identity, recording status, and what can or cannot be public.",
+    editorUse: "Can support articles, oral history work, internal memory, claims, or future audio/video production.",
+  },
+  {
+    kind: "Audio",
+    label: "Audio material",
+    role: "Capture a recording, voice note, song-related audio reference, field recording, or audio archive item.",
+    integrityPrompt: "Track transcript needs, speaker, timestamp, rights, consent, and public-use limits.",
+    editorUse: "Can become internal evidence, article support, oral history material, or future audio vertical input.",
+  },
+  {
+    kind: "Video",
+    label: "Video material",
+    role: "Capture a video source, clip, scene, interview, performance, explainer, or visual record.",
+    integrityPrompt: "Track timestamp, rights, people present, captions, transcript needs, and public-use limits.",
+    editorUse: "Can support article embeds, future video work items, claim review, or archive notes.",
+  },
+  {
+    kind: "Photo",
+    label: "Photo or image",
+    role: "Capture an image that is evidence, not just decoration.",
+    integrityPrompt: "Track credit, date, place, rights, people shown, caption, and consent.",
+    editorUse: "Can support articles, photo essays, registry image candidates, archive records, or scene documentation.",
+  },
+  {
+    kind: "Archive document",
+    label: "Archive document",
+    role: "Capture scans, documents, programs, press kits, PDFs, letters, contracts, flyers, or cataloged material.",
+    integrityPrompt: "Track collection, locator, access note, rights, excerpt, and what the document does not prove.",
+    editorUse: "Can support articles, guides, claims, timelines, corrections, or structured archive records.",
+  },
+  {
+    kind: "Chart data",
+    label: "Chart or dataset",
+    role: "Capture chart positions, rankings, metrics, lists, datasets, or structured evidence.",
+    integrityPrompt: "Track source, date, edition, metric definition, and how the number should be interpreted.",
+    editorUse: "Can support data-led stories, charts context, claim support, or registry enrichment.",
+  },
+  {
+    kind: "Personal note",
+    label: "Contributor memory",
+    role: "Capture a memory, observation, field note, or informed contributor note.",
+    integrityPrompt: "Mark uncertainty clearly. Do not treat memory as verified fact without support.",
+    editorUse: "Can become internal memory, a lead for further evidence, or a fork into a new Inquiry.",
+  },
+];
+
+const editorialOutcomeOptions = [
+  {
+    id: "article_candidate",
+    title: "Article candidate",
+    body: "This material may help an editor create or improve a WAKILISHA article later.",
+    guardrail: "Contributor proposes. Editor decides and opens the real article editor after review.",
+  },
+  {
+    id: "guide_document_candidate",
+    title: "Guide or document candidate",
+    body: "This material may belong in a guide, explainer, document, or research brief.",
+    guardrail: "No public document is created from this screen.",
+  },
+  {
+    id: "registry_update",
+    title: "Registry update proposal",
+    body: "This material may correct, enrich, or challenge a registry record.",
+    guardrail: "Registry changes must be reviewed before anything public changes.",
+  },
+  {
+    id: "claim_support",
+    title: "Claim support",
+    body: "This material appears to support a claim that may be used later.",
+    guardrail: "Claim acceptance comes after review.",
+  },
+  {
+    id: "claim_challenge",
+    title: "Claim challenge",
+    body: "This material appears to weaken, complicate, or contradict a claim.",
+    guardrail: "Contradictions are kept visible for editors.",
+  },
+  {
+    id: "relationship_evidence",
+    title: "Relationship evidence",
+    body: "This material may support a relationship between artists, tracks, places, labels, scenes, or contributors.",
+    guardrail: "Relationship proposals need review before becoming structured knowledge.",
+  },
+  {
+    id: "correction_candidate",
+    title: "Correction candidate",
+    body: "This material suggests something public or internal may need correction.",
+    guardrail: "Corrections need editorial handling before publication.",
+  },
+  {
+    id: "media_work_item",
+    title: "Media work item",
+    body: "This material may become audio, video, photo, or archive work in a future WAKILISHA vertical.",
+    guardrail: "This PR stores the intent. It does not publish media.",
+  },
+  {
+    id: "internal_memory",
+    title: "Internal memory only",
+    body: "This material is useful for WAKILISHA but may not be public-safe or publication-ready.",
+    guardrail: "Useful does not mean public.",
+  },
+  {
+    id: "new_inquiry_fork",
+    title: "Fork into new Inquiry",
+    body: "This material opens a better or separate question.",
+    guardrail: "The fork action comes later.",
+  },
+];
+
+function evidenceMetadataText(item: EvidenceItem, key: string, fallback = "Not set") {
+  const value = item.metadata?.[key];
+  return typeof value === "string" && value.trim() ? value : fallback;
+}
+
+function EvidenceMetric({ label, value, note }: { label: string; value: string | number; note: string }) {
+  return (
+    <div className="rounded-xl border border-wk-border bg-wk-bg-subtle p-4">
+      <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">{label}</div>
+      <div className="mt-2 text-[26px] font-black tracking-[-0.05em] text-wk-text">{value}</div>
+      <p className="mt-1 text-[11px] leading-4 text-wk-text-muted">{note}</p>
+    </div>
+  );
+}
+
 function EvidenceScreen({
   draft,
-  updateDraft,
+  addEvidence,
 }: {
   draft: InquiryDraft | null;
-  updateDraft: (patch: Partial<InquiryDraft>) => void;
+  addEvidence: (inquiryId: string, evidence: Omit<EvidenceItem, "id" | "createdAt" | "updatedAt">) => Promise<EvidenceItem>;
 }) {
-  const [evidenceDraft, setEvidenceDraft] = useState({
+  const [selectedKind, setSelectedKind] = useState<EvidenceKind>("Link");
+  const [form, setForm] = useState({
     title: "",
-    kind: "Link" as EvidenceKind,
     source: "",
     sourceUrl: "",
     summary: "",
     whyItMatters: "",
-    mediaMinutes: "0",
-    reviewState: "Draft" as ReviewState,
+    confidence: "Useful clue",
+    rightsStatus: "Unknown rights",
+    consentStatus: "Not assessed",
+    uncertaintyNote: "",
+    supports: "",
+    challenges: "",
+    editorialOutcome: "article_candidate",
+    contributorNote: "",
   });
+  const [saving, setSaving] = useState(false);
 
   if (!draft) {
     return (
       <div className="mx-auto max-w-[1000px]">
-        <Panel eyebrow="Evidence" title="No Active Inquiry">
-          <EmptyState title="Nothing to add evidence to yet" body="Create or select an Inquiry first." />
+        <Panel eyebrow="Evidence Studio" title="No Active Inquiry">
+          <EmptyState title="Nothing to service yet" body="Create or select an Inquiry first." />
         </Panel>
       </div>
     );
   }
 
   const evidence = draft.evidence ?? [];
-  const canAdd =
-    evidenceDraft.title.trim().length >= 3 &&
-    evidenceDraft.source.trim().length >= 2 &&
-    evidenceDraft.summary.trim().length >= 8 &&
-    evidenceDraft.whyItMatters.trim().length >= 8;
+  const selectedConfig = evidenceSourceConfigs.find((config) => config.kind === selectedKind) ?? evidenceSourceConfigs[0];
+  const selectedOutcome = editorialOutcomeOptions.find((outcome) => outcome.id === form.editorialOutcome) ?? editorialOutcomeOptions[0];
 
-  const addEvidence = () => {
-    if (!canAdd) return;
+  const readyForReview = evidence.filter((item) => item.reviewState === "Needs review").length;
+  const internalMemory = evidence.filter((item) => item.reviewState === "Accepted for internal memory").length;
+  const publicCandidates = evidence.filter((item) => item.reviewState === "Public-safe candidate").length;
+  const withRightsRisk = evidence.filter((item) => evidenceMetadataText(item, "rightsStatus", "").toLowerCase().includes("unknown")).length;
+  const withConsentRisk = evidence.filter((item) => evidenceMetadataText(item, "consentStatus", "").toLowerCase().includes("needed")).length;
 
-    const createdAt = nowDate();
-    const item: EvidenceItem = {
-      id: makeId(),
-      title: evidenceDraft.title.trim(),
-      kind: evidenceDraft.kind,
-      source: evidenceDraft.source.trim(),
-      sourceUrl: evidenceDraft.sourceUrl.trim(),
-      summary: evidenceDraft.summary.trim(),
-      whyItMatters: evidenceDraft.whyItMatters.trim(),
-      mediaMinutes: Math.max(0, Number(evidenceDraft.mediaMinutes) || 0),
-      reviewState: evidenceDraft.reviewState,
-      createdAt,
-      updatedAt: createdAt,
-    };
+  const canSave =
+    form.title.trim().length >= 3 &&
+    form.source.trim().length >= 2 &&
+    form.summary.trim().length >= 8 &&
+    form.whyItMatters.trim().length >= 8;
 
-    updateDraft({ evidence: [item, ...evidence] });
+  const saveSourceMaterial = async () => {
+    if (!canSave || saving) return;
 
-    setEvidenceDraft({
-      title: "",
-      kind: "Link",
-      source: "",
-      sourceUrl: "",
-      summary: "",
-      whyItMatters: "",
-      mediaMinutes: "0",
-      reviewState: "Draft",
-    });
+    setSaving(true);
+    try {
+      await addEvidence(draft.id, {
+        title: form.title.trim(),
+        kind: selectedKind,
+        source: form.source.trim(),
+        sourceUrl: form.sourceUrl.trim(),
+        summary: form.summary.trim(),
+        whyItMatters: form.whyItMatters.trim(),
+        mediaMinutes: 0,
+        reviewState: "Draft",
+        metadata: {
+          evidenceStudioVersion: 1,
+          sourceMaterialRole: selectedConfig.role,
+          sourceIntegrityPrompt: selectedConfig.integrityPrompt,
+          editorUse: selectedConfig.editorUse,
+          confidence: form.confidence,
+          rightsStatus: form.rightsStatus,
+          consentStatus: form.consentStatus,
+          uncertaintyNote: form.uncertaintyNote.trim(),
+          supports: form.supports.trim(),
+          challenges: form.challenges.trim(),
+          suggestedEditorialOutcome: form.editorialOutcome,
+          suggestedEditorialOutcomeLabel: selectedOutcome.title,
+          editorialGuardrail: selectedOutcome.guardrail,
+          contributorNote: form.contributorNote.trim(),
+        },
+      });
+
+      setForm({
+        title: "",
+        source: "",
+        sourceUrl: "",
+        summary: "",
+        whyItMatters: "",
+        confidence: "Useful clue",
+        rightsStatus: "Unknown rights",
+        consentStatus: "Not assessed",
+        uncertaintyNote: "",
+        supports: "",
+        challenges: "",
+        editorialOutcome: "article_candidate",
+        contributorNote: "",
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const reviewReadyCount = evidence.filter((item) => item.reviewState === "Needs review").length;
-  const internalMemoryCount = evidence.filter((item) => item.reviewState === "Accepted for internal memory").length;
-  const publicCandidateCount = evidence.filter((item) => item.reviewState === "Public-safe candidate").length;
-  const totalMaterialMinutes = evidence.reduce((sum, item) => sum + item.mediaMinutes, 0);
-
   return (
-    <div className="mx-auto max-w-[1180px] space-y-5">
-      <Panel eyebrow={`${draft.code} · Evidence`} title="What can we put on the table?">
-        <p className="mb-4 max-w-3xl text-[14px] leading-6 text-wk-text-muted">
-          Add real source material for this Inquiry. Evidence can be useful before it is public-safe.
-        </p>
+    <div className="mx-auto max-w-[1240px] space-y-5">
+      <section className="rounded-[26px] border border-wk-border bg-wk-surface p-6 shadow-sm lg:p-7">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <div className="text-[10px] font-black uppercase tracking-[0.24em] text-wk-brand">
+              {draft.code} · Evidence Studio
+            </div>
+            <h1 className="mt-3 max-w-4xl text-[34px] font-black leading-[1.02] tracking-[-0.065em] text-wk-text lg:text-[42px]">
+              Service the Inquiry before anything becomes public.
+            </h1>
+            <p className="mt-3 max-w-3xl text-[14px] leading-6 text-wk-text-muted">
+              Evidence Studio is where contributors collect source material, explain what it supports, surface risk, and suggest what an editor should review it as. It does not publish.
+            </p>
+          </div>
 
-        <div className="grid gap-3 md:grid-cols-4">
-          <div className="rounded-xl border border-wk-border bg-wk-bg-subtle p-4">
-            <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Items</div>
-            <div className="mt-2 text-[26px] font-black tracking-[-0.05em] text-wk-text">{evidence.length}</div>
-          </div>
-          <div className="rounded-xl border border-wk-border bg-wk-bg-subtle p-4">
-            <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Needs review</div>
-            <div className="mt-2 text-[26px] font-black tracking-[-0.05em] text-wk-text">{reviewReadyCount}</div>
-          </div>
-          <div className="rounded-xl border border-wk-border bg-wk-bg-subtle p-4">
-            <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Internal memory</div>
-            <div className="mt-2 text-[26px] font-black tracking-[-0.05em] text-wk-text">{internalMemoryCount}</div>
-          </div>
-          <div className="rounded-xl border border-wk-border bg-wk-bg-subtle p-4">
-            <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Material time</div>
-            <div className="mt-2 text-[26px] font-black tracking-[-0.05em] text-wk-text">{totalMaterialMinutes} min</div>
+          <div className="rounded-2xl border border-wk-warning/30 bg-wk-warning-soft p-4 text-left">
+            <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-warning">Editorial guardrail</div>
+            <p className="mt-2 max-w-[280px] text-[12px] leading-5 text-wk-text-muted">
+              Contributors create review candidates. Editors approve, promote, schedule, and publish from the correct editorial surface.
+            </p>
           </div>
         </div>
-      </Panel>
 
-      <div className="grid gap-5 lg:grid-cols-[0.95fr_1.05fr]">
-        <Panel title="Add Evidence">
+        <div className="mt-5 rounded-xl border border-wk-border bg-wk-bg-subtle p-4">
+          <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Inquiry being serviced</div>
+          <p className="mt-2 text-[16px] font-black leading-6 text-wk-text">{draft.workingQuestion}</p>
+          {draft.anchor ? (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <Chip tone="brand">{draft.anchor.type}</Chip>
+              <span className="text-[12px] font-bold text-wk-text-muted">{draft.anchor.label}</span>
+              {draft.anchorContextSnapshot ? <Chip tone="success">Anchor brief ready</Chip> : <Chip tone="warning">No anchor snapshot</Chip>}
+            </div>
+          ) : (
+            <div className="mt-3">
+              <Chip tone="warning">No anchor</Chip>
+            </div>
+          )}
+        </div>
+      </section>
+
+      <div className="grid gap-3 md:grid-cols-4">
+        <EvidenceMetric label="Source materials" value={evidence.length} note="Raw material collected for this Inquiry." />
+        <EvidenceMetric label="Ready for review" value={readyForReview} note="Material waiting for an editor decision." />
+        <EvidenceMetric label="Internal memory" value={internalMemory} note="Useful material that may not be public." />
+        <EvidenceMetric label="Risk flags" value={withRightsRisk + withConsentRisk} note="Rights or consent issues that need attention." />
+      </div>
+
+      <div className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
+        <Panel eyebrow="1 · Source Material" title="What are we working with?">
+          <p className="mb-4 text-[13px] leading-6 text-wk-text-muted">
+            Choose the kind of source material. This choice changes how a contributor thinks about trust, rights, consent, and editorial use.
+          </p>
+
+          <div className="grid gap-3 md:grid-cols-2">
+            {evidenceSourceConfigs.map((config) => {
+              const selected = config.kind === selectedKind;
+              return (
+                <button
+                  key={config.kind}
+                  type="button"
+                  onClick={() => setSelectedKind(config.kind)}
+                  className={cx(
+                    "rounded-xl border p-4 text-left transition",
+                    selected ? "border-wk-brand bg-wk-brand-soft shadow-sm" : "border-wk-border bg-wk-bg hover:border-wk-brand/40",
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="text-[13px] font-black text-wk-text">{config.label}</div>
+                    <span className={cx(
+                      "rounded-full border px-2 py-0.5 text-[10px] font-black",
+                      selected ? "border-wk-brand bg-wk-surface text-wk-brand" : "border-wk-border bg-wk-surface text-wk-text-muted",
+                    )}>
+                      {selected ? "Selected" : "Choose"}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-[11px] leading-4 text-wk-text-muted">{config.role}</p>
+                </button>
+              );
+            })}
+          </div>
+        </Panel>
+
+        <Panel eyebrow="2 · Capture" title={`Add ${selectedConfig.label}`}>
+          <div className="mb-4 rounded-xl border border-wk-brand/20 bg-wk-brand-soft p-4">
+            <div className="text-[11px] font-black uppercase tracking-[0.14em] text-wk-brand">How to treat this source</div>
+            <p className="mt-2 text-[12px] leading-5 text-wk-text-muted">{selectedConfig.integrityPrompt}</p>
+            <p className="mt-2 text-[12px] leading-5 text-wk-text-muted">
+              <strong className="text-wk-text">Possible editor use:</strong> {selectedConfig.editorUse}
+            </p>
+          </div>
+
           <div className="space-y-4">
             <label className="block">
-              <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Evidence title</span>
+              <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Material title</span>
               <input
-                value={evidenceDraft.title}
-                onChange={(event) => setEvidenceDraft((current) => ({ ...current, title: event.target.value }))}
-                placeholder="Example: Interview clip, article, archive note"
+                value={form.title}
+                onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
+                placeholder="Give this source material a clear working title"
                 className="w-full rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
               />
             </label>
 
             <div className="grid gap-3 md:grid-cols-2">
               <label>
-                <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Format</span>
-                <select
-                  value={evidenceDraft.kind}
-                  onChange={(event) => setEvidenceDraft((current) => ({ ...current, kind: event.target.value as EvidenceKind }))}
+                <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Source or creator</span>
+                <input
+                  value={form.source}
+                  onChange={(event) => setForm((current) => ({ ...current, source: event.target.value }))}
+                  placeholder="Who or where did this come from?"
                   className="w-full rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
-                >
-                  {evidenceKinds.map((kind) => <option key={kind}>{kind}</option>)}
-                </select>
+                />
               </label>
 
               <label>
-                <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Review state</span>
-                <select
-                  value={evidenceDraft.reviewState}
-                  onChange={(event) => setEvidenceDraft((current) => ({ ...current, reviewState: event.target.value as ReviewState }))}
+                <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">URL or locator</span>
+                <input
+                  value={form.sourceUrl}
+                  onChange={(event) => setForm((current) => ({ ...current, sourceUrl: event.target.value }))}
+                  placeholder="https://, archive locator, file note, or record slug"
                   className="w-full rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
-                >
-                  {reviewStates.map((state) => <option key={state}>{state}</option>)}
-                </select>
+                />
               </label>
             </div>
 
             <label className="block">
-              <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Source</span>
-              <input
-                value={evidenceDraft.source}
-                onChange={(event) => setEvidenceDraft((current) => ({ ...current, source: event.target.value }))}
-                placeholder="Who or where did this come from?"
-                className="w-full rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
-              />
-            </label>
-
-            <label className="block">
-              <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Source URL, if any</span>
-              <input
-                value={evidenceDraft.sourceUrl}
-                onChange={(event) => setEvidenceDraft((current) => ({ ...current, sourceUrl: event.target.value }))}
-                placeholder="https://..."
-                className="w-full rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
-              />
-            </label>
-
-            <label className="block">
-              <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Summary</span>
+              <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">What does this material say?</span>
               <textarea
-                value={evidenceDraft.summary}
-                onChange={(event) => setEvidenceDraft((current) => ({ ...current, summary: event.target.value }))}
-                rows={3}
-                placeholder="What does this evidence say?"
+                value={form.summary}
+                onChange={(event) => setForm((current) => ({ ...current, summary: event.target.value }))}
+                rows={4}
+                placeholder="Summarize the actual material. Keep facts separate from interpretation."
                 className="w-full resize-y rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[13px] leading-6 text-wk-text outline-none focus:border-wk-brand"
               />
             </label>
 
             <label className="block">
-              <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Why it matters</span>
+              <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Why does it matter to this Inquiry?</span>
               <textarea
-                value={evidenceDraft.whyItMatters}
-                onChange={(event) => setEvidenceDraft((current) => ({ ...current, whyItMatters: event.target.value }))}
-                rows={3}
-                placeholder="What does this help us understand?"
+                value={form.whyItMatters}
+                onChange={(event) => setForm((current) => ({ ...current, whyItMatters: event.target.value }))}
+                rows={4}
+                placeholder="Explain how this services the Inquiry. What does it help an editor understand?"
                 className="w-full resize-y rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[13px] leading-6 text-wk-text outline-none focus:border-wk-brand"
               />
             </label>
 
+            <div className="grid gap-3 md:grid-cols-3">
+              <label>
+                <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Confidence</span>
+                <select
+                  value={form.confidence}
+                  onChange={(event) => setForm((current) => ({ ...current, confidence: event.target.value }))}
+                  className="w-full rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
+                >
+                  <option>Useful clue</option>
+                  <option>Strong support</option>
+                  <option>Partial support</option>
+                  <option>Contradicts something</option>
+                  <option>Needs primary source</option>
+                  <option>Unverified memory</option>
+                </select>
+              </label>
+
+              <label>
+                <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Rights</span>
+                <select
+                  value={form.rightsStatus}
+                  onChange={(event) => setForm((current) => ({ ...current, rightsStatus: event.target.value }))}
+                  className="w-full rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
+                >
+                  <option>Unknown rights</option>
+                  <option>Public source</option>
+                  <option>Owned by WAKILISHA</option>
+                  <option>Permission needed</option>
+                  <option>Do not publish</option>
+                </select>
+              </label>
+
+              <label>
+                <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Consent</span>
+                <select
+                  value={form.consentStatus}
+                  onChange={(event) => setForm((current) => ({ ...current, consentStatus: event.target.value }))}
+                  className="w-full rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
+                >
+                  <option>Not assessed</option>
+                  <option>Not needed</option>
+                  <option>Consent needed</option>
+                  <option>Consent captured</option>
+                  <option>Private only</option>
+                </select>
+              </label>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              <label>
+                <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">What does it support?</span>
+                <textarea
+                  value={form.supports}
+                  onChange={(event) => setForm((current) => ({ ...current, supports: event.target.value }))}
+                  rows={3}
+                  placeholder="Claim, relationship, context, correction, scene, timeline, or article angle"
+                  className="w-full resize-y rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[13px] leading-6 text-wk-text outline-none focus:border-wk-brand"
+                />
+              </label>
+
+              <label>
+                <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">What does it challenge or not prove?</span>
+                <textarea
+                  value={form.challenges}
+                  onChange={(event) => setForm((current) => ({ ...current, challenges: event.target.value }))}
+                  rows={3}
+                  placeholder="Contradictions, limits, weak points, or things an editor must verify"
+                  className="w-full resize-y rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[13px] leading-6 text-wk-text outline-none focus:border-wk-brand"
+                />
+              </label>
+            </div>
+
             <label className="block">
-              <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Media time, minutes</span>
-              <input
-                type="number"
-                min="0"
-                value={evidenceDraft.mediaMinutes}
-                onChange={(event) => setEvidenceDraft((current) => ({ ...current, mediaMinutes: event.target.value }))}
-                className="w-full rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
+              <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Uncertainty note</span>
+              <textarea
+                value={form.uncertaintyNote}
+                onChange={(event) => setForm((current) => ({ ...current, uncertaintyNote: event.target.value }))}
+                rows={3}
+                placeholder="What should not be treated as confirmed yet?"
+                className="w-full resize-y rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[13px] leading-6 text-wk-text outline-none focus:border-wk-brand"
               />
             </label>
-
-            <button
-              type="button"
-              disabled={!canAdd}
-              onClick={addEvidence}
-              className="rounded-lg bg-wk-brand px-6 py-3 text-[14px] font-black text-wk-brand-on transition disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              Add Evidence
-            </button>
           </div>
         </Panel>
+      </div>
 
-        <Panel title="Evidence on This Inquiry">
+      <Panel eyebrow="3 · Work Product Proposal" title="What should an editor review this as?">
+        <p className="mb-4 max-w-3xl text-[13px] leading-6 text-wk-text-muted">
+          This is not publishing. This tells the editor what the contributor thinks the material could become after review.
+        </p>
+
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {editorialOutcomeOptions.map((outcome) => {
+            const selected = outcome.id === form.editorialOutcome;
+            return (
+              <button
+                key={outcome.id}
+                type="button"
+                onClick={() => setForm((current) => ({ ...current, editorialOutcome: outcome.id }))}
+                className={cx(
+                  "rounded-xl border p-4 text-left transition",
+                  selected ? "border-wk-brand bg-wk-brand-soft shadow-sm" : "border-wk-border bg-wk-bg hover:border-wk-brand/40",
+                )}
+              >
+                <div className="text-[13px] font-black text-wk-text">{outcome.title}</div>
+                <p className="mt-2 text-[11px] leading-4 text-wk-text-muted">{outcome.body}</p>
+                <p className="mt-3 rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[11px] leading-4 text-wk-text-muted">
+                  {outcome.guardrail}
+                </p>
+              </button>
+            );
+          })}
+        </div>
+
+        <label className="mt-4 block">
+          <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Contributor note to editor</span>
+          <textarea
+            value={form.contributorNote}
+            onChange={(event) => setForm((current) => ({ ...current, contributorNote: event.target.value }))}
+            rows={3}
+            placeholder="What should the editor know when reviewing this material?"
+            className="w-full resize-y rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[13px] leading-6 text-wk-text outline-none focus:border-wk-brand"
+          />
+        </label>
+
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            disabled={!canSave || saving}
+            onClick={() => void saveSourceMaterial()}
+            className="rounded-lg bg-wk-brand px-6 py-3 text-[14px] font-black text-wk-brand-on transition disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {saving ? "Saving..." : "Save Source Material"}
+          </button>
+          <span className="text-[12px] leading-5 text-wk-text-faint">
+            Saves material to this Inquiry. It does not publish, schedule, or approve anything.
+          </span>
+        </div>
+      </Panel>
+
+      <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
+        <Panel eyebrow="4 · Source Material Library" title="What has been collected?">
           {evidence.length ? (
             <div className="space-y-3">
               {evidence.map((item) => (
@@ -1453,57 +1853,89 @@ function EvidenceScreen({
                     <Chip tone={item.reviewState === "Needs review" ? "warning" : item.reviewState === "Accepted for internal memory" ? "success" : "neutral"}>
                       {item.reviewState}
                     </Chip>
-                    {item.mediaMinutes ? <Chip>{item.mediaMinutes} min</Chip> : null}
+                    <Chip>{evidenceMetadataText(item, "confidence")}</Chip>
                   </div>
-                  <h3 className="mt-3 text-[16px] font-black tracking-[-0.03em] text-wk-text">{item.title}</h3>
+
+                  <h3 className="mt-3 text-[17px] font-black tracking-[-0.03em] text-wk-text">{item.title}</h3>
                   <p className="mt-2 text-[13px] leading-6 text-wk-text-muted">{item.summary}</p>
-                  <div className="mt-3 rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[12px] leading-5 text-wk-text-muted">
-                    <strong className="text-wk-text">Source:</strong> {item.source}
-                    {item.sourceUrl ? (
-                      <>
-                        <br />
-                        <a href={item.sourceUrl} target="_blank" rel="noreferrer" className="font-bold text-wk-brand">
-                          Open source
-                        </a>
-                      </>
-                    ) : null}
+
+                  <div className="mt-3 grid gap-2 md:grid-cols-2">
+                    <div className="rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[12px] leading-5 text-wk-text-muted">
+                      <strong className="text-wk-text">Source:</strong> {item.source}
+                      {item.sourceUrl ? (
+                        <>
+                          <br />
+                          <a href={item.sourceUrl} target="_blank" rel="noreferrer" className="font-bold text-wk-brand">
+                            Open source
+                          </a>
+                        </>
+                      ) : null}
+                    </div>
+                    <div className="rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[12px] leading-5 text-wk-text-muted">
+                      <strong className="text-wk-text">Suggested outcome:</strong> {evidenceMetadataText(item, "suggestedEditorialOutcomeLabel")}
+                      <br />
+                      <strong className="text-wk-text">Rights:</strong> {evidenceMetadataText(item, "rightsStatus")}
+                    </div>
                   </div>
-                  <p className="mt-3 text-[12px] leading-5 text-wk-text-muted">{item.whyItMatters}</p>
+
+                  <div className="mt-3 rounded-lg border border-wk-border bg-wk-bg-subtle px-3 py-2">
+                    <div className="text-[10px] font-black uppercase tracking-[0.14em] text-wk-text-faint">Why it matters</div>
+                    <p className="mt-1 text-[12px] leading-5 text-wk-text-muted">{item.whyItMatters}</p>
+                  </div>
+
+                  {evidenceMetadataText(item, "uncertaintyNote", "") ? (
+                    <div className="mt-3 rounded-lg border border-wk-warning/30 bg-wk-warning-soft px-3 py-2">
+                      <div className="text-[10px] font-black uppercase tracking-[0.14em] text-wk-warning">Uncertainty</div>
+                      <p className="mt-1 text-[12px] leading-5 text-wk-text-muted">{evidenceMetadataText(item, "uncertaintyNote", "")}</p>
+                    </div>
+                  ) : null}
                 </article>
               ))}
             </div>
           ) : (
             <EmptyState
-              title="No evidence yet"
-              body="Add the first source, record, link, note, or media item for this Inquiry."
+              title="No source material yet"
+              body="Start by adding one source material item. The goal is not volume. The goal is useful, reviewable material."
             />
           )}
         </Panel>
-      </div>
 
-      <Panel title="Review Prep">
-        {evidence.length ? (
-          <div className="grid gap-3 md:grid-cols-3">
+        <Panel eyebrow="5 · Review Readiness" title="Can this move to editorial review?">
+          <div className="space-y-3">
             <EmptyState
-              title={publicCandidateCount ? "Public candidates exist" : "No public candidates yet"}
-              body={publicCandidateCount ? `${publicCandidateCount} evidence item(s) may support public work after review.` : "Evidence can be internal memory before it is public-safe."}
+              title={evidence.length ? "Material exists" : "No material yet"}
+              body={evidence.length ? `${evidence.length} source material item(s) have been collected.` : "An editor needs source material before they can review anything."}
             />
             <EmptyState
-              title={reviewReadyCount ? "Review needed" : "Nothing waiting for review"}
-              body={reviewReadyCount ? `${reviewReadyCount} item(s) are waiting for a human decision.` : "Mark evidence as Needs review when it is ready."}
+              title={withRightsRisk ? "Rights need attention" : "Rights risk not blocking yet"}
+              body={withRightsRisk ? `${withRightsRisk} item(s) still have unknown rights.` : "No unknown-rights flags were counted from saved material."}
             />
             <EmptyState
-              title="Next useful step"
-              body="After evidence is useful, the next native surface should be Claims."
+              title={withConsentRisk ? "Consent needs attention" : "Consent risk not blocking yet"}
+              body={withConsentRisk ? `${withConsentRisk} item(s) may need consent before public use.` : "No consent-needed flags were counted from saved material."}
             />
+            <EmptyState
+              title={publicCandidates ? "Public candidates are only suggestions" : "No public candidates yet"}
+              body={publicCandidates ? "Public-safe language is not final approval. Editors still decide." : "Contributors should focus on source quality before public outcomes."}
+            />
+
+            <div className="rounded-xl border border-wk-border bg-wk-bg-subtle p-4">
+              <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Next gate</div>
+              <h3 className="mt-2 text-[18px] font-black tracking-[-0.04em] text-wk-text">Submit for editorial review</h3>
+              <p className="mt-2 text-[12px] leading-5 text-wk-text-muted">
+                PR7 will turn this into a frozen review packet. PR6 only builds the Studio foundation and keeps publishing out of the contributor flow.
+              </p>
+              <button
+                type="button"
+                disabled
+                className="mt-4 w-full rounded-lg bg-wk-text px-5 py-3 text-[13px] font-black text-wk-bg opacity-45"
+              >
+                Submit for editorial review in PR7
+              </button>
+            </div>
           </div>
-        ) : (
-          <EmptyState
-            title="Not ready for review"
-            body="Add evidence before review prep can say anything useful."
-          />
-        )}
-      </Panel>
+        </Panel>
+      </div>
     </div>
   );
 }
@@ -1545,7 +1977,7 @@ export default function NativeInstituteInquiryInterface() {
     stripLegacyInstituteHash();
   }, []);
 
-  const { inquiries: drafts, loading: inquiriesLoading, error: inquiriesError, addInquiry, updateInquiry } = useSupabaseInquiries();
+  const { inquiries: drafts, loading: inquiriesLoading, error: inquiriesError, addInquiry, addEvidence, updateInquiry } = useSupabaseInquiries();
   const [state, setRawState] = useState<InstituteState>({
     screen: "home",
     activeId: null,
@@ -1607,7 +2039,7 @@ export default function NativeInstituteInquiryInterface() {
           ) : state.screen === "anchorBrief" ? (
             <AnchorBriefScreen draft={active} />
           ) : state.screen === "evidence" ? (
-            <EvidenceScreen draft={active} updateDraft={updateActiveDraft} />
+            <EvidenceScreen draft={active} addEvidence={addEvidence} />
           ) : (
             <LockedScreen screen={state.screen} />
           )}
