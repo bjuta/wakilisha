@@ -2020,6 +2020,7 @@ function ReviewDeskScreen() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [editorNotes, setEditorNotes] = useState("");
   const [articleEditorOpen, setArticleEditorOpen] = useState(false);
+  const [queueFilter, setQueueFilter] = useState<"all" | InstituteReviewPacketStatus>("all");
   const [loading, setLoading] = useState(true);
   const [savingStatus, setSavingStatus] = useState<InstituteReviewPacketStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -2043,11 +2044,18 @@ function ReviewDeskScreen() {
     void loadPackets();
   }, []);
 
-  const activePacket = packets.find((packet) => packet.id === activeId) ?? packets[0] ?? null;
+  const filteredPackets = useMemo(
+    () => (queueFilter === "all" ? packets : packets.filter((packet) => packet.status === queueFilter)),
+    [packets, queueFilter],
+  );
+
+  const activePacket = filteredPackets.find((packet) => packet.id === activeId) ?? filteredPackets[0] ?? packets[0] ?? null;
   const snapshot = activePacket?.snapshot;
   const inquiry = snapshot?.inquiry;
   const article = snapshot?.articleDraft;
   const workProduct = snapshot?.workProduct;
+  const articleAdminUrl = article?.slug ? `/admin/content/articles/${article.slug}` : null;
+  const isApprovedHandoff = activePacket?.status === "approved_for_promotion";
 
   useEffect(() => {
     setEditorNotes(activePacket?.editorNotes ?? "");
@@ -2075,10 +2083,20 @@ function ReviewDeskScreen() {
     underReview: packets.filter((packet) => packet.status === "under_review").length,
     changesRequested: packets.filter((packet) => packet.status === "changes_requested").length,
     approved: packets.filter((packet) => packet.status === "approved_for_promotion").length,
+    rejected: packets.filter((packet) => packet.status === "rejected").length,
   };
 
   const actionClass =
     "rounded-lg border border-wk-border bg-wk-surface px-4 py-2 text-[12px] font-black text-wk-text transition hover:border-wk-brand hover:text-wk-brand disabled:cursor-not-allowed disabled:opacity-50";
+
+  const queueTabs: Array<{ key: "all" | InstituteReviewPacketStatus; label: string; count: number }> = [
+    { key: "all", label: "All", count: packets.length },
+    { key: "submitted", label: "Submitted", count: counts.submitted },
+    { key: "under_review", label: "Under review", count: counts.underReview },
+    { key: "changes_requested", label: "Changes requested", count: counts.changesRequested },
+    { key: "approved_for_promotion", label: "Approved handoff", count: counts.approved },
+    { key: "rejected", label: "Rejected", count: counts.rejected },
+  ];
 
   return (
     <div className="mx-auto max-w-[1240px] space-y-5">
@@ -2127,9 +2145,34 @@ function ReviewDeskScreen() {
         </Panel>
       ) : (
         <div className="grid gap-5 xl:grid-cols-[380px_1fr]">
-          <Panel eyebrow="Queue" title={`${packets.length} packet(s)`}>
-            <div className="space-y-3">
-              {packets.map((packet) => {
+          <Panel eyebrow="Queue" title={`${filteredPackets.length} of ${packets.length} packet(s)`}>
+            <div className="mb-4 flex flex-wrap gap-2">
+              {queueTabs.map((tab) => (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => {
+                    setQueueFilter(tab.key);
+                    const nextPacket = tab.key === "all" ? packets[0] : packets.find((packet) => packet.status === tab.key);
+                    setActiveId(nextPacket?.id ?? null);
+                  }}
+                  className={cx(
+                    "rounded-full border px-3 py-1.5 text-[11px] font-black transition",
+                    queueFilter === tab.key
+                      ? "border-wk-brand bg-wk-brand-soft text-wk-brand"
+                      : "border-wk-border bg-wk-bg text-wk-text-muted hover:border-wk-brand/40",
+                  )}
+                >
+                  {tab.label} · {tab.count}
+                </button>
+              ))}
+            </div>
+
+            {!filteredPackets.length ? (
+              <EmptyState title="No packets in this queue" body="Change the filter or wait for more submissions." />
+            ) : (
+              <div className="space-y-3">
+                {filteredPackets.map((packet) => {
                 const packetArticle = packet.snapshot?.articleDraft;
                 const packetInquiry = packet.snapshot?.inquiry;
                 const selected = activePacket?.id === packet.id;
@@ -2161,8 +2204,9 @@ function ReviewDeskScreen() {
                     </div>
                   </button>
                 );
-              })}
-            </div>
+                })}
+              </div>
+            )}
           </Panel>
 
           <div className="space-y-5">
@@ -2208,6 +2252,31 @@ function ReviewDeskScreen() {
                 />
               </div>
             </Panel>
+
+            {isApprovedHandoff ? (
+              <Panel eyebrow="Editorial handoff" title="Ready for final editorial pass">
+                <div className="rounded-xl border border-wk-success/30 bg-wk-success-soft px-4 py-3 text-[12px] leading-5 text-wk-text-muted">
+                  This packet has been approved by Institute review. The next step is a final editor-controlled pass in the existing article system. Nothing publishes from the Institute Review Desk.
+                </div>
+
+                {articleAdminUrl ? (
+                  <a
+                    href={articleAdminUrl}
+                    className="mt-4 inline-flex rounded-lg bg-wk-brand px-5 py-3 text-[13px] font-black text-wk-brand-on"
+                  >
+                    Open full Article Editor
+                  </a>
+                ) : (
+                  <div className="mt-4 rounded-xl border border-wk-warning/30 bg-wk-warning-soft px-4 py-3 text-[12px] font-bold text-wk-warning">
+                    No linked article slug found in this packet snapshot.
+                  </div>
+                )}
+
+                <div className="mt-4 rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[12px] leading-5 text-wk-text-muted">
+                  The article should remain private or pending until an editor intentionally publishes through the normal article admin workflow.
+                </div>
+              </Panel>
+            ) : null}
 
             {article?.slug ? (
               <Panel eyebrow="Linked article editor" title="Review the draft itself">
@@ -2257,7 +2326,7 @@ function ReviewDeskScreen() {
                   Request changes
                 </button>
                 <button type="button" disabled={Boolean(savingStatus)} onClick={() => void updateStatus("approved_for_promotion")} className={actionClass}>
-                  Approve for editorial review
+                  Approve and hand off
                 </button>
                 <button type="button" disabled={Boolean(savingStatus)} onClick={() => void updateStatus("accepted_for_internal_memory")} className={actionClass}>
                   Accept as internal memory
