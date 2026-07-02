@@ -35,6 +35,7 @@ interface Props {
   isDirty: boolean;
   isSaving: boolean;
   isPublishing: boolean;
+  publishingLocked?: boolean;
   lastAutosavedAt?: string | null;
   heroImageUrl?: string;
   isSavingHero?: boolean;
@@ -115,6 +116,7 @@ export function ArticleMetaPanel({
   isDirty,
   isSaving,
   isPublishing,
+  publishingLocked = false,
   lastAutosavedAt,
   heroImageUrl = "",
   isSavingHero = false,
@@ -423,7 +425,7 @@ export function ArticleMetaPanel({
           ══════════════════════════════════ */}
       <WkSurface className="overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-wk-border bg-wk-surface-raised/40">
-          <h3 className="text-[11px] font-black uppercase tracking-wider text-wk-text-muted">Publish</h3>
+          <h3 className="text-[11px] font-black uppercase tracking-wider text-wk-text-muted">{publishingLocked ? "Draft controls" : "Publish"}</h3>
           {lastAutosavedAt && (
             <span className="text-[10px] text-wk-text-faint">
               Auto-saved {new Date(lastAutosavedAt).toLocaleTimeString()}
@@ -467,7 +469,7 @@ export function ArticleMetaPanel({
               <div className="flex items-center gap-1 text-[12px] text-wk-text-soft">
                 <span>Status:</span>
                 <span className="font-bold text-wk-text">{getStatusLabel(wpStatus ?? "draft")}</span>
-                {!statusEditOpen && (
+                {!publishingLocked && !statusEditOpen && (
                   <button onClick={() => setStatusEditOpen(true)} className="text-[11px] text-wk-brand hover:underline ml-1 cursor-pointer">Edit</button>
                 )}
               </div>
@@ -505,7 +507,7 @@ export function ArticleMetaPanel({
           <div className="flex items-center gap-2">
             <WkIcon name="Eye" size={13} className="text-wk-text-faint shrink-0" />
             <span className="text-[12px] text-wk-text-soft">Visibility:</span>
-            <span className="text-[12px] font-bold text-wk-text">Public</span>
+            <span className="text-[12px] font-bold text-wk-text">{publishingLocked ? "Private draft" : "Public"}</span>
           </div>
 
           {/* Publish Date row */}
@@ -515,7 +517,7 @@ export function ArticleMetaPanel({
               <div className="flex items-center gap-1 text-[12px] text-wk-text-soft flex-wrap">
                 <span>{isPublished || isFuture ? "Published on:" : "Publish:"}</span>
                 <span className="font-bold text-wk-text">{formatPublishDate(publishedAt)}</span>
-                {!dateEditOpen && (
+                {!publishingLocked && !dateEditOpen && (
                   <button onClick={() => setDateEditOpen(true)} className="text-[11px] text-wk-brand hover:underline ml-1 cursor-pointer">Edit</button>
                 )}
               </div>
@@ -606,33 +608,39 @@ export function ArticleMetaPanel({
           <div className="border-t border-wk-border" />
 
           {/* Main action row */}
-          <div className="flex items-center justify-between">
-            {isPublished ? (
-              <button
-                onClick={onDelete}
-                disabled={isSaving || isPublishing}
-                className="text-[11px] text-wk-danger hover:underline cursor-pointer disabled:opacity-50"
-              >
-                Move to Trash
-              </button>
-            ) : (
-              <span className="text-[11px] text-wk-text-faint">
-                {isDirty ? "• Unsaved changes" : "✓ All saved"}
-              </span>
-            )}
-
-            <button
-              onClick={handlePublishClick}
-              disabled={isSaving || isPublishing}
-              className="flex items-center gap-1.5 rounded-md bg-wk-brand px-4 py-2 text-[13px] font-bold text-wk-brand-on hover:opacity-90 transition-opacity disabled:opacity-50 whitespace-nowrap"
-            >
-              {isPublishing ? (
-                <><i className="ri-loader-4-line animate-spin text-[14px]" /> {getPublishButtonLabel()}…</>
+          {publishingLocked ? (
+            <div className="rounded-lg border border-wk-warning/30 bg-wk-warning-soft px-3 py-2 text-[11px] leading-4 text-wk-text-muted">
+              <strong className="text-wk-text">{isDirty ? "Unsaved changes." : "All saved."}</strong> Publishing is locked in Institute mode. Submit for review, then an editor publishes later.
+            </div>
+          ) : (
+            <div className="flex items-center justify-between">
+              {isPublished ? (
+                <button
+                  onClick={onDelete}
+                  disabled={isSaving || isPublishing}
+                  className="text-[11px] text-wk-danger hover:underline cursor-pointer disabled:opacity-50"
+                >
+                  Move to Trash
+                </button>
               ) : (
-                <><WkIcon name={isPublished ? "RefreshCw" : "Globe"} size={13} /> {getPublishButtonLabel()}</>
+                <span className="text-[11px] text-wk-text-faint">
+                  {isDirty ? "• Unsaved changes" : "✓ All saved"}
+                </span>
               )}
-            </button>
-          </div>
+
+              <button
+                onClick={handlePublishClick}
+                disabled={isSaving || isPublishing}
+                className="flex items-center gap-1.5 rounded-md bg-wk-brand px-4 py-2 text-[13px] font-bold text-wk-brand-on hover:opacity-90 transition-opacity disabled:opacity-50 whitespace-nowrap"
+              >
+                {isPublishing ? (
+                  <><i className="ri-loader-4-line animate-spin text-[14px]" /> {getPublishButtonLabel()}…</>
+                ) : (
+                  <><WkIcon name={isPublished ? "RefreshCw" : "Globe"} size={13} /> {getPublishButtonLabel()}</>
+                )}
+              </button>
+            </div>
+          )}
         </div>
       </WkSurface>
 

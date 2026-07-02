@@ -336,6 +336,78 @@ export async function checkArticleScheduling(slug: string): Promise<{
   };
 }
 
+
+
+export interface ArticleDraftCreatePayload {
+  title: string;
+  excerpt?: string;
+  contentHtml?: string;
+  author?: string;
+  slugBase?: string;
+  categories?: unknown[];
+  tags?: unknown[];
+  seo?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+}
+
+function slugifyArticleDraft(value: string): string {
+  const slug = value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/[\s_]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+
+  return slug || "institute-article-draft";
+}
+
+async function buildUniqueArticleSlug(base: string): Promise<string> {
+  const cleanBase = slugifyArticleDraft(base).slice(0, 76);
+  let candidate = cleanBase;
+  let suffix = 2;
+
+  while (true) {
+    const { data, error } = await supabase
+      .from("wk_articles")
+      .select("id")
+      .eq("slug", candidate)
+      .maybeSingle();
+
+    if (error) throw new Error(`Failed to check article slug: ${error.message}`);
+    if (!data) return candidate;
+
+    candidate = `${cleanBase}-${suffix}`;
+    suffix += 1;
+  }
+}
+
+export async function createArticleDraftForAdmin(payload: ArticleDraftCreatePayload): Promise<AdminArticleDetail> {
+  const title = payload.title.trim() || "Untitled Institute article draft";
+  const slugBase = payload.slugBase || title;
+
+  const { data, error } = await supabase.rpc("create_institute_article_draft", {
+    p_title: title,
+    p_slug_base: slugBase,
+    p_excerpt: payload.excerpt ?? "",
+    p_author: payload.author ?? "WAKILISHA Contributor",
+    p_seo: payload.seo ?? {},
+    p_metadata: payload.metadata ?? {},
+  });
+
+  if (error) throw new Error(`Failed to create article draft: ${error.message}`);
+
+  const row = Array.isArray(data) ? data[0] : null;
+  const slug = row?.article_slug as string | undefined;
+
+  if (!slug) throw new Error("Article draft was created but no slug was returned.");
+
+  const article = await fetchArticleForAdmin(slug);
+  if (!article) throw new Error("Article draft was created but could not be loaded.");
+
+  return article;
+}
+
 /* ════════════════════════════════════════════
    WRITE OPERATIONS
    ════════════════════════════════════════════ */

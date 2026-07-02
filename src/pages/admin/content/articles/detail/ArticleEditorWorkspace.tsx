@@ -833,6 +833,7 @@ export function ArticleEditorWorkspace({
             isDirty={isDirty}
             isSaving={isSaving}
             isPublishing={isPublishing}
+            publishingLocked={isInstituteMode}
             lastAutosavedAt={lastAutosavedAt}
             heroImageUrl={article.heroImageUrl}
             isSavingHero={isSavingHero}
@@ -840,17 +841,17 @@ export function ArticleEditorWorkspace({
             onAuthorChange={(v) => patchDraft({ author: v })}
             onCategoriesChange={(v) => patchDraft({ categories: v })}
             onTagsChange={(v) => patchDraft({ tags: v })}
-            onPublishedAtChange={(v) => patchDraft({ publishedAt: v })}
+            onPublishedAtChange={(v) => !isInstituteMode && patchDraft({ publishedAt: v })}
             onSeoChange={(v) => patchDraft({ seo: v })}
             onRestoreDraft={handleRestoreDraft}
             onSlugChange={handleSlugChange}
             onInsertLink={handleInsertLink}
             onEmbedRelease={handleEmbedRelease}
             onSaveDraft={handleSaveDraft}
-            onPublish={handlePublish}
-            onUnpublish={handleUnpublish}
-            onDelete={() => setShowDeleteConfirm(true)}
-            onStatusChange={handleStatusChange}
+            onPublish={isInstituteMode ? undefined : handlePublish}
+            onUnpublish={isInstituteMode ? undefined : handleUnpublish}
+            onDelete={isInstituteMode ? undefined : () => setShowDeleteConfirm(true)}
+            onStatusChange={isInstituteMode ? undefined : handleStatusChange}
             previewUrl={previewUrl}
             isGeneratingPreview={isGeneratingPreview}
             onGeneratePreviewLink={handleGeneratePreviewLink}

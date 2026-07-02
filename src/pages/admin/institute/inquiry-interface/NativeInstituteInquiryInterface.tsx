@@ -1,3 +1,9 @@
+import { ArticleEditorWorkspace } from "@/pages/admin/content/articles/detail/ArticleEditorWorkspace";
+import {
+  createOrFetchInstituteArticleDraftLink,
+  fetchInstituteArticleDraftLink,
+  type InstituteArticleDraftLink,
+} from "@/services/institute/instituteArticleBridgeService";
 import { useEffect, useMemo, useState } from "react";
 import {
   createInstituteEvidenceItem,
@@ -1507,6 +1513,59 @@ function EvidenceScreen({
     completion: 25,
     status: "In progress",
   });
+  const [articleLink, setArticleLink] = useState<InstituteArticleDraftLink | null>(null);
+  const [articleLinkLoading, setArticleLinkLoading] = useState(false);
+  const [articleLinkError, setArticleLinkError] = useState<string | null>(null);
+
+  const activeDefinition = activeFormat ? workspaceDefinitionFor(activeFormat) : null;
+  const isArticleWorkspace = activeDefinition?.workspaceType === "article";
+
+  useEffect(() => {
+    let alive = true;
+
+    async function loadArticleLink() {
+      if (!draft?.id || !isArticleWorkspace) {
+        setArticleLink(null);
+        setArticleLinkError(null);
+        return;
+      }
+
+      setArticleLinkLoading(true);
+      setArticleLinkError(null);
+
+      try {
+        const link = await fetchInstituteArticleDraftLink(draft.id);
+        if (alive) setArticleLink(link);
+      } catch (error) {
+        if (alive) setArticleLinkError(error instanceof Error ? error.message : "Failed to load linked article draft.");
+      } finally {
+        if (alive) setArticleLinkLoading(false);
+      }
+    }
+
+    void loadArticleLink();
+
+    return () => {
+      alive = false;
+    };
+  }, [draft?.id, isArticleWorkspace]);
+
+  const ensureArticleDraft = async () => {
+    if (!draft || articleLinkLoading) return;
+
+    setArticleLinkLoading(true);
+    setArticleLinkError(null);
+
+    try {
+      const link = await createOrFetchInstituteArticleDraftLink(draft);
+      setArticleLink(link);
+    } catch (error) {
+      setArticleLinkError(error instanceof Error ? error.message : "Failed to create linked article draft.");
+    } finally {
+      setArticleLinkLoading(false);
+    }
+  };
+
 
   useEffect(() => {
     if (!activeFormat && formats.length) setActiveFormat(formats[0]);
@@ -1536,7 +1595,6 @@ function EvidenceScreen({
   }
 
   const evidence = draft.evidence ?? [];
-  const activeDefinition = activeFormat ? workspaceDefinitionFor(activeFormat) : null;
   const producedFormats = formats.filter((format) => evidenceForFormat(evidence, format).length > 0);
   const completedFormats = formats.filter((format) => {
     const items = evidenceForFormat(evidence, format);
@@ -1716,7 +1774,57 @@ function EvidenceScreen({
             </div>
           </Panel>
 
-          {activeDefinition ? (
+          {activeDefinition && activeDefinition.workspaceType === "article" ? (
+            <section className="space-y-4 rounded-[26px] border border-wk-border bg-wk-surface p-5 shadow-sm">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <div className="text-[10px] font-black uppercase tracking-[0.2em] text-wk-brand">Article workspace</div>
+                  <h2 className="mt-2 text-[24px] font-black tracking-[-0.055em] text-wk-text">Write this article in the shared WAKILISHA editor.</h2>
+                  <p className="mt-2 max-w-3xl text-[13px] leading-6 text-wk-text-muted">
+                    This creates a real article draft linked to this Inquiry. Drafting, autosave, preview, and submit for review use the existing article system. Publishing stays editor-only.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => void ensureArticleDraft()}
+                  disabled={articleLinkLoading}
+                  className="rounded-lg bg-wk-brand px-5 py-3 text-[13px] font-black text-wk-brand-on transition disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {articleLinkLoading ? "Loading..." : articleLink ? "Linked draft ready" : "Create linked article draft"}
+                </button>
+              </div>
+
+              {articleLinkError ? (
+                <div className="rounded-xl border border-wk-danger/30 bg-wk-danger-soft px-4 py-3 text-[12px] font-bold text-wk-danger">
+                  {articleLinkError}
+                </div>
+              ) : null}
+
+              {articleLink ? (
+                <div className="space-y-4">
+                  <div className="rounded-xl border border-wk-success/30 bg-wk-success-soft px-4 py-3 text-[12px] leading-5 text-wk-text-muted">
+                    Linked draft: <strong className="text-wk-text">{articleLink.articleSlug}</strong>. This draft is private unless an editor publishes it later.
+                  </div>
+
+                  <ArticleEditorWorkspace
+                    slug={articleLink.articleSlug}
+                    mode="institute"
+                    returnPath="/admin/institute/inquiry-interface"
+                  />
+                </div>
+              ) : (
+                <div className="rounded-xl border border-wk-border bg-wk-bg-subtle p-5">
+                  <h3 className="text-[16px] font-black text-wk-text">No linked article draft yet</h3>
+                  <p className="mt-2 text-[13px] leading-6 text-wk-text-muted">
+                    Create one draft once, then keep writing here. The article will save through the shared article editor, not through a separate Institute textarea.
+                  </p>
+                </div>
+              )}
+            </section>
+          ) : null}
+
+          {activeDefinition && activeDefinition.workspaceType !== "article" ? (
             <div className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
               <Panel eyebrow="2 · Workspace standard" title={`${activeFormat} production room`}>
                 <p className="text-[13px] leading-6 text-wk-text-muted">{activeDefinition.productionGoal}</p>
