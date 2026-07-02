@@ -10,20 +10,24 @@ import { ROLE_LABELS, roleCanAccessAdmin, type Capability } from "@/services/use
 import type { WkIconName } from "@/components/design-system/Icon";
 
 interface NavItem { path: string; label: string; icon: WkIconName; badgeKey?: string; disabled?: boolean; requiredCapability?: Capability; separatorLabel?: string; }
-interface NavGroup { label: string; items: NavItem[]; visible: (can: (capability: Capability) => boolean) => boolean; }
+interface NavGroup { label: string; icon: WkIconName; items: NavItem[]; visible: (can: (capability: Capability) => boolean) => boolean; }
 
 const NAV_GROUPS: NavGroup[] = [
-  { label: "Dashboard", visible: (can) => can("view_dashboard"), items: [
+  { label: "Dashboard", icon: "LayoutDashboard", visible: (can) => can("view_dashboard"), items: [
     { path: "/admin", label: "Overview", icon: "LayoutDashboard", requiredCapability: "view_dashboard" },
     { path: "/admin/analytics", label: "Analytics", icon: "BarChart3", requiredCapability: "view_dashboard" },
   ] },
-  { label: "Institute", visible: (can) => can("view_dashboard") || can("view_admin_readonly"), items: [
-    { path: "/admin/institute/inquiry-interface", label: "Inquiry Interface", icon: "BookOpen" },
+  { label: "Institute", icon: "BookOpen", visible: (can) => can("view_dashboard") || can("view_admin_readonly"), items: [
+    { path: "/admin/institute/inquiry-interface?screen=home", label: "All inquiries", icon: "LayoutDashboard" },
+    { path: "/admin/institute/inquiry-interface?screen=workbench", label: "Workbench", icon: "BookOpen" },
+    { path: "/admin/institute/inquiry-interface?screen=anchorBrief", label: "Anchor brief", icon: "Fingerprint" },
+    { path: "/admin/institute/inquiry-interface?screen=evidence", label: "Evidence", icon: "FileText" },
+    { path: "/admin/institute/inquiry-interface?screen=review", label: "Review", icon: "GitPullRequest" },
   ] },
-  { label: "Community", visible: (can) => can("moderate_community"), items: [
+  { label: "Community", icon: "MessageSquare", visible: (can) => can("moderate_community"), items: [
     { path: "/admin/community", label: "Moderation", icon: "MessageSquare", requiredCapability: "moderate_community", badgeKey: "pendingReports" },
   ] },
-  { label: "Content & Editorial", visible: (can) => can("edit_own_articles"), items: [
+  { label: "Content & Editorial", icon: "FileText", visible: (can) => can("edit_own_articles"), items: [
     { path: "/admin/content/articles", label: "Articles", icon: "FileText", requiredCapability: "edit_own_articles" },
     { path: "/admin/content/guides", label: "Guides", icon: "BookOpen", requiredCapability: "edit_guides" },
     { path: "/admin/content/pages", label: "Pages", icon: "Layout", requiredCapability: "edit_pages" },
@@ -37,7 +41,7 @@ const NAV_GROUPS: NavGroup[] = [
     { path: "/admin/content/tags", label: "Tags", icon: "Tags", requiredCapability: "manage_tags" },
     { path: "/admin/content/archive", label: "Archive", icon: "Archive", requiredCapability: "view_archive" },
   ] },
-  { label: "Music Registry", visible: (can) => can("view_registry"), items: [
+  { label: "Music Registry", icon: "Database", visible: (can) => can("view_registry"), items: [
     { path: "/admin/registry", label: "Overview", icon: "LayoutDashboard", requiredCapability: "view_registry" },
     { path: "/admin/registry/artists", label: "Artists", icon: "Mic2", requiredCapability: "view_registry" },
     { path: "/admin/registry/artists/intake", label: "Artist Intake", icon: "Upload", requiredCapability: "manage_registry" },
@@ -48,7 +52,7 @@ const NAV_GROUPS: NavGroup[] = [
     { path: "/admin/registry/artist-aliases", label: "Artist Aliases", icon: "Link", requiredCapability: "view_registry" },
     { path: "/admin/registry/authors", label: "Authors", icon: "PenLine", requiredCapability: "view_registry" },
   ] },
-  { label: "Charts Engine", visible: (can) => can("view_charts_admin"), items: [
+  { label: "Charts Engine", icon: "BarChart3", visible: (can) => can("view_charts_admin"), items: [
     { path: "/admin/charts/dashboard", label: "Dashboard", icon: "LayoutDashboard", requiredCapability: "view_charts_admin" },
     { path: "/admin/charts/ingest", label: "Ingest Studio", icon: "Database", requiredCapability: "manage_ingest" },
     { path: "/admin/charts/ingest-runs", label: "Ingest Runs", icon: "ListChecks", requiredCapability: "view_charts_admin" },
@@ -58,22 +62,22 @@ const NAV_GROUPS: NavGroup[] = [
     { path: "/admin/charts/snapshots", label: "Snapshots", icon: "Camera", requiredCapability: "view_charts_admin" },
     { path: "/admin/charts/ingest-health", label: "Ingest Health", icon: "HeartPulse", requiredCapability: "view_charts_admin" },
   ] },
-  { label: "Media", visible: (can) => can("manage_media_library"), items: [
+  { label: "Media", icon: "Image", visible: (can) => can("manage_media_library"), items: [
     { path: "/admin/media/library", label: "Media Library", icon: "Image", requiredCapability: "manage_media_library" },
     { path: "/admin/media/missing", label: "Missing Images", icon: "ImageOff", badgeKey: "missingImages", requiredCapability: "view_missing_images" },
     { path: "/admin/media/broken", label: "Broken Links", icon: "LinkBreak", badgeKey: "brokenLinks", requiredCapability: "view_broken_links" },
     { path: "/admin/media/migrate", label: "Migrate Images", icon: "Download", requiredCapability: "manage_media_library" },
   ] },
-  { label: "Review & Quality", visible: (can) => can("view_review_queue") || can("view_relationships"), items: [
+  { label: "Review & Quality", icon: "GitPullRequest", visible: (can) => can("view_review_queue") || can("view_relationships"), items: [
     { path: "/admin/review/queue", label: "Review Queue", icon: "GitPullRequest", badgeKey: "reviewQueue", requiredCapability: "view_review_queue" },
     { path: "/admin/relationships/viewer", label: "Entity Relationships", icon: "Network", requiredCapability: "view_relationships" },
     { path: "/admin/relationships/duplicates", label: "Duplicate Merge", icon: "Copy", requiredCapability: "manage_relationships" },
   ] },
-  { label: "Data Import", visible: (can) => can("view_imports"), items: [
+  { label: "Data Import", icon: "Download", visible: (can) => can("view_imports"), items: [
     { path: "/admin/imports", label: "WordPress Import", icon: "Download", requiredCapability: "view_imports" },
     { path: "/admin/imports/jobs", label: "Import Jobs", icon: "Upload", requiredCapability: "view_imports" },
   ] },
-  { label: "Settings", visible: (can) => can("view_settings"), items: [
+  { label: "Settings", icon: "Settings", visible: (can) => can("view_settings"), items: [
     { path: "/admin/settings", label: "Settings Hub", icon: "Settings", requiredCapability: "view_settings" },
     { path: "/admin/settings/site-identity", label: "Site Identity", icon: "Fingerprint", requiredCapability: "view_settings" },
     { path: "/admin/settings/frontend-appearance", label: "Appearance", icon: "Palette", requiredCapability: "manage_appearance" },
@@ -90,8 +94,8 @@ const NAV_GROUPS: NavGroup[] = [
     { path: "/admin/settings/maintenance", label: "Maintenance", icon: "Wrench", requiredCapability: "view_settings" },
     { path: "/admin/settings/audit", label: "Audit Log", icon: "ClipboardList", requiredCapability: "view_settings" },
   ] },
-  { label: "Users", visible: (can) => can("manage_users"), items: [{ path: "/admin/users", label: "Manage Users", icon: "Users", requiredCapability: "manage_users" }] },
-  { label: "Developer", visible: () => true, items: [{ path: "/admin/api-docs", label: "API Docs", icon: "BookOpen", requiredCapability: undefined }] },
+  { label: "Users", icon: "Users", visible: (can) => can("manage_users"), items: [{ path: "/admin/users", label: "Manage Users", icon: "Users", requiredCapability: "manage_users" }] },
+  { label: "Developer", icon: "BookOpen", visible: () => true, items: [{ path: "/admin/api-docs", label: "API Docs", icon: "BookOpen", requiredCapability: undefined }] },
 ];
 
 function getNavBadge(key: string, counts: ReturnType<typeof useAdminBadgeCounts>): number | undefined {
@@ -105,14 +109,206 @@ function getNavBadge(key: string, counts: ReturnType<typeof useAdminBadgeCounts>
   }
 }
 
-function SidebarLink({ item, active, collapsed, badge, onClick }: { item: NavItem; active: boolean; collapsed: boolean; badge?: number; onClick: () => void }) {
+function isNavItemActive(item: NavItem, pathname: string, currentPath: string = pathname) {
+  if (!item.path) return false;
+
+  if (item.path.includes("?")) {
+    return currentPath === item.path;
+  }
+
+  return pathname === item.path || (item.path !== "/admin" && pathname.startsWith(item.path));
+}
+
+function isNavGroupActive(group: NavGroup, pathname: string, currentPath: string = pathname) {
+  return group.items.some((item) => isNavItemActive(item, pathname, currentPath));
+}
+
+function firstNavigableItem(group: NavGroup) {
+  return group.items.find((item) => Boolean(item.path) && !item.separatorLabel);
+}
+
+function groupBadgeTotal(group: NavGroup, counts: ReturnType<typeof useAdminBadgeCounts>) {
+  return group.items.reduce((total, item) => {
+    const badge = item.badgeKey ? getNavBadge(item.badgeKey, counts) : undefined;
+    return total + (badge ?? 0);
+  }, 0);
+}
+
+function SidebarLink({
+  item,
+  active,
+  collapsed,
+  badge,
+  onClick,
+  nested = false,
+  showIcon = true,
+}: {
+  item: NavItem;
+  active: boolean;
+  collapsed: boolean;
+  badge?: number;
+  onClick: () => void;
+  nested?: boolean;
+  showIcon?: boolean;
+}) {
   return (
-    <button onClick={onClick} title={collapsed ? item.label : undefined} disabled={item.disabled} className={`group relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-semibold transition-all ${item.disabled ? "cursor-not-allowed opacity-40" : active ? "bg-wk-brand-soft text-wk-brand" : "text-wk-text-muted hover:bg-wk-surface-raised hover:text-wk-text-soft"}`}>
-      <span className="flex h-5 w-5 items-center justify-center shrink-0"><WkIcon name={item.icon} size={16} /></span>
-      <span className={`whitespace-nowrap transition-all duration-300 ${collapsed ? "w-0 overflow-hidden opacity-0" : "w-auto opacity-100"}`}>{item.label}</span>
-      {badge !== undefined && badge > 0 && !collapsed && <span className="ml-auto shrink-0 rounded-full bg-wk-danger px-1.5 py-0.5 text-[10px] font-bold text-wk-brand-on">{badge}</span>}
-      {badge !== undefined && badge > 0 && collapsed && <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-wk-danger text-[9px] font-bold text-wk-brand-on">{badge > 99 ? "99+" : badge}</span>}
+    <button
+      onClick={onClick}
+      title={collapsed ? item.label : undefined}
+      disabled={item.disabled}
+      className={`group relative flex w-full items-center gap-3 rounded-lg text-left text-[13px] font-semibold transition-all ${
+        nested ? "px-3 py-2" : "px-3 py-2.5"
+      } ${
+        item.disabled
+          ? "cursor-not-allowed opacity-40"
+          : active
+            ? "bg-wk-brand-soft text-wk-brand"
+            : "text-wk-text-muted hover:bg-wk-surface-raised hover:text-wk-text-soft"
+      }`}
+    >
+      {showIcon ? (
+        <span className="flex h-5 w-5 shrink-0 items-center justify-center">
+          <WkIcon name={item.icon} size={16} />
+        </span>
+      ) : null}
+      <span className={`whitespace-nowrap transition-all duration-300 ${collapsed ? "w-0 overflow-hidden opacity-0" : "w-auto opacity-100"}`}>
+        {item.label}
+      </span>
+      {badge !== undefined && badge > 0 && !collapsed ? (
+        <span className="ml-auto shrink-0 rounded-full bg-wk-danger px-1.5 py-0.5 text-[10px] font-bold text-wk-brand-on">
+          {badge > 99 ? "99+" : badge}
+        </span>
+      ) : null}
+      {badge !== undefined && badge > 0 && collapsed ? (
+        <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-wk-danger text-[9px] font-bold text-wk-brand-on">
+          {badge > 99 ? "99+" : badge}
+        </span>
+      ) : null}
     </button>
+  );
+}
+
+function SidebarGroup({
+  group,
+  collapsed,
+  open,
+  active,
+  counts,
+  pathname,
+  onToggle,
+  onNavigate,
+}: {
+  group: NavGroup;
+  collapsed: boolean;
+  open: boolean;
+  active: boolean;
+  counts: ReturnType<typeof useAdminBadgeCounts>;
+  pathname: string;
+  onToggle: () => void;
+  onNavigate: (path: string) => void;
+}) {
+  const navigableItems = group.items.filter((item) => Boolean(item.path) && !item.separatorLabel);
+  const hasNestedItems = navigableItems.length > 1 || group.items.some((item) => item.separatorLabel);
+  const firstItem = firstNavigableItem(group);
+  const badgeTotal = groupBadgeTotal(group, counts);
+
+  if (collapsed) {
+    return (
+      <div className="mb-1 space-y-1">
+        {group.items.map((item) => {
+          if (item.separatorLabel || !item.path) return null;
+          return (
+            <SidebarLink
+              key={item.path}
+              item={item}
+              active={isNavItemActive(item, pathname, typeof window !== "undefined" ? `${window.location.pathname}${window.location.search}` : pathname)}
+              collapsed={collapsed}
+              badge={item.badgeKey ? getNavBadge(item.badgeKey, counts) : undefined}
+              onClick={() => onNavigate(item.path)}
+            />
+          );
+        })}
+      </div>
+    );
+  }
+
+  if (!hasNestedItems && firstItem) {
+    return (
+      <button
+        onClick={() => onNavigate(firstItem.path)}
+        disabled={firstItem.disabled}
+        className={`group mb-1 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-[13px] font-black transition-all ${
+          firstItem.disabled
+            ? "cursor-not-allowed opacity-40"
+            : active
+              ? "bg-wk-brand-soft text-wk-brand"
+              : "text-wk-text-muted hover:bg-wk-surface-raised hover:text-wk-text-soft"
+        }`}
+      >
+        <span className="flex h-5 w-5 shrink-0 items-center justify-center">
+          <WkIcon name={group.icon} size={16} />
+        </span>
+        <span className="min-w-0 flex-1 truncate">{group.label}</span>
+        {badgeTotal > 0 ? (
+          <span className="shrink-0 rounded-full bg-wk-danger px-1.5 py-0.5 text-[10px] font-bold text-wk-brand-on">
+            {badgeTotal > 99 ? "99+" : badgeTotal}
+          </span>
+        ) : null}
+      </button>
+    );
+  }
+
+  return (
+    <div className="mb-1">
+      <button
+        onClick={onToggle}
+        className={`group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-[13px] font-black transition-all ${
+          active ? "bg-wk-brand-soft text-wk-brand" : "text-wk-text-muted hover:bg-wk-surface-raised hover:text-wk-text-soft"
+        }`}
+      >
+        <span className="flex h-5 w-5 shrink-0 items-center justify-center">
+          <WkIcon name={group.icon} size={16} />
+        </span>
+        <span className="min-w-0 flex-1 truncate">{group.label}</span>
+        {badgeTotal > 0 ? (
+          <span className="shrink-0 rounded-full bg-wk-danger px-1.5 py-0.5 text-[10px] font-bold text-wk-brand-on">
+            {badgeTotal > 99 ? "99+" : badgeTotal}
+          </span>
+        ) : null}
+        <WkIcon
+          name="ChevronUp"
+          size={14}
+          className={`shrink-0 text-wk-text-faint transition-transform ${open ? "rotate-180" : "rotate-90"}`}
+        />
+      </button>
+
+      {open ? (
+        <div className="ml-[22px] mt-1 space-y-1 border-l border-wk-border/70 pl-2">
+          {group.items.map((item) => {
+            if (item.separatorLabel) {
+              return (
+                <div key={item.separatorLabel} className="px-3 pb-1 pt-3 text-[9px] font-black uppercase tracking-widest text-wk-text-faint/50">
+                  {item.separatorLabel}
+                </div>
+              );
+            }
+
+            return (
+              <SidebarLink
+                key={item.path}
+                item={item}
+                active={isNavItemActive(item, pathname, typeof window !== "undefined" ? `${window.location.pathname}${window.location.search}` : pathname)}
+                collapsed={false}
+                nested
+                showIcon={false}
+                badge={item.badgeKey ? getNavBadge(item.badgeKey, counts) : undefined}
+                onClick={() => onNavigate(item.path)}
+              />
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -137,8 +333,22 @@ export function AdminShell() {
   const [collapsed, setCollapsed] = useState(() => { if (typeof window === "undefined") return false; return window.localStorage.getItem("wk-admin-sidebar-collapsed") === "true"; });
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
+    if (typeof window === "undefined") return {};
+    try {
+      return JSON.parse(window.localStorage.getItem("wk-admin-sidebar-open-groups") || "{}") as Record<string, boolean>;
+    } catch {
+      return {};
+    }
+  });
 
   useEffect(() => { window.localStorage.setItem("wk-admin-sidebar-collapsed", String(collapsed)); }, [collapsed]);
+  useEffect(() => { window.localStorage.setItem("wk-admin-sidebar-open-groups", JSON.stringify(openGroups)); }, [openGroups]);
+  useEffect(() => {
+    const activeGroup = NAV_GROUPS.find((group) => isNavGroupActive(group, location.pathname, `${location.pathname}${location.search}`));
+    if (!activeGroup) return;
+    setOpenGroups((current) => (current[activeGroup.label] ? current : { ...current, [activeGroup.label]: true }));
+  }, [location.pathname, location.search]);
   useEffect(() => { setMobileOpen(false); }, [location.pathname]);
   useEffect(() => {
     if (user.loading) return;
@@ -227,34 +437,25 @@ export function AdminShell() {
 
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto px-3 py-4">
-          {visibleGroups.map((group) => group.items.length > 0 && (
-            <div key={group.label} className="mb-5">
-              <div className={`mb-2 px-3 text-[10px] font-black uppercase tracking-wider text-wk-text-faint ${collapsed ? "sr-only" : ""}`}>
-                {group.label}
-              </div>
-              <div className="space-y-1">
-                {group.items.map((item) => {
-                  if (item.separatorLabel) {
-                    return (
-                      <div key={item.separatorLabel} className={`px-3 pt-3 pb-1 text-[9px] font-black uppercase tracking-widest text-wk-text-faint/50 ${collapsed ? "sr-only" : ""}`}>
-                        {item.separatorLabel}
-                      </div>
-                    );
-                  }
-                  return (
-                    <SidebarLink
-                      key={item.path}
-                      item={item}
-                      active={location.pathname === item.path || (item.path !== "/admin" && location.pathname.startsWith(item.path))}
-                      collapsed={collapsed}
-                      badge={item.badgeKey ? getNavBadge(item.badgeKey, counts) : undefined}
-                      onClick={() => navigate(item.path)}
-                    />
-                  );
-                })}
-              </div>
-            </div>
-          ))}
+          {visibleGroups.filter((group) => group.items.length > 0).map((group) => {
+            const currentPath = `${location.pathname}${location.search}`;
+            const active = isNavGroupActive(group, location.pathname, currentPath);
+            const open = openGroups[group.label] ?? active;
+
+            return (
+              <SidebarGroup
+                key={group.label}
+                group={group}
+                collapsed={collapsed}
+                open={open}
+                active={active}
+                counts={counts}
+                pathname={location.pathname}
+                onToggle={() => setOpenGroups((current) => ({ ...current, [group.label]: !open }))}
+                onNavigate={(path) => navigate(path)}
+              />
+            );
+          })}
         </nav>
 
         {/* Footer */}
