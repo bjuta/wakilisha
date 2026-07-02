@@ -85,6 +85,7 @@ export type ArticleEditorWorkspaceProps = {
   mode?: ArticleEditorWorkspaceMode;
   returnPath?: string;
   allowSubmitForReview?: boolean;
+  submitForReviewLabel?: string;
   instituteNotice?: string;
   onSubmittedForReview?: (payload: ArticleReviewSubmitPayload) => Promise<void> | void;
 };
@@ -94,6 +95,7 @@ export function ArticleEditorWorkspace({
   mode = "article-admin",
   returnPath = "/admin/content/articles",
   allowSubmitForReview = true,
+  submitForReviewLabel = "Submit for Review",
   instituteNotice,
   onSubmittedForReview,
 }: ArticleEditorWorkspaceProps) {
@@ -984,6 +986,7 @@ export function ArticleEditorWorkspace({
         onPreview={handlePreview}
         onSubmitForReview={handleSubmitForReview}
         allowSubmitForReview={allowSubmitForReview}
+        submitForReviewLabel={submitForReviewLabel}
         userCanPublish={articlePermissions.canPublish}
         userCanEditOthers={articlePermissions.canEdit}
         isAdmin={isAdmin}

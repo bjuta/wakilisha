@@ -16,6 +16,7 @@ interface Props {
   onPreview: () => void;
   onSubmitForReview: () => void;
   allowSubmitForReview?: boolean;
+  submitForReviewLabel?: string;
   userCanPublish?: boolean;
   userCanEditOthers?: boolean;
   isAdmin?: boolean;
@@ -52,6 +53,7 @@ export function ArticleEditorHeader({
   onPreview,
   onSubmitForReview,
   allowSubmitForReview = true,
+  submitForReviewLabel = "Submit for Review",
   userCanPublish = true,
   userCanEditOthers = true,
   isAdmin = false,
@@ -243,7 +245,7 @@ export function ArticleEditorHeader({
             className="wk-button wk-button-secondary wk-button-sm whitespace-nowrap"
           >
             <WkIcon name="Send" size={14} />
-            Submit for Review
+            {submitForReviewLabel}
           </button>
         ) : null}
       </div>

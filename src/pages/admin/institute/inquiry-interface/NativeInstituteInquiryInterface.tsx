@@ -8,8 +8,10 @@ import { ArticleEditorWorkspace } from "@/pages/admin/content/articles/detail/Ar
 import {
   createOrFetchInstituteArticleDraftLink,
   fetchInstituteArticleDraftLink,
+  fetchInstituteArticleReviewState,
   submitInstituteArticleDraftForReview,
   type InstituteArticleDraftLink,
+  type InstituteLinkedArticleReviewState,
 } from "@/services/institute/instituteArticleBridgeService";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -1523,10 +1525,24 @@ function EvidenceScreen({
   const [articleLink, setArticleLink] = useState<InstituteArticleDraftLink | null>(null);
   const [articleLinkLoading, setArticleLinkLoading] = useState(false);
   const [articleLinkError, setArticleLinkError] = useState<string | null>(null);
-  const [articleReviewSubmission, setArticleReviewSubmission] = useState<{ packetId: string; packetVersion: number; submittedAt: string } | null>(null);
+  const [articleReviewState, setArticleReviewState] = useState<InstituteLinkedArticleReviewState | null>(null);
 
   const activeDefinition = activeFormat ? workspaceDefinitionFor(activeFormat) : null;
   const isArticleWorkspace = activeDefinition?.workspaceType === "article";
+  const canSubmitArticleForReview =
+    !articleReviewState ||
+    articleReviewState.status === "changes_requested" ||
+    articleReviewState.status === "withdrawn";
+  const articleReviewNotice =
+    articleReviewState?.status === "submitted" || articleReviewState?.status === "under_review"
+      ? "Institute article mode. This draft is already with editors. Save Draft and Preview remain available, but resubmission is locked until an editor requests changes."
+      : articleReviewState?.status === "changes_requested"
+        ? "Institute article mode. Editors requested changes. Save your revisions, then resubmit for review."
+        : articleReviewState?.status === "approved_for_promotion" || articleReviewState?.status === "accepted_for_internal_memory"
+          ? "Institute article mode. This work has already been accepted by review. Editors control the next step."
+          : articleReviewState?.status === "rejected"
+            ? "Institute article mode. This work was rejected. Start a new Inquiry if it needs to be rebuilt."
+            : "Institute article mode. Drafting, autosave, preview, and submit for review are allowed. Publishing stays editor-only.";
 
   useEffect(() => {
     let alive = true;
@@ -1578,10 +1594,33 @@ function EvidenceScreen({
     if (!draft || !articleLink) throw new Error("Linked article draft is not ready.");
 
     const submission = await submitInstituteArticleDraftForReview(draft, articleLink, articlePayload);
-    setArticleReviewSubmission(submission);
+    setArticleReviewState(submission);
     setArticleLink((current) => (current ? { ...current, status: "submitted_for_review", updatedAt: submission.submittedAt } : current));
   };
 
+
+  useEffect(() => {
+    let alive = true;
+
+    if (!draft || !articleLink) {
+      setArticleReviewState(null);
+      return () => {
+        alive = false;
+      };
+    }
+
+    void fetchInstituteArticleReviewState(draft, articleLink)
+      .then((reviewState) => {
+        if (alive) setArticleReviewState(reviewState);
+      })
+      .catch(() => {
+        if (alive) setArticleReviewState(null);
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, [draft?.id, articleLink?.id, articleLink?.updatedAt]);
 
   useEffect(() => {
     if (!activeFormat && formats.length) setActiveFormat(formats[0]);
@@ -1823,9 +1862,24 @@ function EvidenceScreen({
                     Linked draft: <strong className="text-wk-text">{articleLink.articleSlug}</strong>. This draft is private unless an editor publishes it later.
                   </div>
 
-                  {articleReviewSubmission ? (
-                    <div className="rounded-xl border border-wk-warning/30 bg-wk-warning-soft px-4 py-3 text-[12px] leading-5 text-wk-text-muted">
-                      Review packet created: <strong className="text-wk-text">v{articleReviewSubmission.packetVersion}</strong>. Submitted {new Date(articleReviewSubmission.submittedAt).toLocaleString()}.
+                  {articleReviewState ? (
+                    <div
+                      className={cx(
+                        "rounded-xl border px-4 py-3 text-[12px] leading-5",
+                        articleReviewState.status === "changes_requested"
+                          ? "border-wk-warning/30 bg-wk-warning-soft text-wk-text-muted"
+                          : "border-wk-success/30 bg-wk-success-soft text-wk-text-muted",
+                      )}
+                    >
+                      <strong className="text-wk-text">
+                        {articleReviewState.status === "changes_requested" ? "Changes requested" : `Review packet v${articleReviewState.packetVersion}`}
+                      </strong>
+                      {" "}· {articleReviewState.status.replaceAll("_", " ")} · Submitted {new Date(articleReviewState.submittedAt).toLocaleString()}.
+                      {articleReviewState.editorNotes ? (
+                        <div className="mt-2 rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-wk-text-muted">
+                          <span className="font-black text-wk-text">Editor notes:</span> {articleReviewState.editorNotes}
+                        </div>
+                      ) : null}
                     </div>
                   ) : null}
 
@@ -1833,6 +1887,9 @@ function EvidenceScreen({
                     slug={articleLink.articleSlug}
                     mode="institute"
                     returnPath="/admin/institute/inquiry-interface"
+                    allowSubmitForReview={canSubmitArticleForReview}
+                    submitForReviewLabel={articleReviewState?.status === "changes_requested" ? "Resubmit for Review" : "Submit for Review"}
+                    instituteNotice={articleReviewNotice}
                     onSubmittedForReview={submitLinkedArticleForReview}
                   />
                 </div>
