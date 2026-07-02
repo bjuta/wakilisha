@@ -15,6 +15,7 @@ interface Props {
   onDelete: () => void;
   onPreview: () => void;
   onSubmitForReview: () => void;
+  allowSubmitForReview?: boolean;
   userCanPublish?: boolean;
   userCanEditOthers?: boolean;
   isAdmin?: boolean;
@@ -50,6 +51,7 @@ export function ArticleEditorHeader({
   onDelete,
   onPreview,
   onSubmitForReview,
+  allowSubmitForReview = true,
   userCanPublish = true,
   userCanEditOthers = true,
   isAdmin = false,
@@ -234,7 +236,7 @@ export function ArticleEditorHeader({
               </>
             )}
           </button>
-        ) : (
+        ) : allowSubmitForReview ? (
           <button
             onClick={onSubmitForReview}
             disabled={isSaving}
@@ -243,7 +245,7 @@ export function ArticleEditorHeader({
             <WkIcon name="Send" size={14} />
             Submit for Review
           </button>
-        )}
+        ) : null}
       </div>
     </div>
   );
