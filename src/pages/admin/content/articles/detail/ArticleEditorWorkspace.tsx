@@ -767,7 +767,7 @@ export function ArticleEditorWorkspace({
             wpStatus: "pending",
           });
         } catch (error) {
-          addToast("error", error instanceof Error ? error.message : "Failed to submit Institute review packet.");
+          addToast("error", error instanceof Error ? error.message : "Failed to submit for review.");
           return;
         }
       }
@@ -966,7 +966,7 @@ export function ArticleEditorWorkspace({
     <div className="space-y-5">
       {isInstituteMode ? (
         <div className="rounded-2xl border border-wk-warning/30 bg-wk-warning-soft px-4 py-3 text-[12px] font-bold leading-5 text-wk-text-muted">
-          {instituteNotice ?? "Institute article mode. Drafting, autosave, preview, and submit for review are allowed. Publishing stays editor-only."}
+          {instituteNotice ?? "Draft, save, preview, then submit."}
         </div>
       ) : null}
 

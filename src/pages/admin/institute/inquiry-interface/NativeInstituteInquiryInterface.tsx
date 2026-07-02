@@ -47,7 +47,7 @@ const defaultSetup: InquirySetup = {
   scopePlaceRoute: "",
   scopeLanguageRegister: "",
   scopeExclusion: "",
-  consentDefault: "Only for review, keep it private",
+  consentDefault: "Private until reviewed",
   reviewStandard: "Internal memory first",
   draftTimer: "Off",
   previewDepth: "Estimate from real material",
@@ -103,18 +103,18 @@ const setupOptions = {
     { label: "Contributor memory intake", note: "Collect memories" },
     { label: "Corrections", note: "Handle changes" },
     { label: "Lineage and forks", note: "Track splits" },
-    { label: "Review queue", note: "Editor decisions" },
+    { label: "Review", note: "Editor decisions" },
     { label: "Inquiry Assistant", note: "AI help, never approval" },
   ],
   consentDefaults: [
     "Publicly after review",
     "Internally as a clue",
-    "Only for review, keep it private",
+    "Private until reviewed",
   ],
   reviewStandards: [
     "Internal memory first",
-    "Public-safe required",
-    "Senior editor required",
+    "Public-safe",
+    "Senior editor",
   ],
   draftTimers: ["10 sec", "30 sec", "60 sec", "Off"],
 };
@@ -554,7 +554,7 @@ function HomeScreen({
                   )) : (
                     <EmptyState
                       title="No matching anchor found"
-                      body="Try another spelling or choose No anchor. Creating new registry entities comes in a later PR."
+                      body="Try another spelling or choose No anchor."
                     />
                   )}
                 </div>
@@ -564,7 +564,7 @@ function HomeScreen({
 
           {state.selectedAnchorCategory === "none" ? (
             <div className="mt-5 rounded-xl border border-wk-border bg-wk-surface p-4">
-              <div className="text-[13px] font-black text-wk-text">No registry anchor selected</div>
+              <div className="text-[13px] font-black text-wk-text">No anchor selected</div>
               <p className="mt-1 text-[12px] leading-5 text-wk-text-muted">
                 This Inquiry will start from the question alone. You can attach evidence and relationships later.
               </p>
@@ -826,10 +826,10 @@ function WorkbenchScreen({
         </div>
 
         <h1 className="mt-3 text-[34px] font-black leading-[1.02] tracking-[-0.065em] text-wk-text lg:text-[38px]">
-          How are we going to investigate this?
+          Set up the inquiry
         </h1>
         <p className="mt-2 text-[14px] leading-6 text-wk-text-muted">
-          Select the formats, tools, scope, and defaults for this Inquiry.
+          
         </p>
 
         <div className="mt-5 rounded-xl border border-wk-border bg-wk-bg-subtle p-4">
@@ -840,12 +840,12 @@ function WorkbenchScreen({
             className="mt-2 w-full rounded-lg border border-wk-border bg-wk-surface px-4 py-3 text-[18px] font-black leading-6 text-wk-text outline-none focus:border-wk-brand"
           />
           <p className="mt-2 text-[12px] leading-5 text-wk-text-muted">
-            {draft.rawQuestion === workingQuestion ? "Original question preserved as Version 1." : `Original question: ${draft.rawQuestion}`}
+            {draft.rawQuestion === workingQuestion ? "" : `Original question: ${draft.rawQuestion}`}
           </p>
         </div>
       </section>
 
-      <Panel eyebrow="Featured Image" title="What image carries this Inquiry?">
+      <Panel eyebrow="Featured Image" title="Image">
         <div className="grid gap-4 lg:grid-cols-[240px_1fr]">
           <div className="self-start overflow-hidden rounded-xl border border-wk-border bg-wk-bg-subtle">
             {draft.featuredImageUrl ? (
@@ -868,14 +868,14 @@ function WorkbenchScreen({
                 onClick={() =>
                   updateDraft({
                     featuredImageUrl: draft.anchor?.imageUrl ?? "",
-                    featuredImageAlt: `${draft.anchor?.label ?? "Artist"} registry image`,
-                    featuredImageCredit: "WAKILISHA registry",
+                    featuredImageAlt: `${draft.anchor?.label ?? "Artist"} image`,
+                    featuredImageCredit: "WAKILISHA",
                     featuredImageSource: "Registry anchor",
                   })
                 }
                 className="rounded-lg border border-wk-brand/30 bg-wk-brand-soft px-4 py-3 text-left text-[12px] font-black text-wk-text"
               >
-                Use {draft.anchor.label} registry image
+                Use {draft.anchor.label} image
               </button>
             ) : null}
 
@@ -909,7 +909,7 @@ function WorkbenchScreen({
               <input
                 value={draft.featuredImageCredit}
                 onChange={(event) => updateDraft({ featuredImageCredit: event.target.value })}
-                placeholder="Photographer, archive, registry, or source credit"
+                placeholder="Photographer, archive, or source credit"
                 className="w-full rounded-lg border border-wk-border bg-wk-bg px-4 py-3 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
               />
             </label>
@@ -920,10 +920,10 @@ function WorkbenchScreen({
       <section className="rounded-2xl border border-wk-brand/20 bg-wk-brand-soft p-5">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-wk-brand">AI Setup</div>
-            <h2 className="mt-1 text-[18px] font-black tracking-[-0.04em] text-wk-text">Suggest inquiry setup.</h2>
+            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-wk-brand">Setup</div>
+            <h2 className="mt-1 text-[18px] font-black tracking-[-0.04em] text-wk-text">Suggest setup</h2>
             <p className="mt-1 text-[12px] leading-5 text-wk-text-muted">
-              Later, AI can suggest formats, tools, scope, and search terms from the working question.
+              
             </p>
           </div>
           <button
@@ -938,7 +938,7 @@ function WorkbenchScreen({
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="space-y-5">
-          <Panel eyebrow="1 · Inquiry Shape" title="What kind of investigation is this?">
+          <Panel eyebrow="1 · Inquiry Shape" title="Shape">
             <p className="mb-3 text-[12px] leading-5 text-wk-text-muted">Select one.</p>
             <div className="flex flex-wrap gap-2">
               {setupOptions.inquiryTypes.map((option) => (
@@ -953,7 +953,7 @@ function WorkbenchScreen({
             </div>
           </Panel>
 
-          <Panel eyebrow="2 · Output Surfaces" title="What might hold the final work?">
+          <Panel eyebrow="2 · Output Surfaces" title="Where will this live?">
             <p className="mb-3 text-[12px] leading-5 text-wk-text-muted">Select any that apply.</p>
             <div className="flex flex-wrap gap-2">
               {setupOptions.outputs.map((option) => (
@@ -968,9 +968,9 @@ function WorkbenchScreen({
             </div>
           </Panel>
 
-          <Panel eyebrow="3 · Evidence Formats" title="What material will we use?">
+          <Panel eyebrow="3 · Evidence Formats" title="Materials">
             <p className="mb-3 text-[12px] leading-5 text-wk-text-muted">
-              These choices control the Evidence page.
+              
             </p>
             <div className="grid gap-3 md:grid-cols-2">
               {setupOptions.formats.map((option) => {
@@ -1003,7 +1003,7 @@ function WorkbenchScreen({
             </div>
           </Panel>
 
-          <Panel eyebrow="7 · Tools of the Trade" title="What tools does this inquiry need?">
+          <Panel eyebrow="7 · Tools" title="Tools">
             <p className="mb-3 text-[12px] leading-5 text-wk-text-muted">Select any that apply.</p>
             <div className="grid gap-3 md:grid-cols-2">
               {setupOptions.tools.map((tool) => (
@@ -1020,7 +1020,7 @@ function WorkbenchScreen({
         </div>
 
         <div className="space-y-5 xl:sticky xl:top-5 xl:self-start">
-          <Panel eyebrow="4 · Scope" title="Give the inquiry edges.">
+          <Panel eyebrow="4 · Scope" title="Scope">
             <div className="space-y-3">
               <input
                 value={setup.scopeTimeRange}
@@ -1050,7 +1050,7 @@ function WorkbenchScreen({
             </div>
           </Panel>
 
-          <Panel eyebrow="6 · Defaults" title="Set the default care level.">
+          <Panel eyebrow="6 · Review" title="Care level">
             <div className="space-y-4">
               <div>
                 <div className="mb-2 text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Consent default</div>
@@ -1127,7 +1127,7 @@ function WorkbenchScreen({
             <div className="text-[10px] font-black uppercase tracking-[0.18em] text-wk-brand">Ready</div>
             <h2 className="mt-1 text-[20px] font-black tracking-[-0.04em] text-wk-text">Next: Evidence</h2>
             <p className="mt-2 text-[12px] leading-5 text-wk-text-muted">
-              The Evidence page will use the formats selected here.
+              
             </p>
             <button
               type="button"
@@ -1138,7 +1138,7 @@ function WorkbenchScreen({
               }}
               className="mt-4 w-full rounded-lg bg-wk-brand px-5 py-3 text-[13px] font-black text-wk-brand-on"
             >
-              Start Adding Material
+              Start evidence
             </button>
           </section>
         </div>
@@ -1200,7 +1200,7 @@ function AnchorBriefScreen({ draft }: { draft: InquiryDraft | null }) {
       <div className="mx-auto max-w-[1000px]">
         <Panel eyebrow={`${draft.code} · Anchor Brief`} title="No anchor attached">
           <EmptyState
-            title="This Inquiry started without a registry anchor"
+            title="This inquiry has no anchor"
             body="Use the Workbench and Evidence surfaces to frame it manually. Anchor suggestions come later."
           />
         </Panel>
@@ -1231,7 +1231,7 @@ function AnchorBriefScreen({ draft }: { draft: InquiryDraft | null }) {
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <Chip tone="brand">{draft.anchor.type}</Chip>
-              {snapshot ? <Chip tone="success">Snapshot ready</Chip> : <Chip tone="warning">No snapshot</Chip>}
+              {snapshot ? <Chip tone="success">Ready</Chip> : <Chip tone="warning">Not ready</Chip>}
             </div>
 
             <h1 className="mt-3 text-[34px] font-black leading-[1.02] tracking-[-0.065em] text-wk-text lg:text-[40px]">
@@ -1244,11 +1244,11 @@ function AnchorBriefScreen({ draft }: { draft: InquiryDraft | null }) {
 
             {snapshot ? (
               <p className="mt-3 text-[12px] leading-5 text-wk-text-muted">
-                Captured {new Date(snapshot.createdAt).toLocaleString()} as snapshot v{snapshot.snapshotVersion}.
+                Brief saved {new Date(snapshot.createdAt).toLocaleString()}.
               </p>
             ) : (
               <p className="mt-3 text-[12px] leading-5 text-wk-text-muted">
-                This Inquiry has an anchor but no captured context snapshot yet. Create a new anchored Inquiry after PR4 deployment, or add a backfill later.
+                This inquiry has an anchor, but no brief yet.
               </p>
             )}
           </div>
@@ -1277,23 +1277,23 @@ function AnchorBriefScreen({ draft }: { draft: InquiryDraft | null }) {
           </div>
 
           <div className="grid gap-5 lg:grid-cols-2">
-            <BriefItemList title="What this anchor already gives us" items={snapshot.knowns} empty="No knowns were captured." />
-            <BriefItemList title="What is still unknown" items={snapshot.unknowns} empty="No unknowns were captured." />
-            <BriefItemList title="Evidence gaps to fill" items={snapshot.evidenceGaps} empty="No evidence gaps were captured." />
-            <BriefItemList title="Relationship leads" items={snapshot.relationshipLeads} empty="No relationship leads were captured." />
+            <BriefItemList title="What this anchor already gives us" items={snapshot.knowns} empty="Nothing saved yet." />
+            <BriefItemList title="What is still unknown" items={snapshot.unknowns} empty="Nothing saved yet." />
+            <BriefItemList title="Evidence gaps to fill" items={snapshot.evidenceGaps} empty="Nothing saved yet." />
+            <BriefItemList title="Relationship leads" items={snapshot.relationshipLeads} empty="Nothing saved yet." />
           </div>
 
           {snapshot.thinDataNotes.length ? (
             <Panel eyebrow="Data Quality" title="Thin data notes">
-              <BriefItemList title="Things to improve" items={snapshot.thinDataNotes} empty="No thin data notes were captured." />
+              <BriefItemList title="Things to improve" items={snapshot.thinDataNotes} empty="Nothing saved yet." />
             </Panel>
           ) : null}
         </>
       ) : (
-        <Panel title="No captured snapshot yet">
+        <Panel title="No brief yet">
           <EmptyState
-            title="Anchor exists, but the brief has no saved snapshot"
-            body="This usually means the Inquiry was created before snapshot capture existed. A backfill can handle older Inquiries later."
+            title="Anchor exists, but no brief is saved yet."
+            body="Older inquiries may need a backfill."
           />
         </Panel>
       )}
@@ -1360,7 +1360,7 @@ const formatWorkspaceDefinitions: FormatWorkspaceDefinition[] = [
     evidenceKind: "Photo",
     workspaceType: "photo",
     deck: "Produce visual evidence with caption, credit, place, people shown, rights, consent, and what the image proves.",
-    productionGoal: "A reviewable image evidence package that can later support articles, archives, photo essays, or registry images.",
+    productionGoal: "A reviewable image evidence package that can later support articles, archives, photo essays, or images.",
     required: ["Image URL or placeholder", "Caption", "Credit", "Date/place", "People shown", "Rights status"],
     niceToHave: ["Alt text", "Crop ideas", "Archive source", "Registry image candidate note"],
     reviewQuestions: ["Can we publish this image?", "Is the caption accurate?", "Is the date/place confirmed?"],
@@ -1380,7 +1380,7 @@ const formatWorkspaceDefinitions: FormatWorkspaceDefinition[] = [
     evidenceKind: "Chart data",
     workspaceType: "data",
     deck: "Produce a data evidence package with metric definition, source, date, interpretation, and limits.",
-    productionGoal: "A reviewable data note that can support chart context, claims, explainers, or registry enrichment.",
+    productionGoal: "A data note that can support chart context, claims, or explainers.",
     required: ["Dataset or chart source", "Metric definition", "Date/edition", "Relevant values", "Interpretation note", "Limitations"],
     niceToHave: ["Comparison set", "Chart idea", "CSV/file link", "Method note"],
     reviewQuestions: ["What does the number mean?", "What should we not infer?", "Is the source consistent?"],
@@ -1390,7 +1390,7 @@ const formatWorkspaceDefinitions: FormatWorkspaceDefinition[] = [
     evidenceKind: "WAKILISHA record",
     workspaceType: "registry",
     deck: "Use existing WAKILISHA records as structured evidence, but mark what needs correction, enrichment, or second sourcing.",
-    productionGoal: "A reviewable registry-backed evidence package that can support claims, relationships, articles, or corrections.",
+    productionGoal: "A source-backed note that can support claims, relationships, articles, or corrections.",
     required: ["Record type", "Record link or slug", "Current value", "Proposed use", "Evidence gap", "Public impact"],
     niceToHave: ["Proposed correction", "Related records", "Merge risk", "Missing image/source note"],
     reviewQuestions: ["Is the record current?", "Is the record enough evidence?", "What must be verified elsewhere?"],
@@ -1537,14 +1537,14 @@ function EvidenceScreen({
     articleReviewState.status === "withdrawn";
   const articleReviewNotice =
     articleReviewState?.status === "submitted" || articleReviewState?.status === "under_review"
-      ? "Institute article mode. This draft is already with editors. Save Draft and Preview remain available, but resubmission is locked until an editor requests changes."
+      ? "Already with editors. You can still save and preview."
       : articleReviewState?.status === "changes_requested"
-        ? "Institute article mode. Editors requested changes. Save your revisions, then resubmit for review."
+        ? "Changes requested. Revise, then resubmit."
         : articleReviewState?.status === "approved_for_promotion" || articleReviewState?.status === "accepted_for_internal_memory"
-          ? "Institute article mode. This work has already been accepted by review. Editors control the next step."
+          ? "Accepted. Editors control the next step."
           : articleReviewState?.status === "rejected"
-            ? "Institute article mode. This work was rejected. Start a new Inquiry if it needs to be rebuilt."
-            : "Institute article mode. Drafting, autosave, preview, and submit for review are allowed. Publishing stays editor-only.";
+            ? "Rejected. Start a new Inquiry to rebuild it."
+            : "Draft, save, preview, then submit.";
 
   useEffect(() => {
     let alive = true;
@@ -1593,7 +1593,7 @@ function EvidenceScreen({
   };
 
   const submitLinkedArticleForReview = async (articlePayload: Parameters<typeof submitInstituteArticleDraftForReview>[2]) => {
-    if (!draft || !articleLink) throw new Error("Linked article draft is not ready.");
+    if (!draft || !articleLink) throw new Error("Article draft is not ready.");
 
     const submission = await submitInstituteArticleDraftForReview(draft, articleLink, articlePayload);
     setArticleReviewState(submission);
@@ -1754,7 +1754,7 @@ function EvidenceScreen({
           </div>
 
           <div className="rounded-2xl border border-wk-warning/30 bg-wk-warning-soft p-4 text-left">
-            <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-warning">No publishing here</div>
+            <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-warning">Editor-only publishing</div>
             <p className="mt-2 max-w-[280px] text-[12px] leading-5 text-wk-text-muted">
               Contributors produce workspaces. Editors review completed work later. No contributor gets a publish button.
             </p>
@@ -1849,9 +1849,9 @@ function EvidenceScreen({
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <div className="text-[10px] font-black uppercase tracking-[0.2em] text-wk-brand">Article workspace</div>
-                  <h2 className="mt-2 text-[24px] font-black tracking-[-0.055em] text-wk-text">Write this article in the shared WAKILISHA editor.</h2>
+                  <h2 className="mt-2 text-[24px] font-black tracking-[-0.055em] text-wk-text">Write the article.</h2>
                   <p className="mt-2 max-w-3xl text-[13px] leading-6 text-wk-text-muted">
-                    This creates a real article draft linked to this Inquiry. Drafting, autosave, preview, and submit for review use the existing article system. Publishing stays editor-only.
+                    Use the shared editor. Publishing is editor-only.
                   </p>
                 </div>
 
@@ -1874,7 +1874,7 @@ function EvidenceScreen({
               {articleLink ? (
                 <div className="space-y-4">
                   <div className="rounded-xl border border-wk-success/30 bg-wk-success-soft px-4 py-3 text-[12px] leading-5 text-wk-text-muted">
-                    Linked draft: <strong className="text-wk-text">{articleLink.articleSlug}</strong>. This draft is private unless an editor publishes it later.
+                    Linked draft: <strong className="text-wk-text">{articleLink.articleSlug}</strong>. Private draft.
                   </div>
 
                   {articleReviewState ? (
@@ -2126,7 +2126,7 @@ function ReviewDeskScreen() {
       setPackets(rows);
       setActiveId((current) => current ?? rows[0]?.id ?? null);
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Failed to load review packets.");
+      setError(loadError instanceof Error ? loadError.message : "Failed to load reviews.");
     } finally {
       setLoading(false);
     }
@@ -2190,7 +2190,7 @@ function ReviewDeskScreen() {
       const updated = await updateInstituteReviewPacketDecision(activePacket, status, editorNotes);
       setPackets((current) => current.map((packet) => (packet.id === updated.id ? updated : packet)));
     } catch (updateError) {
-      setError(updateError instanceof Error ? updateError.message : "Failed to update review packet.");
+      setError(updateError instanceof Error ? updateError.message : "Failed to update review.");
     } finally {
       setSavingStatus(null);
     }
@@ -2225,10 +2225,10 @@ function ReviewDeskScreen() {
           <div>
             <div className="text-[10px] font-black uppercase tracking-[0.24em] text-wk-brand">Institute Review Desk</div>
             <h1 className="mt-3 text-[34px] font-black leading-[1.02] tracking-[-0.065em] text-wk-text lg:text-[42px]">
-              Review submitted Inquiry work.
+              Review work.
             </h1>
             <p className="mt-3 max-w-3xl text-[14px] leading-6 text-wk-text-muted">
-              This is the editor gate. Review packets can be accepted, rejected, or sent back. Nothing publishes from here.
+              Accept, reject, or send work back. Nothing publishes here.
             </p>
           </div>
 
@@ -2256,16 +2256,16 @@ function ReviewDeskScreen() {
       ) : null}
 
       {loading ? (
-        <Panel eyebrow="Review queue" title="Loading packets">
-          <EmptyState title="Loading Review Desk" body="Fetching submitted review packets." />
+        <Panel eyebrow="Review" title="Loading reviews">
+          <EmptyState title="Loading Review Desk" body="Fetching submitted work." />
         </Panel>
       ) : !packets.length ? (
-        <Panel eyebrow="Review queue" title="Nothing waiting">
-          <EmptyState title="No submitted packets yet" body="When contributors submit linked article drafts, they will appear here." />
+        <Panel eyebrow="Review" title="Nothing waiting">
+          <EmptyState title="Nothing submitted yet" body="Submitted article drafts will appear here." />
         </Panel>
       ) : (
         <div className="grid gap-5 xl:grid-cols-[380px_1fr]">
-          <Panel eyebrow="Queue" title={`${filteredPackets.length} of ${packets.length} packet(s)`}>
+          <Panel eyebrow="Queue" title={`${filteredPackets.length} of ${packets.length} submission(s)`}>
             <div className="mb-4 flex flex-wrap gap-2">
               {queueTabs.map((tab) => (
                 <button
@@ -2289,7 +2289,7 @@ function ReviewDeskScreen() {
             </div>
 
             {!filteredPackets.length ? (
-              <EmptyState title="No packets in this queue" body="Change the filter or wait for more submissions." />
+              <EmptyState title="Nothing in this queue" body="Change the filter or wait for more work." />
             ) : (
               <div className="space-y-3">
                 {filteredPackets.map((packet) => {
@@ -2317,7 +2317,7 @@ function ReviewDeskScreen() {
                     </div>
                     <div className="mt-2 text-[15px] font-black text-wk-text">{packetArticle?.title || packetArticle?.slug || "Untitled article draft"}</div>
                     <p className="mt-1 line-clamp-2 text-[12px] leading-5 text-wk-text-muted">
-                      {packetInquiry?.workingQuestion || packetInquiry?.rawQuestion || "No Inquiry question in snapshot."}
+                      {packetInquiry?.workingQuestion || packetInquiry?.rawQuestion || "No question saved."}
                     </p>
                     <div className="mt-3 text-[11px] text-wk-text-faint">
                       Submitted {new Date(packet.submittedAt).toLocaleString()}
@@ -2330,7 +2330,7 @@ function ReviewDeskScreen() {
           </Panel>
 
           <div className="space-y-5">
-            <Panel eyebrow="Packet detail" title={article?.title || "Selected review packet"}>
+            <Panel eyebrow="Submission" title={article?.title || "Selected review"}>
               <div className="grid gap-3 md:grid-cols-2">
                 <div className="rounded-xl border border-wk-border bg-wk-bg-subtle p-4">
                   <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Inquiry</div>
@@ -2345,10 +2345,10 @@ function ReviewDeskScreen() {
                 </div>
 
                 <div className="rounded-xl border border-wk-border bg-wk-bg-subtle p-4">
-                  <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Linked article draft</div>
+                  <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Article draft</div>
                   <div className="mt-2 text-[15px] font-black text-wk-text">{article?.slug ?? workProduct?.productSlug ?? "No article slug"}</div>
                   <p className="mt-2 text-[13px] leading-6 text-wk-text-muted">
-                    {article?.excerpt || "No excerpt captured in snapshot."}
+                    {article?.excerpt || "No excerpt saved."}
                   </p>
                   <div className="mt-3 flex flex-wrap gap-2">
                     <Chip tone="warning">{article?.wpStatus ?? "pending"}</Chip>
@@ -2365,10 +2365,10 @@ function ReviewDeskScreen() {
               </div>
 
               <div className="mt-4 rounded-xl border border-wk-border bg-wk-bg p-4">
-                <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Article snapshot preview</div>
+                <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Article preview</div>
                 <div
                   className="prose prose-sm mt-3 max-h-[360px] overflow-auto text-wk-text"
-                  dangerouslySetInnerHTML={{ __html: article?.contentHtml || "<p>No article body captured.</p>" }}
+                  dangerouslySetInnerHTML={{ __html: article?.contentHtml || "<p>No article body saved.</p>" }}
                 />
               </div>
             </Panel>
@@ -2408,7 +2408,7 @@ function ReviewDeskScreen() {
             {isPublishedWork ? (
               <Panel eyebrow="Published" title="This Institute work is live">
                 <div className="rounded-xl border border-wk-success/30 bg-wk-success-soft px-4 py-3 text-[12px] leading-5 text-wk-text-muted">
-                  The linked article has been published from the editor-controlled Article Editor. Institute did not publish it directly.
+                  Published from the article editor.
                 </div>
 
                 {liveArticleUrl ? (
@@ -2423,7 +2423,7 @@ function ReviewDeskScreen() {
                 ) : null}
 
                 <div className="mt-4 rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[12px] leading-5 text-wk-text-muted">
-                  Published state is synced from the article system into the Institute work product link.
+                  Synced from the article editor.
                 </div>
               </Panel>
             ) : null}
@@ -2431,7 +2431,7 @@ function ReviewDeskScreen() {
             {isApprovedHandoff ? (
               <Panel eyebrow="Editorial handoff" title="Ready for final editorial pass">
                 <div className="rounded-xl border border-wk-success/30 bg-wk-success-soft px-4 py-3 text-[12px] leading-5 text-wk-text-muted">
-                  This packet has been approved by Institute review. The next step is a final editor-controlled pass in the existing article system. Nothing publishes from the Institute Review Desk.
+                  Approved for final editorial pass.
                 </div>
 
                 {articleAdminUrl ? (
@@ -2439,24 +2439,24 @@ function ReviewDeskScreen() {
                     href={articleAdminUrl}
                     className="mt-4 inline-flex rounded-lg bg-wk-brand px-5 py-3 text-[13px] font-black text-wk-brand-on"
                   >
-                    Open full Article Editor
+                    Open article editor
                   </a>
                 ) : (
                   <div className="mt-4 rounded-xl border border-wk-warning/30 bg-wk-warning-soft px-4 py-3 text-[12px] font-bold text-wk-warning">
-                    No linked article slug found in this packet snapshot.
+                    No linked article found.
                   </div>
                 )}
 
                 <div className="mt-4 rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[12px] leading-5 text-wk-text-muted">
-                  The article should remain private or pending until an editor intentionally publishes through the normal article admin workflow.
+                  Publish only from the article editor.
                 </div>
               </Panel>
             ) : null}
 
             {article?.slug ? (
-              <Panel eyebrow="Linked article editor" title="Review the draft itself">
+              <Panel eyebrow="Linked article editor" title="Review the draft">
                 <div className="rounded-xl border border-wk-warning/30 bg-wk-warning-soft px-4 py-3 text-[12px] leading-5 text-wk-text-muted">
-                  Open the real article draft, make editorial changes if needed, save, preview, then use the Review Desk decision buttons below. Publishing remains locked.
+                  Edit, save, preview, then decide below.
                 </div>
 
                 <button
@@ -2464,7 +2464,7 @@ function ReviewDeskScreen() {
                   onClick={() => setArticleEditorOpen((current) => !current)}
                   className="mt-4 rounded-lg bg-wk-brand px-5 py-3 text-[13px] font-black text-wk-brand-on"
                 >
-                  {articleEditorOpen ? "Close linked article editor" : "Open linked article editor"}
+                  {articleEditorOpen ? "Close article editor" : "Open article editor"}
                 </button>
 
                 {articleEditorOpen ? (
@@ -2481,7 +2481,7 @@ function ReviewDeskScreen() {
               </Panel>
             ) : null}
 
-            <Panel eyebrow="Editor decision" title="Gate this work">
+            <Panel eyebrow="Editor decision" title="Decision">
               <label className="block">
                 <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Editor notes</span>
                 <textarea
@@ -2501,10 +2501,10 @@ function ReviewDeskScreen() {
                   Request changes
                 </button>
                 <button type="button" disabled={Boolean(savingStatus)} onClick={() => void updateStatus("approved_for_promotion")} className={actionClass}>
-                  Approve and hand off
+                  Approve
                 </button>
                 <button type="button" disabled={Boolean(savingStatus)} onClick={() => void updateStatus("accepted_for_internal_memory")} className={actionClass}>
-                  Accept as internal memory
+                  Keep internally
                 </button>
                 <button type="button" disabled={Boolean(savingStatus)} onClick={() => void updateStatus("rejected")} className={actionClass}>
                   Reject
@@ -2512,7 +2512,7 @@ function ReviewDeskScreen() {
               </div>
 
               <div className="mt-4 rounded-xl border border-wk-warning/30 bg-wk-warning-soft px-4 py-3 text-[12px] leading-5 text-wk-text-muted">
-                No publishing happens here. Approval only moves the work to the next editor-controlled step.
+                Approval moves the work to the next editorial step.
               </div>
             </Panel>
           </div>
