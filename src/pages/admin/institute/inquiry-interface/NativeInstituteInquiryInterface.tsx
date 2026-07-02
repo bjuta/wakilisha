@@ -1286,160 +1286,194 @@ function AnchorBriefScreen({ draft }: { draft: InquiryDraft | null }) {
 }
 
 
-type EvidenceSourceConfig = {
-  kind: EvidenceKind;
+
+type FormatWorkspaceDefinition = {
   label: string;
-  role: string;
-  integrityPrompt: string;
-  editorUse: string;
+  evidenceKind: EvidenceKind;
+  deck: string;
+  productionGoal: string;
+  workspaceType: "article" | "interview" | "audio" | "video" | "photo" | "archive" | "data" | "registry" | "source" | "memory";
+  required: string[];
+  niceToHave: string[];
+  reviewQuestions: string[];
 };
 
-const evidenceSourceConfigs: EvidenceSourceConfig[] = [
+const formatWorkspaceDefinitions: FormatWorkspaceDefinition[] = [
   {
-    kind: "WAKILISHA record",
-    label: "WAKILISHA record",
-    role: "Use an existing artist, track, release, label, genre, chart, or internal record as structured source material.",
-    integrityPrompt: "Confirm the record is current, specific, and relevant to this Inquiry.",
-    editorUse: "Can support registry updates, article context, claims, relationships, or corrections.",
+    label: "Article",
+    evidenceKind: "Article",
+    workspaceType: "article",
+    deck: "Write the actual draft inside the Inquiry. The editor should receive reviewable work, not loose notes.",
+    productionGoal: "A private, review-ready article draft with structure, evidence spine, claims, source notes, and open risks.",
+    required: ["Working headline", "Standfirst", "Article body", "Section outline", "Evidence spine", "Source list", "Claims to verify"],
+    niceToHave: ["Pull quote candidates", "Registry cards to insert", "Image ideas", "Counter-argument section"],
+    reviewQuestions: ["What is the central argument?", "Which claims are unsupported?", "What must not be overstated?"],
   },
   {
-    kind: "Article",
-    label: "Reference article",
-    role: "Use an existing article as source material. This is not the article we are publishing.",
-    integrityPrompt: "Capture author, publisher, access date, and what the article actually proves.",
-    editorUse: "Can support a future WAKILISHA article, guide, citation trail, or research note.",
+    label: "Interview",
+    evidenceKind: "Interview",
+    workspaceType: "interview",
+    deck: "Produce the interview package: consent, transcript, quote candidates, claims made, and verification needs.",
+    productionGoal: "A structured interview record that separates what was said, what it means, and what still needs proof.",
+    required: ["Interviewee", "Relationship to Inquiry", "Consent status", "Recording or notes", "Transcript or summary", "Key excerpts"],
+    niceToHave: ["Follow-up questions", "Quote approval notes", "Translation notes", "Names and places mentioned"],
+    reviewQuestions: ["Can any quote be public?", "Which claims need another source?", "What is private-only?"],
   },
   {
-    kind: "Link",
-    label: "Web source",
-    role: "Capture a web page, post, database entry, archive page, or useful public URL.",
-    integrityPrompt: "Check source credibility, access date, link rot risk, and whether it needs archiving.",
-    editorUse: "Can support claims, provide context, or point editors to material that needs verification.",
+    label: "Audio",
+    evidenceKind: "Audio",
+    workspaceType: "audio",
+    deck: "Produce an audio evidence room with transcript notes, timestamps, speaker context, rights, and public-use limits.",
+    productionGoal: "A reviewable audio package for oral history, voice notes, field recordings, or sound evidence.",
+    required: ["Audio link or placeholder", "Speaker or source", "Runtime", "Consent status", "Timestamped notes", "Transcript needs"],
+    niceToHave: ["Best quote", "Clip candidates", "Language notes", "Sound quality notes"],
+    reviewQuestions: ["Who owns this audio?", "What can be quoted?", "Which sections are sensitive?"],
   },
   {
-    kind: "Citation",
-    label: "Citation or quote",
-    role: "Capture a quote, excerpt, page reference, timestamp, or exact claim from a source.",
-    integrityPrompt: "Separate what is quoted from what we infer. Add page, timestamp, or locator where possible.",
-    editorUse: "Can become claim support, article citation, correction evidence, or research packet material.",
+    label: "Video",
+    evidenceKind: "Video",
+    workspaceType: "video",
+    deck: "Produce the video evidence package: scene notes, timestamps, people present, transcript/caption needs, rights, and consent.",
+    productionGoal: "A reviewable visual record that can support article work, archive work, or future video production.",
+    required: ["Video link or placeholder", "Runtime", "People shown", "Place/date", "Timestamped notes", "Rights status"],
+    niceToHave: ["Clip candidates", "Caption notes", "Thumbnail candidate", "Sensitive content flags"],
+    reviewQuestions: ["What does the video prove?", "What does it only suggest?", "Can any clip be public?"],
   },
   {
-    kind: "Interview",
-    label: "Interview or oral history",
-    role: "Capture an interview, transcript note, voice account, or contributor conversation.",
-    integrityPrompt: "Track consent, speaker identity, recording status, and what can or cannot be public.",
-    editorUse: "Can support articles, oral history work, internal memory, claims, or future audio/video production.",
+    label: "Photo",
+    evidenceKind: "Photo",
+    workspaceType: "photo",
+    deck: "Produce visual evidence with caption, credit, place, people shown, rights, consent, and what the image proves.",
+    productionGoal: "A reviewable image evidence package that can later support articles, archives, photo essays, or registry images.",
+    required: ["Image URL or placeholder", "Caption", "Credit", "Date/place", "People shown", "Rights status"],
+    niceToHave: ["Alt text", "Crop ideas", "Archive source", "Registry image candidate note"],
+    reviewQuestions: ["Can we publish this image?", "Is the caption accurate?", "Is the date/place confirmed?"],
   },
   {
-    kind: "Audio",
-    label: "Audio material",
-    role: "Capture a recording, voice note, song-related audio reference, field recording, or audio archive item.",
-    integrityPrompt: "Track transcript needs, speaker, timestamp, rights, consent, and public-use limits.",
-    editorUse: "Can become internal evidence, article support, oral history material, or future audio vertical input.",
-  },
-  {
-    kind: "Video",
-    label: "Video material",
-    role: "Capture a video source, clip, scene, interview, performance, explainer, or visual record.",
-    integrityPrompt: "Track timestamp, rights, people present, captions, transcript needs, and public-use limits.",
-    editorUse: "Can support article embeds, future video work items, claim review, or archive notes.",
-  },
-  {
-    kind: "Photo",
-    label: "Photo or image",
-    role: "Capture an image that is evidence, not just decoration.",
-    integrityPrompt: "Track credit, date, place, rights, people shown, caption, and consent.",
-    editorUse: "Can support articles, photo essays, registry image candidates, archive records, or scene documentation.",
-  },
-  {
-    kind: "Archive document",
     label: "Archive document",
-    role: "Capture scans, documents, programs, press kits, PDFs, letters, contracts, flyers, or cataloged material.",
-    integrityPrompt: "Track collection, locator, access note, rights, excerpt, and what the document does not prove.",
-    editorUse: "Can support articles, guides, claims, timelines, corrections, or structured archive records.",
+    evidenceKind: "Archive document",
+    workspaceType: "archive",
+    deck: "Catalog the document properly: collection, locator, excerpts, reliability, rights, and what it proves or does not prove.",
+    productionGoal: "A reviewable archive record with enough structure to support articles, claims, corrections, or timelines.",
+    required: ["Document title", "Document type", "Collection or source", "Locator", "Excerpt", "Reliability note"],
+    niceToHave: ["OCR text", "Page references", "Access restrictions", "Timeline implications"],
+    reviewQuestions: ["What does this document prove?", "What does it not prove?", "Does it conflict with another source?"],
   },
   {
-    kind: "Chart data",
-    label: "Chart or dataset",
-    role: "Capture chart positions, rankings, metrics, lists, datasets, or structured evidence.",
-    integrityPrompt: "Track source, date, edition, metric definition, and how the number should be interpreted.",
-    editorUse: "Can support data-led stories, charts context, claim support, or registry enrichment.",
+    label: "Chart data",
+    evidenceKind: "Chart data",
+    workspaceType: "data",
+    deck: "Produce a data evidence package with metric definition, source, date, interpretation, and limits.",
+    productionGoal: "A reviewable data note that can support chart context, claims, explainers, or registry enrichment.",
+    required: ["Dataset or chart source", "Metric definition", "Date/edition", "Relevant values", "Interpretation note", "Limitations"],
+    niceToHave: ["Comparison set", "Chart idea", "CSV/file link", "Method note"],
+    reviewQuestions: ["What does the number mean?", "What should we not infer?", "Is the source consistent?"],
   },
   {
-    kind: "Personal note",
-    label: "Contributor memory",
-    role: "Capture a memory, observation, field note, or informed contributor note.",
-    integrityPrompt: "Mark uncertainty clearly. Do not treat memory as verified fact without support.",
-    editorUse: "Can become internal memory, a lead for further evidence, or a fork into a new Inquiry.",
+    label: "WAKILISHA record",
+    evidenceKind: "WAKILISHA record",
+    workspaceType: "registry",
+    deck: "Use existing WAKILISHA records as structured evidence, but mark what needs correction, enrichment, or second sourcing.",
+    productionGoal: "A reviewable registry-backed evidence package that can support claims, relationships, articles, or corrections.",
+    required: ["Record type", "Record link or slug", "Current value", "Proposed use", "Evidence gap", "Public impact"],
+    niceToHave: ["Proposed correction", "Related records", "Merge risk", "Missing image/source note"],
+    reviewQuestions: ["Is the record current?", "Is the record enough evidence?", "What must be verified elsewhere?"],
+  },
+  {
+    label: "Link",
+    evidenceKind: "Link",
+    workspaceType: "source",
+    deck: "Turn a link into usable evidence: source quality, access date, what it supports, and what still needs verification.",
+    productionGoal: "A clean source note that can support a larger workspace without becoming the final work itself.",
+    required: ["URL", "Source name", "Access date", "Summary", "Use in Inquiry", "Reliability note"],
+    niceToHave: ["Archive URL", "Author", "Publisher", "Quote/excerpt"],
+    reviewQuestions: ["Is this source credible?", "What exactly does it prove?", "Should we archive it?"],
+  },
+  {
+    label: "Citation",
+    evidenceKind: "Citation",
+    workspaceType: "source",
+    deck: "Capture exact citations, quotes, excerpts, timestamps, or page references with context and limits.",
+    productionGoal: "A citation note that can be attached to article sections, claims, interviews, archives, or corrections.",
+    required: ["Exact citation or quote", "Source", "Locator", "Context", "Allowed use", "Claim supported"],
+    niceToHave: ["Translation note", "Paraphrase option", "Original language", "Sensitivity flag"],
+    reviewQuestions: ["Is the quote exact?", "Is context preserved?", "Can this be public?"],
+  },
+  {
+    label: "Personal note",
+    evidenceKind: "Personal note",
+    workspaceType: "memory",
+    deck: "Capture memory carefully. Useful memory is not automatically verified fact.",
+    productionGoal: "A contributor memory note that can become a lead, internal memory, or a future Inquiry fork.",
+    required: ["Memory note", "Who remembers this", "Time/place", "Confidence", "What needs proof", "Public-use limit"],
+    niceToHave: ["People to ask", "Related records", "Follow-up question", "Contradiction note"],
+    reviewQuestions: ["Is this fact or memory?", "Who can verify it?", "Should this stay internal?"],
   },
 ];
 
-const editorialOutcomeOptions = [
-  {
-    id: "article_candidate",
-    title: "Article candidate",
-    body: "This material may help an editor create or improve a WAKILISHA article later.",
-    guardrail: "Contributor proposes. Editor decides and opens the real article editor after review.",
-  },
-  {
-    id: "guide_document_candidate",
-    title: "Guide or document candidate",
-    body: "This material may belong in a guide, explainer, document, or research brief.",
-    guardrail: "No public document is created from this screen.",
-  },
-  {
-    id: "registry_update",
-    title: "Registry update proposal",
-    body: "This material may correct, enrich, or challenge a registry record.",
-    guardrail: "Registry changes must be reviewed before anything public changes.",
-  },
-  {
-    id: "claim_support",
-    title: "Claim support",
-    body: "This material appears to support a claim that may be used later.",
-    guardrail: "Claim acceptance comes after review.",
-  },
-  {
-    id: "claim_challenge",
-    title: "Claim challenge",
-    body: "This material appears to weaken, complicate, or contradict a claim.",
-    guardrail: "Contradictions are kept visible for editors.",
-  },
-  {
-    id: "relationship_evidence",
-    title: "Relationship evidence",
-    body: "This material may support a relationship between artists, tracks, places, labels, scenes, or contributors.",
-    guardrail: "Relationship proposals need review before becoming structured knowledge.",
-  },
-  {
-    id: "correction_candidate",
-    title: "Correction candidate",
-    body: "This material suggests something public or internal may need correction.",
-    guardrail: "Corrections need editorial handling before publication.",
-  },
-  {
-    id: "media_work_item",
-    title: "Media work item",
-    body: "This material may become audio, video, photo, or archive work in a future WAKILISHA vertical.",
-    guardrail: "This PR stores the intent. It does not publish media.",
-  },
-  {
-    id: "internal_memory",
-    title: "Internal memory only",
-    body: "This material is useful for WAKILISHA but may not be public-safe or publication-ready.",
-    guardrail: "Useful does not mean public.",
-  },
-  {
-    id: "new_inquiry_fork",
-    title: "Fork into new Inquiry",
-    body: "This material opens a better or separate question.",
-    guardrail: "The fork action comes later.",
-  },
-];
+function normalizeFormatLabel(format: string) {
+  return format.trim().toLowerCase();
+}
 
-function evidenceMetadataText(item: EvidenceItem, key: string, fallback = "Not set") {
+function workspaceDefinitionFor(format: string): FormatWorkspaceDefinition {
+  const normalized = normalizeFormatLabel(format);
+  return (
+    formatWorkspaceDefinitions.find((definition) => normalizeFormatLabel(definition.label) === normalized) ??
+    formatWorkspaceDefinitions.find((definition) => normalizeFormatLabel(definition.label).includes(normalized) || normalized.includes(normalizeFormatLabel(definition.label))) ??
+    {
+      label: format,
+      evidenceKind: "Personal note",
+      workspaceType: "memory",
+      deck: "Produce the promised evidence format as reviewable work.",
+      productionGoal: "A structured workspace checkpoint that explains what was produced and what still needs review.",
+      required: ["Work produced", "Evidence used", "Open risks", "Review note"],
+      niceToHave: ["Related entities", "Claims supported", "Source notes"],
+      reviewQuestions: ["What is complete?", "What remains uncertain?", "What should an editor check first?"],
+    }
+  );
+}
+
+function workspaceMetadataText(item: EvidenceItem, key: string, fallback = "Not set") {
   const value = item.metadata?.[key];
   return typeof value === "string" && value.trim() ? value : fallback;
+}
+
+function workspaceCompletion(item: EvidenceItem) {
+  const value = item.metadata?.workspaceCompletion;
+  if (typeof value === "number") return Math.max(0, Math.min(100, value));
+  if (typeof value === "string") return Math.max(0, Math.min(100, Number(value) || 0));
+  return 0;
+}
+
+function evidenceForFormat(evidence: EvidenceItem[], format: string) {
+  return evidence.filter((item) => {
+    const metadataFormat = workspaceMetadataText(item, "workspaceFormat", "");
+    return normalizeFormatLabel(metadataFormat || item.kind) === normalizeFormatLabel(format);
+  });
+}
+
+function CompletionBar({ value }: { value: number }) {
+  return (
+    <div className="h-2 overflow-hidden rounded-full bg-wk-bg-subtle">
+      <div className="h-full rounded-full bg-wk-brand transition-all" style={{ width: `${Math.max(0, Math.min(100, value))}%` }} />
+    </div>
+  );
+}
+
+function WorkspaceChecklist({ title, items }: { title: string; items: string[] }) {
+  return (
+    <div className="rounded-xl border border-wk-border bg-wk-bg-subtle p-4">
+      <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">{title}</div>
+      <div className="mt-3 space-y-2">
+        {items.map((item) => (
+          <div key={item} className="flex gap-2 text-[12px] leading-5 text-wk-text-muted">
+            <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-wk-brand" />
+            <span>{item}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function EvidenceMetric({ label, value, note }: { label: string; value: string | number; note: string }) {
@@ -1455,100 +1489,120 @@ function EvidenceMetric({ label, value, note }: { label: string; value: string |
 function EvidenceScreen({
   draft,
   addEvidence,
+  updateDraft,
 }: {
   draft: InquiryDraft | null;
   addEvidence: (inquiryId: string, evidence: Omit<EvidenceItem, "id" | "createdAt" | "updatedAt">) => Promise<EvidenceItem>;
+  updateDraft: (patch: Partial<InquiryDraft>) => void;
 }) {
-  const [selectedKind, setSelectedKind] = useState<EvidenceKind>("Link");
-  const [form, setForm] = useState({
-    title: "",
-    source: "",
-    sourceUrl: "",
-    summary: "",
-    whyItMatters: "",
-    confidence: "Useful clue",
-    rightsStatus: "Unknown rights",
-    consentStatus: "Not assessed",
-    uncertaintyNote: "",
-    supports: "",
-    challenges: "",
-    editorialOutcome: "article_candidate",
-    contributorNote: "",
-  });
+  const formats = draft?.setup.formats ?? [];
+  const [activeFormat, setActiveFormat] = useState("");
   const [saving, setSaving] = useState(false);
+  const [workspace, setWorkspace] = useState({
+    title: "",
+    producedWork: "",
+    evidenceUsed: "",
+    openRisks: "",
+    editorCheck: "",
+    completion: 25,
+    status: "In progress",
+  });
+
+  useEffect(() => {
+    if (!activeFormat && formats.length) setActiveFormat(formats[0]);
+    if (activeFormat && formats.length && !formats.includes(activeFormat)) setActiveFormat(formats[0]);
+  }, [activeFormat, formats]);
+
+  useEffect(() => {
+    setWorkspace({
+      title: "",
+      producedWork: "",
+      evidenceUsed: "",
+      openRisks: "",
+      editorCheck: "",
+      completion: 25,
+      status: "In progress",
+    });
+  }, [activeFormat]);
 
   if (!draft) {
     return (
       <div className="mx-auto max-w-[1000px]">
-        <Panel eyebrow="Evidence Studio" title="No Active Inquiry">
-          <EmptyState title="Nothing to service yet" body="Create or select an Inquiry first." />
+        <Panel eyebrow="Evidence workspaces" title="No Active Inquiry">
+          <EmptyState title="Nothing to produce yet" body="Create or select an Inquiry first." />
         </Panel>
       </div>
     );
   }
 
   const evidence = draft.evidence ?? [];
-  const selectedConfig = evidenceSourceConfigs.find((config) => config.kind === selectedKind) ?? evidenceSourceConfigs[0];
-  const selectedOutcome = editorialOutcomeOptions.find((outcome) => outcome.id === form.editorialOutcome) ?? editorialOutcomeOptions[0];
+  const activeDefinition = activeFormat ? workspaceDefinitionFor(activeFormat) : null;
+  const producedFormats = formats.filter((format) => evidenceForFormat(evidence, format).length > 0);
+  const completedFormats = formats.filter((format) => {
+    const items = evidenceForFormat(evidence, format);
+    return items.some((item) => workspaceCompletion(item) >= 80);
+  });
+  const latestForActive = activeFormat ? evidenceForFormat(evidence, activeFormat)[0] : null;
+  const activeCompletion = latestForActive ? workspaceCompletion(latestForActive) : 0;
 
-  const readyForReview = evidence.filter((item) => item.reviewState === "Needs review").length;
-  const internalMemory = evidence.filter((item) => item.reviewState === "Accepted for internal memory").length;
-  const publicCandidates = evidence.filter((item) => item.reviewState === "Public-safe candidate").length;
-  const withRightsRisk = evidence.filter((item) => evidenceMetadataText(item, "rightsStatus", "").toLowerCase().includes("unknown")).length;
-  const withConsentRisk = evidence.filter((item) => evidenceMetadataText(item, "consentStatus", "").toLowerCase().includes("needed")).length;
+  const canSave = Boolean(
+    activeDefinition &&
+    workspace.title.trim().length >= 3 &&
+    workspace.producedWork.trim().length >= 8 &&
+    workspace.evidenceUsed.trim().length >= 4,
+  );
 
-  const canSave =
-    form.title.trim().length >= 3 &&
-    form.source.trim().length >= 2 &&
-    form.summary.trim().length >= 8 &&
-    form.whyItMatters.trim().length >= 8;
+  const removeFormat = (format: string) => {
+    const nextFormats = formats.filter((item) => item !== format);
+    updateDraft({
+      setup: {
+        ...draft.setup,
+        formats: nextFormats,
+      },
+    });
 
-  const saveSourceMaterial = async () => {
-    if (!canSave || saving) return;
+    if (activeFormat === format) {
+      setActiveFormat(nextFormats[0] ?? "");
+    }
+  };
+
+  const saveWorkspaceCheckpoint = async () => {
+    if (!activeDefinition || !activeFormat || !canSave || saving) return;
 
     setSaving(true);
     try {
       await addEvidence(draft.id, {
-        title: form.title.trim(),
-        kind: selectedKind,
-        source: form.source.trim(),
-        sourceUrl: form.sourceUrl.trim(),
-        summary: form.summary.trim(),
-        whyItMatters: form.whyItMatters.trim(),
+        title: workspace.title.trim(),
+        kind: activeDefinition.evidenceKind,
+        source: `${activeFormat} workspace`,
+        sourceUrl: "",
+        summary: workspace.producedWork.trim(),
+        whyItMatters: workspace.evidenceUsed.trim(),
         mediaMinutes: 0,
-        reviewState: "Draft",
+        reviewState: workspace.completion >= 80 ? "Needs review" : "Draft",
         metadata: {
-          evidenceStudioVersion: 1,
-          sourceMaterialRole: selectedConfig.role,
-          sourceIntegrityPrompt: selectedConfig.integrityPrompt,
-          editorUse: selectedConfig.editorUse,
-          confidence: form.confidence,
-          rightsStatus: form.rightsStatus,
-          consentStatus: form.consentStatus,
-          uncertaintyNote: form.uncertaintyNote.trim(),
-          supports: form.supports.trim(),
-          challenges: form.challenges.trim(),
-          suggestedEditorialOutcome: form.editorialOutcome,
-          suggestedEditorialOutcomeLabel: selectedOutcome.title,
-          editorialGuardrail: selectedOutcome.guardrail,
-          contributorNote: form.contributorNote.trim(),
+          workspaceVersion: 1,
+          workspaceFormat: activeFormat,
+          workspaceType: activeDefinition.workspaceType,
+          workspaceStatus: workspace.status,
+          workspaceCompletion: workspace.completion,
+          producedWork: workspace.producedWork.trim(),
+          evidenceUsed: workspace.evidenceUsed.trim(),
+          openRisks: workspace.openRisks.trim(),
+          editorCheck: workspace.editorCheck.trim(),
+          productionGoal: activeDefinition.productionGoal,
+          savedFrom: "evidence_format_workspace",
         },
       });
 
-      setForm({
+      setWorkspace({
         title: "",
-        source: "",
-        sourceUrl: "",
-        summary: "",
-        whyItMatters: "",
-        confidence: "Useful clue",
-        rightsStatus: "Unknown rights",
-        consentStatus: "Not assessed",
-        uncertaintyNote: "",
-        supports: "",
-        challenges: "",
-        editorialOutcome: "article_candidate",
-        contributorNote: "",
+        producedWork: "",
+        evidenceUsed: "",
+        openRisks: "",
+        editorCheck: "",
+        completion: 25,
+        status: "In progress",
       });
     } finally {
       setSaving(false);
@@ -1561,381 +1615,269 @@ function EvidenceScreen({
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <div className="text-[10px] font-black uppercase tracking-[0.24em] text-wk-brand">
-              {draft.code} · Evidence Studio
+              {draft.code} · Evidence workspaces
             </div>
             <h1 className="mt-3 max-w-4xl text-[34px] font-black leading-[1.02] tracking-[-0.065em] text-wk-text lg:text-[42px]">
-              Service the Inquiry before anything becomes public.
+              Produce the formats promised in Workbench.
             </h1>
             <p className="mt-3 max-w-3xl text-[14px] leading-6 text-wk-text-muted">
-              Evidence Studio is where contributors collect source material, explain what it supports, surface risk, and suggest what an editor should review it as. It does not publish.
+              This is not another setup page. Workbench decided the evidence formats. This page is where contributors put the work on the table.
             </p>
           </div>
 
           <div className="rounded-2xl border border-wk-warning/30 bg-wk-warning-soft p-4 text-left">
-            <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-warning">Editorial guardrail</div>
+            <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-warning">No publishing here</div>
             <p className="mt-2 max-w-[280px] text-[12px] leading-5 text-wk-text-muted">
-              Contributors create review candidates. Editors approve, promote, schedule, and publish from the correct editorial surface.
+              Contributors produce workspaces. Editors review completed work later. No contributor gets a publish button.
             </p>
           </div>
         </div>
 
         <div className="mt-5 rounded-xl border border-wk-border bg-wk-bg-subtle p-4">
-          <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Inquiry being serviced</div>
+          <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Inquiry being produced</div>
           <p className="mt-2 text-[16px] font-black leading-6 text-wk-text">{draft.workingQuestion}</p>
-          {draft.anchor ? (
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <Chip tone="brand">{draft.anchor.type}</Chip>
-              <span className="text-[12px] font-bold text-wk-text-muted">{draft.anchor.label}</span>
-              {draft.anchorContextSnapshot ? <Chip tone="success">Anchor brief ready</Chip> : <Chip tone="warning">No anchor snapshot</Chip>}
-            </div>
-          ) : (
-            <div className="mt-3">
-              <Chip tone="warning">No anchor</Chip>
-            </div>
-          )}
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {draft.anchor ? <Chip tone="brand">{draft.anchor.label}</Chip> : <Chip tone="warning">No anchor</Chip>}
+            <Chip>{formats.length} promised format(s)</Chip>
+          </div>
         </div>
       </section>
 
       <div className="grid gap-3 md:grid-cols-4">
-        <EvidenceMetric label="Source materials" value={evidence.length} note="Raw material collected for this Inquiry." />
-        <EvidenceMetric label="Ready for review" value={readyForReview} note="Material waiting for an editor decision." />
-        <EvidenceMetric label="Internal memory" value={internalMemory} note="Useful material that may not be public." />
-        <EvidenceMetric label="Risk flags" value={withRightsRisk + withConsentRisk} note="Rights or consent issues that need attention." />
+        <EvidenceMetric label="Promised formats" value={formats.length} note="Chosen in Workbench. These control this page." />
+        <EvidenceMetric label="Started" value={producedFormats.length} note="At least one workspace checkpoint exists." />
+        <EvidenceMetric label="Near review" value={completedFormats.length} note="Completion is 80% or higher." />
+        <EvidenceMetric label="Evidence records" value={evidence.length} note="Saved checkpoints and source material." />
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
-        <Panel eyebrow="1 · Source Material" title="What are we working with?">
-          <p className="mb-4 text-[13px] leading-6 text-wk-text-muted">
-            Choose the kind of source material. This choice changes how a contributor thinks about trust, rights, consent, and editorial use.
-          </p>
-
-          <div className="grid gap-3 md:grid-cols-2">
-            {evidenceSourceConfigs.map((config) => {
-              const selected = config.kind === selectedKind;
-              return (
-                <button
-                  key={config.kind}
-                  type="button"
-                  onClick={() => setSelectedKind(config.kind)}
-                  className={cx(
-                    "rounded-xl border p-4 text-left transition",
-                    selected ? "border-wk-brand bg-wk-brand-soft shadow-sm" : "border-wk-border bg-wk-bg hover:border-wk-brand/40",
-                  )}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="text-[13px] font-black text-wk-text">{config.label}</div>
-                    <span className={cx(
-                      "rounded-full border px-2 py-0.5 text-[10px] font-black",
-                      selected ? "border-wk-brand bg-wk-surface text-wk-brand" : "border-wk-border bg-wk-surface text-wk-text-muted",
-                    )}>
-                      {selected ? "Selected" : "Choose"}
-                    </span>
-                  </div>
-                  <p className="mt-2 text-[11px] leading-4 text-wk-text-muted">{config.role}</p>
-                </button>
-              );
-            })}
-          </div>
-        </Panel>
-
-        <Panel eyebrow="2 · Capture" title={`Add ${selectedConfig.label}`}>
-          <div className="mb-4 rounded-xl border border-wk-brand/20 bg-wk-brand-soft p-4">
-            <div className="text-[11px] font-black uppercase tracking-[0.14em] text-wk-brand">How to treat this source</div>
-            <p className="mt-2 text-[12px] leading-5 text-wk-text-muted">{selectedConfig.integrityPrompt}</p>
-            <p className="mt-2 text-[12px] leading-5 text-wk-text-muted">
-              <strong className="text-wk-text">Possible editor use:</strong> {selectedConfig.editorUse}
-            </p>
-          </div>
-
-          <div className="space-y-4">
-            <label className="block">
-              <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Material title</span>
-              <input
-                value={form.title}
-                onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
-                placeholder="Give this source material a clear working title"
-                className="w-full rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
-              />
-            </label>
-
-            <div className="grid gap-3 md:grid-cols-2">
-              <label>
-                <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Source or creator</span>
-                <input
-                  value={form.source}
-                  onChange={(event) => setForm((current) => ({ ...current, source: event.target.value }))}
-                  placeholder="Who or where did this come from?"
-                  className="w-full rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
-                />
-              </label>
-
-              <label>
-                <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">URL or locator</span>
-                <input
-                  value={form.sourceUrl}
-                  onChange={(event) => setForm((current) => ({ ...current, sourceUrl: event.target.value }))}
-                  placeholder="https://, archive locator, file note, or record slug"
-                  className="w-full rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
-                />
-              </label>
-            </div>
-
-            <label className="block">
-              <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">What does this material say?</span>
-              <textarea
-                value={form.summary}
-                onChange={(event) => setForm((current) => ({ ...current, summary: event.target.value }))}
-                rows={4}
-                placeholder="Summarize the actual material. Keep facts separate from interpretation."
-                className="w-full resize-y rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[13px] leading-6 text-wk-text outline-none focus:border-wk-brand"
-              />
-            </label>
-
-            <label className="block">
-              <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Why does it matter to this Inquiry?</span>
-              <textarea
-                value={form.whyItMatters}
-                onChange={(event) => setForm((current) => ({ ...current, whyItMatters: event.target.value }))}
-                rows={4}
-                placeholder="Explain how this services the Inquiry. What does it help an editor understand?"
-                className="w-full resize-y rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[13px] leading-6 text-wk-text outline-none focus:border-wk-brand"
-              />
-            </label>
-
-            <div className="grid gap-3 md:grid-cols-3">
-              <label>
-                <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Confidence</span>
-                <select
-                  value={form.confidence}
-                  onChange={(event) => setForm((current) => ({ ...current, confidence: event.target.value }))}
-                  className="w-full rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
-                >
-                  <option>Useful clue</option>
-                  <option>Strong support</option>
-                  <option>Partial support</option>
-                  <option>Contradicts something</option>
-                  <option>Needs primary source</option>
-                  <option>Unverified memory</option>
-                </select>
-              </label>
-
-              <label>
-                <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Rights</span>
-                <select
-                  value={form.rightsStatus}
-                  onChange={(event) => setForm((current) => ({ ...current, rightsStatus: event.target.value }))}
-                  className="w-full rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
-                >
-                  <option>Unknown rights</option>
-                  <option>Public source</option>
-                  <option>Owned by WAKILISHA</option>
-                  <option>Permission needed</option>
-                  <option>Do not publish</option>
-                </select>
-              </label>
-
-              <label>
-                <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Consent</span>
-                <select
-                  value={form.consentStatus}
-                  onChange={(event) => setForm((current) => ({ ...current, consentStatus: event.target.value }))}
-                  className="w-full rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
-                >
-                  <option>Not assessed</option>
-                  <option>Not needed</option>
-                  <option>Consent needed</option>
-                  <option>Consent captured</option>
-                  <option>Private only</option>
-                </select>
-              </label>
-            </div>
-
-            <div className="grid gap-3 md:grid-cols-2">
-              <label>
-                <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">What does it support?</span>
-                <textarea
-                  value={form.supports}
-                  onChange={(event) => setForm((current) => ({ ...current, supports: event.target.value }))}
-                  rows={3}
-                  placeholder="Claim, relationship, context, correction, scene, timeline, or article angle"
-                  className="w-full resize-y rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[13px] leading-6 text-wk-text outline-none focus:border-wk-brand"
-                />
-              </label>
-
-              <label>
-                <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">What does it challenge or not prove?</span>
-                <textarea
-                  value={form.challenges}
-                  onChange={(event) => setForm((current) => ({ ...current, challenges: event.target.value }))}
-                  rows={3}
-                  placeholder="Contradictions, limits, weak points, or things an editor must verify"
-                  className="w-full resize-y rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[13px] leading-6 text-wk-text outline-none focus:border-wk-brand"
-                />
-              </label>
-            </div>
-
-            <label className="block">
-              <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Uncertainty note</span>
-              <textarea
-                value={form.uncertaintyNote}
-                onChange={(event) => setForm((current) => ({ ...current, uncertaintyNote: event.target.value }))}
-                rows={3}
-                placeholder="What should not be treated as confirmed yet?"
-                className="w-full resize-y rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[13px] leading-6 text-wk-text outline-none focus:border-wk-brand"
-              />
-            </label>
-          </div>
-        </Panel>
-      </div>
-
-      <Panel eyebrow="3 · Work Product Proposal" title="What should an editor review this as?">
-        <p className="mb-4 max-w-3xl text-[13px] leading-6 text-wk-text-muted">
-          This is not publishing. This tells the editor what the contributor thinks the material could become after review.
-        </p>
-
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {editorialOutcomeOptions.map((outcome) => {
-            const selected = outcome.id === form.editorialOutcome;
-            return (
-              <button
-                key={outcome.id}
-                type="button"
-                onClick={() => setForm((current) => ({ ...current, editorialOutcome: outcome.id }))}
-                className={cx(
-                  "rounded-xl border p-4 text-left transition",
-                  selected ? "border-wk-brand bg-wk-brand-soft shadow-sm" : "border-wk-border bg-wk-bg hover:border-wk-brand/40",
-                )}
-              >
-                <div className="text-[13px] font-black text-wk-text">{outcome.title}</div>
-                <p className="mt-2 text-[11px] leading-4 text-wk-text-muted">{outcome.body}</p>
-                <p className="mt-3 rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[11px] leading-4 text-wk-text-muted">
-                  {outcome.guardrail}
-                </p>
-              </button>
-            );
-          })}
-        </div>
-
-        <label className="mt-4 block">
-          <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Contributor note to editor</span>
-          <textarea
-            value={form.contributorNote}
-            onChange={(event) => setForm((current) => ({ ...current, contributorNote: event.target.value }))}
-            rows={3}
-            placeholder="What should the editor know when reviewing this material?"
-            className="w-full resize-y rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[13px] leading-6 text-wk-text outline-none focus:border-wk-brand"
+      {!formats.length ? (
+        <Panel eyebrow="No formats selected" title="Go back to Workbench first">
+          <EmptyState
+            title="Evidence has nothing to produce yet"
+            body="Choose evidence formats in Workbench. Once selected, they appear here as production workspaces."
           />
-        </label>
-
-        <div className="mt-4 flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            disabled={!canSave || saving}
-            onClick={() => void saveSourceMaterial()}
-            className="rounded-lg bg-wk-brand px-6 py-3 text-[14px] font-black text-wk-brand-on transition disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {saving ? "Saving..." : "Save Source Material"}
-          </button>
-          <span className="text-[12px] leading-5 text-wk-text-faint">
-            Saves material to this Inquiry. It does not publish, schedule, or approve anything.
-          </span>
-        </div>
-      </Panel>
-
-      <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
-        <Panel eyebrow="4 · Source Material Library" title="What has been collected?">
-          {evidence.length ? (
-            <div className="space-y-3">
-              {evidence.map((item) => (
-                <article key={item.id} className="rounded-xl border border-wk-border bg-wk-bg p-4">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Chip tone="brand">{item.kind}</Chip>
-                    <Chip tone={item.reviewState === "Needs review" ? "warning" : item.reviewState === "Accepted for internal memory" ? "success" : "neutral"}>
-                      {item.reviewState}
-                    </Chip>
-                    <Chip>{evidenceMetadataText(item, "confidence")}</Chip>
-                  </div>
-
-                  <h3 className="mt-3 text-[17px] font-black tracking-[-0.03em] text-wk-text">{item.title}</h3>
-                  <p className="mt-2 text-[13px] leading-6 text-wk-text-muted">{item.summary}</p>
-
-                  <div className="mt-3 grid gap-2 md:grid-cols-2">
-                    <div className="rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[12px] leading-5 text-wk-text-muted">
-                      <strong className="text-wk-text">Source:</strong> {item.source}
-                      {item.sourceUrl ? (
-                        <>
-                          <br />
-                          <a href={item.sourceUrl} target="_blank" rel="noreferrer" className="font-bold text-wk-brand">
-                            Open source
-                          </a>
-                        </>
-                      ) : null}
-                    </div>
-                    <div className="rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[12px] leading-5 text-wk-text-muted">
-                      <strong className="text-wk-text">Suggested outcome:</strong> {evidenceMetadataText(item, "suggestedEditorialOutcomeLabel")}
-                      <br />
-                      <strong className="text-wk-text">Rights:</strong> {evidenceMetadataText(item, "rightsStatus")}
-                    </div>
-                  </div>
-
-                  <div className="mt-3 rounded-lg border border-wk-border bg-wk-bg-subtle px-3 py-2">
-                    <div className="text-[10px] font-black uppercase tracking-[0.14em] text-wk-text-faint">Why it matters</div>
-                    <p className="mt-1 text-[12px] leading-5 text-wk-text-muted">{item.whyItMatters}</p>
-                  </div>
-
-                  {evidenceMetadataText(item, "uncertaintyNote", "") ? (
-                    <div className="mt-3 rounded-lg border border-wk-warning/30 bg-wk-warning-soft px-3 py-2">
-                      <div className="text-[10px] font-black uppercase tracking-[0.14em] text-wk-warning">Uncertainty</div>
-                      <p className="mt-1 text-[12px] leading-5 text-wk-text-muted">{evidenceMetadataText(item, "uncertaintyNote", "")}</p>
-                    </div>
-                  ) : null}
-                </article>
-              ))}
-            </div>
-          ) : (
-            <EmptyState
-              title="No source material yet"
-              body="Start by adding one source material item. The goal is not volume. The goal is useful, reviewable material."
-            />
-          )}
         </Panel>
+      ) : (
+        <>
+          <Panel eyebrow="1 · Format queue" title="What did the contributor promise to produce?">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {formats.map((format) => {
+                const definition = workspaceDefinitionFor(format);
+                const items = evidenceForFormat(evidence, format);
+                const latest = items[0];
+                const completion = latest ? workspaceCompletion(latest) : 0;
+                const selected = activeFormat === format;
 
-        <Panel eyebrow="5 · Review Readiness" title="Can this move to editorial review?">
-          <div className="space-y-3">
-            <EmptyState
-              title={evidence.length ? "Material exists" : "No material yet"}
-              body={evidence.length ? `${evidence.length} source material item(s) have been collected.` : "An editor needs source material before they can review anything."}
-            />
-            <EmptyState
-              title={withRightsRisk ? "Rights need attention" : "Rights risk not blocking yet"}
-              body={withRightsRisk ? `${withRightsRisk} item(s) still have unknown rights.` : "No unknown-rights flags were counted from saved material."}
-            />
-            <EmptyState
-              title={withConsentRisk ? "Consent needs attention" : "Consent risk not blocking yet"}
-              body={withConsentRisk ? `${withConsentRisk} item(s) may need consent before public use.` : "No consent-needed flags were counted from saved material."}
-            />
-            <EmptyState
-              title={publicCandidates ? "Public candidates are only suggestions" : "No public candidates yet"}
-              body={publicCandidates ? "Public-safe language is not final approval. Editors still decide." : "Contributors should focus on source quality before public outcomes."}
-            />
+                return (
+                  <article
+                    key={format}
+                    className={cx(
+                      "rounded-xl border p-4 transition",
+                      selected ? "border-wk-brand bg-wk-brand-soft shadow-sm" : "border-wk-border bg-wk-bg",
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-[13px] font-black text-wk-text">{format}</div>
+                        <p className="mt-1 text-[11px] leading-4 text-wk-text-muted">{definition.deck}</p>
+                      </div>
+                      <Chip tone={completion >= 80 ? "success" : items.length ? "warning" : "neutral"}>
+                        {completion >= 80 ? "Near review" : items.length ? "Started" : "Not started"}
+                      </Chip>
+                    </div>
 
-            <div className="rounded-xl border border-wk-border bg-wk-bg-subtle p-4">
-              <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Next gate</div>
-              <h3 className="mt-2 text-[18px] font-black tracking-[-0.04em] text-wk-text">Submit for editorial review</h3>
-              <p className="mt-2 text-[12px] leading-5 text-wk-text-muted">
-                PR7 will turn this into a frozen review packet. PR6 only builds the Studio foundation and keeps publishing out of the contributor flow.
-              </p>
-              <button
-                type="button"
-                disabled
-                className="mt-4 w-full rounded-lg bg-wk-text px-5 py-3 text-[13px] font-black text-wk-bg opacity-45"
-              >
-                Submit for editorial review in PR7
-              </button>
+                    <div className="mt-4">
+                      <div className="mb-2 flex items-center justify-between text-[10px] font-black uppercase tracking-[0.14em] text-wk-text-faint">
+                        <span>Completion</span>
+                        <span>{completion}%</span>
+                      </div>
+                      <CompletionBar value={completion} />
+                    </div>
+
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setActiveFormat(format)}
+                        className="rounded-lg bg-wk-text px-4 py-2 text-[11px] font-black text-wk-bg"
+                      >
+                        Open workspace
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removeFormat(format)}
+                        className="rounded-lg border border-wk-border bg-wk-surface px-4 py-2 text-[11px] font-black text-wk-text-muted"
+                      >
+                        Remove format
+                      </button>
+                    </div>
+                  </article>
+                );
+              })}
             </div>
-          </div>
-        </Panel>
-      </div>
+          </Panel>
+
+          {activeDefinition ? (
+            <div className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
+              <Panel eyebrow="2 · Workspace standard" title={`${activeFormat} production room`}>
+                <p className="text-[13px] leading-6 text-wk-text-muted">{activeDefinition.productionGoal}</p>
+
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  <WorkspaceChecklist title="Required before review" items={activeDefinition.required} />
+                  <WorkspaceChecklist title="Useful if available" items={activeDefinition.niceToHave} />
+                </div>
+
+                <div className="mt-3 rounded-xl border border-wk-border bg-wk-bg-subtle p-4">
+                  <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Editor will ask</div>
+                  <div className="mt-3 space-y-2">
+                    {activeDefinition.reviewQuestions.map((question) => (
+                      <div key={question} className="rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[12px] font-bold text-wk-text-muted">
+                        {question}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </Panel>
+
+              <Panel eyebrow="3 · Produce work" title={`Save a ${activeFormat} checkpoint`}>
+                {latestForActive ? (
+                  <div className="mb-4 rounded-xl border border-wk-success/30 bg-wk-success-soft p-4">
+                    <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-success">Latest saved checkpoint</div>
+                    <div className="mt-2 text-[15px] font-black text-wk-text">{latestForActive.title}</div>
+                    <p className="mt-1 text-[12px] leading-5 text-wk-text-muted">
+                      {activeCompletion}% complete · saved {new Date(latestForActive.createdAt).toLocaleString()}
+                    </p>
+                  </div>
+                ) : null}
+
+                <div className="space-y-4">
+                  <label className="block">
+                    <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Checkpoint title</span>
+                    <input
+                      value={workspace.title}
+                      onChange={(event) => setWorkspace((current) => ({ ...current, title: event.target.value }))}
+                      placeholder={`Name this ${activeFormat} checkpoint`}
+                      className="w-full rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Produced work</span>
+                    <textarea
+                      value={workspace.producedWork}
+                      onChange={(event) => setWorkspace((current) => ({ ...current, producedWork: event.target.value }))}
+                      rows={8}
+                      placeholder="Do the actual work here. For article, draft the section. For interview, add transcript and excerpts. For video, add timestamped analysis."
+                      className="w-full resize-y rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[13px] leading-6 text-wk-text outline-none focus:border-wk-brand"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Evidence used</span>
+                    <textarea
+                      value={workspace.evidenceUsed}
+                      onChange={(event) => setWorkspace((current) => ({ ...current, evidenceUsed: event.target.value }))}
+                      rows={4}
+                      placeholder="What source, quote, timestamp, image, record, or document supports this work?"
+                      className="w-full resize-y rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[13px] leading-6 text-wk-text outline-none focus:border-wk-brand"
+                    />
+                  </label>
+
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <label>
+                      <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Open risks</span>
+                      <textarea
+                        value={workspace.openRisks}
+                        onChange={(event) => setWorkspace((current) => ({ ...current, openRisks: event.target.value }))}
+                        rows={4}
+                        placeholder="What is weak, risky, private, disputed, or not proven yet?"
+                        className="w-full resize-y rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[13px] leading-6 text-wk-text outline-none focus:border-wk-brand"
+                      />
+                    </label>
+
+                    <label>
+                      <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">What should the editor check later?</span>
+                      <textarea
+                        value={workspace.editorCheck}
+                        onChange={(event) => setWorkspace((current) => ({ ...current, editorCheck: event.target.value }))}
+                        rows={4}
+                        placeholder="This is not a briefing. It is a review pointer attached to completed work."
+                        className="w-full resize-y rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[13px] leading-6 text-wk-text outline-none focus:border-wk-brand"
+                      />
+                    </label>
+                  </div>
+
+                  <div className="grid gap-3 md:grid-cols-[1fr_180px]">
+                    <label>
+                      <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Workspace status</span>
+                      <select
+                        value={workspace.status}
+                        onChange={(event) => setWorkspace((current) => ({ ...current, status: event.target.value }))}
+                        className="w-full rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
+                      >
+                        <option>Not started</option>
+                        <option>In progress</option>
+                        <option>Blocked</option>
+                        <option>Needs source</option>
+                        <option>Ready for review</option>
+                      </select>
+                    </label>
+
+                    <label>
+                      <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Completion</span>
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={workspace.completion}
+                        onChange={(event) => setWorkspace((current) => ({ ...current, completion: Math.max(0, Math.min(100, Number(event.target.value) || 0)) }))}
+                        className="w-full rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
+                      />
+                    </label>
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={!canSave || saving}
+                    onClick={() => void saveWorkspaceCheckpoint()}
+                    className="rounded-lg bg-wk-brand px-6 py-3 text-[14px] font-black text-wk-brand-on transition disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {saving ? "Saving..." : "Save workspace checkpoint"}
+                  </button>
+                </div>
+              </Panel>
+            </div>
+          ) : null}
+
+          <Panel eyebrow="4 · Saved workspace checkpoints" title="What has been produced so far?">
+            {evidence.length ? (
+              <div className="grid gap-3 lg:grid-cols-2">
+                {evidence.map((item) => (
+                  <article key={item.id} className="rounded-xl border border-wk-border bg-wk-bg p-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Chip tone="brand">{workspaceMetadataText(item, "workspaceFormat", item.kind)}</Chip>
+                      <Chip tone={item.reviewState === "Needs review" ? "warning" : "neutral"}>{item.reviewState}</Chip>
+                      <Chip>{workspaceCompletion(item)}%</Chip>
+                    </div>
+                    <h3 className="mt-3 text-[17px] font-black tracking-[-0.03em] text-wk-text">{item.title}</h3>
+                    <p className="mt-2 text-[13px] leading-6 text-wk-text-muted">{item.summary}</p>
+                    {workspaceMetadataText(item, "openRisks", "") ? (
+                      <div className="mt-3 rounded-lg border border-wk-warning/30 bg-wk-warning-soft px-3 py-2">
+                        <div className="text-[10px] font-black uppercase tracking-[0.14em] text-wk-warning">Open risks</div>
+                        <p className="mt-1 text-[12px] leading-5 text-wk-text-muted">{workspaceMetadataText(item, "openRisks", "")}</p>
+                      </div>
+                    ) : null}
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <EmptyState
+                title="No workspace checkpoints yet"
+                body="Open a promised format and save the first piece of produced work."
+              />
+            )}
+          </Panel>
+        </>
+      )}
     </div>
   );
 }
@@ -2039,7 +1981,7 @@ export default function NativeInstituteInquiryInterface() {
           ) : state.screen === "anchorBrief" ? (
             <AnchorBriefScreen draft={active} />
           ) : state.screen === "evidence" ? (
-            <EvidenceScreen draft={active} addEvidence={addEvidence} />
+            <EvidenceScreen draft={active} addEvidence={addEvidence} updateDraft={updateActiveDraft} />
           ) : (
             <LockedScreen screen={state.screen} />
           )}
