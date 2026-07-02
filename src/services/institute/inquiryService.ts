@@ -124,6 +124,161 @@ function setupFromRow(row: WorkbenchSetupRow | undefined, fallback: InquirySetup
   };
 }
 
+type AnchorContextItem = {
+  title: string;
+  body: string;
+  source?: string;
+};
+
+function isUsefulValue(value: unknown) {
+  if (value === null || value === undefined) return false;
+  if (typeof value === "string") return value.trim().length > 0;
+  if (Array.isArray(value)) return value.length > 0;
+  if (typeof value === "object") return Object.keys(value as Record<string, unknown>).length > 0;
+  return true;
+}
+
+function formatMetadataValue(value: unknown) {
+  if (Array.isArray(value)) return value.map(String).filter(Boolean).join(", ");
+  if (typeof value === "object" && value !== null) return JSON.stringify(value);
+  return String(value);
+}
+
+function metadataKnowns(anchor: RegistryAnchor): AnchorContextItem[] {
+  const metadata = anchor.metadata ?? {};
+
+  return Object.entries(metadata)
+    .filter(([, value]) => isUsefulValue(value))
+    .slice(0, 8)
+    .map(([key, value]) => ({
+      title: `Anchor metadata: ${key}`,
+      body: formatMetadataValue(value),
+      source: "registry_anchor_metadata",
+    }));
+}
+
+function buildAnchorContextSnapshot(anchor: RegistryAnchor) {
+  const knowns: AnchorContextItem[] = [
+    {
+      title: "Anchor type",
+      body: anchor.type,
+      source: "selected_registry_anchor",
+    },
+    {
+      title: "Anchor label",
+      body: anchor.label,
+      source: "selected_registry_anchor",
+    },
+    {
+      title: "Anchor context",
+      body: anchor.contextText || anchor.subtitle || "No context text was available for this anchor.",
+      source: anchor.contextText ? "registry_search_context" : "registry_anchor_subtitle",
+    },
+    ...metadataKnowns(anchor),
+  ];
+
+  const unknowns: AnchorContextItem[] = [
+    {
+      title: "Evidence has not been reviewed yet",
+      body: "This snapshot only captures registry context. Human evidence still needs to be added and reviewed.",
+      source: "institute_snapshot_rule",
+    },
+    {
+      title: "Claims are not settled",
+      body: "The selected anchor can frame the Inquiry, but it does not prove the Inquiry question on its own.",
+      source: "institute_snapshot_rule",
+    },
+  ];
+
+  const evidenceGaps: AnchorContextItem[] = [
+    {
+      title: "Primary sources",
+      body: "Add interviews, articles, archive links, media, or direct references that support or challenge the Inquiry.",
+      source: "institute_snapshot_rule",
+    },
+    {
+      title: "Relationship evidence",
+      body: "Add evidence that explains how this anchor connects to people, sounds, places, moments, or claims in the Inquiry.",
+      source: "institute_snapshot_rule",
+    },
+  ];
+
+  const relationshipLeads: AnchorContextItem[] = [
+    {
+      title: `${anchor.label} as a starting point`,
+      body: `Investigate what people, records, genres, labels, scenes, or places are connected to ${anchor.label}.`,
+      source: "selected_registry_anchor",
+    },
+  ];
+
+  const thinDataNotes: AnchorContextItem[] = [];
+  if (!anchor.contextText) {
+    thinDataNotes.push({
+      title: "Missing context text",
+      body: "This anchor did not provide a search context paragraph.",
+      source: "registry_search_context",
+    });
+  }
+  if (!anchor.imageUrl) {
+    thinDataNotes.push({
+      title: "Missing image",
+      body: "This anchor did not provide an image URL.",
+      source: "registry_anchor_image",
+    });
+  }
+
+  return {
+    source_context: {
+      anchorType: anchor.type,
+      slug: anchor.slug,
+      label: anchor.label,
+      subtitle: anchor.subtitle,
+      imageUrl: anchor.imageUrl,
+      contextText: anchor.contextText,
+      href: anchor.href,
+      metadata: anchor.metadata ?? {},
+      capturedBy: "institute_inquiry_service",
+    },
+    knowns,
+    unknowns,
+    relationship_leads: relationshipLeads,
+    evidence_gaps: evidenceGaps,
+    related_entities: [],
+    thin_data_notes: thinDataNotes,
+    source_references: anchor.href
+      ? [
+          {
+            type: "registry_url",
+            label: anchor.label,
+            url: anchor.href,
+          },
+        ]
+      : [],
+  };
+}
+
+async function createAnchorContextSnapshot(
+  inquiryId: string,
+  inquiryAnchorId: string,
+  anchor: RegistryAnchor,
+) {
+  const snapshot = buildAnchorContextSnapshot(anchor);
+
+  const { error } = await supabase
+    .from("institute_anchor_context_snapshots")
+    .insert({
+      inquiry_id: inquiryId,
+      inquiry_anchor_id: inquiryAnchorId,
+      snapshot_version: 1,
+      anchor_entity_type: anchor.type,
+      anchor_slug: anchor.slug,
+      anchor_label: anchor.label,
+      ...snapshot,
+    });
+
+  if (error) throw error;
+}
+
 function normalizeInquiry(
   row: InquiryRow,
   anchorByInquiryId: Map<string, AnchorRow>,
@@ -251,22 +406,33 @@ export async function createInstituteInquiry(
     .eq("id", inquiryRow.id);
 
   if (anchor) {
-    await supabase.from("institute_inquiry_anchors").insert({
-      inquiry_id: inquiryRow.id,
-      source_system: "registry",
-      anchor_entity_type: anchor.type,
-      anchor_slug: anchor.slug,
-      anchor_label: anchor.label,
-      anchor_image_url: anchor.imageUrl,
-      anchor_metadata: {
-        ...(anchor.metadata ?? {}),
-        subtitle: anchor.subtitle,
-        contextText: anchor.contextText,
-        href: anchor.href,
-      },
-      is_primary: true,
-      status: "active",
-    });
+    const { data: anchorRow, error: anchorError } = await supabase
+      .from("institute_inquiry_anchors")
+      .insert({
+        inquiry_id: inquiryRow.id,
+        source_system: "registry",
+        anchor_entity_type: anchor.type,
+        anchor_slug: anchor.slug,
+        anchor_label: anchor.label,
+        anchor_url: anchor.href,
+        anchor_image_url: anchor.imageUrl,
+        anchor_metadata: {
+          ...(anchor.metadata ?? {}),
+          subtitle: anchor.subtitle,
+          contextText: anchor.contextText,
+          href: anchor.href,
+        },
+        is_primary: true,
+        status: "active",
+      })
+      .select("id")
+      .single();
+
+    if (anchorError) throw anchorError;
+
+    if (anchorRow?.id) {
+      await createAnchorContextSnapshot(inquiryRow.id, anchorRow.id, anchor);
+    }
   }
 
   await supabase
