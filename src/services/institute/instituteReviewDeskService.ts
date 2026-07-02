@@ -50,6 +50,15 @@ export type InstituteReviewPacketSnapshot = {
   };
 };
 
+export type InstituteWorkProductLiveStatus =
+  | "draft"
+  | "in_progress"
+  | "submitted_for_review"
+  | "approved"
+  | "rejected"
+  | "published"
+  | "archived";
+
 export type InstituteReviewPacket = {
   id: string;
   inquiryId: string;
@@ -63,8 +72,16 @@ export type InstituteReviewPacket = {
   editorNotes: string | null;
   contributorNote: string | null;
   snapshot: InstituteReviewPacketSnapshot;
+  liveWorkProductStatus?: InstituteWorkProductLiveStatus | null;
+  liveWorkProductUpdatedAt?: string | null;
   createdAt: string;
   updatedAt: string;
+};
+
+type WorkProductLinkRow = {
+  id: string;
+  status: InstituteWorkProductLiveStatus;
+  updated_at: string | null;
 };
 
 type ReviewPacketRow = {
@@ -84,7 +101,10 @@ type ReviewPacketRow = {
   updated_at: string;
 };
 
-function mapReviewPacket(row: ReviewPacketRow): InstituteReviewPacket {
+function mapReviewPacket(row: ReviewPacketRow, linksById = new Map<string, WorkProductLinkRow>()): InstituteReviewPacket {
+  const linkId = row.snapshot_json?.workProduct?.linkId;
+  const liveLink = linkId ? linksById.get(linkId) : null;
+
   return {
     id: row.id,
     inquiryId: row.inquiry_id,
@@ -98,6 +118,8 @@ function mapReviewPacket(row: ReviewPacketRow): InstituteReviewPacket {
     editorNotes: row.editor_notes,
     contributorNote: row.contributor_note,
     snapshot: row.snapshot_json ?? {},
+    liveWorkProductStatus: liveLink?.status ?? null,
+    liveWorkProductUpdatedAt: liveLink?.updated_at ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -126,7 +148,29 @@ export async function fetchInstituteReviewPackets(): Promise<InstituteReviewPack
     .limit(100);
 
   if (error) throw error;
-  return ((data ?? []) as ReviewPacketRow[]).map(mapReviewPacket);
+
+  const rows = (data ?? []) as ReviewPacketRow[];
+  const linkIds = Array.from(
+    new Set(
+      rows
+        .map((row) => row.snapshot_json?.workProduct?.linkId)
+        .filter((value): value is string => Boolean(value)),
+    ),
+  );
+
+  let linksById = new Map<string, WorkProductLinkRow>();
+
+  if (linkIds.length) {
+    const { data: links, error: linksError } = await supabase
+      .from("institute_work_product_links")
+      .select("id, status, updated_at")
+      .in("id", linkIds);
+
+    if (linksError) throw linksError;
+    linksById = new Map((links ?? []).map((link) => [link.id, link as WorkProductLinkRow]));
+  }
+
+  return rows.map((row) => mapReviewPacket(row, linksById));
 }
 
 function workProductStatusForReviewStatus(status: InstituteReviewPacketStatus) {
