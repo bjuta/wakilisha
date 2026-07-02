@@ -108,3 +108,116 @@ export async function createOrFetchInstituteArticleDraftLink(inquiry: InquiryDra
 
   return mapLink(data as WorkProductLinkRow);
 }
+
+export type InstituteArticleReviewPayload = {
+  articleId: string;
+  articleSlug: string;
+  title: string;
+  excerpt: string;
+  contentHtml: string;
+  author: string;
+  categories: string[];
+  tags: string[];
+  seo: Record<string, unknown>;
+  wpStatus: string | null;
+};
+
+export type InstituteArticleReviewSubmission = {
+  packetId: string;
+  packetVersion: number;
+  submittedAt: string;
+};
+
+export async function submitInstituteArticleDraftForReview(
+  inquiry: InquiryDraft,
+  link: InstituteArticleDraftLink,
+  article: InstituteArticleReviewPayload,
+): Promise<InstituteArticleReviewSubmission> {
+  const { data: latestRows, error: latestError } = await supabase
+    .from("institute_review_packets")
+    .select("packet_version")
+    .eq("inquiry_id", inquiry.id)
+    .order("packet_version", { ascending: false })
+    .limit(1);
+
+  if (latestError) throw latestError;
+
+  const latestVersion = Array.isArray(latestRows) && latestRows.length
+    ? Number(latestRows[0].packet_version) || 0
+    : 0;
+
+  const snapshot = {
+    reviewPacketVersion: 1,
+    packetKind: "linked_article_draft_review",
+    capturedAt: new Date().toISOString(),
+    editorialInstruction: "Contributor submitted a linked Institute article draft for editorial review. This is not a publishing action.",
+    inquiry: {
+      id: inquiry.id,
+      code: inquiry.code,
+      rawQuestion: inquiry.rawQuestion,
+      workingQuestion: inquiry.workingQuestion,
+      status: inquiry.status,
+      anchor: inquiry.anchor,
+      setup: inquiry.setup,
+    },
+    workProduct: {
+      linkId: link.id,
+      productType: "article",
+      formatLabel: "Article",
+      productId: link.articleId,
+      productSlug: link.articleSlug,
+      status: "submitted_for_review",
+    },
+    articleDraft: {
+      id: article.articleId,
+      slug: article.articleSlug,
+      title: article.title,
+      excerpt: article.excerpt,
+      contentHtml: article.contentHtml,
+      author: article.author,
+      categories: article.categories,
+      tags: article.tags,
+      seo: article.seo,
+      wpStatus: article.wpStatus,
+    },
+    governance: {
+      contributorCanPublish: false,
+      editorMustReviewBeforePublication: true,
+      publicReleaseAllowedFromInstitute: false,
+    },
+  };
+
+  const { data, error } = await supabase
+    .from("institute_review_packets")
+    .insert({
+      inquiry_id: inquiry.id,
+      packet_version: latestVersion + 1,
+      status: "submitted",
+      contributor_note: `Linked article draft submitted for review: ${article.articleSlug}`,
+      snapshot_json: snapshot,
+    })
+    .select("id, packet_version, submitted_at")
+    .single();
+
+  if (error) throw error;
+
+  await supabase
+    .from("institute_work_product_links")
+    .update({
+      status: "submitted_for_review",
+      metadata: {
+        source: "institute_article_review_submission",
+        inquiry_code: inquiry.code,
+        article_slug: article.articleSlug,
+        submitted_at: data.submitted_at,
+        review_packet_id: data.id,
+      },
+    })
+    .eq("id", link.id);
+
+  return {
+    packetId: data.id,
+    packetVersion: data.packet_version,
+    submittedAt: data.submitted_at,
+  };
+}

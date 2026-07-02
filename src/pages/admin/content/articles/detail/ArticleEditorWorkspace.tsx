@@ -66,16 +66,31 @@ let toastCounter = 0;
 
 export type ArticleEditorWorkspaceMode = "article-admin" | "institute";
 
+export type ArticleReviewSubmitPayload = {
+  articleId: string;
+  articleSlug: string;
+  title: string;
+  excerpt: string;
+  contentHtml: string;
+  author: string;
+  categories: string[];
+  tags: string[];
+  seo: Record<string, unknown>;
+  wpStatus: string | null;
+};
+
 export type ArticleEditorWorkspaceProps = {
   slug?: string;
   mode?: ArticleEditorWorkspaceMode;
   returnPath?: string;
+  onSubmittedForReview?: (payload: ArticleReviewSubmitPayload) => Promise<void> | void;
 };
 
 export function ArticleEditorWorkspace({
   slug,
   mode = "article-admin",
   returnPath = "/admin/content/articles",
+  onSubmittedForReview,
 }: ArticleEditorWorkspaceProps) {
   const navigate = useNavigate();
   const adminUser = useAdminUser();
@@ -720,7 +735,29 @@ export function ArticleEditorWorkspace({
     setIsSaving(true);
     const ok = await saveToSupabase({ wp_status: "pending" });
     setIsSaving(false);
-    if (ok) addToast("success", "Submitted for review.");
+    if (ok) {
+      if (onSubmittedForReview && article) {
+        try {
+          await onSubmittedForReview({
+            articleId: article.id,
+            articleSlug: article.slug,
+            title: draft.title,
+            excerpt: draft.excerpt,
+            contentHtml: draft.content,
+            author: draft.author,
+            categories: draft.categories,
+            tags: draft.tags,
+            seo: draft.seo,
+            wpStatus: "pending",
+          });
+        } catch (error) {
+          addToast("error", error instanceof Error ? error.message : "Failed to submit Institute review packet.");
+          return;
+        }
+      }
+
+      addToast("success", "Submitted for review.");
+    }
   }
 
   async function handleDelete() {

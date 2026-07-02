@@ -2,6 +2,7 @@ import { ArticleEditorWorkspace } from "@/pages/admin/content/articles/detail/Ar
 import {
   createOrFetchInstituteArticleDraftLink,
   fetchInstituteArticleDraftLink,
+  submitInstituteArticleDraftForReview,
   type InstituteArticleDraftLink,
 } from "@/services/institute/instituteArticleBridgeService";
 import { useEffect, useMemo, useState } from "react";
@@ -1516,6 +1517,7 @@ function EvidenceScreen({
   const [articleLink, setArticleLink] = useState<InstituteArticleDraftLink | null>(null);
   const [articleLinkLoading, setArticleLinkLoading] = useState(false);
   const [articleLinkError, setArticleLinkError] = useState<string | null>(null);
+  const [articleReviewSubmission, setArticleReviewSubmission] = useState<{ packetId: string; packetVersion: number; submittedAt: string } | null>(null);
 
   const activeDefinition = activeFormat ? workspaceDefinitionFor(activeFormat) : null;
   const isArticleWorkspace = activeDefinition?.workspaceType === "article";
@@ -1564,6 +1566,14 @@ function EvidenceScreen({
     } finally {
       setArticleLinkLoading(false);
     }
+  };
+
+  const submitLinkedArticleForReview = async (articlePayload: Parameters<typeof submitInstituteArticleDraftForReview>[2]) => {
+    if (!draft || !articleLink) throw new Error("Linked article draft is not ready.");
+
+    const submission = await submitInstituteArticleDraftForReview(draft, articleLink, articlePayload);
+    setArticleReviewSubmission(submission);
+    setArticleLink((current) => (current ? { ...current, status: "submitted_for_review", updatedAt: submission.submittedAt } : current));
   };
 
 
@@ -1807,10 +1817,17 @@ function EvidenceScreen({
                     Linked draft: <strong className="text-wk-text">{articleLink.articleSlug}</strong>. This draft is private unless an editor publishes it later.
                   </div>
 
+                  {articleReviewSubmission ? (
+                    <div className="rounded-xl border border-wk-warning/30 bg-wk-warning-soft px-4 py-3 text-[12px] leading-5 text-wk-text-muted">
+                      Review packet created: <strong className="text-wk-text">v{articleReviewSubmission.packetVersion}</strong>. Submitted {new Date(articleReviewSubmission.submittedAt).toLocaleString()}.
+                    </div>
+                  ) : null}
+
                   <ArticleEditorWorkspace
                     slug={articleLink.articleSlug}
                     mode="institute"
                     returnPath="/admin/institute/inquiry-interface"
+                    onSubmittedForReview={submitLinkedArticleForReview}
                   />
                 </div>
               ) : (
