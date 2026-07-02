@@ -2019,6 +2019,7 @@ function ReviewDeskScreen() {
   const [packets, setPackets] = useState<InstituteReviewPacket[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [editorNotes, setEditorNotes] = useState("");
+  const [articleEditorOpen, setArticleEditorOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [savingStatus, setSavingStatus] = useState<InstituteReviewPacketStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -2050,6 +2051,7 @@ function ReviewDeskScreen() {
 
   useEffect(() => {
     setEditorNotes(activePacket?.editorNotes ?? "");
+    setArticleEditorOpen(false);
   }, [activePacket?.id]);
 
   const updateStatus = async (status: InstituteReviewPacketStatus) => {
@@ -2206,6 +2208,34 @@ function ReviewDeskScreen() {
                 />
               </div>
             </Panel>
+
+            {article?.slug ? (
+              <Panel eyebrow="Linked article editor" title="Review the draft itself">
+                <div className="rounded-xl border border-wk-warning/30 bg-wk-warning-soft px-4 py-3 text-[12px] leading-5 text-wk-text-muted">
+                  Open the real article draft, make editorial changes if needed, save, preview, then use the Review Desk decision buttons below. Publishing remains locked.
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setArticleEditorOpen((current) => !current)}
+                  className="mt-4 rounded-lg bg-wk-brand px-5 py-3 text-[13px] font-black text-wk-brand-on"
+                >
+                  {articleEditorOpen ? "Close linked article editor" : "Open linked article editor"}
+                </button>
+
+                {articleEditorOpen ? (
+                  <div className="mt-5 rounded-[22px] border border-wk-border bg-wk-surface p-4">
+                    <ArticleEditorWorkspace
+                      slug={article.slug}
+                      mode="institute"
+                      returnPath="/admin/institute/inquiry-interface"
+                      allowSubmitForReview={false}
+                      instituteNotice="Institute editor review mode. Save Draft and Preview are available. Review decisions happen in the Review Desk. Publishing remains locked."
+                    />
+                  </div>
+                ) : null}
+              </Panel>
+            ) : null}
 
             <Panel eyebrow="Editor decision" title="Gate this work">
               <label className="block">

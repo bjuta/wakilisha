@@ -83,6 +83,8 @@ export type ArticleEditorWorkspaceProps = {
   slug?: string;
   mode?: ArticleEditorWorkspaceMode;
   returnPath?: string;
+  allowSubmitForReview?: boolean;
+  instituteNotice?: string;
   onSubmittedForReview?: (payload: ArticleReviewSubmitPayload) => Promise<void> | void;
 };
 
@@ -90,6 +92,8 @@ export function ArticleEditorWorkspace({
   slug,
   mode = "article-admin",
   returnPath = "/admin/content/articles",
+  allowSubmitForReview = true,
+  instituteNotice,
   onSubmittedForReview,
 }: ArticleEditorWorkspaceProps) {
   const navigate = useNavigate();
@@ -950,7 +954,7 @@ export function ArticleEditorWorkspace({
     <div className="space-y-5">
       {isInstituteMode ? (
         <div className="rounded-2xl border border-wk-warning/30 bg-wk-warning-soft px-4 py-3 text-[12px] font-bold leading-5 text-wk-text-muted">
-          Institute article mode. Drafting, autosave, preview, and submit for review are allowed. Publishing stays editor-only.
+          {instituteNotice ?? "Institute article mode. Drafting, autosave, preview, and submit for review are allowed. Publishing stays editor-only."}
         </div>
       ) : null}
 
@@ -969,6 +973,7 @@ export function ArticleEditorWorkspace({
         onDelete={() => setShowDeleteConfirm(true)}
         onPreview={handlePreview}
         onSubmitForReview={handleSubmitForReview}
+        allowSubmitForReview={allowSubmitForReview}
         userCanPublish={articlePermissions.canPublish}
         userCanEditOthers={articlePermissions.canEdit}
         isAdmin={isAdmin}
