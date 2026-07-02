@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/lib/supabase";
 import {
   createInstituteInquiry,
   listInstituteInquiries,
   updateInstituteInquiry,
 } from "@/services/institute/inquiryService";
+import {
+  anchorCategoryOptions,
+  useInstituteAnchorSearch,
+} from "./useInstituteAnchorSearch";
 import type {
   EvidenceItem,
   EvidenceKind,
@@ -177,60 +180,6 @@ function EmptyState({ title, body }: { title: string; body: string }) {
       <p className="mt-1 text-[12px] leading-5 text-wk-text-muted">{body}</p>
     </div>
   );
-}
-
-function useRegistryAnchors() {
-  const [anchors, setAnchors] = useState<RegistryAnchor[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    let alive = true;
-
-    async function load() {
-      setLoading(true);
-      setError("");
-
-      const { data, error: err } = await supabase
-        .from("registry_artists")
-        .select("slug, display_name, public_image_url, metadata")
-        .eq("status", "active")
-        .order("display_name", { ascending: true })
-        .limit(12);
-
-      if (!alive) return;
-
-      if (err) {
-        setError(err.message);
-        setAnchors([]);
-        setLoading(false);
-        return;
-      }
-
-      const mapped: RegistryAnchor[] = (data ?? []).map((artist) => {
-        const metadata = (artist.metadata ?? {}) as Record<string, unknown>;
-        const country = typeof metadata.country === "string" ? metadata.country : "Country not set";
-        return {
-          type: "artist",
-          slug: String(artist.slug),
-          label: String(artist.display_name ?? artist.slug),
-          subtitle: country,
-          imageUrl: typeof artist.public_image_url === "string" ? artist.public_image_url : null,
-        };
-      });
-
-      setAnchors(mapped);
-      setLoading(false);
-    }
-
-    load();
-
-    return () => {
-      alive = false;
-    };
-  }, []);
-
-  return { anchors, loading, error };
 }
 
 
@@ -441,7 +390,9 @@ function HomeScreen({
     });
   }, [drafts, state.questionDraft]);
 
-  const canCreate = state.questionDraft.trim().length >= 8;
+  const canCreate =
+    state.questionDraft.trim().length >= 8 &&
+    (state.selectedAnchorCategory === "none" || Boolean(state.selectedAnchor));
 
   return (
     <div className="mx-auto max-w-[1000px] space-y-8">
@@ -458,28 +409,139 @@ function HomeScreen({
           className="w-full resize-y rounded-xl border border-wk-border bg-wk-bg-subtle px-4 py-4 text-[16px] font-semibold leading-6 text-wk-text outline-none placeholder:text-wk-text-faint focus:border-wk-brand"
         />
 
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          <span className="text-[11px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Attach a real artist anchor:</span>
+        <div className="mt-5 rounded-xl border border-wk-border bg-wk-bg-subtle p-4">
+          <div className="text-[11px] font-black uppercase tracking-[0.14em] text-wk-text-faint">
+            1 · Pick the main anchor category
+          </div>
 
-          {anchorsLoading ? <Chip>Loading artists</Chip> : null}
-          {anchorsError ? <Chip tone="warning">Registry unavailable</Chip> : null}
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {anchorCategoryOptions.map((option) => (
+              <button
+                key={option.key}
+                type="button"
+                onClick={() =>
+                  setState({
+                    selectedAnchorCategory: option.key,
+                    selectedAnchor: null,
+                    anchorSearch: "",
+                  })
+                }
+                className={cx(
+                  "rounded-xl border px-4 py-3 text-left transition",
+                  state.selectedAnchorCategory === option.key
+                    ? "border-wk-brand bg-wk-brand-soft shadow-sm"
+                    : "border-wk-border bg-wk-surface hover:border-wk-brand/40",
+                )}
+              >
+                <div className="text-[13px] font-black text-wk-text">{option.label}</div>
+                <div className="mt-1 text-[11px] leading-4 text-wk-text-muted">{option.note}</div>
+              </button>
+            ))}
+          </div>
 
-          {!anchorsLoading && !anchorsError && anchors.map((anchor) => (
-            <button
-              key={anchor.slug}
-              type="button"
-              onClick={() => setState({ selectedAnchor: anchor })}
-              className={cx(
-                "flex items-center gap-2 rounded-full border px-3 py-1.5 text-[12px] font-bold transition",
-                state.selectedAnchor?.slug === anchor.slug
-                  ? "border-wk-brand bg-wk-brand-soft text-wk-brand"
-                  : "border-wk-border bg-wk-surface text-wk-text-muted hover:border-wk-brand/40 hover:text-wk-text",
-              )}
-            >
-              {anchor.imageUrl ? <img src={anchor.imageUrl} alt="" className="h-5 w-5 rounded-full object-cover" /> : null}
-              {anchor.label}
-            </button>
-          ))}
+          {state.selectedAnchorCategory && state.selectedAnchorCategory !== "none" ? (
+            <div className="mt-5">
+              <div className="text-[11px] font-black uppercase tracking-[0.14em] text-wk-text-faint">
+                2 · Search inside {state.selectedAnchorCategory}
+              </div>
+
+              <input
+                value={state.anchorSearch}
+                onChange={(event) => setState({ anchorSearch: event.target.value, selectedAnchor: null })}
+                placeholder={`Search ${state.selectedAnchorCategory}s by name, title, artist, label, country, or context.`}
+                className="mt-3 w-full rounded-xl border border-wk-border bg-wk-surface px-4 py-3 text-[14px] font-bold text-wk-text outline-none placeholder:text-wk-text-faint focus:border-wk-brand"
+              />
+
+              {anchorsLoading ? (
+                <div className="mt-3"><Chip>Loading {state.selectedAnchorCategory}s</Chip></div>
+              ) : null}
+              {anchorsError ? (
+                <div className="mt-3"><Chip tone="warning">Registry search unavailable</Chip></div>
+              ) : null}
+
+              {!anchorsLoading && !anchorsError && state.anchorSearch.trim().length < 2 ? (
+                <p className="mt-3 text-[12px] leading-5 text-wk-text-muted">
+                  Type at least two characters to search. Individual records only appear after a category is chosen.
+                </p>
+              ) : null}
+
+              {!anchorsLoading && !anchorsError && state.anchorSearch.trim().length >= 2 ? (
+                <div className="mt-3 grid gap-2 md:grid-cols-2">
+                  {anchors.length ? anchors.map((anchor) => (
+                    <button
+                      key={`${anchor.type}:${anchor.slug}`}
+                      type="button"
+                      onClick={() => setState({ selectedAnchor: anchor })}
+                      className={cx(
+                        "flex items-start gap-3 rounded-xl border p-3 text-left transition",
+                        state.selectedAnchor?.type === anchor.type && state.selectedAnchor?.slug === anchor.slug
+                          ? "border-wk-brand bg-wk-brand-soft shadow-sm"
+                          : "border-wk-border bg-wk-surface hover:border-wk-brand/40",
+                      )}
+                    >
+                      {anchor.imageUrl ? (
+                        <img src={anchor.imageUrl} alt="" className="h-12 w-12 rounded-lg object-cover" />
+                      ) : (
+                        <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-wk-brand-soft text-[10px] font-black uppercase text-wk-brand">
+                          {anchor.type}
+                        </span>
+                      )}
+                      <span className="min-w-0">
+                        <span className="block text-[13px] font-black text-wk-text">{anchor.label}</span>
+                        <span className="mt-1 line-clamp-2 block text-[11px] leading-4 text-wk-text-muted">{anchor.subtitle}</span>
+                      </span>
+                    </button>
+                  )) : (
+                    <EmptyState
+                      title="No matching anchor found"
+                      body="Try another spelling or choose No anchor. Creating new registry entities comes in a later PR."
+                    />
+                  )}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          {state.selectedAnchorCategory === "none" ? (
+            <div className="mt-5 rounded-xl border border-wk-border bg-wk-surface p-4">
+              <div className="text-[13px] font-black text-wk-text">No registry anchor selected</div>
+              <p className="mt-1 text-[12px] leading-5 text-wk-text-muted">
+                This Inquiry will start from the question alone. You can attach evidence and relationships later.
+              </p>
+            </div>
+          ) : null}
+
+          {state.selectedAnchor ? (
+            <div className="mt-5 rounded-xl border border-wk-brand/30 bg-wk-brand-soft p-4">
+              <div className="text-[11px] font-black uppercase tracking-[0.14em] text-wk-brand">3 · Selected anchor</div>
+              <div className="mt-3 flex gap-3">
+                {state.selectedAnchor.imageUrl ? (
+                  <img src={state.selectedAnchor.imageUrl} alt="" className="h-16 w-16 rounded-xl object-cover" />
+                ) : (
+                  <span className="flex h-16 w-16 items-center justify-center rounded-xl bg-wk-surface text-[10px] font-black uppercase text-wk-brand">
+                    {state.selectedAnchor.type}
+                  </span>
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Chip tone="brand">{state.selectedAnchor.type}</Chip>
+                    <span className="text-[14px] font-black text-wk-text">{state.selectedAnchor.label}</span>
+                  </div>
+                  <p className="mt-1 text-[12px] leading-5 text-wk-text-muted">{state.selectedAnchor.subtitle}</p>
+                  {state.selectedAnchor.contextText ? (
+                    <p className="mt-2 line-clamp-2 text-[12px] leading-5 text-wk-text-muted">{state.selectedAnchor.contextText}</p>
+                  ) : null}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setState({ selectedAnchor: null })}
+                  className="self-start rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[11px] font-black text-wk-text-muted"
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+          ) : null}
         </div>
 
         {similarDrafts.length ? (
@@ -1326,14 +1388,17 @@ export default function NativeInstituteInquiryInterface() {
     stripLegacyInstituteHash();
   }, []);
 
-  const { anchors, loading: anchorsLoading, error: anchorsError } = useRegistryAnchors();
   const { inquiries: drafts, loading: inquiriesLoading, error: inquiriesError, addInquiry, updateInquiry } = useSupabaseInquiries();
   const [state, setRawState] = useState<InstituteState>({
     screen: "home",
     activeId: null,
     questionDraft: "",
     selectedAnchor: null,
+    selectedAnchorCategory: null,
+    anchorSearch: "",
   });
+
+  const { anchors, loading: anchorsLoading, error: anchorsError } = useInstituteAnchorSearch(state.selectedAnchorCategory, state.anchorSearch);
 
   const setState = (patch: Partial<InstituteState>) => setRawState((current) => ({ ...current, ...patch }));
 
@@ -1352,6 +1417,8 @@ export default function NativeInstituteInquiryInterface() {
       screen: "workbench",
       questionDraft: "",
       selectedAnchor: null,
+      selectedAnchorCategory: null,
+      anchorSearch: "",
     });
   };
 
