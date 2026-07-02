@@ -203,7 +203,7 @@ function Panel({
   className?: string;
 }) {
   return (
-    <section className={cx("rounded-[22px] border border-wk-border bg-wk-surface p-5 shadow-sm", className)}>
+    <section className={cx("rounded-[20px] border border-wk-border/70 bg-wk-surface/70 p-5 shadow-none", className)}>
       {eyebrow ? (
         <div className="mb-2 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.22em] text-wk-brand">
           <span className="h-px w-7 bg-wk-brand" />
@@ -218,7 +218,7 @@ function Panel({
 
 function EmptyState({ title, body }: { title: string; body: string }) {
   return (
-    <div className="rounded-xl border border-dashed border-wk-border bg-wk-bg p-4">
+    <div className="rounded-lg border border-dashed border-wk-border/60 bg-wk-bg/70 p-3">
       <div className="text-[13px] font-black text-wk-text">{title}</div>
       <p className="mt-1 text-[12px] leading-5 text-wk-text-muted">{body}</p>
     </div>
@@ -333,7 +333,7 @@ function Rail({
   ];
 
   return (
-    <aside className="rounded-2xl border border-wk-border bg-wk-surface p-3 shadow-sm xl:sticky xl:top-5">
+    <aside className="rounded-xl border border-wk-border/70 bg-wk-surface/70 p-3 shadow-none xl:sticky xl:top-5">
       <button
         type="button"
         onClick={() => setState({ screen: "home", activeId: null })}
@@ -369,7 +369,7 @@ function Rail({
 
       <div className="space-y-5">
         <div>
-          <div className="mb-2 px-1 text-[9px] font-black uppercase tracking-[0.18em] text-wk-text-faint">This Inquiry</div>
+          <div className="mb-2 px-1 text-[9px] font-black uppercase tracking-[0.14em] text-wk-text-faint">This Inquiry</div>
           <div className="space-y-1">
             {inquiryNav.map((item) => (
               <button
@@ -392,7 +392,7 @@ function Rail({
         </div>
 
         <div>
-          <div className="mb-2 px-1 text-[9px] font-black uppercase tracking-[0.18em] text-wk-text-faint">Reader Surface</div>
+          <div className="mb-2 px-1 text-[9px] font-black uppercase tracking-[0.14em] text-wk-text-faint">Reader Surface</div>
           <button
             type="button"
             disabled
@@ -405,7 +405,7 @@ function Rail({
         </div>
 
         <div>
-          <div className="mb-2 px-1 text-[9px] font-black uppercase tracking-[0.18em] text-wk-text-faint">System</div>
+          <div className="mb-2 px-1 text-[9px] font-black uppercase tracking-[0.14em] text-wk-text-faint">System</div>
           <button type="button" disabled className="flex w-full cursor-not-allowed items-center gap-2 rounded-lg px-3 py-2 text-left text-[12px] font-bold text-wk-text-muted opacity-45">
             <span className="h-1.5 w-1.5 rounded-full bg-current" />
             Learning board
@@ -469,7 +469,7 @@ function HomeScreen({
           className="w-full resize-y rounded-xl border border-wk-border bg-wk-bg-subtle px-4 py-4 text-[16px] font-semibold leading-6 text-wk-text outline-none placeholder:text-wk-text-faint focus:border-wk-brand"
         />
 
-        <div className="mt-5 rounded-xl border border-wk-border bg-wk-bg-subtle p-4">
+        <div className="mt-5 rounded-lg border border-wk-border/70 bg-wk-bg-subtle/70 p-3">
           <div className="text-[11px] font-black uppercase tracking-[0.14em] text-wk-text-faint">
             1 · Pick the main anchor category
           </div>
@@ -563,7 +563,7 @@ function HomeScreen({
           ) : null}
 
           {state.selectedAnchorCategory === "none" ? (
-            <div className="mt-5 rounded-xl border border-wk-border bg-wk-surface p-4">
+            <div className="mt-5 rounded-lg border border-wk-border/70 bg-wk-surface/70 p-3">
               <div className="text-[13px] font-black text-wk-text">No anchor selected</div>
               <p className="mt-1 text-[12px] leading-5 text-wk-text-muted">
                 This Inquiry will start from the question alone. You can attach evidence and relationships later.
@@ -595,7 +595,7 @@ function HomeScreen({
                 <button
                   type="button"
                   onClick={() => setState({ selectedAnchor: null })}
-                  className="self-start rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[11px] font-black text-wk-text-muted"
+                  className="self-start rounded-md border border-wk-border/60 bg-wk-surface/70 px-3 py-2 text-[11px] font-black text-wk-text-muted"
                 >
                   Clear
                 </button>
@@ -606,7 +606,7 @@ function HomeScreen({
 
         {similarDrafts.length ? (
           <div className="mt-5 rounded-xl border border-wk-warning/30 bg-wk-warning-soft p-4">
-            <div className="text-[11px] font-black uppercase tracking-[0.16em] text-wk-warning">A similar Inquiry may already exist</div>
+            <div className="text-[11px] font-black uppercase tracking-[0.12em] text-wk-warning">A similar Inquiry may already exist</div>
             <div className="mt-3 space-y-2">
               {similarDrafts.slice(0, 2).map((draft) => (
                 <button
@@ -664,7 +664,7 @@ function HomeScreen({
                     loading="lazy"
                   />
                 ) : (
-                  <div className="flex h-full items-center justify-center text-[11px] font-black uppercase tracking-[0.18em] text-wk-text-faint">
+                  <div className="flex h-full items-center justify-center text-[11px] font-black uppercase tracking-[0.14em] text-wk-text-faint">
                     No featured image yet
                   </div>
                 )}
@@ -814,7 +814,7 @@ function WorkbenchScreen({
 
   return (
     <div className="mx-auto max-w-[1180px] space-y-5">
-      <section className="rounded-[22px] border border-wk-border bg-wk-surface p-6 shadow-sm lg:p-7">
+      <section className="rounded-[22px] border border-wk-border/70 bg-wk-surface/70 p-5 shadow-none lg:p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="text-[10px] font-black uppercase tracking-[0.24em] text-wk-brand">
             Inquiry {draft.code.replace("Inquiry ", "")} · Workbench
@@ -832,8 +832,8 @@ function WorkbenchScreen({
           
         </p>
 
-        <div className="mt-5 rounded-xl border border-wk-border bg-wk-bg-subtle p-4">
-          <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Working question</div>
+        <div className="mt-5 rounded-lg border border-wk-border/70 bg-wk-bg-subtle/70 p-3">
+          <div className="text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Working question</div>
           <input
             value={workingQuestion}
             onChange={(event) => setWorkingQuestion(event.target.value)}
@@ -855,7 +855,7 @@ function WorkbenchScreen({
                 className="h-40 w-full object-cover"
               />
             ) : (
-              <div className="flex h-40 items-center justify-center px-4 text-center text-[11px] font-black uppercase tracking-[0.16em] text-wk-text-faint">
+              <div className="flex h-40 items-center justify-center px-4 text-center text-[11px] font-black uppercase tracking-[0.12em] text-wk-text-faint">
                 No featured image yet
               </div>
             )}
@@ -880,7 +880,7 @@ function WorkbenchScreen({
             ) : null}
 
             <label className="block">
-              <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Image URL</span>
+              <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Image URL</span>
               <input
                 value={draft.featuredImageUrl}
                 onChange={(event) =>
@@ -895,7 +895,7 @@ function WorkbenchScreen({
             </label>
 
             <label className="block">
-              <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Alt text</span>
+              <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Alt text</span>
               <input
                 value={draft.featuredImageAlt}
                 onChange={(event) => updateDraft({ featuredImageAlt: event.target.value })}
@@ -905,7 +905,7 @@ function WorkbenchScreen({
             </label>
 
             <label className="block">
-              <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Credit</span>
+              <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Credit</span>
               <input
                 value={draft.featuredImageCredit}
                 onChange={(event) => updateDraft({ featuredImageCredit: event.target.value })}
@@ -917,10 +917,10 @@ function WorkbenchScreen({
         </div>
       </Panel>
 
-      <section className="rounded-2xl border border-wk-brand/20 bg-wk-brand-soft p-5">
+      <section className="rounded-xl border border-wk-brand/20 bg-wk-brand-soft/70 p-4">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-wk-brand">Setup</div>
+            <div className="text-[10px] font-black uppercase tracking-[0.14em] text-wk-brand">Setup</div>
             <h2 className="mt-1 text-[18px] font-black tracking-[-0.04em] text-wk-text">Suggest setup</h2>
             <p className="mt-1 text-[12px] leading-5 text-wk-text-muted">
               
@@ -1053,7 +1053,7 @@ function WorkbenchScreen({
           <Panel eyebrow="6 · Review" title="Care level">
             <div className="space-y-4">
               <div>
-                <div className="mb-2 text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Consent default</div>
+                <div className="mb-2 text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Consent default</div>
                 <div className="space-y-2">
                   {setupOptions.consentDefaults.map((option) => (
                     <button
@@ -1074,7 +1074,7 @@ function WorkbenchScreen({
               </div>
 
               <div>
-                <div className="mb-2 text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Review standard</div>
+                <div className="mb-2 text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Review standard</div>
                 <div className="space-y-2">
                   {setupOptions.reviewStandards.map((option) => (
                     <button
@@ -1095,7 +1095,7 @@ function WorkbenchScreen({
               </div>
 
               <div>
-                <div className="mb-2 text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Draft timer</div>
+                <div className="mb-2 text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Draft timer</div>
                 <div className="grid grid-cols-2 gap-2">
                   {setupOptions.draftTimers.map((option) => (
                     <button
@@ -1123,8 +1123,8 @@ function WorkbenchScreen({
             </div>
           </Panel>
 
-          <section className="rounded-2xl border border-wk-brand/20 bg-wk-brand-soft p-5">
-            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-wk-brand">Ready</div>
+          <section className="rounded-xl border border-wk-brand/20 bg-wk-brand-soft/70 p-4">
+            <div className="text-[10px] font-black uppercase tracking-[0.14em] text-wk-brand">Ready</div>
             <h2 className="mt-1 text-[20px] font-black tracking-[-0.04em] text-wk-text">Next: Evidence</h2>
             <p className="mt-2 text-[12px] leading-5 text-wk-text-muted">
               
@@ -1157,7 +1157,7 @@ function BriefItemList({
   empty: string;
 }) {
   return (
-    <div className="rounded-xl border border-wk-border bg-wk-surface p-4">
+    <div className="rounded-lg border border-wk-border/70 bg-wk-surface/70 p-3">
       <div className="mb-3 flex items-center justify-between gap-3">
         <h3 className="text-[14px] font-black text-wk-text">{title}</h3>
         <Chip>{items.length}</Chip>
@@ -1212,7 +1212,7 @@ function AnchorBriefScreen({ draft }: { draft: InquiryDraft | null }) {
 
   return (
     <div className="mx-auto max-w-[1180px] space-y-5">
-      <section className="rounded-[22px] border border-wk-border bg-wk-surface p-6 shadow-sm lg:p-7">
+      <section className="rounded-[22px] border border-wk-border/70 bg-wk-surface/70 p-5 shadow-none lg:p-6">
         <div className="text-[10px] font-black uppercase tracking-[0.24em] text-wk-brand">
           {draft.code} · Anchor Brief
         </div>
@@ -1222,7 +1222,7 @@ function AnchorBriefScreen({ draft }: { draft: InquiryDraft | null }) {
             {draft.anchor.imageUrl ? (
               <img src={draft.anchor.imageUrl} alt="" className="h-44 w-full object-cover" />
             ) : (
-              <div className="flex h-44 items-center justify-center text-[11px] font-black uppercase tracking-[0.16em] text-wk-text-faint">
+              <div className="flex h-44 items-center justify-center text-[11px] font-black uppercase tracking-[0.12em] text-wk-text-faint">
                 No image
               </div>
             )}
@@ -1258,20 +1258,20 @@ function AnchorBriefScreen({ draft }: { draft: InquiryDraft | null }) {
       {snapshot ? (
         <>
           <div className="grid gap-3 md:grid-cols-4">
-            <div className="rounded-xl border border-wk-border bg-wk-surface p-4">
-              <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Knowns</div>
+            <div className="rounded-lg border border-wk-border/70 bg-wk-surface/70 p-3">
+              <div className="text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Knowns</div>
               <div className="mt-2 text-[26px] font-black tracking-[-0.05em] text-wk-text">{snapshot.knowns.length}</div>
             </div>
-            <div className="rounded-xl border border-wk-border bg-wk-surface p-4">
-              <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Unknowns</div>
+            <div className="rounded-lg border border-wk-border/70 bg-wk-surface/70 p-3">
+              <div className="text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Unknowns</div>
               <div className="mt-2 text-[26px] font-black tracking-[-0.05em] text-wk-text">{snapshot.unknowns.length}</div>
             </div>
-            <div className="rounded-xl border border-wk-border bg-wk-surface p-4">
-              <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Evidence gaps</div>
+            <div className="rounded-lg border border-wk-border/70 bg-wk-surface/70 p-3">
+              <div className="text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Evidence gaps</div>
               <div className="mt-2 text-[26px] font-black tracking-[-0.05em] text-wk-text">{snapshot.evidenceGaps.length}</div>
             </div>
-            <div className="rounded-xl border border-wk-border bg-wk-surface p-4">
-              <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Relationship leads</div>
+            <div className="rounded-lg border border-wk-border/70 bg-wk-surface/70 p-3">
+              <div className="text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Relationship leads</div>
               <div className="mt-2 text-[26px] font-black tracking-[-0.05em] text-wk-text">{snapshot.relationshipLeads.length}</div>
             </div>
           </div>
@@ -1478,8 +1478,8 @@ function CompletionBar({ value }: { value: number }) {
 
 function WorkspaceChecklist({ title, items }: { title: string; items: string[] }) {
   return (
-    <div className="rounded-xl border border-wk-border bg-wk-bg-subtle p-4">
-      <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">{title}</div>
+    <div className="rounded-lg border border-wk-border/70 bg-wk-bg-subtle/70 p-3">
+      <div className="text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">{title}</div>
       <div className="mt-3 space-y-2">
         {items.map((item) => (
           <div key={item} className="flex gap-2 text-[12px] leading-5 text-wk-text-muted">
@@ -1494,8 +1494,8 @@ function WorkspaceChecklist({ title, items }: { title: string; items: string[] }
 
 function EvidenceMetric({ label, value, note }: { label: string; value: string | number; note: string }) {
   return (
-    <div className="rounded-xl border border-wk-border bg-wk-bg-subtle p-4">
-      <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">{label}</div>
+    <div className="rounded-lg border border-wk-border/70 bg-wk-bg-subtle/70 p-3">
+      <div className="text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">{label}</div>
       <div className="mt-2 text-[26px] font-black tracking-[-0.05em] text-wk-text">{value}</div>
       <p className="mt-1 text-[11px] leading-4 text-wk-text-muted">{note}</p>
     </div>
@@ -1739,7 +1739,7 @@ function EvidenceScreen({
 
   return (
     <div className="mx-auto max-w-[1240px] space-y-5">
-      <section className="rounded-[26px] border border-wk-border bg-wk-surface p-6 shadow-sm lg:p-7">
+      <section className="rounded-[22px] border border-wk-border/70 bg-wk-surface/70 p-5 shadow-none lg:p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <div className="text-[10px] font-black uppercase tracking-[0.24em] text-wk-brand">
@@ -1753,16 +1753,16 @@ function EvidenceScreen({
             </p>
           </div>
 
-          <div className="rounded-2xl border border-wk-warning/30 bg-wk-warning-soft p-4 text-left">
-            <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-warning">Editor-only publishing</div>
+          <div className="rounded-xl border border-wk-warning/25 bg-wk-warning-soft/70 p-3 text-left">
+            <div className="text-[10px] font-black uppercase tracking-[0.12em] text-wk-warning">Editor-only publishing</div>
             <p className="mt-2 max-w-[280px] text-[12px] leading-5 text-wk-text-muted">
               Contributors produce workspaces. Editors review completed work later. No contributor gets a publish button.
             </p>
           </div>
         </div>
 
-        <div className="mt-5 rounded-xl border border-wk-border bg-wk-bg-subtle p-4">
-          <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Inquiry being produced</div>
+        <div className="mt-5 rounded-lg border border-wk-border/70 bg-wk-bg-subtle/70 p-3">
+          <div className="text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Inquiry being produced</div>
           <p className="mt-2 text-[16px] font-black leading-6 text-wk-text">{draft.workingQuestion}</p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             {draft.anchor ? <Chip tone="brand">{draft.anchor.label}</Chip> : <Chip tone="warning">No anchor</Chip>}
@@ -1845,7 +1845,7 @@ function EvidenceScreen({
           </Panel>
 
           {activeDefinition && activeDefinition.workspaceType === "article" ? (
-            <section className="space-y-4 rounded-[26px] border border-wk-border bg-wk-surface p-5 shadow-sm">
+            <section className="space-y-4 rounded-[22px] border border-wk-border/70 bg-wk-surface/70 p-5 shadow-none">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <div className="text-[10px] font-black uppercase tracking-[0.2em] text-wk-brand">Article workspace</div>
@@ -1899,11 +1899,11 @@ function EvidenceScreen({
                   ) : null}
 
                   {articleReviewHistory.length > 1 ? (
-                    <div className="rounded-xl border border-wk-border bg-wk-bg px-4 py-3">
-                      <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Review version history</div>
+                    <div className="rounded-lg border border-wk-border/70 bg-wk-bg/80 px-3 py-2.5">
+                      <div className="text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Review version history</div>
                       <div className="mt-3 space-y-2">
                         {articleReviewHistory.map((item) => (
-                          <div key={item.packetId} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[12px] text-wk-text-muted">
+                          <div key={item.packetId} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-wk-border/60 bg-wk-surface/70 px-3 py-2 text-[12px] text-wk-text-muted">
                             <div>
                               <strong className="text-wk-text">v{item.packetVersion}</strong>
                               {" "}· {item.status.replaceAll("_", " ")}
@@ -1949,11 +1949,11 @@ function EvidenceScreen({
                   <WorkspaceChecklist title="Useful if available" items={activeDefinition.niceToHave} />
                 </div>
 
-                <div className="mt-3 rounded-xl border border-wk-border bg-wk-bg-subtle p-4">
-                  <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Editor will ask</div>
+                <div className="mt-3 rounded-lg border border-wk-border/70 bg-wk-bg-subtle/70 p-3">
+                  <div className="text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Editor will ask</div>
                   <div className="mt-3 space-y-2">
                     {activeDefinition.reviewQuestions.map((question) => (
-                      <div key={question} className="rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[12px] font-bold text-wk-text-muted">
+                      <div key={question} className="rounded-md border border-wk-border/60 bg-wk-surface/70 px-3 py-2 text-[12px] font-bold text-wk-text-muted">
                         {question}
                       </div>
                     ))}
@@ -1964,7 +1964,7 @@ function EvidenceScreen({
               <Panel eyebrow="3 · Produce work" title={`Save a ${activeFormat} checkpoint`}>
                 {latestForActive ? (
                   <div className="mb-4 rounded-xl border border-wk-success/30 bg-wk-success-soft p-4">
-                    <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-success">Latest saved checkpoint</div>
+                    <div className="text-[10px] font-black uppercase tracking-[0.12em] text-wk-success">Latest saved checkpoint</div>
                     <div className="mt-2 text-[15px] font-black text-wk-text">{latestForActive.title}</div>
                     <p className="mt-1 text-[12px] leading-5 text-wk-text-muted">
                       {activeCompletion}% complete · saved {new Date(latestForActive.createdAt).toLocaleString()}
@@ -1974,68 +1974,68 @@ function EvidenceScreen({
 
                 <div className="space-y-4">
                   <label className="block">
-                    <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Checkpoint title</span>
+                    <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Checkpoint title</span>
                     <input
                       value={workspace.title}
                       onChange={(event) => setWorkspace((current) => ({ ...current, title: event.target.value }))}
                       placeholder={`Name this ${activeFormat} checkpoint`}
-                      className="w-full rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
+                      className="w-full rounded-lg border border-wk-border/70 bg-wk-bg/80 px-3 py-2.5 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
                     />
                   </label>
 
                   <label className="block">
-                    <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Produced work</span>
+                    <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Produced work</span>
                     <textarea
                       value={workspace.producedWork}
                       onChange={(event) => setWorkspace((current) => ({ ...current, producedWork: event.target.value }))}
                       rows={8}
                       placeholder="Do the actual work here. For article, draft the section. For interview, add transcript and excerpts. For video, add timestamped analysis."
-                      className="w-full resize-y rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[13px] leading-6 text-wk-text outline-none focus:border-wk-brand"
+                      className="w-full resize-y rounded-lg border border-wk-border/70 bg-wk-bg/80 px-3 py-2.5 text-[13px] leading-6 text-wk-text outline-none focus:border-wk-brand"
                     />
                   </label>
 
                   <label className="block">
-                    <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Evidence used</span>
+                    <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Evidence used</span>
                     <textarea
                       value={workspace.evidenceUsed}
                       onChange={(event) => setWorkspace((current) => ({ ...current, evidenceUsed: event.target.value }))}
                       rows={4}
                       placeholder="What source, quote, timestamp, image, record, or document supports this work?"
-                      className="w-full resize-y rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[13px] leading-6 text-wk-text outline-none focus:border-wk-brand"
+                      className="w-full resize-y rounded-lg border border-wk-border/70 bg-wk-bg/80 px-3 py-2.5 text-[13px] leading-6 text-wk-text outline-none focus:border-wk-brand"
                     />
                   </label>
 
                   <div className="grid gap-3 md:grid-cols-2">
                     <label>
-                      <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Open risks</span>
+                      <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Open risks</span>
                       <textarea
                         value={workspace.openRisks}
                         onChange={(event) => setWorkspace((current) => ({ ...current, openRisks: event.target.value }))}
                         rows={4}
                         placeholder="What is weak, risky, private, disputed, or not proven yet?"
-                        className="w-full resize-y rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[13px] leading-6 text-wk-text outline-none focus:border-wk-brand"
+                        className="w-full resize-y rounded-lg border border-wk-border/70 bg-wk-bg/80 px-3 py-2.5 text-[13px] leading-6 text-wk-text outline-none focus:border-wk-brand"
                       />
                     </label>
 
                     <label>
-                      <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">What should the editor check later?</span>
+                      <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">What should the editor check later?</span>
                       <textarea
                         value={workspace.editorCheck}
                         onChange={(event) => setWorkspace((current) => ({ ...current, editorCheck: event.target.value }))}
                         rows={4}
                         placeholder="This is not a briefing. It is a review pointer attached to completed work."
-                        className="w-full resize-y rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[13px] leading-6 text-wk-text outline-none focus:border-wk-brand"
+                        className="w-full resize-y rounded-lg border border-wk-border/70 bg-wk-bg/80 px-3 py-2.5 text-[13px] leading-6 text-wk-text outline-none focus:border-wk-brand"
                       />
                     </label>
                   </div>
 
                   <div className="grid gap-3 md:grid-cols-[1fr_180px]">
                     <label>
-                      <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Workspace status</span>
+                      <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Workspace status</span>
                       <select
                         value={workspace.status}
                         onChange={(event) => setWorkspace((current) => ({ ...current, status: event.target.value }))}
-                        className="w-full rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
+                        className="w-full rounded-lg border border-wk-border/70 bg-wk-bg/80 px-3 py-2.5 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
                       >
                         <option>Not started</option>
                         <option>In progress</option>
@@ -2046,14 +2046,14 @@ function EvidenceScreen({
                     </label>
 
                     <label>
-                      <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Completion</span>
+                      <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Completion</span>
                       <input
                         type="number"
                         min={0}
                         max={100}
                         value={workspace.completion}
                         onChange={(event) => setWorkspace((current) => ({ ...current, completion: Math.max(0, Math.min(100, Number(event.target.value) || 0)) }))}
-                        className="w-full rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
+                        className="w-full rounded-lg border border-wk-border/70 bg-wk-bg/80 px-3 py-2.5 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
                       />
                     </label>
                   </div>
@@ -2206,7 +2206,7 @@ function ReviewDeskScreen() {
   };
 
   const actionClass =
-    "rounded-lg border border-wk-border bg-wk-surface px-4 py-2 text-[12px] font-black text-wk-text transition hover:border-wk-brand hover:text-wk-brand disabled:cursor-not-allowed disabled:opacity-50";
+    "rounded-md border border-wk-border/70 bg-wk-surface/70 px-3 py-2 text-[12px] font-black text-wk-text transition hover:border-wk-brand hover:text-wk-brand disabled:cursor-not-allowed disabled:opacity-50";
 
   const queueTabs: Array<{ key: "all" | "published" | InstituteReviewPacketStatus; label: string; count: number }> = [
     { key: "all", label: "All", count: packets.length },
@@ -2220,7 +2220,7 @@ function ReviewDeskScreen() {
 
   return (
     <div className="mx-auto max-w-[1240px] space-y-5">
-      <section className="rounded-[26px] border border-wk-border bg-wk-surface p-6 shadow-sm lg:p-7">
+      <section className="rounded-[22px] border border-wk-border/70 bg-wk-surface/70 p-5 shadow-none lg:p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <div className="text-[10px] font-black uppercase tracking-[0.24em] text-wk-brand">Institute Review Desk</div>
@@ -2332,8 +2332,8 @@ function ReviewDeskScreen() {
           <div className="space-y-5">
             <Panel eyebrow="Submission" title={article?.title || "Selected review"}>
               <div className="grid gap-3 md:grid-cols-2">
-                <div className="rounded-xl border border-wk-border bg-wk-bg-subtle p-4">
-                  <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Inquiry</div>
+                <div className="rounded-lg border border-wk-border/70 bg-wk-bg-subtle/70 p-3">
+                  <div className="text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Inquiry</div>
                   <div className="mt-2 text-[15px] font-black text-wk-text">{inquiry?.code ?? "Unknown Inquiry"}</div>
                   <p className="mt-2 text-[13px] leading-6 text-wk-text-muted">
                     {inquiry?.workingQuestion || inquiry?.rawQuestion || "No question captured."}
@@ -2344,8 +2344,8 @@ function ReviewDeskScreen() {
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-wk-border bg-wk-bg-subtle p-4">
-                  <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Article draft</div>
+                <div className="rounded-lg border border-wk-border/70 bg-wk-bg-subtle/70 p-3">
+                  <div className="text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Article draft</div>
                   <div className="mt-2 text-[15px] font-black text-wk-text">{article?.slug ?? workProduct?.productSlug ?? "No article slug"}</div>
                   <p className="mt-2 text-[13px] leading-6 text-wk-text-muted">
                     {article?.excerpt || "No excerpt saved."}
@@ -2358,14 +2358,14 @@ function ReviewDeskScreen() {
               </div>
 
               <div className="mt-4 rounded-xl border border-wk-border bg-wk-bg p-4">
-                <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Contributor note</div>
+                <div className="text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Contributor note</div>
                 <p className="mt-2 text-[13px] leading-6 text-wk-text-muted">
                   {activePacket?.contributorNote || "No contributor note captured."}
                 </p>
               </div>
 
               <div className="mt-4 rounded-xl border border-wk-border bg-wk-bg p-4">
-                <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Article preview</div>
+                <div className="text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Article preview</div>
                 <div
                   className="prose prose-sm mt-3 max-h-[360px] overflow-auto text-wk-text"
                   dangerouslySetInnerHTML={{ __html: article?.contentHtml || "<p>No article body saved.</p>" }}
@@ -2395,7 +2395,7 @@ function ReviewDeskScreen() {
                         {packet.reviewedAt ? ` · Reviewed ${new Date(packet.reviewedAt).toLocaleString()}` : ""}
                       </div>
                       {packet.editorNotes ? (
-                        <div className="mt-3 rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[12px] leading-5 text-wk-text-muted">
+                        <div className="mt-3 rounded-md border border-wk-border/60 bg-wk-surface/70 px-3 py-2 text-[12px] leading-5 text-wk-text-muted">
                           <span className="font-black text-wk-text">Editor notes:</span> {packet.editorNotes}
                         </div>
                       ) : null}
@@ -2422,7 +2422,7 @@ function ReviewDeskScreen() {
                   </a>
                 ) : null}
 
-                <div className="mt-4 rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[12px] leading-5 text-wk-text-muted">
+                <div className="mt-4 rounded-lg border border-wk-border/70 bg-wk-bg/80 px-3 py-2.5 text-[12px] leading-5 text-wk-text-muted">
                   Synced from the article editor.
                 </div>
               </Panel>
@@ -2447,7 +2447,7 @@ function ReviewDeskScreen() {
                   </div>
                 )}
 
-                <div className="mt-4 rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[12px] leading-5 text-wk-text-muted">
+                <div className="mt-4 rounded-lg border border-wk-border/70 bg-wk-bg/80 px-3 py-2.5 text-[12px] leading-5 text-wk-text-muted">
                   Publish only from the article editor.
                 </div>
               </Panel>
@@ -2483,13 +2483,13 @@ function ReviewDeskScreen() {
 
             <Panel eyebrow="Editor decision" title="Decision">
               <label className="block">
-                <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Editor notes</span>
+                <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Editor notes</span>
                 <textarea
                   value={editorNotes}
                   onChange={(event) => setEditorNotes(event.target.value)}
                   rows={6}
                   placeholder="What should happen next? What needs revision? What is approved?"
-                  className="w-full resize-y rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[13px] leading-6 text-wk-text outline-none focus:border-wk-brand"
+                  className="w-full resize-y rounded-lg border border-wk-border/70 bg-wk-bg/80 px-3 py-2.5 text-[13px] leading-6 text-wk-text outline-none focus:border-wk-brand"
                 />
               </label>
 

@@ -965,7 +965,7 @@ export function ArticleEditorWorkspace({
   return (
     <div className="space-y-5">
       {isInstituteMode ? (
-        <div className="rounded-2xl border border-wk-warning/30 bg-wk-warning-soft px-4 py-3 text-[12px] font-bold leading-5 text-wk-text-muted">
+        <div className="rounded-xl border border-wk-warning/25 bg-wk-warning-soft/70 px-3 py-2.5 text-[12px] font-bold leading-5 text-wk-text-muted">
           {instituteNotice ?? "Draft, save, preview, then submit."}
         </div>
       ) : null}
