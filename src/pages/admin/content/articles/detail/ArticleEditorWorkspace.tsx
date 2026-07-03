@@ -798,10 +798,13 @@ export function ArticleEditorWorkspace({
       addToast("error", articlePermissions.reason ?? "Permission denied.");
       return;
     }
+
     if (!article) return;
+
     setIsSavingHero(true);
+
     try {
-      const result = await saveArticle(article.id, { hero_image_url: url || null }, articleUpdatedAtRef.current);
+      const result = await saveArticle(article.id, { hero_image_url: url || null }, null);
 
       if (!result.ok) {
         addToast("error", result.error ?? "Hero image save failed.");
@@ -809,6 +812,7 @@ export function ArticleEditorWorkspace({
       }
 
       const refreshedArticle = await fetchArticleForAdmin(article.slug);
+
       if (refreshedArticle) {
         applyServerArticleState(refreshedArticle, false);
       } else {
@@ -816,11 +820,9 @@ export function ArticleEditorWorkspace({
         setArticle((prev) => (prev ? { ...prev, heroImageUrl: url || "" } : prev));
       }
 
-      if (url) {
-        await saveHeroToMediaLibrary(article.slug, draft.title, url);
-      }
+      await saveHeroToMediaLibrary(article.slug, draft.title, url);
 
-      addToast("success", url ? "Hero image saved to media library." : "Hero image removed.");
+      addToast("success", url ? "Hero image saved." : "Hero image removed.");
     } finally {
       setIsSavingHero(false);
     }

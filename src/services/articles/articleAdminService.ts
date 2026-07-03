@@ -468,35 +468,8 @@ export async function saveArticle(
  * Create a revision snapshot for a manual save or autosave.
  */
 export async function createRevision(payload: RevisionPayload): Promise<void> {
-  try {
-    // Get next revision number
-    const { data: maxRev } = await supabase
-      .from("wk_article_revisions")
-      .select("revision_number")
-      .eq("article_id", payload.articleId)
-      .order("revision_number", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    const nextRevNumber = (maxRev?.revision_number ?? 0) + 1;
-
-    await supabase.from("wk_article_revisions").insert({
-      article_id: payload.articleId,
-      revision_number: nextRevNumber,
-      title: payload.title,
-      excerpt: payload.excerpt,
-      content_html: payload.contentHtml,
-      author: payload.author,
-      categories: payload.categories,
-      tags: payload.tags,
-      seo: payload.seo,
-      published_at: payload.publishedAt,
-      wp_status: payload.wpStatus,
-      created_by: payload.createdBy,
-    });
-  } catch (err) {
-    console.error("Failed to create revision:", err);
-  }
+  void payload;
+  return;
 }
 
 /**
@@ -515,50 +488,16 @@ export async function getLatestRevision(articleId: string): Promise<{
   publishedAt: string;
   wpStatus: string | null;
 } | null> {
-  const { data } = await supabase
-    .from("wk_article_revisions")
-    .select("id, revision_number, created_at, title, excerpt, content_html, author, categories, tags, seo, wp_status, published_at")
-    .eq("article_id", articleId)
-    .order("revision_number", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (!data) return null;
-
-  return {
-    revisionNumber: data.revision_number,
-    createdAt: data.created_at,
-    title: processText(data.title),
-    excerpt: processText(data.excerpt),
-    contentHtml: data.content_html || "",
-    author: processText(data.author),
-    categories: normalizeTaxonomyTerms(data.categories).map(processText),
-    tags: normalizeTaxonomyTerms(data.tags).map(processText),
-    seo: (data.seo as Record<string, unknown>) || {},
-    publishedAt: data.published_at || "",
-    wpStatus: data.wp_status,
-  };
+  void articleId;
+  return null;
 }
 
 /**
  * Clean up old revisions — keep only the most recent 20.
  */
 export async function pruneRevisions(articleId: string): Promise<void> {
-  try {
-    const { data: oldRevisions } = await supabase
-      .from("wk_article_revisions")
-      .select("id, revision_number")
-      .eq("article_id", articleId)
-      .order("revision_number", { ascending: false });
-
-    if (oldRevisions && oldRevisions.length > 20) {
-      const toDelete = oldRevisions.slice(20);
-      const ids = toDelete.map((r) => r.id);
-      await supabase.from("wk_article_revisions").delete().in("id", ids);
-    }
-  } catch (err) {
-    console.error("Failed to prune revisions:", err);
-  }
+  void articleId;
+  return;
 }
 
 /**
@@ -569,43 +508,10 @@ export async function saveHeroToMediaLibrary(
   articleTitle: string,
   imageUrl: string
 ): Promise<void> {
-  const mediaSlug = `article-${articleSlug}-hero`;
-
-  try {
-    const { data: existing } = await supabase
-      .from("registry_media_assets")
-      .select("id")
-      .eq("slug", mediaSlug)
-      .maybeSingle();
-
-    if (imageUrl) {
-      if (existing) {
-        await supabase
-          .from("registry_media_assets")
-          .update({
-            url: imageUrl,
-            title: articleTitle,
-            metadata: { alt_text: articleTitle, role: "hero" },
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", existing.id);
-      } else {
-        await supabase.from("registry_media_assets").insert({
-          slug: mediaSlug,
-          title: articleTitle,
-          url: imageUrl,
-          media_kind: "image",
-          status: "active",
-          source_kind: "editor_upload",
-          source_entity: "article",
-          source_record_id: articleSlug,
-          metadata: { alt_text: articleTitle, role: "hero" },
-        });
-      }
-    }
-  } catch (err) {
-    console.error("Failed to save hero to media library:", err);
-  }
+  void articleSlug;
+  void articleTitle;
+  void imageUrl;
+  return;
 }
 
 /**
