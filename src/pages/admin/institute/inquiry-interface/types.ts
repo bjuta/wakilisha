@@ -84,6 +84,7 @@ export type EvidenceItem = {
   whyItMatters: string;
   mediaMinutes: number;
   reviewState: ReviewState;
+  metadata?: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
 };
