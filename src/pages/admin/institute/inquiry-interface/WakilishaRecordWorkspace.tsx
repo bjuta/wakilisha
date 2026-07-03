@@ -328,6 +328,19 @@ export function WakilishaRecordWorkspace({ draft, addEvidence, onSaved }: Props)
       !saving,
   );
 
+  const cleanQuery = query.trim();
+  const canSuggestMissingRecord = !loading && cleanQuery.length >= 2 && records.length === 0;
+
+  useEffect(() => {
+    if (entityType !== "all") setSuggestedType(entityType);
+  }, [entityType]);
+
+  useEffect(() => {
+    if (!canSuggestMissingRecord) return;
+    if (suggestedTitle.trim()) return;
+    setSuggestedTitle(cleanQuery);
+  }, [canSuggestMissingRecord, cleanQuery, suggestedTitle]);
+
   const selectedRecordEvidenceTitle = selectedRecord
     ? `${selectedRecord.label} · WAKILISHA record evidence`
     : "WAKILISHA record evidence";
@@ -522,70 +535,72 @@ export function WakilishaRecordWorkspace({ draft, addEvidence, onSaved }: Props)
               );
             })}
 
-            {!loading && !records.length ? (
-              <div className="rounded-xl border border-dashed border-wk-border bg-wk-bg-subtle p-4">
+            {!loading && cleanQuery.length >= 2 && !records.length ? (
+              <div className="rounded-xl border border-dashed border-wk-warning/40 bg-wk-warning-soft p-4">
                 <div className="text-[13px] font-black text-wk-text">No matching WAKILISHA record found</div>
                 <p className="mt-1 text-[12px] leading-5 text-wk-text-muted">
-                  Use the missing record suggestion form below. It will save as reviewable Institute evidence.
+                  The registry did not return a match for this search. You can now suggest a missing record for editor review.
                 </p>
               </div>
             ) : null}
           </div>
         </section>
 
-        <section className="rounded-[22px] border border-wk-border bg-wk-surface p-5 shadow-sm">
-          <div className="text-[10px] font-black uppercase tracking-[0.18em] text-wk-warning">Missing record intake</div>
-          <h3 className="mt-2 text-[20px] font-black tracking-[-0.045em] text-wk-text">Suggest a new WAKILISHA record.</h3>
-          <p className="mt-2 text-[13px] leading-6 text-wk-text-muted">
-            This does not create public registry data. It creates an editor-reviewable suggestion attached to this inquiry.
-          </p>
+        {canSuggestMissingRecord ? (
+          <section className="rounded-[22px] border border-wk-warning/40 bg-wk-warning-soft p-5 shadow-sm">
+            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-wk-warning">No registry match</div>
+            <h3 className="mt-2 text-[20px] font-black tracking-[-0.045em] text-wk-text">Suggest a missing WAKILISHA record.</h3>
+            <p className="mt-2 text-[13px] leading-6 text-wk-text-muted">
+              This appears only after WAKILISHA search returns zero matches. It does not create public registry data. It creates an editor-reviewable suggestion attached to this inquiry.
+            </p>
 
-          <div className="mt-4 space-y-3">
-            <select
-              value={suggestedType}
-              onChange={(event) => setSuggestedType(event.target.value as WakilishaRecordEntityType)}
-              className="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-3 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
-            >
-              {wakilishaRecordEntityOptions
-                .filter((option) => option.key !== "all")
-                .map((option) => (
-                  <option key={option.key} value={option.key}>{option.label}</option>
-                ))}
-            </select>
+            <div className="mt-4 space-y-3">
+              <select
+                value={suggestedType}
+                onChange={(event) => setSuggestedType(event.target.value as WakilishaRecordEntityType)}
+                className="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-3 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
+              >
+                {wakilishaRecordEntityOptions
+                  .filter((option) => option.key !== "all")
+                  .map((option) => (
+                    <option key={option.key} value={option.key}>{option.label}</option>
+                  ))}
+              </select>
 
-            <input
-              value={suggestedTitle}
-              onChange={(event) => setSuggestedTitle(event.target.value)}
-              placeholder="Name, title, chart family, article, or author..."
-              className="w-full rounded-lg border border-wk-border bg-wk-bg px-4 py-3 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
-            />
+              <input
+                value={suggestedTitle}
+                onChange={(event) => setSuggestedTitle(event.target.value)}
+                placeholder="Name, title, chart family, article, or author..."
+                className="w-full rounded-lg border border-wk-border bg-wk-bg px-4 py-3 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
+              />
 
-            <textarea
-              value={suggestedDetails}
-              onChange={(event) => setSuggestedDetails(event.target.value)}
-              rows={5}
-              placeholder="What should WAKILISHA know, and why does this belong in the record?"
-              className="w-full resize-y rounded-lg border border-wk-border bg-wk-bg px-4 py-3 text-[13px] leading-6 text-wk-text outline-none focus:border-wk-brand"
-            />
+              <textarea
+                value={suggestedDetails}
+                onChange={(event) => setSuggestedDetails(event.target.value)}
+                rows={5}
+                placeholder="What should WAKILISHA know, and why does this belong in the record?"
+                className="w-full resize-y rounded-lg border border-wk-border bg-wk-bg px-4 py-3 text-[13px] leading-6 text-wk-text outline-none focus:border-wk-brand"
+              />
 
-            <textarea
-              value={supportingLinks}
-              onChange={(event) => setSupportingLinks(event.target.value)}
-              rows={4}
-              placeholder="Supporting links, one per line"
-              className="w-full resize-y rounded-lg border border-wk-border bg-wk-bg px-4 py-3 text-[13px] leading-6 text-wk-text outline-none focus:border-wk-brand"
-            />
+              <textarea
+                value={supportingLinks}
+                onChange={(event) => setSupportingLinks(event.target.value)}
+                rows={4}
+                placeholder="Supporting links, one per line"
+                className="w-full resize-y rounded-lg border border-wk-border bg-wk-bg px-4 py-3 text-[13px] leading-6 text-wk-text outline-none focus:border-wk-brand"
+              />
 
-            <button
-              type="button"
-              disabled={!canSaveSuggestion}
-              onClick={() => void saveMissingRecordSuggestion()}
-              className="rounded-lg bg-wk-text px-5 py-3 text-[13px] font-black text-wk-bg transition disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {saving ? "Saving..." : "Save missing record suggestion"}
-            </button>
-          </div>
-        </section>
+              <button
+                type="button"
+                disabled={!canSaveSuggestion}
+                onClick={() => void saveMissingRecordSuggestion()}
+                className="rounded-lg bg-wk-text px-5 py-3 text-[13px] font-black text-wk-bg transition disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {saving ? "Saving..." : "Save missing record suggestion"}
+              </button>
+            </div>
+          </section>
+        ) : null}
       </div>
 
       <div className="space-y-5">
