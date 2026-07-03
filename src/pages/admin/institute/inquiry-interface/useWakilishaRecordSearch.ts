@@ -45,41 +45,11 @@ export type WakilishaRecordDetail = {
     artworkUrl: string | null;
     previewUrl: string | null;
   }>;
+  richContext?: Record<string, unknown>;
+  snapshotPatch?: Record<string, unknown>;
 };
 
 type AnyRow = Record<string, any>;
-
-async function fetchAllRows(
-  tableName: string,
-  selectClause: string,
-  orderColumn?: string,
-  pageSize = 1000,
-): Promise<{ data: AnyRow[]; error: null }> {
-  const rows: AnyRow[] = [];
-  let from = 0;
-
-  while (true) {
-    const client = supabase as any;
-    let request = client.from(tableName).select(selectClause);
-
-    if (orderColumn) {
-      request = request.order(orderColumn);
-    }
-
-    const { data, error } = await request.range(from, from + pageSize - 1);
-
-    if (error) throw error;
-
-    const page = (data ?? []) as AnyRow[];
-    rows.push(...page);
-
-    if (page.length < pageSize) break;
-
-    from += pageSize;
-  }
-
-  return { data: rows, error: null };
-}
 
 export const wakilishaRecordEntityOptions: Array<{
   key: "all" | WakilishaRecordEntityType;
@@ -97,8 +67,23 @@ export const wakilishaRecordEntityOptions: Array<{
   { key: "chart_family", label: "Charts", note: "Chart programs, markets, rules, editions, and entries." },
 ];
 
+const searchableTypes: WakilishaRecordEntityType[] = [
+  "artist",
+  "track",
+  "release",
+  "label",
+  "genre",
+  "article",
+  "author",
+  "chart_family",
+];
+
 function compact(values: Array<string | number | null | undefined | false>) {
   return values.map((value) => String(value || "").trim()).filter(Boolean);
+}
+
+function cleanText(value: unknown) {
+  return String(value ?? "").replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
 }
 
 function safeJson(value: unknown) {
@@ -122,20 +107,24 @@ function searchBlob(values: unknown[]) {
 
 function groupBy<T extends AnyRow>(rows: T[], key: string) {
   const map = new Map<string, T[]>();
+
   rows.forEach((row) => {
     const value = String(row[key] ?? "").trim();
     if (!value) return;
     map.set(value, [...(map.get(value) ?? []), row]);
   });
+
   return map;
 }
 
 function mapBy<T extends AnyRow>(rows: T[], key: string) {
   const map = new Map<string, T>();
+
   rows.forEach((row) => {
     const value = String(row[key] ?? "").trim();
     if (value && !map.has(value)) map.set(value, row);
   });
+
   return map;
 }
 
@@ -161,10 +150,14 @@ function hrefFor(type: WakilishaRecordEntityType, slug: string) {
   return "";
 }
 
+function like(query: string) {
+  return `%${query.replaceAll("%", "").replaceAll(",", " ").trim()}%`;
+}
+
 function socialLinksFrom(metadata: AnyRow | null | undefined) {
   const meta = metadata ?? {};
   const links = [
-    ["Spotify", meta.spotify_url || (meta.spotify_artist_id ? `spotify:artist:${meta.spotify_artist_id}` : "")],
+    ["Spotify", meta.spotify_url || (meta.spotify_artist_id ? `spotify:artist:${meta.spotify_artist_id}` : "") || (meta.spotify_id ? `spotify:artist:${meta.spotify_id}` : "")],
     ["Apple Music", meta.apple_music_url || (meta.apple_music_id ? `apple-music:${meta.apple_music_id}` : "")],
     ["Instagram", meta.instagram_url],
     ["YouTube", meta.youtube_url],
@@ -199,7 +192,11 @@ function metadataHighlights(metadata: AnyRow | null | undefined) {
     "source_entity",
   ];
 
-  return Object.fromEntries(keys.filter((key) => meta[key] !== undefined && meta[key] !== null && String(meta[key]).trim() !== "").map((key) => [key, meta[key]]));
+  return Object.fromEntries(
+    keys
+      .filter((key) => meta[key] !== undefined && meta[key] !== null && String(meta[key]).trim() !== "")
+      .map((key) => [key, meta[key]]),
+  );
 }
 
 function relationSummary(rows: AnyRow[], slug: string) {
@@ -231,7 +228,285 @@ function mediaSummary(rows: AnyRow[], entityId: string, slug: string) {
     }));
 }
 
-function articleRecord(article: AdminArticleListItem): WakilishaRecordSearchResult {
+function authorDisplayName(row: AuthorRow) {
+  return row.name
+    .trim()
+    .split(/[_\s]+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function toArtistRecord(artist: AnyRow): WakilishaRecordSearchResult {
+  const meta = (artist.metadata ?? {}) as AnyRow;
+  const slug = String(artist.slug || "");
+  const country = meta.country || artist.origin_iso2 || "";
+  const genres = Array.isArray(meta.genres) ? meta.genres : Array.isArray(meta.enriched_genres) ? meta.enriched_genres : [];
+  const socials = socialLinksFrom(meta);
+  const missing = compact([
+    artist.public_image_url || meta.portrait_image ? "" : "image",
+    artist.bio ? "" : "bio",
+    country ? "" : "country/origin",
+    genres.length ? "" : "genres",
+    socials.length ? "" : "social/provider links",
+  ]);
+
+  const snapshot = {
+    source: "registry_artists",
+    entityType: "artist",
+    id: artist.id,
+    slug,
+    name: artist.display_name,
+    normalizedName: artist.normalized_name,
+    sortName: artist.sort_name,
+    bio: artist.bio,
+    artistType: artist.artist_type,
+    gender: artist.gender,
+    originIso2: artist.origin_iso2,
+    originConfidence: artist.origin_confidence,
+    country,
+    genres,
+    publicImageUrl: artist.public_image_url,
+    imageSourceProvider: artist.image_source_provider,
+    status: artist.status,
+    metadata: meta,
+    metadataHighlights: metadataHighlights(meta),
+    href: hrefFor("artist", slug),
+  };
+
+  return {
+    id: `artist:${slug}`,
+    entityType: "artist",
+    slug,
+    label: artist.display_name || slug,
+    subtitle: compact([artist.status !== "active" ? artist.status : "", country, genres.slice(0, 2).join(", ")]).join(" · ") || "Artist",
+    href: hrefFor("artist", slug),
+    imageUrl: artist.public_image_url || meta.portrait_image || null,
+    contextText: artist.bio ? cleanText(artist.bio) : compact([country, genres.slice(0, 3).join(", ")]).join(" · "),
+    snapshot,
+    health: healthFrom(missing, statusNote(artist.status)),
+    searchText: searchBlob([artist.display_name, artist.normalized_name, slug, artist.bio, artist.status, meta, socials]),
+  };
+}
+
+function toTrackRecord(track: AnyRow, artists: AnyRow[] = [], release: AnyRow | null = null, chartEntries: AnyRow[] = []): WakilishaRecordSearchResult {
+  const slug = String(track.slug || "");
+  const primaryArtist = artists.find((artist) => artist.is_primary) ?? artists[0] ?? null;
+
+  const artistCredits = artists
+    .sort((a, b) => Number(a.credit_order ?? 999) - Number(b.credit_order ?? 999))
+    .map((artist) => ({
+      slug: artist.artist_slug,
+      name: artist.artist_name_text,
+      role: artist.role,
+      isPrimary: artist.is_primary,
+      isFeatured: artist.is_featured,
+      displayCredit: artist.display_credit,
+    }));
+
+  const missing = compact([
+    track.artwork_url ? "" : "artwork",
+    artistCredits.length ? "" : "artist credits",
+    release ? "" : "release",
+    track.preview_url ? "" : "preview/provider audio",
+  ]);
+
+  const snapshot = {
+    source: "registry_tracks",
+    entityType: "track",
+    id: track.id,
+    slug,
+    title: track.title,
+    normalizedTitle: track.normalized_title,
+    isrc: track.isrc,
+    durationMs: track.duration_ms,
+    explicit: track.explicit,
+    trackNumber: track.track_number,
+    discNumber: track.disc_number,
+    artworkUrl: track.artwork_url,
+    previewUrl: track.preview_url,
+    status: track.status,
+    metadata: track.metadata ?? {},
+    href: hrefFor("track", slug),
+    richContext: {
+      searchContext: {
+        artists: artistCredits,
+        release: release
+          ? {
+              slug: release.slug,
+              title: release.title,
+              releaseType: release.release_type,
+              releaseDate: release.release_date,
+              artworkUrl: release.artwork_url,
+            }
+          : null,
+        chartEntryCount: chartEntries.length,
+      },
+    },
+  };
+
+  return {
+    id: `track:${slug}`,
+    entityType: "track",
+    slug,
+    label: track.title || slug,
+    subtitle: compact([track.status !== "active" ? track.status : "", primaryArtist?.artist_name_text, release?.title]).join(" · ") || "Track",
+    href: hrefFor("track", slug),
+    imageUrl: track.artwork_url || release?.artwork_url || null,
+    contextText: compact([primaryArtist?.artist_name_text, release?.title, track.isrc]).join(" · "),
+    snapshot,
+    health: healthFrom(missing, statusNote(track.status)),
+    searchText: searchBlob([track.title, track.normalized_title, slug, track.isrc, track.metadata, artistCredits, release, chartEntries]),
+  };
+}
+
+function toReleaseRecord(release: AnyRow, artists: AnyRow[] = [], label: AnyRow | null = null, trackCount = 0): WakilishaRecordSearchResult {
+  const slug = String(release.slug || "");
+  const primaryArtist = artists.find((artist) => artist.is_primary) ?? artists[0] ?? null;
+
+  const artistCredits = artists
+    .sort((a, b) => Number(a.credit_order ?? 999) - Number(b.credit_order ?? 999))
+    .map((artist) => ({
+      slug: artist.artist_slug,
+      name: artist.artist_name_text,
+      role: artist.role,
+      isPrimary: artist.is_primary,
+      isFeatured: artist.is_featured,
+      displayCredit: artist.display_credit,
+    }));
+
+  const missing = compact([
+    release.artwork_url ? "" : "artwork",
+    artistCredits.length ? "" : "artist credits",
+    release.release_date ? "" : "release date",
+    trackCount ? "" : "tracklist",
+    release.description ? "" : "description",
+    label ? "" : "label",
+  ]);
+
+  const snapshot = {
+    source: "registry_releases",
+    entityType: "release",
+    id: release.id,
+    slug,
+    title: release.title,
+    normalizedTitle: release.normalized_title,
+    releaseType: release.release_type,
+    upc: release.upc,
+    releaseDate: release.release_date,
+    releaseDatePrecision: release.release_date_precision,
+    artworkUrl: release.artwork_url,
+    description: release.description,
+    status: release.status,
+    metadata: release.metadata ?? {},
+    href: hrefFor("release", slug),
+    richContext: {
+      searchContext: {
+        artists: artistCredits,
+        label: label
+          ? {
+              slug: label.slug,
+              name: label.name,
+              countryCode: label.country_code,
+            }
+          : null,
+        trackCount,
+      },
+    },
+  };
+
+  return {
+    id: `release:${slug}`,
+    entityType: "release",
+    slug,
+    label: release.title || slug,
+    subtitle: compact([
+      release.status !== "active" ? release.status : "",
+      primaryArtist?.artist_name_text,
+      release.release_type,
+      release.release_date,
+      trackCount ? `${trackCount} track(s)` : "",
+    ]).join(" · ") || "Release",
+    href: hrefFor("release", slug),
+    imageUrl: release.artwork_url || null,
+    contextText: release.description || compact([primaryArtist?.artist_name_text, release.release_type, release.release_date]).join(" · "),
+    snapshot,
+    health: healthFrom(missing, statusNote(release.status)),
+    searchText: searchBlob([release.title, release.normalized_title, slug, release.description, release.metadata, artistCredits, label]),
+  };
+}
+
+function toLabelRecord(label: AnyRow): WakilishaRecordSearchResult {
+  const slug = String(label.slug || "");
+  const missing = compact([
+    label.description ? "" : "description",
+    label.country_code ? "" : "country",
+  ]);
+
+  const snapshot = {
+    source: "registry_labels",
+    entityType: "label",
+    id: label.id,
+    slug,
+    name: label.name,
+    normalizedName: label.normalized_name,
+    description: label.description,
+    countryCode: label.country_code,
+    status: label.status,
+    metadata: label.metadata ?? {},
+    href: hrefFor("label", slug),
+  };
+
+  return {
+    id: `label:${slug}`,
+    entityType: "label",
+    slug,
+    label: label.name || slug,
+    subtitle: compact([label.status !== "active" ? label.status : "", label.country_code]).join(" · ") || "Label",
+    href: hrefFor("label", slug),
+    imageUrl: null,
+    contextText: label.description || label.country_code || "",
+    snapshot,
+    health: healthFrom(missing, statusNote(label.status)),
+    searchText: searchBlob([label.name, label.normalized_name, slug, label.description, label.country_code, label.metadata]),
+  };
+}
+
+function toGenreRecord(genre: AnyRow): WakilishaRecordSearchResult {
+  const slug = String(genre.slug || "");
+  const missing = compact([
+    genre.description ? "" : "description",
+  ]);
+
+  const snapshot = {
+    source: "registry_genres",
+    entityType: "genre",
+    id: genre.id,
+    slug,
+    name: genre.name,
+    description: genre.description,
+    parentGenreId: genre.parent_genre_id,
+    status: genre.status,
+    metadata: genre.metadata ?? {},
+    href: hrefFor("genre", slug),
+  };
+
+  return {
+    id: `genre:${slug}`,
+    entityType: "genre",
+    slug,
+    label: genre.name || slug,
+    subtitle: compact([genre.status !== "active" ? genre.status : "", "Genre"]).join(" · "),
+    href: hrefFor("genre", slug),
+    imageUrl: null,
+    contextText: genre.description || "",
+    snapshot,
+    health: healthFrom(missing, statusNote(genre.status)),
+    searchText: searchBlob([genre.name, slug, genre.description, genre.metadata]),
+  };
+}
+
+function toArticleRecord(article: AdminArticleListItem): WakilishaRecordSearchResult {
   const slug = article.slug;
   const label = article.title || slug;
   const subtitle = compact([
@@ -284,16 +559,7 @@ function articleRecord(article: AdminArticleListItem): WakilishaRecordSearchResu
   };
 }
 
-function authorDisplayName(row: AuthorRow) {
-  return row.name
-    .trim()
-    .split(/[_\s]+/)
-    .filter(Boolean)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-    .join(" ");
-}
-
-function authorRecord(author: AuthorRow): WakilishaRecordSearchResult {
+function toAuthorRecord(author: AuthorRow): WakilishaRecordSearchResult {
   const displayName = authorDisplayName(author);
   const subtitle = compact([author.role || "Contributor", author.location || "", author.source_kind || "registry author"]).join(" · ");
   const missing = compact([author.avatar_url ? "" : "avatar", author.bio ? "" : "bio", author.role ? "" : "role", author.location ? "" : "location"]);
@@ -340,7 +606,7 @@ function authorRecord(author: AuthorRow): WakilishaRecordSearchResult {
   };
 }
 
-function chartFamilyRecord(family: ChartFamily): WakilishaRecordSearchResult | null {
+function toChartFamilyRecord(family: ChartFamily): WakilishaRecordSearchResult | null {
   const slug = family.slug || family.publicSlug || family.familyKey;
   if (!slug) return null;
 
@@ -412,694 +678,563 @@ function chartFamilyRecord(family: ChartFamily): WakilishaRecordSearchResult | n
   };
 }
 
-function resultMatches(result: WakilishaRecordSearchResult, query: string) {
-  const clean = query.trim().toLowerCase();
-  if (clean.length < 2) return true;
-  return result.searchText.includes(clean);
+async function searchArtists(query: string) {
+  const pattern = like(query);
+
+  const { data, error } = await supabase
+    .from("registry_artists")
+    .select("id, slug, display_name, normalized_name, sort_name, bio, artist_type, gender, origin_iso2, origin_confidence, public_image_url, image_source_provider, status, metadata, updated_at")
+    .or(`slug.ilike.${pattern},display_name.ilike.${pattern},normalized_name.ilike.${pattern},sort_name.ilike.${pattern},bio.ilike.${pattern}`)
+    .order("display_name")
+    .limit(25);
+
+  if (error) throw error;
+
+  return (data ?? []).map(toArtistRecord);
+}
+
+async function searchTracks(query: string) {
+  const pattern = like(query);
+
+  const { data: tracks, error } = await supabase
+    .from("registry_tracks")
+    .select("id, slug, title, normalized_title, isrc, release_id, duration_ms, explicit, track_number, disc_number, artwork_url, preview_url, status, metadata, updated_at")
+    .or(`slug.ilike.${pattern},title.ilike.${pattern},normalized_title.ilike.${pattern},isrc.ilike.${pattern}`)
+    .order("title")
+    .limit(25);
+
+  if (error) throw error;
+
+  const trackRows = tracks ?? [];
+  const trackIds = trackRows.map((track) => String(track.id));
+  const releaseIds = trackRows.map((track) => String(track.release_id || "")).filter(Boolean);
+  const trackSlugs = trackRows.map((track) => String(track.slug || "")).filter(Boolean);
+
+  const [artistsResult, releasesResult, chartResult] = await Promise.all([
+    trackIds.length
+      ? supabase.from("registry_track_artists").select("track_id, artist_slug, artist_name_text, role, is_primary, is_featured, credit_order, display_credit, status").in("track_id", trackIds).eq("status", "active")
+      : Promise.resolve({ data: [], error: null }),
+    releaseIds.length
+      ? supabase.from("registry_releases").select("id, slug, title, release_type, release_date, artwork_url, status").in("id", releaseIds)
+      : Promise.resolve({ data: [], error: null }),
+    trackSlugs.length
+      ? supabase.from("wk_chart_entries_v2").select("id, edition_id, rank, movement, track_slug, track_title, artist_slug, artist_name, artwork_url, total_score, eligibility_status").in("track_slug", trackSlugs)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  if (artistsResult.error) throw artistsResult.error;
+  if (releasesResult.error) throw releasesResult.error;
+  if (chartResult.error) throw chartResult.error;
+
+  const artistsByTrackId = groupBy((artistsResult.data ?? []) as AnyRow[], "track_id");
+  const releasesById = mapBy((releasesResult.data ?? []) as AnyRow[], "id");
+  const chartEntriesByTrackSlug = groupBy((chartResult.data ?? []) as AnyRow[], "track_slug");
+
+  return trackRows.map((track) =>
+    toTrackRecord(
+      track,
+      artistsByTrackId.get(String(track.id)) ?? [],
+      releasesById.get(String(track.release_id || "")) ?? null,
+      chartEntriesByTrackSlug.get(String(track.slug || "")) ?? [],
+    ),
+  );
+}
+
+async function searchReleases(query: string) {
+  const pattern = like(query);
+
+  const { data: releases, error } = await supabase
+    .from("registry_releases")
+    .select("id, slug, title, normalized_title, release_type, upc, release_date, release_date_precision, label_id, artwork_url, status, metadata, description, updated_at")
+    .or(`slug.ilike.${pattern},title.ilike.${pattern},normalized_title.ilike.${pattern},upc.ilike.${pattern},description.ilike.${pattern}`)
+    .order("title")
+    .limit(25);
+
+  if (error) throw error;
+
+  const releaseRows = releases ?? [];
+  const releaseIds = releaseRows.map((release) => String(release.id));
+  const labelIds = releaseRows.map((release) => String(release.label_id || "")).filter(Boolean);
+  const releaseSlugs = releaseRows.map((release) => String(release.slug || "")).filter(Boolean);
+
+  const [artistsResult, labelsResult, tracklistsResult, releaseTracksResult] = await Promise.all([
+    releaseIds.length
+      ? supabase.from("registry_release_artists").select("release_id, artist_slug, artist_name_text, role, is_primary, is_featured, credit_order, display_credit, status").in("release_id", releaseIds).eq("status", "active")
+      : Promise.resolve({ data: [], error: null }),
+    labelIds.length
+      ? supabase.from("registry_labels").select("id, slug, name, country_code, description, status").in("id", labelIds)
+      : Promise.resolve({ data: [], error: null }),
+    releaseSlugs.length
+      ? supabase.from("registry_release_tracklists").select("release_slug, track_count").in("release_slug", releaseSlugs)
+      : Promise.resolve({ data: [], error: null }),
+    releaseIds.length
+      ? supabase.from("registry_release_tracks").select("release_id, track_id").in("release_id", releaseIds).eq("status", "active")
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  if (artistsResult.error) throw artistsResult.error;
+  if (labelsResult.error) throw labelsResult.error;
+  if (tracklistsResult.error) throw tracklistsResult.error;
+  if (releaseTracksResult.error) throw releaseTracksResult.error;
+
+  const artistsByReleaseId = groupBy((artistsResult.data ?? []) as AnyRow[], "release_id");
+  const labelsById = mapBy((labelsResult.data ?? []) as AnyRow[], "id");
+  const tracklistBySlug = mapBy((tracklistsResult.data ?? []) as AnyRow[], "release_slug");
+  const releaseTracksByReleaseId = groupBy((releaseTracksResult.data ?? []) as AnyRow[], "release_id");
+
+  return releaseRows.map((release) => {
+    const trackCount = Number(tracklistBySlug.get(String(release.slug || ""))?.track_count ?? releaseTracksByReleaseId.get(String(release.id))?.length ?? 0);
+    return toReleaseRecord(release, artistsByReleaseId.get(String(release.id)) ?? [], labelsById.get(String(release.label_id || "")) ?? null, trackCount);
+  });
+}
+
+async function searchLabels(query: string) {
+  const pattern = like(query);
+
+  const { data, error } = await supabase
+    .from("registry_labels")
+    .select("id, slug, name, normalized_name, description, country_code, status, metadata, updated_at")
+    .or(`slug.ilike.${pattern},name.ilike.${pattern},normalized_name.ilike.${pattern},description.ilike.${pattern},country_code.ilike.${pattern}`)
+    .order("name")
+    .limit(25);
+
+  if (error) throw error;
+
+  return (data ?? []).map(toLabelRecord);
+}
+
+async function searchGenres(query: string) {
+  const pattern = like(query);
+
+  const { data, error } = await supabase
+    .from("registry_genres")
+    .select("id, slug, name, parent_genre_id, description, status, metadata, updated_at")
+    .or(`slug.ilike.${pattern},name.ilike.${pattern},description.ilike.${pattern}`)
+    .order("name")
+    .limit(25);
+
+  if (error) throw error;
+
+  return (data ?? []).map(toGenreRecord);
+}
+
+async function searchArticles(query: string) {
+  const clean = query.toLowerCase();
+  const articles = await fetchArticlesForAdminList(500);
+
+  return articles
+    .map(toArticleRecord)
+    .filter((record) => record.searchText.includes(clean))
+    .slice(0, 25);
+}
+
+async function searchAuthors(query: string) {
+  const clean = query.toLowerCase();
+  const authors = await fetchAllAuthors();
+
+  return authors
+    .map(toAuthorRecord)
+    .filter((record) => record.searchText.includes(clean))
+    .slice(0, 25);
+}
+
+async function searchChartFamilies(query: string) {
+  const clean = query.toLowerCase();
+  const chartPayload = await getChartFamilies().catch(() => ({ data: { families: [], editions: [] } }));
+
+  const familyRecords = (chartPayload.data.families ?? [])
+    .map(toChartFamilyRecord)
+    .filter(Boolean) as WakilishaRecordSearchResult[];
+
+  const { data: programs } = await supabase
+    .from("wk_chart_programs_v2")
+    .select("id, series_slug, market_slug, public_slug, public_label, short_label, source_family_slug, default_period_type, default_methodology_version, default_eligibility_rules_version, chart_size, airplay_enabled, airplay_station_scope, updated_at")
+    .limit(25);
+
+  const programRecords = (programs ?? []).map((program) => {
+    const slug = String(program.public_slug || program.id || "");
+    const snapshot = {
+      source: "wk_chart_programs_v2",
+      entityType: "chart_family",
+      id: program.id,
+      slug,
+      label: program.public_label,
+      shortLabel: program.short_label,
+      seriesSlug: program.series_slug,
+      marketSlug: program.market_slug,
+      sourceFamilySlug: program.source_family_slug,
+      periodType: program.default_period_type,
+      methodologyVersion: program.default_methodology_version,
+      eligibilityRulesVersion: program.default_eligibility_rules_version,
+      chartSize: program.chart_size,
+      airplayEnabled: program.airplay_enabled,
+      airplayStationScope: program.airplay_station_scope,
+      href: hrefFor("chart_family", slug),
+      richContext: {
+        chartProgram: program,
+      },
+    };
+
+    return {
+      id: `chart_program:${slug}`,
+      entityType: "chart_family" as const,
+      slug,
+      label: program.public_label || slug,
+      subtitle: compact([program.market_slug, program.default_period_type, program.chart_size ? `${program.chart_size} entries` : ""]).join(" · ") || "Chart program",
+      href: hrefFor("chart_family", slug),
+      imageUrl: null,
+      contextText: compact([program.public_label, program.series_slug, program.market_slug]).join(" · "),
+      snapshot,
+      health: healthFrom([], []),
+      searchText: searchBlob([program]),
+    };
+  });
+
+  return [...familyRecords, ...programRecords]
+    .filter((record) => record.searchText.includes(clean))
+    .slice(0, 25);
+}
+
+async function searchByType(type: WakilishaRecordEntityType, query: string) {
+  if (type === "artist") return searchArtists(query);
+  if (type === "track") return searchTracks(query);
+  if (type === "release") return searchReleases(query);
+  if (type === "label") return searchLabels(query);
+  if (type === "genre") return searchGenres(query);
+  if (type === "article") return searchArticles(query);
+  if (type === "author") return searchAuthors(query);
+  if (type === "chart_family") return searchChartFamilies(query);
+  return [];
 }
 
 export function useWakilishaRecordSearch(entityType: "all" | WakilishaRecordEntityType, query: string) {
-  const [allRecords, setAllRecords] = useState<WakilishaRecordSearchResult[]>([]);
-  const [loading, setLoading] = useState(true);
+  const cleanQuery = query.trim();
+  const [records, setRecords] = useState<WakilishaRecordSearchResult[]>([]);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
     let alive = true;
 
-    async function loadRecords() {
-      setLoading(true);
+    if (cleanQuery.length < 2) {
+      setRecords([]);
+      setLoading(false);
       setError("");
-
-      try {
-        const [
-          artistsResult,
-          tracksResult,
-          releasesResult,
-          labelsResult,
-          genresResult,
-          aliasesResult,
-          trackArtistsResult,
-          releaseArtistsResult,
-          releaseTracksResult,
-          releaseTracklistsResult,
-          entityRelationshipsResult,
-          mediaResult,
-          trackProviderLinksResult,
-          chartEntriesResult,
-          chartProgramsResult,
-          articles,
-          authors,
-          chartPayload,
-        ] = await Promise.all([
-          fetchAllRows("registry_artists", "id, slug, display_name, normalized_name, sort_name, bio, artist_type, gender, origin_iso2, origin_confidence, public_image_url, image_source_provider, status, metadata, updated_at", "display_name"),
-          fetchAllRows("registry_tracks", "id, slug, title, normalized_title, isrc, release_id, duration_ms, explicit, track_number, disc_number, artwork_url, preview_url, status, metadata, updated_at", "title"),
-          fetchAllRows("registry_releases", "id, slug, title, normalized_title, release_type, upc, release_date, release_date_precision, label_id, artwork_url, status, metadata, description, updated_at", "title"),
-          fetchAllRows("registry_labels", "id, slug, name, normalized_name, description, country_code, status, metadata, updated_at", "name"),
-          fetchAllRows("registry_genres", "id, slug, name, parent_genre_id, description, status, metadata, updated_at", "name"),
-          fetchAllRows("registry_artist_aliases", "id, alias_slug, canonical_artist_id, alias_display_name, confidence, source, notes, provider_type, provider_id, provider_uri, status"),
-          fetchAllRows("registry_track_artists", "track_id, artist_id, artist_slug, artist_name_text, role, is_primary, is_featured, credit_order, display_credit, source, confidence, status, metadata"),
-          fetchAllRows("registry_release_artists", "release_id, artist_id, artist_slug, artist_name_text, role, is_primary, is_featured, credit_order, display_credit, source, confidence, status, metadata"),
-          fetchAllRows("registry_release_tracks", "release_id, track_id, disc_number, track_number, source, confidence, status, metadata"),
-          fetchAllRows("registry_release_tracklists", "release_slug, release_title, track_count, tracks"),
-          fetchAllRows("registry_entity_relationships", "source_entity_type, source_slug, target_entity_type, target_slug, relationship_type, relationship_role, relationship_status, confidence, metadata"),
-          fetchAllRows("registry_media_assets", "id, title, url, media_kind, file_kind, asset_purpose, source_entity, source_record_id, status, rights_status, credit_text, tags, metadata"),
-          fetchAllRows("registry_track_provider_links", "track_id, provider_key, provider_track_id, provider_release_id, provider_artist_ids, isrc, upc, preview_url, artwork_url, duration_ms, storefront, match_method, match_confidence, match_status, raw_payload"),
-          fetchAllRows("wk_chart_entries_v2", "id, edition_id, rank, previous_rank, movement, track_slug, track_title, artist_slug, artist_name, artwork_url, source_count, occurrence_count, source_urls_seen, release_date, canonical_track_id, canonical_release_id, canonical_artist_id, total_score, eligibility_status, source_payload, airplay_detections, airplay_station_count, airplay_weighted_score"),
-          fetchAllRows("wk_chart_programs_v2", "id, series_slug, market_slug, public_slug, public_label, short_label, source_family_slug, default_period_type, default_methodology_version, default_eligibility_rules_version, chart_size, airplay_enabled, airplay_station_scope, updated_at"),
-          fetchArticlesForAdminList(500),
-          fetchAllAuthors(),
-          getChartFamilies().catch(() => ({ data: { families: [], editions: [] } })),
-        ]);
-
-        const firstError = [
-          artistsResult.error,
-          tracksResult.error,
-          releasesResult.error,
-          labelsResult.error,
-          genresResult.error,
-          aliasesResult.error,
-          trackArtistsResult.error,
-          releaseArtistsResult.error,
-          releaseTracksResult.error,
-          releaseTracklistsResult.error,
-          entityRelationshipsResult.error,
-          mediaResult.error,
-          trackProviderLinksResult.error,
-          chartEntriesResult.error,
-          chartProgramsResult.error,
-        ].find(Boolean);
-
-        if (firstError) throw firstError;
-
-        const artists = (artistsResult.data ?? []) as AnyRow[];
-        const tracks = (tracksResult.data ?? []) as AnyRow[];
-        const releases = (releasesResult.data ?? []) as AnyRow[];
-        const labels = (labelsResult.data ?? []) as AnyRow[];
-        const genres = (genresResult.data ?? []) as AnyRow[];
-        const aliases = (aliasesResult.data ?? []) as AnyRow[];
-        const trackArtists = (trackArtistsResult.data ?? []) as AnyRow[];
-        const releaseArtists = (releaseArtistsResult.data ?? []) as AnyRow[];
-        const releaseTracks = (releaseTracksResult.data ?? []) as AnyRow[];
-        const releaseTracklists = (releaseTracklistsResult.data ?? []) as AnyRow[];
-        const entityRelationships = (entityRelationshipsResult.data ?? []) as AnyRow[];
-        const mediaAssets = (mediaResult.data ?? []) as AnyRow[];
-        const trackProviderLinks = (trackProviderLinksResult.data ?? []) as AnyRow[];
-        const chartEntries = (chartEntriesResult.data ?? []) as AnyRow[];
-        const chartPrograms = (chartProgramsResult.data ?? []) as AnyRow[];
-
-        const artistsById = mapBy(artists, "id");
-        const artistsBySlug = mapBy(artists, "slug");
-        const tracksById = mapBy(tracks, "id");
-        const releasesById = mapBy(releases, "id");
-        const labelsById = mapBy(labels, "id");
-
-        const aliasesByArtistId = groupBy(aliases.filter((row) => row.status === "active"), "canonical_artist_id");
-        const trackArtistsByTrackId = groupBy(trackArtists.filter((row) => row.status === "active"), "track_id");
-        const trackArtistsBySlug = groupBy(trackArtists.filter((row) => row.status === "active"), "artist_slug");
-        const releaseArtistsByReleaseId = groupBy(releaseArtists.filter((row) => row.status === "active"), "release_id");
-        const releaseArtistsBySlug = groupBy(releaseArtists.filter((row) => row.status === "active"), "artist_slug");
-        const releaseTracksByReleaseId = groupBy(releaseTracks.filter((row) => row.status === "active"), "release_id");
-        const providerLinksByTrackId = groupBy(trackProviderLinks, "track_id");
-        const chartEntriesByArtistSlug = groupBy(chartEntries, "artist_slug");
-        const chartEntriesByTrackSlug = groupBy(chartEntries, "track_slug");
-        const releaseTracklistBySlug = mapBy(releaseTracklists, "release_slug");
-
-        const labelReleaseCounts = new Map<string, number>();
-        releases.forEach((release) => {
-          const labelId = String(release.label_id || "");
-          const label = labelId ? labelsById.get(labelId) : null;
-          if (label?.slug) labelReleaseCounts.set(label.slug, (labelReleaseCounts.get(label.slug) ?? 0) + 1);
-
-          const metaLabel = String(release.metadata?.record_label || release.metadata?.label || "").trim().toLowerCase();
-          if (metaLabel) labelReleaseCounts.set(metaLabel, (labelReleaseCounts.get(metaLabel) ?? 0) + 1);
-        });
-
-        const artistRecords = artists.map((artist) => {
-          const meta = (artist.metadata ?? {}) as AnyRow;
-          const slug = String(artist.slug || "");
-          const artistTrackRows = trackArtistsBySlug.get(slug) ?? [];
-          const artistReleaseRows = releaseArtistsBySlug.get(slug) ?? [];
-          const linkedTracks = artistTrackRows
-            .map((row) => tracksById.get(String(row.track_id)))
-            .filter(Boolean)
-            .slice(0, 24)
-            .map((track) => ({
-              slug: track.slug,
-              title: track.title,
-              artworkUrl: track.artwork_url,
-              status: track.status,
-            }));
-
-          const linkedReleases = artistReleaseRows
-            .map((row) => releasesById.get(String(row.release_id)))
-            .filter(Boolean)
-            .slice(0, 24)
-            .map((release) => ({
-              slug: release.slug,
-              title: release.title,
-              releaseType: release.release_type,
-              releaseDate: release.release_date,
-              artworkUrl: release.artwork_url,
-              status: release.status,
-            }));
-
-          const artistAliases = aliasesByArtistId.get(String(artist.id)) ?? [];
-          const chartContext = chartEntriesByArtistSlug.get(slug) ?? [];
-          const socials = socialLinksFrom(meta);
-          const country = meta.country || artist.origin_iso2 || "";
-          const genres = Array.isArray(meta.genres) ? meta.genres : Array.isArray(meta.enriched_genres) ? meta.enriched_genres : [];
-
-          const missing = compact([
-            artist.public_image_url ? "" : "image",
-            artist.bio ? "" : "bio",
-            country ? "" : "country/origin",
-            genres.length ? "" : "genres",
-            socials.length ? "" : "social/provider links",
-          ]);
-
-          const snapshot = {
-            source: "registry_artists",
-            entityType: "artist",
-            id: artist.id,
-            slug,
-            name: artist.display_name,
-            normalizedName: artist.normalized_name,
-            sortName: artist.sort_name,
-            bio: artist.bio,
-            artistType: artist.artist_type,
-            gender: artist.gender,
-            originIso2: artist.origin_iso2,
-            originConfidence: artist.origin_confidence,
-            country,
-            genres,
-            publicImageUrl: artist.public_image_url,
-            imageSourceProvider: artist.image_source_provider,
-            status: artist.status,
-            metadata: meta,
-            metadataHighlights: metadataHighlights(meta),
-            href: hrefFor("artist", slug),
-            richContext: {
-              profile: {
-                bio: artist.bio,
-                artistType: artist.artist_type,
-                gender: artist.gender,
-                originIso2: artist.origin_iso2,
-                country,
-                genres,
-              },
-              trail: {
-                socialLinks: socials,
-                spotifyFollowers: meta.spotify_followers,
-                spotifyPopularity: meta.spotify_popularity,
-                spotifyArtistId: meta.spotify_artist_id || meta.spotify_id,
-                appleMusicId: meta.apple_music_id,
-                appleMusicAlbumIds: meta.apple_music_album_ids,
-              },
-              media: mediaSummary(mediaAssets, String(artist.id), slug),
-              aliases: artistAliases.map((alias) => ({
-                aliasSlug: alias.alias_slug,
-                displayName: alias.alias_display_name,
-                source: alias.source,
-                confidence: alias.confidence,
-                provider: alias.provider_type,
-                providerId: alias.provider_id,
-              })),
-              discography: {
-                linkedTrackCount: artistTrackRows.length,
-                linkedReleaseCount: artistReleaseRows.length,
-                linkedTracks,
-                linkedReleases,
-                topSongs: Array.isArray(meta.top_songs) ? meta.top_songs : [],
-                youtubeVideos: Array.isArray(meta.youtube_videos) ? meta.youtube_videos : [],
-              },
-              charts: {
-                chartEntryCount: chartContext.length,
-                entries: chartContext.slice(0, 12),
-              },
-              relationships: relationSummary(entityRelationships, slug),
-            },
-          };
-
-          return {
-            id: `artist:${slug}`,
-            entityType: "artist" as const,
-            slug,
-            label: artist.display_name || slug,
-            subtitle: compact([artist.status !== "active" ? artist.status : "", country, genres.slice(0, 2).join(", ")]).join(" · ") || "Artist",
-            href: hrefFor("artist", slug),
-            imageUrl: artist.public_image_url || meta.portrait_image || null,
-            contextText: artist.bio ? String(artist.bio).replace(/<[^>]*>/g, "") : compact([country, genres.slice(0, 3).join(", ")]).join(" · "),
-            snapshot,
-            health: healthFrom(missing, statusNote(artist.status)),
-            searchText: searchBlob([artist.display_name, artist.normalized_name, slug, artist.bio, artist.status, meta, socials, linkedTracks, linkedReleases, chartContext, artistAliases]),
-          };
-        });
-
-        const trackRecords = tracks.map((track) => {
-          const slug = String(track.slug || "");
-          const trackArtistRows = trackArtistsByTrackId.get(String(track.id)) ?? [];
-          const artistsForTrack = trackArtistRows
-            .sort((a, b) => Number(a.credit_order ?? 999) - Number(b.credit_order ?? 999))
-            .map((row) => ({
-              slug: row.artist_slug,
-              name: row.artist_name_text,
-              role: row.role,
-              isPrimary: row.is_primary,
-              isFeatured: row.is_featured,
-              displayCredit: row.display_credit,
-            }));
-          const release = track.release_id ? releasesById.get(String(track.release_id)) : null;
-          const providerLinks = providerLinksByTrackId.get(String(track.id)) ?? [];
-          const chartContext = chartEntriesByTrackSlug.get(slug) ?? [];
-          const primaryArtist = artistsForTrack.find((artist) => artist.isPrimary) ?? artistsForTrack[0] ?? null;
-
-          const missing = compact([
-            track.artwork_url ? "" : "artwork",
-            artistsForTrack.length ? "" : "artist credits",
-            release ? "" : "release",
-            track.preview_url || providerLinks.some((link) => link.preview_url) ? "" : "preview/provider audio",
-          ]);
-
-          const snapshot = {
-            source: "registry_tracks",
-            entityType: "track",
-            id: track.id,
-            slug,
-            title: track.title,
-            normalizedTitle: track.normalized_title,
-            isrc: track.isrc,
-            durationMs: track.duration_ms,
-            explicit: track.explicit,
-            trackNumber: track.track_number,
-            discNumber: track.disc_number,
-            artworkUrl: track.artwork_url,
-            previewUrl: track.preview_url,
-            status: track.status,
-            metadata: track.metadata ?? {},
-            href: hrefFor("track", slug),
-            richContext: {
-              artists: artistsForTrack,
-              release: release
-                ? {
-                    slug: release.slug,
-                    title: release.title,
-                    releaseType: release.release_type,
-                    releaseDate: release.release_date,
-                    artworkUrl: release.artwork_url,
-                    status: release.status,
-                  }
-                : null,
-              providerLinks: providerLinks.map((link) => ({
-                provider: link.provider_key,
-                providerTrackId: link.provider_track_id,
-                providerReleaseId: link.provider_release_id,
-                isrc: link.isrc,
-                upc: link.upc,
-                previewUrl: link.preview_url,
-                artworkUrl: link.artwork_url,
-                storefront: link.storefront,
-                matchStatus: link.match_status,
-                confidence: link.match_confidence,
-              })),
-              charts: {
-                chartEntryCount: chartContext.length,
-                entries: chartContext.slice(0, 12),
-              },
-              relationships: relationSummary(entityRelationships, slug),
-            },
-          };
-
-          return {
-            id: `track:${slug}`,
-            entityType: "track" as const,
-            slug,
-            label: track.title || slug,
-            subtitle: compact([track.status !== "active" ? track.status : "", primaryArtist?.name, release?.title]).join(" · ") || "Track",
-            href: hrefFor("track", slug),
-            imageUrl: track.artwork_url || providerLinks.find((link) => link.artwork_url)?.artwork_url || release?.artwork_url || null,
-            contextText: compact([primaryArtist?.name, release?.title, track.isrc]).join(" · "),
-            snapshot,
-            health: healthFrom(missing, statusNote(track.status)),
-            searchText: searchBlob([track.title, track.normalized_title, slug, track.isrc, track.metadata, artistsForTrack, release, providerLinks, chartContext]),
-          };
-        });
-
-        const releaseRecords = releases.map((release) => {
-          const slug = String(release.slug || "");
-          const releaseArtistRows = releaseArtistsByReleaseId.get(String(release.id)) ?? [];
-          const releaseTrackRows = releaseTracksByReleaseId.get(String(release.id)) ?? [];
-          const tracklistRow = releaseTracklistBySlug.get(slug);
-          const label = release.label_id ? labelsById.get(String(release.label_id)) : null;
-          const artistsForRelease = releaseArtistRows
-            .sort((a, b) => Number(a.credit_order ?? 999) - Number(b.credit_order ?? 999))
-            .map((row) => ({
-              slug: row.artist_slug,
-              name: row.artist_name_text,
-              role: row.role,
-              isPrimary: row.is_primary,
-              isFeatured: row.is_featured,
-              displayCredit: row.display_credit,
-            }));
-          const primaryArtist = artistsForRelease.find((artist) => artist.isPrimary) ?? artistsForRelease[0] ?? null;
-          const tracklistPreview = releaseTrackRows
-            .sort((a, b) => Number(a.track_number ?? 999) - Number(b.track_number ?? 999))
-            .slice(0, 24)
-            .map((row) => {
-              const track = tracksById.get(String(row.track_id));
-              return {
-                trackNumber: row.track_number,
-                discNumber: row.disc_number,
-                slug: track?.slug,
-                title: track?.title,
-                artworkUrl: track?.artwork_url,
-                status: track?.status,
-              };
-            });
-
-          const missing = compact([
-            release.artwork_url ? "" : "artwork",
-            artistsForRelease.length ? "" : "artist credits",
-            release.release_date ? "" : "release date",
-            releaseTrackRows.length || tracklistRow ? "" : "tracklist",
-            release.description ? "" : "description",
-            label ? "" : "label",
-          ]);
-
-          const snapshot = {
-            source: "registry_releases",
-            entityType: "release",
-            id: release.id,
-            slug,
-            title: release.title,
-            normalizedTitle: release.normalized_title,
-            releaseType: release.release_type,
-            upc: release.upc,
-            releaseDate: release.release_date,
-            releaseDatePrecision: release.release_date_precision,
-            artworkUrl: release.artwork_url,
-            description: release.description,
-            status: release.status,
-            metadata: release.metadata ?? {},
-            href: hrefFor("release", slug),
-            richContext: {
-              artists: artistsForRelease,
-              label: label
-                ? {
-                    slug: label.slug,
-                    name: label.name,
-                    countryCode: label.country_code,
-                    description: label.description,
-                  }
-                : null,
-              tracklist: {
-                source: tracklistRow ? "registry_release_tracklists" : "registry_release_tracks",
-                trackCount: Number(tracklistRow?.track_count ?? releaseTrackRows.length ?? 0),
-                tracks: Array.isArray(tracklistRow?.tracks) ? tracklistRow.tracks : tracklistPreview,
-              },
-              media: mediaSummary(mediaAssets, String(release.id), slug),
-              relationships: relationSummary(entityRelationships, slug),
-            },
-          };
-
-          return {
-            id: `release:${slug}`,
-            entityType: "release" as const,
-            slug,
-            label: release.title || slug,
-            subtitle: compact([
-              release.status !== "active" ? release.status : "",
-              primaryArtist?.name,
-              release.release_type,
-              release.release_date,
-              tracklistRow?.track_count ? `${tracklistRow.track_count} track(s)` : releaseTrackRows.length ? `${releaseTrackRows.length} track(s)` : "",
-            ]).join(" · ") || "Release",
-            href: hrefFor("release", slug),
-            imageUrl: release.artwork_url || null,
-            contextText: release.description || compact([primaryArtist?.name, release.release_type, release.release_date]).join(" · "),
-            snapshot,
-            health: healthFrom(missing, statusNote(release.status)),
-            searchText: searchBlob([release.title, release.normalized_title, slug, release.description, release.metadata, artistsForRelease, label, tracklistRow, tracklistPreview]),
-          };
-        });
-
-        const labelRecords = labels.map((label) => {
-          const slug = String(label.slug || "");
-          const labelNameKey = String(label.name || "").toLowerCase();
-          const releaseCount = labelReleaseCounts.get(slug) ?? labelReleaseCounts.get(labelNameKey) ?? 0;
-          const linkedReleases = releases
-            .filter((release) => String(release.label_id || "") === String(label.id) || String(release.metadata?.record_label || "").toLowerCase() === labelNameKey)
-            .slice(0, 24)
-            .map((release) => ({
-              slug: release.slug,
-              title: release.title,
-              releaseType: release.release_type,
-              releaseDate: release.release_date,
-              artworkUrl: release.artwork_url,
-              status: release.status,
-            }));
-
-          const missing = compact([
-            label.description ? "" : "description",
-            label.country_code ? "" : "country",
-            releaseCount ? "" : "linked releases",
-          ]);
-
-          const snapshot = {
-            source: "registry_labels",
-            entityType: "label",
-            id: label.id,
-            slug,
-            name: label.name,
-            normalizedName: label.normalized_name,
-            description: label.description,
-            countryCode: label.country_code,
-            status: label.status,
-            metadata: label.metadata ?? {},
-            href: hrefFor("label", slug),
-            richContext: {
-              releases: {
-                linkedReleaseCount: releaseCount,
-                linkedReleases,
-              },
-              media: mediaSummary(mediaAssets, String(label.id), slug),
-              relationships: relationSummary(entityRelationships, slug),
-            },
-          };
-
-          return {
-            id: `label:${slug}`,
-            entityType: "label" as const,
-            slug,
-            label: label.name || slug,
-            subtitle: compact([label.status !== "active" ? label.status : "", label.country_code, releaseCount ? `${releaseCount} release(s)` : ""]).join(" · ") || "Label",
-            href: hrefFor("label", slug),
-            imageUrl: null,
-            contextText: label.description || compact([label.country_code, `${releaseCount} release(s)`]).join(" · "),
-            snapshot,
-            health: healthFrom(missing, statusNote(label.status)),
-            searchText: searchBlob([label.name, label.normalized_name, slug, label.description, label.country_code, label.metadata, linkedReleases]),
-          };
-        });
-
-        const genreRecords = genres.map((genre) => {
-          const slug = String(genre.slug || "");
-          const relationships = relationSummary(entityRelationships, slug);
-          const representativeArtists = relationships
-            .filter((item) => item.sourceType === "artist" || item.targetType === "artist")
-            .map((item) => {
-              const artistSlug = item.sourceType === "artist" ? item.source : item.target;
-              return artistsBySlug.get(String(artistSlug))?.display_name || artistSlug;
-            })
-            .filter(Boolean)
-            .slice(0, 12);
-
-          const missing = compact([
-            genre.description ? "" : "description",
-            representativeArtists.length ? "" : "representative artists/relationships",
-          ]);
-
-          const snapshot = {
-            source: "registry_genres",
-            entityType: "genre",
-            id: genre.id,
-            slug,
-            name: genre.name,
-            description: genre.description,
-            parentGenreId: genre.parent_genre_id,
-            status: genre.status,
-            metadata: genre.metadata ?? {},
-            href: hrefFor("genre", slug),
-            richContext: {
-              representativeArtists,
-              relationships,
-            },
-          };
-
-          return {
-            id: `genre:${slug}`,
-            entityType: "genre" as const,
-            slug,
-            label: genre.name || slug,
-            subtitle: compact([genre.status !== "active" ? genre.status : "", representativeArtists.length ? `Includes ${representativeArtists.slice(0, 2).join(", ")}` : ""]).join(" · ") || "Genre",
-            href: hrefFor("genre", slug),
-            imageUrl: null,
-            contextText: genre.description || representativeArtists.join(", "),
-            snapshot,
-            health: healthFrom(missing, statusNote(genre.status)),
-            searchText: searchBlob([genre.name, slug, genre.description, genre.metadata, representativeArtists, relationships]),
-          };
-        });
-
-        const chartFamilyRecords = (chartPayload.data.families ?? []).map(chartFamilyRecord).filter(Boolean) as WakilishaRecordSearchResult[];
-
-        const chartProgramRecords = chartPrograms.map((program) => {
-          const slug = String(program.public_slug || program.id || "");
-          const entries = chartEntries.filter((entry) => String(entry.edition_id || "").startsWith(String(program.id || ""))).slice(0, 12);
-
-          const snapshot = {
-            source: "wk_chart_programs_v2",
-            entityType: "chart_family",
-            id: program.id,
-            slug,
-            label: program.public_label,
-            shortLabel: program.short_label,
-            seriesSlug: program.series_slug,
-            marketSlug: program.market_slug,
-            sourceFamilySlug: program.source_family_slug,
-            periodType: program.default_period_type,
-            methodologyVersion: program.default_methodology_version,
-            eligibilityRulesVersion: program.default_eligibility_rules_version,
-            chartSize: program.chart_size,
-            airplayEnabled: program.airplay_enabled,
-            airplayStationScope: program.airplay_station_scope,
-            href: hrefFor("chart_family", slug),
-            richContext: {
-              chartProgram: program,
-              entries,
-            },
-          };
-
-          return {
-            id: `chart_program:${slug}`,
-            entityType: "chart_family" as const,
-            slug,
-            label: program.public_label || slug,
-            subtitle: compact([program.market_slug, program.default_period_type, program.chart_size ? `${program.chart_size} entries` : ""]).join(" · ") || "Chart program",
-            href: hrefFor("chart_family", slug),
-            imageUrl: null,
-            contextText: compact([program.public_label, program.series_slug, program.market_slug]).join(" · "),
-            snapshot,
-            health: healthFrom([], []),
-            searchText: searchBlob([program, entries]),
-          };
-        });
-
-        const nextRecords = [
-          ...artistRecords,
-          ...trackRecords,
-          ...releaseRecords,
-          ...labelRecords,
-          ...genreRecords,
-          ...articles.map(articleRecord),
-          ...authors.map(authorRecord),
-          ...chartFamilyRecords,
-          ...chartProgramRecords,
-        ];
-
-        if (alive) setAllRecords(nextRecords);
-      } catch (loadError) {
-        if (!alive) return;
-        setAllRecords([]);
-        setError(loadError instanceof Error ? loadError.message : "Failed to load rich WAKILISHA records.");
-      } finally {
-        if (alive) setLoading(false);
-      }
+      return () => {
+        alive = false;
+      };
     }
 
-    void loadRecords();
+    const timeout = window.setTimeout(() => {
+      async function runSearch() {
+        setLoading(true);
+        setError("");
+
+        try {
+          const typesToSearch = entityType === "all" ? searchableTypes : [entityType];
+          const chunks = await Promise.all(typesToSearch.map((type) => searchByType(type, cleanQuery)));
+
+          if (!alive) return;
+
+          const nextRecords = chunks
+            .flat()
+            .filter((record, index, all) => all.findIndex((candidate) => candidate.id === record.id) === index)
+            .sort((a, b) => {
+              const aExact = a.label.toLowerCase() === cleanQuery.toLowerCase() || a.slug.toLowerCase() === cleanQuery.toLowerCase();
+              const bExact = b.label.toLowerCase() === cleanQuery.toLowerCase() || b.slug.toLowerCase() === cleanQuery.toLowerCase();
+
+              if (aExact && !bExact) return -1;
+              if (!aExact && bExact) return 1;
+              return a.label.localeCompare(b.label);
+            })
+            .slice(0, 80);
+
+          setRecords(nextRecords);
+        } catch (searchError) {
+          if (!alive) return;
+          setRecords([]);
+          setError(searchError instanceof Error ? searchError.message : "Failed to search WAKILISHA records.");
+        } finally {
+          if (alive) setLoading(false);
+        }
+      }
+
+      void runSearch();
+    }, 250);
 
     return () => {
       alive = false;
+      window.clearTimeout(timeout);
     };
-  }, []);
-
-  const records = useMemo(() => {
-    return allRecords
-      .filter((record) => entityType === "all" || record.entityType === entityType)
-      .filter((record) => resultMatches(record, query))
-      .slice(0, 80);
-  }, [allRecords, entityType, query]);
+  }, [cleanQuery, entityType]);
 
   return {
     records,
     loading,
     error,
-    totalRecords: allRecords.length,
+    totalRecords: records.length,
   };
 }
 
+async function loadEntityRelationships(slugs: string[]) {
+  if (!slugs.length) return [];
+
+  const source = await supabase
+    .from("registry_entity_relationships")
+    .select("source_entity_type, source_slug, target_entity_type, target_slug, relationship_type, relationship_role, relationship_status, confidence, metadata")
+    .in("source_slug", slugs)
+    .eq("relationship_status", "active");
+
+  const target = await supabase
+    .from("registry_entity_relationships")
+    .select("source_entity_type, source_slug, target_entity_type, target_slug, relationship_type, relationship_role, relationship_status, confidence, metadata")
+    .in("target_slug", slugs)
+    .eq("relationship_status", "active");
+
+  if (source.error) throw source.error;
+  if (target.error) throw target.error;
+
+  return [...(source.data ?? []), ...(target.data ?? [])];
+}
+
 export async function fetchWakilishaRecordDetail(record: WakilishaRecordSearchResult): Promise<WakilishaRecordDetail> {
-  if (record.entityType !== "release") return {};
+  if (record.entityType === "artist") {
+    const { data: artist, error } = await supabase
+      .from("registry_artists")
+      .select("id, slug, display_name, normalized_name, sort_name, bio, artist_type, gender, origin_iso2, origin_confidence, public_image_url, image_source_provider, status, metadata, updated_at")
+      .eq("slug", record.slug)
+      .maybeSingle();
 
-  const { data: tracklistRow } = await supabase
-    .from("registry_release_tracklists")
-    .select("release_slug, release_title, track_count, tracks")
-    .eq("release_slug", record.slug)
-    .maybeSingle();
+    if (error || !artist) return {};
 
-  if (tracklistRow?.tracks && Array.isArray(tracklistRow.tracks)) {
+    const artistId = String(artist.id);
+    const slug = String(artist.slug);
+
+    const [aliasesResult, trackArtistsResult, releaseArtistsResult, chartEntriesResult, relationships, mediaResult] = await Promise.all([
+      supabase.from("registry_artist_aliases").select("alias_slug, alias_display_name, confidence, source, notes, provider_type, provider_id, provider_uri, status").eq("canonical_artist_id", artistId).eq("status", "active"),
+      supabase.from("registry_track_artists").select("track_id, artist_slug, artist_name_text, role, is_primary, is_featured, credit_order, display_credit, status").eq("artist_slug", slug).eq("status", "active"),
+      supabase.from("registry_release_artists").select("release_id, artist_slug, artist_name_text, role, is_primary, is_featured, credit_order, display_credit, status").eq("artist_slug", slug).eq("status", "active"),
+      supabase.from("wk_chart_entries_v2").select("id, edition_id, rank, movement, track_slug, track_title, artist_slug, artist_name, artwork_url, total_score, eligibility_status, source_count, occurrence_count, source_urls_seen").eq("artist_slug", slug),
+      loadEntityRelationships([slug]),
+      supabase.from("registry_media_assets").select("title, url, media_kind, file_kind, asset_purpose, source_entity, source_record_id, status, rights_status, credit_text, tags, metadata").or(`source_entity.eq.${slug},source_record_id.eq.${artistId}`).eq("status", "active"),
+    ]);
+
+    if (aliasesResult.error) throw aliasesResult.error;
+    if (trackArtistsResult.error) throw trackArtistsResult.error;
+    if (releaseArtistsResult.error) throw releaseArtistsResult.error;
+    if (chartEntriesResult.error) throw chartEntriesResult.error;
+    if (mediaResult.error) throw mediaResult.error;
+
+    const trackIds = (trackArtistsResult.data ?? []).map((row) => String(row.track_id)).filter(Boolean);
+    const releaseIds = (releaseArtistsResult.data ?? []).map((row) => String(row.release_id)).filter(Boolean);
+
+    const [tracksResult, releasesResult] = await Promise.all([
+      trackIds.length
+        ? supabase.from("registry_tracks").select("id, slug, title, artwork_url, preview_url, status, metadata").in("id", trackIds).limit(40)
+        : Promise.resolve({ data: [], error: null }),
+      releaseIds.length
+        ? supabase.from("registry_releases").select("id, slug, title, release_type, release_date, artwork_url, status, metadata").in("id", releaseIds).limit(40)
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+
+    if (tracksResult.error) throw tracksResult.error;
+    if (releasesResult.error) throw releasesResult.error;
+
+    const meta = (artist.metadata ?? {}) as AnyRow;
+    const country = meta.country || artist.origin_iso2 || "";
+    const genres = Array.isArray(meta.genres) ? meta.genres : Array.isArray(meta.enriched_genres) ? meta.enriched_genres : [];
+
+    const richContext = {
+      profile: {
+        bio: artist.bio,
+        artistType: artist.artist_type,
+        gender: artist.gender,
+        originIso2: artist.origin_iso2,
+        country,
+        genres,
+      },
+      trail: {
+        socialLinks: socialLinksFrom(meta),
+        spotifyFollowers: meta.spotify_followers,
+        spotifyPopularity: meta.spotify_popularity,
+        spotifyArtistId: meta.spotify_artist_id || meta.spotify_id,
+        appleMusicId: meta.apple_music_id,
+        appleMusicAlbumIds: meta.apple_music_album_ids,
+      },
+      aliases: aliasesResult.data ?? [],
+      discography: {
+        linkedTrackCount: trackIds.length,
+        linkedReleaseCount: releaseIds.length,
+        linkedTracks: (tracksResult.data ?? []).map((track) => ({
+          slug: track.slug,
+          title: track.title,
+          artworkUrl: track.artwork_url,
+          status: track.status,
+        })),
+        linkedReleases: (releasesResult.data ?? []).map((release) => ({
+          slug: release.slug,
+          title: release.title,
+          releaseType: release.release_type,
+          releaseDate: release.release_date,
+          artworkUrl: release.artwork_url,
+          status: release.status,
+        })),
+        topSongs: Array.isArray(meta.top_songs) ? meta.top_songs : [],
+        youtubeVideos: Array.isArray(meta.youtube_videos) ? meta.youtube_videos : [],
+      },
+      charts: {
+        chartEntryCount: chartEntriesResult.data?.length ?? 0,
+        entries: chartEntriesResult.data ?? [],
+      },
+      relationships: relationSummary(relationships as AnyRow[], slug),
+      media: mediaSummary((mediaResult.data ?? []) as AnyRow[], artistId, slug),
+    };
+
     return {
-      tracklist: tracklistRow.tracks.map((track: AnyRow, index: number) => ({
+      richContext,
+      snapshotPatch: {
+        ...artist,
+        country,
+        genres,
+        metadataHighlights: metadataHighlights(meta),
+        richContext,
+      },
+    };
+  }
+
+  if (record.entityType === "track") {
+    const { data: track, error } = await supabase
+      .from("registry_tracks")
+      .select("id, slug, title, normalized_title, isrc, release_id, duration_ms, explicit, track_number, disc_number, artwork_url, preview_url, status, metadata, updated_at")
+      .eq("slug", record.slug)
+      .maybeSingle();
+
+    if (error || !track) return {};
+
+    const trackId = String(track.id);
+    const slug = String(track.slug);
+    const releaseId = String(track.release_id || "");
+
+    const [artistsResult, releaseResult, providerResult, chartResult, relationships] = await Promise.all([
+      supabase.from("registry_track_artists").select("artist_slug, artist_name_text, role, is_primary, is_featured, credit_order, display_credit, source, confidence, status, metadata").eq("track_id", trackId).eq("status", "active"),
+      releaseId
+        ? supabase.from("registry_releases").select("id, slug, title, release_type, release_date, artwork_url, status, metadata").eq("id", releaseId).maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+      supabase.from("registry_track_provider_links").select("provider_key, provider_track_id, provider_release_id, provider_artist_ids, isrc, upc, preview_url, artwork_url, duration_ms, storefront, match_method, match_confidence, match_status, raw_payload").eq("track_id", trackId),
+      supabase.from("wk_chart_entries_v2").select("id, edition_id, rank, previous_rank, movement, track_slug, track_title, artist_slug, artist_name, artwork_url, source_count, occurrence_count, source_urls_seen, release_date, canonical_track_id, total_score, eligibility_status, source_payload, airplay_detections, airplay_station_count, airplay_weighted_score").eq("track_slug", slug),
+      loadEntityRelationships([slug]),
+    ]);
+
+    if (artistsResult.error) throw artistsResult.error;
+    if (releaseResult.error) throw releaseResult.error;
+    if (providerResult.error) throw providerResult.error;
+    if (chartResult.error) throw chartResult.error;
+
+    const richContext = {
+      artists: artistsResult.data ?? [],
+      release: releaseResult.data ?? null,
+      providerLinks: providerResult.data ?? [],
+      charts: {
+        chartEntryCount: chartResult.data?.length ?? 0,
+        entries: chartResult.data ?? [],
+      },
+      relationships: relationSummary(relationships as AnyRow[], slug),
+    };
+
+    return {
+      richContext,
+      snapshotPatch: {
+        ...track,
+        richContext,
+      },
+    };
+  }
+
+  if (record.entityType === "release") {
+    const { data: releaseRow, error: releaseError } = await supabase
+      .from("registry_releases")
+      .select("id, slug, title, normalized_title, release_type, upc, release_date, release_date_precision, label_id, artwork_url, status, metadata, description, updated_at")
+      .eq("slug", record.slug)
+      .maybeSingle();
+
+    if (releaseError || !releaseRow?.id) return {};
+
+    const releaseId = String(releaseRow.id);
+    const labelId = String(releaseRow.label_id || "");
+
+    const [artistsResult, labelResult, tracklistResult, releaseTracksResult, relationships, mediaResult] = await Promise.all([
+      supabase.from("registry_release_artists").select("artist_slug, artist_name_text, role, is_primary, is_featured, credit_order, display_credit, source, confidence, status, metadata").eq("release_id", releaseId).eq("status", "active"),
+      labelId
+        ? supabase.from("registry_labels").select("id, slug, name, country_code, description, status, metadata").eq("id", labelId).maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+      supabase.from("registry_release_tracklists").select("release_slug, release_title, track_count, tracks").eq("release_slug", record.slug).maybeSingle(),
+      supabase.from("registry_release_tracks").select("track_id, disc_number, track_number, source, confidence, status, metadata").eq("release_id", releaseId).eq("status", "active").order("track_number", { ascending: true }),
+      loadEntityRelationships([record.slug]),
+      supabase.from("registry_media_assets").select("title, url, media_kind, file_kind, asset_purpose, source_entity, source_record_id, status, rights_status, credit_text, tags, metadata").or(`source_entity.eq.${record.slug},source_record_id.eq.${releaseId}`).eq("status", "active"),
+    ]);
+
+    if (artistsResult.error) throw artistsResult.error;
+    if (labelResult.error) throw labelResult.error;
+    if (tracklistResult.error) throw tracklistResult.error;
+    if (releaseTracksResult.error) throw releaseTracksResult.error;
+    if (mediaResult.error) throw mediaResult.error;
+
+    if (tracklistResult.data?.tracks && Array.isArray(tracklistResult.data.tracks)) {
+      const tracklist = tracklistResult.data.tracks.map((track: AnyRow, index: number) => ({
         trackNumber: Number(track.trackNumber ?? track.track_number ?? index + 1),
         slug: String(track.slug ?? track.trackSlug ?? ""),
         title: String(track.title ?? track.trackTitle ?? "Untitled track"),
         artists: Array.isArray(track.artists) ? track.artists.map(String) : compact([track.artist, track.artistName]),
         artworkUrl: track.artworkUrl ?? track.artwork_url ?? null,
         previewUrl: track.previewUrl ?? track.preview_url ?? null,
-      })),
-    };
-  }
+      }));
 
-  const { data: releaseRow, error: releaseError } = await supabase
-    .from("registry_releases")
-    .select("id, slug, title")
-    .eq("slug", record.slug)
-    .maybeSingle();
+      const richContext = {
+        artists: artistsResult.data ?? [],
+        label: labelResult.data ?? null,
+        tracklist: {
+          source: "registry_release_tracklists",
+          trackCount: tracklist.length,
+          tracks: tracklist,
+        },
+        relationships: relationSummary(relationships as AnyRow[], record.slug),
+        media: mediaSummary((mediaResult.data ?? []) as AnyRow[], releaseId, record.slug),
+      };
 
-  if (releaseError || !releaseRow?.id) return {};
+      return {
+        tracklist,
+        richContext,
+        snapshotPatch: {
+          ...releaseRow,
+          richContext,
+        },
+      };
+    }
 
-  const releaseId = String(releaseRow.id);
+    const releaseTracks = releaseTracksResult.data ?? [];
+    const trackIds = releaseTracks.map((row) => String(row.track_id)).filter(Boolean);
 
-  const { data: releaseTracks, error: releaseTracksError } = await supabase
-    .from("registry_release_tracks")
-    .select("track_id, track_number")
-    .eq("release_id", releaseId)
-    .eq("status", "active")
-    .order("track_number", { ascending: true });
+    const [{ data: trackRows }, { data: artistRows }] = await Promise.all([
+      trackIds.length
+        ? supabase.from("registry_tracks").select("id, slug, title, artwork_url, preview_url").in("id", trackIds)
+        : Promise.resolve({ data: [] }),
+      trackIds.length
+        ? supabase.from("registry_track_artists").select("track_id, artist_name_text, artist_slug, is_primary, is_featured, credit_order").in("track_id", trackIds).eq("status", "active")
+        : Promise.resolve({ data: [] }),
+    ]);
 
-  if (releaseTracksError || !releaseTracks?.length) return {};
+    const trackById = new Map<string, AnyRow>();
+    (trackRows ?? []).forEach((track) => trackById.set(String(track.id), track));
 
-  const trackIds = releaseTracks.map((row) => String(row.track_id)).filter(Boolean);
-  if (!trackIds.length) return {};
+    const artistsByTrack = new Map<string, string[]>();
+    (artistRows ?? []).forEach((artist) => {
+      const trackId = String(artist.track_id);
+      const name = String(artist.artist_name_text || "").trim();
+      if (!name) return;
+      artistsByTrack.set(trackId, [...(artistsByTrack.get(trackId) ?? []), name]);
+    });
 
-  const [{ data: trackRows }, { data: artistRows }] = await Promise.all([
-    supabase.from("registry_tracks").select("id, slug, title, artwork_url, preview_url").in("id", trackIds),
-    supabase.from("registry_track_artists").select("track_id, artist_name_text, artist_slug, is_primary, is_featured, credit_order").in("track_id", trackIds).eq("status", "active"),
-  ]);
-
-  const trackById = new Map<string, AnyRow>();
-  (trackRows ?? []).forEach((track) => trackById.set(String(track.id), track));
-
-  const artistsByTrack = new Map<string, string[]>();
-  (artistRows ?? []).forEach((artist) => {
-    const trackId = String(artist.track_id);
-    const name = String(artist.artist_name_text || "").trim();
-    if (!name) return;
-    artistsByTrack.set(trackId, [...(artistsByTrack.get(trackId) ?? []), name]);
-  });
-
-  return {
-    tracklist: releaseTracks
+    const tracklist = releaseTracks
       .map((row) => {
         const trackId = String(row.track_id);
         const track = trackById.get(trackId);
@@ -1114,6 +1249,87 @@ export async function fetchWakilishaRecordDetail(record: WakilishaRecordSearchRe
           previewUrl: track.preview_url ?? null,
         };
       })
-      .filter(Boolean) as WakilishaRecordDetail["tracklist"],
-  };
+      .filter(Boolean) as WakilishaRecordDetail["tracklist"];
+
+    const richContext = {
+      artists: artistsResult.data ?? [],
+      label: labelResult.data ?? null,
+      tracklist: {
+        source: "registry_release_tracks",
+        trackCount: tracklist?.length ?? 0,
+        tracks: tracklist ?? [],
+      },
+      relationships: relationSummary(relationships as AnyRow[], record.slug),
+      media: mediaSummary((mediaResult.data ?? []) as AnyRow[], releaseId, record.slug),
+    };
+
+    return {
+      tracklist,
+      richContext,
+      snapshotPatch: {
+        ...releaseRow,
+        richContext,
+      },
+    };
+  }
+
+  if (record.entityType === "label") {
+    const { data: label, error } = await supabase
+      .from("registry_labels")
+      .select("id, slug, name, normalized_name, description, country_code, status, metadata, updated_at")
+      .eq("slug", record.slug)
+      .maybeSingle();
+
+    if (error || !label) return {};
+
+    const { data: releases } = await supabase
+      .from("registry_releases")
+      .select("slug, title, release_type, release_date, artwork_url, status, metadata")
+      .eq("label_id", label.id)
+      .limit(40);
+
+    const relationships = await loadEntityRelationships([record.slug]);
+
+    const richContext = {
+      releases: {
+        linkedReleaseCount: releases?.length ?? 0,
+        linkedReleases: releases ?? [],
+      },
+      relationships: relationSummary(relationships as AnyRow[], record.slug),
+    };
+
+    return {
+      richContext,
+      snapshotPatch: {
+        ...label,
+        richContext,
+      },
+    };
+  }
+
+  if (record.entityType === "genre") {
+    const { data: genre, error } = await supabase
+      .from("registry_genres")
+      .select("id, slug, name, parent_genre_id, description, status, metadata, updated_at")
+      .eq("slug", record.slug)
+      .maybeSingle();
+
+    if (error || !genre) return {};
+
+    const relationships = await loadEntityRelationships([record.slug]);
+
+    const richContext = {
+      relationships: relationSummary(relationships as AnyRow[], record.slug),
+    };
+
+    return {
+      richContext,
+      snapshotPatch: {
+        ...genre,
+        richContext,
+      },
+    };
+  }
+
+  return {};
 }

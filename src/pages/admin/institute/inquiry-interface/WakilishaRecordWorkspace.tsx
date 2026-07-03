@@ -75,6 +75,13 @@ function firstUrl(value: string) {
 function selectedSnapshot(record: WakilishaRecordSearchResult, detail: WakilishaRecordDetail | null) {
   return {
     ...record.snapshot,
+    ...(detail?.snapshotPatch ?? {}),
+    richContext: {
+      ...((record.snapshot.richContext && typeof record.snapshot.richContext === "object"
+        ? record.snapshot.richContext
+        : {}) as Record<string, unknown>),
+      ...(detail?.richContext ?? {}),
+    },
     detail: detail ?? {},
     capturedAt: new Date().toISOString(),
     capturedBy: "institute_wakilisha_record_workspace",
@@ -90,10 +97,21 @@ function RecordPreview({
   detail: WakilishaRecordDetail | null;
   detailLoading: boolean;
 }) {
-  const richContext =
+  const detailSnapshot = detail?.snapshotPatch ?? {};
+  const detailRichContext =
+    detail?.richContext && typeof detail.richContext === "object"
+      ? detail.richContext
+      : {};
+
+  const baseRichContext =
     record.snapshot.richContext && typeof record.snapshot.richContext === "object"
       ? (record.snapshot.richContext as Record<string, unknown>)
       : {};
+
+  const richContext = {
+    ...baseRichContext,
+    ...detailRichContext,
+  };
 
   const richSections = Object.entries(richContext).filter(([, value]) => {
     if (value === null || value === undefined) return false;
@@ -102,7 +120,7 @@ function RecordPreview({
     return String(value).trim().length > 0;
   });
 
-  const snapshotEntries = Object.entries(record.snapshot)
+  const snapshotEntries = Object.entries({ ...record.snapshot, ...detailSnapshot })
     .filter(([key, value]) => key !== "richContext" && value !== null && value !== undefined && String(value).trim() !== "")
     .slice(0, 24);
 
@@ -268,7 +286,7 @@ function RecordPreview({
 export function WakilishaRecordWorkspace({ draft, addEvidence, onSaved }: Props) {
   const [entityType, setEntityType] = useState<"all" | WakilishaRecordEntityType>("all");
   const [query, setQuery] = useState("");
-  const { records, loading, error, totalRecords } = useWakilishaRecordSearch(entityType, query);
+  const { records, loading, error } = useWakilishaRecordSearch(entityType, query);
 
   const [selectedRecord, setSelectedRecord] = useState<WakilishaRecordSearchResult | null>(null);
   const [detail, setDetail] = useState<WakilishaRecordDetail | null>(null);
@@ -476,7 +494,7 @@ export function WakilishaRecordWorkspace({ draft, addEvidence, onSaved }: Props)
           </div>
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <Pill>{totalRecords} real record(s) loaded</Pill>
+            {cleanQuery.length < 2 ? <Pill>Type 2+ characters to search</Pill> : <Pill>{records.length} match(es)</Pill>}
             {loading ? <Pill>Loading</Pill> : null}
             {error ? <Pill tone="warning">Some sources failed</Pill> : null}
           </div>
