@@ -912,6 +912,7 @@ export function useWakilishaRecordSearch(entityType: "all" | WakilishaRecordEnti
   const [records, setRecords] = useState<WakilishaRecordSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [searchedQuery, setSearchedQuery] = useState("");
 
   useEffect(() => {
     let alive = true;
@@ -920,6 +921,7 @@ export function useWakilishaRecordSearch(entityType: "all" | WakilishaRecordEnti
       setRecords([]);
       setLoading(false);
       setError("");
+      setSearchedQuery("");
       return () => {
         alive = false;
       };
@@ -950,9 +952,11 @@ export function useWakilishaRecordSearch(entityType: "all" | WakilishaRecordEnti
             .slice(0, 80);
 
           setRecords(nextRecords);
+          setSearchedQuery(cleanQuery);
         } catch (searchError) {
           if (!alive) return;
           setRecords([]);
+          setSearchedQuery(cleanQuery);
           setError(searchError instanceof Error ? searchError.message : "Failed to search WAKILISHA records.");
         } finally {
           if (alive) setLoading(false);
@@ -972,6 +976,7 @@ export function useWakilishaRecordSearch(entityType: "all" | WakilishaRecordEnti
     records,
     loading,
     error,
+    searchedQuery,
     totalRecords: records.length,
   };
 }

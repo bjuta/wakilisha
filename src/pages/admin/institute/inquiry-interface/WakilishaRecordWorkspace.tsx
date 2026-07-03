@@ -286,7 +286,7 @@ function RecordPreview({
 export function WakilishaRecordWorkspace({ draft, addEvidence, onSaved }: Props) {
   const [entityType, setEntityType] = useState<"all" | WakilishaRecordEntityType>("all");
   const [query, setQuery] = useState("");
-  const { records, loading, error } = useWakilishaRecordSearch(entityType, query);
+  const { records, loading, error, searchedQuery } = useWakilishaRecordSearch(entityType, query);
 
   const [selectedRecord, setSelectedRecord] = useState<WakilishaRecordSearchResult | null>(null);
   const [detail, setDetail] = useState<WakilishaRecordDetail | null>(null);
@@ -347,7 +347,8 @@ export function WakilishaRecordWorkspace({ draft, addEvidence, onSaved }: Props)
   );
 
   const cleanQuery = query.trim();
-  const canSuggestMissingRecord = !loading && cleanQuery.length >= 2 && records.length === 0;
+  const searchHasSettled = searchedQuery === cleanQuery;
+  const canSuggestMissingRecord = !loading && !error && searchHasSettled && cleanQuery.length >= 2 && records.length === 0;
 
   useEffect(() => {
     if (entityType !== "all") setSuggestedType(entityType);
@@ -355,9 +356,8 @@ export function WakilishaRecordWorkspace({ draft, addEvidence, onSaved }: Props)
 
   useEffect(() => {
     if (!canSuggestMissingRecord) return;
-    if (suggestedTitle.trim()) return;
     setSuggestedTitle(cleanQuery);
-  }, [canSuggestMissingRecord, cleanQuery, suggestedTitle]);
+  }, [canSuggestMissingRecord, cleanQuery]);
 
   const selectedRecordEvidenceTitle = selectedRecord
     ? `${selectedRecord.label} · WAKILISHA record evidence`
@@ -553,7 +553,7 @@ export function WakilishaRecordWorkspace({ draft, addEvidence, onSaved }: Props)
               );
             })}
 
-            {!loading && cleanQuery.length >= 2 && !records.length ? (
+            {!loading && !error && searchHasSettled && cleanQuery.length >= 2 && !records.length ? (
               <div className="rounded-xl border border-dashed border-wk-warning/40 bg-wk-warning-soft p-4">
                 <div className="text-[13px] font-black text-wk-text">No matching WAKILISHA record found</div>
                 <p className="mt-1 text-[12px] leading-5 text-wk-text-muted">
