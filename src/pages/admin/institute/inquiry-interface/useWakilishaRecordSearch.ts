@@ -49,6 +49,38 @@ export type WakilishaRecordDetail = {
 
 type AnyRow = Record<string, any>;
 
+async function fetchAllRows(
+  tableName: string,
+  selectClause: string,
+  orderColumn?: string,
+  pageSize = 1000,
+): Promise<{ data: AnyRow[]; error: null }> {
+  const rows: AnyRow[] = [];
+  let from = 0;
+
+  while (true) {
+    const client = supabase as any;
+    let request = client.from(tableName).select(selectClause);
+
+    if (orderColumn) {
+      request = request.order(orderColumn);
+    }
+
+    const { data, error } = await request.range(from, from + pageSize - 1);
+
+    if (error) throw error;
+
+    const page = (data ?? []) as AnyRow[];
+    rows.push(...page);
+
+    if (page.length < pageSize) break;
+
+    from += pageSize;
+  }
+
+  return { data: rows, error: null };
+}
+
 export const wakilishaRecordEntityOptions: Array<{
   key: "all" | WakilishaRecordEntityType;
   label: string;
@@ -419,21 +451,21 @@ export function useWakilishaRecordSearch(entityType: "all" | WakilishaRecordEnti
           authors,
           chartPayload,
         ] = await Promise.all([
-          supabase.from("registry_artists").select("id, slug, display_name, normalized_name, sort_name, bio, artist_type, gender, origin_iso2, origin_confidence, public_image_url, image_source_provider, status, metadata, updated_at").order("display_name"),
-          supabase.from("registry_tracks").select("id, slug, title, normalized_title, isrc, release_id, duration_ms, explicit, track_number, disc_number, artwork_url, preview_url, status, metadata, updated_at").order("title"),
-          supabase.from("registry_releases").select("id, slug, title, normalized_title, release_type, upc, release_date, release_date_precision, label_id, artwork_url, status, metadata, description, updated_at").order("title"),
-          supabase.from("registry_labels").select("id, slug, name, normalized_name, description, country_code, status, metadata, updated_at").order("name"),
-          supabase.from("registry_genres").select("id, slug, name, parent_genre_id, description, status, metadata, updated_at").order("name"),
-          supabase.from("registry_artist_aliases").select("id, alias_slug, canonical_artist_id, alias_display_name, confidence, source, notes, provider_type, provider_id, provider_uri, status"),
-          supabase.from("registry_track_artists").select("track_id, artist_id, artist_slug, artist_name_text, role, is_primary, is_featured, credit_order, display_credit, source, confidence, status, metadata"),
-          supabase.from("registry_release_artists").select("release_id, artist_id, artist_slug, artist_name_text, role, is_primary, is_featured, credit_order, display_credit, source, confidence, status, metadata"),
-          supabase.from("registry_release_tracks").select("release_id, track_id, disc_number, track_number, source, confidence, status, metadata"),
-          supabase.from("registry_release_tracklists").select("release_slug, release_title, track_count, tracks"),
-          supabase.from("registry_entity_relationships").select("source_entity_type, source_slug, target_entity_type, target_slug, relationship_type, relationship_role, relationship_status, confidence, metadata"),
-          supabase.from("registry_media_assets").select("id, title, url, media_kind, file_kind, asset_purpose, source_entity, source_record_id, status, rights_status, credit_text, tags, metadata"),
-          supabase.from("registry_track_provider_links").select("track_id, provider_key, provider_track_id, provider_release_id, provider_artist_ids, isrc, upc, preview_url, artwork_url, duration_ms, storefront, match_method, match_confidence, match_status, raw_payload"),
-          supabase.from("wk_chart_entries_v2").select("id, edition_id, rank, previous_rank, movement, track_slug, track_title, artist_slug, artist_name, artwork_url, source_count, occurrence_count, source_urls_seen, release_date, canonical_track_id, canonical_release_id, canonical_artist_id, total_score, eligibility_status, source_payload, airplay_detections, airplay_station_count, airplay_weighted_score"),
-          supabase.from("wk_chart_programs_v2").select("id, series_slug, market_slug, public_slug, public_label, short_label, source_family_slug, default_period_type, default_methodology_version, default_eligibility_rules_version, chart_size, airplay_enabled, airplay_station_scope, updated_at"),
+          fetchAllRows("registry_artists", "id, slug, display_name, normalized_name, sort_name, bio, artist_type, gender, origin_iso2, origin_confidence, public_image_url, image_source_provider, status, metadata, updated_at", "display_name"),
+          fetchAllRows("registry_tracks", "id, slug, title, normalized_title, isrc, release_id, duration_ms, explicit, track_number, disc_number, artwork_url, preview_url, status, metadata, updated_at", "title"),
+          fetchAllRows("registry_releases", "id, slug, title, normalized_title, release_type, upc, release_date, release_date_precision, label_id, artwork_url, status, metadata, description, updated_at", "title"),
+          fetchAllRows("registry_labels", "id, slug, name, normalized_name, description, country_code, status, metadata, updated_at", "name"),
+          fetchAllRows("registry_genres", "id, slug, name, parent_genre_id, description, status, metadata, updated_at", "name"),
+          fetchAllRows("registry_artist_aliases", "id, alias_slug, canonical_artist_id, alias_display_name, confidence, source, notes, provider_type, provider_id, provider_uri, status"),
+          fetchAllRows("registry_track_artists", "track_id, artist_id, artist_slug, artist_name_text, role, is_primary, is_featured, credit_order, display_credit, source, confidence, status, metadata"),
+          fetchAllRows("registry_release_artists", "release_id, artist_id, artist_slug, artist_name_text, role, is_primary, is_featured, credit_order, display_credit, source, confidence, status, metadata"),
+          fetchAllRows("registry_release_tracks", "release_id, track_id, disc_number, track_number, source, confidence, status, metadata"),
+          fetchAllRows("registry_release_tracklists", "release_slug, release_title, track_count, tracks"),
+          fetchAllRows("registry_entity_relationships", "source_entity_type, source_slug, target_entity_type, target_slug, relationship_type, relationship_role, relationship_status, confidence, metadata"),
+          fetchAllRows("registry_media_assets", "id, title, url, media_kind, file_kind, asset_purpose, source_entity, source_record_id, status, rights_status, credit_text, tags, metadata"),
+          fetchAllRows("registry_track_provider_links", "track_id, provider_key, provider_track_id, provider_release_id, provider_artist_ids, isrc, upc, preview_url, artwork_url, duration_ms, storefront, match_method, match_confidence, match_status, raw_payload"),
+          fetchAllRows("wk_chart_entries_v2", "id, edition_id, rank, previous_rank, movement, track_slug, track_title, artist_slug, artist_name, artwork_url, source_count, occurrence_count, source_urls_seen, release_date, canonical_track_id, canonical_release_id, canonical_artist_id, total_score, eligibility_status, source_payload, airplay_detections, airplay_station_count, airplay_weighted_score"),
+          fetchAllRows("wk_chart_programs_v2", "id, series_slug, market_slug, public_slug, public_label, short_label, source_family_slug, default_period_type, default_methodology_version, default_eligibility_rules_version, chart_size, airplay_enabled, airplay_station_scope, updated_at"),
           fetchArticlesForAdminList(500),
           fetchAllAuthors(),
           getChartFamilies().catch(() => ({ data: { families: [], editions: [] } })),
