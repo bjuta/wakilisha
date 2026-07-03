@@ -6,6 +6,7 @@ import {
 } from "@/services/institute/instituteReviewDeskService";
 import { ArticleEditorWorkspace } from "@/pages/admin/content/articles/detail/ArticleEditorWorkspace";
 import { WakilishaRecordWorkspace } from "./WakilishaRecordWorkspace";
+import { InstituteClaimsWorkspace } from "./InstituteClaimsWorkspace";
 import {
   createOrFetchInstituteArticleDraftLink,
   fetchInstituteArticleDraftLink,
@@ -388,7 +389,7 @@ function Rail({
     { screen: "workbench", label: "Workbench" },
     { screen: "anchorBrief", label: "Anchor brief", badge: active?.anchorContextSnapshot ? "ready" : "none" },
     { screen: "evidence", label: "Evidence", badge: active?.evidence?.length ? String(active.evidence.length) : "0" },
-    { screen: "claims", label: "Claims", disabled: true },
+    { screen: "claims", label: "Claims", badge: active?.evidence?.filter((item) => item.metadata?.workspaceType === "claims").length ? String(active.evidence.filter((item) => item.metadata?.workspaceType === "claims").length) : "0" },
     { screen: "relationships", label: "Relationships", disabled: true },
     { screen: "review", label: "Review", badge: "desk" },
     { screen: "summary", label: "Inquiry summary", disabled: true },
@@ -2722,7 +2723,7 @@ function LockedScreen({ screen }: { screen: InquiryScreen }) {
   );
 }
 
-const globalInstituteScreens = new Set<InquiryScreen>(["home", "workbench", "anchorBrief", "evidence", "review"]);
+const globalInstituteScreens = new Set<InquiryScreen>(["home", "workbench", "anchorBrief", "evidence", "claims", "review"]);
 
 function readInstituteScreen(value: string | null): InquiryScreen {
   return value && globalInstituteScreens.has(value as InquiryScreen) ? (value as InquiryScreen) : "home";
@@ -2808,6 +2809,8 @@ export default function NativeInstituteInquiryInterface() {
             <AnchorBriefScreen draft={active} />
           ) : state.screen === "evidence" ? (
             <EvidenceScreen draft={active} addEvidence={addEvidence} updateDraft={updateActiveDraft} />
+          ) : state.screen === "claims" ? (
+            <InstituteClaimsWorkspace draft={active} addEvidence={addEvidence} />
           ) : state.screen === "review" ? (
             <ReviewDeskScreen />
         ) : (
