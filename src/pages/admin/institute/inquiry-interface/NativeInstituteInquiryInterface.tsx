@@ -5,6 +5,7 @@ import {
   type InstituteReviewPacketStatus,
 } from "@/services/institute/instituteReviewDeskService";
 import { ArticleEditorWorkspace } from "@/pages/admin/content/articles/detail/ArticleEditorWorkspace";
+import { WakilishaRecordWorkspace } from "./WakilishaRecordWorkspace";
 import {
   createOrFetchInstituteArticleDraftLink,
   fetchInstituteArticleDraftLink,
@@ -1578,6 +1579,7 @@ function EvidenceScreen({
   const [searchParams, setSearchParams] = useSearchParams();
   const activeWorkspace = searchParams.get("workspace");
   const articleWorkspaceOpen = activeWorkspace === "article";
+  const registryWorkspaceOpen = activeWorkspace === "registry";
 
   const openWorkspace = (workspace: string) => {
     const nextParams = new URLSearchParams(searchParams);
@@ -1599,6 +1601,11 @@ function EvidenceScreen({
     }
 
     void ensureArticleDraft().then(() => openWorkspace("article"));
+  };
+
+  const openRegistryWorkspace = () => {
+    setActiveFormat("WAKILISHA record");
+    openWorkspace("registry");
   };
 
   const formats = draft?.setup.formats ?? [];
@@ -1918,6 +1925,8 @@ function EvidenceScreen({
                           setActiveFormat(format);
                           if (definition.workspaceType === "article") {
                             openArticleWorkspace();
+                          } else if (definition.workspaceType === "registry") {
+                            openRegistryWorkspace();
                           }
                         }}
                         className="rounded-lg bg-wk-text px-4 py-2 text-[11px] font-black text-wk-bg"
@@ -2061,7 +2070,47 @@ function EvidenceScreen({
             </section>
           ) : null}
 
-          {activeDefinition && activeDefinition.workspaceType !== "article" ? (
+
+          {activeDefinition && activeDefinition.workspaceType === "registry" ? (
+            <section className="space-y-4 rounded-[22px] border border-wk-border bg-wk-surface p-5 shadow-sm">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <div className="text-[10px] font-black uppercase tracking-[0.2em] text-wk-brand">WAKILISHA record workspace</div>
+                  <h2 className="mt-2 text-[24px] font-black tracking-[-0.055em] text-wk-text">Use the registry as structured evidence.</h2>
+                  <p className="mt-2 max-w-3xl text-[13px] leading-6 text-wk-text-muted">
+                    Search real WAKILISHA records, preserve a snapshot, and flag missing or incorrect registry data for editor review.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={openRegistryWorkspace}
+                  className="rounded-lg bg-wk-brand px-5 py-3 text-[13px] font-black text-wk-brand-on transition"
+                >
+                  Open workspace
+                </button>
+              </div>
+
+              <div className="rounded-xl border border-wk-border bg-wk-bg-subtle p-4">
+                <div className="text-[13px] font-black text-wk-text">Registry evidence ready</div>
+                <p className="mt-1 text-[12px] leading-5 text-wk-text-muted">
+                  This workspace uses live WAKILISHA records only. Missing records are saved as review suggestions, not created directly.
+                </p>
+              </div>
+
+              <InstituteWorkspaceOverlay
+                open={registryWorkspaceOpen}
+                eyebrow="Evidence · WAKILISHA record"
+                title="WAKILISHA record workspace"
+                description="Use real WAKILISHA records as structured evidence. Suggest missing records or corrections without mutating the public registry."
+                onClose={closeWorkspace}
+              >
+                <WakilishaRecordWorkspace draft={draft} addEvidence={addEvidence} />
+              </InstituteWorkspaceOverlay>
+            </section>
+          ) : null}
+
+          {activeDefinition && activeDefinition.workspaceType !== "article" && activeDefinition.workspaceType !== "registry" ? (
             <div className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
               <Panel eyebrow="2 · Workspace standard" title={`${activeFormat} production room`}>
                 <p className="text-[13px] leading-6 text-wk-text-muted">{activeDefinition.productionGoal}</p>
