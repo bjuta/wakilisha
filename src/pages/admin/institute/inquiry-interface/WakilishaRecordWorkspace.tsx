@@ -283,6 +283,295 @@ function RecordPreview({
   );
 }
 
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+}
+
+function asArray(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function textValue(value: unknown) {
+  return String(value ?? "").trim();
+}
+
+function numberValue(value: unknown) {
+  const next = Number(value ?? 0);
+  return Number.isFinite(next) ? next : 0;
+}
+
+function compactTextValues(values: unknown[]) {
+  return values.map(textValue).filter(Boolean);
+}
+
+function entityShortCode(value: WakilishaRecordEntityType) {
+  if (value === "chart_family") return "CH";
+  return value.slice(0, 2).toUpperCase();
+}
+
+function readableEntityType(value: WakilishaRecordEntityType) {
+  if (value === "chart_family") return "Chart";
+  return entityLabel(value).replace(/s$/, "");
+}
+
+function metadataFrom(record: WakilishaRecordSearchResult) {
+  return asRecord(record.snapshot.metadata);
+}
+
+function richSearchContextFrom(record: WakilishaRecordSearchResult) {
+  const richContext = asRecord(record.snapshot.richContext);
+  return asRecord(richContext.searchContext);
+}
+
+function knownProviderCount(record: WakilishaRecordSearchResult) {
+  const metadata = metadataFrom(record);
+  const providerKeys = [
+    "spotify_url",
+    "spotify_artist_id",
+    "spotify_id",
+    "apple_music_url",
+    "apple_music_id",
+    "instagram_url",
+    "youtube_url",
+    "tiktok_url",
+    "twitter_url",
+    "facebook_url",
+    "website_url",
+  ];
+
+  return providerKeys.filter((key) => textValue(metadata[key])).length;
+}
+
+function recordMetricChips(record: WakilishaRecordSearchResult) {
+  const snapshot = asRecord(record.snapshot);
+  const metadata = metadataFrom(record);
+  const searchContext = richSearchContextFrom(record);
+  const chips: string[] = [];
+
+  if (record.entityType === "artist") {
+    const genres = asArray(snapshot.genres).map(textValue).filter(Boolean);
+    const topSongs = asArray(metadata.top_songs);
+    const youtubeVideos = asArray(metadata.youtube_videos);
+    const providers = knownProviderCount(record);
+
+    chips.push(...compactTextValues([
+      snapshot.country || snapshot.originIso2,
+      genres.length ? genres.slice(0, 2).join(", ") : "",
+      snapshot.bio ? "Bio available" : "",
+      providers ? `${providers} provider trail(s)` : "",
+      topSongs.length ? `${topSongs.length} top song(s)` : "",
+      youtubeVideos.length ? `${youtubeVideos.length} video signal(s)` : "",
+    ]));
+  }
+
+  if (record.entityType === "track") {
+    const artists = asArray(searchContext.artists);
+    const release = asRecord(searchContext.release);
+    const chartEntryCount = numberValue(searchContext.chartEntryCount);
+
+    chips.push(...compactTextValues([
+      artists.length ? `${artists.length} credit(s)` : "",
+      release.title ? `Release: ${release.title}` : "",
+      chartEntryCount ? `${chartEntryCount} chart signal(s)` : "",
+      snapshot.isrc ? "ISRC present" : "",
+      snapshot.previewUrl ? "Preview available" : "",
+    ]));
+  }
+
+  if (record.entityType === "release") {
+    const artists = asArray(searchContext.artists);
+    const label = asRecord(searchContext.label);
+    const trackCount = numberValue(searchContext.trackCount);
+
+    chips.push(...compactTextValues([
+      artists.length ? `${artists.length} artist credit(s)` : "",
+      snapshot.releaseType,
+      snapshot.releaseDate,
+      trackCount ? `${trackCount} track(s)` : "",
+      label.name ? `Label: ${label.name}` : "",
+    ]));
+  }
+
+  if (record.entityType === "label") {
+    chips.push(...compactTextValues([
+      snapshot.countryCode,
+      snapshot.description ? "Description available" : "",
+      snapshot.status && snapshot.status !== "active" ? `Status: ${snapshot.status}` : "",
+    ]));
+  }
+
+  if (record.entityType === "genre") {
+    chips.push(...compactTextValues([
+      snapshot.description ? "Description available" : "",
+      snapshot.parentGenreId ? "Has parent genre" : "",
+      snapshot.status && snapshot.status !== "active" ? `Status: ${snapshot.status}` : "",
+    ]));
+  }
+
+  if (record.entityType === "article") {
+    chips.push(...compactTextValues([
+      snapshot.author ? `By ${snapshot.author}` : "",
+      snapshot.status,
+      snapshot.publishedAt,
+      asArray(snapshot.categories).length ? `${asArray(snapshot.categories).length} categor${asArray(snapshot.categories).length === 1 ? "y" : "ies"}` : "",
+      asArray(snapshot.tags).length ? `${asArray(snapshot.tags).length} tag(s)` : "",
+    ]));
+  }
+
+  if (record.entityType === "author") {
+    const profile = asRecord(asRecord(snapshot.richContext).profile);
+    chips.push(...compactTextValues([
+      snapshot.role,
+      snapshot.location,
+      profile.socialLinks ? "Social links present" : "",
+      snapshot.bio ? "Bio available" : "",
+    ]));
+  }
+
+  if (record.entityType === "chart_family") {
+    const methodology = asRecord(asRecord(snapshot.richContext).methodology);
+    const market = asRecord(asRecord(snapshot.richContext).market);
+
+    chips.push(...compactTextValues([
+      snapshot.marketLabel || market.marketLabel || snapshot.defaultRegion,
+      snapshot.defaultChartSize ? `${snapshot.defaultChartSize} entries` : "",
+      snapshot.periodType,
+      methodology.ruleset,
+      methodology.scoringModel,
+    ]));
+  }
+
+  if (!chips.length) {
+    chips.push(...compactTextValues([
+      record.subtitle,
+      record.href ? "Public route available" : "",
+    ]));
+  }
+
+  return chips.slice(0, 6);
+}
+
+function recordEvidenceSignals(record: WakilishaRecordSearchResult) {
+  const signals: string[] = [];
+  const missingCount = record.health.missingFields.length;
+
+  if (record.health.status === "usable") {
+    signals.push("Ready for evidence");
+  } else if (missingCount) {
+    signals.push(`${missingCount} missing field(s)`);
+  } else {
+    signals.push(record.health.status.replaceAll("_", " "));
+  }
+
+  if (record.href) signals.push("Public record");
+  if (record.imageUrl) signals.push("Visual attached");
+
+  return signals.slice(0, 3);
+}
+
+function whyRecordMatched(record: WakilishaRecordSearchResult, query: string) {
+  const clean = query.trim().toLowerCase();
+  if (!clean) return "";
+
+  if (record.label.toLowerCase() === clean) return "Exact title match";
+  if (record.slug.toLowerCase() === clean) return "Exact slug match";
+  if (record.label.toLowerCase().includes(clean)) return "Matched title";
+  if (record.slug.toLowerCase().includes(clean)) return "Matched slug";
+  if (record.subtitle.toLowerCase().includes(clean)) return "Matched record context";
+  if (record.contextText.toLowerCase().includes(clean)) return "Matched summary";
+  if (record.searchText.includes(clean)) return "Matched linked metadata";
+
+  return "Relevant record match";
+}
+
+function RecordResultCard({
+  record,
+  selected,
+  query,
+  onSelect,
+}: {
+  record: WakilishaRecordSearchResult;
+  selected: boolean;
+  query: string;
+  onSelect: () => void;
+}) {
+  const metricChips = recordMetricChips(record);
+  const evidenceSignals = recordEvidenceSignals(record);
+  const matchReason = whyRecordMatched(record, query);
+
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={cx(
+        "w-full overflow-hidden rounded-2xl border text-left transition",
+        selected ? "border-wk-brand bg-wk-brand-soft shadow-sm" : "border-wk-border bg-wk-bg hover:border-wk-brand/40 hover:bg-wk-surface",
+      )}
+    >
+      <div className="grid gap-3 p-3 sm:grid-cols-[76px_1fr]">
+        <div className="h-[76px] w-[76px] overflow-hidden rounded-xl border border-wk-border bg-wk-bg-subtle">
+          {record.imageUrl ? (
+            <img src={record.imageUrl} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <div className="flex h-full w-full flex-col items-center justify-center gap-1 px-2 text-center">
+              <span className="text-[18px] font-black tracking-[-0.08em] text-wk-text-faint">{entityShortCode(record.entityType)}</span>
+              <span className="text-[8px] font-black uppercase tracking-[0.12em] text-wk-text-faint">No image</span>
+            </div>
+          )}
+        </div>
+
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <Pill tone="brand">{readableEntityType(record.entityType)}</Pill>
+            <Pill tone={record.health.status === "usable" ? "success" : "warning"}>
+              {record.health.status.replaceAll("_", " ")}
+            </Pill>
+            {matchReason ? <Pill>{matchReason}</Pill> : null}
+          </div>
+
+          <div className="mt-2 truncate text-[15px] font-black tracking-[-0.02em] text-wk-text">{record.label}</div>
+          <p className="mt-1 line-clamp-2 text-[12px] leading-5 text-wk-text-muted">{record.subtitle}</p>
+
+          {metricChips.length ? (
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {metricChips.map((chip) => (
+                <span
+                  key={chip}
+                  className="rounded-full border border-wk-border bg-wk-surface px-2 py-1 text-[10px] font-black text-wk-text-muted"
+                >
+                  {chip}
+                </span>
+              ))}
+            </div>
+          ) : null}
+
+          {record.contextText ? (
+            <p className="mt-3 line-clamp-2 text-[11px] leading-5 text-wk-text-faint">{record.contextText}</p>
+          ) : null}
+        </div>
+      </div>
+
+      <div className={cx(
+        "flex flex-wrap items-center justify-between gap-2 border-t px-3 py-2",
+        selected ? "border-wk-brand/20 bg-wk-brand-soft" : "border-wk-border bg-wk-surface",
+      )}>
+        <div className="flex flex-wrap gap-1.5">
+          {evidenceSignals.map((signal) => (
+            <span key={signal} className="text-[10px] font-black uppercase tracking-[0.1em] text-wk-text-faint">
+              {signal}
+            </span>
+          ))}
+        </div>
+        <span className="text-[10px] font-black text-wk-brand">
+          {selected ? "Selected" : "Use record"}
+        </span>
+      </div>
+    </button>
+  );
+}
+
+
 export function WakilishaRecordWorkspace({ draft, addEvidence, onSaved }: Props) {
   const [entityType, setEntityType] = useState<"all" | WakilishaRecordEntityType>("all");
   const [query, setQuery] = useState("");
@@ -516,42 +805,36 @@ export function WakilishaRecordWorkspace({ draft, addEvidence, onSaved }: Props)
           </div>
 
           <div className="mt-4 max-h-[560px] space-y-3 overflow-y-auto pr-1">
-            {records.map((record) => {
-              const selected = selectedRecord?.id === record.id;
+            {cleanQuery.length < 2 ? (
+              <div className="rounded-xl border border-dashed border-wk-border bg-wk-bg-subtle p-4">
+                <div className="text-[13px] font-black text-wk-text">Start with the record, not the form</div>
+                <p className="mt-1 text-[12px] leading-5 text-wk-text-muted">
+                  Type at least two characters. Results will show enough context to decide whether the registry already has what you need.
+                </p>
+              </div>
+            ) : null}
 
-              return (
-                <button
-                  key={record.id}
-                  type="button"
-                  onClick={() => {
-                    setSelectedRecord(record);
-                    setSavedNotice("");
-                  }}
-                  className={cx(
-                    "grid w-full grid-cols-[56px_1fr] gap-3 rounded-xl border p-3 text-left transition",
-                    selected ? "border-wk-brand bg-wk-brand-soft shadow-sm" : "border-wk-border bg-wk-bg hover:border-wk-brand/40",
-                  )}
-                >
-                  <div className="h-14 w-14 overflow-hidden rounded-lg border border-wk-border bg-wk-bg-subtle">
-                    {record.imageUrl ? (
-                      <img src={record.imageUrl} alt="" className="h-full w-full object-cover" />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center text-[9px] font-black uppercase text-wk-text-faint">
-                        {record.entityType.slice(0, 2)}
-                      </div>
-                    )}
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Pill tone="brand">{entityLabel(record.entityType)}</Pill>
-                      <Pill tone={record.health.status === "usable" ? "success" : "warning"}>{record.health.status.replaceAll("_", " ")}</Pill>
-                    </div>
-                    <div className="mt-2 truncate text-[14px] font-black text-wk-text">{record.label}</div>
-                    <p className="mt-1 line-clamp-2 text-[12px] leading-5 text-wk-text-muted">{record.subtitle}</p>
-                  </div>
-                </button>
-              );
-            })}
+            {loading && !records.length ? (
+              <div className="rounded-xl border border-wk-border bg-wk-bg-subtle p-4">
+                <div className="text-[13px] font-black text-wk-text">Searching WAKILISHA records...</div>
+                <p className="mt-1 text-[12px] leading-5 text-wk-text-muted">
+                  Checking artists, tracks, releases, labels, genres, articles, authors, and charts.
+                </p>
+              </div>
+            ) : null}
+
+            {records.map((record) => (
+              <RecordResultCard
+                key={record.id}
+                record={record}
+                selected={selectedRecord?.id === record.id}
+                query={cleanQuery}
+                onSelect={() => {
+                  setSelectedRecord(record);
+                  setSavedNotice("");
+                }}
+              />
+            ))}
 
             {!loading && !error && searchHasSettled && cleanQuery.length >= 2 && !records.length ? (
               <div className="rounded-xl border border-dashed border-wk-warning/40 bg-wk-warning-soft p-4">
