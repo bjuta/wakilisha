@@ -1140,7 +1140,7 @@ export async function getArticle(slug: string, previewNonce?: string | null): Pr
 }
 
 export async function listArtists(): Promise<PublicArtist[]> {
-  const result = await safeApiGet<{ artists: PublicArtist[] }>("/artists?limit=500", { artists: [] });
+  const result = await safeApiGet<{ artists: PublicArtist[] }>("/artists", { artists: [] });
   const mapped = result.artists.map((artist) => ({
     ...artist,
     imageUrl: image(artist.imageUrl, { id: artist.id, slug: artist.slug, name: artist.name, type: "artist" }),
