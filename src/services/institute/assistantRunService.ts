@@ -67,6 +67,12 @@ type RunRow = {
   completed_at: string | null;
 };
 
+function normalizeConfidence(value: number | string | null): number | null {
+  if (value === null || value === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 function mapSuggestion(row: SuggestionRow): AssistantSuggestion {
   return {
     id: row.id,
@@ -76,7 +82,7 @@ function mapSuggestion(row: SuggestionRow): AssistantSuggestion {
     title: row.title ?? "",
     body: row.body,
     reason: row.reason,
-    confidence: row.confidence === null ? null : Number(row.confidence),
+    confidence: normalizeConfidence(row.confidence),
     payload: row.payload ?? {},
     status: row.status,
     reviewedAt: row.reviewed_at,

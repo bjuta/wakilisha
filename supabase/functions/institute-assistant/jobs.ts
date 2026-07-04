@@ -63,6 +63,7 @@ Rules that bind every output:
 - The question comes first. Serve the working question, not a generic content plan.
 - Write in plain, warm, direct language. No academic fog, no marketing tone, no database jargon.
 - Never use em dashes.
+- When you mention names of people, works, or places, copy them exactly as they appear in the context. Never add stray punctuation or possessives to a name. If a possessive would read awkwardly, rephrase the sentence instead (write "the career of Nikita Kering", not a mangled possessive).
 - Confidence is a number from 0 to 100 describing how well the provided material supports the suggestion. It is not a score of cultural quality.`;
 
 function contextJson(ctx: JobContext): string {

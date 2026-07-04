@@ -8,6 +8,7 @@ import { ArticleEditorWorkspace } from "@/pages/admin/content/articles/detail/Ar
 import { WakilishaRecordWorkspace } from "./WakilishaRecordWorkspace";
 import { InstituteClaimsWorkspace } from "./InstituteClaimsWorkspace";
 import InquiryAssistantPanel from "./InquiryAssistantPanel";
+import ClinicScreen from "./ClinicScreen";
 import {
   createOrFetchInstituteArticleDraftLink,
   fetchInstituteArticleDraftLink,
@@ -372,7 +373,7 @@ function useSupabaseInquiries() {
     }
   };
 
-  return { inquiries, loading, error, addInquiry, addEvidence, updateInquiry };
+  return { inquiries, loading, error, addInquiry, addEvidence, updateInquiry, reloadInquiries: loadInquiries };
 }
 
 function Rail({
@@ -394,7 +395,7 @@ function Rail({
     { screen: "relationships", label: "Relationships", disabled: true },
     { screen: "review", label: "Review", badge: "desk" },
     { screen: "summary", label: "Inquiry summary", disabled: true },
-    { screen: "clinic", label: "Question & clinic", badge: active ? `v${active.versionCount}` : "", disabled: true },
+    { screen: "clinic", label: "Question & clinic", badge: active ? `v${active.versionCount}` : "" },
     { screen: "lineage", label: "Lineage & forks", disabled: true },
     { screen: "memory", label: "Contributor memory", disabled: true },
     { screen: "corrections", label: "Corrections", disabled: true },
@@ -2726,7 +2727,7 @@ function LockedScreen({ screen }: { screen: InquiryScreen }) {
   );
 }
 
-const globalInstituteScreens = new Set<InquiryScreen>(["home", "workbench", "anchorBrief", "evidence", "claims", "review"]);
+const globalInstituteScreens = new Set<InquiryScreen>(["home", "workbench", "anchorBrief", "evidence", "claims", "review", "clinic"]);
 
 function readInstituteScreen(value: string | null): InquiryScreen {
   return value && globalInstituteScreens.has(value as InquiryScreen) ? (value as InquiryScreen) : "home";
@@ -2739,7 +2740,7 @@ export default function NativeInstituteInquiryInterface() {
     stripLegacyInstituteHash();
   }, []);
 
-  const { inquiries: drafts, loading: inquiriesLoading, error: inquiriesError, addInquiry, addEvidence, updateInquiry } = useSupabaseInquiries();
+  const { inquiries: drafts, loading: inquiriesLoading, error: inquiriesError, addInquiry, addEvidence, updateInquiry, reloadInquiries } = useSupabaseInquiries();
   const [state, setRawState] = useState<InstituteState>({
     screen: readInstituteScreen(searchParams.get("screen")),
     activeId: null,
@@ -2816,6 +2817,8 @@ export default function NativeInstituteInquiryInterface() {
             <InstituteClaimsWorkspace draft={active} addEvidence={addEvidence} />
           ) : state.screen === "review" ? (
             <ReviewDeskScreen />
+          ) : state.screen === "clinic" ? (
+            <ClinicScreen draft={active} onQuestionChanged={reloadInquiries} />
         ) : (
           <LockedScreen screen={state.screen} />
         )}
