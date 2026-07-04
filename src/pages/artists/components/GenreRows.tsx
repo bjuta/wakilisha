@@ -22,10 +22,12 @@ interface GenreRowsProps {
 const GENRE_COLORS: Record<string, string> = {
   Afrobeats: "rgba(132,194,65,0.06)",
   Amapiano: "rgba(168,72,60,0.06)",
-  BongoFlava: "rgba(45,107,181,0.06)",
+  "Bongo Flava": "rgba(45,107,181,0.06)",
   Gengetone: "rgba(160,104,0,0.06)",
   "R&B": "rgba(158,56,121,0.06)",
-  HipHop: "rgba(100,82,199,0.06)",
+  "Hip-hop": "rgba(100,82,199,0.06)",
+  "Afro-soul": "rgba(132,194,65,0.05)",
+  "Afro-pop": "rgba(132,194,65,0.05)",
 };
 
 function getGenreColor(genre: string): string {
