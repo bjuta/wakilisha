@@ -476,7 +476,7 @@ export default function Magazine() {
                 <i className="ri-search-line text-[var(--wk-text-faint)] text-[28px]" />
               </div>
               <p className="mt-5 text-[16px] font-bold text-[var(--wk-text-muted)]">
-                No articles found for "{searchQuery}"
+                No stories found for "{searchQuery}"
               </p>
               <p className="mt-1.5 text-[13px] text-[var(--wk-text-faint)] max-w-sm">
                 Try a different search term or browse the full magazine.
@@ -515,7 +515,7 @@ export default function Magazine() {
       <main className="min-h-screen flex items-center justify-center bg-[var(--wk-bg)]">
         <div className="text-center px-6">
           <i className="ri-error-warning-line text-[var(--wk-text-faint)] text-[40px] mb-4 block" />
-          <p className="text-[15px] font-bold text-[var(--wk-text-muted)]">{error || "No stories yet."}</p>
+          <p className="text-[15px] font-bold text-[var(--wk-text-muted)]">{error ? "We couldn't load the magazine. Try again in a moment." : "No stories yet."}</p>
         </div>
       </main>
     );

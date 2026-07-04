@@ -17,7 +17,7 @@ export default function BriefingConfirmPage() {
 
   useEffect(() => {
     if (!token) {
-      setState({ stage: "error", message: "No confirmation token found. Check your email for the confirmation link." });
+      setState({ stage: "error", message: "This link is missing something. Check your email for the confirmation link." });
       trackEvent("briefing_confirm_error", { pageType: "briefing_confirm", context: { reason: "missing_token" } });
       return;
     }
@@ -37,13 +37,14 @@ export default function BriefingConfirmPage() {
       }
     }).catch((err: Error) => {
       if (cancelled) return;
-      const msg = err.message;
-      if (/expired/i.test(msg)) {
+      const rawMessage = err.message || "";
+      if (/expired/i.test(rawMessage)) {
         setState({ stage: "expired" });
         trackEvent("briefing_confirm_expired", { pageType: "briefing_confirm" });
       } else {
+        const msg = "We couldn't confirm this. Try the link again.";
         setState({ stage: "error", message: msg });
-        trackEvent("briefing_confirm_error", { pageType: "briefing_confirm", context: { reason: msg } });
+        trackEvent("briefing_confirm_error", { pageType: "briefing_confirm", context: { reason: rawMessage || msg } });
       }
     });
     return () => { cancelled = true; };

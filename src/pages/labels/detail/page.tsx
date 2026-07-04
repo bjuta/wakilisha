@@ -291,8 +291,8 @@ export default function LabelDetail() {
           <div className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-6 md:p-8">
             <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h3 className="text-[16px] font-black text-[var(--wk-text)]">Explore the label directory</h3>
-                <p className="mt-1 text-[13px] text-[var(--wk-text-muted)]">Browse all labels, their rosters and release catalogs across WAKILISHA.</p>
+                <h3 className="text-[16px] font-black text-[var(--wk-text)]">Keep exploring</h3>
+                <p className="mt-1 text-[13px] text-[var(--wk-text-muted)]">Browse all labels, their rosters, and releases across WAKILISHA.</p>
               </div>
               <div className="flex gap-2">
                 <Link to="/labels" className="whitespace-nowrap rounded-xl bg-[var(--wk-brand)] px-5 py-2.5 text-[13px] font-bold text-[var(--wk-brand-on)] transition-all hover:opacity-90">

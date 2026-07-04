@@ -26,12 +26,12 @@ export function ArtistSpotlightSpread({ artists, mood, sectionColor }: { artists
     <section className="magazine-spread mag-reveal" style={{ background: "var(--mag-surface)" }}>
       <div className="mag-registry-spotlight">
         <div className="mag-registry-spotlight-rail">
-          <div className="magazine-meta" style={{ color: accent }}>Archive · Artists on record</div>
+          <div className="magazine-meta" style={{ color: accent }}>Artists in this issue</div>
           <div className="mag-registry-spotlight-title">
-            <span>Voices in the archive</span>
+            <span>Voices behind the story</span>
           </div>
           <p style={{ color: "var(--mag-text-muted)", fontSize: 13, maxWidth: 360 }}>
-            The artists linked to this issue's cultural moment — pulled from the WAKILISHA archive.
+            The artists linked to this issue's cultural moment.
           </p>
           <Link
             to="/artists"
@@ -69,12 +69,12 @@ export function ReleaseSpotlightSpread({ releases, mood, sectionColor }: { relea
     <section className="magazine-spread mag-reveal" style={{ background: "var(--mag-surface)" }}>
       <div className="mag-registry-spotlight">
         <div className="mag-registry-spotlight-rail">
-          <div className="magazine-meta" style={{ color: accent }}>Archive · Releases filed</div>
+          <div className="magazine-meta" style={{ color: accent }}>Releases in this issue</div>
           <div className="mag-registry-spotlight-title">
             <span>Records that shaped the window</span>
           </div>
           <p style={{ color: "var(--mag-text-muted)", fontSize: 13, maxWidth: 360 }}>
-            Releases connected to this issue's timeframe — pulled from the WAKILISHA archive.
+            Releases connected to this issue's timeframe.
           </p>
           <Link
             to="/releases"
@@ -90,7 +90,7 @@ export function ReleaseSpotlightSpread({ releases, mood, sectionColor }: { relea
               key={release.slug}
               slug={release.slug}
               title={release.title}
-              artist="Registry artist"
+              artist="Various artists"
               artworkUrl={release.heroUrl || undefined}
               releaseType={release.releaseType as "Album" | "EP" | "Single" | "Compilation" | undefined}
               sourceSection="magazine_release_spotlight"

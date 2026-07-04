@@ -2,7 +2,7 @@ const PILLARS = [
   {
     k: "01",
     t: "Discover",
-    d: "Find the people, songs, stories, and scenes shaping the culture. Charts and a deep archive that surface what is actually happening.",
+    d: "Find the people, songs, stories, and scenes shaping the culture. Charts and deep catalogs that show you what's actually happening.",
     color: "var(--wk-brand)",
   },
   {

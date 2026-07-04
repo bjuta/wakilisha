@@ -64,7 +64,7 @@ export default function Labels() {
       setStats(statsData);
       setFeaturedLabels(topLabels.labels.filter((l) => l.artistImageUrl).slice(0, 10));
     } catch (err) {
-      setMetaError(err instanceof Error ? err.message : "Could not load label metadata.");
+      setMetaError("Could not load label details.");
     } finally {
       setMetaLoading(false);
     }
@@ -103,7 +103,7 @@ export default function Labels() {
         }
       } catch (err) {
         if (!cancelled) {
-          setPageError(err instanceof Error ? err.message : "Could not load labels.");
+          setPageError("Could not load labels.");
         }
       } finally {
         if (!cancelled) setPageLoading(false);
@@ -137,7 +137,7 @@ export default function Labels() {
 
       setLabels((prev) => [...prev, ...sorted]);
     } catch (err) {
-      setPageError(err instanceof Error ? err.message : "Could not load more labels.");
+      setPageError("Could not load more labels.");
     } finally {
       setIsLoadingMore(false);
     }
@@ -242,7 +242,7 @@ export default function Labels() {
             <div>
               <div className="inline-flex items-center gap-2 rounded-full border border-[var(--wk-brand)]/20 bg-[var(--wk-brand-soft)]/40 px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.18em] text-[var(--wk-brand)] mb-3">
                 <WkIcon name="Building2" size={12} />
-                Label directory
+                Browse
               </div>
               <h2 className="text-[clamp(22px,3vw,32px)] font-black leading-[0.92] tracking-[-0.04em] text-[var(--wk-text)]">
                 All labels
@@ -304,7 +304,7 @@ export default function Labels() {
               {labels.length === 0 && (
                 <div className="rounded-2xl border border-dashed border-[var(--wk-border)] p-20 text-center">
                   <WkIcon name="Building2" size={36} className="mx-auto text-[var(--wk-text-faint)]" />
-                  <h3 className="mt-4 text-[20px] font-black text-[var(--wk-text)]">No labels match</h3>
+                  <h3 className="mt-4 text-[20px] font-black text-[var(--wk-text)]">No labels found</h3>
                   <p className="mx-auto mt-2 max-w-md text-[14px] font-semibold leading-relaxed text-[var(--wk-text-muted)]">
                     Try a different search or clear the country filter to see more labels.
                   </p>
@@ -358,7 +358,7 @@ function FeaturedLabelCarousel({
           <div className="grid items-end gap-8 lg:grid-cols-[minmax(0,1fr)_420px]">
             <div className="max-w-4xl">
               <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-[0.18em] text-white/85 backdrop-blur">
-                <WkIcon name="Building2" size={13} /> Label directory
+                <WkIcon name="Building2" size={13} /> The imprints behind the sound
               </div>
               <h1 className="font-[var(--wk-font-display)] text-[clamp(56px,9vw,128px)] font-black leading-[0.82] tracking-[-0.075em] text-white drop-shadow-2xl">
                 Labels

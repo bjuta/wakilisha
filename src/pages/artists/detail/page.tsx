@@ -105,9 +105,9 @@ export default function ArtistDetail() {
       <div className="wk-container px-6 py-20 text-center">
         <i className="ri-user-line mb-4 block text-5xl text-[var(--wk-text-faint)]" />
         <h1 className="wk-h-section mb-2">Artist not found</h1>
-        <p className="text-[var(--wk-text-muted)]">{error || "This artist could not be found."}</p>
+        <p className="text-[var(--wk-text-muted)]">{error ? "We couldn't load this artist. Try again in a moment." : "This artist could not be found."}</p>
         <Link to="/artists" className="mt-6 inline-block">
-          <WkButton variant="primary">Back to directory</WkButton>
+          <WkButton variant="primary">Back to artists</WkButton>
         </Link>
       </div>
     );
@@ -215,7 +215,7 @@ export default function ArtistDetail() {
               eyebrow="Discography"
               title="Releases"
               emptyTitle="No releases"
-              emptyDescription="No releases match the selected filter."
+              emptyDescription="Nothing here for this filter yet. Try another one."
             />
           )}
 
@@ -226,7 +226,7 @@ export default function ArtistDetail() {
               eyebrow="Appears On"
               title="Features & appearances"
               emptyTitle="No appearances"
-              emptyDescription="No appearances match the selected filter."
+              emptyDescription="Nothing here for this filter yet. Try another one."
             />
           )}
 

@@ -138,11 +138,11 @@ function RegistryPortalCard() {
 
       <div className="relative z-10 flex items-center gap-2.5 mb-4">
         <span className="w-2 h-2 rounded-full bg-[var(--wk-v-music)]" />
-        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--wk-v-music)]">Living Archive</span>
+        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--wk-v-music)]">Beyond the magazine</span>
       </div>
 
       <h3 className="relative z-10 text-[17px] font-black text-white tracking-[-0.02em] mb-4 leading-tight">
-        The Archive
+        The full picture
       </h3>
 
       <div className="relative z-10 flex-1 space-y-3">
@@ -170,13 +170,13 @@ function RegistryPortalCard() {
           </div>
           <div>
             <div className="text-[12px] font-bold text-white/90">Releases</div>
-            <div className="text-[10px] text-white/40">Albums, EPs, singles, catalogued</div>
+            <div className="text-[10px] text-white/40">Albums, EPs, and singles</div>
           </div>
         </div>
       </div>
 
       <div className="relative z-10 mt-auto pt-4 flex items-center gap-1.5 text-[12px] font-semibold text-white/60 group-hover:text-white transition-colors">
-        <span>Explore the archive</span>
+        <span>Start exploring</span>
         <i className="ri-arrow-right-line text-[11px] group-hover:translate-x-0.5 transition-transform" />
       </div>
     </Link>

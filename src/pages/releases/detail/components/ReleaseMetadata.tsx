@@ -26,8 +26,8 @@ export default function ReleaseMetadata({
   const knownTrackCount = Number(release.trackCount || 0);
   const knownDurationSeconds = Number(release.totalDuration || 0);
   const hasKnownDuration = release.tracks.some((track) => Number(track.duration || 0) > 0);
-  const durationLabel = hasKnownDuration ? formatDuration(knownDurationSeconds) : "Not available";
-  const dateLabel = formatReleaseDate(release.releaseDate) || cleanYear(release.year) || "Not available";
+  const durationLabel = hasKnownDuration ? formatDuration(knownDurationSeconds) : "Unknown";
+  const dateLabel = formatReleaseDate(release.releaseDate) || cleanYear(release.year) || "Date unknown";
   const hasLabel = isRealLabel(release.labelName);
   const hasChartData = chartTracks && chartTracks.length > 0;
   const stats = [
@@ -59,7 +59,7 @@ export default function ReleaseMetadata({
           Label
         </div>
         <div className="text-[15px] font-extrabold text-[var(--wk-text)]">
-          {hasLabel ? release.labelName : "Label not available"}
+          {hasLabel ? release.labelName : "Independent"}
         </div>
         <div className="text-[12px] font-semibold text-[var(--wk-text-muted)] mt-1">
           {release.releaseType} · {dateLabel}
@@ -73,22 +73,6 @@ export default function ReleaseMetadata({
             <WkIcon name="ArrowUpRight" size={12} />
           </Link>
         )}
-      </div>
-
-      {/* Source quality */}
-      <div className="border border-[var(--wk-border)] rounded-2xl bg-[var(--wk-surface)] p-5">
-        <div className="flex items-center gap-2 mb-4 text-[11px] font-extrabold uppercase tracking-[0.18em] text-[var(--wk-brand)]">
-          <WkIcon name="BadgeCheck" size={13} />
-          Source details
-        </div>
-        <div className="space-y-2 text-[12px] font-semibold text-[var(--wk-text-muted)]">
-          <QualityRow label="Tracklist" value={release.tracks.length ? "Linked" : "Pending"} />
-          <QualityRow label="Artwork" value={String(release.metadata?.artworkSource || "Standard").replaceAll("_", " ")} />
-          <QualityRow
-            label="Release date"
-            value={formatReleaseDate(release.releaseDate) || cleanYear(release.year) || "Year only"}
-          />
-        </div>
       </div>
 
       {/* Chart performance */}
@@ -163,21 +147,12 @@ function StatCard({ value, label }: { value: string | number; label: string }) {
   );
 }
 
-function QualityRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <span>{label}</span>
-      <span className="text-right font-extrabold capitalize text-[var(--wk-text)]">{value}</span>
-    </div>
-  );
-}
-
 function cleanYear(year: string): string {
   return year && year !== "Unknown year" ? year : "";
 }
 
 function formatDuration(seconds: number): string {
-  if (!Number.isFinite(seconds) || seconds <= 0) return "Not available";
+  if (!Number.isFinite(seconds) || seconds <= 0) return "Unknown";
   const minutes = Math.round(seconds / 60);
   if (minutes < 60) return `${minutes} min`;
   const hours = Math.floor(minutes / 60);

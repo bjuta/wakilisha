@@ -111,7 +111,7 @@ export function NewsletterSubscribe({
       });
     } catch (error) {
       setStatus("error");
-      setMessage(error instanceof Error ? error.message : "Something went wrong. Please try again.");
+      setMessage("We couldn't sign you up. Try again in a moment.");
 
       trackEvent("newsletter_error", {
         pageType: analytics?.pageType,

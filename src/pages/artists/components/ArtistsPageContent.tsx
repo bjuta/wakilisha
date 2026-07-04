@@ -70,8 +70,8 @@ function enrichArtist(artist: PublicArtist) {
     "Tracks, releases, and chart history gathered in one place.",
     "Follow the songs, genres, and routes around this artist.",
     "From early releases to wider audience attention.",
-    "Sound, scene, and release context in one artist record.",
-    "Part of the wider WAKILISHA artist archive.",
+    "Sound, scene, and story, all in one artist profile.",
+    "Part of the wider WAKILISHA artist lineup.",
     "Browse the work, links, and listening routes around this artist.",
   ];
   return {
@@ -106,7 +106,7 @@ export default function ArtistsPageContent() {
       })
       .catch((err) => {
         if (!alive) return;
-        setError(err instanceof Error ? err.message : "Could not load artists.");
+        setError("Could not load artists.");
         setStatus("error");
       });
     return () => { alive = false; };
@@ -313,7 +313,7 @@ export default function ArtistsPageContent() {
         <div className="wk-container-wide">
           <div className="mb-10 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
             <div>
-              <div className="wk-eyebrow mb-3">Artist archive</div>
+              <div className="wk-eyebrow mb-3">Keep exploring</div>
               <h2 className="wk-h-page">Browse artists</h2>
             </div>
             <p className="wk-copy max-w-[44ch] text-[13px]">
@@ -377,7 +377,7 @@ export default function ArtistsPageContent() {
           {sorted.length === 0 ? (
             <div className="artist-empty">
               <i className="ri-user-search-line text-[32px] text-[var(--wk-text-faint)]" />
-              <div className="mt-3 text-[14px] text-[var(--wk-text-muted)]">No artists match this search.</div>
+              <div className="mt-3 text-[14px] text-[var(--wk-text-muted)]">No artists found. Try another name, genre, or country.</div>
             </div>
           ) : view === "grid" ? (
             <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 md:gap-5 lg:grid-cols-4">

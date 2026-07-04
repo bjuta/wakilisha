@@ -293,7 +293,7 @@ export default function GenreDetail() {
           <div className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-6 md:p-8">
             <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h3 className="text-[16px] font-black text-[var(--wk-text)]">Explore the full directory</h3>
+                <h3 className="text-[16px] font-black text-[var(--wk-text)]">Keep exploring</h3>
                 <p className="mt-1 text-[13px] text-[var(--wk-text-muted)]">Browse all genres, artists, tracks and labels across the WAKILISHA cultural map.</p>
               </div>
               <div className="flex gap-2">

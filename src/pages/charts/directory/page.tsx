@@ -1011,7 +1011,7 @@ export default function ChartsDirectory() {
               </div>
             ) : (
               <div className="px-4 py-12 text-center">
-                <p className="text-[14px] text-[var(--wk-text-muted)]">No entries available for this chart yet.</p>
+                <p className="text-[14px] text-[var(--wk-text-muted)]">Nothing on this chart yet. Check back soon.</p>
               </div>
             )}
           </div>

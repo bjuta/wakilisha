@@ -81,7 +81,7 @@ export default function PublicBriefingsPage() {
       } catch (error) {
         if (cancelled) return;
         setLoadState("error");
-        setMessage(error instanceof Error ? error.message : "Could not load briefings.");
+        setMessage("Could not load briefings.");
       }
     }
 
@@ -189,7 +189,7 @@ export default function PublicBriefingsPage() {
       });
     } catch (error) {
       setSubmitState("error");
-      setMessage(error instanceof Error ? error.message : "Could not subscribe. Try again.");
+      setMessage("Could not subscribe. Try again.");
 
       trackEvent("briefings_public_subscribe_error", {
         pageType: "briefings",

@@ -95,7 +95,7 @@ export function ArtistDiscography({
   eyebrow = "Discography",
   title = "Releases",
   emptyTitle = "No releases",
-  emptyDescription = "No releases have been catalogued yet.",
+  emptyDescription = "No releases listed yet.",
   artistName,
 }: ArtistDiscographyProps) {
   const [filter, setFilter] = useState<Filter>("All");

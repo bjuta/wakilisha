@@ -91,7 +91,7 @@ export default function Releases() {
       );
       setFeaturedReleases(withArtwork.slice(0, 10));
     } catch (err) {
-      setMetaError(err instanceof Error ? err.message : "Could not load release metadata.");
+      setMetaError("Could not load release details.");
     } finally {
       setMetaLoading(false);
     }
@@ -117,7 +117,7 @@ export default function Releases() {
       setReleases(result.releases);
       setTotalCount(result.totalCount);
     } catch (err) {
-      setPageError(err instanceof Error ? err.message : "Could not load releases.");
+      setPageError("Could not load releases.");
     } finally {
       setPageLoading(false);
     }
@@ -144,7 +144,7 @@ export default function Releases() {
         }
       } catch (err) {
         if (!cancelled) {
-          setPageError(err instanceof Error ? err.message : "Could not load releases.");
+          setPageError("Could not load releases.");
         }
       } finally {
         if (!cancelled) setPageLoading(false);
@@ -208,7 +208,7 @@ export default function Releases() {
       });
       setReleases((prev) => [...prev, ...result.releases]);
     } catch (err) {
-      setPageError(err instanceof Error ? err.message : "Could not load more releases.");
+      setPageError("Could not load more releases.");
     } finally {
       setIsLoadingMore(false);
     }
@@ -717,7 +717,7 @@ function optionLabel(value: string): string {
 }
 
 function trackCountLabel(count: number): string {
-  if (!count) return "tracks pending";
+  if (!count) return "Tracklist coming soon";
   return `${count} track${count === 1 ? "" : "s"}`;
 }
 
