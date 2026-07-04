@@ -10,6 +10,7 @@ import { InstituteClaimsWorkspace } from "./InstituteClaimsWorkspace";
 import InquiryAssistantPanel from "./InquiryAssistantPanel";
 import ClinicScreen from "./ClinicScreen";
 import EvidenceReaderPanel from "./EvidenceReaderPanel";
+import HowThisLearnedScreen from "./HowThisLearnedScreen";
 import {
   createOrFetchInstituteArticleDraftLink,
   fetchInstituteArticleDraftLink,
@@ -400,7 +401,7 @@ function Rail({
     { screen: "lineage", label: "Lineage & forks", disabled: true },
     { screen: "memory", label: "Contributor memory", disabled: true },
     { screen: "corrections", label: "Corrections", disabled: true },
-    { screen: "learned", label: "How this learned", disabled: true },
+    { screen: "learned", label: "How this learned" },
   ];
 
   return (
@@ -2728,7 +2729,7 @@ function LockedScreen({ screen }: { screen: InquiryScreen }) {
   );
 }
 
-const globalInstituteScreens = new Set<InquiryScreen>(["home", "workbench", "anchorBrief", "evidence", "claims", "review", "clinic"]);
+const globalInstituteScreens = new Set<InquiryScreen>(["home", "workbench", "anchorBrief", "evidence", "claims", "review", "clinic", "learned"]);
 
 function readInstituteScreen(value: string | null): InquiryScreen {
   return value && globalInstituteScreens.has(value as InquiryScreen) ? (value as InquiryScreen) : "home";
@@ -2823,6 +2824,8 @@ export default function NativeInstituteInquiryInterface() {
             <ReviewDeskScreen />
           ) : state.screen === "clinic" ? (
             <ClinicScreen draft={active} onQuestionChanged={reloadInquiries} />
+          ) : state.screen === "learned" ? (
+            <HowThisLearnedScreen draft={active} />
         ) : (
           <LockedScreen screen={state.screen} />
         )}
