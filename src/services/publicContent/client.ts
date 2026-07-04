@@ -3,6 +3,7 @@ import { withPlaceholderImage } from "@/utils/imagePlaceholders";
 import { rewriteWpImageUrl } from "@/services/wpImageRewrite";
 import { supabase } from "@/lib/supabase";
 import { releaseUrl, slugify } from "@/utils/releaseUrl";
+import { normalizeGenres } from "@/services/publicContent/genreNormalization";
 import {
   enrichArtistMedia,
   enrichArtistsMedia,
@@ -1143,6 +1144,7 @@ export async function listArtists(): Promise<PublicArtist[]> {
   const result = await safeApiGet<{ artists: PublicArtist[] }>("/artists", { artists: [] });
   const mapped = result.artists.map((artist) => ({
     ...artist,
+    genres: normalizeGenres(artist.genres),
     imageUrl: image(artist.imageUrl, { id: artist.id, slug: artist.slug, name: artist.name, type: "artist" }),
   }));
   return await enrichArtistsMedia(mapped) as PublicArtist[];
@@ -1154,6 +1156,7 @@ export async function getArtist(slug: string): Promise<PublicArtistDetail | null
   const artist = result.artist;
   const mapped = {
     ...artist,
+    genres: normalizeGenres(artist.genres),
     imageUrl: image(artist.imageUrl, { id: artist.id, slug: artist.slug, name: artist.name, type: "artist" }),
     profileImageUrl: image(artist.profileImageUrl ?? artist.imageUrl, { id: artist.id, slug: artist.slug, name: artist.name, type: "artist" }),
     chartEntries: (artist.chartEntries || []).map((entry) => ({
