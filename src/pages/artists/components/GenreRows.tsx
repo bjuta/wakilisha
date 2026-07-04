@@ -17,6 +17,7 @@ interface GenreShelf {
 
 interface GenreRowsProps {
   shelves: GenreShelf[];
+  onGenreSelect?: (genre: string) => void;
 }
 
 const GENRE_COLORS: Record<string, string> = {
@@ -37,7 +38,7 @@ function getGenreColor(genre: string): string {
   return "rgba(132,194,65,0.04)";
 }
 
-function GenreShelfRow({ genre, artists, index }: GenreShelf & { index: number }) {
+function GenreShelfRow({ genre, artists, index, onGenreSelect }: GenreShelf & { index: number; onGenreSelect?: (genre: string) => void }) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const scroll = (dir: "left" | "right") => {
@@ -60,13 +61,27 @@ function GenreShelfRow({ genre, artists, index }: GenreShelf & { index: number }
           </span>
         </div>
         <div className="flex items-center gap-2">
+          {onGenreSelect && (
+            <button
+              type="button"
+              onClick={() => onGenreSelect(genre)}
+              className="hidden rounded-full border border-[var(--wk-border-2)] bg-[var(--wk-surface)] px-3.5 py-2 text-[11px] font-extrabold uppercase tracking-[0.12em] text-[var(--wk-text-muted)] transition-all hover:border-[var(--wk-brand)] hover:text-[var(--wk-brand)] md:inline-flex md:items-center md:gap-1.5"
+            >
+              Browse sound
+              <i className="ri-arrow-down-line text-[12px]" />
+            </button>
+          )}
           <button
+            type="button"
+            aria-label={`Scroll ${genre} artists left`}
             onClick={() => scroll("left")}
             className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--wk-border-2)] bg-[var(--wk-surface)] text-[var(--wk-text-soft)] transition-all hover:border-[var(--wk-brand)] hover:text-[var(--wk-brand)]"
           >
             <i className="ri-arrow-left-s-line text-base" />
           </button>
           <button
+            type="button"
+            aria-label={`Scroll ${genre} artists right`}
             onClick={() => scroll("right")}
             className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--wk-border-2)] bg-[var(--wk-surface)] text-[var(--wk-text-soft)] transition-all hover:border-[var(--wk-brand)] hover:text-[var(--wk-brand)]"
           >
@@ -126,7 +141,7 @@ function GenreShelfRow({ genre, artists, index }: GenreShelf & { index: number }
   );
 }
 
-export function GenreRows({ shelves }: GenreRowsProps) {
+export function GenreRows({ shelves, onGenreSelect }: GenreRowsProps) {
   if (shelves.length === 0) return null;
 
   return (
@@ -137,7 +152,7 @@ export function GenreRows({ shelves }: GenreRowsProps) {
           <h3 className="wk-h-page max-w-[16ch]">Find your frequency</h3>
         </div>
         {shelves.map((shelf, i) => (
-          <GenreShelfRow key={shelf.genre} genre={shelf.genre} artists={shelf.artists} index={i} />
+          <GenreShelfRow key={shelf.genre} genre={shelf.genre} artists={shelf.artists} index={i} onGenreSelect={onGenreSelect} />
         ))}
       </div>
     </section>
