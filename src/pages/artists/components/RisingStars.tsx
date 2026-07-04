@@ -101,8 +101,12 @@ export function RisingStars({ artists }: RisingStarsProps) {
                   {artist.spotlightBio}
                 </p>
                 <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-white/40">
-                  <span>{artist.country}</span>
-                  <span>·</span>
+                  {artist.country && artist.country !== "Unknown" && (
+                    <>
+                      <span>{artist.country}</span>
+                      <span>·</span>
+                    </>
+                  )}
                   <span>{artist.trackCount} tracks</span>
                   <span>·</span>
                   <span>{artist.releaseCount} releases</span>

@@ -461,8 +461,8 @@ export default function ChartEdition() {
       <main className="min-h-screen flex items-center justify-center bg-[var(--wk-bg)]">
         <div className="max-w-md mx-auto text-center px-6">
           <WkIcon name="BarChart3" size={42} className="mx-auto mb-4 text-[var(--wk-text-faint)]" />
-          <h1 className="text-[24px] font-black tracking-[-.03em] text-[var(--wk-text)] mb-2">No published chart edition found</h1>
-          <p className="text-[14px] text-[var(--wk-text-muted)] mb-6">There are no entries for this chart edition yet.</p>
+          <h1 className="text-[24px] font-black tracking-[-.03em] text-[var(--wk-text)] mb-2">This chart isn't live yet</h1>
+          <p className="text-[14px] text-[var(--wk-text-muted)] mb-6">Check back once this edition has been compiled.</p>
           <div className="flex items-center justify-center gap-3">
             <button onClick={handleRetry} className="chart-hero-v2-cta">
               <i className="ri-refresh-line" /> Refresh
@@ -494,8 +494,8 @@ export default function ChartEdition() {
       <main className="min-h-screen flex items-center justify-center bg-[var(--wk-bg)]">
         <div className="text-center">
           <WkIcon name="BarChart3" size={42} className="mx-auto mb-4 text-[var(--wk-text-faint)]" />
-          <h1 className="text-[24px] font-black text-[var(--wk-text)] mb-2">No chart entries available</h1>
-          <p className="text-[14px] text-[var(--wk-text-muted)]">This chart edition has no entries to display.</p>
+          <h1 className="text-[24px] font-black text-[var(--wk-text)] mb-2">This chart is empty</h1>
+          <p className="text-[14px] text-[var(--wk-text-muted)]">No songs have been added to this edition yet.</p>
         </div>
       </main>
     );
@@ -594,7 +594,7 @@ export default function ChartEdition() {
               <WkIcon name="MessageCircle" size={16} /> Discuss #1
             </button>
             <Link to="/charts" className="chart-hero-v2-cta chart-hero-v2-cta-ghost">
-              <WkIcon name="Archive" size={16} /> Archive
+              <WkIcon name="Archive" size={16} /> All charts
             </Link>
             <ShareButton
               item={{
@@ -694,7 +694,7 @@ export default function ChartEdition() {
                   className={`chart-archive-card ${item.slug === edition.slug ? "active" : ""}`}
                 >
                   <span className="chart-archive-card-label">{item.label}</span>
-                  <span className="chart-archive-card-date">{item.date} · {item.entryCount} entries</span>
+                  <span className="chart-archive-card-date">{item.date} · {item.entryCount} songs</span>
                   {(item.newCount !== undefined || item.droppedCount !== undefined) && (
                     <div className="flex items-center gap-2 mt-1.5">
                       {item.newCount !== undefined && item.newCount > 0 && (

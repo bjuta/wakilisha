@@ -30,7 +30,7 @@ export default function MobileReleases() {
         setLabels(labelsData);
       } catch (err) {
         if (!alive) return;
-        setError(err instanceof Error ? err.message : "Could not load releases.");
+        setError("Could not load releases.");
       } finally {
         if (alive) setLoading(false);
       }

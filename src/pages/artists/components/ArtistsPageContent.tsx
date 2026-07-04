@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { CoverStories } from "./CoverStories";
 import { ChartList } from "./ChartList";
@@ -48,14 +48,33 @@ const CELL_ASPECTS = ["2/3", "3/4", "1/2", "7/10", "3/5", "2/3", "3/4", "9/16", 
 
 const PAGE_SIZE = 12;
 
-type SortMode = "featured" | "az" | "newest" | "prolific";
+type SortMode = "featured" | "az" | "releases" | "prolific";
 
 const SORT_OPTIONS: { key: SortMode; label: string; icon: string }[] = [
   { key: "featured", label: "Featured", icon: "ri-star-line" },
   { key: "az", label: "A–Z", icon: "ri-sort-alphabet-asc" },
-  { key: "newest", label: "Newest", icon: "ri-calendar-event-line" },
+  { key: "releases", label: "Most releases", icon: "ri-album-line" },
   { key: "prolific", label: "Most tracks", icon: "ri-stack-line" },
 ];
+
+function hasRealImage(a: PublicArtist): boolean {
+  return Boolean(a.imageUrl && String(a.imageUrl).startsWith("http"));
+}
+
+/* Discovery signal: chart presence, momentum, completeness, and activity.
+   Keeps low-signal artists searchable but off page one of the default view. */
+function signalScore(a: PublicArtist): number {
+  let score = 0;
+  if (a.isChartArtist) score += 400;
+  if (a.topChartPosition) score += Math.max(0, 100 - a.topChartPosition);
+  if (a.isRising) score += 140;
+  if (hasRealImage(a)) score += 160;
+  score += Math.min(a.trackCount, 40) * 4;
+  score += Math.min(a.releaseCount, 20) * 6;
+  if (a.genres.length > 0) score += 30;
+  if (a.country && a.country !== "Unknown") score += 20;
+  return score;
+}
 
 function seededRandom(seed: string) {
   let h = 0;
@@ -70,8 +89,8 @@ function enrichArtist(artist: PublicArtist) {
     "Tracks, releases, and chart history gathered in one place.",
     "Follow the songs, genres, and routes around this artist.",
     "From early releases to wider audience attention.",
-    "Sound, scene, and release context in one artist record.",
-    "Part of the wider WAKILISHA artist archive.",
+    "Sound, scene, and story, all in one artist profile.",
+    "Part of the wider WAKILISHA artist lineup.",
     "Browse the work, links, and listening routes around this artist.",
   ];
   return {
@@ -86,6 +105,9 @@ function enrichArtist(artist: PublicArtist) {
 type ViewMode = "grid" | "list";
 
 export default function ArtistsPageContent() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const rawCountryParam = searchParams.get("country") || "";
+  const countryParam = rawCountryParam ? normalizeCountry(rawCountryParam) : "";
   const [artists, setArtists] = useState<PublicArtist[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [error, setError] = useState<string | null>(null);
@@ -94,6 +116,19 @@ export default function ArtistsPageContent() {
   const [view, setView] = useState<ViewMode>("grid");
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [sortMode, setSortMode] = useState<SortMode>("featured");
+
+  /* Country arrives via ?country= links (origin tiles) — land the reader on the browse section */
+  useEffect(() => {
+    if (countryParam && status === "ready") {
+      document.getElementById("directory")?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [countryParam, status]);
+
+  const clearCountry = () => {
+    searchParams.delete("country");
+    setSearchParams(searchParams, { replace: true });
+    setVisibleCount(PAGE_SIZE);
+  };
 
   useEffect(() => {
     let alive = true;
@@ -106,7 +141,7 @@ export default function ArtistsPageContent() {
       })
       .catch((err) => {
         if (!alive) return;
-        setError(err instanceof Error ? err.message : "Could not load artists.");
+        setError("Could not load artists.");
         setStatus("error");
       });
     return () => { alive = false; };
@@ -115,42 +150,41 @@ export default function ArtistsPageContent() {
   const enriched = useMemo(() => artists.map(enrichArtist), [artists]);
   const chartArtists = useMemo(() => enriched.filter((a) => a.isChartArtist).sort((a, b) => (a.topChartPosition || 999) - (b.topChartPosition || 999)), [enriched]);
   const risingArtists = useMemo(() => enriched.filter((a) => a.isRising).slice(0, 12), [enriched]);
-  const featured = useMemo(() => chartArtists.slice(0, 7), [chartArtists]);
+  /* Featured spotlight is image-led — favor chart leaders with portraits so the cover card lands */
+  const featured = useMemo(() => {
+    const withImage = chartArtists.filter(hasRealImage);
+    const withoutImage = chartArtists.filter((a) => !hasRealImage(a));
+    return [...withImage, ...withoutImage].slice(0, 7);
+  }, [chartArtists]);
 
-  const artistFilters = useMemo(
-    () => ["All", ...Array.from(new Set(artists.flatMap((a) => a.genres))).filter(Boolean).slice(0, 20)],
-    [artists]
-  );
+  const artistFilters = useMemo(() => {
+    const counts = new Map<string, number>();
+    artists.forEach((a) => a.genres.forEach((g) => { if (g) counts.set(g, (counts.get(g) || 0) + 1); }));
+    const ranked = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]).map(([g]) => g);
+    return ["All", ...ranked.slice(0, 20)];
+  }, [artists]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return artists.filter((a) => {
       const matchesFilter = filter === "All" || a.genres.some((g) => g === filter);
+      const matchesCountry = !countryParam || normalizeCountry(a.country) === countryParam;
       const matchesQuery = !q || a.name.toLowerCase().includes(q) || a.genres.some((g) => g.toLowerCase().includes(q)) || getCountryLabel(a.country).toLowerCase().includes(q);
-      return matchesFilter && matchesQuery;
+      return matchesFilter && matchesCountry && matchesQuery;
     });
-  }, [artists, filter, query]);
+  }, [artists, filter, query, countryParam]);
 
   /* ── Smart sorting ── */
   const sorted = useMemo(() => {
     const list = [...filtered];
     switch (sortMode) {
       case "featured":
-        list.sort((a, b) => {
-          const aChart = a.isChartArtist ? 1 : 0;
-          const bChart = b.isChartArtist ? 1 : 0;
-          if (aChart !== bChart) return bChart - aChart;
-          if (a.isChartArtist && b.isChartArtist) {
-            return (a.topChartPosition || 999) - (b.topChartPosition || 999);
-          }
-          if (a.trackCount !== b.trackCount) return b.trackCount - a.trackCount;
-          return a.name.localeCompare(b.name);
-        });
+        list.sort((a, b) => signalScore(b) - signalScore(a) || a.name.localeCompare(b.name));
         break;
       case "az":
         list.sort((a, b) => a.name.localeCompare(b.name));
         break;
-      case "newest":
+      case "releases":
         list.sort((a, b) => b.releaseCount - a.releaseCount || b.trackCount - a.trackCount || a.name.localeCompare(b.name));
         break;
       case "prolific":
@@ -177,16 +211,17 @@ export default function ArtistsPageContent() {
       });
     });
     return Array.from(map.entries())
-      .map(([genre, list]) => ({ genre, artists: list.slice(0, 10) }))
+      .map(([genre, list]) => ({ genre, artists: [...list].sort((a, b) => signalScore(b) - signalScore(a)).slice(0, 10) }))
       .sort((a, b) => b.artists.length - a.artists.length)
       .slice(0, 6);
   }, [enriched]);
 
-  /* origin groups */
+  /* origin groups — countries only; artists without one stay searchable below */
   const originGroups = useMemo(() => {
     const map = new Map<string, PublicArtist[]>();
     enriched.forEach((a) => {
-      const c = normalizeCountry(a.country) || "Unknown";
+      const c = a.country && a.country !== "Unknown" ? normalizeCountry(a.country) : "";
+      if (!c || c === "Unknown") return;
       if (!map.has(c)) map.set(c, []);
       map.get(c)!.push(a);
     });
@@ -196,7 +231,7 @@ export default function ArtistsPageContent() {
         artistCount: list.length,
         chartCount: list.filter((a) => a.isChartArtist).length,
         risingCount: list.filter((a) => a.isRising).length,
-        artists: list.slice(0, 8),
+        artists: [...list].sort((a, b) => signalScore(b) - signalScore(a)).slice(0, 8),
       }))
       .sort((a, b) => b.artistCount - a.artistCount)
       .slice(0, 8);
@@ -309,17 +344,36 @@ export default function ArtistsPageContent() {
       </div>
 
       {/* ════════ FULL DIRECTORY ════════ */}
-      <section id="directory" className="px-4 md:px-6 py-14 md:py-20">
+      <section id="directory" className="scroll-mt-16 px-4 md:px-6 py-14 md:py-20">
         <div className="wk-container-wide">
           <div className="mb-10 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
             <div>
-              <div className="wk-eyebrow mb-3">Artist archive</div>
-              <h2 className="wk-h-page">Browse artists</h2>
+              <div className="wk-eyebrow mb-3">Every artist</div>
+              <h2 className="wk-h-page">{countryParam ? `Artists from ${countryParam}` : "Browse artists"}</h2>
             </div>
             <p className="wk-copy max-w-[44ch] text-[13px]">
               Search by name, country, genre, chart moments, or release history. Start with who you know. Leave with someone new.
             </p>
           </div>
+
+          {/* Active country filter */}
+          {countryParam && (
+            <div className="mb-4 flex items-center gap-2">
+              <span className="inline-flex items-center gap-2 rounded-full bg-[var(--wk-brand-soft)] pl-3.5 pr-1.5 py-1.5 text-[12px] font-bold text-[var(--wk-brand)]">
+                {getCountryFlagUrl(countryParam, 40) && (
+                  <img src={getCountryFlagUrl(countryParam, 40)!} alt="" className="h-3.5 w-5 rounded-[2px] object-cover" />
+                )}
+                {countryParam}
+                <button
+                  onClick={clearCountry}
+                  aria-label={`Stop filtering by ${countryParam}`}
+                  className="flex h-6 w-6 items-center justify-center rounded-full transition-colors hover:bg-[var(--wk-brand)]/15"
+                >
+                  <i className="ri-close-line text-[14px]" />
+                </button>
+              </span>
+            </div>
+          )}
 
           {/* Toolbar */}
           <div className="directory-toolbar">
@@ -377,7 +431,17 @@ export default function ArtistsPageContent() {
           {sorted.length === 0 ? (
             <div className="artist-empty">
               <i className="ri-user-search-line text-[32px] text-[var(--wk-text-faint)]" />
-              <div className="mt-3 text-[14px] text-[var(--wk-text-muted)]">No artists match this search.</div>
+              <div className="mt-3 text-[15px] font-bold text-[var(--wk-text)]">No artists found</div>
+              <div className="mt-1 text-[13px] text-[var(--wk-text-muted)]">Try another name, genre, or country.</div>
+              {(query || filter !== "All" || countryParam) && (
+                <button
+                  onClick={() => { setQuery(""); setFilter("All"); if (countryParam) clearCountry(); setVisibleCount(PAGE_SIZE); }}
+                  className="mt-5 inline-flex items-center gap-2 rounded-full border border-[var(--wk-border-2)] bg-[var(--wk-surface)] px-5 py-2.5 text-[12px] font-bold text-[var(--wk-text)] transition-all hover:border-[var(--wk-brand)] hover:text-[var(--wk-brand)]"
+                >
+                  <i className="ri-refresh-line text-[13px]" />
+                  Clear search and filters
+                </button>
+              )}
             </div>
           ) : view === "grid" ? (
             <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 md:gap-5 lg:grid-cols-4">
@@ -410,9 +474,15 @@ export default function ArtistsPageContent() {
                       {flagUrl && (
                         <img src={flagUrl} alt="" loading="lazy" className="h-3.5 w-5 shrink-0 rounded-[2px] object-cover" />
                       )}
-                      <span>{getCountryLabel(artist.country)}</span>
-                      <span>·</span>
-                      <span>{artist.trackCount} tracks</span>
+                      {getCountryLabel(artist.country) !== "Unknown origin" && (
+                        <span>{getCountryLabel(artist.country)}</span>
+                      )}
+                      {artist.trackCount > 0 && (
+                        <>
+                          {getCountryLabel(artist.country) !== "Unknown origin" && <span>·</span>}
+                          <span>{artist.trackCount} track{artist.trackCount !== 1 ? "s" : ""}</span>
+                        </>
+                      )}
                     </div>
                     {artist.genres.length > 0 && (
                       <div className="mt-2.5 flex flex-wrap gap-1">
@@ -457,11 +527,20 @@ export default function ArtistsPageContent() {
                       {flagUrl && (
                         <img src={flagUrl} alt="" loading="lazy" className="h-3.5 w-5 shrink-0 rounded-[2px] object-cover" />
                       )}
-                      <span>{getCountryLabel(artist.country)}</span>
-                      <span className="opacity-40">·</span>
-                      <span>{artist.trackCount} tracks</span>
-                      <span className="opacity-40">·</span>
-                      <span>{artist.releaseCount} releases</span>
+                      {(() => {
+                        const meta: string[] = [];
+                        const countryLabel = getCountryLabel(artist.country);
+                        if (countryLabel !== "Unknown origin") meta.push(countryLabel);
+                        if (artist.trackCount > 0) meta.push(`${artist.trackCount} track${artist.trackCount !== 1 ? "s" : ""}`);
+                        if (artist.releaseCount > 0) meta.push(`${artist.releaseCount} release${artist.releaseCount !== 1 ? "s" : ""}`);
+                        if (meta.length < 2 && artist.genres.length > 0) meta.push(artist.genres[0]);
+                        return meta.map((item, i) => (
+                          <span key={item} className="inline-flex items-center gap-x-2">
+                            {i > 0 && <span className="opacity-40">·</span>}
+                            <span>{item}</span>
+                          </span>
+                        ));
+                      })()}
                     </div>
                   </div>
                   <div className="shrink-0 text-[var(--wk-text-faint)] transition-all group-hover:translate-x-1 group-hover:text-[var(--wk-brand)]">
@@ -488,6 +567,30 @@ export default function ArtistsPageContent() {
               </span>
             </div>
           )}
+
+          {/* Keep exploring */}
+          <div className="mt-14 grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {[
+              { to: "/charts", icon: "ri-bar-chart-line", title: "This week's charts", desc: "See who's moving right now." },
+              { to: "/genres", icon: "ri-compass-3-line", title: "Explore by genre", desc: "Follow a sound, find its people." },
+              { to: "/releases", icon: "ri-album-line", title: "Latest releases", desc: "Albums, EPs, and singles worth your time." },
+            ].map((path) => (
+              <Link
+                key={path.to}
+                to={path.to}
+                className="group flex items-center gap-4 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-5 transition-all duration-[var(--wk-d-standard)] hover:-translate-y-0.5 hover:border-[var(--wk-brand)]"
+              >
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]">
+                  <i className={`${path.icon} text-[18px]`} />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-[14px] font-extrabold text-[var(--wk-text)] transition-colors group-hover:text-[var(--wk-brand)]">{path.title}</span>
+                  <span className="block text-[12px] text-[var(--wk-text-muted)]">{path.desc}</span>
+                </span>
+                <i className="ri-arrow-right-line ml-auto shrink-0 text-[var(--wk-text-faint)] transition-all group-hover:translate-x-1 group-hover:text-[var(--wk-brand)]" />
+              </Link>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -572,7 +675,7 @@ function SplitHero({ artists }: SplitHeroProps) {
   return (
     <section
       ref={heroRef}
-      className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-black"
+      className="relative flex min-h-[clamp(480px,88svh,760px)] flex-col items-center justify-center overflow-hidden bg-black md:min-h-screen"
     >
       <style>{`
         @keyframes wkColFadeIn {
@@ -711,6 +814,22 @@ function SplitHero({ artists }: SplitHeroProps) {
             Find the artists shaping African music, from familiar names to rising voices,
             deep catalog acts, scene builders, and people you are about to start pretending you knew all along.
           </p>
+
+          <div className="hero-text-reveal-d2 mt-2 flex flex-wrap items-center justify-center gap-3">
+            <a
+              href="#chart-focus"
+              className="inline-flex min-h-[44px] items-center gap-2 rounded-full bg-[var(--wk-brand)] px-6 py-3 text-[13px] font-extrabold text-[var(--wk-brand-on)] transition-transform hover:-translate-y-0.5"
+            >
+              <i className="ri-bar-chart-line text-[14px]" />
+              Start with the charts
+            </a>
+            <a
+              href="#directory"
+              className="inline-flex min-h-[44px] items-center gap-2 rounded-full border border-white/30 bg-white/10 px-6 py-3 text-[13px] font-extrabold text-white backdrop-blur-md transition-all hover:-translate-y-0.5 hover:bg-white/20"
+            >
+              Browse everyone
+            </a>
+          </div>
         </div>
 
 

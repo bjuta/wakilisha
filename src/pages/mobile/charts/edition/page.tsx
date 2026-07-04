@@ -252,7 +252,7 @@ export default function MobileChartEdition() {
       );
       setArchive(toChartArchiveViewModel(allEditions, entriesMap));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unknown error");
+      setError("Could not load this chart right now.");
     } finally {
       setLoading(false);
     }

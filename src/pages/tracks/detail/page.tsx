@@ -501,7 +501,7 @@ function TrackAlbumContextSection({ vm }: { vm: TrackViewModel }) {
               {vm.releaseTracks.length > 1 && (
                 <span className="inline-flex items-center gap-2.5 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-5 py-3 text-[13px] font-bold text-[var(--wk-text-muted)]">
                   <WkIcon name="ListMusic" size={15} />
-                  {vm.releaseTracks.length} tracks loaded
+                  {vm.releaseTracks.length} tracks on this release
                 </span>
               )}
             </div>
@@ -824,7 +824,7 @@ export default function TrackDetail() {
       })
       .catch((err) => {
         if (!alive) return;
-        setError(err instanceof Error ? err.message : "Could not load track.");
+        setError("Could not load track.");
         setLoading(false);
       });
 
@@ -935,7 +935,7 @@ export default function TrackDetail() {
       if (result) setTrackSaved(result.saved);
     } catch (err) {
       console.error("Could not save track", err);
-      setTrackSaveError(err instanceof Error ? err.message : "Could not save this track.");
+      setTrackSaveError("Could not save this track.");
     }
   };
 

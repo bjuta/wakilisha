@@ -193,7 +193,7 @@ function AboutNewsletter() {
       });
       setDone(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+      setError("We couldn't sign you up. Try again in a moment.");
     }
   };
 
@@ -441,10 +441,10 @@ export default function AboutPage() {
           </div>
           <div className="max-w-[760px]">
             <p className="text-[clamp(18px,2.4vw,28px)] font-black leading-[1.04] tracking-[-0.04em] text-[var(--wk-text)]">
-              Your people are here. Your music is here. Your stories deserve infrastructure that understands them.
+              Your people are here. Your music is here. Your stories deserve a home that understands them.
             </p>
             <p className="mt-6 text-[15px] leading-relaxed text-[var(--wk-text-muted)]">
-              WAKILISHA exists because African creativity needs more than attention. It needs visible authorship, reliable records, practical discovery, and an ecosystem that can stand up to scrutiny from readers, contributors, partners, and investors.
+              WAKILISHA exists because African creativity needs more than attention. It needs visible authorship, accurate history, practical discovery, and a standard that can stand up to scrutiny from readers, contributors, partners, and investors.
             </p>
           </div>
         </section>

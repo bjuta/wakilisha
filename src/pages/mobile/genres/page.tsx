@@ -40,7 +40,7 @@ export default function MobileGenres() {
       const data = await listGenres();
       setGenres(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load genres.");
+      setError("Could not load genres.");
     } finally {
       setLoading(false);
     }

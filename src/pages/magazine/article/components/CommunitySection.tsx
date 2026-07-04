@@ -157,7 +157,7 @@ export function CommunitySection({ entity, user }: CommunitySectionProps) {
         </div>
         <p className="text-[15px] font-bold text-[var(--wk-text)] mb-1">Couldn't load comments</p>
         <p className="text-[13px] text-[var(--wk-text-muted)] mb-4">
-          {error?.message || "Something went wrong. Try again."}
+          Give it another try.
         </p>
         <button
           onClick={refresh}

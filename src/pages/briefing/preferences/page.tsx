@@ -68,7 +68,7 @@ export default function BriefingPreferencesPage() {
         context: { email, briefing_count: slugs.length, briefings: slugs }
       });
     } catch (err: unknown) {
-      setSaveError(err instanceof Error ? err.message : "Could not save preferences. Try again.");
+      setSaveError("Could not save preferences. Try again.");
       setState((s) => (s.stage === "ready" ? { ...s, saving: false } : s));
     }
   };
@@ -84,7 +84,7 @@ export default function BriefingPreferencesPage() {
       });
       window.location.href = `/briefing/unsubscribe?token=${token}`;
     } catch (err: unknown) {
-      setSaveError(err instanceof Error ? err.message : "Something went wrong.");
+      setSaveError("We couldn't unsubscribe you. Try again in a moment.");
       setState((s) => (s.stage === "ready" ? { ...s, saving: false } : s));
     }
   };
@@ -108,7 +108,7 @@ export default function BriefingPreferencesPage() {
             <div className="w-14 h-14 rounded-full bg-[var(--wk-danger-soft)] flex items-center justify-center mx-auto mb-5">
               <i className="ri-error-warning-line text-[26px] text-[var(--wk-danger)]" />
             </div>
-            <h2 className="text-[22px] font-black tracking-[-0.03em] text-[var(--wk-text)] mb-2">Something went wrong</h2>
+            <h2 className="text-[22px] font-black tracking-[-0.03em] text-[var(--wk-text)] mb-2">We couldn't load this</h2>
             <p className="text-[14px] leading-relaxed text-[var(--wk-text-muted)] max-w-[360px] mx-auto mb-6">{state.message}</p>
             <Link
               to="/"

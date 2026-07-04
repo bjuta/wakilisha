@@ -37,13 +37,14 @@ export default function BriefingUnsubscribePage() {
         context: { all: data.all ?? false, briefing: data.briefing ?? null }
       });
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Something went wrong.";
-      if (/expired/i.test(msg)) {
+      const rawMessage = err instanceof Error ? err.message : "";
+      if (/expired/i.test(rawMessage)) {
         setState({ stage: "expired" });
         trackEvent("briefing_unsubscribe_expired", { pageType: "briefing_unsubscribe" });
       } else {
+        const msg = "We couldn't unsubscribe you. Try again in a moment.";
         setState({ stage: "error", message: msg });
-        trackEvent("briefing_unsubscribe_error", { pageType: "briefing_unsubscribe", context: { reason: msg } });
+        trackEvent("briefing_unsubscribe_error", { pageType: "briefing_unsubscribe", context: { reason: rawMessage || msg } });
       }
     }
   };
@@ -70,7 +71,7 @@ export default function BriefingUnsubscribePage() {
       setState({ stage: "manual_done", message: "You have been unsubscribed from all WAKILISHA briefings." });
       trackEvent("briefing_manual_unsubscribe", { pageType: "briefing_unsubscribe", context: { email_domain: email.trim().split("@")[1] } });
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Could not process your request.";
+      const msg = "Could not process your request.";
       setState({ stage: "manual_error", message: msg });
       trackEvent("briefing_manual_unsubscribe_error", { pageType: "briefing_unsubscribe", context: { reason: msg } });
     }
@@ -226,7 +227,7 @@ export default function BriefingUnsubscribePage() {
             <div className="w-14 h-14 rounded-full bg-[var(--wk-danger-soft)] flex items-center justify-center mx-auto mb-5">
               <i className="ri-error-warning-line text-[26px] text-[var(--wk-danger)]" />
             </div>
-            <h2 className="text-[22px] font-black tracking-[-0.03em] text-[var(--wk-text)] mb-2">Something went wrong</h2>
+            <h2 className="text-[22px] font-black tracking-[-0.03em] text-[var(--wk-text)] mb-2">We couldn't do that</h2>
             <p className="text-[14px] leading-relaxed text-[var(--wk-text-muted)] max-w-[360px] mx-auto mb-6">{state.message}</p>
             <Link
               to="/"
@@ -243,7 +244,7 @@ export default function BriefingUnsubscribePage() {
             <div className="w-14 h-14 rounded-full bg-[var(--wk-danger-soft)] flex items-center justify-center mx-auto mb-5">
               <i className="ri-error-warning-line text-[26px] text-[var(--wk-danger)]" />
             </div>
-            <h2 className="text-[22px] font-black tracking-[-0.03em] text-[var(--wk-text)] mb-2">Something went wrong</h2>
+            <h2 className="text-[22px] font-black tracking-[-0.03em] text-[var(--wk-text)] mb-2">We couldn't do that</h2>
             <p className="text-[14px] leading-relaxed text-[var(--wk-text-muted)] max-w-[360px] mx-auto mb-6">{state.message}</p>
             <Link
               to="/"

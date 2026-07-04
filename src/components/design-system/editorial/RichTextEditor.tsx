@@ -839,7 +839,7 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 500 }
                   </div>
                 ) : filteredReleases.length === 0 ? (
                   <div className="py-6 text-center text-[12px] text-[var(--wk-text-faint)]">
-                    {releaseSearch.trim() ? "No releases match your search." : "No releases found in registry."}
+                    {releaseSearch.trim() ? "No releases match your search." : "No releases found yet."}
                   </div>
                 ) : (
                   filteredReleases.map((release) => (
@@ -907,7 +907,7 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 500 }
                   </div>
                 ) : filteredArtists.length === 0 ? (
                   <div className="py-6 text-center text-[12px] text-[var(--wk-text-faint)]">
-                    {artistSearch.trim() ? "No artists match your search." : "No artists found in registry."}
+                    {artistSearch.trim() ? "No artists match your search." : "No artists found yet."}
                   </div>
                 ) : (
                   filteredArtists.map((artist) => (
@@ -973,7 +973,7 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 500 }
                   </div>
                 ) : filteredTracks.length === 0 ? (
                   <div className="py-6 text-center text-[12px] text-[var(--wk-text-faint)]">
-                    {trackSearch.trim() ? "No tracks match your search." : "No tracks found in registry."}
+                    {trackSearch.trim() ? "No tracks match your search." : "No tracks found yet."}
                   </div>
                 ) : (
                   filteredTracks.map((track) => (

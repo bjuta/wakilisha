@@ -92,7 +92,7 @@ export default function Home() {
           <div className="border-t border-[var(--wk-danger)]/20 bg-[var(--wk-danger-soft)] px-6 py-3.5">
             <div className="flex items-center gap-2 text-[13px] text-[var(--wk-danger)]" style={{ maxWidth: 1180, margin: "0 auto" }}>
               <i className="ri-error-warning-line" />
-              <span>Some data could not load: {loadError}</span>
+              <span>Some of this page didn't load. Give it another try.</span>
               <button onClick={loadData} className="ml-auto font-bold underline underline-offset-2 cursor-pointer">
                 Retry
               </button>

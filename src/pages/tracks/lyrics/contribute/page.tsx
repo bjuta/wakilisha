@@ -91,7 +91,7 @@ export default function LyricContribution() {
       .catch((err) => {
         if (!alive) return;
         setLoading(false);
-        setError(err instanceof Error ? err.message : 'Could not load track.');
+        setError('Could not load track.');
       });
     return () => { alive = false; };
   }, [artistSlug, trackSlug]);

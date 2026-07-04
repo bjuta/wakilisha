@@ -77,7 +77,7 @@ export default function FollowFormSection({ data }: { data: FollowFormData }) {
 
       setSubmitted(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+      setError("We couldn't sign you up. Try again in a moment.");
     }
 
     setSubmitting(false);

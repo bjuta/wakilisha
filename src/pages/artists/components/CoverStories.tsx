@@ -23,7 +23,7 @@ export function CoverStories({ artists }: CoverStoriesProps) {
   const side = artists.slice(1, 5);
 
   return (
-    <section className="relative overflow-hidden px-4 py-14 md:px-6 md:py-20">
+    <section id="chart-focus" className="relative scroll-mt-20 overflow-hidden px-4 py-14 md:px-6 md:py-20">
       {/* Background accent */}
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute right-0 top-0 h-[500px] w-[500px] translate-x-1/2 rounded-full bg-[var(--wk-brand)] opacity-[0.02] blur-[100px]" />
@@ -77,8 +77,12 @@ export function CoverStories({ artists }: CoverStoriesProps) {
                   <i className="ri-bar-chart-line text-[12px]" />
                   Peak #{hero.topChartPosition}
                 </span>
-                <span>·</span>
-                <span>{hero.country}</span>
+                {hero.country && hero.country !== "Unknown" && (
+                  <>
+                    <span>·</span>
+                    <span>{hero.country}</span>
+                  </>
+                )}
                 <span>·</span>
                 <span>{hero.trackCount} tracks</span>
               </div>
@@ -111,8 +115,12 @@ export function CoverStories({ artists }: CoverStoriesProps) {
                     {artist.name}
                   </h5>
                   <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-white/50">
-                    <span>{artist.country}</span>
-                    <span>·</span>
+                    {artist.country && artist.country !== "Unknown" && (
+                      <>
+                        <span>{artist.country}</span>
+                        <span>·</span>
+                      </>
+                    )}
                     <span>#{artist.topChartPosition}</span>
                   </div>
                   <div className="mt-2 flex flex-wrap gap-1">

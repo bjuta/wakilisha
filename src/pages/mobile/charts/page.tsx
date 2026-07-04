@@ -48,7 +48,7 @@ export default function MobileCharts() {
       const vm = toChartDirectoryViewModel(families, [edition], activeSlug, edition, entries, meta);
       setData(vm);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unknown error");
+      setError("Could not load this chart right now.");
     } finally {
       setLoading(false);
     }
@@ -134,7 +134,7 @@ export default function MobileCharts() {
         <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--wk-danger-soft)] text-[var(--wk-danger)] mx-auto">
           <i className="ri-error-warning-line text-2xl" />
         </div>
-        <h1 className="text-[16px] font-bold text-[var(--wk-text)] mb-2">Could not load chart data</h1>
+        <h1 className="text-[16px] font-bold text-[var(--wk-text)] mb-2">This chart isn't available</h1>
         <p className="text-[13px] text-[var(--wk-text-muted)] mb-4">{error}</p>
         <button onClick={load} className="wk-button wk-button-primary text-[13px]">
           <i className="ri-refresh-line" /> Retry

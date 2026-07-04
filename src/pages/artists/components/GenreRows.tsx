@@ -102,11 +102,13 @@ function GenreShelfRow({ genre, artists, index }: GenreShelf & { index: number }
               <h5 className="text-[14px] font-extrabold leading-tight text-white md:text-[15px]">
                 {artist.name}
               </h5>
-              <div className="mt-1 flex items-center gap-x-2 text-[11px] text-white/50">
-                <span>{artist.trackCount} tracks</span>
-                <span>·</span>
-                <span>{artist.releaseCount} releases</span>
-              </div>
+              {(artist.trackCount > 0 || artist.releaseCount > 0) && (
+                <div className="mt-1 flex items-center gap-x-2 text-[11px] text-white/50">
+                  {artist.trackCount > 0 && <span>{artist.trackCount} tracks</span>}
+                  {artist.trackCount > 0 && artist.releaseCount > 0 && <span>·</span>}
+                  {artist.releaseCount > 0 && <span>{artist.releaseCount} releases</span>}
+                </div>
+              )}
             </div>
 
             {/* Hover play button */}

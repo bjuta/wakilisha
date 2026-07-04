@@ -11,7 +11,7 @@ export default function BriefingIssuePage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!issueId) { setError("No issue ID provided."); setLoading(false); return; }
+    if (!issueId) { setError("We couldn't find this briefing."); setLoading(false); return; }
     let alive = true;
     setLoading(true);
 
@@ -26,14 +26,14 @@ export default function BriefingIssuePage() {
           html = html.replace(/<a href="#"[^>]*>Unsubscribe<\/a>/gi, "<span>Unsubscribe</span>");
           html = html.replace(/<a href="#"[^>]*>Manage preferences<\/a>/gi, "<span>Manage preferences</span>");
           setIssueHtml(html);
-          setIssueTitle(result.issue.title ?? "Briefing Issue");
+          setIssueTitle(result.issue.title ?? "WAKILISHA Briefing");
         } else {
-          setError("This issue doesn't have a web view yet.");
+          setError("This briefing isn't available to view online yet.");
         }
       })
-      .catch((e: any) => {
+      .catch(() => {
         if (!alive) return;
-        setError(e.message || "Failed to load issue.");
+        setError("We couldn't load this briefing.");
       })
       .finally(() => { if (alive) setLoading(false); });
 
@@ -57,7 +57,7 @@ export default function BriefingIssuePage() {
       <div className="min-h-screen flex items-center justify-center flex-col gap-4 px-4" style={{ background: "#f6f4ef" }}>
         <div style={{ fontFamily: "Inter, Arial, sans-serif", textAlign: "center", maxWidth: 400 }}>
           <div style={{ fontSize: 32, marginBottom: 12 }}>📭</div>
-          <h1 style={{ fontSize: 20, fontWeight: 900, color: "#1a1a1a", margin: "0 0 8px" }}>Issue not found</h1>
+          <h1 style={{ fontSize: 20, fontWeight: 900, color: "#1a1a1a", margin: "0 0 8px" }}>Briefing not found</h1>
           <p style={{ fontSize: 14, color: "#5a5a5a", margin: "0 0 20px" }}>{error}</p>
           <Link to="/" style={{ display: "inline-block", background: "#85C441", color: "#111", textDecoration: "none", fontWeight: 800, fontSize: 13, borderRadius: 10, padding: "10px 20px" }}>
             Back to WAKILISHA
