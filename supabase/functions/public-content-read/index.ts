@@ -556,6 +556,97 @@ async function fetchAllRows(
 }
 
 
+async function fetchCuratedArtistGenresByArtistId(
+  supabase: ReturnType<typeof createClient>,
+  artistIdsRaw: string[],
+): Promise<Map<string, string[]>> {
+  const artistIds = [...new Set((artistIdsRaw || []).map(String).filter(Boolean))];
+  const genresByArtistId = new Map<string, string[]>();
+
+  for (const artistId of artistIds) {
+    genresByArtistId.set(artistId, []);
+  }
+
+  if (artistIds.length === 0) return genresByArtistId;
+
+  const artistIdSet = new Set(artistIds);
+  const queryAllActiveRows = artistIds.length > 50;
+
+  const relationshipRows = await fetchAllRows((from, to) => {
+    let query = supabase
+      .from("registry_artist_genres")
+      .select("artist_id, genre_id, raw_genre_name, genre_role, sort_order, status")
+      .eq("status", "active")
+      .range(from, to);
+
+    if (!queryAllActiveRows) {
+      query = query.in("artist_id", artistIds);
+    }
+
+    return query;
+  });
+
+  const filteredRows = relationshipRows.filter((row: any) =>
+    artistIdSet.has(String(row.artist_id || ""))
+  );
+
+  const genreIds = [...new Set(
+    filteredRows
+      .map((row: any) => String(row.genre_id || ""))
+      .filter(Boolean)
+  )];
+
+  if (genreIds.length === 0) return genresByArtistId;
+
+  const { data: genreRows } = await supabase
+    .from("registry_genres")
+    .select("id, slug, name, status")
+    .in("id", genreIds)
+    .eq("status", "active");
+
+  const genreNameById = new Map(
+    (genreRows ?? []).map((genre: any) => [
+      String(genre.id),
+      String(genre.name || genre.slug || "").trim(),
+    ])
+  );
+
+  const roleRank: Record<string, number> = {
+    primary: 0,
+    secondary: 1,
+    influence: 2,
+    legacy: 3,
+  };
+
+  const sortedRows = filteredRows.sort((a: any, b: any) => {
+    const aRole = roleRank[String(a.genre_role || "secondary")] ?? 99;
+    const bRole = roleRank[String(b.genre_role || "secondary")] ?? 99;
+    if (aRole !== bRole) return aRole - bRole;
+
+    const aSort = Number(a.sort_order ?? 100);
+    const bSort = Number(b.sort_order ?? 100);
+    if (aSort !== bSort) return aSort - bSort;
+
+    return String(a.raw_genre_name || "").localeCompare(String(b.raw_genre_name || ""));
+  });
+
+  for (const row of sortedRows) {
+    const artistId = String(row.artist_id || "");
+    const genreId = String(row.genre_id || "");
+    const genreName = genreNameById.get(genreId) || String(row.raw_genre_name || "").trim();
+
+    if (!artistId || !genreName) continue;
+
+    const current = genresByArtistId.get(artistId) || [];
+    if (!current.includes(genreName)) current.push(genreName);
+    genresByArtistId.set(artistId, current);
+  }
+
+  return genresByArtistId;
+}
+
+
+
 async function fetchLabelMapForReleases(supabase: ReturnType<typeof createClient>, releases: Array<{ label_id?: string | null }>): Promise<Map<string, string>> {
   const labelIds = [...new Set(releases.map((r) => r.label_id).filter(Boolean).map(String))];
   if (!labelIds.length) return new Map();
@@ -749,9 +840,8 @@ Deno.serve(async (req) => {
       const socialSpotify = String(meta.social_spotify || "");
       const youtubeChannel = String(meta.youtube_channel || "");
       const spotifyImage = String(meta.spotify_image || meta.portrait_image || "");
-      const genresArr = meta.genres; const genres: string[] = [];
-      if (Array.isArray(genresArr)) { for (const g of genresArr as string[]) genres.push(String(g)); }
-      if (meta.country) genres.push(String(meta.country));
+      const curatedGenresByArtistId = await fetchCuratedArtistGenresByArtistId(supabase, [String(artist.id)]);
+      const curatedGenres = curatedGenresByArtistId.get(String(artist.id)) ?? [];
       const topSongs = await getTopSongsFromRelationships(supabase, slug);
       const wpBio = String(artist.bio || "");
       const tagline = String(meta.tagline || "");
@@ -771,11 +861,7 @@ Deno.serve(async (req) => {
       const metaAlbums = Array.isArray(meta.studio_albums) ? meta.studio_albums as any[] : [];
       const metaEps = Array.isArray(meta.eps_compilations) ? meta.eps_compilations as any[] : [];
       const releases = await getArtistDiscography(supabase, String(artist.id), displayName, metaAlbums, metaEps);
-      const aggregatedGenres = new Set<string>();
-      for (const r of releases) { if (r.genres) { for (const g of r.genres) { aggregatedGenres.add(g); } } }
-      if (Array.isArray(genresArr)) { for (const g of genresArr as string[]) { aggregatedGenres.add(String(g)); } }
-      if (meta.country) aggregatedGenres.add(String(meta.country));
-      const allGenres = [...aggregatedGenres];
+      const allGenres = curatedGenres;
       const { data: chartEntriesBySlug } = await supabase.from("wk_chart_entries_v2").select("rank, track_title, track_slug, movement, previous_rank, artwork_url, edition_id, artist_name").eq("artist_slug", slug).order("rank", { ascending: true }).limit(50);
       let chartEntries = chartEntriesBySlug ?? [];
       if (chartEntries.length === 0 && displayName) { const { data: chartEntriesByName } = await supabase.from("wk_chart_entries_v2").select("rank, track_title, track_slug, movement, previous_rank, artwork_url, edition_id, artist_name").ilike("artist_name", displayName).order("rank", { ascending: true }).limit(50); chartEntries = chartEntriesByName ?? []; }
@@ -810,6 +896,7 @@ Deno.serve(async (req) => {
       } else {
         const artistIdSet = new Set(artists.map((a: any) => String(a.id)).filter(Boolean));
         const artistSlugSet = new Set(artists.map((a: any) => String(a.slug)).filter(Boolean));
+        const curatedGenresByArtistId = await fetchCuratedArtistGenresByArtistId(supabase, Array.from(artistIdSet));
 
         const trackCountByArtistId = new Map<string, Set<string>>();
         const trackCountByArtistSlug = new Map<string, Set<string>>();
@@ -865,9 +952,8 @@ Deno.serve(async (req) => {
 
         data = {
           artists: artists.map((a: any) => {
-            const meta = (a.metadata || {}) as Record<string, unknown>;
-            const ag: string[] = Array.isArray(meta.genres) ? (meta.genres as string[]).map(String) : [];
             const aid = String(a.id);
+            const ag: string[] = curatedGenresByArtistId.get(aid) ?? [];
             const aSlug = String(a.slug);
 
             const trackCount = Math.max(
