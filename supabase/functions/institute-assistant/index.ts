@@ -88,7 +88,7 @@ Deno.serve(async (req) => {
   const allowed = await requireCap(auth.id, "institute_assistant_use", db);
   if (!allowed) return jsonErr("forbidden", "Your role cannot run Inquiry Assistant jobs.", cors, 403);
 
-  let body: { inquiryId?: string; jobType?: string };
+  let body: { inquiryId?: string; jobType?: string; input?: { evidenceItemId?: string } };
   try {
     body = await req.json();
   } catch {
@@ -105,14 +105,31 @@ Deno.serve(async (req) => {
   const ctx = await gatherContext(db, inquiryId);
   if (!ctx) return jsonErr("not_found", "That inquiry could not be found.", cors, 404);
 
+  if (job.requiresTargetEvidence) {
+    const evidenceItemId = String(body.input?.evidenceItemId ?? "").trim();
+    if (!evidenceItemId) return jsonErr("bad_request", "This job needs an evidence item to read.", cors, 400);
+    const { data: target } = await db
+      .from("institute_evidence_items")
+      .select("id, title, evidence_kind, source, source_url, summary, why_it_matters, review_state")
+      .eq("id", evidenceItemId)
+      .eq("inquiry_id", inquiryId)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (!target) return jsonErr("not_found", "That evidence item could not be found on this inquiry.", cors, 404);
+    ctx.targetEvidence = target as NonNullable<typeof ctx.targetEvidence>;
+  }
+
   const apiKey = await readCred("ANTHROPIC_API_KEY", "anthropic_api_key", db);
   if (!apiKey) return jsonErr("provider_not_ready", "The assistant provider is not configured yet.", cors, 503);
   const model = (await readCred("INSTITUTE_ASSISTANT_MODEL", "institute_assistant_model", db)) || DEFAULT_MODEL;
 
   const sourceReferences = [
+    ctx.targetEvidence ? { type: "evidence_item", id: ctx.targetEvidence.id, role: "target" } : null,
     ctx.questionVersion ? { type: "question_version", id: ctx.questionVersion.id } : null,
     ctx.anchorSnapshot?.id ? { type: "anchor_context_snapshot", id: ctx.anchorSnapshot.id } : null,
-    ...ctx.evidence.map((item) => ({ type: "evidence_item", id: item.id })),
+    ...ctx.evidence
+      .filter((item) => item.id !== ctx.targetEvidence?.id)
+      .map((item) => ({ type: "evidence_item", id: item.id })),
   ].filter(Boolean);
 
   // 1. Log the run before calling the provider. No invisible magic.
@@ -132,6 +149,7 @@ Deno.serve(async (req) => {
         inquiryCode: ctx.inquiry.code,
         evidenceCount: ctx.evidence.length,
         hasAnchorSnapshot: Boolean(ctx.anchorSnapshot),
+        targetEvidenceId: ctx.targetEvidence?.id ?? null,
       },
       source_references: sourceReferences,
       status: "running",
