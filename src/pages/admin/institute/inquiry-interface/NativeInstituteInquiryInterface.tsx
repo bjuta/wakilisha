@@ -9,6 +9,7 @@ import { WakilishaRecordWorkspace } from "./WakilishaRecordWorkspace";
 import { InstituteClaimsWorkspace } from "./InstituteClaimsWorkspace";
 import InquiryAssistantPanel from "./InquiryAssistantPanel";
 import ClinicScreen from "./ClinicScreen";
+import EvidenceReaderPanel from "./EvidenceReaderPanel";
 import {
   createOrFetchInstituteArticleDraftLink,
   fetchInstituteArticleDraftLink,
@@ -2812,7 +2813,10 @@ export default function NativeInstituteInquiryInterface() {
           ) : state.screen === "anchorBrief" ? (
             <AnchorBriefScreen draft={active} />
           ) : state.screen === "evidence" ? (
-            <EvidenceScreen draft={active} addEvidence={addEvidence} updateDraft={updateActiveDraft} />
+            <>
+              <EvidenceScreen draft={active} addEvidence={addEvidence} updateDraft={updateActiveDraft} />
+              {active && <EvidenceReaderPanel draft={active} onEvidenceChanged={reloadInquiries} />}
+            </>
           ) : state.screen === "claims" ? (
             <InstituteClaimsWorkspace draft={active} addEvidence={addEvidence} />
           ) : state.screen === "review" ? (

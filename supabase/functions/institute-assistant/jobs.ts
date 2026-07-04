@@ -23,6 +23,17 @@ export type JobContext = {
     review_state: string;
   }>;
   workbenchSetup: Record<string, unknown> | null;
+  /** Set when a job targets one evidence item (evidence_reader). */
+  targetEvidence?: {
+    id: string;
+    title: string;
+    evidence_kind: string;
+    source: string;
+    source_url: string | null;
+    summary: string;
+    why_it_matters: string;
+    review_state: string;
+  } | null;
 };
 
 export type SuggestionInsert = {
@@ -45,7 +56,9 @@ export type SuggestionInsert = {
 };
 
 export type JobDefinition = {
-  task: "question_clinic" | "next_step_recommender";
+  task: "question_clinic" | "next_step_recommender" | "evidence_reader";
+  /** When true, the request must name an evidenceItemId and the engine loads it. */
+  requiresTargetEvidence?: boolean;
   promptVersion: string;
   inputSchemaVersion: string;
   outputSchemaVersion: string;
@@ -327,7 +340,184 @@ Your job is to suggest the one next honest move for this inquiry, given its curr
   },
 };
 
+const evidenceReader: JobDefinition = {
+  task: "evidence_reader",
+  requiresTargetEvidence: true,
+  promptVersion: "evidence_reader.v1",
+  inputSchemaVersion: "evidence_context.v1",
+  outputSchemaVersion: "evidence_reader_output.v1",
+  maxTokens: 6000,
+  system: `${DOCTRINE}
+
+Your job is the Evidence Reader. Read one piece of evidence and prepare it for the rest of the inquiry. Extract what the evidence actually contains: a faithful summary, the facts it states, the people, works, places, events, and institutions it names, notes on source quality, contradictions with other evidence in the context, and what context is missing. You may point out possible relationships and possible claims, but extraction is not claim judgment: never declare a claim true, only that the evidence appears to support or complicate it. Stay inside what this evidence says. Do not import outside knowledge as if the evidence contained it.`,
+  outputSchema: {
+    type: "object",
+    additionalProperties: false,
+    required: [
+      "summary",
+      "key_facts",
+      "named_entities",
+      "source_quality_notes",
+      "possible_relationships",
+      "possible_claims",
+      "contradictions",
+      "missing_context",
+      "confidence",
+    ],
+    properties: {
+      summary: { type: "string" },
+      key_facts: { type: "array", items: { type: "string" } },
+      named_entities: {
+        type: "array",
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: ["name", "entity_kind", "note"],
+          properties: {
+            name: { type: "string" },
+            entity_kind: {
+              type: "string",
+              enum: ["person", "work", "place", "event", "institution", "date", "other"],
+            },
+            note: { type: "string" },
+          },
+        },
+      },
+      source_quality_notes: { type: "array", items: { type: "string" } },
+      possible_relationships: {
+        type: "array",
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: ["from_entity", "to_entity", "how", "reason"],
+          properties: {
+            from_entity: { type: "string" },
+            to_entity: { type: "string" },
+            how: { type: "string" },
+            reason: { type: "string" },
+          },
+        },
+      },
+      possible_claims: {
+        type: "array",
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: ["claim", "evidence_role", "reason"],
+          properties: {
+            claim: { type: "string" },
+            evidence_role: { type: "string", enum: ["supports", "complicates", "context"] },
+            reason: { type: "string" },
+          },
+        },
+      },
+      contradictions: { type: "array", items: { type: "string" } },
+      missing_context: { type: "array", items: { type: "string" } },
+      confidence: { type: "integer" },
+    },
+  },
+  buildUserContent: (ctx) => {
+    const target = ctx.targetEvidence;
+    return `Read this one piece of evidence for the inquiry. The wider inquiry context follows for orientation only; extract from the target evidence, not from the other items.\n\nTARGET EVIDENCE:\n${JSON.stringify(target, null, 2)}\n\nINQUIRY CONTEXT:\n${contextJson(ctx)}`;
+  },
+  mapSuggestions: (output, ctx) => {
+    const out = output as {
+      summary: string;
+      key_facts: string[];
+      named_entities: Array<{ name: string; entity_kind: string; note: string }>;
+      source_quality_notes: string[];
+      possible_relationships: Array<{ from_entity: string; to_entity: string; how: string; reason: string }>;
+      possible_claims: Array<{ claim: string; evidence_role: string; reason: string }>;
+      contradictions: string[];
+      missing_context: string[];
+      confidence: number;
+    };
+    const evidenceItemId = ctx.targetEvidence?.id ?? null;
+    const base = { kind: "evidence_extraction", evidenceItemId };
+    const clamp = (n: number) => Math.max(0, Math.min(100, Math.round(n)));
+    const suggestions: SuggestionInsert[] = [];
+
+    suggestions.push({
+      suggestion_type: "known",
+      title: "What this evidence says",
+      body: out.summary,
+      reason: null,
+      confidence: clamp(out.confidence),
+      payload: { ...base, part: "summary", namedEntities: out.named_entities },
+    });
+
+    out.key_facts.forEach((fact) => {
+      suggestions.push({
+        suggestion_type: "known",
+        title: "Fact stated by this evidence",
+        body: fact,
+        reason: null,
+        confidence: null,
+        payload: { ...base, part: "key_fact" },
+      });
+    });
+
+    out.possible_relationships.forEach((rel) => {
+      suggestions.push({
+        suggestion_type: "relationship_lead",
+        title: `${rel.from_entity} and ${rel.to_entity}`,
+        body: rel.how,
+        reason: rel.reason,
+        confidence: null,
+        payload: { ...base, part: "possible_relationship", fromEntity: rel.from_entity, toEntity: rel.to_entity },
+      });
+    });
+
+    out.possible_claims.forEach((claim) => {
+      suggestions.push({
+        suggestion_type: "known",
+        title: "Possible claim, not yet judged",
+        body: claim.claim,
+        reason: claim.reason,
+        confidence: null,
+        payload: { ...base, part: "possible_claim", evidenceRole: claim.evidence_role },
+      });
+    });
+
+    out.source_quality_notes.forEach((note) => {
+      suggestions.push({
+        suggestion_type: "risk_note",
+        title: "Source quality",
+        body: note,
+        reason: null,
+        confidence: null,
+        payload: { ...base, part: "source_quality" },
+      });
+    });
+
+    out.contradictions.forEach((item) => {
+      suggestions.push({
+        suggestion_type: "doubt",
+        title: "This evidence contradicts something",
+        body: item,
+        reason: null,
+        confidence: null,
+        payload: { ...base, part: "contradiction" },
+      });
+    });
+
+    out.missing_context.forEach((item) => {
+      suggestions.push({
+        suggestion_type: "evidence_gap",
+        title: "Context this evidence is missing",
+        body: item,
+        reason: null,
+        confidence: null,
+        payload: { ...base, part: "missing_context" },
+      });
+    });
+
+    return suggestions;
+  },
+};
+
 export const JOB_REGISTRY: Record<string, JobDefinition> = {
   question_clinic: questionClinic,
   next_step_recommender: nextStepRecommender,
+  evidence_reader: evidenceReader,
 };

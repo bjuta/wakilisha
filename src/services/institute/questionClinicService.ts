@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { logLearningEvent } from "@/services/institute/learningEventsService";
 
 // Question Clinic service. Sharpens questions without ever overwriting them:
 // every change is a new version with a reason, the old versions stay, and a
@@ -85,29 +86,6 @@ export async function listQuestionVersions(inquiryId: string): Promise<QuestionV
 async function currentUserId(): Promise<string | null> {
   const { data } = await supabase.auth.getUser();
   return data?.user?.id ?? null;
-}
-
-async function logLearningEvent(
-  inquiryId: string,
-  eventType: string,
-  eventLabel: string,
-  beforeValue: Record<string, unknown>,
-  afterValue: Record<string, unknown>,
-  metadata: Record<string, unknown> = {},
-): Promise<void> {
-  const actorId = await currentUserId();
-  const { error } = await supabase.from("institute_events").insert({
-    inquiry_id: inquiryId,
-    actor_id: actorId,
-    event_type: eventType,
-    event_label: eventLabel,
-    before_value: beforeValue,
-    after_value: afterValue,
-    metadata,
-  });
-  // A missing learning event must not block the human's work; the version
-  // history itself remains the primary trail.
-  if (error) console.error("[questionClinic] learning event not saved:", error.message);
 }
 
 export type RefinementInput = {
