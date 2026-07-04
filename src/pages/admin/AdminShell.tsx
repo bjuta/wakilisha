@@ -20,6 +20,7 @@ const NAV_GROUPS: NavGroup[] = [
   { label: "Institute", icon: "BookOpen", visible: (can) => can("view_dashboard") || can("view_admin_readonly"), items: [
     { path: "/admin/institute/inquiry-interface?screen=home", label: "All inquiries", icon: "LayoutDashboard" },
     { path: "/admin/institute/inquiry-interface?screen=workbench", label: "Workbench", icon: "BookOpen" },
+    { path: "/admin/institute/inquiry-interface?screen=clinic", label: "Question Clinic", icon: "HelpCircle" },
     { path: "/admin/institute/inquiry-interface?screen=anchorBrief", label: "Anchor brief", icon: "Fingerprint" },
     { path: "/admin/institute/inquiry-interface?screen=evidence", label: "Evidence", icon: "FileText" },
     { path: "/admin/institute/inquiry-interface?screen=claims", label: "Claims", icon: "GitPullRequest" },
