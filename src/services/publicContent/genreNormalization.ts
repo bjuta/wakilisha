@@ -88,6 +88,53 @@ function titleCaseGenre(value: string): string {
     .join(" ");
 }
 
+export const DISCOVERY_GENRE_ORDER = [
+  "Afrobeats",
+  "Amapiano",
+  "Hip-hop",
+  "Bongo Flava",
+  "Gengetone",
+  "R&B",
+  "Afro R&B",
+  "Afro-soul",
+  "Afro-pop",
+  "Afro-fusion",
+  "Dancehall",
+  "Genge",
+  "Arbantone",
+  "Gospel",
+  "Alté",
+  "3-Step",
+  "Gqom",
+  "Hiplife",
+  "Rumba Congolaise",
+  "Singeli",
+] as const;
+
+const DISCOVERY_GENRE_RANK = new Map<string, number>(
+  DISCOVERY_GENRE_ORDER.map((genre, index) => [cleanGenreKey(genre), index])
+);
+
+export function getGenreDiscoveryRank(genre: string): number {
+  const normalized = normalizeGenre(genre) || genre;
+  return DISCOVERY_GENRE_RANK.get(cleanGenreKey(normalized)) ?? 999;
+}
+
+export function sortGenresByDiscoveryPriority(
+  genres: string[],
+  counts = new Map<string, number>()
+): string[] {
+  return normalizeGenres(genres).sort((a, b) => {
+    const rankDelta = getGenreDiscoveryRank(a) - getGenreDiscoveryRank(b);
+    if (rankDelta !== 0) return rankDelta;
+
+    const countDelta = (counts.get(b) || 0) - (counts.get(a) || 0);
+    if (countDelta !== 0) return countDelta;
+
+    return a.localeCompare(b);
+  });
+}
+
 export function normalizeGenre(value: unknown): string {
   if (typeof value !== "string") return "";
 

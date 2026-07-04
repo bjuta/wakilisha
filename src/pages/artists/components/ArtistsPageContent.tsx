@@ -8,6 +8,7 @@ import { GenreRows } from "./GenreRows";
 import { RisingStars } from "./RisingStars";
 import { normalizeCountry, getCountryFlagUrl, getCountryLabel } from "@/utils/countries";
 import { listArtists, type PublicArtist } from "@/services/publicContent/client";
+import { getGenreDiscoveryRank, sortGenresByDiscoveryPriority } from "@/services/publicContent/genreNormalization";
 import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 
 /* ── Viewport-responsive column count (consistent canvas ↔ production) ── */
@@ -160,7 +161,7 @@ export default function ArtistsPageContent() {
   const artistFilters = useMemo(() => {
     const counts = new Map<string, number>();
     artists.forEach((a) => a.genres.forEach((g) => { if (g) counts.set(g, (counts.get(g) || 0) + 1); }));
-    const ranked = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]).map(([g]) => g);
+    const ranked = sortGenresByDiscoveryPriority(Array.from(counts.keys()), counts);
     return ["All", ...ranked.slice(0, 20)];
   }, [artists]);
 
@@ -201,19 +202,42 @@ export default function ArtistsPageContent() {
 
   const updateFilter = (next: string) => { setFilter(next); setVisibleCount(PAGE_SIZE); };
 
+  const focusGenre = (next: string) => {
+    updateFilter(next);
+    setSortMode("featured");
+    requestAnimationFrame(() => {
+      document.getElementById("directory")?.scrollIntoView({ behavior: "smooth" });
+    });
+  };
+
   /* genre shelves */
   const genreShelves = useMemo(() => {
     const map = new Map<string, PublicArtist[]>();
+
     enriched.forEach((a) => {
-      a.genres.slice(0, 2).forEach((g) => {
+      a.genres.slice(0, 3).forEach((g) => {
         if (!map.has(g)) map.set(g, []);
         map.get(g)!.push(a);
       });
     });
+
     return Array.from(map.entries())
-      .map(([genre, list]) => ({ genre, artists: [...list].sort((a, b) => signalScore(b) - signalScore(a)).slice(0, 10) }))
-      .sort((a, b) => b.artists.length - a.artists.length)
-      .slice(0, 6);
+      .map(([genre, list]) => {
+        const artistsForShelf = [...list].sort((a, b) => signalScore(b) - signalScore(a)).slice(0, 10);
+        return {
+          genre,
+          artistCount: list.length,
+          artists: artistsForShelf,
+        };
+      })
+      .filter((s) => s.artistCount >= 2 || getGenreDiscoveryRank(s.genre) < 999)
+      .sort((a, b) => {
+        const rankDelta = getGenreDiscoveryRank(a.genre) - getGenreDiscoveryRank(b.genre);
+        if (rankDelta !== 0) return rankDelta;
+        return b.artistCount - a.artistCount || b.artists.length - a.artists.length || a.genre.localeCompare(b.genre);
+      })
+      .slice(0, 6)
+      .map(({ genre, artists }) => ({ genre, artists }));
   }, [enriched]);
 
   /* origin groups — countries only; artists without one stay searchable below */
@@ -318,6 +342,7 @@ export default function ArtistsPageContent() {
 
       {/* ════════ EXPLORE BY SOUND ════════ */}
       <GenreRows
+        onGenreSelect={focusGenre}
         shelves={genreShelves.map((s) => ({
           genre: s.genre,
           artists: s.artists.map((a) => ({
