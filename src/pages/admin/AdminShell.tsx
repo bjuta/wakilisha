@@ -25,6 +25,7 @@ const NAV_GROUPS: NavGroup[] = [
     { path: "/admin/institute/inquiry-interface?screen=evidence", label: "Evidence", icon: "FileText" },
     { path: "/admin/institute/inquiry-interface?screen=claims", label: "Claims", icon: "GitPullRequest" },
     { path: "/admin/institute/inquiry-interface?screen=review", label: "Review", icon: "GitPullRequest" },
+    { path: "/admin/institute/inquiry-interface?screen=learned", label: "How this learned", icon: "History" },
   ] },
   { label: "Community", icon: "MessageSquare", visible: (can) => can("moderate_community"), items: [
     { path: "/admin/community", label: "Moderation", icon: "MessageSquare", requiredCapability: "moderate_community", badgeKey: "pendingReports" },
