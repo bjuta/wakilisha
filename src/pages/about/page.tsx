@@ -389,9 +389,8 @@ export default function AboutPage() {
       >
         <div className="absolute inset-0">
           {aboutHeroBackgroundImage && <div className="absolute inset-0 bg-black/68" />}
-          <div className="absolute left-[-12%] top-[-35%] h-[460px] w-[460px] rounded-full bg-[var(--wk-brand)] opacity-18 blur-[120px]" />
+          <div className="absolute inset-y-0 left-0 w-full bg-gradient-to-r from-black/82 via-black/50 to-black/8" />
           <div className="absolute right-[-20%] bottom-[-35%] h-[420px] w-[420px] rounded-full bg-white opacity-[0.06] blur-[120px]" />
-          <div className="absolute inset-0 opacity-[0.055]" style={{ backgroundImage: "linear-gradient(to right, #fff 1px, transparent 1px), linear-gradient(to bottom, #fff 1px, transparent 1px)", backgroundSize: "84px 84px" }} />
         </div>
 
         <div className="relative mx-auto max-w-[1180px] px-5 pb-12 pt-32 sm:px-6 lg:px-8 lg:pb-16 lg:pt-36">
