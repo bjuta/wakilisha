@@ -7,6 +7,7 @@ import {
 import { ArticleEditorWorkspace } from "@/pages/admin/content/articles/detail/ArticleEditorWorkspace";
 import { WakilishaRecordWorkspace } from "./WakilishaRecordWorkspace";
 import { InstituteClaimsWorkspace } from "./InstituteClaimsWorkspace";
+import InquiryAssistantPanel from "./InquiryAssistantPanel";
 import {
   createOrFetchInstituteArticleDraftLink,
   fetchInstituteArticleDraftLink,
@@ -1211,6 +1212,8 @@ function WorkbenchScreen({
           </section>
         </div>
       </div>
+
+      <InquiryAssistantPanel inquiryId={draft.id} workingQuestion={draft.workingQuestion} />
     </div>
   );
 }
