@@ -1876,10 +1876,10 @@ function EvidenceScreen({
       </section>
 
       <div className="grid gap-3 md:grid-cols-4">
-        <EvidenceMetric label="Promised formats" value={formats.length} note="Chosen in Workbench. These control this page." />
-        <EvidenceMetric label="Started" value={producedFormats.length} note="At least one workspace checkpoint exists." />
-        <EvidenceMetric label="Near review" value={completedFormats.length} note="Completion is 80% or higher." />
-        <EvidenceMetric label="Evidence records" value={evidence.length} note="Saved checkpoints and source material." />
+        <EvidenceMetric label="Promised formats" value={formats.length} note="Chosen earlier. Use them as capture lanes." />
+        <EvidenceMetric label="Started" value={producedFormats.length} note="At least one item has been saved." />
+        <EvidenceMetric label="Near review" value={completedFormats.length} note="Ready for an editor to inspect." />
+        <EvidenceMetric label="Evidence records" value={evidence.length} note="Saved evidence and source notes." />
       </div>
 
       {!formats.length ? (
@@ -1920,7 +1920,7 @@ function EvidenceScreen({
 
                     <div className="mt-4">
                       <div className="mb-2 flex items-center justify-between text-[10px] font-black uppercase tracking-[0.14em] text-wk-text-faint">
-                        <span>Completion</span>
+                        <span>Capture state</span>
                         <span>{completion}%</span>
                       </div>
                       <CompletionBar value={completion} />
@@ -2225,7 +2225,7 @@ function EvidenceScreen({
                     </label>
 
                     <label>
-                      <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Completion</span>
+                      <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Capture state</span>
                       <input
                         type="number"
                         min={0}
