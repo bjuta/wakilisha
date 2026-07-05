@@ -7,6 +7,7 @@ import {
 import { ArticleEditorWorkspace } from "@/pages/admin/content/articles/detail/ArticleEditorWorkspace";
 import { WakilishaRecordWorkspace } from "./WakilishaRecordWorkspace";
 import { InstituteClaimsWorkspace } from "./InstituteClaimsWorkspace";
+import { InstitutePlaylistWorkspace } from "./InstitutePlaylistWorkspace";
 import InquiryAssistantPanel from "./InquiryAssistantPanel";
 import ClinicScreen from "./ClinicScreen";
 import EvidenceReaderPanel from "./EvidenceReaderPanel";
@@ -1381,7 +1382,7 @@ type FormatWorkspaceDefinition = {
   evidenceKind: EvidenceKind;
   deck: string;
   productionGoal: string;
-  workspaceType: "article" | "interview" | "audio" | "video" | "photo" | "archive" | "data" | "registry" | "source" | "memory";
+  workspaceType: "article" | "interview" | "audio" | "video" | "photo" | "archive" | "data" | "registry" | "playlist" | "source" | "memory";
   required: string[];
   niceToHave: string[];
   reviewQuestions: string[];
@@ -1457,6 +1458,16 @@ const formatWorkspaceDefinitions: FormatWorkspaceDefinition[] = [
     required: ["Dataset or chart source", "Metric definition", "Date/edition", "Relevant values", "Interpretation note", "Limitations"],
     niceToHave: ["Comparison set", "Chart idea", "CSV/file link", "Method note"],
     reviewQuestions: ["What does the number mean?", "What should we not infer?", "Is the source consistent?"],
+  },
+  {
+    label: "Playlist data",
+    evidenceKind: "Personal note",
+    workspaceType: "playlist",
+    deck: "Create a private playlist draft linked to this Inquiry, with track candidates and provider IDs for later normalization.",
+    productionGoal: "A reviewable playlist work product that can later become a public listening path.",
+    required: ["Playlist title", "Curator label", "Track title", "Artist name", "Provider ID or URL", "Why the track belongs"],
+    niceToHave: ["Registry track ID", "ISRC", "Artwork URL", "Preview URL", "Release title", "Normalization notes"],
+    reviewQuestions: ["Does every track belong?", "Which items need registry matching?", "Is this ready for editor review?"],
   },
   {
     label: "WAKILISHA record",
@@ -1588,6 +1599,7 @@ function EvidenceScreen({
   const activeWorkspace = searchParams.get("workspace");
   const articleWorkspaceOpen = activeWorkspace === "article";
   const registryWorkspaceOpen = activeWorkspace === "registry";
+  const playlistWorkspaceOpen = activeWorkspace === "playlist";
 
   const openWorkspace = (workspace: string) => {
     const nextParams = new URLSearchParams(searchParams);
@@ -1614,6 +1626,11 @@ function EvidenceScreen({
   const openRegistryWorkspace = () => {
     setActiveFormat("WAKILISHA record");
     openWorkspace("registry");
+  };
+
+  const openPlaylistWorkspace = () => {
+    setActiveFormat("Playlist data");
+    openWorkspace("playlist");
   };
 
   const formats = draft?.setup.formats ?? [];
@@ -1935,6 +1952,8 @@ function EvidenceScreen({
                             openArticleWorkspace();
                           } else if (definition.workspaceType === "registry") {
                             openRegistryWorkspace();
+                          } else if (definition.workspaceType === "playlist") {
+                            openPlaylistWorkspace();
                           }
                         }}
                         className="rounded-lg bg-wk-text px-4 py-2 text-[11px] font-black text-wk-bg"
@@ -2118,7 +2137,46 @@ function EvidenceScreen({
             </section>
           ) : null}
 
-          {activeDefinition && activeDefinition.workspaceType !== "article" && activeDefinition.workspaceType !== "registry" ? (
+          {activeDefinition && activeDefinition.workspaceType === "playlist" ? (
+            <section className="space-y-4 rounded-[22px] border border-wk-border bg-wk-surface p-5 shadow-sm">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <div className="text-[10px] font-black uppercase tracking-[0.2em] text-wk-brand">Playlist workspace</div>
+                  <h2 className="mt-2 text-[24px] font-black tracking-[-0.055em] text-wk-text">Build a listening path.</h2>
+                  <p className="mt-2 max-w-3xl text-[13px] leading-6 text-wk-text-muted">
+                    Create a private playlist draft from track candidates. Matching, public routes, and publishing come later.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={openPlaylistWorkspace}
+                  className="rounded-lg bg-wk-brand px-5 py-3 text-[13px] font-black text-wk-brand-on transition"
+                >
+                  Open workspace
+                </button>
+              </div>
+
+              <div className="rounded-xl border border-wk-border bg-wk-bg-subtle p-4">
+                <div className="text-[13px] font-black text-wk-text">Playlist draft bridge ready</div>
+                <p className="mt-1 text-[12px] leading-5 text-wk-text-muted">
+                  The workspace creates a private playlist work product and links it back to this Inquiry.
+                </p>
+              </div>
+
+              <InstituteWorkspaceOverlay
+                open={playlistWorkspaceOpen}
+                eyebrow="Evidence · Playlist"
+                title="Playlist workspace"
+                description="Create a private playlist draft linked to this Inquiry. Editors control public use later."
+                onClose={closeWorkspace}
+              >
+                <InstitutePlaylistWorkspace draft={draft} />
+              </InstituteWorkspaceOverlay>
+            </section>
+          ) : null}
+
+          {activeDefinition && activeDefinition.workspaceType !== "article" && activeDefinition.workspaceType !== "registry" && activeDefinition.workspaceType !== "playlist" ? (
             <div className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
               <Panel eyebrow="2 · Workspace standard" title={`${activeFormat} production room`}>
                 <p className="text-[13px] leading-6 text-wk-text-muted">{activeDefinition.productionGoal}</p>
