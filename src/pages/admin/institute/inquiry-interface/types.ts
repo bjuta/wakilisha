@@ -63,6 +63,9 @@ export type EvidenceKind =
   | "Interview"
   | "Chart data"
   | "Archive document"
+  | "Contributor memory"
+  | "Social post"
+  | "Playlist data"
   | "Personal note";
 
 export type ReviewState =
