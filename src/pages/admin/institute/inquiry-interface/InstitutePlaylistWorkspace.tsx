@@ -174,10 +174,10 @@ export function InstitutePlaylistWorkspace({ draft }: Props) {
         <button
           type="button"
           onClick={createDraft}
-          disabled={creating}
+          disabled={creating || Boolean(createdLink)}
           className="mt-5 rounded-lg bg-wk-brand px-5 py-3 text-[13px] font-black text-wk-brand-on transition disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {creating ? "Creating..." : "Create playlist draft"}
+          {creating ? "Creating..." : createdLink ? "Playlist draft created" : "Create playlist draft"}
         </button>
       </section>
     </div>
