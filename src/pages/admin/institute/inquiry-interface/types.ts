@@ -61,7 +61,10 @@ export type EvidenceKind =
   | "Video"
   | "Photo"
   | "Interview"
+  | "Contributor memory"
+  | "Social post"
   | "Chart data"
+  | "Playlist data"
   | "Archive document"
   | "Personal note";
 

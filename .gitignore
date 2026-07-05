@@ -29,3 +29,7 @@ Thumbs.db
 *.swo
 # Supabase local CLI state
 supabase/.temp/
+
+# Aider local state
+.aider*
+.env

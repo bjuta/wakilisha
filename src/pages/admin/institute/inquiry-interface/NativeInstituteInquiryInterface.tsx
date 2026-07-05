@@ -1850,10 +1850,10 @@ function EvidenceScreen({
               {draft.code} · Evidence workspaces
             </div>
             <h1 className="mt-3 max-w-4xl text-[34px] font-black leading-[1.02] tracking-[-0.065em] text-wk-text lg:text-[42px]">
-              Produce the formats promised in Workbench.
+              Quick evidence capture.
             </h1>
             <p className="mt-3 max-w-3xl text-[14px] leading-6 text-wk-text-muted">
-              This is not another setup page. Workbench decided the evidence formats. This page is where contributors put the work on the table.
+              Capture evidence quickly here. Review and refine later.
             </p>
           </div>
 
@@ -1876,22 +1876,22 @@ function EvidenceScreen({
       </section>
 
       <div className="grid gap-3 md:grid-cols-4">
-        <EvidenceMetric label="Promised formats" value={formats.length} note="Chosen in Workbench. These control this page." />
-        <EvidenceMetric label="Started" value={producedFormats.length} note="At least one workspace checkpoint exists." />
-        <EvidenceMetric label="Near review" value={completedFormats.length} note="Completion is 80% or higher." />
-        <EvidenceMetric label="Evidence records" value={evidence.length} note="Saved checkpoints and source material." />
+        <EvidenceMetric label="Promised formats" value={formats.length} note="Chosen earlier. Use them as capture lanes." />
+        <EvidenceMetric label="Started" value={producedFormats.length} note="At least one item has been saved." />
+        <EvidenceMetric label="Near review" value={completedFormats.length} note="Ready for an editor to inspect." />
+        <EvidenceMetric label="Evidence records" value={evidence.length} note="Saved evidence and source notes." />
       </div>
 
       {!formats.length ? (
         <Panel eyebrow="No formats selected" title="Go back to Workbench first">
           <EmptyState
-            title="Evidence has nothing to produce yet"
-            body="Choose evidence formats in Workbench. Once selected, they appear here as production workspaces."
+            title="No evidence to capture yet"
+            body="Choose evidence formats in Workbench. They will appear here for quick capture."
           />
         </Panel>
       ) : (
         <>
-          <Panel eyebrow="1 · Format queue" title="What did the contributor promise to produce?">
+          <Panel eyebrow="1 · Format queue" title="Formats promised for capture">
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {formats.map((format) => {
                 const definition = workspaceDefinitionFor(format);
@@ -1920,7 +1920,7 @@ function EvidenceScreen({
 
                     <div className="mt-4">
                       <div className="mb-2 flex items-center justify-between text-[10px] font-black uppercase tracking-[0.14em] text-wk-text-faint">
-                        <span>Completion</span>
+                        <span>Capture state</span>
                         <span>{completion}%</span>
                       </div>
                       <CompletionBar value={completion} />
@@ -2225,7 +2225,7 @@ function EvidenceScreen({
                     </label>
 
                     <label>
-                      <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Completion</span>
+                      <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Capture state</span>
                       <input
                         type="number"
                         min={0}
