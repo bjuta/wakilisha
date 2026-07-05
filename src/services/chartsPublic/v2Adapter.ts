@@ -185,11 +185,10 @@ function unwrap<T>(envelope: ApiEnvelope<T> | T): T {
   return envelope as T;
 }
 
-function chartPath(programSlug: string, marketSlug?: string | null, tail?: string): string {
-  const program = String(programSlug || "").replace(/^\/+|\/+$/g, "");
-  const market = String(marketSlug || "").trim().toLowerCase().replace(/^\/+|\/+$/g, "");
+function chartPath(programSlug: string, _marketSlug?: string | null, tail?: string): string {
+  const program = String(programSlug || "").trim().replace(/^\/+|\/+$/g, "");
   const suffix = tail ? `/${String(tail).replace(/^\/+|\/+$/g, "")}` : "";
-  return market ? `/charts/${program}/${market}${suffix}` : `/charts/${program}${suffix}`;
+  return `/charts/${program}${suffix}`;
 }
 
 async function v2GetWithLegacy<T>(primaryPath: string, legacyPath?: string): Promise<T> {

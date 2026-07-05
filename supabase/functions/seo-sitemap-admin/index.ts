@@ -323,7 +323,7 @@ async function buildInternalItems(db: ReturnType<typeof createClient>): Promise<
     if (!programSlug) continue;
 
     items.push({
-      loc: makeUrl(marketSlug ? `/charts/${programSlug}/${marketSlug}/latest` : `/charts/${programSlug}/latest`),
+      loc: makeUrl(`/charts/${programSlug}/latest`),
       lastmod: dateOnly(program.updated_at),
       url_type: "chart",
       source_table: "wk_chart_programs_v2",
