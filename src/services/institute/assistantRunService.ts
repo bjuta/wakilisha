@@ -4,7 +4,7 @@ import { supabase } from "@/lib/supabase";
 // candidates; this service only reads runs, requests new ones, and records
 // human decisions on suggestions. It never writes canonical inquiry data.
 
-export type AssistantJobType = "question_clinic" | "next_step_recommender" | "evidence_reader";
+export type AssistantJobType = "question_clinic" | "next_step_recommender" | "evidence_reader" | "relationship_mapper";
 
 export type AssistantJobInput = { evidenceItemId?: string };
 

@@ -55,8 +55,28 @@ export type SuggestionInsert = {
   payload: Record<string, unknown>;
 };
 
+export const RELATIONSHIP_ENTITY_TYPES = [
+  "artist",
+  "track",
+  "release",
+  "label",
+  "genre",
+  "scene",
+  "place",
+  "event",
+  "institution",
+  "person",
+  "work",
+  "contributor_memory",
+  "evidence_item",
+  "claim",
+  "inquiry",
+] as const;
+
+export const RELATIONSHIP_CONFIDENCE_BANDS = ["well_supported", "partly_supported", "thin_support"] as const;
+
 export type JobDefinition = {
-  task: "question_clinic" | "next_step_recommender" | "evidence_reader";
+  task: "question_clinic" | "next_step_recommender" | "evidence_reader" | "relationship_mapper";
   /** When true, the request must name an evidenceItemId and the engine loads it. */
   requiresTargetEvidence?: boolean;
   promptVersion: string;
@@ -516,8 +536,129 @@ Your job is the Evidence Reader. Read one piece of evidence and prepare it for t
   },
 };
 
+const entitySchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["entity_type", "label", "registry_slug"],
+  properties: {
+    entity_type: { type: "string", enum: [...RELATIONSHIP_ENTITY_TYPES] },
+    label: { type: "string" },
+    registry_slug: { type: "string" },
+  },
+};
+
+const relationshipMapper: JobDefinition = {
+  task: "relationship_mapper",
+  promptVersion: "relationship_mapper.v1",
+  inputSchemaVersion: "inquiry_context_with_evidence_ids.v1",
+  outputSchemaVersion: "relationship_mapper_output.v1",
+  maxTokens: 6000,
+  system: `${DOCTRINE}
+
+Your job is the Relationship Mapper. Suggest relationships across culture objects: people, works, places, scenes, events, institutions, evidence, claims, and inquiries. A relationship is cultural logic, not a decorative link: every candidate needs a plain-language reason and the ids of the evidence items it stands on. Ground candidates only in evidence whose reviewState is "Accepted for internal memory" or "Public-safe candidate". If a connection rests only on unreviewed evidence, you may still surface it, but set recommended_action to hold_as_doubt and say why. If the material is too thin to map anything, return no candidates and explain in material_note. Use registry_slug when the context provides one; otherwise leave it empty. Never invent slugs.`,
+  outputSchema: {
+    type: "object",
+    additionalProperties: false,
+    required: ["candidates", "material_note"],
+    properties: {
+      candidates: {
+        type: "array",
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: [
+            "source_entity",
+            "target_entity",
+            "relationship_kind",
+            "plain_reason",
+            "confidence_band",
+            "evidence_item_ids",
+            "contradictions",
+            "recommended_action",
+          ],
+          properties: {
+            source_entity: entitySchema,
+            target_entity: entitySchema,
+            relationship_kind: { type: "string" },
+            plain_reason: { type: "string" },
+            confidence_band: { type: "string", enum: [...RELATIONSHIP_CONFIDENCE_BANDS] },
+            evidence_item_ids: { type: "array", items: { type: "string" } },
+            contradictions: { type: "array", items: { type: "string" } },
+            recommended_action: { type: "string", enum: ["accept", "review_carefully", "hold_as_doubt"] },
+          },
+        },
+      },
+      material_note: { type: "string" },
+    },
+  },
+  buildUserContent: (ctx) => {
+    const evidenceWithIds = ctx.evidence.map((item) => ({
+      id: item.id,
+      title: item.title,
+      kind: item.evidence_kind,
+      summary: item.summary,
+      whyItMatters: item.why_it_matters,
+      reviewState: item.review_state,
+    }));
+    return `Map relationship candidates for this inquiry. Cite evidence by id from the list below.\n\nEVIDENCE (with ids):\n${JSON.stringify(evidenceWithIds, null, 2)}\n\nINQUIRY CONTEXT:\n${contextJson(ctx)}`;
+  },
+  mapSuggestions: (output, ctx) => {
+    const out = output as {
+      candidates: Array<{
+        source_entity: { entity_type: string; label: string; registry_slug: string };
+        target_entity: { entity_type: string; label: string; registry_slug: string };
+        relationship_kind: string;
+        plain_reason: string;
+        confidence_band: string;
+        evidence_item_ids: string[];
+        contradictions: string[];
+        recommended_action: string;
+      }>;
+      material_note: string;
+    };
+    const knownEvidenceIds = new Set(ctx.evidence.map((item) => item.id));
+    const suggestions: SuggestionInsert[] = [];
+
+    out.candidates.forEach((candidate) => {
+      const evidenceItemIds = candidate.evidence_item_ids.filter((id) => knownEvidenceIds.has(id));
+      suggestions.push({
+        suggestion_type: "relationship_lead",
+        title: `${candidate.source_entity.label} and ${candidate.target_entity.label}`,
+        body: `${candidate.source_entity.label} ${candidate.relationship_kind} ${candidate.target_entity.label}.`,
+        reason: candidate.plain_reason,
+        confidence: null,
+        payload: {
+          kind: "relationship_candidate",
+          sourceEntity: candidate.source_entity,
+          targetEntity: candidate.target_entity,
+          relationshipKind: candidate.relationship_kind,
+          confidenceBand: candidate.confidence_band,
+          evidenceItemIds,
+          contradictions: candidate.contradictions,
+          recommendedAction: candidate.recommended_action,
+          needsEvidence: evidenceItemIds.length === 0,
+        },
+      });
+    });
+
+    if (out.material_note.trim()) {
+      suggestions.push({
+        suggestion_type: "risk_note",
+        title: "About the mapping material",
+        body: out.material_note.trim(),
+        reason: null,
+        confidence: null,
+        payload: { kind: "relationship_material_note" },
+      });
+    }
+
+    return suggestions;
+  },
+};
+
 export const JOB_REGISTRY: Record<string, JobDefinition> = {
   question_clinic: questionClinic,
   next_step_recommender: nextStepRecommender,
   evidence_reader: evidenceReader,
+  relationship_mapper: relationshipMapper,
 };

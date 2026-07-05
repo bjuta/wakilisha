@@ -69,7 +69,7 @@ function assertStrictObjectSchema(schema: Record<string, unknown>, trail: string
 
 describe("assistant job registry", () => {
   it("registers exactly the shipped jobs", () => {
-    expect(Object.keys(JOB_REGISTRY).sort()).toEqual(["evidence_reader", "next_step_recommender", "question_clinic"]);
+    expect(Object.keys(JOB_REGISTRY).sort()).toEqual(["evidence_reader", "next_step_recommender", "question_clinic", "relationship_mapper"]);
   });
 
   it("every job is complete and uses an allowed task name", () => {

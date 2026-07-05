@@ -6,7 +6,7 @@ import { READER_VERDICT_OPTIONS } from "@/services/institute/evidenceReaderServi
 // already exist: question versions, learning events, decided suggestions,
 // and evidence review states. Read-only; nothing here writes.
 
-export type LearningGroup = "question" | "evidence" | "assistant" | "review" | "other";
+export type LearningGroup = "question" | "evidence" | "relationships" | "assistant" | "review" | "other";
 
 export type LearningEntry = {
   id: string;
@@ -20,6 +20,7 @@ export type LearningEntry = {
 export const LEARNING_GROUP_LABELS: Record<LearningGroup, string> = {
   question: "The question",
   evidence: "Evidence",
+  relationships: "Relationships",
   assistant: "Assistant suggestions",
   review: "Review",
   other: "Other",
@@ -66,6 +67,8 @@ const EVENT_GROUPS: Record<string, LearningGroup> = {
   question_refined: "question",
   clinic_assessment_recorded: "question",
   evidence_review_decided: "evidence",
+  relationship_accepted: "relationships",
+  relationship_status_changed: "relationships",
 };
 
 const SUGGESTION_DECISION_LABELS: Record<string, string> = {
@@ -122,7 +125,11 @@ export function buildLearningTimeline(
       group: EVENT_GROUPS[event.event_type] ?? "other",
       title: event.event_label ?? event.event_type,
       body: (() => {
-        const coded = str(after.verdict) ?? str(after.assessment);
+        const source = str(after.source);
+        const kind = str(after.kind);
+        const target = str(after.target);
+        if (source && kind && target) return `${source} ${kind} ${target}.`;
+        const coded = str(after.verdict) ?? str(after.assessment) ?? str(after.status);
         if (coded) return humanize(coded);
         return str(after.question) ?? "";
       })(),

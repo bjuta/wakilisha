@@ -23,6 +23,7 @@ const NAV_GROUPS: NavGroup[] = [
     { path: "/admin/institute/inquiry-interface?screen=clinic", label: "Question Clinic", icon: "HelpCircle" },
     { path: "/admin/institute/inquiry-interface?screen=anchorBrief", label: "Anchor brief", icon: "Fingerprint" },
     { path: "/admin/institute/inquiry-interface?screen=evidence", label: "Evidence", icon: "FileText" },
+    { path: "/admin/institute/inquiry-interface?screen=relationships", label: "Relationships", icon: "GitBranch" },
     { path: "/admin/institute/inquiry-interface?screen=claims", label: "Claims", icon: "GitPullRequest" },
     { path: "/admin/institute/inquiry-interface?screen=review", label: "Review", icon: "GitPullRequest" },
     { path: "/admin/institute/inquiry-interface?screen=learned", label: "How this learned", icon: "History" },

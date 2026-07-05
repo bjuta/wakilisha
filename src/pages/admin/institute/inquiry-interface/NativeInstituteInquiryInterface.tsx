@@ -11,6 +11,7 @@ import InquiryAssistantPanel from "./InquiryAssistantPanel";
 import ClinicScreen from "./ClinicScreen";
 import EvidenceReaderPanel from "./EvidenceReaderPanel";
 import HowThisLearnedScreen from "./HowThisLearnedScreen";
+import RelationshipsScreen from "./RelationshipsScreen";
 import {
   createOrFetchInstituteArticleDraftLink,
   fetchInstituteArticleDraftLink,
@@ -394,7 +395,7 @@ function Rail({
     { screen: "anchorBrief", label: "Anchor brief", badge: active?.anchorContextSnapshot ? "ready" : "none" },
     { screen: "evidence", label: "Evidence", badge: active?.evidence?.length ? String(active.evidence.length) : "0" },
     { screen: "claims", label: "Claims", badge: active?.evidence?.filter((item) => item.metadata?.workspaceType === "claims").length ? String(active.evidence.filter((item) => item.metadata?.workspaceType === "claims").length) : "0" },
-    { screen: "relationships", label: "Relationships", disabled: true },
+    { screen: "relationships", label: "Relationships" },
     { screen: "review", label: "Review", badge: "desk" },
     { screen: "summary", label: "Inquiry summary", disabled: true },
     { screen: "clinic", label: "Question & clinic", badge: active ? `v${active.versionCount}` : "" },
@@ -2729,7 +2730,7 @@ function LockedScreen({ screen }: { screen: InquiryScreen }) {
   );
 }
 
-const globalInstituteScreens = new Set<InquiryScreen>(["home", "workbench", "anchorBrief", "evidence", "claims", "review", "clinic", "learned"]);
+const globalInstituteScreens = new Set<InquiryScreen>(["home", "workbench", "anchorBrief", "evidence", "claims", "review", "clinic", "learned", "relationships"]);
 
 function readInstituteScreen(value: string | null): InquiryScreen {
   return value && globalInstituteScreens.has(value as InquiryScreen) ? (value as InquiryScreen) : "home";
@@ -2826,6 +2827,8 @@ export default function NativeInstituteInquiryInterface() {
             <ClinicScreen draft={active} onQuestionChanged={reloadInquiries} />
           ) : state.screen === "learned" ? (
             <HowThisLearnedScreen draft={active} />
+          ) : state.screen === "relationships" ? (
+            <RelationshipsScreen draft={active} />
         ) : (
           <LockedScreen screen={state.screen} />
         )}
