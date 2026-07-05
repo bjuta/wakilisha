@@ -1,8 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  addInstitutePlaylistItem,
   createInstitutePlaylistDraft,
+  deleteInstitutePlaylistItem,
   fetchInstitutePlaylistDraft,
   fetchInstitutePlaylistDraftLink,
+  moveInstitutePlaylistItem,
+  submitInstitutePlaylistDraftForReview,
   updateInstitutePlaylistDraftMetadata,
   updateInstitutePlaylistItem,
   type InstitutePlaylistDraft,
@@ -73,9 +77,22 @@ export function InstitutePlaylistWorkspace({ draft }: Props) {
   const [editingMetadata, setEditingMetadata] = useState(false);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [savingItemId, setSavingItemId] = useState<string | null>(null);
+  const [addingItem, setAddingItem] = useState(false);
+  const [savingNewItem, setSavingNewItem] = useState(false);
+  const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
+  const [movingItemId, setMovingItemId] = useState<string | null>(null);
+  const [submittingReview, setSubmittingReview] = useState(false);
   const [itemForm, setItemForm] = useState({
     title: "",
     artistNames: "",
+    providerUrl: "",
+    notes: "",
+  });
+  const [newItemForm, setNewItemForm] = useState({
+    title: "",
+    artistNames: "",
+    providerKey: "spotify",
+    providerTrackId: "",
     providerUrl: "",
     notes: "",
   });
@@ -250,6 +267,111 @@ export function InstitutePlaylistWorkspace({ draft }: Props) {
     }
   };
 
+  const resetNewItemForm = () => {
+    setNewItemForm({
+      title: "",
+      artistNames: "",
+      providerKey: "spotify",
+      providerTrackId: "",
+      providerUrl: "",
+      notes: "",
+    });
+  };
+
+  const addItem = async () => {
+    if (!existingDraft) return;
+
+    setError("");
+    setNotice("");
+
+    const artistNames = newItemForm.artistNames
+      .split(",")
+      .map((artist) => artist.trim())
+      .filter(Boolean);
+
+    setSavingNewItem(true);
+    try {
+      const item = await addInstitutePlaylistItem(existingDraft.id, {
+        title: newItemForm.title,
+        artistNames,
+        providerKey: newItemForm.providerKey,
+        providerTrackId: newItemForm.providerTrackId,
+        providerUrl: newItemForm.providerUrl,
+        notes: newItemForm.notes,
+      });
+
+      setExistingDraft({
+        ...existingDraft,
+        items: [...existingDraft.items, item].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
+      });
+      setNotice(`Playlist item added: ${itemTitle(item)}`);
+      setAddingItem(false);
+      resetNewItemForm();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to add playlist item.");
+    } finally {
+      setSavingNewItem(false);
+    }
+  };
+
+  const deleteItem = async (item: InstitutePlaylistDraftItem) => {
+    if (!item.id || !existingDraft) return;
+
+    const confirmed = window.confirm(`Delete "${itemTitle(item)}" from this playlist draft?`);
+    if (!confirmed) return;
+
+    setError("");
+    setNotice("");
+    setDeletingItemId(item.id);
+
+    try {
+      await deleteInstitutePlaylistItem(item.id);
+      const playlist = await fetchInstitutePlaylistDraft(existingDraft.id);
+      setExistingDraft(playlist);
+      setNotice(`Playlist item deleted: ${itemTitle(item)}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete playlist item.");
+    } finally {
+      setDeletingItemId(null);
+    }
+  };
+
+  const moveItem = async (item: InstitutePlaylistDraftItem, direction: "up" | "down") => {
+    if (!item.id || !existingDraft) return;
+
+    setError("");
+    setNotice("");
+    setMovingItemId(item.id);
+
+    try {
+      const playlist = await moveInstitutePlaylistItem(existingDraft.id, item.id, direction);
+      setExistingDraft(playlist);
+      setNotice(`Playlist item moved: ${itemTitle(item)}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to move playlist item.");
+    } finally {
+      setMovingItemId(null);
+    }
+  };
+
+  const submitForReview = async () => {
+    if (!existingDraft) return;
+
+    setError("");
+    setNotice("");
+    setSubmittingReview(true);
+
+    try {
+      const playlist = await submitInstitutePlaylistDraftForReview(existingDraft.id);
+      setExistingDraft(playlist);
+      setNotice(`Playlist submitted for review: ${playlist.slug}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to submit playlist for review.");
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
+
   const createDraft = async () => {
     setError("");
     setNotice("");
@@ -385,6 +507,116 @@ export function InstitutePlaylistWorkspace({ draft }: Props) {
           </div>
         ) : null}
 
+        {existingDraft ? (
+          <div className="mt-5 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setAddingItem((current) => !current);
+                setError("");
+                setNotice("");
+              }}
+              className="rounded-lg bg-wk-text px-4 py-2 text-[12px] font-black text-wk-bg"
+            >
+              {addingItem ? "Close add item" : "Add item"}
+            </button>
+            <button
+              type="button"
+              onClick={submitForReview}
+              disabled={submittingReview || existingDraft.status === "submitted_for_review"}
+              className="rounded-lg border border-wk-border bg-wk-surface px-4 py-2 text-[12px] font-black text-wk-text-muted disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {submittingReview ? "Submitting..." : existingDraft.status === "submitted_for_review" ? "Submitted for review" : "Submit for review"}
+            </button>
+          </div>
+        ) : null}
+
+        {existingDraft && addingItem ? (
+          <div className="mt-5 rounded-xl border border-wk-border bg-wk-bg p-4">
+            <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Add playlist item</div>
+            <div className="mt-4 grid gap-4">
+              <label className="block">
+                <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.14em] text-wk-text-faint">Track title</span>
+                <input
+                  value={newItemForm.title}
+                  onChange={(event) => setNewItemForm((current) => ({ ...current, title: event.target.value }))}
+                  className="w-full rounded-lg border border-wk-border bg-wk-surface px-3 py-3 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
+                />
+              </label>
+
+              <label className="block">
+                <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.14em] text-wk-text-faint">Artists, comma separated</span>
+                <input
+                  value={newItemForm.artistNames}
+                  onChange={(event) => setNewItemForm((current) => ({ ...current, artistNames: event.target.value }))}
+                  className="w-full rounded-lg border border-wk-border bg-wk-surface px-3 py-3 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
+                />
+              </label>
+
+              <div className="grid gap-4 md:grid-cols-3">
+                <label className="block">
+                  <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.14em] text-wk-text-faint">Provider</span>
+                  <input
+                    value={newItemForm.providerKey}
+                    onChange={(event) => setNewItemForm((current) => ({ ...current, providerKey: event.target.value }))}
+                    className="w-full rounded-lg border border-wk-border bg-wk-surface px-3 py-3 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.14em] text-wk-text-faint">Provider ID</span>
+                  <input
+                    value={newItemForm.providerTrackId}
+                    onChange={(event) => setNewItemForm((current) => ({ ...current, providerTrackId: event.target.value }))}
+                    className="w-full rounded-lg border border-wk-border bg-wk-surface px-3 py-3 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.14em] text-wk-text-faint">Provider URL</span>
+                  <input
+                    value={newItemForm.providerUrl}
+                    onChange={(event) => setNewItemForm((current) => ({ ...current, providerUrl: event.target.value }))}
+                    className="w-full rounded-lg border border-wk-border bg-wk-surface px-3 py-3 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
+                  />
+                </label>
+              </div>
+
+              <label className="block">
+                <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.14em] text-wk-text-faint">Notes</span>
+                <textarea
+                  value={newItemForm.notes}
+                  onChange={(event) => setNewItemForm((current) => ({ ...current, notes: event.target.value }))}
+                  rows={3}
+                  className="w-full resize-y rounded-lg border border-wk-border bg-wk-surface px-3 py-3 text-[13px] leading-6 text-wk-text outline-none focus:border-wk-brand"
+                />
+              </label>
+
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={addItem}
+                  disabled={savingNewItem}
+                  className="rounded-lg bg-wk-brand px-4 py-2 text-[12px] font-black text-wk-brand-on disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {savingNewItem ? "Adding..." : "Save new item"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAddingItem(false);
+                    resetNewItemForm();
+                  }}
+                  disabled={savingNewItem}
+                  className="rounded-lg border border-wk-border bg-wk-surface px-4 py-2 text-[12px] font-black text-wk-text-muted disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
         {existingDraft?.items.length ? (
           <div className="mt-5 space-y-3">
             <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Playlist items</div>
@@ -474,13 +706,39 @@ export function InstitutePlaylistWorkspace({ draft }: Props) {
                       </div>
 
                       {item.id ? (
-                        <button
-                          type="button"
-                          onClick={() => startEditingItem(item)}
-                          className="mt-4 rounded-lg border border-wk-border bg-wk-surface px-4 py-2 text-[12px] font-black text-wk-text-muted"
-                        >
-                          Edit item
-                        </button>
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => startEditingItem(item)}
+                            className="rounded-lg border border-wk-border bg-wk-surface px-4 py-2 text-[12px] font-black text-wk-text-muted"
+                          >
+                            Edit item
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => moveItem(item, "up")}
+                            disabled={movingItemId === item.id || item.position === 1}
+                            className="rounded-lg border border-wk-border bg-wk-surface px-4 py-2 text-[12px] font-black text-wk-text-muted disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            Move up
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => moveItem(item, "down")}
+                            disabled={movingItemId === item.id || item.position === existingDraft.items.length}
+                            className="rounded-lg border border-wk-border bg-wk-surface px-4 py-2 text-[12px] font-black text-wk-text-muted disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            Move down
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deleteItem(item)}
+                            disabled={deletingItemId === item.id || existingDraft.items.length <= 1}
+                            className="rounded-lg border border-wk-danger/30 bg-wk-danger-soft px-4 py-2 text-[12px] font-black text-wk-danger disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {deletingItemId === item.id ? "Deleting..." : "Delete"}
+                          </button>
+                        </div>
                       ) : null}
                     </>
                   )}

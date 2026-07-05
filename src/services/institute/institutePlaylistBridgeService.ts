@@ -246,6 +246,154 @@ export async function updateInstitutePlaylistItem(
   return mapItem(data as PlaylistItemRow);
 }
 
+export async function addInstitutePlaylistItem(
+  playlistId: string,
+  payload: {
+    title: string;
+    artistNames: string[];
+    providerKey: string;
+    providerTrackId: string;
+    providerUrl: string;
+    notes: string;
+  },
+): Promise<InstitutePlaylistDraftItem> {
+  const title = payload.title.trim();
+  if (title.length < 1) throw new Error("Track title is required.");
+
+  const artistNames = payload.artistNames
+    .map((artist) => artist.trim())
+    .filter(Boolean);
+
+  if (artistNames.length < 1) throw new Error("At least one artist name is required.");
+
+  const { data: latestItem, error: latestError } = await supabase
+    .from("wk_playlist_items")
+    .select("position")
+    .eq("playlist_id", playlistId)
+    .order("position", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (latestError) throw new Error(`Failed to read playlist position: ${latestError.message}`);
+
+  const nextPosition = ((latestItem?.position as number | undefined) ?? 0) + 1;
+  const providerKey = payload.providerKey.trim().toLowerCase();
+
+  const { data, error } = await supabase
+    .from("wk_playlist_items")
+    .insert({
+      playlist_id: playlistId,
+      position: nextPosition,
+      title,
+      artist_names: artistNames,
+      provider_key: providerKey || null,
+      provider_track_id: payload.providerTrackId.trim() || null,
+      provider_url: payload.providerUrl.trim() || null,
+      match_status: providerKey || payload.providerTrackId.trim() || payload.providerUrl.trim() ? "external_only" : "pending",
+      notes: payload.notes.trim() || null,
+    })
+    .select(`
+      id,
+      position,
+      registry_track_id,
+      registry_release_id,
+      provider_key,
+      provider_track_id,
+      provider_url,
+      title,
+      artist_names,
+      release_title,
+      artwork_url,
+      preview_url,
+      duration_ms,
+      isrc,
+      match_status,
+      match_confidence,
+      normalization_payload,
+      notes
+    `)
+    .single();
+
+  if (error) throw new Error(`Failed to add playlist item: ${error.message}`);
+
+  return mapItem(data as PlaylistItemRow);
+}
+
+export async function deleteInstitutePlaylistItem(itemId: string): Promise<void> {
+  const { error } = await supabase
+    .from("wk_playlist_items")
+    .delete()
+    .eq("id", itemId);
+
+  if (error) throw new Error(`Failed to delete playlist item: ${error.message}`);
+}
+
+export async function moveInstitutePlaylistItem(
+  playlistId: string,
+  itemId: string,
+  direction: "up" | "down",
+): Promise<InstitutePlaylistDraft> {
+  const playlist = await fetchInstitutePlaylistDraft(playlistId);
+  if (!playlist) throw new Error("Playlist draft could not be loaded.");
+
+  const items = [...playlist.items].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+  const currentIndex = items.findIndex((item) => item.id === itemId);
+
+  if (currentIndex < 0) throw new Error("Playlist item could not be found.");
+
+  const swapIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
+  if (swapIndex < 0 || swapIndex >= items.length) return playlist;
+
+  const current = items[currentIndex];
+  const swap = items[swapIndex];
+
+  if (!current.id || !swap.id || !current.position || !swap.position) {
+    throw new Error("Playlist item positions are incomplete.");
+  }
+
+  const temporaryPosition = Math.max(...items.map((item) => item.position ?? 0), 0) + 1000;
+
+  const { error: tempError } = await supabase
+    .from("wk_playlist_items")
+    .update({ position: temporaryPosition })
+    .eq("id", current.id);
+
+  if (tempError) throw new Error(`Failed to prepare playlist reorder: ${tempError.message}`);
+
+  const { error: swapError } = await supabase
+    .from("wk_playlist_items")
+    .update({ position: current.position })
+    .eq("id", swap.id);
+
+  if (swapError) throw new Error(`Failed to reorder playlist item: ${swapError.message}`);
+
+  const { error: finalError } = await supabase
+    .from("wk_playlist_items")
+    .update({ position: swap.position })
+    .eq("id", current.id);
+
+  if (finalError) throw new Error(`Failed to finish playlist reorder: ${finalError.message}`);
+
+  const updated = await fetchInstitutePlaylistDraft(playlistId);
+  if (!updated) throw new Error("Playlist was reordered but could not be reloaded.");
+
+  return updated;
+}
+
+export async function submitInstitutePlaylistDraftForReview(playlistId: string): Promise<InstitutePlaylistDraft> {
+  const { error } = await supabase
+    .from("wk_playlists")
+    .update({ status: "submitted_for_review" })
+    .eq("id", playlistId);
+
+  if (error) throw new Error(`Failed to submit playlist draft for review: ${error.message}`);
+
+  const playlist = await fetchInstitutePlaylistDraft(playlistId);
+  if (!playlist) throw new Error("Playlist draft was submitted but could not be reloaded.");
+
+  return playlist;
+}
+
 export async function updateInstitutePlaylistDraftMetadata(
   playlistId: string,
   payload: {
