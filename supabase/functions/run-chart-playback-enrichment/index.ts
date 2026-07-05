@@ -603,6 +603,170 @@ async function loadCandidates(
   };
 }
 
+type MatchingCounters = {
+  processedCount: number;
+  matchedCount: number;
+  acceptedCount: number;
+  needsReviewCount: number;
+  failedCount: number;
+  topTenCoverageCount: number;
+  fullCoverageCount: number;
+};
+
+type MatchingResult = MatchingCounters & {
+  status: "queued" | "completed" | "partial" | "failed";
+};
+
+function emptyMatchingCounters(): MatchingCounters {
+  return {
+    processedCount: 0,
+    matchedCount: 0,
+    acceptedCount: 0,
+    needsReviewCount: 0,
+    failedCount: 0,
+    topTenCoverageCount: 0,
+    fullCoverageCount: 0,
+  };
+}
+
+function matchingStatus(counters: MatchingCounters, totalItems: number): MatchingResult["status"] {
+  if (totalItems === 0) return "queued";
+  if (counters.processedCount === 0 && counters.failedCount > 0) return "failed";
+  if (counters.failedCount > 0) return "partial";
+  return "completed";
+}
+
+async function processAppleMatching(
+  db: ReturnType<typeof createClient>,
+  runId: string,
+  value: ParsedRequest,
+  token: string,
+): Promise<MatchingResult> {
+  const startedAt = new Date().toISOString();
+
+  await db
+    .from("wk_chart_playback_enrichment_runs")
+    .update({
+      status: "running",
+      started_at: startedAt,
+    })
+    .eq("id", runId);
+
+  const { data: items, error } = await db
+    .from("wk_chart_playback_enrichment_items")
+    .select("id, rank, track_title, artist_name, isrc, storefront, metadata, created_at")
+    .eq("run_id", runId)
+    .eq("status", "queued")
+    .order("rank", { ascending: true, nullsFirst: false })
+    .order("created_at", { ascending: true })
+    .limit(value.limit);
+
+  if (error) throw new Error(`failed_to_load_queued_items: ${error.message}`);
+
+  const counters = emptyMatchingCounters();
+
+  for (const item of items ?? []) {
+    const itemId = uuidOrNull(item.id);
+    if (!itemId) continue;
+
+    try {
+      await db
+        .from("wk_chart_playback_enrichment_items")
+        .update({ status: "running" })
+        .eq("id", itemId);
+
+      const queuedItem: QueuedEnrichmentItem = {
+        id: itemId,
+        rank: typeof item.rank === "number" ? item.rank : null,
+        track_title: cleanRequiredTitle(item.track_title),
+        artist_name: cleanOptionalText(item.artist_name),
+        isrc: cleanOptionalText(item.isrc),
+        storefront: cleanOptionalText(item.storefront),
+      };
+
+      const match = await searchAppleSong(
+        queuedItem,
+        queuedItem.storefront ?? value.storefront,
+        value.minAutoAccept,
+        token,
+      );
+
+      counters.processedCount += 1;
+
+      if (!match) {
+        await db
+          .from("wk_chart_playback_enrichment_items")
+          .update({
+            status: "not_found",
+            error_message: "No safe Apple Music title/artist match",
+          })
+          .eq("id", itemId);
+
+        continue;
+      }
+
+      counters.matchedCount += 1;
+      counters.fullCoverageCount += 1;
+
+      if (match.status === "accepted") counters.acceptedCount += 1;
+      if (match.status === "needs_review") counters.needsReviewCount += 1;
+      if (queuedItem.rank !== null && queuedItem.rank !== undefined && queuedItem.rank >= 1 && queuedItem.rank <= 10) {
+        counters.topTenCoverageCount += 1;
+      }
+
+      const attrs = match.song.attributes ?? {};
+      const updatePayload: Record<string, unknown> = {
+        status: match.status,
+        match_method: match.method,
+        confidence: match.confidence,
+        auto_accept: match.status === "accepted",
+        provider_track_id: match.song.id,
+        raw_match_payload: match.song,
+        error_message: null,
+        metadata: {
+          ...(item.metadata && typeof item.metadata === "object" ? item.metadata : {}),
+          phase: "apple_matching",
+          apple_reason: match.reason,
+          apple_artist_name: attrs.artistName ?? null,
+          apple_title: attrs.name ?? null,
+          apple_album_name: attrs.albumName ?? null,
+          apple_release_date: attrs.releaseDate ?? null,
+          apple_isrc: attrs.isrc ?? null,
+        },
+      };
+
+      if (attrs.url) updatePayload.provider_url = attrs.url;
+
+      const preview = applePreviewUrl(match.song);
+      if (preview) updatePayload.preview_url = preview;
+
+      const artwork = appleArtworkUrl(match.song);
+      if (artwork) updatePayload.artwork_url = artwork;
+
+      await db
+        .from("wk_chart_playback_enrichment_items")
+        .update(updatePayload)
+        .eq("id", itemId);
+    } catch (itemError: unknown) {
+      counters.failedCount += 1;
+
+      await db
+        .from("wk_chart_playback_enrichment_items")
+        .update({
+          status: "failed",
+          error_message: itemError instanceof Error ? itemError.message : String(itemError),
+        })
+        .eq("id", itemId);
+    }
+  }
+
+  return {
+    ...counters,
+    status: matchingStatus(counters, (items ?? []).length),
+  };
+}
+
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders });
@@ -718,12 +882,81 @@ Deno.serve(async (req) => {
       })
       .eq("id", runId);
 
+    if (loaded.items.length === 0) {
+      return jsonResponse({
+        ok: true,
+        run_id: runId,
+        status: "queued",
+        total_candidates: 0,
+        processed_count: 0,
+        matched_count: 0,
+        accepted_count: 0,
+        needs_review_count: 0,
+        failed_count: 0,
+        candidate_source: loaded.candidateSource,
+      }, 201);
+    }
+
+    let token: string;
+    try {
+      token = await createAppleMusicJWT(privateKey, teamId, keyId);
+    } catch (tokenError: unknown) {
+      const message = tokenError instanceof Error ? tokenError.message : String(tokenError);
+
+      await serviceClient
+        .from("wk_chart_playback_enrichment_runs")
+        .update({
+          status: "failed",
+          error_message: message,
+          finished_at: new Date().toISOString(),
+          metadata: {
+            ...runMetadata,
+            phase: "apple_matching",
+            matched_at: new Date().toISOString(),
+          },
+        })
+        .eq("id", runId);
+
+      return jsonResponse({
+        ok: false,
+        run_id: runId,
+        error: message,
+      }, 500);
+    }
+
+    const matched = await processAppleMatching(serviceClient, runId, value, token);
+    const finishedAt = new Date().toISOString();
+
+    await serviceClient
+      .from("wk_chart_playback_enrichment_runs")
+      .update({
+        status: matched.status,
+        processed_count: matched.processedCount,
+        matched_count: matched.matchedCount,
+        accepted_count: matched.acceptedCount,
+        needs_review_count: matched.needsReviewCount,
+        failed_count: matched.failedCount,
+        top_ten_coverage_count: matched.topTenCoverageCount,
+        full_coverage_count: matched.fullCoverageCount,
+        finished_at: finishedAt,
+        metadata: {
+          ...runMetadata,
+          phase: "apple_matching",
+          matched_at: finishedAt,
+        },
+      })
+      .eq("id", runId);
+
     return jsonResponse({
       ok: true,
       run_id: runId,
-      status: "queued",
+      status: matched.status,
       total_candidates: loaded.items.length,
-      candidate_source: loaded.candidateSource,
+      processed_count: matched.processedCount,
+      matched_count: matched.matchedCount,
+      accepted_count: matched.acceptedCount,
+      needs_review_count: matched.needsReviewCount,
+      failed_count: matched.failedCount,
     }, 201);
   } catch (candidateError: unknown) {
     const message = candidateError instanceof Error ? candidateError.message : String(candidateError);
