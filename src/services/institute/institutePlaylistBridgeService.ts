@@ -188,6 +188,64 @@ export async function fetchInstitutePlaylistDraft(playlistId: string): Promise<I
   };
 }
 
+export async function updateInstitutePlaylistItem(
+  itemId: string,
+  payload: {
+    title: string;
+    artistNames: string[];
+    providerUrl: string;
+    notes: string;
+  },
+): Promise<InstitutePlaylistDraftItem> {
+  const title = payload.title.trim();
+  if (title.length < 1) {
+    throw new Error("Track title is required.");
+  }
+
+  const artistNames = payload.artistNames
+    .map((artist) => artist.trim())
+    .filter(Boolean);
+
+  if (artistNames.length < 1) {
+    throw new Error("At least one artist name is required.");
+  }
+
+  const { data, error } = await supabase
+    .from("wk_playlist_items")
+    .update({
+      title,
+      artist_names: artistNames,
+      provider_url: payload.providerUrl.trim() || null,
+      notes: payload.notes.trim() || null,
+    })
+    .eq("id", itemId)
+    .select(`
+      id,
+      position,
+      registry_track_id,
+      registry_release_id,
+      provider_key,
+      provider_track_id,
+      provider_url,
+      title,
+      artist_names,
+      release_title,
+      artwork_url,
+      preview_url,
+      duration_ms,
+      isrc,
+      match_status,
+      match_confidence,
+      normalization_payload,
+      notes
+    `)
+    .single();
+
+  if (error) throw new Error(`Failed to update playlist item: ${error.message}`);
+
+  return mapItem(data as PlaylistItemRow);
+}
+
 export async function updateInstitutePlaylistDraftMetadata(
   playlistId: string,
   payload: {

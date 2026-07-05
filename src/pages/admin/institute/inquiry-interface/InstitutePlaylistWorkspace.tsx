@@ -4,6 +4,7 @@ import {
   fetchInstitutePlaylistDraft,
   fetchInstitutePlaylistDraftLink,
   updateInstitutePlaylistDraftMetadata,
+  updateInstitutePlaylistItem,
   type InstitutePlaylistDraft,
   type InstitutePlaylistDraftItem,
   type InstitutePlaylistDraftLink,
@@ -70,6 +71,14 @@ export function InstitutePlaylistWorkspace({ draft }: Props) {
   const [creating, setCreating] = useState(false);
   const [savingMetadata, setSavingMetadata] = useState(false);
   const [editingMetadata, setEditingMetadata] = useState(false);
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [savingItemId, setSavingItemId] = useState<string | null>(null);
+  const [itemForm, setItemForm] = useState({
+    title: "",
+    artistNames: "",
+    providerUrl: "",
+    notes: "",
+  });
   const [loadingExisting, setLoadingExisting] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
@@ -177,6 +186,67 @@ export function InstitutePlaylistWorkspace({ draft }: Props) {
       setError(err instanceof Error ? err.message : "Failed to save playlist details.");
     } finally {
       setSavingMetadata(false);
+    }
+  };
+
+  const startEditingItem = (item: InstitutePlaylistDraftItem) => {
+    if (!item.id) return;
+
+    setEditingItemId(item.id);
+    setItemForm({
+      title: item.title ?? "",
+      artistNames: item.artist_names?.join(", ") ?? "",
+      providerUrl: item.provider_url ?? "",
+      notes: item.notes ?? "",
+    });
+    setError("");
+    setNotice("");
+  };
+
+  const cancelEditingItem = () => {
+    setEditingItemId(null);
+    setSavingItemId(null);
+    setItemForm({
+      title: "",
+      artistNames: "",
+      providerUrl: "",
+      notes: "",
+    });
+    setError("");
+  };
+
+  const saveItem = async (item: InstitutePlaylistDraftItem) => {
+    if (!item.id || !existingDraft) return;
+
+    setError("");
+    setNotice("");
+
+    const artistNames = itemForm.artistNames
+      .split(",")
+      .map((artist) => artist.trim())
+      .filter(Boolean);
+
+    setSavingItemId(item.id);
+    try {
+      const updatedItem = await updateInstitutePlaylistItem(item.id, {
+        title: itemForm.title,
+        artistNames,
+        providerUrl: itemForm.providerUrl,
+        notes: itemForm.notes,
+      });
+
+      setExistingDraft({
+        ...existingDraft,
+        items: existingDraft.items.map((existingItem) =>
+          existingItem.id === updatedItem.id ? updatedItem : existingItem,
+        ),
+      });
+      setNotice(`Playlist item saved: ${itemTitle(updatedItem)}`);
+      cancelEditingItem();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save playlist item.");
+    } finally {
+      setSavingItemId(null);
     }
   };
 
@@ -318,28 +388,105 @@ export function InstitutePlaylistWorkspace({ draft }: Props) {
         {existingDraft?.items.length ? (
           <div className="mt-5 space-y-3">
             <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Playlist items</div>
-            {existingDraft.items.map((item) => (
-              <article key={item.id ?? `${item.position}-${itemTitle(item)}`} className="rounded-xl border border-wk-border bg-wk-bg p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <div className="text-[13px] font-black text-wk-text">
-                      {item.position ? `${item.position}. ` : null}{itemTitle(item)}
-                    </div>
-                    <p className="mt-1 text-[12px] leading-5 text-wk-text-muted">{itemArtists(item)}</p>
-                  </div>
-                  <span className="rounded-full border border-wk-border bg-wk-surface px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-muted">
-                    {statusLabel(item.match_status)}
-                  </span>
-                </div>
+            {existingDraft.items.map((item) => {
+              const isEditingItem = Boolean(item.id && editingItemId === item.id);
+              const isSavingItem = Boolean(item.id && savingItemId === item.id);
 
-                <div className="mt-3 grid gap-2 text-[11px] leading-5 text-wk-text-muted md:grid-cols-2">
-                  {item.provider_key ? <div><strong className="text-wk-text">Provider:</strong> {item.provider_key}</div> : null}
-                  {item.provider_track_id ? <div><strong className="text-wk-text">Provider ID:</strong> {item.provider_track_id}</div> : null}
-                  {item.provider_url ? <div className="md:col-span-2"><strong className="text-wk-text">URL:</strong> {item.provider_url}</div> : null}
-                  {item.notes ? <div className="md:col-span-2"><strong className="text-wk-text">Notes:</strong> {item.notes}</div> : null}
-                </div>
-              </article>
-            ))}
+              return (
+                <article key={item.id ?? `${item.position}-${itemTitle(item)}`} className="rounded-xl border border-wk-border bg-wk-bg p-4">
+                  {isEditingItem ? (
+                    <div className="grid gap-4">
+                      <label className="block">
+                        <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.14em] text-wk-text-faint">Track title</span>
+                        <input
+                          value={itemForm.title}
+                          onChange={(event) => setItemForm((current) => ({ ...current, title: event.target.value }))}
+                          className="w-full rounded-lg border border-wk-border bg-wk-surface px-3 py-3 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
+                        />
+                      </label>
+
+                      <label className="block">
+                        <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.14em] text-wk-text-faint">Artists, comma separated</span>
+                        <input
+                          value={itemForm.artistNames}
+                          onChange={(event) => setItemForm((current) => ({ ...current, artistNames: event.target.value }))}
+                          className="w-full rounded-lg border border-wk-border bg-wk-surface px-3 py-3 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
+                        />
+                      </label>
+
+                      <label className="block">
+                        <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.14em] text-wk-text-faint">Provider URL</span>
+                        <input
+                          value={itemForm.providerUrl}
+                          onChange={(event) => setItemForm((current) => ({ ...current, providerUrl: event.target.value }))}
+                          className="w-full rounded-lg border border-wk-border bg-wk-surface px-3 py-3 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
+                        />
+                      </label>
+
+                      <label className="block">
+                        <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.14em] text-wk-text-faint">Notes</span>
+                        <textarea
+                          value={itemForm.notes}
+                          onChange={(event) => setItemForm((current) => ({ ...current, notes: event.target.value }))}
+                          rows={3}
+                          className="w-full resize-y rounded-lg border border-wk-border bg-wk-surface px-3 py-3 text-[13px] leading-6 text-wk-text outline-none focus:border-wk-brand"
+                        />
+                      </label>
+
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => saveItem(item)}
+                          disabled={isSavingItem}
+                          className="rounded-lg bg-wk-brand px-4 py-2 text-[12px] font-black text-wk-brand-on disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {isSavingItem ? "Saving..." : "Save item"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={cancelEditingItem}
+                          disabled={isSavingItem}
+                          className="rounded-lg border border-wk-border bg-wk-surface px-4 py-2 text-[12px] font-black text-wk-text-muted disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <div className="text-[13px] font-black text-wk-text">
+                            {item.position ? `${item.position}. ` : null}{itemTitle(item)}
+                          </div>
+                          <p className="mt-1 text-[12px] leading-5 text-wk-text-muted">{itemArtists(item)}</p>
+                        </div>
+                        <span className="rounded-full border border-wk-border bg-wk-surface px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-muted">
+                          {statusLabel(item.match_status)}
+                        </span>
+                      </div>
+
+                      <div className="mt-3 grid gap-2 text-[11px] leading-5 text-wk-text-muted md:grid-cols-2">
+                        {item.provider_key ? <div><strong className="text-wk-text">Provider:</strong> {item.provider_key}</div> : null}
+                        {item.provider_track_id ? <div><strong className="text-wk-text">Provider ID:</strong> {item.provider_track_id}</div> : null}
+                        {item.provider_url ? <div className="md:col-span-2"><strong className="text-wk-text">URL:</strong> {item.provider_url}</div> : null}
+                        {item.notes ? <div className="md:col-span-2"><strong className="text-wk-text">Notes:</strong> {item.notes}</div> : null}
+                      </div>
+
+                      {item.id ? (
+                        <button
+                          type="button"
+                          onClick={() => startEditingItem(item)}
+                          className="mt-4 rounded-lg border border-wk-border bg-wk-surface px-4 py-2 text-[12px] font-black text-wk-text-muted"
+                        >
+                          Edit item
+                        </button>
+                      ) : null}
+                    </>
+                  )}
+                </article>
+              );
+            })}
           </div>
         ) : null}
 
